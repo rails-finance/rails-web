@@ -25,14 +25,6 @@ import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
 import { liquidationBuffer, type AaveSpokeCardInfo, type ReserveStats } from "@/lib/aave-v4/spoke-cards";
 import { hubChipParts } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { actionLabel, getEventActionKey } from "@/lib/shared/event-filter-helpers";
-import {
-  anchorMarketNotes,
-  marketNoteHeadline,
-  marketNoteReceiptLine,
-  marketNoteRowAnnotation,
-  marketNoteSentence,
-  type MarketNote,
-} from "@/lib/shared/market-note";
 
 export interface AaveV4SpokeMarkdownArgs {
   spokeName: string;
@@ -45,18 +37,6 @@ export interface AaveV4SpokeMarkdownArgs {
   prices: Record<string, PriceEntry | number>;
   /** Chronologically sorted (oldest → newest), spoke-scoped event list. */
   events: BaseActivityEvent[];
-  /** Market notes for this position — receipted facts about ONE asset's oracle
-   *  price, observed between two of the position's own rows
-   *  (lib/aave-v4/market-notes.ts). A note is NEVER an event: it is counted in
-   *  no total here, the timeline table's row count and numbering are identical
-   *  with and without them, and the CSV never carries one. */
-  notes?: MarketNote[];
-  /** This position's live notes — Aave's oracle price read at the chain head
-   *  against the position's own newest row that states each asset's price.
-   *  Never anchored (the later end is the head, past every row's block) and
-   *  never in the timeline table; listed alongside the historical notes in the
-   *  "Market notes" section only. */
-  liveNotes?: MarketNote[];
   /** When the snapshot was taken (copy time). Passed in so the serializer stays
    *  pure — `new Date()` makes the output non-deterministic to test. */
   generatedAt: Date;
@@ -129,11 +109,6 @@ export function spokeToMarkdown(args: AaveV4SpokeMarkdownArgs): string {
   // TO-DO-ui-jobs.md item 97, Miles 2026-09-28). The liquidation count line
   // below already states the history, so this carries it once.
   const statusLabel = card.isClosed ? (card.wasLiquidated ? "Liquidated" : "Closed") : "Open";
-  // The notes as the PAGE places them: anchored against this same event list,
-  // so a note the timeline drops is absent here too, and the annotation below
-  // lands on the row the note renders beside on screen.
-  const anchoredNotes = anchorMarketNotes(args.notes ?? [], args.events, "asc");
-  const allNotes = [...[...anchoredNotes.values()].flat(), ...(args.liveNotes ?? [])];
 
   lines.push(`- **Status:** ${statusLabel}`);
   lines.push(`- **Wallet:** ${wallet}`);
@@ -144,8 +119,6 @@ export function spokeToMarkdown(args: AaveV4SpokeMarkdownArgs): string {
   if (card.liquidationCount > 0) {
     lines.push(`- **Liquidations:** ${card.liquidationCount} on this spoke`);
   }
-  const notesLine = marketNotesLine(allNotes);
-  if (notesLine) lines.push(notesLine);
   lines.push("");
 
   // ── Status-specific headline block ──
@@ -166,52 +139,10 @@ export function spokeToMarkdown(args: AaveV4SpokeMarkdownArgs): string {
   lines.push(`- **Transactions:** ${card.txCount}`);
   lines.push("");
 
-  // ── Market notes, then the activity timeline ──
-  lines.push(...marketNotesSection(allNotes));
-  lines.push(...timelineTable(args.events, anchoredNotes));
+  // ── Activity timeline ──
+  lines.push(...timelineTable(args.events));
 
   return lines.join("\n");
-}
-
-/** One line stating that notes exist, and where to read them. Null when this
- *  position has none. */
-function marketNotesLine(notes: MarketNote[]): string | null {
-  if (notes.length === 0) return null;
-  if (notes.length === 1) return `- **Market notes:** 1 — ${marketNoteHeadline(notes[0])} (see below)`;
-  return (
-    `- **Market notes:** ${notes.length} — stretches where one asset's oracle price moved between two of this ` +
-    `position's own rows, and the live readings since its newest one (see below)`
-  );
-}
-
-/** The notes' own section: one paragraph each, with the two rows the fact was
- *  read from. Placed before the timeline table, like Liquity V2's and
- *  Polaris's. */
-function marketNotesSection(notes: MarketNote[]): string[] {
-  if (notes.length === 0) return [];
-  const out: string[] = ["## Market notes", ""];
-  out.push(
-    "Each note is a receipted fact about ONE asset this position holds, observed between two of the position's own " +
-      "rows and stated between them, or between its newest row and the chain head for a live note. A position on a " +
-      "spoke holds a basket, and each asset in it moves on its own feed, so a note is per asset rather than per " +
-      "position. A note is not an event: it is counted in no total in this snapshot, and the timeline table below " +
-      "reads exactly as it would without any of them. Nothing is fetched for a historical note — every row already " +
-      "carries the price Aave's oracle answered at its block; a live note's later end is a live read of the same " +
-      "oracle at the head. The health factors hold every amount, and every other asset's price, as the " +
-      "earlier row recorded them and move only this asset's price, weighting each collateral by the liquidation " +
-      "threshold the spoke reports NOW — that is the effective collateral factor, which an e-mode or correlated venue " +
-      "lifts above the reserve's static one, and the threshold in force at the " +
-      "earlier block is not indexed. A note with no health factor is one whose earlier row does not price the whole " +
-      "basket.",
-  );
-  out.push("");
-  for (const n of notes) {
-    out.push(marketNoteSentence(n));
-    out.push("");
-    out.push(marketNoteReceiptLine(n));
-    out.push("");
-  }
-  return out;
 }
 
 // Reads the headline numbers straight off the card so the export and the
@@ -348,13 +279,7 @@ function closedHeadlines(card: AaveSpokeCardInfo): string[] {
   return out;
 }
 
-function timelineTable(
-  events: BaseActivityEvent[],
-  /** The notes anchored to a row here, keyed by that row's event id — they
-   *  annotate the row's last cell and change nothing else: the numbering, the
-   *  row count and every figure read as they would with no notes at all. */
-  anchoredNotes: ReadonlyMap<string, MarketNote[]>,
-): string[] {
+function timelineTable(events: BaseActivityEvent[]): string[] {
   const out: string[] = [];
   out.push(`## Activity timeline (${events.length} event${events.length === 1 ? "" : "s"}, oldest first)`);
   out.push("");
@@ -373,9 +298,8 @@ function timelineTable(
     const supplyAfter = d.supplyAfter != null ? amt(toNum(d.supplyAfter)) : "—";
     const debtAfter = d.debtAfter != null ? amt(toNum(d.debtAfter)) : "—";
     const tx = e.etherscanUrl ? `[${e.txHash.slice(0, 10)}…](${e.etherscanUrl})` : e.txHash.slice(0, 10) + "…";
-    const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
     out.push(
-      `| ${i + 1} | ${fmtUtc(e.timestamp)} | ${label} | ${asset} | ${amount} | ${supplyAfter} | ${debtAfter} | ${tx}${noted ? ` — ${noted}` : ""} |`,
+      `| ${i + 1} | ${fmtUtc(e.timestamp)} | ${label} | ${asset} | ${amount} | ${supplyAfter} | ${debtAfter} | ${tx} |`,
     );
   });
   out.push("");

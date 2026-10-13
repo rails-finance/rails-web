@@ -39,7 +39,6 @@ import { patchReservesWithChain, patchSpokeCardWithChain } from "@/lib/aave-v4/a
 
 import { SPOKE_NAME_TO_KEY } from "@/lib/aave-v4/spoke-meta";
 import { useClosedCollateralFactors, type CollateralEventRef } from "@/lib/aave-v4/use-closed-collateral-factors";
-import { aaveV4LiveEarlierBlocks, aaveV4PriceGapNotesFor, liveAaveV4PriceGapNotes } from "@/lib/aave-v4/market-notes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -114,7 +113,6 @@ import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
 import { priceKeyFor } from "@/lib/aave/prices";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { AaveV4BaseReserveNotice } from "@/components/protocol/aave-v4/aave-v4-base-reserve-notice";
-import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 
 export interface AaveV4SpokeViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -171,7 +169,7 @@ function AaveV4SpokePageInner({
   // event's card in page mode with the shared column; no position card, no
   // flows panel.
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
-  const { apiRoot, session, oracleRoute } = deployment;
+  const { apiRoot, session } = deployment;
   // The listing filtered to this wallet — formed in one place (the wallet param
   // is `q`, read centrally by the shared listing driver). Feeds the "other
   // spokes" link; the back button derives the same href internally.
@@ -592,136 +590,6 @@ function AaveV4SpokePageInner({
     dates: deployment.key === "base",
   });
 
-  // ── Market notes ─────────────────────────────────────────────────────────
-  // Receipted facts about the MARKET between two of this position's own rows.
-  // Never events: they enter no total, no filter count and no export table
-  // (lib/shared/market-note.ts).
-
-  // The spoke as the selector needs it: its key (the note id's namespace), its
-  // display name (the row's own discriminant), and — from the chain overlay —
-  // each reserve's liquidation threshold and underlying address. Without an
-  // overlay both maps are empty and the selector still runs: a
-  // liquidation-ended, price-only note needs neither.
-  const noteMarket = useMemo(() => {
-    const lts: Record<string, number> = {};
-    const addresses: Record<string, string> = {};
-    for (const r of chainPosition?.reserves ?? []) {
-      if (r.lt != null && r.lt > 0) lts[r.symbol] = r.lt;
-      if (r.address) addresses[r.symbol] = r.address.toLowerCase();
-    }
-    return { spokeKey: SPOKE_NAME_TO_KEY[spokeName] ?? rawSpoke, spokeName, lts, addresses };
-  }, [chainPosition, spokeName, rawSpoke]);
-
-  // Built off the UNFILTERED spoke-scoped list, never the filtered one: a note
-  // is a fact about the market between two rows, and hiding a row type must not
-  // change which prices bracket it. The timeline anchors what it can against
-  // whatever is actually displayed, and drops the rest.
-  const notes = useMemo(
-    () => aaveV4PriceGapNotesFor(spokeScopedEvents, noteMarket).sort((a, b) => a.to.block - b.to.block),
-    [spokeScopedEvents, noteMarket],
-  );
-
-  // The collateral the spoke shows this position holding right now — one live
-  // note each, and the input the earlier rows are picked from.
-  const heldCollateral = useMemo(
-    () =>
-      (chainPosition?.reserves ?? [])
-        .filter((r) => r.isCollateral && Number(r.supplyBalanceRaw) > 0)
-        .map((r) => r.symbol),
-    [chainPosition],
-  );
-  const hasLiveDebt = !!chainPosition && !chainPosition.chainStale && chainPosition.debtAssetCount > 0;
-
-  // The live note's own reads, fetched together and independently of the price
-  // map the rest of the page uses (that one drops the block the map answered
-  // at, which is the live note's later end):
-  //
-  //   the LATER end — /api/oracle/aave-v4 at head, dated against /api/head;
-  //   the EARLIER end — /api/oracle/aave-v4?block=B, the same registry pinned
-  //   to the block of each row a live note runs from (one block for the whole
-  //   position, in practice; two where a collateral was last held on an older
-  //   row). Immutable, so the response is cached for a year.
-  //
-  // The earlier end is a chain read rather than the price the row states,
-  // because a row's stated price comes from the historic-price lane, and a lane
-  // whose live writer covers eight of the registry's feeds served May's price
-  // on a September row. Best-effort — a failed read leaves the live note absent
-  // and the pending slot with it.
-  const earlierBlocks = useMemo(
-    () => (hasLiveDebt ? aaveV4LiveEarlierBlocks(spokeScopedEvents, noteMarket, heldCollateral) : []),
-    [hasLiveDebt, spokeScopedEvents, noteMarket, heldCollateral],
-  );
-  const [liveOracle, setLiveOracle] = useState<{
-    prices: Record<string, number>;
-    block: number;
-    timestamp?: number;
-    earlier: Record<number, Record<string, number>>;
-  } | null>(null);
-  const [liveOraclePending, setLiveOraclePending] = useState(true);
-  useEffect(() => {
-    if (loading || !hasLiveDebt || earlierBlocks.length === 0) {
-      setLiveOraclePending(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const [oracleRes, headRes, ...pinnedRes] = await Promise.all([
-          fetch(oracleRoute),
-          fetch(deployment.chainId === BASE_CHAIN_ID ? `/api/head?chain=${BASE_CHAIN_ID}` : "/api/head"),
-          ...earlierBlocks.map((b) => fetch(`${oracleRoute}?block=${b}`)),
-        ]);
-        type OracleAnswer = {
-          success?: boolean;
-          prices?: Record<string, { usd: number; symbol: string }>;
-          blockNumber?: number;
-        };
-        const oracle = oracleRes.ok ? ((await oracleRes.json()) as OracleAnswer) : null;
-        const head = headRes.ok ? ((await headRes.json()) as { blockNumber: number; blockTimestamp: number }) : null;
-        const pinnedAnswers = await Promise.all(
-          pinnedRes.map(async (r) => (r.ok ? ((await r.json()) as OracleAnswer) : null)),
-        );
-        if (cancelled || !oracle?.prices || !(oracle.blockNumber != null && oracle.blockNumber > 0)) return;
-        // Address first, the map entry's own symbol second: the overlay names
-        // the reserve by address, and two spokes can list the same symbol.
-        const bySymbol = (map: Record<string, { usd: number; symbol: string }>): Record<string, number> => {
-          const out: Record<string, number> = {};
-          for (const r of chainPosition?.reserves ?? []) {
-            const direct = r.address ? map[r.address.toLowerCase()] : undefined;
-            const entry = direct ?? Object.values(map).find((p) => p.symbol === r.symbol);
-            if (entry && entry.usd > 0) out[r.symbol] = entry.usd;
-          }
-          return out;
-        };
-        const earlier: Record<number, Record<string, number>> = {};
-        earlierBlocks.forEach((b, i) => {
-          const answer = pinnedAnswers[i];
-          if (answer?.prices && answer.blockNumber === b) earlier[b] = bySymbol(answer.prices);
-        });
-        setLiveOracle({
-          prices: bySymbol(oracle.prices),
-          block: oracle.blockNumber,
-          timestamp: head?.blockTimestamp,
-          earlier,
-        });
-      } catch (err) {
-        console.error("Failed to fetch the live oracle read:", err);
-      } finally {
-        if (!cancelled) setLiveOraclePending(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, hasLiveDebt, chainPosition, earlierBlocks, oracleRoute, deployment.chainId]);
-
-  // One live note per collateral asset the spoke shows this position holding
-  // right now, while it carries debt.
-  const liveNotes = useMemo(() => {
-    if (!hasLiveDebt || !liveOracle) return [];
-    return liveAaveV4PriceGapNotes(spokeScopedEvents, noteMarket, { ...liveOracle, heldCollateral });
-  }, [hasLiveDebt, liveOracle, heldCollateral, spokeScopedEvents, noteMarket]);
-
   const reserveAddresses = useMemo(() => {
     const out = new Set<string>();
     for (const p of positions) {
@@ -842,8 +710,6 @@ function AaveV4SpokePageInner({
               reserves={activeGroup?.result.reserves ?? []}
               prices={chainTruthPrices}
               events={spokeScopedEvents}
-              notes={notes}
-              liveNotes={liveNotes}
               csvFilename={`${session}-${rawSpoke}-${wallet.slice(0, 10)}-activity.csv`}
               fetchAllEvents={olderCount > 0 ? fetchAllHistory : undefined}
             />
@@ -919,9 +785,6 @@ function AaveV4SpokePageInner({
           eventPage={(slot) => aaveV4Explorer.eventPage({ ...slot, spokeName, wallet, deployment: deployment.key })}
           closed={positionClosed}
           tl={tl}
-          notes={notes}
-          liveNotes={liveNotes}
-          liveNotesPending={hasLiveDebt && liveOraclePending}
           runs={AAVE_V4_TIMELINE_RUNS}
           displayItems={AAVE_V4_DISPLAY_ITEMS}
           emptyLabel={`No activity on the ${spokeName} spoke for this wallet.`}

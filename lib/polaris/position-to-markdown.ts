@@ -45,9 +45,9 @@ export interface PolarisPositionMarkdownArgs {
    *  no total here, the timeline table's row count and numbering are
    *  identical with and without them, and the CSV never carries one. */
   notes?: MarketNote[];
-  /** This CDP's live notes (lib/shared/market-note.ts's `livePolarisPriceGapNote`
-   *  / `liveRateStepNote`) — the market's own price and primary rate read at
-   *  the chain head, against this CDP's own newest touch that carries each.
+  /** This CDP's live note (lib/shared/market-note.ts's `liveRateStepNote`) —
+   *  the market's primary rate read at the chain head, against this CDP's own
+   *  newest touch that carries one.
    *  Never anchored (the later end is the chain head, past every touch's
    *  block) and never in the timeline table; listed alongside the historical
    *  notes in the "Market notes" section only. */
@@ -266,12 +266,12 @@ function liquidationForensicsSection(events: BaseActivityEvent[], market: Polari
 function marketNotesLine(notes: MarketNote[]): string | null {
   if (notes.length === 0) return null;
   if (notes.length === 1) return `- **Market notes:** 1 — ${marketNoteHeadline(notes[0])} (see below)`;
-  return `- **Market notes:** ${notes.length} — stretches where the market's primary rate or its price feed moved between two of this CDP's own touches, and the live readings since its last touch (see below)`;
+  return `- **Market notes:** ${notes.length} — stretches where the market's primary rate moved between two of this CDP's touches, and the live reading since its last touch (see below)`;
 }
 
 /** The notes' own section: one paragraph each, with the two touches (and, when
  *  observed, the PrimaryRateSet log) the fact was read from. Placed before the
- *  timeline table, like Liquity V2's price-gap notes. */
+ *  timeline table. */
 function marketNotesSection(notes: MarketNote[]): string[] {
   if (notes.length === 0) return [];
   const out: string[] = ["## Market notes", ""];
@@ -279,11 +279,10 @@ function marketNotesSection(notes: MarketNote[]): string[] {
     "Each note is a receipted fact about the market this CDP borrows in, observed between two of the CDP's own " +
       "touches and stated between them, or between its last touch and the chain head for a live note. A note is " +
       "not an event: it is counted in no total in this snapshot, and the timeline table below reads exactly as it " +
-      "would without any of them. Neither quantity is fetched for a historical note — every touch on this CDP " +
-      "already carries the market's primary rate in force at its block, and every priced touch carries the feed's " +
-      "price at its block; a live note's later end is read from the market's own contracts at the head. The " +
-      "derived figures hold the earlier touch's own debt and collateral fixed and move only the rate or the " +
-      "price, so the later one is what that state came to be worth. A rate note " +
+      "would without any of them. The rate is not fetched for a historical note — every touch on this CDP " +
+      "already carries the market's primary rate in force at its block; a live note's later end is read from the " +
+      "market's own contracts at the head. The derived figures hold the earlier touch's debt fixed and move " +
+      "only the rate, so the later one is what that debt came to cost. A note " +
       "leads with the rate at its later end — what the market charged by then — and consecutive stretches that " +
       "moved the rate the same way are stated as one note, from the first touch to the last, with each step it " +
       "took in named on its receipt.",

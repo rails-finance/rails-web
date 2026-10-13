@@ -57,8 +57,6 @@ import { UsersGlyph } from "@/components/shared/rate-pill";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
 import type { SpineKey } from "@/components/shared/mobile-spine";
-import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { priceGapNotesFor, livePriceGapNote } from "@/lib/shared/market-note";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
@@ -164,23 +162,13 @@ export default function TroveView({
     blockchain: false,
   });
 
-  // The live-note read: the branch's oracle price and the chain head, fetched
-  // fresh (never the server-seeded `prices`, which is a settled-tail figure,
-  // not a live one) so the note's receipt can state that both were read
-  // "just now" — the two calls can still land a block apart, which the note
-  // itself states. `null` until the read lands or fails; `liveOraclePending`
-  // is the in-flight flag ChainTruthTimeline reserves the note's slot with.
-  const [liveOracle, setLiveOracle] = useState<{ price: number; block: number; timestamp: number } | null>(null);
-  const [liveOraclePending, setLiveOraclePending] = useState(true);
-
-  // Mount. A seeded view already holds the tail and goes straight to the head
-  // read; an unseeded one fetches the tail first. The ref keeps React's
+  // Mount. A seeded view goes to the chain enhancements; an unseeded
+  // one fetches the tail first. The ref keeps React's
   // development double-invoke from issuing the reads twice.
   const started = useRef(false);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void loadLiveOracle();
     if (seeded) void loadEnhancements();
     else void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,27 +271,6 @@ export default function TroveView({
 
   const getEnhancementStatus = (): string | null => {
     return enhancementLoading.blockchain ? troveWords("trove_loading_state") : null;
-  };
-
-  // The live note's own two reads: the branch's oracle price and the chain
-  // head, fetched together and independently of the settled `prices` used
-  // elsewhere on the page. Best-effort — a failed read simply leaves the live
-  // note absent, the same fail-soft rule `/api/head` documents for itself.
-  const loadLiveOracle = async () => {
-    try {
-      const [headRes, oracleRes] = await Promise.all([fetch(`/api/head`), fetch(`/api/oracle/liquity-v2`)]);
-      const head = headRes.ok ? ((await headRes.json()) as { blockNumber: number; blockTimestamp: number }) : null;
-      const oracleJson = oracleRes.ok ? ((await oracleRes.json()) as OraclePricesResponse) : null;
-      const key = collateralType.toLowerCase() as keyof OraclePricesData;
-      const price = oracleJson?.success ? oracleJson.data?.[key] : undefined;
-      if (head && typeof price === "number" && head.blockNumber > 0) {
-        setLiveOracle({ price, block: head.blockNumber, timestamp: head.blockTimestamp });
-      }
-    } catch (err) {
-      console.error("Failed to fetch the live oracle read:", err);
-    } finally {
-      setLiveOraclePending(false);
-    }
   };
 
   // Liquity-narrowed + chronologically exact. Sort primarily by
@@ -505,33 +472,6 @@ export default function TroveView({
 
   const lastEventTs = tl.sortedEvents.length > 0 ? tl.sortedEvents[tl.sortedEvents.length - 1].timestamp : null;
 
-  // Market notes: the stretches between two of this trove's own events where
-  // the branch's oracle price moved far enough to matter to it
-  // (lib/shared/market-note.ts). Nothing is fetched — every Liquity V2 row
-  // already carries `collateralPrice`, so the note is a reduction of the list
-  // already on the page, computed off the FULL sorted list rather than the
-  // filtered one: a note is a fact about the market between two events, and
-  // hiding an event type must not change which prices bracket it. The timeline
-  // then anchors what it can against whatever is actually displayed, and drops
-  // the rest.
-  // The branch's own MCR and PriceFeed, from the protocol catalog — never
-  // `getLiquidationThreshold`, which keeps a second copy of the same constant.
-  const branch = useMemo(() => {
-    const b = LIQUITY_V2_BRANCHES[collateralType.toLowerCase()];
-    return b ? { collateralType: b.symbol, mcr: b.mcr, priceFeed: b.priceFeed } : null;
-  }, [collateralType]);
-  const notes = useMemo(() => (branch ? priceGapNotesFor(tl.sortedEvents, branch) : []), [tl.sortedEvents, branch]);
-
-  // The live note: this trove's own newest priced event against the branch's
-  // oracle price read at the chain head, just now. Open positions only —
-  // closed and liquidated troves get none, ever — and only once both the
-  // branch is known and the live read has landed.
-  const isOpen = troveData?.status === "open";
-  const liveNote = useMemo(
-    () => (branch && isOpen && liveOracle ? livePriceGapNote(tl.sortedEvents, branch, liveOracle) : null),
-    [branch, isOpen, liveOracle, tl.sortedEvents],
-  );
-  const liveNotes = useMemo(() => (liveNote ? [liveNote] : []), [liveNote]);
   // What an event's Copy for LLM header names about the trove.
   const troveMeta = useMemo(
     () => ({ owner: effectiveOwner ?? null, total: totalEvents ?? liquityEvents.length }),
@@ -637,8 +577,6 @@ export default function TroveView({
               debtInFront={debtInFront}
               trovesAhead={trovesAhead}
               events={tl.sortedEvents}
-              notes={notes}
-              liveNotes={liveNotes}
               csvFilename={`liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`}
             />
           }
@@ -697,9 +635,6 @@ export default function TroveView({
               closed={troveData.status !== "open"}
               tl={tlWithGlyph}
               boundary={boundary}
-              notes={notes}
-              liveNotes={liveNotes}
-              liveNotesPending={isOpen && !!branch && liveOraclePending}
               runs={LIQUITY_TIMELINE_RUNS}
               displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               spineKey={LIQUITY_SPINE_KEY}

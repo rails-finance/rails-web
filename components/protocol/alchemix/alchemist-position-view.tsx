@@ -47,8 +47,7 @@
 // row, the position card, Lifetime flows, the timeline, drawn with the shared
 // components (`PositionCardShell`, `OpenPositionStats`, `StatValue`,
 // `WalletPill`, the status pill), with no frame, type scale or palette of its
-// own. The timeline carries share-price market notes between events
-// (lib/alchemix/market-notes.ts).
+// own.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -97,11 +96,6 @@ import {
   type AlchemixUnderlyingUnit,
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet, shareFallToLiquidation, sumRedemptionNets } from "@/lib/alchemix/redemption-net";
-import {
-  alchemixSharePriceNotes,
-  liveAlchemixSharePriceNote,
-  type AlchemixSharePriceLine,
-} from "@/lib/alchemix/market-notes";
 import {
   AlchemixPositionExplanation,
   fallPct,
@@ -429,23 +423,6 @@ export function AlchemistPositionView({
     () => (v2Events.length > 0 ? [...drawnEvents, ...v2Events] : drawnEvents),
     [drawnEvents, v2Events],
   );
-  // Share-price market notes: the stretches between two readings where the
-  // vault's share price moved far enough to matter to this position, and the
-  // newest reading against the price read now (lib/alchemix/market-notes.ts).
-  // Read over the V3 rows the timeline draws, whatever the filter hides.
-  const sharePriceLine = useMemo<AlchemixSharePriceLine | null>(() => {
-    const h = live?.health;
-    if (!h || !underlyingUnit) return null;
-    return {
-      lineKey,
-      mytSymbol,
-      mytAddress: live?.collateral.mytAddress ?? "",
-      underlyingSymbol: underlyingUnit.symbol,
-      syntheticSymbol: sym,
-      underlyingDecimals: underlyingUnit.decimals,
-      liquidationLine: Number(h.collateralizationLowerBoundRaw) / 1e18,
-    };
-  }, [live, underlyingUnit, lineKey, mytSymbol, sym]);
   // The line's two ratios as the position card states them, for the event
   // cards' collateralisation.
   const lineRatios = useMemo<AlchemixLineRatios | null>(() => {
@@ -458,20 +435,6 @@ export function AlchemistPositionView({
         }
       : null;
   }, [live]);
-  const marketNotes = useMemo(
-    () => (sharePriceLine ? alchemixSharePriceNotes(drawnEvents, sharePriceLine) : []),
-    [drawnEvents, sharePriceLine],
-  );
-  const liveMarketNotes = useMemo(() => {
-    const u = live?.collateral.underlying;
-    if (!sharePriceLine || !u || position.status !== "open") return [];
-    const note = liveAlchemixSharePriceNote(drawnEvents, sharePriceLine, {
-      price: Number(u.sharePriceRaw) / 10 ** u.decimals,
-      block: u.sharePriceAsOfBlock ?? live.asOfBlock,
-    });
-    return note ? [note] : [];
-  }, [drawnEvents, sharePriceLine, live, position.status]);
-
   // "21 events in 11 transactions": the count line names the cards' unit
   // beside the logs it counts. Said where every transaction is a card of its
   // own; a V2 row is its own transaction.
@@ -916,9 +879,6 @@ export function AlchemistPositionView({
                     tl={tl}
                     runs={timelineRuns}
                     boundary={boundary}
-                    notes={marketNotes}
-                    liveNotes={liveMarketNotes}
-                    liveNotesPending={livePending}
                     displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                     emptyLabel="No events recorded for this position"
                     toolbarLeading={

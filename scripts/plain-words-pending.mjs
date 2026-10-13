@@ -39,7 +39,6 @@ export const PLAIN_WORDS_PENDING = [
   "lib/makerdao/system-provenance.ts",
   "lib/maple/event-provenance.ts",
   "lib/moonwell/event-provenance.ts",
-  "lib/moonwell/market-note-provenance.ts",
   "lib/moonwell/markets-provenance.ts",
   "lib/moonwell/position-provenance.ts",
   "lib/moonwell/swept-card-provenance.ts",

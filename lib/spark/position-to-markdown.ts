@@ -49,9 +49,7 @@ export interface SparkPositionMarkdownArgs {
   events: BaseActivityEvent[];
   /** Market notes for this position — receipted facts about ONE reserve's own
    *  rate, on ONE side of it, observed between two of the position's own
-   *  touches (lib/aave-v3/market-notes.ts), and the seized asset's price
-   *  before each liquidation (lib/aave-v3/liquidation-price-notes.ts). A note
-   *  is NEVER an event: it is
+   *  touches (lib/aave-v3/market-notes.ts). A note is NEVER an event: it is
    *  counted in no total here, the timeline table's row count and numbering
    *  are identical with and without them, and the CSV never carries one. */
   notes?: MarketNote[];

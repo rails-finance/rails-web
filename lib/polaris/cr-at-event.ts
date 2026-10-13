@@ -5,8 +5,7 @@
 //
 // A touch (open / adjust / close) states `_newColl × previewPrice() ÷ _newDebt`
 // on a row the oracle-at-block lane has priced and whose resulting debt is
-// above zero: the formula the price-gap market note already applies
-// (lib/shared/market-note.ts). The touch has just written the pending
+// above zero. The touch has just written the pending
 // interest and PSM share in, so the two figures are the CDP's own at that
 // moment; the price is the feed's end-of-block value.
 //

@@ -53,13 +53,7 @@ import { TimelineActivityHeader, POLARIS_DISPLAY_ITEMS } from "@/components/shar
 import { RiskFooterStrip, RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { Prov } from "@/components/shared/provenance";
-import {
-  polarisPriceGapNotesFor,
-  rateStepNotesFor,
-  livePolarisPriceGapNote,
-  liveRateStepNote,
-  type MarketNote,
-} from "@/lib/shared/market-note";
+import { rateStepNotesFor, liveRateStepNote, type MarketNote } from "@/lib/shared/market-note";
 import {
   curvePriceAtBlockProv,
   liveCurvePriceProv,
@@ -237,7 +231,7 @@ export default function PolarisPositionView({
   // (lib/shared/market-note.ts). Both ends are this CDP's own rows — the
   // rate is already on them — so this needs nothing the timeline doesn't
   // already hold.
-  const rateStepNotes = useMemo(
+  const notes: MarketNote[] = useMemo(
     () =>
       rateStepNotesFor(tl.sortedEvents, {
         key: market,
@@ -247,48 +241,19 @@ export default function PolarisPositionView({
     [tl.sortedEvents, market, stable],
   );
 
-  // Price-gap notes — the Liquity V2 rule applied to the market's own price
-  // feed, read against the overlay's own normal-mode minimum. The overlay is
-  // the only source of `mcr`, so while it has not answered yet there are no
-  // price notes at all — never a page that renders them against a guessed
-  // minimum.
-  const priceGapNotes = useMemo(
-    () =>
-      chain && !chain.chainStale
-        ? polarisPriceGapNotesFor(tl.sortedEvents, {
-            market,
-            mcr: chain.mcr,
-            stable,
-            priceFeed: POLARIS_MARKET_CONFIG[market].priceFeed,
-          })
-        : [],
-    [tl.sortedEvents, market, stable, chain],
-  );
-
-  const notes: MarketNote[] = useMemo(() => [...rateStepNotes, ...priceGapNotes], [rateStepNotes, priceGapNotes]);
-
-  // Live notes: this CDP's own two live quantities — the market's price and
-  // its primary rate — read at the chain head, against this CDP's own newest
-  // touch that carries each. Open positions only, and only once the chain
-  // overlay has answered (it is the sole source of `mcr`/the live figures —
-  // an index-only `view` while the overlay is still settling is not enough).
+  // The live note: the market's primary rate read at the chain head, against
+  // this CDP's newest touch that carries one. Open positions only, and
+  // only once the chain overlay has answered (an index-only `view` while the
+  // overlay is still settling is not enough).
   const positionOpen = view?.status === "open";
   const liveNotes: MarketNote[] = useMemo(() => {
     if (!chain || chain.chainStale || !chain.isOpen || !chain.price) return [];
-    const out: MarketNote[] = [];
-    const priceNote = livePolarisPriceGapNote(
-      tl.sortedEvents,
-      { market, mcr: chain.mcr, stable, priceFeed: POLARIS_MARKET_CONFIG[market].priceFeed },
-      { price: chain.price.pethInDebt, block: chain.blockNumber, timestamp: chain.blockTimestamp || undefined },
-    );
-    if (priceNote) out.push(priceNote);
     const rateNote = liveRateStepNote(
       tl.sortedEvents,
       { key: market, stableSymbol: stable, cdpManager: POLARIS_MARKET_CONFIG[market].cdpManager },
       { rate: chain.primaryRate, block: chain.blockNumber, timestamp: chain.blockTimestamp || undefined },
     );
-    if (rateNote) out.push(rateNote);
-    return out;
+    return rateNote ? [rateNote] : [];
   }, [chain, tl.sortedEvents, market, stable]);
 
   // The top row's price dropdown — what the protocol's own feed says about

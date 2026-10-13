@@ -103,7 +103,6 @@ import {
   stableRateReserves,
   type AaveFamilyNoteOptions,
 } from "@/lib/aave-v3/market-notes";
-import { aaveFamilyLiquidationPriceNotes } from "@/lib/aave-v3/liquidation-price-notes";
 import { loadAaveFamilyReserveRates, type ReserveRateLookup } from "@/lib/api/fetch-aave-family-reserve-rates";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
 import type { MarketNote } from "@/lib/shared/market-note";
@@ -576,16 +575,13 @@ export default function SparkPositionDetail({
     [chain],
   );
 
-  // Two kinds, one list: the reserve rate steps (once the rates land) and the
-  // seized asset's price before each liquidation, which reads only the rows
-  // already on the page and so never waits on the rates.
+  // The reserve rate steps, once the rates land.
   const notes = useMemo<MarketNote[]>(
     () =>
-      [
-        ...(reserveRates ? aaveFamilyRateStepNotesFor(sparkEvents, reserveRates, noteOptions) : []),
-        ...aaveFamilyLiquidationPriceNotes(sparkEvents, noteOptions, servedFolders),
-      ].sort((a, b) => a.to.block - b.to.block),
-    [sparkEvents, reserveRates, noteOptions, servedFolders],
+      reserveRates
+        ? aaveFamilyRateStepNotesFor(sparkEvents, reserveRates, noteOptions).sort((a, b) => a.to.block - b.to.block)
+        : [],
+    [sparkEvents, reserveRates, noteOptions],
   );
 
   // A live note whose move rounds to 0.00 points says nothing; SparkLend

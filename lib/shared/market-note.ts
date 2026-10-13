@@ -9,8 +9,8 @@
 // Y rows", `eventNumberOf`, the markdown/CSV event tables) can move because a
 // note exists.
 //
-// Everything here is pure and React-free: the placement rule and the phase-1
-// selector are the two things worth proving in isolation, and
+// Everything here is pure and React-free: the placement rule and the
+// selectors are the things worth proving in isolation, and
 // `scripts/verify/verify-market-note-placement.mjs` runs them directly — it
 // loads THIS FILE, not a copy of its rules. That is why every import below is
 // `import type`: a type import is erased before resolution, so node's type
@@ -27,24 +27,18 @@
 // re-anchors on the next surviving event; a note with no event at or past
 // `to.block` does not render at all — there is nothing for it to sit between.
 //
-// PHASE 1 is the Moonwell Base share-rate step: a market's own exchange rate
-// (underlying ÷ mTokens at each Mint and Redeem) moving with no Mint or Redeem
-// in the market to explain it. It needs no oracle — the rate is derivable from
-// the Mint/Redeem rows the index already holds.
+// Two kinds are left (ui-jobs 328 dropped the price gap and the share-rate
+// step, which a price chart replaces): the RATE STEP, a market's rate
+// between two of a position's touches (Polaris here; MakerDAO and the Aave
+// family in `lib/<protocol>/market-notes.ts`), and the VAULT'S
+// TERMS, a configuration event every holder of a vault took at once.
 //
-// PHASE 2a is the Liquity V2 price gap: the branch's own oracle price at two of
-// the trove's own events, and what the price alone did to the collateral ratio
-// recorded at the earlier one. It needs no endpoint at all — every Liquity V2
-// row already carries `collateralPrice`, the PriceFeed reconstruction at that
-// event's block.
-//
-// PHASE 3 is the Polaris primary-rate step: the market's own primary rate (an
+// The Polaris primary-rate step: the market's primary rate (an
 // algorithmic Peg Stability Rate, set on the market's PSM mints/redemptions,
 // never chosen by a holder) moving between two of a CDP's OWN touches on the
-// market it borrows in. Unlike the other two kinds, both ends are the
-// position's own events — the rate is already on the row
-// (`context.data.primaryRate`), so this needs no endpoint and no oracle
-// either. The PrimaryRateSet log each rate was read from is optional on the
+// market it borrows in. Both ends are the position's events — the rate is
+// already on the row (`context.data.primaryRate`), so this needs no endpoint
+// and no oracle. The PrimaryRateSet log each rate was read from is optional on the
 // type: it feeds the receipt when the backend's per-row join has it, and a
 // note still renders off the CDP's own two touches when it does not.
 //
@@ -55,33 +49,12 @@
 // kind, and a third kind should have to touch only the four prose helpers at
 // the foot of this file and its own provenance module.
 
-import type {
-  AsymmetryContext,
-  BaseActivityEvent,
-  BasedollarContext,
-  EbisuContext,
-  LiquityContext,
-  MoonwellContext,
-  PolarisContext,
-} from "@/lib/shared/types/event-shape";
-import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 
-/** The Moonwell context on an event, or null. The narrowing is spelled out
- *  rather than imported (`isMoonwellEvent`) to keep this module's imports
- *  type-only — see the header. The discriminant is the same one that guard
- *  reads: `context.protocol`. */
-const moonwellData = (e: BaseActivityEvent): MoonwellContext | null =>
-  e.context?.protocol === "moonwell" ? (e.context.data as MoonwellContext) : null;
-
-/** The Liquity V2 trove context on an event, or null — the same spelled-out
- *  narrowing, reading the discriminant `isLiquityEvent` reads. */
-const liquityData = (e: BaseActivityEvent): LiquityContext | null =>
-  e.context?.protocol === "liquity-v2-troves" ? (e.context.data as LiquityContext) : null;
-
-/** The polaris context on an event, or null — the same spelled-out narrowing
- *  the other two helpers use, reading the discriminant `isPolarisEvent`
- *  reads. `PolarisContext.rateSet` (the backend's per-row PrimaryRateSet
+/** The polaris context on an event, or null. The narrowing is spelled out
+ *  rather than imported (`isPolarisEvent`) to keep this module's imports
+ *  type-only — see the header. It reads the discriminant that guard reads. `PolarisContext.rateSet` (the backend's per-row PrimaryRateSet
  *  join, plan §3) is optional: the log coordinates are read when present (a
  *  row the join has reached) and simply absent otherwise (a row before it
  *  lands, or a synthetic test event) — never a reason a note fails to
@@ -112,15 +85,6 @@ export interface MarketNotePoint {
   kind: string;
 }
 
-/** The position's own slice across the note, where the ledger gives one. */
-export interface MarketNoteSlice {
-  units: number;
-  unitSymbol: string;
-  before: number;
-  after: number;
-  valueSymbol: string;
-}
-
 /** What every note carries, whatever it observed: two ends and the market they
  *  were observed in. */
 export interface MarketNoteBase {
@@ -129,7 +93,7 @@ export interface MarketNoteBase {
   id: string;
   marketSymbol: string;
   marketAddress: string;
-  /** "MAMO per mMAMO", "USD per WETH" — what one unit of `value` counts. */
+  /** "% per year" — what one unit of `value` counts. */
   unitLabel: string;
   from: MarketNotePoint;
   to: MarketNotePoint;
@@ -148,140 +112,23 @@ export interface MarketNoteBase {
   live?: true;
   /** Which protocol's selector built the note, where the kind alone does not
    *  say how to read it — the prose, the row body and the receipts branch on
-   *  it (`"aave-v4"`, `"makerdao"`, `"alchemix-v3"`). Absent on the three original homes
-   *  (Liquity V2, Polaris, Moonwell), which the kind and `measureKind`
-   *  already tell apart. */
+   *  it (`"makerdao"`, `"aave-v3"`, `"spark"`). Absent on Polaris, the first
+   *  home. */
   protocol?: string;
-}
-
-/** Moonwell Base: a market's own exchange rate stepped between two adjacent
- *  Mint/Redeem observations in the market. */
-export interface ShareRateStepNote extends MarketNoteBase {
-  kind: "share-rate-step";
-  ratio: number;
-  slice?: MarketNoteSlice;
-}
-
-/** Liquity V2: the branch's oracle price at two of the trove's own events, and
- *  what the price alone did to the ratio recorded at the earlier one. */
-export interface PriceGapNote extends MarketNoteBase {
-  kind: "price-gap";
-  /** Signed percent, `(to − from) / from × 100`. */
-  changePct: number;
-  /** The fraction of the position's runway the move consumed — `Infinity` when
-   *  the position was already at or below the branch minimum at the earlier
-   *  price, so there was no runway left to consume. */
-  consumed: number;
-  /** The fraction the price could have fallen at the earlier event before the
-   *  position reached the branch minimum. Never ≤ 0 unless `consumed` is
-   *  `Infinity`. */
-  runway: number;
-  /** What the stretch ends in: a stretch ending in a liquidation or a
-   *  redemption always renders, whatever the move (§ the threshold rule).
-   *  `"head"` is the live end (see `MarketNoteBase.live`) — also unthresholded,
-   *  for the same reason: "nothing has moved" is itself the fact. */
-  endedBy: "adjustment" | "liquidation" | "redemption" | "head";
-  position?: PriceGapPosition;
-  /** What the price is denominated in, for the header's measure mark and the
-   *  row's prose — absent (Liquity V2) means USD; `"protocol"` means the
-   *  price is the PROTOCOL's own unit (Polaris: USDp/GOLDp, not USD), and the
-   *  mark under the asset chip is that protocol's own icon rather than the
-   *  dollar. */
-  measureKind?: "protocol";
-  /** The protocol id the measure mark resolves an icon for, when
-   *  `measureKind` is `"protocol"` (`protocolIconSrc`). */
-  measureProtocolId?: string;
-  /** Which Polaris market this note belongs to — set only by
-   *  `polarisPriceGapNotesFor`, and only so the note's own provenance module
-   *  can name the right CDPManager/price-feed contract; nothing here reads
-   *  it for any other reason. */
-  polarisMarket?: "usdp" | "goldp";
-  /** Aave V4 only (`protocol: "aave-v4"`): what the move did to the health
-   *  factor of the WHOLE basket the earlier row recorded. `position` stays
-   *  unset on those notes — an Aave account holds several collaterals and
-   *  several debts, so there is no single collateral ratio to state. Absent
-   *  where the earlier row's basket is not fully priced or a collateral's
-   *  liquidation threshold is unknown: the note is then price-only, and an
-   *  adjustment-ended stretch is not stated at all (nothing to measure the
-   *  move against). */
-  health?: PriceGapHealth;
-}
-
-/** The whole basket's health across a price gap, on an Aave V4 spoke
- *  position. Every amount and every OTHER asset's price is the earlier row's
- *  own snapshot; only this asset's price moves between the two figures.
- *
- *  `ltSource` is the sharp edge stated in the type: Aave V4 exposes no static
- *  per-reserve liquidation threshold, so the LT here is the one the spoke
- *  reports NOW (the chain overlay's `reserves[].lt`, harvested from
- *  `getUserAccountData.avgCollateralFactor` — see
- *  lib/aave-v4/liquidation-thresholds.ts), applied to amounts and prices
- *  recorded at a past block. The threshold in force AT that block is not
- *  indexed, and the receipt says so in words. */
-export interface PriceGapHealth {
-  /** Σ(collateral × price × LT) ÷ Σ(debt × price) at the earlier price. */
-  hfBefore: number;
-  /** The same amounts with only this asset's price moved to the later one. */
-  hfAfter: number;
-  /** The LT-weighted collateral, in USD, at the earlier price. */
-  collateralUsd: number;
-  /** The debt, in USD, at the earlier price. */
-  debtUsd: number;
-  /** The block the amounts and the other assets' prices were recorded at. */
-  atBlock: number;
-  ltSource: "chain-head";
-  /** The moved asset's own leg of the basket at the earlier row: its amount,
-   *  and which side of the position holds it. The opened note values this
-   *  amount at each end's price. */
-  leg?: { symbol: string; amount: number; side: "collateral" | "debt" };
-  /** The collateral at the earlier price, unweighted: Σ(collateral × price). */
-  collateralValueUsd?: number;
-}
-
-/** The position's own state across a price gap: the debt and collateral its
- *  own log recorded at the earlier event, and the ratio those made at each
- *  end's price. Nothing here is read at the later block — the index says what
- *  the position was at A, and the note moves only the price. */
-export interface PriceGapPosition {
-  /** Collateral ratio in percent at the earlier price. */
-  crBefore: number;
-  /** The same debt and collateral at the later price, in percent. */
-  crAfter: number;
-  /** The branch minimum, in percent (110 for WETH). */
-  mcrPct: number;
-  debt: number;
-  coll: number;
-  /** The block the debt and collateral were recorded at — A's block. */
-  atBlock: number;
-  /** Alchemix V3 (`protocol: "alchemix-v3"`): `coll` is a vault share count
-   *  and the price is one share in the asset underneath, so `coll × price` is
-   *  the collateral's value in this asset, stated at each end. Absent on the
-   *  other homes, whose collateral is the priced asset. */
-  valueSymbol?: string;
-  /** What the debt is denominated in ("BOLD", "USDp", "alUSD"), for the opened
-   *  note's Debt cell. Absent where the builder does not know it. */
-  debtSymbol?: string;
-  /** Liquity V2: the annual interest rate the earlier event logged, in percent
-   *  (4.1 = 4.1%), for the opened note's Interest Rate cell. */
-  rate?: number;
-  /** Polaris: the stretch ended in a liquidation, and `crAfter` is the ratio
-   *  it fired at — the collateral seized and the debt cleared, once the
-   *  pending legs settled, at the later price. */
-  atFire?: { coll: number; debt: number };
 }
 
 /** An ERC-4626 vault's OWN TERMS, changed for every holder at once — the
  *  vault surfaces' note (MetaMorpho's fee, name and symbol; Aave's target
  *  rate, cooldown and unstake window; whatever a third family emits).
  *
- *  It is a note for exactly the reason the other three are: a row is something
+ *  It is a note for the reason a rate step is: a row is something
  *  this holder did, and a configuration event happened to every holder at the
  *  same moment. Placing it among the rows by block is what lets a reader see
  *  WHEN the terms moved relative to their own events; keeping it out of every
  *  count is what stops it being read as one of them.
  *
- *  UNLIKE THE OTHER THREE KINDS IT CARRIES ITS OWN WORDS AND ITS OWN RECEIPT.
- *  Those are one quantity observed twice, so the row can say what moved from
+ *  UNLIKE A RATE STEP IT CARRIES ITS OWN WORDS AND ITS OWN RECEIPT. A rate
+ *  step is one quantity observed twice, so the row can say what moved from
  *  the two figures alone. A configuration event is not that shape:
  *  `TargetRateUpdated` states one rate and no earlier one, `CooldownChanged`
  *  states two second-counts, `UpdateName` states a string — and what each MEANS
@@ -324,12 +171,11 @@ export interface VaultTermsNote extends MarketNoteBase {
   fields: Record<string, string>;
 }
 
-export type MarketNote = ShareRateStepNote | PriceGapNote | RateStepNote | VaultTermsNote;
+export type MarketNote = RateStepNote | VaultTermsNote;
 
 // ── The live notes as one card ──────────────────────────────────────────────
 // Where the head slot holds two or more LIVE notes (an Aave position borrowing
-// several reserves, a Moonwell account in several markets, a Polaris CDP's
-// price and rate), they are drawn as one card with one spine node and one
+// several reserves), they are drawn as one card with one spine node and one
 // line per note (`LiveNoteGroupRow` in components/shared/market-note-row.tsx).
 // One live note keeps its own row, and a historical note never joins a group.
 
@@ -348,28 +194,17 @@ export const LIVE_NOTE_GROUP_ID = "live-notes:head";
 export const isLiveNoteGroup = (x: MarketNote | LiveNoteGroup): x is LiveNoteGroup =>
   (x as LiveNoteGroup).group === "live";
 
-/** The size of the move a note states, in its kind's own unit: points of rate
- *  for a rate step, the percentage move for a price gap, the ratio's distance
- *  from one for a share rate. A vault's terms state no move. */
+/** The size of the move a note states: points of rate for a rate step. A
+ *  vault's terms state no move. */
 function statedMove(note: MarketNote): number {
-  switch (note.kind) {
-    case "rate-step":
-      return Math.abs(note.deltaPp);
-    case "price-gap":
-      return Math.abs(note.changePct);
-    case "share-rate-step":
-      return Math.abs(note.ratio - 1);
-    default:
-      return 0;
-  }
+  return note.kind === "rate-step" ? Math.abs(note.deltaPp) : 0;
 }
 
 /** The order a group's lines are read in. The builders emit notes in the
  *  overlay's reserve or market order, which tells a reader nothing, so the
- *  rule is the size of the move, largest first. The kinds do not share a
- *  unit (points of rate against a percentage price move), so each kind keeps
- *  the place the page built it in (a Polaris CDP's price gap before its rate)
- *  and is ordered inside itself. Equal moves keep the builder's order. */
+ *  rule is the size of the move, largest first. Kinds do not share a unit,
+ *  so each kind keeps the place the page built it in and is ordered within
+ *  its kind. Equal moves keep the builder's order. */
 export function orderLiveNotes(notes: readonly MarketNote[]): MarketNote[] {
   const kindAt = new Map<string, number>();
   notes.forEach((n) => {
@@ -459,61 +294,10 @@ export interface VaultTermsSource {
   fields: Record<string, string>;
 }
 
-/** One end of a step as the share-rate endpoint states it
- *  (`GET /api/moonwell-base/markets/:mtoken/share-rate?steps=1`).
- *
- *  NEITHER END IS ASSUMED TO BE THIS ACCOUNT'S. The series is the whole
- *  market's, so both observations are whoever's Mint or Redeem happened to be
- *  adjacent to the change — on the MAMO step (measured 2026-09-04) they are two
- *  other wallets' redeems, with four more wallets' redeems in between the
- *  account's own last mint and the step. Every figure the note states about an
- *  observation comes from here. */
-export interface ShareRateStepPoint {
-  txHash: string;
-  logIndex: number;
-  wallet: string;
-  kind: string;
-}
-
-/** A step in a market's own exchange rate, as the endpoint states it. */
-export interface ShareRateStep {
-  fromBlock: number;
-  toBlock: number;
-  /** Unix seconds at each end, where the endpoint states them. */
-  fromTs?: number;
-  toTs?: number;
-  fromRate: number;
-  toRate: number;
-  ratio: number;
-  from: ShareRateStepPoint;
-  to: ShareRateStepPoint;
-}
-
-const EMPTY_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
-
-/** Chain order for two events of one position: block, then the log index at
- *  the tail of the id. The two separators in use are both accepted —
- *  `${txHash}-${logIndex}` (Moonwell) and `${txHash}_${logIndex}` (Liquity
- *  V2) — because the tie-break matters most exactly where a position has
- *  several logs in one block, which is where reading the wrong separator
- *  would silently give every row the same key. An id with neither sorts first
- *  within its block; every id this repo builds carries one. */
-function logIndexOf(e: BaseActivityEvent): number {
-  const cut = Math.max(e.id.lastIndexOf("-"), e.id.lastIndexOf("_"));
-  if (cut < 0) return -1;
-  const n = Number(e.id.slice(cut + 1));
-  return Number.isFinite(n) ? n : -1;
-}
-const byChainOrder = (a: BaseActivityEvent, b: BaseActivityEvent): number =>
-  a.blockNumber - b.blockNumber || logIndexOf(a) - logIndexOf(b);
-
 /** The log index from a polaris event id's TAIL `:N` segment
- *  (`cdp_updated:<txHash>:<logIndex>`). `logIndexOf` above splits on the LAST
- *  `-` or `_` — and a polaris id's own `cdp_updated` prefix carries an
- *  underscore, so that split lands inside the word "updated", not at the
- *  tail, and silently returns -1 rather than the real index. This is a
- *  narrow fix for that one id shape; it does not touch `logIndexOf`'s
- *  contract for the other two kinds. */
+ *  (`cdp_updated:<txHash>:<logIndex>`). A split on the last `-` or `_` would
+ *  land inside the prefix's word "updated" and return -1, so the tail is cut
+ *  at the last `:`. */
 function polarisLogIndexOf(e: BaseActivityEvent): number {
   const cut = e.id.lastIndexOf(":");
   if (cut < 0) return -1;
@@ -565,940 +349,7 @@ export function anchorMarketNotes(
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The market a share-rate series belongs to, as the position page names it.
- *
- *  `key` is what a Moonwell event carries in `context.data.market` — the
- *  roster's own market key ('mamo', 'weth'), NOT the mToken address — so the
- *  selector needs both it and the address the endpoint is keyed by. */
-export interface ShareRateMarket {
-  /** mToken address, lowercased — the endpoint's market id and the note's. */
-  address: string;
-  /** The market key on the event context. */
-  key: string;
-  /** The underlying's display symbol (MAMO). */
-  symbol: string;
-}
-
-/**
- * Phase-1 selector: which of a market's steps apply to THIS position, and the
- * position's own slice across each.
- *
- * A step applies when it sits inside the position's life (`fromBlock` at or
- * after the position's first event) AND the position held the market's mTokens
- * across it — the last SUPPLY-side event of the position in that market at or
- * before `fromBlock` left a positive `mTokensAfter`. That balance is the slice.
- *
- * Supply-side is the load-bearing word: only mint / redeem / transfer rows
- * carry an mToken balance at all. A borrow or repay in the same market states
- * none and moves none, so the last supply-side balance is the one that stood at
- * `fromBlock` — reading "the last event in the market" instead would drop a
- * note wherever the account happened to borrow after its last deposit.
- */
-export function shareRateNotesFor(
-  steps: readonly ShareRateStep[],
-  market: ShareRateMarket,
-  events: readonly BaseActivityEvent[],
-  /** The folders a grouped page holds beside `events`. Their members are not
-   *  in `events`, so a seize, a send or a receipt inside one can move the
-   *  balance between the row `held` is read from and the step — and the slice
-   *  would then state a holding the position no longer had. Such a step is not
-   *  stated: an absent note, never a wrong one. */
-  folders?: readonly ServedFolder[] | null,
-): ShareRateStepNote[] {
-  if (steps.length === 0 || events.length === 0) return [];
-  const ascending = [...events].sort(byChainOrder);
-  const firstBlock = ascending[0].blockNumber;
-  const address = market.address.toLowerCase();
-  const mSymbol = `m${market.symbol}`;
-  const unitLabel = `${market.symbol} per ${mSymbol}`;
-
-  // The position's own supply-side rows in this market, oldest first — the
-  // eligibility test and the slice both read this list.
-  const balanceRows = ascending.filter((e) => {
-    const d = moonwellData(e);
-    return d != null && d.market === market.key && d.side === "supply" && d.mTokensAfter != null;
-  });
-  /** The event on this page that IS this observation, if any — matched on the
-   *  log itself (transaction + log index), never on the block: a step's ends
-   *  belong to whoever transacted next in the market, and the account may well
-   *  have an unrelated event in the same block. */
-  const eventForLog = (p: ShareRateStepPoint): BaseActivityEvent | undefined => {
-    const txHash = p.txHash.toLowerCase();
-    return ascending.find((e) => e.txHash.toLowerCase() === txHash && logIndexOf(e) === p.logIndex);
-  };
-
-  const out: ShareRateStepNote[] = [];
-  for (const step of steps) {
-    if (!isPositiveRate(step.fromRate) || !isPositiveRate(step.toRate)) continue;
-    if (step.fromBlock < firstBlock) continue;
-    let held: BaseActivityEvent | undefined;
-    for (const e of balanceRows) {
-      if (e.blockNumber > step.fromBlock) break;
-      held = e;
-    }
-    const heldData = held ? moonwellData(held) : null;
-    if (!heldData) continue;
-    const heldBlock = held!.blockNumber;
-    if (
-      folders?.some((f) => f.lastBlock >= heldBlock && f.firstBlock <= step.fromBlock && folderMovesMTokens(f, address))
-    )
-      continue;
-    const units = Number(heldData.mTokensAfter);
-    if (!Number.isFinite(units) || units <= 0) continue;
-
-    out.push({
-      id: `share-rate-step:${address}:${step.fromBlock}-${step.toBlock}`,
-      kind: "share-rate-step",
-      marketSymbol: market.symbol,
-      marketAddress: address,
-      unitLabel,
-      from: point(step.fromBlock, step.fromTs, step.fromRate, step.from, eventForLog(step.from)),
-      to: point(step.toBlock, step.toTs, step.toRate, step.to, eventForLog(step.to)),
-      ratio: step.ratio,
-      slice: {
-        units,
-        unitSymbol: mSymbol,
-        before: units * step.fromRate,
-        after: units * step.toRate,
-        valueSymbol: market.symbol,
-      },
-    });
-  }
-  return out;
-}
-
-const isPositiveRate = (n: number): boolean => Number.isFinite(n) && n > 0;
-
-/** Whether a served folder's members could have moved one market's mToken
- *  balance: a seize of it, a send or a receipt of it, or members of a kind the
- *  header does not name at all (`other`), which are counted as possibly
- *  touching it because nothing on the folder says otherwise. */
-function folderMovesMTokens(folder: ServedFolder, mtoken: string): boolean {
-  return (
-    folder.other > 0 ||
-    folder.legs.some(
-      (leg) => (leg.verb === "Seized" || leg.verb === "Sent" || leg.verb === "Received") && leg.asset === mtoken,
-    )
-  );
-}
-
-/** One end of a note. Every field is the endpoint's, except `eventId`, which is
- *  set only where this exact log is also an event on this page — usually it is
- *  not, since the market's next transactor is rarely this account. */
-function point(
-  block: number,
-  ts: number | undefined,
-  value: number,
-  end: ShareRateStepPoint,
-  own: BaseActivityEvent | undefined,
-): MarketNotePoint {
-  return {
-    block,
-    timestamp: ts ?? own?.timestamp ?? 0,
-    value,
-    ...(own ? { eventId: own.id } : {}),
-    txHash: end.txHash.toLowerCase(),
-    logIndex: end.logIndex,
-    wallet: end.wallet.toLowerCase(),
-    kind: end.kind,
-  };
-}
-
-/**
- * A LIVE share-rate note: the position's own newest Mint/Redeem in the
- * market — its own implied rate (`assetsDelta ÷ mTokensDelta`) — against the
- * market's own exchange rate read live at the chain head.
- *
- * Unlike `shareRateNotesFor`'s historical steps (two OTHER wallets' logs
- * bracketing a change the market made, with the account's balance carried
- * across as the slice), both ends here are the account's OWN: the earlier
- * one is its own log, and the slice holds its CURRENT holding fixed and
- * moves only the rate — "what this wallet's holding is worth now against
- * what it was worth when it last touched this market", not a balance
- * replayed at some past block. No note where the account has no Mint or
- * Redeem in the market at all: there is no rate of its own to compare the
- * live one against.
- */
-export function liveShareRateNote(
-  events: readonly BaseActivityEvent[],
-  market: ShareRateMarket,
-  live: { rate: number; block: number; timestamp?: number; units: number },
-  /** The folders a grouped page holds beside `events`. A folder newer than the
-   *  newest Mint/Redeem found here, holding members of a kind its header does
-   *  not name, may hold a NEWER one — so the note is not stated rather than
-   *  measured from a touch that was not the last. */
-  folders?: readonly ServedFolder[] | null,
-): ShareRateStepNote | null {
-  if (!isPositiveRate(live.rate) || !(live.units > 0)) return null;
-  const address = market.address.toLowerCase();
-  const mSymbol = `m${market.symbol}`;
-  const unitLabel = `${market.symbol} per ${mSymbol}`;
-
-  let latest: BaseActivityEvent | null = null;
-  for (const e of events) {
-    const d = moonwellData(e);
-    if (!d || d.market !== market.key || d.side !== "supply") continue;
-    if (d.eventType !== "mint" && d.eventType !== "redeem") continue;
-    if (d.assetsDelta == null || d.mTokensDelta == null) continue;
-    if (!latest || byChainOrder(latest, e) < 0) latest = e;
-  }
-  if (!latest) return null;
-  const latestBlock = latest.blockNumber;
-  if (folders?.some((f) => f.other > 0 && f.lastBlock >= latestBlock)) return null;
-  const d = moonwellData(latest)!;
-  const assets = Math.abs(Number(d.assetsDelta));
-  const mTokens = Math.abs(Number(d.mTokensDelta));
-  if (!Number.isFinite(assets) || !Number.isFinite(mTokens) || mTokens <= 0) return null;
-  const fromRate = assets / mTokens;
-  if (!isPositiveRate(fromRate)) return null;
-
-  const from: MarketNotePoint = {
-    block: latest.blockNumber,
-    timestamp: latest.timestamp,
-    value: fromRate,
-    eventId: latest.id,
-    txHash: latest.txHash.toLowerCase(),
-    logIndex: logIndexOf(latest),
-    wallet: (latest.wallet ?? "").toLowerCase(),
-    kind: d.eventType,
-  };
-  const to: MarketNotePoint = {
-    block: live.block,
-    timestamp: live.timestamp ?? 0,
-    value: live.rate,
-    txHash: "",
-    logIndex: -1,
-    wallet: "",
-    kind: "head",
-  };
-  return {
-    id: `share-rate-step:${address}:${from.block}-head`,
-    kind: "share-rate-step",
-    marketSymbol: market.symbol,
-    marketAddress: address,
-    unitLabel,
-    from,
-    to,
-    ratio: to.value / from.value,
-    slice: {
-      units: live.units,
-      unitSymbol: mSymbol,
-      before: live.units * fromRate,
-      after: live.units * live.rate,
-      valueSymbol: market.symbol,
-    },
-    live: true,
-  };
-}
-
-// ── Phase 2a: the Liquity V2 price gap ──────────────────────────────────────
-
-/**
- * How much of the position's own runway a price move has to consume before the
- * stretch is worth stating. Every gap between two events has SOME move in it,
- * so a flat percentage would paper the timeline with notes that meant nothing
- * to this trove; the same 5% is most of the runway of a trove at 116% and
- * barely a fifth of one at 250%. The threshold is therefore a share of the
- * distance the position itself had to the branch minimum, measured at the
- * earlier event.
- *
- * A stretch that ends in a liquidation or a redemption renders whatever the
- * move: those two ends are outcomes, and the price the protocol acted at is
- * part of reading them.
- */
-export const RUNWAY_SHARE = 0.25;
-
-// ── What a LIVE price gap has to state to be worth a row ────────────────────
-// A live note is unthresholded by design: it runs from the position's last
-// touch to the chain head, and "nothing has moved since it was last touched"
-// is itself the fact. That holds for an asset that CAN move. On a basket of
-// pegged assets the same rule produces a row that says nothing at any grain —
-// measured on the Aave V4 forex spoke 2026-09-11, USDC 0.99989 → 0.99966 and
-// USDT the same shape: two rows, both 0.0%, the health factor unmoved in
-// both. The rule that made those rows is the one below; what it now asks is
-// that ONE of the two questions a gap answers has an answer:
-//
-//   the MOVE cleared a floor — five basis points, under which a USD feed is
-//   breathing rather than saying something; OR
-//
-//   the move consumed a share of THIS position's own runway — the measure
-//   every historical stretch is already gated on (`RUNWAY_SHARE`), at a far
-//   lower bar, because three basis points on the dominant collateral of a
-//   position at a 1.0005 health factor is the whole story and no flat
-//   percentage would ever catch it.
-//
-// Both are needed. The floor alone hides the knife-edge position; the runway
-// alone papers a comfortable one with feed jitter. A position with no runway
-// left (`consumed` = Infinity) always renders — it is under the line already.
-//
-// This gates LIVE gaps only. A historical stretch has passed `RUNWAY_SHARE`
-// or ends in an outcome that states itself, and its two ends are two things
-// the index recorded rather than a reading taken because the page was open.
-export const LIVE_GAP_MOVE_FLOOR = 0.0005;
-export const LIVE_GAP_RUNWAY_SHARE = 0.05;
-
-/** Whether a live price gap states a change — see above. `move` is the
- *  unsigned relative move, `consumed` its share of the position's runway. */
-export function liveGapStatesAChange(move: number, consumed: number): boolean {
-  if (!Number.isFinite(move)) return false;
-  return move >= LIVE_GAP_MOVE_FLOOR || consumed >= LIVE_GAP_RUNWAY_SHARE;
-}
-
-/** The branch a price gap is read in. `mcr` is the branch's own minimum
- *  collateral ratio as a multiplier (1.1 for WETH) — `LIQUITY_V2_BRANCHES` in
- *  lib/liquity/asset-catalog.ts, the protocol's own constant, not the
- *  duplicate table in lib/utils/liquidation-utils.ts. */
-export interface PriceGapBranch {
-  /** "WETH" / "wstETH" / "rETH" — the collateral the branch prices. */
-  collateralType: string;
-  mcr: number;
-  /** The branch's PriceFeed, for the receipt's contract line. */
-  priceFeed?: string;
-}
-
-/** The event types that can state a price. A `transfer` carries none of the
- *  position's own economics, so it cannot be an end of a stretch. A
- *  `batch_manager` row (a batch manager's fee or rate change) is priced from
- *  the oracle at its own position since server migration 294. */
-const PRICE_GAP_ENDPOINTS = new Set(["trove", "liquidation", "redemption", "batch_manager"]);
-
-/** Zombie adjustments are the owner's answer to a redemption that took the
- *  trove under the minimum debt, so they end a stretch the way a redemption
- *  does — the precedent is liquity-event-detail.tsx, which reads them in the
- *  redemption's vocabulary. */
-const ZOMBIE_OPERATIONS = new Set(["adjustZombieTrove", "adjustUnredeemableZombieTrove"]);
-
-/** What each end of a price gap is called in prose. Falls back to the raw
- *  operation, so an operation added upstream reads oddly rather than
- *  disappearing. */
-const OPERATION_LABELS: Record<string, string> = {
-  openTrove: "opening",
-  openTroveAndJoinBatch: "opening",
-  adjustTrove: "adjustment",
-  adjustTroveInterestRate: "interest-rate change",
-  adjustZombieTrove: "zombie adjustment",
-  adjustUnredeemableZombieTrove: "zombie adjustment",
-  applyPendingDebt: "pending-debt application",
-  closeTrove: "close",
-  liquidate: "liquidation",
-  redeemCollateral: "redemption",
-  setInterestBatchManager: "batch join",
-  removeFromBatch: "batch exit",
-  setBatchManagerAnnualInterestRate: "batch interest-rate change",
-  lowerBatchManagerAnnualFee: "batch fee cut",
-  transferTrove: "transfer",
-};
-
-export const priceGapEndLabel = (p: MarketNotePoint): string => OPERATION_LABELS[p.kind] ?? p.kind;
-
-/**
- * Phase-2a selector: the stretches between two of a trove's own events where
- * the branch's oracle price moved enough to matter to THIS trove.
- *
- * The ends are the trove's own rows and nothing else — no endpoint is fetched
- * and nothing is read at a block the trove did not transact in. A is always a
- * `trove` row (the position's own operation, whoever performed it); B is the
- * next row of any endpoint type after the filter, so a stretch may span the
- * transfer and batch rows sitting between them.
- *
- * Three guards, each of which would otherwise state something the index has
- * not: a row whose `collateralPrice` is 0 (a per-row enrichment gap, not tied
- * to any operation type) is not an observation and cannot be an end; two rows
- * in the SAME block are one moment, not a stretch; and two identical prices
- * are one reading twice, so there is no move to draw.
- */
-export function priceGapNotesFor(events: readonly BaseActivityEvent[], branch: PriceGapBranch): PriceGapNote[] {
-  const ends = events
-    .filter((e) => {
-      const d = liquityData(e);
-      return d != null && PRICE_GAP_ENDPOINTS.has(d.eventType) && d.collateralPrice > 0;
-    })
-    .sort(byChainOrder);
-  if (ends.length < 2) return [];
-
-  const collateralType = branch.collateralType;
-  // 1.1 × 100 is 110.00000000000001 in binary floating point, and the receipt
-  // states this figure verbatim beside the formatted one.
-  const mcrPct = Math.round(branch.mcr * 100_000) / 1000;
-  const unitLabel = `USD per ${collateralType}`;
-  const out: PriceGapNote[] = [];
-
-  for (let i = 0; i < ends.length - 1; i++) {
-    const a = ends[i];
-    const b = ends[i + 1];
-    const da = liquityData(a);
-    const db = liquityData(b);
-    if (!da || !db) continue;
-    if (da.eventType !== "trove") continue;
-    if (b.blockNumber <= a.blockNumber) continue;
-
-    const priceA = da.collateralPrice;
-    const priceB = db.collateralPrice;
-    if (priceA === priceB) continue;
-
-    const state = da.stateAfter;
-    const debt = state?.debt ?? 0;
-    const coll = state?.coll ?? 0;
-    // No debt is no runway: nothing about a price move can take a trove that
-    // owes nothing to the branch minimum, and the ratio is undefined anyway.
-    if (!(debt > 0) || !(coll > 0)) continue;
-
-    // The backend states the ratio it computed from this row's own debt,
-    // collateral and price; recomputing is the fallback for a row that left it
-    // at 0. The later ratio is the same debt and collateral at the later
-    // price, which is exactly the earlier ratio scaled by the price move —
-    // taking it that way keeps the two figures in the sentence consistent with
-    // each other whichever of the two the earlier one came from.
-    const crBefore = state && state.collateralRatio > 0 ? state.collateralRatio : ((coll * priceA) / debt) * 100;
-    const crAfter = (crBefore * priceB) / priceA;
-    const runway = 1 - branch.mcr / (crBefore / 100);
-    const move = Math.abs(priceB / priceA - 1);
-    // A trove already at or below the minimum has no runway left for a move to
-    // consume — the stretch states itself, rather than being measured against
-    // a negative denominator.
-    const consumed = runway > 0 ? move / runway : Infinity;
-
-    const endedBy: PriceGapNote["endedBy"] =
-      db.eventType === "liquidation"
-        ? "liquidation"
-        : db.eventType === "redemption" || ZOMBIE_OPERATIONS.has(db.operation)
-          ? "redemption"
-          : "adjustment";
-    if (endedBy === "adjustment" && !(consumed >= RUNWAY_SHARE)) continue;
-
-    out.push({
-      id: `price-gap:${collateralType.toLowerCase()}:${a.blockNumber}-${b.blockNumber}`,
-      kind: "price-gap",
-      marketSymbol: collateralType,
-      marketAddress: branch.priceFeed ?? "",
-      unitLabel,
-      from: eventPoint(a, da, priceA),
-      to: eventPoint(b, db, priceB),
-      changePct: (priceB / priceA - 1) * 100,
-      consumed,
-      runway,
-      endedBy,
-      position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, ...liquityPositionExtras(da) },
-    });
-  }
-  return out;
-}
-
-/** The debt's symbol and the logged rate at the earlier event, for the opened
- *  note's Debt and Interest Rate cells. */
-function liquityPositionExtras(d: LiquityContext): { debtSymbol: string; rate?: number } {
-  const rate = d.stateAfter?.annualInterestRate;
-  return { debtSymbol: d.assetType ?? "BOLD", ...(rate != null && rate > 0 ? { rate } : {}) };
-}
-
-/** One end of a price gap. Both ends are events on this page, so each carries
- *  its own `eventId` and the reader can open the card the price was read at. */
-function eventPoint(e: BaseActivityEvent, d: LiquityContext, value: number): MarketNotePoint {
-  return {
-    block: e.blockNumber,
-    timestamp: e.timestamp,
-    value,
-    eventId: e.id,
-    txHash: e.txHash.toLowerCase(),
-    logIndex: logIndexOf(e),
-    wallet: (d.actorAddress ?? e.wallet ?? "").toLowerCase(),
-    kind: d.operation,
-  };
-}
-
-/** Why this stretch is on the page — the rule, with its own numbers in it. */
-export function priceGapReason(note: PriceGapNote): string {
-  if (note.endedBy === "head") return "the stretch runs to the latest block";
-  if (note.endedBy !== "adjustment") return `the stretch ends in a ${note.endedBy}`;
-  if (!Number.isFinite(note.consumed)) {
-    // Aave V4 has no branch: the position is measured against its own health
-    // factor, so the same "no runway left" case has to name that instead.
-    if (note.protocol === "aave-v4")
-      return `the position was already at or below a ${AAVE_V4_LIQUIDATION_HF} health factor at the earlier price`;
-    if (note.protocol === "alchemix-v3")
-      return `the position was already at or below the liquidation line at the earlier share price`;
-    return `the position was already at or below the branch minimum at the earlier price`;
-  }
-  return (
-    `the move consumed ${formatPercent(note.consumed * 100)} of the position's runway ` +
-    `(${formatPercent(RUNWAY_SHARE * 100)} threshold)`
-  );
-}
-
-/**
- * A LIVE price gap: the trove's own NEWEST price-gap endpoint (§ the same
- * `PRICE_GAP_ENDPOINTS` filter `priceGapNotesFor` applies)
- * against the branch's oracle price read live at the chain head. Answers
- * "what has the market done to this trove since it last touched it" —
- * unthresholded like a liquidation/redemption ending (`endedBy: "head"`):
- * "nothing has moved" is itself the fact, not a reason to withhold the note.
- *
- * No note where the trove has no price-gap endpoint at all (never
- * transacted, or every row's price is 0), or its recorded debt/collateral at
- * that row is not positive — the same guards `priceGapNotesFor` applies to
- * each historical stretch.
- */
-export function livePriceGapNote(
-  events: readonly BaseActivityEvent[],
-  branch: PriceGapBranch,
-  live: { price: number; block: number; timestamp?: number },
-): PriceGapNote | null {
-  if (!(live.price > 0)) return null;
-  const ends = events
-    .filter((e) => {
-      const d = liquityData(e);
-      return d != null && PRICE_GAP_ENDPOINTS.has(d.eventType) && d.collateralPrice > 0;
-    })
-    .sort(byChainOrder);
-  if (ends.length === 0) return null;
-  // The earlier end is simply the NEWEST priced endpoint, whichever of the
-  // endpoint types it is (a live note has no second row of the trove's own to
-  // pair it with, so it is not restricted to a `trove`-type "A" the way
-  // `priceGapNotesFor`'s historical pairing is).
-  const a = ends[ends.length - 1];
-  const da = liquityData(a);
-  if (!da) return null;
-  const priceA = da.collateralPrice;
-  const state = da.stateAfter;
-  const debt = state?.debt ?? 0;
-  const coll = state?.coll ?? 0;
-  if (!(debt > 0) || !(coll > 0)) return null;
-
-  const collateralType = branch.collateralType;
-  const mcrPct = Math.round(branch.mcr * 100_000) / 1000;
-  const unitLabel = `USD per ${collateralType}`;
-  const crBefore = state && state.collateralRatio > 0 ? state.collateralRatio : ((coll * priceA) / debt) * 100;
-  const crAfter = (crBefore * live.price) / priceA;
-  const runway = 1 - branch.mcr / (crBefore / 100);
-  const move = Math.abs(live.price / priceA - 1);
-  const consumed = runway > 0 ? move / runway : Infinity;
-  if (!liveGapStatesAChange(move, consumed)) return null;
-
-  const to: MarketNotePoint = {
-    block: live.block,
-    timestamp: live.timestamp ?? 0,
-    value: live.price,
-    txHash: "",
-    logIndex: -1,
-    wallet: "",
-    kind: "head",
-  };
-  return {
-    id: `price-gap:${collateralType.toLowerCase()}:${a.blockNumber}-head`,
-    kind: "price-gap",
-    marketSymbol: collateralType,
-    marketAddress: branch.priceFeed ?? "",
-    unitLabel,
-    from: eventPoint(a, da, priceA),
-    to,
-    changePct: (live.price / priceA - 1) * 100,
-    consumed,
-    runway,
-    endedBy: "head",
-    position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, ...liquityPositionExtras(da) },
-    live: true,
-  };
-}
-
-// ── Phase 2a′: the Liquity V2 forks' price gap ──────────────────────────────
-// The Phase 2a rule on a fork Trove (Ebisu, Asymmetry, Basedollar), where the
-// price is the fork's `priceAtBlock`: the branch PriceFeed's lastGoodPrice
-// at the event's block, or on a redemption the price its log emitted. Ebisu
-// and Asymmetry carry it on every row (server mig 342's every-event filler);
-// Basedollar on redemptions only, which leaves it no stretch to state.
-// Two things differ from 2a because the fork page does: the ratio is worked
-// out here (a fork row states no ratio), and a stretch a served folder sits
-// inside is not a stretch — the Trove transacted in it, off the page.
-
-/** The fork contexts, narrowed by the same discriminant the fork guards read. */
-type ForkNoteContext = EbisuContext | AsymmetryContext | BasedollarContext;
-const FORK_NOTE_PROTOCOLS = new Set(["ebisu", "asymmetry", "basedollar"]);
-const forkNoteData = (e: BaseActivityEvent): ForkNoteContext | null =>
-  e.context && FORK_NOTE_PROTOCOLS.has(e.context.protocol) ? (e.context.data as ForkNoteContext) : null;
-
-/** Rows a stretch cannot start from: someone else's act, or the batch
- *  manager's. The owner's operations only, as 2a's `trove` rows. */
-const FORK_NOT_OWN = new Set([
-  "redeemCollateral",
-  "liquidate",
-  "setBatchManagerAnnualInterestRate",
-  "lowerBatchManagerAnnualFee",
-]);
-
-export interface ForkPriceGapBranch extends PriceGapBranch {
-  /** "ebisu" | "asymmetry" | "basedollar" — the note's `protocol`, which the
-   *  row and the receipts read for the fork's name. */
-  protocol: string;
-  debtSymbol: string;
-  /** The served folders' block spans: a stretch with a folder inside it is
-   *  skipped, since the rows in the folder are not on the page. */
-  breaks?: readonly { firstBlock: number; lastBlock: number }[];
-  /** The minimum ratio in force at a block, where governance has moved it
-   *  (Ebisu's weETH branch went from 128% to 120%); `mcr` otherwise. */
-  mcrAt?: (block: number) => number;
-}
-
-const forkPrice = (d: ForkNoteContext): number => d.priceAtBlock?.usd ?? 0;
-
-function forkEventPoint(e: BaseActivityEvent, d: ForkNoteContext, value: number): MarketNotePoint {
-  return {
-    block: e.blockNumber,
-    timestamp: e.timestamp,
-    value,
-    eventId: e.id,
-    txHash: e.txHash.toLowerCase(),
-    logIndex: logIndexOf(e),
-    wallet: (e.wallet ?? "").toLowerCase(),
-    kind: d.eventType,
-  };
-}
-
-/** The earlier end's state, and the ratio it made at each price. Null where
- *  the Trove owed nothing or held nothing. */
-function forkPosition(
-  a: BaseActivityEvent,
-  da: ForkNoteContext,
-  priceA: number,
-  priceB: number,
-  branch: ForkPriceGapBranch,
-): PriceGapPosition | null {
-  const debt = Number(da.debtAfter);
-  const coll = Number(da.collAfter);
-  if (!(debt > 0) || !(coll > 0)) return null;
-  const crBefore = ((coll * priceA) / debt) * 100;
-  const rate = da.interestRate != null ? Number(da.interestRate) : NaN;
-  const mcr = branch.mcrAt?.(a.blockNumber) ?? branch.mcr;
-  return {
-    crBefore,
-    crAfter: (crBefore * priceB) / priceA,
-    mcrPct: Math.round(mcr * 100_000) / 1000,
-    debt,
-    coll,
-    atBlock: a.blockNumber,
-    debtSymbol: branch.debtSymbol,
-    ...(Number.isFinite(rate) && rate > 0 ? { rate } : {}),
-  };
-}
-
-const forkEnds = (events: readonly BaseActivityEvent[]) =>
-  events
-    .filter((e) => {
-      const d = forkNoteData(e);
-      return d != null && forkPrice(d) > 0;
-    })
-    .sort(byChainOrder);
-
-/** Phase-2a′ selector: `priceGapNotesFor` on a fork Trove's events. */
-export function forkPriceGapNotesFor(events: readonly BaseActivityEvent[], branch: ForkPriceGapBranch): PriceGapNote[] {
-  const ends = forkEnds(events);
-  if (ends.length < 2) return [];
-  const collateralType = branch.collateralType;
-  const out: PriceGapNote[] = [];
-  for (let i = 0; i < ends.length - 1; i++) {
-    const a = ends[i];
-    const b = ends[i + 1];
-    const da = forkNoteData(a);
-    const db = forkNoteData(b);
-    if (!da || !db) continue;
-    if (FORK_NOT_OWN.has(da.eventType)) continue;
-    if (b.blockNumber <= a.blockNumber) continue;
-    if (branch.breaks?.some((f) => f.firstBlock >= a.blockNumber && f.lastBlock <= b.blockNumber)) continue;
-    const priceA = forkPrice(da);
-    const priceB = forkPrice(db);
-    if (priceA === priceB) continue;
-    const position = forkPosition(a, da, priceA, priceB, branch);
-    if (!position) continue;
-    const runway = 1 - position.mcrPct / position.crBefore;
-    const move = Math.abs(priceB / priceA - 1);
-    const consumed = runway > 0 ? move / runway : Infinity;
-    const endedBy: PriceGapNote["endedBy"] =
-      db.eventType === "liquidate" ? "liquidation" : db.eventType === "redeemCollateral" ? "redemption" : "adjustment";
-    if (endedBy === "adjustment" && !(consumed >= RUNWAY_SHARE)) continue;
-    out.push({
-      id: `price-gap:${branch.protocol}:${collateralType.toLowerCase()}:${a.blockNumber}-${b.blockNumber}`,
-      kind: "price-gap",
-      protocol: branch.protocol,
-      marketSymbol: collateralType,
-      marketAddress: branch.priceFeed ?? "",
-      unitLabel: `USD per ${collateralType}`,
-      from: forkEventPoint(a, da, priceA),
-      to: forkEventPoint(b, db, priceB),
-      changePct: (priceB / priceA - 1) * 100,
-      consumed,
-      runway,
-      endedBy,
-      position,
-    });
-  }
-  return out;
-}
-
-/** The live fork note: the Trove's newest priced row against the branch price
- *  read at the chain head — `livePriceGapNote` on a fork Trove. */
-export function liveForkPriceGapNote(
-  events: readonly BaseActivityEvent[],
-  branch: ForkPriceGapBranch,
-  live: { price: number; block: number; timestamp?: number },
-): PriceGapNote | null {
-  if (!(live.price > 0)) return null;
-  const ends = forkEnds(events);
-  if (ends.length === 0) return null;
-  const a = ends[ends.length - 1];
-  const da = forkNoteData(a);
-  if (!da || live.block <= a.blockNumber) return null;
-  const priceA = forkPrice(da);
-  const position = forkPosition(a, da, priceA, live.price, branch);
-  if (!position) return null;
-  const runway = 1 - position.mcrPct / position.crBefore;
-  const move = Math.abs(live.price / priceA - 1);
-  const consumed = runway > 0 ? move / runway : Infinity;
-  if (!liveGapStatesAChange(move, consumed)) return null;
-  const collateralType = branch.collateralType;
-  return {
-    id: `price-gap:${branch.protocol}:${collateralType.toLowerCase()}:${a.blockNumber}-head`,
-    kind: "price-gap",
-    protocol: branch.protocol,
-    marketSymbol: collateralType,
-    marketAddress: branch.priceFeed ?? "",
-    unitLabel: `USD per ${collateralType}`,
-    from: forkEventPoint(a, da, priceA),
-    to: {
-      block: live.block,
-      timestamp: live.timestamp ?? 0,
-      value: live.price,
-      txHash: "",
-      logIndex: -1,
-      wallet: "",
-      kind: "head",
-    },
-    changePct: (live.price / priceA - 1) * 100,
-    consumed,
-    runway,
-    endedBy: "head",
-    position,
-    live: true,
-  };
-}
-
-/** The fork's display name for a fork note, or null for any other note. */
-export function forkNoteHouse(note: MarketNote): string | null {
-  switch (note.protocol) {
-    case "ebisu":
-      return "Ebisu";
-    case "asymmetry":
-      return "Asymmetry";
-    case "basedollar":
-      return "Basedollar";
-    default:
-      return null;
-  }
-}
-
-// ── Phase 2b: the Polaris price gap ─────────────────────────────────────────
-// The same rule as Phase 2a (the same RUNWAY_SHARE, the same PriceGapNote
-// shape), read from a CDP's own touches instead of a trove's. Two things
-// differ because the protocol does: the ends are `open`/`adjust`/`close`/
-// `liquidate` rows (never `transfer`) rather than `trove`/`liquidation`/
-// `redemption`, and Polaris has no redemption row of its own — a PSM share
-// settles on the CDP's next touch, never as an event by itself — so
-// `endedBy` is only ever `"adjustment"` or `"liquidation"` here. The price is
-// the market's own price feed at the end of each touch's block
-// (`priceAtBlock.pethInDebt`, already on every priced row), so — like the
-// Liquity V2 selector — nothing is fetched.
-
-/** The branch a Polaris price gap is read in. `mcr` is the market's own
- *  NORMAL-MODE minimum as a multiplier (1.15 on both markets, `chain.mcr`
- *  from the live overlay) — a defensive-mode minimum can be in force at a
- *  block in the CDP's history, but it is not indexed, so every note here is
- *  read against the normal-mode figure regardless of which was actually in
- *  force. */
-export interface PolarisPriceGapOptions {
-  /** "usdp" | "goldp" — namespaces the note id and selects the receipt's
-   *  contract map. */
-  market: "usdp" | "goldp";
-  mcr: number;
-  stable: string;
-  /** The market's PriceFeed, for the receipt's contract line. */
-  priceFeed?: string;
-}
-
-/** One end of a Polaris price gap: the CDP's own touch, and the price its
- *  own row carries. */
-function polarisPricePoint(e: BaseActivityEvent, d: PolarisContext, value: number): MarketNotePoint {
-  return {
-    block: e.blockNumber,
-    timestamp: e.timestamp,
-    value,
-    eventId: e.id,
-    txHash: e.txHash.toLowerCase(),
-    logIndex: polarisLogIndexOf(e),
-    wallet: (e.wallet ?? "").toLowerCase(),
-    kind: d.eventType,
-  };
-}
-
-/**
- * Phase-2b selector: the stretches between two of a CDP's own touches where
- * the market's own price feed moved enough to matter to THIS CDP — the same
- * rule `priceGapNotesFor` applies to a Liquity V2 trove.
- *
- * The ends are the CDP's own rows and nothing else: a `transfer` carries no
- * price and is filtered out before pairing, so it neither ends a stretch nor
- * splits one, and a row the oracle-at-block lane has not reached yet
- * (`priceAtBlock` absent) is not an observation either. Two rows in the same
- * block are one moment, not a stretch, and two identical prices are one
- * reading twice.
- */
-export function polarisPriceGapNotesFor(
-  events: readonly BaseActivityEvent[],
-  opts: PolarisPriceGapOptions,
-): PriceGapNote[] {
-  const ends = events
-    .filter((e) => {
-      const d = polarisData(e);
-      return d != null && d.eventType !== "transfer" && d.priceAtBlock != null;
-    })
-    .sort((a, b) => a.blockNumber - b.blockNumber || polarisLogIndexOf(a) - polarisLogIndexOf(b));
-  if (ends.length < 2) return [];
-
-  // 1.15 × 100 is 114.99999999999999 in binary floating point, and the
-  // receipt states this figure verbatim beside the formatted one — the same
-  // rounding the Liquity V2 selector applies to its own branch minimum.
-  const mcrPct = Math.round(opts.mcr * 100_000) / 1000;
-  const unitLabel = `${opts.stable} per pETH`;
-  const out: PriceGapNote[] = [];
-
-  for (let i = 0; i < ends.length - 1; i++) {
-    const a = ends[i];
-    const b = ends[i + 1];
-    const da = polarisData(a);
-    const db = polarisData(b);
-    if (!da || !db) continue;
-    if (b.blockNumber <= a.blockNumber) continue;
-
-    const priceA = da.priceAtBlock!.pethInDebt;
-    const priceB = db.priceAtBlock!.pethInDebt;
-    if (priceA === priceB) continue;
-
-    const debt = Number(da.newDebt ?? 0);
-    const coll = Number(da.newColl ?? 0);
-    // No debt is no runway, same guard as the Liquity V2 selector.
-    if (!(debt > 0) || !(coll > 0)) continue;
-
-    const crBefore = ((coll * priceA) / debt) * 100;
-    // A stretch that ends in a liquidation states the ratio the liquidation
-    // fired at — the whole seized collateral at the later price over the debt
-    // cleared, the figure the liquidation row states — because the pending
-    // legs settled at that moment moved both figures away from the earlier
-    // touch's. Every other stretch moves only the price.
-    const seized = Number(db.collLiquidated ?? 0);
-    const cleared = Number(db.debtLiquidated ?? 0);
-    const atFire = db.eventType === "liquidate" && seized > 0 && cleared > 0;
-    const crAfter = atFire ? ((seized * priceB) / cleared) * 100 : (crBefore * priceB) / priceA;
-    const runway = 1 - opts.mcr / (crBefore / 100);
-    const move = Math.abs(priceB / priceA - 1);
-    const consumed = runway > 0 ? move / runway : Infinity;
-
-    // Polaris has no redemption row of its own — the PSM's pro-rata share
-    // settles onto the CDP at its next touch, never as an event by itself —
-    // so a stretch here ends only in a liquidation or an adjustment.
-    const endedBy: PriceGapNote["endedBy"] = db.eventType === "liquidate" ? "liquidation" : "adjustment";
-    if (endedBy === "adjustment" && !(consumed >= RUNWAY_SHARE)) continue;
-
-    out.push({
-      id: `price-gap:${opts.market}:${a.blockNumber}-${b.blockNumber}`,
-      kind: "price-gap",
-      marketSymbol: "pETH",
-      marketAddress: opts.priceFeed ?? "",
-      unitLabel,
-      from: polarisPricePoint(a, da, priceA),
-      to: polarisPricePoint(b, db, priceB),
-      changePct: (priceB / priceA - 1) * 100,
-      consumed,
-      runway,
-      endedBy,
-      position: {
-        crBefore,
-        crAfter,
-        mcrPct,
-        debt,
-        coll,
-        atBlock: a.blockNumber,
-        debtSymbol: opts.stable,
-        ...(atFire ? { atFire: { coll: seized, debt: cleared } } : {}),
-      },
-      measureKind: "protocol",
-      measureProtocolId: "polaris",
-      polarisMarket: opts.market,
-    });
-  }
-  return out;
-}
-
-/**
- * A LIVE Polaris price gap: this CDP's own NEWEST priced touch (any of
- * open/adjust/close/liquidate — `transfer` never carries a price) against the
- * market's own price feed read live at the chain head. The polaris twin of
- * `livePriceGapNote` — unthresholded, "nothing has moved" is itself the fact.
- */
-export function livePolarisPriceGapNote(
-  events: readonly BaseActivityEvent[],
-  opts: PolarisPriceGapOptions,
-  live: { price: number; block: number; timestamp?: number },
-): PriceGapNote | null {
-  if (!(live.price > 0)) return null;
-  const ends = events
-    .filter((e) => {
-      const d = polarisData(e);
-      return d != null && d.eventType !== "transfer" && d.priceAtBlock != null;
-    })
-    .sort((a, b) => a.blockNumber - b.blockNumber || polarisLogIndexOf(a) - polarisLogIndexOf(b));
-  if (ends.length === 0) return null;
-  const a = ends[ends.length - 1];
-  const da = polarisData(a);
-  if (!da) return null;
-  const priceA = da.priceAtBlock!.pethInDebt;
-  const debt = Number(da.newDebt ?? 0);
-  const coll = Number(da.newColl ?? 0);
-  if (!(debt > 0) || !(coll > 0)) return null;
-
-  const mcrPct = Math.round(opts.mcr * 100_000) / 1000;
-  const unitLabel = `${opts.stable} per pETH`;
-  const crBefore = ((coll * priceA) / debt) * 100;
-  const crAfter = (crBefore * live.price) / priceA;
-  const runway = 1 - opts.mcr / (crBefore / 100);
-  const move = Math.abs(live.price / priceA - 1);
-  const consumed = runway > 0 ? move / runway : Infinity;
-  if (!liveGapStatesAChange(move, consumed)) return null;
-
-  const to: MarketNotePoint = {
-    block: live.block,
-    timestamp: live.timestamp ?? 0,
-    value: live.price,
-    txHash: "",
-    logIndex: -1,
-    wallet: "",
-    kind: "head",
-  };
-  return {
-    id: `price-gap:${opts.market}:${a.blockNumber}-head`,
-    kind: "price-gap",
-    marketSymbol: "pETH",
-    marketAddress: opts.priceFeed ?? "",
-    unitLabel,
-    from: polarisPricePoint(a, da, priceA),
-    to,
-    changePct: (live.price / priceA - 1) * 100,
-    consumed,
-    runway,
-    endedBy: "head",
-    position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, debtSymbol: opts.stable },
-    measureKind: "protocol",
-    measureProtocolId: "polaris",
-    polarisMarket: opts.market,
-    live: true,
-  };
-}
+const EMPTY_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
 
 // ── Phase 3: the Polaris primary-rate step ──────────────────────────────────
 
@@ -1506,8 +357,8 @@ export function livePolarisPriceGapNote(
  *  `|rateB − rateA| × 100 ≥ RATE_STEP_MIN_PP`. Absolute, not relative — the
  *  rate is 0 on many rows (a market before its first PrimaryRateSet, or a
  *  reset to zero), so a relative rule divides by zero. There is no
- *  always-render clause for a stretch ending in a liquidation, unlike the
- *  price gap: the primary rate does not cause one. Exported so the verifier
+ *  always-render clause for a stretch ending in a liquidation: the primary
+ *  rate does not cause one. Exported so the verifier
  *  can prove the gate by breaking it (measured yield at this threshold:
  *  usdp 67 notes on 27 CDPs, goldp 25 on 9). */
 export const RATE_STEP_MIN_PP = 1;
@@ -1530,7 +381,7 @@ export interface RateSetLog {
 
 /** Polaris: the market's own primary rate stepped between two of a CDP's own
  *  touches — the CDP's opening/adjustment/close/liquidation rows, never a
- *  transfer. Unlike the other two kinds, BOTH ends are the position's own
+ *  transfer. BOTH ends are the position's own
  *  events: the rate is read off the row itself (`context.data.primaryRate`),
  *  not off an endpoint transacted by somebody else elsewhere in the market. */
 export interface RateStepNote extends MarketNoteBase {
@@ -1562,7 +413,7 @@ export interface RateStepNote extends MarketNoteBase {
   observed: { from: RateSetLog | null; to: RateSetLog | null };
   /** The yearly interest A's own recorded debt would cost at each end's
    *  rate — holds the debt fixed and moves only the rate, the same "what
-   *  that state came to be worth" framing as the price gap's `crAfter`.
+   *  that state came to be worth" framing a note uses throughout.
    *  Stated only when A's debt is positive.
    *
    *  `symbol` is what the debt is DENOMINATED in, where that is not the
@@ -1884,134 +735,10 @@ export function liveRateStepNote(
 
 // ── Formatting — one source for the row, the export and the receipts ─────────
 
-/** A rate reads at five to six significant digits: enough to separate two
- *  observations that differ in the fourth (0.020513 → 0.075460), never so many
- *  that float noise reaches the page. Locale pinned — see check:locale. */
-export const formatShareRate = (n: number): string =>
-  n.toLocaleString("en-US", { minimumSignificantDigits: 5, maximumSignificantDigits: 6 });
-
 const formatBlock = (n: number): string => n.toLocaleString("en-US");
-/** A share-rate move as a magnitude. At a doubling or more (or a halving) it
- *  is the multiplier the step is known by ("3.68×"); under that it is the
- *  unsigned percentage move, because "1×" says nothing about a live note whose
- *  rate has drifted 0.03% since the account's last touch. One decimal from 1%
- *  up, two significant digits below it, so a tiny drift never rounds to "0.0%".
- *  Never a sign: the direction glyph carries it. */
-export const formatRatio = (n: number): string => {
-  if (!(n > 0) || n >= 2 || n <= 0.5) return `${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}×`;
-  const pct = Math.abs(n - 1) * 100;
-  const text =
-    pct >= 1
-      ? pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-      : pct.toLocaleString("en-US", { maximumSignificantDigits: 2 });
-  return `${text}%`;
-};
-/** The compact headline form the rest of the site uses for large amounts
- *  (`formatCompact`): 735,562,000 → "735.56M", small values unabbreviated. */
-const formatUnits = (n: number): string =>
-  n.toLocaleString("en-US", Math.abs(n) >= 1_000 ? { notation: "compact", maximumFractionDigits: 2 } : {});
-
-// ── The grain a PAIR of readings is stated at ───────────────────────────────
-// Every figure in a note is a before → after pair, and a fixed number of
-// decimals is a claim about the SCALE of the quantity rather than about the
-// reading. Two decimals separate 3,114.20 from 2,628.27 and say nothing
-// whatever about 0.99989 against 0.99966 — on a pegged asset they erase the
-// entire range the reader came for, and the row renders "1.00 → 1.00", which
-// is a tautology, not an observation (measured on the Aave V4 forex spoke,
-// 2026-09-11).
-//
-// So a pair chooses its own grain: the fewest decimals at which its two ends
-// do not render as the same string, from the site's usual floor up to a cap.
-// Every surface that prints either end — the stat card that states both, the
-// step mark in the header, the receipt that states one — takes that one
-// number from the note, so no two of them can disagree.
-//
-// The cap is what makes it safe. Past the cap, two ends that still render
-// alike are not "too precise to show": they are the same reading, and a live
-// note that would state them is withheld instead (`liveGapStatesAChange`).
-
-/** One value at a stated number of decimals. Locale pinned — see check:locale. */
-const fixed = (n: number, decimals: number): string =>
-  n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-
-/** The decimals a price outside a pair is read to — the oracle's own figure
- *  as every other surface on a position page states it. */
-export const PRICE_DECIMALS_FLOOR = 2;
-/** Six decimals is the resolution of a USD feed on a $1 asset (a Chainlink
- *  answer carries eight, two of them above the point). Past it the last digit
- *  that moved is the feed's, not the market's. */
-export const PRICE_DECIMALS_CAP = 6;
-/** A health factor is read to two decimals everywhere on a position page; a
- *  pair that agrees there can still separate two further in (1.0312 → 1.0311),
- *  and past four the difference is not one any reader acts on. */
-export const HEALTH_DECIMALS_FLOOR = 2;
-export const HEALTH_DECIMALS_CAP = 4;
-/** A collateral ratio is a whole-number percentage, followed two decimals in
- *  when its pair agrees there. */
-export const RATIO_DECIMALS_FLOOR = 0;
-export const RATIO_DECIMALS_CAP = 2;
-
-/** The fewest decimals in [floor, cap] at which `a` and `b` render as
- *  DIFFERENT strings: `cap` when they never do, and `floor` when the two are
- *  exactly equal, so a figure with nothing to separate reads at its ordinary
- *  grain. Compared as the formatted strings rather than by subtracting,
- *  because what the reader sees is decided by rounding, not by the gap. */
-export function separatingDecimals(a: number, b: number, floor: number, cap: number): number {
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return floor;
-  for (let d = floor; d < cap; d += 1) {
-    if (fixed(a, d) !== fixed(b, d)) return d;
-  }
-  return cap;
-}
-
-/** The grain this note's two prices separate at. */
-export const priceDecimals = (note: PriceGapNote): number =>
-  separatingDecimals(note.from.value, note.to.value, PRICE_DECIMALS_FLOOR, PRICE_DECIMALS_CAP);
-
-/** The grain this note's two health factors separate at. */
-export const healthDecimals = (h: PriceGapHealth): number =>
-  separatingDecimals(h.hfBefore, h.hfAfter, HEALTH_DECIMALS_FLOOR, HEALTH_DECIMALS_CAP);
-
-/** The price formatter bound to one note's grain — for the header's step mark
- *  and for the receipts, which each state ONE end and must agree with the stat
- *  card that states both. */
-export const notePriceFormat = (note: PriceGapNote): ((n: number) => string) => {
-  const decimals = priceDecimals(note);
-  return (n: number) => formatPrice(n, decimals);
-};
-
-/** A collateral price. Two decimals unless a pair asks for more (see above). */
-export const formatPrice = (n: number, decimals: number = PRICE_DECIMALS_FLOOR): string => fixed(n, decimals);
-
-/** A whole-number percentage — a collateral ratio, a threshold, a share of a
- *  runway. Never a sign: the reading is a level, not a change. A pair of
- *  ratios may ask for decimals the way a pair of prices does. */
-const formatPercent = (n: number, decimals: number = RATIO_DECIMALS_FLOOR): string =>
-  `${n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}%`;
-
-/** A percentage change, unsigned. One decimal from 0.1% up; two significant
- *  digits below it, so a small move states what it is instead of rounding to
- *  "0.0%" and calling itself nothing — the rule `formatRatio` already applies
- *  to a share-rate drift. */
-const changeDigits = (n: number): string => {
-  const abs = Math.abs(n);
-  return abs >= 0.1 || abs === 0
-    ? abs.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-    : abs.toLocaleString("en-US", { maximumSignificantDigits: 2 });
-};
-
-/** A signed change, with the typographic minus (U+2212) the rest of the site
- *  uses for a negative figure. */
-export const formatChange = (n: number): string => `${n < 0 ? "−" : "+"}${changeDigits(n)}%`;
-
-/** The same change with no sign — for the header, where the direction glyph
- *  carries what the sign used to. `change` (signed) stays for the markdown
- *  export and the receipt's exact value. */
-export const formatChangeMagnitude = (n: number): string => `${changeDigits(n)}%`;
 
 /** Seconds between the two ends' block timestamps, or null where either end
- *  is undated (a Moonwell step whose sample the endpoint did not date, and no
- *  displayed event at that block to date it). Both timestamps are the blocks'
+ *  is undated. Both timestamps are the blocks'
  *  own headers, so this is the elapsed time, not an estimate from a block
  *  count. */
 export function noteElapsedSeconds(note: MarketNote): number | null {
@@ -2037,173 +764,6 @@ const elapsedFigure = (note: MarketNote): { elapsed?: string } => {
   const s = noteElapsedSeconds(note);
   return s == null ? {} : { elapsed: formatElapsed(s) };
 };
-
-/** Every figure the note states, formatted once. The row renders these inside
- *  `<Prov>`; the markdown export writes the same strings as plain text, so the
- *  page and the export can never state a figure differently. */
-export interface MarketNoteFigures {
-  fromRate: string;
-  toRate: string;
-  ratio: string;
-  fromBlock: string;
-  toBlock: string;
-  /** The time between the two blocks, from their own timestamps — absent
-   *  where either end is undated. Exact, not a block-count estimate. */
-  elapsed?: string;
-  units?: string;
-  before?: string;
-  after?: string;
-}
-
-export function marketNoteFigures(note: ShareRateStepNote): MarketNoteFigures {
-  return {
-    fromRate: formatShareRate(note.from.value),
-    toRate: formatShareRate(note.to.value),
-    ratio: formatRatio(note.ratio),
-    fromBlock: formatBlock(note.from.block),
-    toBlock: formatBlock(note.to.block),
-    ...elapsedFigure(note),
-    ...(note.slice
-      ? {
-          units: `${formatUnits(note.slice.units)} ${note.slice.unitSymbol}`,
-          before: `${formatUnits(note.slice.before)} ${note.slice.valueSymbol}`,
-          after: `${formatUnits(note.slice.after)} ${note.slice.valueSymbol}`,
-        }
-      : {}),
-  };
-}
-
-/** The same, for a price gap. */
-export interface PriceGapFigures {
-  fromPrice: string;
-  toPrice: string;
-  change: string;
-  /** `change` with no sign — the header's headline figure now that the
-   *  direction glyph carries the sign. */
-  changeMagnitude: string;
-  fromBlock: string;
-  toBlock: string;
-  /** As MarketNoteFigures.elapsed. */
-  elapsed?: string;
-  atBlock?: string;
-  crBefore?: string;
-  crAfter?: string;
-  mcr?: string;
-  /** Aave V4 (`note.health`): the whole basket's health factor at each end's
-   *  price, at the grain the pair separates at (two decimals unless the move
-   *  is smaller than that). Absent on a price-only note. */
-  hfBefore?: string;
-  hfAfter?: string;
-  /** The LT-weighted collateral and the debt behind those two figures, in
-   *  compact USD. */
-  collateralUsd?: string;
-  debtUsd?: string;
-  /** Alchemix V3 (`position.valueSymbol`): the share count read at the earlier
-   *  end, valued at each end's share price. */
-  valueBefore?: string;
-  valueAfter?: string;
-}
-
-/** A health factor, at the two decimals every other health-factor figure on a
- *  position page is read to — or at the grain a note's own pair separates at.
- *  Locale pinned — see check:locale. */
-export const formatHealthFactor = (n: number, decimals: number = HEALTH_DECIMALS_FLOOR): string =>
-  Number.isFinite(n) ? fixed(n, decimals) : "∞";
-
-/** A USD amount in the compact headline form the rest of the site uses
- *  (`$1.24K`), two decimals unabbreviated below a thousand. */
-const formatUsdCompact = (n: number): string => {
-  const opts: Intl.NumberFormatOptions =
-    Math.abs(n) >= 1_000
-      ? { notation: "compact", maximumFractionDigits: 2 }
-      : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-  return `$${n.toLocaleString("en-US", opts)}`;
-};
-
-export function priceGapFigures(note: PriceGapNote): PriceGapFigures {
-  const p = note.position;
-  const h = note.health;
-  // Every pair in the note is stated at the grain it separates at, so no cell
-  // reads "x → x" while the header states a move.
-  const pd = priceDecimals(note);
-  // The pair separates from each other AND from the minimum they are read
-  // against: a ratio of 114.9% must not read "115%" beside a 115% minimum.
-  const rd = p
-    ? Math.max(
-        separatingDecimals(p.crBefore, p.crAfter, RATIO_DECIMALS_FLOOR, RATIO_DECIMALS_CAP),
-        separatingDecimals(p.crBefore, p.mcrPct, RATIO_DECIMALS_FLOOR, RATIO_DECIMALS_CAP),
-        separatingDecimals(p.crAfter, p.mcrPct, RATIO_DECIMALS_FLOOR, RATIO_DECIMALS_CAP),
-      )
-    : 0;
-  const hd = h ? healthDecimals(h) : HEALTH_DECIMALS_FLOOR;
-  return {
-    fromPrice: formatPrice(note.from.value, pd),
-    toPrice: formatPrice(note.to.value, pd),
-    change: formatChange(note.changePct),
-    changeMagnitude: formatChangeMagnitude(note.changePct),
-    fromBlock: formatBlock(note.from.block),
-    toBlock: formatBlock(note.to.block),
-    ...elapsedFigure(note),
-    ...(p
-      ? {
-          atBlock: formatBlock(p.atBlock),
-          crBefore: formatPercent(p.crBefore, rd),
-          crAfter: formatPercent(p.crAfter, rd),
-          // The minimum is the branch's own constant, not one end of a pair.
-          // Alchemix's liquidation line (105.26%) is stated to one decimal, the
-          // way the position card states it.
-          mcr: formatPercent(p.mcrPct, p.valueSymbol ? 1 : RATIO_DECIMALS_FLOOR),
-          ...(p.valueSymbol
-            ? {
-                valueBefore: `${formatUnits(p.coll * note.from.value)} ${p.valueSymbol}`,
-                valueAfter: `${formatUnits(p.coll * note.to.value)} ${p.valueSymbol}`,
-              }
-            : {}),
-        }
-      : {}),
-    ...(h
-      ? {
-          atBlock: formatBlock(h.atBlock),
-          hfBefore: formatHealthFactor(h.hfBefore, hd),
-          hfAfter: formatHealthFactor(h.hfAfter, hd),
-          collateralUsd: formatUsdCompact(h.collateralUsd),
-          debtUsd: formatUsdCompact(h.debtUsd),
-        }
-      : {}),
-  };
-}
-
-/** The liquidation line every Aave V4 health payload is read against — the
- *  protocol's own trigger, not a Rails setting and not a per-position
- *  number. Stated as a figure so the row and the export write it once. */
-export const AAVE_V4_LIQUIDATION_HF = "1.00";
-
-/** What each Aave V4 eventType is called in prose, at an end of a stretch —
- *  the row's own word, so "its liquidation" and "this position's borrow"
- *  read the way the event card beside them is labelled. Falls back to the
- *  raw eventType, so a type added upstream reads oddly rather than
- *  disappearing. */
-const AAVE_V4_END_LABELS: Record<string, string> = {
-  supply: "supply",
-  withdraw: "withdrawal",
-  borrow: "borrow",
-  repay: "repayment",
-  liquidation: "liquidation",
-  collateral_toggle: "collateral toggle",
-};
-
-export const aaveV4EndLabel = (p: MarketNotePoint): string => AAVE_V4_END_LABELS[p.kind] ?? p.kind;
-
-/** The move as a direction word plus its magnitude — "down 4.9%". The Aave V4
- *  sentence reads as prose rather than as a signed figure, because the
- *  sentence already names both prices in order. */
-const changeInWords = (note: PriceGapNote): string =>
-  `${note.changePct < 0 ? "down" : "up"} ${formatChangeMagnitude(note.changePct)}`;
-
-/** The clause every Aave V4 note carries about where its liquidation
- *  threshold came from — the one thing about the health figures that is NOT
- *  read at the earlier block. */
-const AAVE_V4_LT_CLAUSE = "at the liquidation threshold the spoke reports now";
 
 /** A primary rate, as the percentage it is — two decimals, matching what the
  *  step mark and the stat cards state everywhere else on the position. */
@@ -2365,8 +925,7 @@ const AAVE_FAMILY_END_LABELS: Record<string, string> = {
   borrow: "borrow",
   repay: "repayment",
   liquidation: "liquidation",
-  // The liquidation price note's earlier end can be any row that touched the
-  // seized reserve, these three included (lib/aave-v3/liquidation-price-notes.ts).
+  // An end can be any row that touched the reserve, these three included.
   transfer_in: "incoming transfer",
   transfer_out: "outgoing transfer",
   swap: "swap",
@@ -2377,15 +936,6 @@ export const aaveFamilyEndLabel = (p: MarketNotePoint): string => AAVE_FAMILY_EN
 
 /** True for the two explorers that read a reserve's own rate this way. */
 const isAaveFamily = (note: RateStepNote): boolean => note.protocol === "aave-v3" || note.protocol === "spark";
-
-/** True for an Aave V3 or SparkLend liquidation price note — price-only, one
- *  per liquidation, for the asset it seized (lib/aave-v3/liquidation-price-notes.ts). */
-export const isAaveFamilyPriceGap = (note: PriceGapNote): boolean =>
-  note.protocol === "aave-v3" || note.protocol === "spark";
-
-/** Whose oracle the row's stored price is — "Aave's", "SparkLend's". */
-export const aaveFamilyOracleOwner = (note: PriceGapNote): string =>
-  note.protocol === "spark" ? "SparkLend's" : "Aave's";
 
 /** "borrow rate" / "supply rate" — the quantity the note states, which on a
  *  V3-family reserve is only half the answer without the side. */
@@ -2409,47 +959,6 @@ function aaveFamilyInterestClause(note: RateStepNote, f: RateStepFigures, live: 
   );
 }
 
-// ── Alchemix V3's own words for a price gap ─────────────────────────────────
-// The price is the vault's SHARE PRICE (one MYT share in the asset underneath),
-// stored with each reading of the position (lib/alchemix/market-notes.ts). It is
-// the one price that moves an Alchemix position's collateral value and its
-// distance to liquidation, and the figures it moves are the collateral's value
-// in the asset underneath and the collateralisation, against the line's
-// liquidation line.
-
-/** What each end of an Alchemix stretch is called: the event card's own word,
- *  lower-cased. Falls back to the raw event type. */
-const ALCHEMIX_END_LABELS: Record<string, string> = {
-  deposit: "deposit",
-  withdraw: "withdrawal",
-  mint: "mint",
-  burn: "burn",
-  repay: "repayment",
-  force_repay: "forced repayment",
-  self_liquidated: "close with collateral",
-  liquidated: "liquidation",
-  repayment_fee: "repayment fee",
-  redemption: "line redemption",
-  batch_liquidated: "batch liquidation",
-  fee_shortfall: "fee shortfall",
-  transfer: "transfer",
-  head: "the latest block",
-};
-
-export const alchemixEndLabel = (p: MarketNotePoint): string => ALCHEMIX_END_LABELS[p.kind] ?? p.kind;
-
-/** The Alchemix sentence's second half: what the move did to this position,
- *  at the shares and debt read at the earlier end. Empty where the note
- *  carries no position. */
-function alchemixEffectClause(note: PriceGapNote, f: PriceGapFigures): string {
-  if (!f.valueBefore || !f.valueAfter || !f.crBefore || !f.crAfter || !f.mcr) return "";
-  return (
-    ` At the shares and debt read at block ${f.atBlock} the collateral was worth ${f.valueBefore} at the earlier ` +
-    `price and ${f.valueAfter} at the ${note.live ? "price now" : "later one"}, a collateralisation of ` +
-    `${f.crBefore} and ${f.crAfter}, against liquidation at ${f.mcr}.`
-  );
-}
-
 // ── Prose — the four phrasings, each switching on `kind` exactly once ────────
 // Every surface that puts a note into words (the row, and each protocol's
 // markdown export) reads these, so a note reads the same on the page as in an
@@ -2464,156 +973,53 @@ export function marketNoteSentence(note: MarketNote): string {
   // than composing a second version of it out of figures this module cannot
   // read.
   if (note.kind === "vault-terms") return `At block ${formatBlock(note.to.block)}, ${note.statement}.`;
-  if (note.kind === "price-gap") {
-    const f = priceGapFigures(note);
-    if (note.protocol === "aave-v4") {
-      // The whole basket, not one collateral ratio: an Aave account holds
-      // several collaterals and several debts, so the figure that answers
-      // "what did this move do to the position" is the health factor.
-      const health =
-        f.hfBefore && f.hfAfter
-          ? ` At the amounts recorded at block ${f.atBlock} the position's health factor was ${f.hfBefore} at the ` +
-            `earlier price and ${f.hfAfter} at the later one, against liquidation at ${AAVE_V4_LIQUIDATION_HF}, ` +
-            `${AAVE_V4_LT_CLAUSE}.`
-          : "";
-      if (note.live) {
-        return (
-          `Since this position's ${aaveV4EndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} ` +
-          `oracle price has moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ${changeInWords(note)}, at the ` +
-          `latest block ${f.toBlock}.${health}`
-        );
-      }
-      return (
-        `The ${note.marketSymbol} oracle price moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ` +
-        `${changeInWords(note)}, between this position's ${aaveV4EndLabel(note.from)} at block ${f.fromBlock} and ` +
-        `its ${aaveV4EndLabel(note.to)} at block ${f.toBlock}.${health}`
-      );
-    }
-    if (note.protocol === "alchemix-v3") {
-      if (note.live) {
-        return (
-          `Since this position's ${alchemixEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} ` +
-          `share price has moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ${changeInWords(note)}, at the ` +
-          `latest block ${f.toBlock}.${alchemixEffectClause(note, f)}`
-        );
-      }
-      return (
-        `The ${note.marketSymbol} share price moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ` +
-        `${changeInWords(note)}, between this position's ${alchemixEndLabel(note.from)} at block ${f.fromBlock} and ` +
-        `its ${alchemixEndLabel(note.to)} at block ${f.toBlock}.${alchemixEffectClause(note, f)}`
-      );
-    }
-    if (isAaveFamilyPriceGap(note)) {
-      return (
-        `The ${note.marketSymbol} oracle price moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ` +
-        `${changeInWords(note)}, between this position's ${aaveFamilyEndLabel(note.from)} at block ${f.fromBlock} ` +
-        `and the liquidation at block ${f.toBlock} that seized ${note.marketSymbol}. This position did not touch ` +
-        `${note.marketSymbol} between them.`
-      );
-    }
-    const isPolaris = note.measureKind === "protocol";
-    const positionNoun = isPolaris ? "CDP" : "trove";
-    const endLabel = isPolaris ? polarisEndLabel : priceGapEndLabel;
-    const minimumLabel = isPolaris ? "the market's normal-mode minimum" : "branch minimum";
+  const f = rateStepFigures(note);
+  if (note.protocol === "makerdao") {
+    const ilk = makerMarketName(note);
+    const interestClause =
+      note.interest && f.debt && f.before && f.after
+        ? ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest ` +
+          `before and ${f.after} after.`
+        : "";
     if (note.live) {
-      let sentence =
-        `Since this ${positionNoun}'s ${endLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} ` +
-        `oracle price has moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ${f.change}, at the latest block ` +
-        `${f.toBlock}.`;
-      if (note.position) {
-        sentence +=
-          ` At the debt and collateral recorded at block ${f.atBlock} this ${positionNoun}'s collateral ratio was ` +
-          `${f.crBefore} then and is ${f.crAfter} at the later price, against the ${minimumLabel} of ${f.mcr}.`;
-        if (!isPolaris) sentence += ` The position card's live ratio also carries the interest accrued since then.`;
-      }
-      return sentence;
-    }
-    const moved =
-      `The ${note.marketSymbol} oracle price moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ` +
-      `${f.change}, between blocks ${f.fromBlock} and ${f.toBlock}.`;
-    if (!note.position) return moved;
-    if (isPolaris && note.position.atFire) {
       return (
-        `${moved} At the debt and collateral recorded at block ${f.atBlock} this CDP's collateral ratio was ` +
-        `${f.crBefore} at the earlier price. At the liquidation it was ${f.crAfter}: the collateral seized over the ` +
-        `debt cleared, once the interest, stability gain and PSM share pending since then were written in, at the ` +
-        `later price — below the market's normal-mode minimum of ${f.mcr}.`
+        `Since this vault's ${makerRateEndLabel(note.from)} at block ${f.fromBlock} the ${ilk} stability fee has ` +
+        `moved ${f.fromRate} → ${f.toRate} per year, ${moveWord(note.deltaPp)} ${f.deltaMagnitude}, at the latest ` +
+        `block ${f.toBlock}.${interestClause}`
+      );
+    }
+    let sentence =
+      `The ${ilk} stability fee moved ${f.fromRate} → ${f.toRate} per year, ${moveWord(note.deltaPp)} ` +
+      `${f.deltaMagnitude}, between this vault's ${makerRateEndLabel(note.from)} at block ${f.fromBlock} and its ` +
+      `${makerRateEndLabel(note.to)} at block ${f.toBlock}`;
+    sentence +=
+      note.setsBetween != null && note.setsBetween > 0
+        ? `; governance reset it ${resetCount(note.setsBetween)} in between.`
+        : `.`;
+    return `${sentence}${interestClause}`;
+  }
+  if (isAaveFamily(note)) {
+    const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)} on ${aaveFamilyMarketName(note)}`;
+    if (note.live) {
+      return (
+        `Since this position's ${aaveFamilyEndLabel(note.from)} at block ${f.fromBlock} ${quantity} has moved ` +
+        `${f.fromRate} → ${f.toRate} per year, ${moveWord(note.deltaPp)} ${f.deltaMagnitude}, at the latest block ` +
+        `${f.toBlock}.${aaveFamilyInterestClause(note, f, true)}`
       );
     }
     return (
-      `${moved} At the debt and collateral recorded at block ${f.atBlock} this trove's collateral ratio was ` +
-      `${f.crBefore} at the earlier price and ${f.crAfter} at the later one, against the branch minimum of ${f.mcr}.`
+      `${quantity[0].toUpperCase()}${quantity.slice(1)} moved ${f.fromRate} → ${f.toRate} per year, ` +
+      `${moveWord(note.deltaPp)} ${f.deltaMagnitude}, between this position's ${aaveFamilyEndLabel(note.from)} at ` +
+      `block ${f.fromBlock} and its ${aaveFamilyEndLabel(note.to)} at block ${f.toBlock}.` +
+      `${aaveFamilyInterestClause(note, f, false)}`
     );
   }
-  if (note.kind === "rate-step") {
-    const f = rateStepFigures(note);
-    if (note.protocol === "makerdao") {
-      const ilk = makerMarketName(note);
-      const interestClause =
-        note.interest && f.debt && f.before && f.after
-          ? ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest ` +
-            `before and ${f.after} after.`
-          : "";
-      if (note.live) {
-        return (
-          `Since this vault's ${makerRateEndLabel(note.from)} at block ${f.fromBlock} the ${ilk} stability fee has ` +
-          `moved ${f.fromRate} → ${f.toRate} per year, ${moveWord(note.deltaPp)} ${f.deltaMagnitude}, at the latest ` +
-          `block ${f.toBlock}.${interestClause}`
-        );
-      }
-      let sentence =
-        `The ${ilk} stability fee moved ${f.fromRate} → ${f.toRate} per year, ${moveWord(note.deltaPp)} ` +
-        `${f.deltaMagnitude}, between this vault's ${makerRateEndLabel(note.from)} at block ${f.fromBlock} and its ` +
-        `${makerRateEndLabel(note.to)} at block ${f.toBlock}`;
-      sentence +=
-        note.setsBetween != null && note.setsBetween > 0
-          ? `; governance reset it ${resetCount(note.setsBetween)} in between.`
-          : `.`;
-      return `${sentence}${interestClause}`;
-    }
-    if (isAaveFamily(note)) {
-      const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)} on ${aaveFamilyMarketName(note)}`;
-      if (note.live) {
-        return (
-          `Since this position's ${aaveFamilyEndLabel(note.from)} at block ${f.fromBlock} ${quantity} has moved ` +
-          `${f.fromRate} → ${f.toRate} per year, ${moveWord(note.deltaPp)} ${f.deltaMagnitude}, at the latest block ` +
-          `${f.toBlock}.${aaveFamilyInterestClause(note, f, true)}`
-        );
-      }
-      return (
-        `${quantity[0].toUpperCase()}${quantity.slice(1)} moved ${f.fromRate} → ${f.toRate} per year, ` +
-        `${moveWord(note.deltaPp)} ${f.deltaMagnitude}, between this position's ${aaveFamilyEndLabel(note.from)} at ` +
-        `block ${f.fromBlock} and its ${aaveFamilyEndLabel(note.to)} at block ${f.toBlock}.` +
-        `${aaveFamilyInterestClause(note, f, false)}`
-      );
-    }
-    if (note.live) {
-      let sentence =
-        `Since this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} market's ` +
-        `primary rate has moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, at the latest block ${f.toBlock}`;
-      sentence += f.sets
-        ? `; the market re-set the primary rate ${f.sets} times since, once per PSM mint or redemption.`
-        : `.`;
-      if (note.interest && f.debt && f.before && f.after) {
-        sentence +=
-          ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest before ` +
-          `and ${f.after} after.`;
-      }
-      return sentence;
-    }
-    // A merged run leads with how much of this CDP's own history it covers,
-    // because that is the thing the reader cannot see any other way: the run's
-    // ends are two touches with more of the CDP's own touches between them.
-    let sentence = f.steps
-      ? `Over ${f.steps} of this CDP's own touches the ${note.marketSymbol} market's primary rate moved ` +
-        `${f.fromRate} → ${f.toRate} per year, ${f.delta}, from its ${polarisEndLabel(note.from)} at block ` +
-        `${f.fromBlock} to its ${polarisEndLabel(note.to)} at block ${f.toBlock} — each step in between moved it ` +
-        `the same way, so they are stated as one stretch`
-      : `The ${note.marketSymbol} market's primary rate moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, ` +
-        `between this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
-        `${polarisEndLabel(note.to)} at block ${f.toBlock}`;
+  if (note.live) {
+    let sentence =
+      `Since this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} market's ` +
+      `primary rate has moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, at the latest block ${f.toBlock}`;
     sentence += f.sets
-      ? `; the market re-set the primary rate ${f.sets} times in between, once per PSM mint or redemption.`
+      ? `; the market re-set the primary rate ${f.sets} times since, once per PSM mint or redemption.`
       : `.`;
     if (note.interest && f.debt && f.before && f.after) {
       sentence +=
@@ -2622,68 +1028,50 @@ export function marketNoteSentence(note: MarketNote): string {
     }
     return sentence;
   }
-  const f = marketNoteFigures(note);
-  if (note.live) {
-    const step =
-      `Since this account's own ${note.from.kind} at block ${f.fromBlock} the ${note.marketSymbol} market's share ` +
-      `rate has moved ${f.fromRate} → ${f.toRate} ${note.unitLabel}, ${f.ratio}, at the latest block ${f.toBlock}.`;
-    if (!f.units) return step;
-    return `${step} This account's ${f.units} represents ${f.before} at the earlier rate and ${f.after} now.`;
+  // A merged run leads with how much of this CDP's own history it covers,
+  // because that is the thing the reader cannot see any other way: the run's
+  // ends are two touches with more of the CDP's own touches between them.
+  let sentence = f.steps
+    ? `Over ${f.steps} of this CDP's own touches the ${note.marketSymbol} market's primary rate moved ` +
+      `${f.fromRate} → ${f.toRate} per year, ${f.delta}, from its ${polarisEndLabel(note.from)} at block ` +
+      `${f.fromBlock} to its ${polarisEndLabel(note.to)} at block ${f.toBlock} — each step in between moved it ` +
+      `the same way, so they are stated as one stretch`
+    : `The ${note.marketSymbol} market's primary rate moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, ` +
+      `between this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
+      `${polarisEndLabel(note.to)} at block ${f.toBlock}`;
+  sentence += f.sets
+    ? `; the market re-set the primary rate ${f.sets} times in between, once per PSM mint or redemption.`
+    : `.`;
+  if (note.interest && f.debt && f.before && f.after) {
+    sentence +=
+      ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest before ` +
+      `and ${f.after} after.`;
   }
-  const step =
-    `The ${note.marketSymbol} market's share rate stepped ${f.fromRate} → ${f.toRate} ${note.unitLabel}, ` +
-    `${f.ratio}, between blocks ${f.fromBlock} and ${f.toBlock}, with no Mint or Redeem in the market between them.`;
-  if (!f.units) return step;
-  return `${step} This account's ${f.units} represented ${f.before} before and ${f.after} after.`;
+  return sentence;
 }
 
 /** The note in one clause, with both blocks — the export's summary line. */
 export function marketNoteHeadline(note: MarketNote): string {
   if (note.kind === "vault-terms") return `${note.statement}, at block ${formatBlock(note.to.block)}`;
-  if (note.kind === "price-gap") {
-    const f = priceGapFigures(note);
-    if (note.protocol === "aave-v4") {
-      return note.live
-        ? `the ${note.marketSymbol} oracle price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
-        : `the ${note.marketSymbol} oracle price moved ${f.change} between this position's ${aaveV4EndLabel(note.from)} at block ${f.fromBlock} and its ${aaveV4EndLabel(note.to)} at block ${f.toBlock}`;
-    }
-    if (isAaveFamilyPriceGap(note)) {
-      return `the ${note.marketSymbol} oracle price moved ${f.change} between this position's ${aaveFamilyEndLabel(note.from)} at block ${f.fromBlock} and the liquidation at block ${f.toBlock} that seized it`;
-    }
-    if (note.protocol === "alchemix-v3") {
-      return note.live
-        ? `the ${note.marketSymbol} share price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
-        : `the ${note.marketSymbol} share price moved ${f.change} between blocks ${f.fromBlock} and ${f.toBlock}`;
-    }
+  // The later rate leads, on the page and here alike (Miles, 2026-09-10):
+  // the question a rate note answers is what the position pays now, and the
+  // move is the qualifier rather than the figure.
+  const f = rateStepFigures(note);
+  if (note.protocol === "makerdao") {
+    const ilk = makerMarketName(note);
     return note.live
-      ? `the ${note.marketSymbol} oracle price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
-      : `the ${note.marketSymbol} oracle price moved ${f.change} between blocks ${f.fromBlock} and ${f.toBlock}`;
+      ? `the ${ilk} stability fee is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+      : `the ${ilk} stability fee was ${f.toRate} per year by block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
   }
-  if (note.kind === "rate-step") {
-    // The later rate leads, on the page and here alike (Miles, 2026-09-10):
-    // the question a rate note answers is what the position pays now, and the
-    // move is the qualifier rather than the figure.
-    const f = rateStepFigures(note);
-    if (note.protocol === "makerdao") {
-      const ilk = makerMarketName(note);
-      return note.live
-        ? `the ${ilk} stability fee is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-        : `the ${ilk} stability fee was ${f.toRate} per year by block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
-    }
-    if (isAaveFamily(note)) {
-      const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)} on ${aaveFamilyMarketName(note)}`;
-      return note.live
-        ? `${quantity} is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-        : `${quantity} was ${f.toRate} per year by this position's ${aaveFamilyEndLabel(note.to)} at block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
-    }
+  if (isAaveFamily(note)) {
+    const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)} on ${aaveFamilyMarketName(note)}`;
     return note.live
-      ? `the ${note.marketSymbol} market's primary rate is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-      : `the ${note.marketSymbol} market's primary rate was ${f.toRate} per year by block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
+      ? `${quantity} is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+      : `${quantity} was ${f.toRate} per year by this position's ${aaveFamilyEndLabel(note.to)} at block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
   }
-  const f = marketNoteFigures(note);
   return note.live
-    ? `the ${note.marketSymbol} market's share rate has moved ${f.ratio} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
-    : `the ${note.marketSymbol} market's share rate stepped ${f.ratio} between blocks ${f.fromBlock} and ${f.toBlock}`;
+    ? `the ${note.marketSymbol} market's primary rate is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+    : `the ${note.marketSymbol} market's primary rate was ${f.toRate} per year by block ${f.toBlock}, ${f.delta} from ${f.fromRate} at block ${f.fromBlock}`;
 }
 
 /** The note in one clause, against the row it is anchored to — the annotation
@@ -2696,50 +1084,22 @@ export function marketNoteRowAnnotation(note: MarketNote): string {
   // rows must not print a "between blocks" annotation for a note that runs
   // to the chain head instead.
   if (note.kind === "vault-terms") return `vault note: ${note.statement}, at block ${formatBlock(note.to.block)}`;
-  if (note.kind === "price-gap") {
-    const f = priceGapFigures(note);
-    if (note.protocol === "aave-v4") {
-      const health = f.hfBefore && f.hfAfter ? `; health factor ${f.hfBefore} → ${f.hfAfter} at those amounts` : "";
-      return note.live
-        ? `market note: the ${note.marketSymbol} oracle price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}${health}`
-        : `market note: the ${note.marketSymbol} oracle price moved ${f.change} by block ${f.toBlock}${health}`;
-    }
-    if (isAaveFamilyPriceGap(note)) {
-      return `market note: the ${note.marketSymbol} oracle price moved ${f.change} by block ${f.toBlock}, since this position last touched ${note.marketSymbol} at block ${f.fromBlock}`;
-    }
-    if (note.protocol === "alchemix-v3") {
-      const cr =
-        f.crBefore && f.crAfter ? `; collateralisation ${f.crBefore} → ${f.crAfter} at those shares and debt` : "";
-      return note.live
-        ? `market note: the ${note.marketSymbol} share price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}${cr}`
-        : `market note: the ${note.marketSymbol} share price moved ${f.change} by block ${f.toBlock}${cr}`;
-    }
+  const f = rateStepFigures(note);
+  if (note.protocol === "makerdao") {
+    const ilk = makerMarketName(note);
     return note.live
-      ? `market note: the ${note.marketSymbol} oracle price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
-      : `market note: the ${note.marketSymbol} oracle price moved ${f.change} by block ${f.toBlock}`;
+      ? `market note: the ${ilk} stability fee is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+      : `market note: the ${ilk} stability fee was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}${f.steps ? `, over ${f.steps} of this vault's touches` : ""}`;
   }
-  if (note.kind === "rate-step") {
-    const f = rateStepFigures(note);
-    if (note.protocol === "makerdao") {
-      const ilk = makerMarketName(note);
-      return note.live
-        ? `market note: the ${ilk} stability fee is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-        : `market note: the ${ilk} stability fee was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}${f.steps ? `, over ${f.steps} of this vault's touches` : ""}`;
-    }
-    if (isAaveFamily(note)) {
-      const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)}`;
-      return note.live
-        ? `market note: ${quantity} is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-        : `market note: ${quantity} was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}`;
-    }
+  if (isAaveFamily(note)) {
+    const quantity = `the ${note.marketSymbol} ${aaveFamilyRateNoun(note)}`;
     return note.live
-      ? `market note: the ${note.marketSymbol} market's primary rate is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-      : `market note: the ${note.marketSymbol} market's primary rate was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}${f.steps ? `, over ${f.steps} of this CDP's touches` : ""}`;
+      ? `market note: ${quantity} is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+      : `market note: ${quantity} was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}`;
   }
-  const f = marketNoteFigures(note);
   return note.live
-    ? `market note: the ${note.marketSymbol} market's share rate has moved ${f.ratio} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
-    : `market note: the ${note.marketSymbol} market's share rate stepped ${f.ratio} by block ${f.toBlock}`;
+    ? `market note: the ${note.marketSymbol} market's primary rate is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
+    : `market note: the ${note.marketSymbol} market's primary rate was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}${f.steps ? `, over ${f.steps} of this CDP's touches` : ""}`;
 }
 
 /** Where each end was read, and (for a price gap) why the stretch is stated at
@@ -2786,122 +1146,50 @@ export function marketNoteReceiptLine(note: MarketNote): string {
         .join(", ")}. It is not this address's event — it moved every holder's terms at once — so it is counted in ` +
       `nothing on the page.`
     );
-  if (note.kind === "price-gap") {
-    if (note.protocol === "aave-v4") {
-      const ltClause = note.health
-        ? ` The health factors read the liquidation threshold the spoke reports now, applied to the amounts and ` +
-          `prices this position's row recorded at block ${note.health.atBlock}.`
-        : "";
-      if (note.live) {
-        // Both ends are reads of the same oracle — Aave V4's own, which since
-        // server mig 314 is what the stored history holds too: the earlier one
-        // pinned to the block of this position's row, the later one at head.
-        return (
-          `- Receipt: earlier price — the oracle read at block ${note.from.block} ` +
-          `(/api/oracle/aave-v4?block=${note.from.block}), the block of this position's ${aaveV4EndLabel(note.from)}, ` +
-          `tx ${note.from.txHash} log ${note.from.logIndex}; later price — a live read of Aave's oracle ` +
-          `(/api/oracle/aave-v4) at the latest block ${note.to.block}. Stated because ${priceGapReason(note)}.${ltClause}`
-        );
-      }
-      return (
-        `- Receipt: earlier price — this position's ${aaveV4EndLabel(note.from)} at block ${note.from.block}, ` +
-        `tx ${note.from.txHash} log ${note.from.logIndex}; later price — its ${aaveV4EndLabel(note.to)} at block ` +
-        `${note.to.block}, tx ${note.to.txHash} log ${note.to.logIndex}. Stated because ${priceGapReason(note)}.${ltClause}`
-      );
-    }
-    if (isAaveFamilyPriceGap(note)) {
-      return (
-        `- Receipt: earlier price — this position's ${aaveFamilyEndLabel(note.from)} at block ${note.from.block}, ` +
-        `tx ${note.from.txHash} log ${note.from.logIndex}, the ${aaveFamilyOracleOwner(note)} oracle price stored on ` +
-        `that row; later price — the liquidation at block ${note.to.block}, tx ${note.to.txHash} log ` +
-        `${note.to.logIndex}, its seized-collateral price. Stated because ${priceGapReason(note)} that seized ` +
-        `${note.marketSymbol}.`
-      );
-    }
-    if (note.protocol === "alchemix-v3") {
-      const later = note.live
-        ? `the vault's share price read with the position card's figures at block ${note.to.block}`
-        : `the reading at its ${alchemixEndLabel(note.to)} at block ${note.to.block}, tx ${note.to.txHash}`;
-      return (
-        `- Receipt: earlier price: the reading of this position at its ${alchemixEndLabel(note.from)} at block ` +
-        `${note.from.block}, tx ${note.from.txHash}; later price: ${later}. Stated because ${priceGapReason(note)}.`
-      );
-    }
-    const isPolaris = note.measureKind === "protocol";
-    const positionNoun = isPolaris ? "CDP" : "trove";
-    const endLabel = isPolaris ? polarisEndLabel : priceGapEndLabel;
-    if (note.live) {
-      const liveRoute = isPolaris ? "the market's own price feed, read live" : "the backend's live oracle read";
-      return (
-        `- Receipt: earlier price — this ${positionNoun}'s ${endLabel(note.from)} at block ${note.from.block}, ` +
-        `tx ${note.from.txHash} log ${note.from.logIndex}; later price — ${liveRoute} at the latest block ` +
-        `${note.to.block}. Stated because ${priceGapReason(note)}.`
-      );
-    }
-    return (
-      `- Receipt: earlier price — this trove's ${priceGapEndLabel(note.from)} at block ${note.from.block}, ` +
-      `tx ${note.from.txHash} log ${note.from.logIndex}; later price — its ${priceGapEndLabel(note.to)} at block ` +
-      `${note.to.block}, tx ${note.to.txHash} log ${note.to.logIndex}. Stated because ${priceGapReason(note)}.`
-    );
-  }
-  if (note.kind === "rate-step") {
-    if (note.protocol === "makerdao") {
-      // A Maker fee has no log of its own: what the receipt can name is the
-      // DRIP the fee is first evidenced by — the first Jug.drip that
-      // compounded at the new duty — and the Jug read that confirms it at that
-      // drip's own block. Never a spell block: it is not indexed.
-      const namedMaker = (end: "from" | "to") => {
-        if (end === "to" && note.live) return `the Jug's base + duty, read live at block ${note.to.block}`;
-        const o = end === "from" ? note.observed.from : note.observed.to;
-        const p = end === "from" ? note.from : note.to;
-        return o
-          ? `the fee the Vat's own fold evidences at block ${o.block}, tx ${o.txHash}, log ${o.logIndex} (the first ` +
-              `drip at that fee), confirmed by the Jug's duty read at that block`
-          : `this vault's ${makerRateEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
-      };
-      return `- Receipt: rate before — ${namedMaker("from")}; rate after — ${namedMaker("to")}.${mergedStepsClause(note)}${groupedClause(note)}`;
-    }
-    if (isAaveFamily(note)) {
-      // Both ends are the reserve's OWN ReserveDataUpdated — the Pool emits
-      // one on every action that touches the reserve — but the two are found
-      // by different rules, and the receipt has to say which: the earlier is
-      // read at or before the position's own action (so it is the rate that
-      // action left in force), the later strictly before the position's next
-      // touch and never from inside that touch's own transaction.
-      const from = note.observed.from;
-      const to = note.observed.to;
-      const after = from
-        ? `the reserve's ReserveDataUpdated at block ${from.block}, tx ${from.txHash}, log ${from.logIndex}`
-        : `this position's ${aaveFamilyEndLabel(note.from)} at block ${note.from.block}, tx ${note.from.txHash}, log ${note.from.logIndex}`;
-      const before = note.live
-        ? `the Pool's getReserveData, read live at block ${note.to.block}`
-        : to
-          ? `its ReserveDataUpdated at block ${to.block}, tx ${to.txHash}, log ${to.logIndex}, read before the ` +
-            `position's own transaction`
-          : `this position's ${aaveFamilyEndLabel(note.to)} at block ${note.to.block}, tx ${note.to.txHash}, log ${note.to.logIndex}`;
-      const later = note.live ? "rate now" : "rate before the position's next touch";
-      return `- Receipt: rate after the position's own action — ${after}; ${later} — ${before}.`;
-    }
-    const named = (end: "from" | "to") => {
-      if (end === "to" && note.live) return `the cdpManager's own rate, read live at block ${note.to.block}`;
+  if (note.protocol === "makerdao") {
+    // A Maker fee has no log of its own: what the receipt can name is the
+    // DRIP the fee is first evidenced by — the first Jug.drip that
+    // compounded at the new duty — and the Jug read that confirms it at that
+    // drip's own block. Never a spell block: it is not indexed.
+    const namedMaker = (end: "from" | "to") => {
+      if (end === "to" && note.live) return `the Jug's base + duty, read live at block ${note.to.block}`;
       const o = end === "from" ? note.observed.from : note.observed.to;
       const p = end === "from" ? note.from : note.to;
       return o
-        ? `its PrimaryRateSet at block ${o.block}, tx ${o.txHash} log ${o.logIndex}`
-        : `this CDP's ${polarisEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
+        ? `the fee the Vat's own fold evidences at block ${o.block}, tx ${o.txHash}, log ${o.logIndex} (the first ` +
+            `drip at that fee), confirmed by the Jug's duty read at that block`
+        : `this vault's ${makerRateEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
     };
-    return `- Receipt: rate before — ${named("from")}; rate after — ${named("to")}.${mergedStepsClause(note)}`;
+    return `- Receipt: rate before — ${namedMaker("from")}; rate after — ${namedMaker("to")}.${mergedStepsClause(note)}${groupedClause(note)}`;
   }
-  if (note.live) {
-    return (
-      `- Receipt: last observation before — this account's own ${note.from.kind} at block ${note.from.block}, ` +
-      `tx ${note.from.txHash} log ${note.from.logIndex}; later rate — the market's own exchange rate, read live at ` +
-      `block ${note.to.block}.`
-    );
+  if (isAaveFamily(note)) {
+    // Both ends are the reserve's OWN ReserveDataUpdated — the Pool emits
+    // one on every action that touches the reserve — but the two are found
+    // by different rules, and the receipt has to say which: the earlier is
+    // read at or before the position's own action (so it is the rate that
+    // action left in force), the later strictly before the position's next
+    // touch and never from inside that touch's own transaction.
+    const from = note.observed.from;
+    const to = note.observed.to;
+    const after = from
+      ? `the reserve's ReserveDataUpdated at block ${from.block}, tx ${from.txHash}, log ${from.logIndex}`
+      : `this position's ${aaveFamilyEndLabel(note.from)} at block ${note.from.block}, tx ${note.from.txHash}, log ${note.from.logIndex}`;
+    const before = note.live
+      ? `the Pool's getReserveData, read live at block ${note.to.block}`
+      : to
+        ? `its ReserveDataUpdated at block ${to.block}, tx ${to.txHash}, log ${to.logIndex}, read before the ` +
+          `position's own transaction`
+        : `this position's ${aaveFamilyEndLabel(note.to)} at block ${note.to.block}, tx ${note.to.txHash}, log ${note.to.logIndex}`;
+    const later = note.live ? "rate now" : "rate before the position's next touch";
+    return `- Receipt: rate after the position's own action — ${after}; ${later} — ${before}.`;
   }
-  return (
-    `- Receipt: last observation before — ${note.from.wallet}'s ${note.from.kind} at block ${note.from.block}, ` +
-    `tx ${note.from.txHash} log ${note.from.logIndex}; first after — ${note.to.wallet}'s ${note.to.kind} at block ` +
-    `${note.to.block}, tx ${note.to.txHash} log ${note.to.logIndex}.`
-  );
+  const named = (end: "from" | "to") => {
+    if (end === "to" && note.live) return `the cdpManager's own rate, read live at block ${note.to.block}`;
+    const o = end === "from" ? note.observed.from : note.observed.to;
+    const p = end === "from" ? note.from : note.to;
+    return o
+      ? `its PrimaryRateSet at block ${o.block}, tx ${o.txHash} log ${o.logIndex}`
+      : `this CDP's ${polarisEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
+  };
+  return `- Receipt: rate before — ${named("from")}; rate after — ${named("to")}.${mergedStepsClause(note)}`;
 }

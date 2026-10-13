@@ -159,16 +159,6 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       except:
         "three PT-USDe rows and 47 USDG rows on two reserves the catalog does not list yet, which carry no price at their block — 50 of 70,904",
     },
-    // Market notes (2026-09-06): the price-gap kind on the spoke position page
-    // — ONE asset's oracle price at two of the position's own rows, and the
-    // health factor the whole basket it recorded there makes at each price.
-    // Per asset, not per basket; the liquidation threshold is the one the spoke
-    // reports now, and where a row does not price the whole basket the note is
-    // price-only. No matrix cell exists for notes. The LIVE note (newest row →
-    // chain head) reads BOTH of its ends from the feeds at page time: the later
-    // at head, the earlier from the same registry pinned to the earlier row's
-    // own block. It depends on no index lane, so it is present whenever the
-    // page's own figures are (lib/aave-v4/market-notes.ts).
     // chain verification (scripts/verify-aave-v4-chain.mjs): the ten-spoke →
     // three-hub address graph derived from the contracts' own getReserve(),
     // per-reserve config, the hub spoke-grouping, a sampled position's health
@@ -1089,12 +1079,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // stretches of at least a percentage point in the market's own primary
   // rate between two of a CDP's own touches, receipted against the
   // cdpManager's PrimaryRateSet log.
-  // 2026-09-06: a second market-note kind, the price gap — the same rule the
-  // Liquity V2 branch applies to its own oracle price, read here from the
-  // oracle-at-block lane's priceAtBlock on the CDP's own touches. The
-  // minimum it reads against is always the market's normal-mode MCR(); a
-  // defensive-mode minimum in force at a past block is not indexed. The same
-  // touch also gets a PSM-outcome strip (on the Lifetime flows panel since
+  // Each touch also gets a PSM-outcome strip (on the Lifetime flows panel since
   // 2 Oct 2026): every priced PSM
   // mint/redemption share, valued at the feed it settled at, summed into the
   // CDP's net equity effect from the PSM alone.

@@ -90,9 +90,7 @@ import type { MoonwellChainTimelineResponse } from "@/lib/moonwell-base/chain-ti
 import { fetchMoonwellChainPosition, type MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTimelineUnavailable, fetchChainTimeline } from "@/lib/api/fetch-chain-timeline";
-import { loadMoonwellShareRates, type MoonwellShareRateResponse } from "@/lib/api/fetch-moonwell-share-rate";
-import { shareRateNotesFor, liveShareRateNote, type MarketNote, type ShareRateMarket } from "@/lib/shared/market-note";
-import { isMoonwellEvent, type BaseActivityEvent, type MoonwellContext } from "@/lib/shared/types/event-shape";
+import { isMoonwellEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { SweepInFlight } from "@/components/shared/sweep-in-flight";
 import { useBaseLendingCoverage } from "@/components/shared/base-lending-coverage-banner";
 
@@ -117,45 +115,6 @@ type MoonwellBaseTimeline = MoonwellChainTimelineResponse & ReplayGroupedFields;
 
 /** What the coverage footer names as the thing that was swept. */
 const SOURCE_LABEL = "Moonwell's Base markets";
-
-/** Stable empties, so a position with no steps re-renders the timeline no more
- *  than it did before market notes existed. */
-const EMPTY_SHARE_RATES: MoonwellShareRateResponse[] = [];
-const EMPTY_NOTES: MarketNote[] = [];
-
-/** The Comptroller lists 21 markets on Base; an account cannot have supplied
- *  into more than that, and this is the ceiling on how many share-rate reads
- *  one page load can start. */
-const MAX_NOTE_MARKETS = 21;
-
-/**
- * The markets this account ever supplied into — the only ones whose share rate
- * can have moved anything of this position's.
- *
- * `context.data.market` is the market key, and on BASE that key is the mToken
- * address itself: two Base markets both answer `symbol()` = "mUSDC" (the
- * bridged and the native USDC), so the roster keys by address
- * (lib/sources/chain/moonwell-roster.ts). No lookup is needed here, and none is
- * done — Moonwell ETHEREUM keys by a short tag ('weth', 'usdc'), which is one
- * reason that deployment passes no notes.
- *
- * A borrow or a repay is not enough: only a supply-side row states an mToken
- * balance, and a market the account only ever borrowed from holds none of its
- * shares.
- */
-function suppliedMarkets(
-  events: readonly (BaseActivityEvent & { context: { data: MoonwellContext } })[],
-): ShareRateMarket[] {
-  const out = new Map<string, ShareRateMarket>();
-  for (const e of events) {
-    const d = e.context.data;
-    if (d.side !== "supply") continue;
-    const address = d.market.toLowerCase();
-    if (out.has(address) || out.size >= MAX_NOTE_MARKETS) continue;
-    out.set(address, { address, key: d.market, symbol: d.marketSymbol });
-  }
-  return [...out.values()];
-}
 
 /**
  * What to say while the history is still coming, given what the index says
@@ -216,11 +175,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   const [error, setError] = useState<string | null>(null);
 
   const [timeline, setTimeline] = useState<MoonwellBaseTimeline | null>(null);
-  // The markets' own share-rate steps, kept as the endpoint stated them rather
-  // than as notes: which steps this position was actually holding across is a
-  // pure reduction over the events on the page, so loading more history
-  // re-reduces the same steps without a second request.
-  const [shareRates, setShareRates] = useState<MoonwellShareRateResponse[]>(EMPTY_SHARE_RATES);
   const [timelineState, setTimelineState] = useState<"loading" | "ready" | "unavailable" | "failed">("loading");
   // The event route renders this same view; `ChainTruthTimeline` reads the
   // same param for its pinned mode.
@@ -262,21 +216,10 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   // gets the same depth without pressing again (Miles, 2026-09-02). The
   // store only ever holds depths above the default, so a wallet never dug
   // into costs nothing here.
-  //
-  // The market notes ride the SAME effect and the same "ready", and the order
-  // is forced rather than chosen: which markets to ask about is the account's
-  // own supply history, so the note read cannot start before the timeline
-  // answers (decision recorded 2026-09-04 — the plan called the two fetches
-  // parallel, and they cannot be). What IS decided is that nothing paints in
-  // between: `timelineState` stays "loading" until the notes have settled, so
-  // a reader gets the events and the notes in one paint and never watches a
-  // row insert itself into a list already being read. The wait is bounded by
-  // MARKET_NOTE_BUDGET_MS and fails open — no note, never a placeholder.
   useEffect(() => {
     if (!wallet) return;
     let cancelled = false;
     setTimelineState("loading");
-    setShareRates(EMPTY_SHARE_RATES);
     fetchChainTimeline<MoonwellBaseTimeline>({
       wallet,
       route: TIMELINE_ROUTE,
@@ -288,13 +231,9 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
       // opened — so a liquidation shared by link would read as not found.
       params: servedFoldersEnabled() && !pinnedRoute ? { group: "1" } : undefined,
     })
-      .then(async (d) => {
-        if (cancelled) return;
-        const markets = suppliedMarkets(d.events.filter(isMoonwellEvent));
-        const rates = await loadMoonwellShareRates({ markets: markets.map((m) => m.address) }).catch(() => []);
+      .then((d) => {
         if (cancelled) return;
         setTimeline(d);
-        setShareRates(rates.length > 0 ? rates : EMPTY_SHARE_RATES);
         setTimelineState("ready");
       })
       .catch((e) => {
@@ -324,57 +263,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
     [servedRows],
   );
-
-  // The market notes: each market's steps reduced against THIS position's own
-  // events — the step has to sit inside the position's life and the position
-  // has to have been holding the market's mTokens across it, and that holding
-  // is the slice the note states. Memoised because <ChainTruthTimeline>
-  // re-anchors on every change of the array's identity.
-  const notes = useMemo(() => {
-    if (shareRates.length === 0 || moonwellEvents.length === 0) return EMPTY_NOTES;
-    const byAddress = new Map(suppliedMarkets(moonwellEvents).map((m) => [m.address, m]));
-    const out = shareRates.flatMap((r) => {
-      const market = byAddress.get(r.market.toLowerCase());
-      return market ? shareRateNotesFor(r.steps, market, moonwellEvents, servedFolders) : [];
-    });
-    return out.length > 0 ? out.sort((a, b) => a.to.block - b.to.block) : EMPTY_NOTES;
-  }, [shareRates, moonwellEvents, servedFolders]);
-
-  // Live notes: one per market this account has ENTERED (Comptroller
-  // membership) and still holds a nonzero live mToken balance in — the
-  // market's own live exchange rate against this account's own newest
-  // Mint/Redeem in it. A market the account only ever borrowed from, or has
-  // fully exited, gets none — `liveShareRateNote` itself drops a market with
-  // no Mint/Redeem row of the account's own to compare the live rate against.
-  // No separate pending state: by the time this component reaches the branch
-  // that mounts <ChainTruthTimeline> at all (`timelineState === "ready"`),
-  // `data` and `moonwellEvents` are already both settled, so this is never
-  // mid-flight on its own.
-  const liveNotes = useMemo(() => {
-    if (!data || data.chainStale || moonwellEvents.length === 0) return EMPTY_NOTES;
-    const byAddress = new Map(suppliedMarkets(moonwellEvents).map((m) => [m.address, m]));
-    const out: MarketNote[] = [];
-    for (const m of data.markets) {
-      if (!m.entered) continue;
-      const rawUnits = Number(m.mtokenBalanceRaw);
-      if (!Number.isFinite(rawUnits) || rawUnits <= 0) continue;
-      const descriptor = byAddress.get(m.market.toLowerCase());
-      if (!descriptor) continue;
-      const note = liveShareRateNote(
-        moonwellEvents,
-        descriptor,
-        {
-          rate: m.exchangeRate,
-          block: data.blockNumber,
-          timestamp: data.blockTimestamp || undefined,
-          units: rawUnits / 1e8,
-        },
-        servedFolders,
-      );
-      if (note) out.push(note);
-    }
-    return out.length > 0 ? out : EMPTY_NOTES;
-  }, [data, moonwellEvents, servedFolders]);
 
   // "The sweep read every block of this deployment's life." Both conditions
   // are needed: no holes inside the span, AND the span reaching the
@@ -587,8 +475,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                     view={view}
                     chain={data}
                     events={moonwellEvents}
-                    notes={notes}
-                    liveNotes={liveNotes}
                     csvFilename={`moonwell-base-${wallet.slice(0, 10)}-activity.csv`}
                     history={markdownHistoryScope(undefined, moonwellEvents, servedFolders)}
                     scopeNote={exportScopeNote(undefined, moonwellEvents, "this wallet's whole history", servedFolders)}
@@ -684,16 +570,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                         segments={segments}
                         persistKeyPrefix="moonwell"
                         closed={view?.status !== "open"}
-                        // Receipted facts about the MARKETS this account supplied
-                        // into, placed between the two of its own events that
-                        // bracket each one. Never counted anywhere — see the prop's
-                        // own doc comment and lib/shared/market-note.ts.
-                        notes={notes}
-                        // This account's own live share-rate note per entered
-                        // market it still holds — no pending state here (see
-                        // `liveNotes`'s own comment): both it and `moonwellEvents`
-                        // are already settled by the time this branch mounts.
-                        liveNotes={liveNotes}
                         toolbarLeading={
                           <TimelineActivityHeader
                             events={headerStamps}

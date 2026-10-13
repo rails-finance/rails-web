@@ -17,17 +17,11 @@
 // THE MARK IS THE HEADER (Miles, 2026-09-04: "the numbers speak for
 // themselves"). At rest the row reads on one vertical centre line — a pair
 // of marks (the asset, and what it was measured in, overlapping), a
-// lucide direction glyph (up-right / down-right — the sign of a price-gap
-// move, or a share-rate step's always-a-rise), the one headline figure, and —
-// on the two kinds whose headline is a MOVE — the step mark with its two
-// values. What the headline figure IS depends on the question the kind
-// answers: a price gap and a share-rate step state the move (a magnitude or a
-// ratio; the glyph carries the direction, not the figure's sign), a rate step
-// states the LATER RATE, because "what does this position pay now" is what a
-// reader asks of a rate (Miles, 2026-09-10) — and a rate step therefore draws
-// no step mark, which would print that same later rate a second time. No
-// words: what moved is named in the panel's stat label and the (i), not the
-// header. The row has
+// lucide direction glyph (up-right / down-right) where the kind observed a
+// move, and the one headline figure. A rate step states the LATER RATE,
+// because "what does this position pay now" is what a reader asks of a rate
+// (Miles, 2026-09-10); a vault's terms state the new figure. No words: what
+// moved is named in the panel's stat label and the (i). The row has
 // its own ground (`bg-note`, #1d212b dark / #f0f0f0 light) rather than the
 // cards' `bg-raised`, so a note reads as a different KIND of row from an
 // event before the diamond does — not a card waiting for a hover it never
@@ -46,7 +40,7 @@
 // events it sits between. Every figure carries its own receipt.
 //
 // ONE SWITCH ON `kind`, and it is at the top of MarketNoteRow. What differs
-// between a Moonwell share-rate step and a Liquity V2 price gap is the label,
+// between a rate step and a vault's terms is the label,
 // the headline figure, the stat cards, the derivation prose, the "?" content
 // and how a value on the mark is written — nothing else. Each kind hands back
 // exactly those and the shell draws them: same geometry, same diamond on the
@@ -54,7 +48,6 @@
 // plus its own provenance module, never a branch in the layout.
 
 import { useState, type ReactNode } from "react";
-import { formatTinyNonZero } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { usePathname } from "next/navigation";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
@@ -66,95 +59,38 @@ import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { H } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { usePreferences } from "@/lib/shared/preferences-context";
-import { formatRatio } from "@/lib/shared/ratio-format";
-import type { RatioMode } from "@/lib/shared/preferences";
 import {
-  PriceChipShell,
   StatCard,
   StatSubline,
   StateTransition,
   TransitionArrow as CardArrow,
-  ValuePill as CardValuePill,
 } from "@/components/shared/state-transition";
-import { StepMark } from "@/components/shared/step-mark";
 import { EventDateContext, EventTime } from "@/components/shared/event-time";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
 import { protocolIconSrc } from "@/lib/shared/protocols";
-import {
-  marketNotePriceGapContent,
-  marketNoteRateStepContent,
-  marketNoteShareRateContent,
-  marketNoteVaultTermsContent,
-} from "@/lib/shared/learn-more-content";
+import { marketNoteRateStepContent, marketNoteVaultTermsContent } from "@/lib/shared/learn-more-content";
 import { polarisModal } from "@/lib/polaris/event-templates";
 import { aaveFamilyRateStepInterestProv, aaveFamilyRateStepProv } from "@/lib/aave-v3/market-note-provenance";
-import { aaveFamilyPriceGapProv } from "@/lib/aave-v3/liquidation-price-note-provenance";
-import { aaveV4PriceGapHealthProv, aaveV4PriceGapProv } from "@/lib/aave-v4/market-note-provenance";
-import { alchemixSharePricePositionProv, alchemixSharePriceProv } from "@/lib/alchemix/market-note-provenance";
-import { priceGapPositionProv, priceGapProv } from "@/lib/liquity/market-note-provenance";
 import { makerRateStepInterestProv, makerRateStepProv } from "@/lib/makerdao/market-note-provenance";
-import { shareRateSliceProv, shareRateStepProv } from "@/lib/moonwell/market-note-provenance";
+import { rateStepInterestProv, rateStepProv } from "@/lib/polaris/market-note-provenance";
 import {
-  polarisPriceGapPositionProv,
-  polarisPriceGapProv,
-  rateStepInterestProv,
-  rateStepProv,
-} from "@/lib/polaris/market-note-provenance";
-import {
-  AAVE_V4_LIQUIDATION_HF,
   aaveFamilyEndLabel,
-  aaveFamilyOracleOwner,
   aaveFamilyRateNoun,
-  aaveV4EndLabel,
-  alchemixEndLabel,
-  formatShareRate,
-  forkNoteHouse,
-  LIVE_GAP_MOVE_FLOOR,
-  LIVE_GAP_RUNWAY_SHARE,
-  isAaveFamilyPriceGap,
   makerRateEndLabel,
-  marketNoteFigures,
   noteElapsedSeconds,
-  notePriceFormat,
-  formatChange,
-  formatChangeMagnitude,
-  formatPrice,
-  priceDecimals,
-  PRICE_DECIMALS_CAP,
-  separatingDecimals,
   polarisEndLabel,
-  priceGapEndLabel,
-  priceGapFigures,
-  priceGapReason,
   rateStepFigures,
   formatRatePercent,
   type LiveNoteGroup,
   type MarketNote,
   type MarketNotePoint,
-  type PriceGapNote,
   type RateStepNote,
-  type ShareRateStepNote,
   type VaultTermsNote,
 } from "@/lib/shared/market-note";
-import { heldAmountProv, valueAtPriceProv, type HeldSource } from "@/lib/shared/market-note-cell-provenance";
-
-/** A figure at a fixed number of decimals, grouped. Locale pinned. */
-const grouped = (n: number, decimals: number): string =>
-  n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-
-/** An amount the way a regular card's grid writes one: whole units from a
- *  thousand up, two places down to 0.01, formatTinyNonZero below. */
-const amountText = (n: number): string => {
-  if (n === 0) return "0";
-  if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (Math.abs(n) < 0.01) return formatTinyNonZero(n);
-  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-};
 
 /** A receipted figure in a stat card: the text, its receipt, and the mark of
  *  the asset it counts (none for a block, a ratio, a percentage). */
@@ -164,10 +100,8 @@ interface NoteFigure {
   /** The exact value the receipt records — defaults to `text`. */
   exact?: string;
   symbol?: string;
-  /** Resolve the mark under another symbol (mMAMO wearing MAMO's). */
-  iconAs?: string;
   /** Greyed, the way a regular card states a figure the event left as it
-   *  was: the price move did not change it. */
+   *  was: the move did not change it. */
   muted?: boolean;
 }
 
@@ -176,48 +110,29 @@ interface NoteStat {
   label: string;
   figure?: NoteFigure;
   transition?: { before: NoteFigure; after: NoteFigure };
-  /** The figure's value at each end's price, drawn in the bordered value
-   *  pill a regular card draws beside a collateral amount. */
-  values?: { before: NoteFigure; after: NoteFigure };
-  /** A small receipted line under the value — "branch minimum 110%",
-   *  "23,739 BOLD / year" — for the figure that qualifies the card's own
+  /** A small receipted line under the value — "23,739 USDp / year" — for the figure that qualifies the card's own
    *  rather than deserving a card of its own. Muted, as a reference or a
    *  qualifier of a held figure is, unless `changed`: the one sub-line the
    *  move itself sets (a rate step's "moved"). */
   sub?: { text?: string; figure: NoteFigure; suffix?: string; changed?: boolean };
 }
 
-/** The price chip, bottom right, where a regular card states its price: one
- *  unit of the asset at each end. */
-interface NoteChip {
-  before: NoteFigure;
-  after: NoteFigure;
-  /** The asset one unit of which is priced; its mark closes the chip. */
-  symbol: string;
-  iconAs?: string;
-  /** "$" for a USD price; otherwise the price is followed by its unit. */
-  prefix?: string;
-  unit?: string;
-  title: string;
-}
-
 /** The mark the asset was measured in, drawn overlapping the asset's own:
- *  the dollar for an oracle price, the protocol for a share rate. */
-type MeasureMark = { kind: "usd" } | { kind: "protocol"; id: string } | { kind: "token"; symbol: string };
+ *  the protocol whose rate or terms the note states. */
+type MeasureMark = { kind: "protocol"; id: string };
 
 /** What one kind of note hands the shell. Nothing else varies. */
 interface NoteBody {
-  /** "MAMO share rate", "WETH oracle price" — the header's accessible name;
-   *  the panel's stat label carries it in view. */
+  /** "USDp primary rate", "ETH-A stability fee" — the header's accessible
+   *  name; the panel's stat label carries it in view. */
   label: string;
   measure: MeasureMark;
-  /** The one figure the header states beside the mark. On a move (a price gap,
-   *  a share rate) it is the move; on a rate step it is the LATER RATE — what
-   *  the position pays now, which is the question that note answers (Miles,
-   *  2026-09-10). */
+  /** The one figure the header states beside the mark. On a rate step it is
+   *  the LATER RATE — what the position pays now, which is the question that
+   *  note answers (Miles, 2026-09-10). */
   headline: NoteFigure;
-  /** The quiet word naming what the headline counts — "oracle price",
-   *  "primary rate", "share rate" — sitting just after the headline figure.
+  /** The quiet word naming what the headline counts — "primary rate",
+   *  "stability fee" — sitting just after the headline figure.
    *  THE MARK IS THE HEADER: this is the one word of prose the
    *  header carries, so a reader never has to open the panel just to learn
    *  what moved. */
@@ -225,26 +140,16 @@ interface NoteBody {
   stats: NoteStat[];
   /** The line above the cells: what the stretch is, and how long it ran. */
   intro?: { lead: string; elapsed?: NoteFigure; tail?: "ago" | "apart" };
-  /** The price chip. Absent on a kind with no price (a rate, a vault's terms). */
-  chip?: NoteChip;
   /** The two blocks the stretch runs between, stated in the (i) beneath. */
   blocks?: { before: NoteFigure; after: NoteFigure };
-  /** The (i) beneath the cells: a paragraph, or (the price gap's form) one
-   *  bullet per fact, in the shape of a regular event's explanation. */
-  derivation: ReactNode | ReactNode[];
+  /** The (i) beneath the cells: a paragraph. */
+  derivation: ReactNode;
   /** False on a kind that observed ONE value rather than a move: the header
    *  then draws no direction glyph. A configuration event states its new
    *  terms and, often, no earlier ones — an arrow over it would be a
    *  direction nothing read. Default true, which is every kind built out of
    *  two observations. */
   direction?: boolean;
-  /** How the step mark labels its two levels — and whether the header draws
-   *  one at all. A rate step states no mark: since its headline became the
-   *  later rate, the mark's own "to" label would print that same rate a
-   *  second time an inch away, and one figure stated twice in one row reads
-   *  as two facts. The from → to pair is in the panel's own stat card, where
-   *  it is receipted. */
-  format?: (n: number) => string;
   learnMore: LearnMoreContent;
 }
 
@@ -339,22 +244,12 @@ function useNoteBody(note: MarketNote): NoteBody {
     explorer: (p) => explorerUrl(chainId, "tx-logs", p.txHash),
   };
 
-  // The T3 ratio-pair rule's viewer preference (see ratioPairNote): read once
-  // here, since it reaches only the price-gap kind's collateral-ratio bullet.
-  const { prefs } = usePreferences();
-
   // The one switch. Everything below it is the same row whatever was observed.
-  return note.kind === "price-gap"
-    ? priceGapBody(note, links, prefs.ratioMode)
-    : note.kind === "rate-step"
-      ? rateStepBody(note, links)
-      : note.kind === "vault-terms"
-        ? vaultTermsBody(note, links)
-        : shareRateBody(note, links);
+  return note.kind === "rate-step" ? rateStepBody(note, links) : vaultTermsBody(note, links);
 }
 
 /** The header's figures: the marks, the direction, the headline and its
- *  quantity word, and the step mark where the kind draws one. */
+ *  quantity word. */
 function NoteHeadline({ note, body }: { note: MarketNote; body: NoteBody }) {
   return (
     <>
@@ -367,12 +262,11 @@ function NoteHeadline({ note, body }: { note: MarketNote; body: NoteBody }) {
       {body.direction !== false && <DirectionGlyph rising={note.to.value >= note.from.value} />}
       <Figure figure={body.headline} className="text-sm font-semibold" />
       <span className="text-xs text-rb-500">{body.quantity}</span>
-      {body.format && <StepMark from={note.from.value} to={note.to.value} format={body.format} />}
     </>
   );
 }
 
-/** The opened note: the lead line, the cells, the price chip and the (i). */
+/** The opened note: the lead line, the cells and the (i). */
 function NoteBodyPanel({ body }: { body: NoteBody }) {
   return (
     <>
@@ -403,13 +297,6 @@ function NoteBodyPanel({ body }: { body: NoteBody }) {
                   ) : (
                     s.figure && <Figure figure={s.figure} className="text-sm font-semibold" />
                   )}
-                  {s.values && (
-                    <>
-                      <ValuePill figure={s.values.before} />
-                      <TransitionArrow />
-                      <ValuePill figure={s.values.after} />
-                    </>
-                  )}
                 </StateTransition>
                 {s.sub && (
                   <StatSubline changed={!!s.sub.changed} className="mt-1 flex items-center gap-1">
@@ -423,7 +310,6 @@ function NoteBodyPanel({ body }: { body: NoteBody }) {
           ))}
         </div>
       )}
-      {body.chip && <PriceChip chip={body.chip} />}
       <div className="px-4 pb-3 pt-1">
         <InfoDisclosure
           label="how this note was derived"
@@ -433,36 +319,17 @@ function NoteBodyPanel({ body }: { body: NoteBody }) {
             </span>
           }
         >
-          {Array.isArray(body.derivation) ? (
-            // The bullet form of a regular event's (i), closing on the block
-            // range. The blocks are stated only here, so they stay muted.
-            <ProseExplainer
-              items={[
-                ...body.derivation,
-                ...(body.blocks
-                  ? [
-                      <>
-                        The stretch runs from block{" "}
-                        <Figure figure={{ ...body.blocks.before, muted: true }} className="" /> to block{" "}
-                        <Figure figure={{ ...body.blocks.after, muted: true }} className="" />.
-                      </>,
-                    ]
-                  : []),
-              ]}
-            />
-          ) : (
-            <p className="text-xs leading-relaxed text-rb-500">
-              {body.derivation}
-              {body.blocks && (
-                <>
-                  {" "}
-                  The stretch runs from block{" "}
-                  <Figure figure={{ ...body.blocks.before, muted: true }} className="text-xs" /> to block{" "}
-                  <Figure figure={{ ...body.blocks.after, muted: true }} className="text-xs" />.
-                </>
-              )}
-            </p>
-          )}
+          <p className="text-xs leading-relaxed text-rb-500">
+            {body.derivation}
+            {body.blocks && (
+              <>
+                {" "}
+                The stretch runs from block{" "}
+                <Figure figure={{ ...body.blocks.before, muted: true }} className="text-xs" /> to block{" "}
+                <Figure figure={{ ...body.blocks.after, muted: true }} className="text-xs" />.
+              </>
+            )}
+          </p>
         </InfoDisclosure>
       </div>
     </>
@@ -470,22 +337,12 @@ function NoteBodyPanel({ body }: { body: NoteBody }) {
 }
 
 /** A note as its spine marker states it: the tooltip and the open caption
- *  ("WETH price −12.0%", the header's grain) and the words a screen reader
- *  hears ("WETH price down 12.0%"). */
+ *  ("ETH-A fee 2.00% → 9.50%") and the words a screen reader hears ("ETH-A
+ *  fee from 2.00% to 9.50%"). */
 export function noteMarkerText(note: MarketNote): { tip: string; spoken: string } {
   const sym = note.marketSymbol;
-  if (note.kind === "price-gap") {
-    const dir = note.changePct < 0 ? "down" : "up";
-    return {
-      tip: `${sym} price ${formatChange(note.changePct)}`,
-      spoken: `${sym} price ${dir} ${formatChangeMagnitude(note.changePct)}`,
-    };
-  }
-  // The other kinds carry no one signed move on the price-gap's grain: the
-  // marker names the quantity and its direction, and the open row the figures.
-  const noun = note.kind === "rate-step" ? "rate" : note.kind === "share-rate-step" ? "share rate" : "terms";
   if (note.kind === "vault-terms") {
-    const text = note.tip ?? `${sym} ${noun}`;
+    const text = note.tip ?? `${sym} terms`;
     return { tip: text, spoken: text };
   }
   // MakerDAO's fee notes state the ilk's fee both ends: "ETH-A fee 2.00% → 9.50%".
@@ -502,7 +359,9 @@ export function noteMarkerText(note: MarketNote): { tip: string; spoken: string 
       spoken: `${sym} primary rate from ${f.fromRate} to ${f.toRate}`,
     };
   }
-  const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
+  // The Aave family's rate notes name the quantity and its direction, and the
+  // open row the figures.
+  const text = `${sym} rate ${note.to.value >= note.from.value ? "up" : "down"}`;
   return { tip: text, spoken: text };
 }
 
@@ -595,8 +454,8 @@ function LiveNoteLine({ note }: { note: MarketNote }) {
   );
 }
 
-/** The asset's mark with the measure's overlapping it — WETH under the dollar,
- *  MAMO under Moonwell. The same chip geometry as InlineAssetCluster, so the
+/** The asset's mark with the measure's overlapping it — USDp under Polaris,
+ *  wstETH under MakerDAO. The same chip geometry as InlineAssetCluster, so the
  *  pair reads as one object. Decoration: the header's accessible name says
  *  what the pair says. */
 function MarkPair({ asset, measure }: { asset: string; measure: MeasureMark }) {
@@ -607,21 +466,14 @@ function MarkPair({ asset, measure }: { asset: string; measure: MeasureMark }) {
         <TokenChipIcon symbol={asset} size={24} filterable={false} />
       </span>
       <span className={chip} style={{ marginLeft: -8, zIndex: 1 }}>
-        {measure.kind === "usd" ? (
-          <img src="/icons/usd.svg" alt="" width={24} height={24} className="rounded-full" />
-        ) : measure.kind === "token" ? (
-          <TokenChipIcon symbol={measure.symbol} size={24} filterable={false} />
-        ) : (
-          <img src={protocolIconSrc(measure.id)} alt="" width={24} height={24} className="rounded-full" />
-        )}
+        <img src={protocolIconSrc(measure.id)} alt="" width={24} height={24} className="rounded-full" />
       </span>
     </span>
   );
 }
 
-/** The direction glyph beside the headline figure: it carries the sign the
- *  figure no longer does (a price-gap headline is now an unsigned
- *  magnitude, and a share-rate ratio never carried one). An sr-only word
+/** The direction glyph beside the headline figure: the headline states the
+ *  later rate, so the glyph carries which way it moved. An sr-only word
  *  precedes it, so a screen reader still gets the direction. */
 function DirectionGlyph({ rising }: { rising: boolean }) {
   const Icon = rising ? ArrowUpRight : ArrowDownRight;
@@ -640,7 +492,7 @@ function elapsedFigure(note: MarketNote, text: string, prov: Provenance): NoteFi
 
 /** The row's time, where a card states its own: the date of the stretch's
  *  later end, on the timeline's day-stamp rule, or "Now" on a live note, whose
- *  later end is the price read at the chain head. */
+ *  later end is a read at the chain head. */
 function NoteTime({ note, datePrefix }: { note: MarketNote; datePrefix: string | null }) {
   if (note.live) {
     return (
@@ -672,43 +524,6 @@ function TransitionArrow() {
   );
 }
 
-/** A value in the bordered pill a regular card draws beside an amount. The
- *  price move is what changed it, so it takes the foreground tone unless the
- *  figure says it is muted. */
-function ValuePill({ figure }: { figure: NoteFigure }) {
-  return (
-    <Prov info={figure.prov} value={figure.exact ?? figure.text}>
-      <CardValuePill changed={!figure.muted}>{figure.text}</CardValuePill>
-    </Prov>
-  );
-}
-
-/** The price chip a regular card draws bottom right, with both ends. The two
- *  ends are the move the note states, so the chip takes the foreground tone. */
-function PriceChip({ chip }: { chip: NoteChip }) {
-  const end = (f: NoteFigure) => (
-    <Prov info={f.prov} value={f.exact ?? f.text}>
-      <span className="tabular-nums">
-        {chip.prefix ?? ""}
-        {f.text}
-      </span>
-    </Prov>
-  );
-  return (
-    <div className="flex items-center gap-2 px-4 py-2">
-      <PriceChipShell changed title={chip.title} marker>
-        {end(chip.before)}
-        <span aria-hidden="true" className="text-rb-500">
-          →
-        </span>
-        {end(chip.after)}
-        {chip.unit && <span>{chip.unit}</span>}
-        <TokenChipIcon symbol={chip.symbol} iconOverride={chip.iconAs} size={14} filterable={false} />
-      </PriceChipShell>
-    </div>
-  );
-}
-
 /** A receipted figure with, where it counts an asset, that asset's mark. */
 function Figure({ figure, className }: { figure: NoteFigure; className: string }) {
   return (
@@ -716,76 +531,12 @@ function Figure({ figure, className }: { figure: NoteFigure; className: string }
       info={figure.prov}
       value={figure.exact ?? figure.text}
       symbol={figure.symbol}
-      icon={
-        figure.symbol ? (
-          <TokenChipIcon symbol={figure.symbol} iconOverride={figure.iconAs} size={16} filterable={false} />
-        ) : undefined
-      }
+      icon={figure.symbol ? <TokenChipIcon symbol={figure.symbol} size={16} filterable={false} /> : undefined}
     >
       <span className={`tabular-nums ${figure.muted ? "text-rb-500" : "text-foreground"} ${className}`}>
         {figure.text}
       </span>
     </Prov>
-  );
-}
-
-/** A figure the (i) repeats from the cells or the chip above: the foreground
- *  tone of the T3 echo-colour rule, and an echo of the cell's receipt so the
- *  inspector's locator reaches both. Written exactly as the cell writes it.
- *  `muted` keeps the same echoed receipt (the locator still reaches it) but
- *  drops the foreground tone, for the T3 ratio-pair rule's "other form" case,
- *  where the cell's own figure isn't the one the viewer's preference shows. */
-function Echo({
-  figure,
-  prefix = "",
-  suffix = "",
-  muted = false,
-}: {
-  figure: NoteFigure;
-  prefix?: string;
-  suffix?: string;
-  muted?: boolean;
-}) {
-  const echoed = (
-    <Prov echo info={figure.prov} value={figure.exact ?? figure.text} symbol={figure.symbol}>
-      <span className={`tabular-nums ${muted ? "text-rb-500" : ""}`}>
-        {prefix}
-        {figure.text}
-        {suffix}
-      </span>
-    </Prov>
-  );
-  return muted ? echoed : <H>{echoed}</H>;
-}
-
-/** "25 Aug" — a touch's day, in UTC, the way the timeline dates a row. */
-const utcDayMonth = (ts: number): string => {
-  const d = new Date(ts * 1000);
-  return `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })}`;
-};
-
-/** The T3 ratio-pair rule (rails-ops standards/detail-page-anatomy.md, "The
- *  disclosure ladder"): a T3 statement of the collateral ratio states the LTV
- *  alongside it, the same fact read the other way, with whichever form the
- *  viewer's CR/LTV preference shows elsewhere on the page foreground, the
- *  other muted. This note's own stat card states only the collateral ratio
- *  (no CR/LTV toggle of its own), so the preference is read directly
- *  (`prefs.ratioMode`) rather than off a T2 cell that switches. The CR figure
- *  keeps its own receipt in both cases (`Echo`'s `muted` only swaps the
- *  colour); the LTV has none to echo, so its foreground is a plain `<H>` and
- *  its muted form is plain text, with no invented provenance. Both forms are
- *  written at a fixed two decimals, the ratio grain T2 uses elsewhere on the
- *  page, not this note's own separating-decimals grain. */
-function ratioPairNote(cr: number, crFigure: NoteFigure, mode: RatioMode): ReactNode {
-  const ltvText = formatRatio(cr, "ltv", 2);
-  return mode === "ltv" ? (
-    <>
-      <Echo figure={crFigure} muted /> (LTV <H>{ltvText}</H>)
-    </>
-  ) : (
-    <>
-      <Echo figure={crFigure} /> (LTV {ltvText})
-    </>
   );
 }
 
@@ -859,923 +610,11 @@ function vaultTermsBody(note: VaultTermsNote, links: NoteLinks): NoteBody {
   };
 }
 
-// ── Moonwell Base: a market's share rate stepped ────────────────────────────
-
-function shareRateBody(note: ShareRateStepNote, links: NoteLinks): NoteBody {
-  const f = marketNoteFigures(note);
-  const observation = (p: MarketNotePoint, which: "before" | "after") => {
-    if (which === "after" && note.live) {
-      return (
-        <>
-          now: m{note.marketSymbol}&rsquo;s own exchange rate, read live at block {p.block.toLocaleString("en-US")} —
-          not a log
-        </>
-      );
-    }
-    return (
-      <>
-        {which === "before" ? (note.live ? "this account's own last" : "last observation before") : "first after"}:{" "}
-        {p.eventId ? "this account" : `${p.wallet.slice(0, 6)}…${p.wallet.slice(-4)}`}
-        &rsquo;s {p.kind} at block {p.block.toLocaleString("en-US")}
-        {observationLinks(p, links)}
-      </>
-    );
-  };
-  // The regular Moonwell card states the mToken balance and what it
-  // represents in the underlying. The balance is the account's own; the rate
-  // moves what it is worth. A note with no slice states the rate alone.
-  const stats: NoteStat[] = [];
-  if (note.slice && f.units && f.before && f.after) {
-    const s = note.slice;
-    stats.push(
-      {
-        label: "mToken balance",
-        figure: {
-          text: f.units,
-          prov: shareRateSliceProv(note, "units"),
-          exact: String(s.units),
-          symbol: s.unitSymbol,
-          iconAs: s.valueSymbol,
-          muted: true,
-        },
-      },
-      {
-        label: `Supplied (${s.valueSymbol})`,
-        transition: {
-          before: {
-            text: f.before,
-            prov: shareRateSliceProv(note, "before"),
-            exact: String(s.before),
-            symbol: s.valueSymbol,
-          },
-          after: {
-            text: f.after,
-            prov: shareRateSliceProv(note, "after"),
-            exact: String(s.after),
-            symbol: s.valueSymbol,
-          },
-        },
-      },
-    );
-  }
-  const elapsed = f.elapsed ? elapsedFigure(note, f.elapsed, shareRateStepProv(note, "elapsed")) : undefined;
-  return {
-    label: `${note.marketSymbol} share rate`,
-    measure: { kind: "protocol", id: "moonwell" },
-    headline: { text: f.ratio, prov: shareRateStepProv(note, "ratio"), exact: String(note.ratio) },
-    quantity: "share rate",
-    format: formatShareRate,
-    // A historical step's two ends are other wallets' mints and redeems in the
-    // market, so it is dated by their distance apart; a live note's earlier end
-    // is this account's own last one.
-    intro: note.live
-      ? { lead: "Market fluctuation since this account's last mint or redeem", ...(elapsed ? { elapsed } : {}) }
-      : {
-          lead: "Share-rate step in the market, between two observations",
-          ...(elapsed ? { elapsed, tail: "apart" } : {}),
-        },
-    chip: {
-      before: { text: f.fromRate, prov: shareRateStepProv(note, "rate"), exact: String(note.from.value) },
-      after: { text: f.toRate, prov: shareRateStepProv(note, "rate"), exact: String(note.to.value) },
-      symbol: `m${note.marketSymbol}`,
-      iconAs: note.marketSymbol,
-      unit: note.marketSymbol,
-      title: `One m${note.marketSymbol} in ${note.marketSymbol} at each end (${note.unitLabel})`,
-    },
-    blocks: {
-      before: { text: f.fromBlock, prov: shareRateStepProv(note, "blocks"), exact: String(note.from.block) },
-      after: { text: f.toBlock, prov: shareRateStepProv(note, "blocks"), exact: String(note.to.block) },
-    },
-    stats,
-    learnMore: marketNoteShareRateContent(),
-    derivation: note.live ? (
-      <>
-        This is a LIVE note: the earlier reading is this account&rsquo;s own last Mint or Redeem in the{" "}
-        {note.marketSymbol} market — the underlying amount it emitted divided by the mTokens it was exchanged for — and
-        the later one is m{note.marketSymbol}&rsquo;s own exchange rate read now, at the chain head, not a second log.{" "}
-        {observation(note.from, "before")}; {observation(note.to, "after")}. Shown whenever this account still holds the
-        market&rsquo;s mTokens, whatever the move — nothing having changed is itself the fact this note states.
-        {note.slice && (
-          <>
-            {" "}
-            The position&rsquo;s own slice holds this account&rsquo;s CURRENT mToken holding fixed — its live balance,
-            read at the chain head — and moves only the rate, so it can differ from the balance right after the last
-            Mint or Redeem if the account transferred mTokens since.
-          </>
-        )}
-      </>
-    ) : (
-      <>
-        The market&rsquo;s share rate is not read from anywhere: every Mint and Redeem in the {note.marketSymbol} market
-        emits the underlying amount and the mTokens it was exchanged for, and their quotient is the rate at that block.
-        Two adjacent observations bracket this step — {observation(note.from, "before")},{" "}
-        {observation(note.to, "after")}. Nothing between them is drawn, because nothing between them was observed. A
-        step is only stated where the change exceeds ten times the interest the market could have accrued over the same
-        blocks.
-        {note.slice && (
-          <>
-            {" "}
-            The position&rsquo;s own slice is its mToken balance at the first of the two blocks, replayed from every
-            mToken Transfer touching this wallet, multiplied by each end&rsquo;s rate.
-          </>
-        )}
-      </>
-    ),
-  };
-}
-
-// ── Liquity V2's branch oracle price, or Polaris's market price — both moved
-//    between two of the position's own events ───────────────────────────────
-// One body function for both: Liquity V2's price is USD and its ends are a
-// trove's own events (priceGapProv / priceGapPositionProv); Polaris's price
-// is the market's own stable (USDp/GOLDp, never USD) and its ends are a
-// CDP's own touches (polarisPriceGapProv / polarisPriceGapPositionProv).
-// `note.measureKind === "protocol"` is the one flag that tells the two
-// apart — set only by `polarisPriceGapNotesFor` — and it picks the measure
-// mark, the end-label function, the position noun and the receipt builders
-// alike; nothing else in the body branches.
-
-function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): NoteBody {
-  // Aave V4's basket is a different position shape, not a different kind: one
-  // note per ASSET, and a health factor over the whole basket where the other
-  // two homes state one collateral ratio. Its own body below.
-  if (note.protocol === "aave-v4") return aaveV4PriceGapBody(note, links);
-  if (isAaveFamilyPriceGap(note)) return aaveFamilyPriceGapBody(note, links);
-  if (note.protocol === "alchemix-v3") return alchemixSharePriceBody(note, links);
-  const f = priceGapFigures(note);
-  const p = note.position;
-  const isPolaris = note.measureKind === "protocol";
-  const endLabel = isPolaris ? polarisEndLabel : priceGapEndLabel;
-  const positionNoun = isPolaris ? "CDP" : "trove";
-  // A Liquity V2 fork's note names the fork (lib/shared/market-note.ts,
-  // `forkPriceGapNotesFor`); its price is the branch PriceFeed's.
-  const fork = forkNoteHouse(note);
-  const feedNoun = isPolaris ? "the market's price feed" : fork ? `${fork}'s branch PriceFeed` : "Liquity's PriceFeed";
-  const minimumLabel = isPolaris ? "the market's normal-mode minimum" : "branch minimum";
-  const priceProv = isPolaris ? polarisPriceGapProv : priceGapProv;
-  const positionProv = isPolaris ? polarisPriceGapPositionProv : priceGapPositionProv;
-  /** Where one end's price was read: a position event (with its two links),
-   *  or, on a live note's later end, the live read at the chain head. */
-  const source = (point: MarketNotePoint, which: "earlier" | "later") => {
-    if (which === "later" && note.live) {
-      const liveNoun = isPolaris ? "the market's price feed, read live" : "the backend's live oracle read";
-      return (
-        <>
-          {liveNoun} at the chain head, block {point.block.toLocaleString("en-US")}
-        </>
-      );
-    }
-    return (
-      <>
-        this {positionNoun}&rsquo;s {endLabel(point)} at block {point.block.toLocaleString("en-US")}
-        {observationLinks(point, links)}
-      </>
-    );
-  };
-  const held: HeldSource = {
-    recordedBy: `this ${positionNoun}'s ${p ? endLabel(note.from) : "event"}`,
-    atBlock: p?.atBlock ?? note.from.block,
-    ...(note.marketAddress && !isPolaris
-      ? { contract: { name: `${note.marketSymbol} PriceFeed`, address: note.marketAddress } }
-      : {}),
-  };
-  // Polaris prices pETH in the market's own stable, so its values are in that
-  // stable, written after the figure; Liquity V2's are dollars.
-  const stable = isPolaris ? note.unitLabel.split(" per ")[0] : null;
-  const stats: NoteStat[] = [];
-  // The figures the (i) repeats, kept as the cells built them.
-  let collFig: NoteFigure | undefined;
-  let valueFigs: { before: NoteFigure; after: NoteFigure } | undefined;
-  let crFigs: { before: NoteFigure; after: NoteFigure } | undefined;
-  let mcrFig: NoteFigure | undefined;
-  // A Polaris stretch ending in a liquidation: the liquidation's own seized
-  // collateral and cleared debt, which the later end states.
-  let fireFigs: { coll: NoteFigure; debt: NoteFigure } | undefined;
-  if (p) {
-    const vd = separatingDecimals(p.coll * note.from.value, p.coll * note.to.value, 0, 2);
-    const money = (n: number) => (stable ? `${grouped(n, vd)} ${stable}` : `$${grouped(n, vd)}`);
-    const priceText = (n: number) => formatPrice(n, priceDecimals(note));
-    const priceUnit = stable ?? "USD";
-    collFig = {
-      text: isPolaris ? grouped(p.coll, 4) : p.coll.toFixed(4),
-      exact: String(p.coll),
-      symbol: note.marketSymbol,
-      muted: true,
-      prov: heldAmountProv(note, "collateral", String(p.coll), held),
-    };
-    valueFigs = {
-      before: {
-        text: money(p.coll * note.from.value),
-        exact: String(p.coll * note.from.value),
-        prov: valueAtPriceProv(
-          note,
-          "before",
-          { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
-          { value: priceText(note.from.value), unit: priceUnit },
-          held,
-        ),
-      },
-      after: {
-        text: money(p.coll * note.to.value),
-        exact: String(p.coll * note.to.value),
-        prov: valueAtPriceProv(
-          note,
-          "after",
-          { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
-          { value: priceText(note.to.value), unit: priceUnit },
-          held,
-        ),
-      },
-    };
-    const debtFig: NoteFigure = {
-      text: amountText(p.debt),
-      exact: String(p.debt),
-      ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
-      muted: true,
-      prov: heldAmountProv(note, "debt", String(p.debt), held),
-    };
-    if (isPolaris && p.atFire) {
-      // A Polaris stretch that ends in a liquidation: the later end is the
-      // liquidation's own seized collateral and cleared debt, the figures its
-      // row and its ratio state, once the pending legs were written in.
-      const fire = p.atFire;
-      const liqProv = (what: string, field: string): Provenance => ({
-        kind: "chain",
-        pclass: "emitted",
-        summary: `The ${what} at the liquidation that ends the stretch — the Liquidation log's \`${field}\` at block ${note.to.block}, after the interest, stability gain and PSM share pending since the earlier touch were written in.`,
-        via: `Liquidation.${field}`,
-      });
-      const seizedValue = fire.coll * note.to.value;
-      fireFigs = {
-        coll: {
-          text: grouped(fire.coll, 4),
-          exact: String(fire.coll),
-          symbol: note.marketSymbol,
-          muted: true,
-          prov: liqProv("collateral seized", "_collLiquidated"),
-        },
-        debt: {
-          text: amountText(fire.debt),
-          exact: String(fire.debt),
-          ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
-          muted: true,
-          prov: liqProv("debt cleared", "_debtLiquidated"),
-        },
-      };
-      valueFigs = {
-        before: valueFigs.before,
-        after: {
-          text: money(seizedValue),
-          exact: String(seizedValue),
-          prov: {
-            kind: "chain-derived",
-            pclass: "oracle",
-            summary: `The collateral seized at the liquidation, valued — at that block's pETH price, the figure the ratio at the liquidation divides by the debt cleared.`,
-            formula: "collateral seized × price",
-            inputs: [
-              {
-                label: "collateral seized",
-                value: `${fire.coll} ${note.marketSymbol}`,
-                kind: "chain",
-                pclass: "emitted",
-              },
-              { label: "price", value: `${priceText(note.to.value)} ${priceUnit}`, kind: "chain", pclass: "oracle" },
-            ],
-          },
-        },
-      };
-      stats.push({ label: "Collateral", transition: { before: collFig, after: fireFigs.coll }, values: valueFigs });
-      stats.push({ label: "Debt", transition: { before: debtFig, after: fireFigs.debt } });
-    } else {
-      stats.push({ label: "Collateral", figure: collFig, values: valueFigs });
-      stats.push({ label: "Debt", figure: debtFig });
-    }
-  }
-  // A Polaris ratio here holds the earlier touch's recorded debt and
-  // collateral fixed while the CDP card's ratio adds what is pending since, so
-  // the figure names its basis where it stands.
-  const recordedDebtAt =
-    isPolaris && p && !p.atFire && note.from.timestamp > 0
-      ? `at the recorded debt of the ${utcDayMonth(note.from.timestamp)} touch`
-      : null;
-  if (p && f.crBefore && f.crAfter && f.mcr) {
-    crFigs = {
-      before: { text: f.crBefore, prov: positionProv(note, "crBefore"), exact: String(p.crBefore) },
-      after: { text: f.crAfter, prov: positionProv(note, "crAfter"), exact: String(p.crAfter) },
-    };
-    mcrFig = { text: f.mcr, prov: positionProv(note, "mcr"), exact: String(p.mcrPct) };
-    stats.push({
-      label: isPolaris
-        ? recordedDebtAt
-          ? `Collateral ratio, ${recordedDebtAt}`
-          : "Collateral ratio"
-        : "Collateral Ratio",
-      transition: crFigs,
-      sub: { text: minimumLabel, figure: mcrFig },
-    });
-  }
-  if (p && !isPolaris && p.rate != null) {
-    const yearly = p.debt * (p.rate / 100);
-    stats.push({
-      label: "Interest Rate",
-      figure: {
-        text: `${p.rate.toFixed(1)}%`,
-        exact: String(p.rate),
-        muted: true,
-        prov: heldAmountProv(note, "annual interest rate", `${p.rate}%`, held),
-      },
-      ...(yearly > 0.01
-        ? {
-            sub: {
-              figure: {
-                text: amountText(yearly),
-                exact: String(yearly),
-                prov: heldAmountProv(note, "yearly interest", String(yearly), held, {
-                  formula: "debt × annual interest rate",
-                  inputs: [
-                    {
-                      label: "debt",
-                      value: `${p.debt} ${p.debtSymbol ?? ""}`.trim(),
-                      kind: "chain",
-                      pclass: "emitted",
-                    },
-                    { label: "annual interest rate", value: `${p.rate}%`, kind: "chain", pclass: "emitted" },
-                  ],
-                }),
-              },
-              suffix: `${p.debtSymbol ?? ""} / year`.trim(),
-            },
-          }
-        : {}),
-    });
-  }
-  const pd = separatingDecimals(note.from.value, note.to.value, 0, PRICE_DECIMALS_CAP);
-  const chip: NoteChip = {
-    before: { text: grouped(note.from.value, pd), prov: priceProv(note, "price"), exact: String(note.from.value) },
-    after: { text: grouped(note.to.value, pd), prov: priceProv(note, "price"), exact: String(note.to.value) },
-    symbol: note.marketSymbol,
-    ...(stable ? { unit: stable } : { prefix: "$" }),
-    title: `${note.marketSymbol} price at each end of the stretch (${note.unitLabel})`,
-  };
-  const price = (fig: NoteFigure) => (
-    <Echo figure={fig} prefix={chip.prefix ?? ""} suffix={chip.unit ? ` ${chip.unit}` : ""} />
-  );
-  // "then" and "now" on a live note; the two events on a historical one.
-  const [thenWord, nowWord] = note.live ? ["then", "now"] : ["at the earlier event", "at the later event"];
-  const atBlock = p ? (
-    <Prov info={positionProv(note, "state")} value={String(p.atBlock)}>
-      <span className="tabular-nums">{f.atBlock}</span>
-    </Prov>
-  ) : null;
-  const derivation: ReactNode[] = [
-    note.live ? (
-      <>
-        The {note.marketSymbol} price was {price(chip.before)} at {source(note.from, "earlier")}, and is{" "}
-        {price(chip.after)} now, from {source(note.to, "later")}.
-      </>
-    ) : (
-      <>
-        The {note.marketSymbol} price was {price(chip.before)} at {source(note.from, "earlier")}, and{" "}
-        {price(chip.after)} at {source(note.to, "later")}.
-      </>
-    ),
-    !note.live && (
-      <>
-        Each price is the one {feedNoun} stated at that event&rsquo;s block. The {positionNoun} transacted nothing
-        between the two events, so nothing between them is drawn.
-      </>
-    ),
-    collFig &&
-      valueFigs &&
-      (fireFigs ? (
-        <>
-          The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
-          <Echo figure={valueFigs.before} /> {thenWord}. At the liquidation, once the interest, stability gain and PSM
-          share pending since then were written in, the CDP held{" "}
-          <Echo figure={fireFigs.coll} suffix={` ${note.marketSymbol}`} />, worth <Echo figure={valueFigs.after} />,
-          against <Echo figure={fireFigs.debt} suffix={p?.debtSymbol ? ` ${p.debtSymbol}` : ""} /> of debt.
-        </>
-      ) : (
-        <>
-          The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
-          <Echo figure={valueFigs.before} /> {thenWord} and {note.live ? "is" : "was"} worth{" "}
-          <Echo figure={valueFigs.after} /> {nowWord}.
-        </>
-      )),
-    crFigs && mcrFig && p && (
-      <>
-        The collateral ratio was {ratioPairNote(p.crBefore, crFigs.before, mode)} {thenWord} and{" "}
-        {note.live ? "is" : "was"} {ratioPairNote(p.crAfter, crFigs.after, mode)} {nowWord}
-        {recordedDebtAt ? `, ${recordedDebtAt}` : ""}, against{" "}
-        {isPolaris ? "the market's normal-mode minimum" : "the branch minimum"} of <Echo figure={mcrFig} />.
-      </>
-    ),
-    atBlock &&
-      (fireFigs ? (
-        <>
-          The earlier ratio uses the debt and collateral recorded at block {atBlock}; the later one uses the
-          liquidation&rsquo;s seized collateral and cleared debt, as its row does.
-        </>
-      ) : (
-        <>Both ratios use the debt and collateral recorded at block {atBlock}; only the price moves.</>
-      )),
-    p &&
-      (note.live ? (
-        <>
-          Interest has accrued since block {f.atBlock}
-          {isPolaris
-            ? "."
-            : ", so the position card's live ratio, which includes it, differs from the later ratio here."}
-        </>
-      ) : (
-        <>Interest kept accruing across the stretch.</>
-      )),
-    p && isPolaris && (
-      <>
-        The minimum named here is the market&rsquo;s normal-mode MCR(). A defensive-mode minimum can be in force at a
-        past block, but it is not indexed.
-      </>
-    ),
-    p && !note.live && <>The stretch is stated because {priceGapReason(note)}.</>,
-  ].filter(Boolean) as ReactNode[];
-  return {
-    label: `${note.marketSymbol} oracle price`,
-    measure: isPolaris ? { kind: "protocol", id: note.measureProtocolId ?? "polaris" } : { kind: "usd" },
-    quantity: "oracle price",
-    headline: { text: f.changeMagnitude, prov: priceProv(note, "change"), exact: String(note.changePct) },
-    // The step mark states the same two prices the stat card does, so it takes
-    // the note's own grain rather than a default that could round them alike.
-    format: notePriceFormat(note),
-    intro: {
-      lead: "Market fluctuation since the last event",
-      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, priceProv(note, "elapsed")) } : {}),
-    },
-    chip,
-    blocks: {
-      before: { text: f.fromBlock, prov: priceProv(note, "blocks"), exact: String(note.from.block) },
-      after: { text: f.toBlock, prov: priceProv(note, "blocks"), exact: String(note.to.block) },
-    },
-    stats,
-    learnMore: isPolaris ? polarisModal("price_gap") : marketNotePriceGapContent(fork ? "liquity-fork" : "liquity-v2"),
-    derivation,
-  };
-}
-
-// ── Alchemix V3: the vault's share price, moved between two of a position's
-//    readings ────────────────────────────────────────────────────────────────
-// The price-gap kind on a position whose collateral is a vault share count.
-// The price is one share in the asset underneath, stored with each reading, so
-// the figures it moves are the collateral's value in that asset and the
-// collateralisation, against the line's liquidation line
-// (lib/alchemix/market-notes.ts).
-
-function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody {
-  const f = priceGapFigures(note);
-  const p = note.position;
-  const under = p?.valueSymbol ?? "the asset underneath";
-  /** Where one end's share price was read: a reading at one of this
-   *  position's rows, or, on a live note's later end, the position card's. */
-  const source = (point: MarketNotePoint, which: "earlier" | "later") =>
-    which === "later" && note.live ? (
-      <>the position card&rsquo;s reading at block {point.block.toLocaleString("en-US")}</>
-    ) : (
-      <>
-        this position&rsquo;s {alchemixEndLabel(point)} at block {point.block.toLocaleString("en-US")}
-        {observationLinks(point, links)}
-      </>
-    );
-  const held: HeldSource = {
-    recordedBy: `this position's ${alchemixEndLabel(note.from)}`,
-    atBlock: p?.atBlock ?? note.from.block,
-  };
-  // The regular card's reading grid: Debt, Collateral (the share count), and
-  // the collateralisation the position card states. The share count and the
-  // debt are the earlier reading's; only the share price moves.
-  const stats: NoteStat[] = [];
-  // The figures the (i) repeats, kept as the cells built them.
-  let collFig: NoteFigure | undefined;
-  let valueFigs: { before: NoteFigure; after: NoteFigure } | undefined;
-  let crFigs: { before: NoteFigure; after: NoteFigure } | undefined;
-  let mcrFig: NoteFigure | undefined;
-  if (p) {
-    stats.push({
-      label: "Debt",
-      figure: {
-        text: amountText(p.debt),
-        exact: String(p.debt),
-        ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
-        muted: true,
-        prov: heldAmountProv(note, "debt", String(p.debt), held),
-      },
-    });
-    collFig = {
-      text: amountText(p.coll),
-      exact: String(p.coll),
-      symbol: note.marketSymbol,
-      muted: true,
-      prov: heldAmountProv(note, "share count", String(p.coll), held),
-    };
-    valueFigs =
-      f.valueBefore && f.valueAfter
-        ? {
-            before: {
-              text: f.valueBefore,
-              prov: alchemixSharePricePositionProv(note, "valueBefore"),
-              exact: String(p.coll * note.from.value),
-            },
-            after: {
-              text: f.valueAfter,
-              prov: alchemixSharePricePositionProv(note, "valueAfter"),
-              exact: String(p.coll * note.to.value),
-            },
-          }
-        : undefined;
-    stats.push({ label: "Collateral", figure: collFig, ...(valueFigs ? { values: valueFigs } : {}) });
-  }
-  if (p && f.crBefore && f.crAfter && f.mcr) {
-    crFigs = {
-      before: { text: f.crBefore, prov: alchemixSharePricePositionProv(note, "crBefore"), exact: String(p.crBefore) },
-      after: { text: f.crAfter, prov: alchemixSharePricePositionProv(note, "crAfter"), exact: String(p.crAfter) },
-    };
-    mcrFig = { text: f.mcr, prov: alchemixSharePricePositionProv(note, "mcr"), exact: String(p.mcrPct) };
-    stats.push({ label: "Collateralisation", transition: crFigs, sub: { text: "liquidation at", figure: mcrFig } });
-  }
-  const chip: NoteChip = {
-    before: { text: f.fromPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.from.value) },
-    after: { text: f.toPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.to.value) },
-    symbol: note.marketSymbol,
-    unit: under,
-    title: `One ${note.marketSymbol} share in ${under} at each end of the stretch`,
-  };
-  // "then" and "now" on a live note; the two rows on a historical one.
-  const [thenWord, nowWord] = note.live ? ["then", "now"] : ["at the earlier reading", "at the later reading"];
-  const is = note.live ? "is" : "was";
-  const derivation: ReactNode[] = [
-    <>
-      One {note.marketSymbol} share was worth <Echo figure={chip.before} suffix={` ${under}`} /> at{" "}
-      {source(note.from, "earlier")}, and {is} <Echo figure={chip.after} suffix={` ${under}`} /> at{" "}
-      {source(note.to, "later")}.
-    </>,
-    collFig && valueFigs && (
-      <>
-        The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
-        <Echo figure={valueFigs.before} /> {thenWord} and {is} worth <Echo figure={valueFigs.after} /> {nowWord}.
-      </>
-    ),
-    crFigs && mcrFig && (
-      <>
-        Collateralisation was <Echo figure={crFigs.before} /> {thenWord} and {is} <Echo figure={crFigs.after} />{" "}
-        {nowWord}, against the liquidation line of <Echo figure={mcrFig} />.
-      </>
-    ),
-    p && (
-      <>
-        Both use the share count and debt read at block{" "}
-        <Prov info={alchemixSharePricePositionProv(note, "state")} value={String(p.atBlock)}>
-          <span className="tabular-nums">{f.atBlock}</span>
-        </Prov>
-        ; only the share price moves.
-      </>
-    ),
-    <>
-      {note.live ? (
-        <>
-          It is drawn where the price has moved at least {LIVE_GAP_MOVE_FLOOR * 100}% since the earlier reading, or the
-          move used {LIVE_GAP_RUNWAY_SHARE * 100}% of the position&rsquo;s runway to the liquidation line.
-        </>
-      ) : (
-        <>It is stated because {priceGapReason(note)}.</>
-      )}
-    </>,
-  ].filter(Boolean) as ReactNode[];
-  return {
-    label: `${note.marketSymbol} share price`,
-    measure: { kind: "token", symbol: under },
-    quantity: "share price",
-    headline: { text: f.changeMagnitude, prov: alchemixSharePriceProv(note, "change"), exact: String(note.changePct) },
-    format: notePriceFormat(note),
-    intro: {
-      lead: "Market fluctuation since the last event",
-      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, alchemixSharePriceProv(note, "elapsed")) } : {}),
-    },
-    chip,
-    blocks: {
-      before: { text: f.fromBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.from.block) },
-      after: { text: f.toBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.to.block) },
-    },
-    stats,
-    learnMore: marketNotePriceGapContent("alchemix-v3"),
-    derivation,
-  };
-}
-
-// ── Aave V4: ONE asset's oracle price, moved between two of a spoke
-//    position's own rows ─────────────────────────────────────────────────────
-// The same price-gap kind, on a position with a different shape. A trove has
-// one collateral and one debt, so its note states a collateral ratio; an Aave
-// account holds several collaterals against several debts in one spoke, so a
-// note here is about ONE asset and the figure it moves is the HEALTH FACTOR of
-// the whole basket the earlier row recorded. Where that basket is not fully
-// priced, or a collateral's liquidation threshold is unknown, there is no
-// health payload and the note is price-only — which only a liquidation-ended
-// stretch ever is, since an adjustment-ended one has nothing to be measured
-// against and is never stated.
-
-function aaveV4PriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
-  const f = priceGapFigures(note);
-  const h = note.health;
-  const end = (point: MarketNotePoint, which: "earlier" | "later") => {
-    if (which === "later" && note.live) {
-      return (
-        <>
-          the later price: a live read of Aave&rsquo;s oracle (/api/oracle/aave-v4), at the chain head block{" "}
-          {point.block.toLocaleString("en-US")} — not a row of this position&rsquo;s
-        </>
-      );
-    }
-    // A live note's earlier price is a read too — the same oracle pinned to
-    // the row's block. The row is named because it is where the stretch starts,
-    // not because the figure came off it.
-    if (which === "earlier" && note.live) {
-      return (
-        <>
-          the earlier price: the oracle read at block {point.block.toLocaleString("en-US")} (/api/oracle/aave-v4?block=
-          {point.block}), the block of this position&rsquo;s {aaveV4EndLabel(point)}
-          {observationLinks(point, links)}
-        </>
-      );
-    }
-    return (
-      <>
-        the {which} price: this position&rsquo;s {aaveV4EndLabel(point)} at block {point.block.toLocaleString("en-US")}
-        {observationLinks(point, links)}
-      </>
-    );
-  };
-  // The regular card's grid is Collateral, Debt, the ratio and the borrow
-  // rate. The note carries the moved asset's own leg and the basket's totals
-  // at the earlier row, so the moved side states the asset's amount and its
-  // value at each price, the other side states its total, and the ratio cell
-  // is the health factor the note measures. The borrow rate is not on a note.
-  const held: HeldSource = {
-    recordedBy: `this position's ${aaveV4EndLabel(note.from)}`,
-    atBlock: h?.atBlock ?? note.from.block,
-  };
-  const stats: NoteStat[] = [];
-  if (h) {
-    const leg = h.leg;
-    const priceUnit = "USD";
-    const priceText = (n: number) => formatPrice(n, priceDecimals(note));
-    const legCell = (label: string): NoteStat | null => {
-      if (!leg) return null;
-      const vb = leg.amount * note.from.value;
-      const va = leg.amount * note.to.value;
-      const vd = separatingDecimals(vb, va, 0, 2);
-      const amount = { label: leg.side === "collateral" ? "collateral" : "debt", value: `${leg.amount} ${leg.symbol}` };
-      return {
-        label,
-        figure: {
-          text: amountText(leg.amount),
-          exact: String(leg.amount),
-          symbol: leg.symbol,
-          muted: true,
-          prov: heldAmountProv(note, `${leg.symbol} ${amount.label}`, String(leg.amount), held),
-        },
-        values: {
-          before: {
-            text: `$${grouped(vb, vd)}`,
-            exact: String(vb),
-            prov: valueAtPriceProv(
-              note,
-              "before",
-              amount,
-              { value: priceText(note.from.value), unit: priceUnit },
-              held,
-            ),
-          },
-          after: {
-            text: `$${grouped(va, vd)}`,
-            exact: String(va),
-            prov: valueAtPriceProv(note, "after", amount, { value: priceText(note.to.value), unit: priceUnit }, held),
-          },
-        },
-      };
-    };
-    const totalCell = (label: string, what: string, usd: number | undefined): NoteStat | null =>
-      usd == null
-        ? null
-        : {
-            label,
-            figure: {
-              text: `$${grouped(usd, 0)}`,
-              exact: String(usd),
-              muted: true,
-              prov: heldAmountProv(note, what, String(usd), held, {
-                formula: "Σ amount × price, at the row's own prices",
-                inputs: [
-                  {
-                    label: what,
-                    value: String(usd),
-                    kind: "chain-derived",
-                    pclass: "oracle",
-                    note: `every ${label.toLowerCase()} asset on the row at block ${h.atBlock}, at the price the row recorded for it`,
-                  },
-                ],
-              }),
-            },
-          };
-    const collateral =
-      leg?.side === "collateral"
-        ? legCell("Collateral")
-        : totalCell("Collateral", "collateral value", h.collateralValueUsd);
-    const debt = leg?.side === "debt" ? legCell("Debt") : totalCell("Debt", "debt value", h.debtUsd);
-    if (collateral) stats.push(collateral);
-    if (debt) stats.push(debt);
-  }
-  if (h && f.hfBefore && f.hfAfter) {
-    stats.push({
-      label: "Health Factor",
-      transition: {
-        before: { text: f.hfBefore, prov: aaveV4PriceGapHealthProv(note, "hfBefore"), exact: String(h.hfBefore) },
-        after: { text: f.hfAfter, prov: aaveV4PriceGapHealthProv(note, "hfAfter"), exact: String(h.hfAfter) },
-      },
-      sub: {
-        text: "liquidation at",
-        figure: {
-          text: AAVE_V4_LIQUIDATION_HF,
-          prov: aaveV4PriceGapHealthProv(note, "minimum"),
-          exact: AAVE_V4_LIQUIDATION_HF,
-        },
-      },
-    });
-  }
-  const pd = separatingDecimals(note.from.value, note.to.value, 0, PRICE_DECIMALS_CAP);
-  return {
-    label: `${note.marketSymbol} oracle price`,
-    measure: { kind: "usd" },
-    quantity: "oracle price",
-    headline: { text: f.changeMagnitude, prov: aaveV4PriceGapProv(note, "change"), exact: String(note.changePct) },
-    // The step mark states the same two prices the stat card does, so it takes
-    // the note's own grain rather than a default that could round them alike.
-    format: notePriceFormat(note),
-    intro: {
-      lead: "Market fluctuation since the last event",
-      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, aaveV4PriceGapProv(note, "elapsed")) } : {}),
-    },
-    chip: {
-      before: {
-        text: grouped(note.from.value, pd),
-        prov: aaveV4PriceGapProv(note, "price"),
-        exact: String(note.from.value),
-      },
-      after: {
-        text: grouped(note.to.value, pd),
-        prov: aaveV4PriceGapProv(note, "price"),
-        exact: String(note.to.value),
-      },
-      symbol: note.marketSymbol,
-      prefix: "$",
-      title: `${note.marketSymbol} price at each end of the stretch (${note.unitLabel})`,
-    },
-    blocks: {
-      before: { text: f.fromBlock, prov: aaveV4PriceGapProv(note, "blocks"), exact: String(note.from.block) },
-      after: { text: f.toBlock, prov: aaveV4PriceGapProv(note, "blocks"), exact: String(note.to.block) },
-    },
-    stats,
-    learnMore: marketNotePriceGapContent("aave-v4"),
-    derivation: note.live ? (
-      <>
-        This is a LIVE note: {end(note.from, "earlier")}; {end(note.to, "later")}. It states one asset&rsquo;s price —
-        this spoke position holds a basket, and each asset in it moves on its own feed. Shown whenever the position
-        still holds {note.marketSymbol} as collateral against debt, whatever the move — nothing having moved is itself
-        the fact this note states.
-        {h && (
-          <>
-            {" "}
-            The two health factors hold every amount, and every OTHER asset&rsquo;s price, as this position&rsquo;s own
-            row recorded them at block{" "}
-            <Prov info={aaveV4PriceGapHealthProv(note, "state")} value={String(h.atBlock)}>
-              <span className="tabular-nums">{f.atBlock}</span>
-            </Prov>{" "}
-            and move only the {note.marketSymbol} price, so the later one is what that basket is worth NOW rather than a
-            second reading; interest has kept accruing since. The threshold each collateral is weighted by is the one
-            the spoke reports now — Aave V4 states no static per-reserve threshold, and the one in force at that block
-            is not indexed.
-          </>
-        )}
-      </>
-    ) : (
-      <>
-        The price is not read for this note: every row on this position already carries the {note.marketSymbol} price
-        Aave&rsquo;s own oracle answered at that row&rsquo;s block, and these are the two rows either side of the
-        stretch — {end(note.from, "earlier")}, {end(note.to, "later")}. Nothing between them is drawn, because the
-        position transacted nothing between them and the index states no price where it did not. The note is about one
-        asset: this spoke position holds a basket, and each asset in it moves on its own feed.
-        {note.endedBy === "liquidation" && (
-          <>
-            {" "}
-            A stretch that ends in a liquidation is drawn whatever the move, and only for the asset that liquidation
-            seized — {note.marketSymbol} here. It does not say the move caused the seizure: the debt side of the basket
-            moves too.
-          </>
-        )}
-        {h ? (
-          <>
-            {" "}
-            The two health factors hold every amount, and every OTHER asset&rsquo;s price, as this position&rsquo;s own
-            row recorded them at block{" "}
-            <Prov info={aaveV4PriceGapHealthProv(note, "state")} value={String(h.atBlock)}>
-              <span className="tabular-nums">{f.atBlock}</span>
-            </Prov>{" "}
-            and move only the {note.marketSymbol} price, so the later one is what that basket came to be worth rather
-            than a second reading; interest kept accruing across the stretch. The threshold each collateral is weighted
-            by is the one the spoke reports now — Aave V4 states no static per-reserve threshold, and the one in force
-            at that block is not indexed. The stretch is stated because {priceGapReason(note)}.
-          </>
-        ) : (
-          <>
-            {" "}
-            No health factor is stated: the earlier row&rsquo;s snapshot does not price every asset in the basket, so
-            there is nothing to weigh this move against without inventing a figure.
-          </>
-        )}
-      </>
-    ),
-  };
-}
-
-// ── Aave V3 and SparkLend: the seized asset's oracle price before a
-//    liquidation ───────────────────────────────────────────────────────────
-// A row here carries the price of the one reserve it touched, so the note is
-// price-only and drawn only before a liquidation, for the asset it seized
-// (lib/aave-v3/liquidation-price-notes.ts). The earlier end is this position's
-// last row that touched that asset; rows touching other reserves can sit
-// between the two ends, and the derivation says so.
-
-function aaveFamilyPriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
-  const f = priceGapFigures(note);
-  const sym = note.marketSymbol;
-  const rowNoun = note.protocol === "spark" ? "a SparkLend row" : "an Aave V3 row";
-  // Price-only: a V3 row prices the reserve it touched and no other, so there
-  // is no position state at the earlier row to draw the regular grid from.
-  const stats: NoteStat[] = [];
-  const pd = separatingDecimals(note.from.value, note.to.value, 0, PRICE_DECIMALS_CAP);
-  return {
-    label: `${sym} oracle price`,
-    measure: { kind: "usd" },
-    quantity: "oracle price",
-    headline: { text: f.changeMagnitude, prov: aaveFamilyPriceGapProv(note, "change"), exact: String(note.changePct) },
-    format: notePriceFormat(note),
-    intro: {
-      lead: `Market fluctuation since this position last touched ${sym}`,
-      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, aaveFamilyPriceGapProv(note, "elapsed")) } : {}),
-    },
-    chip: {
-      before: {
-        text: grouped(note.from.value, pd),
-        prov: aaveFamilyPriceGapProv(note, "price"),
-        exact: String(note.from.value),
-      },
-      after: {
-        text: grouped(note.to.value, pd),
-        prov: aaveFamilyPriceGapProv(note, "price"),
-        exact: String(note.to.value),
-      },
-      symbol: sym,
-      prefix: "$",
-      title: `${sym} price at each end of the stretch (${note.unitLabel})`,
-    },
-    blocks: {
-      before: { text: f.fromBlock, prov: aaveFamilyPriceGapProv(note, "blocks"), exact: String(note.from.block) },
-      after: { text: f.toBlock, prov: aaveFamilyPriceGapProv(note, "blocks"), exact: String(note.to.block) },
-    },
-    stats,
-    learnMore: marketNotePriceGapContent(note.protocol === "spark" ? "spark" : "aave-v3"),
-    derivation: (
-      <>
-        The price is not read for this note: each end is a row on this page that carries the {sym} price{" "}
-        {aaveFamilyOracleOwner(note)} oracle answered at its block. The earlier price is this position&rsquo;s{" "}
-        {aaveFamilyEndLabel(note.from)} at block {note.from.block.toLocaleString("en-US")}
-        {observationLinks(note.from, links)}, its last row that touched {sym} before the liquidation; the later price is
-        the liquidation at block {note.to.block.toLocaleString("en-US")}
-        {observationLinks(note.to, links)}. This position did not touch {sym} between them. Rows between them, if any,
-        touched other reserves: {rowNoun} carries the price of the reserve it touched and no other. A stretch that ends
-        in a liquidation is drawn whatever the move, and only for the asset that liquidation seized. It does not say the
-        move caused the seizure: the debt side and the rest of the account move too. No health factor is stated here,
-        because the rest of the account is not priced at the earlier row&rsquo;s block.
-        {note.protocol === "aave-v3" && (
-          <> Opening the liquidation&rsquo;s card reads the account before and after it, health factor included.</>
-        )}
-      </>
-    ),
-  };
-}
-
 // ── Polaris: the market's own primary rate stepped between two of a CDP's
 //    OWN touches ────────────────────────────────────────────────────────────
-// Unlike the other two kinds, both ends here ARE this position's own events —
-// the rate is already on the row (context.data.primaryRate), read at the
-// market's last PrimaryRateSet at or before each touch.
+// Both ends here are this position's events: the rate is already on the
+// row (context.data.primaryRate), read at the market's last PrimaryRateSet at
+// or before each touch.
 
 function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   if (note.protocol === "makerdao") return makerRateStepBody(note, links);

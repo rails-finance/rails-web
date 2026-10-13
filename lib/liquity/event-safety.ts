@@ -12,7 +12,6 @@ import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { isLiquityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { RUNWAY_SHARE } from "@/lib/shared/market-note";
 import {
   exactCollAfter,
   exactCollBefore,
@@ -21,6 +20,13 @@ import {
   exactDebtBefore,
   exactDebtChange,
 } from "@/lib/liquity/utils/interest-calculator";
+
+/** How much of the trove's runway (the fraction the price could fall
+ *  before the branch minimum, read at the previous event) a price move has
+ *  to consume to be material. The same 5% is most of the runway of a trove
+ *  at 116% and barely a fifth of one at 250%, so the bar is a share of the
+ *  distance rather than a flat percentage. */
+const RUNWAY_SHARE = 0.25;
 
 export interface LiquityEventSafety {
   /** This event's oracle price (a liquidation's: the price it ran at). */
@@ -40,7 +46,7 @@ export interface LiquityEventSafety {
   /** The price's relative move since the previous event (−0.53 = −53%). */
   priceChange: number | null;
   /** The move consumed at least RUNWAY_SHARE of the trove's room above the
-   *  minimum, as it stood before the move (lib/shared/market-note.ts). */
+   *  minimum, as it stood before the move. */
   priceMoveMaterial: boolean;
 }
 

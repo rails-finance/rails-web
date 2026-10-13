@@ -17,14 +17,6 @@ import type { MoonwellPositionView } from "@/components/protocol/moonwell/moonwe
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import {
-  anchorMarketNotes,
-  marketNoteHeadline,
-  marketNoteReceiptLine,
-  marketNoteRowAnnotation,
-  marketNoteSentence,
-  type MarketNote,
-} from "@/lib/shared/market-note";
-import {
   markdownFirstTimestamp,
   markdownTimelineSlice,
   type MarkdownHistoryScope,
@@ -50,20 +42,6 @@ export interface MoonwellPositionMarkdownArgs {
   chain: MoonwellChainResponse | null;
   /** Chronologically sorted (oldest → newest) event list, all markets. */
   events: BaseActivityEvent[];
-  /** Market notes for this position — receipted facts about the markets it was
-   *  in, observed between two of its own events (lib/shared/market-note.ts).
-   *  They ride three placements below (a line in the account section, their own
-   *  section, an annotation on the event they are anchored to) and are counted
-   *  in NO total here: the event table's row count and every figure in it are
-   *  what they are with this absent. The CSV carries events only. */
-  notes?: MarketNote[];
-  /** This account's live notes (lib/shared/market-note.ts's `liveShareRateNote`)
-   *  — one per entered market it still holds, the market's own live exchange
-   *  rate against this account's own newest Mint/Redeem in it. Never
-   *  anchored (the later end is the chain head, past every event's block)
-   *  and never in the timeline table; listed alongside the historical notes
-   *  in the "Market notes" section only. */
-  liveNotes?: MarketNote[];
   /** When the snapshot was taken (copy time) — passed in so the serializer
    *  stays pure. */
   generatedAt: Date;
@@ -102,19 +80,9 @@ export function moonwellPositionToMarkdown(args: MoonwellPositionMarkdownArgs): 
       `Everything drifts as the market and position change. Not financial advice.`,
   );
   lines.push("");
-  // The notes as the PAGE places them: anchored against this same event list,
-  // so a note the timeline drops (its step postdates every event here) is
-  // absent from the export too, and the anchor an annotation lands on below is
-  // the row the note renders beside on screen.
-  const anchoredNotes = anchorMarketNotes(args.notes ?? [], events, "asc");
-  const noteList = [...anchoredNotes.values()].flat();
-  const allNotes = [...noteList, ...(args.liveNotes ?? [])];
-
   lines.push(`- **Wallet:** ${wallet}`);
   lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
   if (view.liquidationCount > 0) lines.push(`- **Liquidations:** ${view.liquidationCount}`);
-  const notesLine = marketNotesLine(allNotes);
-  if (notesLine) lines.push(notesLine);
   lines.push("");
 
   if (view.status !== "open") {
@@ -201,50 +169,11 @@ export function moonwellPositionToMarkdown(args: MoonwellPositionMarkdownArgs): 
   lines.push(`- **Transactions:** ${view.txCount}`);
   lines.push("");
 
-  lines.push(...marketNotesSection(allNotes));
-  lines.push(...timelineTable(events, args.history, anchoredNotes));
+  lines.push(...timelineTable(events, args.history));
   return lines.join("\n");
 }
 
-/** (a) One line in the account section — the fact that notes exist and where
- *  to read them. Null when this position has none. */
-function marketNotesLine(notes: MarketNote[]): string | null {
-  if (notes.length === 0) return null;
-  if (notes.length === 1) return `- **Market notes:** 1 — ${marketNoteHeadline(notes[0])} (see below)`;
-  const markets = [...new Set(notes.map((n) => n.marketSymbol))].join(", ");
-  return `- **Market notes:** ${notes.length}, in ${markets} — see below`;
-}
-
-/** (b) The notes' own section: one paragraph each, with the two logs the fact
- *  was read from. Placed before the timeline table, like f(x)'s drift table. */
-function marketNotesSection(notes: MarketNote[]): string[] {
-  if (notes.length === 0) return [];
-  const out: string[] = ["## Market notes", ""];
-  out.push(
-    "Each note is a receipted fact about a market this account was in, observed between two of the account's own " +
-      "events and stated between them. A note is not an event: it is counted in no total in this snapshot, and the " +
-      "timeline table below reads exactly as it would without any of them. The share rate is not read from a price " +
-      "feed — every Mint and Redeem emits the underlying amount and the mTokens it was exchanged for, and the rate " +
-      "is their quotient at that block.",
-  );
-  out.push("");
-  for (const n of notes) {
-    out.push(marketNoteSentence(n));
-    out.push("");
-    out.push(marketNoteReceiptLine(n));
-    out.push("");
-  }
-  return out;
-}
-
-function timelineTable(
-  events: BaseActivityEvent[],
-  history: MarkdownHistoryScope | undefined,
-  /** (c) The notes anchored to a row here, keyed by that row's event id. They
-   *  annotate the last cell and change nothing else: not the row count, not a
-   *  figure, not the numbering. */
-  anchoredNotes: ReadonlyMap<string, MarketNote[]>,
-): string[] {
+function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScope | undefined): string[] {
   const out: string[] = [];
   const { rows, heading, firstIndex } = markdownTimelineSlice(events, history, { suffix: ", all markets" });
   out.push(heading);
@@ -275,9 +204,8 @@ function timelineTable(
     const debtAfter = d.debtAfter != null ? amt(parseFloat(d.debtAfter)) : "—";
     const supplied = d.supplyAfter != null ? amt(parseFloat(d.supplyAfter)) : "—";
     const interest = d.interestSincePrevious != null ? amt(parseFloat(d.interestSincePrevious)) : "";
-    const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketSymbol} | ${amount} | ${supplied} | ${interest} | ${mAfter} | ${debtAfter} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketSymbol} | ${amount} | ${supplied} | ${interest} | ${mAfter} | ${debtAfter} | ${txCell(e)} |`,
     );
   });
   out.push("");

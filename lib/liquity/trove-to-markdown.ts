@@ -21,14 +21,6 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCollSurplusClaimEvent, isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { claimMarkdownLabel } from "@/lib/shared/liquity-coll-surplus-claim";
 import { getLiquidationThreshold } from "@/lib/utils/liquidation-utils";
-import {
-  anchorMarketNotes,
-  marketNoteHeadline,
-  marketNoteReceiptLine,
-  marketNoteRowAnnotation,
-  marketNoteSentence,
-  type MarketNote,
-} from "@/lib/shared/market-note";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { actionLabel, getEventActionKey } from "@/lib/shared/event-filter-helpers";
 
@@ -40,18 +32,6 @@ export interface TroveMarkdownArgs {
   trovesAhead: number | null;
   /** Chronologically sorted (oldest → newest) event list. */
   events: BaseActivityEvent[];
-  /** Market notes for this trove — receipted facts about the branch's own
-   *  oracle price, observed between two of the trove's own events
-   *  (lib/shared/market-note.ts). A note is NEVER an event: it is counted in
-   *  no total here, the timeline table's row count and numbering are identical
-   *  with and without them, and the CSV never carries one. */
-  notes?: MarketNote[];
-  /** This trove's live note (lib/shared/market-note.ts's `livePriceGapNote`)
-   *  — the same branch oracle price read at the chain head, against this
-   *  trove's own newest priced event. Never anchored (see `allNotes` below)
-   *  and never in the timeline table; listed alongside the historical notes
-   *  in the "Market notes" section only. */
-  liveNotes?: MarketNote[];
   /** When the snapshot was taken (copy time). Passed in so the serializer
    *  stays pure — `new Date()` is unavailable in some runtimes and makes the
    *  output non-deterministic to test. */
@@ -107,29 +87,18 @@ function statusLabel(status: TroveSummary["status"]): string {
 export function troveToMarkdown(args: TroveMarkdownArgs): string {
   const { trove, events } = args;
   const ct = trove.collateralType;
-  // The notes as the PAGE places them: anchored against this same event list,
-  // so a note the timeline drops is absent here too, and the annotation below
-  // lands on the row the note renders beside on screen. A LIVE note has no
-  // anchor by definition (its later end is the chain head, past every event's
-  // block) — `anchorMarketNotes` would silently drop it, so it is appended to
-  // the listed set directly rather than routed through the same call, and it
-  // never reaches `timelineTable`'s per-row annotations.
-  const anchoredNotes = anchorMarketNotes(args.notes ?? [], events, "asc");
-  const noteList = [...anchoredNotes.values()].flat();
-  const allNotes = [...noteList, ...(args.liveNotes ?? [])];
-  const lines = troveSummaryMarkdown(args, allNotes);
+  const lines = troveSummaryMarkdown(args);
 
-  // ── Market notes, then the activity timeline ──
-  lines.push(...marketNotesSection(allNotes));
-  lines.push(...timelineTable(events, ct, anchoredNotes));
+  // ── Activity timeline ──
+  lines.push(...timelineTable(events, ct));
 
   return lines.join("\n");
 }
 
 /** The position's card as Markdown: the header, the headlines and the
- *  lifetime, without the market notes and the timeline. The test exports
+ *  lifetime, without the timeline. The test exports
  *  (scripts/exports-liquity-v2.mjs) open each position with it. */
-export function troveSummaryMarkdown(args: TroveMarkdownArgs, allNotes: MarketNote[] = []): string[] {
+export function troveSummaryMarkdown(args: TroveMarkdownArgs): string[] {
   const { trove, events, generatedAt } = args;
   const ct = trove.collateralType;
   const lines: string[] = [];
@@ -152,12 +121,7 @@ export function troveSummaryMarkdown(args: TroveMarkdownArgs, allNotes: MarketNo
   lines.push("");
 
   // ── Status-specific headline block ──
-  const headlines = trove.status === "open" ? openHeadlines(args) : closedOrLiquidatedHeadlines(trove);
-  // (a) The headline block ends with its own blank line; the notes line is its
-  // last bullet, not a stray line after the section.
-  const notesLine = marketNotesLine(allNotes);
-  if (notesLine) headlines.splice(headlines.length - 1, 0, notesLine);
-  lines.push(...headlines);
+  lines.push(...(trove.status === "open" ? openHeadlines(args) : closedOrLiquidatedHeadlines(trove)));
 
   // ── Lifetime ──
   lines.push("## Lifetime");
@@ -171,38 +135,6 @@ export function troveSummaryMarkdown(args: TroveMarkdownArgs, allNotes: MarketNo
   );
   lines.push("");
   return lines;
-}
-
-/** (a) One line in the headline block — that notes exist, and where to read
- *  them. Null when this trove has none. */
-function marketNotesLine(notes: MarketNote[]): string | null {
-  if (notes.length === 0) return null;
-  if (notes.length === 1) return `- **Market notes:** 1 — ${marketNoteHeadline(notes[0])} (see below)`;
-  return `- **Market notes:** ${notes.length} — stretches where the branch's oracle price moved between two of this trove's own events (see below)`;
-}
-
-/** (b) The notes' own section: one paragraph each, with the two events the
- *  fact was read from. Placed before the timeline table, like f(x)'s drift
- *  table and Moonwell's share-rate steps. */
-function marketNotesSection(notes: MarketNote[]): string[] {
-  if (notes.length === 0) return [];
-  const out: string[] = ["## Market notes", ""];
-  out.push(
-    "Each note is a receipted fact about the branch this trove borrows on, observed between two of the trove's own " +
-      "events and stated between them. A note is not an event: it is counted in no total in this snapshot, and the " +
-      "timeline table below reads exactly as it would without any of them. The price is not fetched for the note — " +
-      "every event on this trove already carries the price Liquity's own PriceFeed stated at that event's block. The " +
-      "two ratios hold the debt and collateral the earlier event recorded and move only the price, so the later one " +
-      "is what that state came to be worth.",
-  );
-  out.push("");
-  for (const n of notes) {
-    out.push(marketNoteSentence(n));
-    out.push("");
-    out.push(marketNoteReceiptLine(n));
-    out.push("");
-  }
-  return out;
 }
 
 // Mirror of buildOpenItems' computations. Kept faithful so the markdown and the
@@ -312,14 +244,7 @@ function closedOrLiquidatedHeadlines(trove: TroveSummary): string[] {
   return out;
 }
 
-function timelineTable(
-  events: BaseActivityEvent[],
-  collateralType: string,
-  /** (c) The notes anchored to a row here, keyed by that row's event id. They
-   *  annotate the row's last cell and change nothing else: the numbering, the
-   *  row count and every figure read as they would with no notes at all. */
-  anchoredNotes: ReadonlyMap<string, MarketNote[]>,
-): string[] {
+function timelineTable(events: BaseActivityEvent[], collateralType: string): string[] {
   const out: string[] = [];
   out.push(`## Activity timeline (${events.length} event${events.length === 1 ? "" : "s"}, oldest first)`);
   out.push("");
@@ -341,10 +266,7 @@ function timelineTable(
     const collAfter = d.stateAfter ? amt(d.stateAfter.coll) : "—";
     const label = actionLabel(getEventActionKey(e), "liquity-v2-troves");
     const tx = e.etherscanUrl ? `[${e.txHash.slice(0, 10)}…](${e.etherscanUrl})` : e.txHash.slice(0, 10) + "…";
-    const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
-    out.push(
-      `| ${i + 1} | ${fmtUtc(e.timestamp)} | ${label} | ${debtAfter} | ${collAfter} | ${tx}${noted ? ` — ${noted}` : ""} |`,
-    );
+    out.push(`| ${i + 1} | ${fmtUtc(e.timestamp)} | ${label} | ${debtAfter} | ${collAfter} | ${tx} |`);
   });
   out.push("");
   return out;

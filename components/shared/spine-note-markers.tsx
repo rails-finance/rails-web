@@ -5,8 +5,8 @@
 //
 // A closed note is a MARKER in the gap between the two events it sits
 // between: a hollow diamond on the line with a direction arrow beside it, in
-// the spine's neutral ink (a price fall is bad for a borrower and good for
-// others, so no green or red). Several notes in one gap (a Types of event
+// the spine's neutral ink (a rate rise is bad for a borrower and good for a
+// supplier, so no green or red). Several notes in one gap (a Types of event
 // filter hid the events between them) stack in date order, one target apart.
 // A marker stays when a filter hides the events either side of it: it
 // describes the market, not the account.

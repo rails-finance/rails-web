@@ -180,20 +180,14 @@ export function StatSubline({
   return <div className={`text-xs tabular-nums ${changeTone(changed)} ${className}`}>{children}</div>;
 }
 
-/** The price chip at the foot of an opened card. A regular card's single price
- *  is context the event did not change, so it is muted by default; a market
- *  note's "$1,565 → $2,709" is the change and passes `changed`. */
+/** The price chip at the foot of an opened card. A card's price is context the
+ *  event did not change, so it is muted. */
 export function PriceChipShell({
-  changed = false,
   title,
-  marker,
   bare,
   children,
 }: {
-  changed?: boolean;
   title?: string;
-  /** Stamped as `data-note-price-chip` where a verifier reads the chip. */
-  marker?: boolean;
   /** The figure and its icon with no fill or box (Liquity V2's event price,
    *  ui-jobs 281). */
   bare?: boolean;
@@ -201,9 +195,8 @@ export function PriceChipShell({
 }) {
   return (
     <span
-      className={`ml-auto inline-flex items-center gap-1.5 text-xs font-bold ${bare ? "" : "rounded-md bg-background px-2 py-1 "}${changeTone(changed)}`}
+      className={`ml-auto inline-flex items-center gap-1.5 text-xs font-bold ${bare ? "" : "rounded-md bg-background px-2 py-1 "}${changeTone(false)}`}
       title={title}
-      data-note-price-chip={marker ? "" : undefined}
     >
       {children}
     </span>

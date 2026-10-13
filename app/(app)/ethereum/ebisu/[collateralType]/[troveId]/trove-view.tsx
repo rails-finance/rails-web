@@ -86,9 +86,7 @@ import {
   liquityForkEconomicsContent,
   liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
-import { DEBT_SYMBOL, EBISU_DOCS, resolveBranch } from "@/lib/ebisu/asset-catalog";
-import { forkMcrAt } from "@/lib/shared/liquity-fork-ops";
-import { forkPriceGapNotesFor, liveForkPriceGapNote, type ForkPriceGapBranch } from "@/lib/shared/market-note";
+import { DEBT_SYMBOL, EBISU_DOCS } from "@/lib/ebisu/asset-catalog";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -152,9 +150,6 @@ export default function EbisuTroveDetail({
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
   const [chain, setChain] = useState<LiquityForkTroveChainResponse | null>(null);
-  // The live read has answered, landed or not — the live note's slot is held
-  // only until then.
-  const [chainSettled, setChainSettled] = useState(false);
   // Standing display framing (risk view) — a global preference, so the reader's
   // choice on one trove carries to the next.
 
@@ -235,8 +230,6 @@ export default function EbisuTroveDetail({
         if (!cancelled && !data.chainStale) setChain(data);
       } catch {
         // Index-derived surfaces already render; the risk layer just stays off.
-      } finally {
-        if (!cancelled) setChainSettled(true);
       }
     })();
     return () => {
@@ -385,41 +378,6 @@ export default function EbisuTroveDetail({
     price: view?.priceUsd ?? null,
     surplusClaimed: surplus?.claimed != null,
   });
-
-  // Market notes — the Liquity V2 trove page's price stretches, on this fork:
-  // every Ebisu row carries the branch price at its block (server mig 342's
-  // every-event filler), so a note is a reduction of the rows on the page,
-  // computed off the whole sorted list the way V2 computes it. A stretch with a
-  // served folder inside it is skipped: the Trove transacted in it, off the
-  // page. Notes are never rows, so they count toward nothing (market-note.ts).
-  const noteBranch = useMemo<ForkPriceGapBranch | null>(() => {
-    const b = resolveBranch(collateralType);
-    if (!b) return null;
-    const folders = [
-      ...(servedFolders ?? []),
-      ...(tl.displayedRows ?? []).flatMap((r) => (r.kind === "folder" ? [r.folder] : [])),
-    ];
-    return {
-      protocol: "ebisu",
-      collateralType: b.symbol,
-      mcr: b.mcr,
-      priceFeed: b.priceFeed,
-      debtSymbol: DEBT_SYMBOL,
-      mcrAt: (block) => forkMcrAt(b, { block }),
-      breaks: folders.map((f) => ({ firstBlock: f.firstBlock, lastBlock: f.lastBlock })),
-    };
-  }, [collateralType, servedFolders, tl.displayedRows]);
-  const notes = useMemo(
-    () => (noteBranch ? forkPriceGapNotesFor(tl.sortedEvents, noteBranch) : []),
-    [tl.sortedEvents, noteBranch],
-  );
-  // The live note: the Trove's newest priced row against the branch price the
-  // live read simulated at the head. Open Troves only, once that read lands.
-  const liveNotes = useMemo(() => {
-    if (!noteBranch || !liveRisk || !chain || chain.priceUsd == null) return [];
-    const n = liveForkPriceGapNote(tl.sortedEvents, noteBranch, { price: chain.priceUsd, block: chain.blockNumber });
-    return n ? [n] : [];
-  }, [noteBranch, liveRisk, chain, tl.sortedEvents]);
 
   // The top row's price dropdown: the branch's own oracle
   // price for the collateral — the live chain read when it landed, else the
@@ -591,9 +549,6 @@ export default function EbisuTroveDetail({
               persistKeyPrefix="ebisu"
               closed={view ? view.status !== "open" : undefined}
               tl={tl}
-              notes={notes}
-              liveNotes={liveNotes}
-              liveNotesPending={view?.status === "open" && !chainSettled}
               runs={FORK_RUNS}
               folderRegister={LIQUITY_FORK_FOLDER_REGISTER}
               readFolderMembers={readFolderMembers}
