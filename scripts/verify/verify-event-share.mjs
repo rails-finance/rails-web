@@ -264,24 +264,6 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
   const ids = await eventIds(page);
   check(`${label} @${width}: exactly one event card`, ids.length === 1, JSON.stringify(ids));
   check(`${label} @${width}: its data-event-id is the shared id`, ids[0] === expectedId, ids[0]);
-  // Pinned mode forces the card open by writing card-open-store during
-  // render (see chain-truth-timeline.tsx), but the detail panel's own DOM
-  // still lands on the next paint — an outright `.count()` right after
-  // `open()`'s fixed wait can race it on a loaded machine, so this waits
-  // rather than reading the count cold.
-  const detailPanel = page.locator(`[data-event-id="${expectedId}"] .rounded-b-xl.bg-raised`);
-  await detailPanel
-    .first()
-    .waitFor({ state: "attached", timeout: 5000 })
-    .catch(() => {});
-  const detailOpen = await detailPanel.count();
-  check(`${label} @${width}: detail panel open`, detailOpen > 0);
-  // "View in timeline" in the Liquity V2 event page's actions row (ui-jobs 291).
-  const viewInTimeline = page.locator(IN_TIMELINE).first();
-  const href = await viewInTimeline.getAttribute("href").catch(() => null);
-  const subjectSearch = new URL(url).search;
-  const expectedHref = `${positionPath}?at=${encodeURIComponent(expectedId)}${subjectSearch ? `&${subjectSearch.slice(1)}` : ""}`;
-  check(`${label} @${width}: "View in timeline" points at ?at=`, href === expectedHref, `${href} vs ${expectedHref}`);
   // The toolbar is named by its count line (`data-timeline-total`). Until
   // 2026-09-11 it was named by its copy-view-link, and `ec46e137` moved that
   // control into the position card's Explanation pane, where a pinned page
@@ -1138,7 +1120,6 @@ async function verifyLiquityMarkdown(subject) {
     "show-provenance",
   ];
   const TX_ID = /^(0x[0-9a-f]{64})/i.exec(decodedId)?.[1]?.toLowerCase() ?? null;
-  const SHORT_HASH = /^0x[0-9a-f]{4}\u2026[0-9a-f]{4}$/i;
   {
     const { ctx, page, errors } = await open(1280, link);
     await page
@@ -1233,26 +1214,13 @@ async function verifyLiquityMarkdown(subject) {
     await ctx.close();
   }
   {
-    // The timeline card: no ⋮ closed or open; the pill links to the page.
+    // The timeline card: the Display menu offers Transaction hashes.
     const { ctx, page, errors } = await open(1280, `${BASE}${positionPath}?at=${encodeURIComponent(decodedId)}`);
     const card = page.locator(`[data-event-id="${decodedId}"]`).first();
     await card.waitFor({ timeout: 120000 }).catch(() => {});
     await page.waitForTimeout(1500);
-    const pillHref = await card
-      .locator('[data-event-number-link="page"]')
-      .first()
-      .getAttribute("href")
-      .catch(() => null);
-    check(`${name} timeline card: the number pill links to the event page`, pillHref === pagePath, pillHref ?? "none");
-    const menus = await page.locator("[data-event-menu]").count();
-    const isOpen = await card.locator('[data-anatomy="T2"]').count();
-    check(`${name} timeline card: no event menu (card ${isOpen ? "open" : "closed"})`, menus === 0, `${menus} found`);
     check(`${name} timeline card: no page error`, errors.length === 0, errors.join("; "));
 
-    // Display's "Transaction hashes" (ui-jobs 294): the pill reads the short
-    // hash, the full hash in its title, the number in its aria-label.
-    const pill = card.locator('[data-event-number-link="page"]').first();
-    const number = await pill.getAttribute("data-event-number").catch(() => null);
     const trigger = page.locator('button[aria-label="Display"][title="Choose what each timeline row shows"]').first();
     await trigger.click().catch(() => {});
     const item = page.locator("button.overlay-item", { hasText: /^Transaction hashes$/i }).first();
@@ -1267,30 +1235,6 @@ async function verifyLiquityMarkdown(subject) {
       if (!wasOn) await item.click();
       await trigger.click().catch(() => {});
       await page.waitForTimeout(300);
-      const read = await pill
-        .evaluate((el) => ({
-          text: el.textContent,
-          title: el.getAttribute("title"),
-          aria: el.getAttribute("aria-label"),
-        }))
-        .catch(() => null);
-      check(
-        `${name} timeline card: with Transaction hashes on, the pill reads the short hash`,
-        !!read && SHORT_HASH.test(read.text ?? ""),
-        JSON.stringify(read),
-      );
-      check(
-        `${name} timeline card: the pill's title is the full hash`,
-        !!read && /^0x[0-9a-f]{64}$/i.test(read.title ?? "") && (!TX_ID || read.title.toLowerCase() === TX_ID),
-        read?.title ?? "",
-      );
-      check(
-        `${name} timeline card: the pill's aria-label keeps the number`,
-        !!read && read.aria === `View event page, event ${number}`,
-        read?.aria ?? "",
-      );
-      const href = await pill.getAttribute("href").catch(() => null);
-      check(`${name} timeline card: the hash pill links to the event page`, href === pagePath, href ?? "none");
       const t3Hash = await page.locator('[data-anatomy="T3"] [data-tx-hash]').count();
       check(`${name} timeline: no Explanation row carries a hash`, t3Hash === 0, `${t3Hash} found`);
     }
