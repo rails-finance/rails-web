@@ -1850,7 +1850,7 @@ function ChainTruthTimelineBody({
     // prefix of the rows — and everything that hangs off a row, market notes
     // included, is drawn with it. A count taken there is a count of the
     // window, not of the position (§38, 2026-09-20: a trove drawing 50 of its
-    // 70 rows showed 7 of its 9 price-gap notes, and the two absent ones were
+    // 70 rows showed 7 of its 9 market notes, and the two absent ones were
     // read as a defect in the rule for a day). The toolbar pill states the
     // whole count throughout; these two say when the list agrees with it.
     <SpineViewProvider>

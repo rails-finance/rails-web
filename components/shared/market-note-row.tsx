@@ -1177,7 +1177,7 @@ function liftTimeCells(stats: NoteStat[]): Pick<NoteBody, "stats" | "intro" | "b
   const elapsed = elapsedCell?.figure ?? (blocksCell?.sub?.text === "elapsed" ? blocksCell.sub.figure : undefined);
   return {
     stats: stats.filter((c) => c !== blocksCell && c !== elapsedCell),
-    intro: { lead: "Market fluctuation since the last event", ...(elapsed ? { elapsed } : {}) },
+    intro: { lead: "Rate change since the last event", ...(elapsed ? { elapsed } : {}) },
     ...(blocksCell?.transition ? { blocks: blocksCell.transition } : {}),
   };
 }

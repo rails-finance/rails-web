@@ -12,7 +12,7 @@
 //             ("Showing 1,000 rows of 29,513 events").
 //
 // Both were read as findings on 2026-09-20 (TO-DO-ui-jobs §38): a trove that
-// draws 50 of its 70 rows shows 7 of its 9 price-gap notes, which was recorded
+// draws 50 of its 70 rows shows 7 of its 9 market notes, which was recorded
 // as a disagreement between the page and the rule for a day; and three checks
 // of `verify-event-share`'s served-folders arm went red under batch load
 // against a page that had not settled. Neither page was wrong — both said so
