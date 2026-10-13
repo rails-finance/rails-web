@@ -86,7 +86,7 @@ export function BetaStrip() {
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
-      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      {feedbackOpen && <FeedbackModal initialType="general" onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }

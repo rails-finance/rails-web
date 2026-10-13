@@ -4,7 +4,7 @@
 //
 // Checklist:
 //   1. SiteFooter (home): "Send feedback" trigger opens the modal.
-//   2. Category pills switch; the Title field hides on Data correction.
+//   2. Category pills switch; the Title field hides on Correctness.
 //   3. Description counter updates live (n/2000).
 //   4. Honeypot input exists in the DOM, invisible, unfocusable and hidden
 //      from assistive tech — and empty, which is what makes it a trap.
@@ -90,21 +90,21 @@ check("5. body scroll locks while open", overflowOpen === "hidden", `overflow="$
 const pageLine = (await page.textContent('[data-testid="feedback-page-line"]'))?.trim();
 check("7. page line auto-captures pathname", pageLine === "Page: /", `"${pageLine}"`);
 
-// ── 2. Pills switch; Title hides on Data correction ──────────────────────────
+// ── 2. Pills switch; Title hides on Correctness ──────────────────────────
 const titleInput = page.locator(`${DIALOG} input[placeholder="Short summary"]`);
-check("2. Title field visible on Bug report (default)", await titleInput.isVisible());
-await page.click(`${DIALOG} button[role="tab"]:has-text("Data correction")`);
+check("2. Title field visible on Bug (default)", await titleInput.isVisible());
+await page.click(`${DIALOG} button[role="tab"]:has-text("Correctness")`);
 await pause(150);
-check("2. Title field hides on Data correction", (await titleInput.count()) === 0);
+check("2. Title field hides on Correctness", (await titleInput.count()) === 0);
 const dataPlaceholder = await page.getAttribute(`${DIALOG} textarea`, "placeholder");
 check(
-  "2. Data correction placeholder swaps in",
+  "2. Correctness placeholder swaps in",
   dataPlaceholder === "Which number looks wrong, and what was expected? A link or tx hash helps.",
   `"${dataPlaceholder}"`,
 );
-await page.click(`${DIALOG} button[role="tab"]:has-text("Feature request")`);
+await page.click(`${DIALOG} button[role="tab"]:has-text("Request")`);
 await pause(150);
-check("2. Title field returns on Feature request", await titleInput.isVisible());
+check("2. Title field returns on Request", await titleInput.isVisible());
 
 // ── 3. Live counter ──────────────────────────────────────────────────────────
 const counterBefore = (await page.textContent('[data-testid="feedback-counter"]'))?.trim();
