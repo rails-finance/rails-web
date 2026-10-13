@@ -219,6 +219,7 @@ export function frankencoinEventProse(input: FrankencoinProseInput): Frankencoin
   if (priceAfter != null) v.price_after = priceAfter;
   const collEcho = { coll_change: "collateral" } as const;
   const repaidEcho = { repaid: "minted" } as const;
+  const mintedEcho = { minted: "minted" } as const;
   const priceEcho = { price_after: "price_after" } as const;
 
   // What a mint paid out, from the receipt.
@@ -294,7 +295,10 @@ export function frankencoinEventProse(input: FrankencoinProseInput): Frankencoin
     case "frankencoin.open": {
       const o = facts?.opening ?? null;
       const deposited = showColl ? num(ctx.collateral) : 0;
-      sp.say(deposited > 0 ? "open.what" : "open.what_empty");
+      if (deposited > 0) {
+        v.coll_change = deposited;
+        sp.say("open.what", collEcho);
+      } else sp.say("open.what_empty");
       sp.say("open.price");
       if (o) {
         if (Number(o.fee) > 0) sp.say("open.fee");
@@ -326,26 +330,37 @@ export function frankencoinEventProse(input: FrankencoinProseInput): Frankencoin
       break;
     }
     case "frankencoin.mint": {
-      sp.say(variant === "first" ? "mint.what_first" : "mint.what");
+      if (dMint != null && dMint > 0) v.minted = dMint;
+      sp.say(variant === "first" ? "mint.what_first" : v.minted != null ? "mint.what" : "mint.what_plain", mintedEcho);
       mintLegs();
       mintInterest();
       roll();
       break;
     }
     case "frankencoin.repay": {
-      sp.say(variant === "closed" ? "repay.what_closed" : variant === "cleared" ? "repay.what_cleared" : "repay.what");
+      const hasRepaid = dMint != null && dMint < 0;
+      if (hasRepaid) v.repaid = Math.abs(dMint as number);
+      if (variant === "closed") sp.say(hasRepaid ? "repay.what_closed" : "repay.what_closed_plain", repaidEcho);
+      else if (variant === "cleared") sp.say(hasRepaid ? "repay.what_cleared" : "repay.what_cleared_plain", repaidEcho);
+      else sp.say(hasRepaid ? "repay.what" : "repay.what_plain", repaidEcho);
       repayLegs();
       if (variant === "cleared") sp.say("repay.next");
       break;
     }
     case "frankencoin.add_collateral": {
       if (ctx.collateralUnderstated) sp.say("coll.understated");
-      else sp.say("add.what");
+      else if (dColl != null && dColl > 0) {
+        v.coll_change = dColl;
+        sp.say("add.what", collEcho);
+      } else sp.say("add.what_plain");
       break;
     }
     case "frankencoin.withdraw_collateral": {
       if (ctx.collateralUnderstated) sp.say("coll.understated");
-      else sp.say(variant === "emptied" ? "withdraw.what_emptied" : "withdraw.what");
+      else if (dColl != null && dColl < 0) {
+        v.coll_change = Math.abs(dColl);
+        sp.say(variant === "emptied" ? "withdraw.what_emptied" : "withdraw.what", collEcho);
+      } else sp.say(variant === "emptied" ? "withdraw.what_emptied_plain" : "withdraw.what_plain");
       if (rs.hasDebt) limit(true);
       pauseEnded();
       break;
@@ -362,12 +377,17 @@ export function frankencoinEventProse(input: FrankencoinProseInput): Frankencoin
         break;
       }
       if (ctx.collateralUnderstated) sp.say("coll.understated");
-      else if (dColl != null && dColl !== 0) sp.say(dColl > 0 ? "adjust.coll_in" : "adjust.coll_out");
+      else if (dColl != null && dColl !== 0) {
+        v.coll_change = Math.abs(dColl);
+        sp.say(dColl > 0 ? "adjust.coll_in" : "adjust.coll_out", collEcho);
+      }
       if (dMint != null && dMint < 0) {
-        sp.say("adjust.repaid");
+        v.repaid = Math.abs(dMint);
+        sp.say("adjust.repaid", repaidEcho);
         repayLegs();
       } else if (dMint != null && dMint > 0) {
-        sp.say("adjust.minted");
+        v.minted = dMint;
+        sp.say("adjust.minted", mintedEcho);
         mintLegs();
       }
       if (priceMoved) sp.say(raised ? "price.raised" : "price.lowered", priceEcho);

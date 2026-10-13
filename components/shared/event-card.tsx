@@ -1,6 +1,7 @@
 "use client";
 
 import { PriceBasisProvider } from "@/components/shared/price-basis";
+import { usePathname } from "next/navigation";
 import { useState, useCallback, useEffect, useContext, useId, useMemo, useRef, type ReactNode } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
@@ -29,6 +30,8 @@ import { useRowTarget } from "@/components/shared/row-target";
 import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
+import { EventSheetView, type EventSheet } from "@/components/shared/event-sheet";
+import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -117,6 +120,11 @@ interface EventCardSlotsCommon {
   /** T2's grid: the ordered cells, the cells to come while their figures are
    *  read, or the reason the event has none. */
   cells: EventCells;
+  /** T2 as a balance sheet (ui-jobs 330): the side panels and the Risk and
+   *  Limits pair, drawn in place of `cells` where a family supplies it. Null:
+   *  the family draws a sheet whose figures are still on their way, and
+   *  `cells` stands (its placeholders) until they land. */
+  sheet?: EventSheet | null;
   /** Data attributes on the grid: the state of the read its figures come
    *  from ("data-position-state": "ready"). */
   cellsData?: Record<string, string>;
@@ -165,12 +173,24 @@ export type EventCardOpened = Partial<Pick<EventCardSlots, "cells" | "notes" | "
 
 /** The body of a card whose slots wait on `useOpened`: mounted with the open
  *  panel, so its read starts when the card opens. */
-function OpenedBody({ slots, useOpened }: { slots: EventCardSlots; useOpened: () => EventCardOpened }) {
+function OpenedBody({
+  slots,
+  useOpened,
+  breakdown,
+}: {
+  slots: EventCardSlots;
+  useOpened: () => EventCardOpened;
+  breakdown: boolean;
+}) {
   const opened = useOpened();
   const price = opened.price ?? slots.price;
   return (
     <>
-      <EventCellGrid cells={opened.cells ?? slots.cells} />
+      {slots.sheet ? (
+        <EventSheetView sheet={slots.sheet} breakdown={breakdown} data={slots.cellsData} />
+      ) : (
+        <EventCellGrid cells={opened.cells ?? slots.cells} />
+      )}
       {opened.notes ?? slots.notes}
       {hasPriceRow(price) && <EventPriceRow price={price} />}
     </>
@@ -240,12 +260,13 @@ interface EventCardDrawn {
 
 export type EventCardProps = EventCardFrame & { slots: EventCardSlots };
 
-/** The slots, as the shell draws them. */
-function drawnOf(slots: EventCardSlots, pageMode: boolean): EventCardDrawn {
+/** The slots, as the shell draws them. `breakdown`: the sheet's carry-forward
+ *  layer and parameters (the timeline's switch; always on an event page). */
+function drawnOf(slots: EventCardSlots, pageMode: boolean, breakdown: boolean): EventCardDrawn {
   const { event, actor, explainer } = slots;
   // A stand-in card with nothing under its row (a run with no sums) opens
   // nothing.
-  const bodyless = !event && "none" in slots.cells && slots.notes == null && !hasPriceRow(slots.price);
+  const bodyless = !event && !slots.sheet && "none" in slots.cells && slots.notes == null && !hasPriceRow(slots.price);
   return {
     iconColumn: <SpineColumn {...slots.spine} />,
     header: slots.event ? (
@@ -261,10 +282,14 @@ function drawnOf(slots: EventCardSlots, pageMode: boolean): EventCardDrawn {
     ),
     band: slots.band,
     detail: bodyless ? undefined : slots.useOpened ? (
-      <OpenedBody slots={slots} useOpened={slots.useOpened} />
+      <OpenedBody slots={slots} useOpened={slots.useOpened} breakdown={breakdown} />
     ) : (
       <>
-        <EventCellGrid cells={slots.cells} data={slots.cellsData} />
+        {slots.sheet ? (
+          <EventSheetView sheet={slots.sheet} breakdown={breakdown} data={slots.cellsData} />
+        ) : (
+          <EventCellGrid cells={slots.cells} data={slots.cellsData} />
+        )}
         {slots.notes}
       </>
     ),
@@ -334,7 +359,15 @@ export function EventCard(props: EventCardProps) {
   // stand open with no toggle. The boundary card's open is controlled.
   const page = useContext(EventPageContext);
   const pageMode = page != null;
-  const drawn = drawnOf(props.slots, pageMode);
+  // The full breakdown (ui-jobs 330): one switch for the whole timeline, in
+  // the row's ⋮; always on an event's page, the event page's card or the card
+  // a family's event URL pins on its position page.
+  const display = useTimelineDisplay();
+  const pathname = usePathname();
+  const ownPage = useEventShareHref()?.split("?")[0];
+  const onOwnPage = ownPage != null && pathname === ownPage;
+  const breakdown = pageMode || onOwnPage || display.showFullBreakdown;
+  const drawn = drawnOf(props.slots, pageMode, breakdown);
   const {
     iconColumn,
     header,
@@ -515,7 +548,8 @@ export function EventCard(props: EventCardProps) {
   // The event menu (⋮) at the right end of the T1 row, at both widths: after
   // the header on desktop, at the caption's right on a phone. A press on it
   // stays with the menu (Escape still reaches the menu's document listener).
-  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu);
+  const hasSheet = props.slots.sheet !== undefined && !!props.slots.event && !groupMenu && !onOwnPage;
+  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu || hasSheet);
   const headMenu =
     !pageMode && menuRows ? (
       <span
@@ -526,7 +560,13 @@ export function EventCard(props: EventCardProps) {
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu shareHref={groupMenu ? null : shareHref} groupShow={groupMenu} />
+        <EventCardMenu
+          shareHref={groupMenu ? null : shareHref}
+          groupShow={groupMenu}
+          breakdown={
+            hasSheet ? { on: display.showFullBreakdown, toggle: () => display.toggle("showFullBreakdown") } : undefined
+          }
+        />
       </span>
     ) : null;
 

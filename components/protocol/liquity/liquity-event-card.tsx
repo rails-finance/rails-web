@@ -278,7 +278,13 @@ export function LiquityEventCard({
         }
       : null,
   };
-  const cells = useLiquityCells({ ctx, txHash: event.txHash, blockNumber: event.blockNumber, prose });
+  const { cells, sheet } = useLiquityCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    prose,
+    previousEvent,
+  });
 
   const head = useLiquityHeadSpec(ctx, coords);
   const slots: EventCardSlots = {
@@ -309,6 +315,7 @@ export function LiquityEventCard({
           : undefined,
     },
     cells,
+    sheet,
     ledgers: {
       provider: (children) => (
         <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp} accrualLabel={liquityAccrualLabel}>

@@ -506,6 +506,28 @@ L2_words:
     At the latest block’s price, {price_today}, the redeemed {coll_symbol} would be worth {redemption_vs_today_usd} more than the debt it paid off
   collateral_ratio: |-
     Collateral Ratio
+  # T2's balance sheet (ui-jobs 330): the event's rows a family names, and the
+  # Risk and Limits rows.
+  sheet_redistribution: |-
+    Redistribution
+  sheet_upfront_fee: |-
+    Upfront fee
+  sheet_fee: |-
+    Management fee
+  sheet_face: |-
+    $1.00 face
+  liquidates_at: |-
+    Liquidates at
+  debt_in_front: |-
+    Debt in front
+  debt_in_front_unread: |-
+    Not read at this block
+  delegate_fee: |-
+    Delegate's fee
+  minimum_ratio: |-
+    Minimum ratio
+  critical_ratio: |-
+    Critical ratio
 
 # ── Copy for LLM: the block's context header ──
 context_words:

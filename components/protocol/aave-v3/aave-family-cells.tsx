@@ -121,7 +121,7 @@ export const ACCOUNT_CELL_HEADS: EventCellHead[] = [
 export const fig = (f: Figure): EventFigure => ({ text: f.text, info: f.prov, value: f.value });
 
 /** Each side's figures at the event. */
-function sideFacts(state: AaveV3PositionState, side: FlowSide) {
+export function sideFacts(state: AaveV3PositionState, side: FlowSide) {
   const acc = state.account;
   const base = (a: AaveV3AccountSide) => (side === "collateral" ? a.totalCollateralBase : a.totalDebtBase);
   const before = acc ? baseToUsd(base(acc.before)) : null;
@@ -178,7 +178,7 @@ function sideBalances(state: AaveV3PositionState, side: FlowSide): AssetBalance[
   return out;
 }
 
-const atWords = (eventTs?: number) => (eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event");
+export const atWords = (eventTs?: number) => (eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event");
 const usdText = (v: number) => (v < 0.005 ? "$0" : fmtPositionUsd(v));
 
 /** What the side's ledger closes on in dollars, with its receipts: the
@@ -213,7 +213,7 @@ function sideTotals(
 }
 
 /** The closed cell's dollars before → after, as its ledger closes on them. */
-function sideUsd(
+export function sideUsd(
   side: FlowSide,
   state: AaveV3PositionState,
   coords: V3Coords,
