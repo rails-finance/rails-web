@@ -1,45 +1,54 @@
 "use client";
 
-// Frankencoin position card — one Position contract, through the SAME shared
-// grammar (OpenPositionStats + StatValue) as the other explorers.
+// Frankencoin position card: one Position contract, drawn by the shared
+// position card (components/shared/position-card.tsx; rails-ops
+// TO-DO-position-card 322). `useFrankencoinCardSlots` builds the slots from
+// the position's view and the page's live read; `PositionCard` draws them on
+// the position page and in the listing row.
 //
-// THE GRAIN IS THE CONTRACT: the card is one Position clone — the address is
-// the identity, the owner a mutable fact shown beside it. UNITS ARE NATIVE:
-// collateral in the position's own token (per-token decimals from the row —
-// four observed collaterals are decimals=0), debt in ZCHF. There is NO USD
-// column and no dollar anywhere: Frankencoin is oracle-free, and the one
-// price on the card — the liquidation price footnote — is OWNER-DECLARED,
-// labeled so, in ZCHF per token.
+// THE GRAIN IS THE CONTRACT: the card is one Position clone, the address is
+// the identity and the owner a mutable fact. UNITS ARE NATIVE: collateral in
+// the position's token (per-token decimals from the row; four observed
+// collaterals are decimals=0), debt in ZCHF. There is NO USD line and no
+// dollar anywhere: Frankencoin runs no oracle, and the one price on the card,
+// the liquidation price, is OWNER-DECLARED, labelled so, in ZCHF per token.
 //
-// STATUS IS TWO-AXIS. The lifecycle pill says open / closed / denied /
-// expired; the challenge history is the orthogonal axis — an OPEN position
-// that survived a challenge stays an OPEN card with the meta cluster's
-// caution count (challenges, named as challenges, never "liquidations").
-// There is NO health column and no invented health factor: risk here is
-// challenge status + the declared price + the expiry, and the detail page's
-// live strips carry exactly those.
+// STATUS IS TWO-AXIS. The tag says closed, denied or expired; a live
+// position has none. The challenge history is the other axis: an open
+// position that survived a challenge stays an open card, its tally in the
+// panel (named as challenges, never "liquidations"), and a running challenge
+// is the notice above the headlines. There is NO health headline and no
+// invented health factor: the declared price, the challenges, the expiry and
+// the cooldown carry the risk, as panel rows.
 //
-// The card view builds from EITHER lane: `viewFromSummary` (the index row —
-// the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay —
-// the position's own slots at head, the primary truth on the detail page).
+// The card view builds from EITHER lane: `viewFromSummary` (the index row,
+// the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay,
+// the position's slots at head, the primary truth on the detail page).
 
-import { Fragment } from "react";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
+import { useState, type ReactNode } from "react";
+import { AlertTriangle, Check, Hash, Link2 } from "lucide-react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardMenu,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
+import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash, StatFootnote } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { Icon } from "@/components/icons/icon";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { latestAbsoluteProv, peakAbsoluteProv, lifetimeFlowProv } from "@/lib/frankencoin/event-provenance";
 import type { FrankencoinLifetimeDebt } from "@/lib/frankencoin/flows";
-import { fmtZchf } from "@/lib/frankencoin/figures";
+import { fmtZchf, phaseText } from "@/lib/frankencoin/figures";
 import {
   liveMintedProv,
   liveCollateralProv,
@@ -52,7 +61,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/lib/sources/api/frankencoin-positions";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
 import { AmountText } from "@/components/shared/amount-text";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDayMonth } from "@/lib/date";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -107,11 +116,11 @@ export interface FrankencoinEnding {
  *  "expired" (expiration is head state, never an API fact). */
 export type FrankencoinCardStatus = FrankencoinPositionStatus | "expired";
 
-const STATUS: Record<FrankencoinCardStatus, { label: string; cls: string }> = {
-  open: { label: "OPEN", cls: "bg-positive/20 text-positive" },
-  closed: { label: "CLOSED", cls: "bg-rb-300 dark:bg-rb-700 text-foreground/70" },
-  denied: { label: "DENIED", cls: "bg-red-500/20 text-red-500" },
-  expired: { label: "EXPIRED", cls: "bg-caution-400/20 text-caution-400" },
+/** The tag on an ended position; a live one has none. */
+const STATUS: Record<Exclude<FrankencoinCardStatus, "open">, PositionCardStatus> = {
+  closed: { word: "Closed", tone: "muted" },
+  denied: { word: "Denied", tone: "muted" },
+  expired: { word: "Expired", tone: "muted" },
 };
 
 const collProv = (v: FrankencoinPositionView): Provenance =>
@@ -137,7 +146,7 @@ function PositionIdentity({ v, cloneParent }: { v: FrankencoinPositionView; clon
   return (
     <span className="text-xs text-rb-500 tabular-nums">
       <RevealTip
-        tip="The position's own contract address. Every Frankencoin position is a contract of its own."
+        tip="The position's contract address. Every Frankencoin position is a contract of its own."
         label="Position contract address"
         focusable
         className="focus-ring rounded-sm"
@@ -179,77 +188,29 @@ function cloneTip(root: string | null, parent: string | null): string {
   return `A clone${of ? ` of ${shortAddress(of)}` : ""}: a position of its own on that original's terms, sharing its minting limit.`;
 }
 
-/** The orthogonal challenge marker — caution triangle + count, named as
- *  challenges (never "liquidations": Frankencoin's own vocabulary). */
-function ChallengeMarker({ count, closedBySale }: { count: number; closedBySale: boolean }) {
+/** The listing's challenge marker: caution triangle + count, named as
+ *  challenges (never "liquidations": Frankencoin's vocabulary). The position
+ *  page states the tally in the panel or the closed card's Challenges. */
+function ChallengeMarker({ count }: { count: number }) {
   if (count <= 0) return null;
-  const times = `Challenged ${count} time${count === 1 ? "" : "s"}`;
-  const title = closedBySale
-    ? `${times}. A challenge sale took its collateral below the position's minimum, which closed it.`
-    : `${times}. A challenged position can survive its auction.`;
+  const title = `Challenged ${count} time${count === 1 ? "" : "s"}`;
   return (
-    // Mounted outside PositionCardMeta's cluster (Frankencoin's own vocabulary,
-    // never "liquidations"); RevealTip gives it the same hover, tap and
-    // keyboard tip as that cluster's badges.
-    <RevealTip tip={title} label={title} focusable className="text-caution-400 focus-ring rounded-sm">
+    <RevealTip tip={title} label={title} className="text-caution-400 text-xs">
       <Icon name="triangle" size={12} />
-      <span className="ml-1 font-semibold text-xs">{count}</span>
+      <span className="ml-1 font-semibold">{count}</span>
     </RevealTip>
   );
 }
 
-function MetaCluster({ v, closedBySale = false }: { v: FrankencoinPositionView; closedBySale?: boolean }) {
-  return (
-    <span className="flex items-center gap-2">
-      <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} />
-      <ChallengeMarker count={v.challengeCount} closedBySale={closedBySale} />
-    </span>
-  );
-}
-
-/** The card's identity lead, one node for open and closed cards: the owner
- *  wallet pill (facehash + copy + bookmark — the bookmark keys off the owner
- *  wallet, so the address is its home) when the owner is known, then the
- *  position's own identity (contract address · hub · clone). The detail page
- *  draws the owner on the wallet row above the card (ui-jobs 228). */
-function IdentityLead({
-  v,
-  cloneParent,
-  wallet = true,
-}: {
-  v: FrankencoinPositionView;
-  cloneParent?: string | null;
-  wallet?: boolean;
-}) {
-  if (!v.owner || !wallet) return <PositionIdentity v={v} cloneParent={cloneParent} />;
-  return (
-    <span className="flex items-center gap-2">
-      <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmarkProtocol="frankencoin" />
-      <PositionIdentity v={v} cloneParent={cloneParent} />
-    </span>
-  );
-}
-
-/** Expiry footnote — a countdown against the position's own clock. */
-function expiryText(expiration: number | null): string | null {
-  if (expiration == null || expiration <= 0) return null;
-  const now = Date.now() / 1000;
-  const days = (expiration - now) / 86400;
-  if (days <= 0) return "expired";
-  if (days < 1) return "expires in less than a day";
-  return `expires in ${Math.round(days)}d`;
-}
-
-/** A closed card's lifetime line: the peak above is one moment, this is the
- *  whole life (the Lifetime flows panel's debt side). */
+/** A closed card's lifetime line under its highest debt: the peak above is
+ *  one moment, this is the whole life (the Lifetime flows panel's debt side). */
 function LifetimeDebtLine({ side }: { side: FrankencoinLifetimeDebt }) {
   const minted = side.minted;
-  if (!(minted > 0)) return null;
   const repaid = side.repaid;
   const cleared = side.cleared;
   const allRepaid = !cleared && Math.abs(repaid - minted) <= Math.max(1e-9, minted * 1e-12);
   return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+    <span className="tabular-nums">
       <Prov info={lifetimeFlowProv("minted", "ZCHF")}>
         <span>{fmtZchf(minted)} ZCHF</span>
       </Prov>{" "}
@@ -266,291 +227,357 @@ function LifetimeDebtLine({ side }: { side: FrankencoinLifetimeDebt }) {
           )}
         </>
       )}
-    </div>
+    </span>
   );
 }
 
-/** A closed card's expiry: the date its terms ran to. */
-function closedExpiryText(expiration: number | null): string | null {
-  if (expiration == null || expiration <= 0) return null;
-  return `${expiration * 1000 <= Date.now() ? "expiry was" : "expiry"} ${formatDate(expiration)}`;
+/** The position's rows at the head of the card's ⋮ (ui-jobs 308 point 2):
+ *  its contract address with a copy, and a link to its page. */
+function FrankencoinMenuRows({ position }: { position: string }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (key: string, value: string) => {
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
+  const icon = (key: string, glyph: ReactNode) => (copied === key ? <Check size={16} /> : glyph);
+  return (
+    <>
+      <ToolsMenuItem
+        icon={icon("position", <Hash size={16} />)}
+        title={`Position ${shortAddress(position)}`}
+        subtitle={copied === "position" ? "Copied" : "Copy the position's contract address"}
+        onClick={() => copy("position", position)}
+      />
+      <ToolsMenuItem
+        icon={icon("link", <Link2 size={16} className="-rotate-45" />)}
+        title="Link to this position"
+        subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
+        onClick={() => copy("link", `${window.location.origin}/ethereum/frankencoin/${position}`)}
+      />
+    </>
+  );
 }
 
-export function FrankencoinPositionCard({
+/** Days to a future expiry, in words. */
+function daysLeft(expiration: number): string {
+  const days = (expiration - Date.now() / 1000) / 86400;
+  if (days <= 0) return "passed";
+  if (days < 1) return "in less than a day";
+  const n = Math.round(days);
+  return `in ${n} day${n === 1 ? "" : "s"}`;
+}
+
+export interface FrankencoinPositionCardProps {
+  v: FrankencoinPositionView;
+  /** `detail` on the position page (receipts, panel, (i), ⋮); `listing` in a row. */
+  surface?: "listing" | "detail";
+  /** The position a clone was cloned from (PositionOpened's parent), where the
+   *  timeline has it; `v.original` is the family's original. */
+  cloneParent?: string | null;
+  /** How a terminal position ended, where the timeline says. */
+  ending?: FrankencoinEnding | null;
+  /** The debt's lifetime totals, for a closed card's lifetime line. */
+  lifetimeDebt?: FrankencoinLifetimeDebt | null;
+  /** The page's live read of the position contract: the running challenge,
+   *  the phase length and the minting cooldown. */
+  live?: FrankencoinChainResponse | null;
+  /** The challenge tally from the index, or null while it has not landed. */
+  challengeTally?: number | null;
+  /** The (i) pane's prose. */
+  explanation?: ReactNode;
+  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** The ⋮'s export shapes; `null` leaves the position's rows and the
+   *  provenance row. */
+  exports?: PositionCardExports | null;
+}
+
+/** Frankencoin's slots for the shared position card: Collateral and Debt,
+ *  the panel, the tag, the ⋮ and the counters. */
+export function useFrankencoinCardSlots({
   v,
-  receipts = false,
-  rowExtra,
-  explanation,
-  viewHref,
   surface = "detail",
   cloneParent,
   ending,
   lifetimeDebt,
-  positionSummary,
-  challengeAlert,
-  collateralDetail,
-  debtDetail,
-}: {
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
-   *  forwarded to `PositionCardShell`. Closed, the card is its header and its
-   *  headlines; opened, each headline's detail. */
-  positionSummary?: boolean;
-  /** A running challenge, from the live read: drawn under Collateral (Outcome
-   *  on a terminal card) in both states. Only on a disclosing card. */
-  challengeAlert?: React.ReactNode;
-  /** Opened-layer lines under Collateral from the live read (the challenge
-   *  tally and phase length). Only drawn on a disclosing card. */
-  collateralDetail?: React.ReactNode;
-  /** Opened-layer lines under Debt from the live read (the minting
-   *  cooldown). Only drawn on a disclosing card. */
-  debtDetail?: React.ReactNode;
-  /** The debt's lifetime totals, for a closed card's lifetime line. */
-  lifetimeDebt?: FrankencoinLifetimeDebt | null;
-  /** How a terminal position ended, where the timeline says. */
-  ending?: FrankencoinEnding | null;
-  v: FrankencoinPositionView;
-  /** The position a clone was cloned from (PositionOpened's parent), where the
-   *  timeline has it; `v.original` is the family's original. */
-  cloneParent?: string | null;
-  receipts?: boolean;
-  /** Context content riding the shell's heading-button row. */
-  rowExtra?: React.ReactNode;
-  /** The card's Explanation section (narration describing the position NOW). */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  /** Which surface renders the card — the two-axis pill rule: listing cards
-   *  carry the lifecycle pill (green OPEN), the detail page the neutral mode
-   *  word ("Minting" — the MintingHub's own vocabulary). Terminal states
-   *  (DENIED / EXPIRED / closed) keep their lifecycle pills on both. */
-  surface?: "listing" | "detail";
-}) {
-  const st = STATUS[v.status] ?? STATUS.open;
-  // The closed/opened card (ui-jobs 209): every line under a headline moves
-  // into the opened layer (<PositionCardDetail>); a running challenge stays
-  // in view.
-  const disclosing = receipts && !!positionSummary;
-  const Detail = disclosing ? PositionCardDetail : Fragment;
+  live,
+  challengeTally = null,
+  explanation,
+  viewHref,
+  exports,
+}: FrankencoinPositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
+  const ended = v.status !== "open";
+  const status = v.status === "open" ? null : STATUS[v.status];
+  const sym = v.collateralSymbol;
 
-  // Terminal states — closed, DENIED (the challenge that never became a
-  // position), or EXPIRED (past its deadline, unclaimed) — all draw the
-  // shared terminal frame. The latest absolutes are back at zero for a
-  // closed/denied position, so the headline is what the ledger recorded at
-  // its height — lifetime maxima where the index carries them, an explicit
-  // dash otherwise (never a fabricated figure).
-  if (v.status === "closed" || v.status === "denied" || v.status === "expired") {
+  const identity = detail ? (
+    <PositionIdentity v={v} cloneParent={cloneParent} />
+  ) : (
+    <span className="flex flex-wrap items-center gap-2">
+      {v.owner && (
+        <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmarkProtocol="frankencoin" />
+      )}
+      <PositionIdentity v={v} cloneParent={cloneParent} />
+      <ChallengeMarker count={v.challengeCount} />
+    </span>
+  );
+
+  const counters: PositionCardMetaProps = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    // The foot strip reads transactions, then the age (ui-jobs 270).
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+
+  // A running challenge stays in view above the headlines, on any position
+  // still holding collateral.
+  const challenged = live && v.status !== "closed" ? (live.challengedAmount ?? 0) : 0;
+  const notice =
+    challenged > 0 ? (
+      <div className="notice-caution flex items-start gap-2 p-3 mb-2 text-sm text-caution-700 dark:text-caution-400">
+        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+        <p>
+          Under challenge: {live?.challengedAmount} {sym} in auction
+        </p>
+      </div>
+    ) : undefined;
+
+  let heads: PositionCardHead[];
+  let outcome: PositionCardOutcome | undefined;
+
+  if (ended) {
+    // The latest absolutes are back at zero for an ended position, so the
+    // headlines are what the ledger recorded at its height: lifetime maxima
+    // where the index carries them, a dash otherwise.
     const forcedAt = ending?.forcedAt ?? null;
     const deniedAt = v.status === "denied" ? (ending?.deniedAt ?? null) : null;
-    // The outcome names how it ended: a denial on its date, a forced sale on
-    // the sale's date. A denied position later force-sold says so beside it.
-    const outcomeLabel = v.status === "closed" && forcedAt != null ? "Forced sale" : undefined;
     const closedAt = deniedAt ?? (v.status === "closed" && forcedAt != null ? forcedAt : v.lastActivityAt);
-    const extra =
-      v.status === "denied" && forcedAt != null
-        ? {
-            label: "Then",
-            value: (
-              <>
-                <div className="text-lg font-bold mt-2 text-rb-500">Forced sale</div>
-                <div className="text-xs text-rb-500 mt-0.5">{formatDate(forcedAt)}</div>
-              </>
-            ),
-          }
-        : {
-            label: "Challenges",
-            value: (
-              <div className="text-lg font-bold mt-2 text-rb-500">
-                {v.challengeCount === 0 ? "Never challenged" : v.challengeCount}
-              </div>
-            ),
-          };
-    const peakCollateral = v.peakCollateral;
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        rowExtra={rowExtra}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={frankencoinPositionModal({ status: v.status, forcedSale: forcedAt != null, hub: v.hub })}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome
-          // (with any running challenge); the highest recorded balances and
-          // the challenge count are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcomeFootnote={disclosing ? challengeAlert : undefined}
-          outcome={v.status}
-          outcomeLabel={outcomeLabel}
-          extra={extra}
-          leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} wallet={!receipts} />}
-          identity={<MetaCluster v={v} closedBySale={v.status === "closed" && ending?.closedByChallenge === true} />}
-          closedAt={closedAt ?? undefined}
-          collateral={
-            peakCollateral != null && peakCollateral > 0 ? (
-              <StatValue>
-                <Prov info={peakAbsoluteProv("collateral", v.collateralSymbol)}>
-                  <AssetAmount value={peakCollateral} symbol={v.collateralSymbol} />
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debt={
-            v.peakMinted != null && v.peakMinted > 0 ? (
-              <StatValue>
-                <Prov info={peakAbsoluteProv("minted", "ZCHF")}>
-                  <AssetAmount value={v.peakMinted} symbol="ZCHF" />
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debtLabel={CARD_VOCAB.peakDebt}
-          debtFootnote={
-            <>
-              <StatFootnote>minted ZCHF</StatFootnote>
-              {v.status === "closed" && lifetimeDebt && <LifetimeDebtLine side={lifetimeDebt} />}
-              {closedExpiryText(v.expiration) && (
-                <div className="text-xs mt-0.5 text-rb-500">{closedExpiryText(v.expiration)}</div>
-              )}
-            </>
-          }
-        />
-      </PositionCardShell>
-    );
+    heads = [
+      {
+        id: "peak-collateral",
+        label: CARD_VOCAB.peakCollateral,
+        value:
+          v.peakCollateral != null && v.peakCollateral > 0 ? (
+            <Prov info={peakAbsoluteProv("collateral", sym)}>
+              <AssetAmount value={v.peakCollateral} symbol={sym} />
+            </Prov>
+          ) : null,
+      },
+      {
+        id: "peak-debt",
+        label: CARD_VOCAB.peakDebt,
+        value:
+          v.peakMinted != null && v.peakMinted > 0 ? (
+            <Prov info={peakAbsoluteProv("minted", "ZCHF")}>
+              <AssetAmount value={v.peakMinted} symbol="ZCHF" />
+            </Prov>
+          ) : null,
+        sub:
+          v.status === "closed" && lifetimeDebt && lifetimeDebt.minted > 0 ? (
+            <LifetimeDebtLine side={lifetimeDebt} />
+          ) : (
+            "minted ZCHF"
+          ),
+      },
+    ];
+    const dates: PositionCardOutcome["dates"] = [];
+    if (closedAt) dates.push({ at: closedAt });
+    if (v.expiration != null && v.expiration > 0) dates.push({ label: "Expiry", at: v.expiration });
+    outcome = {
+      // How it ended: a denial on its date, a forced sale on the sale's date.
+      word:
+        v.status === "denied"
+          ? "Denied"
+          : v.status === "expired"
+            ? "Expired"
+            : forcedAt != null
+              ? "Forced sale"
+              : "Closed",
+      dates: dates.length ? dates : undefined,
+      footnote:
+        v.status === "closed" && ending?.closedByChallenge ? (
+          <div className="text-xs text-rb-500 mt-0.5">A challenge sale closed it</div>
+        ) : undefined,
+      // A denied position later force-sold says so beside it.
+      extra:
+        v.status === "denied" && forcedAt != null
+          ? {
+              label: "Then",
+              value: (
+                <>
+                  <div className="text-lg font-bold mt-2 text-rb-500">Forced sale</div>
+                  <div className="text-xs text-rb-500 mt-0.5">{formatDate(forcedAt)}</div>
+                </>
+              ),
+            }
+          : {
+              label: "Challenges",
+              value: (
+                <div className="text-lg font-bold mt-2 text-rb-500">
+                  {v.challengeCount === 0 ? "Never challenged" : v.challengeCount}
+                </div>
+              ),
+            },
+    };
+  } else {
+    heads = [
+      {
+        id: "collateral",
+        label: CARD_VOCAB.collateral,
+        // NULL collateral = the ledger never spoke: a dash, never a zero (the
+        // chain lane corrects at head on the detail page).
+        value:
+          v.collateral != null && v.collateral > 0 ? (
+            <Prov info={collProv(v)}>
+              <AssetAmount
+                value={v.collateral}
+                symbol={sym}
+                exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined}
+              />
+            </Prov>
+          ) : null,
+      },
+      {
+        id: "debt",
+        label: CARD_VOCAB.debt,
+        value:
+          v.minted > 0 ? (
+            <Prov info={mintedProv(v)}>
+              <AssetAmount
+                value={v.minted}
+                symbol="ZCHF"
+                exact={v.mintedRaw != null ? formatUnitsExact(v.mintedRaw, 18) : undefined}
+              />
+            </Prov>
+          ) : null,
+        sub: "minted ZCHF",
+      },
+    ];
   }
 
-  const expiry = expiryText(v.expiration);
+  const common = { status, heads, identity, notice, counters, outcome };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={frankencoinPositionModal({ status: "open", hub: v.hub })}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        statusPill={
-          surface === "detail" && v.status === "open" ? (
-            <RevealTip
-              tip="An open minting position: it holds collateral and can mint ZCHF against it."
-              label="Minting: an open minting position"
-              focusable
-              className="focus-ring rounded-sm"
-            >
-              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-                Minting
-              </span>
-            </RevealTip>
-          ) : (
-            <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}>{st.label}</span>
-          )
-        }
-        leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} wallet={!receipts} />}
-        identity={<MetaCluster v={v} />}
-        columns={[
-          {
-            label: "Collateral",
-            // NULL collateral = the ledger never spoke — a dash, never a zero
-            // (the chain lane corrects at head on the detail page).
-            // No `assetIcons` cluster: the value is a single-asset AssetAmount,
-            // which already carries the ticker as its glyph — a cluster of the
-            // same one symbol drew the icon twice. The cluster slot is for USD
-            // headlines and stacks over several assets (Compound V2, Maple).
-            value:
-              v.collateral != null && v.collateral > 0 ? (
-                <StatValue>
-                  <Prov info={collProv(v)}>
-                    <AssetAmount
-                      value={v.collateral}
-                      symbol={v.collateralSymbol}
-                      exact={
-                        v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined
-                      }
-                    />
-                  </Prov>
-                </StatValue>
-              ) : (
-                <StatDash />
-              ),
-            footnote: (
-              <>
-                {disclosing && challengeAlert}
-                <Detail>
-                  {v.liqPrice != null && v.liqPrice > 0 ? (
-                    <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-                      <Prov info={liqPriceProv(v)} value={String(v.liqPrice)}>
-                        <span>
-                          liq. price <AmountText value={v.liqPrice} /> ZCHF/{v.collateralSymbol}
-                        </span>
-                      </Prov>{" "}
-                      <span className="text-rb-400">(owner-declared)</span>
-                      {surface === "detail" &&
-                        v.collateral != null &&
-                        v.collateral * v.liqPrice - v.minted > -0.005 && (
-                          <div className="mt-0.5">
-                            headroom <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} /> ZCHF at
-                            this price
-                          </div>
-                        )}
-                    </div>
-                  ) : null}
-                  {disclosing && collateralDetail}
-                </Detail>
-              </>
-            ),
-          },
-          {
-            label: CARD_VOCAB.debt,
-            value:
-              v.minted > 0 ? (
-                <StatValue>
-                  <Prov info={mintedProv(v)}>
-                    <AssetAmount
-                      value={v.minted}
-                      symbol="ZCHF"
-                      exact={v.mintedRaw != null ? formatUnitsExact(v.mintedRaw, 18) : undefined}
-                    />
-                  </Prov>
-                </StatValue>
-              ) : (
-                <StatDash />
-              ),
-            footnote: (
-              <Detail>
-                <StatFootnote>minted ZCHF</StatFootnote>
-                {v.annualInterestPPM != null && (
-                  <div className="text-xs mt-0.5 text-rb-500">
-                    <Prov info={liveInterestProv(v.hub, v.position)}>
-                      <span>{ppmToPct(v.annualInterestPPM).toFixed(2)}%</span>
-                    </Prov>{" "}
-                    a year on today&rsquo;s terms, charged at each mint
-                  </div>
-                )}
-                {v.minted > 0 && v.reserveHeld != null && v.reserveHeld > 0 && (
-                  <div className="text-xs mt-0.5 text-rb-500">
-                    <AmountText value={v.minted - v.reserveHeld} /> ZCHF repays it in full
-                  </div>
-                )}
-                {expiry && <div className="text-xs mt-0.5 text-rb-500">{expiry}</div>}
-                {disclosing && debtDetail}
-              </Detail>
-            ),
-          },
-          // No health column BY DESIGN: Frankencoin has no health factor, and
-          // none is synthesized — the declared price, the challenges, the
-          // expiry and the cooldown carry the risk, under the two headlines.
-        ]}
-      />
-    </PositionCardShell>
-  );
+  const menu: PositionCardMenu = {
+    leading: () => <FrankencoinMenuRows position={v.position} />,
+    exports: exports ?? null,
+  };
+  const detailCommon = {
+    ...common,
+    surface: "detail" as const,
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore: frankencoinPositionModal({
+      status: v.status,
+      forcedSale: ended ? ending?.forcedAt != null : undefined,
+      hub: v.hub,
+    }),
+    menu,
+  };
+  if (outcome) return { ...detailCommon, outcome };
+
+  // The panel: the collateral side's risk on the left (the declared price,
+  // the room it leaves, the challenges), the debt's terms on the right.
+  const left: PositionPanelRow[] = [];
+  const right: PositionPanelRow[] = [];
+  const lane = v.basis === "chain" ? "the position's price() at the latest block" : "the latest MintingUpdate";
+  if (v.liqPrice != null && v.liqPrice > 0) {
+    left.push({
+      id: "liquidation-price",
+      label: "Liquidation price",
+      value: (
+        <>
+          <Prov info={liqPriceProv(v)} value={String(v.liqPrice)}>
+            <span>
+              <AmountText value={v.liqPrice} /> ZCHF/{sym}
+            </span>
+          </Prov>{" "}
+          <span className="text-rb-500">(owner-declared)</span>
+        </>
+      ),
+      tip: `The liquidation price the owner declared, in ZCHF per ${sym}, from ${lane}. A challenge auction tests it.`,
+    });
+    if (v.collateral != null && v.collateral * v.liqPrice - v.minted > -0.005) {
+      left.push({
+        id: "headroom",
+        label: "Headroom",
+        value: (
+          <>
+            <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} /> ZCHF
+          </>
+        ),
+        tip: "The ZCHF more debt the collateral backs at the declared liquidation price: the collateral at that price, less the debt.",
+      });
+    }
+  }
+  if (live && challenged === 0 && challengeTally != null) {
+    left.push({
+      id: "challenges",
+      label: "Challenges",
+      value: challengeTally === 0 ? "Never challenged" : `${challengeTally}, none running`,
+      tip: "How many times anyone has challenged the position's declared price, from its indexed history.",
+    });
+  }
+  if (live?.challengePeriod != null && live.challengePeriod > 0) {
+    left.push({
+      id: "challenge-phases",
+      label: "Challenge phases",
+      value: `${phaseText(live.challengePeriod)} each`,
+      tip: "The length of each of a challenge's two phases, from the position's challengePeriod() at the latest block.",
+    });
+  }
+  if (v.annualInterestPPM != null) {
+    right.push({
+      id: "interest",
+      label: "Interest",
+      value: (
+        <>
+          <Prov info={liveInterestProv(v.hub, v.position)}>
+            <span>{ppmToPct(v.annualInterestPPM).toFixed(2)}%</span>
+          </Prov>{" "}
+          a year, charged at each mint
+        </>
+      ),
+      tip: "The yearly rate a mint pays on today's terms, from the position's annualInterestPPM() at the latest block. Frankencoin charges it up front at each mint.",
+    });
+  }
+  if (v.minted > 0 && v.reserveHeld != null && v.reserveHeld > 0) {
+    right.push({
+      id: "repay",
+      label: "Repays in full",
+      value: (
+        <>
+          <AmountText value={v.minted - v.reserveHeld} /> ZCHF
+        </>
+      ),
+      tip: "The ZCHF that repays the debt: the rest of the debt is the reserve share held back at minting, which repaying returns.",
+    });
+  }
+  if (v.expiration != null && v.expiration > 0) {
+    right.push({
+      id: "expiry",
+      label: "Expires",
+      value: `${formatDate(v.expiration)}, ${daysLeft(v.expiration)}`,
+      tip: "When the position expires, from its expiration() at the latest block. It is fixed for the life of the position.",
+    });
+  }
+  const cooling = live?.cooldownActive && live.cooldownUntil != null;
+  if (live && (cooling || !live.mintingDisabledForGood)) {
+    right.push({
+      id: "cooldown",
+      label: "Minting cooldown",
+      value: cooling ? `until ${formatDayMonth(live.cooldownUntil as number)}` : "None",
+      tip: "Minting and withdrawals pause for a cooldown after the owner raises the declared price, read from the position at the latest block.",
+    });
+  }
+  return { ...detailCommon, outcome: undefined, panel: [left, right] };
+}
+
+/** The Frankencoin position card: its slots, drawn by the shared card. */
+export function FrankencoinPositionCard(props: FrankencoinPositionCardProps) {
+  return <PositionCard slots={useFrankencoinCardSlots(props)} />;
 }
 
 /** Build a card view from the listing summary row (the indexed ledger). */
