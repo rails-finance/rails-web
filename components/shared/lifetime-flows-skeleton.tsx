@@ -7,8 +7,58 @@
 // are real while it loads. Heights measured 5 Oct 2026 on the Liquity V2 trove
 // at 390, 430 and 1280: 415px phone, 332px desktop between the header and the
 // (i) row.
+//
+// Over it, the waiting cue (ui-jobs 333): after 1.2 s an activity bar and the
+// scale of the read ("Adding up 44,898 events…" where the timeline has stated
+// the count), and after 4 s, on a position past the timeline's preload, a
+// line that large positions take longer. Both appear on CSS delays, so the
+// cue keeps time while the main thread parses a large answer. The times are
+// the measured waits on dev, 13 Oct 2026: 0.7 to 0.9 s on the families the
+// server sums (Aave V3, SparkLend), 1.8 to 3 s at 3,000 to 14,000 events, 7
+// to 10.5 s past 40,000 (Maple, Compound V2), where the browser reads the
+// whole history.
+
+import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import type { LifeCount } from "@/lib/shared/life-count-store";
 
 const BLOCK = "rounded-md bg-rb-300/70 dark:bg-rb-700/60";
+
+/** The cue's words: the scale of the read where the count is known. */
+export function flowsWaitingLine(count: LifeCount | null): string {
+  if (!count) return "Reading the flow history…";
+  const n = count.n.toLocaleString("en-US");
+  return `Adding up ${count.atLeast ? "at least " : ""}${n} ${count.n === 1 ? "event" : "events"}…`;
+}
+
+/** The activity bar and the lines over the skeleton; aria-hidden, since the
+ *  panel's status line says the same to a screen reader. */
+export function LifetimeFlowsWaiting({ count }: { count: LifeCount | null }) {
+  const large = count != null && count.n > TIMELINE_WINDOW_EVENTS;
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 top-[28%] flex justify-center px-4"
+      aria-hidden
+      data-flows-cue=""
+      data-anatomy="F20"
+    >
+      <div className="flows-cue-in flex max-w-[22rem] flex-col items-center rounded-lg bg-raised px-4 py-3 text-center shadow-sm">
+        <div className="flows-cue-bar h-1 w-32 overflow-hidden rounded-full bg-rb-200 dark:bg-rb-700" />
+        <p className="mt-2 text-sm text-foreground" data-flows-cue-line="">
+          {flowsWaitingLine(count)}
+        </p>
+        {large && (
+          <div className="flows-cue-late" data-flows-cue-late="">
+            <p className="min-h-0 overflow-hidden text-xs text-rb-500">
+              <span className="block pt-1">
+                Large positions take longer to load. Faster loading is coming to Rails.
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function LifetimeFlowsSkeleton() {
   return (

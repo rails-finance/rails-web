@@ -1136,6 +1136,64 @@ label[for] {
   }
 }
 
+/* The Lifetime flows panel's waiting cue (components/shared/lifetime-flows-skeleton.tsx,
+   ui-jobs 333): the box at 1.2 s, the late line at 4 s, on CSS delays so they
+   keep time while the main thread is busy. Like ctrl-waking these are state
+   changes on a delay, kept under reduced motion; there the bar's sliding
+   segment becomes a still segment that breathes. */
+.flows-cue-in {
+  animation: fade-in 200ms ease-out 1200ms both;
+}
+.flows-cue-late {
+  display: grid;
+  animation: flows-cue-open 250ms ease-out 4000ms both;
+}
+@keyframes flows-cue-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.flows-cue-bar {
+  position: relative;
+}
+.flows-cue-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--color-blue-500);
+  animation: flows-cue-slide 1.4s ease-in-out infinite;
+}
+@keyframes flows-cue-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+@keyframes flows-cue-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flows-cue-in,
+  .flows-cue-late {
+    animation-duration: 1ms;
+  }
+  .flows-cue-bar::after {
+    left: 30%;
+    animation: flows-cue-breathe 2s ease-in-out infinite;
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

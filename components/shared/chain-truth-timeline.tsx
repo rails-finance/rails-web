@@ -100,8 +100,10 @@ import {
   NARROWING_PILL_X,
   TimelineFilterPill,
   timelineFilterPills,
+  eventCountState,
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
+import { usePublishLifeCount, type LifeCount } from "@/lib/shared/life-count-store";
 import { NoteGap, type GapItem } from "@/components/shared/spine-note-markers";
 import { SpineLine } from "@/components/shared/spine-line";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
@@ -535,6 +537,8 @@ export function ChainTruthTimeline(props: ChainTruthTimelineProps) {
     props.tl.assetOptions.length > 1 && props.tl.visibleAssetKeys.size < props.tl.assetOptions.length
       ? props.tl.visibleAssetKeys
       : null;
+  // The count the toolbar states, for the Lifetime flows panel's loading cue.
+  usePublishLifeCount(usePathname(), lifeCountOf(props.tl));
   return (
     <SingleWalletProvider value={true}>
       <TimelineDisplayProvider>
@@ -546,6 +550,16 @@ export function ChainTruthTimeline(props: ChainTruthTimelineProps) {
       </TimelineDisplayProvider>
     </SingleWalletProvider>
   );
+}
+
+/** The position's event count where the toolbar states one: none while a
+ *  window's opening balance is pending, and none on a month segment, whose
+ *  line counts the month. */
+function lifeCountOf(tl: TimelineEventsState): LifeCount | null {
+  if (tl.historyWindow.state === "span" || tl.totalCount <= 0) return null;
+  const state = eventCountState(tl);
+  if (state.total === "pending") return null;
+  return { n: tl.totalCount, atLeast: state.total === "floor" };
 }
 
 /**
