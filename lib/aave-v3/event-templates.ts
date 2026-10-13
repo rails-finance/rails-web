@@ -36,6 +36,7 @@ export type AaveV3L5Key =
 interface AaveV3ProseFile extends ProseFile<AaveV3L5Key> {
   words: Words;
   position_words: Words;
+  page_words: Words;
   doc_urls: Words;
 }
 
@@ -46,6 +47,10 @@ export const PROSE = eventProseEngine<AaveV3L5Key, AaveV3EchoKey>(FILE, { doc: F
 
 /** Words the generator and the position explanation put into a sentence. */
 export const V3_WORDS = FILE.words;
+
+/** The event page's side column: the paragraph, the facts' labels and the
+ *  metadata description. */
+export const AAVE_V3_PAGE_WORDS = FILE.page_words;
 
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 

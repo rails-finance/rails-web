@@ -3,6 +3,8 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { asV3Market } from "@/lib/aave-v3/asset-catalog";
 import { loadAaveV3PositionTail } from "@/lib/aave-v3/position-page-data";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
+import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
+import { aaveV3EventHeading, aaveV3EventPageDescription } from "@/lib/aave-v3/explorer";
 import AaveV3PositionPage from "../../page";
 
 interface Props {
@@ -39,7 +41,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     session: "aave-v3",
     subject: wallet,
     canonicalPath: `/ethereum/aave-v3/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: aaveV3EventHeading(event, "ethereum"), timestamp: event.timestamp } : null,
+    description: event ? aaveV3EventPageDescription(MARKET_NAME[market] ?? "Core", wallet, event.timestamp) : undefined,
   });
 }
 
