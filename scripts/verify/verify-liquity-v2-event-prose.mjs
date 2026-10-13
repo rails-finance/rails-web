@@ -19,9 +19,15 @@
 //       opened card's Explanation, in order; a grouped L4's headings
 //       ("**L4 · What happened**") are the pane's group headings, in order
 //       (ui-jobs 282).
-//   P3  L2 ON THE PAGE — every figure of the block's L2 lines is in the
-//       opened card, in order; a Collateral or Debt line by its after figures, which
-//       close the sheet's side.
+//   P3  L2 AGAINST CHAIN TRUTH — the copy states the chain-truth figures
+//       (ui-jobs 330), so each L2 figure is checked against its source. The
+//       token after-figures of the Collateral and Debt lines, a "CLOSED", the
+//       ratio's and the rate's before, and the yearly interest and fee equal
+//       the event's state as the timeline API the page reads gives it
+//       (stateAfter and stateBefore at the log's precision, the operation, the
+//       event's price), at the precision the copy prints them. The figures the
+//       sheet draws (the sides' dollar totals, the ratio and the rate after,
+//       the price) are on the opened card, in order, as before.
 //   P4  L1 ON THE PAGE — the L1 line's words and figures are on the event's
 //       row (the header and the spine; on the event page, the header).
 //
@@ -49,6 +55,22 @@ const BASE = (process.env.BASE ?? "http://localhost:3000").replace(/\/$/, "");
 const MAX = Number(process.env.MAX ?? 14);
 const FIXTURES = resolvePath(ROOT, "scripts/exports/liquity-v2-fixtures.json");
 const MANIFEST = resolvePath(ROOT, "scripts/exports/liquity-v2-ethereum.manifest.json");
+/** The timeline API the page reads, one fetch per Trove. */
+const timelines = new Map();
+async function chainEvent(branch, troveId, id) {
+  if (!timelines.has(troveId)) {
+    const byId = new Map();
+    for (let offset = 0; offset <= 20_000; offset += 1_000) {
+      const res = await fetch(`${BASE}/api/trove/${branch}/${troveId}/timeline?limit=1000&offset=${offset}`);
+      if (!res.ok) break;
+      const page = await res.json();
+      for (const e of page.events ?? []) byId.set(e.id, e);
+      if (!page.pagination?.hasMore) break;
+    }
+    timelines.set(troveId, byId);
+  }
+  return timelines.get(troveId).get(id)?.context?.data ?? null;
+}
 const STORY = "102247037494986730506041632222868001124387697185626929998095238518734059870154";
 
 let pass = 0;
@@ -150,6 +172,131 @@ const l4Runs = (block) => {
   return runs;
 };
 
+// ── P3: L2's figures against the event's chain-truth state ───────────────────
+
+const NUM = /[−+]?\$?[\d,]+(?:\.\d+)?%?/g;
+const CLOSED = "CLOSED";
+const NOT_APPLICABLE = "N/A";
+/** A log field at its precision (lib/liquity/utils/interest-calculator.ts rawAt). */
+const rawAt = (raw, places, float) =>
+  raw != null && /^-?\d+$/.test(String(raw)) ? Number(raw) / 10 ** places : (float ?? 0);
+/** A printed figure equals a value at the precision it is printed to. */
+function printedEq(printed, value) {
+  const t = printed.replace(/[−+$,%]/g, "");
+  const dec = t.includes(".") ? t.split(".")[1].length : 0;
+  const n = Number(t) * (printed.startsWith("−") ? -1 : 1);
+  return (
+    Number.isFinite(n) && value != null && Math.abs(n - value) <= 0.5 * 10 ** -dec + 1e-9 * Math.max(1, Math.abs(value))
+  );
+}
+/** The Trove's figures before the event as the generator rebuilds them
+ *  (lib/liquity/event-safety.ts liquityBeforeAmounts), and the price they are
+ *  read at. */
+function beforeAmounts(c) {
+  const op = c.troveOperation;
+  const sb = c.stateBefore ?? {};
+  const sa = c.stateAfter ?? {};
+  const collAfter = rawAt(sa.raw?.coll, 18, sa.coll);
+  const debtAfter = rawAt(sa.raw?.debt, 18, sa.debt);
+  const dColl = op ? Math.abs(rawAt(op.raw?.collChangeFromOperation, 18, op.collChangeFromOperation)) : 0;
+  const dDebt = op ? Math.abs(rawAt(op.raw?.debtChangeFromOperation, 18, op.debtChangeFromOperation)) : 0;
+  const l = c.liquidation;
+  if (c.operation === "liquidate" && l)
+    return {
+      price: l.price,
+      debt: l.debtOffsetBySP + l.debtRedistributed,
+      coll: l.collSentToSP + l.collRedistributed + l.collSurplus + l.collGasCompensation,
+    };
+  const price = c.collateralPrice ?? 0;
+  if (["redeemCollateral", "adjustZombieTrove", "adjustUnredeemableZombieTrove"].includes(c.operation) && op)
+    return { price, debt: debtAfter + dDebt, coll: collAfter + dColl };
+  if (c.operation === "closeTrove" && op && sb.debt === 0 && sb.coll === 0) return { price, debt: dDebt, coll: dColl };
+  return { price, coll: rawAt(sb.raw?.coll, 18, sb.coll), debt: rawAt(sb.raw?.debt, 18, sb.debt) };
+}
+/** L2's lines split by source: `card`, the figures the sheet draws, matched
+ *  on the card in order; `state`, the figures checked against the event's
+ *  chain-truth state. A line the parse does not know keeps the card match. */
+function l2Checks(lines, c) {
+  const card = [];
+  const state = [];
+  const truth = (what, printed, value) =>
+    state.push({ what, printed, truth: value == null ? "unread" : value, ok: c != null && printedEq(printed, value) });
+  const closedIs = (what) =>
+    state.push({ what, printed: CLOSED, truth: c?.operation ?? "unread", ok: c?.operation === "closeTrove" });
+  const sa = c?.stateAfter ?? {};
+  const sb = c?.stateBefore ?? {};
+  const collAfter = c ? rawAt(sa.raw?.coll, 18, sa.coll) : null;
+  const debtAfter = c ? rawAt(sa.raw?.debt, 18, sa.debt) : null;
+  const rateAfter = c ? rawAt(sa.raw?.annualInterestRate, 16, sa.annualInterestRate) : null;
+  const rateBefore = c ? rawAt(sb.raw?.annualInterestRate, 16, sb.annualInterestRate) : null;
+  for (const raw of lines) {
+    const l = raw.replace(/^- /, "");
+    const m = /^(Collateral|Debt|Collateral Ratio|Interest Rate): (.*)$/.exec(l);
+    if (!m) {
+      card.push(...(l.match(NUM) ?? []));
+      continue;
+    }
+    const [, what, body] = m;
+    if (what === "Collateral" || what === "Debt") {
+      // "20.9383 → 22.9383 WETH ($43,733 → $47,911)", "+16.96 interest =
+      // 28,766.06 BOLD ($28,766)", "15.004 → CLOSED WETH": the token after
+      // against the state, the dollars after on the card; the parentheses in
+      // words (the fee, the accrual's ledger line) and the befores aside.
+      const head = body.replace(/\([^)]*\)/g, "").replace(/[−+][\d,]+(?:\.\d+)? [a-z ]+ = /, "");
+      const after = head.split("→").at(-1).trim().split(" ")[0];
+      if (after === CLOSED) closedIs(`${what} after`);
+      else truth(`${what} after`, after, what === "Collateral" ? collAfter : debtAfter);
+      const usd = (body.match(/\(([^)]*\$[^)]*)\)/)?.[1] ?? "").replace(/^.*→\s*/, "").match(NUM) ?? [];
+      card.push(...usd.filter((x) => !/[a-z]/.test(x)));
+      continue;
+    }
+    // "152.12% → 166.55%", "2.00% → CLOSED · 574.98 BOLD / year interest".
+    const [level, ...rest] = body.split(" · ");
+    const parts = level.split("→").map((x) => x.trim());
+    const after = parts.at(-1);
+    const before = parts.length > 1 ? parts[0] : null;
+    if (after === CLOSED) closedIs(`${what} after`);
+    else if (after === NOT_APPLICABLE)
+      state.push({
+        what: `${what} after`,
+        printed: after,
+        truth: what === "Interest Rate" ? rateAfter : debtAfter,
+        ok: c != null && (what === "Interest Rate" ? !(rateAfter > 0) : debtAfter === 0),
+      });
+    else if (after.match(NUM)) card.push(after.match(NUM)[0]);
+    if (before && what === "Interest Rate") truth("Interest Rate before", before, rateBefore);
+    if (before && what === "Collateral Ratio" && c) {
+      const b = beforeAmounts(c);
+      truth(
+        "Collateral Ratio before",
+        before,
+        b.price > 0 && b.coll > 0 && b.debt > 0 ? ((b.coll * b.price) / b.debt) * 100 : null,
+      );
+    }
+    // "574.98 BOLD / year interest"; "+ 0.30% management fee · 86.25 BOLD / year".
+    const feeAt = rest.findIndex((r) => /[\d.]+% management fee/.test(r));
+    rest.forEach((r, i) => {
+      const yearly = /([\d,]+\.\d+) \S+ \/ year/.exec(r);
+      if (i === feeAt) card.push(`${/([\d.]+)%/.exec(r)[1]}%`);
+      else if ((feeAt < 0 || i !== feeAt + 1) && yearly && rateAfter != null)
+        truth("Yearly interest", yearly[1], (debtAfter * rateAfter) / 100);
+    });
+    // The fee's yearly figure sits in the next " · " part.
+    const feeYear = feeAt >= 0 ? /([\d,]+\.\d+) \S+ \/ year/.exec(rest[feeAt + 1] ?? "") : null;
+    if (feeAt >= 0 && feeYear) {
+      const printed = /([\d.]+)%/.exec(rest[feeAt])[1];
+      const pct = Number(printed);
+      // At the fee's printed precision: half its last place on the debt.
+      const dec = printed.split(".")[1]?.length ?? 0;
+      const slack = (debtAfter * 0.5 * 10 ** -dec) / 100;
+      const want = (debtAfter * pct) / 100;
+      const got = Number(feeYear[1].replace(/,/g, ""));
+      state.push({ what: "Yearly fee", printed: feeYear[1], truth: want, ok: Math.abs(got - want) <= slack + 0.005 });
+    }
+  }
+  return { card, state, found: c != null };
+}
+
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: 1280, height: 1800 },
@@ -250,21 +397,8 @@ try {
     );
 
     // P3
-    const LEDGER = /^- (Collateral|Debt):/;
-    const NUM = /[−+]?\$?[\d,]+(?:\.\d+)?%?/g;
-    const figures = section(copy, "L2")
-      .slice(1)
-      .flatMap((l) =>
-        LEDGER.test(l)
-          ? (l
-              .replace(/\([^)]*[a-z][^)]*\)/g, "")
-              .replace(/[−+]?\$?[\d,]+(?:\.\d+)?%?\s*→\s*/g, "")
-              // "+8,580.12 interest = 667,073.79": the move is the ledger's
-              // "since last event" row, the after closes it (ui-jobs 285).
-              .replace(/[−+][\d,]+(?:\.\d+)? [a-z ]+ = /g, "")
-              .match(NUM) ?? [])
-          : (l.match(NUM) ?? []),
-      );
+    const l2 = section(copy, "L2").slice(1);
+    const P3 = l2Checks(l2, await chainEvent(f.branch, f.troveId, e.id));
     // The panels above the Explanation, whose prose repeats figures.
     const panels = await card.evaluate((el) => {
       const c = el.cloneNode(true);
@@ -274,8 +408,16 @@ try {
       c.remove();
       return text;
     });
-    const missing2 = inOrder(panels, figures);
-    check(`${label}: L2's figures are on the card (${figures.length})`, !missing2, missing2 ?? "");
+    const missing2 = inOrder(panels, P3.card);
+    check(`${label}: L2's figures the sheet draws are on the card (${P3.card.length})`, !missing2, missing2 ?? "");
+    const wrong = P3.state.filter((x) => !x.ok);
+    check(
+      `${label}: L2's other figures equal the event's chain-truth state (${P3.state.length})`,
+      P3.found && wrong.length === 0,
+      P3.found
+        ? wrong.map((x) => `${x.what} ${x.printed} ≠ ${x.truth}`).join("; ")
+        : "the event is not in the timeline API",
+    );
 
     // P4: the row (spine and header; the event page's header states the
     // spine's values), with the timeline values on.
