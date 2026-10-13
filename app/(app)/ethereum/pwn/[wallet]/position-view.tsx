@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
@@ -52,6 +53,7 @@ import { formatNumber } from "@/lib/utils/format";
 import { fetchPwnCollateralTransfers } from "@/lib/api/fetch-pwn-collateral-transfer";
 import type { PwnCollateralReturn, PwnContext } from "@/lib/shared/types/event-shape";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { pwnExplorer } from "@/lib/pwn/explorer";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
@@ -84,6 +86,9 @@ export default function PwnLoanView({
   initialCutoffBlock,
   initialOpening,
 }: PwnLoanViewProps) {
+  // The event route draws the sub-nav and the timeline alone: the card in page
+  // mode beside the shared side column (ui-jobs 236, 307).
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   // Keyed on the timeline, not the roster: a wallet party to no PWN loan is a
   // real answer the server can seed, and its `initialSummaries` is empty.
   const seeded = initialEvents != null;
@@ -480,43 +485,56 @@ export default function PwnLoanView({
           <div className="text-sm text-rb-500">No loan captured for this wallet.</div>
         ) : (
           <>
-            <PwnPositionCard
-              v={view}
-              viewer={wallet}
-              receipts
-              viewHref={tl.viewHref}
-              explanation={<PwnPositionExplanation v={view} wallet={wallet} />}
-            />
-            {/* Lifetime flows: the bars and the line over the loan's replay
-              (lib/pwn/flows.ts), the collateral in its token and the debt in
-              the credit token, in place of the tower (TO-DO-ui-jobs 206). */}
-            <LifetimeFlowsPanel
-              scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-              read={flows.read}
-              explanation={
-                <div className="space-y-2 text-sm text-rb-500">
-                  <PwnFlowsNote
-                    facts={flows.facts}
-                    collSymbol={view.collateral?.symbol ?? "the collateral"}
-                    collLabel={
-                      view.collateral?.tokenId != null && view.collateral.category !== "ERC20"
-                        ? `#${shortTokenId(view.collateral.tokenId)}`
-                        : null
-                    }
-                    creditSymbol={view.credit?.symbol ?? "the credit token"}
-                    apr={isAccruing(view) ? view.accruingInterestApr : null}
-                    role={wallet === view.lender ? "lender" : wallet === view.borrower ? "borrower" : null}
-                  />
-                </div>
-              }
-              learnMore={pwnFlowsContent()}
-            />
+            {!onEventPage && (
+              <>
+                <PwnPositionCard
+                  v={view}
+                  viewer={wallet}
+                  receipts
+                  viewHref={tl.viewHref}
+                  explanation={<PwnPositionExplanation v={view} wallet={wallet} />}
+                />
+                {/* Lifetime flows: the bars and the line over the loan's replay
+                (lib/pwn/flows.ts), the collateral in its token and the debt in
+                the credit token, in place of the tower (TO-DO-ui-jobs 206). */}
+                <LifetimeFlowsPanel
+                  scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flows.read}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <PwnFlowsNote
+                        facts={flows.facts}
+                        collSymbol={view.collateral?.symbol ?? "the collateral"}
+                        collLabel={
+                          view.collateral?.tokenId != null && view.collateral.category !== "ERC20"
+                            ? `#${shortTokenId(view.collateral.tokenId)}`
+                            : null
+                        }
+                        creditSymbol={view.credit?.symbol ?? "the credit token"}
+                        apr={isAccruing(view) ? view.accruingInterestApr : null}
+                        role={wallet === view.lender ? "lender" : wallet === view.borrower ? "borrower" : null}
+                      />
+                    </div>
+                  }
+                  learnMore={pwnFlowsContent()}
+                />
+              </>
+            )}
             <ChainTruthTimeline
               csvExportCeiling={INDEX_ROW_CEILING}
               // Matches `PwnEventCard`'s own `persistKey={`pwn:${event.id}`}` —
               // lets pinned mode (the per-event share route) force a landed
               // card's detail panel open on its first mount.
               persistKeyPrefix="pwn"
+              eventPage={(slot) =>
+                pwnExplorer.eventPage({
+                  ...slot,
+                  loanId: view.loanId,
+                  wallet,
+                  lender: view.lender ?? null,
+                  borrower: view.borrower ?? null,
+                })
+              }
               // A loan past its deadline is not live: no pulsing tip.
               closed={view.status !== "open" || unclaimed}
               tl={tl}

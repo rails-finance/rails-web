@@ -24,25 +24,13 @@ import {
   swapLegSign,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
-import { AAVE_V3_SWAP_LABELS } from "@/lib/aave-v3/swap-kinds";
+import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
 import { useChainId } from "@/lib/shared/chain-context";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
-
-const LABELS: Record<string, string> = {
-  supply: "Supply",
-  withdraw: "Withdraw",
-  borrow: "Borrow",
-  repay: "Repay",
-  liquidation: "Liquidated",
-  transfer_in: "Transferred in",
-  transfer_out: "Transferred out",
-  swap: "Swap",
-  bad_debt_written_off: "Debt written off",
-};
 
 /** The primary reserve amount signed by direction: supply/borrow/transfer_in
  *  increase their side (+), withdraw/repay/transfer_out decrease it (−). A
@@ -81,32 +69,6 @@ export interface AaveV3CtEventHeaderProps {
   /** Set when this transfer is a liquidation's protocol fee to the Aave
    *  treasury (lib/aave-v3/liquidation-fee.ts): the row names itself so. */
   feeOf?: AaveV3Context;
-}
-
-/** The word T1 states for the row, which the phone spine view's caption
- *  repeats. A swap names its direction, sold → bought ("Debt swap GHO →
- *  cbBTC"); a supply from a swap sold the received side for the given. An
- *  aToken transfer to a WETH gateway is a withdrawal to ETH: the gateway
- *  withdraws it from the Pool and sends ETH on in the same transaction
- *  (WrappedTokenGatewayV3 withdrawETH), and the lifetime flows count it as
- *  withdrawn. The row says so, and names the gateway as the route. */
-export function aaveV3CtLabel(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | undefined | null): string {
-  const sw = ctx.swap;
-  const direction =
-    sw && ctx.reserveSymbol && sw.receivedSymbol
-      ? sw.kind === "supply_from_swap"
-        ? `${sw.receivedSymbol} → ${ctx.reserveSymbol}`
-        : `${ctx.reserveSymbol} → ${sw.receivedSymbol}`
-      : null;
-  const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
-  const viaGateway = !isFee && ctx.eventType === "transfer_out" && named?.kind === "gateway";
-  return isFee
-    ? "Liquidation fee"
-    : viaGateway
-      ? "Withdraw as ETH"
-      : sw && AAVE_V3_SWAP_LABELS[sw.kind]
-        ? `${AAVE_V3_SWAP_LABELS[sw.kind]}${direction ? ` ${direction}` : ""}`
-        : (LABELS[ctx.eventType] ?? ctx.eventType);
 }
 
 /** The row's head spec. */

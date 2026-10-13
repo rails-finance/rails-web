@@ -27,6 +27,8 @@
 // the tail itself, exactly as it did before the route had a server half.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { liquityForkExplorer } from "@/lib/liquity-fork/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -131,6 +133,9 @@ export default function EbisuTroveDetail({
   // whole (summary AND timeline) or not at all, so a seeded view never
   // states an empty history for a trove whose timeline read simply failed.
   const seeded = initialTrove != null;
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const [view, setView] = useState<EbisuTroveView | null>(() => (initialTrove ? viewFromSummary(initialTrove) : null));
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
   // The same history as ROWS (decision 0019's evening amendment): the index
@@ -477,7 +482,7 @@ export default function EbisuTroveDetail({
           <DetailBodySkeleton />
         ) : (
           <>
-            {view && (
+            {!onEventPage && view && (
               <EbisuPositionCard
                 v={view}
                 receipts
@@ -511,7 +516,8 @@ export default function EbisuTroveDetail({
                 }
               />
             )}
-            {view &&
+            {!onEventPage &&
+              view &&
               (() => {
                 const towerData = computeEbisuEconomics(view, lifetimeEvents, precomputedLifetime);
                 const forkOpts = {
@@ -547,6 +553,17 @@ export default function EbisuTroveDetail({
               // — lets pinned mode (the per-event share route) force a landed
               // card's detail panel open on its first mount.
               persistKeyPrefix="ebisu"
+              eventPage={(slot) =>
+                liquityForkExplorer.eventPage({
+                  ...slot,
+                  deployment: "ebisu",
+                  collateralType,
+                  troveId,
+                  owner: view?.owner ?? null,
+                  lastOwner: view?.lastOwner ?? null,
+                  ownerEns: view?.ownerEns ?? null,
+                })
+              }
               closed={view ? view.status !== "open" : undefined}
               tl={tl}
               runs={FORK_RUNS}

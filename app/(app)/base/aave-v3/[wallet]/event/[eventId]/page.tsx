@@ -4,6 +4,7 @@ import { loadAaveV3BaseTail } from "@/lib/aave-v3-base/position-page-data";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { ChainTimelineResponse } from "@/lib/api/fetch-chain-timeline";
+import { aaveV3EventHeading, aaveV3EventPageDescription } from "@/lib/aave-v3/explorer";
 import AaveV3BasePositionPage from "../../page";
 
 interface Props {
@@ -36,7 +37,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "aave-v3-base",
     subject: shortSubject(wallet),
     canonicalPath: `/base/aave-v3/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: aaveV3EventHeading(event, "base"), timestamp: event.timestamp } : null,
+    description: event ? aaveV3EventPageDescription("Base", wallet, event.timestamp) : undefined,
   });
 }
 

@@ -287,6 +287,26 @@ words:
   more_reserve: |-
     one more reserve
 
+# The event page (ui-jobs 236, 307): the side column's paragraph, the facts'
+# labels and the metadata description. {market} is the Pool's name (Core, Prime,
+# EtherFi, Base), {account} the shortened address and {day} the long date. Read
+# by lib/aave-v3/explorer.ts.
+page_words:
+  paragraph: |-
+    This page is one transaction from this account's history on the Aave V3 {market} Pool.
+  timeline_link: |-
+    See the whole history in the timeline.
+  timeline_hint: |-
+    Open this event in the account's timeline
+  market: |-
+    Market
+  account: |-
+    Account
+  copy_account: |-
+    Copy the account's address
+  description: |-
+    One transaction from the Aave V3 {market} account {account}, on {day}.
+
 position_words:
   heading_holdings: |-
     Holdings

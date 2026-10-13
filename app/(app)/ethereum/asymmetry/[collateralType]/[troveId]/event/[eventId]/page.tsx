@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
+import { liquityForkEventHeading, liquityForkEventPageDescription } from "@/lib/liquity-fork/explorer";
 import { shortId } from "@/lib/asymmetry/asset-catalog";
 import { loadAsymmetryTroveTail } from "@/lib/asymmetry/trove-page-data";
 import AsymmetryTrovePage from "../../page";
@@ -38,19 +39,25 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     // alone, not paired with the debt symbol.
     market: collateralType,
     canonicalPath: `/ethereum/asymmetry/${collateralType}/${troveId}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: liquityForkEventHeading(event), timestamp: event.timestamp } : null,
+    description: event
+      ? liquityForkEventPageDescription({
+          deployment: "asymmetry",
+          collateralType,
+          troveId,
+          owner: tail.trove?.owner ?? null,
+          lastOwner: tail.trove?.lastOwner ?? null,
+          ownerEns: tail.trove?.ownerEns ?? null,
+          timestamp: event.timestamp,
+        })
+      : undefined,
   });
 }
 
-// THIN: renders the exact same parent trove page, same params — the nested
-// `event/[eventId]` segment sits inside the same `[troveId]` layout, so every
-// provider still wraps it, and `AsymmetryTroveDetail` (this page's client
-// half) never learns a new prop. It finds out it is on an event route from
-// `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra `eventId`
-// key the parent's own `Props` type doesn't declare; passing the same
-// promise through is still structurally valid (the parent only reads
-// `collateralType`/`troveId` off it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent trove page's server
+// half, same params; its client half (`AsymmetryTroveDetail`) reads `eventId`
+// from the route and draws the sub-nav and the event's card in page mode with
+// the shared column (`ChainTruthTimeline`'s `eventPage`).
 export default async function AsymmetryEventPage({ params, searchParams }: Props) {
   return AsymmetryTrovePage({ params, searchParams });
 }
