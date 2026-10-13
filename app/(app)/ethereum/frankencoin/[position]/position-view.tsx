@@ -25,7 +25,6 @@ import { useParams } from "next/navigation";
 import { frankencoinExplorer } from "@/lib/frankencoin/explorer";
 import { DRAINED_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFrankencoinEvent } from "@/lib/shared/types/event-shape";
 import { fetchFrankencoinPositions } from "@/lib/api/fetch-frankencoin-positions";
@@ -69,23 +68,15 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { RiskFigure } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { formatDayMonth } from "@/lib/date";
-import { phaseText } from "@/lib/frankencoin/figures";
+import { ExportMenu } from "@/components/shared/export-menu";
+import { frankencoinExports } from "@/components/protocol/frankencoin/frankencoin-export-menu";
 import { FrankencoinPageFactsProvider, frankencoinPageFacts } from "@/lib/frankencoin/page-facts";
 import {
   applyFrankencoinOpening,
   prefetchFrankencoinEventReads,
   useFrankencoinOpening,
 } from "@/lib/frankencoin/use-event-read";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const FrankencoinExportMenu = dynamic(
-  () => import("@/components/protocol/frankencoin/frankencoin-export-menu").then((m) => m.FrankencoinExportMenu),
-  { ssr: false },
-);
 
 interface FrankencoinPositionViewProps {
   /** The position's own contract address, normalised by the server route — a
@@ -373,6 +364,20 @@ export default function FrankencoinPositionView({
     ];
   }, [view, chain]);
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = view
+    ? frankencoinExports({
+        position,
+        view,
+        chain,
+        events: frankEvents,
+        csvFilename: `frankencoin-${position.slice(0, 10)}-activity.csv`,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        history: markdownHistoryScope(historyWindow, frankEvents),
+        scopeNote: exportScopeNote(historyWindow, frankEvents, "this position's whole history"),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -382,19 +387,11 @@ export default function FrankencoinPositionView({
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.frankencoin}
           closed={view != null && view.status !== "open"}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {view && (
-            <FrankencoinExportMenu
-              position={position}
-              view={view}
-              chain={chain}
-              events={frankEvents}
-              csvFilename={`frankencoin-${position.slice(0, 10)}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              history={markdownHistoryScope(historyWindow, frankEvents)}
-              scopeNote={exportScopeNote(historyWindow, frankEvents, "this position's whole history")}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -413,47 +410,14 @@ export default function FrankencoinPositionView({
                     cloneParent={cloneParent}
                     ending={ending}
                     lifetimeDebt={lifetimeDebt}
-                    receipts
+                    surface="detail"
                     viewHref={tl.viewHref}
-                    // Closed by default, remembered per viewer and position (ui-jobs
-                    // 209). A running challenge stays in view; the challenge tally,
-                    // the phase length and the minting cooldown, from the
-                    // position's slots at head, sit in the opened layer.
-                    positionSummary
-                    challengeAlert={
-                      chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
-                        <RiskFigure alignStart caution>
-                          Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
-                        </RiskFigure>
-                      ) : undefined
-                    }
-                    collateralDetail={
-                      chain && view.status === "open" ? (
-                        <>
-                          {(chain.challengedAmount ?? 0) > 0 ? null : summary ? (
-                            <RiskFigure alignStart>
-                              {summary.challengeCount === 0
-                                ? "never challenged"
-                                : `challenged ${summary.challengeCount}×, none running`}
-                            </RiskFigure>
-                          ) : null}
-                          {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
-                            <RiskFigure alignStart>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
-                          ) : null}
-                        </>
-                      ) : undefined
-                    }
-                    debtDetail={
-                      chain && view.status === "open" ? (
-                        chain.cooldownActive && chain.cooldownUntil != null ? (
-                          <RiskFigure alignStart>
-                            minting cooldown until {formatDayMonth(chain.cooldownUntil)}
-                          </RiskFigure>
-                        ) : !chain.mintingDisabledForGood ? (
-                          <RiskFigure alignStart>no minting cooldown</RiskFigure>
-                        ) : undefined
-                      ) : undefined
-                    }
+                    // The running challenge, the phase length and the minting
+                    // cooldown come from the position's slots at head; the
+                    // challenge tally from the index.
+                    live={chain}
+                    challengeTally={summary ? summary.challengeCount : null}
+                    exports={exports}
                     // Everything describing the CURRENT on-chain position lives on
                     // the card: the Explanation heading-button holds the narration —
                     // mounted when the live read landed.

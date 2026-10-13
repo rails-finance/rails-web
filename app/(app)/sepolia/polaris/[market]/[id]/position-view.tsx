@@ -16,7 +16,6 @@
 // feed, and the header line says "Sepolia testnet" once.
 
 import { useEffect, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -51,21 +50,12 @@ import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/a
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { TimelineActivityHeader, POLARIS_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import { RiskFooterStrip, RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
+import { ExportMenu } from "@/components/shared/export-menu";
+import { polarisExports } from "@/components/protocol/polaris/polaris-export-menu";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { Prov } from "@/components/shared/provenance";
 import { rateStepNotesFor, liveRateStepNote, type MarketNote } from "@/lib/shared/market-note";
-import {
-  curvePriceAtBlockProv,
-  liveCurvePriceProv,
-  liveEntireProv,
-  liveMedianiserProv,
-  livePendingProv,
-  liveRecordedDebtProv,
-  polarisAnnualCostProv,
-} from "@/lib/polaris/live-provenance";
+import { curvePriceAtBlockProv, liveCurvePriceProv, liveMedianiserProv } from "@/lib/polaris/live-provenance";
 import { usePolarisUiState } from "@/hooks/usePolarisUiState";
-import { AmountText } from "@/components/shared/amount-text";
 import { polarisExplorer } from "@/lib/polaris/explorer";
 
 /** What the ETH/USD row is, and why it is in the menu. */
@@ -73,23 +63,9 @@ const ETH_USD_LABEL = "ETH/USD — the protocol's medianiser";
 const ETH_USD_TIP =
   "ETH in USD from the protocol's ETH/USD medianiser, the median of its testnet oracles. pETH's USD price is its bonding-curve price in ETH times this.";
 
-/** A figure in the card's cost and debt-sum lines, at the card's grain:
- *  three decimals with trailing zeros kept ("24.040"), so the sum reads at the
- *  same grain as the Debt figure above it. A magnitude too small for three
- *  decimals keeps AmountText's floor and tooltip. */
-function CardSumAmount({ value }: { value: number }) {
-  if (value !== 0 && Math.abs(value) < 0.0005) return <AmountText value={value} />;
-  return <>{value.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</>;
-}
-
 /** What the trigger's pETH-in-ETH figure is, and why it is above one. */
 const PETH_CURVE_TIP =
   "pETH's price in ETH on the protocol's bonding curve. ETH paid into the curve mints pETH at a price that rises as ETH enters it, so one pETH costs more than one ETH.";
-
-const PolarisExportMenu = dynamic(
-  () => import("@/components/protocol/polaris/polaris-export-menu").then((m) => m.PolarisExportMenu),
-  { ssr: false },
-);
 
 /** The card's "Highest recorded" peaks, with the liquidation's own state
  *  counted: the index takes its peaks over each touch's resulting figures, and
@@ -349,121 +325,16 @@ export default function PolarisPositionView({
   });
   const flowFocus = flows.read !== "failed" ? flows.focus : null;
 
-  // ── The card's risk footer strip ────────────────────────────────────────
-  // ONE strip, whose items are, in reading order: what a year of interest
-  // costs, then the CDP's live warning — below the minimum ratio if it is, the
-  // pending legs otherwise. It used to be two mutually exclusive strips, each
-  // holding one item, so the strip appeared only when one of those two cases
-  // held; now the cost line brings it out on every open CDP that owes
-  // anything, and the strip's own layout (RiskFooterStrip) pairs the two items
-  // per its container's width.
-  //
-  // THE COST IS COMPUTED ON THE RECORDED DEBT, not the entire debt. That is
-  // the base the contract accrues on (liveRateProv's own summary states the
-  // rule), and the two differ by whatever the PSM has pending — a quarter of
-  // the figure on the deepest CDP here. The pending share joins the recorded
-  // debt at the next touch and the cost rises then; the receipt says all of
-  // that, so nobody "corrects" the base.
-  const annualCost = chain && chain.isOpen && chain.recordedDebt > 0 ? chain.recordedDebt * chain.interestRate : null;
-  const belowMinimum =
-    chain != null &&
-    chain.isOpen &&
-    chain.icr != null &&
-    chain.icr < (chain.defensiveMode ? chain.defensiveMcr : chain.mcr);
-  const hasPendingLegs =
-    chain != null &&
-    chain.isOpen &&
-    (chain.accruedInterest > 0 ||
-      chain.accruedStables > 0 ||
-      chain.mintRedeemCollChange !== 0 ||
-      chain.mintRedeemDebtChange !== 0);
-
-  const riskStrip =
-    annualCost != null || belowMinimum || hasPendingLegs ? (
-      <RiskFooterStrip>
-        {annualCost != null && (
-          <RiskFigure label="Costs">
-            <Prov info={polarisAnnualCostProv(market)} value={String(annualCost)} symbol={stable}>
-              <RiskStrong>
-                ~<CardSumAmount value={annualCost} />
-              </RiskStrong>
-            </Prov>{" "}
-            {stable} / year on the{" "}
-            <Prov info={liveRecordedDebtProv(market)} value={String(chain?.recordedDebt ?? 0)}>
-              <span>
-                <CardSumAmount value={chain?.recordedDebt ?? 0} />
-              </span>
-            </Prov>{" "}
-            {stable} recorded at the last touch
-          </RiskFigure>
-        )}
-        {belowMinimum && chain?.icr != null ? (
-          <RiskFigure caution>
-            Below the minimum ratio — {(chain.icr * 100).toFixed(1)}% against{" "}
-            {((chain.defensiveMode ? chain.defensiveMcr : chain.mcr) * 100).toFixed(0)}%; anyone may liquidate it
-          </RiskFigure>
-        ) : hasPendingLegs && chain ? (
-          // The entire debt as a sum the reader can add up: the debt the last
-          // touch recorded, then each leg pending since, at the card's block.
-          <RiskFigure>
-            <span data-polaris-debt-sum="">
-              Owed at this block:{" "}
-              <Prov info={liveRecordedDebtProv(market)} value={String(chain.recordedDebt)}>
-                <span>
-                  <CardSumAmount value={chain.recordedDebt} />
-                </span>
-              </Prov>{" "}
-              recorded at the last touch
-              {chain.accruedInterest > 0 && (
-                <>
-                  {" + "}
-                  <Prov info={livePendingProv("accruedInterest", market)} value={String(chain.accruedInterest)}>
-                    <span>
-                      <CardSumAmount value={chain.accruedInterest} />
-                    </span>
-                  </Prov>{" "}
-                  interest
-                </>
-              )}
-              {chain.accruedStables > 0 && (
-                <>
-                  {" − "}
-                  <Prov info={livePendingProv("accruedStables", market)} value={String(chain.accruedStables)}>
-                    <span>
-                      <CardSumAmount value={chain.accruedStables} />
-                    </span>
-                  </Prov>{" "}
-                  stability gain
-                </>
-              )}
-              {chain.mintRedeemDebtChange !== 0 && (
-                <>
-                  {chain.mintRedeemDebtChange < 0 ? " − " : " + "}
-                  <Prov info={livePendingProv("mintRedeemDebt", market)} value={String(chain.mintRedeemDebtChange)}>
-                    <span>
-                      <CardSumAmount value={Math.abs(chain.mintRedeemDebtChange)} />
-                    </span>
-                  </Prov>{" "}
-                  net PSM share
-                </>
-              )}
-              {" = "}
-              <Prov info={liveEntireProv("debt", market)} value={String(chain.entireDebt)}>
-                <RiskStrong>
-                  {chain.entireDebt < 0 ? "−" : ""}
-                  <CardSumAmount value={Math.abs(chain.entireDebt)} />
-                </RiskStrong>
-              </Prov>{" "}
-              {stable}
-              {chain.entireDebt <= 0
-                ? ": at or below zero, so it owes nothing, and the next touch settles the debt to zero"
-                : ""}
-              . A touch is any transaction on the CDP; these pending legs are written into its figures at the next one.
-            </span>
-          </RiskFigure>
-        ) : null}
-      </RiskFooterStrip>
-    ) : undefined;
+  const exports = view
+    ? polarisExports({
+        view,
+        chain,
+        events: polarisEvents,
+        notes,
+        liveNotes,
+        csvFilename: `polaris-${market}-${cdpId}-activity.csv`,
+      })
+    : null;
 
   return (
     <FlowFocusContext.Provider value={flowFocus}>
@@ -475,24 +346,12 @@ export default function PolarisPositionView({
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {view && (
-            <PolarisExportMenu
-              view={view}
-              chain={chain}
-              events={polarisEvents}
-              notes={notes}
-              liveNotes={liveNotes}
-              csvFilename={`polaris-${market}-${cdpId}-activity.csv`}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
-
-        {!onEventPage && (
-          <p className="text-xs text-rb-500">
-            Sepolia testnet · {stable} market · CDP #{cdpId} — every figure on this page is a test figure.
-          </p>
-        )}
 
         {loading ? (
           <DetailBodySkeleton />
@@ -506,9 +365,8 @@ export default function PolarisPositionView({
               <>
                 <PolarisPositionCard
                   v={view}
-                  receipts
                   viewHref={tl.viewHref}
-                  rowExtra={riskStrip}
+                  exports={exports ?? undefined}
                   explanationDefaultOpen={explanationOpen}
                   onExplanationToggle={setExplanationOpen}
                   explanation={
