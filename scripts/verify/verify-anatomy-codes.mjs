@@ -101,6 +101,36 @@ const NO_FLOWS_CHART = "the page is not tied to a Lifetime flows chart (`dates` 
 const NO_LEDGER = "the family's cells carry no ledger (`ledgers: { none }`, no flows panel), so no cell opens into one";
 const NO_LEDGER_SHEET =
   "the opened card's T2 is the event sheet (ui-jobs 330), whose sides and panels hold no cell, so no cell opens into a ledger; verify-event-share.mjs reads the sheet";
+/** Families with a sheet builder (ui-jobs 330). Some of their event kinds keep
+ *  the cells, so the n/a is read off the walk: where the first card's T2 draws
+ *  `data-sheet`, T2.1 is n/a for NO_LEDGER_SHEET; where it draws cells, the
+ *  family's entry in NA below (or none) stands. */
+const SHEET_FAMILIES = new Set([
+  "compound-v2",
+  "moonwell",
+  "liquity-v1",
+  "ebisu",
+  "asymmetry",
+  "basedollar",
+  "polaris",
+  "spark",
+  "makerdao",
+  "fx",
+  "frankencoin",
+  "maple",
+  "pwn",
+  "aave-v4",
+  "sky-savings",
+  "dolomite",
+  "morpho-base-vaults",
+  "yearn-vaults",
+  "aave-vaults",
+  "compound-v3",
+  "morpho",
+  "llamalend",
+  "fluid",
+  "alchemix-v3",
+]);
 const NA = {
   "liquity-v2": { "T2.1": NO_LEDGER_SHEET },
   "aave-v3": { "T2.1": NO_LEDGER_SHEET },
@@ -187,7 +217,7 @@ async function firstCardId(page) {
  *  Explanation. A press before hydration is lost, so each is pressed until
  *  it reads open. Returns the codes read with the ledger open and with the
  *  Explanation open, merged; null when the card never opened. */
-async function openCard(page, id, expectLedger) {
+async function openCard(page, id, expectLedger, sheetFamily) {
   const card = page.locator(cardSelector(id)).first();
   const control = card
     .locator('[data-spine-toggle], [data-anatomy~="T1"] [data-row-control][role="button"]')
@@ -218,6 +248,15 @@ async function openCard(page, id, expectLedger) {
     .catch(() => {});
   // The cells settle after the family's reads (Spark and Aave read on open).
   await page.waitForTimeout(4000);
+  // A sheet family's T2 stands as cells placeholders until its read lands.
+  if (sheetFamily)
+    await card
+      .locator('[data-anatomy~="T2"] [data-sheet]')
+      .first()
+      .waitFor({ state: "attached", timeout: 60_000 })
+      .catch(() => {});
+  const sheet = (await card.locator('[data-anatomy~="T2"] [data-sheet]').count()) > 0;
+  if (sheet) expectLedger = false;
   // A ledger cell draws its toggle once the flows model arrives (10 to 40 s,
   // longer under load, ui-jobs 309 step 7); a family with no ledger draws none.
   const ledger = card.locator("[data-ledger-toggle]").locator("visible=true").first();
@@ -244,6 +283,7 @@ async function openCard(page, id, expectLedger) {
   return {
     page: [...new Set([...withLedger.page, ...withExplanation.page])],
     card: [...new Set([...withLedger.card, ...withExplanation.card])],
+    sheet,
   };
 }
 
@@ -273,7 +313,7 @@ async function positionOf(f) {
 }
 
 /** One family at one width: { closed, opened, page, firstId } or { error }. */
-async function walk(path, width, expectLedger) {
+async function walk(path, width, expectLedger, sheetFamily) {
   const ctx = await browser.newContext({
     viewport: { width, height: width < 640 ? 844 : 1100 },
     extraHTTPHeaders: bypassHeaders(),
@@ -290,7 +330,7 @@ async function walk(path, width, expectLedger) {
     if (!firstId) return { error: "no event card drew" };
     await page.waitForTimeout(2000);
     const closed = await readCodes(page, firstId);
-    const opened = await openCard(page, firstId, expectLedger);
+    const opened = await openCard(page, firstId, expectLedger, sheetFamily);
     if (!opened) return { error: `the first card (${firstId}) never opened`, closed };
     return { firstId, closed, opened };
   } catch (e) {
@@ -320,10 +360,12 @@ for (const f of FAMILIES) {
   }
   const byWidth = {};
   for (const w of WIDTHS) {
-    byWidth[w] = await walk(path, w, !NA[f.key]?.["T2.1"]);
+    byWidth[w] = await walk(path, w, !NA[f.key]?.["T2.1"], SHEET_FAMILIES.has(f.key));
     if (byWidth[w].error) check(`${f.key} @${w}: the walk read the page`, false, byWidth[w].error);
   }
-  const na = NA[f.key] ?? {};
+  const na = { ...(NA[f.key] ?? {}) };
+  // The first card's T2 drew the sheet at a width: no cell, so no ledger.
+  if (WIDTHS.some((w) => byWidth[w]?.opened?.sheet)) na["T2.1"] = NO_LEDGER_SHEET;
   const cells = {};
   for (const code of SHARED) {
     const at = WIDTHS.filter((w) => {

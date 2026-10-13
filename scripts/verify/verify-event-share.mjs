@@ -34,11 +34,11 @@
 // states itself, and the boundary card survives where the cut still binds.
 // That section SKIPS, loudly, wherever the backend cannot answer `?group=1`.
 //
-// And THE EVENT SHEET (ui-jobs 330) on Liquity V2 and Aave V3, whose opened
-// card's T2 is a balance sheet (components/shared/event-sheet.tsx): pinned
-// events, each opened on its timeline and on its event page, read by the
-// sheet's attributes. Every other family draws cells, and its pinned page is
-// checked to draw no sheet.
+// And THE EVENT SHEET (ui-jobs 330) on every family whose opened card's T2 is
+// a balance sheet (components/shared/event-sheet.tsx; SHEET_FAMILIES):
+// pinned events, each opened on its timeline and on its event page, read by
+// the sheet's attributes. Every other family draws cells, and its pinned page
+// is checked to draw no sheet.
 //
 // Subjects are read live off each family's listing (`/ethereum/aave-v3`,
 // `/ethereum/spark`, `/ethereum/liquity-v2`) rather than hard-coded — the
@@ -138,10 +138,53 @@ const EXPLANATION_FROM_FIRST_PAINT = new Set([
   // which draws no position card, so no Explanation pane carries the link.
 ]);
 
-/** Families whose opened card's T2 is the event sheet (ui-jobs 330). */
-const SHEET_FAMILIES = new Set(["liquity-v2", "aave-v3", "aave-v3-base"]);
+/** Families whose opened card's T2 is the event sheet (ui-jobs 330). A
+ *  family's every label is listed; some of its event kinds keep the cells
+ *  (MakerDAO's give and auction rows, Polaris's liquidations and transfers,
+ *  PWN's mint, burn, non-default claim and extension, Compound V2's rows that
+ *  move neither side, Frankencoin's terms changes and challenges, a Liquity
+ *  fork's batch-manager rate changes), so the generic pinned page is not
+ *  checked either way here. Seamless keeps the cells (no read lane), and so
+ *  does Compound V3 on Base (no sheet drawn on 0x2b4e…f40f or 0x5c38…f4f6,
+ *  13 Oct 2026). */
+const SHEET_FAMILIES = new Set([
+  "liquity-v2",
+  "aave-v3",
+  "aave-v3-base",
+  "spark",
+  "moonwell",
+  "moonwell-base",
+  "compound-v2",
+  "dolomite",
+  "dolomite-closed",
+  "liquity-v1",
+  "ebisu",
+  "asymmetry",
+  "basedollar",
+  "makerdao",
+  "polaris",
+  "maple",
+  "frankencoin",
+  "fx",
+  "pwn",
+  "aave-v4",
+  "aave-vaults",
+  "morpho-base-vaults",
+  "yearn-vaults",
+  "compound-v3",
+  "morpho",
+  "morpho-base",
+  "fluid",
+  "llamalend",
+  "llamalend-closed",
+]);
+/** The families whose builders key the event's rows `event…` (the first two
+ *  sheets); the checks hold them to it. */
+const KEYED_EVENT_ROWS = new Set(["liquity-v2", "aave-v3"]);
 
 let failures = 0;
+/** Sheet checks a subject's flags leave out; each prints a SKIP line. */
+let skipped = 0;
 /** Families whose run threw once and was retried — named in the verdict. */
 const retriedFamilies = [];
 const check = (name, cond, detail = "") => {
@@ -421,7 +464,7 @@ async function waitForCardInViewport(page, eventId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// THE EVENT SHEET (ui-jobs 330) — Liquity V2 and Aave V3
+// THE EVENT SHEET (ui-jobs 330) — every family with a sheet builder
 // ══════════════════════════════════════════════════════════════════════════
 //
 // The opened card's T2 on these families is a balance sheet: `data-sheet`
@@ -441,6 +484,14 @@ async function waitForCardInViewport(page, eventId) {
 // one with a previous event (its values swap, its breakdown has a carry
 // layer), `second` another card on the same page, opened beside it, and
 // `first` an event with no previous one, whose values are plain.
+//
+// Liquity V2 and Aave V3 are held to every check. A later family states what
+// its sheet does not draw as a flag set false, its reason in `why`, and the
+// check it would fail prints a SKIP line: `swaps` (no value swaps to its
+// change), `carry` (no carry-forward layer), `usd` (no dollar column, so the
+// phone's asset | USD toggle has nothing to swap), `panels` (no Risk or Limits
+// panel, checked absent). `oneSided` is a lender's or holder's sheet: one
+// side, named by the family (`SheetSide.name`).
 const SHEET_SUBJECTS = {
   "liquity-v2": [
     {
@@ -470,6 +521,239 @@ const SHEET_SUBJECTS = {
       // The account's first event.
       first:
         "supply:0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2:0x1e69dafd5a2ca3310edf6fa7f9e39cf48edd998396fdb40063b16935c21ac222:6",
+    },
+  ],
+  // ── The families that followed (330's overnight sprint). A flag set false
+  // names a check the family's sheet cannot pass, with the reason from item
+  // 330's gaps in `why`; the run prints a SKIP line for each. ──
+  spark: [
+    {
+      label: "0x1601…347e",
+      path: "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e",
+      // 13 Oct 2026, a Withdraw with a Market move; Spark draws through aaveFamilySheet.
+      event: "withdraw:0x27bc2b480b5f8097cdd121baa615017d34190cf94afc4a3463ddc5a50b04af0d:4",
+      second: "supply:0x448f90f08cdb9b214c4db8774342f71f80eb76f0dee831405ebce2e57c666a3f:31",
+    },
+  ],
+  moonwell: [
+    {
+      label: "0x9781…5f05",
+      path: "/ethereum/moonwell/0x9781f72f15ff9d961f5b0aaf1d93b40c23905f05",
+      // 10 Sep 2026, a Withdraw. The Ethereum and Base names share the builder.
+      event: "0x1f10abf19d6af3e4f41901ac9576026d9a08de07792cec138e18112df462b183-4",
+      second: "0x59fa943af178b6fc645f186cf9d04c34c6ffd9418ca1b606c0bedd8d6c86e27f-4",
+      swaps: false,
+      why: { swaps: "Risk and Limits are unread (the page carries no per-event Comptroller state), so no value swaps" },
+    },
+  ],
+  "compound-v2": [
+    {
+      label: "0x1a6b…9910",
+      path: "/ethereum/compound-v2/0x1a6bae20f70691ce1755a003c4560879b7798910",
+      // 29 Dec 2021, a Repay with a Market move.
+      event: "repay:6db9b0118adb0763a140babff113b07c206215d112d7b0365c6aca31f77b3105:0",
+      second: "redeem:7096b7359ba8b7eb5fe17f18111d7dd58b8d8d850c2e62d205c6db840f3d9cd5:1",
+      swaps: false,
+      why: {
+        swaps:
+          "Risk and Limits are unread (getAccountLiquidity and markets() at the event's block are not on the page), so no value swaps",
+      },
+    },
+  ],
+  dolomite: [
+    {
+      label: "0xe670…7273",
+      path: "/ethereum/dolomite/0xe6705fccaf951870ef24463c88a81f31610efba4/53264333596970428064010753932179380014364720754547549633613121572245119207273",
+      // 9 Aug 2026, a Repay (a deposit of the owed asset).
+      event: "deposit:7a188131629ca1733dfe5b2068842a9ee5df52eca7b522f905352f42c96bf7f6:8:self",
+      second: "withdraw:c635006b74581a9f7a1f85880578a63dbe9e437a720e4eec6b73793e52db8ee5:6:self",
+      swaps: false,
+      why: {
+        swaps:
+          "Risk and Limits are unread (the account's margin reads at the event's block are not on the page), so no value swaps",
+      },
+    },
+  ],
+  "liquity-v1": [
+    {
+      label: "0x8eb2…d74c",
+      path: "/ethereum/liquity-v1/0x8eb2e0cebcd191625037a042c9edf67b7f7fd74c",
+      // 14 Jun 2022, a Repay: the collateral side untouched.
+      event: "0x279c6976b089bdb2fde79c11eea756c46ef01dd8dc1ea1e05b4049cd893137d6-420",
+      second: "0xe409ed2b68b9bc04511c5b5939a298599a70846a94cc194c4ee8ac71d8fa0724-455",
+      // The open, 28 Aug 2021.
+      first: "0x6f54fef7f4a201edd128d9224910678961d2279042a232b941e58c1647ceb0b1-139",
+    },
+  ],
+  ebisu: [
+    {
+      label: "WBTC …7638",
+      path: "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638",
+      // 9 Jun 2026, a Withdraw. Ebisu, Asymmetry and Basedollar share liquity-fork-sheet.tsx.
+      event: "0x8496531fb5d25fc73d0d2df3695176b44d86f057871e9b89a5de224f16590a18-0",
+      second: "0x56f402df843e775def041e3096fbef00dcebc3873d309b8d52629b204f7f0c32-2",
+    },
+  ],
+  basedollar: [
+    {
+      label: "wstETH …0874",
+      path: "/base/basedollar/wstETH/35503968854505941585891917177059866138830265432583817156640567483056892500874",
+      // 29 Aug 2026, Add and Borrow; the collateral total reads "Not read on
+      // this page" (Basedollar's operate rows carry no price).
+      event: "0x81c3c97a12ae9b68adfa808ef542f7cfb157f5fd0890e7eb37b21336e5e0f757-2",
+      second: "0x08ed0149157d9954c4ea33ff7567578a91cd94deb0e0d93e2d22bf5489dae6e8-2",
+    },
+  ],
+  makerdao: [
+    {
+      label: "0x226e…eb4",
+      path: "/ethereum/makerdao/0x226ede73e2efae6a1acf4f162b8e28caee3aaeb4",
+      // 8 Oct 2026, a Withdraw (frob).
+      event: "frob:0xb23e4a4d2a5dc6a25010c0c123f3a680e892ed16ec9e347ee1fdf39f918a7e35:498",
+      second: "frob:0x12405480368425ba378ac66172a1c9103de29f8713967897614083b27ca6520a:683",
+    },
+  ],
+  polaris: [
+    {
+      label: "usdp/166",
+      path: "/sepolia/polaris/usdp/166",
+      // 27 Aug 2026, a Withdraw; the liquidation above it keeps the cells.
+      event: "cdp_updated:0xc12e8b48a67cb713800b900f19091df1a8bafff6c3b7a0f3f42bac9d0c3e5999:10",
+      second: "cdp_updated:0x9e33142311ce234052410e8d2455045035c59370eae3e72c35a633fe6caec872:14",
+      // The open.
+      first: "cdp_updated:0xc3cd88b40626d8f4caa15c76e73b9a9e3b2982ca3727f2a0a1b6a9f14256dc28:21",
+    },
+  ],
+  maple: [
+    {
+      label: "0xd2f8…aa97",
+      path: "/ethereum/maple/0xd2f8d420b06328b50b3593da1a60f362053aaa97",
+      // 13 Oct 2026, a withdrawal request (USDC pool).
+      event: "request:83c49c5687101aed6a0a1494933bb2ba8e0c85bc8d5ecabc144491332b6ee471:5",
+      second: "request_fill:64cf04ea90b65e50d04884ca5d20f2e89a6efe7489687f62700975bde22fab65:0",
+      oneSided: true,
+      panels: false,
+      swaps: false,
+      usd: false,
+      why: {
+        oneSided: "a lender holds a pool claim, drawn as one side named Pool claim",
+        panels: "a lender has no liquidation, so 330's table gives Maple no Risk or Limits",
+        swaps: "no panel, so no value swaps",
+        usd: "the claim is stated in the pool's asset, no dollar column",
+      },
+    },
+  ],
+  frankencoin: [
+    {
+      label: "0x6377…a3f",
+      path: "/ethereum/frankencoin/0x6377a63b2a8caa1db4190a5419d2dc9215d74a3f",
+      // 15 Jul 2026, Close Position.
+      event: "minting_update:807177d0a82fcc6d334f645792264052d59164a85f52f6c0d2db116a11afb93d:143",
+      second: "minting_update:16f31cae70b1f9075899e79c312bc96675f7ee062331622f3dc8d8d908e7a801:101",
+      swaps: false,
+      usd: false,
+      why: {
+        swaps:
+          "on the close the liquidation price reads Closed and the rest read Not read on this page (no market price, no receipt rate); the page's other sheet row is the open, with no previous event",
+        usd: "Frankencoin prices nothing in dollars: both totals state the unit figure",
+      },
+    },
+  ],
+  fx: [
+    {
+      label: "wsteth-249",
+      path: "/ethereum/fx/wsteth-249",
+      // 28 Feb 2025, Withdraw and Repay.
+      event: "0x8766352d623d50606f8a6929ee945523619b5e9c81a83d5dcf740f3c15a0f795:21",
+      second: "0xe6dab53fd66f31cdea1bb1f7ec776bfb292e7b1adabc5063c5aba213bce9aea1:18",
+      swaps: false,
+      why: { swaps: "the card gets no previousEvent, so no Risk or Limits value carries a change" },
+    },
+  ],
+  pwn: [
+    {
+      label: "loan 20",
+      path: "/ethereum/pwn/0x0598b250a99bd45155a6b9b04af2ee19a2e5fed0?loan=20",
+      // 1 Nov 2023, the repayment; Default state is the one swap value.
+      event: "paid_back:d9505efcdac9fe2798b1870ca57e03c3cb810c2c9d6b03ea52f5ace086d4cbd8:5",
+      second: "created:3325cf7144a87e1a2d9d23e2080800752a39637b813e27678a009a902a1d0dc4:4",
+      // The creation.
+      first: "created:3325cf7144a87e1a2d9d23e2080800752a39637b813e27678a009a902a1d0dc4:4",
+      usd: false,
+      why: { usd: "the page holds no price, so no dollar column" },
+    },
+  ],
+  "aave-v4": [
+    {
+      label: "main 0x7eac…fa09",
+      path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
+      // 19 Sep 2026, a Withdraw with a Market move; LTV is the one swap value.
+      event: "0x93924cd94df220dd1ab3691d52e949bc413fa9fd03838d20dae69195db1d6898-6",
+      second: "0x76bd74533a140879613d00986f828c5734fd9dd79892f85a8be550ec930e7c18-6",
+    },
+  ],
+  "compound-v3": [
+    {
+      label: "usdc 0xd51c…f519c",
+      path: "/ethereum/compound-v3/usdc/0xd51c5283b8727206bf9be2b2db4e5673efaf519c",
+      // 26 Sep 2026, Withdraw Collateral.
+      event: "0x1b24d1761a9ca435f2b63b76ed2f6b7b119c9474b37e2fc2c60e7266b9e55fec-1",
+      second: "0x1b24d1761a9ca435f2b63b76ed2f6b7b119c9474b37e2fc2c60e7266b9e55fec-3",
+      swaps: false,
+      why: {
+        swaps:
+          "the collateral factors are read only for an absorb's seized assets, so the Risk and Limits values stand unread and none swaps",
+      },
+    },
+  ],
+  fluid: [
+    {
+      label: "11044",
+      path: "/ethereum/fluid/11044",
+      // 21 Jul 2026, a Withdraw.
+      event: "withdraw:09dc1e0d4e197230f505de564bd5e1d7ab3ff1299462a9bf36f08d72a512ffcc:355:11044",
+      second: "payback:5106b940ddf22656194b98b35a6a6f076cff396e01b1df03669248d63f88aaa6:233:11044",
+      usd: false,
+      why: { usd: "Fluid prices nothing in dollars: the totals state the leg's token" },
+    },
+  ],
+  "morpho-base": [
+    {
+      label: "0xd13d…/0x9103…",
+      path: "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+      // 5 Oct 2026, Remove Collateral. Ethereum and Base share morpho-sheet.ts.
+      event: "0x17675f8d57fdd518d7cc8c8f607588887495778d8f00f00883920b29f7e2ff78:3",
+      second: "0x249a970937cbda2e4fae1445393bae26e1af37bed69d5c921ca2f9fa0da4d2ba:6",
+      usd: false,
+      why: { usd: "Morpho prices nothing in dollars: the sheet is in tokens" },
+    },
+  ],
+  llamalend: [
+    {
+      label: "0x100d…/0xe32a…",
+      path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xe32a8cf93af8661ec4708ef627b255801184ad2f",
+      // 29 Jul 2026, a Repay.
+      event: "repay:8acd69cf7e9ec31a63b7a6f3c93f7642826a266dc60b578707d0d072a69697b4:732:self",
+      second: "borrow:73d5f7a54ab2338d01859dbf7f175d64ffebe95f1896c37bc962da3a85f5abec:384:self",
+    },
+  ],
+  "aave-vaults": [
+    {
+      label: "0x7bc3…/0x6348…",
+      path: "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
+      // 20 Jun 2026, a Deposit. Yearn, the Aave vaults and MetaMorpho share vault-sheet.tsx.
+      event: "0x386ee149ce06cce688af210acd99d1b222f6bd4606e7702ca170b4b5eac5e423:115",
+      second: "0x386ee149ce06cce688af210acd99d1b222f6bd4606e7702ca170b4b5eac5e423:77",
+      oneSided: true,
+      panels: false,
+      swaps: false,
+      usd: false,
+      why: {
+        oneSided: "a vault holding is one side, named Vault shares",
+        panels: "a vault holding has no liquidation, so 330's table gives the vault rows no Risk or Limits",
+        swaps: "no panel, so no value swaps",
+        usd: "the page holds no price: the total states the asset",
+      },
     },
   ],
 };
@@ -503,9 +787,16 @@ const readSheet = (page, id) =>
           const rows = rowsOf(e);
           return {
             side: e.getAttribute("data-sheet-side"),
+            name: e.querySelector("h3")?.textContent.trim() ?? "",
             touched: e.getAttribute("data-sheet-touched"),
             totals: rows.filter((r) => r === "total").length,
             events: rows.filter((r) => /^event/.test(r)).length,
+            // The rows outside every layer, less the total and Before: the
+            // event's rows, whatever key the builder gave them.
+            moved: [...e.querySelectorAll("[data-sheet-row]")].filter(
+              (r) =>
+                !r.closest("[data-sheet-layer]") && !["total", "before"].includes(r.getAttribute("data-sheet-row")),
+            ).length,
           };
         }),
         panels: [...s.querySelectorAll("[data-sheet-panel]")].map((e) => ({
@@ -596,7 +887,22 @@ const waitBreakdown = (page, id, want) =>
 /** One subject's sheet checks. */
 async function verifySheetSubject(name, s) {
   const tag = `${name} sheet ${s.label}`;
-  const landing = (id) => `${BASE}${s.path}?at=${encodeURIComponent(id)}`;
+  // A path may carry its subject's query (PWN's `?loan=`); `at` joins it.
+  const [route, query] = s.path.split("?");
+  const landing = (id) => `${BASE}${route}?${query ? `${query}&` : ""}at=${encodeURIComponent(id)}`;
+  const eventPage = (id) => `${BASE}${route}/event/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
+  /** A check the subject's flags leave out, stated in the run. */
+  const skip = (what, why) => {
+    skipped++;
+    console.log(`SKIP  ${tag}: ${what} — ${why}`);
+  };
+  const flag = (k) => s[k] !== false;
+  // Liquity V2 and Aave V3 key the event's rows `event…`, and the check
+  // holds them to it; the families that followed name their rows freely, and
+  // their event rows are read as the rows outside every layer.
+  const keyed = KEYED_EVENT_ROWS.has(name);
+  const eventRows = (x) => (keyed ? x.events : x.moved);
+  const layersWanted = flag("carry") ? ["carry"] : [];
 
   // ── 1280, the timeline: the sheet on open, the switch, the sides, the
   // panels, the swap, the receipts ──
@@ -616,11 +922,18 @@ async function verifySheetSubject(name, s) {
       `${at?.controls} row, ${at?.switches} switch`,
     );
     const sides = at?.sides ?? [];
-    check(
-      `${tag} @1280: the sides are Collateral and Debt`,
-      JSON.stringify(sides.map((x) => x.side)) === JSON.stringify(["collateral", "debt"]),
-      JSON.stringify(sides.map((x) => x.side)),
-    );
+    if (s.oneSided)
+      check(
+        `${tag} @1280: one side, headed by the family's name for it (${s.why.oneSided})`,
+        sides.length === 1 && !!sides[0].name && !["Collateral", "Debt"].includes(sides[0].name),
+        JSON.stringify(sides.map((x) => [x.side, x.name])),
+      );
+    else
+      check(
+        `${tag} @1280: the sides are Collateral and Debt`,
+        JSON.stringify(sides.map((x) => x.side)) === JSON.stringify(["collateral", "debt"]),
+        JSON.stringify(sides.map((x) => x.side)),
+      );
     check(
       `${tag} @1280: each side has one total row`,
       sides.length > 0 && sides.every((x) => x.totals === 1),
@@ -629,15 +942,22 @@ async function verifySheetSubject(name, s) {
     check(
       `${tag} @1280: a touched side has the event's row, an untouched side none`,
       sides.length > 0 &&
-        sides.every((x) => (x.touched === "true" ? x.events > 0 : x.touched === "false" && x.events === 0)),
+        sides.every((x) => (x.touched === "true" ? eventRows(x) > 0 : x.touched === "false" && eventRows(x) === 0)),
       JSON.stringify(sides),
     );
-    check(
-      `${tag} @1280: the Risk and Limits panels, each with rows`,
-      JSON.stringify(at?.panels.map((p) => p.panel)) === JSON.stringify(["risk", "limits"]) &&
-        at.panels.every((p) => p.rows > 0),
-      JSON.stringify(at?.panels),
-    );
+    if (flag("panels"))
+      check(
+        `${tag} @1280: the Risk and Limits panels, each with rows`,
+        JSON.stringify(at?.panels.map((p) => p.panel)) === JSON.stringify(["risk", "limits"]) &&
+          at.panels.every((p) => p.rows > 0),
+        JSON.stringify(at?.panels),
+      );
+    else
+      check(
+        `${tag} @1280: no Risk or Limits panel (${s.why.panels})`,
+        at?.panels.length === 0,
+        JSON.stringify(at?.panels),
+      );
     check(
       `${tag} @1280: amount and usd columns, no phone column`,
       JSON.stringify([...(at?.cols ?? [])].sort()) === JSON.stringify(["amount", "usd"]),
@@ -665,11 +985,13 @@ async function verifySheetSubject(name, s) {
     const on = await waitBreakdown(page, s.event, "on");
     const atOn = await readSheet(page, s.event);
     check(`${tag} @1280: a press on the switch turns the breakdown on`, on, atOn?.breakdown);
-    check(
-      `${tag} @1280: with the breakdown on, its layers are drawn`,
-      (atOn?.layers.length ?? 0) > 0 && atOn.layers.includes("carry"),
-      JSON.stringify(atOn?.layers),
-    );
+    if (flag("carry"))
+      check(
+        `${tag} @1280: with the breakdown on, its layers are drawn`,
+        (atOn?.layers.length ?? 0) > 0 && atOn.layers.includes("carry"),
+        JSON.stringify(atOn?.layers),
+      );
+    else skip("with the breakdown on, the carry layer is drawn", s.why.carry);
     if (secondOpen) {
       const other = await readSheet(page, second);
       check(
@@ -703,7 +1025,8 @@ async function verifySheetSubject(name, s) {
     // The swap: a press shows the change, a second the level again.
     const swap = `${sheetSel(s.event)} button[data-swap-value]`;
     const swaps = await page.locator(swap).count();
-    if (check(`${tag} @1280: a value swaps to its change (${swaps})`, swaps > 0)) {
+    if (!flag("swaps")) skip("a value swaps to its change", s.why.swaps);
+    else if (check(`${tag} @1280: a value swaps to its change (${swaps})`, swaps > 0)) {
       const read = () =>
         page
           .locator(swap)
@@ -742,8 +1065,9 @@ async function verifySheetSubject(name, s) {
   // ── An event with no previous one: its values are plain. Read on its event
   // page: a served Aave page's `?at=` landing does not reach an account's
   // oldest event. ──
-  if (s.first) {
-    const { ctx, page } = await open(1280, `${BASE}${s.path}/event/${encodeURIComponent(s.first)}`);
+  if (s.first && !flag("swaps")) skip("with no previous event the values are plain", s.why.swaps);
+  else if (s.first) {
+    const { ctx, page } = await open(1280, eventPage(s.first));
     if (check(`${tag} first event, event page: the card draws its sheet`, await waitSheet(page, s.first))) {
       const at = await readSheet(page, s.first);
       check(
@@ -773,7 +1097,8 @@ async function verifySheetSubject(name, s) {
         );
       const before = { cells: await phone(), pressed: await pressed() };
       const idle = before.pressed.indexOf("false");
-      if (
+      if (!flag("usd")) skip("the asset | USD toggle changes what the phone column shows", s.why.usd);
+      else if (
         check(
           `${tag} @390: the controls row holds the asset | USD group and the switch`,
           before.pressed.length === 2 && idle >= 0 && at?.switches === 1,
@@ -806,12 +1131,12 @@ async function verifySheetSubject(name, s) {
 
   // ── The event page: the breakdown always on, no switch ──
   {
-    const { ctx, page, errors } = await open(1280, `${BASE}${s.path}/event/${encodeURIComponent(s.event)}`);
+    const { ctx, page, errors } = await open(1280, eventPage(s.event));
     if (check(`${tag} event page: the card draws its sheet`, await waitSheet(page, s.event))) {
       const at = await readSheet(page, s.event);
       check(
         `${tag} event page: the breakdown is on, its layers drawn, no data-sheet-switch`,
-        at?.breakdown === "on" && at.layers.length > 0 && at.switches === 0,
+        at?.breakdown === "on" && layersWanted.every((l) => at.layers.includes(l)) && at.switches === 0,
         JSON.stringify({ breakdown: at?.breakdown, layers: at?.layers, switches: at?.switches }),
       );
     }
@@ -1484,6 +1809,7 @@ await verifyFamily("spark", {
   listingPath: "/ethereum/spark",
   rowHrefRe: /^\/ethereum\/spark\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("spark");
 const liquityV2Subject = await verifyFamily("liquity-v2", {
   listingPath: "/ethereum/liquity-v2",
   rowHrefRe: /^\/ethereum\/liquity-v2\/trove\//,
@@ -1702,30 +2028,37 @@ await verifyFamily("compound-v3", {
   listingPath: "/ethereum/compound-v3",
   rowHrefRe: /^\/ethereum\/compound-v3\/[^/]+\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("compound-v3");
 await verifyFamily("compound-v2", {
   listingPath: "/ethereum/compound-v2",
   rowHrefRe: /^\/ethereum\/compound-v2\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("compound-v2");
 await verifyFamily("moonwell", {
   listingPath: "/ethereum/moonwell",
   rowHrefRe: /^\/ethereum\/moonwell\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("moonwell");
 await verifyFamily("maple", {
   listingPath: "/ethereum/maple",
   rowHrefRe: /^\/ethereum\/maple\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("maple");
 await verifyFamily("makerdao", {
   listingPath: "/ethereum/makerdao",
   rowHrefRe: /^\/ethereum\/makerdao\/(\d+|0x[0-9a-fA-F]{40})$/,
 });
+await verifySheet("makerdao");
 await verifyFamily("fluid", {
   listingPath: "/ethereum/fluid",
   rowHrefRe: /^\/ethereum\/fluid\/\d+$/,
 });
+await verifySheet("fluid");
 await verifyFamily("frankencoin", {
   listingPath: "/ethereum/frankencoin",
   rowHrefRe: /^\/ethereum\/frankencoin\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("frankencoin");
 
 // ── sweep batch b ──
 await verifyFamily("fx", {
@@ -1734,14 +2067,17 @@ await verifyFamily("fx", {
   // also catch the listing's own `/ethereum/fx/pools` and `/info` links.
   rowHrefRe: /^\/ethereum\/fx\/(wsteth|wbtc)-\d+$/,
 });
+await verifySheet("fx");
 await verifyFamily("dolomite", {
   listingPath: "/ethereum/dolomite",
   rowHrefRe: /^\/ethereum\/dolomite\/0x[0-9a-fA-F]{40}\//,
 });
+await verifySheet("dolomite");
 await verifyFamily("llamalend", {
   listingPath: "/ethereum/llamalend",
   rowHrefRe: /^\/ethereum\/llamalend\/0x[0-9a-fA-F]{40}\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("llamalend");
 /** A closed account's position path, read off the family's own listing API
  *  (`status=closed`, the first row with events), or null when none answers. */
 async function closedSubject(name, apiPath, toHref) {
@@ -1778,10 +2114,12 @@ await verifyFamily("pwn", {
   listingPath: "/ethereum/pwn",
   rowHrefRe: /^\/ethereum\/pwn\/0x[0-9a-fA-F]{40}\?loan=/,
 });
+await verifySheet("pwn");
 await verifyFamily("liquity-v1", {
   listingPath: "/ethereum/liquity-v1",
   rowHrefRe: /^\/ethereum\/liquity-v1\/0x[0-9a-fA-F]{40}\?epoch=/,
 });
+await verifySheet("liquity-v1");
 await verifyFamily("morpho", {
   listingPath: "/ethereum/morpho",
   // Anchored to the (market, user) id shape so it doesn't also catch the
@@ -1792,12 +2130,14 @@ await verifyFamily("aave-v4", {
   listingPath: "/ethereum/aave-v4",
   rowHrefRe: /^\/ethereum\/aave-v4\/spoke\//,
 });
+await verifySheet("aave-v4");
 
 // ── sweep batch c ──────────────────────────────────────────────────────────
 await verifyFamily("ebisu", {
   listingPath: "/ethereum/ebisu",
   rowHrefRe: /^\/ethereum\/ebisu\/[^/]+\/[^/]+$/,
 });
+await verifySheet("ebisu");
 await verifyFamily("asymmetry", {
   listingPath: "/ethereum/asymmetry",
   rowHrefRe: /^\/ethereum\/asymmetry\/[^/]+\/[^/]+$/,
@@ -1806,6 +2146,7 @@ await verifyFamily("basedollar", {
   listingPath: "/base/basedollar",
   rowHrefRe: /^\/base\/basedollar\/[^/]+\/[^/]+$/,
 });
+await verifySheet("basedollar");
 await verifyFamily("aave-v3-base", {
   listingPath: "/base/aave-v3",
   rowHrefRe: /^\/base\/aave-v3\/0x[0-9a-fA-F]{40}$/,
@@ -1836,6 +2177,7 @@ await verifyFamily("morpho-base", {
   // the server loader seeds the whole history, so the event route renders
   // its card rather than the fallback.
 });
+await verifySheet("morpho-base");
 
 // ── polaris (2026-09-17) ───────────────────────────────────────────────────
 // The 27th event route, built after the sweep (rails-ops
@@ -1848,6 +2190,7 @@ await verifyFamily("polaris", {
   rowHrefRe: /^\/sepolia\/polaris\/(usdp|goldp)\/\d+$/,
 });
 await verifyPolarisOwn();
+await verifySheet("polaris");
 
 /** Polaris's own assertions, beyond the shared six — kept out of
  *  `verifyFamily`, which every family shares.
@@ -2199,6 +2542,7 @@ const aaveVaultSubject = await verifyFamily("aave-vaults", {
   rowHrefRe: /^\/ethereum\/aave\/vaults\/0x[0-9a-fA-F]{40}\/0x[0-9a-fA-F]{40}$/,
 });
 await verifyVaultOwn("aave-vaults", aaveVaultSubject);
+await verifySheet("aave-vaults");
 
 // MetaMorpho on Base, off the same shape of listing.
 const morphoVaultSubject = await verifyFamily("morpho-base-vaults", {
@@ -2228,5 +2572,6 @@ if (retriedFamilies.length)
   console.log(
     `\n\u27f3 ${retriedFamilies.length} retried: ${retriedFamilies.join(", ")} — green, but not on the first attempt`,
   );
+if (skipped) console.log(`\n${skipped} sheet check(s) skipped by a subject's flags (SKIP lines above)`);
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
