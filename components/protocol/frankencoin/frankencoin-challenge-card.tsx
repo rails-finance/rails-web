@@ -18,8 +18,8 @@
 
 import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
 import { isFrankencoinEvent } from "@/lib/shared/types/event-shape";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, ProvUnscoped } from "@/components/shared/provenance";
+import { POSITION_CARD_FRAME } from "@/lib/shared/ui-grammar";
 import { EventTime } from "@/components/shared/event-time";
 import { challengeFigureProv, type FrankencoinCoords } from "@/lib/frankencoin/event-provenance";
 import { fmtFcColl, fmtFcPct, fmtZchf, dateTimeText } from "@/lib/frankencoin/figures";
@@ -304,9 +304,11 @@ export function FrankencoinChallengeCard({
   const groups = groupChallenges(events);
   if (groups.length === 0) return null;
 
+  // A bare frame in the position card's look. It sits outside the position
+  // card's receipts scope, so its figures trace nothing.
   return (
-    <PositionCardShell>
-      <div className="space-y-3">
+    <ProvUnscoped>
+      <div className={`${POSITION_CARD_FRAME} space-y-3`}>
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold">Challenge history</h3>
           <span className="text-xs text-rb-500">
@@ -318,6 +320,6 @@ export function FrankencoinChallengeCard({
           <Group key={g.key} g={g} positionOpen={positionOpen} />
         ))}
       </div>
-    </PositionCardShell>
+    </ProvUnscoped>
   );
 }

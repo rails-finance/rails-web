@@ -19,6 +19,11 @@
 // peaks as `heads`, the Outcome column, no panel); an open detail card carries
 // `panel`.
 //
+// The listing branch is the one place in the app where <Prov> is meant to
+// trace nothing, and the figures cannot tell which render they are in. The
+// shell knows, so it declares it: <ProvUnscoped> keeps the dev unscoped-<Prov>
+// warning quiet for listing rows and loud everywhere else.
+//
 // Hooks for the verifiers: the frame keeps `data-anatomy="P1"`,
 // `data-skel-section` and `data-prov-scope="position-card"`, and adds
 // `data-position-card-shell` and `data-card-status`; each headline keeps
@@ -26,7 +31,7 @@
 // `data-card-counters`.
 
 import type { ReactNode } from "react";
-import { POSITION_CARD_FRAME } from "@/lib/shared/ui-grammar";
+import { POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   POSITION_CARD_SCOPE,
   ProvReceiptsScope,
@@ -35,14 +40,9 @@ import {
 } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import {
-  PositionCardRow,
-  PositionSummaryProvider,
-  PositionSummaryTitle,
-} from "@/components/shared/position-card-disclosure";
 import { PositionCardPanel, type PositionPanelColumns } from "@/components/shared/position-card-panel";
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
+import { TipLabel } from "@/components/shared/tip-label";
 import { StatDash, StatValue } from "@/components/shared/stat-value";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ExportMenu, type ExportMenuProps } from "@/components/shared/export-menu";
@@ -211,6 +211,45 @@ const OPEN_GRID: Record<number, string> = {
 // a stack line up.
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
 
+/** The "Position summary" heading at the left of a detail card's heading row. */
+function PositionSummaryTitle() {
+  return (
+    <h2 className={`${SECTION_HEADING} text-rb-500`} data-position-summary="">
+      Position summary
+    </h2>
+  );
+}
+
+/** One headline: its label, then the figure and the lines under it. */
+function PositionCardRow({
+  index,
+  head,
+  label,
+  labelTip,
+  headerIcon,
+  className,
+  children,
+}: {
+  index: number;
+  /** The headline's name (`data-card-head`). */
+  head: string;
+  label: string;
+  labelTip?: string;
+  headerIcon?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={className} data-card-row={index} data-card-head={head}>
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
+        <TipLabel text={label} tip={labelTip} />
+        {headerIcon}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** The small tag at the left of a detail card's heading row. */
 function StatusTag({ status }: { status: PositionCardStatus }) {
   return (
@@ -220,16 +259,17 @@ function StatusTag({ status }: { status: PositionCardStatus }) {
   );
 }
 
+const OPEN_PILL = "bg-positive/20 text-positive";
+
 /** The listing's lifecycle pill: OPEN for a live position, else the status
  *  word in capitals. */
 function ListingPill({ status }: { status: PositionCardStatus | null }) {
-  if (!status) return <LifecyclePill status="open" />;
   return (
     <span
-      className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${TAG_TONE[status.tone]}`}
+      className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? TAG_TONE[status.tone] : OPEN_PILL}`}
       data-anatomy="C6"
     >
-      {status.word.toUpperCase()}
+      {status ? status.word.toUpperCase() : "OPEN"}
     </span>
   );
 }
@@ -425,8 +465,10 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   );
 
   return detail ? (
+    // verify-unscoped-prov's tripwire: return `frame` bare from this branch and
+    // every detail card's figures report as unscoped.
     <ProvReceiptsScope registry={registry} scopeId={POSITION_CARD_SCOPE}>
-      <PositionSummaryProvider value>{frame}</PositionSummaryProvider>
+      {frame}
     </ProvReceiptsScope>
   ) : (
     <ProvUnscoped>{frame}</ProvUnscoped>

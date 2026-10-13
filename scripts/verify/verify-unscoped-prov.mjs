@@ -9,9 +9,10 @@
 // the running dev server). It now aborts on any non-2xx rather than reporting
 // a zero it did not earn.
 //
-// To confirm the tripwire still has teeth, break a scope on purpose — change
-// position-card-shell.tsx's `receipts ? <ProvReceiptsScope…>` to `false ?` —
-// and re-run: it should report ~250 labels.
+// To confirm the tripwire still has teeth, break a scope on purpose: in
+// components/shared/position-card.tsx, make the `detail ? <ProvReceiptsScope…>`
+// branch at the end of `PositionCard` return `frame` bare, and re-run. Every
+// detail card's figures then report as unscoped.
 
 import { chromium } from "playwright";
 const BASE = process.env.BASE ?? "http://localhost:3000";

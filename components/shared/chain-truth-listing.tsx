@@ -296,11 +296,10 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
                           does not run a dynamic route's data work to answer one. Do
                           not infer that from the code; measure it again if the
                           prefetch semantics move. */}
-                    {/* group/listing-row: <PositionCardShell> keys its blue navigation
-                          hover border off this group, so shell-based cards match the
-                          bare-content cards (V2/V4) whose configs own the row surface.
-                          Detail pages render the same cards outside any row Link, so
-                          the hover state never fires there. */}
+                    {/* group/listing-row: the position card's frame keys its blue
+                          navigation hover border off this group. Detail pages render
+                          the same cards outside any row Link, so the hover state never
+                          fires there. */}
                     <Link
                       href={hrefFor(item)}
                       prefetch={true}
