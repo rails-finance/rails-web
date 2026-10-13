@@ -66,7 +66,7 @@ export function FxListing({ initialItems, initialTotal, initialKey, initialSearc
         poolStats && poolStats.length > 0 ? <FxPoolStatsBand pools={poolStats} anchors={anchors} /> : undefined
       }
       searchPlaceholder="Search owner address or position #"
-      renderCard={(p) => <FxPositionCard v={viewFromSummary(p)} listingPx={anchors[p.pool]} />}
+      renderCard={(p) => <FxPositionCard v={viewFromSummary(p)} surface="listing" listingPx={anchors[p.pool]} />}
       hrefFor={(p) => `/ethereum/fx/${fxPositionSlug(p.pool, p.positionId)}`}
       keyFor={(p) => fxPositionSlug(p.pool, p.positionId)}
       strategy={serverStrategy<FxPositionSummary, FxListFilters>({

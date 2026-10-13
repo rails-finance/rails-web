@@ -15,7 +15,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
@@ -59,12 +58,9 @@ import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-r
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const FxExportMenu = dynamic(() => import("@/components/protocol/fx/fx-export-menu").then((m) => m.FxExportMenu), {
-  ssr: false,
-});
+import { ExportMenu } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
+import { fxPositionToMarkdown } from "@/lib/fx/position-to-markdown";
 
 interface FxPositionViewProps {
   /** The `<pool>-<id>` slug. Already parsed by the server route, which answered
@@ -446,6 +442,27 @@ export default function FxPositionView({
   // position page.
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
+  // draws no card, keeps them in the wallet row's Tools.
+  const exports: PositionCardExports | null = view
+    ? {
+        buildMarkdown: () =>
+          fxPositionToMarkdown({
+            view,
+            events: fxEvents,
+            drift,
+            reads: historyWindow.state === "whole" ? socializedReadsMap : undefined,
+            parts: noTxParts,
+            history: markdownHistoryScope(historyWindow, fxEvents),
+            generatedAt: new Date(),
+          }),
+        events: fxEvents,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        csvFilename: `fx-${slug}-activity.csv`,
+        scopeNote: exportScopeNote(historyWindow, fxEvents, "this position's whole history"),
+      }
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -455,20 +472,11 @@ export default function FxPositionView({
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {view && (
-            <FxExportMenu
-              view={view}
-              events={fxEvents}
-              drift={drift}
-              reads={historyWindow.state === "whole" ? socializedReadsMap : undefined}
-              parts={noTxParts}
-              csvFilename={`fx-${slug}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              history={markdownHistoryScope(historyWindow, fxEvents)}
-              scopeNote={exportScopeNote(historyWindow, fxEvents, "this position's whole history")}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {/* An unreadable slug never reaches here: the server route answers 404
@@ -483,11 +491,9 @@ export default function FxPositionView({
               // pending (the card shows dashes and the pane says so plainly).
               <FxPositionCard
                 v={view}
-                receipts
+                surface="detail"
                 viewHref={tl.viewHref}
-                // Closed by default, remembered per viewer and position (ui-jobs
-                // 209).
-                positionSummary
+                exports={exports}
                 drift={drift}
                 rebalanceRows={historyWindow.state === "whole" ? rebalanceRows : undefined}
                 inTxFunding={inTxFunding}
