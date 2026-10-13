@@ -54,15 +54,14 @@ function RailsGlyph() {
 
 /** The release-stage pill at the very foot of the rail, below the bookmark
  *  (Miles, 2026-09-25). Drawn as a label coming out of the browser's left
- *  edge: square on the left, rounded on the right, flush to x=0 rather than
- *  centred in the rail. Under the glyph it read as part of the mark and pulled
+ *  edge: a full-width strip across the foot of the 56px rail, square on every
+ *  corner, the word centred. Under the glyph it read as part of the mark and pulled
  *  the eye to the top of the page; down here it is a standing note about the
  *  product. Same caution-500 anatomy the top bar uses, a size down to sit
- *  inside 56px, and rounded only at the top right since it meets the
- *  window's left and bottom edges. */
+ *  inside 56px. */
 function BetaPill() {
   return (
-    <span className="self-start rounded-tr bg-caution-500 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white">
+    <span className="w-full bg-caution-500 py-0.5 text-center text-[8px] font-semibold uppercase tracking-wide text-white">
       Beta
     </span>
   );

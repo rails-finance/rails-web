@@ -17,7 +17,7 @@ export function maplePositionContent(opts: { status: "open" | "closed"; inQueue?
     return {
       title: "About This Position",
       intro:
-        "This lender has withdrawn its whole pool claim. The panel above shows its lifetime peak — the highest share balance it ever held, and the highest principal ever deposited where one was recorded.",
+        "This lender has withdrawn its whole pool claim. The headline above shows its lifetime peak — the highest share balance it ever held, and the highest principal ever deposited where one was recorded.",
       detailsHeading: "Key concepts:",
       details: [
         {

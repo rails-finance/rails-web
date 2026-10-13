@@ -42,7 +42,7 @@ export function MapleListing({ initialItems, initialTotal, initialKey, initialSe
         poolState && Object.keys(poolState).length > 0 ? <MaplePoolStatsBand poolState={poolState} /> : undefined
       }
       searchPlaceholder="Search wallet address"
-      renderCard={(p) => <MaplePositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <MaplePositionCard v={viewFromSummary(p)} surface="listing" />}
       hrefFor={(p) => `/ethereum/maple/${p.wallet}`}
       keyFor={(p) => p.wallet}
       strategy={serverStrategy<MaplePositionSummary, MapleListFilters>({

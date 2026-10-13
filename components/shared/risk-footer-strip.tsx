@@ -107,9 +107,3 @@ export function RiskFigure({
 export function RiskStrong({ children }: { children: ReactNode }) {
   return <span className="text-foreground/80 font-semibold">{children}</span>;
 }
-
-/** A compact meter slot (runway bars) — fixed width, right-anchored, wraps as
- *  its own unit. */
-export function RiskMeter({ children }: { children: ReactNode }) {
-  return <div className="w-64 max-w-full">{children}</div>;
-}

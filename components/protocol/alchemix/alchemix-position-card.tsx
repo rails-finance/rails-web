@@ -1,4 +1,6 @@
-// One Alchemist position, as a listing row.
+// One Alchemist position on the shared position card (rails-ops
+// TO-DO-position-card 322, 323): the listing row here, and the pieces the
+// position page's card (alchemist-position-view.tsx) builds its slots from.
 //
 // THE CARD'S JOB IS TO SAY WHAT IS TRUE AND WHEN IT WAS TRUE. Three rules it
 // keeps, each of them a way this protocol's figures can be misread:
@@ -9,42 +11,40 @@
 //    open position's debt at once with nothing in the position's events to see
 //    (rails-ops decisions/0032). A reader cannot be expected to decode that
 //    from a coloured pill, so the route's own plain-words sentence is rendered
-//    as given.
+//    as given, as the listing card's notice.
 //
 // 2. EVERY FIGURE CARRIES ITS BLOCK, AND A FIGURE WITHOUT ONE IS NOT SHOWN.
 //    `asOfBlock` is typed nullable because the wire types it that way; a null
 //    there means the read did not settle, and an amount rendered without the
 //    block it belongs to is a number that looks stated and is not. So the
-//    amount and the block are drawn from one guard. The position page, whose
-//    figures are one reading, names the block once in its header
-//    (`hideBlock`); each figure's receipt still carries it.
+//    amount and the block are drawn from one guard. The listing states each
+//    figure's block under it; the position page, whose figures are one
+//    reading, names the block once in its notice, and each figure's receipt
+//    carries it.
 //
 // 3. EARMARKED IS SHOWN ONLY AT ITS OWN BLOCK, AND NEVER BESIDE DEBT AS THOUGH
-//    THEY SUMMED. It accrues every block; the reading is true at the block it
-//    was taken at and at no other. It sits on its own line, with its own block,
-//    and nothing here adds it to anything.
+//    THEY SUMMED. On the position page it is a panel row of its own; the
+//    listing, which has no panel, leaves it to the page.
 //
 // There is also no V2 leg on this card and no slot for one. A V3 position is
 // what a linked V2 position BECAME, so showing the two debts as one row would
 // double count one obligation (rails-ops reference/alchemix-v2-frozen-record.md).
-//
-// THE CHROME IS THE HOUSE'S, NOT THIS PROTOCOL'S. The frame, the status pill,
-// the identity row, the stat grid and the footnote rhythm are the shared
-// position-card components every other explorer renders — `PositionCardShell` +
-// `OpenPositionStats` + `LifecyclePill` + `WalletPill` + `StatValue`. What is
-// Alchemix's here is what it says, not how it is drawn.
 
 import type { ReactNode } from "react";
-import { OpenPositionStats, type OpenPositionStatsColumn } from "@/components/shared/open-position-stats";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
+import {
+  PositionCard,
+  type PositionCardHead,
+  type PositionCardListingSlots,
+  type PositionCardStatus,
+} from "@/components/shared/position-card";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import type {
-  AlchemixAmountAtBlock,
+  AlchemixAmount,
+  AlchemixCollateral,
+  AlchemixLiveCollateral,
   AlchemixPositionStatus,
   AlchemixPositionSummary,
   AlchemixUnderlyingValue,
@@ -56,20 +56,6 @@ import { BlockRef } from "@/components/shared/block-ref";
 import { isStableDenominated } from "@/lib/aave-v4/asset-class";
 import { DEPEG_BAND } from "@/lib/shared/usd-display";
 
-/** The collateral, as either surface holds it. The listing serves it with the
- *  block it was settled at; the live read pins one block to the whole reading,
- *  and the caller lifts it onto this shape. */
-export interface AlchemixCollateralView {
-  raw: string;
-  formatted: number;
-  asOfBlock: number | null;
-  mytSymbol: string | null;
-  underlying: AlchemixUnderlyingValue | null;
-  usd: AlchemixUsdValue | null;
-}
-
-const block = (n: number) => n.toLocaleString("en-US");
-
 /** A vault share price at the asset underneath's own precision, up to six
  *  places (1.000934 USDC), so the share count times it gives the value the
  *  card states. */
@@ -78,93 +64,42 @@ export function formatSharePrice(price: number, decimals: number): string {
   return price.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-/** The LISTING axis: Open and Closed are the roster's own lifecycle pill. The
- *  two states only Alchemix has wear the muted pill CLOSED wears, with the
- *  words the listing's Status facet names them by — there is no lifecycle word
- *  for a position the reducer declined, or for one on a read-grade line with no
- *  current reading. */
-export function AlchemixLifecyclePill({ status }: { status: AlchemixPositionStatus }) {
-  if (status === "open" || status === "closed") return <LifecyclePill status={status} />;
-  return (
-    <span className="font-bold tracking-wider uppercase px-2 py-0.5 rounded-xs text-xs bg-rb-300 dark:bg-rb-700 text-foreground/70">
-      {status === "unknown" ? "No current reading" : status}
-    </span>
-  );
+/** The tag: none while open; the lifecycle word for a closed position, and
+ *  the two states only Alchemix has (a position the reducer declined, one on
+ *  a read-grade line with no current reading) with the words the listing's
+ *  Status facet names them by. */
+export function alchemixStatus(status: AlchemixPositionStatus): PositionCardStatus | null {
+  if (status === "open") return null;
+  if (status === "closed") return { word: "Closed", tone: "muted" };
+  if (status === "refused") return { word: "Refused", tone: "muted" };
+  return { word: "No current reading", tone: "muted" };
 }
 
-/** The DETAIL axis: the house's neutral pill, carrying the route's own word for
- *  what this position is. Alchemix states a lifecycle word where another
- *  protocol states a mode word, because a position on a read-grade line with no
- *  current reading has no mode anyone can name from the chain. */
-export function AlchemixStatusPill({ status }: { status: AlchemixPositionStatus }) {
-  return (
-    <span className="font-bold capitalize px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-      {status === "unknown" ? "No current reading" : status}
-    </span>
-  );
+/** A headline asset's icon. */
+export function alchemixChip(symbol: string): ReactNode {
+  return <TokenChipIcon symbol={symbol} size={28} filterable={false} untitled />;
 }
 
-/** An amount is stated only with the block it was settled at. Without one the
- *  column says the figure did not settle rather than printing a bare number.
- *
- *  The figure is number + chip only, no ticker text after it — the chip
- *  alone carries the symbol, on hover, the same grammar every other
- *  protocol's headline figures use (`components/shared/asset-amount.tsx`).
- *
- *  One builder for both surfaces — the listing row passes neither receipt nor
- *  note, the position page passes both. */
-export function amountColumn(
-  label: string,
-  value: AlchemixAmountAtBlock | null,
-  unit: string,
-  extra?: { prov?: Provenance; note?: ReactNode; hideBlock?: boolean },
-): OpenPositionStatsColumn {
-  // The note stays on the footnote's own rb-500 rather than dropping to rb-400:
-  // rb-400 is the LIGHTER end of the ramp, so it reads dimmer than the block
-  // line on the light canvas and brighter than it on the dark one, which is the
-  // hierarchy inverting between themes.
-  const note = extra?.note ? <div className="mt-0.5 leading-snug">{extra.note}</div> : null;
-  if (!value || value.asOfBlock == null) {
-    return {
-      label,
-      value: <StatValue color="text-rb-500">Not settled</StatValue>,
-      footnote: note ? <StatFootnote>{note}</StatFootnote> : undefined,
-    };
-  }
-  const { display, title } = formatCompact(value.formatted);
+/** An amount as a headline figure: the compact form, the exact one on hover,
+ *  inside its receipt where the surface has one. */
+export function alchemixAmountFigure(a: AlchemixAmount, unit: string, prov?: Provenance): ReactNode {
+  const { display, title } = formatCompact(a.formatted);
   const figure = (
-    <span className="inline-flex items-center gap-1.5">
+    <span title={title} className="tabular-nums">
       {display}
-      <TokenChipIcon symbol={unit} size={20} filterable={false} />
     </span>
   );
-  return {
-    label,
-    value: (
-      <StatValue title={title}>
-        {extra?.prov ? (
-          <Prov info={extra.prov} value={String(value.formatted)} symbol={unit}>
-            {figure}
-          </Prov>
-        ) : (
-          figure
-        )}
-      </StatValue>
-    ),
-    // The position page states the block once, in the card's header; the
-    // listing row has no header, so each figure carries it.
-    footnote: extra?.hideBlock ? (
-      note ? (
-        <StatFootnote>{note}</StatFootnote>
-      ) : undefined
-    ) : (
-      <StatFootnote>
-        <BlockRef block={value.asOfBlock} />
-        {note}
-      </StatFootnote>
-    ),
-  };
+  return prov ? (
+    <Prov info={prov} value={String(a.formatted)} symbol={unit}>
+      {figure}
+    </Prov>
+  ) : (
+    figure
+  );
 }
+
+/** The figure for an amount whose read did not settle. */
+export const NOT_SETTLED = <span className="text-rb-500">Not settled</span>;
 
 /** The collateral's dollar figure, where the card states one. The house rule
  *  for a stablecoin (lib/shared/usd-display.ts): a USDC line priced within
@@ -182,168 +117,164 @@ export function collateralUsdText(
   return `$${formatCompact(usd.usd).display}`;
 }
 
-/** The collateral as a stat, on either surface. What a holder recognises is the
- *  asset underneath, not the vault share, so THE UNDERLYING LEADS and the share
- *  count stays beside it — the count is what the position holds and the two
- *  surfaces state them in the same order.
+/** The Deposited headline, on either surface. What a holder recognises is the
+ *  asset underneath, so THE UNDERLYING LEADS, its dollar
+ *  figure beneath where the card states one, and the share count the position
+ *  holds is the line under that.
  *
- *  `myt_share_price` lives only on a reading of the position, so a position with
- *  no reading has no share price, and therefore no underlying and no USD. That
- *  case leads with the share count and says the conversion is not in hand. It
- *  never renders a zero. */
-export function collateralColumn(
-  c: AlchemixCollateralView | null,
+ *  `myt_share_price` lives only on a reading of the position, so a position
+ *  with no reading has no share price, and therefore no underlying and no USD.
+ *  That case leads with the share count and says the conversion is not in
+ *  hand. It never renders a zero. `block` is the listing's stamp after the
+ *  share count; the position page names its block once. */
+export function depositedHead(
+  c: (AlchemixCollateral | AlchemixLiveCollateral) | null,
   fallbackMytSymbol: string,
-  prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance; sharePrice?: Provenance },
-  opts?: { showSharePrice?: boolean; hideBlock?: boolean },
-): OpenPositionStatsColumn {
-  const myt = c?.mytSymbol ?? fallbackMytSymbol;
-  const underlying = c?.underlying ?? null;
-
-  if (!c || !underlying) {
-    return amountColumn("Collateral", c ? { raw: c.raw, formatted: c.formatted, asOfBlock: c.asOfBlock } : null, myt, {
-      prov: prov?.shares,
-      note: c ? "No share price in hand, so no figure for the asset underneath." : undefined,
-      hideBlock: opts?.hideBlock,
-    });
-  }
-
-  // The value in the asset underneath is the share count at one block times
-  // the share price read at another. The listing stamps each with its own:
-  // the headline with the share price's block, as Set aside is stamped, and
-  // the share count with the block it was settled at. The position page reads
-  // both at one block and names it once in its header.
-  const priceBlock = underlying.sharePriceAsOfBlock ?? c.asOfBlock;
-  const twoBlocks = !opts?.hideBlock && c.asOfBlock != null && priceBlock != null && priceBlock !== c.asOfBlock;
+  prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance },
+  block?: ReactNode,
+): PositionCardHead {
+  const head = { id: "deposited", label: "Deposited" };
+  if (!c) return { ...head, value: NOT_SETTLED };
+  const myt = c.mytSymbol ?? fallbackMytSymbol;
+  const u = c.underlying;
   const shares = (
-    <span className="inline-flex items-center gap-1 tabular-nums">
-      {formatCompact(c.formatted).display}
-      <TokenChipIcon symbol={myt} size={14} filterable={false} />
-      {myt}
+    <span className="tabular-nums">
+      {formatCompact(c.formatted).display} {myt}
     </span>
   );
-  // Its own inline run, so on a narrow card it wraps under the share count.
-  const sharesBlock = twoBlocks ? (
-    <>
-      {" "}
-      <span className="whitespace-nowrap">
-        at <BlockRef block={c.asOfBlock!} size={12} />
-      </span>
-    </>
-  ) : null;
-  const usdText = collateralUsdText(underlying, c.usd);
-  const usd = usdText != null ? <span className="tabular-nums">{usdText}</span> : null;
-  // The share price beside the two figures it relates, so the gap between the
-  // share count and the underlying reads as a price and not a mismatch. Drawn
-  // where the caller asks for it or hands its receipt, and never on a position
-  // holding no collateral: a price with nothing for it to value reads as a
-  // stray fact rather than as a wound-down position (e.g. closed eth-alusd/543).
-  const priceShown = (opts?.showSharePrice || prov?.sharePrice) && underlying.sharePriceRaw && c.raw !== "0";
-  const priceValue = priceShown ? Number(underlying.sharePriceRaw) / 10 ** underlying.decimals : null;
-  const priceText =
-    priceValue != null ? (
-      <span className="tabular-nums">
-        1 {myt} = {formatSharePrice(priceValue, underlying.decimals)} {underlying.symbol ?? "underlying"}
-      </span>
-    ) : null;
-  return amountColumn(
-    "Collateral",
-    { raw: underlying.raw, formatted: underlying.formatted, asOfBlock: twoBlocks ? priceBlock : c.asOfBlock },
-    underlying.symbol ?? "underlying",
-    {
-      prov: prov?.underlying,
-      note: (
-        <>
-          held as{" "}
-          {prov?.shares ? (
-            <Prov info={prov.shares} value={String(c.formatted)} symbol={myt}>
-              {shares}
-            </Prov>
-          ) : (
-            shares
-          )}
-          {sharesBlock}
-          {usd ? (
-            <>
-              {" · "}
-              {prov?.usd && c.usd ? (
-                <Prov info={prov.usd} value={String(c.usd.usd)}>
-                  {usd}
-                </Prov>
-              ) : (
-                usd
-              )}
-            </>
-          ) : null}
-          {priceText ? (
-            <div>
-              {prov?.sharePrice ? (
-                <Prov info={prov.sharePrice} value={String(priceValue)} symbol={underlying.symbol ?? undefined}>
-                  {priceText}
-                </Prov>
-              ) : (
-                priceText
-              )}
-            </div>
-          ) : null}
-        </>
-      ),
-      hideBlock: opts?.hideBlock,
-    },
+  const sharesNode = prov?.shares ? (
+    <Prov info={prov.shares} value={String(c.formatted)} symbol={myt}>
+      {shares}
+    </Prov>
+  ) : (
+    shares
+  );
+  if (!u) {
+    return {
+      ...head,
+      value: alchemixAmountFigure(c, myt, prov?.shares),
+      assets: alchemixChip(myt),
+      sub: <>no share price in hand{block}</>,
+    };
+  }
+  const usdText = collateralUsdText(u, c.usd);
+  const usd =
+    usdText != null ? (
+      prov?.usd && c.usd ? (
+        <Prov info={prov.usd} value={String(c.usd.usd)}>
+          <span className="text-green-400">{usdText}</span>
+        </Prov>
+      ) : (
+        <span className="text-green-400">{usdText}</span>
+      )
+    ) : undefined;
+  return {
+    ...head,
+    value: alchemixAmountFigure(u, u.symbol ?? "underlying", prov?.underlying),
+    assets: alchemixChip(u.symbol ?? "underlying"),
+    usd,
+    sub: (
+      <>
+        held as {sharesNode}
+        {block}
+      </>
+    ),
+  };
+}
+
+/** The identity at the right of the heading (detail) or after the pill
+ *  (listing): "alUSD position 1221", the chain, and on a listing the holder. */
+export function AlchemixIdentity({
+  name,
+  chain,
+  wallet,
+  session,
+  prefix,
+}: {
+  name: string;
+  chain: string;
+  wallet?: string | null;
+  session?: SessionProtocol;
+  /** A word before the wallet ("claimed by"). */
+  prefix?: string;
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+      {/* Not uppercased: the symbol's case is part of its name
+          (lib/alchemix/naming.ts). */}
+      <span className="font-bold tracking-wide text-foreground/80">{name}</span>
+      <span className="text-rb-500">{chain}</span>
+      {wallet && session ? (
+        <span className="inline-flex items-center gap-1.5 text-rb-500">
+          {prefix}
+          <WalletPill wallet={wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+        </span>
+      ) : null}
+    </span>
   );
 }
 
-/** True where the events-only debt and the debt last read disagree by more
- *  than a thousandth of a unit. */
-function eventsAloneDiffers(p: AlchemixPositionSummary): boolean {
-  const dlb = p.figures.derivedLowerBound;
-  const debt = p.figures.debt;
-  if (!dlb || !debt) return false;
-  return Math.abs(Number(dlb.debtRaw) / 1e18 - debt.formatted) >= 1e-3;
+/** " · block 26,186,057": a listing figure's stamp. */
+function stamp(block: number | null | undefined): ReactNode {
+  return block != null ? (
+    <>
+      {" · "}
+      <BlockRef block={block} size={12} />
+    </>
+  ) : null;
+}
+
+export function alchemixListingSlots(p: AlchemixPositionSummary, session: SessionProtocol): PositionCardListingSlots {
+  const sym = p.syntheticSymbol;
+  const c = p.figures.collateral;
+  const collSettled = c && c.asOfBlock != null ? c : null;
+  // The share count and the share price can be read at two blocks; the
+  // listing stamps the share count with its own, and the price's after it.
+  const priceBlock = collSettled?.underlying?.sharePriceAsOfBlock ?? null;
+  const collStamp = collSettled ? (
+    <>
+      {stamp(collSettled.asOfBlock)}
+      {priceBlock != null && priceBlock !== collSettled.asOfBlock ? (
+        <>
+          , priced at <BlockRef block={priceBlock} size={12} />
+        </>
+      ) : null}
+    </>
+  ) : null;
+  const debt = p.figures.debt && p.figures.debt.asOfBlock != null ? p.figures.debt : null;
+  return {
+    surface: "listing",
+    status: alchemixStatus(p.status),
+    identity: (
+      <AlchemixIdentity
+        name={alchemixPositionName(sym, p.tokenId)}
+        chain={p.chainName ?? `chain ${p.chainId}`}
+        wallet={p.owner}
+        session={session}
+      />
+    ),
+    heads: [
+      depositedHead(collSettled, "shares", undefined, collStamp),
+      {
+        id: "debt",
+        label: "Debt",
+        value: debt ? alchemixAmountFigure(debt, sym) : NOT_SETTLED,
+        assets: debt ? alchemixChip(sym) : undefined,
+        sub: debt ? <BlockRef block={debt.asOfBlock!} size={12} /> : undefined,
+      },
+    ],
+    // The route's sentence for this line's grade, rendered as given.
+    notice: (
+      <div className="mb-3 space-y-1.5 text-xs leading-relaxed text-rb-500">
+        <p>{p.figures.gradeReason}</p>
+        {p.refusedReason ? <p>{p.refusedReason}</p> : null}
+      </div>
+    ),
+    counters: null,
+    menu: null,
+  };
 }
 
 export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummary; session: SessionProtocol }) {
-  return (
-    <PositionCardShell>
-      <OpenPositionStats
-        statusPill={<AlchemixLifecyclePill status={p.status} />}
-        leadingIdentity={
-          <>
-            {/* "alUSD position 1221": the naming ruling (lib/alchemix/naming.ts).
-                Not uppercased, because the symbol's case is part of its name. */}
-            <span className="text-xs font-bold tracking-wide text-foreground/80">
-              {alchemixPositionName(p.syntheticSymbol, p.tokenId)}
-            </span>
-            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
-              <span>{p.chainName ?? `chain ${p.chainId}`}</span>
-              {p.owner ? (
-                <WalletPill wallet={p.owner} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
-              ) : null}
-            </span>
-          </>
-        }
-        columns={[
-          amountColumn("Debt", p.figures.debt, p.syntheticSymbol, {
-            // The events-only debt, only where it differs from the debt read:
-            // a redemption clears debt with no event of the position's to show it.
-            note: eventsAloneDiffers(p) ? (
-              <span className="tabular-nums">
-                {formatCompact(Number(p.figures.derivedLowerBound!.debtRaw) / 1e18).display} {p.syntheticSymbol} from
-                events alone
-              </span>
-            ) : undefined,
-          }),
-          collateralColumn(p.figures.collateral, "shares", undefined, { showSharePrice: true }),
-          // Its own slot, never added to the debt beside it.
-          amountColumn("Set aside for repayment", p.figures.earmarked, p.syntheticSymbol),
-        ]}
-      />
-
-      <div className="mt-3 space-y-1.5">
-        {/* The route's own sentence for this line's grade, rendered as given. */}
-        <p className="text-xs leading-relaxed text-rb-500">{p.figures.gradeReason}</p>
-        {p.refusedReason ? <p className="text-xs leading-relaxed text-rb-500">{p.refusedReason}</p> : null}
-      </div>
-    </PositionCardShell>
-  );
+  return <PositionCard slots={alchemixListingSlots(p, session)} />;
 }

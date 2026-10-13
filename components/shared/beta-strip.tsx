@@ -61,23 +61,21 @@ export function BetaStrip() {
 
   return (
     // Spans the viewport, so on an explorer it reserves the rail's 56px the
-    // way WorkInProgressStrip does. bg-band is the quiet panel tone: this is
-    // information, so no caution colour.
-    <div
-      data-anatomy="H14"
-      className={`bg-band border-b border-[var(--surface-active)]${isExplorerRoute(pathname) ? " md:pl-14" : ""}`}
-    >
-      <div className="mx-auto flex max-w-7xl items-start gap-3 px-4 py-2.5 text-sm text-foreground md:px-6">
-        <p className="min-w-0 flex-1">
+    // way WorkInProgressStrip does. bg-sunken is the dark recessed tone
+    // (--surface-sunken); no rule under it, and no caution colour: this is
+    // information.
+    <div data-anatomy="H14" className={`bg-sunken${isExplorerRoute(pathname) ? " md:pl-14" : ""}`}>
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2 text-sm leading-5 text-foreground md:px-6">
+        <p className="min-w-0 flex-1 leading-5">
           <span className="font-semibold">Rails is in beta and changing often.</span>{" "}
           <span className="text-rb-500">We&rsquo;d love to hear from you</span>
           <span className="text-rb-500"> &mdash; </span>
           <button
             type="button"
             onClick={() => setFeedbackOpen(true)}
-            className="inline-flex cursor-pointer items-center gap-1 font-medium text-blue-500 hover:underline"
+            className="cursor-pointer font-medium text-teal-600 hover:underline dark:text-teal-500"
           >
-            <MessageSquarePlus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <MessageSquarePlus className="mr-1 inline-block h-3.5 w-3.5 align-middle" aria-hidden="true" />
             Send feedback
           </button>
         </p>
@@ -85,7 +83,7 @@ export function BetaStrip() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss"
-          className="-my-1 -mr-2 shrink-0 cursor-pointer rounded p-1.5 text-rb-500 hover:text-foreground"
+          className="-my-2 -mr-2 shrink-0 cursor-pointer rounded p-1.5 text-rb-500 hover:text-foreground"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
