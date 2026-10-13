@@ -19,6 +19,7 @@ import {
 } from "@/lib/maple/event-provenance";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
 import { formatWait } from "@/lib/maple/row-times";
+import { TRANSFER_LABEL } from "@/lib/maple/event-label";
 import { formatNumber } from "@/lib/utils/format";
 
 export interface MapleEventHeaderProps {
@@ -43,9 +44,6 @@ export interface MapleEventHeaderProps {
   /** Queue fills: unix seconds of the request this fill paid, where loaded. */
   requestAt?: number;
 }
-
-/** The row's words for a share transfer: what the wallet did with shares. */
-export const TRANSFER_LABEL = { transfer_in: "Shares received", transfer_out: "Shares sent" } as const;
 
 /** T1's head row spec (the card's `head` slot). */
 export function useMapleHeadSpec({

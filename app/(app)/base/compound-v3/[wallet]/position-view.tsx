@@ -47,6 +47,7 @@ import {
   CompoundClosedPositionExplanation,
 } from "@/components/protocol/compound/compound-position-explanation";
 import { CompoundBorrowRoom, compoundRiskColumn } from "@/components/protocol/compound/compound-risk-slot";
+import { compoundExplorer } from "@/lib/compound/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -306,42 +307,47 @@ function MarketSection({
 
   const live = chain && !chain.chainStale ? chain : null;
   const holds = holdsSomething(live);
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
 
   return (
     <FlowFocusContext.Provider value={flows.focus}>
       <CompoundFlowReplayContext.Provider value={flows.replay}>
         <section id={`market-${market.key}`} className="scroll-mt-20 space-y-6">
-          <CompoundPositionCard
-            v={view}
-            receipts
-            viewHref={tl.viewHref}
-            vocab={vocab}
-            session="compound-base"
-            // Closed by default, remembered per viewer and position (ui-jobs
-            // 209); the risk headline and the room to borrow from the Comet read.
-            positionSummary
-            risk={
-              // A stale read states no figure, so it draws no risk column.
-              view.status === "open" && !(chain && !live) ? compoundRiskColumn(live, compoundBorrowing(view)) : null
-            }
-            debtDetail={live ? <CompoundBorrowRoom chain={live} /> : undefined}
-            explanation={
-              view.status !== "open" ? (
-                <CompoundClosedPositionExplanation v={view} principalOnly={!replay?.baseAtChain} />
-              ) : live ? (
-                <CompoundPositionExplanation
-                  chain={live}
-                  collateralUsd={sideUsd.supplyUsd}
-                  debtUsd={sideUsd.borrowUsd}
-                  externalActivity={externalActivity}
-                />
-              ) : undefined
-            }
-          />
+          {!onEventPage && (
+            <CompoundPositionCard
+              v={view}
+              receipts
+              viewHref={tl.viewHref}
+              vocab={vocab}
+              session="compound-base"
+              // Closed by default, remembered per viewer and position (ui-jobs
+              // 209); the risk headline and the room to borrow from the Comet read.
+              positionSummary
+              risk={
+                // A stale read states no figure, so it draws no risk column.
+                view.status === "open" && !(chain && !live) ? compoundRiskColumn(live, compoundBorrowing(view)) : null
+              }
+              debtDetail={live ? <CompoundBorrowRoom chain={live} /> : undefined}
+              explanation={
+                view.status !== "open" ? (
+                  <CompoundClosedPositionExplanation v={view} principalOnly={!replay?.baseAtChain} />
+                ) : live ? (
+                  <CompoundPositionExplanation
+                    chain={live}
+                    collateralUsd={sideUsd.supplyUsd}
+                    debtUsd={sideUsd.borrowUsd}
+                    externalActivity={externalActivity}
+                  />
+                ) : undefined
+              }
+            />
+          )}
 
           {/* Lifetime flows: the bars and the line over this market's replay
           (lib/compound/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
-          {timelineState === "ready" && (
+          {!onEventPage && timelineState === "ready" && (
             <LifetimeFlowsPanel
               scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
               read={flows.read}
@@ -367,6 +373,7 @@ function MarketSection({
               // on the URL — see `renderedSectionsWithViews` above for why (this
               // page holds one section per market, each with its own timeline).
               persistKeyPrefix="compound"
+              eventPage={(slot) => compoundExplorer.eventPage({ ...slot, wallet, deployment: "base" })}
               closed={view.status !== "open"}
               tl={tl}
               // Both grouping paths: the spec groups a flat answer in the browser,
@@ -812,15 +819,18 @@ export default function CompoundBaseWalletView({
               </div>
             ) : (
               <div className="space-y-10">
-                <p className="text-[11px] text-rb-500">
-                  This wallet has a position in{" "}
-                  <span className="text-foreground">
-                    {sections.length} of Base&rsquo;s {data?.marketsScanned ?? COMPOUND_BASE_DEPLOYMENT.markets.length}
-                  </span>{" "}
-                  Compound markets; the others hold nothing for it. Each market is separate: nothing is
-                  cross-collateralised between them, so there is no combined health factor here and no total — the
-                  markets do not all price in the same unit.
-                </p>
+                {!pinnedRoute && (
+                  <p className="text-[11px] text-rb-500">
+                    This wallet has a position in{" "}
+                    <span className="text-foreground">
+                      {sections.length} of Base&rsquo;s{" "}
+                      {data?.marketsScanned ?? COMPOUND_BASE_DEPLOYMENT.markets.length}
+                    </span>{" "}
+                    Compound markets; the others hold nothing for it. Each market is separate: nothing is
+                    cross-collateralised between them, so there is no combined health factor here and no total — the
+                    markets do not all price in the same unit.
+                  </p>
+                )}
                 {renderedSectionsWithViews.map(({ s, view }) => (
                   <MarketSection
                     key={s.market.key}

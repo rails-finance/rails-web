@@ -51,6 +51,8 @@ import {
   type TimelineOpeningBalance,
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
+import { useParams } from "next/navigation";
+import { compoundExplorer } from "@/lib/compound/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
 import { interleaveRowPlan, servedFoldersEnabled, type ServedFolder } from "@/lib/shared/timeline-folder";
@@ -239,6 +241,9 @@ export default function CompoundPositionView({
   initialGrouped,
 }: CompoundPositionViewProps) {
   const marketLabel = marketOf(market).label;
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   // Keyed on the timeline, not the row: an account this Comet has never seen is
   // a real answer the server can seed, and its `initialPosition` is null.
   const seeded = initialEvents != null;
@@ -526,33 +531,35 @@ export default function CompoundPositionView({
             <DetailBodySkeleton />
           ) : view ? (
             <>
-              <Position
-                view={view}
-                events={compoundEvents}
-                chain={chain}
-                opening={opening}
-                viewHref={tl.viewHref}
-                folders={servedFolders}
-                flows={
-                  // Lifetime flows: the bars and the line over the position's
-                  // replay (lib/compound/flows.ts), in place of the tower
-                  // (TO-DO-ui-jobs 206).
-                  <LifetimeFlowsPanel
-                    scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-                    read={flows.read}
-                    explanation={
-                      <div className="space-y-2 text-sm text-rb-500">
-                        <CompoundFlowsNote
-                          facts={flows.facts}
-                          baseSymbol={cometMarket.baseSymbol}
-                          ethQuoted={cometMarket.quoteUnit === "ETH"}
-                        />
-                      </div>
-                    }
-                    learnMore={compoundFlowsContent()}
-                  />
-                }
-              />
+              {!onEventPage && (
+                <Position
+                  view={view}
+                  events={compoundEvents}
+                  chain={chain}
+                  opening={opening}
+                  viewHref={tl.viewHref}
+                  folders={servedFolders}
+                  flows={
+                    // Lifetime flows: the bars and the line over the position's
+                    // replay (lib/compound/flows.ts), in place of the tower
+                    // (TO-DO-ui-jobs 206).
+                    <LifetimeFlowsPanel
+                      scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                      read={flows.read}
+                      explanation={
+                        <div className="space-y-2 text-sm text-rb-500">
+                          <CompoundFlowsNote
+                            facts={flows.facts}
+                            baseSymbol={cometMarket.baseSymbol}
+                            ethQuoted={cometMarket.quoteUnit === "ETH"}
+                          />
+                        </div>
+                      }
+                      learnMore={compoundFlowsContent()}
+                    />
+                  }
+                />
+              )}
               <ChainTruthTimeline
                 // The queued export (rails-ops decision 0029) has no row cap: the
                 // card offers the CSV whenever the total is known.
@@ -561,6 +568,7 @@ export default function CompoundPositionView({
                 // lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="compound"
+                eventPage={(slot) => compoundExplorer.eventPage({ ...slot, wallet, deployment: "ethereum" })}
                 closed={view.status !== "open"}
                 tl={tl}
                 runs={COMPOUND_LIQUIDATION_RUNS}
