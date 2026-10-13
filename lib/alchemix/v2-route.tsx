@@ -4,7 +4,10 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { positionMetadata, shortSubject } from "@/lib/shared/page-metadata";
+import { decodeEventId, eventMetadata, positionMetadata, shortSubject } from "@/lib/shared/page-metadata";
+import { eventCardModel } from "@/lib/share/event-model";
+import { eventImage } from "@/lib/share/event-image";
+import { alchemixEventHeading, alchemixEventPageDescription } from "@/lib/alchemix/explorer";
 import { positionImage } from "@/lib/share/position-image";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { formatNumber } from "@/lib/utils/format";
@@ -65,6 +68,55 @@ export async function AlchemixV2PositionPage({
       position={read.position}
     />
   );
+}
+
+export interface AlchemixV2EventParams extends AlchemixV2PositionParams {
+  eventId: string;
+}
+
+/** The event page's metadata (rails-ops TO-DO-ui-jobs 236): the event named
+ *  through the adapter, found in the page's cached read. */
+export async function alchemixV2EventMetadata(
+  deployment: AlchemixDeployment,
+  { lineKey, account, eventId }: AlchemixV2EventParams,
+): Promise<Metadata> {
+  const decoded = decodeEventId(eventId);
+  const { position } = await loadAlchemixV2Position(deployment.chainId, lineKey, account);
+  const event = position?.events.find((e) => e.id === decoded) ?? null;
+  const sym = position?.syntheticSymbol ?? lineKey;
+  return eventMetadata({
+    session: deployment.session,
+    subject: account.toLowerCase(),
+    market: alchemixMarketWord(sym, "v2"),
+    canonicalPath: `${v2PositionPath(deployment, lineKey, account)}/event/${encodeURIComponent(decoded)}`,
+    event:
+      event && position
+        ? { actionLabel: alchemixEventHeading(event, position.events), timestamp: event.timestamp }
+        : null,
+    description: event
+      ? alchemixEventPageDescription(deployment, sym, account.toLowerCase(), event.timestamp, "v2")
+      : undefined,
+  });
+}
+
+/** The event's share card, from the page's cached read. */
+export function alchemixV2EventImage(deployment: AlchemixDeployment, params: AlchemixV2EventParams) {
+  return eventImage({
+    session: deployment.session,
+    load: async () => {
+      const { lineKey, account, eventId } = params;
+      if (!isV2LineOnChain(deployment.chainId, lineKey) || !ALCHEMIX_V2_ACCOUNT.test(account)) return null;
+      const decoded = decodeEventId(eventId);
+      const { position } = await loadAlchemixV2Position(deployment.chainId, lineKey, account);
+      const event = position?.events.find((e) => e.id === decoded);
+      if (!position || !event) return null;
+      return eventCardModel(event, {
+        session: deployment.session,
+        subject: shortSubject(account.toLowerCase()),
+        market: alchemixMarketWord(position.syntheticSymbol, "v2"),
+      });
+    },
+  });
 }
 
 /** The share card, from the same cached read the page awaits. */

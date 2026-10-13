@@ -7,8 +7,9 @@
 // close", beside the (i)); everything that explains or totals is in the
 // Explanation (TO-DO-ui-jobs §251): the protocol's bullets, the Lifetime
 // totals the scrubber reports with any outcome bullet, the Chart bullets and
-// the Key. Until the scrubber's timeline lands the panel says it is reading;
-// where that read fails, that it was not read.
+// the Key. Until the scrubber's timeline lands the panel says it is reading,
+// with the waiting cue over the skeleton (ui-jobs 333); where that read fails,
+// that it was not read.
 //
 // Mounted by the position views directly, with no <ChainTruthTower>, so the
 // towers can be removed without removing the scrubber (rails-ops
@@ -22,7 +23,12 @@ import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
-import { LifetimeFlowsSkeleton } from "@/components/shared/lifetime-flows-skeleton";
+import {
+  flowsWaitingLine,
+  LifetimeFlowsSkeleton,
+  LifetimeFlowsWaiting,
+} from "@/components/shared/lifetime-flows-skeleton";
+import { useLifeCount } from "@/lib/shared/life-count-store";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { FLOWS_SCOPE, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
@@ -144,6 +150,8 @@ export function LifetimeFlowsPanel({
   // return visit should reserve (TO-DO-ui-jobs §266).
   const [infoOpen, setInfoOpen] = useState(false);
   const { remembered } = useSkeletonSizes();
+  // The timeline's event count, for the waiting cue's scale line.
+  const lifeCount = useLifeCount(pathname);
   if (scrubber == null && read === "done") return null;
   const loading = scrubber == null && read !== "failed";
 
@@ -211,11 +219,12 @@ export function LifetimeFlowsPanel({
               The flow history was not read. Reload to try again.
             </p>
           ) : (
-            <div data-flows-read={read}>
+            <div className="relative" data-flows-read={read}>
               <p className="sr-only" role="status">
-                Reading the flow history…
+                {flowsWaitingLine(lifeCount)}
               </p>
               <LifetimeFlowsSkeleton />
+              <LifetimeFlowsWaiting count={lifeCount} />
             </div>
           )}
           <ProvenanceInfoTabs

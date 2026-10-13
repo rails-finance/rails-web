@@ -94,7 +94,15 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
  *  Rendered inside a `<Suspense>` because its reads are log sweeps and the rest
  *  of the page is `eth_call`s that have already answered; the reading paints
  *  first and this arrives when the chain has spoken. */
-async function VaultTimelineSection({ data, holder }: { data: AaveEthereumVaultResponse; holder: string }) {
+async function VaultTimelineSection({
+  data,
+  holder,
+  onEventPage,
+}: {
+  data: AaveEthereumVaultResponse;
+  holder: string;
+  onEventPage: boolean;
+}) {
   // Without the share token's own `decimals()` there is no exponent to ask a
   // share price with, and inventing one would print a 6-decimal price 1e12 too
   // large. No reading, so no rows.
@@ -177,7 +185,7 @@ async function VaultTimelineSection({ data, holder }: { data: AaveEthereumVaultR
     <>
       {/* The lifetime flows, drawn under exactly the condition the rows are —
           the feeder answers null on every path the gate refused. */}
-      {data.holder && (
+      {!onEventPage && data.holder && (
         <VaultFlowsTower
           computed={economics}
           holder={holder}
@@ -387,7 +395,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function AaveEthereumVaultPositionPage({ params }: Props) {
-  const { vault, holder } = await params;
+  const { vault, holder, eventId } = (await params) as Awaited<Props["params"]> & { eventId?: string };
+  // The event route re-renders this page (ui-jobs 236): the sub-nav and the
+  // event's card beside the shared column, nothing else.
+  const onEventPage = eventId != null;
   const address = vault.toLowerCase();
   if (!ADDRESS.test(address)) notFound();
 
@@ -431,6 +442,18 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
     },
   ];
 
+  const timelineSlot = data.holder ? (
+    <Suspense
+      fallback={
+        <div className="mb-6" data-skel-section="vault-timeline-pending">
+          <SkeletonBlock height={180} />
+        </div>
+      }
+    >
+      <VaultTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
+    </Suspense>
+  ) : null;
+
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -446,31 +469,34 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
             priceReason={ORACLE_USD_REASON["aave-vaults"]}
             owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
           />
-          <h1
-            className="text-2xl font-semibold text-foreground"
-            data-vault-page={address}
-            data-vault-family={data.vault.family}
-          >
-            <span className="font-mono">{subject}</span>
-            <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>
-          </h1>
-          {/* How the subject was REACHED — a fact about the page rather than
+          {!onEventPage && (
+            <>
+              <h1
+                className="text-2xl font-semibold text-foreground"
+                data-vault-page={address}
+                data-vault-family={data.vault.family}
+              >
+                <span className="font-mono">{subject}</span>
+                <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>
+              </h1>
+              {/* How the subject was REACHED — a fact about the page rather than
               about the address, and stated here because the header is always
               drawn. The card below carries the identity itself; the census has
               no row for an address it has never seen, so a card is not
               somewhere this note could always live. */}
-          {lookup.kind === "ens" && lookup.address && (
-            <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
-              {lookup.typed} · resolved through mainnet ENS
-            </p>
+              {lookup.kind === "ens" && lookup.address && (
+                <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
+                  {lookup.typed} · resolved through mainnet ENS
+                </p>
+              )}
+            </>
           )}
-
           {data.chainStale ? (
             <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
               This vault could not be read from chain just now, so no figure is stated for this address in it — not the
               family either, because which family it belongs to is a read like everything else on this page.
             </p>
-          ) : (
+          ) : onEventPage ? null : (
             <>
               <p className="mt-2 text-[12px] text-rb-500">
                 {AAVE_FAMILY_SINGULAR[data.vault.family]}, deployed by Aave · shares{" "}
@@ -520,37 +546,28 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
           </p>
         )}
 
-        {!data.chainStale && (
-          <AaveEthereumVaultPositionView
-            data={data}
-            positionCard={
-              data.holder ? (
-                <Suspense
-                  fallback={
-                    <div data-skel-section="vault-position-card-pending">
-                      <SkeletonBlock height={120} />
-                    </div>
-                  }
-                >
-                  <VaultPositionCardSection data={data} holder={data.holder.address} lookup={lookup} />
-                </Suspense>
-              ) : null
-            }
-            timeline={
-              data.holder ? (
-                <Suspense
-                  fallback={
-                    <div className="mb-6" data-skel-section="vault-timeline-pending">
-                      <SkeletonBlock height={180} />
-                    </div>
-                  }
-                >
-                  <VaultTimelineSection data={data} holder={data.holder.address} />
-                </Suspense>
-              ) : null
-            }
-          />
-        )}
+        {!data.chainStale &&
+          (onEventPage ? (
+            timelineSlot
+          ) : (
+            <AaveEthereumVaultPositionView
+              data={data}
+              positionCard={
+                data.holder ? (
+                  <Suspense
+                    fallback={
+                      <div data-skel-section="vault-position-card-pending">
+                        <SkeletonBlock height={120} />
+                      </div>
+                    }
+                  >
+                    <VaultPositionCardSection data={data} holder={data.holder.address} lookup={lookup} />
+                  </Suspense>
+                ) : null
+              }
+              timeline={timelineSlot}
+            />
+          ))}
 
         <ProvInspectorLayer />
       </div>

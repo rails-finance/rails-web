@@ -32,6 +32,7 @@
 import type { Metadata } from "next";
 
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { vaultEventPageDescription } from "@/lib/vaults/explorer";
 import { findVaultTailEvent } from "@/lib/vaults/event-share-card";
 import { ethereumVaultHref } from "@/lib/vaults/routes";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -83,6 +84,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: ADDRESS.test(who) ? who : decodeURIComponent(holder),
     canonicalPath: `${ethereumVaultHref(address, holder)}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: KIND_LABEL[event.kind], timestamp: event.timestamp } : null,
+    description: event
+      ? vaultEventPageDescription("aave-vaults", "ethereum", null, address, who, event.timestamp)
+      : undefined,
   });
 }
 
