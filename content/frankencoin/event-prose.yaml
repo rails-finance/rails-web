@@ -62,11 +62,15 @@ placeholders:
   coll_change:
     rounding: fc_coll
     means: |-
-      the collateral a sale took, as the row prints it
+      the collateral an event moved or a sale took, as the row prints it
   repaid:
     rounding: units2
     means: |-
-      the ZCHF of debt a sale cleared, as the row prints it
+      the ZCHF of debt a sale or a repayment cleared, as the row prints it
+  minted:
+    rounding: units2
+    means: |-
+      the ZCHF of debt a mint drew, as the row prints it
   received:
     rounding: units2
     means: |-
@@ -518,7 +522,7 @@ templates:
         when: |-
           the opening deposited collateral
         text: |-
-          This position opened as a new original and took its first collateral.
+          This position opened as a new original and took its first {coll_change} {coll_symbol} of collateral.
       open.what_empty:
         when: |-
           the opening deposited no collateral
@@ -623,25 +627,31 @@ templates:
         when: |-
           first
         text: |-
-          This mint is the position's first debt.
+          This mint of {minted} ZCHF is the position's first debt.
       mint.what:
         when: |-
-          more
+          more, where the row carries the debt drawn
+        text: |-
+          Minted {minted} ZCHF more against the collateral.
+      mint.what_plain:
+        when: |-
+          more, where it does not
         text: |-
           Minted more ZCHF against the collateral.
     order:
       - mint.what_first
       - mint.what
+      - mint.what_plain
       - mint.received
       - mint.interest
       - mint.interest_min
       - mint.roll
     groups:
-      happened: [mint.what_first, mint.what]
+      happened: [mint.what_first, mint.what, mint.what_plain]
       adds_up: [mint.received, mint.interest, mint.interest_min]
       leaves: [mint.roll]
     alternates:
-      - [mint.what_first, mint.what]
+      - [mint.what_first, mint.what, mint.what_plain]
       - [mint.interest, mint.interest_min]
 
   - id: frankencoin.repay
@@ -660,17 +670,32 @@ templates:
     sentences:
       repay.what:
         when: |-
-          partial
+          partial, where the row carries the debt repaid
+        text: |-
+          Repaid {repaid} ZCHF of the debt.
+      repay.what_plain:
+        when: |-
+          partial, where it does not
         text: |-
           Repaid part of the debt.
       repay.what_cleared:
         when: |-
-          cleared
+          cleared, where the row carries the debt repaid
+        text: |-
+          Repaid {repaid} ZCHF and cleared the debt; the collateral stays in the position.
+      repay.what_cleared_plain:
+        when: |-
+          cleared, where it does not
         text: |-
           Cleared the debt; the collateral stays in the position.
       repay.what_closed:
         when: |-
-          closed
+          closed, where the row carries the debt repaid
+        text: |-
+          Repaid {repaid} ZCHF, cleared the debt and closed the position.
+      repay.what_closed_plain:
+        when: |-
+          closed, where it does not
         text: |-
           Cleared the debt and closed the position.
       repay.next:
@@ -680,16 +705,19 @@ templates:
           With no debt left, the collateral can be withdrawn or back a future mint.
     order:
       - repay.what
+      - repay.what_plain
       - repay.what_cleared
+      - repay.what_cleared_plain
       - repay.what_closed
+      - repay.what_closed_plain
       - repay.paid
       - repay.next
     groups:
-      happened: [repay.what, repay.what_cleared, repay.what_closed]
+      happened: [repay.what, repay.what_plain, repay.what_cleared, repay.what_cleared_plain, repay.what_closed, repay.what_closed_plain]
       adds_up: [repay.paid]
       leaves: [repay.next]
     alternates:
-      - [repay.what, repay.what_cleared, repay.what_closed]
+      - [repay.what, repay.what_plain, repay.what_cleared, repay.what_cleared_plain, repay.what_closed, repay.what_closed_plain]
 
   - id: frankencoin.add_collateral
     title: |-
@@ -703,16 +731,22 @@ templates:
     sentences:
       add.what:
         when: |-
-          the collateral figure is recorded
+          the collateral figure is recorded, where the row carries the collateral added
+        text: |-
+          {coll_change} {coll_symbol} of collateral went into the position.
+      add.what_plain:
+        when: |-
+          the collateral figure is recorded, where it does not
         text: |-
           Added collateral to the position.
     order:
       - add.what
+      - add.what_plain
       - coll.understated
     groups:
-      happened: [add.what, coll.understated]
+      happened: [add.what, add.what_plain, coll.understated]
     alternates:
-      - [add.what, coll.understated]
+      - [add.what, add.what_plain, coll.understated]
 
   - id: frankencoin.withdraw_collateral
     title: |-
@@ -728,12 +762,22 @@ templates:
     sentences:
       withdraw.what:
         when: |-
-          partial
+          partial, where the row carries the collateral withdrawn
+        text: |-
+          {coll_change} {coll_symbol} of collateral came out of the position.
+      withdraw.what_plain:
+        when: |-
+          partial, where it does not
         text: |-
           Withdrew part of the collateral.
       withdraw.what_emptied:
         when: |-
-          emptied
+          emptied, where the row carries the collateral withdrawn
+        text: |-
+          The last {coll_change} {coll_symbol} of collateral came out: nothing remains on either side.
+      withdraw.what_emptied_plain:
+        when: |-
+          emptied, where it does not
         text: |-
           Withdrew the last collateral: nothing remains on either side.
       limit.at:
@@ -743,16 +787,18 @@ templates:
           The withdrawal stopped at the limit: the collateral left backs the debt at the declared price.
     order:
       - withdraw.what
+      - withdraw.what_plain
       - withdraw.what_emptied
+      - withdraw.what_emptied_plain
       - limit.at
       - limit.room
       - pause.ended
       - coll.understated
     groups:
-      happened: [withdraw.what, withdraw.what_emptied, coll.understated]
+      happened: [withdraw.what, withdraw.what_plain, withdraw.what_emptied, withdraw.what_emptied_plain, coll.understated]
       leaves: [limit.at, limit.room, pause.ended]
     alternates:
-      - [withdraw.what, withdraw.what_emptied, coll.understated]
+      - [withdraw.what, withdraw.what_plain, withdraw.what_emptied, withdraw.what_emptied_plain, coll.understated]
       - [limit.at, limit.room]
 
   - id: frankencoin.adjust_price
@@ -808,22 +854,22 @@ templates:
         when: |-
           change, where collateral came in
         text: |-
-          Deposited collateral.
+          {coll_change} {coll_symbol} of collateral went into the position.
       adjust.repaid:
         when: |-
           change, where the debt fell
         text: |-
-          Repaid part of the debt.
+          {repaid} ZCHF of the debt was repaid.
       adjust.coll_out:
         when: |-
           change, where collateral went out
         text: |-
-          Withdrew collateral.
+          {coll_change} {coll_symbol} of collateral came out of the position.
       adjust.minted:
         when: |-
           change, where the debt rose
         text: |-
-          Minted more ZCHF.
+          {minted} ZCHF more was minted against the collateral.
       adjust.none:
         when: |-
           none
