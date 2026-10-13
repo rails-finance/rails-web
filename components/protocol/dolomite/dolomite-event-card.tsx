@@ -2,9 +2,10 @@
 
 // Composer: fills the shared event card's slots (components/shared/
 // event-card.tsx; ui-jobs 309) from a Dolomite balance leg: the head, the
-// account's Collateral and Debt ledger cells with the market's balance cell
-// after them, the other account, forensics and spread lines as notes, the
-// price row and the explanation.
+// balance sheet (dolomite-event-sheet.tsx; ui-jobs 330) with the account's
+// Collateral and Debt ledger cells and the market's balance cell standing
+// where the sheet does not, the other account, forensics and spread lines as
+// notes, the price row and the explanation.
 //
 // The rows arrive at the BALANCE grain — one row per BalanceUpdate leg, so a
 // liquidation is FOUR rows across two accounts and this account's timeline
@@ -24,6 +25,7 @@ import { type DolomiteCoords } from "@/lib/dolomite/event-provenance";
 import { dolomiteExplainerTeaser, type DolomiteEvent } from "@/lib/dolomite/explainer-clauses";
 import { dolomiteHeadSpec } from "./dolomite-event-header";
 import { useDolomiteCells } from "./dolomite-event-detail";
+import { useDolomiteSheet } from "./dolomite-event-sheet";
 import { DolomiteEventExplainer, dolomiteLearnMoreContent } from "./dolomite-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 
@@ -92,6 +94,7 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
     siblings: sibs,
     accountNumber,
   });
+  const sheet = useDolomiteSheet({ event, siblings: sibs, coords });
 
   const slots: EventCardSlots = {
     event: {
@@ -125,6 +128,7 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
       sent: { txFrom: ctx.txFrom, caller: ctx.caller, owner: event.wallet },
     },
     cells,
+    sheet,
     ledgers,
     notes,
     price: { gas: ownerPaidGas(event, ctx.txFrom), prices },

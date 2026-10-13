@@ -125,7 +125,7 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
       ),
     },
     price,
-    useOpened: () => useMorphoOpened(ctx, coords, event.flows, cells, price),
+    useOpened: () => useMorphoOpened(ctx, coords, event.flows, cells, price, event.actionLabel),
     explainer: {
       body: <MorphoEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />,
     },

@@ -86,23 +86,24 @@ function changeProv(what: string, formula: string): Provenance {
 /** The sheet; undefined where the cells stand: the event moves no balance, its
  *  running figures did not load, or the ilk read at its block is not on hand.
  *  The page reads the ilk for each row of a short history. A row of a longer
- *  one reads that block on the event's page (the card there is always
- *  open), null while that read is on its way; on the timeline it keeps the
- *  cells, which read the block when the card opens. */
-export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords): EventSheet | null | undefined {
+ *  one reads that block while its card is open (`open`, the card's opened
+ *  read; the event page's card is always open), null while that read is on
+ *  its way. A closed row makes no read. */
+export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = false): EventSheet | null | undefined {
   const history = useMakerVaultHistory();
   const pathname = usePathname();
   const ownPage = useEventShareHref()?.split("?")[0];
   const pinned = useContext(EventPageContext) != null || (ownPage != null && pathname === ownPage);
+  const reads = pinned || open;
   const block = coords.blockNumber;
   const heldPage = block != null ? history.ilkAt.get(block) : undefined;
-  const own = useMakerIlkAt(heldPage || block == null || !pinned ? null : ctx.ilk, block != null ? [block] : []);
+  const own = useMakerIlkAt(heldPage || block == null || !reads ? null : ctx.ilk, block != null ? [block] : []);
   const held = heldPage ?? (block != null ? own?.reads.get(block) : undefined);
   const isGrab = ctx.eventType === "grab";
   const stated = isGrab || ctx.eventType === "frob" || ctx.eventType === "fork-in" || ctx.eventType === "fork-out";
   if (!stated || ctx.inkAfter == null || ctx.debtAfter == null) return undefined;
   const price = isGrab ? (ctx.priceAtBlock?.usd ?? held?.priceUsd ?? null) : (held?.priceUsd ?? null);
-  if (!held && !(isGrab && price != null)) return pinned && block != null && own == null ? null : undefined;
+  if (!held && !(isGrab && price != null)) return reads && block != null && own == null ? null : undefined;
   const mat = held?.mat ?? null;
   const dust = held?.dustDai ?? null;
 

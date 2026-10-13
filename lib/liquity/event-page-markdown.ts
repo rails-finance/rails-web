@@ -17,6 +17,7 @@ import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { liquityEventProse } from "@/lib/liquity/event-prose";
 import { liquityEventMarkdown } from "@/lib/liquity/event-markdown";
+import type { DayObs } from "@/lib/shared/price-series";
 
 export interface EventPageMarkdownInput {
   collateralType: string;
@@ -28,8 +29,8 @@ export interface EventPageMarkdownInput {
   /** The route's count where its first page stopped short, else null. */
   totalEvents: number | null;
   prices: OraclePricesData | null;
-  /** The branch's daily price, `[UTC day, usd]` ascending; null where unread. */
-  dailyColl: [number, number][] | null;
+  /** The branch's daily price, `[UTC day, usd, block?]` ascending; null where unread. */
+  dailyColl: DayObs[] | null;
   /** A liquidated Trove's surplus at the head: the crediting transaction and
    *  its claim. Null where the liquidation credited none or the read failed. */
   surplus: { creditTx: string; claimed: CollSurplusClaim | null } | null;

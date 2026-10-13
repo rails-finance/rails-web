@@ -213,6 +213,91 @@ words:
     at least once
   operators_where: |-
     recorded on this position
+  # The event card's balance sheet (components/protocol/morpho/morpho-sheet.ts):
+  # its row names and the words a figure stands in for.
+  sheet_supplied: |-
+    Supplied
+  sheet_seized: |-
+    Collateral seized
+  sheet_cleared: |-
+    Debt cleared
+  sheet_ltv: |-
+    LTV (liquidation at {lltv})
+  sheet_fall: |-
+    Collateral can fall
+  sheet_borrowable: |-
+    Still borrowable
+  sheet_rate: |-
+    Borrow rate
+  sheet_lltv: |-
+    LLTV
+  sheet_oracle: |-
+    Oracle price
+  sheet_no_debt: |-
+    No debt
+  sheet_past_line: |-
+    Past the LLTV
+  sheet_unread: |-
+    Not read on this page
+  sheet_no_read: |-
+    Not read at this block
+  sheet_not_loaded: |-
+    Not loaded
+  # The sheet's read-more, one per row: what the figure is and where it is read.
+  tip_coll_event: |-
+    The {symbol} this event added to or took from the collateral, as Morpho Blue's log states it.
+  tip_coll_seized: |-
+    The {symbol} the liquidator seized from the collateral, the Liquidate log's seizedAssets.
+  tip_coll_before: |-
+    The {symbol} collateral just before this event; collateral earns no interest, so it is also the collateral at the last event.
+  tip_coll_total: |-
+    The {symbol} collateral after this event, replayed from the position's collateral logs.
+  tip_debt_last: |-
+    The {symbol} owed once the position's previous event had run: its borrow shares at the market's totals there.
+  tip_debt_interest: |-
+    The interest the debt accrued between the previous event and this one: the debt before this event less the debt after the previous one.
+  tip_debt_before: |-
+    The {symbol} owed just before this event: the borrow shares at the market's totals there, interest included.
+  tip_debt_event: |-
+    The debt this event added or cleared: the debt after less the debt before, both at the market's totals.
+  tip_debt_cleared: |-
+    The debt this liquidation cleared, any bad debt the market wrote off included.
+  tip_debt_total: |-
+    The {symbol} owed after this event: the borrow shares at the market's totals at this block, interest included.
+  tip_borrowed_event: |-
+    The {symbol} this event borrowed or repaid, as Morpho Blue's log states it.
+  tip_borrowed_before: |-
+    The {symbol} principal borrowed just before this event: the principal after it less the amount it moved.
+  tip_borrowed_total: |-
+    The {symbol} principal borrowed after this event, replayed from the position's Borrow, Repay and Liquidate logs; the interest is not in it.
+  tip_supply_last: |-
+    The {symbol} supply once the position's previous event had run: its supply shares at the market's totals there.
+  tip_supply_interest: |-
+    What the supply earned between the previous event and this one, less any bad debt the market spread over its lenders.
+  tip_supply_before: |-
+    The {symbol} supply just before this event: its supply shares at the market's totals there, interest included.
+  tip_supply_event: |-
+    The supply this event added or took out: the supply after less the supply before, both at the market's totals.
+  tip_supply_total: |-
+    The {symbol} supply after this event: its supply shares at the market's totals at this block, interest included.
+  tip_supplied_event: |-
+    The {symbol} this event supplied or withdrew, as Morpho Blue's log states it.
+  tip_supplied_before: |-
+    The {symbol} principal supplied just before this event: the principal after it less the amount it moved.
+  tip_supplied_total: |-
+    The {symbol} principal supplied after this event, replayed from the position's Supply and Withdraw logs; the interest is not in it.
+  tip_ltv: |-
+    Loan-to-value: the debt over the collateral's value at the market's oracle, after this event. The market liquidates at its LLTV.
+  tip_fall: |-
+    How far the oracle's {symbol} price can fall, the debt held, before the LTV reaches the LLTV: one less one over the health factor.
+  tip_borrowable: |-
+    What the position can still borrow at the oracle's price: the collateral's value times the LLTV, less the debt.
+  tip_rate: |-
+    The market's borrow rate at the end of this event's block, from its interest rate model; it moves with the share of the market's supply lent out.
+  tip_lltv: |-
+    The market's liquidation loan-to-value, fixed when the market was created: the most the position can borrow, and the line past which it can be liquidated.
+  tip_oracle: |-
+    The market oracle's {symbol} price in the loan token going into this event (on a liquidation, the price it ran at): the price the Risk and Limits figures are valued at.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
