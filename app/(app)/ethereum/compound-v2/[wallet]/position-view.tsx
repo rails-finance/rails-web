@@ -21,7 +21,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundV2Event } from "@/lib/shared/types/event-shape";
 import { fetchCompoundV2Positions } from "@/lib/api/fetch-compound-v2-positions";
@@ -59,7 +58,8 @@ import {
   CompoundV2PositionExplanation,
   CompoundV2ClosedPositionExplanation,
 } from "@/components/protocol/compound-v2/compound-v2-position-explanation";
-import { CompoundV2BorrowRoom, compoundV2RiskColumn } from "@/components/protocol/compound-v2/compound-v2-risk-slot";
+import { compoundV2Exports } from "@/components/protocol/compound-v2/compound-v2-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { compoundV2LifetimeWithOpening, computeCompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -75,13 +75,6 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { externalActor, summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { liquidationStories } from "@/lib/shared/ctoken-liquidation-story";
 import { balancePeaks, withBalancePeaks } from "@/lib/shared/ctoken-peaks";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the Moonwell page.
-const CompoundV2ExportMenu = dynamic(
-  () => import("@/components/protocol/compound-v2/compound-v2-export-menu").then((m) => m.CompoundV2ExportMenu),
-  { ssr: false },
-);
 
 interface CompoundV2PositionViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -455,6 +448,26 @@ export default function CompoundV2PositionView({
     return out;
   }, [view]);
 
+  const exports = liveView
+    ? compoundV2Exports({
+        wallet,
+        view: liveView,
+        chain,
+        events: v2Events,
+        csvFilename: `compound-v2-${wallet.slice(0, 10)}-activity.csv`,
+        // A folder's members are not in the page's events, so a grouped page
+        // reads the whole history for the CSV as a windowed one does.
+        fetchAllEvents: historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory,
+        queued: {
+          protocol: "compound-v2",
+          params: { wallet },
+          totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+        },
+        history: markdownHistoryScope(historyWindow, v2Events, servedFolders),
+        scopeNote: exportScopeNote(historyWindow, v2Events, "this wallet's whole history", servedFolders),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flows.focus}>
       <CTokenLedgerContext.Provider value={ledgerData}>
@@ -465,26 +478,11 @@ export default function CompoundV2PositionView({
             owner={{ wallet }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
+            // The exports ride the card's ⋮; the event route, which draws no card,
+            // keeps them in the wallet row's Tools.
+            tools={onEventPage}
           >
-            {liveView && (
-              <CompoundV2ExportMenu
-                wallet={wallet}
-                view={liveView}
-                chain={chain}
-                events={v2Events}
-                csvFilename={`compound-v2-${wallet.slice(0, 10)}-activity.csv`}
-                // A folder's members are not in the page's events, so a grouped page
-                // reads the whole history for the CSV as a windowed one does.
-                fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-                queued={{
-                  protocol: "compound-v2",
-                  params: { wallet },
-                  totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-                }}
-                history={markdownHistoryScope(historyWindow, v2Events, servedFolders)}
-                scopeNote={exportScopeNote(historyWindow, v2Events, "this wallet's whole history", servedFolders)}
-              />
-            )}
+            {onEventPage && exports && <ExportMenu {...exports} />}
           </DetailTopRow>
 
           {loading ? (
@@ -494,18 +492,13 @@ export default function CompoundV2PositionView({
               {!onEventPage && liveView && cardView && (
                 <CompoundV2PositionCard
                   v={cardView}
-                  receipts
+                  surface="detail"
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // Closed by default, remembered per viewer and position (ui-jobs
-                  // 209). The risk headline, the room left to borrow and the
-                  // distance bar come from the live Comptroller read, inside the
-                  // card's receipts scope.
-                  positionSummary
-                  risk={
-                    liveView.status === "open" ? compoundV2RiskColumn(chain ?? null, cardView.borrows.length > 0) : null
-                  }
-                  debtDetail={chain ? <CompoundV2BorrowRoom chain={chain} /> : undefined}
+                  // The risk headline and the panel's line rows come from the live
+                  // Comptroller read, inside the card's receipts scope.
+                  chain={chain}
+                  exports={exports ?? undefined}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The borrow-capacity strip
                   // is absorbed into the risk slot above; the market rates live on
