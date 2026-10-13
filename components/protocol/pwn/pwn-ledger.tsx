@@ -45,6 +45,37 @@ export function usePwnLedgerSides(
   }, [focus, eventId]);
 }
 
+/** One side of a sheet row: the tokens held before the row's transaction, once
+ *  it had run, and once the loan's previous row had run (null where there is
+ *  no previous row). */
+export interface PwnSheetSide {
+  before: number;
+  after: number;
+  last: number | null;
+  symbol: string;
+}
+
+/** A row's two sides for the event sheet: the replay's figures with the
+ *  previous row's, which the carry layer starts from. Null where the panel has
+ *  no model for the row. */
+export function usePwnSheetSides(eventId: string): Record<FlowSide, PwnSheetSide> | null {
+  const focus = useFlowFocus();
+  return useMemo(() => {
+    if (!focus?.model) return null;
+    const i = focus.events.findIndex((e) => e.id === eventId);
+    const ev = i >= 0 ? focus.events[i] : null;
+    if (!ev?.sides) return null;
+    const prev = i > 0 ? focus.events[i - 1] : null;
+    const side = (s: FlowSide): PwnSheetSide => ({
+      before: Math.max(0, ev.sides![s].held - ev.sides![s].amount),
+      after: ev.sides![s].held,
+      last: prev?.sides ? prev.sides[s].held : null,
+      symbol: ev.sides![s].symbol,
+    });
+    return { collateral: side("collateral"), debt: side("debt") };
+  }, [focus, eventId]);
+}
+
 /** The panel's model is still on its way: a flow row's cells stand as
  *  placeholder rows. */
 export function usePwnLedgerPending(): boolean {

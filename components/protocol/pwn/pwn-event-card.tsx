@@ -167,6 +167,7 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings }: PwnEventC
     // The transaction-sender test (ui-jobs 304).
     actor: { sent: { txFrom: ctx.txFrom, owner: event.wallet } },
     cells: body.cells,
+    sheet: body.sheet,
     ledgers: flowRow
       ? {
           provider: (children) => (
