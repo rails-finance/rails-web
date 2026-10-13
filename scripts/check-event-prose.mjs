@@ -291,13 +291,14 @@ const FAMILIES = {
             (k) => ["aave3.swap", k],
           )
         : [],
-    wordConsts: { V3_WORDS: "words" },
+    wordConsts: { V3_WORDS: "words", AAVE_V3_PAGE_WORDS: "page_words" },
     modalWords: null,
     readers: [
       "lib/aave-v3/event-prose.ts",
       "lib/aave-v3/event-templates.ts",
       "components/protocol/aave-v3/aave-v3-event-explainer.tsx",
       "components/protocol/aave-v3/aave-v3-position-explanation.tsx",
+      "lib/aave-v3/explorer.ts",
     ],
     nodes: {
       section: "position_words",

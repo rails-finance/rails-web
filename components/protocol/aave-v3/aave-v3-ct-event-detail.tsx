@@ -70,7 +70,8 @@ import {
   buildLiquidationForensics,
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
-import { aaveV3CtLabel, signedAmount } from "./aave-v3-ct-event-header";
+import { signedAmount } from "./aave-v3-ct-event-header";
+import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
 import { aaveFamilySheet } from "./aave-family-sheet";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
