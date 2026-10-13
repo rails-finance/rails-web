@@ -261,7 +261,7 @@ export type EventCardProps = EventCardFrame & { slots: EventCardSlots };
 
 /** The slots, as the shell draws them. `breakdown`: the sheet stands with its
  *  carry-forward layer and parameters and no switch (an event's page); else
- *  each opened sheet carries its own switch. */
+ *  each opened sheet carries a switch. */
 function drawnOf(slots: EventCardSlots, pageMode: boolean, breakdown: boolean): EventCardDrawn {
   const { event, actor, explainer } = slots;
   // A stand-in card with nothing under its row (a run with no sums) opens
