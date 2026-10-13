@@ -49,9 +49,9 @@ import { MorphoBaseVaultTimeline } from "@/components/protocol/morpho-base/vault
 import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { VaultPositionCard } from "@/components/vaults/vault-position-card";
-import { VaultContextStrip, VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
-import { RiskFooterStrip } from "@/components/shared/risk-footer-strip";
+import { VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { holderListingSegment } from "@/lib/shared/protocols";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { assetText } from "@/lib/shared/vault-amount-text";
@@ -285,17 +285,12 @@ async function VaultPositionCardSection({
       <VaultPositionCard
         row={onPage}
         receipts
-        holderIdentity={{ ensName: lookup.ensName }}
         // The same "?" the Ethereum position card carries, on this chain's own
         // family: what each figure on the card is a reading of, and what the
         // section refuses to state. It is where the prose that left the
         // listing's face stays reachable from inside a position view.
         learnMore={aaveVaultPositionContent("morpho", data.vault.asset.symbol, data.vault.symbol)}
-        rowExtra={
-          <RiskFooterStrip>
-            <VaultContextStrip {...strip} />
-          </RiskFooterStrip>
-        }
+        context={strip}
         explanation={<PositionCardExplanation row={onPage} maxWithdrawRead={data.holder.maxWithdraw != null} />}
       />
     </div>
@@ -340,11 +335,15 @@ function vaultContextStrip(data: MorphoBaseVaultResponse) {
  *  the daily census at the census block. */
 function PositionCardExplanation({ row, maxWithdrawRead }: { row: VaultPositionRow; maxWithdrawRead: boolean }) {
   const n = (v: number) => v.toLocaleString("en-US");
+  const open = row.live ? row.live.live : row.census.live;
   const items = [
     `Shares, claim and share of the vault are calls answered at block ${n(row.live?.blockNumber ?? 0)} — the same block every figure under this card is read at.`,
-    maxWithdrawRead
-      ? `"Redeemable now" on the row above is the vault's own maxWithdraw() for this address at that same block, in ${row.asset?.symbol ?? "the vault's asset"} — what the vault says could be taken out then, bounded by the liquidity of the markets in its withdraw queue at that block. It is not the claim beside it and it is not a promise about the next block.`
-      : `"Redeemable now" reads "Not loaded": the vault's own maxWithdraw() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
+    // A closed card draws no panel, so it has no Redeemable now row.
+    !open
+      ? null
+      : maxWithdrawRead
+        ? `"Redeemable now" in the panel above is the vault's maxWithdraw() for this address at that same block, in ${row.asset?.symbol ?? "the vault's asset"} — what the vault says could be taken out then, bounded by the liquidity of the markets in its withdraw queue at that block. It is not the claim beside it and it is not a promise about the next block.`
+        : `"Redeemable now" reads "Not loaded": the vault's maxWithdraw() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
     `Transfers, first seen and last activity are counted by the census: one whole-Transfer sweep of this vault from its own creation block, proven complete by Σ balanceOf equalling totalSupply() wei-exact, swept to block ${n(row.census.block)}.`,
     `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"}.`,
     row.value.usdE8 != null
@@ -353,7 +352,7 @@ function PositionCardExplanation({ row, maxWithdrawRead }: { row: VaultPositionR
         ? "Value · USD is stated as not priced: the daily census has not yet run its price pass over this vault, so no oracle was asked."
         : `Value · USD is stated as not priced: the chain's Aave V3 oracle declined ${row.value.assetSymbol ?? "this vault's asset"} at block ${n(row.value.pricedBlock)} — reverted or answered zero — and the card carries an empty slot rather than a figure from some other feed.`,
     "Nothing here is annualised; the blocks are stated rather than reconciled into one.",
-  ];
+  ].filter((text): text is string => text != null);
   return (
     <div className="space-y-2 text-sm text-rb-500">
       <p className="leading-relaxed">This card draws two lanes, and each figure names the block its own lane read.</p>
@@ -451,7 +450,17 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
             fallbackHref={baseVaultsListingHref()}
             assets={shareAssets}
             priceReason={ORACLE_USD_REASON["morpho-base"]}
-            owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
+            owner={{
+              wallet: lookup.address,
+              ensName: lookup.ensName,
+              filterProtocol: null,
+              // The bookmark the card's wallet pill carried: the position page's
+              // card leaves the wallet to this row.
+              bookmarkProtocol: "morpho-base",
+              bookmarkListing: holderListingSegment("morpho-base"),
+            }}
+            // The card's ⋮ carries the menu; the event route draws no card.
+            tools={onEventPage}
           />
           {!onEventPage && (
             <>

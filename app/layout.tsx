@@ -192,14 +192,10 @@ export default function RootLayout({
         <Providers>
           <WalletContextProvider>
             <NavigationProgress />
-            {/* The beta notice sits ABOVE the header: on home the header is
-                absolute at the top and would cover a strip placed under it.
-                The relative wrapper makes that absolute header anchor below the
-                strip. Draws nothing on a route that carries the strip below. */}
+            {/* The beta notice sits above the header. It draws only on the app
+                routes (/ethereum, /base, /sepolia) and nothing on marketing. */}
             <BetaStrip />
-            <div className="relative">
-              <HeaderBar />
-            </div>
+            <HeaderBar />
             {/* Renders only on a route inside an unlaunched explorer, or on an
                 unlaunched chain's coverage page — nothing at all elsewhere.
                 Mounted here so no such route can be missed. */}

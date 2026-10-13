@@ -1,38 +1,29 @@
 "use client";
 
-// The vault position card's context strip — WORDS ONLY.
-// ----------------------------------------------------------------------------
-// What the card cannot say and the sections under it should not have to: what
-// is redeemable at this block, which function a holder leaves through, and —
-// on a stake token — the cooldown that decides the first of those. It rides
-// the card's heading-button row as `rowExtra`, the grammar the Liquity V2
-// trove card set (components/shared/risk-footer-strip.tsx), and it returns a
-// FRAGMENT of `RiskFigure` clusters so the caller's `RiskFooterStrip` lays
-// them out as its own children rather than nesting a second strip inside one.
+// What is redeemable at this block, which function a holder leaves through,
+// and on a stake token the cooldown that decides the first of those — WORDS
+// ONLY, with no bars, meters or colour (Miles, 2026-09-09).
 //
-// NO BARS, NO METERS, NO COLOUR (Miles, 2026-09-09). `RiskMeter` is a `w-64`
-// runway for a figure with two ends and a marker between them; a redeemable
-// amount has neither, and drawing one would invent a scale the chain never
-// stated. `RiskFigure`'s `caution` tone is refused for the same reason a
-// slashable stake is not tinted anywhere else in this section: the state is
-// the contract's, and the colour would be this page's opinion of it.
+// On the position card these are rows of the panel's right column
+// (`vaultContextRows`, rails-ops TO-DO-position-card 322). Where the census has
+// no row for the address there is no card, and the same figures stand alone
+// under the sentence that says why (`VaultContextStripStandalone`).
 //
-// CHAIN-AGNOSTIC BY SHAPE, NOT BY BRANCH. Ethereum's redeemable figure is
-// `maxRedeem(holder)` in SHARE units and Base's is `maxWithdraw(holder)` in
-// ASSET units — two different readings of two different contracts — so the
-// caller hands in already-formatted words plus the receipt that traces them,
-// and this file states them. The `figure` name travels with the props for the
-// same reason: a check that reads "what is redeemable" off either chain reads
-// the name the page's own loader answers under.
+// CHAIN-AGNOSTIC BY SHAPE. Ethereum's redeemable figure is `maxRedeem(holder)`
+// in share units and Base's is `maxWithdraw(holder)` in asset units, so the
+// caller hands in formatted words plus the receipt that traces them. The
+// `figure` name travels with the props: a check that reads "what is
+// redeemable" reads the name the page's loader answers under.
 //
-// AN UNREAD CALL IS SAID IN WORDS. `{ unread: true }` prints "Not loaded" —
-// never a dash, never a zero. A zero that WAS read is a reading and prints as
-// one, which on a stake token outside its window is the whole point.
+// AN UNREAD CALL IS SAID IN WORDS. `{ unread: true }` prints "Not loaded",
+// never a dash or a zero. A zero that was read is a reading and prints as one,
+// which on a stake token outside its window is the point.
 
 import { Fragment } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import type { PositionPanelRow } from "@/components/shared/position-card";
 
 /** The redeemable reading, or the statement that it was not read. `figure` is
  *  the `data-figure` name the cluster wears, and it names the CALL: Ethereum's
@@ -51,7 +42,7 @@ export interface VaultContextStripProps {
   cooldown?: { text: string; prov: Provenance };
 }
 
-export function VaultContextStrip({ redeemable, exit, cooldown }: VaultContextStripProps) {
+function VaultContextStrip({ redeemable, exit, cooldown }: VaultContextStripProps) {
   return (
     <Fragment>
       <RiskFigure label="Redeemable now">
@@ -98,4 +89,51 @@ export function VaultContextStripStandalone({ absence, ...strip }: VaultContextS
       </div>
     </div>
   );
+}
+
+/** The same figures as rows of the position card's panel. */
+export function vaultContextRows({ redeemable, exit, cooldown }: VaultContextStripProps): PositionPanelRow[] {
+  const shares = redeemable.figure === "holder-max-redeem";
+  return [
+    {
+      id: "redeemable",
+      label: "Redeemable now",
+      value: (
+        <span data-figure={redeemable.figure}>
+          {"unread" in redeemable ? (
+            <NotLoaded inline className="" />
+          ) : (
+            <Prov info={redeemable.prov}>{redeemable.text}</Prov>
+          )}
+        </span>
+      ),
+      tip: shares
+        ? "The vault's maxRedeem() for this address at the page's block, in shares: what the contract says can be redeemed then."
+        : "The vault's maxWithdraw() for this address at the page's block, in the asset: what the markets in its withdraw queue could pay then.",
+    },
+    {
+      id: "exit",
+      label: "Exit",
+      value: (
+        <span data-figure="holder-exit">
+          <code>{exit}</code>
+        </span>
+      ),
+      tip: "The vault's functions a holder leaves through, as the contract names them.",
+    },
+    ...(cooldown
+      ? [
+          {
+            id: "cooldown",
+            label: "Cooldown",
+            value: (
+              <span data-figure="holder-cooldown">
+                <Prov info={cooldown.prov}>{cooldown.text}</Prov>
+              </span>
+            ),
+            tip: "The stake token's cooldown for this address, read from the contract at the page's block: redeem() answers only inside its window.",
+          },
+        ]
+      : []),
+  ];
 }

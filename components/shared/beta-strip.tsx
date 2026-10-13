@@ -1,13 +1,13 @@
 "use client";
 
-// The strip every launched page carries while Rails is in beta.
+// The strip the app pages carry while Rails is in beta.
 // ----------------------------------------------------------------------------
-// One line above the header, site-wide: the product changes often and the
+// One line above the header on the explorer routes only (none on marketing): the product changes often and the
 // reader is invited to say what they see. "Tell us what you think." opens the same
 // FeedbackModal the footers' FeedbackCluster does (→ /api/feedback).
 //
 // MOUNTED ONCE, in the root layout, above the header (WorkInProgressStrip sits
-// below it). An unlaunched route already carries that strip, so this one
+// below it), and gated by path so that the header's mobile bar stays under it. An unlaunched route already carries that strip, so this one
 // renders nothing there — a reader sees one strip at a time, and the louder
 // one wins.
 //
@@ -27,7 +27,7 @@ import { unlaunchedSubject } from "@/components/shared/work-in-progress-strip";
 const STORAGE_KEY = "rails-beta-strip-dismissed";
 
 /** The explorers live under app/(app) at /ethereum, /base and /sepolia, which
- *  is where BrandRail is mounted. Everything else is marketing. */
+ *  is where BrandRail is mounted. Everything else is marketing, and gets no strip. */
 function isExplorerRoute(pathname: string | null): boolean {
   return /^\/(ethereum|base|sepolia)(\/|$)/.test(pathname ?? "");
 }
@@ -57,14 +57,14 @@ export function BetaStrip() {
     }
   };
 
-  if (dismissed !== false || unlaunchedSubject(pathname)) return null;
+  if (dismissed !== false || !isExplorerRoute(pathname) || unlaunchedSubject(pathname)) return null;
 
   return (
     // Spans the viewport, so on an explorer it reserves the rail's 56px the
     // way WorkInProgressStrip does. bg-sunken is the dark recessed tone
     // (--surface-sunken); no rule under it, and no caution colour: this is
     // information.
-    <div data-anatomy="H14" className={`bg-sunken${isExplorerRoute(pathname) ? " md:pl-14" : ""}`}>
+    <div data-anatomy="H14" className="bg-sunken md:pl-14">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2 text-sm leading-5 text-foreground md:px-6">
         <p className="min-w-0 flex-1 leading-5">
           <span className="font-semibold">Rails is in beta.</span>{" "}
@@ -86,7 +86,7 @@ export function BetaStrip() {
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
-      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      {feedbackOpen && <FeedbackModal initialType="general" onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }
