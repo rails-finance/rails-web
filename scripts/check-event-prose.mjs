@@ -332,6 +332,7 @@ const FAMILIES = {
       "lib/makerdao/event-templates.ts",
       "components/protocol/makerdao/makerdao-event-explainer.tsx",
       "components/protocol/makerdao/makerdao-position-explanation.tsx",
+      "components/protocol/makerdao/makerdao-sheet.tsx",
     ],
     nodes: {
       section: "position_words",
@@ -453,6 +454,7 @@ const FAMILIES = {
       "lib/frankencoin/event-templates.ts",
       "components/protocol/frankencoin/frankencoin-event-explainer.tsx",
       "components/protocol/frankencoin/frankencoin-position-explanation.tsx",
+      "components/protocol/frankencoin/frankencoin-sheet.tsx",
     ],
     nodes: {
       section: "position_words",

@@ -10,7 +10,7 @@ import {
   type LiquityForkDeployment,
 } from "@/components/protocol/liquity-fork/liquity-fork-event-card";
 import * as provs from "@/lib/basedollar/event-provenance";
-import { DEBT_SYMBOL, MIN_DEBT } from "@/lib/basedollar/asset-catalog";
+import { DEBT_SYMBOL, MIN_DEBT, resolveBranch } from "@/lib/basedollar/asset-catalog";
 
 // The one live-verified Basedollar link (docs.basedollar.money doesn't answer).
 export const BASEDOLLAR_FORK = {
@@ -18,6 +18,19 @@ export const BASEDOLLAR_FORK = {
   stablecoin: DEBT_SYMBOL,
   minDebt: MIN_DEBT,
   docsLink: { label: "Basedollar", url: "https://basedollar.money" },
+};
+
+// The ratios are BorrowerOperations getters on this fork.
+const branchOf: LiquityForkDeployment["branch"] = (symbol) => {
+  const b = resolveBranch(symbol);
+  return (
+    b && {
+      collateralAddr: b.collateralAddr,
+      mcr: b.mcr,
+      ccr: b.ccr,
+      constants: { name: `Basedollar ${b.symbol} BorrowerOperations`, address: b.borrowerOperations },
+    }
+  );
 };
 
 const DEPLOYMENT: LiquityForkDeployment = {
@@ -29,6 +42,7 @@ const DEPLOYMENT: LiquityForkDeployment = {
   // No gas: on Base the index's gas is the L2 execution fee alone, which
   // leaves out the L1 data fee, and no whole figure is read yet.
   gas: false,
+  branch: branchOf,
 };
 
 export interface BasedollarEventCardProps {

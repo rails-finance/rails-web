@@ -79,3 +79,17 @@ export function liveInterestProv(hub: "v1" | "v2", position?: string): Provenanc
     via: `${LANE_VIA} · Position.annualInterestPPM(): annual interest, parts per million`,
   };
 }
+
+/** A fixed term of the position (expiry, reserve requirement, challenge
+ *  period) or the challenge in the auction now: one getter on the position at
+ *  the latest block. */
+export function liveTermProv(method: string, summary: string, position?: string): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    verify: recompute(method),
+    summary,
+    contract: positionContract(position),
+    via: `${LANE_VIA} · Position.${method}`,
+  };
+}

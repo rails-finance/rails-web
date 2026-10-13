@@ -10,7 +10,7 @@ import {
   type LiquityForkDeployment,
 } from "@/components/protocol/liquity-fork/liquity-fork-event-card";
 import * as provs from "@/lib/ebisu/event-provenance";
-import { DEBT_SYMBOL, EBISU_DOCS, MIN_DEBT } from "@/lib/ebisu/asset-catalog";
+import { DEBT_SYMBOL, EBISU_DOCS, MIN_DEBT, resolveBranch } from "@/lib/ebisu/asset-catalog";
 
 // The general Ebisu link (docs.ebisu.money doesn't answer) plus the
 // question-level docs links per card topic (EBISU_DOCS — read and verified
@@ -23,6 +23,20 @@ export const EBISU_FORK = {
   docsByTopic: EBISU_DOCS,
 };
 
+// The ratios live on the branch's EbisuBranchManager.
+const branchOf: LiquityForkDeployment["branch"] = (symbol) => {
+  const b = resolveBranch(symbol);
+  return (
+    b && {
+      collateralAddr: b.collateralAddr,
+      mcr: b.mcr,
+      mcrBefore: b.mcrBefore,
+      ccr: b.ccr,
+      constants: { name: `Ebisu ${b.symbol} BranchManager`, address: b.branchManager },
+    }
+  );
+};
+
 const DEPLOYMENT: LiquityForkDeployment = {
   family: "ebisu",
   words: EBISU_FORK,
@@ -30,6 +44,7 @@ const DEPLOYMENT: LiquityForkDeployment = {
   minDebt: MIN_DEBT,
   provs,
   gas: true,
+  branch: branchOf,
 };
 
 export interface EbisuEventCardProps {
