@@ -1,8 +1,10 @@
 "use client";
 
-// PWN loan card — the chain-state analog of the Spark / Morpho / Maker position
-// cards, through the SAME shared grammar (OpenPositionStats + StatValue) so it
-// lines up with the other explorers.
+// PWN loan card, as a slot builder for the shared position card (rails-ops
+// TO-DO-position-card 322): `pwnCardSlots` turns the loan's view into one
+// `PositionCardSlots` object, and `PositionCard`
+// (components/shared/position-card.tsx) draws it on the loan page and in the
+// listing row.
 //
 // A PWN "position" is a DISCRETE fixed-term loan, not a pooled account: one
 // loan_id, two fixed parties (lender advances credit, borrower locks collateral),
@@ -11,16 +13,23 @@
 // captured on-chain. There is no health factor, no USD, no liquidation price — a
 // fixed-term loan has none; they'd be interpreted figures, absent from this baseline.
 
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
+import type { ReactNode } from "react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
+import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
+import { StatValue, StatFootnote } from "@/components/shared/stat-value";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import {
   positionCollateralProv,
@@ -51,6 +60,7 @@ import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { pwnPositionContent } from "@/lib/pwn/position-content";
 import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
 import type { PwnBundleAsset } from "@/lib/api/fetch-pwn-bundle";
+import { PwnMenuRows } from "./pwn-menu-rows";
 
 export interface PwnPositionView {
   loanId: string;
@@ -116,31 +126,91 @@ function FungibleAmount({ asset, value }: { asset: PwnAsset; value: number }) {
 /** An asset value: an NFT reads "SYMBOL #id", a fungible token reads amount+symbol.
  *  An NFT contract with no on-chain name (ERC-1155 has no symbol()/name()) has
  *  only its address for an identity — render that as a mono identifier, not
- *  styled like a token symbol (the category footnote below the stat says what
- *  kind of thing it is). Wrapped in its provenance when one is supplied. */
-function AssetValue({ asset, prov }: { asset: PwnAsset | null; prov?: Provenance }) {
-  if (!asset) return <StatDash />;
+ *  styled like a token symbol (the panel's Collateral kind row says what kind
+ *  of thing it is). Inline: the headline or the panel row around it sets the
+ *  type. Wrapped in its provenance when one is supplied. */
+function AssetValue({ asset, prov }: { asset: PwnAsset; prov?: Provenance }) {
   const isNft = asset.category === "ERC721" || asset.category === "ERC1155";
   const inner =
     isNft && asset.tokenId != null ? (
       asset.named ? (
-        <StatValue title={`${asset.symbol} #${asset.tokenId}`}>
+        <RevealTip tip={`${asset.symbol} #${asset.tokenId}`}>
           <span className="tabular-nums">
             {asset.symbol} <span className="text-rb-500">#{shortTokenId(asset.tokenId)}</span>
           </span>
-        </StatValue>
+        </RevealTip>
       ) : (
-        <StatValue title={`${asset.address} #${asset.tokenId}`} color="text-foreground/60">
-          <span className="font-mono text-[0.85em]">{asset.symbol}</span>{" "}
-          <span className="text-rb-500">#{shortTokenId(asset.tokenId)}</span>
-        </StatValue>
+        <RevealTip tip={`${asset.address} #${asset.tokenId}`}>
+          <span className="text-foreground/60">
+            <span className="font-mono text-[0.85em]">{asset.symbol}</span>{" "}
+            <span className="text-rb-500">#{shortTokenId(asset.tokenId)}</span>
+          </span>
+        </RevealTip>
       )
     ) : (
-      <StatValue>
-        <FungibleAmount asset={asset} value={asset.amount} />
-      </StatValue>
+      <FungibleAmount asset={asset} value={asset.amount} />
     );
   return prov ? <Prov info={prov}>{inner}</Prov> : inner;
+}
+
+/** The bundle's contents grouped by contract, one panel row each: an ERC20 reads
+ *  "1,000 USDT", a single NFT "#3599", several of one contract "4×". The values
+ *  carry the Token Bundler read's receipt. */
+function bundleRows(assets: PwnBundleAsset[], bundleId: string, atBlock?: number | null): PositionPanelRow[] {
+  const byContract = new Map<string, PwnBundleAsset[]>();
+  for (const a of assets) {
+    const list = byContract.get(a.address) ?? [];
+    list.push(a);
+    byContract.set(a.address, list);
+  }
+  const prov = positionBundleContentsProv(bundleId, atBlock);
+  const tip =
+    "One of the assets wrapped inside the bundled collateral, read from the Token Bundler's tokensInBundle view at the block the loan opened.";
+  const rows: PositionPanelRow[] = [];
+  for (const list of byContract.values()) {
+    const first = list[0];
+    const make = (key: string, value: string): PositionPanelRow => ({
+      id: `bundle-${first.address}-${key}`,
+      label: `${first.symbol} in the bundle`,
+      tip,
+      value: (
+        <Prov info={prov}>
+          <RevealTip tip={first.address}>{value}</RevealTip>
+        </Prov>
+      ),
+    });
+    if (first.category === "ERC20") {
+      list.forEach((a, i) => rows.push(make(String(i), a.amount.toLocaleString("en-US"))));
+    } else if (list.length === 1 && first.amount <= 1) {
+      rows.push(make("0", first.tokenId != null ? `#${shortTokenId(first.tokenId)}` : "1"));
+    } else {
+      rows.push(make("0", `${list.reduce((n, a) => n + Math.max(1, a.amount), 0)}×`));
+    }
+  }
+  return rows;
+}
+
+/** The closed card's collateral note, under its figure: what the bundle
+ *  wrapped, once the chain overlay supplied it; else the ERC category for an
+ *  unnamed NFT contract (whose value line is a bare address identifier). */
+function collateralNote(v: PwnPositionView): ReactNode {
+  const c = v.collateral;
+  if (!c) return undefined;
+  if (v.bundleContents && v.bundleContents.length > 0 && c.tokenId != null) {
+    const detail = v.bundleContents
+      .map((a) => `${a.symbol}${a.tokenId != null ? ` #${a.tokenId}` : ""} (${a.address})`)
+      .join("\n");
+    return (
+      <RevealTip tip={detail}>
+        <Prov info={positionBundleContentsProv(c.tokenId, v.createdBlock)}>
+          contains {bundleSummary(v.bundleContents)}
+        </Prov>
+      </RevealTip>
+    );
+  }
+  const isNft = c.category === "ERC721" || c.category === "ERC1155";
+  if (isNft && !c.named) return <>{c.category === "ERC721" ? "ERC-721" : "ERC-1155"} · unnamed contract</>;
+  return undefined;
 }
 
 /** "PIRATE #3599" / "4× PIRATE" / "1,000 USDT" — bundle contents grouped by
@@ -167,45 +237,18 @@ function bundleSummary(assets: PwnBundleAsset[]): string {
   return parts.join(", ");
 }
 
-/** The collateral stat's footnote: the resolved bundle contents when the chain
- *  overlay supplied them; else the ERC category for an unnamed NFT contract
- *  (whose value line is a bare address identifier). */
-function collateralFootnote(v: PwnPositionView) {
-  const c = v.collateral;
-  if (!c) return undefined;
-  if (v.bundleContents && v.bundleContents.length > 0 && c.tokenId != null) {
-    const detail = v.bundleContents
-      .map((a) => `${a.symbol}${a.tokenId != null ? ` #${a.tokenId}` : ""} (${a.address})`)
-      .join("\n");
-    return (
-      <StatFootnote title={detail}>
-        <Prov info={positionBundleContentsProv(c.tokenId, v.createdBlock)}>
-          contains {bundleSummary(v.bundleContents)}
-        </Prov>
-      </StatFootnote>
-    );
-  }
-  const isNft = c.category === "ERC721" || c.category === "ERC1155";
-  if (isNft && !c.named) {
-    return <StatFootnote>{c.category === "ERC721" ? "ERC-721" : "ERC-1155"} · unnamed contract</StatFootnote>;
-  }
-  return undefined;
-}
-
-/** The activity cluster: transactions where the count is known, with the events
- *  beside them in the tip, since one transaction can carry two of the loan's
- *  events. */
-function LoanActivityMeta({ v }: { v: PwnPositionView }) {
+/** The activity counters: transactions where the count is known, with the
+ *  events beside them in the tip, since one transaction can carry two of the
+ *  loan's events. */
+function loanCounters(v: PwnPositionView): PositionCardMetaProps {
   const txs = v.txCount ?? null;
-  return (
-    <PositionCardMeta
-      lastActivityAt={v.lastActivityAt}
-      eventCount={txs ?? v.eventCount}
-      eventCountNoun={txs != null ? "transaction" : "event"}
-      eventTotal={txs != null ? v.eventCount : undefined}
-      countRule={txs != null ? txCountRule(v, txs) : undefined}
-    />
-  );
+  return {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: txs ?? v.eventCount,
+    eventCountNoun: txs != null ? "transaction" : "event",
+    eventTotal: txs != null ? v.eventCount : undefined,
+    countRule: txs != null ? txCountRule(v, txs) : undefined,
+  };
 }
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
@@ -245,17 +288,16 @@ const dueDateTitle = (unix: number): string => {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 };
 
-/** The cost tile's footnote: the interest, and how it was reached. A loan past
- *  its deadline and unclaimed says first that the sum can no longer be repaid. */
-function costFootnote(v: PwnPositionView, cost: PwnLoanCost, unclaimed = false): React.ReactNode {
+/** The closed card's footnote under what was paid or owed: the interest, and
+ *  how it was reached (a closed card has no panel to hold them as rows). */
+function costFootnote(v: PwnPositionView, cost: PwnLoanCost): ReactNode {
   const sym = v.credit?.symbol ?? "";
-  const lapsed = unclaimed ? <>no longer repayable · </> : null;
   if (cost.shape === "fixed") {
-    if (!(cost.interest > 0)) return <StatFootnote>{lapsed}no interest</StatFootnote>;
+    if (!(cost.interest > 0)) return <StatFootnote>no interest</StatFootnote>;
     const ext = v.extensionCount ?? 0;
     return (
       <StatFootnote>
-        {lapsed}principal + {formatNumber(cost.interest)} {sym} fixed interest
+        principal + {formatNumber(cost.interest)} {sym} fixed interest
         {cost.rate ? <> · {interestRateText(cost.rate)}</> : null}
         {ext > 0 ? <> · unchanged by the {ext === 1 ? "extension" : `${ext} extensions`}</> : null}
       </StatFootnote>
@@ -264,15 +306,15 @@ function costFootnote(v: PwnPositionView, cost: PwnLoanCost, unclaimed = false):
   const a = cost.accrual!;
   return (
     <StatFootnote>
-      {lapsed}principal + {formatNumber(cost.interest)} {sym} interest · accrues {aprText(a.apr)}
+      principal + {formatNumber(cost.interest)} {sym} interest · accrues {aprText(a.apr)}
       {cost.basis === "paid" ? <> · to the repayment</> : <> · counted to the deadline</>}
     </StatFootnote>
   );
 }
 
-/** The cost as a tile value, traced to its terms (fixed) or to the contract's
+/** The cost as a figure, traced to its terms (fixed) or to the contract's
  *  accrual sum (accruing). */
-function CostValue({ v, cost }: { v: PwnPositionView; cost: PwnLoanCost }) {
+function CostFigure({ v, cost }: { v: PwnPositionView; cost: PwnLoanCost }) {
   const c = v.credit!;
   const prov =
     cost.shape === "fixed"
@@ -281,41 +323,91 @@ function CostValue({ v, cost }: { v: PwnPositionView; cost: PwnLoanCost }) {
         : positionInterestProv(c.symbol, v.version)
       : positionAccruedProv(c.symbol, v.version, cost.accrual!, cost.basis === "paid" ? "paid" : "at-deadline");
   return (
-    <StatValue>
-      <Prov info={prov}>
-        <FungibleAmount asset={c} value={cost.total} />
-      </Prov>
-    </StatValue>
+    <Prov info={prov}>
+      <FungibleAmount asset={c} value={cost.total} />
+    </Prov>
   );
 }
 
-export function PwnPositionCard({
-  v,
-  receipts = false,
-  explanation,
-  viewHref,
-  viewer,
-}: {
+/** The interest and its rate as panel rows, where the card is open. */
+function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
+  const sym = v.credit?.symbol ?? "";
+  if (cost.shape === "fixed") {
+    const rows: PositionPanelRow[] = [
+      {
+        id: "interest",
+        label: "Fixed interest",
+        tip: "The interest struck in the loan's terms, the repay total less the principal, read from the PWN contract at creation. Extensions do not change it.",
+        value: cost.interest > 0 ? `${formatNumber(cost.interest)} ${sym}` : "none",
+      },
+    ];
+    if (cost.rate)
+      rows.push({
+        id: "rate",
+        label: "Rate",
+        tip: "The fixed interest as a rate over the term the parties struck, worked out from the principal and the repay total.",
+        value: interestRateText(cost.rate),
+      });
+    return rows;
+  }
+  const a = cost.accrual!;
+  return [
+    {
+      id: "interest",
+      label: "Interest",
+      tip: "The principal times the loan's yearly rate for each whole minute, counted to the deadline while the loan is unpaid and to the repayment once it is paid. The contract refuses a repayment after the deadline, so the sum stops there.",
+      value: (
+        <>
+          {formatNumber(cost.interest)} {sym}
+          <span className="text-rb-500">
+            {cost.basis === "paid" ? " to the repayment" : " counted to the deadline"}
+          </span>
+        </>
+      ),
+    },
+    {
+      id: "rate",
+      label: "Accrues",
+      tip: "The yearly rate in the loan's terms, read from the PWN contract at creation.",
+      value: aprText(a.apr),
+    },
+  ];
+}
+
+export interface PwnPositionCardProps {
   v: PwnPositionView;
-  receipts?: boolean;
+  /** `detail` on the loan page (receipts, panel, (i)); `listing` in a row. */
+  surface?: "detail" | "listing";
   /** The wallet the page is read from (lowercase). The other party's pill
    *  links to the same loan read from that party's side. */
   viewer?: string;
   /** The card's Explanation section (the loan narrated as it stands now) —
    *  rendered by the shell on the detail surface. */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
+  explanation?: ReactNode;
+  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
-}) {
-  // The deadline is a struck term like the other three columns, so it renders
-  // in every mood. Past it, an open loan is defaulted and waits for the
-  // lender's claim (lib/pwn/economics.ts `pwnLoanState`).
+  /** The ⋮'s export shapes (`pwnExports`). */
+  exports?: PositionCardExports | null;
+}
+
+/** PWN's slots for the shared position card: the headlines, the panel, the tag,
+ *  the ⋮ and the counters, from the loan's view. */
+export function pwnCardSlots({
+  v,
+  surface = "listing",
+  viewer,
+  explanation,
+  viewHref,
+  exports,
+}: PwnPositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
+  // The deadline is a struck term like the other headlines, so it renders in
+  // every mood. Past it, an open loan is defaulted and waits for the lender's
+  // claim (lib/pwn/economics.ts `pwnLoanState`).
   const struckDueAt = loanDueAt(v);
   const dueAt = loanDeadlineAt(v);
   const extended = v.extendedDueAt != null && struckDueAt != null && v.extendedDueAt !== struckDueAt;
-  const state = pwnLoanState(v);
-  const unclaimed = state === "unclaimed";
+  const unclaimed = pwnLoanState(v) === "unclaimed";
   const cost = loanCost(v);
   const accruing = isAccruing(v);
   // The side the page reads from, and the other one, as a visible switch.
@@ -351,18 +443,18 @@ export function PwnPositionCard({
   const favWallet = v.borrower ?? v.lender;
 
   // The two parties, each named by its role (lender → borrower, the way the
-  // credit went). On the detail page (receipts) each party is a WalletPill
-  // whose address opens the same loan from that party's side, with a visible
-  // "Read as the lender" switch beside the side the page reads from; the
-  // bookmark star rides the borrower pill. On the listing the whole card is
-  // already a <Link>, so it keeps compact text (a nested anchor is invalid
-  // HTML) with the standalone star.
-  // The party the page is read from is on the wallet row above the card
-  // (ui-jobs 228), so the card names the other party.
+  // credit went). On the detail page each party is a WalletPill whose address
+  // opens the same loan from that party's side, with a visible "Read as the
+  // lender" switch beside the side the page reads from; the bookmark star rides
+  // the borrower pill. The party the page is read from is on the wallet row
+  // above the card (ui-jobs 228), so the card names the other party. On the
+  // listing the whole card is already a <Link>, so it keeps compact text (a
+  // nested anchor is invalid HTML) with the standalone star, after the loan's
+  // number.
   const showLender = v.lender != null && !(side === "lender");
   const showBorrower = v.borrower != null && !(side === "borrower");
-  const partiesIdentity =
-    receipts && (v.lender || v.borrower) ? (
+  const identity = detail ? (
+    v.lender || v.borrower ? (
       <span className="flex flex-wrap items-center gap-1.5 text-xs text-rb-500">
         {showLender && v.lender && (
           <>
@@ -393,7 +485,6 @@ export function PwnPositionCard({
             />
           </>
         )}
-        <LoanActivityMeta v={v} />
         {side && other && (
           <span className="basis-full text-[11px] sm:basis-auto">
             read as the {side} ·{" "}
@@ -406,25 +497,37 @@ export function PwnPositionCard({
           </span>
         )}
       </span>
-    ) : (
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-rb-500 tabular-nums">
-        <span className="text-foreground/80">{parties}</span>
-        {favWallet && <BookmarkToggle wallet={favWallet} ensName={null} protocol="pwn" />}
-        <LoanActivityMeta v={v} />
-      </span>
-    );
-  const leadingIdentity = <span className="text-xs font-semibold text-rb-500">PWN · Loan #{v.loanId}</span>;
-
-  const principalValue = v.credit ? (
-    <StatValue>
-      <Prov info={positionCreditProv(v.credit.symbol, v.version)}>
-        <FungibleAmount asset={v.credit} value={v.credit.amount} />
-      </Prov>
-    </StatValue>
+    ) : undefined
   ) : (
-    <StatDash />
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-rb-500 tabular-nums">
+      <span className="font-semibold">Loan #{v.loanId}</span>
+      <span className="text-foreground/80">{parties}</span>
+      {favWallet && <BookmarkToggle wallet={favWallet} ensName={null} protocol="pwn" />}
+    </span>
   );
-  const principalFootnote = <StatFootnote>advanced by the lender</StatFootnote>;
+
+  const principalFigure = v.credit ? (
+    <Prov info={positionCreditProv(v.credit.symbol, v.version)}>
+      <FungibleAmount asset={v.credit} value={v.credit.amount} />
+    </Prov>
+  ) : null;
+  const principalSub = "advanced by the lender";
+  const principalTip =
+    "The credit the lender advanced, from the loan's terms as created. It is fixed for the life of the loan.";
+  const collateralFigure = v.collateral ? (
+    <AssetValue asset={v.collateral} prov={positionCollateralProv(v.collateral.symbol, v.version)} />
+  ) : null;
+
+  const common = { identity, counters: loanCounters(v) };
+  const menu = {
+    leading: () => (
+      <PwnMenuRows
+        loanId={v.loanId}
+        pagePath={`/ethereum/pwn/${viewer ?? v.borrower ?? v.lender ?? ""}?loan=${encodeURIComponent(v.loanId)}`}
+      />
+    ),
+    exports: exports ?? null,
+  };
   const learnMore = pwnPositionContent({
     status: v.status,
     unclaimed,
@@ -435,18 +538,30 @@ export function PwnPositionCard({
     accruing,
   });
 
-  // REPAID / DEFAULTED: the loan is over, so it draws through the shared
-  // terminal-card frame like every other closed position — collateral and
-  // principal as struck, and in the fourth column what the borrower paid (or,
-  // on a default, what the loan owed when its deadline passed).
+  // REPAID / DEFAULTED: the loan is over, so it draws the closed card —
+  // collateral and principal as struck, and in the fourth column what the
+  // borrower paid (or, on a default, what the loan owed when its deadline passed).
   if (v.status === "repaid" || v.status === "defaulted") {
+    const status: PositionCardStatus =
+      v.status === "repaid" ? { word: "Repaid", tone: "muted" } : { word: "Defaulted", tone: "danger" };
+    const heads: PositionCardHead[] = [
+      {
+        id: "collateral",
+        label: CARD_VOCAB.collateral,
+        value: collateralFigure,
+        sub: collateralNote(v),
+      },
+      { id: "principal", label: "Principal", labelTip: principalTip, value: principalFigure, sub: principalSub },
+    ];
     const extra =
       cost && v.credit
         ? {
             label: v.status === "repaid" ? "Repaid" : "Owed at deadline",
             value: (
               <>
-                <CostValue v={v} cost={cost} />
+                <StatValue>
+                  <CostFigure v={v} cost={cost} />
+                </StatValue>
                 {costFootnote(v, cost)}
               </>
             ),
@@ -461,108 +576,109 @@ export function PwnPositionCard({
               ),
             }
           : undefined;
-    return (
-      <PositionCardShell receipts={receipts} explanation={explanation} viewHref={viewHref} learnMore={learnMore}>
-        <ClosedPositionStats
-          outcome={v.status}
-          leadingIdentity={leadingIdentity}
-          identity={partiesIdentity}
-          // The listing's lastActivityAt is closedAt ?? createdAt (see
-          // viewFromSummary) — the best close-time approximation the view
-          // carries; there is no separate "closed" field to prefer over it.
-          closedAt={v.lastActivityAt ?? undefined}
-          collateral={
-            <AssetValue
-              asset={v.collateral}
-              prov={v.collateral ? positionCollateralProv(v.collateral.symbol, v.version) : undefined}
-            />
-          }
-          collateralFootnote={collateralFootnote(v)}
-          debtLabel="Principal"
-          debt={principalValue}
-          debtFootnote={principalFootnote}
-          collateralLabel={CARD_VOCAB.collateral}
-          extra={extra}
-        />
-      </PositionCardShell>
-    );
+    const outcome = {
+      word: status.word,
+      // The listing's lastActivityAt is closedAt ?? createdAt (see
+      // viewFromSummary) — the best close-time approximation the view carries;
+      // there is no separate "closed" field to prefer over it.
+      dates: v.lastActivityAt != null ? [{ at: v.lastActivityAt }] : undefined,
+      extra,
+    };
+    if (!detail) return { ...common, surface: "listing", status, menu: null, heads, outcome };
+    return {
+      ...common,
+      surface: "detail",
+      status,
+      heads,
+      outcome,
+      explainer: { body: explanation ?? null, viewHref },
+      learnMore,
+      menu,
+    };
   }
 
-  // The two-axis pill rule: the listing carries the lifecycle pill, the detail
-  // page a mode word. A running loan is green OPEN / "Running"; past its
-  // deadline it is defaulted, in the default colour, until the lender claims.
-  const pill = receipts ? (
-    <span
-      className={`font-bold px-2 py-0.5 rounded-sm text-xs ${
-        unclaimed ? "bg-red-500/20 text-red-500" : "bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60"
-      }`}
-    >
-      {unclaimed ? "Defaulted, not yet claimed" : "Running"}
-    </span>
-  ) : unclaimed ? (
-    <span className="font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs bg-red-500/20 text-red-500">
-      {UNCLAIMED_PILL}
-    </span>
-  ) : (
-    <span className="font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs bg-positive/20 text-positive">OPEN</span>
-  );
+  // Past the deadline an open loan is defaulted until the lender claims; a
+  // running loan carries no tag.
+  const status: PositionCardStatus | null = unclaimed ? { word: "Defaulted · unclaimed", tone: "danger" } : null;
+  const heads: PositionCardHead[] = [
+    { id: "principal", label: "Principal", labelTip: principalTip, value: principalFigure, sub: principalSub },
+    {
+      id: "repay",
+      // Past the deadline the contract refuses a repayment, so the sum is what
+      // the loan owed when it lapsed, never a figure to repay.
+      label: unclaimed || cost?.shape === "accruing" ? "Owed at deadline" : "Repay",
+      labelTip:
+        unclaimed || cost?.shape === "accruing"
+          ? "What the loan owes at its deadline: the principal plus the interest to that day. The contract refuses a repayment after it."
+          : "The single fixed total, principal plus interest, that the borrower owes by the deadline, from the loan's terms as created.",
+      value: cost && v.credit ? <CostFigure v={v} cost={cost} /> : null,
+      sub: unclaimed ? "no longer repayable" : undefined,
+    },
+    {
+      id: "due",
+      label: "Due",
+      labelTip: "The deadline for repayment, from the loan's terms as created or as the latest extension moved it.",
+      value:
+        dueAt != null ? (
+          <RevealTip tip={dueDateTitle(dueAt)}>
+            <Prov
+              info={extended ? extendedDeadlineProv({ loanId: v.loanId, version: v.version }) : bookDueProv(v.dueKind)}
+            >
+              <span className="tabular-nums">{dueDateText(dueAt)}</span>
+            </Prov>
+          </RevealTip>
+        ) : null,
+      sub: unclaimed ? <Prov info={bookPastDueProv()}>defaulted then, not yet claimed by the lender</Prov> : undefined,
+    },
+  ];
 
-  return (
-    <PositionCardShell receipts={receipts} explanation={explanation} viewHref={viewHref} learnMore={learnMore}>
-      <OpenPositionStats
-        statusPill={pill}
-        leadingIdentity={leadingIdentity}
-        identity={partiesIdentity}
-        columns={[
-          {
-            label: "Collateral",
-            value: (
-              <AssetValue
-                asset={v.collateral}
-                prov={v.collateral ? positionCollateralProv(v.collateral.symbol, v.version) : undefined}
-              />
-            ),
-            footnote: collateralFootnote(v),
-          },
-          { label: "Principal", value: principalValue, footnote: principalFootnote },
-          {
-            // Past the deadline the contract refuses a repayment, so the sum is
-            // what the loan owed when it lapsed, never a figure to repay.
-            label: unclaimed ? "Owed at the deadline" : cost?.shape === "accruing" ? "Owed at deadline" : "Repay",
-            value: cost && v.credit ? <CostValue v={v} cost={cost} /> : <StatDash />,
-            footnote: cost ? costFootnote(v, cost, unclaimed) : undefined,
-          },
-          {
-            label: "Due",
-            value:
-              dueAt != null ? (
-                <StatValue title={dueDateTitle(dueAt)}>
-                  <Prov
-                    info={
-                      extended ? extendedDeadlineProv({ loanId: v.loanId, version: v.version }) : bookDueProv(v.dueKind)
-                    }
-                  >
-                    <span className="tabular-nums">{dueDateText(dueAt)}</span>
-                  </Prov>
-                </StatValue>
-              ) : (
-                <StatDash />
-              ),
-            footnote: unclaimed ? (
-              <StatFootnote>
-                <Prov info={bookPastDueProv()}>defaulted then, not yet claimed by the lender</Prov>
-              </StatFootnote>
-            ) : extended && struckDueAt != null ? (
-              <StatFootnote>extended from {dueDateText(struckDueAt)}</StatFootnote>
-            ) : undefined,
-          },
-        ]}
-      />
-    </PositionCardShell>
-  );
+  if (!detail) return { ...common, surface: "listing", status, menu: null, heads };
+
+  const left: PositionPanelRow[] = [];
+  if (v.collateral && collateralFigure) {
+    left.push({
+      id: "collateral",
+      label: CARD_VOCAB.collateral,
+      tip: "What the borrower locked for this loan, from the loan's terms as created. The protocol holds it until the loan ends.",
+      value: collateralFigure,
+    });
+    const c = v.collateral;
+    if (v.bundleContents && v.bundleContents.length > 0 && c.tokenId != null) {
+      left.push(...bundleRows(v.bundleContents, c.tokenId, v.createdBlock));
+    } else if ((c.category === "ERC721" || c.category === "ERC1155") && !c.named) {
+      left.push({
+        id: "collateral-kind",
+        label: "Collateral kind",
+        tip: "The kind of token locked, read from the loan's terms. This contract reports no name on chain, so the card shows its address.",
+        value: `${c.category === "ERC721" ? "ERC-721" : "ERC-1155"} · unnamed contract`,
+      });
+    }
+  }
+  const right: PositionPanelRow[] = cost ? costRows(v, cost) : [];
+  if (extended && struckDueAt != null) {
+    right.push({
+      id: "extended-from",
+      label: "Extended from",
+      tip: "The deadline the loan's terms struck. An extension moved it later; the principal and the repay total did not change.",
+      value: dueDateText(struckDueAt),
+    });
+  }
+
+  return {
+    ...common,
+    surface: "detail",
+    status,
+    heads,
+    panel: [left, right],
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore,
+    menu,
+  };
 }
 
-/** The listing pill of a loan past its deadline that no one has claimed. */
-export const UNCLAIMED_PILL = "DEFAULTED · UNCLAIMED";
+/** The PWN loan card: its slots, drawn by the shared card. */
+export function PwnPositionCard(props: PwnPositionCardProps) {
+  return <PositionCard slots={pwnCardSlots(props)} />;
+}
 
 export { viewFromSummary };
