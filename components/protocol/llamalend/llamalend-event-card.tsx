@@ -157,6 +157,8 @@ export function LlamalendEventCard({
         blockNumber: event.blockNumber,
         wallet: event.wallet,
         previousStated,
+        collateralAddress: soleFlowAddress(event.flows, ctx.collateralSymbol),
+        borrowedAddress: soleFlowAddress(event.flows, ctx.borrowedSymbol),
         price,
       }),
     explainer: {

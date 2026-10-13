@@ -62,6 +62,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 
 import { useMorphoLedgerCells } from "./morpho-ledger";
+import { morphoSheet } from "./morpho-sheet";
 
 const fmt = (human: string): string => formatNumber(Number(human));
 /** A running balance the answer did not carry is stated, never filled in. */
@@ -339,13 +340,16 @@ export function useMorphoCells(
 /** The opened card: the market read at the event's block adds Health factor,
  *  LTV and the market borrow rate (a cell holds its place while the read is in
  *  flight; a failed read draws none), the oracle price in the loan token to
- *  the price row, and a liquidation's forensics under the grid. */
+ *  the price row, and a liquidation's forensics under the grid. The balance
+ *  sheet (morpho-sheet.ts) takes the cells' place where it can state the
+ *  event; `label` is the event's word, naming its rows. */
 export function useMorphoOpened(
   ctx: MorphoContext,
   coords: MorphoCoords,
   flows: AssetFlow[] | undefined,
   cells: EventCellSpec[],
   price: EventCardPrice | undefined,
+  label: string,
 ): EventCardOpened {
   const read = useMorphoAtBlock(ctx.marketId, coords.blockNumber, coords.chainId ?? 1);
   const lender = ctx.eventType === "supply" || ctx.eventType === "withdraw";
@@ -465,6 +469,7 @@ export function useMorphoOpened(
   const forensics = ctx.eventType === "liquidation" ? buildMorphoLiqForensics(ctx, coords, flows, read) : undefined;
   return {
     cells: [...cells, ...riskCells],
+    sheet: morphoSheet({ ctx, coords, flows, label, read, move }),
     // The forensics' price pill gives way to the price row's chip.
     notes: forensics ? (
       <LiquidationForensics {...forensics} pricePills={chip ? [] : forensics.pricePills} />

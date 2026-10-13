@@ -34,7 +34,7 @@ import type { EventCardOpened } from "@/components/shared/event-card";
 import type { EventCellHead } from "@/components/shared/event-cells";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { useLlamalendEventState } from "@/lib/llamalend/use-event-state";
+import { useLlamalendEventState, useLlamalendEventStateRead } from "@/lib/llamalend/use-event-state";
 import {
   fmtBandPrice,
   fmtColl,
@@ -60,6 +60,7 @@ import {
 import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { useLlamalendLedgerCells } from "./llamalend-ledger";
+import { llamalendSheet } from "./llamalend-sheet";
 
 export interface LlamalendCellsProps {
   ctx: LlamalendContext;
@@ -69,6 +70,9 @@ export interface LlamalendCellsProps {
   /** The last collateral balance an earlier row stated (see
    *  lib/llamalend/event-figures.ts), for what the AMM sold since. */
   previousStated?: LlamalendPreviousStated | null;
+  /** The tokens' contracts, where the event's flows carry them. */
+  collateralAddress?: string;
+  borrowedAddress?: string;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Math.abs(Number(human))));
@@ -181,6 +185,8 @@ export function useLlamalendOpened({
   blockNumber,
   wallet,
   previousStated,
+  collateralAddress,
+  borrowedAddress,
   price: price0,
 }: LlamalendCellsProps & { price?: EventCardPrice }): EventCardOpened {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
@@ -191,7 +197,9 @@ export function useLlamalendOpened({
   const atBlock = useLiqPriceAtBlock(needsPrice, ctx.controller, blockNumber);
   // The position at block − 1 and at this block: what stood before, what the
   // AMM had converted, and health on each side.
-  const state = useLlamalendEventState(ctx, blockNumber, wallet);
+  // undefined while the read is on its way, null after a miss.
+  const read = useLlamalendEventStateRead(ctx, blockNumber, wallet);
+  const state = read ?? null;
   const f = state ? llamalendEventFigures(ctx, state) : null;
   const block = blockNumber ?? 0;
   const cSym = ctx.collateralSymbol;
@@ -451,14 +459,26 @@ export function useLlamalendOpened({
         }
       : price0;
 
+  // The balance sheet (ui-jobs 330), where the read states this page's
+  // position: null while it is on its way; a liquidator's row and a missed
+  // read keep the cells.
+  const sheet =
+    read === undefined
+      ? null
+      : state && f
+        ? llamalendSheet({ ctx, state, f, coords, previousStated, collateralAddress, borrowedAddress })
+        : undefined;
+
   const ledgered = cells != null || flowsPending;
   const notes: ReactNode[] = [];
-  if (converted && (!ledgered || !own)) notes.push(<ConvertedNote key="converted" c={converted} />);
+  // The sheet states what the AMM holds; the cells take the note.
+  if (converted && !sheet && (!ledgered || !own)) notes.push(<ConvertedNote key="converted" c={converted} />);
   if (forensics)
     notes.push(<LiquidationForensics key="forensics" {...forensics} pricePills={price ? [] : forensics.pricePills} />);
 
   return {
     cells: stats.length > 0 ? cellList : { pending: LLAMALEND_HEADS },
+    sheet,
     notes: notes.length ? <>{notes}</> : undefined,
     price,
   };
