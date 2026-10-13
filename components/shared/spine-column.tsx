@@ -168,9 +168,8 @@ export interface SpineColumnProps {
    *  neither, the triangle stands in. */
   warningLegs?: SpineWarningLeg[];
   /** icon="rate-change": the rate before and after (%). The right flank,
-   *  where a row's leg numbers stand, states the change signed in points
-   *  ("−0.52 pts", "+0.40 pts") with no arrow; a rate that did not move
-   *  reads "0.00 pts". Unset, the glyph carries the arrow alone. */
+   *  where a row's leg numbers stand, states the rate after ("0.50%") with
+   *  no sign and no arrow. Unset, the glyph carries the arrow alone. */
   rateSpan?: [number, number];
   /** Direction for rate-change arrow (none drawn when unset) or delegate
    *  badge */
@@ -944,13 +943,11 @@ export function SpineColumn({
       }
       case "rate-change": {
         if (rateSpan) {
-          // The change signed, in points, with no arrow; a rate that did not
-          // move reads "0.00 pts".
+          // The rate after, to two decimals; data-spine-rate carries the
+          // direction of the move.
           const delta = rateSpan[1] - rateSpan[0];
-          const pts = Math.abs(delta).toFixed(2);
-          const moved = pts !== "0.00";
+          const moved = Math.abs(delta).toFixed(2) !== "0.00";
           const direction = !moved ? "flat" : delta > 0 ? "up" : "down";
-          const sign = !moved ? "" : delta > 0 ? "+" : "\u2212";
           return nodeRow(
             <RateIcon size={T} />,
             <>
@@ -959,8 +956,7 @@ export function SpineColumn({
                 className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
                 data-spine-rate={direction}
               >
-                {sign}
-                {pts} pts
+                {rateSpan[1].toFixed(2)}%
               </span>
             </>,
           );

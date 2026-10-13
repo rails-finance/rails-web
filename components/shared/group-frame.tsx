@@ -3,13 +3,13 @@
 import { createContext, useEffect, useRef, type ReactNode } from "react";
 import { GroupHideContext } from "@/components/shared/event-card-menu";
 
-// A group on the timeline (rails-ops TO-DO-ui-jobs 250 points 3 and 4, 240):
-// a closed group is a row on the spine, its legs summed as nodes, its number
-// column empty, and its ⋮ offering "Show 48 grouped events", the one way to
-// open it. Open, the members draw as rows and each
-// member's ⋮ offers "Hide", the one way to close it.
-// A bracket frame marks the group closed and open; the tone sits on the
-// nodes, the T1 word and the dotted segment.
+// A group on the timeline (rails-ops TO-DO-ui-jobs 250 points 3 and 4, 240,
+// 331 point 4): a closed group is a row on the spine, its legs summed as
+// nodes, and its ⋮ offering "Show 48 grouped events", the one way to open it.
+// Open, the members draw as rows and each member's ⋮ offers "Hide", the one
+// way to close it. A bracket frame marks the group closed and open and
+// carries the range: the newest member's number at its top end, the oldest at
+// its tail. The tone sits on the nodes, the T1 word and the dotted segment.
 
 /** The event numbers a client-grouped folder holds, lowest and highest, for
  *  its node (`renderRunFolders` provides it). */
@@ -34,9 +34,17 @@ export function groupMenuWords(count: number, range: string | null) {
 
 /** The bracket frame around a group: a left border with bracket ends, in the
  *  muted border colour (`border-rb-300`, `dark:border-rb-500`). Closed it
- *  holds the group's row and its ⋮ offering "Show"; open, the members alone, the first on the row the summed nodes
- *  held, every member's ⋮ offering "Hide". A `group-open` event on the frame
- *  opens it (the timeline's rewind). */
+ *  holds the group's row and its ⋮ offering "Show"; open, the members alone,
+ *  the first on the row the summed nodes held, every member's ⋮ offering
+ *  "Hide". A `group-open` event on the frame opens it (the timeline's rewind).
+ *
+ *  The ends carry the range (ui-jobs 331 point 4), closed and open: the
+ *  highest number level with the bracket's top edge, the lowest with its
+ *  bottom edge, in the row number's style (`num-pill`) at the number column's
+ *  x (`.group-range`). A group of one draws the top number alone. Open, the
+ *  members keep their own numbers. The ends are drawing only: no
+ *  `data-event-number` (the verifiers read that as a row), `aria-hidden`
+ *  (the group's name and the ⋮ words carry the range), no pointer. */
 export function GroupFrame({
   open,
   show,
@@ -44,8 +52,11 @@ export function GroupFrame({
   closed,
   members,
   membersId,
+  range,
 }: {
   open: boolean;
+  /** The group's event numbers, lowest and highest (either order). */
+  range?: [number, number] | null;
   show: () => void;
   /** The members' ⋮ entry: the group's collapse. */
   hide: { title: string; subtitle: string; hide: () => void };
@@ -63,13 +74,30 @@ export function GroupFrame({
     frame.addEventListener("group-open", onOpen);
     return () => frame.removeEventListener("group-open", onOpen);
   }, []);
+  const ends = range ? (range[0] <= range[1] ? range : [range[1], range[0]]) : null;
   return (
-    <div ref={frameRef} data-group-frame={open ? "open" : "closed"} className="relative flex flex-col gap-2 rounded-xl">
+    <div
+      ref={frameRef}
+      data-group-frame={open ? "open" : "closed"}
+      className="group-frame relative flex flex-col gap-2 rounded-xl"
+    >
       <div
         aria-hidden
         data-group-bracket=""
         className="pointer-events-none absolute inset-y-0 left-0 z-20 w-3 rounded-l-xl border-y border-l border-rb-300 dark:border-rb-500"
       />
+      {ends && (
+        <>
+          <span aria-hidden data-group-range="hi" className="group-range group-range-hi">
+            <span className="num-pill">{ends[1]}</span>
+          </span>
+          {ends[0] !== ends[1] && (
+            <span aria-hidden data-group-range="lo" className="group-range group-range-lo">
+              <span className="num-pill">{ends[0]}</span>
+            </span>
+          )}
+        </>
+      )}
       {open ? (
         <GroupHideContext.Provider value={hide}>
           <div id={membersId} className="flex flex-col gap-2">

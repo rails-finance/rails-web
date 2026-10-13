@@ -4,6 +4,7 @@ import { useContext, useId, useState } from "react";
 import type { ReactNode } from "react";
 
 import { EventCard } from "@/components/shared/event-card";
+import { CountChip } from "@/components/shared/count-chip";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -23,8 +24,9 @@ import { troveWords } from "@/lib/liquity/event-templates";
  *
  * It draws as every group does (`group-frame.tsx`): the bracket, no node of
  * its own, the dotted segment for the members not drawn, and its ⋮ to show
- * them; its words are the pink delegate pill with the people glyph and the
- * net rate movement (first rate → last).
+ * them; its words are "Adjusted" with the count's chip after it (ui-jobs
+ * 331), the pink delegate pill with the people glyph and the net rate
+ * movement (first rate → last).
  */
 export interface DelegateAdjustRunCardProps {
   count: number;
@@ -83,7 +85,10 @@ export function DelegateAdjustRunCard({
   // no node and the words stand (set C gives the spine the rate).
   const words = (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="text-sm font-medium text-rb-500">{troveWords("run_adjusted")}</span>
+      <span className="inline-flex items-center text-sm font-medium text-rb-500">
+        {troveWords("run_adjusted")}
+        <CountChip count={count} />
+      </span>
       {hasMovement && (
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-400 text-xs font-bold">
           <UsersGlyph />
@@ -97,7 +102,6 @@ export function DelegateAdjustRunCard({
         </span>
       )}
       {managerName && <span className="text-sm font-bold text-pink-500">{managerName}</span>}
-      <span className="text-sm text-rb-500">({count.toLocaleString("en-US")})</span>
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-rb-500">{range}</span>
       </span>
@@ -131,6 +135,7 @@ export function DelegateAdjustRunCard({
       show={showMenu.show}
       hide={hide}
       membersId={membersId}
+      range={numberRange}
       closed={
         <EventCard
           avatar={null}
@@ -146,9 +151,14 @@ export function DelegateAdjustRunCard({
             explainer: { body: null },
             learnMore: null,
           }}
-          // On a phone the caption carries the word, the count and the range,
-          // and the words open beneath it as the card.
-          phoneCaption={troveWords("run_phone_caption", { count: count.toLocaleString("en-US"), range })}
+          // On a phone the caption carries the word, the count's chip and the
+          // range, and the words open beneath it as the card.
+          phoneCaption={
+            <>
+              {troveWords("run_adjusted")}
+              <CountChip count={count} /> {troveWords("run_phone_caption", { range })}
+            </>
+          }
           spokenCaption={troveWords("run_spoken", { range: spokenRange })}
           label={troveWords("run_label", { count_text: countText, by, range: spokenRange, movement })}
           group="words"

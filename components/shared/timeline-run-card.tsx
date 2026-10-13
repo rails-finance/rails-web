@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { Calculator } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
+import { CountChip } from "@/components/shared/count-chip";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { type SpineColumnProps, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -37,8 +38,8 @@ import type { Tone } from "@/lib/shared/tone";
  * renders count-only rather than misstate the position.
  *
  * The closed run is a row on the spine (ui-jobs 250 set B): its legs summed as
- * nodes, the kind word and the count in T1 ("Redemptions (48)"), the date
- * range in the time slot, and the list's line dotted below it for the members
+ * nodes, the kind word and the count in T1, the count a chip after the word
+ * (`CountChip`, ui-jobs 331), the date range in the time slot, and the list's line dotted below it for the members
  * not drawn; the row's ⋮ ("Show 48 grouped events") shows them, inside the
  * bracket frame (`group-frame.tsx`). A click on the nodes or the head opens the
  * summary card: the sums with their Σ receipts, and the date range.
@@ -286,7 +287,8 @@ export function TimelineRunCard({
   const netTokens = adverse || spineIcon === "custody" ? [] : netLegs(legAggs);
   // The group opens from its row's ⋮ ("Show 48 grouped events") and closes
   // from a member's ("Hide …"); the range of event numbers rides the items'
-  // sub-line. A closed group's number column is empty.
+  // sub-line. The bracket carries the range at its ends, closed and open,
+  // and the closed row's number column is empty (ui-jobs 331 point 4).
   const contextRange = useContext(GroupNumbersContext);
   const numberRange = eventRange ?? contextRange;
   const rangeText = groupRangeText(numberRange);
@@ -320,8 +322,8 @@ export function TimelineRunCard({
   // T1's word: the shape a served folder names, else the kind ("Redemptions",
   // "Transfers"), in the run's tone.
   const kindWord = kindWordProp ?? `${memberPlural.charAt(0).toUpperCase()}${memberPlural.slice(1)}`;
-  // The count rides T1 and the caption: "Redemptions (48)".
-  const countMark = `(${count.toLocaleString("en-US")})`;
+  // The count rides T1 and the caption as a chip after the word (ui-jobs 331).
+  const countMark = <CountChip count={count} />;
 
   /** The sums, verb by verb: the summary card's body, and T1's legs where
    *  the spine does not carry them (a pinned page). */
@@ -434,13 +436,17 @@ export function TimelineRunCard({
   const head = (
     <div data-anatomy="L6" className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
       {lead ? (
-        <span className="inline-flex items-center gap-1.5" data-group-word="">
+        <span className="inline-flex items-center text-sm" data-group-word="">
           {lead}
-          <span className="text-sm text-rb-500">{countMark}</span>
+          {countMark}
         </span>
       ) : (
-        <span className={`text-sm font-medium ${VERB_CLASSES[adverse ? tone : "neutral"]}`} data-group-word="">
-          {kindWord} {countMark}
+        <span
+          className={`inline-flex items-center text-sm font-medium ${VERB_CLASSES[adverse ? tone : "neutral"]}`}
+          data-group-word=""
+        >
+          {kindWord}
+          {countMark}
         </span>
       )}
       {sums(hideVal, false)}
@@ -494,7 +500,7 @@ export function TimelineRunCard({
   }
 
   // The phone caption and the phone control's name: the word, the count and
-  // the range ("Redemptions (48) · 1 Oct '25 – 12 Oct '25").
+  // the range ("Redemptions [48] · 1 Oct '25 – 12 Oct '25", the count a chip).
   const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
   const spokenSums = legAggs
     .filter((agg) => !unreadOf(undefined, agg.symbol))
@@ -507,6 +513,7 @@ export function TimelineRunCard({
       show={showMenu.show}
       hide={hide}
       membersId={membersId}
+      range={numberRange}
       closed={
         <EventCard
           avatar={null}
@@ -523,7 +530,8 @@ export function TimelineRunCard({
           }}
           phoneCaption={
             <>
-              {kindWord} {countMark} &middot; {range}
+              {kindWord}
+              {countMark} &middot; {range}
             </>
           }
           spokenCaption={`${kindWord}, ${spokenRange}`}

@@ -7,7 +7,7 @@
 // a testnet's token set is whatever the one protocol on it deploys.
 export const SEPOLIA_TOKEN_ADDRESSES: Record<string, string> = {
   /** Polaris's reserve token — the bonding-curve ETH wrapper every CDP posts. */
-  pETH: "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+  pETH: "0x07ea2ff889e6228cded329a09f66e370f12c705e",
   /** The USD-tracking stablecoin of the `usdp` market. */
   USDp: "0x899d225d779f41fa1ab422ab1b8a9408296dd5c6",
   /** The gold-tracking stablecoin of the `goldp` market. */
