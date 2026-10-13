@@ -644,9 +644,9 @@ export function aaveV4BaseHubContent(): LearnMoreContent {
 // These links serve the economics modals below (Z3, still TSX).
 
 const SPARK_DOC_URLS = {
-  SPARKLEND: "https://docs.spark.fi/products/sparklend",
-  LIQUIDATIONS: "https://docs.spark.fi/products/sparklend/guides/liquidations",
-  FAQ: "https://docs.spark.fi/faq",
+  SPARKLEND: "https://docs.spark.finance/products/sparklend",
+  LIQUIDATIONS: "https://docs.spark.finance/products/sparklend/guides/liquidations",
+  FAQ: "https://docs.spark.finance/faq",
 } as const;
 
 // ── Moonwell — doc link of the Lifetime flows modal ──────────────────────────
@@ -2509,7 +2509,7 @@ export function vaultEventContent(family: VaultPositionFamily | "yearn"): LearnM
 export function emodeSwitchContent(protocol: "aave" | "spark" | "seamless"): LearnMoreContent {
   const link: LearnMoreLink =
     protocol === "spark"
-      ? { label: "E-mode on SparkLend", url: "https://docs.spark.fi/products/sparklend/guides/e-mode" }
+      ? { label: "E-mode on SparkLend", url: "https://docs.spark.finance/products/sparklend/guides/e-mode" }
       : protocol === "seamless"
         ? { label: "Seamless documentation", url: SEAMLESS_DOCS_URL }
         : { label: "Aave V3 overview: Efficiency Mode", url: "https://aave.com/docs/aave-v3/overview" };

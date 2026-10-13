@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { CompoundV2FlowsFacts } from "@/hooks/useCompoundV2Flows";
 
-const DOCS = "https://docs.compound.finance/v2/";
+const DOCS = "https://docs.compound.xyz/v2/";
 
 const n = (k: number, one: string, many: string) => (k === 1 ? one : `${k.toLocaleString("en-US")} ${many}`);
 

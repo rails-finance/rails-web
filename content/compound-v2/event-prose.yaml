@@ -643,41 +643,41 @@ templates:
 # ── The documentation pages the modals link, by id ──
 doc_urls:
   OVERVIEW: |-
-    https://docs.compound.finance/v2/#introduction-to-compound-v2
+    https://docs.compound.xyz/v2/#introduction-to-compound-v2
   CTOKENS: |-
-    https://docs.compound.finance/v2/ctokens/#introduction
+    https://docs.compound.xyz/v2/ctokens/#introduction
   MINT: |-
-    https://docs.compound.finance/v2/ctokens/#mint
+    https://docs.compound.xyz/v2/ctokens/#mint
   REDEEM: |-
-    https://docs.compound.finance/v2/ctokens/#redeem
+    https://docs.compound.xyz/v2/ctokens/#redeem
   BORROW: |-
-    https://docs.compound.finance/v2/ctokens/#borrow
+    https://docs.compound.xyz/v2/ctokens/#borrow
   REPAY_BORROW: |-
-    https://docs.compound.finance/v2/ctokens/#repay-borrow
+    https://docs.compound.xyz/v2/ctokens/#repay-borrow
   REPAY_BEHALF: |-
-    https://docs.compound.finance/v2/ctokens/#repay-borrow-behalf
+    https://docs.compound.xyz/v2/ctokens/#repay-borrow-behalf
   TRANSFER: |-
-    https://docs.compound.finance/v2/ctokens/#transfer
+    https://docs.compound.xyz/v2/ctokens/#transfer
   LIQUIDATE_BORROW: |-
-    https://docs.compound.finance/v2/ctokens/#liquidate-borrow
+    https://docs.compound.xyz/v2/ctokens/#liquidate-borrow
   EXCHANGE_RATE: |-
-    https://docs.compound.finance/v2/ctokens/#exchange-rate
+    https://docs.compound.xyz/v2/ctokens/#exchange-rate
   RESERVE_FACTOR: |-
-    https://docs.compound.finance/v2/ctokens/#reserve-factor
+    https://docs.compound.xyz/v2/ctokens/#reserve-factor
   PRICES: |-
-    https://docs.compound.finance/v2/prices/#introduction
+    https://docs.compound.xyz/v2/prices/#introduction
   COMPTROLLER: |-
-    https://docs.compound.finance/v2/comptroller/#introduction
+    https://docs.compound.xyz/v2/comptroller/#introduction
   ENTER_MARKETS: |-
-    https://docs.compound.finance/v2/comptroller/#enter-markets
+    https://docs.compound.xyz/v2/comptroller/#enter-markets
   COLLATERAL_FACTOR: |-
-    https://docs.compound.finance/v2/comptroller/#collateral-factor
+    https://docs.compound.xyz/v2/comptroller/#collateral-factor
   ACCOUNT_LIQUIDITY: |-
-    https://docs.compound.finance/v2/comptroller/#account-liquidity
+    https://docs.compound.xyz/v2/comptroller/#account-liquidity
   CLOSE_FACTOR: |-
-    https://docs.compound.finance/v2/comptroller/#close-factor
+    https://docs.compound.xyz/v2/comptroller/#close-factor
   LIQUIDATION_INCENTIVE: |-
-    https://docs.compound.finance/v2/comptroller/#liquidation-incentive
+    https://docs.compound.xyz/v2/comptroller/#liquidation-incentive
 
 # ── The "?" modals (zone Z4): the event modals and the position card's. Each
 # stops at the mechanism and hands it to a Quick Link; no figure of one

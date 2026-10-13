@@ -7,9 +7,9 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { CompoundFlowFacts } from "@/lib/compound/flows";
 
 const DOCS = {
-  ACCOUNTS: "https://docs.compound.finance/collateral-and-borrowing/",
-  INTEREST: "https://docs.compound.finance/interest-rates/",
-  LIQUIDATION: "https://docs.compound.finance/liquidation/",
+  ACCOUNTS: "https://docs.compound.xyz/collateral-and-borrowing/",
+  INTEREST: "https://docs.compound.xyz/interest-rates/",
+  LIQUIDATION: "https://docs.compound.xyz/liquidation/",
 };
 
 export interface CompoundFlowsNoteProps {
@@ -120,9 +120,9 @@ export function compoundFlowsContent(): LearnMoreContent {
       },
     ],
     links: [
-      { label: "docs.compound.finance — Collateral and borrowing", url: DOCS.ACCOUNTS },
-      { label: "docs.compound.finance — Interest rates", url: DOCS.INTEREST },
-      { label: "docs.compound.finance — Liquidation", url: DOCS.LIQUIDATION },
+      { label: "docs.compound.xyz — Collateral and borrowing", url: DOCS.ACCOUNTS },
+      { label: "docs.compound.xyz — Interest rates", url: DOCS.INTEREST },
+      { label: "docs.compound.xyz — Liquidation", url: DOCS.LIQUIDATION },
     ],
   };
 }

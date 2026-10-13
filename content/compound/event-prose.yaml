@@ -823,35 +823,35 @@ templates:
 # ── The documentation pages the modals link, by id ──
 doc_urls:
   OVERVIEW: |-
-    https://docs.compound.finance/#introduction
+    https://docs.compound.xyz/#introduction
   COLLATERAL_BORROWING: |-
-    https://docs.compound.finance/collateral-and-borrowing/
+    https://docs.compound.xyz/collateral-and-borrowing/
   SUPPLY: |-
-    https://docs.compound.finance/collateral-and-borrowing/#supply
+    https://docs.compound.xyz/collateral-and-borrowing/#supply
   BORROW: |-
-    https://docs.compound.finance/collateral-and-borrowing/#withdraw-or-borrow
+    https://docs.compound.xyz/collateral-and-borrowing/#withdraw-or-borrow
   BORROW_COLLATERALIZATION: |-
-    https://docs.compound.finance/collateral-and-borrowing/#borrow-collateralization
+    https://docs.compound.xyz/collateral-and-borrowing/#borrow-collateralization
   LIQUIDATION: |-
-    https://docs.compound.finance/liquidation/
+    https://docs.compound.xyz/liquidation/
   LIQUIDATABLE: |-
-    https://docs.compound.finance/liquidation/#liquidatable-accounts
+    https://docs.compound.xyz/liquidation/#liquidatable-accounts
   ABSORB: |-
-    https://docs.compound.finance/liquidation/#absorb
+    https://docs.compound.xyz/liquidation/#absorb
   BUY_COLLATERAL: |-
-    https://docs.compound.finance/liquidation/#buy-collateral
+    https://docs.compound.xyz/liquidation/#buy-collateral
   RESERVES: |-
-    https://docs.compound.finance/liquidation/#reserves
+    https://docs.compound.xyz/liquidation/#reserves
   INTEREST_RATES: |-
-    https://docs.compound.finance/interest-rates/
+    https://docs.compound.xyz/interest-rates/
   ACCOUNT_MANAGEMENT: |-
-    https://docs.compound.finance/account-management/
+    https://docs.compound.xyz/account-management/
   ALLOW: |-
-    https://docs.compound.finance/account-management/#allow
+    https://docs.compound.xyz/account-management/#allow
   TRANSFER: |-
-    https://docs.compound.finance/account-management/#transfer
+    https://docs.compound.xyz/account-management/#transfer
   LIQUIDATION_FACTOR: |-
-    https://docs.compound.finance/governance/#update-liquidation-factor
+    https://docs.compound.xyz/governance/#update-liquidation-factor
 
 # ── The "?" modals (zone Z4): the event modals and the position card's. Each
 # stops at the mechanism and hands it to a Quick Link; no figure of one

@@ -17,9 +17,9 @@ import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 
 const SPARK_DOCS = {
-  SPARKLEND: "https://docs.spark.fi/products/sparklend",
-  LIQUIDATIONS: "https://docs.spark.fi/products/sparklend/guides/liquidations",
-  FAQ: "https://docs.spark.fi/faq",
+  SPARKLEND: "https://docs.spark.finance/products/sparklend",
+  LIQUIDATIONS: "https://docs.spark.finance/products/sparklend/guides/liquidations",
+  FAQ: "https://docs.spark.finance/faq",
 } as const;
 
 const SPARK_OPTS: AaveV3EconomicsOpts = {
