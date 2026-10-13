@@ -70,7 +70,10 @@ import {
   buildLiquidationForensics,
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
-import { signedAmount } from "./aave-v3-ct-event-header";
+import { aaveV3CtLabel, signedAmount } from "./aave-v3-ct-event-header";
+import { aaveFamilySheet } from "./aave-family-sheet";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import {
   exactLeg,
   exactUsd,
@@ -127,6 +130,9 @@ export interface AaveV3CtEventDetailProps {
 /** The card's T2 parts, and the read they came from. */
 export interface AaveV3EventBody {
   cells: EventCells;
+  /** T2 as a balance sheet (ui-jobs 330) on the read lane: null until the
+   *  read lands; unset on a lane with no read (Seamless, a fee's row). */
+  sheet?: EventSheet | null;
   /** The grid's data attributes: the read's state. */
   cellsData?: Record<string, string>;
   /** Lines under the grid: a liquidation's figures, a fee's, a missing read. */
@@ -193,9 +199,11 @@ export function useAaveV3EventBody({
   feeOf,
   fee,
   previous,
+  eventId,
   eventTs,
   active = true,
 }: AaveV3CtEventDetailProps): AaveV3EventBody {
+  const focus = useFlowFocus();
   const coords: V3Coords = {
     txHash,
     blockNumber,
@@ -790,8 +798,35 @@ export function useAaveV3EventBody({
     </>
   );
 
+  // The sheet (ui-jobs 330), on the read lane once the read has landed. The
+  // assets repaid in full: the debt assets the page's flows moved up to this
+  // event that the account owes none of after it.
+  const readLane = !!market && !feeOf;
+  let sheet: EventSheet | null | undefined = readLane ? null : undefined;
+  if (readLane && ready && risk) {
+    let repaid: string[] | undefined;
+    const at = focus && eventId ? focus.events.findIndex((e) => e.id === eventId) : -1;
+    if (focus?.model && at >= 0) {
+      const debtLines = new Set(focus.model.buckets.filter((b) => b.side === "debt").map((b) => b.key));
+      const owes = new Set(ready.reserves.filter((r) => BigInt(r.debt.after || "0") > BigInt(0)).map(reserveSymbol));
+      const once = new Set<string>();
+      for (const e of focus.events.slice(0, at + 1))
+        for (const l of e.legs) if (l.symbol && !l.accrual && debtLines.has(l.bucket)) once.add(l.symbol);
+      repaid = [...once].filter((s) => !owes.has(s));
+    }
+    sheet = aaveFamilySheet({
+      state: ready,
+      prev: prevReady,
+      coords: stateCoords,
+      label: aaveV3CtLabel(ctx, false, coords.chainId),
+      eventTs,
+      repaid,
+    });
+  }
+
   return {
     cells,
+    sheet,
     cellsData:
       waiting
         ? { "data-position-state": "loading" }

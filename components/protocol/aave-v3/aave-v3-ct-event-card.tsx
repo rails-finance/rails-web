@@ -251,6 +251,7 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
           : undefined,
     },
     cells: body.cells,
+    sheet: body.sheet,
     cellsData: body.cellsData,
     ledgers: readLane
       ? {

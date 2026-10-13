@@ -7,8 +7,8 @@
 
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { accrualNoun } from "@/lib/liquity/accrual";
-import { fillText, wordsAround, type LiquityEventProse } from "@/lib/liquity/event-prose";
-import { L2_WORDS } from "@/lib/liquity/event-templates";
+import { fillText, liquityL1Label, wordsAround, type LiquityEventProse } from "@/lib/liquity/event-prose";
+import { L1_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
@@ -29,6 +29,13 @@ import {
   TROVE_MANAGER,
 } from "@/lib/liquity/event-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { BaseActivityEvent } from "@/lib/shared/types/activity";
+import { isLiquityEvent } from "@/lib/shared/types/activity";
+import { liquityEventSafety } from "@/lib/liquity/event-safety";
+import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
+import { collChangeProv as collCpOf, debtChangeProv } from "@/lib/liquity/event-provenance";
+import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow, type SheetStat } from "@/components/shared/event-sheet";
+import { changeText } from "@/components/shared/change-swap-value";
 
 const tmContractOf = (addr?: string) => ({ name: "TroveManager", address: addr });
 
@@ -65,27 +72,32 @@ const rateText = (r: number) => (
   </>
 );
 
-/** T2's cells, or why the event has none. */
+/** T2's cells, or why the event has none; and its balance sheet (ui-jobs
+ *  330), where the event carries the Trove's state. */
 export function useLiquityCells({
   ctx,
   txHash,
   blockNumber,
   prose,
+  previousEvent,
 }: {
+  /** The Trove's previous event: the sheet's carry-forward layer and the
+   *  changes its Risk and Limits values swap to start there. */
+  previousEvent?: BaseActivityEvent;
   ctx: LiquityContext;
   txHash: string;
   /** Block of the emitting event — threaded into the after-state provenance so
    *  the dock shows the concrete coordinates behind each decoded value. */
   blockNumber?: number;
   prose: LiquityEventProse;
-}): EventCells {
+}): { cells: EventCells; sheet?: EventSheet } {
   const { prefs } = usePreferences();
   const crColor = useLiquityRatioColorClass();
   const { stateBefore, stateAfter, troveOperation, liquidation } = ctx;
   const l2 = prose.L2;
 
-  if (!stateBefore || !stateAfter || !l2) return { none: "the event carries no Trove state" };
-  if (!l2.showGrid) return { none: "the event moves no figure of the Trove" };
+  if (!stateBefore || !stateAfter || !l2) return { cells: { none: "the event carries no Trove state" } };
+  if (!l2.showGrid) return { cells: { none: "the event moves no figure of the Trove" } };
   const { accrual, batchFee } = l2;
 
   // The grid's figures: before rebuilt where the event logs only the after,
@@ -528,7 +540,7 @@ export function useLiquityCells({
           ],
     };
   };
-  if (isBatchManagerOp) return [rateCell(false)];
+  if (isBatchManagerOp) return { cells: [rateCell(false)] };
 
   // ── Collateral ──
   const collAfter = l2.coll.after;
@@ -701,7 +713,404 @@ export function useLiquityCells({
     },
   };
 
-  return [collateral, debt, ratio, rateCell(isClose)];
+  const cells: EventCells = [collateral, debt, ratio, rateCell(isClose)];
+
+  // ── The balance sheet (ui-jobs 330) ──
+  const prevCtx = previousEvent && isLiquityEvent(previousEvent) ? previousEvent.context.data : null;
+  const safety = liquityEventSafety(ctx, previousEvent);
+  const priceNow = isLiquidation && liquidation ? liquidation.price : collPrice;
+  const prevPrice = safety.prevPrice;
+  const DUST_COLL = 0.00005;
+  const DUST_DEBT = 0.005;
+  const signed = (n: number, text: string) => (n < 0 ? `−${text}` : text);
+  // The event's word on each side: an adjust names its act per side.
+  const op = troveOperation;
+  const sideWord = (side: "coll" | "debt") =>
+    ctx.operation === "adjustTrove" && op
+      ? side === "coll"
+        ? op.collChangeFromOperation > 0
+          ? L1_WORDS.add
+          : L1_WORDS.withdraw
+        : op.debtChangeFromOperation > 0
+          ? L1_WORDS.borrow
+          : L1_WORDS.repay
+      : liquityL1Label(ctx);
+  const sheetCollCp = collCpOf(ctx, coords);
+  const sheetDebtCp = debtChangeProv(ctx, coords);
+  const debtMoveProv: Provenance = {
+    kind: "derived",
+    summary: `Debt (${debtSym}) this event moved — the debt after less the debt before this event, any upfront fee and any redistributed debt.`,
+    formula: "debt after − debt before this event − upfront fee − redistributed debt",
+  };
+  const debtBeforeEventProv: Provenance = {
+    kind: "derived",
+    summary: `Debt (${debtSym}) immediately before this event — the debt the Trove's previous event recorded plus the ${accrualNoun(accrual)} accrued since.`,
+    formula: "debt at the previous event + accrual since",
+    inputs: [
+      { label: "debt at the previous event", value: `${toLocaleStringHelper(beforeDebt)} ${debtSym}`, kind: "chain" },
+      {
+        label: "accrual",
+        value: `${fmtAccrued(accrual.total)} ${debtSym}`,
+        kind: accrual.source === "rate" ? "derived" : "chain",
+      },
+    ],
+  };
+
+  // Collateral: what the previous event left at its price, the price's move
+  // since, the balance before this event at this block's price, the event's
+  // move (and any redistribution it applied), the balance after.
+  const redistColl = op?.collIncreaseFromRedist ?? 0;
+  const opColl = collAfter - beforeColl - redistColl;
+  const collRows: SheetRow[] = [];
+  if (Math.abs(opColl) >= DUST_COLL)
+    collRows.push({
+      key: "event",
+      label: sideWord("coll"),
+      amount: {
+        text: signed(opColl, formatColl(Math.abs(opColl))),
+        symbol: collSym,
+        info:
+          sheetCollCp && Math.abs(Math.abs(sheetCollCp.change) - Math.abs(opColl)) < DUST_COLL
+            ? sheetCollCp.info
+            : collDeltaProv,
+        value: sheetCollCp?.value,
+      },
+      usd:
+        priceNow > 0 ? { text: sheetUsd(opColl * priceNow), info: usdMoveProv(collSym, opColl, priceNow) } : undefined,
+    });
+  if (Math.abs(redistColl) >= DUST_COLL)
+    collRows.push({
+      key: "redistribution",
+      label: L2_WORDS.sheet_redistribution,
+      amount: { text: formatColl(redistColl), symbol: collSym, info: collDeltaProv },
+      usd:
+        priceNow > 0
+          ? { text: sheetUsd(redistColl * priceNow), info: usdMoveProv(collSym, redistColl, priceNow) }
+          : undefined,
+    });
+  const collCarry: EventSheet["sides"][number]["carry"] = [];
+  if (prevCtx && beforeColl > 0) {
+    collCarry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      amount: { text: formatColl(beforeColl), symbol: collSym, info: collBeforeProv },
+      usd: prevPrice
+        ? {
+            text: sheetUsd(beforeColl * prevPrice),
+            info: atPriceProv(collSym, beforeColl, prevPrice, "the previous event"),
+          }
+        : undefined,
+    });
+    // The same price at both events moves nothing: the row is left out.
+    if (prevPrice && priceNow > 0 && Math.round(beforeColl * (priceNow - prevPrice) * 100) !== 0)
+      collCarry.push({
+        key: "market",
+        label: SHEET_WORDS.market,
+        usd: {
+          text: sheetUsd(beforeColl * (priceNow - prevPrice), true),
+          info: marketMoveProv(collSym, beforeColl, prevPrice, priceNow),
+        },
+      });
+  }
+  const collSide: EventSheet["sides"][number] = {
+    side: "collateral",
+    icons: [collSym],
+    carry: collCarry,
+    before:
+      collCarry.length > 0
+        ? {
+            key: "before",
+            label: SHEET_WORDS.before,
+            amount: { text: formatColl(beforeColl), symbol: collSym, info: collBeforeProv },
+            usd: beforeCollAtEventUsd > 0 ? { text: sheetUsd(beforeCollAtEventUsd), info: usdBeforeProv } : undefined,
+          }
+        : undefined,
+    rows: collRows,
+    total: { text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0", info: usdAfterProv ?? collAfterProv },
+  };
+
+  // Debt: the debt the previous event recorded, the interest (and any
+  // management fee) since, the debt before this event, the event's move, its
+  // upfront fee and any redistributed debt, the debt after, all at $1 face.
+  const accrualTotal = accrual.total;
+  const debtBeforeEvent = beforeDebt + accrualTotal;
+  const redistDebt = op?.debtIncreaseFromRedist ?? 0;
+  const opDebt = debtAfter - debtBeforeEvent - upfrontFee - redistDebt;
+  const debtRows: SheetRow[] = [];
+  const debtFig = (n: number) => signed(n, toLocaleStringHelper(Math.abs(n)));
+  if (Math.abs(opDebt) >= DUST_DEBT)
+    debtRows.push({
+      key: "event",
+      label: sideWord("debt"),
+      amount: {
+        text: debtFig(opDebt),
+        symbol: debtSym,
+        info:
+          sheetDebtCp && Math.abs(Math.abs(sheetDebtCp.change) - Math.abs(opDebt)) < DUST_DEBT
+            ? sheetDebtCp.info
+            : debtMoveProv,
+        value: sheetDebtCp?.value,
+      },
+      usd: { text: sheetUsd(opDebt), info: debtMoveProv },
+    });
+  if (upfrontFee >= DUST_DEBT)
+    debtRows.push({
+      key: "upfront-fee",
+      label: L2_WORDS.sheet_upfront_fee,
+      amount: { text: toLocaleStringHelper(upfrontFee), symbol: debtSym, info: feeP?.info, value: feeP?.value },
+      usd: { text: sheetUsd(upfrontFee), info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after") },
+    });
+  if (Math.abs(redistDebt) >= DUST_DEBT)
+    debtRows.push({
+      key: "redistribution",
+      label: L2_WORDS.sheet_redistribution,
+      amount: { text: debtFig(redistDebt), symbol: debtSym, info: debtMoveProv },
+      usd: { text: sheetUsd(redistDebt), info: debtMoveProv },
+    });
+  const debtCarry: EventSheet["sides"][number]["carry"] = [];
+  if (prevCtx && beforeDebt > 0) {
+    debtCarry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      amount: { text: toLocaleStringHelper(beforeDebt), symbol: debtSym, info: debtBeforeProv },
+      usd: { text: sheetUsd(beforeDebt), info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before") },
+    });
+    if (accrualTotal >= DUST_DEBT)
+      debtCarry.push({
+        key: "interest",
+        label: SHEET_WORDS.interest,
+        usd: { text: sheetUsd(accrualTotal), info: accrualProv },
+        sub: [
+          {
+            key: `interest-${debtSym}`,
+            label: debtSym,
+            note: L2_WORDS.sheet_face,
+            amount: {
+              text: fmtAccrued(accrual.batched && accrual.split ? accrual.interest : accrualTotal),
+              symbol: debtSym,
+              info: accrualProv,
+            },
+            usd: {
+              text: sheetUsd(accrual.batched && accrual.split ? accrual.interest : accrualTotal),
+              info: accrualProv,
+            },
+          },
+          ...(accrual.batched && accrual.split && accrual.fee >= DUST_DEBT
+            ? [
+                {
+                  key: "fee",
+                  label: L2_WORDS.sheet_fee,
+                  amount: { text: fmtAccrued(accrual.fee), symbol: debtSym, info: accrualProv },
+                  usd: { text: sheetUsd(accrual.fee), info: accrualProv },
+                },
+              ]
+            : []),
+        ],
+      });
+  }
+  const debtSide: EventSheet["sides"][number] = {
+    side: "debt",
+    icons: [debtSym],
+    carry: debtCarry,
+    before:
+      debtCarry.length > 0
+        ? {
+            key: "before",
+            label: SHEET_WORDS.before,
+            amount: { text: toLocaleStringHelper(debtBeforeEvent), symbol: debtSym, info: debtBeforeEventProv },
+            usd: { text: sheetUsd(debtBeforeEvent), info: debtBeforeEventProv },
+          }
+        : undefined,
+    rows: debtRows,
+    total: {
+      text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
+      info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after"),
+    },
+  };
+
+  // Risk: the collateral ratio and the price that liquidates the Trove;
+  // Limits: the debt ahead of it in the redemption queue and its rate. Each
+  // swaps to its change since the previous event.
+  const prevAfter = prevCtx?.stateAfter;
+  const prevCr = prevAfter && prevAfter.collateralRatio > 0 && prevAfter.debt > 0 ? prevAfter.collateralRatio : null;
+  const disp = (cr: number) => (mode === "ltv" ? 10000 / cr : cr);
+  const open = !isClose && stateAfter.debt > 0;
+  const pts = (a: number) => `${a.toFixed(2)} pts`;
+  const sinceProv = (what: string, formula: string): Provenance => ({
+    kind: "derived",
+    summary: `${what} — the figure after this event less the figure after the Trove's previous event.`,
+    formula,
+  });
+  const liqOf = (coll: number, d: number) => (safety.mcr > 0 && coll > 0 && d > 0 ? (d * safety.mcr) / coll : null);
+  const liqAfter = open ? safety.liqPriceAfter : null;
+  const liqPrev = prevAfter ? liqOf(prevAfter.coll, prevAfter.debt) : null;
+  const usd2 = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const liqProv: Provenance = {
+    kind: "chain-derived",
+    summary: `The ${collSym} price at which this Trove's collateral ratio meets the branch's minimum, ${(safety.mcr * 100).toFixed(0)}% — the debt times the minimum ratio, divided by the collateral, after this event.`,
+    formula: "debt × minimum ratio ÷ collateral",
+    inputs: [
+      { label: "debt", value: `${toLocaleStringHelper(stateAfter.debt)} ${debtSym}`, kind: "chain", note: "after" },
+      { label: "collateral", value: `${formatColl(collAfter)} ${collSym}`, kind: "chain", note: "after" },
+      { label: "minimum ratio", value: `${(safety.mcr * 100).toFixed(0)}%`, kind: "chain", pclass: "state" },
+    ],
+  };
+  const risk: SheetStat[] = [
+    {
+      key: "ratio",
+      label: ratioLabel(mode),
+      value: isClose
+        ? { none: L2_WORDS.closed }
+        : stateAfter.debt === 0
+          ? { none: L2_WORDS.not_applicable }
+          : { text: formatRatio(afterCollRatio, mode, 2), info: crAfterProv },
+      tone: open ? crColor(afterCollRatio, ctx.collateralType) : undefined,
+      change:
+        open && prevCr != null
+          ? {
+              text: changeText(disp(afterCollRatio) - disp(prevCr), pts),
+              info: sinceProv(
+                `${ratioLabel(mode)} change since the previous event, in percentage points`,
+                "after − after the previous event",
+              ),
+            }
+          : null,
+    },
+    {
+      key: "liquidates-at",
+      label: L2_WORDS.liquidates_at,
+      value:
+        liqAfter != null
+          ? { text: usd2(liqAfter), info: liqProv }
+          : { none: isClose ? L2_WORDS.closed : L2_WORDS.not_applicable },
+      change:
+        liqAfter != null && liqPrev != null
+          ? {
+              text: changeText(liqAfter - liqPrev, usd2),
+              info: sinceProv("Liquidation price change since the previous event", "after − after the previous event"),
+            }
+          : null,
+    },
+  ];
+  const rateBefore = stateBefore.annualInterestRate;
+  const limits: SheetStat[] = [
+    { key: "debt-in-front", label: L2_WORDS.debt_in_front, value: { none: L2_WORDS.debt_in_front_unread } },
+    {
+      key: "rate",
+      label: L2_WORDS.interest_rate,
+      value: isClose
+        ? { none: L2_WORDS.closed }
+        : rateAfter > 0
+          ? { text: `${fmtRateNum(rateAfter)}%`, info: rateP?.info, value: rateP?.value }
+          : { none: L2_WORDS.not_applicable },
+      change:
+        !isClose && rateAfter > 0 && rateBefore > 0
+          ? {
+              text: changeText(rateAfter - rateBefore, pts),
+              info: sinceProv(
+                "Interest rate change since the previous event, in percentage points",
+                "rate after − rate before",
+              ),
+            }
+          : null,
+    },
+    ...(ctx.isInBatch && batchFee && !isClose
+      ? [
+          {
+            key: "delegate-fee",
+            label: L2_WORDS.delegate_fee,
+            value: { text: `${fmtRateNum(batchFee.fee)}%`, info: batchFeeProv },
+          },
+        ]
+      : []),
+  ];
+  const branch = LIQUITY_V2_BRANCHES[(collSym === "ETH" ? "WETH" : (collSym ?? "")).toLowerCase()];
+  const paramProv = (what: string, pct: number): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    summary: `The ${collSym} branch's ${what}, ${pct.toFixed(0)}% — a constant the branch's contracts were deployed with.`,
+    contract: tmContract,
+  });
+  const params: SheetStat[] = branch
+    ? [
+        {
+          key: "minimum-ratio",
+          label: L2_WORDS.minimum_ratio,
+          value: {
+            text: `${(branch.mcr * 100).toFixed(0)}%`,
+            info: paramProv("minimum collateral ratio (MCR)", branch.mcr * 100),
+          },
+        },
+        {
+          key: "critical-ratio",
+          label: L2_WORDS.critical_ratio,
+          value: {
+            text: `${(branch.ccr * 100).toFixed(0)}%`,
+            info: paramProv("critical collateral ratio (CCR)", branch.ccr * 100),
+          },
+        },
+      ]
+    : [];
+  const sheet: EventSheet = {
+    sides: [collSide, debtSide],
+    panels: [
+      { panel: "risk", rows: risk },
+      { panel: "limits", rows: limits, breakdown: params },
+    ],
+  };
+  return { cells, sheet };
+}
+
+/** A token amount's dollars at a price. */
+function usdMoveProv(sym: string, amount: number, price: number): Provenance {
+  return {
+    kind: "chain-derived",
+    summary: `${sym} this event moved, in US dollars — the amount times Liquity's price for ${sym} at this block.`,
+    formula: "amount × price",
+    inputs: [
+      { label: "amount", value: `${fmtColl(amount)} ${sym}`, kind: "chain" },
+      {
+        label: "price",
+        value: fmtUsdWhole(price),
+        kind: "chain-derived",
+        pclass: "oracle",
+        note: "on-chain oracle @ event block",
+      },
+    ],
+  };
+}
+
+/** A balance's dollars at another event's price. */
+function atPriceProv(sym: string, amount: number, price: number, when: string): Provenance {
+  return {
+    kind: "chain-derived",
+    summary: `${sym} held after ${when}, in US dollars — the amount times Liquity's price for ${sym} then.`,
+    formula: "collateral × price then",
+    inputs: [
+      { label: "collateral", value: `${fmtColl(amount)} ${sym}`, kind: "chain" },
+      { label: `price at ${when}`, value: fmtUsdWhole(price), kind: "chain-derived", pclass: "oracle" },
+    ],
+  };
+}
+
+/** The collateral's move in dollars from the previous event's price to this
+ *  event's, the balance held through it. */
+function marketMoveProv(sym: string, amount: number, prev: number, now: number): Provenance {
+  return {
+    kind: "chain-derived",
+    summary: `Market move — the change in the ${sym} price from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
+    formula: "collateral × (price now − price at the previous event)",
+    inputs: [
+      { label: "collateral", value: `${fmtColl(amount)} ${sym}`, kind: "chain" },
+      {
+        label: `${sym} price at the previous event`,
+        value: fmtUsdWhole(prev),
+        kind: "chain-derived",
+        pclass: "oracle",
+      },
+      { label: `${sym} price at this event`, value: fmtUsdWhole(now), kind: "chain-derived", pclass: "oracle" },
+    ],
+  };
 }
 
 /** The redemption's redeemer, under the grid. */
