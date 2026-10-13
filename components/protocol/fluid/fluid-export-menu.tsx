@@ -1,15 +1,18 @@
-"use client";
+// The export shapes for a Fluid position on the position card's ⋮ (Copy
+// Position, View as Markdown, Download CSV): the shared card draws them with
+// `ExportMenu`; the Markdown is the Fluid serializer, mirroring
+// components/protocol/moonwell/moonwell-export-menu.tsx.
 
-// Export control for the Fluid position detail page — a thin wrapper over the
-// shared <ExportMenu> that supplies the Fluid Markdown serializer, mirroring
-// components/protocol/liquity-fork/liquity-fork-export-menu.tsx. The wrapper
-// exists so the page can lazy-load the whole export path (dropdown UX +
-// serializer + CSV builder) as one chunk off the initial bundle.
-
-import { ExportMenu, type WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
 import { fluidPositionToMarkdown, type FluidPositionMarkdownArgs } from "@/lib/fluid/position-to-markdown";
 
-type Props = Omit<FluidPositionMarkdownArgs, "generatedAt"> & {
+export function fluidExports({
+  csvFilename,
+  scopeNote,
+  fetchAllEvents,
+  ...markdownArgs
+}: Omit<FluidPositionMarkdownArgs, "generatedAt"> & {
   /** Loads the position's whole history for the CSV, on a page that drew a
    *  window. Absent where the page already holds every event. */
   fetchAllEvents?: () => Promise<WholeHistoryFetch>;
@@ -20,16 +23,12 @@ type Props = Omit<FluidPositionMarkdownArgs, "generatedAt"> & {
    *  seeded from the opening balance — but the per-event rows are the window,
    *  and the menu says so rather than handing over a short spreadsheet. */
   scopeNote?: string;
-};
-
-export function FluidExportMenu({ csvFilename, scopeNote, fetchAllEvents, ...markdownArgs }: Props) {
-  return (
-    <ExportMenu
-      buildMarkdown={() => fluidPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() })}
-      events={markdownArgs.events}
-      fetchAllEvents={fetchAllEvents}
-      csvFilename={csvFilename}
-      scopeNote={scopeNote}
-    />
-  );
+}): PositionCardExports {
+  return {
+    buildMarkdown: () => fluidPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() }),
+    events: markdownArgs.events,
+    fetchAllEvents,
+    csvFilename,
+    scopeNote,
+  };
 }

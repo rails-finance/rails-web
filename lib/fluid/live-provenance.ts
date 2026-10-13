@@ -57,23 +57,6 @@ export const vaultConfigProv = (what: string, field: string, vault: string, pair
   via: `${LANE_VIA} · VaultResolver.positionByNftId @ head · configs.${field}`,
 });
 
-/** The vault oracle's price — DEBT PER COL, the protocol's only price space. */
-export const vaultOraclePriceProv = (
-  colSym: string,
-  debtSym: string,
-  oracle: string,
-  leg: "operate" | "liquidate" = "liquidate",
-): Provenance => ({
-  kind: "chain",
-  pclass: "oracle",
-  verify: recompute(
-    `Re-run VaultResolver.positionByNftId and read configs.oraclePrice${leg === "operate" ? "Operate" : "Liquidate"} — scale is 1e(27 + debt decimals − collateral decimals)`,
-  ),
-  summary: `The ${colSym} price in ${debtSym} — the vault's own oracle (each Fluid vault names one), read through the resolver at the head block. Fluid oracles price the collateral IN THE DEBT TOKEN; there is no USD feed anywhere in the protocol — this pair price is the exact space the liquidation engine judges in${leg === "liquidate" ? " (the liquidate-leg price, the one liquidations use)" : " (the operate-leg price, the one user operations are gated by)"}.`,
-  contract: { name: "Fluid vault oracle", address: oracle },
-  via: `${LANE_VIA} · configs.oraclePrice${leg === "operate" ? "Operate" : "Liquidate"} @ head`,
-});
-
 /** The position's ratio in the engine's own space. */
 export const fluidRatioProv = (colSym: string, debtSym: string, vault: string, pair?: string): Provenance => ({
   kind: "chain-derived",
