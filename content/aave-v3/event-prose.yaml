@@ -294,6 +294,8 @@ words:
 page_words:
   paragraph: |-
     This page is one transaction from this account's history on the Aave V3 {market} Pool.
+  paragraph_seamless: |-
+    This page is one transaction from this account's history on the Seamless Pool, an Aave V3 market on Base.
   timeline_link: |-
     See the whole history in the timeline.
   timeline_hint: |-
@@ -306,6 +308,8 @@ page_words:
     Copy the account's address
   description: |-
     One transaction from the Aave V3 {market} account {account}, on {day}.
+  description_seamless: |-
+    One transaction from the Seamless account {account}, on {day}.
 
 position_words:
   heading_holdings: |-
