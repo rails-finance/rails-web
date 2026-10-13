@@ -89,13 +89,23 @@ async function live(): Promise<void> {
     );
 
     await page.goto(`${BASE}/ethereum/frankencoin/${V1_POSITION}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
-    const line = page.getByText(/Interest was charged at each mint/).first();
-    // The explanation sits in a collapsed drawer: read it attached, not visible.
-    await line.waitFor({ state: "attached", timeout: 90_000 });
-    const text = (await line.textContent()) ?? "";
+    // The closed position's "?" modal carries the Hub V1 "Interest up front" entry.
+    await page.locator('button[aria-label="Learn more"]').first().waitFor({ state: "attached", timeout: 90_000 });
+    await page.waitForTimeout(5_000); // hydration: a click before it opens nothing
+    const buttons = page.locator('button[aria-label="Learn more"]');
+    let text = "";
+    for (let i = 0; i < (await buttons.count()) && !text; i++) {
+      await buttons.nth(i).evaluate((el) => (el as HTMLElement).click()); // the buttons sit in the collapsed layer
+      const dialog = page.locator('[role="dialog"]').first();
+      await dialog.waitFor({ state: "attached", timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(1_000);
+      const body = (await dialog.textContent().catch(() => "")) ?? "";
+      if (/About this position/.test(body)) text = body;
+      else await page.keyboard.press("Escape");
+    }
     check(
-      "V1 position: interest line names the 4-week minimum and the fixed rate",
-      /at least 4 weeks, at the rate fixed when the position opened/.test(text),
+      "V1 position: the ? modal's interest entry names the 4-week minimum and the rate fixed at opening",
+      /paid the rate fixed at opening at once, to expiry and for at least 4 weeks/.test(text),
       text.slice(0, 200),
     );
   } finally {
