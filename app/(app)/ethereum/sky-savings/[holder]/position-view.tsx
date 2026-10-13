@@ -184,6 +184,9 @@ export default function SkySavingsPositionView({
         owner={{ wallet: position.holder }}
         assets={priceAssets}
         priceReason={ORACLE_USD_REASON["sky-savings"]}
+        // The card's ⋮ carries Show provenance; the event route, which draws no
+        // card, keeps Tools in the wallet row.
+        tools={onEventPage}
       />
 
       {!onEventPage && (
@@ -199,7 +202,7 @@ export default function SkySavingsPositionView({
           asOf={asOf}
           surface="detail"
           viewHref={tl.viewHref}
-          rowExtra={checked}
+          foot={checked}
           explanation={
             <SkySavingsPositionExplanation position={position} asOf={asOf} totals={totals} firstAt={firstAt} />
           }

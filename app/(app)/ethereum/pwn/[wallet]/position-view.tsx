@@ -14,7 +14,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -38,6 +37,8 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
+import { pwnExports } from "@/components/protocol/pwn/pwn-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { PwnEventCard } from "@/components/protocol/pwn/pwn-event-card";
 import { PwnPositionCard, viewFromSummary } from "@/components/protocol/pwn/pwn-position-card";
 import { PwnPositionExplanation } from "@/components/protocol/pwn/pwn-position-explanation";
@@ -55,12 +56,6 @@ import type { PwnCollateralReturn, PwnContext } from "@/lib/shared/types/event-s
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { pwnExplorer } from "@/lib/pwn/explorer";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const PwnExportMenu = dynamic(() => import("@/components/protocol/pwn/pwn-export-menu").then((m) => m.PwnExportMenu), {
-  ssr: false,
-});
 
 interface PwnLoanViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -440,6 +435,23 @@ export default function PwnLoanView({
     return out;
   }, [view]);
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2). A window survives here
+  // only on a single-loan wallet: with more loans the page refetches the whole
+  // history, because PWN's timeline route takes no per-loan cutoff and a
+  // wallet-grained opening balance cannot be split across loans. So where the
+  // scope note appears, the wallet's history IS this loan's.
+  const exports = view
+    ? pwnExports({
+        view,
+        events: pwnEvents,
+        wallet,
+        csvFilename: `pwn-loan-${view.loanId}-activity.csv`,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        history: markdownHistoryScope(historyWindow, pwnEvents),
+        scopeNote: exportScopeNote(historyWindow, pwnEvents, "this loan's whole history"),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -457,26 +469,14 @@ export default function PwnLoanView({
               ) : undefined,
           }}
           showStamp={false}
+          tools={onEventPage}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.pwn}
           closed={view != null && view.status !== "open"}
         >
-          {/* A window survives here only on a single-loan wallet: with more loans
-            the page refetches the whole history, because PWN's timeline route
-            takes no per-loan cutoff and a wallet-grained opening balance cannot
-            be split across loans. So where the scope note below appears, the
-            wallet's history IS this loan's. */}
-          {view && (
-            <PwnExportMenu
-              view={view}
-              events={pwnEvents}
-              wallet={wallet}
-              csvFilename={`pwn-loan-${view.loanId}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              history={markdownHistoryScope(historyWindow, pwnEvents)}
-              scopeNote={exportScopeNote(historyWindow, pwnEvents, "this loan's whole history")}
-            />
-          )}
+          {/* The exports ride the card's ⋮; the event route, which draws no card,
+            keeps them in the wallet row's Tools. */}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -490,7 +490,8 @@ export default function PwnLoanView({
                 <PwnPositionCard
                   v={view}
                   viewer={wallet}
-                  receipts
+                  surface="detail"
+                  exports={exports}
                   viewHref={tl.viewHref}
                   explanation={<PwnPositionExplanation v={view} wallet={wallet} />}
                 />

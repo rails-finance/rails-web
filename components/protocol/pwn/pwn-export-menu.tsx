@@ -1,15 +1,18 @@
-"use client";
+// The export shapes for a PWN loan on the position card's ⋮ (Copy Position,
+// View as Markdown, Download CSV): the shared card draws them with
+// `ExportMenu`; the Markdown is the PWN serializer, mirroring
+// components/protocol/fluid/fluid-export-menu.tsx.
 
-// Export control for the PWN loan detail page — a thin wrapper over the
-// shared <ExportMenu> that supplies the PWN Markdown serializer, mirroring
-// components/protocol/fluid/fluid-export-menu.tsx. The wrapper exists so the
-// page can lazy-load the whole export path (dropdown UX + serializer + CSV
-// builder) as one chunk off the initial bundle.
-
-import { ExportMenu, type WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
 import { pwnPositionToMarkdown, type PwnPositionMarkdownArgs } from "@/lib/pwn/position-to-markdown";
 
-type Props = Omit<PwnPositionMarkdownArgs, "generatedAt"> & {
+export function pwnExports({
+  csvFilename,
+  scopeNote,
+  fetchAllEvents,
+  ...markdownArgs
+}: Omit<PwnPositionMarkdownArgs, "generatedAt"> & {
   /** Loads the position's whole history for the CSV, on a page that drew a
    *  window. Absent where the page already holds every event. */
   fetchAllEvents?: () => Promise<WholeHistoryFetch>;
@@ -19,17 +22,13 @@ type Props = Omit<PwnPositionMarkdownArgs, "generatedAt"> & {
    *  landed — see the checkpoint model in lib/shared/timeline-opening-balance.ts.
    *  Absent on the no-op path, which is every PWN wallet in the index today. */
   scopeNote?: string;
-};
-
-export function PwnExportMenu({ csvFilename, scopeNote, fetchAllEvents, ...markdownArgs }: Props) {
-  return (
-    <ExportMenu
-      buildMarkdown={() => pwnPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() })}
-      events={markdownArgs.events}
-      fetchAllEvents={fetchAllEvents}
-      csvFilename={csvFilename}
-      ariaLabel="Export this loan"
-      scopeNote={scopeNote}
-    />
-  );
+}): PositionCardExports {
+  return {
+    buildMarkdown: () => pwnPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() }),
+    events: markdownArgs.events,
+    fetchAllEvents,
+    csvFilename,
+    ariaLabel: "Export this loan",
+    scopeNote,
+  };
 }

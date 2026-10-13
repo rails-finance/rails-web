@@ -1,18 +1,20 @@
-"use client";
+// The export shapes for a Frankencoin position on the position card's ⋮
+// (Copy Position, View as Markdown, Download CSV): the shared card draws them
+// with `ExportMenu`; the Markdown is the Frankencoin serializer.
 
-// Export control for the Frankencoin position detail page — a thin wrapper
-// over the shared <ExportMenu> that supplies the Frankencoin Markdown
-// serializer. The wrapper exists so the page can lazy-load the whole export
-// path (dropdown UX + serializer + CSV builder) as one chunk off the initial
-// bundle.
-
-import { ExportMenu, type WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
 import {
   frankencoinPositionToMarkdown,
   type FrankencoinPositionMarkdownArgs,
 } from "@/lib/frankencoin/position-to-markdown";
 
-type Props = Omit<FrankencoinPositionMarkdownArgs, "generatedAt"> & {
+export function frankencoinExports({
+  csvFilename,
+  scopeNote,
+  fetchAllEvents,
+  ...markdownArgs
+}: Omit<FrankencoinPositionMarkdownArgs, "generatedAt"> & {
   /** Output file name for the CSV download, including the `.csv` extension. */
   csvFilename: string;
   /** Loads the position's whole history for the CSV, on a page that drew a
@@ -23,16 +25,12 @@ type Props = Omit<FrankencoinPositionMarkdownArgs, "generatedAt"> & {
    *  seeded from the opening balance — but the per-event rows are the window,
    *  and the menu says so rather than handing over a short spreadsheet. */
   scopeNote?: string;
-};
-
-export function FrankencoinExportMenu({ csvFilename, scopeNote, fetchAllEvents, ...markdownArgs }: Props) {
-  return (
-    <ExportMenu
-      buildMarkdown={() => frankencoinPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() })}
-      events={markdownArgs.events}
-      fetchAllEvents={fetchAllEvents}
-      csvFilename={csvFilename}
-      scopeNote={scopeNote}
-    />
-  );
+}): PositionCardExports {
+  return {
+    buildMarkdown: () => frankencoinPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() }),
+    events: markdownArgs.events,
+    fetchAllEvents,
+    csvFilename,
+    scopeNote,
+  };
 }

@@ -19,7 +19,6 @@ import { useParams } from "next/navigation";
 import { liquityV1Explorer } from "@/lib/liquity-v1/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCollSurplusClaimEvent, isLiquityV1Event } from "@/lib/shared/types/event-shape";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -45,17 +44,14 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV1EventCard } from "@/components/protocol/liquity-v1/liquity-v1-event-card";
 import { LiquityV1PositionCard, viewFromSummary } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
+import { liquityV1Exports } from "@/components/protocol/liquity-v1/liquity-v1-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { redemptionSplit } from "@/lib/liquity-v1/event-figures";
 import {
   LiquityV1PositionExplanation,
   LiquityV1ClosedEpochExplanation,
   LiquityV1SupersededExplanation,
 } from "@/components/protocol/liquity-v1/liquity-v1-position-explanation";
-import {
-  LiquityV1RiskDetail,
-  LiquityV1RiskHeadline,
-  liquityV1HasRisk,
-} from "@/components/protocol/liquity-v1/liquity-v1-risk-slot";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
@@ -76,13 +72,6 @@ import {
 import { liquityV1OutcomeTxs, liquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { protocolPriceProv } from "@/lib/liquity-v1/position-provenance";
 import { eventPriceProv } from "@/lib/liquity-v1/event-provenance";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the V4 spoke page.
-const LiquityV1ExportMenu = dynamic(
-  () => import("@/components/protocol/liquity-v1/liquity-v1-export-menu").then((m) => m.LiquityV1ExportMenu),
-  { ssr: false },
-);
 
 interface LiquityV1TroveViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -125,6 +114,8 @@ export default function LiquityV1TroveView({
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
   const [chain, setChain] = useState<LiquityV1PositionChainResponse | null>(null);
+  // The live read has returned or failed: until then the collateral ratio waits.
+  const [chainSettled, setChainSettled] = useState(false);
   // Standing display framing (risk view) — a global preference, so the reader's
   // choice on one Trove carries to the next.
 
@@ -223,6 +214,8 @@ export default function LiquityV1TroveView({
         if (!cancelled && !data.chainStale) setChain(data);
       } catch {
         // Index-derived surfaces already render; the risk layer just stays off.
+      } finally {
+        if (!cancelled) setChainSettled(true);
       }
     })();
     return () => {
@@ -484,6 +477,22 @@ export default function LiquityV1TroveView({
       ? { ...view, collateral: chainLive.coll, debt: chainLive.debt, atBlock: chainLive.blockNumber }
       : view;
 
+  const exports = view
+    ? liquityV1Exports({
+        wallet,
+        view,
+        // The live read describes the CURRENT Trove — a closed prior life
+        // serializes its replayed history alone.
+        chain: view.status === "open" ? chain : null,
+        events: v1Events,
+        csvFilename: `liquity-v1-${wallet.slice(0, 10)}-activity.csv`,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        claimRow,
+        history: markdownHistoryScope(historyWindow, v1Events),
+        scopeNote: exportScopeNote(historyWindow, v1Events, "this wallet's whole history"),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -497,6 +506,9 @@ export default function LiquityV1TroveView({
               : []
           }
           closed={view != null && view.status !== "open"}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
           closing={
             // The PriceFeed's lastGoodPrice at the closing block, carried on
             // liquidation and redemption rows only.
@@ -518,21 +530,7 @@ export default function LiquityV1TroveView({
               : undefined
           }
         >
-          {view && (
-            <LiquityV1ExportMenu
-              wallet={wallet}
-              view={view}
-              // The live read describes the CURRENT Trove — a closed prior life
-              // serializes its replayed history alone.
-              chain={view.status === "open" ? chain : null}
-              events={v1Events}
-              csvFilename={`liquity-v1-${wallet.slice(0, 10)}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              claimRow={claimRow}
-              history={markdownHistoryScope(historyWindow, v1Events)}
-              scopeNote={exportScopeNote(historyWindow, v1Events, "this wallet's whole history")}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -542,24 +540,18 @@ export default function LiquityV1TroveView({
             {!onEventPage && view && faceView && (
               <LiquityV1PositionCard
                 v={faceView}
-                receipts
+                surface="detail"
                 live={chainLive != null}
                 viewHref={tl.viewHref}
                 surplus={surplus}
                 priceUsd={priceNow}
                 endedBy={lastRow ? endedBy : null}
-                // Closed by default, remembered per viewer and Trove (ui-jobs
-                // 209). The collateral ratio from the live read is the third
-                // headline; the liquidation price, its bar, the redemption queue,
-                // the room to borrow and the system ratio sit in the opened
-                // layer, inside the card's receipts scope. Only for the open
-                // life with the read landed: they describe the CURRENT Trove.
-                positionSummary
-                risk={
-                  chain && view.status === "open" && liquityV1HasRisk(chain)
-                    ? { value: <LiquityV1RiskHeadline chain={chain} />, detail: <LiquityV1RiskDetail chain={chain} /> }
-                    : undefined
-                }
+                // The collateral ratio, the queue, the liquidation price and the
+                // room to borrow come from the live read; they describe the
+                // CURRENT Trove, so only the open life takes them.
+                chain={view.status === "open" ? chain : null}
+                riskPending={view.status === "open" && !chainSettled}
+                exports={exports}
                 // The Explanation is prose about the face figures; the
                 // redemption card's protocol-wide figures (fees, absolute
                 // debt-in-front) live on the system view.

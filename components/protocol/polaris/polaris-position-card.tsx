@@ -1,7 +1,7 @@
 "use client";
 
-// Polaris CDP card — one (market, cdpId), through the SAME shared grammar
-// (OpenPositionStats + StatValue) as the other explorers.
+// Polaris CDP card — one (market, cdpId): a slot builder for the shared
+// position card (components/shared/position-card.tsx), as Liquity V2's is.
 //
 // THE GRAIN IS THE CDP NFT: the card is one CDP in one market — the id and
 // the market are the identity, the holder a mutable fact shown beside them.
@@ -31,35 +31,46 @@
 // the detail page).
 
 import { useState, type ReactNode } from "react";
-import { Image as ImageIcon, Link2 } from "lucide-react";
+import { AlertTriangle, Check, Copy, Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
+import { AssetPopover } from "@/components/shared/asset-popover";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash, StatFootnote } from "@/components/shared/stat-value";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardMenu,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
+import { StatValue } from "@/components/shared/stat-value";
+import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatExact, formatNumber, formatUnitsExact, formatUsdValue, withRealMinus } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, peakProv } from "@/lib/polaris/event-provenance";
 import {
   listingIcrProv,
-  listingLiqPriceProv,
   liveEntireProv,
   liveEquityProv,
   liveIcrProv,
   liveMcrProv,
+  liveModeProv,
   liveOwnerProv,
   livePendingProv,
   liveRateProv,
+  liveRecordedDebtProv,
   liveUsdValueProv,
+  polarisAnnualCostProv,
 } from "@/lib/polaris/live-provenance";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { polarisPositionModal } from "@/lib/polaris/event-templates";
-import { polarisCdpNftUrl } from "@/lib/polaris/routes";
+import { polarisCdpNftUrl, polarisPositionHref } from "@/lib/polaris/routes";
+import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
 import type { PolarisPositionSummary, PolarisPositionStatus } from "@/lib/sources/api/polaris-positions";
 import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
@@ -102,9 +113,6 @@ export interface PolarisPositionView {
   icr: number | null;
   mcr: number | null;
   defensiveMode: boolean;
-  /** Index lane only — debt × the MCR in force ÷ coll: the pETH price, in the
-   *  market's own unit, at which the row's stated figures reach the floor. */
-  liqPrice: number | null;
   /** The market-board read the ratio needs has not answered yet — the ratio
    *  slot holds a pulse rather than a dash. Never true once it has settled,
    *  answered or not. */
@@ -136,12 +144,6 @@ export interface PolarisPositionView {
   blockNumber: number | null;
 }
 
-const STATUS: Record<PolarisPositionStatus, { label: string; cls: string }> = {
-  open: { label: "OPEN", cls: "bg-positive/20 text-positive" },
-  closed: { label: "CLOSED", cls: "bg-rb-300 dark:bg-rb-700 text-foreground/70" },
-  liquidated: { label: "LIQUIDATED", cls: "bg-red-500/20 text-red-500" },
-};
-
 const collProv = (v: PolarisPositionView): Provenance =>
   v.basis === "chain" ? liveEntireProv("coll", v.market) : latestStateProv("coll", v.market);
 const debtProv = (v: PolarisPositionView): Provenance =>
@@ -149,18 +151,10 @@ const debtProv = (v: PolarisPositionView): Provenance =>
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 
-/** What the lead badge on an open CDP's card says, on hover or tap. */
-const BADGE_TIPS = {
-  borrowing: "Borrowing: the CDP owes debt at this block — the Debt figure beside it.",
-  collateralOnly:
-    "Collateral only: the CDP owes nothing at this block. Polaris allows a CDP with no debt; the PSM's shares can still add debt to it at a later touch.",
-} as const;
+/** What the Debt label says on a CDP that owes nothing. */
+const COLLATERAL_ONLY_TIP =
+  "The CDP owes nothing at this block. Polaris allows a CDP with no debt; the PSM's shares can still add debt to it at a later touch.";
 
-/** A liquidation price in the market's own unit — never "$": GOLDp's unit is
- *  a troy ounce of gold, and the protocol prices nothing in dollars here.
- *  Magnitude-aware the way the shared formatLiquidationPrice is, minus the
- *  currency sign, because the two markets' prices sit four orders apart
- *  (USDp ~6,000; GOLDp ~1.4). */
 /** A pETH price in the market's own stablecoin, at a readable grain: three
  *  decimals under 1, two under 100, whole numbers above (USDp's feed runs in
  *  the thousands, where a compact "5K" would hide the move). Shared with the
@@ -198,53 +192,74 @@ const cardFigure = (value: number): string =>
     ? formatNumber(value)
     : value.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
-/** A card headline in full — the row's and the grid's rule, three decimals —
- *  with the token named in words and by its glyph. The word and the glyph
- *  wrap under the figure where the column is too narrow for all three (a
- *  five-figure debt at phone width), so a full figure never pushes the glyph
- *  off the card. The exact decimal rides the tip and the inspector's
- *  `data-prov-exact`, as AssetAmount's does. */
-function CardAmount({
+/** A figure in the card's cost and debt-sum lines, at the card's grain:
+ *  three decimals with trailing zeros kept ("24.040"), so the sum reads at the
+ *  same grain as the Debt figure above it. A magnitude too small for three
+ *  decimals keeps AmountText's floor and tooltip. */
+export function CardSumAmount({ value }: { value: number }) {
+  if (value !== 0 && Math.abs(value) < 0.0005) return <AmountText value={value} />;
+  return <>{cardFigure(value)}</>;
+}
+
+/** A card headline in full — the row's and the grid's rule, three decimals.
+ *  The exact decimal rides the tip and the inspector's `data-prov-exact`, as
+ *  AssetAmount's does. The token stands beside it as an icon (`assets`). */
+function CardFigure({
   value,
   symbol,
-  address,
   exact,
   signed = false,
 }: {
   value: number;
   symbol: string;
-  address: string;
   exact?: string;
   signed?: boolean;
 }) {
   const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
   const shown = signed ? withRealMinus(cardFigure(value)) : cardFigure(value);
   return (
+    <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
+      <span data-prov-exact={full} data-prov-symbol={symbol}>
+        {shown}
+      </span>
+    </RevealTip>
+  );
+}
+
+/** A figure with the token named in words and by its glyph, for a cell that
+ *  has no icon slot of its own (Surplus to claim). The word and the glyph wrap
+ *  under the figure where the column is too narrow for all three. */
+function CardAmount(props: { value: number; symbol: string; address: string; exact?: string }) {
+  return (
     <span className="inline-flex flex-wrap items-center gap-x-2">
-      <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
-        <span data-prov-exact={full} data-prov-symbol={symbol}>
-          {shown}
-        </span>
-      </RevealTip>
+      <CardFigure value={props.value} symbol={props.symbol} exact={props.exact} />
       <span data-prov-hidden="" className="inline-flex items-center gap-2">
-        <span className="text-[0.55em] font-medium text-rb-500">{symbol}</span>
+        <span className="text-[0.55em] font-medium text-rb-500">{props.symbol}</span>
         <span className="inline-flex items-center justify-center rounded-full bg-raised p-0.5">
-          <TokenChipIcon symbol={symbol} address={address} size={28} filterable={false} />
+          <TokenChipIcon symbol={props.symbol} address={props.address} size={28} filterable={false} />
         </span>
       </span>
     </span>
   );
 }
 
-/** The CDP-grain identity: market chip · CDP id, then the two things a reader
- *  wants to do with the id — take it away, and look at the NFT it names.
+/** A headline's token icon; it opens the asset's popover with the exact figure. */
+function assetIcon(symbol: string, address: string, figure: string): ReactNode {
+  return (
+    <AssetPopover symbol={symbol} address={address} chainId={SEPOLIA_CHAIN_ID} figure={`${figure} ${symbol}`}>
+      <TokenChipIcon symbol={symbol} address={address} size={28} filterable={false} untitled />
+    </AssetPopover>
+  );
+}
+
+/** The CDP-grain identity on a listing row: market chip · CDP id, then the two
+ *  things a reader wants to do with the id — take it away, and look at the NFT
+ *  it names.
  *
- *  Both are <button>s, never <a>s: on the listing this row renders inside the
- *  driver's row <Link>, and a nested anchor is invalid HTML. So the NFT link
- *  is a button + window.open, and both handlers preventDefault/stopPropagation
- *  so a click copies or opens instead of navigating to the CDP's own page.
- *  Modelled on the V2 trove row (trove-identity-row.tsx), down to the 1.5 s
- *  "Copied" state and the copy/check glyph pair. */
+ *  Both are <button>s, never <a>s: this row renders inside the driver's row
+ *  <Link>, and a nested anchor is invalid HTML. So the NFT link is a button +
+ *  window.open, and both handlers preventDefault/stopPropagation so a click
+ *  copies or opens instead of navigating to the CDP's page. */
 function CdpIdentity({ v }: { v: PolarisPositionView }) {
   const cfg = POLARIS_MARKET_CONFIG[v.market];
   const [copied, setCopied] = useState(false);
@@ -289,36 +304,37 @@ function CdpIdentity({ v }: { v: PolarisPositionView }) {
   );
 }
 
-function MetaCluster({ v }: { v: PolarisPositionView }) {
+/** The CDP's rows at the head of the card's ⋮: its number with a copy, its
+ *  NFT, and a link to this page. */
+function CdpMenuRows({ v }: { v: PolarisPositionView }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (key: string, value: string) => {
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
   return (
-    <PositionCardMeta
-      lastActivityAt={v.lastActivityAt}
-      eventCount={v.eventCount}
-      liquidationCount={v.liqCount > 0 ? v.liqCount : null}
-    />
-  );
-}
-
-/** The card's identity lead: the holder's wallet pill (the bookmark keys off
- *  the holder), then the CDP's own identity. The detail page draws the holder
- *  on the wallet row above the card (ui-jobs 228, `polarisOwnerWrap`). */
-function IdentityLead({ v, wallet = true }: { v: PolarisPositionView; wallet?: boolean }) {
-  if (!v.owner || !wallet) return <CdpIdentity v={v} />;
-  const pill = <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmarkProtocol="polaris" />;
-  return (
-    <span className="flex items-center gap-2">
-      {/* On the chain lane the holder is the NFT's own ownerOf at head; the
-          index lane's holder is the last Transfer's recipient (its receipt
-          rides the transfer rows). */}
-      {v.basis === "chain" ? (
-        <Prov info={liveOwnerProv(v.market)} value={v.owner}>
-          {pill}
-        </Prov>
-      ) : (
-        pill
-      )}
-      <CdpIdentity v={v} />
-    </span>
+    <>
+      <ToolsMenuItem
+        icon={copied === "id" ? <Check size={16} /> : <Copy size={16} />}
+        title={`CDP #${v.cdpId}`}
+        subtitle={copied === "id" ? "Copied" : "Copy the CDP number"}
+        onClick={() => copy("id", v.cdpId)}
+      />
+      <ToolsMenuItem
+        icon={<ImageIcon size={16} />}
+        title="CDP NFT"
+        subtitle="Open it on Etherscan"
+        onClick={() => window.open(polarisCdpNftUrl(v.market, v.cdpId), "_blank", "noopener,noreferrer")}
+      />
+      <ToolsMenuItem
+        icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
+        title="Link to this CDP"
+        subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
+        onClick={() => copy("link", `${window.location.origin}${polarisPositionHref(v.market, v.cdpId)}`)}
+      />
+    </>
   );
 }
 
@@ -334,341 +350,429 @@ export function polarisOwnerWrap(v: PolarisPositionView): ((pill: ReactNode) => 
   );
 }
 
-export function PolarisPositionCard({
+/** What a Polaris page or listing hands the card. */
+export interface PolarisPositionCardProps {
+  v: PolarisPositionView;
+  /** `detail` on the CDP's page (receipts, panel, (i)); `listing` in a row. */
+  surface?: "listing" | "detail";
+  /** The (i) pane's prose. */
+  explanation?: ReactNode;
+  /** Open the Explanation pane on first mount, and hear about every toggle.
+   *  The detail page passes a stored per-CDP flag through them
+   *  (hooks/usePolarisUiState.ts); the listing render passes neither. */
+  explanationDefaultOpen?: boolean;
+  onExplanationToggle?: (open: boolean) => void;
+  /** Copy-this-view link: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** The ⋮'s export shapes (`polarisExports`). Absent: the ⋮ holds the CDP's
+   *  rows and the provenance row alone. */
+  exports?: PositionCardExports;
+}
+
+/** The Polaris slots for the shared position card: the headlines, the panel,
+ *  the tag, the ⋮ and the counters, from the CDP's view. */
+export function polarisCardSlots({
   v,
-  receipts = false,
-  rowExtra,
+  surface = "detail",
   explanation,
   explanationDefaultOpen,
   onExplanationToggle,
   viewHref,
-  surface = "detail",
-}: {
-  v: PolarisPositionView;
-  receipts?: boolean;
-  rowExtra?: React.ReactNode;
-  explanation?: React.ReactNode;
-  /** Open the Explanation pane on first mount, and hear about every toggle —
-   *  both forwarded straight to the shell. The detail page passes a stored
-   *  per-CDP flag through them (hooks/usePolarisUiState.ts); the listing
-   *  render passes neither, and the pane keeps its closed default. */
-  explanationDefaultOpen?: boolean;
-  onExplanationToggle?: (open: boolean) => void;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  /** Listing cards carry the lifecycle pill (green OPEN); the detail page the
-   *  neutral mode word. Terminal states keep their pills on both. */
-  surface?: "listing" | "detail";
-}) {
-  const st = STATUS[v.status] ?? STATUS.open;
+  exports,
+}: PolarisPositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
+  const cfg = POLARIS_MARKET_CONFIG[v.market];
   const stable = v.stableSymbol;
+  const stableAddress = cfg.stable.address;
+  const index = v.basis === "index";
 
-  if (v.status === "closed" || v.status === "liquidated") {
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        rowExtra={rowExtra}
-        explanation={explanation}
-        explanationDefaultOpen={explanationDefaultOpen}
-        onExplanationToggle={onExplanationToggle}
-        viewHref={viewHref}
-        learnMore={polarisPositionModal(v.status)}
-      >
-        <ClosedPositionStats
-          outcome={v.status}
-          leadingIdentity={<IdentityLead v={v} wallet={!receipts} />}
-          identity={<MetaCluster v={v} />}
-          closedAt={v.lastActivityAt ?? undefined}
-          collateral={
-            v.peakColl > 0 ? (
-              <StatValue>
-                <Prov info={peakProv("coll", v.market, v.peaksCountLiquidation)}>
-                  <CardAmount value={v.peakColl} symbol={PETH.symbol} address={PETH.address} />
+  const status: PositionCardStatus | null =
+    v.status === "liquidated"
+      ? { word: "Liquidated", tone: "danger" }
+      : v.status === "closed"
+        ? { word: "Closed", tone: "muted" }
+        : null;
+
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.eventCount,
+    liquidationCount: v.liqCount > 0 ? v.liqCount : null,
+    // The foot strip reads transactions, warnings, then the age.
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+
+  // The listing names the holder and the CDP; the detail page's wallet row
+  // names the holder and the card's ⋮ the CDP, so the card states the market
+  // and the network.
+  const identity = detail ? (
+    <span className="text-xs text-rb-500">Sepolia testnet · {stable} market</span>
+  ) : (
+    <span className="flex items-center gap-2">
+      {v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmarkProtocol="polaris" />}
+      <CdpIdentity v={v} />
+    </span>
+  );
+
+  const ended = v.status === "closed" || v.status === "liquidated";
+  let heads: PositionCardHead[];
+  let outcome: PositionCardOutcome | undefined;
+
+  if (ended) {
+    const peakTip = (what: "coll" | "debt") =>
+      what === "coll"
+        ? `${
+            v.peaksCountLiquidation
+              ? "The most pETH the CDP held at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in."
+              : "The most pETH the CDP held after any of its touches (a touch is any transaction on it)."
+          } ${PEAK_COLL_ABOVE_DEPOSITS}`
+        : v.peaksCountLiquidation
+          ? `The most ${stable} the CDP owed at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in.`
+          : `The most ${stable} the CDP owed after any of its touches (a touch is any transaction on it).`;
+    heads = [
+      {
+        id: "peak-collateral",
+        label: CARD_VOCAB.peakCollateral,
+        labelTip: peakTip("coll"),
+        labelIcon: assetIcon(PETH.symbol, PETH.address, formatExact(v.peakColl)),
+        value:
+          v.peakColl > 0 ? (
+            <Prov info={peakProv("coll", v.market, v.peaksCountLiquidation)}>
+              <span className="text-rb-500">
+                <CardFigure value={v.peakColl} symbol={PETH.symbol} />
+              </span>
+            </Prov>
+          ) : null,
+      },
+      {
+        id: "peak-debt",
+        label: CARD_VOCAB.peakDebt,
+        labelTip: peakTip("debt"),
+        labelIcon: assetIcon(stable, stableAddress, formatExact(v.peakDebt)),
+        value:
+          v.peakDebt > 0 ? (
+            <Prov info={peakProv("debt", v.market, v.peaksCountLiquidation)}>
+              <span className="text-rb-500">
+                <CardFigure value={v.peakDebt} symbol={stable} />
+              </span>
+            </Prov>
+          ) : null,
+      },
+    ];
+    outcome = {
+      word: v.status === "liquidated" ? "Liquidated" : "Closed",
+      dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
+      extra:
+        v.status === "liquidated" && v.surplus != null && v.surplus > 0
+          ? {
+              label: "Surplus to claim",
+              value: (
+                <>
+                  <StatValue>
+                    <CardAmount value={v.surplus} symbol={PETH.symbol} address={PETH.address} />
+                  </StatValue>
+                  <div className="text-xs mt-0.5 text-rb-500">
+                    set aside at the liquidation for the owner to claim; this page does not show claims
+                  </div>
+                </>
+              ),
+            }
+          : undefined,
+    };
+  } else {
+    const mcrInForce = v.mcr;
+    const belowMin = v.icr != null && mcrInForce != null && v.icr < mcrInForce;
+    heads = [
+      {
+        id: "collateral",
+        label: CARD_VOCAB.collateral,
+        value:
+          v.coll > 0 ? (
+            <Prov info={collProv(v)}>
+              <CardFigure
+                value={v.coll}
+                symbol={PETH.symbol}
+                exact={v.collRaw != null ? formatUnitsExact(v.collRaw, 18) : undefined}
+              />
+            </Prov>
+          ) : null,
+        assets:
+          v.coll > 0
+            ? assetIcon(
+                PETH.symbol,
+                PETH.address,
+                v.collRaw != null ? formatUnitsExact(v.collRaw, 18) : formatExact(v.coll),
+              )
+            : undefined,
+        usd:
+          v.collUsd != null && v.collUsd > 0 ? (
+            <Prov info={liveUsdValueProv("Collateral", index)} value={formatUsdValue(v.collUsd)}>
+              <span className="font-bold text-green-400">{formatUsdValue(v.collUsd)}</span>
+            </Prov>
+          ) : v.pricePending && v.coll > 0 ? (
+            // The USD value needs the same price read the ratio does, so it
+            // holds a pulse while that is in flight.
+            <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+          ) : null,
+      },
+      {
+        id: "debt",
+        label: CARD_VOCAB.debt,
+        labelTip: v.debt <= 0 && v.coll > 0 ? COLLATERAL_ONLY_TIP : undefined,
+        value:
+          v.debt > 0 ? (
+            <Prov info={debtProv(v)}>
+              <CardFigure
+                value={v.debt}
+                symbol={stable}
+                exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : undefined}
+              />
+            </Prov>
+          ) : v.coll > 0 ? (
+            // A CDP holding collateral and no debt states the word; a dash
+            // would read as a missing figure.
+            <span className="text-rb-500">none</span>
+          ) : null,
+        assets:
+          v.debt > 0
+            ? assetIcon(
+                stable,
+                stableAddress,
+                v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : formatExact(v.debt),
+              )
+            : undefined,
+      },
+      {
+        id: "collateral-ratio",
+        label: ratioLabel("cdp"),
+        value:
+          v.icr != null ? (
+            <span data-figure="collateral-ratio">
+              {index ? (
+                // The index lane's ratio is an approximation and wears the ≈:
+                // the receipt says where the two legs come from, the tooltip
+                // what the figure is and is not.
+                <Prov info={listingIcrProv(v.market)} value={`≈ ${pct(v.icr)}`}>
+                  <RevealTip tip={<span className={TIP_PROSE}>{LISTING_ICR_TIP}</span>}>
+                    <span className={belowMin ? "text-red-500" : undefined}>
+                      {"≈"}&nbsp;{formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
+                    </span>
+                  </RevealTip>
                 </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debt={
-            v.peakDebt > 0 ? (
-              <StatValue>
-                <Prov info={peakProv("debt", v.market, v.peaksCountLiquidation)}>
-                  <CardAmount
-                    value={v.peakDebt}
-                    symbol={stable}
-                    address={POLARIS_MARKET_CONFIG[v.market].stable.address}
-                  />
+              ) : (
+                <Prov info={liveIcrProv(v.market)} value={pct(v.icr)}>
+                  <span className={belowMin ? "text-red-500" : undefined}>
+                    {formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
+                  </span>
                 </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debtLabel={CARD_VOCAB.peakDebt}
-          extra={
-            v.status === "liquidated" && v.surplus != null && v.surplus > 0
-              ? {
-                  label: "Surplus to claim",
-                  value: (
-                    <>
-                      <StatValue>
-                        <CardAmount value={v.surplus} symbol={PETH.symbol} address={PETH.address} />
-                      </StatValue>
-                      <div className="text-xs mt-0.5 text-rb-500">
-                        set aside at the liquidation for the owner to claim; this page does not show claims
-                      </div>
-                    </>
-                  ),
-                }
-              : undefined
-          }
-          labelTips={{
-            collateral: `${
-              v.peaksCountLiquidation
-                ? "The most pETH the CDP held at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in."
-                : "The most pETH the CDP held after any of its touches (a touch is any transaction on it)."
-            } ${PEAK_COLL_ABOVE_DEPOSITS}`,
-            debt: v.peaksCountLiquidation
-              ? `The most ${stable} the CDP owed at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in.`
-              : `The most ${stable} the CDP owed after any of its touches (a touch is any transaction on it).`,
-          }}
-        />
-      </PositionCardShell>
-    );
+              )}
+            </span>
+          ) : null,
+        pending: v.icr == null && v.pricePending && v.debt > 0,
+      },
+    ];
   }
 
-  const mcrInForce = v.mcr;
-  const belowMin = v.icr != null && mcrInForce != null && v.icr < mcrInForce;
+  // The test-figure line stays in view on the detail card; a CDP under the
+  // minimum ratio adds its warning above the headlines.
+  const notice = detail ? (
+    <>
+      <p className="mb-3 text-xs text-rb-500">Every figure on this page is a test figure.</p>
+      {!ended && v.basis === "chain" && v.icr != null && v.mcr != null && v.icr < v.mcr && (
+        <div className="notice-caution flex items-start gap-2 p-3 mb-3 text-sm text-caution-700 dark:text-caution-400">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>
+            Below the minimum ratio — {(v.icr * 100).toFixed(1)}% against {(v.mcr * 100).toFixed(0)}%; anyone may
+            liquidate it
+          </p>
+        </div>
+      )}
+    </>
+  ) : undefined;
 
+  const common = { status, heads, identity, notice, counters };
+  if (!detail) return { ...common, notice: undefined, surface: "listing", menu: null, outcome };
+
+  const menu: PositionCardMenu = { leading: () => <CdpMenuRows v={v} />, exports: exports ?? null };
+  const detailCommon = {
+    ...common,
+    surface: "detail" as const,
+    explainer: {
+      body: explanation ?? null,
+      defaultOpen: explanationDefaultOpen,
+      onToggle: onExplanationToggle,
+      viewHref,
+    },
+    learnMore: polarisPositionModal(v.status),
+    menu,
+  };
+  if (outcome) return { ...detailCommon, outcome };
+
+  // The panel: the market's floor and the CDP's valuation on the left, the
+  // rate and what is pending on the right.
+  const left: PositionPanelRow[] = [];
+  const right: PositionPanelRow[] = [];
+  if (v.basis === "chain" && v.equity != null && v.coll > 0) {
+    left.push({
+      id: "equity",
+      label: "Equity at the feed",
+      tip: "The collateral at the market's price feed less the debt owed, read at this block; it moves with the feed and can be negative.",
+      value: (
+        <Prov info={liveEquityProv(v.market)}>
+          <span>
+            <CardFigure value={v.equity} symbol={stable} signed /> {stable}
+          </span>
+        </Prov>
+      ),
+    });
+  }
+  if (v.mcr != null) {
+    left.push({
+      id: "minimum-ratio",
+      label: "Minimum ratio",
+      tip: "The collateral ratio under which anyone may liquidate the CDP, read from the market at this block.",
+      value: (
+        <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(v.mcr)}>
+          <span>{pct(v.mcr)}</span>
+        </Prov>
+      ),
+    });
+    if (v.defensiveMode) {
+      left.push({
+        id: "defensive-mode",
+        label: "Defensive mode",
+        tip: "The market's reserve is thin against its debt, so the minimum ratio stands at its higher floor until the reserve recovers.",
+        value: (
+          <Prov info={liveModeProv(v.market, index)}>
+            <span>On</span>
+          </Prov>
+        ),
+      });
+    }
+  }
+  const owesRecorded = index ? v.debt > 0 : (v.recordedDebt ?? 0) > 0;
+  if (v.interestRate != null && owesRecorded) {
+    right.push({
+      id: "interest-rate",
+      label: "Interest rate",
+      tip: "The yearly rate the market charges on debt, set by the market and read at this block.",
+      value: (
+        <Prov info={liveRateProv("combined", v.market, index)}>
+          <span>{(v.interestRate * 100).toFixed(2)}% per year</span>
+        </Prov>
+      ),
+    });
+  }
+  const annualCost =
+    v.basis === "chain" && v.recordedDebt != null && v.recordedDebt > 0 && v.interestRate != null
+      ? v.recordedDebt * v.interestRate
+      : null;
+  if (annualCost != null) {
+    right.push({
+      id: "annual-cost",
+      label: "Costs per year",
+      tip: "A year of interest at today's rate on the debt recorded at the last touch, the base the contract accrues on; the rate moves.",
+      value: (
+        <Prov info={polarisAnnualCostProv(v.market)} value={String(annualCost)} symbol={stable}>
+          <span>
+            ~<CardSumAmount value={annualCost} /> {stable}
+          </span>
+        </Prov>
+      ),
+    });
+  }
+  if (v.pendingReward != null && v.pendingReward > 0) {
+    right.push({
+      id: "pending-reward",
+      label: "Reward pending",
+      tip: "pETH the CDP has earned from the protocol's fees and not yet settled; it joins the collateral at the next touch.",
+      value: (
+        <Prov info={livePendingProv("bcTokenGain", v.market)}>
+          <span>
+            <AmountText value={v.pendingReward} /> pETH
+          </span>
+        </Prov>
+      ),
+    });
+  }
+  if (v.basis === "chain" && v.blockNumber != null) {
+    right.push({
+      id: "block",
+      label: "As of block",
+      tip: "Every figure on this card is read at this one block; the pending legs move at every block.",
+      // The block is the page's stamp and carries no receipt.
+      value: <span data-prov-exempt="">{v.blockNumber.toLocaleString("en-US")}</span>,
+    });
+  }
+
+  return { ...detailCommon, outcome: undefined, panel: [left, right], foot: debtSum(v) };
+}
+
+/** The entire debt as a sum the reader can add up: the debt the last touch
+ *  recorded, then each leg pending since, at the card's block. */
+function debtSum(v: PolarisPositionView): ReactNode {
+  const hasPendingLegs = (v.pendingInterest ?? 0) > 0 || (v.pendingStables ?? 0) > 0 || (v.pendingPsmDebt ?? 0) !== 0;
+  if (v.basis !== "chain" || v.recordedDebt == null || !hasPendingLegs) return undefined;
+  const stable = v.stableSymbol;
+  const psm = v.pendingPsmDebt ?? 0;
   return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      explanationDefaultOpen={explanationDefaultOpen}
-      onExplanationToggle={onExplanationToggle}
-      viewHref={viewHref}
-      learnMore={polarisPositionModal("open")}
-    >
-      <OpenPositionStats
-        statusPill={
-          surface === "detail" ? (
-            <RevealTip
-              tip={<span className={TIP_PROSE}>{v.debt > 0 ? BADGE_TIPS.borrowing : BADGE_TIPS.collateralOnly}</span>}
-              label={v.debt > 0 ? BADGE_TIPS.borrowing : BADGE_TIPS.collateralOnly}
-              focusable
-              className="focus-ring rounded-sm"
-            >
-              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-                {v.debt > 0 ? "Borrowing" : "Collateral only"}
-              </span>
-            </RevealTip>
-          ) : (
-            <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}>{st.label}</span>
-          )
-        }
-        leadingIdentity={<IdentityLead v={v} wallet={!receipts} />}
-        identity={<MetaCluster v={v} />}
-        columns={[
-          {
-            label: CARD_VOCAB.collateral,
-            value:
-              v.coll > 0 ? (
-                <StatValue>
-                  <Prov info={collProv(v)}>
-                    <CardAmount
-                      value={v.coll}
-                      symbol={PETH.symbol}
-                      address={PETH.address}
-                      exact={v.collRaw != null ? formatUnitsExact(v.collRaw, 18) : undefined}
-                    />
-                  </Prov>
-                </StatValue>
-              ) : (
-                <StatDash />
-              ),
-            footnote:
-              v.collUsd != null && v.collUsd > 0 ? (
-                <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-                  <Prov info={liveUsdValueProv("Collateral", v.basis === "index")} value={formatUsdValue(v.collUsd)}>
-                    <span>{formatUsdValue(v.collUsd)}</span>
-                  </Prov>{" "}
-                  <span className="text-rb-400">by the protocol&rsquo;s feed · testnet</span>
-                </div>
-              ) : v.pendingReward != null && v.pendingReward > 0 ? (
-                <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-                  <Prov info={livePendingProv("bcTokenGain", v.market)}>
-                    <span>
-                      <AmountText value={v.pendingReward} /> pETH
-                    </span>
-                  </Prov>{" "}
-                  reward pending
-                </div>
-              ) : v.pricePending && v.coll > 0 ? (
-                // The USD value needs the same price read the ratio does, so
-                // it holds a pulse rather than nothing while that is in
-                // flight — otherwise the footnote appears from nowhere a
-                // second after the collateral figure.
-                <div className="text-xs mt-0.5">
-                  <span className="inline-block h-3 w-32 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
-                </div>
-              ) : undefined,
-          },
-          {
-            label: CARD_VOCAB.debt,
-            value:
-              v.debt > 0 ? (
-                <StatValue>
-                  <Prov info={debtProv(v)}>
-                    <CardAmount
-                      value={v.debt}
-                      symbol={stable}
-                      address={POLARIS_MARKET_CONFIG[v.market].stable.address}
-                      exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : undefined}
-                    />
-                  </Prov>
-                </StatValue>
-              ) : v.coll > 0 ? (
-                // A CDP holding collateral and no debt: a word, not a dash a
-                // reader takes for a missing figure.
-                <StatValue>
-                  <span className="text-rb-500">none</span>
-                </StatValue>
-              ) : (
-                <StatDash />
-              ),
-            footnote: (
-              <>
-                {v.basis === "chain" && v.debt <= 0 && v.recordedDebt != null && v.recordedDebt > 0 && (
-                  // The pending legs have cleared more than the recorded debt:
-                  // the entire debt is at or below zero, and the next touch
-                  // mints the difference so it lands on zero.
-                  <div className="text-xs mt-0.5 text-rb-500 max-w-64">
-                    no debt: the pending PSM share and stability gains exceed the <AmountText value={v.recordedDebt} />{" "}
-                    {stable} recorded at the last touch; the next touch settles it to zero
-                  </div>
-                )}
-                {v.interestRate != null && (v.basis === "index" ? v.debt > 0 : (v.recordedDebt ?? 0) > 0) ? (
-                  <div className="text-xs mt-0.5 text-rb-500">
-                    <Prov info={liveRateProv("combined", v.market, v.basis === "index")}>
-                      <span>{(v.interestRate * 100).toFixed(2)}%</span>
-                    </Prov>{" "}
-                    per year, set by the market
-                  </div>
-                ) : v.pricePending && v.debt > 0 ? (
-                  // The rate comes off the same read; a debt column that
-                  // states no rate at all for a second reads as a market that
-                  // charges none.
-                  <div className="text-xs mt-0.5">
-                    <span className="inline-block h-3 w-36 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
-                  </div>
-                ) : null}
-                {v.basis === "chain" && v.blockNumber != null && (
-                  // Every figure on the card is read at this one block (the
-                  // pending legs move at every block): said once, here.
-                  <div className="text-xs mt-0.5 text-rb-500">
-                    <span data-prov-exempt="">as of block {v.blockNumber.toLocaleString("en-US")}</span>
-                  </div>
-                )}
-              </>
-            ),
-          },
-          {
-            label: ratioLabel("cdp"),
-            value:
-              v.icr != null ? (
-                <StatValue figure="collateral-ratio">
-                  {v.basis === "index" ? (
-                    // The index lane's ratio is an approximation and wears the
-                    // ≈: the receipt says where the two legs come from, the
-                    // tooltip what the figure is and is not.
-                    <Prov info={listingIcrProv(v.market)} value={`≈ ${pct(v.icr)}`}>
-                      <RevealTip tip={<span className={TIP_PROSE}>{LISTING_ICR_TIP}</span>}>
-                        <span className={belowMin ? "text-red-500" : undefined}>
-                          {"≈"}&nbsp;{formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
-                        </span>
-                      </RevealTip>
-                    </Prov>
-                  ) : (
-                    <Prov info={liveIcrProv(v.market)} value={pct(v.icr)}>
-                      <span className={belowMin ? "text-red-500" : undefined}>
-                        {formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
-                      </span>
-                    </Prov>
-                  )}
-                </StatValue>
-              ) : v.pricePending && v.debt > 0 ? (
-                <div className="h-9 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse mt-2" />
-              ) : (
-                <StatDash />
-              ),
-            footnote:
-              mcrInForce != null ? (
-                <StatFootnote>
-                  <span className="inline-flex flex-wrap items-center gap-x-1">
-                    <span>
-                      <Prov info={liveMcrProv(v.defensiveMode, v.market, v.basis === "index")} value={pct(mcrInForce)}>
-                        <span>min {pct(mcrInForce)}</span>
-                      </Prov>
-                      {v.defensiveMode ? " · defensive mode" : ""}
-                    </span>
-                    {v.liqPrice != null && (
-                      // The ratio's tangible restatement — the price at which
-                      // the stated figures reach the floor, in the market's
-                      // own unit (USDp or a troy ounce of gold), never "$".
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-rb-400">·</span> Liquidates if
-                        <TokenChipIcon symbol={PETH.symbol} address={PETH.address} size={14} filterable={false} />
-                        pETH falls to
-                        <Prov
-                          info={listingLiqPriceProv(v.defensiveMode, v.market)}
-                          value={formatPethPrice(v.liqPrice)}
-                          symbol={stable}
-                        >
-                          <span className="tabular-nums">
-                            {formatPethPrice(v.liqPrice)} {stable}
-                          </span>
-                        </Prov>
-                      </span>
-                    )}
-                  </span>
-                </StatFootnote>
-              ) : v.pricePending && v.debt > 0 ? (
-                <div className="text-xs mt-0.5">
-                  <span className="inline-block h-3 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
-                </div>
-              ) : undefined,
-          },
-          // A genuinely 4th column, only for the chain lane's open CDPs with a
-          // feed price — an array of 3 (never a null-padded 4th slot) so a
-          // card without it keeps the exact 3-column layout it always had,
-          // mobile spanning included.
-          ...(v.basis === "chain" && v.equity != null && v.coll > 0
-            ? [
-                {
-                  label: "Equity at the feed",
-                  value: (
-                    <StatValue>
-                      <Prov info={liveEquityProv(v.market)}>
-                        <CardAmount
-                          value={v.equity}
-                          symbol={stable}
-                          address={POLARIS_MARKET_CONFIG[v.market].stable.address}
-                          signed
-                        />
-                      </Prov>
-                    </StatValue>
-                  ),
-                  footnote: <div className="text-xs mt-0.5 text-rb-500">by the protocol&rsquo;s feed · testnet</div>,
-                },
-              ]
-            : []),
-        ]}
-      />
-    </PositionCardShell>
+    <p className="mt-3 text-xs text-rb-500" data-polaris-debt-sum="">
+      Owed at this block:{" "}
+      <Prov info={liveRecordedDebtProv(v.market)} value={String(v.recordedDebt)}>
+        <span>
+          <CardSumAmount value={v.recordedDebt} />
+        </span>
+      </Prov>{" "}
+      recorded at the last touch
+      {(v.pendingInterest ?? 0) > 0 && (
+        <>
+          {" + "}
+          <Prov info={livePendingProv("accruedInterest", v.market)} value={String(v.pendingInterest)}>
+            <span>
+              <CardSumAmount value={v.pendingInterest ?? 0} />
+            </span>
+          </Prov>{" "}
+          interest
+        </>
+      )}
+      {(v.pendingStables ?? 0) > 0 && (
+        <>
+          {" − "}
+          <Prov info={livePendingProv("accruedStables", v.market)} value={String(v.pendingStables)}>
+            <span>
+              <CardSumAmount value={v.pendingStables ?? 0} />
+            </span>
+          </Prov>{" "}
+          stability gain
+        </>
+      )}
+      {psm !== 0 && (
+        <>
+          {psm < 0 ? " − " : " + "}
+          <Prov info={livePendingProv("mintRedeemDebt", v.market)} value={String(psm)}>
+            <span>
+              <CardSumAmount value={Math.abs(psm)} />
+            </span>
+          </Prov>{" "}
+          net PSM share
+        </>
+      )}
+      {" = "}
+      <Prov info={liveEntireProv("debt", v.market)} value={String(v.debt)}>
+        <span className="font-semibold text-foreground">
+          {v.debt < 0 ? "−" : ""}
+          <CardSumAmount value={Math.abs(v.debt)} />
+        </span>
+      </Prov>{" "}
+      {stable}
+      {v.debt <= 0 ? ": at or below zero, so it owes nothing, and the next touch settles the debt to zero" : ""}. A
+      touch is any transaction on the CDP; these pending legs are written into its figures at the next one.
+    </p>
   );
+}
+
+/** The Polaris CDP card: its slots, drawn by the shared card. */
+export function PolarisPositionCard(props: PolarisPositionCardProps) {
+  return <PositionCard slots={polarisCardSlots(props)} />;
 }
 
 /** Build a card view from the listing summary row (the index).
@@ -707,7 +811,6 @@ export function viewFromSummary(
     icr: priced && board ? (s.coll * board.price.pethInDebt) / s.debt : null,
     mcr: mcrInForce,
     defensiveMode: board?.defensiveMode ?? false,
-    liqPrice: priced && mcrInForce != null ? (s.debt * mcrInForce) / s.coll : null,
     pricePending: pending,
     pendingInterest: null,
     pendingStables: null,
@@ -747,10 +850,6 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     icr: c.icr,
     mcr: c.defensiveMode ? c.defensiveMcr : c.mcr,
     defensiveMode: c.defensiveMode,
-    // The chain lane states the contract's own ratio against the floor; the
-    // liquidation price is the LISTING's restatement of an approximation, and
-    // does not follow the figure it is derived from onto this lane.
-    liqPrice: null,
     pricePending: false,
     pendingInterest: c.accruedInterest,
     pendingStables: c.accruedStables,
