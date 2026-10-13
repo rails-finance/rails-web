@@ -237,25 +237,39 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 900 
 async function readCards(url) {
   const page = await context.newPage();
   await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
-  const cards = await page.locator("[data-position-card]").evaluateAll((els) =>
-    els.map((e) => {
+  const cards = await page.locator("[data-position-card]").evaluateAll(async (els) => {
+    const out = [];
+    for (const e of els) {
       const stat = [...e.querySelectorAll("div")].find(
         (d) => d.firstElementChild && (d.firstElementChild.textContent ?? "").trim() === "Value · USD",
       );
-      const valueEl = stat?.querySelector("[title]");
+      // Since `aa0ea5e` the exact dollars are a click-opened RevealTip in place
+      // of a `title`: the tip is opened, read and closed.
+      const valueEl = stat?.querySelector("[data-reveal-tip]");
+      let valueTitle = "";
+      if (valueEl) {
+        valueEl.click();
+        await new Promise((r) => setTimeout(r, 80));
+        valueTitle = (valueEl.querySelector('[role="tooltip"]')?.textContent ?? "").trim();
+        valueEl.click();
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      const shown = valueEl?.cloneNode(true);
+      shown?.querySelector('[role="tooltip"]')?.remove();
       const statText = stat ? (stat.textContent ?? "").replace(/\s+/g, " ").trim() : "";
-      return {
+      out.push({
         vault: e.getAttribute("data-vault"),
         holder: e.getAttribute("data-holder"),
         status: e.getAttribute("data-status"),
         valueUsdE8: e.getAttribute("data-value-usd-e8"),
         pricedBlock: e.getAttribute("data-priced-block"),
-        valueText: (valueEl?.textContent ?? "").trim(),
-        valueTitle: valueEl?.getAttribute("title") ?? "",
+        valueText: (shown?.textContent ?? "").trim(),
+        valueTitle,
         valueStatText: statText,
-      };
-    }),
-  );
+      });
+    }
+    return out;
+  });
   const chips = await page.locator("[aria-label^='Remove '][aria-label$=' filter']").evaluateAll((els) =>
     els.map((b) => ({
       dim: (b.getAttribute("aria-label") ?? "").replace(/^Remove | filter$/g, ""),

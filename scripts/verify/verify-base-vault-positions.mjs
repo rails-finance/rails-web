@@ -784,27 +784,40 @@ async function readListingDom(qs = "") {
   const page = await context.newPage();
   const res = await page.goto(qs ? `${LISTING}?${qs}` : LISTING, { waitUntil: "networkidle", timeout: 120_000 });
   const status = res?.status() ?? 0;
-  const cards = await page.locator("[data-position-card]").evaluateAll((els) =>
-    els.map((e) => {
+  const cards = await page.locator("[data-position-card]").evaluateAll(async (els) => {
+    const out = [];
+    for (const e of els) {
       // The two headline figures, read as the reader sees them: the printed
-      // text AND the `title` the exact value rides on. The listing's cards
+      // text AND the tip the exact value rides on. The listing's cards
       // carry no `data-figure` markers on purpose (twenty rows would make
       // twenty of each name), so each column is found by its own label —
-      // "Shares · <symbol>" / "Claim · <symbol>" — and the value is the one
-      // element under it that carries a title.
-      const stats = [...e.querySelectorAll("div")]
-        .filter((d) => d.firstElementChild && /^(Shares|Claim) · /.test(d.firstElementChild.textContent ?? ""))
-        .map((d) => {
-          const value = d.querySelector("[title]");
-          return {
-            label: (d.firstElementChild.textContent ?? "").trim(),
-            text: (value?.textContent ?? "").trim(),
-            title: value?.getAttribute("title") ?? "",
-          };
+      // "Shares · <symbol>" / "Claim · <symbol>". Since `aa0ea5e` the exact
+      // value is a click-opened RevealTip in place of a `title`, so the tip
+      // is opened, read and closed.
+      const stats = [];
+      for (const d of [...e.querySelectorAll("div")].filter(
+        (d) => d.firstElementChild && /^(Shares|Claim) · /.test(d.firstElementChild.textContent ?? ""),
+      )) {
+        const value = d.querySelector("[data-reveal-tip]");
+        let title = "";
+        if (value) {
+          value.click();
+          await new Promise((r) => setTimeout(r, 80));
+          title = (value.querySelector('[role="tooltip"]')?.textContent ?? "").trim();
+          value.click();
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        const shown = value?.cloneNode(true);
+        shown?.querySelector('[role="tooltip"]')?.remove();
+        stats.push({
+          label: (d.firstElementChild.textContent ?? "").trim(),
+          text: (shown?.textContent ?? "").trim(),
+          title,
         });
+      }
       const symbolEl = e.querySelector("[data-card-vault-symbol]");
       const pillEl = e.querySelector("[data-wallet-label]");
-      return {
+      out.push({
         id: e.getAttribute("data-position-card"),
         vault: e.getAttribute("data-vault"),
         holder: e.getAttribute("data-holder"),
@@ -821,9 +834,10 @@ async function readListingDom(qs = "") {
         symbolLeadsPill: symbolEl && pillEl ? (symbolEl.compareDocumentPosition(pillEl) & 4) === 4 : null,
         text: e.innerText.replace(/\s+/g, " ").trim(),
         href: e.closest("a")?.getAttribute("href") ?? null,
-      };
-    }),
-  );
+      });
+    }
+    return out;
+  });
   // Copy rules are judged over what the page STATES. The listing's own face is
   // the rendered innerText, never `body.textContent`: that sweeps the RSC
   // payload in the <script> tags with it, where "$3" and "your" are module
@@ -1252,7 +1266,8 @@ else {
     "L5c the closed card states 'Closed by' at this script's OWN last log block",
     f5Card != null &&
       /Closed by/.test(f5Card.text) &&
-      f5Card.text.includes(`block ${n(ownLast)}`) &&
+      // The block is a BlockRef, its icon in place of the word since `f245752`.
+      f5Card.text.includes(n(ownLast)) &&
       Number(f5Card.lastBlock) === ownLast,
     `own last log block ${ownLast}, card says ${f5Card?.lastBlock}`,
   );

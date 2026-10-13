@@ -123,7 +123,9 @@ for (const [proto, cfg] of targets) {
     // green on a number that was never on the page.
     const listed = await listing.locator("a.group\\/listing-row").evaluateAll((els) =>
       els.map((el) => {
-        const id = el.querySelector("span.font-mono")?.textContent?.trim() ?? null;
+        // The trove id from the row's link: Liquity V2's card prints its owner
+        // in mono since `fcee3e1`, so the id is read where every card states it.
+        const id = (el.getAttribute("href") ?? "").split("?")[0].split("/").pop() || null;
         let rate = null;
         for (const node of el.querySelectorAll("*")) {
           const m = node.textContent
@@ -132,10 +134,20 @@ for (const [proto, cfg] of targets) {
             .match(/^([\d.]+)% interest rate$/);
           if (m) rate = Number(m[1]);
         }
+        // Liquity V2's card states the rate as a headline cell since `fcee3e1`:
+        // "Interest rate" over "0.5%".
+        if (rate == null)
+          for (const cell of el.querySelectorAll("div")) {
+            if (cell.firstElementChild?.textContent?.trim() !== "Interest rate") continue;
+            const m = (cell.firstElementChild.nextElementSibling?.textContent ?? "")
+              .replace(/\s+/g, "")
+              .match(/^([\d.]+)%$/);
+            if (m) rate = Number(m[1]);
+          }
         return { id, rate };
       }),
     );
-    const listRows = listed.filter((r) => r.id && r.rate != null);
+    const listRows = listed.filter((r) => r.id && r.rate != null).map((r) => ({ ...r, id: short(r.id) }));
 
     // ZOMBIES COME OFF THE CHAIN SIDE TOO. The link selects open troves only
     // (see queueHref's note), so comparing against a queue that leads with

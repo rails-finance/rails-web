@@ -460,9 +460,11 @@ for (const fx of FIXTURES) {
         const want = rows.filter(
           (r) => big(r[side].after) > BigInt(0) && (touched.has(r.reserve) || !isDustRow(r, side)),
         );
-        const icons = scope.locator("[data-closed-assets] span[title]");
+        // Since `aa0ea5e` (tooltips open on click) an icon's balance is its
+        // RevealTip's label, read from the tip's screen-reader text.
+        const icons = scope.locator("[data-closed-assets] [data-reveal-tip] > .sr-only");
         const titles = [];
-        for (let k = 0; k < (await icons.count()); k++) titles.push(await icons.nth(k).getAttribute("title"));
+        for (let k = 0; k < (await icons.count()); k++) titles.push((await icons.nth(k).innerText()).trim());
         check(
           `${fx.label}: the ${side} cell draws ${want.length} asset icon(s)`,
           titles.length === want.length,
@@ -620,21 +622,22 @@ for (const fx of FIXTURES) {
         `${fx.label}: a closed cell with a ledger states no USD after its tokens`,
         (await card.locator(ledgerUsdSel).count()) === 0,
       );
-      // Its dollars stand in a tooltip on the figure (ui-jobs 296).
-      const usdHost = card.locator("[data-ledger-cell] [data-closed-usd-tip]").first();
+      // Its dollars stand in a tooltip on the figure (ui-jobs 296), opened by a
+      // click since `aa0ea5e`.
+      const usdHost = card.locator("[data-ledger-cell] [data-closed-usd-tip] [data-reveal-tip]").first();
       if (await usdHost.count()) {
-        await usdHost.hover();
+        await usdHost.click();
         const tip = await card
           .locator("[data-ledger-usd-tip]")
           .first()
           .innerText({ timeout: 3000 })
           .catch(() => "");
         check(
-          `${fx.label}: hovering a closed figure shows its USD and the event's price`,
+          `${fx.label}: clicking a closed figure shows its USD and the event's price`,
           /\$/.test(tip) && /price/.test(tip),
           tip,
         );
-        await page.mouse.move(0, 0);
+        await page.keyboard.press("Escape");
       }
       if (a) {
         const hfReceipt = await receiptText(
@@ -656,7 +659,10 @@ for (const fx of FIXTURES) {
           cell,
           supplied.length === 1
             ? amount
-            : cell.locator(`[data-closed-assets] span.prov-locate-box:has([title^="${amount} "])`).first(),
+            : cell
+                .locator("[data-closed-assets] span.prov-locate-box")
+                .filter({ has: page.locator(".sr-only", { hasText: `${amount} ` }) })
+                .first(),
         );
         check(
           `${fx.label}: a supplied balance's receipt states scaled × index accrued to block time`,

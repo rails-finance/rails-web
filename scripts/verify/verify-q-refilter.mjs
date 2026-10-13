@@ -230,12 +230,13 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
 
     // The filtered listing's own cards are the evidence: every card must carry
     // the same owner identity the detail page showed. Since ui-jobs 246 a
-    // Liquity V2 listing card shows its owner as inert text (no pill), a span
-    // titled with the address, so those spans are read. Reading the whole body
+    // Liquity V2 listing card shows its owner as inert text (no pill); since
+    // `aa0ea5e` the address is the text's click-opened tip in place of a
+    // `title`, so the short form under the tip is read. Reading the whole body
     // for a substring of the address would pass on an unfiltered listing that
     // merely happens to contain that owner somewhere.
     const cardCountFiltered = (await rows(page, "liquity-v2 filtered rows", V2_ROW, "href", 1)).length;
-    const OWNER_TEXT = `${V2_ROW} span[title*="0x"]`;
+    const OWNER_TEXT = `${V2_ROW} [data-reveal-tip] > span.font-mono`;
     await page
       .locator(OWNER_TEXT)
       .first()

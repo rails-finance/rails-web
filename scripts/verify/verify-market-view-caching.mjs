@@ -85,7 +85,9 @@ for (const view of VIEWS) {
   // Non-greedy to the FIRST "block" after the stamp opens: several stamps name
   // a second block further along the same line (Morpho's roster census), and a
   // greedy match would read that one, or the word "block" in the prose.
-  const stamp = text.match(/Chain snapshot[^\n]*?(?:block\s*)?(\d[\d,]{4,})/);
+  // The block is a BlockRef (`f245752`), whose icon puts a line break before
+  // the number in innerText.
+  const stamp = text.match(/Chain snapshot[^\n]*?\s*(?:block\s*)?(\d[\d,]{4,})/);
   const blockNumber = stamp ? Number(stamp[1].replace(/,/g, "")) : 0;
   check(`${view.path}: names the block it read at`, blockNumber > 1_000_000, stamp ? `block ${stamp[1]}` : "no stamp");
 

@@ -245,8 +245,16 @@ check(
 // a real <a> would be invalid HTML), and this proves the click actually
 // navigates rather than merely carrying a correct-looking data attribute.
 if (pillCount > 0) {
-  await vaultPills.first().click();
-  await page.waitForURL(`**${EXPECTED_HREF}`, { timeout: 10000 }).catch(() => {});
+  // A press before hydration is lost (the page is read at domcontentloaded),
+  // so the click is retried until the URL moves.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await vaultPills.first().click();
+    const moved = await page
+      .waitForURL(`**${EXPECTED_HREF}`, { timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (moved) break;
+  }
   const url = new URL(page.url());
   check("4b clicking the pill actually navigates to the vault's page", url.pathname === EXPECTED_HREF, url.pathname);
 }

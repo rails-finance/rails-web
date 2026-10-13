@@ -131,8 +131,17 @@ console.log("\n=== F. the page's aggregates");
 // rather than passed silently. The gap itself is still asserted — a page stuck
 // at yesterday's block is a real defect, and the only thing that separates it
 // from an ordinary cache hit is how far behind it is.
-const stamp = (await page.locator("text=/Chain snapshot . block/").first().innerText()).replace(/[\s,]/g, "");
-const stampedBlock = Number(stamp.match(/block(\d+)/)?.[1] ?? NaN);
+// The stamp draws the block as a BlockRef (a block-clock icon in place of the
+// word since `f245752`); its aria-label reads "Block 26,179,557".
+const stamp = (
+  (await page
+    .locator("p", { hasText: "Chain snapshot" })
+    .first()
+    .locator("[data-block-ref]")
+    .first()
+    .getAttribute("aria-label")) ?? ""
+).replace(/[\s,]/g, "");
+const stampedBlock = Number(stamp.match(/Block(\d+)/)?.[1] ?? NaN);
 /** How far AHEAD of our own head read the page may legitimately be — two
  *  independent nodes read within seconds of each other, not one clock. */
 const AHEAD_SLACK = 10;

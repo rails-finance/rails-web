@@ -12,7 +12,7 @@
 //      character; the priced leg matches the restated Σ legs × feed within $1
 //      and wears the ≈; the nearest-floor line names the restated position, its
 //      ratio within 0.05 pp, and links to it;
-//   d  hovering an ≈ figure reveals a sentence;
+//   d  clicking an ≈ figure reveals a sentence;
 //   e  a wallet holding more than one page states the count only — no legs, no
 //      nearest-floor line, and a footnote saying why (proved by rewriting the
 //      wallet response's `pagination.total` to 21 on the wire);
@@ -332,10 +332,11 @@ info(
     );
 
     // d. the ≈ opens a sentence.
-    // Hover the inline figure itself, not the stat column: the column is
-    // full-width and its centre lands beside the value, where RevealTip never
-    // fires (the listing-ratio verifier learned this first).
-    await page.locator('[data-figure="holder-debt"]').getByText(/≈/).first().hover();
+    // The press goes to the inline figure: the stat column is full-width and
+    // its centre lands beside the value, where RevealTip never fires (the
+    // listing-ratio verifier learned this first). Tips open on a click since
+    // `aa0ea5e`.
+    await page.locator('[data-figure="holder-debt"]').getByText(/≈/).first().click();
     await page.waitForTimeout(500);
     const tip = await page
       .locator('[role="tooltip"]')
@@ -343,7 +344,7 @@ info(
       .innerText()
       .catch(() => "");
     check(
-      "P7. hovering the ≈ debt figure reveals a sentence saying what it is not",
+      "P7. clicking the ≈ debt figure reveals a sentence saying what it is not",
       tip.replace(/\s+/g, " ").length > 40 && /not in it|estimate/i.test(tip),
       tip.replace(/\s+/g, " ").slice(0, 120),
     );
@@ -498,7 +499,7 @@ info(
       `"${strip.nearest?.text}" vs restated ≈ ${near[0].ratioPct.toFixed(1)}% / minimum ${near[0].minPct}%`,
     );
 
-    await page.locator('[data-figure="holder-collateral"]').getByText(/≈/).first().hover();
+    await page.locator('[data-figure="holder-collateral"]').getByText(/≈/).first().click();
     await page.waitForTimeout(500);
     const tip = await page
       .locator('[role="tooltip"]')
@@ -506,7 +507,7 @@ info(
       .innerText()
       .catch(() => "");
     check(
-      "V7. hovering the ≈ collateral figure reveals a sentence saying what it is",
+      "V7. clicking the ≈ collateral figure reveals a sentence saying what it is",
       tip.replace(/\s+/g, " ").length > 40 && /estimate|valuation/i.test(tip),
       tip.replace(/\s+/g, " ").slice(0, 120),
     );

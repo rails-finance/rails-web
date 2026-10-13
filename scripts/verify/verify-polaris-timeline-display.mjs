@@ -105,7 +105,8 @@ const pct1 = (pct) => {
 };
 const chipText = (pct) => `${pct1(pct)} CR`;
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
-const MENU_LABELS = ["Timeline values", "Collateral Ratio", "Transaction hashes"];
+// "Timeline values" left Display with its off state (326, `5b5c19b`).
+const MENU_LABELS = ["Collateral Ratio", "Transaction hashes"];
 
 // ── the routes, read at run time ────────────────────────────────────────────
 const byTime = (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp;
@@ -175,7 +176,7 @@ async function readDisplayMenu(page) {
   await countSpan.waitFor({ state: "visible", timeout: 30000 });
   // The dropdown title-cases its labels ("Collateral ratio"), so every
   // comparison in this file is case-insensitive.
-  const anyItem = page.getByRole("button", { name: /^Timeline values$/i });
+  const anyItem = page.getByRole("button", { name: /^Collateral ratio$/i });
   let opened = false;
   for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
     await trigger.click();
@@ -316,10 +317,10 @@ try {
   // rule (rails-ops TO-DO-ui-jobs item 118).
   const NOTE_LABELS = ["market notes", "open all market notes"];
   check(
-    "a. usdp/8's display menu offers the three labels, then the two market-note items, and no collapse item",
-    menu.length === 5 &&
+    "a. usdp/8's display menu offers the two labels, then the two market-note items, and no collapse item",
+    menu.length === MENU_LABELS.length + NOTE_LABELS.length &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
-      NOTE_LABELS.every((l, i) => menu[3 + i] === l) &&
+      NOTE_LABELS.every((l, i) => menu[MENU_LABELS.length + i] === l) &&
       !menu.includes("collapse like events"),
     JSON.stringify(menu),
   );

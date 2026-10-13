@@ -128,10 +128,15 @@ const FIXTURES = [
 ];
 
 // The operator bullet across all 12 vocabularies.
-const OPERATOR = /executed (by an address other than|not by the owner|by a third-party address)/;
+// The strings files (ui-jobs 314) word it per family: Morpho "run by another
+// account", Aave V3 and Seamless "sent by … on the owner's behalf", Aave V4
+// "sent through a position manager".
+const OPERATOR =
+  /executed (by an address other than|not by the owner|by a third-party address)|run by another account|sent by .+ on the owner['’]s behalf|sent through (a position manager|[\d,]+ position managers)/;
 // The trailing "where" wording varies per protocol ("recorded here,", "on this
 // account’s timeline,") — anchor only on the figure, never on the phrasing.
-const SELF_ANCHORED = /Of the ([\d,]+) events\b/;
+// "Of the 45 events …, 3 were …", or Aave V3's "3 of the 45 events were …".
+const SELF_ANCHORED = /(?:Of|[\d,]+ of) the ([\d,]+) events\b/;
 const CHAINED = /^Of those, /;
 // fx says "The timeline RECORDS n events"; the rest say "has RECORDED n".
 const COUNT_BULLET = /\brecords?\b|\brecorded\b/;
@@ -327,7 +332,12 @@ function judge(proto, subject, { bullets, idx }) {
     return;
   }
   const denom = Number(m[1].replace(/,/g, ""));
-  const ext = Number((bullet.match(/, ([\d,]+) (?:was|were) executed/) || [0, "0"])[1].replace(/,/g, ""));
+  const ext = Number(
+    (bullet.match(/, ([\d,]+) (?:was|were) (?:executed|run|sent)|^([\d,]+) of the [\d,]+ events/) || [0, "0"])
+      .slice(1)
+      .find(Boolean)
+      .replace(/,/g, ""),
+  );
   if (ext > denom) {
     bad(`${proto}: external ${ext} EXCEEDS its denominator ${denom}`);
   } else if (denom === 0) {

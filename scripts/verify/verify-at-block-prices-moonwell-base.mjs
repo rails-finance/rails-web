@@ -42,6 +42,7 @@
 import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
+import { CLOSED_GROUP, openGroup } from "./lib/group-rows.mjs";
 
 const EXPLORERS = {
   "moonwell-base": {
@@ -159,41 +160,6 @@ const roundsTo = (text, expected) => {
 
 // ── Page helpers (verify-historic-usd-pills.mjs's, verbatim in spirit) ──
 
-async function setDisplayFlag(page, label, wantOn, { optional = false } = {}) {
-  const countSpan = page.getByText(COUNT_RE).first();
-  await countSpan.waitFor({ state: "visible", timeout: 30000 });
-  const row = countSpan.locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " gap-2 ") and contains(concat(" ", normalize-space(@class), " "), " items-center ")][1]',
-  );
-  const trigger = row.locator("div.relative.inline-flex.items-center > button").last();
-  const item = page.getByRole("button", { name: new RegExp(`^${label}$`, "i") });
-  let opened = false;
-  for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
-    await trigger.click();
-    opened = await item
-      .waitFor({ state: "visible", timeout: 2500 })
-      .then(() => true)
-      .catch(() => false);
-    if (!opened) await page.waitForTimeout(700);
-  }
-  if (!opened && optional) {
-    // The item is offered only where a collapse spec forms a run on the list;
-    // a list with nothing to collapse has nothing to turn off.
-    await countSpan.click();
-    console.log(`      Display menu offers no "${label}" here (nothing collapses)`);
-    return false;
-  }
-  if (!opened) throw new Error(`Display menu never offered "${label}" on ${page.url()}`);
-  const isOn = await item
-    .locator("span")
-    .first()
-    .evaluate((el) => el.className.includes("bg-rb-500"))
-    .catch(() => false);
-  if (isOn !== wantOn) await item.click();
-  await countSpan.click();
-  return true;
-}
-
 /** Grow the render window until every event is painted. The cap counts PRESSES,
  *  and one press paints `TIMELINE_PAGE_ROWS` (lib/shared/timeline-opening-balance.ts)
  *  — halve that constant and a fixed cap reaches half as far, so the cap is set
@@ -213,17 +179,30 @@ async function showAll(page, max = 25) {
  *  own `items-start relative` div, which the Aave verifier scopes to, holds
  *  no detail here). */
 function cardFor(page, n) {
+  // The number stands in the row's number column since ui-jobs 250, outside
+  // the content tier, so the card is the row's `data-event-id` element.
   const badge = page.locator(`[data-event-number="${n}"]`);
-  return badge.locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " min-w-0 ") and contains(concat(" ", normalize-space(@class), " "), " grow ")][1]',
-  );
+  return badge.locator("xpath=ancestor::*[@data-event-id][1]");
+}
+
+/** Open every closed group from its ⋮ ("Show N grouped events"): like events
+ *  always collapse since `8166216`, so the Display toggle that flattened them
+ *  is gone. An open group's members draw numbered cards. */
+async function openAllGroups(page, max = 60) {
+  for (let i = 0; i < max; i++) {
+    const frame = page.locator(CLOSED_GROUP).first();
+    if ((await frame.count()) === 0) return i;
+    await frame.scrollIntoViewIfNeeded().catch(() => {});
+    if (!(await openGroup(page, frame))) return i;
+  }
+  return max;
 }
 
 async function expandCard(page, n) {
   const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
   await badge.scrollIntoViewIfNeeded();
-  const clickable = badge.locator('xpath=ancestor::div[@role="button"][1]');
+  const clickable = cardFor(page, n).locator('[data-anatomy="T1"] [role="button"]').first();
   await clickable.click();
   await page.waitForTimeout(250);
 }
@@ -317,17 +296,15 @@ async function openWalletPage(w, evts) {
   const p = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   p.on("pageerror", (e) => pageErrors.push(String(e)));
   // `?folders=0` PINNED. The badges below are read card by card, so the page must
-  // be flat. The default page is answered in folders (leg C of 0019), and since
-  // rails-ops decision 0021 a served page neither offers "Collapse like events"
-  // nor opens its folders when the flag is off. The flat answer groups in the
-  // browser, so the toggle below still expands its runs.
+  // be flat. The default page is answered in folders (leg C of 0019); the flat
+  // answer groups in the browser, and its groups open from their ⋮ below.
   await p.goto(`${BASE}${X.page(w)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await p.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
   // A collapsed ×N run renders no individual badge — the MAMO cascade is
-  // hundreds of like liquidations in a row, so runs stay expanded here. The
-  // item is offered only where a run forms: required on the cascade wallet,
-  // optional on the small specimen wallets the unpriced arm discovers.
-  await setDisplayFlag(p, "Collapse like events", false, { optional: w !== X.wallet });
+  // hundreds of like liquidations in a row, so every group is opened here.
+  await showAll(p, 25);
+  const opened = await openAllGroups(p);
+  if (opened) console.log(`      opened ${opened} group(s) from their ⋮`);
   await showAll(p, 25);
   // Chronological numbering runs over the WHOLE history (an elided older
   // window offsets it), so the DOM number of API index i is offset + i + 1,
@@ -346,18 +323,21 @@ if (pricedOrdinary) {
   const { n, d } = pricedOrdinary;
   await expandCard(page, domN(n));
   const card = cardFor(page, domN(n));
-  const pill = card.getByText(/oracle at block/).first();
-  check(`ordinary #${n}: AtBlockPriceFootnote pill renders`, (await pill.count()) > 0);
+  // Since ui-jobs 309 step 6 the price at the block is a then/today chip in
+  // the card's price row, "<symbol> price at this event: Moonwell's oracle at
+  // block N" its tip.
+  const pill = card.locator(`[data-price-row] [title^="${d.marketSymbol} "][title*="oracle at block"]`).first();
+  check(`ordinary #${n}: the price row's at-block chip renders`, (await pill.count()) > 0);
   if ((await pill.count()) > 0) {
-    const text = (await pill.locator("xpath=..").innerText()).replace(/\s+/g, " ").trim();
+    const text = `${await pill.getAttribute("title")} ${(await pill.innerText()).replace(/\s+/g, " ").trim()}`;
     check(
-      `ordinary #${n}: pill names ${d.marketSymbol} at its at-block price`,
-      text.includes(d.marketSymbol) && roundsTo(text.replace(d.marketSymbol, ""), d.priceAtBlock.usd),
+      `ordinary #${n}: chip names ${d.marketSymbol} at its at-block price`,
+      text.startsWith(`${d.marketSymbol} `) && roundsTo(text.replace(/^.*?\$/, ""), d.priceAtBlock.usd),
       `"${text}" vs ${d.priceAtBlock.usd}`,
     );
-    // The pill's own box: the card also carries receipts that name the
+    // Opened on the chip: the card also carries receipts that name the
     // market symbol (the position's debt before the event), which come first.
-    const receipt = await openReceiptFor(page, card, "oracle at block");
+    const receipt = await openReceiptFor(page, pill, "$");
     check(
       `ordinary #${n}: the pill's receipt names Comptroller.oracle() → getUnderlyingPrice at the block`,
       !!receipt &&
@@ -402,9 +382,9 @@ if (pricedLiq) {
     (await incentive.count()) > 0 &&
       (await incentive.innerText()).includes(`+${((d.incentiveAtBlock - 1) * 100).toFixed(2)}%`),
   );
-  const pills = card.getByText(/oracle at block/);
+  const pills = card.locator('[data-price-row] [title*="oracle at block"]');
   check(
-    `liquidation #${n}: two at-block price pills (${d.collateralSymbol}, ${d.marketSymbol})`,
+    `liquidation #${n}: two at-block price chips (${d.collateralSymbol}, ${d.marketSymbol})`,
     (await pills.count()) === 2,
     `${await pills.count()} pill(s)`,
   );
@@ -441,8 +421,8 @@ if (unpriced) {
   await expandCard(own.page, own.domN(n));
   const card = cardFor(own.page, own.domN(n));
   check(
-    `unpriced #${n}: renders token-only (no "oracle at block" pill)`,
-    (await card.getByText(/oracle at block/).count()) === 0,
+    `unpriced #${n}: renders token-only (no "oracle at block" chip)`,
+    (await card.locator('[data-price-row] [title*="oracle at block"]').count()) === 0,
   );
   if (own.page !== page) await own.page.close();
 } else if (!X.complete) {

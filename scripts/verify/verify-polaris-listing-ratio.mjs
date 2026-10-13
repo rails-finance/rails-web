@@ -257,12 +257,13 @@ check(
 
 // ── 2. the tooltip ─────────────────────────────────────────────────────────
 const TIP_FRAGMENT = "Interest since the last touch and any PSM share are not in it";
-// Hover the figure ITSELF, not the stat column: the column is full-width and
-// its centre lands beside the inline value, where RevealTip never fires.
+// The press goes to the figure: the stat column is full-width and its centre
+// lands beside the inline value, where RevealTip never fires. Tips open on a
+// click since `aa0ea5e`.
 await page1
   .getByText(/≈\s*[\d,]+\.\d+%/)
   .first()
-  .hover();
+  .click();
 await page1.waitForTimeout(400);
 const tipText = await page1
   .locator('[role="tooltip"]')
@@ -270,7 +271,7 @@ const tipText = await page1
   .innerText()
   .catch(() => "");
 check(
-  "2. hovering a ratio reveals the tooltip sentence",
+  "2. clicking a ratio reveals the tooltip sentence",
   tipText.replace(/\s+/g, " ").includes(TIP_FRAGMENT),
   tipText.slice(0, 160),
 );

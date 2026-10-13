@@ -516,9 +516,10 @@ async function verifyFamilyOnce(
   // failed attempt leaves a screenshot and a state dump so the next flake
   // explains itself instead of being re-run blind.
   //
-  // Liquity V2 (`linkFrom: "pill"`) reads the first card's number pill,
-  // without opening the card. The copy-link button is on the event page's
-  // side column (`verifyLiquityMarkdown`, ui-jobs 308).
+  // `linkFrom: "pill"` reads the first card's number pill, without opening
+  // the card; no family passes it since the timeline's number went plain
+  // (ui-jobs 250). The copy-link button is on the event page's side column
+  // (`verifyLiquityMarkdown`, ui-jobs 308).
   let posCtx = null;
   let posPage = null;
   let positionPath = null;
@@ -1075,7 +1076,8 @@ await verifyFamily("spark", {
 const liquityV2Subject = await verifyFamily("liquity-v2", {
   listingPath: "/ethereum/liquity-v2",
   rowHrefRe: /^\/ethereum\/liquity-v2\/trove\//,
-  linkFrom: "pill",
+  // The timeline's number is plain since ui-jobs 250 (`e427ee5`); the event
+  // page opens from the row's ⋮, as on every family.
 });
 await verifyLiquityMarkdown(liquityV2Subject);
 

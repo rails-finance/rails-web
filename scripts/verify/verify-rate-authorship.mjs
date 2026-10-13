@@ -77,7 +77,8 @@ const assert = (cond, msg) => {
   }
 };
 
-const CARD_SEL = ".flex.w-full.items-start";
+// A card is its `data-event-id` row (the shared event card, ui-jobs 309).
+const CARD_SEL = "[data-event-id]";
 const MODAL_SEL = ".fixed.inset-0.z-\\[9999\\]";
 
 /** Expand the event card whose header matches `labelRe`, open its explanation
@@ -93,15 +94,20 @@ async function expandCardWithLabel(page, labelRe) {
       // Scoped to an event CARD: the timeline's filter menu carries the same
       // action names, and clicking one of those filters the list instead of
       // expanding anything.
-      const leaf = Array.from(document.querySelectorAll("*")).find(
+      // The card's screen-reader label carries the words too since 309
+      // (`7bfc37d`), outside the header's button: the first leaf under a
+      // button is the press.
+      const leaves = Array.from(document.querySelectorAll("*")).filter(
         (e) => e.children.length === 0 && re.test((e.textContent || "").trim()) && e.closest(sel),
       );
-      if (!leaf) return null;
-      let a = leaf;
-      while (a && a.getAttribute?.("role") !== "button") a = a.parentElement;
-      if (!a) return null;
-      a.setAttribute("data-verify-target", "1");
-      return true;
+      for (const leaf of leaves) {
+        let a = leaf;
+        while (a && a.getAttribute?.("role") !== "button") a = a.parentElement;
+        if (!a) continue;
+        a.setAttribute("data-verify-target", "1");
+        return true;
+      }
+      return null;
     },
     { reSrc: labelRe.source, sel: CARD_SEL },
   );
