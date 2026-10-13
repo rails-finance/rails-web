@@ -3,6 +3,7 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
 import { loadMaplePositionTail } from "@/lib/maple/position-page-data";
+import { mapleEventHeading, mapleEventPageDescription } from "@/lib/maple/explorer";
 import MaplePositionPage from "../../page";
 
 interface Props {
@@ -39,18 +40,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     session: "maple",
     subject: wallet,
     canonicalPath: `/ethereum/maple/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: mapleEventHeading(event), timestamp: event.timestamp } : null,
+    description: event ? mapleEventPageDescription(wallet, event.timestamp) : undefined,
   });
 }
 
-// THIN: renders the exact same parent position page, same params — the
-// nested `event/[eventId]` segment sits inside the same `[wallet]` layout, so
-// every provider still wraps it, and `MaplePositionView` (this page's client
-// half) never learns a new prop. It finds out it is on an event route from
-// `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra `eventId`
-// key the parent's own `Props` type doesn't declare; passing the same promise
-// through is still structurally valid (the parent only reads `wallet` off it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent position page's
+// server half, same params; its client half (`MaplePositionView`) reads
+// `eventId` from the route and draws the sub-nav and the event's card in page
+// mode with the shared column (`ChainTruthTimeline`'s `eventPage`).
 export default async function MapleEventPage({ params, searchParams }: Props) {
   return MaplePositionPage({ params, searchParams });
 }
