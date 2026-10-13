@@ -44,7 +44,7 @@ export interface SparkEventHeaderProps {
 
 /** A transfer's verb, kept before the amount (the custody row's label, as Aave
  *  V3's "Transferred out"). */
-const TRANSFER_LABEL = { transfer_in: "Transfer in", transfer_out: "Transfer out" } as const;
+export const TRANSFER_LABEL = { transfer_in: "Transfer in", transfer_out: "Transfer out" } as const;
 
 /** The row's head spec. */
 export function sparkHeadSpec({
