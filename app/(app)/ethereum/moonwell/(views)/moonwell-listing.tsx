@@ -35,7 +35,7 @@ export function MoonwellListing({ initialItems, initialTotal, initialKey, initia
       defaults={MOONWELL_LIST_DEFAULTS}
       sortOptions={MOONWELL_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      renderCard={(p) => <MoonwellPositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <MoonwellPositionCard v={viewFromSummary(p)} surface="listing" />}
       hrefFor={(p) => `/ethereum/moonwell/${p.wallet}`}
       keyFor={(p) => p.wallet}
       strategy={serverStrategy<MoonwellPositionSummary, MoonwellListFilters>({

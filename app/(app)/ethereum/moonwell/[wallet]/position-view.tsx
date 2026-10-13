@@ -23,7 +23,6 @@ import { useParams } from "next/navigation";
 import { moonwellExplorer } from "@/lib/moonwell/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMoonwellEvent } from "@/lib/shared/types/event-shape";
 import { fetchMoonwellPositions } from "@/lib/api/fetch-moonwell-positions";
@@ -52,7 +51,8 @@ import {
   MoonwellPositionExplanation,
   MoonwellClosedPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
-import { MoonwellBorrowRoom, moonwellRiskColumn } from "@/components/protocol/moonwell/moonwell-risk-slot";
+import { moonwellExports } from "@/components/protocol/moonwell/moonwell-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { computeMoonwellCardCaptions, moonwellLifetimeWithOpening } from "@/lib/moonwell/economics";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -68,13 +68,6 @@ import { externalActor, summariseExternalActors, withOpeningActors } from "@/lib
 import { liquidationStories } from "@/lib/shared/ctoken-liquidation-story";
 import { balancePeaks, withBalancePeaks } from "@/lib/shared/ctoken-peaks";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the Compound page.
-const MoonwellExportMenu = dynamic(
-  () => import("@/components/protocol/moonwell/moonwell-export-menu").then((m) => m.MoonwellExportMenu),
-  { ssr: false },
-);
 
 /** An Ethereum market key's mToken address. */
 const mtokenOf = (market: string) => MOONWELL_MARKET_BY_KEY[market]?.mtoken ?? market;
@@ -363,6 +356,20 @@ export default function MoonwellPositionView({
     return out;
   }, [view]);
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = liveView
+    ? moonwellExports({
+        wallet,
+        view: liveView,
+        chain,
+        events: moonwellEvents,
+        csvFilename: `moonwell-${wallet.slice(0, 10)}-activity.csv`,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        history: markdownHistoryScope(historyWindow, moonwellEvents),
+        scopeNote: exportScopeNote(historyWindow, moonwellEvents, "this wallet's whole history"),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flows.focus}>
       <CTokenLedgerContext.Provider value={ledgerData}>
@@ -373,19 +380,11 @@ export default function MoonwellPositionView({
             owner={{ wallet }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
+            // The exports ride the card's ⋮; the event route, which draws no card,
+            // keeps them in the wallet row's Tools.
+            tools={onEventPage}
           >
-            {liveView && (
-              <MoonwellExportMenu
-                wallet={wallet}
-                view={liveView}
-                chain={chain}
-                events={moonwellEvents}
-                csvFilename={`moonwell-${wallet.slice(0, 10)}-activity.csv`}
-                fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-                history={markdownHistoryScope(historyWindow, moonwellEvents)}
-                scopeNote={exportScopeNote(historyWindow, moonwellEvents, "this wallet's whole history")}
-              />
-            )}
+            {onEventPage && exports && <ExportMenu {...exports} />}
           </DetailTopRow>
 
           {loading ? (
@@ -395,18 +394,14 @@ export default function MoonwellPositionView({
               {!onEventPage && liveView && cardView && (
                 <MoonwellPositionCard
                   v={cardView}
-                  receipts
+                  surface="detail"
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // Closed by default, remembered per viewer and position (ui-jobs
-                  // 209). The health factor, the room left to borrow and the
-                  // distance bar come from the live Comptroller read, inside the
+                  // The Health factor, the room left to borrow and the distance to
+                  // liquidation come from the live Comptroller read, inside the
                   // card's receipts scope.
-                  positionSummary
-                  risk={
-                    liveView.status === "open" ? moonwellRiskColumn(chain ?? null, cardView.borrows.length > 0) : null
-                  }
-                  debtDetail={chain ? <MoonwellBorrowRoom chain={chain} /> : undefined}
+                  chain={chain}
+                  exports={exports}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The borrow-capacity strip
                   // is absorbed into the risk slot above; the market rates live on
