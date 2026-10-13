@@ -1,63 +1,84 @@
 "use client";
 
-// Aave V4 spoke selector card. This surface only ships aave-v4 (no shared
-// aave-v3 / spark code path), so the import paths point at the v4-namespaced
-// versions of constants / spoke-meta.
+// The Aave V4 spoke position card. It is a slot builder (rails-ops
+// TO-DO-position-card 322): `useAaveV4SpokeCardSlots` turns one spoke
+// position into a `PositionCardSlots` object and the shared `PositionCard`
+// (components/shared/position-card.tsx) draws it. The selector stays around the
+// shell: `AaveV4SpokeCardSelector` keeps `CardSelectorShell` (click to choose
+// among a wallet's spoke cards) and wraps each `PositionCard` in the chooser's
+// hover surface.
+//
+// Heads: Collateral, Debt and Health factor in USD with the asset clusters, or
+// one head, Supplied, on a supply-only spoke. The panel holds the lines that
+// sat under them: what the totals leave out, the supplies that are not
+// collateral, the interest inside each side, the borrow rate and its yearly
+// cost, the liquidation threshold, the risk premium and the liquidation read.
+// A closed spoke shows its highest recorded balances and the Outcome.
 
+import { useState, type ReactNode } from "react";
+import { Link2 } from "lucide-react";
 import { formatDate } from "@/lib/date";
 import { CardSelectorShell, positionCardSurface } from "@/components/shared/card-selector-shell";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
+import { Icon } from "@/components/icons/icon";
+import { ToolsMenuItem } from "@/components/shared/tools-menu";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel, yearlyDebtCost } from "@/lib/aave-v4/spoke-cards";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
-import { AaveV4LiquidationFootnote } from "@/components/protocol/aave-v4/aave-v4-liquidation-footnote";
-import { bucketForHealth } from "@/lib/aave-v4/health-bucket";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
-import { fmtUsd, hfLabelV4, hfColorClass, fmtYearly } from "@/lib/aave-v4/format";
+import { fmtUsd, hfLabelV4, fmtYearly, fmtLiqPrice } from "@/lib/aave-v4/format";
 import {
   AaveV4PositionExplanation,
   AaveV4ClosedExplanation,
 } from "@/components/protocol/aave-v4/aave-v4-position-explanation";
+import { aaveV4PositionModal } from "@/lib/aave-v4/event-templates";
 import type { ExternalActorSummary } from "@/lib/shared/external-actor";
-import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   usdProvOnchain,
   healthFactorProv,
   interestSinceZeroProv,
+  BLENDED_LT_PROV,
   BORROW_RATE_PROV,
   COLL_USD_PROV,
   DEBT_USD_PROV,
+  LIQ_DROP_PROV,
+  LIQ_PRICE_PROV,
+  liqRatioProv,
   NONCOLL_USD_PROV,
   PEAK_COLL_PROV,
   PEAK_DEBT_PROV,
   SUPPLY_USD_PROV,
   YEARLY_COST_PROV,
 } from "@/lib/aave-v4/position-provenance";
-import { listSymbols, NO_PRICE_HINT, PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
+import { listSymbols, PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
+
+export type { AaveSpokeCardInfo };
 
 // The interest figures are added since each balance last started from zero.
 const supplyInterestProv = () => interestSinceZeroProv("Supply interest inside the collateral");
 const borrowInterestProv = () => interestSinceZeroProv("Borrow interest inside the debt");
 
 /**
- * A headline USD stat (collateral / debt / supplied) that tells the truth in
- * both views. In the default (derived) view it shows the DefiLlama figure tagged
- * `usdProv` (off-chain price → middots under On-chain-values). When On-chain-values
- * is active AND an on-chain-oracle total is available (every contributing asset
- * is oracle-priced), it shows THAT value tagged `usdProvOnchain` (chain-derived
- * → survives the gate). If the on-chain total is unavailable — no chain balances,
- * no oracle price, or a partial (some asset unpriced) — it keeps the DefiLlama
- * figure, which middots under the gate; an incomplete on-chain number is never
- * asserted. That fallback figure is itself partial where an asset has no price
- * source at all: it is marked so, and `UnpricedFootnote` names what is missing.
+ * A headline USD figure (collateral, debt, supplied). The on-chain-oracle
+ * total when every contributing asset is oracle-priced, traced as read from
+ * the chain; otherwise the DefiLlama figure, which sums only the assets a price
+ * covers and is marked partial when one is missing (RULE: Rails never invents a
+ * price, lib/aave-v4/unpriced.ts). The panel's "Not in the totals" row names
+ * what is missing.
  */
 function HeadlineUsd({
   defillamaUsd,
@@ -65,55 +86,39 @@ function HeadlineUsd({
   derivedProv,
   onchainLabel,
   unpricedSymbols,
-  color,
 }: {
   defillamaUsd: number;
   onchainUsd: number | null | undefined;
   derivedProv: Provenance;
   onchainLabel: string;
-  /** Assets held here that no price source covers. Only bears on the fallback
-   *  figure — the on-chain total is null unless every contributing asset is
-   *  oracle-priced, so when it shows there is nothing left out. */
   unpricedSymbols: string[];
-  color: string;
 }) {
-  // Oracle-default: show the on-chain-oracle total whenever it's available
-  // (every contributing asset oracle-priced), tagged chain-derived — matching
-  // the listing, which prices from the same oracle at the backend. Fall back to
-  // the DefiLlama figure only when the oracle total is partial/unavailable.
-  // (Previously this was gated behind On-chain-values mode; now it's the default
-  // so listing and detail agree — both chain-true by default.)
   const useOnchain = onchainUsd != null;
   const v = fmtUsd(useOnchain ? onchainUsd : defillamaUsd);
-  // RULE: Rails never invents a price (lib/aave-v4/unpriced.ts). The fallback
-  // figure sums only the assets a price covers, so when one is missing the
-  // number is marked partial and the receipt names it.
   const excluded = useOnchain ? [] : unpricedSymbols;
   const info: Provenance = useOnchain
     ? usdProvOnchain(onchainLabel)
     : partialSumProv(derivedProv, onchainLabel, excluded);
   return (
-    <StatValue color={color} title={excluded.length > 0 ? `${v.title}${PARTIAL_LABEL_SUFFIX}` : v.title}>
+    <RevealTip tip={excluded.length > 0 ? `${v.title}${PARTIAL_LABEL_SUFFIX}` : v.title}>
       <Prov info={info}>{v.display}</Prov>
-    </StatValue>
+    </RevealTip>
   );
 }
 
-/** "excl. XAUt · no price source" — the assets a headline total could not
- *  include, in the card's own footnote grammar. Renders only when the shown
- *  figure is the fallback one, since the on-chain total is whole or absent. */
-function UnpricedFootnote({ spoke, onchainUsd }: { spoke: AaveSpokeCardInfo; onchainUsd: number | null | undefined }) {
-  if (onchainUsd != null || spoke.unpricedSymbols.length === 0) return null;
-  const names = listSymbols(spoke.unpricedSymbols);
+/** A closed card's peak, muted as a historic figure. */
+function PeakUsd({ usd, info }: { usd: number; info: Provenance }) {
+  const v = fmtUsd(usd);
   return (
-    <div className="text-xs mt-0.5 text-rb-500" title={`${names} is held here but no source prices it`}>
-      excl. {names} · {NO_PRICE_HINT}
-    </div>
+    <span className="text-rb-500">
+      <RevealTip tip={v.title}>
+        <Prov info={info}>{v.display}</Prov>
+      </RevealTip>
+    </span>
   );
 }
 
-export type { AaveSpokeCardInfo };
-
+/** The spoke and its hubs, at the right end of the heading row. */
 function SpokeIdentity({ name, hub, debtHubs }: { name: string; hub: HubTier; debtHubs: HubTier[] }) {
   return (
     <span className="flex items-center gap-1.5 leading-none text-foreground">
@@ -123,415 +128,439 @@ function SpokeIdentity({ name, hub, debtHubs }: { name: string; hub: HubTier; de
   );
 }
 
-/** Supply-side interest earned, shown under the Collateral / Supplied stat.
- *  Deliberately the supply leg ONLY — it never merges in borrow-interest paid, so
- *  the collateral footnote can't show a debt-driven negative. Earned supply
- *  interest is already part of the collateral balance shown above (it grew it),
- *  so it reads as an "incl." figure with no sign rather than a separate signed
- *  gain — parallel to the debt side. Hidden when it rounds below a cent — dust
- *  isn't worth a line. Renders nothing without the chain overlay. */
-function SupplyInterestFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
-  const got = spoke.interestSinceZero?.supply;
+/** The ⋮'s row for this position: a link to its page. A spoke position has no
+ *  ID or NFT of its own; the wallet and the spoke name it. */
+function AaveV4MenuRows({ pagePath }: { pagePath: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <ToolsMenuItem
+      icon={copied ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
+      title="Link to this position"
+      subtitle={copied ? "Copied" : "Copy the page's address"}
+      onClick={() =>
+        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        })
+      }
+    />
+  );
+}
+
+/** "$X since 25 Jun 2026": the interest inside one side, or null below a cent. */
+function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): PositionPanelRow | null {
+  const got = side === "supply" ? spoke.interestSinceZero?.supply : spoke.interestSinceZero?.debt;
   if (!got || got.usd < 0.01) return null;
   const v = fmtUsd(got.usd);
-  return (
-    <div
-      className="text-xs mt-0.5 font-medium text-rb-500"
-      title={`${v.title} of the collateral is supply interest added since ${formatDate(got.since)}, when the balance last started from zero`}
-    >
-      incl. <Prov info={supplyInterestProv()}>{v.display}</Prov> interest since {formatDate(got.since)}
-    </div>
-  );
+  return side === "supply"
+    ? {
+        id: "supply-interest",
+        label: "Supply interest",
+        tip: "The supply interest inside the collateral, in dollars: what the supplied balance holds beyond its deposits and withdrawals since it last started from zero.",
+        value: (
+          <span>
+            <Prov info={supplyInterestProv()}>{v.display}</Prov> since {formatDate(got.since)}
+          </span>
+        ),
+      }
+    : {
+        id: "borrow-interest",
+        label: "Borrow interest",
+        tip: "The borrow interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
+        value: (
+          <span>
+            <Prov info={borrowInterestProv()}>{v.display}</Prov> since {formatDate(got.since)}
+          </span>
+        ),
+      };
 }
 
-/** Debt-stat footnote: the accrued borrow interest (when non-dust), then the
- *  latest borrow rate with what it costs a year at this debt. Accrued interest
- *  GREW the debt, so it reads "incl. $X interest" directly under the
- *  debt it is part of, with no sign; the rate sits on the next line, so
- *  the two read as two figures. */
-function DebtFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
-  const rate = spoke.latestBorrowRate;
-  const owed = spoke.interestSinceZero?.debt;
-  const interest = owed && owed.usd >= 0.01 ? fmtUsd(owed.usd) : null;
-  const yearly = yearlyDebtCost(spoke);
-  if (rate === null && !interest) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500 space-y-0.5">
-      {interest && (
-        <div
-          title={`${interest.title} of the debt is borrow interest added since ${formatDate(owed!.since)}, when the debt last started from zero`}
-        >
-          incl. <Prov info={borrowInterestProv()}>{interest.display}</Prov> interest since {formatDate(owed!.since)}
-        </div>
-      )}
-      {rate !== null && (
-        <div>
-          <Prov info={BORROW_RATE_PROV}>{rate.toFixed(2)}%</Prov> {rateSymbolLabel(spoke)}borrow rate
-          {yearly && yearly.amount > 0 && (
-            <>
-              {" "}
-              · ~<Prov info={YEARLY_COST_PROV}>{fmtYearly(yearly.amount)}</Prov> {aaveV4DisplaySymbol(yearly.symbol)}
-              /year
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
+/** The liquidation read beside the health factor: the one collateral's price
+ *  (or its price in the debt asset where the two move together), else the
+ *  drop the whole collateral can take, `1 − 1/HF`. */
+function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
+  const buf = liquidationBuffer(spoke);
+  if (buf.liquidatable)
+    return {
+      id: "health-bucket",
+      label: "Health bucket",
+      tip: "The health factor is below 1, so a liquidator can repay part of the debt and take collateral at a discount.",
+      value: "Liquidatable at this block",
+    };
+  if (buf.dropPct == null) return null;
+  if (buf.atLine)
+    return {
+      id: "liquidation",
+      label: "Liquidation",
+      tip: "The health factor is above 1 by less than the card can show as a drop: the position is at the line where it can be liquidated.",
+      value: "At the liquidation line",
+    };
+  if (buf.single?.against) {
+    const a = buf.single.against;
+    const coll = aaveV4DisplaySymbol(buf.single.symbol);
+    const debt = aaveV4DisplaySymbol(a.symbol);
+    return {
+      id: "liquidates-at",
+      label: "Liquidates at",
+      tip: `The ${coll} price, in ${debt}, at which the health factor reaches 1 and the position can be liquidated. The debt moves with the collateral, so the price between the two is the one that matters.`,
+      value: (
+        <span className="inline-flex items-center gap-1">
+          <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
+          <Prov info={liqRatioProv(coll, debt)}>
+            {a.liqRatio.toLocaleString("en-US", { maximumFractionDigits: 4 })} {debt}
+          </Prov>
+        </span>
+      ),
+    };
+  }
+  if (buf.single)
+    return {
+      id: "liquidates-at",
+      label: "Liquidates at",
+      tip: `The ${aaveV4DisplaySymbol(buf.single.symbol)} price at which the health factor reaches 1 and the position can be liquidated: its market price divided by the health factor.`,
+      value: (
+        <span className="inline-flex items-center gap-1">
+          <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
+          <Prov info={LIQ_PRICE_PROV}>{fmtLiqPrice(buf.single.liqPrice)}</Prov>
+        </span>
+      ),
+    };
+  return {
+    id: "liquidation-drop",
+    label: "Liquidates on a drop of",
+    tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the position can be liquidated: 1 − 1 ÷ health factor.",
+    value: <Prov info={LIQ_DROP_PROV}>{buf.dropPct.toFixed(0)}%</Prov>,
+  };
 }
 
-/** "+ $X supplied · not collateral" — the market value of supplies NOT enabled as
- *  collateral (they can't be seized and don't move HF), shown under the Collateral
- *  stat. Truthful in both views like HeadlineUsd: the DefiLlama figure tagged
- *  off-chain (middots under On-chain-values) unless the on-chain-oracle
- *  non-collateral total is available — supply − collateral, and only when BOTH are
- *  strictly priced — which shows chain-derived. Never renders a bare, untagged price. */
-function NonCollateralFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
-  const defillamaUsd = spoke.supplyBreakdown.nonCollateralUsd;
-  if (defillamaUsd <= 0) return null;
-  // supply − collateral, both null-guarded: a non-collateral supply is always part
-  // of `supply`, so a single unpriced supplied reserve collapses the on-chain figure
-  // to null and we fall back to the middotting DefiLlama tag rather than assert a
-  // partial total (the same strict-completeness rule HeadlineUsd / computeOnchainUsd use).
-  const onc = spoke.onchainUsd;
-  const onchainNonColl: number | null =
-    onc && onc.supply != null && onc.collateral != null ? onc.supply - onc.collateral : null;
-  const useOnchain = onchainNonColl != null;
-  const v = fmtUsd(useOnchain ? onchainNonColl : defillamaUsd);
-  const info: Provenance = useOnchain ? usdProvOnchain("Supplied, not collateral") : NONCOLL_USD_PROV;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500" title={v.title}>
-      + <Prov info={info}>{v.display}</Prov> supplied · not collateral
-    </div>
-  );
-}
-
-function AaveV4SpokeCard({
-  spoke,
-  isSelected,
-  noHover,
-  staticCard,
-  onClick,
-  wallet,
-  ensName,
-  rowExtra,
-  externalActivity,
-  closedFactors,
-}: {
+export interface AaveV4SpokeCardProps {
   spoke: AaveSpokeCardInfo;
-  isSelected: boolean;
-  noHover?: boolean;
-  staticCard?: boolean;
-  onClick: () => void;
-  /** When set, a wallet pill (facehash + addr/ENS + copy) renders alongside
-   *  the spoke identity. The detail page passes this; multi-spoke selectors
-   *  inside a wallet-scoped view omit it (the page header already names the
-   *  wallet). */
+  /** The card carries the (i) Explanation and its "?". */
+  showInfo: boolean;
+  /** A wallet pill beside the spoke name, for a selector whose page does not
+   *  name the wallet above the card. */
   wallet?: string;
   ensName?: string | null;
-  /** Inline context riding the info area's heading-button row (the V2 trove
-   *  treatment — the detail page passes the risk slot: the collateral-exposure
-   *  cluster + compact liquidation runway, right-aligned after the buttons).
-   *  Only renders where the info area does. */
-  rowExtra?: React.ReactNode;
   /** Who executed this spoke position's events, reduced over the page's
-   *  spoke-scoped history — feeds the explanation's operator bullet. Only the
-   *  detail page has an event stream to reduce, so it is the only caller that
-   *  passes this. */
+   *  spoke-scoped history: the explanation's operator bullet. */
   externalActivity?: ExternalActorSummary;
-  /** A closed position's collateral factors while it was open (detail page). */
+  /** A closed position's collateral factors while it was open. */
   closedFactors?: ClosedCollateralFactors;
-}) {
-  const { isClosed } = spoke;
-  // The info area renders by placement: the static detail card, or a
-  // non-selected card in a hoverless selector. Open positions carry the
-  // expandable explanation; closed positions have none, and their figures are
-  // traced through the page-level inspector like every other card's.
-  const showInfo = (noHover && !isSelected) || !!staticCard;
-  // Supply-only collapses the card to a single "Supplied" stat (hiding the
-  // Debt / HF columns). Which question decides it depends on the card's mode:
-  //   - Closed card = history view: peak debt is the headline, so supply-only
-  //     means the position NEVER carried real debt (peakDebt < $1).
-  //   - Open card = live view: ANY live debt counts as borrowing — there is no
-  //     dust floor here. A sub-dollar leftover borrow still shows its Debt + HF
-  //     columns, so the headline agrees with the "Borrowing" pill and the
-  //     liquidation runway beneath it (both key off debt > 0). An earlier `< $1`
-  //     collapse made those three disagree: a ~$0.57 loan read as a lone
-  //     "Supplied" up top while the pill + runway called it an active loan.
-  const { session } = useAaveV4Deployment();
-  const supplyOnly = isClosed ? spoke.peakDebtUsd < 1 : spoke.totalDebtUsd <= 0;
-  const bucket = bucketForHealth(spoke.healthFactor);
-  const walletPill = wallet ? (
-    <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol={session} bookmarkProtocol={session} />
-  ) : null;
-
-  // Collateral USD lags when the supply asset's price is still resolving:
-  // stablecoin debt prices in instantly via the categorical-price fallback, but
-  // WETH / LST collateral comes from the async price provider. Rather than flash
-  // a misleading "< $0.01" and then jolt to the real number, hold a skeleton
-  // until the price lands. A real collateralized position is never worth
-  // sub-cent, and core/plus collateral is always priceable, so
-  // sub-cent-with-supplies reliably means "price still loading". The skeleton
-  // sits inside a StatValue so its line-box matches the real value exactly —
-  // the swap is a fade, not a reflow.
-  const supplyUsdPending = spoke.supplyingSymbols.length > 0 && spoke.totalSupplyUsd < 0.01;
-  const supplyValueSkeleton = (
-    <StatValue color="text-foreground/80">
-      <span
-        className="inline-block h-[0.7em] w-20 rounded-md bg-skeleton animate-pulse align-middle"
-        aria-hidden="true"
-      />
-    </StatValue>
-  );
-  return (
-    <div
-      onClick={onClick}
-      className={`w-full text-left rounded-lg transition-all ${staticCard ? "cursor-default" : "cursor-pointer"} ${positionCardSurface(isClosed ? "closed" : "open", { noHover, staticCard, isSelected })}`}
-    >
-      <div className="px-5 py-4">
-        {isClosed ? (
-          <ClosedPositionStats
-            // Any liquidation in the record marks the outcome "liquidated",
-            // whether or not a later owner transaction is what actually
-            // zeroed the position — matches Aave V3's `everLiquidated` rule
-            // and the backend's status column (migration 057, rewritten for
-            // this rule; rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28).
-            outcome={spoke.wasLiquidated ? "liquidated" : "closed"}
-            identity={
-              <PositionCardMeta
-                eventCount={spoke.txCount}
-                eventTotal={spoke.eventCount}
-                liquidationCount={spoke.liquidationCount}
-              />
-            }
-            collateralAssetIcons={
-              spoke.supplyingSymbols.length > 0 ? <InlineAssetCluster symbols={spoke.supplyingSymbols} /> : undefined
-            }
-            debtAssetIcons={
-              !supplyOnly && spoke.borrowingSymbols.length > 0 ? (
-                <InlineAssetCluster symbols={spoke.borrowingSymbols} />
-              ) : undefined
-            }
-            leadingIdentity={
-              <>
-                {walletPill}
-                <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
-              </>
-            }
-            collateralLabel={supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
-            collateral={(() => {
-              const v = fmtUsd(spoke.peakSupplyUsd);
-              return (
-                <StatValue color="text-rb-500" title={v.title}>
-                  <Prov info={PEAK_COLL_PROV}>{v.display}</Prov>
-                </StatValue>
-              );
-            })()}
-            debt={
-              supplyOnly
-                ? undefined
-                : (() => {
-                    const v = fmtUsd(spoke.peakDebtUsd);
-                    return (
-                      <StatValue color="text-rb-500" title={v.title}>
-                        <Prov info={PEAK_DEBT_PROV}>{v.display}</Prov>
-                      </StatValue>
-                    );
-                  })()
-            }
-          />
-        ) : (
-          <OpenPositionStats
-            statusPill={
-              <span className={`font-bold px-2 py-0.5 rounded-sm text-xs ${bucket.pillClass}`}>{bucket.pillLabel}</span>
-            }
-            leadingIdentity={
-              <>
-                {walletPill}
-                <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
-              </>
-            }
-            identity={
-              // Activity-meta cluster (top-right, shared across every protocol's
-              // position cards): the owner transaction count, then the red
-              // liquidation triangle when present. No time-ago on the detail card —
-              // the page is already scoped to one wallet. txCount counts distinct
-              // non-liquidation transactions, so it isn't inflated by the
-              // supply+enable merge and doesn't double-count the triangle beside it.
-              <PositionCardMeta eventCount={spoke.txCount} liquidationCount={spoke.liquidationCount} />
-            }
-            columns={
-              supplyOnly
-                ? [
-                    {
-                      label: "Supplied",
-                      assetIcons:
-                        spoke.supplyingSymbols.length > 0 ? (
-                          <InlineAssetCluster symbols={spoke.supplyingSymbols} />
-                        ) : undefined,
-                      value: supplyUsdPending ? (
-                        supplyValueSkeleton
-                      ) : (
-                        <HeadlineUsd
-                          defillamaUsd={spoke.totalSupplyUsd}
-                          onchainUsd={spoke.onchainUsd?.supply}
-                          derivedProv={SUPPLY_USD_PROV}
-                          onchainLabel="Currently supplied"
-                          unpricedSymbols={spoke.unpricedSymbols}
-                          color="text-foreground/80"
-                        />
-                      ),
-                      footnote: (
-                        <>
-                          <UnpricedFootnote spoke={spoke} onchainUsd={spoke.onchainUsd?.supply} />
-                          <SupplyInterestFootnote spoke={spoke} />
-                        </>
-                      ),
-                    },
-                    null,
-                    null,
-                  ]
-                : [
-                    {
-                      // "Collateral" is the full (un-LT-weighted) market value of
-                      // the supplies ENABLED as collateral — what actually backs
-                      // the loan. Supplied-but-not-collateral assets are excluded
-                      // (they can't be seized and don't move HF) and shown as a
-                      // separate footnote. The LT weighting lives in HF + borrowing
-                      // power, not in this number.
-                      label: CARD_VOCAB.collateral,
-                      assetIcons:
-                        spoke.supplyBreakdown.collateralSymbols.length > 0 ? (
-                          <InlineAssetCluster symbols={spoke.supplyBreakdown.collateralSymbols} />
-                        ) : undefined,
-                      value: supplyUsdPending ? (
-                        supplyValueSkeleton
-                      ) : (
-                        <HeadlineUsd
-                          defillamaUsd={spoke.supplyBreakdown.collateralUsd}
-                          onchainUsd={spoke.onchainUsd?.collateral}
-                          derivedProv={COLL_USD_PROV}
-                          onchainLabel="Current collateral"
-                          unpricedSymbols={spoke.unpricedSymbols}
-                          color="text-foreground/80"
-                        />
-                      ),
-                      footnote: (
-                        <>
-                          <UnpricedFootnote spoke={spoke} onchainUsd={spoke.onchainUsd?.collateral} />
-                          <NonCollateralFootnote spoke={spoke} />
-                          <SupplyInterestFootnote spoke={spoke} />
-                        </>
-                      ),
-                    },
-                    {
-                      label: CARD_VOCAB.debt,
-                      assetIcons:
-                        spoke.borrowingSymbols.length > 0 ? (
-                          <InlineAssetCluster symbols={spoke.borrowingSymbols} />
-                        ) : undefined,
-                      value: (
-                        <HeadlineUsd
-                          defillamaUsd={spoke.totalDebtUsd}
-                          onchainUsd={spoke.onchainUsd?.debt}
-                          derivedProv={DEBT_USD_PROV}
-                          onchainLabel="Current debt"
-                          unpricedSymbols={spoke.unpricedSymbols}
-                          color="text-foreground/80"
-                        />
-                      ),
-                      footnote: (
-                        <>
-                          <UnpricedFootnote spoke={spoke} onchainUsd={spoke.onchainUsd?.debt} />
-                          <DebtFootnote spoke={spoke} />
-                        </>
-                      ),
-                    },
-                    {
-                      label: ratioLabel("pooled"),
-                      value:
-                        spoke.healthFactor !== null ? (
-                          <StatValue color={hfColorClass(spoke.healthFactor)}>
-                            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>
-                              {hfLabelV4(spoke.healthFactor)}
-                            </Prov>
-                          </StatValue>
-                        ) : spoke.borrowingSymbols.length > 0 ? (
-                          // Debt the card shows but could not price: no HF
-                          // can be worked out, and "∞" would say there is none.
-                          <StatDash />
-                        ) : (
-                          <StatDash>{"∞"}</StatDash>
-                        ),
-                      // The liquidation read sits beneath HF as its tangible
-                      // restatement (single collateral → price, multi → 1 − 1/HF
-                      // buffer), not as a peer column — it's derived from HF.
-                      // Borrowing power stays omitted (it's the gap to a 1.00 HF,
-                      // which misreads as a safe-to-borrow stat).
-                      footnote: <AaveV4LiquidationFootnote buf={liquidationBuffer(spoke)} />,
-                    },
-                  ]
-            }
-          />
-        )}
-        {/* The card's info area at the bottom-left: (i) Explanation beside
-            route-icon Provenance (the receipts list for every traced value in
-            the surrounding scope — the detail page wraps the whole position
-            panel in one). */}
-        {showInfo && (
-          <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-            <ProvenanceInfoTabs
-              // A terminal life gets the past-tense closed narration — never no
-              // pane. rowExtra (the live risk strip) stays open-only: it
-              // describes the chain NOW and never rides a past life.
-              explanation={
-                isClosed ? (
-                  <AaveV4ClosedExplanation spoke={spoke} embedded factorsThen={closedFactors} />
-                ) : (
-                  <AaveV4PositionExplanation spoke={spoke} embedded externalActivity={externalActivity} />
-                )
-              }
-              rowExtra={isClosed ? undefined : rowExtra}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  /** The risk premium the spoke charges this position, as a fraction; a row
+   *  only when it is above zero. */
+  riskPremium?: number | null;
+  /** The position page's path, for the ⋮'s link. */
+  pagePath?: string;
+  /** The ⋮'s export shapes (`aaveV4Exports`). */
+  exports?: PositionCardExports | null;
+  /** The (i) pane's copy-this-view link. */
+  viewHref?: () => string;
+  /** A foot line (Base: the oracle prices and the reserves' pause state). */
+  foot?: ReactNode;
 }
 
-export interface AaveV4SpokeCardSelectorProps {
+/** The Aave V4 spoke's slots for the shared position card. */
+export function useAaveV4SpokeCardSlots({
+  spoke,
+  showInfo,
+  wallet,
+  ensName,
+  externalActivity,
+  closedFactors,
+  riskPremium,
+  pagePath,
+  exports,
+  viewHref,
+  foot,
+}: AaveV4SpokeCardProps): PositionCardSlots {
+  const { session } = useAaveV4Deployment();
+  const { isClosed } = spoke;
+  // Supply-only draws one head, Supplied. A closed card asks whether the
+  // position ever carried real debt (peak debt under $1); an open card counts
+  // any live debt, so a sub-dollar leftover borrow keeps its Debt and Health
+  // factor heads.
+  const supplyOnly = isClosed ? spoke.peakDebtUsd < 1 : spoke.totalDebtUsd <= 0;
+
+  const identity = (
+    <span className="flex items-center gap-2">
+      {wallet && (
+        <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol={session} bookmarkProtocol={session} />
+      )}
+      <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
+    </span>
+  );
+  // The owner transaction count and the liquidation triangle; the closed
+  // card's tip also gives the events behind them.
+  const counters = {
+    eventCount: spoke.txCount,
+    ...(isClosed ? { eventTotal: spoke.eventCount } : {}),
+    liquidationCount: spoke.liquidationCount,
+  };
+  const explainer = {
+    body: showInfo ? (
+      isClosed ? (
+        <AaveV4ClosedExplanation spoke={spoke} embedded factorsThen={closedFactors} />
+      ) : (
+        <AaveV4PositionExplanation spoke={spoke} embedded externalActivity={externalActivity} />
+      )
+    ) : null,
+    viewHref,
+  };
+  const learnMore = showInfo ? aaveV4PositionModal(spoke.name, spoke.wasLiquidated) : null;
+  const menu = {
+    leading: pagePath ? () => <AaveV4MenuRows pagePath={pagePath} /> : undefined,
+    exports: exports ?? null,
+  };
+
+  if (isClosed) {
+    // Any liquidation in the record marks the outcome Liquidated, whether or
+    // not a later owner transaction emptied the position (Aave V3's
+    // `everLiquidated` rule; rails-ops TO-DO-ui-jobs 97).
+    const liquidated = spoke.wasLiquidated;
+    const status: PositionCardStatus = liquidated
+      ? { word: "Liquidated", tone: "danger" }
+      : { word: "Closed", tone: "muted" };
+    const heads: PositionCardHead[] = [
+      {
+        id: "peak-collateral",
+        label: supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
+        value: <PeakUsd usd={spoke.peakSupplyUsd} info={PEAK_COLL_PROV} />,
+      },
+      ...(supplyOnly
+        ? []
+        : [
+            {
+              id: "peak-debt",
+              label: CARD_VOCAB.peakDebt,
+              value: <PeakUsd usd={spoke.peakDebtUsd} info={PEAK_DEBT_PROV} />,
+            },
+          ]),
+    ];
+    return {
+      surface: "detail",
+      status,
+      heads,
+      identity,
+      counters,
+      explainer,
+      learnMore,
+      menu,
+      foot,
+      outcome: { word: liquidated ? "Liquidated" : "Closed" },
+    };
+  }
+
+  // Collateral USD lags while the supplied asset's price resolves: hold the
+  // figure's place until it lands rather than flash "< $0.01". A collateral
+  // position is never worth under a cent, so that reading means a price still
+  // loading.
+  const supplyUsdPending = spoke.supplyingSymbols.length > 0 && spoke.totalSupplyUsd < 0.01;
+  const cluster = (symbols: string[]) => (symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined);
+  const onc = spoke.onchainUsd;
+
+  const heads: PositionCardHead[] = supplyOnly
+    ? [
+        {
+          id: "supplied",
+          label: "Supplied",
+          pending: supplyUsdPending,
+          assets: cluster(spoke.supplyingSymbols),
+          value: (
+            <HeadlineUsd
+              defillamaUsd={spoke.totalSupplyUsd}
+              onchainUsd={onc?.supply}
+              derivedProv={SUPPLY_USD_PROV}
+              onchainLabel="Currently supplied"
+              unpricedSymbols={spoke.unpricedSymbols}
+            />
+          ),
+        },
+      ]
+    : [
+        {
+          // The full market value of the supplies enabled as collateral; the
+          // ones that are not stand in the panel. The threshold weighting
+          // lives in the health factor.
+          id: "collateral",
+          label: CARD_VOCAB.collateral,
+          pending: supplyUsdPending,
+          assets: cluster(spoke.supplyBreakdown.collateralSymbols),
+          value: (
+            <HeadlineUsd
+              defillamaUsd={spoke.supplyBreakdown.collateralUsd}
+              onchainUsd={onc?.collateral}
+              derivedProv={COLL_USD_PROV}
+              onchainLabel="Current collateral"
+              unpricedSymbols={spoke.unpricedSymbols}
+            />
+          ),
+        },
+        {
+          id: "debt",
+          label: CARD_VOCAB.debt,
+          assets: cluster(spoke.borrowingSymbols),
+          value: (
+            <HeadlineUsd
+              defillamaUsd={spoke.totalDebtUsd}
+              onchainUsd={onc?.debt}
+              derivedProv={DEBT_USD_PROV}
+              onchainLabel="Current debt"
+              unpricedSymbols={spoke.unpricedSymbols}
+            />
+          ),
+        },
+        {
+          id: "health-factor",
+          label: ratioLabel("pooled"),
+          // A debt the card could not price has no health factor: a dash,
+          // since "∞" would say there is no debt.
+          value:
+            spoke.healthFactor !== null ? (
+              <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabelV4(spoke.healthFactor)}</Prov>
+            ) : spoke.borrowingSymbols.length > 0 ? null : (
+              <span className="text-rb-500">∞</span>
+            ),
+        },
+      ];
+
+  // ── The panel: the supplied side on the left, the debt and the risk on the
+  //    right.
+  const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
+    rows.filter((r): r is PositionPanelRow => r != null);
+
+  // What a fallback total leaves out. The on-chain totals are whole or
+  // absent, so the row stands only when a head shows the fallback figure.
+  const fallbackShown = supplyOnly ? onc?.supply == null : onc?.collateral == null || onc?.debt == null;
+  const unpricedRow: PositionPanelRow | null =
+    fallbackShown && spoke.unpricedSymbols.length > 0
+      ? {
+          id: "unpriced",
+          label: "Not in the totals",
+          tip: "Assets held here that no price source covers. The dollar figures above leave them out and are marked partial.",
+          value: `${listSymbols(spoke.unpricedSymbols)}, no price source`,
+        }
+      : null;
+
+  // Supplies not enabled as collateral: they cannot be seized and do not move
+  // the health factor. The on-chain figure (supply − collateral, both priced)
+  // where it stands, else the DefiLlama one.
+  const nonCollUsd = spoke.supplyBreakdown.nonCollateralUsd;
+  const onchainNonColl = onc && onc.supply != null && onc.collateral != null ? onc.supply - onc.collateral : null;
+  const nonCollRow: PositionPanelRow | null =
+    !supplyOnly && nonCollUsd > 0
+      ? (() => {
+          const v = fmtUsd(onchainNonColl ?? nonCollUsd);
+          return {
+            id: "not-collateral",
+            label: "Supplied, not collateral",
+            tip: "Supplies the position has not enabled as collateral, in dollars. They cannot be seized and do not count toward the health factor.",
+            value: (
+              <RevealTip tip={v.title}>
+                <Prov info={onchainNonColl != null ? usdProvOnchain("Supplied, not collateral") : NONCOLL_USD_PROV}>
+                  {v.display}
+                </Prov>
+              </RevealTip>
+            ),
+          };
+        })()
+      : null;
+
+  // The liquidation threshold the health factor weighs the collateral at: one
+  // asset's, or the dollar-weighted blend of several.
+  const ltPct = spoke.blendedLt != null && spoke.blendedLt > 0 ? Math.round(spoke.blendedLt * 100) : null;
+  const blended = spoke.supplyBreakdown.collateralSymbols.length > 1;
+  const ltRow: PositionPanelRow | null =
+    !supplyOnly && ltPct != null
+      ? {
+          id: "liquidation-threshold",
+          label: blended ? "Blended liquidation threshold" : "Liquidation threshold",
+          tip: blended
+            ? "Each collateral asset's liquidation threshold weighted by its dollar share, as the spoke reports them: the part of the collateral's value the health factor counts."
+            : "The collateral's liquidation threshold, as the spoke reports it: the part of its value the health factor counts.",
+          value: <Prov info={BLENDED_LT_PROV}>{ltPct}%</Prov>,
+        }
+      : null;
+
+  const rate = spoke.latestBorrowRate;
+  // "USDC borrow rate" where the position has borrowed more than one asset.
+  const ratePrefix = rateSymbolLabel(spoke);
+  const rateRow: PositionPanelRow | null =
+    !supplyOnly && rate !== null
+      ? {
+          id: "borrow-rate",
+          label: ratePrefix ? `${ratePrefix}borrow rate` : "Borrow rate",
+          tip: "The latest borrow rate recorded on this spoke for the borrowed asset, from its most recent rate event.",
+          value: <Prov info={BORROW_RATE_PROV}>{rate.toFixed(2)}%</Prov>,
+        }
+      : null;
+  const yearly = yearlyDebtCost(spoke);
+  const costRow: PositionPanelRow | null =
+    !supplyOnly && yearly && yearly.amount > 0
+      ? {
+          id: "yearly-cost",
+          label: "Costs per year",
+          tip: "What the debt costs in a year at the latest borrow rate, in the borrowed token, if the rate and the debt stay where they are.",
+          value: (
+            <span>
+              ~<Prov info={YEARLY_COST_PROV}>{fmtYearly(yearly.amount)}</Prov> {aaveV4DisplaySymbol(yearly.symbol)}
+            </span>
+          ),
+        }
+      : null;
+  const premiumRow: PositionPanelRow | null =
+    riskPremium && riskPremium > 0
+      ? {
+          id: "risk-premium",
+          label: "Risk premium",
+          tip: "Aave V4 prices risk per position: the collateral held here carries a premium on top of the hub's base borrow rate.",
+          value: `${(riskPremium * 100).toFixed(2)}%`,
+        }
+      : null;
+
+  return {
+    surface: "detail",
+    status: null,
+    heads,
+    identity,
+    counters,
+    explainer,
+    learnMore,
+    menu,
+    foot,
+    panel: [
+      present([unpricedRow, nonCollRow, interestRow(spoke, "supply"), ltRow]),
+      present([interestRow(spoke, "debt"), rateRow, costRow, premiumRow, supplyOnly ? null : liquidationRow(spoke)]),
+    ],
+  };
+}
+
+/** One spoke's card, drawn by the shared shell. */
+function AaveV4SpokeCard(props: AaveV4SpokeCardProps) {
+  return <PositionCard slots={useAaveV4SpokeCardSlots(props)} />;
+}
+
+export interface AaveV4SpokeCardSelectorProps extends Omit<AaveV4SpokeCardProps, "spoke" | "showInfo"> {
   spokes: AaveSpokeCardInfo[];
   selected: string | undefined;
   onSelect: (spokeName: string) => void;
-  /** When set, every rendered card carries a wallet pill alongside the spoke
-   *  identity (facehash + ENS-or-short-addr + copy). Detail page passes this
-   *  so the card matches the listing-card identity row; multi-spoke selectors
-   *  inside a wallet-scoped page omit it. */
-  wallet?: string;
-  ensName?: string | null;
-  /** Compact context for the info area's heading-button row (detail page only —
-   *  the single static card; see AaveV4SpokeCard.rowExtra). */
-  rowExtra?: React.ReactNode;
-  /** Third-party-actor summary for the SELECTED spoke's history (detail page
-   *  only — see AaveV4SpokeCard.externalActivity). The detail page renders a
-   *  single spoke, so one summary is unambiguous; a genuine multi-spoke
-   *  selector must not pass a summary reduced over another spoke's events. */
-  externalActivity?: ExternalActorSummary;
-  /** The SELECTED spoke's collateral factors while it was open, when it is
-   *  closed (detail page only; see useClosedCollateralFactors). */
-  closedFactors?: ClosedCollateralFactors;
 }
 
+/** The wallet's spoke cards: the selected one in place, the others behind
+ *  the chooser's chevron. Each card is the shared shell inside the chooser's
+ *  hover surface; a press on a control inside the card (the ⋮, the (i), a
+ *  receipt) stays with that control. */
 export function AaveV4SpokeCardSelector({
   spokes,
   selected,
   onSelect,
-  wallet,
-  ensName,
-  rowExtra,
   externalActivity,
   closedFactors,
+  riskPremium,
+  exports,
+  pagePath,
+  viewHref,
+  foot,
+  ...rest
 }: AaveV4SpokeCardSelectorProps) {
   const items = spokes.map((s) => {
     const status: "open" | "closed" = s.isClosed ? "closed" : "open";
@@ -548,23 +577,33 @@ export function AaveV4SpokeCardSelector({
           return b.totalSupplyUsd - a.totalSupplyUsd;
         })
       }
-      renderCard={(item, props) => (
-        <AaveV4SpokeCard
-          spoke={item}
-          isSelected={props.isSelected}
-          noHover={props.noHover}
-          staticCard={props.staticCard}
-          onClick={props.onClick}
-          wallet={wallet}
-          ensName={ensName}
-          rowExtra={rowExtra}
-          // Gated on the selected spoke: the summary is reduced over ONE
-          // spoke's events, so handing it to a sibling card would state
-          // another market's operator pattern under this one's heading.
-          externalActivity={item.name === selected ? externalActivity : undefined}
-          closedFactors={item.name === selected ? closedFactors : undefined}
-        />
-      )}
+      renderCard={(item, props) => {
+        // The page-scoped parts (the operator summary, the factors then, the
+        // premium, the exports, the foot) belong to the selected spoke only.
+        const mine = item.name === selected;
+        return (
+          <div
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("button, a, [role='menu'], [role='dialog']")) return;
+              props.onClick();
+            }}
+            className={`w-full rounded-2xl text-left transition-all ${props.staticCard ? "cursor-default" : "cursor-pointer"} ${positionCardSurface(item.isClosed ? "closed" : "open", props)}`}
+          >
+            <AaveV4SpokeCard
+              {...rest}
+              spoke={item}
+              showInfo={(props.noHover && !props.isSelected) || props.staticCard}
+              externalActivity={mine ? externalActivity : undefined}
+              closedFactors={mine ? closedFactors : undefined}
+              riskPremium={mine ? riskPremium : undefined}
+              exports={mine ? exports : undefined}
+              pagePath={mine ? pagePath : undefined}
+              viewHref={mine ? viewHref : undefined}
+              foot={mine ? foot : undefined}
+            />
+          </div>
+        );
+      }}
     />
   );
 }

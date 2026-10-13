@@ -21,12 +21,11 @@ import { fmtUsd, hfProseV4, fmtLiqPrice, fmtYearly } from "@/lib/aave-v4/format"
 import { useSpokeCollateralFactors } from "@/lib/aave-v4/use-spoke-collateral-factors";
 import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
-import { LearnMore } from "@/components/shared/learn-more-modal";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import type { ExternalActorSummary } from "@/lib/shared/external-actor";
-import { aaveV4PositionModal, positionWords, V4_WORDS } from "@/lib/aave-v4/event-templates";
+import { positionWords, V4_WORDS } from "@/lib/aave-v4/event-templates";
 import { positionNodes } from "@/lib/aave-v4/position-nodes";
 import { arrangeByHeading } from "@/lib/shared/event-prose/nodes";
 import {
@@ -366,7 +365,6 @@ export function AaveV4PositionExplanation({
       }
     >
       <ProseExplainer paragraph={lead} items={arrange(bullets)} />
-      <LearnMore content={aaveV4PositionModal(spoke.name, spoke.wasLiquidated)} />
     </div>
   );
 }
@@ -442,7 +440,6 @@ export function AaveV4ClosedExplanation({
       }
     >
       <ProseExplainer paragraph={lead} items={arrange(bullets)} />
-      <LearnMore content={aaveV4PositionModal(spoke.name, spoke.wasLiquidated)} />
     </div>
   );
 }

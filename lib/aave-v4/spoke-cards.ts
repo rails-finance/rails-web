@@ -153,12 +153,9 @@ export interface AaveSpokeCardInfo {
   weightedCollateralUsd: number;
   /** Collateral-only blended liquidation threshold — Σ(collateralUsd × lt) /
    *  Σ(collateralUsd) over collateral-enabled reserves, on the chain-state
-   *  balance basis. Computed with the IDENTICAL formula `describeCollateral
-   *  Exposure` uses (lib/aave-v4/position-exposure), so the exposure sentence
-   *  ("…% blended liquidation threshold") and the position-explanation panel
-   *  ("each asset counts only up to its liquidation threshold, ~…%") state the
-   *  same number rather than two same-looking-but-differently-derived figures.
-   *  null when there's no priced collateral. */
+   *  balance basis. The card's liquidation-threshold row and the position
+   *  explanation ("each asset counts only up to its liquidation threshold,
+   *  ~…%") both read this one figure. null when there's no priced collateral. */
   blendedLt: number | null;
   totalDebtUsd: number;
   peakSupplyUsd: number;
@@ -192,9 +189,8 @@ export interface AaveSpokeCardInfo {
   /** Liq price for the dominant collateral asset (largest USD share). null when
    *  no debt, single-asset can't reach liq, or there's no priced collateral. */
   liqPrice: { symbol: string; currentPrice: number; liqPrice: number; headroomPct: number } | null;
-  /** Per-collateral-asset liq prices (full output of the calculation). Drives the
-   *  stacked price-runway view below the active spoke card. Sorted by USD share
-   *  desc so the runway stack reads dominant → minor. */
+  /** Per-collateral-asset liq prices (full output of the calculation), sorted
+   *  by USD share, dominant first. */
   assetLiqPrices: {
     symbol: string;
     address?: string;
@@ -942,11 +938,10 @@ export function buildSpokeCards(
     const liquidationCount = g.result.reserves.reduce((n, r) => n + r.liquidationCount, 0);
     const wasLiquidated = liquidationCount > 0;
 
-    // Collateral-only blended LT on the chain-state basis — same formula as the
-    // exposure sentence (describeCollateralExposure) so the two readouts agree.
+    // Collateral-only blended LT on the chain-state basis:
     // Σ(collateralUsd × lt) / Σ(collateralUsd) over collateral-enabled reserves,
-    // using currentSupplied when chain-patched and the same net-supply fallback
-    // and LT-fallback the exposure component uses.
+    // using currentSupplied when chain-patched, else the net supply, and the
+    // fallback LT where the spoke reports none.
     let collValueUsd = 0;
     let collWeightedLtUsd = 0;
     for (const r of g.result.reserves) {

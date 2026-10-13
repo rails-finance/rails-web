@@ -19,7 +19,7 @@ export function fmtUsd(n: number): { display: string; title: string } {
 // keeps the sign and never collapses a negative to "< $0.01" (fmtUsd's `n <
 // 0.01` guard would mis-handle −$46). Near-zero reads as "$0.00" so a dust
 // position doesn't flash a misleading "+$0". Intentionally NOT color-coded —
-// the sign carries the meaning (see hfColorClass rationale).
+// the sign carries the meaning, as the health factor is never coloured.
 export function fmtSignedUsd(n: number): { display: string; title: string } {
   if (Math.abs(n) < 0.005) return { display: "$0.00", title: "$0.00" };
   const sign = n < 0 ? "−" : "+";
@@ -86,14 +86,6 @@ export function fmtV4Amount(v: string | number | undefined): string {
   if (abs >= 1_000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
   const decimals = abs >= 0.0001 ? 4 : Math.min(6, Math.ceil(-Math.log10(abs)) + 1);
   return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
-}
-
-// Health-factor value color. Intentionally neutral at every level — Rails
-// doesn't color-code risk valence (green=safe / red=danger); the numeric HF
-// and the headroom readout carry the meaning. Kept as a function so call sites
-// don't need to change.
-export function hfColorClass(_hf: number | null): string {
-  return "text-foreground/80";
 }
 
 // Liq prices vary wildly: BTC at $100k vs USDC at $1. Scale formatting to the

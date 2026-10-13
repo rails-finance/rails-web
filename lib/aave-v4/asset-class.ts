@@ -84,16 +84,6 @@ export function assetClass(symbol: string): AssetClass {
   return "other";
 }
 
-// Sentence-case label — for inline prose ("Collateral is 60% stablecoin, 40%
-// eth-correlated…"). Lowercase on purpose so it reads naturally mid-sentence.
-export const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
-  eth: "ETH-correlated",
-  btc: "BTC-correlated",
-  stablecoin: "stablecoin",
-  gold: "gold",
-  other: "other",
-};
-
 // Title-case label — for standalone UI (legends, chips, table cells), where a
 // label is a noun, not part of a sentence.
 export const ASSET_CLASS_TITLE: Record<AssetClass, string> = {

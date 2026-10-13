@@ -47,22 +47,18 @@ import { AaveV4EventCard } from "@/components/protocol/aave-v4/aave-v4-event-car
 import type { AaveV4TxGroup } from "@/components/protocol/aave-v4/aave-v4-head";
 import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 import { AaveV4SpokeCardSelector } from "@/components/protocol/aave-v4/aave-v4-spoke-card";
-import { AaveV4RiskSlot } from "@/components/protocol/aave-v4/aave-v4-risk-slot";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { aaveV4EconomicsContent } from "@/lib/shared/learn-more-content";
 import { computeAaveLifetimeTotals } from "@/lib/aave-v4/lifetime-totals";
-// Lazy chunks: the tower chart (below the fold, ~700 lines of legend/anatomy)
-// and the export path (interaction-only dropdown + serializers) load as their
-// own chunks off the initial bundle. A mount-time prefetch (below) has both
-// cached well before the data fetch resolves and they first render.
+// Lazy chunk: the tower chart (below the fold, ~700 lines of legend/anatomy)
+// loads off the initial bundle. A mount-time prefetch (below) has it cached
+// well before the data fetch resolves and it first renders.
 const AaveV4TowerChart = dynamic(
   () => import("@/components/protocol/aave-v4/aave-v4-tower-chart").then((m) => m.AaveV4TowerChart),
   { loading: () => null },
 );
-const AaveV4ExportMenu = dynamic(
-  () => import("@/components/protocol/aave-v4/aave-v4-export-menu").then((m) => m.AaveV4ExportMenu),
-  { loading: () => null },
-);
+import { aaveV4Exports } from "@/components/protocol/aave-v4/aave-v4-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import {
   buildAaveV4SpokeCards,
   buildSpokeCards,
@@ -90,7 +86,7 @@ import { AAVE_V4_TIMELINE_RUNS } from "@/lib/aave-v4/timeline-runs";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
-import { SECTION_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
+import { SECTION_HEADING, NAV_LINK, CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { ChevronDown } from "lucide-react";
 import {
   FlowsKey,
@@ -200,14 +196,9 @@ function AaveV4SpokePageInner({
 
   // hasHydrated only — the timeline's own filter/sort/date/heatmap state now
   // lives in useTimelineEvents (below), keyed per spoke. This hook's flag
-  // still gates the exposure cluster + tower panel so they don't flash before
-  // client-side UI state settles.
+  // still gates the tower panel so it doesn't flash before client-side UI
+  // state settles.
   const { hasHydrated: hasUiHydrated } = useAaveV4UiState(isValidWallet ? wallet : undefined);
-
-  // Every <Prov> figure inside the position panel (card stats, footnotes,
-  // explanation bullets) reports into this registry, which the page-level
-  // inspector reads.
-  const positionRegistry = useReceiptRegistry();
 
   const { setWallets } = useWalletContext();
   useEffect(() => {
@@ -215,11 +206,10 @@ function AaveV4SpokePageInner({
     setWallets([wallet], { [wallet]: null });
   }, [wallet, isValidWallet, setWallets]);
 
-  // Warm the lazy chunks while the data fetch is in flight, so the toolbar and
-  // economics panel paint whole when the loading gate clears (no pop-in).
+  // Warm the lazy chunk while the data fetch is in flight, so the economics
+  // panel paints whole when the loading gate clears (no pop-in).
   useEffect(() => {
     void import("@/components/protocol/aave-v4/aave-v4-tower-chart");
-    void import("@/components/protocol/aave-v4/aave-v4-export-menu");
   }, []);
 
   // Mount. A seeded view already holds the tail and leaves this alone; an
@@ -721,66 +711,56 @@ function AaveV4SpokePageInner({
     );
   }
 
+  // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
+  const exports = activeCard
+    ? aaveV4Exports({
+        spokeName,
+        wallet,
+        card: activeCard,
+        reserves: activeGroup?.result.reserves ?? [],
+        prices: chainTruthPrices,
+        events: spokeScopedEvents,
+        csvFilename: `${session}-${rawSpoke}-${wallet.slice(0, 10)}-activity.csv`,
+        fetchAllEvents: olderCount > 0 ? fetchAllHistory : undefined,
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
-        <DetailTopRow session={session} wallet={wallet} owner={{ wallet }} assets={stripAssets} closed={positionClosed}>
-          {activeCard && (
-            <AaveV4ExportMenu
-              spokeName={spokeName}
-              wallet={wallet}
-              card={activeCard}
-              reserves={activeGroup?.result.reserves ?? []}
-              prices={chainTruthPrices}
-              events={spokeScopedEvents}
-              csvFilename={`${session}-${rawSpoke}-${wallet.slice(0, 10)}-activity.csv`}
-              fetchAllEvents={olderCount > 0 ? fetchAllHistory : undefined}
-            />
-          )}
+        <DetailTopRow
+          session={session}
+          wallet={wallet}
+          owner={{ wallet }}
+          assets={stripAssets}
+          closed={positionClosed}
+          // The exports ride the card's ⋮; the event route, which draws no
+          // card, keeps them in the wallet row's Tools.
+          tools={onEventPage}
+        >
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
-        {/* Position card in its own rounded panel — owner address sits in its
-            top row, and the info area at its bottom-left holds the Explanation
-            heading-button, with the risk slot riding that row
-            (the V2 trove treatment — the preferred pattern; the full-width
-            runway block retired): the label-led collateral-exposure cluster
-            beside the compact "% from liquidation" runway, one wrapping line
-            (detail-page-anatomy §2). The "% from liquidation" figure carries
-            the glance message; the liquidation price itself lives on as the HF
-            stat's "Liquidates at" caption. One receipts scope wraps the whole
-            panel, so every traced figure — headline stats, footnotes,
-            explanation bullets — lists in the card's Provenance section. */}
+        {/* The position card: the shared shell inside the spoke chooser, with
+            its receipts scope. No wallet: the page's wallet row above the
+            card names it (ui-jobs 228); the spoke name stays with the card. */}
         {!onEventPage && activeCard && (
-          <ProvReceiptsScope registry={positionRegistry}>
-            <div className="rounded-2xl bg-raised">
-              <AaveV4SpokeCardSelector
-                spokes={[activeCard]}
-                selected={spokeName}
-                onSelect={() => {}}
-                // No wallet: the page's wallet row above the card names it
-                // (ui-jobs 228); the spoke name stays with the card.
-                externalActivity={externalActivity}
-                closedFactors={closedFactors}
-                rowExtra={
-                  activeCard.totalDebtUsd > 0 && activeCard.healthFactor != null ? (
-                    <AaveV4RiskSlot
-                      spoke={activeCard}
-                      // The exposure cluster waits for the event group + UI
-                      // hydration (the gate the retired footnote used), so it
-                      // doesn't flash before the chain overlay lands; the
-                      // runway renders on the spoke alone.
-                      reserves={activeGroup && hasUiHydrated ? activeGroup.result.reserves : null}
-                      prices={chainTruthPrices}
-                    />
-                  ) : undefined
-                }
-              />
-              <RiskPremiumNotice raw={chainPosition?.riskPremiumRaw ?? null} spokeName={spokeName} />
-              {deployment.key === "base" && chainPosition && !chainPosition.chainStale && (
+          <AaveV4SpokeCardSelector
+            spokes={[activeCard]}
+            selected={spokeName}
+            onSelect={() => {}}
+            externalActivity={externalActivity}
+            closedFactors={closedFactors}
+            riskPremium={parseRiskPremiumFraction(chainPosition?.riskPremiumRaw ?? null)}
+            exports={exports}
+            pagePath={`${deployment.basePath}/spoke/${rawSpoke}/${wallet}`}
+            viewHref={tl.viewHref}
+            foot={
+              deployment.key === "base" && chainPosition && !chainPosition.chainStale ? (
                 <AaveV4BaseReserveNotice reserves={chainPosition.reserves} />
-              )}
-            </div>
-          </ProvReceiptsScope>
+              ) : undefined
+            }
+          />
         )}
 
         {/* Lifetime-flow towers sit directly above the timeline — the towers are
@@ -837,31 +817,6 @@ function AaveV4SpokePageInner({
       </div>
       <ProvInspectorLayer />
     </FlowFocusContext.Provider>
-  );
-}
-
-// ── Risk-premium notice ──────────────────────────────────────────────────────
-// V4 prices risk per position: a collateral mix the DAO deems riskier accrues a
-// premium on top of the hub's base borrow rate (see the spoke-meta rateNote).
-// Premiums are zeroed protocol-wide for now and turned on gradually, so this
-// renders NOTHING until a position actually carries one — at which point it
-// surfaces the captured chain value. Neutral styling only: per house rule we
-// never color-code cost/risk, so the number carries the meaning, not a hue.
-//
-// NOTE: the displayed magnitude depends on parseRiskPremiumFraction's wad
-// assumption, which is best-evidence not contract-confirmed (it's 0 everywhere
-// today). Verify against Aave Pro the first time a non-zero premium appears.
-function RiskPremiumNotice({ raw, spokeName }: { raw: string | null; spokeName: string }) {
-  const frac = parseRiskPremiumFraction(raw);
-  if (!frac) return null;
-  return (
-    <div className="px-4 md:px-6 pb-4 -mt-1">
-      <span className={PILL_META}>Risk premium {(frac * 100).toFixed(2)}%</span>
-      <p className="mt-1.5 text-xs text-rb-500 max-w-prose">
-        Aave V4 prices risk per position. The collateral held here carries a risk premium that increases the borrow
-        interest accruing on top of the {spokeName} hub&rsquo;s base rate.
-      </p>
-    </div>
   );
 }
 

@@ -86,7 +86,7 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
 
   if (rows.length === 0 && paused.length === 0 && frozen.length === 0 && registryPaused.length === 0) return null;
   return (
-    <div className="px-4 md:px-6 pb-4 -mt-1 text-xs text-rb-500 space-y-1.5 max-w-prose">
+    <div className="mt-4 text-xs text-rb-500 space-y-1.5 max-w-prose">
       {rows.length > 0 && (
         <>
           <p>Prices this position is valued at, from the spoke&rsquo;s oracle:</p>

@@ -4,44 +4,37 @@
 // detail page's position card (components/protocol/aave-v4/aave-v4-spoke-card.tsx).
 //
 // How parity is enforced:
-//   - Layout shell: both surfaces render through `OpenPositionStats`, so
-//     grid, label/value spacing, footnote handling, and asset-cluster
-//     alignment are byte-identical.
+//   - Layout: both surfaces render through the shared `PositionCard`.
 //   - Numbers: the server ships per-reserve chain-state (`reserves[]`:
 //     chain balances, LTs, isCollateral, on-chain oracle prices) on every listing
 //     row, mirroring the detail page's chain-state endpoint. The card runs
 //     the same `calculateAaveV4Position` the detail's `patchSpokeCardWithChain`
 //     runs, so totals, liq prices, and borrowing power are derived from
 //     identical inputs.
-//   - Formatting: shared `fmtUsd` / `hfLabelV4` / `fmtLiqPrice` (`lib/aave-v4/format.ts`).
+//   - Formatting: shared `fmtUsd` / `hfLabelV4` (`lib/aave-v4/format.ts`).
 //
-// Listing-only additions (not on the detail card):
-//   - Wallet identity pill (facehash + short addr + copy) sits alongside
-//     the spoke identity, since the listing shows many wallets and the
-//     detail is already scoped to one.
-//   - Time-ago in the `identity` slot.
-//   - Renders through the shared <PositionCardShell> (roster grammar): the
-//     listing's status pill is the LIFECYCLE word (open/closed/liquidated,
-//     `LifecyclePill`), not the detail card's mode word (Borrowing / Supply
-//     only / Liquidatable) — the two-axis rule. The mode word's one load-
-//     bearing state, Liquidatable, still needs to be readable off a listing
-//     row, so it rides as a footnote under Health Factor instead of the pill.
+// It renders through the shared position card (components/shared/position-card.tsx,
+// rails-ops TO-DO-position-card 322 and 324): the detail card's heads, the
+// lifecycle pill (OPEN, CLOSED, LIQUIDATED), the wallet and spoke as the
+// identity, the counters at the right of the heading row, and no panel. A
+// health factor below 1 says so under the figure, since the listing's pill is
+// the lifecycle one.
 
-import { ratioLabel } from "@/lib/shared/card-vocab";
+import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { Icon } from "@/components/icons/icon";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
-import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { useMemo } from "react";
 import type { AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
 import { holdsNothingOnChain, scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { SPOKE_HUB, debtHubsOf, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
+import {
+  PositionCard,
+  type PositionCardHead,
+  type PositionCardListingSlots,
+  type PositionCardStatus,
+} from "@/components/shared/position-card";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { fmtUsd, hfLabelV4 } from "@/lib/aave-v4/format";
 import {
@@ -49,8 +42,6 @@ import {
   computeSupplyBreakdown,
   type CalcPositionInputs,
 } from "@/lib/aave-v4/utils/position-calculation";
-import { liquidationBufferFrom } from "@/lib/aave-v4/spoke-cards";
-import { AaveV4LiquidationFootnote } from "@/components/protocol/aave-v4/aave-v4-liquidation-footnote";
 import { Prov } from "@/components/shared/provenance";
 import { usdProvOnchain, usdProv, isOnChainPriceSource } from "@/lib/aave-v4/position-provenance";
 
@@ -93,25 +84,16 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     };
   }, [row.reserves]);
 
-  // Liquidation read — identical helper to the detail card. Single collateral
-  // asset → its price; two or more → the 1 − 1/HF buffer. Uses the chain HF the
-  // server shipped (row.healthFactor), not the calculation's derived HF.
-  const buf = liquidationBufferFrom(row.healthFactor, calc.totalDebtUsd, calc.assetLiqPrices);
-
   // Prefer the chain HF the server already shipped (matches Aave UI by
   // construction) over the calculation's derived HF. They agree when LTs are fresh;
   // chain wins when they don't (premium-shares, recently-changed LT).
   const healthFactor = row.healthFactor;
   const hasDebt = healthFactor != null;
-  // Hard on-chain fact (HF < 1), not an editorialized "at risk" judgment — the
-  // ratio-column footnote below names it the same way the detail spoke card's
-  // mode-word pill would, since a listing row carries no such pill.
+  // Hard on-chain fact (HF < 1): the health factor head's sub line names it.
   const isLiquidatable = hasDebt && healthFactor < 1;
-  // Live view: ANY live debt counts as borrowing — no dust floor. A sub-dollar
-  // leftover borrow still shows its full Debt / HF readout so the headline
-  // agrees with the "Borrowing" pill (both key off debt > 0). Past borrows or
-  // liquidations on an otherwise debt-free position stay carried by the
-  // LiquidatedBadge + timeline, since debt is genuinely 0 there.
+  // Live view: ANY live debt counts as borrowing, no dust floor, so a
+  // sub-dollar leftover borrow still shows its Debt and Health factor heads, as
+  // on the detail card.
   const supplyOnly = calc.totalDebtUsd <= 0;
   // Chain overlay failed for this row → balances are MV-indexed (potentially
   // drifted from on-chain). The card still renders; the indicator warns.
@@ -123,14 +105,11 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   );
 
   // Lifecycle (two-axis model). Status is structural: open vs closed (no live
-  // balance). A closed position renders through the shared terminal frame
-  // (ClosedPositionStats), grey CLOSED badge / "Closed" outcome for a life
-  // never liquidated, red CLOSED badge / "Liquidated" outcome for one that
-  // was (closedByLiquidation below) — the Outcome column names it, so no
-  // separate qualifier text is needed.
-  // A zeroed position has no live balances, so in place of the live stat grid
-  // it shows the all-time high-water mark — Peak Supplied / Peak Debt —
-  // matching the detail card.
+  // balance). A closed position shows the muted CLOSED pill and "Closed"
+  // outcome for a life never liquidated, the red LIQUIDATED pill and
+  // "Liquidated" for one that was (closedByLiquidation below).
+  // A zeroed position has no live balances, so in place of the live heads it
+  // shows the all-time high-water mark, matching the detail card.
   // Null-safe against a pre-057 API that omits `status`: that API only ever
   // returned open positions (closed ones were pruned), so absent ⇒ open.
   //
@@ -179,60 +158,35 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
 
   const collateralValue = (() => {
     // "Collateral" is the full (un-LT-weighted) value of the supplies enabled as
-    // collateral. Supply-only positions have no collateral concept yet, so show
-    // the full deposited value; once there's debt, non-collateral supplies are
-    // excluded (shown as a footnote). The LT weighting lives in HF + borrowing
-    // power, not in this number.
+    // collateral. Supply-only positions show the full deposited value. The LT
+    // weighting lives in HF and borrowing power.
     const usd = supplyOnly ? calc.totalCollateralUsd : calc.breakdown.collateralUsd;
     const v = fmtUsd(usd);
     const label = supplyOnly ? "Supplied" : "Collateral";
     const info = collateralOnChain
       ? usdProvOnchain(label)
       : usdProv(label, { amountLabel: "supply balance", amountKind: "chain" });
-    // Supply-only positions are still live — render the value bright like any
-    // active position. The muted (text-rb-500) tone is reserved for genuinely
-    // closed positions, so using it here would falsely read as "closed."
     return (
-      <StatValue color="text-foreground/80" title={v.title}>
+      <RevealTip tip={v.title}>
         <Prov info={info}>{v.display}</Prov>
-      </StatValue>
+      </RevealTip>
     );
   })();
 
-  // Debt / HF values for positions carrying real (non-dust) debt. Supply-only
-  // rows never reach these — their columns are `null`ed out below so the grid
-  // slot stays open without asserting an empty Debt/HF (matches the detail
-  // card and the closed-Liquity precedent: an absent dimension shows nothing,
-  // not a placeholder dash).
   const debtValue = (() => {
     const v = fmtUsd(calc.totalDebtUsd);
     const info = debtOnChain
       ? usdProvOnchain("Debt")
       : usdProv("Debt", { amountLabel: "debt balance", amountKind: "chain" });
     return (
-      <StatValue color="text-foreground/80" title={v.title}>
+      <RevealTip tip={v.title}>
         <Prov info={info}>{v.display}</Prov>
-      </StatValue>
+      </RevealTip>
     );
   })();
 
-  const hfValue = (() => {
-    if (!hasDebt) return <StatDash>{"∞"}</StatDash>;
-    return (
-      <StatValue color="text-foreground/80">
-        {hfStale ? "~" : ""}
-        {hfLabelV4(healthFactor)}
-      </StatValue>
-    );
-  })();
-
-  // Shared identity nodes — both the open (OpenPositionStats) and closed
-  // (ClosedPositionStats) frames carry the same wallet + spoke lead and the
-  // same right-hand activity-meta cluster: time-ago, the owner transaction
-  // count, then the red liquidation triangle. txCount is distinct
-  // non-liquidation transactions — liquidations stay on the triangle, not in
-  // this tally.
-  const leadingIdentity = (
+  // The wallet and the spoke with its hubs, after the lifecycle pill.
+  const identity = (
     <>
       <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol={session} bookmarkProtocol={session} />
       <span className="flex items-center gap-1.5 leading-none text-foreground">
@@ -241,126 +195,110 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
       </span>
     </>
   );
-  const metaIdentity = (
-    <PositionCardMeta
-      lastActivityAt={row.lastActivityAt}
-      eventCount={row.txCount}
-      liquidationCount={row.liquidationCount}
-    />
-  );
+  // Time-ago, the owner transaction count (distinct non-liquidation
+  // transactions), then the red liquidation triangle.
+  const counters = {
+    lastActivityAt: row.lastActivityAt,
+    eventCount: row.txCount,
+    liquidationCount: row.liquidationCount,
+  };
 
-  // ⇒ A LISTING ROW, so its <Prov> figures deliberately trace nothing — same
-  // contract as every other listing render. <PositionCardShell> makes that
-  // declaration (via <ProvUnscoped>) once both branches render through it.
+  // ⇒ A LISTING ROW: the shell declares its <Prov> figures unscoped, so they
+  // trace nothing, the contract of every listing render.
   if (!isOpen) {
-    // Closed / liquidated: no live balances to show, so the shared terminal
-    // frame surfaces the all-time high-water mark (Peak Supplied / Peak Debt)
-    // the same way the detail card does — no debt column when the position
-    // never carried real debt. The Outcome column's own word ("Closed" /
-    // "Liquidated") plus its closedAt date now carry what the old "by
-    // liquidation" caption said, so that caption is retired.
-    return (
-      <PositionCardShell>
-        <ClosedPositionStats
-          outcome={closedByLiquidation ? "liquidated" : "closed"}
-          leadingIdentity={leadingIdentity}
-          identity={metaIdentity}
-          closedAt={closedAt}
-          collateralLabel={!peakKnown ? "" : peakSupplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
-          collateral={(() => {
-            if (!peakKnown) return null;
-            const v = fmtUsd(row.peakSupplyUsd ?? 0);
-            return (
-              <StatValue color="text-rb-500" title={v.title}>
-                {v.display}
-              </StatValue>
-            );
-          })()}
-          debt={
-            peakSupplyOnly
-              ? undefined
-              : (() => {
-                  const v = fmtUsd(row.peakDebtUsd ?? 0);
-                  return (
-                    <StatValue color="text-rb-500" title={v.title}>
-                      {v.display}
-                    </StatValue>
-                  );
-                })()
-          }
-        />
-      </PositionCardShell>
-    );
+    // Closed / liquidated: the all-time high-water mark (Highest recorded
+    // supply or collateral, Highest recorded debt) as the detail card shows
+    // it, with no debt head when the position never carried real debt. The
+    // Outcome column's word and date say how it ended.
+    const status: PositionCardStatus = closedByLiquidation
+      ? { word: "Liquidated", tone: "danger" }
+      : { word: "Closed", tone: "muted" };
+    const peak = (usd: number) => {
+      const v = fmtUsd(usd);
+      return (
+        <span className="text-rb-500">
+          <RevealTip tip={v.title}>{v.display}</RevealTip>
+        </span>
+      );
+    };
+    const heads: PositionCardHead[] = [
+      {
+        id: "peak-collateral",
+        label: peakSupplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral,
+        value: peakKnown ? peak(row.peakSupplyUsd ?? 0) : null,
+      },
+      ...(peakSupplyOnly ? [] : [{ id: "peak-debt", label: CARD_VOCAB.peakDebt, value: peak(row.peakDebtUsd ?? 0) }]),
+    ];
+    const slots: PositionCardListingSlots = {
+      surface: "listing",
+      status,
+      heads,
+      identity,
+      counters,
+      menu: null,
+      outcome: {
+        word: closedByLiquidation ? "Liquidated" : "Closed",
+        dates: closedAt ? [{ at: closedAt }] : undefined,
+      },
+    };
+    return <PositionCard slots={slots} />;
   }
 
-  return (
-    <PositionCardShell>
-      <OpenPositionStats
-        statusPill={<LifecyclePill status="open" />}
-        leadingIdentity={leadingIdentity}
-        identity={metaIdentity}
-        columns={[
+  const symbols = supplyOnly ? calc.supplyingSymbols : calc.breakdown.collateralSymbols;
+  const heads: PositionCardHead[] = [
+    {
+      id: supplyOnly ? "supplied" : "collateral",
+      label: supplyOnly ? "Supplied" : CARD_VOCAB.collateral,
+      assets: symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined,
+      value: collateralValue,
+    },
+    // Supply-only draws the one head: no Debt or Health factor to assert.
+    ...(supplyOnly
+      ? []
+      : [
           {
-            label: supplyOnly ? "Supplied" : "Collateral",
-            assetIcons: (() => {
-              const symbols = supplyOnly ? calc.supplyingSymbols : calc.breakdown.collateralSymbols;
-              return symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined;
-            })(),
-            value: collateralValue,
-            footnote:
-              !supplyOnly && calc.breakdown.nonCollateralUsd > 0 ? (
-                <div className="text-xs mt-0.5 text-rb-500">
-                  + {fmtUsd(calc.breakdown.nonCollateralUsd).display} supplied · not collateral
-                </div>
-              ) : undefined,
+            id: "debt",
+            label: CARD_VOCAB.debt,
+            assets:
+              calc.borrowingSymbols.length > 0 ? <InlineAssetCluster symbols={calc.borrowingSymbols} /> : undefined,
+            value: debtValue,
           },
-          // Supply-only → null both columns. The grid slot stays open (so the
-          // card lines up with sibling borrowing cards) but renders nothing —
-          // no "Debt"/"Health Factor" label, no dash, no footnote.
-          supplyOnly
-            ? null
-            : {
-                label: "Debt",
-                assetIcons:
-                  calc.borrowingSymbols.length > 0 ? <InlineAssetCluster symbols={calc.borrowingSymbols} /> : undefined,
-                value: debtValue,
-              },
-          supplyOnly
-            ? null
-            : {
-                label: ratioLabel("pooled"),
-                headerIcon: hfStale ? (
-                  // Approximate-value flag, NOT an adverse-event warning — the
-                  // warning triangle is reserved for liquidations/redemptions, so
-                  // a derived HF uses the neutral calculator glyph ("computed, not
-                  // read live") and no valence colour. The leading `~` on the value
-                  // carries "approximate"; this says why (source unavailable).
-                  <span
-                    className="text-rb-500"
-                    title="Approximate — live on-chain source unavailable. Shown value derived from indexed balances × off-chain prices."
-                    aria-label="Health factor is approximate; live on-chain source unavailable"
-                  >
-                    <Icon name="calculator" size={11} />
-                  </span>
-                ) : undefined,
-                value: hfValue,
-                // Liquidation read sits beneath HF as its tangible restatement (single
-                // collateral → price, multi → 1 − 1/HF buffer), mirroring the detail
-                // card. Borrowing power stays omitted (misreads as safe-to-borrow).
-                // The detail spoke card names this state with a mode-word pill
-                // ("Liquidatable"); a listing row's pill is the lifecycle one
-                // (open/closed), so this line carries the hard on-chain fact in
-                // its place — AaveV4LiquidationFootnote itself renders nothing
-                // once already-liquidatable (its price/drop read stops applying).
-                footnote: (
-                  <>
-                    {isLiquidatable && <div className="text-xs mt-0.5 text-rb-500">liquidatable at this block</div>}
-                    <AaveV4LiquidationFootnote buf={buf} />
-                  </>
-                ),
-              },
-        ]}
-      />
-    </PositionCardShell>
-  );
+          {
+            id: "health-factor",
+            label: ratioLabel("pooled"),
+            // Approximate-value flag: the calculator glyph says the figure is
+            // computed from indexed balances because the live read was
+            // unavailable; the leading "~" on the value says approximate.
+            labelIcon: hfStale ? (
+              <span
+                className="text-rb-500"
+                title="Approximate — live on-chain source unavailable. Shown value derived from indexed balances × off-chain prices."
+                aria-label="Health factor is approximate; live on-chain source unavailable"
+              >
+                <Icon name="calculator" size={11} />
+              </span>
+            ) : undefined,
+            value: hasDebt ? (
+              <>
+                {hfStale ? "~" : ""}
+                {hfLabelV4(healthFactor)}
+              </>
+            ) : (
+              <span className="text-rb-500">∞</span>
+            ),
+            // The hard on-chain fact the detail card's panel states; a listing
+            // row's pill is the lifecycle one.
+            sub: isLiquidatable ? "liquidatable at this block" : undefined,
+          },
+        ]),
+  ];
+  const slots: PositionCardListingSlots = {
+    surface: "listing",
+    status: null,
+    heads,
+    identity,
+    counters,
+    menu: null,
+  };
+  return <PositionCard slots={slots} />;
 }
