@@ -31,7 +31,6 @@ import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
 import { EventSheetView, type EventSheet } from "@/components/shared/event-sheet";
-import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -218,8 +217,8 @@ interface EventCardFrame {
    *  and inside a folder the dimmed rows read as disabled, not as quieter
    *  (Miles, 2026-09-02). */
   muted?: boolean;
-  /** A group's whole phone caption ("Redemptions (48) · 1 Oct '25 – 12 Oct
-   *  '25"), in place of the kind and the moment. */
+  /** A group's whole phone caption ("Redemptions", the count's chip, " · 1 Oct
+   *  '25 – 12 Oct '25"), in place of the kind and the moment. */
   phoneCaption?: ReactNode;
   /** The caption as spoken ("Redemptions, 1 October 2025 to …"). */
   spokenCaption?: string;
@@ -260,8 +259,9 @@ interface EventCardDrawn {
 
 export type EventCardProps = EventCardFrame & { slots: EventCardSlots };
 
-/** The slots, as the shell draws them. `breakdown`: the sheet's carry-forward
- *  layer and parameters (the timeline's switch; always on an event page). */
+/** The slots, as the shell draws them. `breakdown`: the sheet stands with its
+ *  carry-forward layer and parameters and no switch (an event's page); else
+ *  each opened sheet carries a switch. */
 function drawnOf(slots: EventCardSlots, pageMode: boolean, breakdown: boolean): EventCardDrawn {
   const { event, actor, explainer } = slots;
   // A stand-in card with nothing under its row (a run with no sums) opens
@@ -359,14 +359,12 @@ export function EventCard(props: EventCardProps) {
   // stand open with no toggle. The boundary card's open is controlled.
   const page = useContext(EventPageContext);
   const pageMode = page != null;
-  // The full breakdown (ui-jobs 330): one switch for the whole timeline, in
-  // the row's ⋮; always on an event's page, the event page's card or the card
-  // a family's event URL pins on its position page.
-  const display = useTimelineDisplay();
+  // The full breakdown (ui-jobs 330): always on at an event's page, the event
+  // page's card or the card a family's event URL pins on its position page;
+  // elsewhere the switch above each opened sheet.
   const pathname = usePathname();
   const ownPage = useEventShareHref()?.split("?")[0];
-  const onOwnPage = ownPage != null && pathname === ownPage;
-  const breakdown = pageMode || onOwnPage || display.showFullBreakdown;
+  const breakdown = pageMode || (ownPage != null && pathname === ownPage);
   const drawn = drawnOf(props.slots, pageMode, breakdown);
   const {
     iconColumn,
@@ -548,8 +546,7 @@ export function EventCard(props: EventCardProps) {
   // The event menu (⋮) at the right end of the T1 row, at both widths: after
   // the header on desktop, at the caption's right on a phone. A press on it
   // stays with the menu (Escape still reaches the menu's document listener).
-  const hasSheet = props.slots.sheet !== undefined && !!props.slots.event && !groupMenu && !onOwnPage;
-  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu || hasSheet);
+  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu);
   const headMenu =
     !pageMode && menuRows ? (
       <span
@@ -560,19 +557,14 @@ export function EventCard(props: EventCardProps) {
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu
-          shareHref={groupMenu ? null : shareHref}
-          groupShow={groupMenu}
-          breakdown={
-            hasSheet ? { on: display.showFullBreakdown, toggle: () => display.toggle("showFullBreakdown") } : undefined
-          }
-        />
+        <EventCardMenu shareHref={groupMenu ? null : shareHref} groupShow={groupMenu} />
       </span>
     ) : null;
 
   // ── The phone caption: the T1 row under 640px (mobile decision 16) ─────
   // "Repay · 6 Jun '26 13:31", the date once per day as the desktop row
-  // states it; a group passes its caption ("Redemptions (48) · 1 Oct '25 – …").
+  // states it; a group passes its caption ("Redemptions", the count's chip,
+  // " · 1 Oct '25 – …").
   const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
   const kind = custody
     ? `${custody.dir === "to" ? "Sent to" : "Received from"} ${short(custody.address)}`

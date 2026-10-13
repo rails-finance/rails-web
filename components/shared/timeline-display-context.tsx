@@ -8,8 +8,7 @@ export type TimelineDisplayKey =
   | "showCollateralRatio"
   | "showMarketNotes"
   | "openAllMarketNotes"
-  | "showTxHashes"
-  | "showFullBreakdown";
+  | "showTxHashes";
 
 export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside
@@ -34,10 +33,6 @@ export interface TimelineDisplayState {
    *  number pill shows its transaction's short hash in place of the number.
    *  Off by default. The event page's pill keeps the number. */
   showTxHashes: boolean;
-  /** "Show full breakdown" in an event card's ⋮ (ui-jobs 330): every sheet on
-   *  the timeline draws its carry-forward layer and the protocol's parameters.
-   *  Off by default; an event page always draws them. */
-  showFullBreakdown: boolean;
   toggle: (key: TimelineDisplayKey) => void;
 }
 
@@ -48,7 +43,6 @@ const DEFAULTS = {
   showMarketNotes: true,
   openAllMarketNotes: false,
   showTxHashes: false,
-  showFullBreakdown: false,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences
@@ -64,8 +58,9 @@ const Ctx = createContext<TimelineDisplayState>({
  *  events always collapse), `showTimelineValues`
  *  (the spine always carries the values), `showUsdValues`,
  *  `showChangeBars`, `showBalanceBars`, `showEventNumbers`, `showTimestamps`,
- *  `showUsdStable`, `showUsdOther` and `mobileSpine` (the phone's Timeline |
- *  List choice: the spine view is the only phone view). */
+ *  `showUsdStable`, `showUsdOther`, `mobileSpine` (the phone's Timeline |
+ *  List choice: the spine view is the only phone view) and
+ *  `showFullBreakdown` (the sheet's breakdown is each card's, ui-jobs 330). */
 function migrate(
   parsed: Partial<typeof DEFAULTS> & {
     showUsdValues?: boolean;
@@ -78,6 +73,7 @@ function migrate(
     mobileSpine?: boolean;
     showTimelineValues?: boolean;
     collapseRuns?: boolean;
+    showFullBreakdown?: boolean;
   },
 ): Partial<typeof DEFAULTS> {
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -92,6 +88,7 @@ function migrate(
     mobileSpine,
     showTimelineValues,
     collapseRuns,
+    showFullBreakdown,
     ...rest
   } = parsed;
   /* eslint-enable @typescript-eslint/no-unused-vars */

@@ -676,7 +676,7 @@ trove_words:
   run_adjusted: |-
     Adjusted
   run_phone_caption: |-
-    Adjusted ({count}) · {range}
+    · {range}
   run_spoken: |-
     Adjusted, {range}
   run_count_one: |-
