@@ -34,8 +34,25 @@ export interface FrankencoinForcedSaleFact {
   ctx: FrankencoinContext;
 }
 
+/** The position's terms and challenge state from the page's chain read at the
+ *  latest block (/api/chain/frankencoin/position). Expiry, the reserve
+ *  requirement and the challenge period are fixed for the position's life;
+ *  the challenged amount is the state now. */
+export interface FrankencoinLiveTerms {
+  expiration: number | null;
+  annualInterestPPM: number | null;
+  reserveContributionPPM: number | null;
+  /** Collateral in a running challenge auction now; null where unread. */
+  challengedAmount: number | null;
+}
+
 export interface FrankencoinPageFacts {
   challengePeriod: number | null;
+  /** The chain read's terms; null until it lands or where it failed. */
+  terms?: FrankencoinLiveTerms | null;
+  /** The newest event that carries ledger figures: the one whose state after
+   *  is the state now, so the chain read's running challenge belongs to it. */
+  latestLedgerEventId?: string | null;
   /** The family's original (the chain's original()), for a clone's lineage. */
   familyOriginal: string | null;
   /** Keyed `${hub}|${number}`. */
@@ -86,8 +103,14 @@ export function frankencoinPageFacts(
   let createdFor: string | null = null;
   const priceRaises: number[] = [];
   const withdrawals: number[] = [];
+  let latestLedgerEventId: string | null = null;
+  let latestLedgerBlock = -1;
   for (const e of events) {
     const ctx = e.context.data;
+    if ((ctx.collateral != null || ctx.minted != null) && e.blockNumber >= latestLedgerBlock) {
+      latestLedgerBlock = e.blockNumber;
+      latestLedgerEventId = e.id;
+    }
     const priceBefore = Number(ctx.liqPriceBefore ?? NaN);
     const priceAfter = Number(ctx.liqPrice ?? NaN);
     if (!ctx.firstState && priceBefore > 0 && priceAfter > priceBefore) priceRaises.push(e.timestamp);
@@ -129,6 +152,7 @@ export function frankencoinPageFacts(
   return {
     priceRaises,
     withdrawals,
+    latestLedgerEventId,
     challengePeriod,
     familyOriginal,
     challenges,

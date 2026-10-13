@@ -19,7 +19,15 @@
 import type { ReactNode } from "react";
 import type { FrankencoinContext } from "@/lib/shared/types/event-shape";
 import type { ChainTruthStat, ChainTruthTransition } from "@/components/shared/chain-truth-event";
-import { StatNotes, useChainTruthCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
+import {
+  EventNotes,
+  NoteLine,
+  StatNotes,
+  useChainTruthCells,
+  type ChainTruthCellStat,
+} from "@/components/shared/chain-truth-cells";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import { frankencoinSheet } from "./frankencoin-sheet";
 import type { EventCells } from "@/components/shared/event-cells";
 import {
   mintedAfterProv,
@@ -147,6 +155,9 @@ function cellKey(label: string): string | null {
 export function useFrankencoinCells({ ctx, txHash, blockNumber, eventId, timestamp }: FrankencoinCellsProps): {
   cells: EventCells;
   notes: ReactNode;
+  /** The balance sheet (ui-jobs 330) for the events that moved collateral or
+   *  debt; undefined where the cells stand. */
+  sheet: EventSheet | undefined;
 } {
   const coords: FrankencoinCoords = { txHash, blockNumber, position: ctx.position, hub: ctx.hub };
   const sym = ctx.collateralSymbol;
@@ -164,6 +175,9 @@ export function useFrankencoinCells({ ctx, txHash, blockNumber, eventId, timesta
   const debtLedger = ledgerRow && (cells?.debt || flowsPending) ? { ledger: "debt" as const } : {};
 
   const stats: ChainTruthStat[] = [];
+  // Set where the ledger lanes are drawn: the events that can be a sheet.
+  let ledgerLanes = false;
+  let zchfSplit: ReturnType<typeof frankencoinZchfSplit> = null;
 
   switch (ctx.eventType) {
     case "challenge_started": {
@@ -510,6 +524,7 @@ export function useFrankencoinCells({ ctx, txHash, blockNumber, eventId, timesta
       // SKIPPED on an understated row (the V1 clone-creation lie): its
       // emitted figure understates reality, so nothing renders rather than a
       // wrong absolute — the live overlay corrects at head.
+      ledgerLanes = true;
       if (ctx.collateral != null && !ctx.collateralUnderstated)
         stats.push({
           label: "Collateral",
@@ -532,6 +547,7 @@ export function useFrankencoinCells({ ctx, txHash, blockNumber, eventId, timesta
         });
       if (ctx.minted != null) {
         const dMint = ctx.mintedBefore != null ? Number(ctx.minted) - Number(ctx.mintedBefore) : 0;
+        zchfSplit = read ? frankencoinZchfSplit(read, dMint, ctx.hub) : null;
         stats.push({
           label: "Debt",
           value: fmtZchf(Number(ctx.minted)),
@@ -542,7 +558,7 @@ export function useFrankencoinCells({ ctx, txHash, blockNumber, eventId, timesta
           changed: ctx.minted !== ctx.mintedBefore,
           ...debtLedger,
           sub:
-            zchfSplitLine(read ? frankencoinZchfSplit(read, dMint, ctx.hub) : null, coords, sym) ??
+            zchfSplitLine(zchfSplit, coords, sym) ??
             (pending ? <span className="text-rb-400">reading the receipt…</span> : undefined),
         });
       }
@@ -577,9 +593,38 @@ export function useFrankencoinCells({ ctx, txHash, blockNumber, eventId, timesta
     else asNotes.push(st);
   }
   const cellList = useChainTruthCells(asCells);
+  const sheet = ledgerLanes
+    ? frankencoinSheet({
+        ctx,
+        coords,
+        eventId,
+        facts,
+        read,
+        forcedSettlement: (facts?.txKinds[txHash ?? ""] ?? []).includes("forced_sale"),
+      })
+    : undefined;
+  // The debt cell's receipt split (what the wallet received or paid, the
+  // reserve share) stands under the sheet as a note.
+  const splitNote = sheet
+    ? (zchfSplitLine(zchfSplit, coords, sym) ??
+      (pending && ctx.mintedBefore != null && ctx.minted !== ctx.mintedBefore ? (
+        <span className="text-rb-400">reading the receipt…</span>
+      ) : undefined))
+    : undefined;
   return {
     cells: cellList.length > 0 ? cellList : { none: "The event moved no balance of the position" },
-    notes: asNotes.length > 0 ? <StatNotes stats={asNotes} /> : undefined,
+    notes:
+      asNotes.length > 0 || splitNote ? (
+        <>
+          {asNotes.length > 0 && <StatNotes stats={asNotes} />}
+          {splitNote && (
+            <EventNotes>
+              <NoteLine label="ZCHF">{splitNote}</NoteLine>
+            </EventNotes>
+          )}
+        </>
+      ) : undefined,
+    sheet,
   };
 }
 
