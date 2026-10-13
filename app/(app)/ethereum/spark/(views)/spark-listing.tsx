@@ -35,7 +35,7 @@ export function SparkListing({ initialItems, initialTotal, initialKey, initialSe
       defaults={SPARK_LIST_DEFAULTS}
       sortOptions={SPARK_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      renderCard={(p) => <SparkPositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <SparkPositionCard v={viewFromSummary(p)} surface="listing" />}
       hrefFor={(p) => `/ethereum/spark/${p.wallet}`}
       keyFor={(p) => p.wallet}
       strategy={serverStrategy<SparkPositionSummary, SparkListFilters>({
