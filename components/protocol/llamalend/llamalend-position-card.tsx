@@ -1,58 +1,63 @@
 "use client";
 
-// LlamaLend position card — one (controller, user) pair, through the SAME
-// shared grammar (OpenPositionStats + StatValue) as the other explorers.
+// LlamaLend position card: one (controller, user) pair, as a slot builder for
+// the shared position card (components/shared/position-card.tsx; rails-ops
+// TO-DO-position-card 322).
 //
 // THE GRAIN IS THE PAIR: the card is one position in one isolated market,
 // never a user — controllers liquidate independently, and one card per user
 // would assert a single health across markets that share nothing. The
-// identity row carries the user AND the market (collateral / borrowed pair,
+// identity slot carries the user AND the market (collateral / borrowed pair,
 // version-tagged), because both halves are the key.
 //
 // ⇒ SOFT-LIQUIDATION LEADS. When the live overlay says the AMM has already
 // converted part of this position's collateral (user_state.stablecoin > 0 —
-// a state-only figure no event carries), the card grows a third column:
-// the converted amount, traced to the two-contract cross-check. No risk
-// color on the figures — the numbers carry the meaning.
+// a state-only figure no event carries), the status tag says so and the
+// panel's Converted row states the amount, traced to the two-contract
+// cross-check. No risk color on the figures — the numbers carry the meaning.
 //
 // ⇒ LIQUIDATABLE OUTRANKS IT. When health(user, true) reads below 0, anyone
-// may liquidate the position now, whatever the AMM has converted: the mode
-// word is "Liquidatable", on the CRITICAL red pill (color-grammar.md: the
-// line is the protocol's, so the colour is a claim of fact), and the
-// listing's third column states the health.
+// may liquidate the position now, whatever the AMM has converted: the panel's
+// Liquidatable row says so in CRITICAL red (color-grammar.md: the line is the
+// protocol's, so the colour is a claim of fact), and a listing row, which has
+// no panel, says it in its pill.
 //
 // ⚠️ USD only where the borrowed token IS crvUSD (~$1): debt is already in
 // crvUSD, collateral through the AMM's own price_oracle. The handful of
 // markets that borrow WETH / tBTC / ynETH / CRV render in their own tokens —
-// the token stack IS the headline there, and no dollar is asserted.
+// the token amount IS the headline there, and no dollar is asserted.
 //
-// STATUS IS TWO-AXIS. The lifecycle pill says open/closed/liquidated, where
-// 'liquidated' names only a CLOSED position; an OPEN survivor stays an OPEN
-// card with the meta cluster's count. The detail render swaps the lifecycle
-// pill for the mode word.
+// STATUS IS TWO-AXIS. The tag says Closed or Liquidated, where 'liquidated'
+// names only a CLOSED position; an OPEN survivor stays an OPEN card with the
+// counters' count.
 
-import { Fragment } from "react";
-import { Icon } from "@/components/icons/icon";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+} from "@/components/shared/position-card";
+import { StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
-import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
+import { formatUsd } from "@/lib/shared/format-event";
 import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
-import { llamalendConvertedProv, llamalendHealthFullProv } from "@/lib/llamalend/live-provenance";
-import { fmtHealth } from "@/lib/llamalend/event-figures";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
 import { type LlamalendFactoryKind, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
 import type { LlamalendPositionSummary } from "@/lib/sources/api/llamalend-positions";
-import { AmountText } from "@/components/shared/amount-text";
+import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
+import { LlamalendMenuRows } from "@/components/protocol/llamalend/llamalend-menu-rows";
+import {
+  LlamalendHealth,
+  llamalendHasRisk,
+  llamalendHealthSub,
+  llamalendRiskRows,
+} from "@/components/protocol/llamalend/llamalend-risk-slot";
 
 export interface LlamalendPositionView {
   /** The isolated market's key. */
@@ -134,189 +139,171 @@ function PositionIdentity({ v, wallet = true }: { v: LlamalendPositionView; wall
   );
 }
 
-export function LlamalendPositionCard({
-  v,
-  receipts = false,
-  rowExtra,
-  explanation,
-  bodyExtra,
-  viewHref,
-  bands,
-  positionSummary,
-  risk,
-  collateralDetail,
-}: {
+export interface LlamalendPositionCardProps {
   v: LlamalendPositionView;
-  receipts?: boolean;
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
-   *  forwarded to `PositionCardShell`. Closed, the card is its header and
-   *  three headlines; opened, each headline's detail. */
-  positionSummary?: boolean;
-  /** The third headline from the page's live read: the health and its
-   *  opened-layer lines. Omitted until the read lands, and on a listing. */
-  risk?: { value: React.ReactNode; detail?: React.ReactNode };
-  /** Opened-layer lines under Collateral from the live read (what the AMM
-   *  holds converted). Only drawn on a disclosing card. */
-  collateralDetail?: React.ReactNode;
-  /** Context content riding the shell's heading-button row. */
-  rowExtra?: React.ReactNode;
+  /** `detail` on the position page (receipts, panel, (i)); `listing` in a row. */
+  surface: "detail" | "listing";
+  /** The page's live chain read. Its health is the third headline; its
+   *  converted amount, soft-liquidation multiple and band figures are panel
+   *  rows. */
+  chain?: LlamalendChainResponse | null;
+  /** The chain read is still in flight: the health waits behind a pulsing bar. */
+  chainPending?: boolean;
+  /** Collateral lost to soft-liquidation over the position's life, where it can
+   *  be stated (llamalendLostToSoftLiq): a panel row. */
+  lost?: number | null;
+  /** Collateral the AMM has sold net of buy-backs, on a position in its bands
+   *  now (llamalendSoldInBands): a panel row. */
+  sold?: number | null;
   /** The card's Explanation section (narration describing the position NOW). */
   explanation?: React.ReactNode;
-  /** The band strip — LlamaLend's one protocol-specific CARD-BODY element,
-   *  rendered below the stats on an OPEN position only (a closed position's
-   *  band is meaningless: the stored ticks go stale there). It sits inside the
-   *  shell's children on purpose — that is what puts its <Prov> figures inside
-   *  the card's receipts scope. The detail page is the only caller; the listing
-   *  row never passes it. */
-  bodyExtra?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell` —
-   *  the page's `useTimelineEvents().viewHref`. */
+  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
-  /** The position's band count, from the live read, for the "?" modal. */
-  bands?: number | null;
-}) {
-  // The closed/opened card (ui-jobs 209): every line under a headline moves
-  // into the opened layer (<PositionCardDetail>), and the converted amount
-  // joins Collateral there in place of its own column.
-  const disclosing = receipts && !!positionSummary;
+  /** A line that stays in the card's foot: the loans line on a position with
+   *  more than one loan, the owner's outcome on a liquidated one. */
+  foot?: React.ReactNode;
+  /** The ⋮'s export shapes. `null`: the ⋮ holds the position's rows and the
+   *  provenance row alone. */
+  exports?: PositionCardExports | null;
+}
+
+/** The USD line beneath a figure: the oracle-priced dollars where the borrowed
+ *  token is crvUSD. `null` keeps the line's height while the oracle price is
+ *  unread; absent where the market borrows another token and no dollar is
+ *  asserted. */
+function usdLine(
+  v: LlamalendPositionView,
+  usd: number | null,
+  what: "Collateral" | "Borrowed",
+): React.ReactNode | null | undefined {
+  if (usd == null) return v.borrowedIsCrvusd ? null : undefined;
+  return (
+    <Prov info={llamalendUsdProv(what, v.borrowedSymbol, v.amm ?? undefined)}>
+      <span
+        className="font-bold text-green-400"
+        title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      >
+        {formatUsd(usd)}
+      </span>
+    </Prov>
+  );
+}
+
+/** The LlamaLend position's slots for the shared position card: the heads, the
+ *  panel, the tag, the ⋮ and the counters, from the position's view and the
+ *  page's live read. */
+export function useLlamalendCardSlots({
+  v,
+  surface,
+  chain,
+  chainPending = false,
+  lost,
+  sold,
+  explanation,
+  viewHref,
+  foot,
+  exports,
+}: LlamalendPositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
+  const open = v.status === "open";
+
+  // What the position is doing NOW, neutral unless anyone may liquidate it. A
+  // detail card names Liquidatable in its panel; a listing row has none, so its
+  // pill says it.
+  const liquidatable = open && v.liquidatable === true && v.healthFull != null;
+  const status: PositionCardStatus | null =
+    v.status === "liquidated"
+      ? { word: "Liquidated", tone: "danger" }
+      : v.status === "closed"
+        ? { word: "Closed", tone: "muted" }
+        : !detail && liquidatable
+          ? { word: "Liquidatable", tone: "danger" }
+          : v.inSoftLiq
+            ? { word: "In soft-liquidation", tone: "caution" }
+            : null;
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    liquidationCount: v.liquidationCount,
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+  const common = { status, identity: <PositionIdentity v={v} wallet={!detail} />, counters };
 
   // Closed / liquidated: the last emitted absolutes are back at zero, so the
-  // card states the outcome and its metadata (no USD: the oracle prices the
-  // PRESENT, not history). The LIQUIDATED outcome appears only here: an open
-  // survivor never reaches this branch.
-  if (v.status === "closed" || v.status === "liquidated") {
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={llamalendPositionContent({ status: v.status, liquidationCount: v.liquidationCount })}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the final balances are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcome={v.status}
-          leadingIdentity={<PositionIdentity v={v} wallet={!receipts} />}
-          identity={
-            <PositionCardMeta
-              lastActivityAt={v.lastActivityAt}
-              eventCount={v.txCount}
-              liquidationCount={v.liquidationCount}
+  // card states the outcome (no USD: the oracle prices the PRESENT, not
+  // history). The LIQUIDATED outcome appears only here: an open survivor never
+  // reaches this branch.
+  let heads: PositionCardHead[];
+  let outcome: PositionCardOutcome | undefined;
+  if (!open) {
+    // The values are the LAST emitted absolutes (usually zero on an unwound
+    // position) — never claim the shared default "Highest recorded": the API
+    // carries no peak figures. A closed loan holds nothing: the Controller
+    // withdraws the collateral when the debt reaches 0, so an unstated
+    // collateral here is 0.
+    heads = [
+      {
+        id: "final-collateral",
+        label: CARD_VOCAB.finalCollateral,
+        value: (
+          <AssetAmount
+            value={v.collateral ?? 0}
+            symbol={v.collateralSymbol}
+            exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : "0"}
+          />
+        ),
+      },
+      {
+        id: "final-debt",
+        label: CARD_VOCAB.finalDebt,
+        value: (
+          <AssetAmount
+            value={v.debt}
+            symbol={v.borrowedSymbol}
+            exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
+          />
+        ),
+      },
+    ];
+    outcome = {
+      word: v.status === "liquidated" ? "Liquidated" : "Closed",
+      dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
+    };
+  } else {
+    const hasColl = v.collateral != null && v.collateral > 0;
+    heads = [
+      {
+        id: "collateral",
+        label: CARD_VOCAB.collateral,
+        value: hasColl ? (
+          <Prov info={stateProv(v, v.collateralSymbol, "collateral")}>
+            <AssetAmount
+              value={v.collateral!}
+              symbol={v.collateralSymbol}
+              exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined}
             />
-          }
-          closedAt={v.lastActivityAt}
-          // The values below are the LAST emitted absolutes (usually zero on
-          // an unwound position) — never claim the shared default "Highest
-          // recorded": the API carries no peak figures.
-          collateralLabel={CARD_VOCAB.finalCollateral}
-          debtLabel={CARD_VOCAB.finalDebt}
-          // The figures after the last event. A closed loan holds nothing: the
-          // Controller withdraws the collateral when the debt reaches 0, so an
-          // unstated collateral here is 0.
-          collateral={
-            <StatValue>
-              <AssetAmount
-                value={v.collateral ?? 0}
-                symbol={v.collateralSymbol}
-                exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : "0"}
-              />
-            </StatValue>
-          }
-          debt={
-            <StatValue>
-              <AssetAmount
-                value={v.debt}
-                symbol={v.borrowedSymbol}
-                exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
-              />
-            </StatValue>
-          }
-        />
-        {bodyExtra && <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>}
-      </PositionCardShell>
-    );
-  }
-
-  const collUsd = v.collateralUsd;
-  const Detail = disclosing ? PositionCardDetail : Fragment;
-  const debtUsd = v.debtUsd;
-
-  const collateralFootnote =
-    collUsd != null && v.collateral != null && v.collateral > 0 ? (
-      <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-        <Prov info={stateProv(v, v.collateralSymbol, "collateral")}>
-          <span title={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined}>
-            <AmountText value={v.collateral} format="compact" /> {v.collateralSymbol}
-          </span>
-        </Prov>
-      </div>
-    ) : undefined;
-
-  const columns = [
-    {
-      label: CARD_VOCAB.collateral,
-      // The cluster rides the USD headline only: the AssetAmount fallback
-      // already carries the ticker as its glyph, and a one-symbol cluster
-      // beside it drew the icon twice on every non-crvUSD market.
-      assetIcons:
-        collUsd != null && v.collateral != null && v.collateral > 0 ? (
-          <InlineAssetCluster symbols={[v.collateralSymbol]} />
-        ) : undefined,
-      value:
-        collUsd != null && v.collateral != null && v.collateral > 0 ? (
-          <UsdHeadline usd={collUsd} info={llamalendUsdProv("Collateral", v.borrowedSymbol, v.amm ?? undefined)} />
-        ) : v.collateral != null && v.collateral > 0 ? (
-          // StatValue OUTSIDE, Prov inside (the UsdHeadline nesting) — an
-          // inline Prov wrapping the block StatValue grows empty line struts
-          // above and below the value (~48px per column).
-          <StatValue>
-            <Prov info={stateProv(v, v.collateralSymbol, "collateral")}>
-              <AssetAmount
-                value={v.collateral}
-                symbol={v.collateralSymbol}
-                exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined}
-              />
-            </Prov>
-          </StatValue>
+          </Prov>
         ) : v.collateral == null ? (
           // ⚠️ The chain did not state this figure (the deployed controller's
           // sentinel path) — unstated, never zero. The live read repairs it.
-          <StatValue>
-            <span
-              className="text-xs text-rb-500"
-              title="The last emitted UserState carried the controller's 2^256−1 sentinel here — the chain did not state the figure; the live read on the position page carries the current one."
-            >
-              unstated
-            </span>
-          </StatValue>
+          <span
+            className="text-xs text-rb-500"
+            title="The last emitted UserState carried the controller's 2^256−1 sentinel here — the chain did not state the figure; the live read on the position page carries the current one."
+          >
+            unstated
+          </span>
         ) : v.converted != null && v.converted > 0 ? (
-          // Everything is converted — the band is fully crossed; the
-          // converted column beside this one carries the whole holding.
-          <StatValue>
-            <span className="text-xs text-rb-500">fully converted</span>
-          </StatValue>
-        ) : (
-          <StatDash />
-        ),
-      footnote: disclosing ? (
-        <PositionCardDetail>
-          {collateralFootnote}
-          {collateralDetail}
-        </PositionCardDetail>
-      ) : (
-        collateralFootnote
-      ),
-    },
-    {
-      label: CARD_VOCAB.debt,
-      assetIcons: debtUsd != null && v.debt > 0 ? <InlineAssetCluster symbols={[v.borrowedSymbol]} /> : undefined,
-      value:
-        debtUsd != null && v.debt > 0 ? (
-          <UsdHeadline usd={debtUsd} info={llamalendUsdProv("Borrowed", v.borrowedSymbol, v.amm ?? undefined)} />
-        ) : v.debt > 0 ? (
-          <StatValue>
+          // Everything is converted — the band is fully crossed; the panel's
+          // Converted row carries the whole holding.
+          <span className="text-xs text-rb-500">fully converted</span>
+        ) : null,
+        usd: hasColl ? usdLine(v, v.collateralUsd, "Collateral") : undefined,
+      },
+      {
+        id: "debt",
+        label: CARD_VOCAB.debt,
+        value:
+          v.debt > 0 ? (
             <Prov info={stateProv(v, v.borrowedSymbol, "debt")}>
               <AssetAmount
                 value={v.debt}
@@ -324,140 +311,56 @@ export function LlamalendPositionCard({
                 exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
               />
             </Prov>
-          </StatValue>
-        ) : (
-          <StatDash />
-        ),
-      footnote:
-        debtUsd != null && v.debt > 0 ? (
-          <Detail>
-            <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-              <Prov info={stateProv(v, v.borrowedSymbol, "debt")}>
-                <span title={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}>
-                  <AmountText value={v.debt} format="compact" /> {v.borrowedSymbol}
-                </span>
-              </Prov>
-            </div>
-          </Detail>
-        ) : undefined,
+          ) : null,
+        usd: v.debt > 0 ? usdLine(v, v.debtUsd, "Borrowed") : undefined,
+      },
+    ];
+    // The health rides the detail page's live read; the listing carries none,
+    // so a listing card has two headlines.
+    if (detail) {
+      heads.push({
+        id: "health",
+        label: "Health",
+        labelTip:
+          "The Controller's health for this position: what its bands would hold with the price through their bottom, less the liquidation discount, over the debt, minus 1. Below 0 anyone may liquidate it.",
+        value: chain && llamalendHasRisk(chain) ? <LlamalendHealth chain={chain} /> : null,
+        pending: chainPending && !chain,
+        sub: chain ? llamalendHealthSub(chain) : undefined,
+      });
+    }
+  }
+
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
+
+  const detailCommon = {
+    ...common,
+    heads,
+    surface: "detail" as const,
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore: llamalendPositionContent(
+      open
+        ? { status: v.status, inSoftLiq: v.inSoftLiq ?? undefined, bands: chain?.hasLoan ? chain.bands : null }
+        : { status: v.status, liquidationCount: v.liquidationCount },
+    ),
+    menu: {
+      leading: () => (
+        <LlamalendMenuRows controller={v.controller} pagePath={`/ethereum/llamalend/${v.controller}/${v.user}`} />
+      ),
+      exports: exports ?? null,
     },
-    // The health rides the detail page's live read; the listing carries
-    // none. The page's card holds the third slot empty until the read lands.
-    ...(disclosing
-      ? [
-          risk
-            ? {
-                label: "Health",
-                value: risk.value,
-                footnote: risk.detail ? <PositionCardDetail>{risk.detail}</PositionCardDetail> : undefined,
-              }
-            : null,
-        ]
-      : []),
-    // ⇒ Liquidatable now: the listing row has no mode pill, so its third
-    // column carries the word and the health that makes it so.
-    ...(v.liquidatable && v.healthFull != null && !disclosing
-      ? [
-          {
-            label: "Liquidatable",
-            value: (
-              <StatValue>
-                <Prov info={llamalendHealthFullProv(v.controller, v.healthFullRaw ?? null)}>
-                  {fmtHealth(v.healthFull)}
-                </Prov>
-              </StatValue>
-            ),
-            footnote: (
-              <div data-llamalend-liquidatable="" className="text-xs mt-0.5 flex items-center gap-1 text-red-500">
-                <Icon name="triangle" size={12} />
-                health below 0: anyone may liquidate it
-              </div>
-            ),
-          },
-        ]
-      : []),
-    // ⇒ The distinctive column — present the moment the live overlay says the
-    // AMM has converted anything: the position is in soft-liquidation NOW.
-    ...(v.inSoftLiq && v.converted != null && !disclosing && !(v.liquidatable && v.healthFull != null)
-      ? [
-          {
-            // The detail card's status pill already says "In soft-liquidation";
-            // the listing row has no such pill, so its tile carries the word.
-            label: receipts ? "Converted" : "In soft-liquidation",
-            value: (
-              <StatValue>
-                <Prov
-                  info={llamalendConvertedProv(
-                    v.borrowedSymbol,
-                    v.convertedCrossCheckExact ?? null,
-                    v.controller,
-                    v.amm ?? undefined,
-                  )}
-                >
-                  <AssetAmount
-                    value={v.converted}
-                    symbol={v.borrowedSymbol}
-                    exact={v.convertedRaw != null ? formatUnitsExact(v.convertedRaw, v.borrowedDecimals) : undefined}
-                  />
-                </Prov>
-              </StatValue>
-            ),
-            footnote: (
-              <div className="text-xs mt-0.5 text-rb-500">
-                {v.borrowedSymbol} the AMM holds from sold {v.collateralSymbol}
-              </div>
-            ),
-          },
-        ]
-      : []),
-  ];
+    foot: foot ? <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{foot}</div> : undefined,
+  };
+  if (outcome) return { ...detailCommon, outcome };
+  return {
+    ...detailCommon,
+    outcome: undefined,
+    panel: chain && open ? llamalendRiskRows(chain, { lost, sold }) : [[], []],
+  };
+}
 
-  // Detail render (receipts): the mode-word pill — what the position is doing
-  // NOW, neutral unless anyone may liquidate it. The LISTING render keeps the
-  // lifecycle pill.
-  const liquidatable = v.liquidatable === true && v.status === "open";
-  const modeWord = liquidatable ? "Liquidatable" : v.inSoftLiq ? "In soft-liquidation" : "Borrowing";
-
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={llamalendPositionContent({ status: v.status, inSoftLiq: v.inSoftLiq ?? undefined, bands })}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        statusPill={
-          receipts ? (
-            <span
-              data-llamalend-mode={liquidatable ? "liquidatable" : v.inSoftLiq ? "soft-liquidation" : "borrowing"}
-              className={
-                liquidatable
-                  ? "font-bold px-2 py-0.5 rounded-sm text-xs bg-red-500 text-white"
-                  : "font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60"
-              }
-            >
-              {modeWord}
-            </span>
-          ) : (
-            <LifecyclePill status={v.status} />
-          )
-        }
-        leadingIdentity={<PositionIdentity v={v} wallet={!receipts} />}
-        identity={
-          <PositionCardMeta
-            lastActivityAt={v.lastActivityAt}
-            eventCount={v.txCount}
-            liquidationCount={v.liquidationCount}
-          />
-        }
-        columns={columns}
-      />
-      {bodyExtra && <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>}
-    </PositionCardShell>
-  );
+/** The LlamaLend position card: its slots, drawn by the shared card. */
+export function LlamalendPositionCard(props: LlamalendPositionCardProps) {
+  return <PositionCard slots={useLlamalendCardSlots(props)} />;
 }
 
 /** Build a card view from the LIVE chain read alone — the degrade path while
