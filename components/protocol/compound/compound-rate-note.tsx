@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { createReadStore } from "./read-store";
 
 interface Rate {
   utilization: number;
@@ -16,6 +17,29 @@ interface Rate {
 }
 
 const pct = (f: number) => `${(f * 100).toFixed(2)}%`;
+
+/** The two reads, as the sheet's Borrow rate states them. */
+export interface CompoundRates {
+  then: Rate;
+  now: Rate;
+  /** The block before this event, where `now` is read. */
+  readBlock: number;
+}
+
+const store = createReadStore<CompoundRates>();
+const keyOf = (chainId: number | undefined, marketKey: string, prevBlock: number, block: number) =>
+  `${chainId ?? 1}:${marketKey}:${prevBlock}:${block}`;
+
+/** The rates the card's note read, once it has (the note mounts while the
+ *  card is open); null before. */
+export function useCompoundRates(
+  chainId: number | undefined,
+  marketKey: string,
+  prevBlock: number | undefined,
+  block: number | undefined,
+): CompoundRates | null {
+  return store.use(prevBlock != null && block != null ? keyOf(chainId, marketKey, prevBlock, block) : null);
+}
 
 export function CompoundRateNote({
   chainId,
@@ -53,6 +77,9 @@ export function CompoundRateNote({
 
   const then = rates?.[prevBlock];
   const now = rates?.[readBlock];
+  useEffect(() => {
+    if (then && now) store.set(keyOf(chainId, marketKey, prevBlock, block), { then, now, readBlock });
+  }, [then, now, chainId, marketKey, prevBlock, block, readBlock]);
   if (!then || !now) return null;
   return (
     <p className="px-5 pb-2 text-xs leading-relaxed text-rb-500" data-rate-note="">

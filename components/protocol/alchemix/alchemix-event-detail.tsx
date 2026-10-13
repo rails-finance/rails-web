@@ -35,8 +35,12 @@ import { formatExact, formatNumber } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { useAlchemixReadingCells } from "./alchemix-state-at-block";
+import { alchemixSheet } from "./alchemix-event-sheet";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import { soleFlowAddress } from "@/lib/shared/format-event";
 import {
   collateralTakenRaw,
+  useAlchemixLineRatios,
   useAlchemixUnderlying,
   useReadingBefore,
   type AlchemixReading,
@@ -311,10 +315,12 @@ function LogNotes({ stats, heading }: { stats: ChainTruthStat[]; heading: string
   );
 }
 
-/** The card's T2: the reading as cells; the logs' figures, the line-scope
- *  sentence and any word about the reading as notes. */
+/** The card's T2: the reading as the balance sheet (alchemix-event-sheet.ts),
+ *  or as cells where the block has no stated reading; the logs' figures, the
+ *  line-scope sentence and any word about the reading as notes. */
 export function useAlchemixDetail({ legs, mytSymbol, coordsFor }: AlchemixEventDetailProps): {
   cells: EventCells;
+  sheet: EventSheet | undefined;
   notes: ReactNode;
 } {
   // The reading, taken once from whichever leg states one; with none stated,
@@ -323,6 +329,7 @@ export function useAlchemixDetail({ legs, mytSymbol, coordsFor }: AlchemixEventD
   const readingCtx = readingLeg.context.data;
   const before = useReadingBefore(readingCtx.stateAtBlockFromReading?.blockNumber);
   const unit = useAlchemixUnderlying();
+  const ratios = useAlchemixLineRatios();
   const stats = legs.flatMap((leg) => legStats(leg, mytSymbol, coordsFor(leg), before, unit, legs));
   const reading = useAlchemixReadingCells({
     state: readingCtx.stateAtBlockFromReading,
@@ -381,5 +388,16 @@ export function useAlchemixDetail({ legs, mytSymbol, coordsFor }: AlchemixEventD
       {reading.note}
     </>
   );
-  return { cells: reading.cells, notes };
+  const sheet = alchemixSheet({
+    legs,
+    state: readingCtx.stateAtBlockFromReading,
+    before,
+    mytSymbol,
+    syntheticSymbol: readingCtx.syntheticSymbol,
+    syntheticAddress: legs.map((l) => soleFlowAddress(l.flows, readingCtx.syntheticSymbol)).find((a) => a != null),
+    unit,
+    ratios,
+    coords: coordsFor(readingLeg),
+  });
+  return { cells: reading.cells, sheet, notes };
 }

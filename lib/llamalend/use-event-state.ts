@@ -69,6 +69,16 @@ export function useLlamalendEventState(
   blockNumber?: number,
   wallet?: string,
 ): LlamalendEventState | null {
+  return useLlamalendEventStateRead(ctx, blockNumber, wallet) ?? null;
+}
+
+/** The same read, telling the two apart: undefined while it is on its way,
+ *  null after a miss or where there is nothing to read. */
+export function useLlamalendEventStateRead(
+  ctx: LlamalendContext,
+  blockNumber?: number,
+  wallet?: string,
+): LlamalendEventState | null | undefined {
   const url = llamalendEventStateUrl(ctx, blockNumber, wallet);
   const [state, setState] = useState<{ url: string; value: LlamalendEventState | null } | null>(null);
   useEffect(() => {
@@ -81,6 +91,7 @@ export function useLlamalendEventState(
       live = false;
     };
   }, [url]);
-  if (!url || state?.url !== url) return null;
+  if (!url) return null;
+  if (state?.url !== url) return undefined;
   return state.value;
 }
