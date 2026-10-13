@@ -7,7 +7,7 @@
 // the right-hand panel (322) does so in its layout. The (i) Explanation row
 // stays a toggle, since it opens an explanation and not a card state.
 //
-// `PositionCardRow` and `PositionCardDetail` keep their names
+// `PositionCardRow` keeps its name
 // for the families that still draw their lines under the headlines (323).
 
 import { createContext, useContext, type ReactNode } from "react";
@@ -115,10 +115,4 @@ export function PositionCardRegion({
       {children}
     </div>
   );
-}
-
-/** The lines beneath a headline. Always drawn; kept as a seam for the
- *  families that pass it as their `detailGate`. */
-export function PositionCardDetail({ children }: { children: ReactNode }) {
-  return <>{children}</>;
 }
