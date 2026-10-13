@@ -26,7 +26,7 @@
 // close ÷ the index at that event, the chain's balance that day. Without them
 // it stays as the event recorded it.
 
-import type { DayObs } from "@/lib/shared/price-series";
+import type { DayObs, PriceMarks } from "@/lib/shared/price-series";
 
 export type FlowSide = "collateral" | "debt";
 
@@ -330,6 +330,9 @@ export interface FlowTimeline {
    *  Unset, an asset with `carriedWhy` reads as priced by its events and any
    *  other as the daily price store's. */
   priceSource?: string;
+  /** Per asset, what the price view draws beside `dailyPrices`: the rows'
+   *  prices as marks and the liquidation level (Liquity V2). */
+  priceMarks?: Record<string, PriceMarks>;
   /** Today's UTC day number. With it the slider runs to today while anything
    *  is still held after the last event; without it, one stop past that event. */
   today?: number;

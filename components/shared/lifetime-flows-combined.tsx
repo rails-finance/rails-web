@@ -45,7 +45,11 @@ import {
   labelWidth,
   priceAxis,
   pricePieces,
+  levelAt,
   priceReadout,
+  redemptionsOn,
+  runwayPct,
+  runwayShare,
   STRIP_PAD,
   stripGeometry,
   type FlowPriceSeries,
@@ -150,6 +154,8 @@ export function FlowPip({ tick, left, opacity }: { tick: FlowTick; left: number;
 
 /** The line's hues; the panel's Key draws the same. */
 export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
+/** The liquidation level's hue: the liquidation tick's red. */
+const LIQ_HUE = FLOW_TICK.liquidation;
 
 const STRIP_H = 80;
 /** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
@@ -487,6 +493,7 @@ export function CombinedFlows({
   const dim = ready && atStop != null && !atStop.live;
   const cursorDay = cur.live ? today : startDay + cur.stop;
   const cursorPrice = priced ? (priceReadout(priced, cursorDay, model.gapDays)?.point[1] ?? null) : null;
+  const cursorLevel = priced ? (levelAt(priced, cursorDay)?.[1] ?? null) : null;
   const sliderLabel = `Date, by ${(series?.bin ?? "week") === "day" ? "day" : `${series?.bin ?? "week"} and by day with events`}: moves the headlines and the bars`;
 
   return (
@@ -598,6 +605,7 @@ export function CombinedFlows({
                       cx={cx}
                       dim={dim}
                       cursorPrice={cursorPrice}
+                      cursorLevel={cursorLevel}
                       windowFrom={from > 0 ? startDay + from : null}
                       startDay={startDay}
                     />
@@ -652,6 +660,19 @@ export function CombinedFlows({
                 >
                   {priced.asset.symbol} in {priced.unitLabel}: {priced.source}
                   {priced.grain === "event" ? ", one point per event" : ", one point per day"}
+                  {priced.events?.length ? "; each event marked at its own price" : ""}
+                  {priced.events?.some((e) => e.redemptionPrice != null)
+                    ? ", a redemption also at its redemption price"
+                    : ""}
+                  {priced.sparseBefore != null && priced.sparseBefore > startDay && priced.sparseBefore <= today
+                    ? `; before ${dayStamp(priced.sparseBefore * 86_400)}, the events alone`
+                    : ""}
+                  {priced.level && (
+                    <>
+                      {" · "}
+                      <span data-liq-caption="">Liquidates at: {priced.level.formula}</span>
+                    </>
+                  )}
                 </p>
               )}
             </div>
@@ -1323,9 +1344,16 @@ function CursorDot({ x, y, hue }: { x: number; y: number; hue: string }) {
  *  draws (lib/shared/flows-price.ts). */
 export function priceStripScale(s: FlowPriceSeries, startDay: number, today: number) {
   const pieces = pricePieces(s, startDay, today);
-  const values = [...pieces.solid, ...pieces.dotted, ...pieces.flat, ...pieces.riser].flat().map((v) => v[1]);
+  const inView = (day: number) => day >= startDay && day <= today;
+  const level = (s.level?.points ?? []).filter((p) => inView(p[0]));
+  const events = (s.events ?? []).filter((e) => inView(e.day));
+  const values = [
+    ...[...pieces.solid, ...pieces.dotted, ...pieces.flat, ...pieces.riser].flat().map((v) => v[1]),
+    ...level.map((p) => p[1]),
+    ...events.flatMap((e) => (e.redemptionPrice != null ? [e.price, e.redemptionPrice] : [e.price])),
+  ];
   const axis = priceAxis(values);
-  return { pieces, axis, labels: axis.ticks.map((t) => formatPriceAxis(t, s.unitLabel)) };
+  return { pieces, level, events, axis, labels: axis.ticks.map((t) => formatPriceAxis(t, s.unitLabel)) };
 }
 type PriceScale = ReturnType<typeof priceStripScale>;
 
@@ -1341,6 +1369,7 @@ function PriceStrip({
   cx,
   dim,
   cursorPrice,
+  cursorLevel,
   windowFrom,
   startDay,
 }: {
@@ -1352,15 +1381,32 @@ function PriceStrip({
   cx: number;
   dim: boolean;
   cursorPrice: number | null;
+  /** The liquidation level on the cursor's day, where the series has one. */
+  cursorLevel: number | null;
   windowFrom: number | null;
   startDay: number;
 }) {
-  const { pieces, axis } = scale;
+  const { pieces, axis, level, events } = scale;
   const xClose = (day: number) => geo.xClose(Math.min(day, today));
   const y = (v: number) => STRIP_H - 4 - ((v - axis.min) / (axis.max - axis.min || 1)) * (STRIP_H - 8);
   const path = (vs: [number, number][]) => vs.map(([d, v], j) => `${j ? "L" : "M"}${xClose(d)},${y(v)}`).join("");
   // A lone day draws as a point.
   const dots = pieces.solid.filter((p) => p.length === 1);
+  // The liquidation level: held from one day's close to the next, stepped
+  // on the day it moves; a day it has none breaks it.
+  const levelRuns: [number, number][][] = [];
+  for (const [d, v] of level) {
+    const run = levelRuns[levelRuns.length - 1];
+    if (run && run[run.length - 1][0] === d - 1) run.push([d, v]);
+    else levelRuns.push([[d, v]]);
+  }
+  const stepPath = (run: [number, number][]) =>
+    run
+      .map(([d, v], j) =>
+        j === 0 ? `M${xClose(d)},${y(v)}` : `L${xClose(d)},${y(run[j - 1][1])}L${xClose(d)},${y(v)}`,
+      )
+      .join("");
+  const redeemed = events.filter((e) => e.redemptionPrice != null);
   const hue = LINE_HUE[s.side];
   const shade = windowFrom != null && windowFrom > startDay ? geo.xDay(windowFrom) : null;
   if (!(w > 0)) return null;
@@ -1438,8 +1484,61 @@ function PriceStrip({
             />
           ))}
         </g>
+        <g data-anatomy="F19.4">
+          {levelRuns.map((run) => (
+            <path
+              key={`l${run[0][0]}`}
+              d={stepPath(run)}
+              fill="none"
+              stroke={LIQ_HUE}
+              strokeWidth={1.25}
+              strokeLinejoin="round"
+              data-liq-level=""
+              data-liq-days={run.map((p) => p[0]).join(",")}
+            />
+          ))}
+        </g>
+        {/* Each row's price on its day; a redemption's redemption price over it. */}
+        <g data-price-events={events.length} data-anatomy="F19.5">
+          {events.map((e, i) => (
+            <circle
+              key={`e${i}`}
+              cx={xClose(e.day)}
+              cy={y(e.price)}
+              r={2.25}
+              className={e.tone === "liquidation" ? undefined : "fill-background"}
+              fill={e.tone === "liquidation" ? LIQ_HUE : undefined}
+              stroke={e.tone === "liquidation" ? LIQ_HUE : hue}
+              strokeWidth={1.25}
+              data-price-event={e.tone}
+              data-price-event-day={e.day}
+              data-price-event-block={e.block ?? ""}
+              data-price-event-price={e.price}
+            />
+          ))}
+        </g>
+        <g data-redemption-marks={redeemed.length} data-anatomy="F19.6">
+          {redeemed.map((e, i) => {
+            const ex = xClose(e.day);
+            const ey = y(e.redemptionPrice!);
+            return (
+              <path
+                key={`r${i}`}
+                d={`M${ex},${ey - 3}L${ex + 3},${ey}L${ex},${ey + 3}L${ex - 3},${ey}Z`}
+                fill={FLOW_TICK.redemption}
+                className="stroke-background"
+                strokeWidth={0.75}
+                data-redemption-mark=""
+                data-redemption-day={e.day}
+                data-redemption-block={e.block ?? ""}
+                data-redemption-price={e.redemptionPrice}
+              />
+            );
+          })}
+        </g>
         {dim && <AfterCursor x={cx} w={w} />}
         <CursorLine x={cx} />
+        {cursorLevel != null && <CursorDot x={cx} y={y(cursorLevel)} hue={LIQ_HUE} />}
         {cursorPrice != null && <CursorDot x={cx} y={y(cursorPrice)} hue={hue} />}
       </svg>
       <div aria-hidden data-prov-exempt="" data-price-axis="">
@@ -1535,7 +1634,9 @@ function ageProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord: str
 
 /** The price at the cursor's day, in HTML so it carries its receipt: the
  *  asset, its price in its unit, and the day's observation or the carried one
- *  with its age. */
+ *  with its age. Where the series has a liquidation level, a second line: the
+ *  level on that day, the runway as the position card states it, and the
+ *  day's redemptions at their redemption price. */
 function PriceReadout({
   s,
   day,
@@ -1549,46 +1650,161 @@ function PriceReadout({
 }) {
   const r = priceReadout(s, day, gapDays);
   const dayWord = isLive ? "today" : dayStamp(day * 86_400);
+  const second = <LevelReadout s={s} day={day} r={r} isLive={isLive} dayWord={dayWord} />;
   if (!r)
     return (
-      <p className="text-xs text-rb-500" data-price-readout="" data-price-none="">
-        No {s.asset.symbol} price recorded by {dayWord}
-      </p>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <p className="text-xs text-rb-500" data-price-readout="" data-price-none="">
+          No {s.asset.symbol} price recorded by {dayWord}
+        </p>
+        {second}
+      </div>
     );
   const pointWord = dayStamp(r.point[0] * 86_400);
   return (
-    <p
-      className="flex min-w-0 items-baseline gap-x-1.5 whitespace-nowrap text-xs tabular-nums"
-      aria-live="polite"
-      data-price-readout=""
-      data-price-day={r.point[0]}
-      data-price-block={r.point[2] ?? ""}
-      data-price-carried={r.carried ? r.ageDays : undefined}
-      data-anatomy="F19.2"
-    >
-      <span className="font-semibold text-foreground">{s.asset.symbol}</span>{" "}
-      <span className="font-semibold text-foreground">
-        <Prov info={readoutProv(s, r, dayWord, pointWord)} value={String(r.point[1])}>
-          {formatPrice(r.point[1], s.unitLabel)}
-        </Prov>
-      </span>{" "}
-      <span className="min-w-0 truncate text-rb-500">
-        on {pointWord}
-        {r.carried && (
-          <>
-            ,{" "}
-            <Prov info={ageProv(s, r, dayWord, pointWord)}>
-              carried {r.ageDays} {r.ageDays === 1 ? "day" : "days"}
-            </Prov>
-          </>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <p
+        className="flex min-w-0 items-baseline gap-x-1.5 whitespace-nowrap text-xs tabular-nums"
+        aria-live="polite"
+        data-price-readout=""
+        data-price-day={r.point[0]}
+        data-price-block={r.point[2] ?? ""}
+        data-price-carried={r.carried ? r.ageDays : undefined}
+        data-anatomy="F19.2"
+      >
+        <span className="font-semibold text-foreground">{s.asset.symbol}</span>{" "}
+        <span className="font-semibold text-foreground">
+          <Prov info={readoutProv(s, r, dayWord, pointWord)} value={String(r.point[1])}>
+            {formatPrice(r.point[1], s.unitLabel)}
+          </Prov>
+        </span>{" "}
+        <span className="min-w-0 truncate text-rb-500">
+          on {pointWord}
+          {r.carried && (
+            <>
+              ,{" "}
+              <Prov info={ageProv(s, r, dayWord, pointWord)}>
+                carried {r.ageDays} {r.ageDays === 1 ? "day" : "days"}
+              </Prov>
+            </>
+          )}
+        </span>
+        {r.old && (
+          <span
+            className="rounded border border-rb-300 px-1 text-[11px] font-medium text-rb-600 dark:border-rb-600 dark:text-rb-400"
+            data-price-old=""
+          >
+            Old price
+          </span>
         )}
-      </span>
-      {r.old && (
-        <span
-          className="rounded border border-rb-300 px-1 text-[11px] font-medium text-rb-600 dark:border-rb-600 dark:text-rb-400"
-          data-price-old=""
-        >
-          Old price
+      </p>
+      {second}
+    </div>
+  );
+}
+
+/** The readout's second line: the liquidation level on the cursor's day, the
+ *  runway from the day's price to it, and the day's redemptions. */
+function LevelReadout({
+  s,
+  day,
+  r,
+  isLive,
+  dayWord,
+}: {
+  s: FlowPriceSeries;
+  day: number;
+  r: PriceAt | null;
+  isLive: boolean;
+  dayWord: string;
+}) {
+  const lv = s.level ? levelAt(s, day) : null;
+  const red = redemptionsOn(s, day);
+  if (!lv && red.length === 0) return null;
+  const sym = s.asset.symbol;
+  const levelProv: Provenance | null = lv
+    ? {
+        kind: "derived",
+        summary: `${s.level!.summary} ${
+          lv[2] == null
+            ? "Here at the trove's debt and collateral as the TroveManager reports them now, the card's figure."
+            : `Here at the debt and collateral the trove's event at block ${lv[2].toLocaleString("en-US")} recorded, the debt grown by its interest to the end of ${dayWord}.`
+        }`,
+        formula: s.level!.formula,
+        ...(lv[2] != null ? { source: { block: lv[2] } } : {}),
+      }
+    : null;
+  const share = lv && r ? runwayShare(r.point[1], lv[1]) : null;
+  const underwater = share != null && share <= 0;
+  const runwayBlock = r?.point[2] ?? lv?.[2] ?? null;
+  const runwayProv: Provenance | null =
+    share != null && lv && r
+      ? {
+          kind: "derived",
+          summary: underwater
+            ? `Runway — the ${sym} price on ${dayWord} is at or under the liquidation price: the trove can be liquidated.`
+            : `Runway — how far the ${sym} price on ${dayWord} can fall before it meets the liquidation price, as the position card states it.`,
+          formula: "(price − liquidation price) ÷ price",
+          inputs: [
+            { label: "price", value: formatPrice(r.point[1], s.unitLabel), kind: "chain", pclass: "oracle" },
+            { label: "liquidation price", value: formatPrice(lv[1], s.unitLabel), kind: "derived" },
+          ],
+          ...(runwayBlock != null ? { source: { block: runwayBlock } } : {}),
+        }
+      : null;
+  const lastRed = red[red.length - 1];
+  const redProv: Provenance | null = lastRed
+    ? {
+        kind: "chain",
+        pclass: "emitted",
+        summary: `Redemption price — the ${sym} price the branch's PriceFeed gave the redemption of this trove, from the Redemption event's _redemptionPrice.`,
+        ...(lastRed.block != null ? { source: { block: lastRed.block } } : {}),
+      }
+    : null;
+  return (
+    <p
+      className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-xs tabular-nums text-rb-500"
+      data-liq-readout=""
+      data-liq-day={lv?.[0]}
+      data-liq-block={lv ? (lv[2] ?? "") : undefined}
+      data-liq-value={lv?.[1]}
+      data-runway-block={share != null ? (runwayBlock ?? "") : undefined}
+      data-runway-share={share ?? undefined}
+      data-redeemed-block={lastRed ? (lastRed.block ?? "") : undefined}
+      data-redeemed-price={lastRed?.redemptionPrice}
+      data-anatomy="F19.3"
+    >
+      {lv && levelProv && (
+        <span className="whitespace-nowrap">
+          Liquidates at{" "}
+          <span className="font-semibold" style={{ color: LIQ_HUE }}>
+            <Prov info={levelProv} value={String(lv[1])}>
+              {formatPrice(lv[1], s.unitLabel)}
+            </Prov>
+          </span>
+        </span>
+      )}
+      {share != null && runwayProv && (
+        <span className="whitespace-nowrap" data-runway="">
+          {underwater ? (
+            <span className="font-semibold text-red-600 dark:text-red-400">
+              <Prov info={runwayProv}>{isLive ? "Liquidatable now" : "Liquidatable"}</Prov>
+            </span>
+          ) : (
+            <>
+              {sym} can fall <Prov info={runwayProv}>{runwayPct(share)}%</Prov> before liquidation
+            </>
+          )}
+        </span>
+      )}
+      {lastRed && redProv && (
+        <span className="whitespace-nowrap" data-redeemed="">
+          {red.length > 1 ? `Redeemed ${red.length} times, last at ` : "Redeemed at "}
+          <span className="font-semibold" style={{ color: FLOW_TICK.redemption }}>
+            <Prov info={redProv} value={String(lastRed.redemptionPrice)}>
+              {formatPrice(lastRed.redemptionPrice!, s.unitLabel)}
+            </Prov>
+          </span>
         </span>
       )}
     </p>
