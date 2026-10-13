@@ -1,8 +1,10 @@
 "use client";
 
-// MakerDAO vault position card — the chain-state analog of the Aave V4 / Liquity
-// position cards, rendered through the SAME shared grammar (OpenPositionStats +
-// StatValue) so it lines up byte-for-byte with the other explorers.
+// MakerDAO vault position card: a slot builder for the shared position card
+// (components/shared/position-card.tsx). `makerVaultCardSlots` turns the
+// vault's view and the page's live overlay into one `PositionCardSlots`; the
+// shell draws the frame, the tag, the ⋮, the headlines, the panel, the (i) and
+// the counters (rails-ops TO-DO-position-card 322).
 //
 // Every headline value is the on-chain record: collateral (ink) and normalized debt
 // (art) are Vat slots — read live via eth_call on the detail page, or
@@ -16,16 +18,21 @@
 // leaf — a DefiLlama price, a projection — would push it out; cf. Compound's
 // parked USD.)
 
-import { Fragment } from "react";
+import { type ReactNode, useState } from "react";
+import { Check, Copy, Link2 } from "lucide-react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardMenu,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+} from "@/components/shared/position-card";
+import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { collAmount, usdPrice } from "@/lib/makerdao/price-format";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
-import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import {
@@ -34,8 +41,6 @@ import {
   daiDebtProv,
   collateralUsdProv,
   collateralRatioProv,
-  stabilityFeeAprProv,
-  liquidationPriceProv,
   peakInkProv,
   peakDebtProv,
 } from "@/lib/makerdao/event-provenance";
@@ -44,7 +49,7 @@ import { formatUsd } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { makerPositionModal } from "@/lib/makerdao/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
+import { makerdaoPanelColumns } from "./makerdao-risk-slot";
 
 export interface MakerVaultView {
   cdpId: string | null;
@@ -109,8 +114,6 @@ export interface MakerVaultView {
   drawnDai?: number | null;
 }
 
-const BORROWING_TIP = "Open, with debt drawn against the collateral. The vault list marks it OPEN.";
-const COLLATERAL_ONLY_TIP = "Open, holding collateral with no debt. The vault list marks it OPEN.";
 const URN_TIP =
   "The vault's address in the Vat, Maker's core accounting contract. This vault has no vault number, so it is named by that address.";
 const LOCKSTAKE_TIP =
@@ -125,11 +128,6 @@ const capTip = (v: MakerVaultView): string =>
     ? `; the oracle reads ${v.collateralSymbol} at ${usdPrice(v.priceCap!.oracleUsd)}, so the vault is valued at the cap.`
     : ".");
 
-/** The Clipper's breaker in one sentence. */
-const auctionsOffTip = (v: MakerVaultView): string =>
-  `Governance has switched ${v.ilk}'s auctions off: its auction contract refuses new auctions` +
-  `${(v.auction?.stopped ?? 0) >= 3 ? " and bids" : ""}, so for now a vault under the minimum is not sold.`;
-
 /** The vault's number-or-address identity: CdpManager vaults have the friendly
  *  cdp id; LockStake urns and direct-Vat urns have only their urn address
  *  (there is no global LSE ordinal — Open.index is owner-scoped). */
@@ -138,34 +136,101 @@ function vaultIdentityLabel(v: MakerVaultView): string {
   return `Urn ${v.urn.slice(0, 6)}…${v.urn.slice(-4)}`;
 }
 
-export function MakerVaultCard({
+/** The debt's dollar value at Maker's $1 par. */
+function debtUsdProv(symbol: string, debt: number): Provenance {
+  return {
+    kind: "derived",
+    summary: `Debt value in USD: the ${symbol} debt at Maker's $1 par. The Vat counts one ${symbol} as one dollar, and the card states no market price for it.`,
+    formula: "debt × $1",
+    inputs: [
+      { label: "debt", value: `${formatNumber(debt)} ${symbol}`, kind: "chain-derived", pclass: "state" },
+      { label: "par", value: "$1", kind: "derived", note: `Maker accounts ${symbol} at $1` },
+    ],
+  };
+}
+
+const chipClass =
+  "rounded-sm bg-rb-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground/60 dark:bg-rb-700";
+
+/** A neutral chip with its tip. */
+function KindChip({ word, tip }: { word: string; tip: string }) {
+  return (
+    <RevealTip tip={tip} label={`${word}: ${tip}`} focusable>
+      <span className={chipClass}>{word}</span>
+    </RevealTip>
+  );
+}
+
+/** What kind of vault this is, where it is not a plain CdpManager vault with
+ *  a number: a urn named by its address, a LockStake engine urn, or a urn
+ *  opened on the Vat with no manager. */
+function VaultKindChips({ v, urn = true }: { v: MakerVaultView; urn?: boolean }) {
+  if (v.cdpId != null && !v.lse) return null;
+  return (
+    <>
+      {urn && v.cdpId == null && <KindChip word="Urn" tip={URN_TIP} />}
+      {v.lse ? (
+        <KindChip word="LockStake" tip={LOCKSTAKE_TIP} />
+      ) : v.cdpId == null ? (
+        <KindChip word="Direct" tip={DIRECT_TIP} />
+      ) : null}
+    </>
+  );
+}
+
+/** The vault's number or address on the card's ⋮ with a copy, and the link to
+ *  this position. */
+function MakerMenuRows({ v }: { v: MakerVaultView }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (key: string, value: string) => {
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
+  const id = v.cdpId ?? v.urn;
+  return (
+    <>
+      <ToolsMenuItem
+        icon={copied === "id" ? <Check size={16} /> : <Copy size={16} />}
+        title={vaultIdentityLabel(v)}
+        subtitle={copied === "id" ? "Copied" : v.cdpId != null ? "Copy the vault number" : "Copy the urn address"}
+        onClick={() => copy("id", id)}
+      />
+      <ToolsMenuItem
+        icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
+        title="Link to this position"
+        subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
+        onClick={() => copy("link", `${window.location.origin}/ethereum/makerdao/${id}`)}
+      />
+    </>
+  );
+}
+
+/** What a Maker vault page or listing hands the card. */
+export interface MakerVaultCardProps {
+  v: MakerVaultView;
+  /** `detail` on the vault's page (receipts, panel, (i)); `listing` in a row. */
+  surface?: "detail" | "listing";
+  /** The card's Explanation section (the V4/trove "About this position" home):
+   *  narration bullets describing the vault NOW. */
+  explanation?: ReactNode;
+  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** The ⋮'s export shapes (`makerdaoExports`). Absent: the ⋮ holds the
+   *  vault's rows and the provenance row alone. */
+  exports?: PositionCardExports;
+}
+
+/** The Maker vault's slots for the shared position card. */
+export function makerVaultCardSlots({
   v,
-  receipts = false,
-  rowExtra,
+  surface = "listing",
   explanation,
   viewHref,
-  positionSummary,
-  riskDetail,
-}: {
-  v: MakerVaultView;
-  receipts?: boolean;
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per vault —
-   *  forwarded to `PositionCardShell`. Closed, the card is its header and
-   *  three headlines; opened, each headline's detail. */
-  positionSummary?: boolean;
-  /** Opened-layer lines under Collateral ratio from the page's live overlay
-   *  (the price bar, the room to the minimum). Only drawn on a disclosing card. */
-  riskDetail?: React.ReactNode;
-  /** Context content riding the shell's heading-button row (the detail page
-   *  passes the compact liquidation runway). */
-  rowExtra?: React.ReactNode;
-  /** The card's Explanation section (the V4/trove "About this position" home) —
-   *  narration bullets + the risk strips describing the vault NOW. */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell` —
-   *  the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-}) {
+  exports,
+}: MakerVaultCardProps): PositionCardSlots {
+  const detail = surface === "detail";
   const artHuman = formatNumber(v.art);
   // DAI for CdpManager vaults, USDS for LockStake urns — same Vat accounting,
   // different join mints the token (asset-catalog).
@@ -173,10 +238,67 @@ export function MakerVaultCard({
   const ratio = v.debtDai && v.collateralUsd != null && v.debtDai > 0 ? (v.collateralUsd / v.debtDai) * 100 : null;
   // A capped feed valued at its cap: the oracle reads above it.
   const capBinds = v.priceCap != null && v.priceCap.oracleUsd != null && v.priceCap.oracleUsd > v.priceCap.capUsd;
-  // The closed/opened card (ui-jobs 209): every line under a headline moves
-  // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!positionSummary;
-  const Detail = disclosing ? PositionCardDetail : Fragment;
+
+  const status: PositionCardStatus | null =
+    v.status === "liquidated"
+      ? { word: "Liquidated", tone: "danger" }
+      : v.status === "closed"
+        ? { word: "Closed", tone: "muted" }
+        : null;
+
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    eventTotal: v.eventCount,
+    liquidated: v.everLiquidated,
+    // The foot strip reads transactions, warnings, then the age.
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+
+  // The vault's kind labels the card. The listing adds the owner and the
+  // vault's number; the detail page names the owner in its wallet row and the
+  // number in the ⋮.
+  const identity = detail ? (
+    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
+      {v.ilk}
+      <VaultKindChips v={v} />
+    </span>
+  ) : (
+    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
+      {v.owner ? (
+        <WalletPill wallet={v.owner} ensName={null} filterProtocol="makerdao" bookmarkProtocol="makerdao" />
+      ) : (
+        <span className="font-normal tabular-nums text-rb-400">—</span>
+      )}
+      <span>
+        {v.ilk}
+        <span className="ml-2 font-normal tabular-nums text-rb-400">
+          {v.cdpId == null ? (
+            <RevealTip tip={URN_TIP} label={`${vaultIdentityLabel(v)}: ${URN_TIP}`} focusable>
+              <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
+                {vaultIdentityLabel(v)}
+              </span>
+            </RevealTip>
+          ) : (
+            vaultIdentityLabel(v)
+          )}
+        </span>
+      </span>
+      <VaultKindChips v={v} urn={false} />
+    </span>
+  );
+
+  const common = { status, identity, counters };
+  const menu: PositionCardMenu = {
+    leading: () => <MakerMenuRows v={v} />,
+    exports: exports ?? null,
+  };
+  const detailCommon = {
+    surface: "detail" as const,
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore: makerPositionModal(v.status, !!v.lse),
+    menu,
+  };
 
   // Closed / liquidated: ink and art have settled to 0, so the headline is what
   // the vault held at its height — highest recorded collateral + DAI debt (the
@@ -184,302 +306,126 @@ export function MakerVaultCard({
   // rate). DAI is measured at recorded on-chain events, so between-event fee
   // accrual is not reflected.
   if (v.status === "closed" || v.status === "liquidated") {
-    const identity = (
-      <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-        {receipts ? null : v.owner ? (
-          <WalletPill wallet={v.owner} ensName={null} filterProtocol="makerdao" bookmarkProtocol="makerdao" />
-        ) : (
-          <span className="font-normal tabular-nums text-rb-400">—</span>
-        )}
-        <span>
-          {v.ilk}
-          <span className="ml-2 font-normal tabular-nums text-rb-400">{vaultIdentityLabel(v)}</span>
-        </span>
-      </span>
-    );
-    return (
-      // The shell threads the heading-button row and the Explanation section on
-      // terminal cards too — a closed vault gets its receipts pane and its
-      // prose exactly like an open one (the props used to stop here). rowExtra
-      // deliberately does not ride here — the live risk strips describe the
-      // chain NOW and never a past life's card.
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={makerPositionModal(v.status, !!v.lse)}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the highest recorded balances are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcome={v.status}
-          badgeTip={
-            v.status === "liquidated"
-              ? "A liquidation emptied this vault. It still belongs to its owner and can take a new deposit."
-              : "This vault owes nothing and its collateral has been taken out. It still belongs to its owner and can take a new deposit."
-          }
-          leadingIdentity={identity}
-          closedAt={v.lastActivityAt ?? undefined}
-          identity={
-            <PositionCardMeta
-              lastActivityAt={v.lastActivityAt}
-              eventCount={v.txCount}
-              eventTotal={v.eventCount}
-              liquidated={v.everLiquidated}
-            />
-          }
-          labelTips={{
-            collateral: "The most collateral the vault held at any of its events.",
-            debt: "The most the vault owed at any of its events, stability fee accrued to that event included.",
-            outcome: "How the vault's history ended: closed by its owner, or liquidated.",
-          }}
-          collateral={
-            v.peakInk > 0 ? (
-              <StatValue>
-                <Prov info={peakInkProv(v.collateralSymbol, { ilk: v.ilk })}>
-                  <AssetAmount value={v.peakInk} symbol={v.collateralSymbol} display={collAmount(v.peakInk)} />
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debt={
-            v.peakDebtDai != null && v.peakDebtDai > 0 ? (
-              <StatValue>
-                <Prov info={peakDebtProv(debtSym, { ilk: v.ilk })}>
-                  <AssetAmount value={v.peakDebtDai} symbol={debtSym} />
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debtFootnote={
-            v.peakDebtDai != null && v.peakDebtDai > 0 ? (
-              <StatFootnote>the most it owed at any event, fee included</StatFootnote>
-            ) : undefined
-          }
-        />
-      </PositionCardShell>
-    );
+    const heads: PositionCardHead[] = [
+      {
+        id: "peak-collateral",
+        label: CARD_VOCAB.peakCollateral,
+        labelTip: "The most collateral the vault held at any of its events.",
+        value:
+          v.peakInk > 0 ? (
+            <Prov info={peakInkProv(v.collateralSymbol, { ilk: v.ilk })}>
+              <AssetAmount value={v.peakInk} symbol={v.collateralSymbol} display={collAmount(v.peakInk)} />
+            </Prov>
+          ) : null,
+      },
+      {
+        id: "peak-debt",
+        label: CARD_VOCAB.peakDebt,
+        labelTip: "The most the vault owed at any of its events, stability fee accrued to that event included.",
+        value:
+          v.peakDebtDai != null && v.peakDebtDai > 0 ? (
+            <Prov info={peakDebtProv(debtSym, { ilk: v.ilk })}>
+              <AssetAmount value={v.peakDebtDai} symbol={debtSym} />
+            </Prov>
+          ) : null,
+        sub: v.peakDebtDai != null && v.peakDebtDai > 0 ? "the most it owed at any event, fee included" : undefined,
+      },
+    ];
+    const endTip =
+      v.status === "liquidated"
+        ? "A liquidation emptied this vault. It still belongs to its owner and can take a new deposit."
+        : "This vault owes nothing and its collateral has been taken out. It still belongs to its owner and can take a new deposit.";
+    const outcome: PositionCardOutcome = {
+      word: v.status === "liquidated" ? "Liquidated" : "Closed",
+      dates: v.lastActivityAt != null ? [{ at: v.lastActivityAt }] : undefined,
+      // The shell's Outcome column has no tip of its own: the sentence rides
+      // under the dates.
+      footnote: (
+        <div className="mt-0.5 text-xs text-rb-500">
+          <RevealTip tip={endTip} label={`${v.status === "liquidated" ? "Liquidated" : "Closed"}: ${endTip}`} focusable>
+            <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">What this means</span>
+          </RevealTip>
+        </div>
+      ),
+    };
+    if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null };
+    return { ...common, ...detailCommon, heads, outcome };
   }
 
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={makerPositionModal(v.status, !!v.lse)}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        // Detail render (receipts): the V4 spoke-card header grammar — a
-        // neutral mode-word pill (what the vault is doing NOW, not a lifecycle
-        // word). The LISTING render keeps the lifecycle pill; the owner wallet
-        // pill (facehash + copy + bookmark) renders on both surfaces.
-        statusPill={
-          receipts ? (
-            <RevealTip
-              tip={(v.debtDai ?? 0) > 0 ? BORROWING_TIP : COLLATERAL_ONLY_TIP}
-              label={`${(v.debtDai ?? 0) > 0 ? "Borrowing" : "Collateral only"}: ${(v.debtDai ?? 0) > 0 ? BORROWING_TIP : COLLATERAL_ONLY_TIP}`}
-              focusable
-              className="focus-ring rounded-sm"
-            >
-              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-                {(v.debtDai ?? 0) > 0 ? "Borrowing" : "Collateral only"}
-              </span>
-            </RevealTip>
-          ) : (
-            <LifecyclePill status={v.status} />
-          )
-        }
-        // The owner pill leads, with the ilk + vault id alongside; the owner
-        // pill's buttons (not anchors) live safely inside the listing card's <Link>.
-        leadingIdentity={
-          <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-            {receipts ? null : v.owner ? (
-              <WalletPill wallet={v.owner} ensName={null} filterProtocol="makerdao" bookmarkProtocol="makerdao" />
-            ) : (
-              <span className="font-normal tabular-nums text-rb-400">—</span>
-            )}
-            <span>
-              {v.ilk}
-              <span className="ml-2 font-normal tabular-nums text-rb-400">
-                {v.cdpId == null ? (
-                  <RevealTip tip={URN_TIP} label={`${vaultIdentityLabel(v)}: ${URN_TIP}`} focusable>
-                    <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
-                      {vaultIdentityLabel(v)}
-                    </span>
-                  </RevealTip>
-                ) : (
-                  vaultIdentityLabel(v)
-                )}
-              </span>
+  const heads: PositionCardHead[] = [
+    {
+      id: "collateral",
+      label: CARD_VOCAB.collateral,
+      labelTip: v.priceCap
+        ? `The ${v.collateralSymbol} locked in the vault, valued at Maker's price: the oracle's, capped by governance.`
+        : `The ${v.collateralSymbol} locked in the vault, valued at Maker's oracle price.`,
+      value: (
+        <Prov info={vaultInkProv(v.collateralSymbol, v.atBlock, false, v.source)}>
+          <AssetAmount value={v.ink} symbol={v.collateralSymbol} />
+        </Prov>
+      ),
+      usd:
+        v.collateralUsd != null ? (
+          <Prov info={collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0)}>
+            <span className="font-bold text-green-400">{formatUsd(v.collateralUsd)}</span>
+          </Prov>
+        ) : null,
+      // The feed is capped under the oracle, so the value is at the cap
+      // (TO-DO-ui-jobs 189).
+      sub:
+        capBinds && v.priceCap ? (
+          <RevealTip tip={capTip(v)} label={`Capped price: ${capTip(v)}`} focusable className="focus-ring rounded-sm">
+            <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
+              at the {usdPrice(v.priceCap.capUsd)} cap
             </span>
-            {v.lse ? (
-              // Neutral origin marking (the give/era grammar's register): this
-              // vault lives in the Sky LockStake Engine, not the CdpManager.
-              <RevealTip tip={LOCKSTAKE_TIP} label={`LockStake: ${LOCKSTAKE_TIP}`} focusable>
-                <span className="rounded-sm bg-rb-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground/60 dark:bg-rb-700">
-                  LockStake
-                </span>
-              </RevealTip>
-            ) : v.cdpId == null ? (
-              // Same marking for a urn opened on the Vat with no manager: its
-              // owner is the urn, often a contract.
-              <RevealTip tip={DIRECT_TIP} label={`Direct: ${DIRECT_TIP}`} focusable>
-                <span className="rounded-sm bg-rb-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground/60 dark:bg-rb-700">
-                  Direct
-                </span>
-              </RevealTip>
-            ) : null}
-          </span>
-        }
-        // Right-hand activity-meta cluster: time-ago + own-tx count +
-        // liquidation flag (the roster grammar; the count is distinct own
-        // transactions, per the chip title's claim).
-        identity={
-          <PositionCardMeta
-            lastActivityAt={v.lastActivityAt}
-            eventCount={v.txCount}
-            eventTotal={v.eventCount}
-            liquidated={v.everLiquidated}
-          />
-        }
-        columns={[
-          {
-            label: CARD_VOCAB.collateral,
-            labelTip: v.priceCap
-              ? `The ${v.collateralSymbol} locked in the vault, valued at Maker's price: the oracle's, capped by governance.`
-              : `The ${v.collateralSymbol} locked in the vault, valued at Maker's oracle price.`,
-            value: (
-              <StatValue>
-                <Prov info={vaultInkProv(v.collateralSymbol, v.atBlock, false, v.source)}>
-                  <AssetAmount value={v.ink} symbol={v.collateralSymbol} />
-                </Prov>
-              </StatValue>
-            ),
-            footnote:
-              v.collateralUsd != null ? (
-                <Detail>
-                  <StatFootnote>
-                    <Prov info={collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0)}>
-                      {formatUsd(v.collateralUsd)}
-                    </Prov>
-                    {capBinds && v.priceCap ? (
-                      // The feed is capped under the oracle, so the value is at
-                      // the cap (TO-DO-ui-jobs 189).
-                      <>
-                        {" "}
-                        <RevealTip
-                          tip={capTip(v)}
-                          label={`Capped price: ${capTip(v)}`}
-                          focusable
-                          className="focus-ring rounded-sm"
-                        >
-                          <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
-                            at the {usdPrice(v.priceCap.capUsd)} cap
-                          </span>
-                        </RevealTip>
-                      </>
-                    ) : null}
-                  </StatFootnote>
-                </Detail>
-              ) : undefined,
-          },
-          {
-            label: CARD_VOCAB.debt,
-            labelTip: `The ${debtSym} the vault owes: what it drew plus the stability fee added since.`,
-            value:
-              v.debtDai != null && v.rate ? (
-                <StatValue>
-                  <Prov info={daiDebtProv(artHuman, v.rate, debtSym)}>
-                    <AssetAmount value={v.debtDai} symbol={debtSym} />
-                  </Prov>
-                </StatValue>
-              ) : (
-                <StatValue>
-                  <Prov info={vaultArtProv(v.atBlock, false, v.source)}>{artHuman} art</Prov>
-                </StatValue>
-              ),
-            // The ilk's live stability fee. The fee already in the debt is
-            // the Explanation's and the flows panel's to state.
-            footnote:
-              v.stabilityFeeApr != null ? (
-                <Detail>
-                  <StatFootnote>
-                    <Prov info={stabilityFeeAprProv(v.ilk)}>{(v.stabilityFeeApr * 100).toFixed(2)}%</Prov> stability fee
-                  </StatFootnote>
-                </Detail>
-              ) : undefined,
-          },
-          {
-            label: ratioLabel("cdp"),
-            labelTip:
-              "The collateral's value divided by the debt. Below the collateral type's minimum the vault can be liquidated.",
-            value:
-              ratio != null ? (
-                <StatValue>
-                  <Prov
-                    info={collateralRatioProv(
-                      v.collateralUsd != null ? formatUsd(v.collateralUsd) : "—",
-                      v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
-                    )}
-                  >
-                    {ratio.toFixed(0)}%
-                  </Prov>
-                </StatValue>
-              ) : (
-                <StatDash />
-              ),
-            // Liquidates-at caption (single-collateral anchor — a vault has
-            // exactly one ilk, so the price form is always meaningful).
-            footnote: (
-              <Detail>
-                {v.liquidationPriceUsd != null && v.liquidationPriceUsd > 0 ? (
-                  <StatFootnote>
-                    Liquidates at{" "}
-                    <Prov
-                      info={liquidationPriceProv(
-                        v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
-                        v.matRatio != null ? `${(v.matRatio * 100).toFixed(0)}%` : "—",
-                        `${formatNumber(v.ink)} ${v.collateralSymbol}`,
-                      )}
-                    >
-                      {usdPrice(v.liquidationPriceUsd, formatUsd)}
-                    </Prov>
-                    {v.auction != null && v.auction.stopped > 0 ? (
-                      // The breaker is on: a vault under the minimum is not
-                      // sold while it stands (TO-DO-ui-jobs 189).
-                      <>
-                        {" · "}
-                        <RevealTip
-                          tip={auctionsOffTip(v)}
-                          label={`Auctions off: ${auctionsOffTip(v)}`}
-                          focusable
-                          className="focus-ring rounded-sm"
-                        >
-                          <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
-                            auctions off
-                          </span>
-                        </RevealTip>
-                      </>
-                    ) : null}
-                  </StatFootnote>
-                ) : null}
-                {disclosing && riskDetail}
-              </Detail>
-            ),
-          },
-        ]}
-      />
-    </PositionCardShell>
-  );
+          </RevealTip>
+        ) : undefined,
+    },
+    {
+      id: "debt",
+      label: CARD_VOCAB.debt,
+      labelTip: `The ${debtSym} the vault owes: what it drew plus the stability fee added since.`,
+      value:
+        v.debtDai != null && v.rate ? (
+          <Prov info={daiDebtProv(artHuman, v.rate, debtSym)}>
+            <AssetAmount value={v.debtDai} symbol={debtSym} />
+          </Prov>
+        ) : (
+          <Prov info={vaultArtProv(v.atBlock, false, v.source)}>{artHuman} art</Prov>
+        ),
+      usd:
+        v.debtDai != null && v.rate && v.debtDai > 0 ? (
+          <Prov info={debtUsdProv(debtSym, v.debtDai)}>
+            <span className="font-bold text-green-400">{formatUsd(v.debtDai)}</span>
+          </Prov>
+        ) : null,
+    },
+    {
+      id: "collateral-ratio",
+      label: ratioLabel("cdp"),
+      labelTip:
+        "The collateral's value divided by the debt. Below the collateral type's minimum the vault can be liquidated.",
+      value:
+        ratio != null ? (
+          <Prov
+            info={collateralRatioProv(
+              v.collateralUsd != null ? formatUsd(v.collateralUsd) : "—",
+              v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
+            )}
+          >
+            {ratio.toFixed(0)}%
+          </Prov>
+        ) : null,
+    },
+  ];
+
+  if (!detail) return { ...common, heads, surface: "listing", menu: null };
+  return { ...common, ...detailCommon, heads, outcome: undefined, panel: makerdaoPanelColumns(v) };
+}
+
+/** The Maker vault card: its slots, drawn by the shared card. */
+export function MakerVaultCard(props: MakerVaultCardProps) {
+  return <PositionCard slots={makerVaultCardSlots(props)} />;
 }
 
 /** Build a card view from a listing row (MakerVaultSummary, the api builder's presentation shape). */

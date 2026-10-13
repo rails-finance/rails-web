@@ -83,7 +83,9 @@ function useMakerRoster(): MakerRosterState {
 function MakerListingCard({ s }: { s: MakerVaultSummary }) {
   const terms = useMakerIlkTerms(s.lse ? s.ilk : null);
   const v = viewFromSummary(s);
-  return <MakerVaultCard v={terms ? { ...v, priceCap: terms.priceCap, auction: terms.auction } : v} />;
+  return (
+    <MakerVaultCard v={terms ? { ...v, priceCap: terms.priceCap, auction: terms.auction } : v} surface="listing" />
+  );
 }
 
 export function MakerDAOListing({ initialItems, initialTotal, initialKey, initialSearch }: MakerDAOListingProps) {

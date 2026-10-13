@@ -1,41 +1,53 @@
 "use client";
 
-// Fluid position card — the NFT-keyed analog of the MakerDAO vault card,
-// rendered through the SAME shared grammar (OpenPositionStats + StatValue) so
-// it lines up with the other explorers.
+// Fluid position card — the NFT-keyed analog of the MakerDAO vault card, as a
+// slot builder for the shared position card (rails-ops TO-DO-position-card
+// 322): `fluidCardSlots` turns the position's view and the page's live
+// resolver read into one `PositionCardSlots` object, and `PositionCard`
+// (components/shared/position-card.tsx) draws it on the position page and in
+// the listing row.
 //
 // A Fluid position is a factory-minted ERC721 living in ONE vault (one
-// collateral/debt pair), so the card carries exactly two figures — and TWO
+// collateral/debt pair), so the card carries two figures — and TWO
 // deliberately distinguishable lanes behind them. The settled overlay (the
 // vault resolver's own math at a stamped block: liquidations + accrued
 // interest applied) is the primary figure when present; the Σ replay lane
 // (operate deltas + liquidation attributions, interest-blind between events)
-// is the fallback, and each lane's provenance names its basis. Smart-vault
-// legs have no ERC20 symbol (the "token" is a Fluid DEX pool) — they render
-// as shares; no USD is asserted at this depth.
+// is the fallback, and each lane's provenance names its basis. The Σ replay
+// rides in the panel as "from events". Smart-vault legs have no ERC20 symbol
+// (the "token" is a Fluid DEX pool) — they render as shares; no USD is
+// asserted at this depth.
 
-import { Fragment } from "react";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
+import type { ReactNode } from "react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { settledNowProv, positionSigmaProv, peakLegProv, accruedInterestProv } from "@/lib/fluid/event-provenance";
 import { fluidLegHolds } from "@/lib/fluid/explainer-clauses";
-import { fluidRatioProv, liveSettledProv, vaultConfigProv } from "@/lib/fluid/live-provenance";
-import { FluidRunway } from "@/components/protocol/fluid/fluid-runway";
+import {
+  fluidRatioProv,
+  liveSettledProv,
+  vaultConfigProv,
+  fluidLiqPriceProv,
+  liveBorrowRateProv,
+} from "@/lib/fluid/live-provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { fluidPositionContent } from "@/lib/fluid/position-content";
-import { pairLabel, poolShareLabel, vaultKindLabel, shortAddress } from "@/lib/fluid/asset-catalog";
+import { pairLabel, poolShareLabel, vaultKindLabel } from "@/lib/fluid/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
+import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
 import { AmountText } from "@/components/shared/amount-text";
+import { FluidMenuRows } from "./fluid-menu-rows";
 
 export interface FluidPositionView {
   nftId: string;
@@ -100,23 +112,16 @@ export function fluidPairText(v: FluidPositionView, chain?: FluidPositionChainRe
 
 /** One leg's figure, by lane strength: the page's LIVE resolver read at head
  *  when it landed, the worker's stamped settled overlay next, the Σ replay
- *  last — each wrapped in the provenance that names its basis. */
-function LegValue({
-  v,
-  side,
-  chain,
-}: {
-  v: FluidPositionView;
-  side: "supply" | "borrow";
-  chain?: FluidPositionChainResponse | null;
-}) {
+ *  last — each wrapped in the provenance that names its basis. Null (a dash)
+ *  where the leg holds nothing. */
+function legFigure(v: FluidPositionView, side: "supply" | "borrow", chain?: FluidPositionChainResponse | null) {
   const sym = fluidLegName(v, side, chain);
   const sigma = side === "supply" ? v.colNet : v.debtNet;
   const settled = v.settled ? (side === "supply" ? v.settled.supply : v.settled.borrow) : null;
   const live = chain && chain.found && !chain.chainStale ? chain : null;
   const exact = live != null ? (side === "supply" ? live.supplyExact : live.borrowExact) : (settled ?? sigma);
   const amount = Number(exact);
-  if (!Number.isFinite(amount) || amount <= 0) return <StatDash />;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
   const prov =
     live != null
       ? liveSettledProv(side, sym, live.blockNumber)
@@ -124,30 +129,27 @@ function LegValue({
         ? settledNowProv(side, sym, v.settled?.updatedBlock)
         : positionSigmaProv(side, sym);
   return (
-    <StatValue>
-      <Prov info={prov}>
-        <AssetAmount value={amount} symbol={sym} exact={exact} />
-      </Prov>
-    </StatValue>
+    <Prov info={prov}>
+      <AssetAmount value={amount} symbol={sym} exact={exact} />
+    </Prov>
   );
 }
 
-/** Beneath a settled figure, the Σ replay rides as a traced footnote, and the
- *  gap between the two lanes is stated beside it as the interest it is: the
- *  replay carries every operate and liquidation amount and no interest, so
- *  "from events + interest" reconciles to the headline above. The gap is read
- *  off the same two figures the card shows; it drops when it rounds to nothing
- *  at the displayed precision (a smart leg's share count accrues none) or runs
- *  negative. */
-function SigmaFootnote({
-  v,
-  side,
-  chain,
-}: {
-  v: FluidPositionView;
-  side: "supply" | "borrow";
-  chain?: FluidPositionChainResponse | null;
-}) {
+const SIGMA_TIP =
+  "What the position's recorded operations and liquidation attributions add up to, before interest. The headline is the vault's settled figure, which includes the interest.";
+
+/** A panel row for the Σ replay of one leg, beside the settled headline: the
+ *  events' sum, and the gap between the two lanes stated as the interest it
+ *  is (the replay carries every operate and liquidation amount and no
+ *  interest). The gap is read off the same two figures the card shows; it
+ *  drops when it rounds to nothing at the displayed precision (a smart leg's
+ *  share count accrues none) or runs negative. Null where the card has no
+ *  settled figure to set it against. */
+function sigmaRow(
+  v: FluidPositionView,
+  side: "supply" | "borrow",
+  chain?: FluidPositionChainResponse | null,
+): PositionPanelRow | null {
   const live = chain && chain.found && !chain.chainStale ? chain : null;
   if (!v.settled && !live) return null;
   const sym = fluidLegName(v, side, chain);
@@ -170,56 +172,58 @@ function SigmaFootnote({
       <AmountText value={n} /> {sym}
     </Prov>
   );
-  if (!showGap) return <StatFootnote>events add up to {sigmaFig}</StatFootnote>;
-  return (
-    <StatFootnote>
-      {sigmaFig} from events +{" "}
-      <Prov info={accruedInterestProv(side, sym)}>
-        <AmountText value={gap} /> {sym}
-      </Prov>{" "}
-      interest
-    </StatFootnote>
-  );
+  return {
+    id: `events-${side === "supply" ? "collateral" : "debt"}`,
+    label: side === "supply" ? "Collateral from events" : "Debt from events",
+    tip: SIGMA_TIP,
+    value: showGap ? (
+      <>
+        {sigmaFig} +{" "}
+        <Prov info={accruedInterestProv(side, sym)}>
+          <AmountText value={gap} /> {sym}
+        </Prov>{" "}
+        interest
+      </>
+    ) : (
+      sigmaFig
+    ),
+  };
 }
 
-export function FluidPositionCard({
+export interface FluidPositionCardProps {
+  v: FluidPositionView;
+  /** `detail` on the position page (receipts, panel, (i)); `listing` in a row. */
+  surface?: "detail" | "listing";
+  /** The page's live resolver read — upgrades the leg figures from the
+   *  worker's stamped overlay to the head-block settled state, and brings the
+   *  Position ratio headline and the panel's risk rows. */
+  chain?: FluidPositionChainResponse | null;
+  /** The live read is still out: the Position ratio head waits for it. */
+  chainPending?: boolean;
+  /** The card's Explanation section (narration describing the position NOW). */
+  explanation?: ReactNode;
+  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** The ⋮'s export shapes (`fluidExports`). */
+  exports?: PositionCardExports | null;
+}
+
+/** Fluid's slots for the shared position card: the headlines, the panel, the
+ *  tag, the ⋮ and the counters, from the position's view and the page's live
+ *  resolver read. */
+export function fluidCardSlots({
   v,
-  receipts = false,
-  rowExtra,
+  surface = "listing",
+  chain = null,
+  chainPending = false,
   explanation,
   viewHref,
-  chain,
-  positionSummary,
-  debtDetail,
-}: {
-  v: FluidPositionView;
-  receipts?: boolean;
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
-   *  forwarded to `PositionCardShell`. Closed, the card is its header and
-   *  three headlines; opened, each headline's detail. */
-  positionSummary?: boolean;
-  /** Opened-layer lines under Debt from the live read (the borrow rate, the
-   *  room to the borrow limit). Only drawn on a disclosing card. */
-  debtDetail?: React.ReactNode;
-  /** Context content riding the shell's heading-button row. */
-  rowExtra?: React.ReactNode;
-  /** The card's Explanation section (narration describing the position NOW). */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  /** The live resolver read (detail page) — upgrades the leg figures from the
-   *  worker's stamped overlay to the head-block settled state. */
-  chain?: FluidPositionChainResponse | null;
-}) {
+  exports,
+}: FluidPositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
   const pairText = fluidPairText(v, chain);
-  // The closed/opened card (ui-jobs 209): every line under a headline moves
-  // into the opened layer (<PositionCardDetail>). The events-plus-interest
-  // footnotes leave it: the flows panel counts the interest.
-  const disclosing = receipts && !!positionSummary;
-  // The position type and the share pair are labels the figures do not
-  // carry; on the detail card they sit at the header's right end (ui-jobs
-  // 270 item 6), leaving the left end to the status.
+  // The position type and the share pair are labels the figures do not carry
+  // (ui-jobs 270 item 6): the pair, the NFT and the vault kind.
   const typeLabel = (
     <span className="text-xs font-semibold text-rb-500">
       {pairText}
@@ -228,102 +232,91 @@ export function FluidPositionCard({
       </span>
     </span>
   );
-  const identityMeta = (
-    <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-      {receipts && typeLabel}
-      <PositionCardMeta
-        lastActivityAt={v.lastActivityAt}
-        eventCount={v.txCount}
-        liquidationCount={v.liquidationCount}
-      />
-    </span>
-  );
-
-  // The owner pill (facehash + copy + bookmark) leads; the pair rides
-  // alongside with the NFT id + vault kind, on both surfaces (buttons, not
-  // anchors, so it lives safely inside the listing card's <Link>). The detail
-  // page draws the owner on the wallet row above the card (ui-jobs 228).
-  const leadingIdentity = (
-    <span className="contents text-xs font-semibold text-rb-500">
-      {receipts ? null : v.owner ? (
+  // The listing names the owner; the position page's wallet row does.
+  const identity = detail ? (
+    typeLabel
+  ) : (
+    <span className="contents">
+      {v.owner ? (
         <WalletPill wallet={v.owner} ensName={null} filterProtocol="fluid" bookmarkProtocol="fluid" />
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}
-      {!receipts && typeLabel}
+      {typeLabel}
     </span>
   );
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    liquidationCount: v.liquidationCount,
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+  const closed = v.status === "closed";
+  const status: PositionCardStatus | null = closed
+    ? v.wasLiquidated
+      ? { word: "Liquidated", tone: "danger" }
+      : { word: "Closed", tone: "muted" }
+    : null;
+  const common = { status, identity, counters };
 
-  // Closed: the settled figures have gone to zero, so the headline is what
-  // each leg held at its height — the per-leg MAX of the rows' settled
-  // balances (the replay's while a row is unread; no USD). The
-  // Explanation threads through: a terminal position narrates from the index
-  // alone, and its pane is the peaks/record/closure story.
-  if (v.status === "closed") {
+  if (closed) {
+    // The settled figures have gone to zero, so the headline is what each leg
+    // held at its height: the per-leg MAX of the rows' settled balances (the
+    // replay's while a row is unread; no USD).
     const peakCol = Number(v.peakCol);
     const peakDebt = Number(v.peakDebt);
     const colName = fluidLegName(v, "supply", chain);
     const debtName = fluidLegName(v, "borrow", chain);
     const peakCoords = { vault: v.vault, pairLabel: pairText, nftId: v.nftId };
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={fluidPositionContent({
-          status: "closed",
-          wasLiquidated: v.wasLiquidated,
-          peakBasis: v.peakBasis,
-        })}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the highest recorded balances are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcome={v.wasLiquidated ? "liquidated" : "closed"}
-          leadingIdentity={leadingIdentity}
-          identity={identityMeta}
-          closedAt={v.lastActivityAt ?? undefined}
-          collateral={
-            Number.isFinite(peakCol) && peakCol > 0 ? (
-              <StatValue>
-                <Prov info={peakLegProv("supply", colName, peakCoords, v.peakBasis)}>
-                  <AssetAmount value={peakCol} symbol={colName} exact={v.peakCol} />
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debt={
-            Number.isFinite(peakDebt) && peakDebt > 0 ? (
-              <StatValue>
-                <Prov info={peakLegProv("borrow", debtName, peakCoords, v.peakBasis)}>
-                  <AssetAmount value={peakDebt} symbol={debtName} exact={v.peakDebt} />
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debtFootnote={
-            Number.isFinite(peakCol) && peakCol > 0 && Number.isFinite(peakDebt) && peakDebt > 0 ? (
-              <div className="text-xs text-rb-500 mt-0.5">each peak at its own date</div>
-            ) : undefined
-          }
-        />
-      </PositionCardShell>
-    );
+    const heads: PositionCardHead[] = [
+      {
+        id: "peak-collateral",
+        label: CARD_VOCAB.peakCollateral,
+        value:
+          Number.isFinite(peakCol) && peakCol > 0 ? (
+            <Prov info={peakLegProv("supply", colName, peakCoords, v.peakBasis)}>
+              <AssetAmount value={peakCol} symbol={colName} exact={v.peakCol} />
+            </Prov>
+          ) : null,
+      },
+      {
+        id: "peak-debt",
+        label: CARD_VOCAB.peakDebt,
+        value:
+          Number.isFinite(peakDebt) && peakDebt > 0 ? (
+            <Prov info={peakLegProv("borrow", debtName, peakCoords, v.peakBasis)}>
+              <AssetAmount value={peakDebt} symbol={debtName} exact={v.peakDebt} />
+            </Prov>
+          ) : null,
+      },
+    ];
+    const outcome = {
+      word: status?.word ?? "Closed",
+      dates: v.lastActivityAt != null ? [{ at: v.lastActivityAt }] : undefined,
+      footnote:
+        Number.isFinite(peakCol) && peakCol > 0 && Number.isFinite(peakDebt) && peakDebt > 0 ? (
+          <div className="text-xs text-rb-500 mt-0.5">each peak at its own date</div>
+        ) : undefined,
+    };
+    if (!detail) return { ...common, surface: "listing", menu: null, heads, outcome };
+    return {
+      ...common,
+      surface: "detail",
+      heads,
+      outcome,
+      explainer: { body: explanation ?? null, viewHref },
+      learnMore: fluidPositionContent({
+        status: "closed",
+        wasLiquidated: v.wasLiquidated,
+        peakBasis: v.peakBasis,
+      }),
+      menu: fluidMenu(v, exports),
+    };
   }
 
-  // Detail render (receipts): a neutral mode-word pill (what the position is
-  // doing NOW); the LISTING render keeps the lifecycle pill. The liquidated
-  // badge is orthogonal history (two-axis model) and rides both.
   const live = chain && chain.found && !chain.chainStale ? chain : null;
-  const Detail = disclosing ? PositionCardDetail : Fragment;
   // One rule with the pane below (fluidLegHolds): ε on the Σ replay, `> 0` on a
-  // chain figure, so the pill and the prose can never disagree about the debt.
+  // chain figure, so the card and the prose can never disagree about the debt.
   const hasDebt =
     live != null
       ? fluidLegHolds(live.borrow, "chain")
@@ -331,95 +324,113 @@ export function FluidPositionCard({
 
   // Position ratio: debt ÷ (collateral × the vault oracle's liquidate price),
   // the engine's own figure. Only with live debt against live collateral.
-  const ratioColumn =
+  const riskLive =
     live != null &&
     !live.isEmpty &&
     live.ratio != null &&
     live.borrow > 0 &&
     live.supply > 0 &&
     live.oraclePriceLiquidateDebtPerCol != null
-      ? {
-          label: "Position ratio",
-          value: (
-            <StatValue>
-              <Prov
-                info={fluidRatioProv(
-                  fluidLegName(v, "supply", chain),
-                  fluidLegName(v, "borrow", chain),
-                  live.vault,
-                  pairText,
-                )}
-              >
-                {pct(live.ratio)}
-              </Prov>
-            </StatValue>
-          ),
-          footnote: (
-            <Detail>
-              <StatFootnote>
-                liquidates above{" "}
-                <Prov info={vaultConfigProv("Liquidation threshold", "liquidationThreshold", live.vault, pairText)}>
-                  {pct(live.liquidationThreshold)}
-                </Prov>
-              </StatFootnote>
-              <div className="mt-2 w-64 max-w-full">
-                <FluidRunway compact chain={live} />
-              </div>
-            </Detail>
-          ),
-        }
+      ? live
       : null;
+  const colName = fluidLegName(v, "supply", chain);
+  const debtName = fluidLegName(v, "borrow", chain);
 
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={fluidPositionContent({ status: "open", hasDebt })}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        statusPill={
-          <span className="flex items-center gap-1.5">
-            {receipts ? (
-              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-                {hasDebt ? "Borrowing" : "Collateral only"}
-              </span>
-            ) : (
-              <LifecyclePill status={v.status} />
-            )}
-          </span>
-        }
-        leadingIdentity={leadingIdentity}
-        identity={identityMeta}
-        columns={[
-          {
-            label: "Collateral",
-            value: <LegValue v={v} side="supply" chain={chain} />,
-            footnote: disclosing ? undefined : <SigmaFootnote v={v} side="supply" chain={chain} />,
-          },
-          {
-            label: "Debt",
-            value: <LegValue v={v} side="borrow" chain={chain} />,
-            footnote: disclosing ? (
-              debtDetail ? (
-                <PositionCardDetail>{debtDetail}</PositionCardDetail>
-              ) : undefined
-            ) : (
-              <SigmaFootnote v={v} side="borrow" chain={chain} />
-            ),
-          },
-          // The third column, on the live read only (Liquity V2's ratio
-          // column is the model): the position ratio, the vault's
-          // liquidation line under it, and the runway to it.
-          // A disclosing card holds the slot empty until the read lands.
-          ...(ratioColumn ? [ratioColumn] : disclosing ? [null] : []),
-        ]}
-      />
-    </PositionCardShell>
+  const heads: PositionCardHead[] = [
+    { id: "collateral", label: CARD_VOCAB.collateral, value: legFigure(v, "supply", chain) },
+    { id: "debt", label: CARD_VOCAB.debt, value: legFigure(v, "borrow", chain) },
+  ];
+  if (riskLive) {
+    heads.push({
+      id: "position-ratio",
+      label: "Position ratio",
+      labelTip:
+        "Debt divided by collateral at the vault oracle's liquidate price, the figure Fluid's liquidation engine compares with the vault's risk lines.",
+      value: <Prov info={fluidRatioProv(colName, debtName, riskLive.vault, pairText)}>{pct(riskLive.ratio!)}</Prov>,
+    });
+  } else if (detail && chainPending && hasDebt) {
+    // The third slot waits for the read to land, so the row does not jump.
+    heads.push({ id: "position-ratio", label: "Position ratio", value: null, pending: true });
+  }
+
+  if (!detail) return { ...common, surface: "listing", menu: null, heads };
+
+  const left = [sigmaRow(v, "supply", chain), sigmaRow(v, "borrow", chain)].filter(
+    (r): r is PositionPanelRow => r != null,
   );
+  const right: PositionPanelRow[] = [];
+  if (riskLive) {
+    // Headroom to the borrow gate, in the debt leg's unit (token or shares;
+    // dimensionally sound either way: price is debt-leg per col-leg).
+    const headroom = Math.max(
+      0,
+      riskLive.supply * riskLive.oraclePriceLiquidateDebtPerCol! * riskLive.collateralFactor - riskLive.borrow,
+    );
+    const colSym = riskLive.supplySymbol ?? poolShareLabel(riskLive.supplyPoolPair) ?? "DEX shares";
+    const debtSym = riskLive.borrowSymbol ?? poolShareLabel(riskLive.borrowPoolPair) ?? "DEX shares";
+    if (riskLive.borrowRatePct != null) {
+      right.push({
+        id: "borrow-rate",
+        label: "Borrow rate",
+        tip: "The vault's current borrow rate, annual, read from the vault on chain at the latest block. It floats with how heavily the vault is used.",
+        value: <Prov info={liveBorrowRateProv(riskLive.vault, pairText)}>{riskLive.borrowRatePct.toFixed(2)}%</Prov>,
+      });
+    }
+    right.push(
+      {
+        id: "borrow-room",
+        label: "Room to the borrow limit",
+        tip: "How much more debt the position can take before it reaches the vault's borrow limit (its collateral factor), where Fluid stops lending. Read from the vault on chain at the latest block.",
+        value: (
+          <>
+            <Prov info={fluidLiqPriceProv(colSym, debtSym, riskLive.vault, pairText)}>
+              <AmountText value={headroom} format="compact" /> {debtSym}
+            </Prov>{" "}
+            to the{" "}
+            <Prov
+              info={vaultConfigProv("Collateral factor (borrow gate)", "collateralFactor", riskLive.vault, pairText)}
+            >
+              {pct(riskLive.collateralFactor)}
+            </Prov>{" "}
+            limit
+          </>
+        ),
+      },
+      {
+        id: "liquidates-above",
+        label: "Liquidates above",
+        tip: "The ratio above which Fluid can liquidate the position: the vault's liquidation threshold, read from its settings on chain at the latest block.",
+        value: (
+          <Prov info={vaultConfigProv("Liquidation threshold", "liquidationThreshold", riskLive.vault, pairText)}>
+            {pct(riskLive.liquidationThreshold)}
+          </Prov>
+        ),
+      },
+    );
+  }
+
+  return {
+    ...common,
+    surface: "detail",
+    heads,
+    panel: [left, right],
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore: fluidPositionContent({ status: "open", hasDebt }),
+    menu: fluidMenu(v, exports),
+  };
+}
+
+/** The ⋮: the NFT with a copy, the link to this page, then the export shapes. */
+function fluidMenu(v: FluidPositionView, exports?: PositionCardExports | null) {
+  return {
+    leading: () => <FluidMenuRows nftId={v.nftId} pagePath={`/ethereum/fluid/${v.nftId}`} />,
+    exports: exports ?? null,
+  };
+}
+
+/** The Fluid position card: its slots, drawn by the shared card. */
+export function FluidPositionCard(props: FluidPositionCardProps) {
+  return <PositionCard slots={fluidCardSlots(props)} />;
 }
 
 /** Build a card view from the listing summary row. */
