@@ -41,7 +41,6 @@
 // runs is exactly the state the page showed for those 36 seconds anyway.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { moonwellExplorer } from "@/lib/moonwell/explorer";
 
@@ -50,7 +49,8 @@ import {
   MoonwellClosedPositionExplanation,
   MoonwellPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
-import { MoonwellBorrowRoom, moonwellRiskColumn } from "@/components/protocol/moonwell/moonwell-risk-slot";
+import { moonwellExports } from "@/components/protocol/moonwell/moonwell-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { MoonwellEventCard } from "@/components/protocol/moonwell/moonwell-event-card";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -94,13 +94,6 @@ import { ChainTimelineUnavailable, fetchChainTimeline } from "@/lib/api/fetch-ch
 import { isMoonwellEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { SweepInFlight } from "@/components/shared/sweep-in-flight";
 import { useBaseLendingCoverage } from "@/components/shared/base-lending-coverage-banner";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, as on the Ethereum page.
-const MoonwellExportMenu = dynamic(
-  () => import("@/components/protocol/moonwell/moonwell-export-menu").then((m) => m.MoonwellExportMenu),
-  { ssr: false },
-);
 
 const POSITION_ROUTE = "/api/chain/moonwell-base/position";
 const TIMELINE_ROUTE = "/api/chain/moonwell-base/timeline";
@@ -457,6 +450,22 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     return out;
   }, [view]);
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = view
+    ? moonwellExports({
+        wallet,
+        deploymentName: "Moonwell (Base)",
+        source: captureSource,
+        view,
+        chain: data,
+        events: moonwellEvents,
+        csvFilename: `moonwell-base-${wallet.slice(0, 10)}-activity.csv`,
+        history: markdownHistoryScope(undefined, moonwellEvents, servedFolders),
+        scopeNote: exportScopeNote(undefined, moonwellEvents, "this wallet's whole history", servedFolders),
+        fetchAllEvents: servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined,
+      })
+    : null;
+
   return (
     <CaptureSourceProvider value={captureSource}>
       <MoonwellDeploymentProvider value={DEPLOYMENT}>
@@ -469,21 +478,11 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                 owner={{ wallet }}
                 assets={stripAssets}
                 closed={view != null && view.status !== "open"}
+                // The exports ride the card's ⋮; the event route, which draws no card,
+                // keeps them in the wallet row's Tools.
+                tools={pinnedRoute}
               >
-                {view && (
-                  <MoonwellExportMenu
-                    wallet={wallet}
-                    deploymentName="Moonwell (Base)"
-                    source={captureSource}
-                    view={view}
-                    chain={data}
-                    events={moonwellEvents}
-                    csvFilename={`moonwell-base-${wallet.slice(0, 10)}-activity.csv`}
-                    history={markdownHistoryScope(undefined, moonwellEvents, servedFolders)}
-                    scopeNote={exportScopeNote(undefined, moonwellEvents, "this wallet's whole history", servedFolders)}
-                    fetchAllEvents={servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined}
-                  />
-                )}
+                {pinnedRoute && exports && <ExportMenu {...exports} />}
               </DetailTopRow>
 
               {loading ? (
@@ -516,15 +515,13 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                   {!pinnedRoute && view && data && (
                     <MoonwellPositionCard
                       v={view}
-                      receipts
+                      surface="detail"
                       viewHref={tl.viewHref}
                       captions={captions ?? undefined}
-                      // Closed by default, remembered per viewer and position
-                      // (ui-jobs 209). The health factor, the room left to borrow
-                      // and the distance bar come from the Comptroller read.
-                      positionSummary
-                      risk={view.status === "open" ? moonwellRiskColumn(data, view.borrows.length > 0) : null}
-                      debtDetail={<MoonwellBorrowRoom chain={data} />}
+                      // The Health factor, the room left to borrow and the distance
+                      // to liquidation come from the Comptroller read.
+                      chain={data}
+                      exports={exports}
                       // The Explanation is layman prose about those same face
                       // figures. A terminal account narrates from the sweep alone
                       // (peaks, closure); an open one from the Comptroller read.
