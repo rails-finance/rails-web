@@ -99,7 +99,7 @@ export const LOCAL_TOKEN_ICONS: Record<string, string> = {
   "0xe95a203b1a91a908f9b9ce46459d101078c2c3cb": "0xe95a203b1a91a908f9b9ce46459d101078c2c3cb.png",
   "0xec53bf9167f50cdeb3ae105f56099aaab9061f83": "0xec53bf9167f50cdeb3ae105f56099aaab9061f83.png",
   "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38": "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38.png",
-  "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89": "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89.png",
+  "0x07ea2ff889e6228cded329a09f66e370f12c705e": "0x07ea2ff889e6228cded329a09f66e370f12c705e.png",
   "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e": "0xf939e0a03fb07f59a73314e73794be0e57ac1b4e.png",
   "0xf951e335afb289353dc249e82926178eac7ded78": "0xf951e335afb289353dc249e82926178eac7ded78.png",
   "pt-ethena-susde-7may2026": "PT-Ethena-sUSDE-7MAY2026.png",
