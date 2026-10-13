@@ -451,34 +451,6 @@ export function listingIcrProv(market: PolarisMarket): Provenance {
   };
 }
 
-/** debt × the MCR in force ÷ coll — the pETH price at which the row's stated
- *  figures reach the floor, in the market's own unit. */
-export function listingLiqPriceProv(defensive: boolean, market: PolarisMarket): Provenance {
-  const stable = stableOf(market);
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    verify: {
-      kind: "recompute",
-      text: `Re-run the cdpManager's ${defensive ? "DEFENSIVE_MODE_MCR()" : "MCR()"} at the stamped block, multiply the CDP's last emitted debt by it and divide by its last emitted collateral.`,
-    },
-    summary: `The pETH price, in ${stable}, at which this CDP's stated figures reach the floor — its last emitted debt × the minimum collateral ratio in force (the cdpManager's own ${defensive ? "DEFENSIVE_MODE_MCR() — 150%, because the market is in defensive mode" : "MCR() — 115%"}) ÷ its last emitted collateral. Approximate for the same reason the ratio is: interest and the PSM's share settle only at the next touch, and the price the protocol judges against moves every block.`,
-    contract: manager(market),
-    via: `${BOARD_VIA} · last emitted debt × ${defensive ? "DEFENSIVE_MODE_MCR" : "MCR"}() ÷ last emitted coll`,
-    formula: "debt × MCR ÷ coll",
-    inputs: [
-      { label: "debt", kind: "chain", pclass: "emitted", note: "the CDP's last emitted debt, from the index" },
-      {
-        label: "MCR",
-        kind: "chain",
-        pclass: "state",
-        note: defensive ? "DEFENSIVE_MODE_MCR() — the floor in force" : "MCR() — the floor in force",
-      },
-      { label: "collateral", kind: "chain", pclass: "emitted", note: "the CDP's last emitted coll, from the index" },
-    ],
-  };
-}
-
 // ── the holder strip's derived figures ───────────────────────────────────────
 // A wallet search states its own positions at a glance above the cards. Two of
 // those figures are sums over the wallet's OPEN CDPs — one exact (pETH is one
