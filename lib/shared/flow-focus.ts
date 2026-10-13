@@ -546,14 +546,20 @@ export interface FlowFocusState {
    *  null while the cursor is not frozen. A card's chart button hides on it. */
   frozenDay: number | null;
   /** A card's "View on chart": the chart's cursor goes to that day's close
-   *  and freezes there. The timeline is untouched. */
-  move: { ts: number; n: number } | null;
+   *  and freezes there. The timeline is untouched. `free`: the cursor goes
+   *  there unfrozen (the chip's × while the timeline follows the chart). */
+  move: { ts: number; n: number; free?: boolean } | null;
   /** The cut applied to the timeline by the chart's "Show timeline to {date}": the
    *  list holds every event up to `endTs` (that day's close), named `word`
    *  ("2 Sep '26"). Null where nothing is cut. Freezing or moving the chart
    *  leaves it where it is; the chip's × clears it. The address bar carries
    *  it as `?to=2026-09-02` (`useRewindParam`). */
   rewind: { endTs: number; word: string } | null;
+  /** "Timeline follows the chart" (ui-jobs 305): the timeline is cut at
+   *  `cursor` wherever it goes. The reader's preference, kept with Display's
+   *  others (`useFollowPreference`). While it is on, `rewind` holds the day the
+   *  cursor is frozen on, so the address bar carries a frozen cut only. */
+  follow: boolean;
   /** Bumped to bring the cut's top card into view and flash its header (the
    *  chip's text). "Show timeline to {date}" cuts without it: the page stays where it is. */
   go: number;
@@ -574,6 +580,7 @@ export function createFlowFocusStore(): FlowFocusStore {
     frozenDay: null,
     move: null,
     rewind: null,
+    follow: false,
     go: 0,
     restore: null,
   };
@@ -592,6 +599,17 @@ export function createFlowFocusStore(): FlowFocusStore {
 }
 
 // ── The timeline's rewind ───────────────────────────────────────────────────
+
+/** The cut the timeline reads. With "Timeline follows the chart" on it is the
+ *  chart's cursor (none at today), and the stored cut while the panel is not
+ *  mounted or a cut from the address bar is still putting the cursor on its
+ *  day; off, the cut "Show timeline to {date}" stored. */
+export function timelineCut(
+  s: Pick<FlowFocusState, "cursor" | "rewind" | "follow" | "restore">,
+): { endTs: number; word: string } | null {
+  if (!s.follow || !s.cursor || s.restore) return s.rewind;
+  return s.cursor.live ? null : { endTs: s.cursor.endTs, word: s.cursor.word };
+}
 
 /** A newest-first list cut to what happened by `cut` (unix seconds); the
  *  list whole where `cut` is null. What goes is always the list's top. */

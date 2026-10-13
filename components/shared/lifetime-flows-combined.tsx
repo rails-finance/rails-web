@@ -25,7 +25,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight, ListEnd, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { ChevronLeft, ChevronRight, Link2, ListEnd, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { Headline, Rescaled, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -295,6 +295,19 @@ export function CombinedFlows({
     if (committed?.live) focus.store.set({ rewind: null });
     else focus.store.set({ rewind: { endTs: committedEnd, word: committedWord } });
   };
+  // "Timeline follows the chart" (ui-jobs 305): the timeline reads the
+  // cursor itself (`timelineCut`), and the stored cut, which the address bar
+  // carries, is the day the cursor is frozen on, kept level here. Play writes
+  // it once it stops; a cut from the address bar still putting the cursor on
+  // its day is left standing.
+  const follow = useFlowFocusState((s) => s.follow);
+  const restoring = useFlowFocusState((s) => s.restore != null);
+  useEffect(() => {
+    if (!focus || !follow || playing || restoring || restoreTo.current != null) return;
+    const want = frozen && committed && !committed.live ? committedEnd : null;
+    if ((focus.store.get().rewind?.endTs ?? null) === want) return;
+    focus.store.set({ rewind: want == null ? null : { endTs: want, word: committedWord } });
+  });
   // The button names the day the cursor is on, in the cut pill's format. The
   // row gives it what the controls leave; the longer wording goes first and
   // the shorter ones follow where the width runs out (no shrunk text).
@@ -305,6 +318,7 @@ export function CombinedFlows({
   const rowRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
+  const followRef = useRef<HTMLButtonElement>(null);
   const [labelLevel, setLabelLevel] = useState(0);
   const labelKey = applyLabels.join("|");
   useLayoutEffect(() => {
@@ -315,9 +329,12 @@ export function CombinedFlows({
     const fit = () => {
       // Button chrome: 12px padding each side, the 16px icon and its 6px gap;
       // 12px between the controls and the button. Below sm the button has a
-      // row of its own (TO-DO-ui-jobs §247).
+      // row of its own (TO-DO-ui-jobs §247), after the follow setting.
+      // "Timeline follows the chart" stands before the button, 8px apart, on
+      // either row.
       const own = window.matchMedia("(max-width: 639.98px)").matches;
-      const room = row.clientWidth - (own ? 0 : controls.offsetWidth + 12) - 24 - 22;
+      const follows = (followRef.current?.offsetWidth ?? 0) + 8;
+      const room = row.clientWidth - (own ? 0 : controls.offsetWidth + 12) - follows - 24 - 22;
       const widths = Array.from(probe.children).map((c) => (c as HTMLElement).offsetWidth);
       const i = widths.findIndex((w) => w <= room);
       setLabelLevel(i < 0 ? widths.length - 1 : i);
@@ -326,7 +343,7 @@ export function CombinedFlows({
     const ro = new ResizeObserver(fit);
     ro.observe(row);
     return () => ro.disconnect();
-  }, [labelKey, byDays]);
+  }, [labelKey, byDays, follow]);
   const move = useFlowFocusState((s) => s.move);
   const moved = useRef<number | null>(null);
   useEffect(() => {
@@ -336,7 +353,7 @@ export function CombinedFlows({
     if (i != null) {
       halt();
       setAt(i);
-      setFrozen(true);
+      setFrozen(!move.free);
     }
   }, [move, stops, model.start, halt]);
   // A cut restored from the address bar (`useRewindParam`): the cursor goes
@@ -506,9 +523,11 @@ export function CombinedFlows({
             />
           </div>
 
-          {/* The playback controls at the left; "Show timeline to {date}" at the
-              right, on a page that ties the panel to its timeline. Below sm the
-              button takes the full width on a row of its own. */}
+          {/* The playback controls at the left; "Timeline follows the chart" and
+              "Show timeline to {date}" at the right, on a page that ties the
+              panel to its timeline. Below sm the two take a row of their own,
+              the button the width the setting leaves. While the timeline follows
+              the chart the button is not drawn. */}
           <div ref={rowRef} className="relative mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div
               ref={controlsRef}
@@ -565,27 +584,51 @@ export function CombinedFlows({
               </span>
             )}
             {byDays && (
-              <button
-                type="button"
-                className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} min-h-11 w-full justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:ml-auto sm:min-h-9 sm:w-auto`}
-                disabled={!canApply}
-                title={
-                  canApply
-                    ? committed?.live
-                      ? "Show the timeline up to today"
-                      : `Show the timeline up to the end of ${committedWord}`
-                    : committed?.live
-                      ? "Move the cursor to a past day to cut the timeline there"
-                      : `The timeline is cut at ${committedWord}`
-                }
-                onClick={apply}
-                data-flow-apply=""
-                data-anatomy="F6"
-                {...KEEP_PANEL}
-              >
-                <ListEnd size={16} aria-hidden />
-                {applyLabels[Math.min(labelLevel, applyLabels.length - 1)]}
-              </button>
+              <div className="flex w-full items-center justify-end gap-2 sm:ml-auto sm:w-auto">
+                <button
+                  ref={followRef}
+                  type="button"
+                  className={`${CTRL_GHOST} ${follow ? CTRL_ON_ACCENT : CTRL_OFF} min-h-11 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:min-h-9`}
+                  aria-pressed={follow}
+                  aria-label="Timeline follows the chart"
+                  title={
+                    follow
+                      ? "The timeline is cut at the cursor's day as it moves"
+                      : "Cut the timeline at the cursor's day as it moves"
+                  }
+                  onClick={() => focus?.store.set({ follow: !follow })}
+                  data-flow-follow={follow ? "on" : "off"}
+                  data-anatomy="F17"
+                  {...KEEP_PANEL}
+                >
+                  <Link2 size={16} aria-hidden />
+                  <span className="sm:hidden">Follow</span>
+                  <span className="hidden sm:inline">Timeline follows the chart</span>
+                </button>
+                {!follow && (
+                  <button
+                    type="button"
+                    className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} min-h-11 min-w-0 flex-1 justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:min-h-9 sm:flex-none`}
+                    disabled={!canApply}
+                    title={
+                      canApply
+                        ? committed?.live
+                          ? "Show the timeline up to today"
+                          : `Show the timeline up to the end of ${committedWord}`
+                        : committed?.live
+                          ? "Move the cursor to a past day to cut the timeline there"
+                          : `The timeline is cut at ${committedWord}`
+                    }
+                    onClick={apply}
+                    data-flow-apply=""
+                    data-anatomy="F6"
+                    {...KEEP_PANEL}
+                  >
+                    <ListEnd size={16} aria-hidden />
+                    {applyLabels[Math.min(labelLevel, applyLabels.length - 1)]}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

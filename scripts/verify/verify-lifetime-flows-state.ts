@@ -28,7 +28,7 @@
 // 2026-10-01) is read from its day and is no event day.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
-import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
+import { createFlowFocusStore, rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -723,6 +723,43 @@ test("the rewind: the list up to a day's close, its rows moved up by what was cu
     rewindRows(rows, null, (r) => r.oldest, 0),
     rows,
   );
+});
+
+test("Timeline follows the chart (ui-jobs 305): the list cut moves with each step; off, the button's cut stands", () => {
+  const ev = (id: string, timestamp: number) => ({ id, timestamp });
+  const events = [ev("e", 500), ev("d", 400), ev("c", 300), ev("b", 200), ev("a", 100)];
+  const store = createFlowFocusStore();
+  const listed = () => rewindEvents(events, timelineCut(store.get())?.endTs ?? null).map((e) => e.id);
+  const at = (endTs: number, word: string, live = false) => store.set({ cursor: { endTs, word, live } });
+  // Off (today's behaviour): the cursor moves the chart only; the button's
+  // cut (`rewind`) is what the list reads, and it stays while the cursor moves.
+  at(450, "day 4");
+  assert.deepEqual(listed(), ["e", "d", "c", "b", "a"], "off: a step cuts nothing");
+  store.set({ rewind: { endTs: 350, word: "day 3" } });
+  at(250, "day 2");
+  assert.deepEqual(listed(), ["c", "b", "a"], "off: the button's cut stands as the cursor moves");
+  assert.equal(timelineCut(store.get())?.word, "day 3", "off: the chip names the button's day");
+  // On: each step of the cursor cuts the list there and the chip names its day.
+  store.set({ follow: true, rewind: null });
+  const steps: [number, string, string[]][] = [
+    [150, "day 1", ["a"]],
+    [250, "day 2", ["b", "a"]],
+    [450, "day 4", ["d", "c", "b", "a"]],
+    [350, "day 3", ["c", "b", "a"]],
+  ];
+  for (const [endTs, word, want] of steps) {
+    at(endTs, word);
+    assert.deepEqual(listed(), want, `on: the cursor at ${word}`);
+    assert.equal(timelineCut(store.get())?.word, word, `on: the chip names ${word}`);
+  }
+  at(Number.MAX_SAFE_INTEGER, "today", true);
+  assert.equal(timelineCut(store.get()), null, "on: the cursor at today leaves the list whole");
+  // A cut from the address bar still putting the cursor on its day stands
+  // until the cursor reaches it; a panel not mounted leaves the stored cut.
+  store.set({ rewind: { endTs: 250, word: "day 2" }, restore: { endTs: 250, n: 1 } });
+  assert.deepEqual(listed(), ["b", "a"], "on: a restore in hand reads the stored cut");
+  store.set({ restore: null, cursor: null });
+  assert.deepEqual(listed(), ["b", "a"], "on: no panel, the stored cut");
 });
 
 test("Combined: the strip's time axis spans a week at least, and a longer life whole", () => {

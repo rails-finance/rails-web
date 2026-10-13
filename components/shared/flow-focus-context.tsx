@@ -11,6 +11,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import { formatUtcDay, parseUtcDay } from "@/hooks/useTimelineEvents";
+import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { buildFlowModel, type FlowModel, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import {
@@ -115,4 +116,26 @@ export function useRewindParam(store: FlowFocusStore | null): void {
       write(endTs);
     });
   }, [store]);
+}
+
+/** "Timeline follows the chart" kept with Display's other preferences
+ *  (ui-jobs 305). The scrubber row stands outside the timeline's Display
+ *  provider, so it sets the store's `follow`; this hook, mounted inside the
+ *  provider, keeps the two level: the stored preference into the store on
+ *  load, the row's change into the preference. */
+export function useFollowPreference(store: FlowFocusStore | null): void {
+  const { followChart, set } = useTimelineDisplay();
+  useEffect(() => {
+    if (store && store.get().follow !== followChart) store.set({ follow: followChart });
+  }, [store, followChart]);
+  useEffect(() => {
+    if (!store) return;
+    let last = store.get().follow;
+    return store.subscribe(() => {
+      const follow = store.get().follow;
+      if (follow === last) return;
+      last = follow;
+      set("followChart", follow);
+    });
+  }, [store, set]);
 }

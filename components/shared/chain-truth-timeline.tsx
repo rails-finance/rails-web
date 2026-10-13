@@ -69,9 +69,14 @@
 
 import { LedgerAssetFilterContext } from "@/components/shared/event-ledger";
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
-import { useFlowFocus, useFlowFocusState, useRewindParam } from "@/components/shared/flow-focus-context";
+import {
+  useFlowFocus,
+  useFlowFocusState,
+  useFollowPreference,
+  useRewindParam,
+} from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
-import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
+import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { List, ListEnd, X } from "lucide-react";
@@ -716,9 +721,12 @@ function ChainTruthTimelineBody({
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
   // "Show timeline to {date}" is pressed, the list holds every event up to that
   // day's close. What goes is the list's top, so the rows keep their order
-  // and move up by what was cut.
-  const rewind = useFlowFocusState((st) => st.rewind);
-  const cut = rewind?.endTs ?? null;
+  // and move up by what was cut. With "Timeline follows the chart" on, the cut
+  // is the chart's cursor wherever it goes (`timelineCut`, ui-jobs 305).
+  const cut = useFlowFocusState((st) => timelineCut(st)?.endTs ?? null);
+  const cutWord = useFlowFocusState((st) => timelineCut(st)?.word ?? null);
+  const following = useFlowFocusState((st) => st.follow);
+  const rewind = useMemo(() => (cut != null && cutWord != null ? { endTs: cut, word: cutWord } : null), [cut, cutWord]);
   // Where the cut falls on a day with no events of its own, the cut list
   // opens with a card for that moment (components/shared/flow-moment-card.tsx).
   const flowFocusValue = useFlowFocus();
@@ -1157,13 +1165,20 @@ function ChainTruthTimelineBody({
   // Aave V4 on Base wears the provider without a series, so without the Show timeline button,
   // and keeps Dates and its `?from=&to=`.
   useRewindParam(tl.datesAxis ? null : focusStore);
+  useFollowPreference(tl.datesAxis ? null : focusStore);
   const go = useFlowFocusState((st) => st.go);
   const [rewindNote, setRewindNote] = useState<string | null>(null);
   /** The month this code asked the page to read, and the cut it read for. */
   const askedMonth = useRef<number | null>(null);
   const askedCut = useRef<number | null>(null);
+  // While the timeline follows the chart, the chip's × sends the cursor to
+  // today, which leaves the list whole.
   const releaseRewind = useCallback(() => {
-    if (focusStore?.get().rewind) focusStore.set({ rewind: null });
+    if (!focusStore) return;
+    const st = focusStore.get();
+    if (st.follow && st.cursor && !st.cursor.live)
+      focusStore.set({ move: { ts: Date.now() / 1000, n: (st.move?.n ?? 0) + 1, free: true } });
+    if (st.rewind) focusStore.set({ rewind: null });
   }, [focusStore]);
   // A pill per filter narrowing the list (the narrowing row, L2).
   const filterPills = timelineFilterPills(tl);
@@ -1256,7 +1271,9 @@ function ChainTruthTimelineBody({
     if (rewindKey !== lastRewindKey.current) {
       lastRewindKey.current = rewindKey;
       setRewindNote(null);
-      watchTop.current = rewindKey != null;
+      // The flash is for the button's one-shot cut: a cut that follows the
+      // cursor moves with each step and rings nothing.
+      watchTop.current = rewindKey != null && !following;
     }
     if (rewindKey == null) {
       // Cleared: a month the cut read goes back to the rows the page
@@ -1296,8 +1313,9 @@ function ChainTruthTimelineBody({
       // still armed, for the row a pill's × brings back.
       if (rows.length === 0 && tl.isFiltered) return;
     }
-    // Draw from the top, where the cut list starts.
-    setWindowSize(WINDOW_CHUNK);
+    // Draw from the top, where the cut list starts. A cut that follows the
+    // cursor keeps what is drawn, so the page stays where it is.
+    if (!following) setWindowSize(WINDOW_CHUNK);
     const mode = pendingGo.current > 0 ? "scroll" : watchTop.current ? "watch" : "none";
     watchTop.current = false;
     seekTop(mode, pendingGo.current);

@@ -8,7 +8,8 @@ export type TimelineDisplayKey =
   | "showCollateralRatio"
   | "showMarketNotes"
   | "openAllMarketNotes"
-  | "showTxHashes";
+  | "showTxHashes"
+  | "followChart";
 
 export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside
@@ -33,7 +34,14 @@ export interface TimelineDisplayState {
    *  number pill shows its transaction's short hash in place of the number.
    *  Off by default. The event page's pill keeps the number. */
   showTxHashes: boolean;
+  /** "Timeline follows the chart" on the Lifetime flows scrubber row
+   *  (ui-jobs 305): the timeline is cut at the chart's cursor wherever it
+   *  goes. Off by default. Set from the scrubber row, which stands outside
+   *  this provider, through the page's flow-focus store
+   *  (`useFollowPreference`). */
+  followChart: boolean;
   toggle: (key: TimelineDisplayKey) => void;
+  set: (key: TimelineDisplayKey, value: boolean) => void;
 }
 
 const DEFAULTS = {
@@ -43,6 +51,7 @@ const DEFAULTS = {
   showMarketNotes: true,
   openAllMarketNotes: false,
   showTxHashes: false,
+  followChart: false,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences
@@ -52,6 +61,7 @@ const STORAGE_KEY = "timeline-display-v3";
 const Ctx = createContext<TimelineDisplayState>({
   ...DEFAULTS,
   toggle: () => {},
+  set: () => {},
 });
 
 /** A stored preference drops the retired switches: `collapseRuns` (like
@@ -108,6 +118,16 @@ export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
+  const set = useCallback((key: TimelineDisplayKey, value: boolean) => {
+    setState((prev) => {
+      if (prev[key] === value) return prev;
+      const next = { ...prev, [key]: value };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
   const toggle = useCallback((key: TimelineDisplayKey) => {
     setState((prev) => {
       const next = { ...prev, [key]: !prev[key] };
@@ -118,7 +138,7 @@ export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  return <Ctx.Provider value={{ ...state, toggle }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...state, toggle, set }}>{children}</Ctx.Provider>;
 }
 
 export function useTimelineDisplay(): TimelineDisplayState {
