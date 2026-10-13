@@ -43,7 +43,11 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
       sortOptions={LIQUITY_V1_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
       renderCard={(p) => (
-        <LiquityV1PositionCard v={viewFromSummary(p)} endedBy={p.closedByRedemption ? "redemption" : null} />
+        <LiquityV1PositionCard
+          v={viewFromSummary(p)}
+          surface="listing"
+          endedBy={p.closedByRedemption ? "redemption" : null}
+        />
       )}
       hrefFor={(p) => `/ethereum/liquity-v1/${p.wallet}?epoch=${p.epoch}`}
       keyFor={(p) => `${p.wallet}-${p.epoch}`}

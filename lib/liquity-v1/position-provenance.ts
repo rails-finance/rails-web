@@ -205,6 +205,82 @@ export function queueShareProv(): Provenance {
   };
 }
 
+/** The LUSD owed by the Troves a redemption reaches before this one. */
+export function debtInFrontProv(): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: STATE_VERIFY,
+    summary:
+      "Debt in front of this Trove in the redemption queue — the recorded LUSD debt of every Trove below it in the protocol's SortedTroves list (lowest collateral ratio first), summed from one MultiTroveGetter sweep at the latest block.",
+    contract: MULTI_TROVE_GETTER,
+    via: `${CHAIN_VIA} · MultiTroveGetter sweep of SortedTroves @ head · Σ recorded debt below this Trove · ÷10^18`,
+    formula: "Σ recorded debt of the Troves with a lower collateral ratio",
+  };
+}
+
+/** How many Troves a redemption reaches before this one. */
+export function trovesAheadProv(): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: STATE_VERIFY,
+    summary:
+      "Troves in front of this one in the redemption queue — the count of Troves below it in the protocol's SortedTroves list (lowest collateral ratio first), from the same MultiTroveGetter sweep at the latest block.",
+    contract: MULTI_TROVE_GETTER,
+    via: `${CHAIN_VIA} · MultiTroveGetter sweep of SortedTroves @ head · count below this Trove`,
+    formula: "count of Troves with a lower collateral ratio",
+  };
+}
+
+/** The collateral's worth in USD at the protocol's price. */
+export function collateralUsdProv(coll: number, price: number): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: STATE_VERIFY,
+    summary:
+      "Collateral value in USD — the Trove's entire ETH collateral at the PriceFeed price that liquidation and redemption use at the latest block.",
+    contract: PRICE_FEED,
+    via: `${CHAIN_VIA} · getEntireDebtAndColl × PriceFeed.fetchPrice @ head`,
+    formula: "entire collateral × ETH price",
+    inputs: [
+      {
+        label: "entire collateral",
+        value: `${coll} ETH`,
+        kind: "chain",
+        pclass: "state",
+        note: "getEntireDebtAndColl @ head",
+      },
+      { label: "ETH price", value: `$${price}`, kind: "chain", pclass: "oracle", note: "PriceFeed.fetchPrice @ head" },
+    ],
+  };
+}
+
+/** The debt in USD at LUSD's $1 face. */
+export function debtUsdProv(debt: number): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: STATE_VERIFY,
+    summary:
+      "Debt value in USD — the LUSD debt at its $1 face: the protocol redeems LUSD for $1 of ETH, and the card states no market price for it.",
+    contract: TROVE_MANAGER,
+    via: `${CHAIN_VIA} · getEntireDebtAndColl @ head × $1`,
+    formula: "entire debt × $1",
+    inputs: [
+      {
+        label: "entire debt",
+        value: `${debt} LUSD`,
+        kind: "chain",
+        pclass: "state",
+        note: "getEntireDebtAndColl @ head",
+      },
+      { label: "face", value: "$1", kind: "derived", note: "LUSD redeems at $1" },
+    ],
+  };
+}
+
 // ── The system lane — /api/chain/liquity-v1/system ───────────────────────────
 //
 // The protocol view's builders: the same singleton contracts, read for the
