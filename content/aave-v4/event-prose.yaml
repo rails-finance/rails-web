@@ -330,9 +330,9 @@ position_words:
   debt_mix: |-
     Its earlier {gone_assets} debt was cleared; the {debt_assets} debt is what remains.
   operators: |-
-    Of the {total} events here, {external} were executed by an address other than the owner's, all through position managers.
+    Of the {total} events here, {external} came from an address other than the owner's, all through position managers.
   operators_one: |-
-    Of the {total} events here, {external} were executed by an address other than the owner's, position manager {actor}.
+    Of the {total} events here, {external} came from an address other than the owner's, position manager {actor}.
   # ── A closed position ──
   closed_lead_seized: |-
     Liquidation ended this position on the {spoke} spoke, and no balances remain.

@@ -132,7 +132,7 @@ const FIXTURES = [
 // account", Aave V3 and Seamless "sent by … on the owner's behalf", Aave V4
 // "sent through a position manager".
 const OPERATOR =
-  /executed (by an address other than|not by the owner|by a third-party address)|run by another account|sent by .+ on the owner['’]s behalf|sent through (a position manager|[\d,]+ position managers)/;
+  /(?:executed by|came from) an address other than|executed (?:not by the owner|by a third-party address)|run by another account|sent by .+ on the owner['’]s behalf|sent through (a position manager|[\d,]+ position managers)/;
 // The trailing "where" wording varies per protocol ("recorded here,", "on this
 // account’s timeline,") — anchor only on the figure, never on the phrasing.
 // "Of the 45 events …, 3 were …", or Aave V3's "3 of the 45 events were …".
@@ -333,7 +333,7 @@ function judge(proto, subject, { bullets, idx }) {
   }
   const denom = Number(m[1].replace(/,/g, ""));
   const ext = Number(
-    (bullet.match(/, ([\d,]+) (?:was|were) (?:executed|run|sent)|^([\d,]+) of the [\d,]+ events/) || [0, "0"])
+    (bullet.match(/, ([\d,]+) (?:(?:was|were) (?:executed|run|sent)|came from)|^([\d,]+) of the [\d,]+ events/) || [0, "0"])
       .slice(1)
       .find(Boolean)
       .replace(/,/g, ""),
