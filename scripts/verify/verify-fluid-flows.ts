@@ -487,7 +487,7 @@ test("the daily store: a quiet day takes the store's price, an event day its row
     const rp = fluidFlowReplay(rows(f), opts(f));
     if (!rp.borrower) continue;
     const G = rp.grain;
-    const obs = new Map(t.dailyPrices!.coll);
+    const obs = new Map(t.dailyPrices!.coll.map(([d, p]) => [d, p]));
     const eventDays = new Map(rp.replayed.map((r) => [Math.floor(r.ev.ts / DAY), r.price * G]));
     let quiet = 0;
     for (const [d, p] of f.daily!) {

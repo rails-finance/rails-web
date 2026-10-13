@@ -100,6 +100,7 @@ import {
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { vaultEventContent } from "@/lib/shared/learn-more-content";
 import type { EventCellSpec } from "@/components/shared/event-cells";
+import type { SheetRow } from "@/components/shared/event-sheet";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -356,6 +357,8 @@ export function MorphoBaseVaultTimeline({
                     />
                   }
                   extraCells={(rowCoords) => [shareOfVaultCell(row, rowCoords, shareUnit)]}
+                  extraRows={(rowCoords) => [shareOfVaultRow(row, rowCoords, shareUnit)]}
+                  earlier={timeline.events[i + 1] ?? null}
                   learnMore={vaultEventContent("morpho")}
                   detailNotes={(rowCoords) => (
                     <VaultAllocationDetail
@@ -476,6 +479,26 @@ function shareOfVaultCell(event: VaultHolderEvent, coords: VaultTimelineCoords, 
             },
           }
         : { after: { text: <NotLoaded className="text-sm font-semibold text-rb-500" /> } },
+  };
+}
+
+/** The same proportion as a row of the sheet's breakdown: the balance over
+ *  the supply at the row's block, with the receipt the cell has. */
+function shareOfVaultRow(event: VaultHolderEvent, coords: VaultTimelineCoords, shareUnit: string): SheetRow {
+  const supply = supplyAt(event);
+  const read = supply && BigInt(supply) > BigInt(0);
+  return {
+    key: "share-of-vault",
+    label: "Share of the vault after this",
+    amount: read
+      ? {
+          text: pctText(Number(BigInt(event.balanceAfter)) / Number(BigInt(supply))),
+          info: morphoVaultTimelineShareOfVaultProv(coords),
+        }
+      : { text: "Not read on this page" },
+    tip: supply
+      ? `This address's balance over the ${shareText(raw(supply, event.shareDecimals), event.shareDecimals)} ${shareUnit} in existence at block ${event.blockNumber.toLocaleString("en-US")}.`
+      : "The vault's supply at this block was not read, so no proportion is stated.",
   };
 }
 
