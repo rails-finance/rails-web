@@ -994,7 +994,6 @@ export function useLiquityCells({
   ];
   const rateBefore = stateBefore.annualInterestRate;
   const limits: SheetStat[] = [
-    { key: "debt-in-front", label: L2_WORDS.debt_in_front, value: { none: L2_WORDS.debt_in_front_unread } },
     {
       key: "rate",
       label: L2_WORDS.interest_rate,

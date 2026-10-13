@@ -518,10 +518,6 @@ L2_words:
     $1.00 face
   liquidates_at: |-
     Liquidates at
-  debt_in_front: |-
-    Debt in front
-  debt_in_front_unread: |-
-    Not read at this block
   delegate_fee: |-
     Delegate's fee
   minimum_ratio: |-
