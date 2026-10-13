@@ -35,7 +35,7 @@ export interface PolarisTokenMeta {
 /** pETH — the one collateral, minted on the bonding curve against ETH. */
 export const PETH: PolarisTokenMeta = {
   symbol: "pETH",
-  address: "0xf430240a61e0a5bd7a3637d616e0dab5632fbe89",
+  address: "0x07ea2ff889e6228cded329a09f66e370f12c705e",
   decimals: 18,
 };
 

@@ -108,7 +108,7 @@ export function ToolsMenuItem({
 function moveFocus(e: React.KeyboardEvent<HTMLElement>) {
   const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
   if (!keys.includes(e.key)) return;
-  const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]')];
+  const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])')];
   if (items.length === 0) return;
   e.preventDefault();
   const at = items.indexOf(document.activeElement as HTMLElement);
@@ -215,7 +215,7 @@ export function ToolsMenu({
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() =>
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]')?.focus({ preventScroll: true }),
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus({ preventScroll: true }),
     );
     return () => window.clearTimeout(t);
   }, [open, sheet]);
@@ -294,7 +294,7 @@ export function ToolsMenu({
                 role="menu"
                 aria-label={name}
                 onKeyDown={moveFocus}
-                className="-mx-4 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:w-[calc(100%-0.5rem)] [&_[role=menuitemcheckbox]]:min-h-11 [&_[role=menuitemcheckbox]]:w-[calc(100%-0.5rem)]"
+                className="-mx-4 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:w-[calc(100%-0.5rem)]"
               >
                 {rows}
               </div>
