@@ -49,6 +49,10 @@ export function SpineLine() {
     const measure = () => {
       frame = 0;
       const base = list.getBoundingClientRect();
+      // The list's scale on screen: a transformed ancestor (the home page's
+      // live example draws the timeline at 0.65) scales every rect read here,
+      // and the line is drawn in the list's own pixels.
+      const k = list.offsetWidth > 0 ? base.width / list.offsetWidth : 1;
       let tipBottom: number | null = null;
       let nodeX: number | null = null;
       const nodes: {
@@ -67,13 +71,13 @@ export function SpineLine() {
           // A row's dot draws its own lead-in above its node; the head
           // slot's dot leads the line down to the markers.
           if (el.closest("[data-spine-node]")) continue;
-          tipBottom = Math.min(tipBottom ?? Infinity, r.bottom - base.top + TIP_GAP);
+          tipBottom = Math.min(tipBottom ?? Infinity, (r.bottom - base.top) / k + TIP_GAP);
           continue;
         }
-        if (nodeX == null) nodeX = r.left + r.width / 2 - base.left;
+        if (nodeX == null) nodeX = (r.left + r.width / 2 - base.left) / k;
         nodes.push({
-          cy: r.top + r.height / 2 - base.top,
-          foot: r.bottom - base.top,
+          cy: (r.top + r.height / 2 - base.top) / k,
+          foot: (r.bottom - base.top) / k,
           marker: el.getAttribute("data-spine-node") === "marker",
           end: el.hasAttribute("data-spine-end"),
           undrawn: (el.getAttribute("data-spine-dotted") as Tone | "default" | null) ?? null,
@@ -111,7 +115,7 @@ export function SpineLine() {
       const tail = nodes[nodes.length - 1];
       if (tail && !tail.end) {
         const phase = tail.undrawn ? ((((tail.origin ?? tail.foot) - tail.cy) % 6) + 6) % 6 : 0;
-        push(tail.cy, base.height + TAIL, tail.undrawn, phase);
+        push(tail.cy, base.height / k + TAIL, tail.undrawn, phase);
       }
       setX((cur) => (cur === nodeX ? cur : nodeX));
       setStretches((cur) => (cur && same(cur, next) ? cur : next));

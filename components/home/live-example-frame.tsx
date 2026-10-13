@@ -1,180 +1,114 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { OraclePricesData } from "@/types/api/oracle";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isLiquityEvent } from "@/lib/shared/types/event-shape";
-import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeLiquityEconomics } from "@/lib/liquity/economics";
-import { liquityEconomicsExplanation } from "@/lib/liquity/economics-explanation";
-import { liquityLifetimeFlowsContent } from "@/lib/shared/learn-more-content";
-import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
-import { SpineLine } from "@/components/shared/spine-line";
-import { SpineTipContext } from "@/components/shared/spine-column";
-import { TimelineDisplayProvider } from "@/components/shared/timeline-display-context";
-import { EventDateContext } from "@/components/shared/event-time";
-import { dayKey, shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { formatDate, formatDuration } from "@/lib/date";
-import { Icon } from "@/components/icons/icon";
-import { PILL_CTA, PILL_META } from "@/lib/shared/ui-grammar";
+import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
+import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { PILL_CTA } from "@/lib/shared/ui-grammar";
 import { LIVE_EXAMPLE_TROVE_ID, LIVE_EXAMPLE_TROVE_PATH, type LiveExampleData } from "@/lib/home/live-example";
 
 /**
- * Live example frame — the hero's proof-by-showing: the REAL trove page's own
- * components (position card, lifetime flows, the first timeline cards),
- * embedded in browser chrome at a slightly zoomed-out scale. Nothing is
- * reconstructed or approximated — the data is a server-side fetch of the live
- * position (ISR, refreshed hourly) rendered through the SAME components the
- * product uses, so the hero can never drift out of step with the actual view.
- * The whole frame is one link to the live position: hovering lifts it and
- * reveals the pill affordance; touch/small viewports get a caption link under
- * the frame instead. The render itself stays inert (pointer-events off,
- * `inert`, aria-hidden) — it's a picture of the app, not a second app.
+ * Live example frame — the hero's proof-by-showing: the Trove page's body
+ * (components/trove/TroveBody.tsx — position card, Lifetime flows, the
+ * timeline's newest rows) embedded in browser chrome at a zoomed-out scale.
+ * The Trove page renders the same component, so the example draws what the
+ * page draws; the data is a server-side fetch of the live position (ISR,
+ * refreshed hourly). The whole frame is one link to the live position:
+ * hovering lifts it and reveals the pill affordance; touch/small viewports get
+ * a caption link under the frame instead. The render stays inert
+ * (pointer-events off, `inert`, aria-hidden) — it's a picture of the app, not a
+ * second app — so the body draws without the page's top row, without export
+ * shapes, and with a still timeline toolbar (its words and count, no
+ * controls).
  *
  * The composition paints after mount behind the skeleton crossfade: the trove
  * components format times in the visitor's locale/timezone and tick against
  * Date.now(), so server markup could never match hydration — the data ships
- * with the page, only the paint waits for the client.
- *
- * The timeline sets aside the same ops the old `?hide=` iframe param did —
- * redemption touches and the delegate's rate updates — so the visible cards
- * tell the owner's own story (the counter still counts everything).
+ * with the page, only the paint waits for the client. Every read the page
+ * makes in the browser (the head, the daily prices) arrives in that data, so
+ * the Lifetime flows panel draws on the first paint and never shows its
+ * waiting cue.
  */
 
-/** The "slightly zoomed out" factor: the composition renders at a ~1530px
- *  internal viewport — the full desktop layout, read at a glance. */
+/** The "zoomed out" factor: the composition renders at a ~1530px internal
+ *  viewport — the full desktop layout, read at a glance. */
 const SCALE = 0.65;
-/** Visible height of the render zone (px) — deep enough that the position
- *  card, the lifetime-flows panel, and the first timeline events all show,
- *  with the fade swallowing the rest. */
-const VISIBLE_H = 600;
+/** Visible height of the render zone — deep enough that the position card,
+ *  the Lifetime flows panel, the toolbar and the first timeline rows show,
+ *  with the fade swallowing the rest. A phone's stacked layout reaches the
+ *  rows only past a screen's height, so it stops at the flows panel. */
+const VISIBLE_H = "h-[600px] sm:h-[720px]";
 
-/** The trove page's stack, re-composed from its real components — the same
- *  container column, card, flows panel, opened-row, and event cards, minus
- *  the interactive toolbar controls (the hero is inert, so a sort arrow or
- *  filter dropdown would be dead weight the fade mostly hides anyway). */
+/** The Trove page's body, fed from the home page's data. */
 function HeroTroveComposition({ data }: { data: LiveExampleData }) {
-  const { trove, liveState, prices, debtInFront, trovesAhead, visibleEvents, towerEvents, visibleTotal, totalEvents } =
-    data;
-  const currentPrice = prices?.[trove.collateralType.toLowerCase() as keyof OraclePricesData];
-  // The previous-event seams take full events; the tower
-  // projection carries every field they actually read (see HeroTowerEvent).
+  const {
+    trove,
+    liveState,
+    prices,
+    debtInFront,
+    trovesAhead,
+    rowEvents,
+    towerEvents,
+    flowEvents,
+    dailyObs,
+    totalEvents,
+  } = data;
+  // The composition paints after mount (above), so the browser's clock is the
+  // only one this render meets.
+  const [now] = useState(() => Date.now() / 1000);
+  const collSymbol = trove.collateralType;
+  const daily = useMemo(() => ({ obs: dailyObs, settled: true }), [dailyObs]);
+  const { flowTimeline, flowFocus } = useTroveFlows({
+    flowEvents,
+    collSymbol,
+    debtSymbol: towerEvents[0]?.context.data.assetType || "BOLD",
+    surplusClaimed: false,
+    now,
+    daily,
+    open: trove.status === "open",
+    price: prices?.[collSymbol.toLowerCase() as keyof OraclePricesData],
+    liveState,
+  });
+  // The rows are the newest of the history: numbering and the count run over
+  // the whole of it. No storage key — the home page keeps no timeline state.
+  const tl = useTimelineEvents(rowEvents, {
+    protocolKey: "liquity-v2-troves",
+    olderCount: totalEvents - rowEvents.length,
+    dates: false,
+  });
+  // A card's previous event comes from the whole history; the projection
+  // carries every field those reads take (see HeroTowerEvent).
   const chronoEvents = towerEvents as unknown as BaseActivityEvent[];
-  const chronoIndexById = new Map(towerEvents.map((e, i) => [e.id, i]));
-  const lastEventTs = towerEvents.length > 0 ? towerEvents[towerEvents.length - 1].timestamp : undefined;
+  const troveMeta = useMemo(() => ({ owner: trove.owner ?? null, total: totalEvents }), [trove.owner, totalEvents]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 md:px-6">
-      <div className="space-y-6 py-8">
-        <TroveSummaryStack
-          trove={trove}
-          liveState={liveState}
-          prices={prices}
-          debtInFront={debtInFront}
-          trovesAhead={trovesAhead}
-          debtInFrontLoading={false}
-          loadingStatus={{ message: null, snapshotDate: lastEventTs }}
-        />
-
-        {(() => {
-          // The composition paints after mount (above), so the browser's
-          // clock is the only one this render meets.
-          const now = Date.now() / 1000;
-          const result = computeLiquityEconomics(towerEvents, {
-            currentPrice,
-            collateralType: trove.collateralType,
-            now,
-          });
-          if (!result) return null;
-          return (
-            <>
-              <ChainTruthTower
-                data={result.data}
-                title="Lifetime flows"
-                explanation={liquityEconomicsExplanation(result.economics, result.economics._meta, now)}
-                learnMore={liquityLifetimeFlowsContent({ isBatched: result.economics._meta.isInBatch })}
-                // Stated, not left to default (ui-jobs 61): the hero belongs to
-                // no protocol, so it has no setting of its own to read and must
-                // not borrow one — a reader who put the tower away on an Aave
-                // V4 position would otherwise find the home page's picture of
-                // the app missing its middle. The frame is inert anyway, so a
-                // chevron here would be a control nobody could press.
-                collapseKey={null}
-              />
-            </>
-          );
-        })()}
-
-        {/* The timeline toolbar's passive half: opened date + age on the left,
-            the filtered event counter on the right. */}
-        <div className="flex items-center justify-between flex-wrap gap-2 pl-5">
-          <div className="flex items-center gap-2 text-sm">
-            {trove.activity?.createdAt && (
-              <>
-                <span className="text-foreground">Opened {formatDate(trove.activity.createdAt)}</span>
-                <span className={PILL_META}>
-                  {formatDuration(
-                    trove.activity.createdAt,
-                    trove.status === "open" ? new Date() : (trove.activity.lastActivityAt ?? new Date()),
-                  )}
-                </span>
-              </>
-            )}
-            {trove.activity?.lastActivityAt && (
-              <span className={PILL_META}>
-                <Icon name="clock-zap" size={14} />
-                {formatDuration(trove.activity.lastActivityAt, new Date())} ago
-              </span>
-            )}
-          </div>
-          <span className="text-xs text-rb-500 tabular-nums">
-            {visibleTotal} of {totalEvents} events
-          </span>
-        </div>
-
-        <TimelineDisplayProvider>
-          <div className="relative space-y-2">
-            <SpineLine />
-            {visibleEvents.map((event, idx) => {
-              if (!isLiquityEvent(event)) return null;
-              const tempIdx = chronoIndexById.get(event.id) ?? 0;
-              const previousEvent = tempIdx > 0 ? chronoEvents[tempIdx - 1] : undefined;
-              // Day-grouping in display (newest-first) order — same rule as
-              // the trove page's renderCard.
-              // The newest AND the oldest card of each day carry the date,
-              // so an older card never reads as a bare time above a card
-              // dated the day before.
-              const prevDisplayed = idx > 0 ? visibleEvents[idx - 1] : undefined;
-              const nextDisplayed = idx + 1 < visibleEvents.length ? visibleEvents[idx + 1] : undefined;
-              const showDate =
-                !prevDisplayed ||
-                !nextDisplayed ||
-                dayKey(event.timestamp) !== dayKey(prevDisplayed.timestamp) ||
-                dayKey(event.timestamp) !== dayKey(nextDisplayed.timestamp);
-              const datePrefix = showDate ? `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}` : null;
-              return (
-                <EventDateContext.Provider key={event.id} value={datePrefix}>
-                  {/* Newest-first, so the first card is the tip of the
-                        timeline and carries the pulsing dot (the frame draws
-                        its rows itself, outside the shared timeline). */}
-                  <SpineTipContext.Provider value={idx === 0 ? "above" : null}>
-                    <LiquityEventCard
-                      event={event}
-                      addressDisplay="hidden"
-                      isLast={idx === visibleEvents.length - 1}
-                      previousEvent={previousEvent}
-                      eventNumber={tempIdx + 1}
-                      currentPrice={currentPrice}
-                    />
-                  </SpineTipContext.Provider>
-                </EventDateContext.Provider>
-              );
-            })}
-          </div>
-        </TimelineDisplayProvider>
-      </div>
+      <TroveBody
+        still
+        trove={trove}
+        liveState={liveState}
+        prices={prices}
+        debtInFront={debtInFront}
+        trovesAhead={trovesAhead}
+        debtInFrontLoading={false}
+        exports={null}
+        loadingMessage={null}
+        liquityEvents={rowEvents}
+        tl={tl}
+        boundary={null}
+        economicsEvents={towerEvents}
+        chronoEvents={chronoEvents}
+        flowEvents={flowEvents}
+        flowTimeline={flowTimeline}
+        flowFocus={flowFocus}
+        flowsRead="done"
+        now={now}
+        daily={dailyObs != null}
+        surplusState={null}
+        troveMeta={troveMeta}
+      />
     </div>
   );
 }
@@ -254,14 +188,9 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
               picture of the app, not a second app — the Link is the a11y
               surface, and `inert` keeps the composition's links and buttons
               out of the tab order. */}
-          <div
-            className="relative overflow-hidden bg-background"
-            style={{ height: VISIBLE_H }}
-            aria-hidden="true"
-            inert
-          >
+          <div className={`relative overflow-hidden bg-background ${VISIBLE_H}`} aria-hidden="true" inert>
             {/* Skeleton stand-in until the client paints — the trove layout's
-                silhouette (position card, then the lifetime flows panel) in
+                silhouette (position card, the Lifetime flows panel, the rows) in
                 the shared skeleton tone, fading out once the real components
                 are ready. */}
             <div
@@ -269,8 +198,8 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
                 showTrove ? "opacity-0" : "opacity-100"
               }`}
             >
-              <div className="animate-pulse h-36 bg-skeleton rounded-2xl" />
-              <div className="animate-pulse h-64 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
+              <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
+              <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
               <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
             </div>
 

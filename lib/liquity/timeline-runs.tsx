@@ -12,13 +12,7 @@ import { RedemptionRunCard } from "@/components/shared/redemption-run-card";
 import { renderRunFolders } from "@/lib/shared/run-folders";
 import { DelegateAdjustRunCard } from "@/components/protocol/liquity/delegate-adjust-run-card";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
-
-/** Runs shorter than this stay as individual cards — collapsing two or three
- *  rows would hide meaningful events behind a click for no density win. */
-const MIN_REDEMPTION_RUN = 4;
-/** Delegate rate adjusts are pure automation, so a shorter streak already
- *  reads as noise; a lone pair still stands as rows. */
-const MIN_DELEGATE_ADJUST_RUN = 3;
+import { MIN_DELEGATE_ADJUST_RUN, MIN_REDEMPTION_RUN } from "@/lib/liquity/timeline-run-kinds";
 
 /** Consecutive redemption touches collapse into one expandable run row — a
  *  heavily redeemed Trove sitting low in its collateral branch's redemption

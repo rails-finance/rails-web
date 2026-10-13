@@ -22,21 +22,10 @@ import {
 import { troveWords } from "@/lib/liquity/event-templates";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
-import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
-import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
-import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import {
-  liquityFlowTimeline,
-  liquityFocusEvents,
-  liquityV2FlowEvents,
-  unpricedEvents,
-} from "@/lib/shared/liquity-flows";
-import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
-import { troveLives } from "@/lib/shared/liquity-flows-explanation";
+import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
+import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
+import { liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
-import { computeLiquityEconomics } from "@/lib/liquity/economics";
-import { LiquityFlowsExplanation } from "@/lib/liquity/economics-explanation";
-import { liquityLifetimeFlowsContent } from "@/lib/shared/learn-more-content";
 import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
@@ -45,18 +34,9 @@ import { useWalletContext } from "@/components/nav/wallet-context";
 
 import { fetchTroveTimeline } from "@/lib/api/fetch-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isCollSurplusClaimEvent, isLiquityEvent } from "@/lib/shared/types/event-shape";
+import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
-import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
-import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
-import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
-import { UsersGlyph } from "@/components/shared/rate-pill";
-import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
-import type { SpineKey } from "@/components/shared/mobile-spine";
-import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
@@ -66,12 +46,6 @@ import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/sh
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-
-/** The phone spine view's key row. */
-const LIQUITY_SPINE_KEY: SpineKey = {
-  keyLeft: troveWords("spine_to_wallet"),
-  keyRight: troveWords("spine_into_trove"),
-};
 
 export interface TroveViewProps {
   collateralType: string;
@@ -369,53 +343,17 @@ export default function TroveView({
   // The branch's daily price for the collateral between the Trove's events;
   // where the read fails, each event's price carries.
   const flowDaily = useLiquityDailyPrices(liquityDailyBranch(flowCollSymbol));
-  const flowTimeline = useMemo(
-    () =>
-      flowsNow == null || !flowDaily.settled
-        ? null
-        : liquityFlowTimeline(flowEvents, {
-            collSymbol: flowCollSymbol,
-            debtSymbol: flowDebtSymbol,
-            surplusClaimed: flowSurplusClaimed,
-            now: flowsNow,
-            dailyColl: flowDaily.obs,
-            priceView: { collateralType: flowCollSymbol },
-            live: flowOpen
-              ? {
-                  price: flowPrice ?? null,
-                  ...(liveState
-                    ? {
-                        coll: liveState.collateral.entire,
-                        debt: liveState.debt.entire,
-                        redistColl: liveState.collateral.redistGain,
-                        redistDebt: liveState.debt.redistGain,
-                        batchFee: liveState.rates.accruedBatchManagementFee,
-                      }
-                    : {}),
-                }
-              : null,
-          }),
-    [
-      flowEvents,
-      flowCollSymbol,
-      flowDebtSymbol,
-      flowSurplusClaimed,
-      flowsNow,
-      flowOpen,
-      flowPrice,
-      liveState,
-      flowDaily.settled,
-      flowDaily.obs,
-    ],
-  );
-  // The panel and the timeline are tied by the day (components/shared/flow-focus-context.tsx):
-  // "Show timeline to {date}", each day's mark, and each card's sum as of its event,
-  // read from the same replay.
-  const focusEvents = useMemo(
-    () => liquityFocusEvents(flowEvents, flowCollSymbol, flowDebtSymbol),
-    [flowEvents, flowCollSymbol, flowDebtSymbol],
-  );
-  const flowFocus = useFlowFocusValue(useFlowFocusRoot(focusEvents), flowTimeline);
+  const { flowTimeline, flowFocus } = useTroveFlows({
+    flowEvents,
+    collSymbol: flowCollSymbol,
+    debtSymbol: flowDebtSymbol,
+    surplusClaimed: flowSurplusClaimed,
+    now: flowsNow,
+    daily: flowDaily,
+    open: flowOpen,
+    price: flowPrice,
+    liveState,
+  });
 
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;
   const tl = useTimelineEvents(timelineEvents, {
@@ -438,28 +376,6 @@ export default function TroveView({
       state: boundaryStateFromOldestRow(oldest),
     });
   }, [olderCount, totalEvents, liquityEvents.length, tl.sortedEvents]);
-
-  // Delegate-set rate shares the "Interest rate" label with the owner's own
-  // rate change; the people glyph marks it as the delegate's action in the
-  // "Types of event" filter — a decoration `useTimelineEvents`'s generic
-  // eventOptions builder has no slot for, so it's layered on here.
-  const tlWithGlyph = {
-    ...tl,
-    eventOptions: tl.eventOptions.map((o) =>
-      o.key === "setBatchManagerAnnualInterestRate" ? { ...o, suffix: <UsersGlyph /> } : o,
-    ),
-  };
-
-  // Chronological-index lookup for `previousEvent` (interest accrued /
-  // time-since-last deltas need the temporally-older event, regardless of
-  // display order) — built once over the hook's own sorted list.
-  const sortedIndex = useMemo(() => {
-    const map = new Map<string, number>();
-    tl.sortedEvents.forEach((e, i) => map.set(e.id, i));
-    return map;
-  }, [tl.sortedEvents]);
-
-  const lastEventTs = tl.sortedEvents.length > 0 ? tl.sortedEvents[tl.sortedEvents.length - 1].timestamp : null;
 
   // What an event's Copy for LLM header names about the trove.
   const troveMeta = useMemo(
@@ -531,138 +447,57 @@ export default function TroveView({
       : undefined;
 
   return (
-    <FlowFocusContext.Provider value={flowFocus}>
-      <div className="py-8 space-y-6">
-        <DetailTopRow
-          session="liquity-v2"
-          wallet={effectiveOwner}
-          owner={{
-            wallet: effectiveOwner,
-            ensName: troveData?.ownerEns ?? null,
-            prefix: effectiveOwner && effectiveOwner !== troveData?.owner ? <LastOwnerPrefix /> : undefined,
-          }}
-          assets={stripAssets}
-          closed={troveData.status !== "open"}
-          closing={closing}
-          tools={false}
-        />
-        <TroveSummaryStack
-          trove={troveData}
-          liveState={liveState}
-          prices={prices}
-          debtInFront={debtInFront}
-          trovesAhead={trovesAhead}
-          queueDebtTotal={queueDebtTotal}
-          debtInFrontLoading={debtInFrontLoading}
-          viewHref={tl.viewHref}
-          surplus={surplus}
-          exports={troveExports({
-            trove: troveData,
-            liveState,
-            prices,
-            debtInFront,
-            trovesAhead,
-            events: tl.sortedEvents,
-            csvFilename: `liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`,
-          })}
-          loadingStatus={{
-            message: getEnhancementStatus(),
-            snapshotDate: lastEventTs ?? undefined,
-          }}
-        />
-
-        {/* Lifetime flows: the bars and the line over the Trove's own event
-            replay (lib/shared/liquity-flows.ts). The runway that used to share
-            this panel lives in the position card with the current-state
-            stats. */}
-        {(() => {
-          const currentPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
-          // One clock for the scrubber and the Explanation once mounted;
-          // the server's until then.
-          const now = flowsNow ?? renderedAt;
-          const result = computeLiquityEconomics(tl.sortedEvents, {
-            currentPrice,
-            collateralType: troveData.collateralType,
-            surplusClaimed: surplus?.claimed != null,
-            now,
-          });
-          if (!result) return null;
-          return (
-            <>
-              <LifetimeFlowsPanel
-                scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
-                read={flowsNow == null || !flowDaily.settled ? "reading" : flowsRead}
-                explanation={
-                  <LiquityFlowsExplanation
-                    economics={result.economics}
-                    meta={result.economics._meta}
-                    now={now}
-                    currentPrice={currentPrice}
-                    surplusClaimed={surplus?.claimed != null}
-                    unpriced={unpricedEvents(flowEvents)}
-                    lives={troveLives(flowEvents)}
-                    daily={flowDaily.obs != null}
-                  />
-                }
-                learnMore={liquityLifetimeFlowsContent({ isBatched: result.economics._meta.isInBatch })}
-              />
-            </>
-          );
-        })()}
-
-        <CollSurplusCtx.Provider value={surplusState}>
-          <LiquityTroveMetaContext.Provider value={troveMeta}>
-            <ChainTruthTimeline
-              // Matches `LiquityEventCard`'s own `persistKey={`liquity-v2:${event.id}`}`
-              // — lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="liquity-v2"
-              closed={troveData.status !== "open"}
-              tl={tlWithGlyph}
-              boundary={boundary}
-              runs={LIQUITY_TIMELINE_RUNS}
-              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              spineKey={LIQUITY_SPINE_KEY}
-              emptyLabel={troveWords("history_empty")}
-              toolbarLeading={
-                <TimelineActivityHeader
-                  events={liquityEvents}
-                  closed={troveData.status !== "open"}
-                  firstAt={troveData.activity?.createdAt}
-                />
-              }
-              renderCard={(event, meta) => {
-                if (isCollSurplusClaimEvent(event))
-                  return (
-                    <CollSurplusClaimCard
-                      event={event}
-                      isLast={meta.isLast}
-                      eventNumber={meta.eventNumber}
-                      persistPrefix="liquity-v2"
-                    />
-                  );
-                if (!isLiquityEvent(event)) return null;
-                // previousEvent is always the temporally-older event, regardless
-                // of display order, so explainer deltas (interest accrued,
-                // time-since-last) stay correct.
-                const idx = sortedIndex.get(event.id);
-                const previousEvent = idx != null && idx > 0 ? tl.sortedEvents[idx - 1] : undefined;
-                return (
-                  <LiquityEventCard
-                    event={event}
-                    addressDisplay="hidden"
-                    isLast={meta.isLast}
-                    previousEvent={previousEvent}
-                    eventNumber={meta.eventNumber}
-                    currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
-                  />
-                );
-              }}
-            />
-          </LiquityTroveMetaContext.Provider>
-        </CollSurplusCtx.Provider>
-      </div>
+    <>
+      <TroveBody
+        topRow={
+          <DetailTopRow
+            session="liquity-v2"
+            wallet={effectiveOwner}
+            owner={{
+              wallet: effectiveOwner,
+              ensName: troveData?.ownerEns ?? null,
+              prefix: effectiveOwner && effectiveOwner !== troveData?.owner ? <LastOwnerPrefix /> : undefined,
+            }}
+            assets={stripAssets}
+            closed={troveData.status !== "open"}
+            closing={closing}
+            tools={false}
+          />
+        }
+        trove={troveData}
+        liveState={liveState}
+        prices={prices}
+        debtInFront={debtInFront}
+        trovesAhead={trovesAhead}
+        queueDebtTotal={queueDebtTotal}
+        debtInFrontLoading={debtInFrontLoading}
+        surplus={surplus}
+        exports={troveExports({
+          trove: troveData,
+          liveState,
+          prices,
+          debtInFront,
+          trovesAhead,
+          events: tl.sortedEvents,
+          csvFilename: `liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`,
+        })}
+        loadingMessage={getEnhancementStatus()}
+        liquityEvents={liquityEvents}
+        tl={tl}
+        boundary={boundary}
+        economicsEvents={tl.sortedEvents}
+        flowEvents={flowEvents}
+        flowTimeline={flowTimeline}
+        flowFocus={flowFocus}
+        flowsRead={flowsNow == null || !flowDaily.settled ? "reading" : flowsRead}
+        // One clock for the scrubber and the Explanation once mounted; the
+        // server's until then.
+        now={flowsNow ?? renderedAt}
+        daily={flowDaily.obs != null}
+        surplusState={surplusState}
+        troveMeta={troveMeta}
+      />
       <ProvInspectorLayer />
-    </FlowFocusContext.Provider>
+    </>
   );
 }

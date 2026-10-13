@@ -59,14 +59,6 @@ export function formatTimestamp(unix: number): string {
   return `${hh}:${mm}`;
 }
 
-/** Stable per-day key for grouping ("2026-04-14") — UTC, so a day's events
- *  group the same way for every reader and on the server. `toDateString()`
- *  grouped by the runtime's local day, which put an event at 23:40 UTC in a
- *  different bucket depending on who was looking. */
-export function dayKey(unix: number): string {
-  return new Date(unix * 1000).toISOString().slice(0, 10);
-}
-
 /** Compact day-month label, e.g. "14 Apr" — UTC, en-GB.
  *
  *  en-GB because that is the house date form: lib/date.ts writes "7 Feb 2026"

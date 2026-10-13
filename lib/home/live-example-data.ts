@@ -18,10 +18,11 @@ import type { BaseActivityEvent, LiquityContext } from "@/lib/shared/types/event
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import type { FetchTroveTimelineResult } from "@/lib/api/fetch-timeline";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { getEventActionKey } from "@/lib/shared/event-filter-helpers";
+import { liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
+import { liquityBranchObs } from "@/lib/shared/price-series";
+import { LIQUITY_RUN_KINDS } from "@/lib/liquity/timeline-run-kinds";
 import {
   LIVE_EXAMPLE_COLLATERAL,
-  LIVE_EXAMPLE_HIDDEN_OPS,
   LIVE_EXAMPLE_TROVE_ID,
   type HeroTowerEvent,
   type LiveExampleData,
@@ -110,13 +111,39 @@ function toTowerEvent(e: BaseActivityEvent & { context: { data: LiquityContext }
   };
 }
 
-/** How many full event cards ship to the client — the hero's visible zone
- *  fades out after ~2, so 6 leaves comfortable headroom. */
-const VISIBLE_EVENT_LIMIT = 6;
+/** How many timeline rows ship as full events — the hero's visible zone fades
+ *  out after about three. */
+const ROW_LIMIT = 5;
+/** A run of more events than this is not shipped after the first row: its
+ *  members would weigh the home page down for a row under the fade. */
+const RUN_EVENT_CAP = 12;
+
+/** The newest events that make up whole timeline rows, newest first: a streak
+ *  the Trove page collapses into one run row (LIQUITY_RUN_KINDS) ships whole
+ *  or not at all, so the hero's run rows count what the page's count. */
+function newestRows(newestFirst: BaseActivityEvent[]): BaseActivityEvent[] {
+  const op = (e: BaseActivityEvent) => (isLiquityEvent(e) ? e.context.data.operation : null);
+  const out: BaseActivityEvent[] = [];
+  let rows = 0;
+  let i = 0;
+  while (i < newestFirst.length && rows < ROW_LIMIT) {
+    const kind = LIQUITY_RUN_KINDS.find((k) => k.operation === op(newestFirst[i]));
+    let j = i + 1;
+    if (kind) while (j < newestFirst.length && op(newestFirst[j]) === kind.operation) j++;
+    // A streak shorter than its kind's minimum draws one card per event.
+    const run = kind && j - i >= kind.min;
+    if (!run) j = i + 1;
+    if (run && rows > 0 && j - i > RUN_EVENT_CAP) break;
+    out.push(...newestFirst.slice(i, j));
+    rows++;
+    i = j;
+  }
+  return out;
+}
 
 export async function getLiveExampleData(): Promise<LiveExampleData | null> {
   const base = `/api/trove/${LIVE_EXAMPLE_COLLATERAL}/${LIVE_EXAMPLE_TROVE_ID}`;
-  const [summaryRes, timelineRes, stateRes, pricesRes, difRes] = await Promise.all([
+  const [summaryRes, timelineRes, stateRes, pricesRes, difRes, dailyRes] = await Promise.all([
     getJson<TrovesResponse>(`/api/troves?troveId=${LIVE_EXAMPLE_TROVE_ID}&collateralType=${LIVE_EXAMPLE_COLLATERAL}`),
     getJson<FetchTroveTimelineResult>(`${base}/timeline?limit=500`),
     getJson<TroveStateResponse>(`/api/trove/state/${LIVE_EXAMPLE_COLLATERAL}/${LIVE_EXAMPLE_TROVE_ID}`),
@@ -124,6 +151,7 @@ export async function getLiveExampleData(): Promise<LiveExampleData | null> {
     getJson<{ data?: { debtInFront?: number; trovesAhead?: number } }>(
       `/api/liquity-v2/debt-in-front?collateralType=${LIVE_EXAMPLE_COLLATERAL}&troveId=${LIVE_EXAMPLE_TROVE_ID}`,
     ),
+    getJson<unknown>(`/api/liquity-v2/prices/daily?collateralType=${LIVE_EXAMPLE_COLLATERAL}`),
   ]);
 
   const trove = summaryRes?.data?.[0];
@@ -142,8 +170,7 @@ export async function getLiveExampleData(): Promise<LiveExampleData | null> {
     (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp || logIndex(a) - logIndex(b),
   );
 
-  const hidden = new Set(LIVE_EXAMPLE_HIDDEN_OPS);
-  const visibleAsc = sorted.filter((e) => !hidden.has(getEventActionKey(e)));
+  const liquity = sorted.filter(isLiquityEvent);
 
   return {
     trove,
@@ -151,11 +178,11 @@ export async function getLiveExampleData(): Promise<LiveExampleData | null> {
     prices: pricesRes?.success && pricesRes.data ? pricesRes.data : undefined,
     debtInFront: typeof difRes?.data?.debtInFront === "number" ? difRes.data.debtInFront : null,
     trovesAhead: typeof difRes?.data?.trovesAhead === "number" ? difRes.data.trovesAhead : null,
-    visibleEvents: [...visibleAsc].reverse().slice(0, VISIBLE_EVENT_LIMIT),
-    towerEvents: sorted.filter(isLiquityEvent).map(toTowerEvent),
-    visibleTotal: visibleAsc.length,
-    // The loaded-event count, not the backend's raw total — the real page's
-    // counter is `filtered of sortedEvents.length`, so the hero matches it.
-    totalEvents: sorted.length,
+    rowEvents: newestRows([...liquity].reverse()).reverse(),
+    towerEvents: liquity.map(toTowerEvent),
+    flowEvents: liquityV2FlowEvents(liquity),
+    dailyObs: liquityBranchObs(dailyRes),
+    // The loaded-event count, as the Trove page's counter states it.
+    totalEvents: liquity.length,
   };
 }

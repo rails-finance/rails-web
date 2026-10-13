@@ -352,6 +352,9 @@ export interface TimelineToolbarProps {
   countTooltip?: string;
   /** Words after an unfiltered whole-history count (ChainTruthTimelineProps.countDetail). */
   countDetail?: string;
+  /** A picture of the strip (the home page's live example): the leading words
+   *  and the position's whole count, no controls. */
+  still?: boolean;
 }
 
 /**
@@ -729,6 +732,7 @@ export function TimelineToolbar({
   countTooltip,
   countDetail,
   monthReach,
+  still,
 }: TimelineToolbarProps) {
   // One option is not an axis — a single-reserve wallet on a multi-asset roster
   // would get a control whose every state shows the same list.
@@ -760,7 +764,11 @@ export function TimelineToolbar({
     : segmentMonth != null
       ? monthLabel(segmentMonth)
       : "Dates";
-  const baseCountLine = eventCountLine(tl);
+  // A still strip's rows are the newest few of the history, so it states the
+  // whole count the page's strip states.
+  const baseCountLine = still
+    ? `${tl.totalCount.toLocaleString("en-US")} ${tl.totalCount === 1 ? "event" : "events"}`
+    : eventCountLine(tl);
   const countLine =
     countDetail && !tl.isFiltered && tl.historyWindow.state === "whole" && tl.olderCount === 0
       ? `${baseCountLine}${countDetail}`
@@ -858,7 +866,7 @@ export function TimelineToolbar({
               <span className="text-xs text-rb-500 tabular-nums">{countLine}</span>
             )}
           </span>
-          {tl.eventOptions.length > 1 && (
+          {!still && tl.eventOptions.length > 1 && (
             <FilterDropdown
               label="Types of event"
               anatomy="L1.3"
@@ -874,7 +882,7 @@ export function TimelineToolbar({
               onToggle={(act) => tl.toggleHiddenAction(act)}
             />
           )}
-          {assetOptions.length > 0 && (
+          {!still && assetOptions.length > 0 && (
             <FilterDropdown
               label="Assets"
               anatomy="L1.4"
@@ -898,7 +906,7 @@ export function TimelineToolbar({
               onToggle={(sym) => tl.toggleHiddenAsset(sym)}
             />
           )}
-          {versionOptions.length > 0 && (
+          {!still && versionOptions.length > 0 && (
             <FilterDropdown
               label="Versions"
               anatomy="L1.5"
@@ -915,7 +923,7 @@ export function TimelineToolbar({
               onToggle={(v) => tl.toggleHiddenVersion(v)}
             />
           )}
-          {counterpartyOptions.length > 0 && (
+          {!still && counterpartyOptions.length > 0 && (
             <FilterDropdown
               label="Addresses"
               anatomy="L1.6"
@@ -936,7 +944,7 @@ export function TimelineToolbar({
           {/* No Dates on a page tied to its Lifetime flows chart
               (`tl.datesAxis`): the chart's scrubber and "Show timeline to {date}"
               navigate it by the day. */}
-          {tl.datesAxis && (
+          {!still && tl.datesAxis && (
             <button
               type="button"
               data-date-control=""
@@ -975,7 +983,7 @@ export function TimelineToolbar({
               </svg>
             </button>
           )}
-          {displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
+          {!still && displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
         </div>
       </div>
 

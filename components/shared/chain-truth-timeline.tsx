@@ -503,6 +503,10 @@ export interface ChainTruthTimelineProps {
   /** The phone spine view's key row, in the family's words: what a left and
    *  a right arrow mean. Unset: "to wallet" and "into position". */
   spineKey?: SpineKey;
+  /** The toolbar as a picture: its leading words and the position's whole
+   *  count, no controls (the home page's live example, whose rows are the
+   *  newest few of the history). */
+  still?: boolean;
 }
 
 export interface TimelineSegments {
@@ -713,6 +717,7 @@ function ChainTruthTimelineBody({
   closed,
   segments,
   spineKey,
+  still,
 }: ChainTruthTimelineProps) {
   const { showMarketNotes, openAllMarketNotes } = useTimelineDisplay();
   // Desktop list view: the notes opened from their markers (item 118). Each
@@ -1901,6 +1906,7 @@ function ChainTruthTimelineBody({
             leading={toolbarLeading}
             countTooltip={countTooltip}
             countDetail={countDetail}
+            still={still}
             // The Date button's panel hangs from the toolbar; the second path a
             // month click can take travels to it here.
             monthReach={
