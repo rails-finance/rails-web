@@ -16,8 +16,8 @@
 // pill and the family's listing ⋮, with no heading, panel or (i) (324).
 //
 // A card is open or closed by its slots: a closed card carries `outcome` (its
-// peaks as `heads`, the Outcome column, no panel); an open detail card carries
-// `panel`.
+// peaks as `heads`, the Outcome column, and a panel only for lines with no
+// head); an open detail card carries `panel`.
 //
 // The listing branch is the one place in the app where <Prov> is meant to
 // trace nothing, and the figures cannot tell which render they are in. The
@@ -42,6 +42,7 @@ import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { PositionCardPanel, type PositionPanelColumns } from "@/components/shared/position-card-panel";
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
+import { RowHelp } from "@/components/shared/row-help";
 import { TipLabel } from "@/components/shared/tip-label";
 import { StatDash, StatValue } from "@/components/shared/stat-value";
 import { ToolsMenu } from "@/components/shared/tools-menu";
@@ -60,6 +61,9 @@ export type PositionCardTone = "muted" | "danger" | "caution";
 export interface PositionCardStatus {
   word: string;
   tone: PositionCardTone;
+  /** The tag's read-more: a "?" after the tag on a detail card, drawn as a
+   *  panel row's is. */
+  tip?: string;
 }
 
 /** One headline figure. */
@@ -124,7 +128,14 @@ export interface PositionCardOutcome {
   footnote?: ReactNode;
   /** A fourth column ("Time open", "Surplus to claim"). */
   extra?: { label: string; value: ReactNode };
+  /** What the ending means: a "?" after the Outcome label on a detail card,
+   *  drawn as a panel row's is. */
+  tip?: string;
 }
+
+/** The activity counters, and `extra`: a badge after the counts (Frankencoin's
+ *  challenge marker on its listing). */
+export type PositionCardCounters = PositionCardMetaProps & { extra?: ReactNode };
 
 /** What both surfaces take. */
 interface PositionCardSlotsCommon {
@@ -145,7 +156,7 @@ interface PositionCardSlotsCommon {
   /** The activity counters (age, transactions, liquidations, redemptions).
    *  Detail draws them at the right of the (i) row, listing at the right of
    *  the heading row. `null` where a card has none. */
-  counters: PositionCardMetaProps | null;
+  counters: PositionCardCounters | null;
 }
 
 interface PositionCardDetailCommon extends PositionCardSlotsCommon {
@@ -169,10 +180,12 @@ interface PositionCardDetailOpen extends PositionCardDetailCommon {
   outcome?: undefined;
 }
 
-/** A closed position on its page: peaks and Outcome, no panel. */
+/** A closed position on its page: peaks and Outcome. `panel` is optional
+ *  here, for the lines that have no head (SparkLend's not-collateral peaks,
+ *  f(x)'s reconciliation rows); it draws beneath the peaks. */
 interface PositionCardDetailClosed extends PositionCardDetailCommon {
   outcome: PositionCardOutcome;
-  panel?: undefined;
+  panel?: PositionPanelColumns;
 }
 
 /** A row of a listing. */
@@ -227,6 +240,7 @@ function PositionCardRow({
   label,
   labelTip,
   headerIcon,
+  help,
   className,
   children,
 }: {
@@ -236,6 +250,8 @@ function PositionCardRow({
   label: string;
   labelTip?: string;
   headerIcon?: ReactNode;
+  /** A "?" read-more after the label (the Outcome's `tip`). */
+  help?: string;
   className?: string;
   children: ReactNode;
 }) {
@@ -244,17 +260,21 @@ function PositionCardRow({
       <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
         <TipLabel text={label} tip={labelTip} />
         {headerIcon}
+        {help && <RowHelp tip={help} name={label} />}
       </div>
       {children}
     </div>
   );
 }
 
-/** The small tag at the left of a detail card's heading row. */
+/** The small tag at the left of a detail card's heading row, with its "?". */
 function StatusTag({ status }: { status: PositionCardStatus }) {
   return (
-    <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${TAG_TONE[status.tone]}`} data-anatomy="C6">
-      {status.word}
+    <span className="inline-flex items-center">
+      <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${TAG_TONE[status.tone]}`} data-anatomy="C6">
+        {status.word}
+      </span>
+      {status.tip && <RowHelp tip={status.tip} name={status.word} />}
     </span>
   );
 }
@@ -334,10 +354,14 @@ function ClosedGrid({
   heads,
   outcome,
   tone,
+  detail,
 }: {
   heads: PositionCardHead[];
   outcome: PositionCardOutcome;
   tone: PositionCardTone;
+  /** The Outcome's "?" draws on a detail card only: a listing card sits
+   *  inside its row's link. */
+  detail: boolean;
 }) {
   const peaks = heads.slice(0, 2);
   return (
@@ -355,7 +379,7 @@ function ClosedGrid({
         </PositionCardRow>
       ))}
       {peaks.length < 2 && <div className="hidden sm:block" />}
-      <PositionCardRow index={2} head="outcome" label="Outcome">
+      <PositionCardRow index={2} head="outcome" label="Outcome" help={detail ? outcome.tip : undefined}>
         <div className={`text-lg font-bold mt-2 ${OUTCOME_TONE[tone]}`}>{outcome.word}</div>
         {outcome.dates?.map((d, i) => (
           <div key={d.label ?? i} className="text-xs text-rb-500 mt-0.5">
@@ -387,10 +411,12 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const registry = useReceiptRegistry();
   const detail = slots.surface === "detail";
   const closed = slots.outcome != null;
+  const { extra: countersExtra, ...meta } = slots.counters ?? {};
   const counters = slots.counters ? (
     // `contents`: the wrapper names the cluster without taking part in the row's layout.
     <span className="contents" data-card-counters="">
-      <PositionCardMeta {...slots.counters} />
+      <PositionCardMeta {...meta} />
+      {countersExtra}
     </span>
   ) : null;
   const menu = detail ? slots.menu && <DetailMenu menu={slots.menu} /> : slots.menu;
@@ -424,7 +450,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
     <div {...(closed ? { "data-anatomy": "C11" } : {})}>
       {header}
       {slots.outcome ? (
-        <ClosedGrid heads={slots.heads} outcome={slots.outcome} tone={slots.status?.tone ?? "muted"} />
+        <ClosedGrid heads={slots.heads} outcome={slots.outcome} tone={slots.status?.tone ?? "muted"} detail={detail} />
       ) : (
         <OpenGrid heads={slots.heads} />
       )}

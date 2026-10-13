@@ -20,9 +20,8 @@
 // The event-implied debt (Σ of the events' deltas) rides along ONLY as the
 // reconciliation rows: implied vs settled, the difference being the socialized
 // lane (funding / rebalances / write-offs). They are always surfaced, never
-// hidden: wsteth-285 shows implied 25,178 fxUSD against settled 0. On an open
-// card they are panel rows; a closed card has no panel, so they ride under its
-// two headlines.
+// hidden: wsteth-285 shows implied 25,178 fxUSD against settled 0. They are
+// panel rows on an open card and on a closed one.
 
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -703,29 +702,18 @@ export function useFxCardSlots({
   if (closed) {
     // Closed: the settled lane has emptied, so the heads carry the settled
     // zeros (there is no peak aggregate on the summary) and the reconciliation
-    // rides beneath them, since a closed card has no panel: a closed position's
+    // rows sit in the closed card's panel: a closed position's
     // implied-vs-settled gap is the socialized burn / write-off story.
-    const line = (rows: (PositionPanelRow | null)[]): ReactNode => {
-      const kept = rows.filter((r): r is PositionPanelRow => r != null);
-      if (kept.length === 0) return undefined;
-      return kept.map((r) => (
-        <span key={r.id} className="block tabular-nums">
-          {r.label}: {r.value}
-        </span>
-      ));
-    };
     heads = [
       {
         id: "final-collateral",
         label: CARD_VOCAB.finalCollateral,
         value: collateralValue,
-        sub: detail ? line([driftRow]) : undefined,
       },
       {
         id: "final-debt",
         label: CARD_VOCAB.finalDebt,
         value: debtValue,
-        sub: detail ? line(debtRows) : undefined,
       },
     ];
     outcome = {
@@ -787,7 +775,7 @@ export function useFxCardSlots({
       <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>
     ) : undefined,
   };
-  if (outcome) return { ...detailCommon, outcome };
+  if (outcome) return { ...detailCommon, outcome, panel: [[...(driftRow ? [driftRow] : []), ...debtRows], []] };
 
   const [prices, lines] = ratioRows(v, terms, px);
   return {

@@ -292,9 +292,17 @@ export function mapleCardSlots({
   // Closed, or some shares wait in the withdrawal queue: the wallet still
   // earns on them until the request fills.
   const status: PositionCardStatus | null = closed
-    ? { word: "Closed", tone: "muted" }
+    ? {
+        word: "Closed",
+        tone: "muted",
+        tip: "The wallet holds no pool shares and nothing waits in the withdrawal queue.",
+      }
     : v.inQueue
-      ? { word: "In withdrawal queue", tone: "caution" }
+      ? {
+          word: "In withdrawal queue",
+          tone: "caution",
+          tip: "Some of the wallet's shares wait in the withdrawal queue to be paid out; they earn interest until then.",
+        }
       : null;
   const common = { status, identity, counters };
 
