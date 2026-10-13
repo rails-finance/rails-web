@@ -3,7 +3,7 @@
 // The strip every launched page carries while Rails is in beta.
 // ----------------------------------------------------------------------------
 // One line above the header, site-wide: the product changes often and the
-// reader is invited to say what they see. "Send feedback" opens the same
+// reader is invited to say what they see. "Tell us what you think." opens the same
 // FeedbackModal the footers' FeedbackCluster does (→ /api/feedback).
 //
 // MOUNTED ONCE, in the root layout, above the header (WorkInProgressStrip sits
@@ -67,16 +67,14 @@ export function BetaStrip() {
     <div data-anatomy="H14" className={`bg-sunken${isExplorerRoute(pathname) ? " md:pl-14" : ""}`}>
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2 text-sm leading-5 text-foreground md:px-6">
         <p className="min-w-0 flex-1 leading-5">
-          <span className="font-semibold">Rails is in beta and changing often.</span>{" "}
-          <span className="text-rb-500">We&rsquo;d love to hear from you</span>
-          <span className="text-rb-500"> &mdash; </span>
+          <span className="font-semibold">Rails is in beta.</span>{" "}
           <button
             type="button"
             onClick={() => setFeedbackOpen(true)}
             className="cursor-pointer font-medium text-teal-600 hover:underline dark:text-teal-500"
           >
             <MessageSquarePlus className="mr-1 inline-block h-3.5 w-3.5 align-middle" aria-hidden="true" />
-            Send feedback
+            Tell us what you think.
           </button>
         </p>
         <button
