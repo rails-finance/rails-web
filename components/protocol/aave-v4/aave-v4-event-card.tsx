@@ -35,6 +35,10 @@ export interface AaveV4EventCardProps {
   previousRate?: number;
   /** For a repay that clears its debt: the interest that debt accrued over its life. */
   debtLifeInterest?: number;
+  /** The previous event on this spoke, for the sheet's carry layer. */
+  previousEvent?: AaveV4Event;
+  /** The assets the position once owed on this spoke and owes none of after this event. */
+  repaid?: string[];
 }
 
 export function AaveV4EventCard({
@@ -45,6 +49,8 @@ export function AaveV4EventCard({
   eventNumber,
   previousRate,
   debtLifeInterest,
+  previousEvent,
+  repaid,
 }: AaveV4EventCardProps) {
   const ctx = event.context.data;
   const isLiquidation = ctx.eventType === "liquidation";
@@ -100,14 +106,17 @@ export function AaveV4EventCard({
     txGroup,
     externalBy: extBy ?? undefined,
   });
-  // T2: the snapshot as cells (no flows panel: the cells stand as rows), the
-  // prices at this block and the gas in the price row (ui-jobs 309).
-  const { cells, prices } = useAaveV4Cells({
+  // T2: the snapshot as a balance sheet (ui-jobs 330), a collateral toggle as
+  // its cell, the prices at this block and the gas in the price row (309).
+  const { cells, prices, sheet } = useAaveV4Cells({
     ctx,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
     wallet: event.wallet,
     previousRate,
+    previous: previousEvent?.context.data,
+    repaid,
+    address: symAddress,
   });
 
   const slots: EventCardSlots = {
@@ -124,6 +133,7 @@ export function AaveV4EventCard({
     caption: aaveV4Label(ctx),
     actor: { by: extBy ?? undefined },
     cells,
+    sheet,
     ledgers: { none: "no flows panel on Aave V4 yet" },
     price: { gas: eventGas(event.gas), prices },
     // The explanation reads the position state the card opens with, so the

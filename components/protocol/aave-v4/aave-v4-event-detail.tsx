@@ -38,6 +38,9 @@ import {
 } from "@/lib/aave-v4/position-provenance";
 import { ExactTip } from "@/components/shared/amount-text";
 import { useHealthFactorAround, hfOf, premiumAt } from "@/lib/aave-v4/use-health-factor-around";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import { aaveV4Label } from "@/lib/aave-v4/event-label";
+import { aaveV4Sheet } from "./aave-v4-event-sheet";
 
 const SNAPSHOT_USD_PROV = usdProv("The after-balance", {
   amountLabel: "balance after event",
@@ -97,6 +100,14 @@ export interface AaveV4EventDetailProps {
   /** The borrow rate (decimal) the previous event on this spoke recorded for
    *  this event's asset: the Borrow Rate cell is changed where it moved. */
   previousRate?: number;
+  /** The previous event on this spoke: the sheet's carry layer reads its
+   *  snapshot. */
+  previous?: AaveV4Context;
+  /** The assets the position once owed on this spoke and owes none of after
+   *  this event. */
+  repaid?: string[];
+  /** The moved reserve's contract, from the event's flows. */
+  address?: string;
 }
 
 /** Render a single position row — with before→after if this asset changed,
@@ -203,9 +214,19 @@ function V4PositionRow({
 /** The card's cells and the price row's chips (ui-jobs 309): Collateral and
  *  Debt with a line per reserve, the ratio, the health factor either side and
  *  the borrow rate; one price per asset in the snapshot. */
-export function useAaveV4Cells({ ctx, txHash, blockNumber, wallet, previousRate }: AaveV4EventDetailProps): {
+export function useAaveV4Cells({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  previousRate,
+  previous,
+  repaid,
+  address,
+}: AaveV4EventDetailProps): {
   cells: EventCellSpec[];
   prices: EventPriceChip[];
+  sheet: EventSheet | null | undefined;
 } {
   const { prefs } = usePreferences();
   const ratioMode = prefs.ratioMode;
@@ -558,5 +579,8 @@ export function useAaveV4Cells({ ctx, txHash, blockNumber, wallet, previousRate 
     title: pricePillTitle(p.symbol, p.source, p.block, blockNumber),
   }));
 
-  return { cells, prices: chips };
+  // The balance sheet (ui-jobs 330); a collateral toggle keeps its cell.
+  const sheet = aaveV4Sheet({ ctx, prev: previous, coord, label: aaveV4Label(ctx), address, hf: hfAround, repaid });
+
+  return { cells, prices: chips, sheet };
 }

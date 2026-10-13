@@ -510,6 +510,29 @@ function AaveV4SpokePageInner({
     return out;
   }, [spokeScopedEvents]);
 
+  // The sheet's inputs (ui-jobs 330): each event's previous event on this
+  // spoke, whose snapshot the carry layer reads, and the debt assets the
+  // position owed at some earlier point on the spoke and owes none of after it.
+  const { previousEvents, repaidAssets } = useMemo(() => {
+    const previousEvents = new Map<string, AaveV4Event>();
+    const repaidAssets = new Map<string, string[]>();
+    let last: AaveV4Event | undefined;
+    const once = new Set<string>();
+    for (const e of spokeScopedEvents) {
+      if (!isAaveV4Event(e)) continue;
+      const c = e.context.data;
+      if (last) previousEvents.set(e.id, last);
+      for (const d of c.allDebts ?? []) once.add(d.symbol);
+      if ((c.eventType === "borrow" || c.eventType === "repay" || c.eventType === "liquidation") && c.reserveSymbol)
+        once.add(c.reserveSymbol);
+      const owes = new Set((c.allDebts ?? []).filter((d) => Number(d.amount) > 0).map((d) => d.symbol));
+      const gone = [...once].filter((s) => !owes.has(s)).map(aaveV4DisplaySymbol);
+      if (gone.length > 0) repaidAssets.set(e.id, gone);
+      if (c.allSupplies || c.allDebts) last = e as AaveV4Event;
+    }
+    return { previousEvents, repaidAssets };
+  }, [spokeScopedEvents]);
+
   // For a repay that clears its reserve's debt: the interest that debt accrued
   // over its life, the repayments less the borrows since the debt was last
   // zero. Only where the page holds the whole history (a window may start
@@ -804,6 +827,8 @@ function AaveV4SpokePageInner({
                 siblings={txSiblings.get(event.txHash ?? "")}
                 previousRate={previousRates.get(event.id)}
                 debtLifeInterest={olderCount === 0 ? debtLifeInterest.get(event.id) : undefined}
+                previousEvent={previousEvents.get(event.id)}
+                repaid={repaidAssets.get(event.id)}
                 eventNumber={meta.eventNumber}
               />
             ) : null
