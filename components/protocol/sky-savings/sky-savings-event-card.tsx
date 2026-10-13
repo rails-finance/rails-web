@@ -65,18 +65,11 @@ import {
   type SkyEventCoords,
 } from "@/lib/sky-savings/provenance";
 import { skySavingsSheet } from "@/components/protocol/sky-savings/sky-savings-sheet";
+import { SKY_EVENT_LABEL } from "@/lib/sky-savings/event-label";
 import { skyEventContent } from "@/lib/sky-savings/learn-more";
 import { skyEventBullets, skyInterestSince, type SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
 
 export type SkySavingsEvent = BaseActivityEvent & { context: { protocol: "sky-savings"; data: SkySavingsContext } };
-
-const LABEL: Record<SkySavingsContext["eventType"], string> = {
-  deposit: "Deposit",
-  withdrawal: "Withdrawal",
-  received: "Received",
-  sent: "Sent",
-  self: "Transfer to self",
-};
 
 /** A signed raw difference as its exact decimal with a real minus. */
 const signedExact = (v: bigint) => (v < BigInt(0) ? `−${exact(-v)}` : `+${exact(v)}`);
@@ -189,7 +182,7 @@ export function SkySavingsEventCard({
           : undefined;
   const referralProv = c.referral != null ? eventReferralProv(coords, c.referral) : null;
   const spec: ChainTruthRowSpec = {
-    label: LABEL[kind],
+    label: SKY_EVENT_LABEL[kind],
     custody: isTransfer,
     custodyLabel: isTransfer,
     deltas,
@@ -345,7 +338,7 @@ export function SkySavingsEventCard({
     },
     spine,
     head: spec,
-    caption: LABEL[kind],
+    caption: SKY_EVENT_LABEL[kind],
     // A transfer received: the sender acted (ui-jobs 304).
     actor: kind === "received" ? { byOwner: false } : undefined,
     cells,
