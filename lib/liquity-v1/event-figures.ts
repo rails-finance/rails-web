@@ -17,6 +17,8 @@ import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
 
 /** LUSD_GAS_COMPENSATION: the reserve every Trove's debt carries. */
 export const LIQUITY_V1_RESERVE = 200;
+/** The least debt a Trove may hold: MIN_NET_DEBT (1,800 LUSD) plus the reserve. */
+export const LIQUITY_V1_MIN_DEBT = 2000;
 /** What a liquidation does to each side, as the timeline row and the lifetime
  *  flows both name it. One place, so the two change together. */
 export const LIQUIDATION_COLL_VERB = "Seized";
