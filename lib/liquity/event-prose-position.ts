@@ -14,6 +14,7 @@ import { buildFlowModel } from "@/lib/shared/flows-timeline";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { liquityEventProse, type LiquityEventContext, type LiquityEventProse } from "@/lib/liquity/event-prose";
 import type { LiquityEventLedgers } from "@/lib/liquity/event-markdown";
+import type { DayObs } from "@/lib/shared/price-series";
 
 type LiquityEvent = BaseActivityEvent & { context: { protocol: "liquity-v2-troves"; data: LiquityContext } };
 
@@ -43,8 +44,8 @@ export interface LiquityPositionInput {
   /** The trove's whole history, in liquityTroveHistory's order. */
   events: LiquityEvent[];
   trove: TroveSummary | null;
-  /** The branch's daily price, `[UTC day, usd]` ascending, where read. */
-  dailyColl: [number, number][] | null;
+  /** The branch's daily price, `[UTC day, usd, block?]` ascending, where read. */
+  dailyColl: DayObs[] | null;
   /** Today's oracle price for the branch's collateral. */
   priceToday: number | undefined;
   /** Unix seconds now. */

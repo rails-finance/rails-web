@@ -59,6 +59,8 @@ import { sharePriceText } from "@/components/vaults/aave-vault-format";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { KIND_LABEL, type VaultHolderEvent, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import type { SheetRow } from "@/components/shared/event-sheet";
+import { vaultSheet } from "@/components/vaults/vault-sheet";
 
 /** A raw integer and the number a formatter wants, from one string. Scaled here
  *  at the render edge and nowhere earlier — the row data is wei-exact. */
@@ -99,6 +101,11 @@ export interface VaultTimelineRowProps {
   band?: ReactNode;
   /** Where a family's figure joins the row's cells. */
   extraCells?: (rowCoords: VaultTimelineCoords) => EventCellSpec[];
+  /** The same figure as a row of the sheet's breakdown. */
+  extraRows?: (rowCoords: VaultTimelineCoords) => SheetRow[];
+  /** The row before this one in time, where the list holds it: the sheet's
+   *  carry rows read its share price. */
+  earlier?: VaultHolderEvent | null;
   /** Where a family's own sentence joins the row's detail panel, under the
    *  standard paragraphs. */
   detailNotes?: (rowCoords: VaultTimelineCoords) => ReactNode;
@@ -124,6 +131,8 @@ export function VaultTimelineRow({
   prov,
   band,
   extraCells,
+  extraRows,
+  earlier,
   detailNotes,
   icon,
   persistPrefix,
@@ -202,6 +211,16 @@ export function VaultTimelineRow({
     head: spec,
     caption: KIND_LABEL[event.kind],
     cells: rowCells(event, rowCoords, shareUnit, assetSymbol, prov, extraCells),
+    sheet: vaultSheet({
+      event,
+      earlier,
+      coords: rowCoords,
+      shareUnit,
+      assetSymbol,
+      vaultAddress,
+      prov,
+      extraRows: extraRows?.(rowCoords),
+    }),
     ledgers: { none: "a vault row states one share token, with no flows panel" },
     notes: (
       <RowNotes

@@ -3,12 +3,25 @@
 // day as `[day, usd]` ascending. A day with no price is absent, and a row
 // whose unit is not USD (Compound V2's ETH years) is left out; the caller
 // carries the last price over both. Null where the read failed or answered
-// nothing, so a page keeps carrying each event's price.
+// nothing, so a page keeps carrying each event's price. The block each price
+// was read at, and the per-row source, reach the chart through
+// `dailyStorePriceSeries` (lib/shared/price-series.ts).
 
+/** [day, price_raw, block, unit?, scale?]. */
 type Obs = [number, string, string, string?, number?];
 
 export interface DailyAnswer {
-  series?: Record<string, { unit?: string; scale?: number; obs?: Obs[] }>;
+  series?: Record<
+    string,
+    {
+      unit?: string;
+      scale?: number;
+      obs?: Obs[];
+      /** The sources the rows name (`seed:<table>`, `read:<family>`), and per row an index into them. */
+      sources?: string[];
+      src?: number[];
+    }
+  >;
 }
 
 /** At most 40 series per read (the route's cap). */

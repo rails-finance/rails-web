@@ -296,6 +296,8 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
             renderCard={(event, meta) => {
               const row = byId.get(event.id);
               if (!row) return null;
+              // Rows run newest first: the row before this one in time is the next.
+              const earlier = timeline.events[timeline.events.indexOf(row) + 1] ?? null;
               // NO share provider here. `ChainTruthTimeline` already wraps
               // every card it renders in one carrying that event's own
               // permalink, and this section's `event/[eventId]` route now
@@ -312,6 +314,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
                   vaultAddress={timeline.vault}
                   eventNumber={meta.eventNumber}
                   isLast={meta.isLast}
+                  earlier={earlier}
                   family={family}
                 />
               );
@@ -465,6 +468,7 @@ function AaveTimelineRow({
   vaultAddress,
   eventNumber,
   isLast,
+  earlier,
   family,
 }: {
   event: VaultHolderEvent;
@@ -477,6 +481,8 @@ function AaveTimelineRow({
    *  header's number pill. */
   eventNumber: number;
   isLast: boolean;
+  /** The row before this one in time, where the list holds it. */
+  earlier: VaultHolderEvent | null;
 }) {
   const cooldowns = cooldownsOf(event);
   const sd = event.shareDecimals;
@@ -490,6 +496,7 @@ function AaveTimelineRow({
       vaultAddress={vaultAddress}
       eventNumber={eventNumber}
       isLast={isLast}
+      earlier={earlier}
       prov={PROV}
       persistPrefix="aave-vault"
       learnMore={vaultEventContent(family)}

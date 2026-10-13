@@ -184,6 +184,65 @@ words:
     time
   time_many: |-
     times
+  # T2's balance sheet (ui-jobs 330): the Risk and Limits rows, the parameter
+  # rows and the words for a figure the page does not hold.
+  sheet_health: |-
+    Health factor
+  sheet_fall: |-
+    Collateral can fall
+  sheet_limit_used: |-
+    Borrowing limit used
+  sheet_borrowable: |-
+    Still borrowable
+  sheet_collateral_factor: |-
+    {market_symbol} collateral factor
+  sheet_unread: |-
+    Not read on this page
+  sheet_no_price: |-
+    A market here has no price
+  # The sheet's read-more, one per row: what the figure is and where it is read.
+  tip_coll_last: |-
+    The collateral's total in dollars once the previous transaction on this timeline had run, from the market rows the page replays.
+  tip_coll_interest: |-
+    The interest every supplied market earned between the previous event and this one, at Compound's latest oracle prices by this event.
+  tip_coll_interest_asset: |-
+    The {market_symbol} the supply earned since the previous event: its balance just before this transaction less its balance after the previous one.
+  tip_coll_market: |-
+    The change Compound's oracle prices made to the dollar value of the collateral held between the previous event and this one.
+  tip_coll_before: |-
+    The collateral's total in dollars just before this transaction, each market's supply at Compound's latest oracle price by this event.
+  tip_coll_event: |-
+    The {market_symbol} this transaction moved on the supplied side, its supply after less before, at Compound's latest {market_symbol} oracle price by this event.
+  tip_coll_total: |-
+    The collateral's total in dollars after this transaction: each market's supply, its cTokens times the exchange rate, at Compound's latest oracle price by this event.
+  tip_debt_last: |-
+    The debt's total in dollars once the previous transaction on this timeline had run, from the market rows the page replays.
+  tip_debt_interest: |-
+    The interest every borrowed market accrued between the previous event and this one, at Compound's latest oracle prices by this event.
+  tip_debt_interest_asset: |-
+    The {market_symbol} the borrow accrued since the previous event: the debt just before this transaction less the debt after the previous one.
+  tip_debt_market: |-
+    The change Compound's oracle prices made to the dollar value of the debt owed between the previous event and this one.
+  tip_debt_before: |-
+    The debt's total in dollars just before this transaction, each market's accountBorrows at Compound's latest oracle price by this event.
+  tip_debt_event: |-
+    The {market_symbol} this transaction moved on the borrowed side, the market's accountBorrows after less before, at Compound's latest {market_symbol} oracle price by this event.
+  tip_debt_asset: |-
+    The {market_symbol} owed after this transaction, the market's accountBorrows, at Compound's latest {market_symbol} oracle price by this event.
+  tip_debt_repaid: |-
+    The assets this account once borrowed and owes none of after this event.
+  tip_debt_total: |-
+    The debt's total in dollars after this transaction: each market's accountBorrows at Compound's latest oracle price by this event.
+  tip_health: |-
+    The Comptroller's health factor after this event: each entered market's collateral times its collateral factor, over the debt; at 1 or below the account can be liquidated.
+  tip_fall: |-
+    How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.
+  tip_limit_used: |-
+    The debt as a share of the borrowing limit, each entered market's collateral times its collateral factor; the same factor sets the liquidation line, so Compound liquidates at 100%.
+  tip_borrowable: |-
+    What the account could still borrow in dollars after this event: the borrowing limit less the debt, as the Comptroller's getAccountLiquidity states it.
+  tip_collateral_factor: |-
+    The share of the {market_symbol} supplied that counts toward the borrowing limit, set by governance in the Comptroller's markets() for the market.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more

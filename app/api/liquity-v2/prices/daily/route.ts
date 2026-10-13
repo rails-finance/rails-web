@@ -9,7 +9,7 @@ const RAILS_API_URL = process.env.RAILS_API_URL;
  * Proxy to rails-server-onboarding's `/api/liquity-v2/prices/daily?collateralType=`
  * (WETH, wstETH or rETH): the branch's collateral price per UTC day, the last
  * any Trove's operation recorded on the branch that day,
- * `{ collateralType, obs: [[day, usd], …], today }`. The Lifetime flows panel
+ * `{ collateralType, obs: [[day, usd, block], …], today }` (the block absent on an older server). The Lifetime flows panel
  * values a Trove's collateral between its events at it (lib/shared/liquity-flows.ts).
  */
 export async function GET(request: NextRequest) {

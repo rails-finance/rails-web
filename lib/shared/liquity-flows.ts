@@ -34,6 +34,7 @@ import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
+import type { DayObs } from "@/lib/shared/price-series";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -235,10 +236,10 @@ export interface LiquityFlowOptions {
   now: number;
   /** Liquity V1, or V2 and its forks (the default). */
   family?: LiquityFamily;
-  /** The branch's daily price, `[UTC day, usd]` ascending, where the page
+  /** The branch's daily price, `[UTC day, usd, block?]` ascending, where the page
    *  read one (Liquity V2's daily route); null or absent keeps each event's
    *  price between events. */
-  dailyColl?: [number, number][] | null;
+  dailyColl?: DayObs[] | null;
 }
 
 /** A replayed event's legs, for the tests and the Explanation. */

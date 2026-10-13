@@ -222,6 +222,8 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
             renderCard={(event, meta) => {
               const row = byId.get(event.id);
               if (!row) return null;
+              // Rows run newest first: the row before this one in time is the next.
+              const earlier = timeline.events[timeline.events.indexOf(row) + 1] ?? null;
               // NO share provider here. `ChainTruthTimeline` already wraps
               // every card it renders in one carrying that event's own
               // permalink, and this section's `event/[eventId]` route now
@@ -239,6 +241,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
                   vaultAddress={timeline.vault}
                   eventNumber={meta.eventNumber}
                   isLast={meta.isLast}
+                  earlier={earlier}
                   prov={PROV}
                   persistPrefix="yearn-vault"
                   learnMore={vaultEventContent("yearn")}

@@ -5,6 +5,7 @@ import { readTrovesFromBackend } from "@/lib/sources/api/troves-backend";
 import { liquityPositionProse, liquityTroveHistory } from "@/lib/liquity/event-prose-position";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { OraclePricesResponse } from "@/types/api/oracle";
+import type { DayObs } from "@/lib/shared/price-series";
 
 // One Liquity V2 event's prose as data: the generator's template, variant and
 // version, every value it read (unrounded), and each sentence with its id, the
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     const [troves, daily, oracle] = await Promise.all([
       readTrovesFromBackend(new URLSearchParams({ troveId, collateralType: branch }), readerIp),
-      get<{ obs?: [number, number][] }>(`/api/liquity-v2/prices/daily?collateralType=${branch}`),
+      get<{ obs?: DayObs[] }>(`/api/liquity-v2/prices/daily?collateralType=${branch}`),
       get<OraclePricesResponse>("/api/oracle/liquity-v2"),
     ]);
     const priceKey = branch.toLowerCase() as "weth" | "wsteth" | "reth";
