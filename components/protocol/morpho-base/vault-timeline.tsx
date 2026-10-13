@@ -64,11 +64,13 @@
 
 import { useMemo } from "react";
 
+import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { VaultAllocationBand, VaultAllocationDetail } from "@/components/protocol/morpho-base/vault-allocation-band";
 import { Prov } from "@/components/shared/provenance";
 import { pctText, shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
+import { vaultExplorer } from "@/lib/vaults/explorer";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
 import { AAVE_VAULT_TIMELINE_KEY, aaveVaultTimelineRuns, vaultEventToActivity } from "@/lib/aave-vaults/timeline-runs";
@@ -150,6 +152,8 @@ export function MorphoBaseVaultTimeline({
     holder: timeline.holder,
   };
   const { reconcile } = timeline;
+  // The event route draws the sub-nav and the event's card beside the shared column (ui-jobs 236).
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const shareUnit = shareSymbol ?? "shares";
   const shareDecimals = timeline.events[0]?.shareDecimals ?? 18;
   const assetDecimals = timeline.events[0]?.assetDecimals ?? 0;
@@ -204,14 +208,16 @@ export function MorphoBaseVaultTimeline({
 
   return (
     <section className="mb-6" data-skel-section="vault-timeline" data-vault-timeline={timeline.holder}>
-      <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+      {!onEventPage && (
+        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+      )}
 
       {/* Where the rows came from. A row at or below the lane's own `finalized`
           block never changes, so it may be kept; anything above it may not.
           When half of a life came out of the store the reader is told which
           half, at which cut, and that the check below ran on the two together
           — a stored page and a swept one must never render the same. */}
-      <HistoryLine coords={coords} timeline={timeline} />
+      {!onEventPage && <HistoryLine coords={coords} timeline={timeline} />}
 
       {timeline.unread ? (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-unread">
@@ -268,7 +274,7 @@ export function MorphoBaseVaultTimeline({
           . The rows and the flows are drawn once the whole life is stored, on a later visit. Every figure above this is
           unaffected — they are calls answered at block {n(timeline.blockNumber)}.
         </p>
-      ) : (
+      ) : onEventPage ? null : (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-reconciled">
           Every share transfer this address sent or received on this vault, newest first, replayed into the balance the
           vault itself reports.{" "}
@@ -282,7 +288,7 @@ export function MorphoBaseVaultTimeline({
         </p>
       )}
 
-      {drawn && (
+      {drawn && !onEventPage && (
         <p className="mt-2 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="timeline-exponent">
           <Prov info={morphoVaultTimelineExponentProv(coords, shareDecimals, assetDecimals, decimalsOffset)}>
             Every share price below is <code>convertToAssets(10^{shareDecimals})</code>, the {shareDecimals} being this
@@ -323,6 +329,16 @@ export function MorphoBaseVaultTimeline({
             // The two spellings must agree — a prefix that missed the vault
             // would force a key no card ever reads.
             persistKeyPrefix={`morpho-base-vault:${timeline.vault}`}
+            eventPage={(slot) =>
+              vaultExplorer.eventPage({
+                ...slot,
+                family: "morpho-base",
+                deployment: "base",
+                vaultName,
+                vault: timeline.vault,
+                holder: timeline.holder,
+              })
+            }
             renderCard={(event, meta) => {
               const row = byId.get(event.id);
               if (!row) return null;
@@ -380,7 +396,7 @@ export function MorphoBaseVaultTimeline({
         </div>
       )}
 
-      {drawn && (
+      {drawn && !onEventPage && (
         <p className="mt-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-figure="timeline-accrual">
           <Prov info={morphoVaultTimelineAccrualProv(coords)}>
             The vault&rsquo;s own accrual, and the curator&rsquo;s reallocations, are rows nowhere here.

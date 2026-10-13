@@ -39,7 +39,7 @@ function coverageChain(pathname: string | null): ChainId | undefined {
  *  `explorer` is what decides the rail offset below: an explorer route is
  *  under app/(app) and carries BrandRail from `md` up, a coverage page is
  *  marketing and carries none. */
-function unlaunchedSubject(pathname: string | null): { subject: string; explorer: boolean } | undefined {
+export function unlaunchedSubject(pathname: string | null): { subject: string; explorer: boolean } | undefined {
   const entry = protocolForPathname(pathname);
   if (entry) return entry.unlaunched ? { subject: explorerName(entry), explorer: true } : undefined;
   const chainId = coverageChain(pathname);
