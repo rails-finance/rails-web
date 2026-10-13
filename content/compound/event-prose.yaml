@@ -223,6 +223,78 @@ words:
     time
   time_many: |-
     times
+  # T2's balance sheet (ui-jobs 330): the side's name where it holds only lent
+  # base, the event's words where the base crosses zero, the Risk and Limits
+  # rows, the parameter rows and the words for a figure the page does not hold.
+  sheet_lent_side: |-
+    Lent
+  sheet_supply: |-
+    Supply
+  sheet_repay: |-
+    Repay
+  sheet_withdraw: |-
+    Withdraw
+  sheet_borrow: |-
+    Borrow
+  sheet_limit_used: |-
+    Borrowing limit used
+  sheet_fall: |-
+    Collateral can fall
+  sheet_borrowable: |-
+    Still borrowable
+  sheet_borrow_rate: |-
+    Borrow rate
+  sheet_borrow_factor: |-
+    {symbol} borrow collateral factor
+  sheet_liquidate_factor: |-
+    {symbol} liquidate collateral factor
+  sheet_unread: |-
+    Not read on this page
+  sheet_no_debt: |-
+    No debt
+  sheet_no_collateral: |-
+    No collateral
+  sheet_no_price: |-
+    A price here was not read
+  # The sheet's read-more, one per row: what the figure is and where it is read.
+  tip_coll_last: |-
+    This side's total in dollars once the previous event had run, from the page's replay of the position's rows at the Comet's oracle prices then.
+  tip_coll_interest: |-
+    The interest the lent {symbol} earned since the previous event, at the Comet's oracle price at this event.
+  tip_coll_market: |-
+    The change the Comet's oracle prices made to the dollar value of the assets on this side between the previous event and this one.
+  tip_coll_before: |-
+    This side's total in dollars just before this event, each asset at the Comet's oracle price at this event.
+  tip_coll_event: |-
+    The {symbol} this event moved on this side, as its log states it, at the Comet's oracle price at this event.
+  tip_coll_total: |-
+    This side's total in dollars after this event: each asset posted and any lent {symbol}, at the Comet's oracle prices at this event.
+  tip_debt_last: |-
+    The {symbol} owed once the previous event had run, at the Comet's oracle price then.
+  tip_debt_interest: |-
+    The interest the Comet charged on the borrowed {symbol} since the previous event, at its oracle price at this event.
+  tip_debt_market: |-
+    The change the Comet's oracle price for {symbol} made to the dollar value of the debt between the previous event and this one.
+  tip_debt_before: |-
+    The {symbol} owed just before this event, interest included, at the Comet's oracle price at this event.
+  tip_debt_event: |-
+    The {symbol} this event moved on the debt, as its log states it, at the Comet's oracle price at this event.
+  tip_debt_repaid: |-
+    The base asset this account once borrowed and owes none of after this event.
+  tip_debt_total: |-
+    The {symbol} owed after this event, the Comet's borrow balance, at its oracle price at this event.
+  tip_limit_used: |-
+    The debt as a share of the borrowing limit, which each collateral asset's value times its borrow collateral factor sets.
+  tip_fall: |-
+    How far the collateral's total value can fall, the debt held, before the debt crosses the liquidation line and anyone can absorb the account.
+  tip_borrowable: |-
+    What the account could still borrow after this event: the borrowing limit less the debt, in dollars.
+  tip_borrow_rate: |-
+    The market's yearly borrow rate just before this event, the Comet's getBorrowRate at its utilisation, read at the block before.
+  tip_borrow_factor: |-
+    The share of the {symbol} posted that counts toward the borrowing limit, from the Comet's asset settings.
+  tip_liquidate_factor: |-
+    The share of the {symbol} posted that counts toward the liquidation line, from the Comet's asset settings.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk and History when two of them hold two or more bullets

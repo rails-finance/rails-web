@@ -24,6 +24,7 @@ import { fmtPositionUsd } from "@/components/shared/position-row";
 import { Prov } from "@/components/shared/provenance";
 import {
   CompoundAbsorbBreakdown,
+  useAbsorbFactors,
   type CompoundPreviousRow,
 } from "@/components/protocol/compound/compound-absorb-breakdown";
 import { compoundAmount, compoundBaseBefore, impliedYearlyRate, isBaseDust } from "@/lib/compound/row-facts";
@@ -47,7 +48,10 @@ import {
   replayHeldProv,
   type CompoundCoords,
 } from "@/lib/compound/event-provenance";
-import { CompoundRateNote } from "@/components/protocol/compound/compound-rate-note";
+import { CompoundRateNote, useCompoundRates } from "@/components/protocol/compound/compound-rate-note";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import type { Provenance } from "@/components/shared/provenance";
+import { compoundEventSheet } from "./compound-event-sheet";
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -66,6 +70,8 @@ export interface CompoundCellsInput {
   previousTx?: CompoundPreviousRow;
   /** The timeline event, for the cells' ledgers. */
   eventId: string;
+  /** The event's word ("Supply collateral"), naming the sheet's rows. */
+  label: string;
 }
 
 /** A before within one unit of zero is Comet's rounding: it reads as zero,
@@ -105,7 +111,14 @@ export function useCompoundCells({
   previous,
   previousTx,
   eventId,
-}: CompoundCellsInput): { cells: EventCells; ledgers: EventCardLedgers; notes: ReactNode; prices: EventPriceChip[] } {
+  label,
+}: CompoundCellsInput): {
+  cells: EventCells;
+  sheet: EventSheet | null | undefined;
+  ledgers: EventCardLedgers;
+  notes: ReactNode;
+  prices: EventPriceChip[];
+} {
   const m = useCometMarket(ctx.market);
   const ledgerState = useCompoundLedgerState(eventId);
   const rp = useContext(CompoundFlowReplayContext);
@@ -220,24 +233,23 @@ export function useCompoundCells({
     };
   };
 
+  /** The touched collateral asset's change receipt. */
+  const collChangeProv = (collCoords: CompoundCoords): Provenance =>
+    ctx.eventType === "absorb_collateral"
+      ? absorbCollateralProv(ctx.assetSymbol, collCoords)
+      : ctx.eventType === "transfer_collateral_in" || ctx.eventType === "transfer_collateral_out"
+        ? transferCollateralProv(ctx.assetSymbol, ctx.eventType === "transfer_collateral_in" ? "in" : "out", collCoords)
+        : collateralDeltaProv(
+            ctx.assetSymbol,
+            ctx.eventType === "supply_collateral" ? "supply" : "withdraw",
+            collCoords,
+          );
+
   /** The touched collateral asset's stat. */
   const collStat = (): ChainTruthStat | null => {
     if (ctx.isBase) return null;
     const collCoords: CompoundCoords = { ...coords, asset: undefined };
-    const changeProv =
-      ctx.eventType === "absorb_collateral"
-        ? absorbCollateralProv(ctx.assetSymbol, collCoords)
-        : ctx.eventType === "transfer_collateral_in" || ctx.eventType === "transfer_collateral_out"
-          ? transferCollateralProv(
-              ctx.assetSymbol,
-              ctx.eventType === "transfer_collateral_in" ? "in" : "out",
-              collCoords,
-            )
-          : collateralDeltaProv(
-              ctx.assetSymbol,
-              ctx.eventType === "supply_collateral" ? "supply" : "withdraw",
-              collCoords,
-            );
+    const changeProv = collChangeProv(collCoords);
     return {
       label: SIDE_NAME.collateral,
       value: fmt(ctx.collateralAfter),
@@ -380,6 +392,38 @@ export function useCompoundCells({
     previous != null &&
     blockNumber != null &&
     previous.blockNumber < blockNumber;
+  // The market's rates and an absorb's factors, as the note and the
+  // breakdown read them while the card is open.
+  const rates = useCompoundRates(
+    coords.chainId,
+    m.key,
+    showRates ? previous?.blockNumber : undefined,
+    showRates ? blockNumber : undefined,
+  );
+  const absorbRead = useAbsorbFactors(coords, m.key, ctx.eventType === "absorb_debt");
+
+  // The balance sheet (ui-jobs 330): from the replay where the page has one,
+  // pending while it is on its way; the cells stand elsewhere.
+  const sheet: EventSheet | null | undefined =
+    ledgerState === "pending"
+      ? null
+      : ledgerState === "ready" && rp
+        ? compoundEventSheet({
+            rp,
+            eventId,
+            ctx,
+            coords,
+            label,
+            previous,
+            move: ctx.isBase
+              ? { info: baseChangeProv, delta: ctx.assetsDelta }
+              : { info: collChangeProv({ ...coords, asset: undefined }), delta: ctx.assetsDelta },
+            rates,
+            absorb: absorbRead,
+            unsettled: unreadBalanceText(balanceRead),
+          })
+        : undefined;
+
   const notes =
     showRates || ctx.eventType === "absorb_debt" ? (
       <>
@@ -406,6 +450,7 @@ export function useCompoundCells({
 
   return {
     cells,
+    sheet,
     ledgers: {
       provider: (children) =>
         ledgerState == null ? (
