@@ -174,6 +174,21 @@
 //
 //   BASE=http://localhost:3000 node scripts/verify/verify-timeline-boundary-card.mjs
 //   ONLY=spark,vault-eth …   run a subset (fixture ids)
+//   ONLY=rewind               the rewind run alone (below)
+//
+// ── THE REWIND RUN (ui-jobs 305) ───────────────────────────────────────────
+//   On the Liquity V2 control Trove, the cut the Lifetime flows chart puts on
+//   the timeline, in both modes of "Timeline follows the chart"
+//   (`[data-flow-follow]`, stored as `followChart` in timeline-display-v3):
+//   R1 off: the arrow keys move the chart and cut nothing; "Show timeline to
+//      {date}" cuts at the cursor's day, writes `?to=`, and the cut stands
+//      while the cursor moves on.
+//   R2 on: no button is drawn; each step of the cursor cuts the list there,
+//      the chip names the cursor's day, the newest drawn day is on or before
+//      it, the page does not scroll, and `?to=` stays out of the address bar
+//      while the cursor is free. A freeze (Enter) writes `?to=` for its day;
+//      the link reopens on that day with the chip; the chip's × sends the
+//      cursor to the close and the list goes whole.
 //
 // ── PROVED IT CAN FAIL ──────────────────────────────────────────────────────
 //   2026-09-10 (the card): its label pointed at `omitted + 1` (a one-line edit
@@ -1564,6 +1579,152 @@ for (const f of FIXTURES) {
     check(`0  ${f.id}: the page answered`, false, String(err?.message ?? err).slice(0, 200));
   } finally {
     await page.close();
+    console.log("");
+  }
+}
+
+// ── The rewind run (ui-jobs 305) ───────────────────────────────────────────
+const REWIND_PATH =
+  "/ethereum/liquity-v2/trove/rETH/15819037836432619065432019909407415740867073754834407017193922594371690360030";
+/** The rewind's state as the page draws it. */
+const rewindRead = (page) =>
+  page.evaluate(() => {
+    const days = [...document.querySelectorAll("[data-flow-day-mark]")].map((m) =>
+      Number(m.getAttribute("data-flow-day-mark")),
+    );
+    return {
+      to: new URL(location.href).searchParams.get("to"),
+      chip:
+        document
+          .querySelector("[data-flow-rewind-go]")
+          ?.textContent?.trim()
+          .replace(/^Timeline to /, "") ?? null,
+      date: document.querySelector("[data-flow-date]")?.textContent?.trim() ?? null,
+      cards: document.querySelectorAll("[data-event-id]").length,
+      newest: days.length ? Math.max(...days) : null,
+      apply: document.querySelector("[data-flow-apply]") != null,
+      follow: document.querySelector("[data-flow-follow]")?.getAttribute("data-flow-follow") ?? null,
+      y: Math.round(window.scrollY),
+    };
+  });
+/** The chart's day in words ("3 Feb '26") as a UTC day number. */
+const dayOfWord = (w) => {
+  const m = /^(\d{1,2}) (\w{3}) '(\d{2})$/.exec(w ?? "");
+  if (!m) return null;
+  return (
+    Date.UTC(2000 + Number(m[3]), "JanFebMarAprMayJunJulAugSepOctNovDec".indexOf(m[2]) / 3, Number(m[1])) / 86_400_000
+  );
+};
+for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
+  const mode = follow ? "on" : "off";
+  const rctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: "light" });
+  await rctx.addInitScript(INIT);
+  await rctx.addInitScript(`
+    try {
+      const k = "timeline-display-v3";
+      const cur = JSON.parse(localStorage.getItem(k) || "{}");
+      localStorage.setItem(k, JSON.stringify({ ...cur, followChart: ${follow} }));
+    } catch {}
+  `);
+  const page = await rctx.newPage();
+  page.setDefaultTimeout(180_000);
+  try {
+    await page.goto(`${BASE}${REWIND_PATH}`, { waitUntil: "domcontentloaded" });
+    await page.locator(`[data-flow-follow="${mode}"]`).first().waitFor({ state: "visible" });
+    await page.waitForFunction(() => document.querySelector("[data-ctrl-waking]") == null, null, { timeout: 120_000 });
+    await page.waitForFunction(() => document.querySelector("[data-flow-day-mark]") != null);
+    await page.waitForTimeout(1500);
+    // Focused first, so the scroll a key press brings is taken before the
+    // page's place is read.
+    const strip = page.locator("[data-flow-strip]").first();
+    await strip.focus();
+    await page.waitForTimeout(200);
+    const step = async (key) => {
+      await strip.press(key);
+      await page.waitForTimeout(300);
+      return rewindRead(page);
+    };
+    const whole = await rewindRead(page);
+    check(
+      `R  ${mode}: the page opens whole, no chip, no ?to=`,
+      whole.chip == null && whole.to == null,
+      JSON.stringify(whole),
+    );
+    if (!follow) {
+      const moved = await step("ArrowLeft");
+      check(
+        "R1 off: a step moves the chart and cuts nothing",
+        moved.chip == null && moved.cards === whole.cards && moved.date !== whole.date && moved.apply,
+        JSON.stringify(moved),
+      );
+      await page.locator("[data-flow-apply]").first().click();
+      await page.waitForTimeout(500);
+      const cut = await rewindRead(page);
+      check(
+        "R1 off: the button cuts at the cursor's day and writes ?to=",
+        cut.chip === moved.date &&
+          cut.to != null &&
+          dayOfWord(cut.chip) === Date.parse(`${cut.to}T00:00:00Z`) / 86_400_000,
+        JSON.stringify(cut),
+      );
+      const after = await step("ArrowLeft");
+      check(
+        "R1 off: the cut stands while the cursor moves on",
+        after.chip === cut.chip && after.to === cut.to && after.date !== cut.date,
+        JSON.stringify(after),
+      );
+    } else {
+      check("R2 on: no show-timeline button is drawn", !whole.apply, JSON.stringify(whole));
+      const seen = [];
+      for (const key of ["ArrowLeft", "ArrowLeft", "ArrowLeft", "ArrowRight"]) {
+        const r = await step(key);
+        seen.push(r);
+        const cutDay = dayOfWord(r.chip);
+        check(
+          `R2 on: ${key} cuts at the cursor's day (${r.date})`,
+          r.chip != null && r.chip === r.date && cutDay != null && (r.newest == null || r.newest <= cutDay),
+          JSON.stringify(r),
+        );
+        check(
+          `R2 on: ${key} leaves ?to= out and the page where it is`,
+          r.to == null && r.y === whole.y,
+          JSON.stringify(r),
+        );
+      }
+      check(
+        "R2 on: the cut moves with the steps",
+        new Set(seen.map((r) => r.chip)).size >= 3,
+        seen.map((r) => r.chip).join(" → "),
+      );
+      const frozen = await step("Enter");
+      check(
+        "R2 on: a freeze writes ?to= for its day",
+        frozen.to != null && dayOfWord(frozen.chip) === Date.parse(`${frozen.to}T00:00:00Z`) / 86_400_000,
+        JSON.stringify(frozen),
+      );
+      const link = page.url();
+      await page.locator("[data-flow-rewind-release]").first().click();
+      await page.waitForTimeout(500);
+      const released = await rewindRead(page);
+      check(
+        "R2 on: the chip's × sends the cursor to the close and the list goes whole",
+        released.chip == null && released.to == null && released.cards === whole.cards,
+        JSON.stringify(released),
+      );
+      await page.goto(link, { waitUntil: "domcontentloaded" });
+      await page.locator("[data-flow-rewind-chip]").first().waitFor({ state: "visible" });
+      await page.waitForTimeout(1500);
+      const reopened = await rewindRead(page);
+      check(
+        "R2 on: the frozen link reopens on its day",
+        reopened.chip === frozen.chip && reopened.date === frozen.chip && reopened.to === frozen.to,
+        JSON.stringify(reopened),
+      );
+    }
+  } catch (err) {
+    check(`R  ${mode}: the page answered`, false, String(err?.message ?? err).slice(0, 200));
+  } finally {
+    await rctx.close();
     console.log("");
   }
 }
