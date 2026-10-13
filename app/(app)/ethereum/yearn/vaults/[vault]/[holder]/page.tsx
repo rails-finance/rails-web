@@ -84,7 +84,15 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
  *
  *  Rendered inside a `<Suspense>` because its reads are log sweeps and the rest
  *  of the page is `eth_call`s that have already answered. */
-async function YearnTimelineSection({ data, holder }: { data: YearnVaultResponse; holder: string }) {
+async function YearnTimelineSection({
+  data,
+  holder,
+  onEventPage,
+}: {
+  data: YearnVaultResponse;
+  holder: string;
+  onEventPage: boolean;
+}) {
   // Without the vault's own `decimals()` there is no exponent to ask a share
   // price with, and inventing one would print a 6-decimal price 1e12 too large.
   // No reading, so no rows.
@@ -133,7 +141,7 @@ async function YearnTimelineSection({ data, holder }: { data: YearnVaultResponse
     <>
       {/* The lifetime flows, drawn under exactly the condition the rows are —
           the feeder answers null on every path the gate refused. */}
-      {data.holder && (
+      {!onEventPage && data.holder && (
         <VaultFlowsTower
           computed={economics}
           holder={holder}
@@ -173,7 +181,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function YearnVaultHoldingPage({ params }: Props) {
-  const { vault, holder } = await params;
+  const { vault, holder, eventId } = (await params) as Awaited<Props["params"]> & { eventId?: string };
+  // The event route re-renders this page (ui-jobs 236): the sub-nav and the
+  // event's card beside the shared column, nothing else.
+  const onEventPage = eventId != null;
   const address = vault.toLowerCase();
   // Catalogue membership is the served set, exactly as on the factsheet: a miss
   // means "not in this census", never "not a Yearn V3 vault".
@@ -227,25 +238,28 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
             priceReason={ORACLE_USD_REASON["yearn"]}
             owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
           />
-          <h1 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
-            <span className="font-mono">{subject}</span>
-            <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>
-          </h1>
-          {/* How the subject was REACHED — a fact about the page rather than
+          {!onEventPage && (
+            <>
+              <h1 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
+                <span className="font-mono">{subject}</span>
+                <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>
+              </h1>
+              {/* How the subject was REACHED — a fact about the page rather than
               about the address, and stated here because the header is always
               drawn. */}
-          {lookup.kind === "ens" && lookup.address && (
-            <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
-              {lookup.typed} · resolved through mainnet ENS
-            </p>
+              {lookup.kind === "ens" && lookup.address && (
+                <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
+                  {lookup.typed} · resolved through mainnet ENS
+                </p>
+              )}
+            </>
           )}
-
           {data.chainStale ? (
             <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
               This vault could not be read from chain just now, so no figure is stated for this address in it. The page
               states nothing it could not read.
             </p>
-          ) : (
+          ) : onEventPage ? null : (
             <>
               <p className="mt-2 text-[12px] text-rb-500">
                 Yearn V3 {data.vault.apiVersion} · asset{" "}
@@ -306,7 +320,7 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
               </div>
             }
           >
-            <YearnTimelineSection data={data} holder={data.holder.address} />
+            <YearnTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
           </Suspense>
         )}
 

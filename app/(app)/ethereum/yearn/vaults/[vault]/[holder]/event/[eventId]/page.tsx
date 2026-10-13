@@ -35,6 +35,7 @@
 import type { Metadata } from "next";
 
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { vaultEventPageDescription } from "@/lib/vaults/explorer";
 import { yearnVaultHref } from "@/lib/vaults/routes";
 import { yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import YearnVaultHoldingPage from "../../page";
@@ -59,12 +60,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { vault, holder, eventId } = await params;
   const address = vault.toLowerCase();
   const decoded = decodeEventId(eventId);
+  const vaultName = (await yearnRosterEntry(address))?.name;
   return eventMetadata({
     session: "yearn",
     subject: ADDRESS.test(holder) ? holder.toLowerCase() : decodeURIComponent(holder),
-    market: (await yearnRosterEntry(address))?.name,
+    market: vaultName,
     canonicalPath: `${yearnVaultHref(address, holder)}/event/${encodeURIComponent(decoded)}`,
     event: null,
+    description: vaultEventPageDescription(
+      "yearn",
+      "ethereum",
+      vaultName ?? null,
+      address,
+      ADDRESS.test(holder) ? holder.toLowerCase() : holder,
+      null,
+    ),
     image: "explorer",
   });
 }
