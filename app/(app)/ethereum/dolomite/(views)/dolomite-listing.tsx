@@ -39,7 +39,7 @@ export function DolomiteListing({ initialItems, initialTotal, initialKey, initia
       defaults={DOLOMITE_LIST_DEFAULTS}
       sortOptions={DOLOMITE_SORT_OPTIONS}
       searchPlaceholder="Search owner address"
-      renderCard={(p) => <DolomitePositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <DolomitePositionCard v={viewFromSummary(p)} surface="listing" />}
       hrefFor={(p) => `/ethereum/dolomite/${p.owner}/${p.accountNumber}`}
       keyFor={(p) => `${p.owner}-${p.accountNumber}`}
       strategy={serverStrategy<DolomitePositionSummary, DolomiteListFilters>({

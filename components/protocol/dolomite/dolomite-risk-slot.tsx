@@ -1,15 +1,13 @@
 "use client";
 
-// The Dolomite position card's margin ratio (ui-jobs 209): the third headline
-// and the lines under it in the opened layer, from the page's live core read.
-// The ratio is the core's own adjusted supply ÷ adjusted borrow; the line is
-// the core's own requirement for exactly this account (the risk override where
-// one is set). The adjusted debt, its share of the borrow capacity and the
-// capacity itself are stated in the card's Explanation.
+// The Dolomite position card's margin ratio and the panel rows that go with it,
+// from the page's live core read. The ratio is the core's adjusted supply ÷
+// adjusted borrow; the line is the core's requirement for this account (the
+// risk override where one is set). The adjusted debt, its share of the borrow
+// capacity and the capacity are stated in the card's Explanation.
 
 import { Prov } from "@/components/shared/provenance";
-import { StatValue } from "@/components/shared/stat-value";
-import { DolomiteRunway } from "@/components/protocol/dolomite/dolomite-runway";
+import type { PositionPanelRow } from "@/components/shared/position-card";
 import { dolomiteRequirementProv, dolomiteCollateralizationProv } from "@/lib/dolomite/live-provenance";
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
 
@@ -25,41 +23,40 @@ export function dolomiteHasRisk(chain: DolomiteChainResponse): boolean {
   );
 }
 
-/** The headline: the account's margin ratio. */
-export function DolomiteRiskHeadline({ chain }: { chain: DolomiteChainResponse }) {
+/** The headline figure: the account's margin ratio. */
+export function DolomiteMarginRatio({ chain }: { chain: DolomiteChainResponse }) {
   if (chain.collateralization == null) return null;
-  return (
-    <StatValue>
-      <Prov info={dolomiteCollateralizationProv()}>{pct2(chain.collateralization)}</Prov>
-    </StatValue>
-  );
+  return <Prov info={dolomiteCollateralizationProv()}>{pct2(chain.collateralization)}</Prov>;
 }
 
-/** Under the headline: the fall that reaches the account's line, the line,
- *  and the distance bar. */
-export function DolomiteRiskDetail({ chain }: { chain: DolomiteChainResponse }) {
+/** The panel's liquidation rows: the fall that reaches the account's line, and
+ *  the line. */
+export function dolomiteRiskRows(chain: DolomiteChainResponse): PositionPanelRow[] {
   const c = chain.collateralization;
   const req = chain.requiredCollateralization;
-  if (c == null || req <= 0) return null;
+  if (c == null || req <= 0) return [];
   const dropPct = c > req ? Math.round((1 - req / c) * 100) : null;
-  return (
-    <>
-      <div className="text-xs mt-0.5 text-rb-500">
-        {dropPct != null && dropPct > 0 ? `Liquidates on a ${dropPct}% drop · ` : null}line at{" "}
+  return [
+    ...(dropPct != null && dropPct > 0
+      ? [
+          {
+            id: "liquidates-on-drop",
+            label: "Liquidates on a drop of",
+            value: <>{dropPct}%</>,
+            tip: "How far the collateral's value can fall, with the debt unchanged, before the margin ratio reaches the account's line. It is 1 minus the line divided by the margin ratio.",
+          },
+        ]
+      : []),
+    {
+      id: "liquidation-line",
+      label: "Liquidation line",
+      value: (
         <Prov info={dolomiteRequirementProv()}>
           {pct2(req)}
           {chain.override.active ? " (account override)" : ""}
         </Prov>
-      </div>
-      <div className="mt-1.5 max-w-72">
-        <DolomiteRunway
-          compact
-          barOnly
-          collateralization={c}
-          requiredCollateralization={req}
-          overrideActive={chain.override.active}
-        />
-      </div>
-    </>
-  );
+      ),
+      tip: "The margin ratio this account must keep, read from the Dolomite core for this account: the account's override where one is set, the global ratio otherwise. Below it the account can be liquidated.",
+    },
+  ];
 }
