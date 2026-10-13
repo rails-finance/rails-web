@@ -256,6 +256,7 @@ const FAMILIES = {
       "lib/polaris/event-templates.ts",
       "components/protocol/polaris/polaris-event-explainer.tsx",
       "components/protocol/polaris/polaris-position-explanation.tsx",
+      "components/protocol/polaris/polaris-sheet.ts",
     ],
     nodes: {
       section: "position_words",

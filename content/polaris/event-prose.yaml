@@ -194,6 +194,93 @@ words:
     stability gains
   leg_reward: |-
     reward pETH
+  # T2's balance sheet (ui-jobs 330): the event's rows, the Risk and Limits
+  # rows and the words for a figure the sheet cannot state.
+  sheet_open: |-
+    Open
+  sheet_close: |-
+    Close
+  sheet_add: |-
+    Add
+  sheet_withdraw: |-
+    Withdraw
+  sheet_borrow: |-
+    Borrow
+  sheet_repay: |-
+    Repay
+  sheet_reward: |-
+    Reward pETH
+  sheet_psm: |-
+    Net PSM share
+  sheet_stability_gain: |-
+    Stability gain
+  sheet_settled: |-
+    Settled to zero
+  sheet_closed: |-
+    Closed
+  sheet_no_debt: |-
+    No debt
+  sheet_no_price: |-
+    No price read at this block
+  sheet_no_rate: |-
+    No rate set yet
+  sheet_not_read: |-
+    Not read on this page
+  collateral_ratio: |-
+    Collateral ratio
+  liquidates_at: |-
+    Liquidates at
+  primary_rate: |-
+    Primary rate
+  reserve_to_debt: |-
+    Reserve-to-debt ratio
+  minimum_ratio: |-
+    Minimum ratio
+  liquidation_penalty: |-
+    Liquidation penalty, stability pool
+  # The sheet's read-more, one per row: what the figure is and where it is read.
+  tip_coll_last: |-
+    The CDP's pETH after its previous event, from the CDPManager's log.
+  tip_coll_before: |-
+    The CDP's pETH just before this event: what the previous event left, at this block's pETH price.
+  tip_coll_event: |-
+    The pETH the holder moved at this event, from the CDPManager's log, at this block's pETH price.
+  tip_coll_reward: |-
+    The reward pETH the CDP's share of the bonding curve's rewards added to its collateral at this event, from the CDPManager's log.
+  tip_coll_psm: |-
+    The CDP's share of the pETH the market's PSM moved since the previous event, settled at this event, from the CDPManager's log.
+  tip_coll_total: |-
+    The CDP's pETH after this event, from the CDPManager's log, in dollars at this block's pETH price.
+  tip_debt_last: |-
+    The CDP's debt after its previous event, from the CDPManager's log.
+  tip_debt_interest: |-
+    The interest charged into the debt since the previous event, from the CDPManager's log.
+  tip_debt_interest_asset: |-
+    The interest in the market's stablecoin, valued at its price at this block.
+  tip_debt_before: |-
+    The debt just before this event: the previous event's debt plus the interest charged since.
+  tip_debt_event: |-
+    The stablecoin the holder borrowed or repaid at this event, from the CDPManager's log.
+  tip_debt_gain: |-
+    The CDP's share of the market's revenue, credited against the debt at this event, from the CDPManager's log.
+  tip_debt_psm: |-
+    The CDP's share of the debt the market's PSM moved since the previous event, settled at this event, from the CDPManager's log.
+  tip_debt_settled: |-
+    The stablecoin added so the debt lands on zero when the gains and the PSM share clear more than was owed, from the CDPManager's log.
+  tip_debt_total: |-
+    The CDP's debt after this event, from the CDPManager's log, in dollars at the stablecoin's price at this block.
+  tip_cr: |-
+    The collateral's value divided by the debt after this event, both in the market's stablecoin, at the market's pETH price at this block.
+  tip_liquidates_at: |-
+    The pETH price, in the market's stablecoin, at which the CDP's collateral ratio meets the minimum: the debt times the minimum ratio, divided by the collateral.
+  tip_primary_rate: |-
+    The part of the market's interest rate that follows its stablecoin's peg, set by the market and read from its last rate event at this block.
+  tip_reserve_to_debt: |-
+    The market's reserve divided by its debt, which sets the secondary interest rate and the market's defensive mode.
+  tip_minimum_ratio: |-
+    The collateral ratio below which the CDP can be liquidated, in the market's normal mode.
+  tip_liquidation_penalty: |-
+    The share of the seized collateral that goes as a penalty when the stability pool absorbs a liquidation, a constant of the market's contracts.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
