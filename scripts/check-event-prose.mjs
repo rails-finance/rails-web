@@ -394,6 +394,7 @@ const FAMILIES = {
       "lib/morpho/event-templates.ts",
       "components/protocol/morpho/morpho-event-explainer.tsx",
       "components/protocol/morpho/morpho-position-explanation.tsx",
+      "components/protocol/morpho/morpho-sheet.ts",
     ],
     nodes: {
       section: "position_words",
