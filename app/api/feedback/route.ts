@@ -14,6 +14,7 @@ const TYPE_LABELS = {
   bug: "\u{1F6E0} Bug report",
   data: "\u{1F4CA} Data correction",
   feature: "\u{1F4A1} Feature request",
+  general: "\u{1F4AC} General feedback",
 } as const;
 type FeedbackType = keyof typeof TYPE_LABELS;
 
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
   // 4. Manual validation (no deps; matches the repo's route convention).
   const rawType = body.type;
-  if (rawType !== "bug" && rawType !== "data" && rawType !== "feature") return invalid();
+  if (rawType !== "bug" && rawType !== "data" && rawType !== "feature" && rawType !== "general") return invalid();
   const type: FeedbackType = rawType;
   const title = clean(body.title);
   const description = clean(body.description);

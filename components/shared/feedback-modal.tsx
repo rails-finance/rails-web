@@ -4,24 +4,28 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 
-// Footer feedback modal — Bug report / Data correction / Feature request.
+// Footer feedback modal — Bug / Correctness / Request / General.
 // Mirrors DonateModal's shell (portal, mounted gate, Esc close, body scroll
 // lock) and POSTs to /api/feedback, which relays to the private team chat.
 // The hidden "website" field is a honeypot: readers never see it, so a
 // non-empty value marks the submission as bot traffic.
 
-type FeedbackType = "bug" | "data" | "feature";
+// The stored values (bug, data, feature) predate the labels and stay; only
+// the visible words changed. "general" is the open-ended feedback type.
+export type FeedbackType = "bug" | "data" | "feature" | "general";
 
 const CATEGORIES: { value: FeedbackType; label: string }[] = [
-  { value: "bug", label: "Bug report" },
-  { value: "data", label: "Data correction" },
-  { value: "feature", label: "Feature request" },
+  { value: "bug", label: "Bug" },
+  { value: "data", label: "Correctness" },
+  { value: "feature", label: "Request" },
+  { value: "general", label: "General" },
 ];
 
 const DESCRIPTION_PLACEHOLDER: Record<FeedbackType, string> = {
   bug: "What happened, and what was expected instead? Steps to reproduce help.",
   data: "Which number looks wrong, and what was expected? A link or tx hash helps.",
   feature: "What should the explorer surface, and where would it help?",
+  general: "What's working, what isn't, what you'd like to see?",
 };
 
 const FIELD_CLASSES = "w-full rounded-xl border border-rb-200 dark:border-rb-700 px-3 py-2 text-sm input-focus";
@@ -185,7 +189,7 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
                 Page: <span className="font-mono break-all">{pathname}</span>
               </p>
 
-              {/* Title — bug/feature only */}
+              {/* Title — every type but Correctness */}
               {needsTitle && (
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-semibold tracking-widest text-rb-400 uppercase">Title</span>
