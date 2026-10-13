@@ -17,8 +17,11 @@
 // (change-swap-value.tsx), the protocol's parameters as muted rows with the
 // breakdown on.
 //
-// Under 640px one value column is drawn, the asset figure or the USD, picked by
-// the asset | USD switch at the sheet's top; a row with no figure in the picked
+// A row above the panels holds the card's breakdown switch, "Show breakdown" /
+// "Hide breakdown", which changes this card alone and starts off each time the
+// card opens; an event's page draws the breakdown with no switch. Under 640px
+// one value column is drawn, the asset figure or the USD, picked by the
+// asset | USD switch at the other end of that row; a row with no figure in the picked
 // column draws the other.
 
 import { useState, type ReactNode } from "react";
@@ -124,6 +127,8 @@ const WORDS = {
   untouched: "Not changed by this event",
   repaid: (n: number) => `${n} repaid ${n === 1 ? "asset" : "assets"}`,
   column: "Column shown",
+  show: "Show breakdown",
+  hide: "Hide breakdown",
   tokens: "Asset",
   usd: "USD",
 };
@@ -339,9 +344,10 @@ function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
   );
 }
 
-/** The sheet, drawn from the `sheet` slot. `breakdown`: the timeline's switch,
- *  always on an event page. `data` marks the sheet (the state of the read its
- *  figures come from). */
+/** The sheet, drawn from the `sheet` slot. `breakdown`: the breakdown stands
+ *  with no switch (an event's page); else the card's switch, off at first,
+ *  shows it. `data` marks the sheet (the state of the read its figures come
+ *  from). */
 export function EventSheetView({
   sheet,
   breakdown,
@@ -352,14 +358,35 @@ export function EventSheetView({
   data?: Record<string, string>;
 }) {
   const [col, setCol] = useState<Col>("usd");
+  const [shown, setShown] = useState(false);
+  const on = breakdown || shown;
   return (
-    <div className="px-5 py-2" data-sheet="" data-sheet-breakdown={breakdown ? "on" : "off"} {...data}>
-      <div className="mb-2 flex justify-end sm:hidden">
+    <div className="px-5 py-2" data-sheet="" data-sheet-breakdown={on ? "on" : "off"} {...data}>
+      <div
+        className={`mb-2 flex items-center justify-between gap-3 ${breakdown ? "sm:hidden" : ""}`}
+        data-sheet-controls=""
+      >
+        {breakdown ? (
+          <span />
+        ) : (
+          <button
+            type="button"
+            aria-label={shown ? WORDS.hide : WORDS.show}
+            data-sheet-switch=""
+            onClick={(e) => {
+              e.stopPropagation();
+              setShown((v) => !v);
+            }}
+            className="min-h-7 rounded-md bg-sunken px-2.5 text-xs font-semibold text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 max-sm:min-h-9"
+          >
+            {shown ? WORDS.hide : WORDS.show}
+          </button>
+        )}
         <div
           role="group"
           aria-label={WORDS.column}
-          className="inline-flex shrink-0 rounded-md bg-sunken p-0.5 text-xs font-semibold"
-          data-sheet-switch=""
+          className="inline-flex shrink-0 rounded-md bg-sunken p-0.5 text-xs font-semibold sm:hidden"
+          data-sheet-column=""
         >
           {(["tokens", "usd"] as const).map((c) => (
             <button
@@ -379,12 +406,12 @@ export function EventSheetView({
       </div>
       <div className="flex flex-col gap-2.5">
         {sheet.sides.map((s) => (
-          <SidePanel key={s.side} s={s} breakdown={breakdown} col={col} />
+          <SidePanel key={s.side} s={s} breakdown={on} col={col} />
         ))}
         {sheet.panels.length > 0 && (
           <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2">
             {sheet.panels.map((p) => (
-              <StatPanel key={p.panel} p={p} breakdown={breakdown} />
+              <StatPanel key={p.panel} p={p} breakdown={on} />
             ))}
           </div>
         )}
