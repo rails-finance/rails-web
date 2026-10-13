@@ -457,11 +457,16 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   // The collateral's recorded prices, by day (the last each day), the
   // branch's daily series over them where the page read it (a day's close),
   // and today's.
-  const collObs = new Map<number, number>();
-  for (const r of replayed) if (!r.borrowedPrice && r.price > 0) collObs.set(Math.floor(r.ev.ts / DAY_S), r.price);
+  // Each day's price with the block it was read at (null where none is known).
+  const collObs = new Map<number, DayObs>();
+  for (const r of replayed)
+    if (!r.borrowedPrice && r.price > 0) {
+      const d = Math.floor(r.ev.ts / DAY_S);
+      collObs.set(d, [d, r.price, r.ev.block ?? null]);
+    }
   const daily = (o.dailyColl ?? []).filter(([d, usd]) => d <= today && usd > 0);
-  for (const [d, usd] of daily) collObs.set(d, usd);
-  if (livePrice != null && open) collObs.set(today, livePrice);
+  for (const [d, usd, block] of daily) collObs.set(d, [d, usd, block ?? null]);
+  if (livePrice != null && open) collObs.set(today, [today, livePrice, null]);
   // The debt's price each day from the first event to today (or the day after
   // the last event on a closed Trove).
   const debtObs: [number, number][] = [];
@@ -506,9 +511,12 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     },
     todayPrices: { [coll]: pricedNow, [debt]: 1 },
     dailyPrices: {
-      [coll]: [...collObs].sort((a, b) => a[0] - b[0]),
+      [coll]: [...collObs.values()].sort((a, b) => a[0] - b[0]),
       [debt]: debtObs,
     },
+    ...(daily.length > 0
+      ? { priceSource: "Liquity V2 branch PriceFeed, the last Trove operation's price each day" }
+      : {}),
     seriesCarry: true,
     carriedWhy: {
       [coll]:

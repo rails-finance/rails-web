@@ -13,6 +13,14 @@
 // the strip, the playback controls, and on a page tied to its timeline "Show
 // timeline to {date}". The line's key sits in the panel's Explanation and its basis
 // beside the (i).
+//
+// "Value · Price" on the control row (ui-jobs 328) swaps the strip in place:
+// the flows line, or one held asset's price in the family's unit
+// (`PriceStrip`, lib/shared/flows-price.ts), with the asset picker and the
+// readout at the cursor's day over it and the series' caption under it. Both
+// strips take one time axis (`stripGeometry`), one cursor and one pip row;
+// the bars, the end labels and the controls stay. The choice is a Display
+// preference; the control is drawn only where the panel has a price series.
 
 import {
   useCallback,
@@ -29,6 +37,21 @@ import { ChevronLeft, ChevronRight, Link2, ListEnd, Pause, Play, SkipBack, SkipF
 import { Headline, Rescaled, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import type { FlowsView } from "@/components/shared/timeline-display-context";
+import {
+  formatPrice,
+  formatPriceAxis,
+  labelWidth,
+  priceAxis,
+  pricePieces,
+  priceReadout,
+  STRIP_PAD,
+  stripGeometry,
+  type FlowPriceSeries,
+  type StripGeometry,
+} from "@/lib/shared/flows-price";
+import type { PriceAt } from "@/lib/shared/price-series";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -131,13 +154,6 @@ export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--colo
 const STRIP_H = 80;
 /** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
 const OLD_TIP_W = 282;
-/** The strip's inset each side. */
-const PAD = 8;
-/** The lead-in: the strip's time axis starts this share of its width before
- *  the first event's day, never under LEAD_MIN_PX, drawn at zero, so the first
- *  event never sits on the left border. */
-const LEAD_SHARE = 0.06;
-const LEAD_MIN_PX = 16;
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
 /** A walk of the whole line takes about this long, a point no faster than
  *  PLAY_MIN_MS nor slower than PLAY_MAX_MS. */
@@ -155,6 +171,8 @@ export interface CombinedFlowsProps {
   busy: boolean;
   /** The line's series, or null while it loads. */
   series: FlowBinSeries | null;
+  /** The held assets' price series, for the price view (none: no toggle). */
+  prices: FlowPriceSeries[];
   failed: boolean;
   /** A ledger's note while the cursor is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
@@ -169,6 +187,7 @@ export function CombinedFlows({
   from,
   busy,
   series,
+  prices,
   failed,
   onLedgerNote,
   renderBars,
@@ -233,6 +252,22 @@ export function CombinedFlows({
   // opens a short tip with its line, value and share.
   const focus = useFlowFocus();
   const byDays = focus != null;
+  // "Value · Price": the store's, which the page keeps level with Display's
+  // preference (`useFollowPreference`); a page without the store keeps it
+  // here, read once from the stored preferences.
+  const storeView = useFlowFocusState((s) => s.view);
+  const [ownView, setOwnView] = useState<FlowsView>("value");
+  useEffect(() => {
+    if (focus) return;
+    try {
+      const v = (JSON.parse(localStorage.getItem("timeline-display-v3") ?? "{}") as { flowsView?: unknown }).flowsView;
+      if (v === "price") setOwnView("price");
+    } catch {}
+  }, [focus]);
+  const view: FlowsView = prices.length === 0 ? "value" : focus ? storeView : ownView;
+  const setView = (v: FlowsView) => (focus ? focus.store.set({ view: v }) : setOwnView(v));
+  const [assetKey, setAssetKey] = useState<string | null>(null);
+  const priced = prices.find((p) => p.key === assetKey) ?? prices[0] ?? null;
   const [frozen, setFrozen] = useState(false);
   useEffect(() => {
     if (!frozen) return;
@@ -433,6 +468,27 @@ export function CombinedFlows({
     [atClose, closeDay, head.isLive, dateText, at, last, outside, byDays, stops],
   );
 
+  // The time axis both strips share: its lead-in holds the widest value label
+  // of either view, so a day sits on one x in both.
+  const [stripRef, w] = useWidth();
+  const today = series?.today ?? startDay + model.liveStop;
+  const span = axisSpanDays(startDay, today);
+  const lineScale = useMemo(() => lineStripScale(model, series, hasDebt), [model, series, hasDebt]);
+  const priceScales = useMemo(
+    () => new Map(prices.map((p) => [p.key, priceStripScale(p, startDay, today)])),
+    [prices, startDay, today],
+  );
+  const labelW = labelWidth([...lineScale.labels, ...[...priceScales.values()].flatMap((s) => s.labels)]);
+  const geo = useMemo(() => stripGeometry(w, startDay, today, span, labelW), [w, startDay, today, span, labelW]);
+  const xStop = (s: CombinedStop) => geo.xClose(s.live ? today : startDay + s.stop);
+  const atStop = stops[Math.min(at, last)];
+  const ready = view === "price" ? priced != null : lineScale.points.length > 0;
+  const cx = ready && atStop ? xStop(atStop) : STRIP_PAD + geo.inner;
+  const dim = ready && atStop != null && !atStop.live;
+  const cursorDay = cur.live ? today : startDay + cur.stop;
+  const cursorPrice = priced ? (priceReadout(priced, cursorDay, model.gapDays)?.point[1] ?? null) : null;
+  const sliderLabel = `Date, by ${(series?.bin ?? "week") === "day" ? "day" : `${series?.bin ?? "week"} and by day with events`}: moves the headlines and the bars`;
+
   return (
     <FlowCursorContext.Provider value={cursor}>
       <SegmentTipContext.Provider value={byDays || null}>
@@ -506,21 +562,99 @@ export function CombinedFlows({
           </Steady>
 
           <div {...KEEP_PANEL}>
-            <LineStrip
-              model={model}
-              series={series}
-              failed={failed}
-              stops={stops}
-              at={Math.min(at, last)}
-              head={{ collateral: head.collateral.now, debt: head.debt.now }}
-              hasDebt={hasDebt}
-              windowFrom={from > 0 ? model.start / DAY_MS + from : null}
-              valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
-              cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
-              onPick={go}
-              ends={{ start: dayStamp(dayStart(model, 0)), end: closed ? closeDay : "Today" }}
-              freeze={byDays ? { frozen, onTap: tapStop } : null}
-            />
+            <div ref={stripRef} className="mt-4">
+              {view === "price" && priced && (
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
+                  <PricePicker series={prices} selected={priced.key} onPick={setAssetKey} />
+                </div>
+              )}
+              <div className="relative">
+                <StripSlider
+                  geo={geo}
+                  w={w}
+                  stops={stops}
+                  at={Math.min(at, last)}
+                  xStop={xStop}
+                  cx={cx}
+                  ready={ready}
+                  ariaLabel={
+                    view === "price" && priced ? `${sliderLabel}, over the ${priced.asset.symbol} price` : sliderLabel
+                  }
+                  valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
+                  cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
+                  onPick={go}
+                  freeze={byDays ? { frozen, onTap: tapStop } : null}
+                  view={view}
+                  startDay={startDay}
+                >
+                  {view === "price" && priced ? (
+                    <PriceStrip
+                      s={priced}
+                      scale={priceScales.get(priced.key)!}
+                      geo={geo}
+                      w={w}
+                      today={today}
+                      cx={cx}
+                      dim={dim}
+                      cursorPrice={cursorPrice}
+                      windowFrom={from > 0 ? startDay + from : null}
+                      startDay={startDay}
+                    />
+                  ) : (
+                    <LineStrip
+                      model={model}
+                      scale={lineScale}
+                      failed={failed}
+                      geo={geo}
+                      w={w}
+                      today={today}
+                      cx={cx}
+                      dim={dim}
+                      ready={ready}
+                      head={{ collateral: head.collateral.now, debt: head.debt.now }}
+                      hasDebt={hasDebt}
+                      windowFrom={from > 0 ? startDay + from : null}
+                    />
+                  )}
+                </StripSlider>
+              </div>
+              {/* The event ticks, under the plot on the time axis, the cursor
+                  running through them; one row for both views. The keyboard
+                  hears each day's events through the slider's value. */}
+              <PipRow
+                model={model}
+                geo={geo}
+                w={w}
+                today={today}
+                stops={stops}
+                at={Math.min(at, last)}
+                cx={cx}
+                dim={dim}
+                ready={ready}
+                onPick={go}
+              />
+              {/* The first day sits under the end of the lead-in, and the end
+                  under today's close, a few px clear of the ticks. */}
+              <div className="mt-1.5">
+                <TrackEnds
+                  start={dayStamp(dayStart(model, 0))}
+                  end={closed ? closeDay : "Today"}
+                  startInset={w > 0 ? Math.max(0, geo.x0 - STRIP_PAD) : 0}
+                  endInset={w > 0 ? Math.max(0, STRIP_PAD + geo.inner - geo.xClose(today)) : 0}
+                />
+              </div>
+              {view === "price" && priced && (
+                <p
+                  className="mt-1 text-[11px] leading-snug text-rb-500"
+                  data-prov-exempt=""
+                  data-price-caption={priced.key}
+                >
+                  {priced.asset.symbol} in {priced.unitLabel}: {priced.source}
+                  {priced.grain === "event" ? ", one point per event" : ", one point per day"}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* The playback controls at the left; "Timeline follows the chart" and
@@ -529,46 +663,66 @@ export function CombinedFlows({
               the button the width the setting leaves. While the timeline follows
               the chart the button is not drawn. */}
           <div ref={rowRef} className="relative mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div
-              ref={controlsRef}
-              className="-ml-2 flex items-center gap-x-1"
-              data-flow-controls=""
-              data-anatomy="F5"
-              {...KEEP_PANEL}
-            >
-              <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
-                <SkipBack size={16} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className={btn}
-                aria-label={byDays ? "Previous day with events" : "Previous date"}
-                onClick={stepBack}
-              >
-                <ChevronLeft size={18} aria-hidden />
-              </button>
-              <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
-                {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
-              </button>
-              <button
-                type="button"
-                className={btn}
-                aria-label={byDays ? "Next day with events" : "Next date"}
-                onClick={stepOn}
-              >
-                <ChevronRight size={18} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className={btn}
-                aria-label={closed ? "Jump to close" : "Jump to today"}
-                onClick={() => {
-                  go(last);
-                  setFrozen(false);
-                }}
-              >
-                <SkipForward size={16} aria-hidden />
-              </button>
+            <div ref={controlsRef} className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="-ml-2 flex items-center gap-x-1" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
+                <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
+                  <SkipBack size={16} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={btn}
+                  aria-label={byDays ? "Previous day with events" : "Previous date"}
+                  onClick={stepBack}
+                >
+                  <ChevronLeft size={18} aria-hidden />
+                </button>
+                <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
+                  {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
+                </button>
+                <button
+                  type="button"
+                  className={btn}
+                  aria-label={byDays ? "Next day with events" : "Next date"}
+                  onClick={stepOn}
+                >
+                  <ChevronRight size={18} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={btn}
+                  aria-label={closed ? "Jump to close" : "Jump to today"}
+                  onClick={() => {
+                    go(last);
+                    setFrozen(false);
+                  }}
+                >
+                  <SkipForward size={16} aria-hidden />
+                </button>
+              </div>
+              {prices.length > 0 && (
+                <div
+                  className="inline-flex shrink-0 rounded-md border border-rb-200 p-0.5 dark:border-rb-700"
+                  role="group"
+                  aria-label="Strip"
+                  data-flows-view-toggle=""
+                  data-anatomy="F18"
+                  {...KEEP_PANEL}
+                >
+                  {(["value", "price"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={view === v}
+                      className={`${CTRL_GHOST} ${view === v ? CTRL_ON_ACCENT : CTRL_OFF} min-h-10 rounded px-2.5 text-xs font-semibold sm:min-h-8`}
+                      title={v === "value" ? "The collateral and debt line" : "Each held asset's price"}
+                      onClick={() => setView(v)}
+                      data-flows-view={v}
+                    >
+                      {v === "value" ? "Value" : "Price"}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {byDays && (
               <span
@@ -673,102 +827,43 @@ type Point = { to: number; collateral: number | null; debt: number | null };
 /** How near, in px, a pointer must be to an event tick to open it. */
 const TICK_REACH = { mouse: 6, touch: 14 };
 
-/** The collateral and debt line, short and unlabelled (the headlines carry the
- *  figures), with the event ticks over it and the bars' window shaded. Its
- *  horizontal axis is the slider; the cursor snaps to the nearest stop, and
- *  tapping a tick jumps to that day's events. */
-function LineStrip({
-  model,
-  series,
-  failed,
-  stops,
-  at,
-  head,
-  hasDebt,
-  windowFrom,
-  valueText,
-  cursorWord,
-  onPick,
-  ends,
-  freeze,
-}: {
-  model: FlowModel;
-  series: FlowBinSeries | null;
-  failed: boolean;
-  stops: CombinedStop[];
-  at: number;
-  /** The headlines' figures, where the cursor's dots sit. */
-  head: { collateral: number; debt: number };
-  hasDebt: boolean;
-  windowFrom: number | null;
-  valueText: string;
-  /** The cursor's day, over it while a press drags. */
-  cursorWord: string;
-  onPick: (i: number) => void;
-  /** The words under the strip's two ends: the first event's day, and today
-   *  or the close's day. */
-  ends: { start: string; end: string };
-  /** On a page that ties the panel to its timeline: a click or a tap
-   *  (a press that does not drag) freezes the cursor. */
-  freeze: { frozen: boolean; onTap: (i: number) => void } | null;
-}) {
-  const [ref, w] = useWidth();
-  const pipRef = useRef<HTMLDivElement>(null);
-  const [pip, setPip] = useState<{ x: number; text: string; day: number } | null>(null);
-  const dragging = useRef(false);
-  const startDay = model.start / DAY_MS;
+/** The flows line's points and value axes, fixed per position: the line's
+ *  points and every day's figures, so the cursor's dots stay inside the strip
+ *  on an event day too. Its value labels set the lead-in both strips share. */
+export function lineStripScale(model: FlowModel, series: FlowBinSeries | null, hasDebt: boolean) {
   // The last point is today's, at the live figures.
-  const points = useMemo<Point[]>(() => {
-    const out = (series?.points ?? []).map(([, to, collateral, debt]) => ({ to, collateral, debt }));
-    const tail = out[out.length - 1];
-    if (tail) {
-      tail.collateral = model.live.collateralUsd;
-      tail.debt = model.live.debtUsd;
-    }
-    return out;
-  }, [series, model.live]);
-  const n = points.length;
-  // Fixed per position: the line's points and every day's figures, so the
-  // cursor's dots stay inside the strip on an event day too.
-  const axis = useMemo(() => {
-    let peak = 0;
-    for (const p of points) peak = Math.max(peak, p.collateral ?? 0, hasDebt ? (p.debt ?? 0) : 0);
-    for (const v of model.valued) peak = Math.max(peak, v.collateral, hasDebt ? v.debt : 0);
-    return axisFor(peak);
-  }, [points, hasDebt, model.valued]);
+  const points: Point[] = (series?.points ?? []).map(([, to, collateral, debt]) => ({ to, collateral, debt }));
+  const tail = points[points.length - 1];
+  if (tail) {
+    tail.collateral = model.live.collateralUsd;
+    tail.debt = model.live.debtUsd;
+  }
+  let peak = 0;
+  for (const p of points) peak = Math.max(peak, p.collateral ?? 0, hasDebt ? (p.debt ?? 0) : 0);
+  for (const v of model.valued) peak = Math.max(peak, v.collateral, hasDebt ? v.debt : 0);
+  const axis = axisFor(peak);
   // Where the sides have no common unit (Frankencoin), each line on its own
   // axis, its top labelled in its token and hue.
   const sideUnits = model.sideUnits;
-  const axes = useMemo(() => {
-    if (!sideUnits) return null;
-    const peak = { collateral: 0, debt: 0 };
+  let axes: { collateral: { max: number; ticks: number[] }; debt: { max: number; ticks: number[] } } | null = null;
+  if (sideUnits) {
+    const pk = { collateral: 0, debt: 0 };
     for (const p of points) {
-      peak.collateral = Math.max(peak.collateral, p.collateral ?? 0);
-      peak.debt = Math.max(peak.debt, p.debt ?? 0);
+      pk.collateral = Math.max(pk.collateral, p.collateral ?? 0);
+      pk.debt = Math.max(pk.debt, p.debt ?? 0);
     }
     for (const v of model.valued) {
-      peak.collateral = Math.max(peak.collateral, v.collateral);
-      peak.debt = Math.max(peak.debt, v.debt);
+      pk.collateral = Math.max(pk.collateral, v.collateral);
+      pk.debt = Math.max(pk.debt, v.debt);
     }
-    return { collateral: axisFor(peak.collateral), debt: axisFor(peak.debt) };
-  }, [sideUnits, points, model.valued]);
-  // The time axis: the lead-in, then the start of the first event's day at
-  // `x0`, and the end of today at the right. A day's figures are its close,
-  // drawn at the end of that day, so a life of one day, today's included,
-  // still runs from the lead-in through the day to Today. The axis spans at
-  // least a week (axisSpanDays), so the stretch after a short life's last event keeps
-  // its length in days.
-  const today = series?.today ?? startDay + model.liveStop;
-  const span = axisSpanDays(startDay, today);
+    axes = { collateral: axisFor(pk.collateral), debt: axisFor(pk.debt) };
+  }
   // A token axis (Morpho) labels its values without the symbol.
   const axisLabel = (t: number) => (model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t));
-  const inner = Math.max(0, w - PAD * 2);
-  // The lead-in also holds the value labels, so it is never narrower than
-  // the widest of them (about 6px a character at 10px, and some air).
-  // Labels at least 24px apart: every k-th of the axis's ticks.
+  // Labels at least 24px apart: every k-th of the axis's ticks. A label that
+  // reads as the one under it ("$0" thrice on a position worth cents) is left
+  // out.
   const every = axis.ticks.length > 1 ? Math.ceil(24 / (((STRIP_H - 8) * axis.ticks[1]) / axis.max)) : 1;
-  // A label that reads as the one under it ("$0" thrice on a position worth
-  // cents) is left out.
   const yTicks = axes
     ? []
     : axis.ticks.filter((_, i) => i % every === 0).filter((t, i, a) => i === 0 || axisLabel(t) !== axisLabel(a[i - 1]));
@@ -781,36 +876,75 @@ function LineStrip({
           .filter((x) => x.t > 0)
           .map((x) => ({ k: x.k, t: x.t, text: formatFlowToken(x.t, sideUnits[x.k]) }))
       : [];
-  const labelW = Math.max(0, ...yTicks.map((t) => axisLabel(t).length), ...sideTops.map((x) => x.text.length)) * 6 + 8;
-  const lead = Math.max(LEAD_MIN_PX, labelW, Math.round(inner * LEAD_SHARE));
-  const x0 = PAD + Math.min(lead, inner);
-  const run = Math.max(0, PAD + inner - x0);
-  /** Where a day starts on the strip (absolute UTC day). */
-  const xDay = (day: number) => x0 + ((day - startDay) / span) * run;
-  /** Where a day's close sits: the end of that day. */
-  const xClose = (day: number) => xDay(Math.min(day, today) + 1);
-  const x = (i: number) => xClose(points[i].to);
-  const y = (v: number, k?: "collateral" | "debt") =>
-    STRIP_H - 2 - (v / (k && axes ? axes[k].max : axis.max)) * (STRIP_H - 8);
-  // A stop's place on the line: its day's close (the live stop at today's).
-  const xStop = (s: CombinedStop) => (s.live ? xClose(today) : xClose(startDay + s.stop));
+  return {
+    points,
+    axis,
+    axes,
+    axisLabel,
+    yTicks,
+    sideTops,
+    labels: [...yTicks.map(axisLabel), ...sideTops.map((x) => x.text)],
+  };
+}
+type LineScale = ReturnType<typeof lineStripScale>;
 
+/** The strip's frame, in either view: the slider over the plot. Its
+ *  horizontal axis is the shared time axis; the cursor snaps to the nearest
+ *  stop. Mouse, pen and touch scrub alike: only a press moves the cursor, a
+ *  drag carries it (held by pointer capture off the strip until release), and
+ *  hovering moves nothing. Where a press started tells a click or a tap
+ *  (which freezes, where the page has `freeze`) from a drag (which scrubs). */
+function StripSlider({
+  geo,
+  w,
+  stops,
+  at,
+  xStop,
+  cx,
+  ready,
+  ariaLabel,
+  valueText,
+  cursorWord,
+  onPick,
+  freeze,
+  view,
+  startDay,
+  children,
+}: {
+  geo: StripGeometry;
+  w: number;
+  stops: CombinedStop[];
+  at: number;
+  xStop: (s: CombinedStop) => number;
+  /** The cursor's x. */
+  cx: number;
+  /** The plot has something to scrub over. */
+  ready: boolean;
+  ariaLabel: string;
+  valueText: string;
+  /** The cursor's day, over it while a press drags. */
+  cursorWord: string;
+  onPick: (i: number) => void;
+  /** On a page that ties the panel to its timeline: a click or a tap (a press
+   *  that does not drag) freezes the cursor. */
+  freeze: { frozen: boolean; onTap: (i: number) => void } | null;
+  view: FlowsView;
+  startDay: number;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
   /** The stop nearest the pointer, on the strip's time axis. */
   const nearest = (clientX: number): number | null => {
     const el = ref.current;
-    if (!el || n === 0 || run <= 0) return null;
+    if (!el || !ready || geo.run <= 0) return null;
     const px = clientX - el.getBoundingClientRect().left;
-    const day = startDay + ((px - x0) / run) * span - 1;
-    const i = nearestStop(stops, day - startDay);
+    const i = nearestStop(stops, geo.dayAt(px) - startDay);
     // The live stop sits at today, which may lie past the last event's stop count.
     const last = stops.length - 1;
     if (i === last - 1 && Math.abs(xStop(stops[last]) - px) < Math.abs(xStop(stops[i]) - px)) return last;
     return i;
   };
-  // Mouse, pen and touch scrub alike: only a press moves the cursor, a drag
-  // carries it (held by pointer capture off the strip until release), and
-  // hovering moves nothing. Where a press started tells a click or a tap
-  // (which freezes, where the page has `freeze`) from a drag (which scrubs).
   const pressX = useRef<number | null>(null);
   const dragged = useRef(false);
   const [grabbing, setGrabbing] = useState(false);
@@ -868,9 +1002,630 @@ function LineStrip({
     else return;
     e.preventDefault();
   };
+  return (
+    <div
+      ref={ref}
+      role="slider"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      aria-valuemin={0}
+      aria-valuemax={Math.max(0, stops.length - 1)}
+      aria-valuenow={at}
+      aria-valuetext={valueText}
+      className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-crosshair"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
+      style={{ height: STRIP_H }}
+      data-flow-strip=""
+      data-flow-strip-view={view}
+      data-anatomy={view === "price" ? "F19" : "F4"}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onCancel}
+      onLostPointerCapture={onCancel}
+      onKeyDown={onKey}
+    >
+      {children}
+      {grabbing && w > 0 && ready && (
+        <span
+          aria-hidden
+          data-prov-hidden=""
+          data-flow-drag-date=""
+          className="pointer-events-none absolute bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+          style={{
+            left: Math.max(36, Math.min(w - 36, cx)),
+            background: "var(--rb-tooltip-bg)",
+            borderColor: "var(--rb-tooltip-border)",
+          }}
+        >
+          {cursorWord}
+        </span>
+      )}
+    </div>
+  );
+}
 
-  // The event ticks: the nearest within reach of the pointer names its day's
-  // events; a tap or a click also moves the cursor to that day.
+/** The value labels in the lead-in at the plot's left, each just above its
+ *  gridline (under it at the top). */
+function AxisLabels({ ticks, y, label }: { ticks: number[]; y: (v: number) => number; label: (v: number) => string }) {
+  return (
+    <>
+      {ticks.map((t) => {
+        const ty = y(t);
+        return (
+          <span
+            key={t}
+            className="pointer-events-none absolute text-[10px] leading-none tabular-nums text-rb-500"
+            style={{ left: STRIP_PAD + 1, ...(ty < 14 ? { top: ty + 2 } : { top: ty - 11 }) }}
+          >
+            {label(t)}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+/** The collateral and debt line, short and unlabelled (the headlines carry the
+ *  figures), with the bars' window shaded. */
+function LineStrip({
+  model,
+  scale,
+  failed,
+  geo,
+  w,
+  today,
+  cx,
+  dim,
+  ready,
+  head,
+  hasDebt,
+  windowFrom,
+}: {
+  model: FlowModel;
+  scale: LineScale;
+  failed: boolean;
+  geo: StripGeometry;
+  w: number;
+  today: number;
+  cx: number;
+  dim: boolean;
+  ready: boolean;
+  /** The headlines' figures, where the cursor's dots sit. */
+  head: { collateral: number; debt: number };
+  hasDebt: boolean;
+  windowFrom: number | null;
+}) {
+  const startDay = model.start / DAY_MS;
+  const { points, axis, axes, axisLabel, yTicks, sideTops } = scale;
+  const n = points.length;
+  const { x0, xDay } = geo;
+  const xClose = (day: number) => geo.xClose(Math.min(day, today));
+  const x = (i: number) => xClose(points[i].to);
+  const y = (v: number, k?: "collateral" | "debt") =>
+    STRIP_H - 2 - (v / (k && axes ? axes[k].max : axis.max)) * (STRIP_H - 8);
+  const runs = (k: "collateral" | "debt") => {
+    const out: number[][] = [];
+    let cur: number[] = [];
+    points.forEach((p, i) => {
+      if (p[k] == null) {
+        if (cur.length) out.push(cur);
+        cur = [];
+      } else cur.push(i);
+    });
+    if (cur.length) out.push(cur);
+    return out;
+  };
+  // The first run of each side starts at zero in the lead-in and steps up at
+  // the first event's day to that day's close.
+  const firstClose = model.valued[0] ?? { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
+  const lineOf = (k: "collateral" | "debt", seq: number[]) => {
+    const pts = seq.map((i) => `${x(i)},${y(points[i][k] as number, k)}`);
+    const lead = seq[0] === 0 ? [`${STRIP_PAD},${y(0)}`, `${x0},${y(0)}`, `${x0},${y(firstClose[k], k)}`] : [];
+    return [...lead, ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
+  };
+  // Where the side's value at a point rests on an old price (the model's
+  // `stale`, as the readout's label), or on a price or a read the page does
+  // not have (`unsure`): the segment into that point is drawn dotted. Today's
+  // point is at live prices.
+  const oldAt = (k: "collateral" | "debt", i: number) =>
+    i < n - 1 &&
+    ((model.stale.get(points[i].to - startDay) ?? []).some((x) => x.side === k) ||
+      (model.unsure.get(points[i].to - startDay) ?? []).some((x) => x.side === k));
+  /** A run's line as its solid and dotted pieces, each a path of whole
+   *  segments; a dotted piece keeps the indexes of its points for its tip. */
+  const piecesOf = (k: "collateral" | "debt", seq: number[]) => {
+    const solid: string[] = [];
+    const dotted: { d: string; idx: number[] }[] = [];
+    if (seq[0] === 0) {
+      const p0 = `${x(seq[0])},${y(points[seq[0]][k] as number, k)}`;
+      solid.push(`M${STRIP_PAD},${y(0)}L${x0},${y(0)}L${x0},${y(firstClose[k], k)}L${p0}`);
+    }
+    for (let j = 1; j < seq.length; j++) {
+      const a = seq[j - 1];
+      const b = seq[j];
+      const seg = `M${x(a)},${y(points[a][k] as number, k)}L${x(b)},${y(points[b][k] as number, k)}`;
+      if (!oldAt(k, b)) {
+        solid.push(seg);
+        continue;
+      }
+      const prev = dotted[dotted.length - 1];
+      if (prev && prev.idx[prev.idx.length - 1] === a) {
+        prev.d += `L${x(b)},${y(points[b][k] as number, k)}`;
+        prev.idx.push(b);
+      } else dotted.push({ d: seg, idx: [a, b] });
+    }
+    return { solid: solid.join(""), dotted };
+  };
+  // A dotted piece under the mouse opens the label's tip for its nearest point.
+  const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
+  const plotRef = useRef<SVGSVGElement>(null);
+  const hoverOld = (e: PointerEvent<SVGPathElement>, k: "collateral" | "debt", idx: number[]) => {
+    if (e.pointerType !== "mouse") return;
+    const px = e.clientX - (plotRef.current?.getBoundingClientRect().left ?? 0);
+    let best = idx[idx.length - 1];
+    for (const i of idx) if (oldAt(k, i) && Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
+    const stop = points[best].to - startDay;
+    const held = unsureAt(model, stop, k).held;
+    // The old-price line once, where a reason already names each asset it names.
+    const old = oldPriceAt(model, stop)?.lines ?? [];
+    const stale = (model.stale.get(stop) ?? []).filter((x) => x.side === k);
+    const named = stale.length > 0 && stale.every((x) => held.some((h) => h.startsWith(`${x.symbol} `)));
+    const lines = [...(named ? old.slice(0, old.length - 1) : old), ...held];
+    setOldTip(lines.length ? { x: px, y: y(points[best][k] as number, k), lines } : null);
+  };
+  const area = (k: "collateral" | "debt", seq: number[]) =>
+    `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? STRIP_PAD : x(seq[0])},${STRIP_H}Z`;
+  const shade = windowFrom != null && windowFrom > startDay ? xDay(windowFrom) : null;
+  const sides = hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const);
+
+  if (!(w > 0 && ready))
+    return (
+      <p className="flex h-full items-center justify-center text-xs text-rb-500">
+        {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
+      </p>
+    );
+  return (
+    <>
+      <svg ref={plotRef} width={w} height={STRIP_H} aria-hidden className="block">
+        {shade != null && (
+          <rect
+            x={shade}
+            y={0}
+            width={Math.max(0, w - STRIP_PAD - shade)}
+            height={STRIP_H}
+            className="fill-rb-400/15 dark:fill-rb-500/15"
+            data-flow-window=""
+          />
+        )}
+        {/* Faint gridlines at the value labels' ticks, the zero line being
+            the plot's floor. */}
+        {yTicks
+          .filter((t) => t > 0)
+          .map((t) => (
+            <line
+              key={t}
+              x1={STRIP_PAD}
+              x2={w - STRIP_PAD}
+              y1={y(t)}
+              y2={y(t)}
+              className="stroke-rb-400/20 dark:stroke-rb-500/25"
+              strokeWidth={1}
+              data-flow-gridline=""
+            />
+          ))}
+        {sides.map((k) =>
+          runs(k).map((seq) => {
+            const pieces = piecesOf(k, seq);
+            return (
+              <g key={`${k}${seq[0]}`}>
+                <path d={area(k, seq)} fill={LINE_HUE[k]} fillOpacity={k === "collateral" ? 0.14 : 0.12} />
+                {pieces.solid && (
+                  <path d={pieces.solid} fill="none" stroke={LINE_HUE[k]} strokeWidth={1.5} strokeLinejoin="round" />
+                )}
+                {pieces.dotted.map((p) => (
+                  <path
+                    key={p.idx[0]}
+                    d={p.d}
+                    fill="none"
+                    stroke={LINE_HUE[k]}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeDasharray="0 4"
+                    data-flow-old-line={k}
+                  />
+                ))}
+              </g>
+            );
+          }),
+        )}
+        {dim && <AfterCursor x={cx} w={w} />}
+        {/* Each dotted piece's hit area, wider than its stroke. */}
+        {sides.map((k) =>
+          runs(k).flatMap((seq) =>
+            piecesOf(k, seq).dotted.map((p) => (
+              <path
+                key={`${k}${p.idx[0]}`}
+                d={p.d}
+                fill="none"
+                stroke="transparent"
+                strokeWidth={12}
+                pointerEvents="stroke"
+                onPointerMove={(e) => hoverOld(e, k, p.idx)}
+                onPointerLeave={() => setOldTip(null)}
+                data-flow-old-hit={k}
+              />
+            )),
+          ),
+        )}
+        <CursorLine x={cx} />
+        <CursorDot x={cx} y={y(head.collateral, "collateral")} hue={LINE_HUE.collateral} />
+        {hasDebt && <CursorDot x={cx} y={y(head.debt, "debt")} hue={LINE_HUE.debt} />}
+      </svg>
+      <div aria-hidden data-prov-exempt="" data-flow-line-axis="">
+        {sideTops.map((x, i) => (
+          <span
+            key={x.k}
+            className={`pointer-events-none absolute text-[10px] leading-none tabular-nums ${x.k === "collateral" ? "text-blue-600 dark:text-blue-400" : "text-green-700 dark:text-green-400"}`}
+            style={{ left: STRIP_PAD + 1, top: 2 + i * 12 }}
+            data-flow-line-side-top={x.k}
+          >
+            {x.text}
+          </span>
+        ))}
+        <AxisLabels ticks={yTicks} y={(t) => y(t)} label={axisLabel} />
+      </div>
+      {oldTip && (
+        <span
+          role="tooltip"
+          data-prov-hidden=""
+          data-flow-old-tip=""
+          className="pointer-events-none absolute z-50 rounded-2xl border p-3 text-xs font-medium text-foreground shadow-lg"
+          style={{
+            left: Math.max(4, Math.min(w - OLD_TIP_W - 4, oldTip.x - OLD_TIP_W / 2)),
+            bottom: STRIP_H - oldTip.y + 10,
+            background: "var(--rb-tooltip-bg)",
+            borderColor: "var(--rb-tooltip-border)",
+          }}
+        >
+          <OldPriceTip lines={oldTip.lines} />
+        </span>
+      )}
+    </>
+  );
+}
+
+/** The strip after the cursor lies under a translucent layer, except at
+ *  today, where nothing is after it. */
+function AfterCursor({ x, w }: { x: number; w: number }) {
+  return (
+    <rect
+      x={x}
+      y={0}
+      width={Math.max(0, w - x)}
+      height={STRIP_H}
+      style={{ fill: "var(--surface-raised)" }}
+      fillOpacity={0.7}
+      pointerEvents="none"
+      data-flow-after-cursor=""
+    />
+  );
+}
+
+function CursorLine({ x }: { x: number }) {
+  return <line x1={x} x2={x} y1={0} y2={STRIP_H} className="stroke-foreground" strokeWidth={1} pointerEvents="none" />;
+}
+
+function CursorDot({ x, y, hue }: { x: number; y: number; hue: string }) {
+  return <circle cx={x} cy={y} r={3.5} fill={hue} className="stroke-background" strokeWidth={1.5} />;
+}
+
+/** One asset's price scale over the visible days, and the pieces its line
+ *  draws (lib/shared/flows-price.ts). */
+export function priceStripScale(s: FlowPriceSeries, startDay: number, today: number) {
+  const pieces = pricePieces(s, startDay, today);
+  const values = [...pieces.solid, ...pieces.dotted, ...pieces.flat, ...pieces.riser].flat().map((v) => v[1]);
+  const axis = priceAxis(values);
+  return { pieces, axis, labels: axis.ticks.map((t) => formatPriceAxis(t, s.unitLabel)) };
+}
+type PriceScale = ReturnType<typeof priceStripScale>;
+
+/** The price line of one held asset in its unit, on the time axis the flows
+ *  line uses: solid day to day, dotted where a day's price is carried, the
+ *  step mark for an event series. */
+function PriceStrip({
+  s,
+  scale,
+  geo,
+  w,
+  today,
+  cx,
+  dim,
+  cursorPrice,
+  windowFrom,
+  startDay,
+}: {
+  s: FlowPriceSeries;
+  scale: PriceScale;
+  geo: StripGeometry;
+  w: number;
+  today: number;
+  cx: number;
+  dim: boolean;
+  cursorPrice: number | null;
+  windowFrom: number | null;
+  startDay: number;
+}) {
+  const { pieces, axis } = scale;
+  const xClose = (day: number) => geo.xClose(Math.min(day, today));
+  const y = (v: number) => STRIP_H - 4 - ((v - axis.min) / (axis.max - axis.min || 1)) * (STRIP_H - 8);
+  const path = (vs: [number, number][]) => vs.map(([d, v], j) => `${j ? "L" : "M"}${xClose(d)},${y(v)}`).join("");
+  // A lone day draws as a point.
+  const dots = pieces.solid.filter((p) => p.length === 1);
+  const hue = LINE_HUE[s.side];
+  const shade = windowFrom != null && windowFrom > startDay ? geo.xDay(windowFrom) : null;
+  if (!(w > 0)) return null;
+  return (
+    <>
+      <svg width={w} height={STRIP_H} aria-hidden className="block">
+        {shade != null && (
+          <rect
+            x={shade}
+            y={0}
+            width={Math.max(0, w - STRIP_PAD - shade)}
+            height={STRIP_H}
+            className="fill-rb-400/15 dark:fill-rb-500/15"
+            data-flow-window=""
+          />
+        )}
+        {axis.ticks.map((t) => (
+          <line
+            key={t}
+            x1={STRIP_PAD}
+            x2={w - STRIP_PAD}
+            y1={y(t)}
+            y2={y(t)}
+            className="stroke-rb-400/20 dark:stroke-rb-500/25"
+            strokeWidth={1}
+            data-flow-gridline=""
+          />
+        ))}
+        <g
+          data-price-line={s.key}
+          data-price-grain={s.grain}
+          data-price-observed={pieces.observed.join(",")}
+          data-price-carried={pieces.carried.join(",")}
+        >
+          {pieces.solid
+            .filter((p) => p.length > 1)
+            .map((p) => (
+              <path
+                key={`s${p[0][0]}`}
+                d={path(p)}
+                fill="none"
+                stroke={hue}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+                data-price-solid=""
+              />
+            ))}
+          {dots.map((p) => (
+            <circle key={`p${p[0][0]}`} cx={xClose(p[0][0])} cy={y(p[0][1])} r={1.5} fill={hue} />
+          ))}
+          {pieces.dotted.map((p) => (
+            <path
+              key={`d${p[0][0]}`}
+              d={path(p)}
+              fill="none"
+              stroke={hue}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeDasharray="0 4"
+              data-price-carried-line=""
+            />
+          ))}
+          {pieces.flat.map((p) => (
+            <path key={`f${p[0][0]}`} d={path(p)} fill="none" stroke={hue} strokeWidth={1.5} data-price-step="" />
+          ))}
+          {pieces.riser.map((p) => (
+            <path
+              key={`r${p[0][0]}`}
+              d={path(p)}
+              fill="none"
+              stroke={hue}
+              strokeWidth={1}
+              strokeDasharray="2 2"
+              data-price-riser=""
+            />
+          ))}
+        </g>
+        {dim && <AfterCursor x={cx} w={w} />}
+        <CursorLine x={cx} />
+        {cursorPrice != null && <CursorDot x={cx} y={y(cursorPrice)} hue={hue} />}
+      </svg>
+      <div aria-hidden data-prov-exempt="" data-price-axis="">
+        <AxisLabels ticks={axis.ticks} y={y} label={(t) => formatPriceAxis(t, s.unitLabel)} />
+      </div>
+    </>
+  );
+}
+
+/** The price view's asset picker, in the manner of the event ledger's wide
+ *  side (ui-jobs 306): the first PICKER_SHOWN held assets with a series and a
+ *  line "Show all N assets" where there are more. One asset at a time. */
+const PICKER_SHOWN = 3;
+function PricePicker({
+  series,
+  selected,
+  onPick,
+}: {
+  series: FlowPriceSeries[];
+  selected: string;
+  onPick: (key: string) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const firstN = series.slice(0, PICKER_SHOWN);
+  const listed = all
+    ? series
+    : firstN.some((s) => s.key === selected)
+      ? firstN
+      : [...firstN, ...series.filter((s) => s.key === selected)];
+  const hidden = series.length - listed.length;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1"
+      role="group"
+      aria-label="Asset"
+      data-price-picker=""
+      data-anatomy="F19.1"
+      {...KEEP_PANEL}
+    >
+      {listed.map((s) => {
+        const on = s.key === selected;
+        return (
+          <button
+            key={s.key}
+            type="button"
+            aria-pressed={on}
+            className={`${CTRL_GHOST} ${on ? CTRL_ON_ACCENT : CTRL_OFF} min-h-9 rounded-md px-2 text-xs font-semibold sm:min-h-7`}
+            onClick={() => onPick(s.key)}
+            data-price-asset={s.asset.symbol}
+          >
+            {s.asset.symbol}
+          </button>
+        );
+      })}
+      {(hidden > 0 || all) && series.length > PICKER_SHOWN && (
+        <button
+          type="button"
+          className="px-1 text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+          aria-expanded={all}
+          onClick={() => setAll((v) => !v)}
+          data-price-show-all={series.length}
+        >
+          {all ? `Show ${PICKER_SHOWN} assets` : `Show all ${series.length} assets`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** The receipt of the readout's price: the series' point at or before the
+ *  cursor's day, read at its block. */
+function readoutProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord: string): Provenance {
+  const block = r.point[2];
+  return {
+    kind: "chain",
+    pclass: "oracle",
+    summary: r.carried
+      ? `${s.asset.symbol} price — in ${s.unitLabel}, carried to ${dayWord} from ${pointWord}, the last day with a price recorded; from ${s.source}.`
+      : `${s.asset.symbol} price — in ${s.unitLabel} on ${dayWord}, from ${s.source}.`,
+    ...(block != null ? { source: { block } } : {}),
+  };
+}
+
+function ageProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord: string): Provenance {
+  const block = r.point[2];
+  return {
+    kind: "derived",
+    summary: `Days carried — from ${pointWord}, the price's day, to ${dayWord}; no ${s.asset.symbol} price is recorded between them.`,
+    formula: "cursor's day − price's day",
+    ...(block != null ? { source: { block } } : {}),
+  };
+}
+
+/** The price at the cursor's day, in HTML so it carries its receipt: the
+ *  asset, its price in its unit, and the day's observation or the carried one
+ *  with its age. */
+function PriceReadout({
+  s,
+  day,
+  gapDays,
+  isLive,
+}: {
+  s: FlowPriceSeries;
+  day: number;
+  gapDays: number;
+  isLive: boolean;
+}) {
+  const r = priceReadout(s, day, gapDays);
+  const dayWord = isLive ? "today" : dayStamp(day * 86_400);
+  if (!r)
+    return (
+      <p className="text-xs text-rb-500" data-price-readout="" data-price-none="">
+        No {s.asset.symbol} price recorded by {dayWord}
+      </p>
+    );
+  const pointWord = dayStamp(r.point[0] * 86_400);
+  return (
+    <p
+      className="flex min-w-0 items-baseline gap-x-1.5 whitespace-nowrap text-xs tabular-nums"
+      aria-live="polite"
+      data-price-readout=""
+      data-price-day={r.point[0]}
+      data-price-block={r.point[2] ?? ""}
+      data-price-carried={r.carried ? r.ageDays : undefined}
+      data-anatomy="F19.2"
+    >
+      <span className="font-semibold text-foreground">{s.asset.symbol}</span>{" "}
+      <span className="font-semibold text-foreground">
+        <Prov info={readoutProv(s, r, dayWord, pointWord)} value={String(r.point[1])}>
+          {formatPrice(r.point[1], s.unitLabel)}
+        </Prov>
+      </span>{" "}
+      <span className="min-w-0 truncate text-rb-500">
+        on {pointWord}
+        {r.carried && (
+          <>
+            ,{" "}
+            <Prov info={ageProv(s, r, dayWord, pointWord)}>
+              carried {r.ageDays} {r.ageDays === 1 ? "day" : "days"}
+            </Prov>
+          </>
+        )}
+      </span>
+      {r.old && (
+        <span
+          className="rounded border border-rb-300 px-1 text-[11px] font-medium text-rb-600 dark:border-rb-600 dark:text-rb-400"
+          data-price-old=""
+        >
+          Old price
+        </span>
+      )}
+    </p>
+  );
+}
+
+/** The event pips under the strip, on the shared time axis, the cursor
+ *  running through them: one row for both views. The nearest pip within
+ *  reach of the pointer names its day's events; a tap or a click also moves
+ *  the cursor to that day. */
+function PipRow({
+  model,
+  geo,
+  w,
+  today,
+  stops,
+  at,
+  cx,
+  dim,
+  ready,
+  onPick,
+}: {
+  model: FlowModel;
+  geo: StripGeometry;
+  w: number;
+  today: number;
+  stops: CombinedStop[];
+  at: number;
+  cx: number;
+  dim: boolean;
+  ready: boolean;
+  onPick: (i: number) => void;
+}) {
+  const startDay = model.start / DAY_MS;
+  const xClose = (day: number) => geo.xClose(Math.min(day, today));
+  const pipRef = useRef<HTMLDivElement>(null);
+  const [pip, setPip] = useState<{ x: number; text: string; day: number } | null>(null);
   const tickText = (t: FlowModel["ticks"][number]) =>
     `${dayStamp(dayStart(model, t.day))}${t.kinds.length ? `: ${t.kinds.join(", ")}` : ""}`;
   const tickAt = (clientX: number, reach: number) => {
@@ -912,351 +1667,51 @@ function LineStrip({
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);
   }, [pip]);
-
-  const runs = (k: "collateral" | "debt") => {
-    const out: number[][] = [];
-    let cur: number[] = [];
-    points.forEach((p, i) => {
-      if (p[k] == null) {
-        if (cur.length) out.push(cur);
-        cur = [];
-      } else cur.push(i);
-    });
-    if (cur.length) out.push(cur);
-    return out;
-  };
-  // The first run of each side starts at zero in the lead-in and steps up at
-  // the first event's day to that day's close.
-  const firstClose = model.valued[0] ?? { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
-  const lineOf = (k: "collateral" | "debt", seq: number[]) => {
-    const pts = seq.map((i) => `${x(i)},${y(points[i][k] as number, k)}`);
-    const lead = seq[0] === 0 ? [`${PAD},${y(0)}`, `${x0},${y(0)}`, `${x0},${y(firstClose[k], k)}`] : [];
-    return [...lead, ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
-  };
-  // Where the side's value at a point rests on an old price (the model's
-  // `stale`, as the readout's label), or on a price or a read the page does
-  // not have (`unsure`): the segment into that point is drawn dotted. Today's
-  // point is at live prices.
-  const oldAt = (k: "collateral" | "debt", i: number) =>
-    i < n - 1 &&
-    ((model.stale.get(points[i].to - startDay) ?? []).some((x) => x.side === k) ||
-      (model.unsure.get(points[i].to - startDay) ?? []).some((x) => x.side === k));
-  /** A run's line as its solid and dotted pieces, each a path of whole
-   *  segments; a dotted piece keeps the indexes of its points for its tip. */
-  const piecesOf = (k: "collateral" | "debt", seq: number[]) => {
-    const solid: string[] = [];
-    const dotted: { d: string; idx: number[] }[] = [];
-    if (seq[0] === 0) {
-      const p0 = `${x(seq[0])},${y(points[seq[0]][k] as number, k)}`;
-      solid.push(`M${PAD},${y(0)}L${x0},${y(0)}L${x0},${y(firstClose[k], k)}L${p0}`);
-    }
-    for (let j = 1; j < seq.length; j++) {
-      const a = seq[j - 1];
-      const b = seq[j];
-      const seg = `M${x(a)},${y(points[a][k] as number, k)}L${x(b)},${y(points[b][k] as number, k)}`;
-      if (!oldAt(k, b)) {
-        solid.push(seg);
-        continue;
-      }
-      const prev = dotted[dotted.length - 1];
-      if (prev && prev.idx[prev.idx.length - 1] === a) {
-        prev.d += `L${x(b)},${y(points[b][k] as number, k)}`;
-        prev.idx.push(b);
-      } else dotted.push({ d: seg, idx: [a, b] });
-    }
-    return { solid: solid.join(""), dotted };
-  };
-  // A dotted piece under the mouse opens the label's tip for its nearest point.
-  const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
-  const hoverOld = (e: PointerEvent<SVGPathElement>, k: "collateral" | "debt", idx: number[]) => {
-    if (e.pointerType !== "mouse") return;
-    const px = e.clientX - (ref.current?.getBoundingClientRect().left ?? 0);
-    let best = idx[idx.length - 1];
-    for (const i of idx) if (oldAt(k, i) && Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    const stop = points[best].to - startDay;
-    const held = unsureAt(model, stop, k).held;
-    // The old-price line once, where a reason already names each asset it names.
-    const old = oldPriceAt(model, stop)?.lines ?? [];
-    const stale = (model.stale.get(stop) ?? []).filter((x) => x.side === k);
-    const named = stale.length > 0 && stale.every((x) => held.some((h) => h.startsWith(`${x.symbol} `)));
-    const lines = [...(named ? old.slice(0, old.length - 1) : old), ...held];
-    setOldTip(lines.length ? { x: px, y: y(points[best][k] as number, k), lines } : null);
-  };
-  const area = (k: "collateral" | "debt", seq: number[]) =>
-    `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? PAD : x(seq[0])},${STRIP_H}Z`;
-  const shade = windowFrom != null && windowFrom > startDay ? xDay(windowFrom) : null;
-  const per = series?.bin ?? "week";
-  const cx = n > 0 && stops[at] ? xStop(stops[at]) : PAD + inner;
-  // The strip after the cursor lies under a translucent layer, except at
-  // today, where nothing is after it.
-  const dim = n > 0 && stops[at] != null && !stops[at].live;
-  const sides = hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const);
-
   return (
-    <div className="mt-4">
-      <div className="relative">
-        <div
-          ref={ref}
-          role="slider"
-          tabIndex={0}
-          aria-label={`Date, by ${per === "day" ? "day" : `${per} and by day with events`}: moves the headlines and the bars`}
-          aria-valuemin={0}
-          aria-valuemax={Math.max(0, stops.length - 1)}
-          aria-valuenow={at}
-          aria-valuetext={valueText}
-          className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-crosshair"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
-          style={{ height: STRIP_H }}
-          data-flow-strip=""
-          data-anatomy="F4"
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onCancel}
-          onLostPointerCapture={onCancel}
-          onKeyDown={onKey}
-        >
-          {w > 0 && n > 0 ? (
-            <svg width={w} height={STRIP_H} aria-hidden className="block">
-              {shade != null && (
-                <rect
-                  x={shade}
-                  y={0}
-                  width={Math.max(0, w - PAD - shade)}
-                  height={STRIP_H}
-                  className="fill-rb-400/15 dark:fill-rb-500/15"
-                  data-flow-window=""
-                />
-              )}
-              {/* Faint gridlines at the value labels' ticks, the zero line
-                  being the plot's floor. */}
-              {yTicks
-                .filter((t) => t > 0)
-                .map((t) => (
-                  <line
-                    key={t}
-                    x1={PAD}
-                    x2={w - PAD}
-                    y1={y(t)}
-                    y2={y(t)}
-                    className="stroke-rb-400/20 dark:stroke-rb-500/25"
-                    strokeWidth={1}
-                    data-flow-gridline=""
-                  />
-                ))}
-              {sides.map((k) =>
-                runs(k).map((seq) => {
-                  const pieces = piecesOf(k, seq);
-                  return (
-                    <g key={`${k}${seq[0]}`}>
-                      <path d={area(k, seq)} fill={LINE_HUE[k]} fillOpacity={k === "collateral" ? 0.14 : 0.12} />
-                      {pieces.solid && (
-                        <path
-                          d={pieces.solid}
-                          fill="none"
-                          stroke={LINE_HUE[k]}
-                          strokeWidth={1.5}
-                          strokeLinejoin="round"
-                        />
-                      )}
-                      {pieces.dotted.map((p) => (
-                        <path
-                          key={p.idx[0]}
-                          d={p.d}
-                          fill="none"
-                          stroke={LINE_HUE[k]}
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeDasharray="0 4"
-                          data-flow-old-line={k}
-                        />
-                      ))}
-                    </g>
-                  );
-                }),
-              )}
-              {dim && (
-                <rect
-                  x={cx}
-                  y={0}
-                  width={Math.max(0, w - cx)}
-                  height={STRIP_H}
-                  style={{ fill: "var(--surface-raised)" }}
-                  fillOpacity={0.7}
-                  pointerEvents="none"
-                  data-flow-after-cursor=""
-                />
-              )}
-              {/* Each dotted piece's hit area, wider than its stroke. */}
-              {sides.map((k) =>
-                runs(k).flatMap((seq) =>
-                  piecesOf(k, seq).dotted.map((p) => (
-                    <path
-                      key={`${k}${p.idx[0]}`}
-                      d={p.d}
-                      fill="none"
-                      stroke="transparent"
-                      strokeWidth={12}
-                      pointerEvents="stroke"
-                      onPointerMove={(e) => hoverOld(e, k, p.idx)}
-                      onPointerLeave={() => setOldTip(null)}
-                      data-flow-old-hit={k}
-                    />
-                  )),
-                ),
-              )}
-              <line
-                x1={cx}
-                x2={cx}
-                y1={0}
-                y2={STRIP_H}
-                className="stroke-foreground"
-                strokeWidth={1}
-                pointerEvents="none"
-              />
-              <circle
-                cx={cx}
-                cy={y(head.collateral, "collateral")}
-                r={3.5}
-                fill={LINE_HUE.collateral}
-                className="stroke-background"
-                strokeWidth={1.5}
-              />
-              {hasDebt && (
-                <circle
-                  cx={cx}
-                  cy={y(head.debt, "debt")}
-                  r={3.5}
-                  fill={LINE_HUE.debt}
-                  className="stroke-background"
-                  strokeWidth={1.5}
-                />
-              )}
-            </svg>
-          ) : null}
-          {/* The value labels, in the lead-in at the plot's left, each just
-              above its gridline (under it at the top). */}
-          {w > 0 && n > 0 && (
-            <div aria-hidden data-prov-exempt="" data-flow-line-axis="">
-              {sideTops.map((x, i) => (
-                <span
-                  key={x.k}
-                  className={`pointer-events-none absolute text-[10px] leading-none tabular-nums ${x.k === "collateral" ? "text-blue-600 dark:text-blue-400" : "text-green-700 dark:text-green-400"}`}
-                  style={{ left: PAD + 1, top: 2 + i * 12 }}
-                  data-flow-line-side-top={x.k}
-                >
-                  {x.text}
-                </span>
-              ))}
-              {yTicks.map((t) => {
-                const ty = y(t);
-                return (
-                  <span
-                    key={t}
-                    className="pointer-events-none absolute text-[10px] leading-none tabular-nums text-rb-500"
-                    style={{ left: PAD + 1, ...(ty < 14 ? { top: ty + 2 } : { top: ty - 11 }) }}
-                  >
-                    {axisLabel(t)}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-          {oldTip && (
-            <span
-              role="tooltip"
-              data-prov-hidden=""
-              data-flow-old-tip=""
-              className="pointer-events-none absolute z-50 rounded-2xl border p-3 text-xs font-medium text-foreground shadow-lg"
-              style={{
-                left: Math.max(4, Math.min(w - OLD_TIP_W - 4, oldTip.x - OLD_TIP_W / 2)),
-                bottom: STRIP_H - oldTip.y + 10,
-                background: "var(--rb-tooltip-bg)",
-                borderColor: "var(--rb-tooltip-border)",
-              }}
-            >
-              <OldPriceTip lines={oldTip.lines} />
-            </span>
-          )}
-          {grabbing && w > 0 && n > 0 && (
-            <span
-              aria-hidden
-              data-prov-hidden=""
-              data-flow-drag-date=""
-              className="pointer-events-none absolute bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
-              style={{
-                left: Math.max(36, Math.min(w - 36, cx)),
-                background: "var(--rb-tooltip-bg)",
-                borderColor: "var(--rb-tooltip-border)",
-              }}
-            >
-              {cursorWord}
-            </span>
-          )}
-          {w > 0 && n > 0 ? null : (
-            <p className="flex h-full items-center justify-center text-xs text-rb-500">
-              {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
-            </p>
-          )}
-        </div>
-      </div>
-      {/* The event ticks, under the plot on the line's time axis, the cursor
-          running through them. The keyboard hears each day's events through
-          the slider's value. */}
-      <div
-        ref={pipRef}
-        className="relative h-5 cursor-pointer sm:h-3.5"
-        data-flow-pips=""
-        data-anatomy="F4.1"
-        onPointerMove={(e) => {
-          if (e.pointerType !== "mouse") return;
-          const t = tickAt(e.clientX, TICK_REACH.mouse);
-          setPip(t ? openTick(t) : null);
-        }}
-        onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
-        onClick={(e) => {
-          const t = tickAt(e.clientX, TICK_REACH.touch);
-          if (!t) return setPip(null);
-          setPip(openTick(t));
-          const i = stops.findIndex((s) => !s.live && s.stop === t.day);
-          if (i >= 0) onPick(i);
-        }}
-      >
-        <div aria-hidden>
-          {w > 0 && n > 0 && (
-            <i className="pointer-events-none absolute inset-y-0 w-px bg-foreground" style={{ left: cx - 0.5 }} />
-          )}
-          {w > 0 &&
-            visiblePips(model.ticks, (d) => xClose(startDay + d)).map((t) => (
-              <FlowPip
-                key={t.day}
-                tick={t.tick}
-                left={xClose(startDay + t.day)}
-                opacity={dim && xClose(startDay + t.day) > cx + 0.5 ? 0.35 : 1}
-              />
-            ))}
-        </div>
-        {pip && (
-          <span
-            role="tooltip"
-            data-prov-hidden=""
-            data-flow-pip-tip=""
-            className="pointer-events-none absolute bottom-full z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
-            style={{ left: pip.x, background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
-          >
-            {pip.text}
-          </span>
+    <div
+      ref={pipRef}
+      className="relative h-5 cursor-pointer sm:h-3.5"
+      data-flow-pips=""
+      data-anatomy="F4.1"
+      onPointerMove={(e) => {
+        if (e.pointerType !== "mouse") return;
+        const t = tickAt(e.clientX, TICK_REACH.mouse);
+        setPip(t ? openTick(t) : null);
+      }}
+      onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
+      onClick={(e) => {
+        const t = tickAt(e.clientX, TICK_REACH.touch);
+        if (!t) return setPip(null);
+        setPip(openTick(t));
+        const i = stops.findIndex((s) => !s.live && s.stop === t.day);
+        if (i >= 0) onPick(i);
+      }}
+    >
+      <div aria-hidden>
+        {w > 0 && ready && (
+          <i className="pointer-events-none absolute inset-y-0 w-px bg-foreground" style={{ left: cx - 0.5 }} />
         )}
+        {w > 0 &&
+          visiblePips(model.ticks, (d) => xClose(startDay + d)).map((t) => (
+            <FlowPip
+              key={t.day}
+              tick={t.tick}
+              left={xClose(startDay + t.day)}
+              opacity={dim && xClose(startDay + t.day) > cx + 0.5 ? 0.35 : 1}
+            />
+          ))}
       </div>
-      {/* The first day sits under the end of the lead-in, and the end under
-        today's close, a few px clear of the ticks. */}
-      <div className="mt-1.5">
-        <TrackEnds
-          start={ends.start}
-          end={ends.end}
-          startInset={w > 0 ? Math.max(0, x0 - PAD) : 0}
-          endInset={w > 0 ? Math.max(0, PAD + inner - xClose(today)) : 0}
-        />
-      </div>
+      {pip && (
+        <span
+          role="tooltip"
+          data-prov-hidden=""
+          data-flow-pip-tip=""
+          className="pointer-events-none absolute bottom-full z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+          style={{ left: pip.x, background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
+        >
+          {pip.text}
+        </span>
+      )}
     </div>
   );
 }

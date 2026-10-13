@@ -25,7 +25,11 @@
 // scrubber's state where the bin's last day recorded every held asset's price,
 // and a bin with no price recorded for a held asset a gap. A balance step
 // (Core's GHO discount settlement, lifetime-flows-series-gho-2079.json, read
-// 2026-10-01) is read from its day and is no event day.
+// 2026-10-01) is read from its day and is no event day. The price view
+// (lib/shared/flows-price.ts, ui-jobs 328): "Value · Price" is no input to the
+// stops, so the cursor keeps its stop and the Value view its line; both strips
+// take one time axis; the price series keep the route's blocks; carried days
+// draw dotted, nothing before the first point, the step mark by grain.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
 import { createFlowFocusStore, rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
@@ -78,6 +82,8 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
+import { flowPriceSeries, pricePieces, priceReadout, stripGeometry } from "@/lib/shared/flows-price";
+import { eventPriceSeries } from "@/lib/shared/price-series";
 import { binUnitFor, flowBins, groupOperations, isBusy, throughput } from "@/lib/shared/flows-busy";
 import { AAVE_V3_BASE_FLOW_BUCKETS } from "@/lib/aave-v3-base/flows";
 import { compoundFlowBuckets } from "@/lib/compound/flows";
@@ -1907,4 +1913,176 @@ test("incomplete stretches: a figure without its price or read is dashed and nam
     ),
   })!;
   assert.ok(unsureAt(two, 10, "collateral").flows.includes("WETH, USDC and WBTC priced at the day's close."));
+});
+
+// The price view (ui-jobs 328, step 2): "Value · Price" swaps the strip and
+// nothing the Value view reads; the price line's series and grammar.
+test("the price view: the toggle leaves the Value view's stops and axis alone, the Price view keeps the cursor's stop", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const t = aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!;
+  const model = buildFlowModel(t) as FlowModel;
+  // The stops are a function of the model and the line's series: the view is
+  // no input, so the cursor's stop is the same index in both views.
+  const stops = combinedStops(model, null, 0, null);
+  assert.deepEqual(combinedStops(model, null, 0, null), stops);
+  // One time axis: a day sits on one x whatever the view's labels.
+  const startDay = model.start / DAY_MS;
+  const today = startDay + model.liveStop;
+  const a = stripGeometry(800, startDay, today, today - startDay, 40);
+  const b = stripGeometry(800, startDay, today, today - startDay, 40);
+  for (const s of [stops[0], stops[Math.floor(stops.length / 2)], stops[stops.length - 1]])
+    assert.equal(a.xClose(startDay + s.stop), b.xClose(startDay + s.stop));
+  // dayAt inverts xClose.
+  const d = startDay + stops[5].stop;
+  assert.ok(Math.abs(a.dayAt(a.xClose(d)) - d) < 1e-9);
+  // The series: one per held asset with a daily series, collateral first,
+  // each point's block kept from the route.
+  const prices = flowPriceSeries(t);
+  assert.ok(prices.length > 0);
+  assert.equal(prices[0].side, "collateral");
+  assert.equal(prices[0].unitLabel, "USD");
+  assert.equal(prices[0].source, "AaveOracle, the last price recorded each day");
+  const held = new Set(t.days.flatMap((r) => r.balances.map((x) => x.asset)));
+  for (const p of prices) {
+    assert.ok(held.has(p.key), `${p.asset.symbol} is held`);
+    const obs = new Map((t.dailyPrices?.[p.key] ?? []).map((o) => [o[0], o]));
+    for (const [day, price, block] of p.points) {
+      assert.equal(obs.get(day)?.[1], price);
+      assert.equal(obs.get(day)?.[2] ?? null, block);
+    }
+  }
+});
+
+test("the price line: observed days solid, carried days dotted, nothing before the first point, the step mark by grain", () => {
+  const s = {
+    key: "x",
+    asset: { symbol: "WETH", chain: 1 },
+    unit: "usd",
+    grain: "daily" as const,
+    source: "test",
+    points: [
+      [10, 100, 1000],
+      [11, 110, 1010],
+      [15, 120, 1050],
+      [16, 125, null],
+    ] as [number, number, number | null][],
+  };
+  const p = pricePieces(s, 5, 18);
+  assert.deepEqual(p.observed, [10, 11, 15, 16]);
+  assert.deepEqual(p.carried, [12, 13, 14, 17, 18]);
+  // 10 → 11 solid; 11 → 15 through the carried days dotted; 15 → 16 solid;
+  // 16 → 18 dotted.
+  assert.deepEqual(p.solid, [
+    [
+      [10, 100],
+      [11, 110],
+    ],
+    [
+      [15, 120],
+      [16, 125],
+    ],
+  ]);
+  assert.equal(p.dotted.length, 2);
+  assert.deepEqual(p.dotted[0][0], [11, 110]);
+  assert.deepEqual(p.dotted[0][p.dotted[0].length - 1], [15, 120]);
+  // Nothing drawn before the series' first day.
+  assert.ok([...p.solid, ...p.dotted].flat().every(([d]) => d >= 10));
+  // The readout: the day's point, or the one before it with its age, old past
+  // the panel's gap.
+  assert.deepEqual(priceReadout(s, 11, 7)?.point, [11, 110, 1010]);
+  const carried = priceReadout(s, 14, 7)!;
+  assert.equal(carried.carried, true);
+  assert.equal(carried.ageDays, 3);
+  assert.equal(carried.point[2], 1010);
+  assert.equal(carried.old, false);
+  assert.equal(priceReadout(s, 30, 7)?.old, true);
+  assert.equal(priceReadout(s, 9, 7), null);
+  // An event series: each observation held flat to the next, a riser there.
+  const e = eventPriceSeries({
+    key: "e",
+    asset: { symbol: "WETH", chain: 1 },
+    unit: "usd",
+    source: "rows",
+    obs: [
+      { block: 1, ts: 10 * 86_400, price: 100 },
+      { block: 2, ts: 14 * 86_400, price: 90 },
+    ],
+  });
+  const ep = pricePieces(e, 0, 20);
+  assert.deepEqual(ep.flat, [
+    [
+      [10, 100],
+      [14, 100],
+    ],
+    [
+      [14, 90],
+      [20, 90],
+    ],
+  ]);
+  assert.deepEqual(ep.riser, [
+    [
+      [14, 100],
+      [14, 90],
+    ],
+  ]);
+  assert.deepEqual(ep.solid, []);
+  assert.deepEqual(ep.dotted, []);
+});
+
+test("the price view's series: a face side and the unit's own token draw no line, side units none at all", () => {
+  const base: FlowTimeline = {
+    buckets: [],
+    days: [
+      {
+        day: 100,
+        events: 1,
+        tick: "collateral",
+        cum: {},
+        balances: [
+          { asset: "c", symbol: "WETH", side: "collateral", amount: 1 },
+          { asset: "d", symbol: "BOLD", side: "debt", amount: 1 },
+        ],
+        prices: [],
+      },
+    ],
+    live: { collateralUsd: 0, debtUsd: 0 },
+    dailyPrices: {
+      c: [
+        [100, 2000, 5],
+        [101, 2100],
+      ],
+      d: [[100, 1.0001]],
+    },
+    words: { moment: { face: ["debt"] } },
+  };
+  const ps = flowPriceSeries(base);
+  assert.deepEqual(
+    ps.map((p) => p.asset.symbol),
+    ["WETH"],
+  );
+  assert.deepEqual(ps[0].points, [
+    [100, 2000, 5],
+    [101, 2100, null],
+  ]);
+  assert.equal(ps[0].source, "daily price store");
+  // A token unit: prices in grains of the unit, its own token skipped.
+  const tok = flowPriceSeries({
+    ...base,
+    unit: { symbol: "USDC", scale: 2 },
+    words: {},
+    days: [
+      {
+        ...base.days[0],
+        balances: [{ asset: "d", symbol: "USDC", side: "debt", amount: 1 }, base.days[0].balances[0]],
+      },
+    ],
+  });
+  assert.deepEqual(
+    tok.map((p) => [p.asset.symbol, p.unitLabel, p.points[0][1]]),
+    [["WETH", "USDC", 20]],
+  );
+  assert.deepEqual(
+    flowPriceSeries({ ...base, sideUnits: { collateral: { symbol: "A", scale: 0 }, debt: { symbol: "B", scale: 0 } } }),
+    [],
+  );
 });

@@ -257,6 +257,18 @@ const SHOTS = [
   },
   { name: "flows", path: AAVE, widths: [1280, 390], codes: ["P2", "F"], crop: ["P2"] },
   {
+    // The price view (ui-jobs 328): "Value · Price" pressed to Price.
+    name: "flows-price",
+    path: AAVE,
+    widths: [1280, 390],
+    codes: ["F18", "F19"],
+    crop: ["P2"],
+    setup: async (page) => {
+      await click(page, '[data-flows-view="price"]');
+      await seen(page, sel("F19"), 10000);
+    },
+  },
+  {
     name: "flows-explained",
     path: AAVE,
     widths: [1280],
