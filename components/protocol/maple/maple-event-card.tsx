@@ -134,6 +134,10 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
     timestamp: event.timestamp,
     prevAt: times?.prevAt,
     eventId: event.id,
+    addresses: {
+      [ctx.assetSymbol]: soleFlowAddress(event.flows, ctx.assetSymbol),
+      [ctx.poolSymbol]: soleFlowAddress(event.flows, ctx.poolSymbol),
+    },
   });
 
   const slots: EventCardSlots = {
@@ -158,6 +162,7 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
           : undefined,
     },
     cells: body.cells,
+    sheet: body.sheet,
     // The claim opens into its ledger: the pool's flows where the page's
     // panel shows this pool, else its Held and Interest rows.
     ledgers: {
