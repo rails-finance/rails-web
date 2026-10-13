@@ -1,16 +1,14 @@
-"use client";
+// SparkLend's export shapes for the position card's ⋮ (Copy Position, View as
+// Markdown, Download CSV): the shared <ExportMenu>'s props with the Spark
+// Markdown serializer. The event route, which draws no card, hands the same
+// object to the wallet row's Tools.
 
-// Export control for the SparkLend position detail page — a thin wrapper over
-// the shared <ExportMenu> that supplies the Spark Markdown serializer,
-// mirroring components/protocol/aave-v4/aave-v4-export-menu.tsx. The wrapper
-// exists so the page can lazy-load the whole export path (dropdown UX +
-// serializer + CSV builder) as one chunk off the initial bundle.
-
-import { ExportMenu, type WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
 import type { QueuedExportRequest } from "@/lib/shared/queued-export";
 import { sparkPositionToMarkdown, type SparkPositionMarkdownArgs } from "@/lib/spark/position-to-markdown";
 
-type Props = Omit<SparkPositionMarkdownArgs, "generatedAt"> & {
+type Args = Omit<SparkPositionMarkdownArgs, "generatedAt"> & {
   /** Loads the position's whole history for the CSV, on a page that drew a
    *  window. Absent where the page already holds every event. */
   fetchAllEvents?: () => Promise<WholeHistoryFetch>;
@@ -20,21 +18,25 @@ type Props = Omit<SparkPositionMarkdownArgs, "generatedAt"> & {
   /** Output file name for the CSV download, including the `.csv` extension. */
   csvFilename: string;
   /** What the exported EVENT LIST covers, when the page drew a window. The
-   *  position figures in the snapshot are whole-history either way — they are
-   *  seeded from the opening balance — but the per-event rows are the window,
-   *  and the menu says so rather than handing over a short spreadsheet. */
+   *  position figures in the snapshot are whole-history either way (seeded
+   *  from the opening balance); the per-event rows are the window, and the
+   *  menu says so. */
   scopeNote?: string;
 };
 
-export function SparkExportMenu({ csvFilename, scopeNote, fetchAllEvents, queued, ...markdownArgs }: Props) {
-  return (
-    <ExportMenu
-      buildMarkdown={() => sparkPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() })}
-      events={markdownArgs.events}
-      fetchAllEvents={fetchAllEvents}
-      queued={queued}
-      csvFilename={csvFilename}
-      scopeNote={scopeNote}
-    />
-  );
+export function sparkExports({
+  csvFilename,
+  scopeNote,
+  fetchAllEvents,
+  queued,
+  ...markdownArgs
+}: Args): PositionCardExports {
+  return {
+    buildMarkdown: () => sparkPositionToMarkdown({ ...markdownArgs, generatedAt: new Date() }),
+    events: markdownArgs.events,
+    fetchAllEvents,
+    queued,
+    csvFilename,
+    scopeNote,
+  };
 }

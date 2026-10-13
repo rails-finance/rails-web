@@ -27,7 +27,6 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
@@ -73,14 +72,12 @@ import {
   cardSideUsd,
   viewFromSummary,
   type CompoundPositionView,
-  compoundBorrowing,
 } from "@/components/protocol/compound/compound-position-card";
 import { CompoundEventCard } from "@/components/protocol/compound/compound-event-card";
 import {
   CompoundPositionExplanation,
   CompoundClosedPositionExplanation,
 } from "@/components/protocol/compound/compound-position-explanation";
-import { CompoundBorrowRoom, compoundRiskColumn } from "@/components/protocol/compound/compound-risk-slot";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
@@ -90,13 +87,9 @@ import { useCompoundFlows } from "@/hooks/useCompoundFlows";
 import type { CompoundLive } from "@/lib/compound/flows";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the V4 spoke page.
-const CompoundExportMenu = dynamic(
-  () => import("@/components/protocol/compound/compound-export-menu").then((m) => m.CompoundExportMenu),
-  { ssr: false },
-);
+import { ExportMenu } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
+import { compoundExports } from "@/components/protocol/compound/compound-export-menu";
 
 /** Renders the single (market, wallet) position: the card, the live risk
  *  surfaces for that market (when its chain read landed), and the Lifetime
@@ -109,6 +102,8 @@ function Position({
   folders,
   opening,
   flows,
+  pagePath,
+  exports,
 }: {
   view: CompoundPositionView;
   events: BaseActivityEvent[];
@@ -123,6 +118,10 @@ function Position({
   viewHref?: () => string;
   /** The Lifetime flows panel. */
   flows: ReactNode;
+  /** This position's page, for the card's ⋮ link row. */
+  pagePath: string;
+  /** The card ⋮'s export shapes. */
+  exports: PositionCardExports | null;
 }) {
   // One live read for the whole card: where the Comet read at head has landed,
   // its balance is the card's, the tower's and the pane's, so the three
@@ -176,19 +175,15 @@ function Position({
     <div className="space-y-6">
       <CompoundPositionCard
         v={view}
-        receipts
+        surface="detail"
         viewHref={viewHref}
-        // Closed by default, remembered per viewer and position (ui-jobs 209).
-        // The borrowing-limit headline, the room left to borrow and the
-        // distance bar come from the live Comet read.
-        positionSummary
-        risk={view.status === "open" ? compoundRiskColumn(chain ?? null, compoundBorrowing(view)) : null}
-        debtDetail={chain ? <CompoundBorrowRoom chain={chain} /> : undefined}
-        // The Explanation is now pure layman prose about those same face
-        // figures — no secondary figure-strips. The borrow-capacity strip is
-        // absorbed into the risk slot above; the market rates live on the
-        // market view (where pool-wide rate context belongs). The card's own
-        // USD side headlines ride along so the pane can restate them exactly.
+        pagePath={pagePath}
+        exports={exports}
+        // The borrowing-limit headline and the panel's room and absorb rows
+        // come from the live Comet read; null while it is out.
+        live={chain}
+        // The Explanation is layman prose about the same face figures; the
+        // card's USD side figures ride along so the pane restates them.
         explanation={
           // A terminal position narrates from the index alone (its live read
           // answers zeros) — the pane must never wait on the chain lane.
@@ -460,6 +455,30 @@ export default function CompoundPositionView({
     };
   }, [chain, view]);
   const cometMarket = useMemo(() => marketOf(market), [market]);
+  const exports = view
+    ? compoundExports({
+        wallet,
+        views: [view],
+        chainByMarket: chain ? { [market]: chain } : {},
+        events: compoundEvents,
+        csvFilename: `compound-${market}-${wallet.slice(0, 10)}-activity.csv`,
+        // A folder's members are not in the page's events, so a grouped page
+        // reads the whole history for the CSV as a windowed one does.
+        fetchAllEvents: historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory,
+        queued: {
+          protocol: "compound-v3",
+          params: { wallet, market },
+          totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+        },
+        history: markdownHistoryScope(historyWindow, compoundEvents, servedFolders),
+        scopeNote: exportScopeNote(
+          historyWindow,
+          compoundEvents,
+          "this wallet's whole history in this market",
+          servedFolders,
+        ),
+      })
+    : null;
   const flows = useCompoundFlows({
     wholeEvents: flowWhole ? compoundEvents : null,
     fetchAll: fetchAllHistory,
@@ -500,31 +519,11 @@ export default function CompoundPositionView({
             owner={{ wallet }}
             assets={stripAssets}
             closed={view != null && view.status !== "open"}
+            // The exports ride the card's ⋮; the event route, which draws no
+            // card, keeps them in the wallet row's Tools.
+            tools={onEventPage}
           >
-            {view && (
-              <CompoundExportMenu
-                wallet={wallet}
-                views={[view]}
-                chainByMarket={chain ? { [market]: chain } : {}}
-                events={compoundEvents}
-                csvFilename={`compound-${market}-${wallet.slice(0, 10)}-activity.csv`}
-                // A folder's members are not in the page's events, so a grouped page
-                // reads the whole history for the CSV as a windowed one does.
-                fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-                queued={{
-                  protocol: "compound-v3",
-                  params: { wallet, market },
-                  totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-                }}
-                history={markdownHistoryScope(historyWindow, compoundEvents, servedFolders)}
-                scopeNote={exportScopeNote(
-                  historyWindow,
-                  compoundEvents,
-                  "this wallet's whole history in this market",
-                  servedFolders,
-                )}
-              />
-            )}
+            {onEventPage && exports && <ExportMenu {...exports} />}
           </DetailTopRow>
 
           {loading ? (
@@ -539,6 +538,8 @@ export default function CompoundPositionView({
                   opening={opening}
                   viewHref={tl.viewHref}
                   folders={servedFolders}
+                  pagePath={`/ethereum/compound-v3/${market}/${wallet}`}
+                  exports={exports}
                   flows={
                     // Lifetime flows: the bars and the line over the position's
                     // replay (lib/compound/flows.ts), in place of the tower

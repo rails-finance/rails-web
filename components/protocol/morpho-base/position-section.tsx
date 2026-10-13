@@ -17,18 +17,21 @@
 // borrow-shares slot equals the replayed one exactly, which is the proof the
 // sweep read every row; otherwise the interest split is gated with its reason.
 
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
-import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { useCallback, useMemo } from "react";
 
 import { morphoExplorer } from "@/lib/morpho/explorer";
 import { MorphoEventCard } from "@/components/protocol/morpho/morpho-event-card";
-import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
+import {
+  MorphoMenuRows,
+  MorphoPositionCard,
+  morphoCardIdentity,
+} from "@/components/protocol/morpho/morpho-position-card";
+import { PositionCard, type PositionCardExports, type PositionCardSlots } from "@/components/shared/position-card";
+import { morphoBasePositionHref } from "@/lib/morpho-base/routes";
 import {
   MorphoClosedPositionExplanation,
   MorphoPositionExplanation,
 } from "@/components/protocol/morpho/morpho-position-explanation";
-import { MorphoBorrowRoom, morphoRiskColumn } from "@/components/protocol/morpho/morpho-risk-slot";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
@@ -46,13 +49,6 @@ import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-positio
 import { morphoViewFromSweep } from "@/lib/morpho/swept-position-view";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
-import { WalletPill } from "@/components/shared/wallet-pill";
-import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
 import { marketLabel } from "@/lib/morpho/asset-catalog";
@@ -96,6 +92,8 @@ export interface MorphoBasePositionSectionProps {
   /** The event route (rails-ops TO-DO-ui-jobs 236): the event's card in page
    *  mode with the shared column; no position card, no flows panel. */
   onEventPage?: boolean;
+  /** The card ⋮'s export shapes (ui-jobs 308 point 2). */
+  exports?: PositionCardExports | null;
 }
 
 export function MorphoBasePositionSection({
@@ -107,6 +105,7 @@ export function MorphoBasePositionSection({
   vaultOwner = null,
   grouped = null,
   onEventPage = false,
+  exports = null,
 }: MorphoBasePositionSectionProps) {
   const events = useMemo(() => pos.events.filter(isMorphoEvent), [pos.events]);
 
@@ -256,21 +255,19 @@ export function MorphoBasePositionSection({
           sweptClean &&
           !borrowerSide &&
           (live ? (
-            <MorphoLenderOpenCard p={live} receipts vault={vaultOwner} positionSummary />
+            <MorphoLenderOpenCard p={live} surface="detail" vault={vaultOwner} exports={exports} />
           ) : (
-            <LenderClosedCard pos={pos} wallet={wallet} receipts vault={vaultOwner} positionSummary />
+            <LenderClosedCard pos={pos} wallet={wallet} surface="detail" vault={vaultOwner} exports={exports} />
           ))}
         {!onEventPage && sweptClean && borrowerSide && (
           <MorphoPositionCard
             v={{ ...view, vaultOwner }}
-            receipts
+            surface="detail"
             viewHref={tl.viewHref}
             session="morpho-base"
-            // Closed by default, remembered per viewer and position (ui-jobs
-            // 209); the LTV and the room to borrow from the live market read.
-            positionSummary
-            risk={view.status === "open" ? morphoRiskColumn(live, morphoHasDebt(view.borrowSharesRaw)) : null}
-            debtDetail={live ? <MorphoBorrowRoom chain={live} /> : undefined}
+            // The LTV, the rate and the room to borrow from the live market read.
+            live={chain}
+            exports={exports}
             explanation={
               view.status !== "open" ? (
                 <MorphoClosedPositionExplanation
@@ -383,133 +380,122 @@ export function MorphoBasePositionSection({
 
 const lenderPct = (v: number): string => `${(v * 100).toFixed(2)}%`;
 
-/** A market the wallet only ever LENT in, read live — the shared primitives,
- *  since the shared card's grammar is a borrower's and has no supply axis to
- *  place a lending-only holding on. Supply and its rate are a slot the
- *  singleton always answers fresh, so this draws the live chain read alone;
- *  nothing here comes from the replay. */
+/** A market the wallet only ever LENT in, read live: one headline, Supplied,
+ *  and its rate in the panel. Supply and its rate are a slot the singleton
+ *  always answers fresh, so this draws the live chain read alone; nothing here
+ *  comes from the replay. */
 export function MorphoLenderOpenCard({
   p,
-  receipts = false,
+  surface = "listing",
   vault = null,
-  positionSummary,
+  exports,
 }: {
   p: MorphoChainPositionResponse;
-  receipts?: boolean;
-  /** Opt in to the closed/opened card (ui-jobs 209): the supply rate is the
-   *  opened layer. */
-  positionSummary?: boolean;
+  /** `detail` on the position page; `listing` in a row. */
+  surface?: "detail" | "listing";
   /** Set when `p.user` is a catalogued MetaMorpho vault — see
    *  MorphoBasePositionSection. */
   vault?: { name: string; href: string } | null;
+  /** The ⋮'s export shapes on the position page. */
+  exports?: PositionCardExports | null;
 }) {
-  return (
-    <PositionCardShell receipts={receipts} positionSummary={positionSummary}>
-      <OpenPositionStats
-        stackOnPhone={receipts && !!positionSummary}
-        statusPill={
-          receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              Supply only
-            </span>
-          ) : (
-            <LifecyclePill status="open" />
-          )
-        }
-        leadingIdentity={
-          <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-            {!receipts && (
-              <WalletPill
-                wallet={p.user}
-                ensName={null}
-                filterProtocol="morpho-base"
-                bookmarkProtocol="morpho-base"
-                vault={vault}
-              />
-            )}
-            <span>
-              {marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0)}
-              {p.lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(p.lltv * 100).toFixed(1)}%</span>}
-            </span>
-          </span>
-        }
-        identity={<PositionCardMeta />}
-        columns={[
-          {
-            label: CARD_VOCAB.supply,
-            value: (
-              <StatValue>
-                {/* The market params ARE two addresses and this row already
-                    holds them, so the chip is handed the loan token rather
-                    than left to find "stkWELL" in the house symbol table —
-                    which, Morpho being permissionless, it cannot. */}
-                <AssetAmount value={p.currentSupply} symbol={p.loanSymbol} address={p.loanToken} />
-              </StatValue>
+  const identity = morphoCardIdentity({
+    market: marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0),
+    lltv: p.lltv,
+    listingOwner: surface === "detail" ? undefined : { wallet: p.user, session: "morpho-base", vault },
+  });
+  const heads = [
+    {
+      id: "supplied",
+      label: "Supplied",
+      // The market params are two addresses and this row holds them, so the
+      // chip is handed the loan token: Morpho being permissionless, the house
+      // symbol table cannot find "stkWELL".
+      value: <AssetAmount value={p.currentSupply} symbol={p.loanSymbol} address={p.loanToken} />,
+    },
+  ];
+  const slots: PositionCardSlots =
+    surface === "detail"
+      ? {
+          surface: "detail",
+          status: null,
+          heads,
+          identity,
+          counters: null,
+          explainer: { body: null },
+          learnMore: null,
+          menu: {
+            leading: () => (
+              <MorphoMenuRows marketId={p.marketId} pagePath={morphoBasePositionHref(p.user, p.marketId)} />
             ),
-            footnote: (
-              <PositionCardDetail>
-                <StatFootnote>earning {lenderPct(p.supplyApr)}</StatFootnote>
-              </PositionCardDetail>
-            ),
+            exports: exports ?? null,
           },
-        ]}
-      />
-    </PositionCardShell>
-  );
+          panel: [
+            [
+              {
+                id: "supply-rate",
+                label: "Supply rate",
+                value: `${lenderPct(p.supplyApr)} APR`,
+                tip: "The rate the market's lenders earn now, read live from the market: its borrow rate times the share of supply lent out, less the market's fee.",
+              },
+            ],
+            [],
+          ],
+        }
+      : { surface: "listing", status: null, heads, identity, counters: null, menu: null };
+  return <PositionCard slots={slots} />;
 }
 
-/** A lender-only market the wallet has fully left — the shared terminal-card
- *  primitives. The replay carries the lifetime SUMS (supplied, withdrawn),
- *  not a peak balance, so the column states what it honestly can: no peak is
- *  on record for this lane, and the footnote says so rather than putting a
- *  sum under a "highest recorded" label it never earned. */
+/** A lender-only market the wallet has fully left. The replay carries the
+ *  lifetime SUMS (supplied, withdrawn) and no peak balance, so the headline
+ *  states that no peak is on record for this lane. */
 export function LenderClosedCard({
   pos,
   wallet,
-  receipts = false,
+  surface = "listing",
   vault = null,
-  positionSummary,
+  exports,
 }: {
   pos: MorphoSweptPosition;
   wallet: string;
-  receipts?: boolean;
-  /** Opt in to the closed/opened card (ui-jobs 209). */
-  positionSummary?: boolean;
+  /** `detail` on the position page; `listing` in a row. */
+  surface?: "detail" | "listing";
   /** Set when `wallet` is a catalogued MetaMorpho vault — see
    *  MorphoBasePositionSection. */
   vault?: { name: string; href: string } | null;
+  /** The ⋮'s export shapes on the position page. */
+  exports?: PositionCardExports | null;
 }) {
-  const note = <div className="text-xs mt-0.5 text-rb-500">{notRecordedNote("wallet")}</div>;
-  return (
-    <PositionCardShell receipts={receipts} positionSummary={positionSummary}>
-      <ClosedPositionStats
-        detailGate={receipts && positionSummary ? PositionCardDetail : undefined}
-        outcome="closed"
-        leadingIdentity={
-          <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-            {!receipts && (
-              <WalletPill
-                wallet={wallet}
-                ensName={null}
-                filterProtocol="morpho-base"
-                bookmarkProtocol="morpho-base"
-                vault={vault}
-              />
-            )}
-            <span>
-              {pos.marketLabel}
-              {pos.lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(pos.lltv * 100).toFixed(1)}%</span>}
-            </span>
-          </span>
-        }
-        identity={
-          <PositionCardMeta lastActivityAt={pos.lastTs} eventCount={pos.txCount} liquidated={pos.everLiquidated} />
-        }
-        closedAt={pos.lastTs ?? undefined}
-        collateralLabel={CARD_VOCAB.peakSupply}
-        collateral={<StatDash />}
-        collateralFootnote={note}
-      />
-    </PositionCardShell>
-  );
+  const detail = surface === "detail";
+  const common = {
+    status: { word: "Closed", tone: "muted" as const },
+    heads: [{ id: "peak-supply", label: CARD_VOCAB.peakSupply, value: null, sub: notRecordedNote("wallet") }],
+    identity: morphoCardIdentity({
+      market: pos.marketLabel,
+      lltv: pos.lltv,
+      listingOwner: detail ? undefined : { wallet, session: "morpho-base", vault },
+    }),
+    counters: {
+      lastActivityAt: pos.lastTs,
+      eventCount: pos.txCount,
+      liquidated: pos.everLiquidated,
+      ...(detail ? { order: "age-last" as const } : {}),
+    },
+    outcome: { word: "Closed", dates: pos.lastTs ? [{ at: pos.lastTs }] : undefined },
+  };
+  const slots: PositionCardSlots = detail
+    ? {
+        ...common,
+        surface: "detail",
+        explainer: { body: null },
+        learnMore: null,
+        menu: {
+          leading: () => (
+            <MorphoMenuRows marketId={pos.marketId} pagePath={morphoBasePositionHref(wallet, pos.marketId)} />
+          ),
+          exports: exports ?? null,
+        },
+      }
+    : { ...common, surface: "listing", menu: null };
+  return <PositionCard slots={slots} />;
 }

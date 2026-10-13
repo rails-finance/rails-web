@@ -7,7 +7,7 @@
 // the right-hand panel (322) does so in its layout. The (i) Explanation row
 // stays a toggle, since it opens an explanation and not a card state.
 //
-// `PositionCardRow`, `PositionCardDetail` and `riskColumns` keep their names
+// `PositionCardRow` and `PositionCardDetail` keep their names
 // for the families that still draw their lines under the headlines (323).
 
 import { createContext, useContext, type ReactNode } from "react";
@@ -115,29 +115,6 @@ export function PositionCardRegion({
       {children}
     </div>
   );
-}
-
-/** A card's risk headline drawn from the page's live read (Compound V2,
- *  Moonwell, Compound V3): the label, the figure, and the lines beneath it. */
-export interface CardRiskColumn {
-  label: string;
-  labelTip?: string;
-  value: ReactNode;
-  detail?: ReactNode;
-}
-
-/** The risk headline as an `OpenPositionStats` column; none where the card
- *  does not draw the summary face or has no risk. */
-export function riskColumns(risk: CardRiskColumn | null | undefined, summary: boolean) {
-  if (!summary || !risk) return [];
-  return [
-    {
-      label: risk.label,
-      labelTip: risk.labelTip,
-      value: risk.value,
-      footnote: risk.detail,
-    },
-  ];
 }
 
 /** The lines beneath a headline. Always drawn; kept as a seam for the

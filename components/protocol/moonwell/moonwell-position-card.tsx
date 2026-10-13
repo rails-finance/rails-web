@@ -1,42 +1,46 @@
 "use client";
 
-// Moonwell position card — the Compound-v2-family analog of the Spark /
-// Compound position cards, through the SAME shared grammar (OpenPositionStats +
-// StatValue) so it lines up with the other explorers.
+// Moonwell position card: the Compound-v2-family analog of the Spark /
+// Compound position cards, as a slot builder for the shared position card
+// (rails-ops TO-DO-position-card 322): `useMoonwellCardSlots` turns the
+// account's view and the page's live Comptroller read into one
+// `PositionCardSlots` object, and `PositionCard`
+// (components/shared/position-card.tsx) draws it on the position page and in
+// the listing row.
 //
 // A Moonwell account is cross-collateralised through the Comptroller: one
-// wallet supplies and borrows across the four mToken markets. The two sides
+// wallet supplies and borrows across the mToken markets. The two sides
 // carry DIFFERENT bases, and the provenance names each: supply is the exact
 // mToken balance (slot-verified Transfer replay) × the market's exchange rate
 // when the chain read landed — balanceOfUnderlying, interest included — else
 // the replayed deposit principal; debt is the emitted accountBorrows at the
 // last borrow/repay event, UPGRADED to the live borrowBalanceStored on the
 // detail page when its chain lane lands (each borrow row's `live` flag names
-// the basis). The health layer (runway / capacity / verdict) rides the detail
-// page's live Comptroller read — the listing card still asserts no health
-// column (the listing snapshot carries none).
+// the basis). The Health factor headline and the panel's risk rows ride the
+// detail page's live Comptroller read — the listing card still asserts no
+// health column (the listing snapshot carries none).
 
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import type { ReactNode } from "react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import { moonwellPositionModal } from "@/lib/moonwell/event-templates";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
 import { formatUsd } from "@/lib/shared/format-event";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
-import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
-import {
-  useReserveDisclosure,
-  ReserveDisclosureToggle,
-  ReserveDisclosureList,
-} from "@/components/shared/reserve-disclosure";
+import { protocolForSession } from "@/lib/shared/protocols";
 import type {
   MoonwellPositionSummary,
   MoonwellSupplyAmount,
@@ -44,11 +48,11 @@ import type {
   MoonwellPeakAmount,
 } from "@/lib/sources/api/moonwell-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
-import { TipLabel } from "@/components/shared/tip-label";
-import { PositionCardDetail, riskColumns, type CardRiskColumn } from "@/components/shared/position-card-disclosure";
-import { ShareLine, ShareLines } from "@/components/shared/share-bar";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
+import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
+import { moonwellHealthHead, moonwellRiskRows } from "./moonwell-risk-slot";
+import { MoonwellMenuRows } from "./moonwell-menu-rows";
 
 export interface MoonwellPositionView {
   wallet: string;
@@ -129,214 +133,144 @@ function useLineReceipts() {
   };
 }
 
-/** Per-market token amounts, demoted beneath the USD headline — still the
- *  strict chain reads (each line traced, exact figure on hover). The exact hover
- *  figure is the lane the line's provenance asserts: the raw mToken balance on
- *  a current-value line, the raw principal on a principal line. */
-function SupplyFootnoteLines({ v, total }: { v: MoonwellPositionView; total?: number }) {
-  const { supplyProv, mSymbolOf } = useLineReceipts();
-  const usdOf = supplyLineUsd(v);
-  const { lines, control } = useDustLines(v.supplies, usdOf);
-  if (v.supplies.length === 0) return null;
-  return (
-    <ShareLines total={total} control={control}>
-      {lines.map((r) => {
-        const exact = r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal);
-        return (
-          <ShareLine key={r.address} share={total ? (usdOf(r) ?? 0) / total : null} side="collateral">
-            <Prov info={supplyProv(r)}>
-              <ExactSpan exact={exact} symbol={r.current != null ? mSymbolOf(r) : r.symbol}>
-                {formatCompact(supplyAmount(r))} {r.symbol}
-              </ExactSpan>
-            </Prov>
-          </ShareLine>
-        );
-      })}
-    </ShareLines>
-  );
-}
-
-function BorrowFootnoteLines({ v, total }: { v: MoonwellPositionView; total?: number }) {
-  const { borrowProv } = useLineReceipts();
-  const usdOf = borrowLineUsd(v);
-  const { lines, control } = useDustLines(v.borrows, usdOf);
-  if (v.borrows.length === 0) return null;
-  return (
-    <ShareLines total={total} control={control}>
-      {lines.map((r) => {
-        const exact = formatUnitsExact(r.amountRaw, r.decimals);
-        return (
-          <ShareLine key={r.address} share={total ? (usdOf(r) ?? 0) / total : null} side="debt">
-            <Prov info={borrowProv(r)}>
-              <ExactSpan exact={exact} symbol={r.symbol}>
-                {formatCompact(r.amount)} {r.symbol}
-              </ExactSpan>
-            </Prov>
-          </ShareLine>
-        );
-      })}
-    </ShareLines>
-  );
-}
-
-/** "X% borrow rate" — the live per-timestamp rate on the single borrowed
- *  market, or the debt-USD-weighted average across several. */
-function BorrowRateCaption({ rate }: { rate: MoonwellCardCaptions["borrowRate"] | undefined }) {
-  const dep = useMoonwellDeployment();
-  if (!rate) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      <Prov info={rate.avg ? dep.card.avgBorrowRate() : dep.card.borrowRate(rate.symbol)}>{rate.pct.toFixed(2)}%</Prov>{" "}
-      {rate.avg ? "avg borrow rate" : "borrow rate"}
-    </div>
-  );
-}
-
-/** A vertical stack of the wallet's supplied markets, each traced. */
-function SupplyStack({ v }: { v: MoonwellPositionView }) {
-  const { supplyProv, mSymbolOf } = useLineReceipts();
-  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
-  if (v.supplies.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.address}>
-          <Prov info={supplyProv(r)}>
-            <AssetAmount
-              value={supplyAmount(r)}
-              symbol={r.symbol}
-              exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
-              {...(r.current != null ? { exactUnit: mSymbolOf(r) } : {})}
-            />
-          </Prov>
-        </StatValue>
-      ))}
-      {control}
-    </div>
-  );
-}
-
-function BorrowStack({ v }: { v: MoonwellPositionView }) {
-  const { borrowProv } = useLineReceipts();
-  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
-  if (v.borrows.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.address}>
-          <Prov info={borrowProv(r)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-          </Prov>
-        </StatValue>
-      ))}
-      {control}
-    </div>
-  );
-}
-
-/** A vertical stack of per-market PEAK amounts (highest recorded), each traced
- *  to its own lane's maximum (the supply balance at a row on supply, emitted
- *  accountBorrows on debt); no USD — the token amount only. */
-function PeakStack({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply" | "debt" }) {
-  const dep = useMoonwellDeployment();
-  if (lines.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.address}>
-          <Prov info={side === "supply" ? dep.card.peakSupply(r.symbol) : dep.card.peakDebt(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-          </Prov>
-        </StatValue>
-      ))}
-    </div>
-  );
-}
-
 const NOT_COLLATERAL_TIP =
   "Supplied and earning the supply rate, but not entered as collateral (the Comptroller's market membership, read now), so it backs no borrowing. A liquidation can still seize it.";
+const FACTOR_TIP =
+  "The share of each entered market's value that counts toward the borrow limit, as the Comptroller sets it now.";
+const DUST_TIP =
+  "Balances worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open to see them.";
 
 /** Whether a line's market is entered as collateral; true where membership
  *  is unknown, so nothing is split without a read behind it. */
 const isEntered = (v: MoonwellPositionView, address: string) =>
   !v.entered || v.entered.some((e) => e.underlying === address.toLowerCase());
 
-/** "Collateral factor WETH 84% · USDC 88%": the entered markets the card
- *  lists, each at the factor the Comptroller applies to it now. */
-function FactorCaption({ v, addresses }: { v: MoonwellPositionView; addresses: string[] }) {
+/** A line's share of its side, as the panel states it. */
+const shareText = (share: number) => (share > 0 && share < 0.01 ? "under 1%" : `${Math.round(share * 100)}%`);
+
+/** The stacked per-market amounts of a side with no complete USD total. */
+function AmountStack({ children }: { children: ReactNode }) {
+  return <span className="flex flex-col gap-1">{children}</span>;
+}
+
+/** Per-market PEAK amounts (highest recorded), each traced to the lane's
+ *  maximum (the supply balance at a row on supply, emitted accountBorrows on
+ *  debt); no USD, the token amount only. */
+function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply" | "debt" }) {
+  const dep = useMoonwellDeployment();
+  return (
+    <AmountStack>
+      {lines.map((r) => (
+        <Prov key={r.address} info={side === "supply" ? dep.card.peakSupply(r.symbol) : dep.card.peakDebt(r.symbol)}>
+          <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+        </Prov>
+      ))}
+    </AmountStack>
+  );
+}
+
+/** One side's USD total as the headline figure, traced to the oracle read. */
+function UsdFigure({ usd, what }: { usd: number; what: string }) {
+  const dep = useMoonwellDeployment();
+  return (
+    <span title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+      <Prov info={dep.card.usd(what)}>{formatUsd(usd)}</Prov>
+    </span>
+  );
+}
+
+/** A panel row's value for one market line: the amount, then its USD and its
+ *  share of the side. */
+function LineValue({
+  amount,
+  usd,
+  share,
+  usdWhat,
+}: {
+  amount: ReactNode;
+  usd: number | null;
+  share: number | null;
+  usdWhat: string;
+}) {
+  const dep = useMoonwellDeployment();
+  return (
+    <>
+      {amount}
+      {usd != null && (
+        <span className="text-rb-500">
+          {" · "}
+          <Prov info={dep.card.usd(usdWhat)}>{formatUsd(usd)}</Prov>
+          {share != null && ` · ${shareText(share)}`}
+        </span>
+      )}
+    </>
+  );
+}
+
+/** "WETH 84% · USDC 88%": the entered markets the card lists, each at the
+ *  factor the Comptroller applies to it now. */
+function factorsRow(v: MoonwellPositionView, addresses: string[]): PositionPanelRow | null {
   const rows = (v.entered ?? []).filter((e) => addresses.some((a) => a.toLowerCase() === e.underlying));
   if (rows.length === 0) return null;
+  return {
+    id: "collateral-factors",
+    label: rows.length > 1 ? "Collateral factors" : "Collateral factor",
+    tip: FACTOR_TIP,
+    value: rows.map((e) => `${e.symbol} ${+(e.collateralFactor * 100).toFixed(1)}%`).join(" · "),
+  };
+}
+
+/** The borrow rate row: the live per-timestamp rate on the single borrowed
+ *  market, or the debt-USD-weighted average across several. */
+function BorrowRateValue({ rate }: { rate: NonNullable<MoonwellCardCaptions["borrowRate"]> }) {
+  const dep = useMoonwellDeployment();
   return (
-    <div className="text-xs mt-0.5 text-rb-500" data-moonwell-collateral-factors="">
-      <TipLabel
-        text={rows.length > 1 ? "collateral factors" : "collateral factor"}
-        tip="The share of each entered market's value that counts toward the borrow limit, as the Comptroller sets it now."
-      />{" "}
-      {rows.map((e, i) => (
-        <span key={e.underlying}>
-          {i > 0 ? " · " : ""}
-          {e.symbol} {+(e.collateralFactor * 100).toFixed(1)}%
-        </span>
-      ))}
-    </div>
+    <Prov info={rate.avg ? dep.card.avgBorrowRate() : dep.card.borrowRate(rate.symbol)}>{rate.pct.toFixed(2)}%</Prov>
   );
 }
 
-function NotCollateralBlock({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-2" data-moonwell-not-collateral="">
-      <div className="text-rb-500 text-xs font-semibold">
-        <TipLabel text="Supplied, not collateral" tip={NOT_COLLATERAL_TIP} />
-      </div>
-      {children}
-    </div>
-  );
-}
-
-export function MoonwellPositionCard({
-  v,
-  receipts = false,
-  rowExtra,
-  explanation,
-  viewHref,
-  captions,
-  peaks = true,
-  positionSummary,
-  risk,
-  debtDetail,
-}: {
+export interface MoonwellPositionCardProps {
   v: MoonwellPositionView;
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
-   *  forwarded to `PositionCardShell`. */
-  positionSummary?: boolean;
-  /** The risk headline from the page's Comptroller read, with its opened
-   *  layer (moonwellRiskColumn). */
-  risk?: CardRiskColumn | null;
-  /** Opened-layer lines under Debt from the same read (the room to borrow). */
-  debtDetail?: React.ReactNode;
-  receipts?: boolean;
+  /** `detail` on the position page (receipts, panel, (i)); `listing` in a row. */
+  surface: "detail" | "listing";
+  /** The page's live Comptroller read: the Health factor headline and the
+   *  panel's risk rows. Null while it is out; the listing passes none. */
+  chain?: MoonwellChainResponse | null;
   /** Whether the row carries highest-recorded amounts (the index's replay and
    *  a whole sweep do; the Base listing, a chain read at a block with no
    *  replay behind it, does not — its closed cards say so instead of showing
    *  a dash as if nothing was ever held). */
   peaks?: boolean;
-  /** Context content riding the shell's heading-button row. */
-  rowExtra?: React.ReactNode;
   /** The card's Explanation section (narration describing the position NOW). */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
+  explanation?: ReactNode;
+  /** Copy-this-view control, the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
   /** Detail-page stat captions (accrued interest, borrow rate) — computed from
    *  the event stream + the per-market chain read (computeMoonwellCardCaptions).
    *  Listing cards omit them. */
   captions?: MoonwellCardCaptions;
-}) {
-  // The page's deployment — the session the wallet pill filters and bookmarks
-  // under (so a Base wallet never lands in Ethereum's bookmarks) and the USD
-  // headline's receipts.
+  /** The ⋮'s export shapes (`moonwellExports`). */
+  exports?: PositionCardExports | null;
+}
+
+/** Moonwell's slots for the shared position card: the headlines, the panel,
+ *  the tag, the ⋮ and the counters, from the account's view and the page's
+ *  live read. */
+export function useMoonwellCardSlots({
+  v,
+  surface,
+  chain = null,
+  peaks = true,
+  explanation,
+  viewHref,
+  captions,
+  exports,
+}: MoonwellPositionCardProps): PositionCardSlots {
   const dep = useMoonwellDeployment();
   const session = dep.session;
+  const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts();
+  const detail = surface === "detail";
+
   // The collateral column holds the entered markets; a supply the account
   // never entered is shown apart ("Supplied, not collateral").
   const vc: MoonwellPositionView = { ...v, supplies: v.supplies.filter((r) => isEntered(v, r.address)) };
@@ -350,237 +284,225 @@ export function MoonwellPositionCard({
     vo.supplies.map((r) => ({ address: r.address, amount: supplyAmount(r) })),
   );
   const debtUsd = totalUsd(v, v.borrows);
-  // `receipts` is the render-site switch (listing defaults false; only the
-  // detail page passes it) — computed here (not just below) because the
-  // reserve-list disclosure hooks must run on every render, before the
-  // closed/liquidated early return. A priced side's list only exists on the
-  // detail page (the footnote lines); an unpriced side's list is the
-  // headline itself and collapses on every surface.
-  const isDetail = receipts;
-  // The closed/opened card (ui-jobs 209): the per-side market chevrons give
-  // way to the card's one header chevron, and every line under a headline
-  // moves into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!positionSummary;
-  // Dust lines (under a cent) leave the icon stack, its "+N" and the list
-  // count; the lines put them behind the "N dust reserves hidden" control.
+  // Dust lines (under a cent) leave the icon cluster and the panel's rows;
+  // the "N dust reserves hidden" control puts them back.
+  const collDust = useDustLines(vc.supplies, supplyLineUsd(v));
+  const otherDust = useDustLines(vo.supplies, supplyLineUsd(v));
+  const debtDust = useDustLines(v.borrows, borrowLineUsd(v));
   const suppliesShown = splitDust(vc.supplies, supplyLineUsd(v)).shown;
   const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
-  const supplyListCount = collUsd == null ? suppliesShown.length : isDetail ? suppliesShown.length : 0;
-  const debtListCount = debtUsd == null ? borrowsShown.length : isDetail ? borrowsShown.length : 0;
-  const supplyDisclosure = useReserveDisclosure(supplyListCount);
-  const debtDisclosure = useReserveDisclosure(debtListCount);
 
-  // Closed / liquidated: the wallet holds no open markets, so the headline is
-  // what each asset held at its height — highest recorded per-market supply +
-  // debt (replayed MAX over the wallet's life, per asset; no USD).
-  if (v.status === "closed" || v.status === "liquidated") {
-    const noPeaksNote = !peaks ? (
-      <div className="text-xs mt-0.5 text-rb-500">{notRecordedNote("position")}</div>
-    ) : undefined;
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={moonwellPositionModal(v.status)}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the highest recorded balances are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcome={v.status}
-          leadingIdentity={
-            receipts ? undefined : (
-              <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
-            )
-          }
-          identity={
-            <PositionCardMeta
-              lastActivityAt={v.lastActivityAt}
-              eventCount={v.txCount}
-              eventTotal={v.eventTotal}
-              countNote={txCountNote(v.liquidationCount)}
-              liquidationCount={v.liquidationCount}
-            />
-          }
-          closedAt={v.lastActivityAt}
-          outcomeDates={outcomeDates(v)}
-          collateral={<PeakStack lines={v.peakSupplies.filter((r) => isEntered(v, r.address))} side="supply" />}
-          debt={<PeakStack lines={v.peakBorrows} side="debt" />}
-          collateralFootnote={
-            noPeaksNote ??
-            (receipts ? (
-              <>
-                <FactorCaption
-                  v={v}
-                  addresses={v.peakSupplies.filter((r) => isEntered(v, r.address)).map((r) => r.address)}
-                />
-                {v.peakSupplies.some((r) => !isEntered(v, r.address)) && (
-                  <NotCollateralBlock>
-                    <PeakStack lines={v.peakSupplies.filter((r) => !isEntered(v, r.address))} side="supply" />
-                  </NotCollateralBlock>
-                )}
-              </>
-            ) : undefined)
-          }
-          debtFootnote={noPeaksNote}
-        />
-      </PositionCardShell>
-    );
+  const ended = v.status === "closed" || v.status === "liquidated";
+  const status: PositionCardStatus | null =
+    v.status === "liquidated"
+      ? { word: "Liquidated", tone: "danger" }
+      : v.status === "closed"
+        ? { word: "Closed", tone: "muted" }
+        : v.status === "unread"
+          ? { word: "Not loaded", tone: "muted" }
+          : null;
+
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    eventTotal: v.eventTotal,
+    countNote: txCountNote(v.liquidationCount),
+    liquidationCount: v.liquidationCount,
+    // The foot strip reads transactions, warnings, then the age (ui-jobs 270).
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+  // The listing names the account; the position page's wallet row does.
+  const identity = detail ? undefined : (
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+  );
+  const common = { status, identity, counters };
+
+  let heads: PositionCardHead[];
+  let outcome: PositionCardOutcome | undefined;
+  if (ended) {
+    // Closed / liquidated: the wallet holds no open markets, so the headline is
+    // what each asset held at its height — highest recorded per-market supply +
+    // debt (replayed MAX over the wallet's life, per asset; no USD).
+    const noPeaksNote = !peaks ? notRecordedNote("position") : undefined;
+    heads = [
+      {
+        id: "peak-collateral",
+        label: CARD_VOCAB.peakCollateral,
+        value: peaks && v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
+        sub: noPeaksNote,
+      },
+      {
+        id: "peak-debt",
+        label: CARD_VOCAB.peakDebt,
+        value: peaks && v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
+        sub: noPeaksNote,
+      },
+    ];
+    outcome = {
+      word: v.status === "liquidated" ? "Liquidated" : "Closed",
+      dates: outcomeDates(v) ?? (v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined),
+    };
+  } else {
+    // ONE oracle-USD figure leads each side (the asset cluster carries the
+    // identities), the per-market amounts sit in the panel. When any
+    // contributing market is unpriced the token stack stays the headline: a
+    // partial USD total is never asserted.
+    heads = [
+      {
+        id: "collateral",
+        label: CARD_VOCAB.collateral,
+        value:
+          vc.supplies.length === 0 ? null : collUsd != null ? (
+            <UsdFigure usd={collUsd} what="Collateral" />
+          ) : (
+            <AmountStack>
+              {collDust.lines.map((r) => (
+                <Prov key={r.address} info={supplyProv(r)}>
+                  <AssetAmount
+                    value={supplyAmount(r)}
+                    symbol={r.symbol}
+                    exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
+                    {...(r.current != null ? { exactUnit: mSymbolOf(r) } : {})}
+                  />
+                </Prov>
+              ))}
+            </AmountStack>
+          ),
+        assets:
+          vc.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
+      },
+      {
+        id: "debt",
+        label: CARD_VOCAB.debt,
+        value:
+          v.borrows.length === 0 ? null : debtUsd != null ? (
+            <UsdFigure usd={debtUsd} what="Borrowed" />
+          ) : (
+            <AmountStack>
+              {debtDust.lines.map((r) => (
+                <Prov key={r.address} info={borrowProv(r)}>
+                  <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+                </Prov>
+              ))}
+            </AmountStack>
+          ),
+        assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
+      },
+    ];
+    // The health factor rides the detail page's live Comptroller read; the
+    // listing snapshot carries none, so a listing card asserts no health
+    // column (never dashed, never staled).
+    const health = detail ? moonwellHealthHead(chain, v.borrows.length > 0) : null;
+    if (health) heads.push(health);
   }
 
-  // Detail render (receipts): a neutral mode-word pill (what the account is
-  // doing NOW), plus the wallet pill. The LISTING render keeps the lifecycle
-  // pill; the wallet pill (facehash + copy + bookmark) renders on both surfaces.
-  const modeWord = v.borrows.length > 0 ? "Borrowing" : "Supply only";
-  // Supplied but never entered as collateral: listed apart beneath Collateral
-  // (in the opened layer on a disclosing card).
-  const notCollateral =
-    vo.supplies.length > 0 ? (
-      <NotCollateralBlock>
-        {otherUsd != null ? (
-          <>
-            <div className="text-sm font-semibold tabular-nums">
-              <Prov info={dep.card.usd("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
-            </div>
-            {isDetail && <SupplyFootnoteLines v={vo} />}
-          </>
-        ) : (
-          <SupplyStack v={vo} />
-        )}
-      </NotCollateralBlock>
-    ) : null;
-  // `isDetail` (== `receipts`) doubles as the surface discriminator: the
-  // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
-  // capped cluster only), the detail page keeps the full traced list.
+  if (!detail) return { ...common, surface: "listing", menu: null, heads, outcome };
 
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={moonwellPositionModal(v.status, v.borrows.length > 0)}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        statusPill={
-          receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {modeWord}
-            </span>
-          ) : (
-            <LifecyclePill status={v.status} />
-          )
-        }
-        leadingIdentity={
-          receipts ? undefined : (
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
-          )
-        }
-        identity={
-          <PositionCardMeta
-            lastActivityAt={v.lastActivityAt}
-            eventCount={v.txCount}
-            eventTotal={v.eventTotal}
-            countNote={txCountNote(v.liquidationCount)}
-            liquidationCount={v.liquidationCount}
-          />
-        }
-        columns={[
-          // ONE oracle-USD figure leads each side (the asset cluster carries
-          // the identities), the per-market token amounts demote to traced
-          // footnote lines. When any contributing market is unpriced the token
-          // stack stays the headline — a partial USD total is never asserted.
-          {
-            label: CARD_VOCAB.collateral,
-            assetIcons:
-              vc.supplies.length > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} />
-                  {disclosing ? null : (
-                    <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
-                  )}
-                </span>
-              ) : undefined,
-            value:
-              collUsd != null ? (
-                <UsdHeadline usd={collUsd} info={dep.card.usd("Collateral")} />
-              ) : supplyDisclosure.collapsible && !disclosing ? null : (
-                <SupplyStack v={vc} />
-              ),
-            footnote: disclosing ? (
-              <PositionCardDetail>
-                {collUsd != null && <SupplyFootnoteLines v={vc} total={collUsd} />}
-                <FactorCaption v={v} addresses={vc.supplies.map((r) => r.address)} />
-                {notCollateral}
-              </PositionCardDetail>
-            ) : (
-              <>
-                {collUsd == null && supplyDisclosure.collapsible && (
-                  <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <SupplyStack v={vc} />
-                  </ReserveDisclosureList>
-                )}
-                {isDetail && collUsd != null && (
-                  <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <SupplyFootnoteLines v={vc} />
-                  </ReserveDisclosureList>
-                )}
-                {isDetail && <FactorCaption v={v} addresses={vc.supplies.map((r) => r.address)} />}
-                {notCollateral}
-              </>
-            ),
-          },
-          {
-            label: CARD_VOCAB.debt,
-            assetIcons:
-              v.borrows.length > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} />
-                  {disclosing ? null : (
-                    <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
-                  )}
-                </span>
-              ) : undefined,
-            value:
-              debtUsd != null ? (
-                <UsdHeadline usd={debtUsd} info={dep.card.usd("Borrowed")} />
-              ) : debtDisclosure.collapsible && !disclosing ? null : (
-                <BorrowStack v={v} />
-              ),
-            footnote: disclosing ? (
-              <PositionCardDetail>
-                {debtUsd != null && <BorrowFootnoteLines v={v} total={debtUsd} />}
-                <BorrowRateCaption rate={captions?.borrowRate} />
-                {debtDetail}
-              </PositionCardDetail>
-            ) : (
-              <>
-                {debtUsd == null && debtDisclosure.collapsible && (
-                  <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <BorrowStack v={v} />
-                  </ReserveDisclosureList>
-                )}
-                {isDetail && debtUsd != null && (
-                  <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <BorrowFootnoteLines v={v} />
-                  </ReserveDisclosureList>
-                )}
-                <BorrowRateCaption rate={captions?.borrowRate} />
-              </>
-            ),
-          },
-          // The health factor rides the detail page's live Comptroller read
-          // (moonwellRiskColumn); the listing snapshot carries none, so a
-          // listing card asserts no risk column (never dashed, never staled).
-          ...riskColumns(risk, disclosing),
-        ]}
-      />
-    </PositionCardShell>
+  const menu = {
+    leading: () => (
+      <MoonwellMenuRows wallet={v.wallet} pagePath={`${protocolForSession(session)?.href ?? ""}/${v.wallet}`} />
+    ),
+    exports: exports ?? null,
+  };
+  const detailCommon = {
+    ...common,
+    surface: "detail" as const,
+    heads,
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore: ended ? moonwellPositionModal(v.status) : moonwellPositionModal(v.status, v.borrows.length > 0),
+    menu,
+  };
+  if (outcome) return { ...detailCommon, outcome };
+
+  const supplyRow = (r: MoonwellSupplyAmount, kind: "collateral" | "other", total: number | null): PositionPanelRow => {
+    const usd = lineUsd(v, r.address, supplyAmount(r));
+    const exact = r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal);
+    const basis =
+      r.current != null
+        ? "its mToken balance times the market's exchange rate, interest included"
+        : "the deposits replayed, less the withdrawals";
+    return {
+      id: `${kind}-${r.address}`,
+      label: kind === "collateral" ? `${r.symbol} collateral` : `${r.symbol} supplied, not collateral`,
+      tip:
+        kind === "collateral"
+          ? `The ${r.symbol} this account supplies as collateral: ${basis}, with its oracle value and its share of the collateral.`
+          : NOT_COLLATERAL_TIP,
+      value: (
+        <LineValue
+          amount={
+            <Prov info={supplyProv(r)}>
+              <ExactSpan exact={exact} symbol={r.current != null ? mSymbolOf(r) : r.symbol}>
+                {formatCompact(supplyAmount(r))} {r.symbol}
+              </ExactSpan>
+            </Prov>
+          }
+          usd={usd}
+          share={usd != null && total ? usd / total : null}
+          usdWhat={`${r.symbol} supplied`}
+        />
+      ),
+    };
+  };
+  const dustRow = (id: string, control: ReactNode): PositionPanelRow[] =>
+    control ? [{ id, label: "Dust reserves", tip: DUST_TIP, value: control }] : [];
+
+  const collateralFactors = factorsRow(
+    v,
+    vc.supplies.map((r) => r.address),
   );
+  const left: PositionPanelRow[] = [
+    ...collDust.lines.map((r) => supplyRow(r, "collateral", collUsd)),
+    ...dustRow("dust-collateral", collDust.control),
+    ...(collateralFactors ? [collateralFactors] : []),
+    ...otherDust.lines.map((r) => supplyRow(r, "other", otherUsd)),
+    ...dustRow("dust-not-collateral", otherDust.control),
+  ];
+  const rate = captions?.borrowRate;
+  const right: PositionPanelRow[] = [
+    ...debtDust.lines.map((r): PositionPanelRow => {
+      const usd = lineUsd(v, r.address, r.amount);
+      return {
+        id: `debt-${r.address}`,
+        label: `${r.symbol} borrowed`,
+        tip: `The ${r.symbol} this account owes: the market's borrow balance, with its oracle value and its share of the debt.`,
+        value: (
+          <LineValue
+            amount={
+              <Prov info={borrowProv(r)}>
+                <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+                  {formatCompact(r.amount)} {r.symbol}
+                </ExactSpan>
+              </Prov>
+            }
+            usd={usd}
+            share={usd != null && debtUsd ? usd / debtUsd : null}
+            usdWhat={`${r.symbol} borrowed`}
+          />
+        ),
+      };
+    }),
+    ...dustRow("dust-debt", debtDust.control),
+    ...(rate
+      ? [
+          {
+            id: "borrow-rate",
+            label: rate.avg ? "Average borrow rate" : "Borrow rate",
+            tip: rate.avg
+              ? "The live variable borrow rate of each borrowed market, annualised from its per-timestamp rate and weighted by the debt in each."
+              : `The live variable borrow rate on the ${rate.symbol} market, annualised from its per-timestamp rate.`,
+            value: <BorrowRateValue rate={rate} />,
+          },
+        ]
+      : []),
+    ...moonwellRiskRows(chain),
+  ];
+  return { ...detailCommon, outcome: undefined, panel: [left, right] };
+}
+
+/** The Moonwell position card: its slots, drawn by the shared card. */
+export function MoonwellPositionCard(props: MoonwellPositionCardProps) {
+  return <PositionCard slots={useMoonwellCardSlots(props)} />;
 }
 
 /** Why the transaction count and the event count differ. */

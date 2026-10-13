@@ -19,7 +19,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFluidEvent, type FluidContext } from "@/lib/shared/types/event-shape";
 import { fetchFluidPositions } from "@/lib/api/fetch-fluid-positions";
@@ -52,7 +51,8 @@ import {
   viewFromSummary,
   type FluidPositionView,
 } from "@/components/protocol/fluid/fluid-position-card";
-import { FluidDebtDetail } from "@/components/protocol/fluid/fluid-risk-card";
+import { fluidExports } from "@/components/protocol/fluid/fluid-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { FluidPositionExplanation } from "@/components/protocol/fluid/fluid-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -71,13 +71,6 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const FluidExportMenu = dynamic(
-  () => import("@/components/protocol/fluid/fluid-export-menu").then((m) => m.FluidExportMenu),
-  { ssr: false },
-);
 
 /** Thread the chain lane's pool names into the event contexts. Names only —
  *  the quantities stay shares, and an API-served symbol is never overridden.
@@ -341,7 +334,6 @@ export default function FluidPositionView({
   const flowFocus = flowsOn && flows.read !== "failed" ? flows.focus : null;
 
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
-  const liveRisk = chain != null && view?.status === "open";
 
   // The top row's price dropdown. Fluid runs no USD feed: a vault's own oracle
   // quotes the collateral in the vault's DEBT token, which is the two-token
@@ -435,6 +427,19 @@ export default function FluidPositionView({
     [chain, fluidEvents],
   );
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = view
+    ? fluidExports({
+        view,
+        chain,
+        events: fluidEvents,
+        csvFilename: `fluid-${nftId}-activity.csv`,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        history: markdownHistoryScope(historyWindow, fluidEvents),
+        scopeNote: exportScopeNote(historyWindow, fluidEvents, "this position's whole history"),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -445,18 +450,11 @@ export default function FluidPositionView({
           priceReason={ORACLE_USD_REASON.fluid}
           closed={view != null && view.status !== "open"}
           closing={closing}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {view && (
-            <FluidExportMenu
-              view={view}
-              chain={chain}
-              events={fluidEvents}
-              csvFilename={`fluid-${nftId}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              history={markdownHistoryScope(historyWindow, fluidEvents)}
-              scopeNote={exportScopeNote(historyWindow, fluidEvents, "this position's whole history")}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -466,18 +464,16 @@ export default function FluidPositionView({
             {!onEventPage && view && (
               <FluidPositionCard
                 v={view}
-                receipts
+                surface="detail"
                 viewHref={tl.viewHref}
+                // The borrow rate, the room to the borrow limit and the Position
+                // ratio come from the live read, inside the card's receipts scope.
                 chain={chain}
-                // Closed by default, remembered per viewer and position (ui-jobs
-                // 209). The borrow rate and the room to the borrow limit from
-                // the live read sit in the opened layer under Debt, inside the
-                // card's receipts scope.
-                positionSummary
-                debtDetail={liveRisk ? <FluidDebtDetail chain={chain} pair={fluidPairText(view, chain)} /> : undefined}
+                chainPending={!chainSettled}
+                exports={exports}
                 // The Explanation is layman prose about the face figures.
-                // Rendered whenever there's a view or a chain read — a closed
-                // position gets its prose too (the risk slot keeps its own gate).
+                // Rendered whenever there's a view or a chain read: a closed
+                // position gets its prose too.
                 explanation={
                   view || chain ? (
                     <FluidPositionExplanation chain={chain} view={view} externalActivity={externalActivity} />
