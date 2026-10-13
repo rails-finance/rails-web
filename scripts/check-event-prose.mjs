@@ -422,6 +422,7 @@ const FAMILIES = {
       "lib/moonwell/event-templates.ts",
       "components/protocol/moonwell/moonwell-event-explainer.tsx",
       "components/protocol/moonwell/moonwell-position-explanation.tsx",
+      "components/protocol/moonwell/moonwell-event-sheet.tsx",
     ],
     nodes: {
       section: "position_words",
