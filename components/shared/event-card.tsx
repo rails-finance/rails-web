@@ -218,8 +218,8 @@ interface EventCardFrame {
    *  and inside a folder the dimmed rows read as disabled, not as quieter
    *  (Miles, 2026-09-02). */
   muted?: boolean;
-  /** A group's whole phone caption ("Redemptions (48) · 1 Oct '25 – 12 Oct
-   *  '25"), in place of the kind and the moment. */
+  /** A group's whole phone caption ("Redemptions", the count's chip, " · 1 Oct
+   *  '25 – 12 Oct '25"), in place of the kind and the moment. */
   phoneCaption?: ReactNode;
   /** The caption as spoken ("Redemptions, 1 October 2025 to …"). */
   spokenCaption?: string;
@@ -572,7 +572,8 @@ export function EventCard(props: EventCardProps) {
 
   // ── The phone caption: the T1 row under 640px (mobile decision 16) ─────
   // "Repay · 6 Jun '26 13:31", the date once per day as the desktop row
-  // states it; a group passes its caption ("Redemptions (48) · 1 Oct '25 – …").
+  // states it; a group passes its caption ("Redemptions", the count's chip,
+  // " · 1 Oct '25 – …").
   const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
   const kind = custody
     ? `${custody.dir === "to" ? "Sent to" : "Received from"} ${short(custody.address)}`
