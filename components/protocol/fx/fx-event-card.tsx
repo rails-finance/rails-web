@@ -22,6 +22,7 @@
 // by construction.
 
 import type { BaseActivityEvent, FxContext } from "@/lib/shared/types/event-shape";
+import { useCallback, useState } from "react";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
@@ -33,6 +34,7 @@ import { fxExplainerTeaser } from "@/lib/fx/explainer-clauses";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { useFxHeadSpec } from "./fx-event-header";
 import { FX_HEADS, useFxOpened } from "./fx-cells";
+import { useFxSheet } from "./fx-sheet";
 import { FxEventExplainer, fxLearnMoreContent } from "./fx-event-explainer";
 import { useFxPoolTerms } from "@/lib/fx/use-event-state";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -166,6 +168,17 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
   const gas = ownTx ? ownerPaidGas({ wallet: ctx.ownerAt ?? event.wallet, gas: event.gas }, ctx.txFrom) : undefined;
   const price = gas ? { gas, prices: [] } : undefined;
   const normalizedSymbol = meta?.normalizedSymbol ?? ctx.poolSymbol;
+  // The position's read, and with it the sheet, starts when the card first opens.
+  const [active, setActive] = useState(false);
+  const onOpen = useCallback(() => setActive(true), []);
+  const sheet = useFxSheet({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    normalizedSymbol,
+    blockPeers,
+    active,
+  });
 
   const slots: EventCardSlots = {
     event: {
@@ -197,15 +210,21 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
       ),
     },
     price,
-    useOpened: () =>
-      useFxOpened({
+    // A sheet whose read is on its way keeps the cells' placeholders; a row the
+    // sheet cannot state (undefined) draws the cells.
+    sheet,
+    onOpen,
+    useOpened: () => {
+      const opened = useFxOpened({
         ctx,
         txHash: event.txHash,
         blockNumber: event.blockNumber,
         normalizedSymbol,
         blockPeers,
         price,
-      }),
+      });
+      return sheet === null ? { ...opened, cells: { pending: FX_HEADS } } : opened;
+    },
     explainer: {
       body: (
         <FxEventExplainer

@@ -9,7 +9,7 @@ const RAILS_API_URL = process.env.RAILS_API_URL;
  * Proxy to rails-server-onboarding's shared daily price store,
  * `/api/prices/daily?chain=&series=k1,k2&from=&to=` (rails-ops
  * reference/daily-prices.md): one price per series and completed UTC day,
- * `{ series: { "<key>": { unit, scale, obs: [[day, price_raw, block], …] } } }`.
+ * `{ series: { "<key>": { unit, scale, obs: [[day, price_raw, block], …], sources, src } } }`.
  * The Lifetime flows panel values a quiet asset between its events at it.
  */
 export async function GET(request: NextRequest) {

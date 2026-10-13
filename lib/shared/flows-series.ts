@@ -18,6 +18,7 @@
 
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { grownBalance, type FlowIndexes, type FlowSide, type FlowTimeline } from "@/lib/shared/flows-timeline";
+import type { DayObs } from "@/lib/shared/price-series";
 
 export type SeriesBin = "day" | "week" | "month";
 
@@ -50,11 +51,11 @@ export function windowFromDay(activeDays: readonly number[]): number {
 }
 
 /** What binning reads: the replay's day rows (balances after each active
- *  day), each asset's daily prices ([day, usd] on each day one was recorded),
+ *  day), each asset's daily prices ([day, usd, block?] on each day one was recorded),
  *  and the symbols. Days are UTC day numbers. */
 export interface BinInput {
   days: { day: number; balances: { side: FlowSide; asset: string; amount: number; index?: number }[] }[];
-  prices: Record<string, [number, number][]>;
+  prices: Record<string, DayObs[]>;
   symbols: Record<string, string>;
   today: number;
   /** Prices are recorded only on some days (a family's events): a bin keeps
@@ -116,7 +117,7 @@ export function binSeries(input: BinInput, bin: SeriesBin): FlowBinSeries | null
   if (days.length === 0) return null;
   const first = days[0].day;
   const today = Math.max(input.today, days[days.length - 1].day);
-  const obs = new Map<string, [number, number][]>();
+  const obs = new Map<string, DayObs[]>();
   for (const [asset, list] of Object.entries(input.prices))
     obs.set(
       asset,

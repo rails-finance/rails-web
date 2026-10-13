@@ -26,6 +26,8 @@
 // close ÷ the index at that event, the chain's balance that day. Without them
 // it stays as the event recorded it.
 
+import type { DayObs } from "@/lib/shared/price-series";
+
 export type FlowSide = "collateral" | "debt";
 
 /** How an outflow's hatch reads: an owner's own exit, a liquidation, or
@@ -320,9 +322,9 @@ export interface FlowTimeline {
   live: FlowLive;
   /** Today's price per asset, for an asset held while no event has priced it. */
   todayPrices?: Record<string, number>;
-  /** Per asset, the days a new daily price was recorded: [day, usd]. The last
+  /** Per asset, the days a new daily price was recorded: [day, usd, block?]. The last
    *  oracle price recorded on or before each day's end, across every wallet. */
-  dailyPrices?: Record<string, [number, number][]>;
+  dailyPrices?: Record<string, DayObs[]>;
   /** Today's UTC day number. With it the slider runs to today while anything
    *  is still held after the last event; without it, one stop past that event. */
   today?: number;
