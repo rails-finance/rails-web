@@ -307,6 +307,44 @@ const FAMILIES = {
       "components/protocol/aave-v3/aave-v3-event-explainer.tsx",
     ],
   },
+  makerdao: {
+    generator: "lib/makerdao/event-prose.ts",
+    loader: "lib/makerdao/event-templates.ts",
+    entry: "export function makerEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "maker",
+    fallback: "maker.fallback",
+    builtVariants: (gen) => {
+      const out = [];
+      // [c, d].filter(Boolean).join("_") || "none": deposit or withdraw, draw or repay, either, both or none.
+      if (/const variant = \[c, d\]\.filter\(Boolean\)\.join\("_"\) \|\| "none"/.test(gen))
+        for (const c of ["deposit", "withdraw", ""])
+          for (const d of ["draw", "repay", ""]) out.push(["maker.adjust", [c, d].filter(Boolean).join("_") || "none"]);
+      return out;
+    },
+    wordConsts: { MAKER_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/makerdao/event-prose.ts",
+      "lib/makerdao/event-templates.ts",
+      "components/protocol/makerdao/makerdao-event-explainer.tsx",
+      "components/protocol/makerdao/makerdao-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/makerdao/makerdao-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/makerdao/event-prose.ts",
+      "lib/makerdao/event-templates.ts",
+      "lib/makerdao/event-figures.ts",
+      "lib/makerdao/position-nodes.tsx",
+      "components/protocol/makerdao/makerdao-event-explainer.tsx",
+      "components/protocol/makerdao/makerdao-event-card.tsx",
+    ],
+  },
   morpho: {
     generator: "lib/morpho/event-prose.ts",
     loader: "lib/morpho/event-templates.ts",

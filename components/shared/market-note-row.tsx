@@ -75,6 +75,7 @@ import { protocolIconSrc } from "@/lib/shared/protocols";
 import { marketNoteRateStepContent, marketNoteVaultTermsContent } from "@/lib/shared/learn-more-content";
 import { polarisModal } from "@/lib/polaris/event-templates";
 import { aaveFamilyRateStepInterestProv, aaveFamilyRateStepProv } from "@/lib/aave-v3/market-note-provenance";
+import { makerModal } from "@/lib/makerdao/event-templates";
 import { makerRateStepInterestProv, makerRateStepProv } from "@/lib/makerdao/market-note-provenance";
 import { rateStepInterestProv, rateStepProv } from "@/lib/polaris/market-note-provenance";
 import {
@@ -925,7 +926,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
       // event" would name a row inside a folder.
       lead: `Governance ${note.setsBetween != null && note.setsBetween > 1 ? `changed ${ilk}'s fee ${f.sets} times` : `changed ${ilk}'s fee`} since ${note.steps != null || note.grouped ? `the vault's event on ${formatDate(note.from.timestamp)}` : `the vault's ${note.live ? "last event" : "previous event"}`}`,
     },
-    learnMore: marketNoteRateStepContent("makerdao"),
+    learnMore: makerModal("rate_step"),
     // T3 in plain words. How the fee at each touch is found (the Jug.drip
     // derivation) is the receipts' job: makerRateStepProv.
     derivation: (

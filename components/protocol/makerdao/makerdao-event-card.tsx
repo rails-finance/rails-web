@@ -2,7 +2,8 @@
 
 // MakerDAO's event card on the shared shell's slots (ui-jobs 309 step 8): the
 // head from makerdao-event-header.tsx, T2 from makerdao-cells.tsx, the
-// explanation and the Learn More from makerdao-event-explainer.tsx. The index
+// explanation from makerdao-event-explainer.tsx and the Learn More from the
+// generator (lib/makerdao/event-prose.ts). The index
 // carries no gas for Maker's rows, so the price row states none.
 
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
@@ -13,11 +14,11 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 
 import { debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-provenance";
-import { makerdaoExplainerTeaser } from "@/lib/makerdao/explainer-clauses";
 import { useMakerHeadSpec } from "./makerdao-event-header";
 import { MakerLedgerProvider } from "./makerdao-ledger";
 import { useMakerCells, useMakerOpened } from "./makerdao-cells";
-import { MakerDAOEventExplainer, makerdaoLearnMoreContent, useMakerRowExtras } from "./makerdao-event-explainer";
+import { MakerDAOEventExplainer, useMakerRowExtras } from "./makerdao-event-explainer";
+import { makerEventModal } from "@/lib/makerdao/event-prose";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { openedForSigner, useMakerVaultHistory } from "@/lib/makerdao/vault-history";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
@@ -145,17 +146,10 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
     useOpened: () => useMakerOpened(ctx, coords, event.id, undefined),
     explainer: {
       body: (
-        <MakerDAOEventExplainer
-          ctx={ctx}
-          eventId={event.id}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          skipLead
-        />
+        <MakerDAOEventExplainer ctx={ctx} eventId={event.id} txHash={event.txHash} blockNumber={event.blockNumber} />
       ),
-      first: makerdaoExplainerTeaser(ctx, coords, extras),
     },
-    learnMore: <LearnMore inline content={makerdaoLearnMoreContent(ctx, extras.leftover != null)} />,
+    learnMore: <LearnMore inline content={makerEventModal(ctx, extras)} />,
   };
   return <EventCard slots={slots} avatar={null} />;
 }

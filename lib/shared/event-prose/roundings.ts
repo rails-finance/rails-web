@@ -10,6 +10,7 @@ import { formatDate, formatMonthDay } from "@/lib/date";
 import { compoundAmount } from "@/lib/compound/row-facts";
 import { formatNumber, formatTinyNonZero, formatUsdValue } from "@/lib/utils/format";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
+import { collAmount } from "@/lib/makerdao/price-format";
 import type { ProseValue, Rounding } from "./types";
 
 /** The values one sentence is filled from, and the collateral ledger's decimals. */
@@ -135,4 +136,5 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
   usd_value: (v) => formatUsdValue(num(v)),
   pct_plain: (v) => `${num(v) < 0 ? "−" : ""}${Number((Math.abs(num(v)) * 100).toFixed(2))}%`,
   hf: (v) => hfLabelV4(num(v)),
+  coll_amount: (v) => collAmount(Math.abs(num(v))),
 };

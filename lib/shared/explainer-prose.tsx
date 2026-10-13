@@ -3,7 +3,7 @@
 // Form + emphasis are governed by the explanation-copy charter
 // (rails-ops/standards/explanation-copy-charter.md): §4 fixes the position-pane
 // shape ProseExplainer renders — no heading inside the pane, a single
-// subject-first colon-terminated lead sentence (≤2 figures) over one bullet per
+// subject-first lead sentence with no colon (≤2 figures) over one bullet per
 // independent fact — and §3's highlight rule governs when a figure wears <H>
 // (only with an exact twin on the card's chrome, and every chrome figure must
 // appear bold somewhere in the pane — reverse-completeness).
@@ -199,18 +199,19 @@ export function ProseExplainer({
   const hasItems = items != null && items.length > 0;
   const hasList = list != null && list.length > 0;
   if (paragraph == null && !hasItems && !hasList) return null;
-  // Over headed groups the lead is the first group's first bullet, its
-  // closing colon dropped, so nothing sits above the first heading.
+  // The lead ends in no colon. Over headed groups it is the first group's
+  // first bullet, so nothing sits above the first heading.
+  const lead = paragraph != null ? dropTrailingColon(paragraph) : null;
   const runs = hasItems && items.some(isGrouped) ? runsOf(items) : null;
-  const leadInGroup = paragraph != null && runs != null && runs[0].group !== "";
-  if (leadInGroup) runs[0].nodes.unshift(dropTrailingColon(paragraph));
+  const leadInGroup = lead != null && runs != null && runs[0].group !== "";
+  if (leadInGroup) runs[0].nodes.unshift(lead);
   return (
     <div>
       {/* The lead spaces itself off the bullets (mb-2, matching their space-y-2)
           only when items follow — an items-only event pane keeps the flush top
           described above. */}
-      {paragraph != null && !leadInGroup && (
-        <p className={`text-sm leading-relaxed text-rb-500${hasItems ? " mb-2" : ""}`}>{paragraph}</p>
+      {lead != null && !leadInGroup && (
+        <p className={`text-sm leading-relaxed text-rb-500${hasItems ? " mb-2" : ""}`}>{lead}</p>
       )}
       {hasItems &&
         (runs ? (

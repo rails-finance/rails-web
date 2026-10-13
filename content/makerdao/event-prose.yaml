@@ -1,0 +1,1474 @@
+# MakerDAO prose: every string a vault event's explanation, the vault card's
+# explanation and the "?" modals print on a MakerDAO vault or LockStake urn.
+# The page reads this file and nothing else; the code chooses which strings to
+# say and fills their figures (lib/makerdao/event-prose.ts for an event,
+# components/protocol/makerdao/makerdao-position-explanation.tsx for the vault
+# card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  coll_amount: |-
+    a collateral amount as the card prints it: four significant digits under one unit (0.2538), grouped above (1,204.5)
+  number: |-
+    an amount at up to three places, grouped (1,204.512)
+  units2: |-
+    two places, grouped (1,800.00)
+  usd_value: |-
+    dollars and cents ($4,490.12)
+  pct_whole: |-
+    whole percent of a fraction (0.32 → 32%), unsigned
+  pct_plain: |-
+    a fraction as a percent at up to two places (1.725 → 172.5%)
+  date: |-
+    a UTC day (1 Sep 2025)
+  count: |-
+    a whole number, grouped (1,204)
+  address: |-
+    an address, shortened and linked (0x3ee4…7675)
+  text: |-
+    a word or name as given
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  coll_change:
+    rounding: coll_amount
+    means: |-
+      the collateral the event moved, as the header prints it
+  coll_symbol:
+    rounding: text
+    means: |-
+      the collateral's symbol (ETH, WSTETH, SKY)
+  debt_change:
+    rounding: number
+    means: |-
+      the debt the event drew or repaid, as the header prints it
+  debt_symbol:
+    rounding: text
+    means: |-
+      DAI on a vault, USDS on a LockStake urn
+  coll_after:
+    rounding: coll_amount
+    means: |-
+      the collateral the vault holds after the event
+  fee_after:
+    rounding: units2
+    means: |-
+      the part of the debt after the event that is stability fee: the debt less the principal drawn since the vault last owed nothing
+  principal:
+    rounding: units2
+    means: |-
+      the principal a repayment cleared
+  fee_part:
+    rounding: units2
+    means: |-
+      the stability fee a repayment cleared
+  drop:
+    rounding: pct_whole
+    means: |-
+      how far the collateral price at the event's block could fall before the vault reached its minimum ratio
+  mat:
+    rounding: pct_plain
+    means: |-
+      the collateral type's minimum ratio at the event's block
+  mat_from:
+    rounding: pct_plain
+    means: |-
+      the minimum ratio at the vault's previous event
+  ilk:
+    rounding: text
+    means: |-
+      the collateral type (ETH-A, WSTETH-B)
+  auction_date:
+    rounding: date
+    means: |-
+      the day of the liquidation whose auction handed the collateral back
+  taken_date:
+    rounding: date
+    means: |-
+      the day the owner took the handed-back collateral out
+  tx_changes:
+    rounding: count
+    means: |-
+      how many changes to this vault the event's transaction made
+  cup:
+    rounding: text
+    means: |-
+      the number of the Single-Collateral Dai CDP a migration moved into the vault
+  creator:
+    rounding: address
+    means: |-
+      the contract that opened the vault and handed it over
+  recipient:
+    rounding: address
+    means: |-
+      the account it handed the vault to
+  caller:
+    rounding: address
+    means: |-
+      the address that made an ownership transfer, or the account behind the DSProxy that made it
+  caller_name:
+    rounding: text
+    means: |-
+      a known contract's name, where one made the transfer
+  fork_dir:
+    rounding: text
+    means: |-
+      the fork's direction, from `words`
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  # The vault card's figures, drawn by the card with their receipts.
+  coll:
+    rounding: coll_amount
+    means: |-
+      the collateral the vault holds now
+  debt:
+    rounding: number
+    means: |-
+      the debt the vault owes now, stability fee included
+  coll_usd:
+    rounding: usd_value
+    means: |-
+      that collateral at Maker's price now
+  cap_usd:
+    rounding: usd_value
+    means: |-
+      the cap governance set on Maker's price for the collateral
+  oracle_usd:
+    rounding: usd_value
+    means: |-
+      the oracle's price for the collateral now
+  fee:
+    rounding: units2
+    means: |-
+      the part of the debt that is stability fee: the debt less the principal drawn since the vault last owed nothing
+  ratio:
+    rounding: pct_whole
+    means: |-
+      the vault's collateral ratio now
+  mat_then:
+    rounding: pct_plain
+    means: |-
+      the minimum ratio at the vault's newest event
+  fee_rate:
+    rounding: pct_plain
+    means: |-
+      the collateral type's stability fee, a yearly rate
+  yearly:
+    rounding: number
+    means: |-
+      that rate on today's debt over a year
+  exit_fee:
+    rounding: pct_plain
+    means: |-
+      the LockStake Engine's fee on SKY taken out
+  farm:
+    rounding: address
+    means: |-
+      the rewards farm the urn's SKY is staked in
+  delegate:
+    rounding: address
+    means: |-
+      the delegate the urn's voting power goes to
+  total:
+    rounding: count
+    means: |-
+      the vault's events on the page
+  external:
+    rounding: count
+    means: |-
+      those executed by an address other than the owner's
+  lead_name:
+    rounding: text
+    means: |-
+      the name of the address that executed the most of them
+  actors:
+    rounding: count
+    means: |-
+      how many addresses executed them
+  top_count:
+    rounding: count
+    means: |-
+      how many the most active address executed
+  owner:
+    rounding: address
+    means: |-
+      the account that owns the vault now, behind its DSProxy where it has one
+  since:
+    rounding: date
+    means: |-
+      the day the current owner took the vault
+  transfers:
+    rounding: count
+    means: |-
+      the vault's ownership transfers on the page
+  ended:
+    rounding: date
+    means: |-
+      the day of the vault's first liquidation
+  seizures:
+    rounding: count
+    means: |-
+      how many times liquidation seized the vault
+  sold:
+    rounding: coll_amount
+    means: |-
+      the collateral the vault's auctions sold
+  raised:
+    rounding: units2
+    means: |-
+      what they raised
+  penalty:
+    rounding: units2
+    means: |-
+      the liquidation penalties they had to raise beside the debt
+  shortfall:
+    rounding: units2
+    means: |-
+      what the auctions fell short of the debt and penalty
+  returned:
+    rounding: coll_amount
+    means: |-
+      the collateral the auctions handed back
+  taken:
+    rounding: date
+    means: |-
+      the day the owner took that collateral out
+  min_then:
+    rounding: pct_plain
+    means: |-
+      the minimum ratio at the vault's first liquidation
+  residue_symbol:
+    rounding: text
+    means: |-
+      the symbol of a trace balance under 0.000001
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence ──
+words:
+  fork_out: |-
+    left for another vault
+  fork_in: |-
+    arrived from another vault
+
+# ── The vault card's explanation (zone Z1): a lead with no colon, then
+# bullets under Holdings, Risk, Rate and History when two of them hold two or
+# more bullets; grouped, the lead is the first bullet of the first group.
+# Risk holds at most four. Read by positionWords / positionNodes
+# (lib/makerdao/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── An open vault ──
+  lead_debt: |-
+    This vault holds {coll} {coll_symbol} of collateral against {debt} {debt_symbol} of debt.
+  lead_no_debt: |-
+    This vault holds {coll} {coll_symbol} of collateral and owes nothing.
+  worth: |-
+    At Maker's oracle price that collateral is worth {coll_usd}.
+  worth_capped: |-
+    At Maker's capped price that collateral is worth {coll_usd}.
+  cap_binds: |-
+    Governance caps that price at {cap_usd}, below the oracle's {oracle_usd}.
+  cap_under: |-
+    The oracle's {oracle_usd} is under the {cap_usd} cap governance set, so the oracle price counts.
+  fee_split: |-
+    Of the debt, {fee} {debt_symbol} is stability fee and the rest is principal drawn.
+  lockstake: |-
+    The urn's SKY is staked in the farm {farm} and its votes go to {delegate}.
+  no_debt: |-
+    With no debt, the vault cannot be liquidated.
+  ratio_drop: |-
+    At a collateral ratio of {ratio}, {coll_symbol} can fall {drop} before the vault can be liquidated.
+  ratio_drop_capped: |-
+    At a collateral ratio of {ratio}, Maker's price can fall {drop} before the vault can be liquidated.
+  ratio_below: |-
+    At a collateral ratio of {ratio}, the vault is under the {mat} minimum, so it can be liquidated.
+  ratio_below_off: |-
+    At a collateral ratio of {ratio}, the vault is under the {mat} minimum; auctions for {ilk} are switched off.
+  mat_moved: |-
+    Governance moved the minimum ratio from {mat_then} at the vault's newest event to {mat}.
+  auctions_off: |-
+    Governance has switched off liquidation auctions for {ilk}, so for now the vault would not be sold.
+  rate: |-
+    The debt grows at the {fee_rate} stability fee, about {yearly} {debt_symbol} a year.
+  exit_fee: |-
+    SKY taken out of the urn pays an exit fee of {exit_fee}.
+  operators: |-
+    Of the {total} events here, {external} were executed by an address other than the owner's.
+  operators_one: |-
+    Of the {total} events here, {external} was executed by an address other than the owner's.
+  operators_one_named: |-
+    That one ran through {lead_name}.
+  operators_all_named: |-
+    All of them ran through {lead_name}.
+  operators_most_named: |-
+    Most of them ran through {lead_name}.
+  operators_single: |-
+    A single address ran all of them.
+  operators_spread: |-
+    The work is spread across {actors} addresses, the most active running {top_count} of them.
+  owner_one: |-
+    It has had one owner since it opened: {owner}.
+  owner_since: |-
+    Owned by {owner} since {since}.
+  transfers: |-
+    Ownership of the vault moved {transfers} times.
+  transfers_one: |-
+    Ownership of the vault moved once.
+  # ── A closed or liquidated vault ──
+  closed_lead: |-
+    This vault closed with its collateral withdrawn and its debt repaid.
+  closed_lead_moved: |-
+    This vault closed by moving its collateral and debt to another vault.
+  liq_lead: |-
+    This vault was liquidated on {ended}.
+  liq_lead_emptied: |-
+    This vault was liquidated on {ended}, and its owner emptied it afterwards.
+  liq_lead_moved: |-
+    This vault was liquidated on {ended}, and later moved what remained to another vault.
+  liq_lead_undated: |-
+    This vault was liquidated.
+  lost: |-
+    Liquidation sold {sold} {coll_symbol} for {raised} {debt_symbol} to cover the debt and the penalty.
+  penalty: |-
+    The liquidation penalty came to {penalty} {debt_symbol}.
+  shortfall: |-
+    Liquidation fell {shortfall} {debt_symbol} short, which the protocol absorbed.
+  kept: |-
+    The owner kept the {debt_symbol} the vault drew.
+  returned: |-
+    Liquidation handed back {returned} {coll_symbol} to the vault.
+  returned_taken: |-
+    Liquidation handed back {returned} {coll_symbol}, which the owner took out on {taken}.
+  residue: |-
+    A trace under 0.000001 {residue_symbol} remains in the vault, too small to count as a balance.
+  min_then: |-
+    Its collateral ratio fell under the {min_then} minimum.
+  seized_count: |-
+    Liquidation seized the vault {seizures} times.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  actor.other:
+    when: |-
+      an address other than the owner signed the transaction, outside the owner's DSProxy, and the event only added collateral or repaid
+    text: |-
+      An address other than the owner's executed this transaction.
+  actor.permitted:
+    when: |-
+      the same, on an event that withdrew or drew, which needs the owner's permission
+    text: |-
+      An address other than the owner's executed this, with permission the owner had granted on this vault.
+  created:
+    when: |-
+      a contract opened the vault in its name and handed it over in the same transaction
+    text: |-
+      The contract {creator} opened this vault and handed it to {recipient} in the same transaction.
+  migrated:
+    when: |-
+      the transaction moved a Single-Collateral Dai CDP into this vault
+    text: |-
+      Maker's migration contract moved Single-Collateral Dai CDP #{cup} into this vault.
+  tx.steps:
+    when: |-
+      the event's transaction changed the vault more than once
+    text: |-
+      This transaction changed the vault {tx_changes} times, each change a row of the timeline.
+  risk.drop:
+    when: |-
+      the vault owes debt and the collateral type's price and minimum at this block are read
+    text: |-
+      {coll_symbol} would need to fall {drop} from this block's price for the vault to reach liquidation.
+  risk.drop_capped:
+    when: |-
+      the same, where Maker's price sits at the governance cap
+    text: |-
+      Maker's capped price would need to fall {drop} for the vault to reach liquidation.
+  risk.drop_mat:
+    when: |-
+      the same, where governance moved the minimum ratio since the vault's previous event
+    text: |-
+      Governance moved the minimum ratio to {mat}; {coll_symbol} would now need to fall {drop} to reach it.
+  risk.at_line:
+    when: |-
+      the same, where the price could not fall even half a percent before the minimum
+    text: |-
+      At this block's price the vault stood at its liquidation line.
+  state.no_debt:
+    when: |-
+      the vault holds collateral and owes nothing after the event
+    text: |-
+      The vault owes nothing, so it cannot be liquidated.
+  state.empty:
+    when: |-
+      the vault holds nothing and owes nothing after the event
+    text: |-
+      The vault is now empty.
+
+# ── Templates: one per kind of event ──
+#   id          the template's id
+#   title       the event's label in the template list
+#   when        the event and state that select it
+#   L5          the modal it opens (see L5 below)
+#   variants    each variant's id and when it applies
+#   sentences   its sentences, each with `when` and `text`
+#   order       the order the explanation says them in, shared sentences included
+#   groups      which group (group_words) each sentence of order sits in
+#   alternates  lists of sentences the code says at most one of
+# A figure the card's cells, notes or price row show stays out of a sentence
+# unless the sentence says what it means (rails-ops
+# standards/prose-limits-and-zones.md).
+templates:
+  - id: maker.open
+    title: |-
+      Open
+    when: |-
+      the vault's first frob
+    L5: open
+    variants:
+      collateral: |-
+        the vault opened with collateral only
+      draw: |-
+        the vault opened and drew debt
+    sentences:
+      open.what:
+        when: |-
+          collateral
+        text: |-
+          The vault opened with {coll_change} {coll_symbol} of collateral.
+      open.what_draw:
+        when: |-
+          draw, where the row carries the debt drawn
+        text: |-
+          The vault opened with {coll_change} {coll_symbol} of collateral and drew {debt_change} {debt_symbol}.
+      open.what_draw_plain:
+        when: |-
+          draw, where the row does not carry the debt drawn
+        text: |-
+          The vault opened with {coll_change} {coll_symbol} of collateral and drew its first debt.
+    order:
+      - open.what
+      - open.what_draw
+      - open.what_draw_plain
+      - created
+      - actor.other
+      - actor.permitted
+      - migrated
+      - risk.drop
+      - risk.drop_capped
+      - risk.at_line
+      - state.no_debt
+    groups:
+      happened: [open.what, open.what_draw, open.what_draw_plain, created, actor.other, actor.permitted, migrated]
+      leaves: [risk.drop, risk.drop_capped, risk.at_line, state.no_debt]
+    alternates:
+      - [open.what, open.what_draw, open.what_draw_plain]
+      - [created, actor.other, actor.permitted]
+      - [risk.drop, risk.drop_capped, risk.at_line, state.no_debt]
+
+  - id: maker.adjust
+    title: |-
+      Adjust
+    when: |-
+      a frob after the first: collateral in or out, debt drawn or repaid, or both
+    L5: adjust
+    variants:
+      deposit: |-
+        collateral in only
+      withdraw: |-
+        collateral out only
+      draw: |-
+        debt drawn only
+      repay: |-
+        debt repaid only
+      deposit_draw: |-
+        collateral in and debt drawn
+      deposit_repay: |-
+        collateral in and debt repaid
+      withdraw_draw: |-
+        collateral out and debt drawn
+      withdraw_repay: |-
+        collateral out and debt repaid
+      none: |-
+        nothing moved
+    sentences:
+      adj.deposit:
+        when: |-
+          deposit
+        text: |-
+          {coll_change} {coll_symbol} of collateral went into the vault.
+      adj.withdraw:
+        when: |-
+          withdraw
+        text: |-
+          {coll_change} {coll_symbol} of collateral came out of the vault.
+      adj.draw:
+        when: |-
+          draw, where the row carries the debt drawn
+        text: |-
+          The vault drew {debt_change} {debt_symbol} of new debt.
+      adj.draw_plain:
+        when: |-
+          draw, where it does not
+        text: |-
+          The vault drew new debt.
+      adj.repay:
+        when: |-
+          repay, where the row carries the debt repaid
+        text: |-
+          {debt_change} {debt_symbol} of the debt was repaid.
+      adj.repay_plain:
+        when: |-
+          repay, where it does not
+        text: |-
+          Part of the debt was repaid.
+      adj.deposit_draw:
+        when: |-
+          deposit_draw, where the row carries the debt drawn
+        text: |-
+          {coll_change} {coll_symbol} went into the vault and it drew {debt_change} {debt_symbol} of new debt.
+      adj.deposit_draw_plain:
+        when: |-
+          deposit_draw, where it does not
+        text: |-
+          {coll_change} {coll_symbol} went into the vault and it drew new debt.
+      adj.deposit_repay:
+        when: |-
+          deposit_repay, where the row carries the debt repaid
+        text: |-
+          {coll_change} {coll_symbol} went into the vault and {debt_change} {debt_symbol} of the debt was repaid.
+      adj.deposit_repay_plain:
+        when: |-
+          deposit_repay, where it does not
+        text: |-
+          {coll_change} {coll_symbol} went into the vault and part of the debt was repaid.
+      adj.withdraw_draw:
+        when: |-
+          withdraw_draw, where the row carries the debt drawn
+        text: |-
+          {coll_change} {coll_symbol} came out of the vault and it drew {debt_change} {debt_symbol} of new debt.
+      adj.withdraw_draw_plain:
+        when: |-
+          withdraw_draw, where it does not
+        text: |-
+          {coll_change} {coll_symbol} came out of the vault and it drew new debt.
+      adj.withdraw_repay:
+        when: |-
+          withdraw_repay, where the row carries the debt repaid
+        text: |-
+          {coll_change} {coll_symbol} came out of the vault and {debt_change} {debt_symbol} of the debt was repaid.
+      adj.withdraw_repay_plain:
+        when: |-
+          withdraw_repay, where it does not
+        text: |-
+          {coll_change} {coll_symbol} came out of the vault and part of the debt was repaid.
+      adj.none:
+        when: |-
+          none
+        text: |-
+          This operation moved no collateral and no debt, usually one step of a larger action.
+      tx.in:
+        when: |-
+          deposit, where the same amount came out again later in the transaction
+        text: |-
+          The same {coll_change} {coll_symbol} came out again later in this transaction, so it added nothing.
+      tx.out:
+        when: |-
+          withdraw, where the same amount went in earlier in the transaction
+        text: |-
+          This is the {coll_change} {coll_symbol} put in earlier in this transaction, so the vault ends where it began.
+      fee.split:
+        when: |-
+          a draw or repay leaves debt with stability fee in it
+        text: |-
+          Of the debt now owed, {fee_after} {debt_symbol} is stability fee and the rest is principal.
+      fee.covered:
+        when: |-
+          a repayment went past the principal into the fee
+        text: |-
+          The repayment covered {principal} {debt_symbol} of principal and {fee_part} {debt_symbol} of stability fee.
+      state.cleared:
+        when: |-
+          a repayment cleared the debt and collateral remains
+        text: |-
+          The debt is cleared, so the vault cannot be liquidated.
+    order:
+      - adj.deposit
+      - adj.withdraw
+      - adj.draw
+      - adj.draw_plain
+      - adj.repay
+      - adj.repay_plain
+      - adj.deposit_draw
+      - adj.deposit_draw_plain
+      - adj.deposit_repay
+      - adj.deposit_repay_plain
+      - adj.withdraw_draw
+      - adj.withdraw_draw_plain
+      - adj.withdraw_repay
+      - adj.withdraw_repay_plain
+      - adj.none
+      - actor.other
+      - actor.permitted
+      - tx.steps
+      - tx.in
+      - tx.out
+      - fee.split
+      - fee.covered
+      - risk.drop
+      - risk.drop_capped
+      - risk.drop_mat
+      - risk.at_line
+      - state.no_debt
+      - state.cleared
+      - state.empty
+    groups:
+      happened:
+        - adj.deposit
+        - adj.withdraw
+        - adj.draw
+        - adj.draw_plain
+        - adj.repay
+        - adj.repay_plain
+        - adj.deposit_draw
+        - adj.deposit_draw_plain
+        - adj.deposit_repay
+        - adj.deposit_repay_plain
+        - adj.withdraw_draw
+        - adj.withdraw_draw_plain
+        - adj.withdraw_repay
+        - adj.withdraw_repay_plain
+        - adj.none
+        - actor.other
+        - actor.permitted
+      adds_up: [tx.steps, tx.in, tx.out, fee.split, fee.covered]
+      leaves: [risk.drop, risk.drop_capped, risk.drop_mat, risk.at_line, state.no_debt, state.cleared, state.empty]
+    alternates:
+      - - adj.deposit
+        - adj.withdraw
+        - adj.draw
+        - adj.draw_plain
+        - adj.repay
+        - adj.repay_plain
+        - adj.deposit_draw
+        - adj.deposit_draw_plain
+        - adj.deposit_repay
+        - adj.deposit_repay_plain
+        - adj.withdraw_draw
+        - adj.withdraw_draw_plain
+        - adj.withdraw_repay
+        - adj.withdraw_repay_plain
+        - adj.none
+      - [actor.other, actor.permitted]
+      - [tx.steps, tx.in, tx.out]
+      - [fee.split, fee.covered]
+      - [risk.drop, risk.drop_capped, risk.drop_mat, risk.at_line, state.no_debt, state.cleared, state.empty]
+
+  - id: maker.returned
+    title: |-
+      Auction leftover
+    when: |-
+      a frob that moved collateral a liquidation auction handed back
+    L5: returned
+    variants:
+      in: |-
+        the collateral moved into the vault
+      out: |-
+        the collateral went out to the owner
+    sentences:
+      returned.in:
+        when: |-
+          in
+        text: |-
+          {coll_change} {coll_symbol} moved into the vault: collateral the auction of {auction_date} handed back.
+      returned.out:
+        when: |-
+          out
+        text: |-
+          {coll_change} {coll_symbol} went out to the owner: what the auction of {auction_date} handed back.
+      returned.left:
+        when: |-
+          out, where collateral stays
+        text: |-
+          {coll_after} {coll_symbol} stays in the vault, which owes nothing.
+      returned.trace:
+        when: |-
+          out, where a trace under 0.000001 stays
+        text: |-
+          A trace under 0.000001 {coll_symbol} stays in the vault, which owes nothing.
+    order:
+      - returned.in
+      - returned.out
+      - returned.left
+      - returned.trace
+      - state.empty
+    groups:
+      happened: [returned.in, returned.out]
+      leaves: [returned.left, returned.trace, state.empty]
+    alternates:
+      - [returned.in, returned.out]
+      - [returned.left, returned.trace, state.empty]
+
+  - id: maker.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      grab
+    L5: liquidation
+    variants:
+      auction: |-
+        the auction is read and has settled
+      running: |-
+        the auction is read and still running
+      flip: |-
+        the collateral went to one of Maker's earlier auctions
+      unread: |-
+        the auction is not read
+    sentences:
+      liq.what:
+        when: |-
+          the row carries the debt cleared
+        text: |-
+          The vault was liquidated: {coll_change} {coll_symbol} was seized and {debt_change} {debt_symbol} of debt cleared.
+      liq.what_plain:
+        when: |-
+          it does not
+        text: |-
+          The vault was liquidated: {coll_change} {coll_symbol} of collateral was seized.
+      liq.why:
+        when: |-
+          always
+        text: |-
+          Its collateral ratio had fallen under the minimum for {ilk}, so anyone could start the liquidation.
+      liq.why_mat:
+        when: |-
+          governance moved the minimum ratio since the vault's previous event
+        text: |-
+          Governance had moved that minimum from {mat_from} to {mat} since the vault's previous event.
+      liq.kept:
+        when: |-
+          auction
+        text: |-
+          The owner keeps the {debt_symbol} it drew and gives up the {coll_symbol} the auction sold.
+      liq.taken:
+        when: |-
+          auction, where collateral came back and the owner took it out
+        text: |-
+          The collateral the auction handed back waited at the vault until the owner took it on {taken_date}.
+      liq.running:
+        when: |-
+          running
+        text: |-
+          The auction for the seized collateral is still running.
+      liq.flip:
+        when: |-
+          flip
+        text: |-
+          The seized collateral went to one of Maker's earlier auctions.
+    order:
+      - liq.what
+      - liq.what_plain
+      - liq.why
+      - liq.why_mat
+      - liq.kept
+      - liq.taken
+      - liq.running
+      - liq.flip
+    groups:
+      happened: [liq.what, liq.what_plain, liq.why, liq.why_mat]
+      leaves: [liq.kept, liq.taken, liq.running, liq.flip]
+    alternates:
+      - [liq.what, liq.what_plain]
+      - [liq.kept, liq.running, liq.flip]
+
+  - id: maker.ownership
+    title: |-
+      Ownership transfer
+    when: |-
+      give
+    L5: ownership
+    variants:
+      default: |-
+        always
+    sentences:
+      give.what:
+        when: |-
+          always
+        text: |-
+          The vault changed owner; its collateral and debt stayed in it.
+      give.by:
+        when: |-
+          the transfer's caller is an address with no name
+        text: |-
+          The transfer was made by {caller}.
+      give.by_name:
+        when: |-
+          the caller is a known contract
+        text: |-
+          The transfer was made by {caller_name}.
+      give.by_proxy:
+        when: |-
+          the caller is a DSProxy
+        text: |-
+          The transfer was made by the DSProxy of {caller}.
+      give.round:
+        when: |-
+          the transaction handed the vault back with the same collateral and debt
+        text: |-
+          The transaction handed the vault back to its owner with the same collateral and debt.
+    order:
+      - give.what
+      - give.by
+      - give.by_name
+      - give.by_proxy
+      - created
+      - migrated
+      - tx.steps
+      - give.round
+    groups:
+      happened: [give.what, give.by, give.by_name, give.by_proxy, created, migrated, tx.steps]
+      leaves: [give.round]
+    alternates:
+      - [give.by, give.by_name, give.by_proxy, created]
+      - [migrated, tx.steps]
+
+  - id: maker.fork
+    title: |-
+      Move between vaults
+    when: |-
+      fork-out or fork-in
+    L5: fork
+    variants:
+      out: |-
+        the position left this vault
+      in: |-
+        the position arrived in this vault
+    sentences:
+      fork.both:
+        when: |-
+          collateral and debt moved
+        text: |-
+          {coll_change} {coll_symbol} of collateral and {debt_change} {debt_symbol} of debt {fork_dir}.
+      fork.coll:
+        when: |-
+          collateral alone moved
+        text: |-
+          {coll_change} {coll_symbol} of collateral {fork_dir}.
+      fork.debt:
+        when: |-
+          debt alone moved
+        text: |-
+          {debt_change} {debt_symbol} of debt {fork_dir}.
+      fork.none:
+        when: |-
+          the row carries neither amount
+        text: |-
+          The position {fork_dir}.
+    order:
+      - fork.both
+      - fork.coll
+      - fork.debt
+      - fork.none
+    groups:
+      happened: [fork.both, fork.coll, fork.debt, fork.none]
+    alternates:
+      - [fork.both, fork.coll, fork.debt, fork.none]
+
+  - id: maker.lse
+    title: |-
+      LockStake auction
+    when: |-
+      lse-kick, lse-take or lse-remove
+    L5: liquidation
+    variants:
+      kick: |-
+        the auction opened
+      take: |-
+        a bidder bought from it
+      remove: |-
+        the auction settled
+    sentences:
+      lse.kick:
+        when: |-
+          kick
+        text: |-
+          A liquidation auction opened for this vault's seized {coll_symbol}; the liquidation row carries the amounts.
+      lse.take:
+        when: |-
+          take
+        text: |-
+          A bidder bought part of this vault's seized {coll_symbol} from the auction.
+      lse.remove:
+        when: |-
+          remove
+        text: |-
+          The auction for this vault's seized {coll_symbol} settled.
+    order:
+      - lse.kick
+      - lse.take
+      - lse.remove
+    groups:
+      happened: [lse.kick, lse.take, lse.remove]
+    alternates:
+      - [lse.kick, lse.take, lse.remove]
+
+  - id: maker.fallback
+    title: |-
+      Event
+    when: |-
+      an event type the generator does not know, or a row without its balances after
+    L5: adjust
+    variants:
+      default: |-
+        an event type the generator does not know
+      unloaded: |-
+        the row does not carry the vault's balances after it
+    sentences:
+      fallback.what:
+        when: |-
+          default
+        text: |-
+          The vault recorded a {event_type} event.
+      fallback.unloaded:
+        when: |-
+          unloaded
+        text: |-
+          The vault's balances after this event are not loaded.
+    order:
+      - fallback.what
+      - fallback.unloaded
+    groups:
+      happened: [fallback.what, fallback.unloaded]
+    alternates:
+      - [fallback.what, fallback.unloaded]
+
+# ── The documentation pages the modals link, by id ──
+# Every docs.makerdao.com path answered 307 to developers.skyeco.com/ on
+# 2026-10-09 (rails-ops reference/official-docs/makerdao.md); the links stay on
+# the listed host at page level until the host is ruled on.
+doc_urls:
+  VAT: |-
+    https://docs.makerdao.com/smart-contract-modules/core-module/vat-detailed-documentation
+  RATES: |-
+    https://docs.makerdao.com/smart-contract-modules/rates-module
+  LIQUIDATIONS: |-
+    https://docs.makerdao.com/smart-contract-modules/dog-and-clipper-detailed-documentation
+  OVERVIEW: |-
+    https://docs.makerdao.com/
+
+# ── The "?" modals (zone Z4): the event modals, the vault card's and the rate
+# note's. Each stops at the mechanism and hands it to a Quick Link; no figure
+# of one vault appears here. A `_usds` form is the LockStake urn's. ──
+L5:
+  open:
+    title: |-
+      How opening a Maker vault works
+    intro: |-
+      A vault holds one type of collateral, such as ETH-A or WSTETH-B, and lets its owner draw DAI against it. Opening one is usually a deposit and a first draw together.
+    intro_usds: |-
+      A LockStake urn holds SKY as collateral and lets its owner draw USDS against it. Opening one is usually a deposit and a first draw together.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral ratio
+        text: |-
+          the collateral's value divided by the debt; below the type's minimum ratio the vault can be liquidated.
+      - bold: |-
+          Oracle price
+        text: |-
+          Maker values the collateral at its oracle price, which reaches the vault an hour after the market.
+      - bold: |-
+          Stability fee
+        text: |-
+          a yearly rate governance sets per collateral type, added to the debt continuously.
+      - bold: |-
+          Minimum debt
+        text: |-
+          a vault that owes anything must owe at least its collateral type's floor.
+      - bold: |-
+          Opened by a contract
+        text: |-
+          whoever opens a vault owns it, so a contract opening one for a user hands it over in the same transaction.
+    links:
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Rates module (stability fees)
+        doc: RATES
+      - label: |-
+          Maker protocol docs
+        doc: OVERVIEW
+
+  deposit:
+    title: |-
+      How depositing collateral works
+    intro: |-
+      A deposit locks more collateral in the vault. It raises the collateral ratio, so the price would need to fall further before liquidation.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          No charge
+        text: |-
+          a deposit costs nothing and leaves the debt unchanged.
+      - bold: |-
+          Oracle price
+        text: |-
+          the added collateral counts at Maker's oracle price, an hour behind the market.
+      - bold: |-
+          Who can deposit
+        text: |-
+          any address can add collateral at the Vat; through the CDP manager the owner must have authorised it first.
+    links:
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Maker protocol docs
+        doc: OVERVIEW
+
+  withdraw:
+    title: |-
+      How withdrawing collateral works
+    intro: |-
+      A withdrawal takes collateral out of the vault. It lowers the collateral ratio, so Maker allows it only while the vault stays above its minimum ratio.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Locked collateral
+        text: |-
+          with debt, only the collateral above what the minimum ratio needs can leave; the rest stays until the debt is repaid.
+      - bold: |-
+          Empty vault
+        text: |-
+          with no debt everything can be withdrawn, and the vault number stays with its owner for a later deposit.
+      - bold: |-
+          Permission
+        text: |-
+          only the owner, or an address the owner authorised, can take collateral out.
+    links:
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Maker protocol docs
+        doc: OVERVIEW
+
+  generate:
+    title: |-
+      How drawing debt works
+    intro: |-
+      Drawing mints new DAI to the owner and adds it to the vault's debt. Maker refuses a draw that would take the vault under its minimum ratio.
+    intro_usds: |-
+      Drawing mints new USDS to the owner and adds it to the urn's debt. Maker refuses a draw that would take the urn under its minimum ratio.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Stability fee
+        text: |-
+          the debt grows by the fee from the draw onward, so repaying costs more than was drawn.
+      - bold: |-
+          Fee in lumps
+        text: |-
+          the fee reaches the debt when someone updates the collateral type's rate, which a draw or a repayment does first.
+      - bold: |-
+          Minimum debt
+        text: |-
+          after a draw the debt must be at least the collateral type's floor.
+    links:
+      - label: |-
+          Rates module (stability fees)
+        doc: RATES
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Maker protocol docs
+        doc: OVERVIEW
+
+  repay:
+    title: |-
+      How repaying debt works
+    intro: |-
+      Repaying returns DAI to the vault, which burns it and lowers the debt. It raises the collateral ratio and frees collateral to withdraw.
+    intro_usds: |-
+      Repaying returns USDS to the urn, which burns it and lowers the debt. It raises the collateral ratio and frees collateral to withdraw.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Principal and fee
+        text: |-
+          Maker keeps one debt figure; the page splits it into principal, drawn less repaid, and fee, the rest.
+      - bold: |-
+          Repayment order
+        text: |-
+          the page counts a repayment against principal first, and against fee once principal reaches zero.
+      - bold: |-
+          Minimum debt
+        text: |-
+          a repayment must leave no debt or at least the collateral type's floor.
+      - bold: |-
+          Anyone can repay
+        text: |-
+          any address can repay a vault's debt at the Vat; the collateral stays the owner's.
+    links:
+      - label: |-
+          Rates module (stability fees)
+        doc: RATES
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Maker protocol docs
+        doc: OVERVIEW
+
+  adjust:
+    title: |-
+      How Maker vault adjustments work
+    intro: |-
+      A vault can take collateral in or out and draw or repay debt, one or several at once. Adding or repaying raises the collateral ratio; withdrawing or drawing lowers it.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Minimum ratio
+        text: |-
+          a change that withdraws or draws must leave the vault above its minimum at Maker's oracle price.
+      - bold: |-
+          Stability fee
+        text: |-
+          the debt includes the fee added since the draws, booked when the collateral type's rate is updated.
+      - bold: |-
+          Minimum debt
+        text: |-
+          a vault's debt is zero or at least its collateral type's floor.
+      - bold: |-
+          One transaction, several rows
+        text: |-
+          each change to the vault is a separate row, so collateral put in and taken out again adds nothing.
+      - bold: |-
+          Another address
+        text: |-
+          adding collateral or repaying needs no permission at the Vat; withdrawing or drawing needs the owner's, which it can withdraw.
+    links:
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Rates module (stability fees)
+        doc: RATES
+      - label: |-
+          Maker protocol docs
+        doc: OVERVIEW
+
+  returned:
+    title: |-
+      How auction leftovers come back
+    intro: |-
+      Once a liquidation auction has raised the debt and the penalty, it sends the collateral left over back to the vault's address.
+    stepsHeading: |-
+      How the owner takes it:
+    steps:
+      - |-
+        The owner moves the returned collateral into the vault.
+      - |-
+        The owner then takes it out to their wallet.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Free collateral
+        text: |-
+          collateral at the vault's address that Maker records outside the vault's balance.
+      - bold: |-
+          Not a new deposit
+        text: |-
+          it is the owner's collateral coming back, so it adds nothing to what they put in.
+    links:
+      - label: |-
+          Liquidations 2.0 (Dog and Clipper)
+        doc: LIQUIDATIONS
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+
+  ownership:
+    title: |-
+      How vault ownership works
+    intro: |-
+      Every vault opened through Maker's CDP manager has a number and a recorded owner. A transfer changes that owner; the collateral and the debt stay where they are.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          DSProxy
+        text: |-
+          a small contract wallet a user deploys once and acts through; the page names the account behind it as the owner.
+      - bold: |-
+          Opened by a contract
+        text: |-
+          whoever opens a vault owns it, so a contract opening one for a user hands it over in the same transaction.
+      - bold: |-
+          Held for a moment
+        text: |-
+          some tools hold a vault for part of a transaction and hand it on or back before the transaction ends.
+      - bold: |-
+          Migration
+        text: |-
+          Maker's migration contract moved each Single-Collateral Dai CDP into a new vault and handed it to its holder.
+      - bold: |-
+          Permission
+        text: |-
+          only the owner, or an address it allowed on this vault, can give the vault away.
+    links:
+      - label: |-
+          Maker protocol docs
+        doc: OVERVIEW
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+
+  fork:
+    title: |-
+      How moving a position between vaults works
+    intro: |-
+      A fork moves collateral and the debt against it from one vault to another inside Maker's core contract. No tokens change hands and no debt is repaid.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Migration
+        text: |-
+          moving a position this way is how a vault's contents move to another vault in one step.
+      - bold: |-
+          Both timelines
+        text: |-
+          the sending vault shows the move out and the receiving vault shows it arriving.
+    links:
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+
+  liquidation:
+    title: |-
+      How Maker liquidations work
+    intro: |-
+      When a vault's collateral ratio falls under its type's minimum, anyone can start a liquidation. Maker seizes the collateral and debt and auctions the collateral.
+    stepsHeading: |-
+      What happens to the vault:
+    steps:
+      - |-
+        The vault's collateral and debt are seized in one step.
+      - |-
+        An auction sells the collateral at a falling price to raise the debt plus a penalty.
+      - |-
+        Once that is raised, the collateral left over goes back to the vault's address.
+      - |-
+        A shortfall becomes bad debt, which the protocol's surplus covers.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Oracle delay
+        text: |-
+          Maker acts on its oracle price, an hour behind the market, so owners see a fall before it counts.
+      - bold: |-
+          Liquidation penalty
+        text: |-
+          a percentage of the debt that the auction must raise beside it, set per collateral type.
+      - bold: |-
+          After a liquidation
+        text: |-
+          the vault survives with its number and can take collateral again.
+      - bold: |-
+          LockStake urns
+        text: |-
+          the engine first takes the SKY out of its rewards farm and back from its delegate.
+    links:
+      - label: |-
+          Liquidations 2.0 (Dog and Clipper)
+        doc: LIQUIDATIONS
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+
+  position_open:
+    title: |-
+      About this vault
+    intro: |-
+      The explanation states the vault's collateral, its DAI debt, what the debt costs and how far the collateral price can fall before liquidation.
+    intro_usds: |-
+      The explanation states the urn's SKY, its USDS debt, what the debt costs and how far Maker's SKY price can fall before liquidation.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral ratio
+        text: |-
+          the collateral's value over the debt; governance sets a minimum per collateral type, and below it the vault can be liquidated.
+      - bold: |-
+          Oracle price
+        text: |-
+          Maker judges the vault at its oracle price, which passes each price on an hour late.
+        text_usds: |-
+          Maker values SKY at the lower of its oracle price, an hour late, and a cap governance sets.
+      - bold: |-
+          Stability fee
+        text: |-
+          a yearly rate that compounds into the debt; the page splits the debt into principal drawn and fee.
+      - bold: |-
+          Minimum debt
+        text: |-
+          each collateral type sets a floor, and a repayment may leave no debt or at least that much.
+      - bold: |-
+          Debt ceiling
+        text: |-
+          the most all vaults of one collateral type may owe together; at the ceiling none can draw more.
+        text_usds: |-
+          the LockStake Engine makes the urn and stakes its SKY in a farm and delegate the owner picks.
+    links:
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Rates module (stability fees)
+        doc: RATES
+      - label: |-
+          Liquidations 2.0 (Dog and Clipper)
+        doc: LIQUIDATIONS
+
+  position_closed:
+    title: |-
+      About this vault
+    intro: |-
+      This vault owes nothing and its collateral has been withdrawn. The card shows the most it held and owed at any of its events.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each peak is its highest point over the vault's events, so the two need not have stood together.
+      - bold: |-
+          Moving out
+        text: |-
+          a vault can also close by moving its collateral and debt to another vault in one step.
+      - bold: |-
+          Coming back
+        text: |-
+          the vault still belongs to its owner and can take a new deposit.
+    links:
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+      - label: |-
+          Rates module (stability fees)
+        doc: RATES
+
+  position_liquidated:
+    title: |-
+      About this vault
+    intro: |-
+      This vault was liquidated when its collateral ratio fell under its collateral type's minimum. The card shows the most it held and owed at any event.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Seizure
+        text: |-
+          a liquidation removes collateral and debt in one step and sends the collateral to auction.
+      - bold: |-
+          Penalty and leftover
+        text: |-
+          the auction raises the debt plus a penalty and returns any collateral left to the vault.
+      - bold: |-
+          Highest recorded
+        text: |-
+          each peak is its highest point over the vault's events, so the two need not have stood together.
+      - bold: |-
+          Coming back
+        text: |-
+          the vault still belongs to its owner and can take a new deposit.
+    links:
+      - label: |-
+          Liquidations 2.0 (Dog and Clipper)
+        doc: LIQUIDATIONS
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
+
+  rate_step:
+    title: |-
+      How the stability fee moves a vault
+    intro: |-
+      A market note is a row in a vault's timeline that states something that happened while the vault transacted nothing. It is never counted in a total, filter, run or export.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Stability fee
+        text: |-
+          the yearly rate a collateral type's debt compounds at, set by governance.
+      - bold: |-
+          Fee in force at an event
+        text: |-
+          worked out from how fast the collateral type's debt grew around the event, then checked against the rate Maker stored at that block.
+      - bold: |-
+          Which changes are stated
+        text: |-
+          every change of 0.01 percentage points or more between two of the vault's events.
+      - bold: |-
+          When the fee is booked
+        text: |-
+          the fee reaches the debt when someone updates the collateral type's rate, so it lands in lumps on draws and repayments.
+      - bold: |-
+          A live note
+        text: |-
+          the later end is now: the collateral type's rate at the latest block, as a yearly figure.
+    links:
+      - label: |-
+          Rates module (stability fees)
+        doc: RATES
+      - label: |-
+          Vat, the core accounting
+        doc: VAT
