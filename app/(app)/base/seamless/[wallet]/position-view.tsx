@@ -30,15 +30,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import dynamic from "next/dynamic";
 
 import { AaveV3PositionCard } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import {
   AaveV3ClosedPositionExplanation,
   AaveV3PositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
-import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
-import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
+import { aaveV3Exports } from "@/components/protocol/aave-v3/aave-v3-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
@@ -94,13 +93,6 @@ import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import { SweepInFlight } from "@/components/shared/sweep-in-flight";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { aaveV3LastBorrowRate } from "@/lib/aave-v3/last-borrow-rate";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, as on the Ethereum page.
-const AaveV3ExportMenu = dynamic(
-  () => import("@/components/protocol/aave-v3/aave-v3-export-menu").then((m) => m.AaveV3ExportMenu),
-  { ssr: false },
-);
 
 const POSITION_ROUTE = "/api/chain/seamless/position";
 const TIMELINE_ROUTE = "/api/chain/seamless/timeline";
@@ -585,6 +577,24 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     prices,
   });
 
+  // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
+  const exports = view
+    ? aaveV3Exports({
+        wallet,
+        protocolName: "Seamless",
+        marketName: "Base",
+        source: captureSource,
+        view,
+        chain: data,
+        captions,
+        events: aaveEvents,
+        history: markdownHistoryScope(undefined, aaveEvents, servedFolders),
+        scopeNote: exportScopeNote(undefined, aaveEvents, "this wallet's whole history", servedFolders),
+        fetchAllEvents: servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined,
+        csvFilename: `seamless-${wallet.slice(0, 10)}-activity.csv`,
+      })
+    : null;
+
   return (
     <CaptureSourceProvider value={captureSource}>
       <V3PoolProvider pool={POOL_IDENTITY}>
@@ -596,23 +606,11 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
               owner={{ wallet }}
               assets={stripAssets}
               closed={view != null && view.status !== "open"}
+              // The exports ride the card's ⋮; the event route, which draws no
+              // card, keeps them in the wallet row's Tools.
+              tools={pinnedRoute}
             >
-              {view && (
-                <AaveV3ExportMenu
-                  wallet={wallet}
-                  protocolName="Seamless"
-                  marketName="Base"
-                  source={captureSource}
-                  view={view}
-                  chain={data}
-                  captions={captions}
-                  events={aaveEvents}
-                  history={markdownHistoryScope(undefined, aaveEvents, servedFolders)}
-                  scopeNote={exportScopeNote(undefined, aaveEvents, "this wallet's whole history", servedFolders)}
-                  fetchAllEvents={servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined}
-                  csvFilename={`seamless-${wallet.slice(0, 10)}-activity.csv`}
-                />
-              )}
+              {pinnedRoute && exports && <ExportMenu {...exports} />}
             </DetailTopRow>
 
             {loading ? (
@@ -652,13 +650,10 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                     viewHref={tl.viewHref}
                     deployment={SEAMLESS_LIVE_CARD_DEPLOYMENT}
                     captions={captions ?? undefined}
-                    // Closed by default, remembered per viewer and position (ui-jobs
-                    // 209), as on Ethereum. The room left to borrow and the
-                    // distance bar from the Pool read sit in the opened layer
-                    // under Debt and Health factor, inside the card's receipts scope.
-                    positionSummary
-                    debtDetail={<AaveV3BorrowRoom chain={data} />}
-                    riskDetail={<AaveV3RiskDetail chain={data} />}
+                    // The Pool read's room to borrow and eMode go in the panel,
+                    // inside the card's receipts scope.
+                    chain={data}
+                    exports={exports}
                     // The Explanation: the L1 prose about the face figures, then
                     // what is particular to THIS Pool — eMode, a supply that
                     // backs nothing (pre-3.2 accounting here), and the freeze.

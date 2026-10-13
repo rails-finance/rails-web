@@ -105,3 +105,17 @@ export function avgBorrowRateProv(pool: V3PoolLane): Provenance {
     ],
   };
 }
+
+/** The wallet's eMode category, read from the Pool at the latest block
+ *  (getUserEMode, with the category's label from the Pool's category
+ *  data). The position card's eMode row. */
+export function userEmodeProv(label: string, pool: V3PoolLane): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    verify: STATE_VERIFY,
+    summary: `eMode ${label} — the efficiency-mode category this wallet has chosen, as the Pool gives it at the latest block. A reserve in the category is borrowed against at the category's loan-to-value and liquidation threshold, in place of the ones set on the reserve.`,
+    contract: poolContractFor(pool),
+    via: `GET ${laneRoute(pool)} · Pool.getUserEMode @ head · category label`,
+  };
+}
