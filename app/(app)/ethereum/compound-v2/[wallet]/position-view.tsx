@@ -41,6 +41,8 @@ import {
 } from "@/lib/shared/timeline-opening-balance";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { fetchCompoundV2ChainPosition, type CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
+import { useParams } from "next/navigation";
+import { compoundV2Explorer } from "@/lib/compound-v2/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { COMPOUND_V2_FOLDER_REGISTER, COMPOUND_V2_LIQUIDATION_RUNS } from "@/lib/compound-v2/timeline-runs";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
@@ -110,6 +112,9 @@ export default function CompoundV2PositionView({
   // Keyed on the timeline, not the row: an account Compound V2 has never seen
   // is a real answer the server can seed, and its `initialPosition` is null.
   const seeded = initialEvents != null;
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const [view, setView] = useState<CompoundV2PositionView | null>(() =>
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
@@ -486,7 +491,7 @@ export default function CompoundV2PositionView({
             <DetailBodySkeleton />
           ) : (
             <>
-              {liveView && cardView && (
+              {!onEventPage && liveView && cardView && (
                 <CompoundV2PositionCard
                   v={cardView}
                   receipts
@@ -528,7 +533,7 @@ export default function CompoundV2PositionView({
               {/* Lifetime flows: the bars and the line over the account's replay
             (lib/shared/ctoken-flows.ts), in place of the tower (TO-DO-ui-jobs
             206). */}
-              {liveView && (
+              {!onEventPage && liveView && (
                 <LifetimeFlowsPanel
                   scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                   read={flows.read}
@@ -548,6 +553,7 @@ export default function CompoundV2PositionView({
                 // lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="compound-v2"
+                eventPage={(slot) => compoundV2Explorer.eventPage({ ...slot, wallet })}
                 closed={liveView ? liveView.status !== "open" : undefined}
                 tl={tl}
                 runs={COMPOUND_V2_LIQUIDATION_RUNS}

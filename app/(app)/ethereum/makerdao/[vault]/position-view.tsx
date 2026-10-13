@@ -16,6 +16,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
+import { makerdaoExplorer } from "@/lib/makerdao/explorer";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
@@ -511,6 +513,8 @@ export default function MakerVaultDetailView({
   );
   const flowColl = view?.collateralSymbol ?? null;
   const flowDebt = ilk ? ilkDebtSymbol(ilk) : null;
+  // The event route draws the sub-nav and the event's card beside the shared column (ui-jobs 236).
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const flows = useMakerFlows({
     ilk,
     pending: loading,
@@ -673,7 +677,7 @@ export default function MakerVaultDetailView({
           <DetailBodySkeleton />
         ) : (
           <MakerVaultHistoryProvider value={vaultHistory}>
-            {cardView && (
+            {!onEventPage && cardView && (
               <MakerVaultCard
                 v={cardView}
                 receipts
@@ -703,7 +707,7 @@ export default function MakerVaultDetailView({
             )}
             {/* Lifetime flows: the bars and the line over the vault's replay
             (lib/makerdao/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
-            {view && flowColl && flowDebt && (
+            {!onEventPage && view && flowColl && flowDebt && (
               <LifetimeFlowsPanel
                 scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                 read={flows.read}
@@ -727,6 +731,14 @@ export default function MakerVaultDetailView({
               // lets pinned mode (the per-event share route) force a landed
               // card's detail panel open on its first mount.
               persistKeyPrefix="makerdao"
+              eventPage={(slot) =>
+                makerdaoExplorer.eventPage({
+                  ...slot,
+                  vault,
+                  ilk: ilk ?? "",
+                  owner: (cardView?.owner ?? view?.owner) ?? null,
+                })
+              }
               closed={view?.status !== "open"}
               countDetail={countDetail}
               tl={tl}
