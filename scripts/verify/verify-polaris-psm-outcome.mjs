@@ -12,8 +12,7 @@
 //      since the feed moves); the strip carries no "profit" and no "%".
 //   2. usdp/27: +124.509 total; usdp/166: +0.719, no mint clause.
 //   4. A Liquity V2 trove with a redemption: liquityRedemptionOutcome's own
-//      strip still renders (TROVE_B from verify-market-note-row-liquity-v2.mjs — a WETH
-//      trove whose price-gap stretch ends in a redemption).
+//      strip still renders (TROVE_B, a WETH trove that has been redeemed).
 //   5. The markdown export carries the outcome line on usdp/8.
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
@@ -196,8 +195,7 @@ check(
 await page166.close();
 
 // ── 4. a Liquity V2 trove with a redemption ──────────────────────────────────
-// TROVE_B from verify-market-note-row-liquity-v2.mjs — a WETH trove whose
-// price-gap stretch ends in a redemption (so it has actually been redeemed).
+// TROVE_B, a WETH trove that has been redeemed.
 const TROVE_B = "29779854367542649123526514384205099621162281315544372345570836626121545773770";
 const troveUrl = `${BASE}/ethereum/liquity-v2/trove/WETH/${TROVE_B}`;
 const pageTrove = await open(context, troveUrl);

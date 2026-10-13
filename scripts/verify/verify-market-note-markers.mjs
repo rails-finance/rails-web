@@ -1,5 +1,5 @@
 // Market notes as spine markers (rails-ops TO-DO-ui-jobs item 118), on a
-// Liquity V2 trove with notes.
+// MakerDAO vault with stability-fee notes.
 // ----------------------------------------------------------------------------
 // On desktop a closed note is a marker on the spine (`[data-note-marker]`, a
 // button) that sits where its open row's node will stand, so it neither moves
@@ -12,10 +12,10 @@
 // every event. On a phone the list view keeps note rows, its Display offers the
 // switch alone, and the spine view (`?timeline=spine`) keeps its markers.
 //
-// The trove is TROVE_A of verify-market-note-row-liquity-v2.mjs, which pins
-// what its notes state; this script holds the markers, not the figures. The
-// note count is read off the page (`data-market-notes`), never pinned, and a
-// run that finds no note says so rather than passing.
+// The vault is 28699 of verify-makerdao-rate-step.mjs, which pins what its
+// notes state; this script holds the markers. The note count
+// is read off the page (`data-market-notes`), never pinned, and a run that
+// finds no note says so rather than passing.
 //
 // Run: BASE=http://localhost:3471 node scripts/verify/verify-market-note-markers.mjs
 
@@ -23,8 +23,8 @@ import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 import { marketNoteCount } from "./lib/market-notes.mjs";
 
-const TROVE_A = "78653451855876984404200224290704233324607545013117117463168140077362570442915";
-const URL_A = `${BASE}/ethereum/liquity-v2/trove/WETH/${TROVE_A}`;
+const VAULT_A = "28699";
+const URL_A = `${BASE}/ethereum/makerdao/${VAULT_A}`;
 
 let failures = 0;
 let checked = 0;
@@ -42,6 +42,13 @@ async function open(width, url = URL_A) {
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.locator("[data-timeline-rows-drawn]").first().waitFor({ state: "attached", timeout: 120000 });
   await page.locator("[data-event-id]").first().waitFor({ state: "visible", timeout: 120000 });
+  // A fee note exists only once the ilk's rate log has landed, after the
+  // timeline names the ilk: wait for a note rather than a fixed delay.
+  await page
+    .locator("[data-note-marker], [data-market-note]")
+    .first()
+    .waitFor({ state: "attached", timeout: 60000 })
+    .catch(() => {});
   await page.waitForTimeout(1500);
   return { ctx, page };
 }
@@ -58,7 +65,7 @@ console.log(`Market notes — against ${BASE}\n`);
   const { ctx, page } = await open(1280);
   const total = await marketNoteCount(page);
   const n = await closedMarkers(page).count();
-  if (!check("0. the trove has notes to mark", total > 0, `data-market-notes ${total}`)) {
+  if (!check("0. the vault has notes to mark", total > 0, `data-market-notes ${total}`)) {
     await browser.close();
     process.exit(1);
   }
@@ -88,7 +95,7 @@ console.log(`Market notes — against ${BASE}\n`);
   const first = closedMarkers(page).first();
   const id = await first.getAttribute("data-note-marker");
   const label = (await first.getAttribute("aria-label")) ?? "";
-  check("2. a marker is a button with a full label", /^Market note, .+: .+ (up|down) /.test(label), label);
+  check("2. a marker is a button with a full label", /^Market note, .+: .+ fee from .+ to .+/.test(label), label);
   await first.hover();
   await page.waitForTimeout(300);
   // The tooltip is the marker's ::after, drawn from `data-tip`, so it adds no
@@ -99,7 +106,7 @@ console.log(`Market notes — against ${BASE}\n`);
   });
   check(
     "2b. hover shows the tooltip in the header's form",
-    tip.shown && tip.content.includes(tip.text) && /price [−+]/.test(tip.text),
+    tip.shown && tip.content.includes(tip.text) && /fee .+ → .+/.test(tip.text),
     tip.text,
   );
 

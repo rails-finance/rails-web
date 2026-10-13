@@ -1,6 +1,6 @@
 // The market-notes switch, and the LIVE note at the head of the timeline —
-// the position's own quantity read at the chain head against its newest event
-// that carries it.
+// the market's rate read at the chain head against the position's newest
+// event that carries it, on a Polaris CDP (usdp/8).
 // ---------------------------------------------------------------------------
 // A live note sits in a dedicated head slot above the newest row for any OPEN
 // position whose live read exists — unthresholded, because "nothing has moved"
@@ -22,14 +22,10 @@
 // Run:  BASE=http://localhost:3416 node scripts/verify/verify-market-note-live.mjs
 
 import { chromium } from "playwright";
-import { drawnRows, drawWholeList } from "../lib/timeline-draw.mjs";
+import { drawWholeList } from "../lib/timeline-draw.mjs";
 import { marketNoteCount, setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let failures = 0;
 let checked = 0;
@@ -55,14 +51,8 @@ async function api(path, tries = 4) {
 }
 
 // ── Formatting, restated independently of lib/shared/market-note.ts ────────
-const formatPrice = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const formatPercent0 = (n) => `${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}%`;
-const formatChangeMagnitude = (n) =>
-  `${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const formatRatePercent = (n) =>
   `${(n * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-const formatDeltaPpMagnitude = (n) =>
-  `${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pp`;
 const formatStableAmount = (n) => {
   const opts =
     Math.abs(n) >= 1000
@@ -70,34 +60,6 @@ const formatStableAmount = (n) => {
       : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
   return n.toLocaleString("en-US", opts);
 };
-const formatShareRate = (n) => n.toLocaleString("en-US", { minimumSignificantDigits: 5, maximumSignificantDigits: 6 });
-// Mirrors lib/shared/market-note.ts formatRatio: a multiplier at a doubling or
-// more (or a halving), the unsigned percentage move under that.
-const formatRatio = (n) => {
-  if (!(n > 0) || n >= 2 || n <= 0.5) return `${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}×`;
-  const pct = Math.abs(n - 1) * 100;
-  const text =
-    pct >= 1
-      ? pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-      : pct.toLocaleString("en-US", { maximumSignificantDigits: 2 });
-  return `${text}%`;
-};
-const blk = (n) => n.toLocaleString("en-US");
-
-/** A rendered block number is a live figure's own echo of whichever
- *  route answered it — never string-pinned. Extract the "after" integer of
- *  the `label` stat card's before→after pair and assert it sits within `tol`
- *  blocks of a route read taken moments apart on this same run. */
-function blockNear(text, label, wantBlock, tol) {
-  const re = new RegExp(`${label}.*?[\\d,]+\\s*(?:→|to block)\\s*([\\d,]+)`);
-  const m = re.exec(text);
-  if (!m) return { ok: false, got: null };
-  const got = Number(m[1].replace(/,/g, ""));
-  return { ok: Math.abs(got - wantBlock) <= tol, got };
-}
-
-const pctWithin = (got, want, tolFrac) => Math.abs(got - want) <= Math.abs(want) * tolFrac + 1e-9;
-
 /** The number right after the LAST "→" following `label` in the note's text —
  *  the "after" half of a before→after stat card, e.g. "Oracle price (…) 5,003.96
  *  → 5,378.75" yields 5378.75 for label "Oracle price". Used to compare a
@@ -108,15 +70,6 @@ function afterArrow(text, label) {
   const re = new RegExp(`${label}.*?([\\d.,]+)\\s*(?:%|pp)?\\s*→\\s*([\\d.,]+)`);
   const m = re.exec(text);
   return m ? Number(m[2].replace(/,/g, "")) : null;
-}
-
-/** The later half of the LAST before → after pair in the note's text. Since
- *  2026-09-27 a price note states its price pair on the price chip under the
- *  grid ("$1,565 → $2,709"), the last pair before the (i), whose prose states
- *  none; the header's step mark draws its two prices with no arrow. */
-function lastArrowPair(text) {
-  const all = [...text.matchAll(/\$?([\d.,]+)\s*→\s*\$?([\d.,]+)/g)];
-  return all.length ? Number(all[all.length - 1][2].replace(/,/g, "")) : null;
 }
 
 console.log("Market notes — the Display switch and the live note\n");
@@ -156,7 +109,7 @@ async function openNote(row) {
   return (await row.innerText()).replace(/\s+/g, " ");
 }
 
-// ── 1. usdp/8 — two live notes in the head slot ─────────────────────────────
+// ── 1. usdp/8 — the live rate note in the head slot ─────────────────────────
 
 const chain8 = await api("/api/chain/polaris/position?market=usdp&id=8");
 check("0a. usdp/8's chain overlay answers, open, priced", chain8.isOpen === true && chain8.price != null);
@@ -176,68 +129,26 @@ const ids8 = await page8
 //
 // So what this run asserts is the claim a pinned number could never make: the
 // row count, the timeline's `data-market-notes` and the export all state ONE
-// number (checks 7a and 9a), and the two live notes are the pinned ones by id
-// (1b). A count that drifted from its own rows is the defect this pair is for,
-// and it survives a count that moves.
+// number (checks 7a and 9a), and the live note is the pinned one by id (1b).
+// A count that drifted from its rows is the defect this pair is for, and it
+// survives a count that moves.
 const NOTE_COUNT_8 = ids8.length;
-check("1a. usdp/8 draws its live notes and some history", NOTE_COUNT_8 >= 3, `${NOTE_COUNT_8} note rows`);
+check("1a. usdp/8 draws its live note", NOTE_COUNT_8 >= 1, `${NOTE_COUNT_8} note rows`);
 check(
-  "1b. the two live rows are in the head slot, above every historical row (DOM order, newest-first default)",
-  ids8[0] === "price-gap:usdp:11610231-head" && ids8[1] === "rate-step:usdp:11610231-head",
+  "1b. the live row is in the head slot, above every historical row (DOM order, newest-first default)",
+  ids8[0] === "rate-step:usdp:11610231-head",
   ids8.slice(0, 3).join(", "),
 );
 
-const priceRow8 = page8.locator('[data-market-note="price-gap:usdp:11610231-head"]');
 const rateRow8 = page8.locator('[data-market-note="rate-step:usdp:11610231-head"]');
-const priceText8 = await openNote(priceRow8.first());
 const rateText8 = await openNote(rateRow8.first());
 
-// Fresh read, right before the assertion — the live end is never pinned. Used
-// as the independent, external cross-check (1e/1f below prove the page's own
-// figures track a route read taken moments apart); the CR recomputation
-// (1g) instead uses the price the PAGE ITSELF rendered (gotPrice8), so that
-// check cannot go red from cross-read drift between two separate fetches —
-// only from a wrong multiplication.
+// Fresh read, right before the assertion — the live end is never pinned. It
+// is the independent cross-check (2c below proves the page's figure
+// tracks a route read taken moments apart).
 const liveChain8 = await api("/api/chain/polaris/position?market=usdp&id=8");
-const FROM_PRICE_8 = 5003.958117092452;
 const FROM_RATE_8 = 0.09343584279726581;
-const FROM_COLL_8 = 2459.00427746329139381;
 const FROM_DEBT_8 = 9191687.015714981855337009;
-const crBefore8 = ((FROM_COLL_8 * FROM_PRICE_8) / FROM_DEBT_8) * 100;
-
-check(
-  "1c. the price note names its earlier end as this CDP's adjustment at block 11,610,231",
-  /the \S+ price was .* at this cdp.s adjustment at block 11,610,231/i.test(priceText8),
-  priceText8.slice(0, 200),
-);
-check(
-  "1d. the price note's earlier price is the pinned historical figure",
-  priceText8.includes(formatPrice(FROM_PRICE_8)),
-  `wanted ${formatPrice(FROM_PRICE_8)}`,
-);
-const gotPrice8 = lastArrowPair(priceText8);
-check(
-  "1e. the price note's later price is within 0.5% of the freshly-read overlay price",
-  gotPrice8 != null && pctWithin(gotPrice8, liveChain8.price.pethInDebt, 0.005),
-  `page ${gotPrice8}, overlay ${liveChain8.price.pethInDebt}`,
-);
-const priceBlock8 = blockNear(priceText8, "runs from block", liveChain8.blockNumber, 200);
-check(
-  "1f. the price note's later block is within 200 blocks of the overlay's blockNumber",
-  priceBlock8.ok,
-  `page states ${priceBlock8.got}, overlay ${liveChain8.blockNumber}`,
-);
-const crAfter8 = gotPrice8 != null ? (crBefore8 * gotPrice8) / FROM_PRICE_8 : NaN;
-check(
-  "1g. the price note's CR is recomputed from the pinned state and the page's own live price",
-  priceText8.includes(formatPercent0(crBefore8)) && priceText8.includes(formatPercent0(crAfter8)),
-  `wanted ${formatPercent0(crBefore8)} → ${formatPercent0(crAfter8)}`,
-);
-check(
-  '1h. the price note names the quantity "oracle price"',
-  priceText8.includes("oracle price"),
-  priceText8.slice(0, 80),
-);
 
 check(
   "2a. the rate note is a LIVE note naming the CDP's own last touch, block 11,610,231",
@@ -277,17 +188,14 @@ check(
   rateText8.slice(0, 80),
 );
 
-// ── 2. usdp/27 and usdp/166 — no live note, historical counts unchanged ────
+// ── 2. usdp/27 and usdp/166 — no live note ─────────────────────────────────
 
-for (const [id, wantCount] of [
-  ["27", 1],
-  ["166", 1],
-]) {
+for (const id of ["27", "166"]) {
   const chain = await api(`/api/chain/polaris/position?market=usdp&id=${id}`);
   const p = await open(`${BASE}/sepolia/polaris/usdp/${id}`, 3000);
-  // Same reason as 4 below: a note is drawn beside its row, so the list is
-  // drawn whole before the notes on it are counted.
-  const drawn = await drawWholeList(p);
+  // A note is drawn beside its row, so the list is drawn whole before the
+  // notes on it are read.
+  await drawWholeList(p);
   const ids = await p
     .locator("[data-market-note]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-market-note")));
@@ -297,289 +205,8 @@ for (const [id, wantCount] of [
     liveOnes.length === 0,
     `${liveOnes.length} live note(s): ${liveOnes.join(", ")}`,
   );
-  check(
-    `3. usdp/${id}'s historical price-gap count is unchanged at ${wantCount}`,
-    drawn.complete && ids.filter((i) => i.startsWith("price-gap:")).length === wantCount,
-    `got ${ids.filter((i) => i.startsWith("price-gap:")).length}, list ${drawn.drawn} of ${drawn.loaded} rows`,
-  );
   await p.close();
 }
-
-// ── 3. TROVE_B — one live note ──────────────────────────────────────────────
-
-// RE-PINNED 2026-09-20. The old fixture
-// (`29779854367542649123526514384205099621162281315544372345570836626121545773770`)
-// was closed on chain at block 25,963,791 — `closeTrove`, debt 0 — and a trove
-// that owes nothing has no runway, so no live note can exist and check 3 was
-// red on an absence. Chosen from the 82 open WETH troves carrying debt: 187%
-// CR (the furthest from the branch minimum among the candidates with enough
-// history), 269,949 BOLD on 203.49 WETH, 40 transactions, and **no
-// redemptions ever** — the old one was redeemed so often its newest endpoint
-// moved inside a single evening.
-//
-// 🔑 Its ten historical notes were confirmed to EQUAL this script's own
-// arithmetic before it was pinned, which is what check 4b compares. Four of
-// the six candidates did not: the page drew fewer notes than the same formula
-// over the same timeline predicts, always dropping the OLDEST ones (trove
-// `6993997275523863…` drew 7 where the arithmetic gives 9, missing blocks
-// 23,764,772 and 23,983,783, on a 70-row life the page renders whole). That is
-// a real disagreement and it is recorded in TO-DO-ui-jobs §38 rather than
-// pinned around quietly — a fixture picked for agreeing is a check that has
-// been steered away from what it is for.
-const TROVE_B = "44560592591009195935177350759434193903980268875508162801605009277761763394257";
-const ENDPOINT_TYPES = new Set(["trove", "liquidation", "redemption"]);
-const logIndexOf = (e) => Number(e.id.split("_").pop());
-const troveTimeline = await api(`/api/trove/WETH/${TROVE_B}/timeline?limit=500`);
-const troveEnds = troveTimeline.events
-  .filter((e) => {
-    const d = e.context?.data;
-    return d && ENDPOINT_TYPES.has(d.eventType) && d.collateralPrice > 0;
-  })
-  .sort((a, b) => a.blockNumber - b.blockNumber || logIndexOf(a) - logIndexOf(b));
-const troveHistoricalCount = (() => {
-  const MCR = 1.1;
-  const RUNWAY_SHARE = 0.25;
-  const ZOMBIE = new Set(["adjustZombieTrove", "adjustUnredeemableZombieTrove"]);
-  let n = 0;
-  for (let i = 0; i < troveEnds.length - 1; i++) {
-    const a = troveEnds[i];
-    const b = troveEnds[i + 1];
-    const da = a.context.data;
-    const db = b.context.data;
-    if (da.eventType !== "trove") continue;
-    if (b.blockNumber <= a.blockNumber) continue;
-    const pa = da.collateralPrice;
-    const pb = db.collateralPrice;
-    if (pa === pb) continue;
-    const state = da.stateAfter;
-    const debt = state?.debt ?? 0;
-    const coll = state?.coll ?? 0;
-    if (!(debt > 0) || !(coll > 0)) continue;
-    const crBefore = state && state.collateralRatio > 0 ? state.collateralRatio : ((coll * pa) / debt) * 100;
-    const runway = 1 - MCR / (crBefore / 100);
-    const move = Math.abs(pb / pa - 1);
-    const consumed = runway > 0 ? move / runway : Infinity;
-    const endedBy =
-      db.eventType === "liquidation"
-        ? "liquidation"
-        : db.eventType === "redemption" || ZOMBIE.has(db.operation)
-          ? "redemption"
-          : "adjustment";
-    if (endedBy === "adjustment" && !(consumed >= RUNWAY_SHARE)) continue;
-    n++;
-  }
-  return n;
-})();
-// TROVE_B is redeemed often (its newest endpoint moved from 25,916,252 to
-// 25,920,903 inside one evening), so the earlier end is READ from the route
-// rather than pinned: the timeline is an input to the page, not the thing
-// under test, and the live note must name whichever priced endpoint is
-// newest at run time. What IS pinned is the shape — a priced trove /
-// redemption / liquidation row carrying the debt and collateral the CR is
-// recomputed from.
-const newestTrovePriced = troveEnds[troveEnds.length - 1];
-const newestDataB = newestTrovePriced.context.data;
-const END_LABELS_B = {
-  openTrove: "opening",
-  openTroveAndJoinBatch: "opening",
-  adjustTrove: "adjustment",
-  adjustTroveInterestRate: "interest-rate change",
-  adjustZombieTrove: "zombie adjustment",
-  adjustUnredeemableZombieTrove: "zombie adjustment",
-  applyPendingDebt: "pending-debt application",
-  closeTrove: "close",
-  liquidate: "liquidation",
-  redeemCollateral: "redemption",
-  setInterestBatchManager: "batch join",
-  removeFromBatch: "batch exit",
-};
-const endLabelB = END_LABELS_B[newestDataB.operation] ?? newestDataB.operation;
-check(
-  "0b. TROVE_B's newest priced endpoint is a priced trove/redemption/liquidation row stating debt and collateral",
-  newestDataB.collateralPrice > 0 && newestDataB.stateAfter?.debt > 0 && newestDataB.stateAfter?.coll > 0,
-  `${newestTrovePriced.blockNumber} (${newestDataB.eventType} / ${newestDataB.operation}), price ${newestDataB.collateralPrice}`,
-);
-const FROM_BLOCK_B = newestTrovePriced.blockNumber;
-
-const pageB = await open(`${BASE}/ethereum/liquity-v2/trove/WETH/${TROVE_B}`);
-// A NOTE IS DRAWN BESIDE ITS ROW, so a census taken over the first render
-// window counts the window's notes and not the position's. Draw the whole
-// loaded list first — and say so, because a count taken on an undrawn list is
-// not a smaller count, it is a different question (§38, 2026-09-21).
-const drawnB = await drawWholeList(pageB);
-check(
-  "4. TROVE_B's list is drawn whole before its notes are counted",
-  drawnB.complete,
-  `${drawnB.drawn} of ${drawnB.loaded} rows, ${drawnB.presses} press(es)`,
-);
-const idsB = await pageB
-  .locator("[data-market-note]")
-  .evaluateAll((els) => els.map((e) => e.getAttribute("data-market-note")));
-const liveB = idsB.filter((i) => i.endsWith("-head"));
-check("4a. TROVE_B shows exactly one live note", liveB.length === 1, `${liveB.length}: ${liveB.join(", ")}`);
-check(
-  "4b. TROVE_B's historical price-gap count is unchanged",
-  idsB.filter((i) => i.startsWith("price-gap:") && !i.endsWith("-head")).length === troveHistoricalCount,
-  `wanted ${troveHistoricalCount}, got ${idsB.filter((i) => i.startsWith("price-gap:") && !i.endsWith("-head")).length}`,
-);
-// 4c — THE INVARIANT THAT WOULD HAVE ENDED THIS IN A MINUTE. The count
-// (`data-market-notes`, the toolbar pill until item 118) covers every note the
-// rule found, whatever the list has drawn; the drawn notes are the ones a
-// reader can see. On a whole list the two are the same number, and where they
-// are not, one of them is wrong. Four troves were recorded as disagreeing with
-// their own arithmetic on 2026-09-20 because the page drew 50 of 70 rows: the
-// pill said 10 throughout and nothing was reading it.
-const countB = await marketNoteCount(pageB);
-check(
-  "4c. the timeline's note count is the count of notes on the drawn list",
-  drawnB.complete && countB === idsB.length,
-  `count ${countB} vs ${idsB.length} drawn`,
-);
-
-// ── 4d/4e — THE TRAP ITSELF, on a subject DISCOVERED at run time ───────────
-// TROVE_B is 26 rows and fits inside one render window, so 4c can pass there
-// without the window ever binding — an invariant nothing exercises is the
-// vacuous pass in its other costume. A trove with more rows than the window
-// is the only subject that proves it: undrawn, its notes are FEWER than the
-// count states; drawn whole, the two agree. Where the roster holds no such
-// trove today that is SAID, not passed.
-const wideRoster = await api("/api/troves?collateralType=WETH&status=open&limit=200");
-let windowed = null;
-for (const t of (wideRoster.data ?? []).filter((r) => Number(r.activity?.transactionCount ?? 0) > 60).slice(0, 4)) {
-  const p = await open(`${BASE}/ethereum/liquity-v2/trove/WETH/${t.id}`, 3000);
-  const rows = await drawnRows(p);
-  if (rows.loaded != null && rows.drawn < rows.loaded) {
-    windowed = { id: t.id, page: p, rows };
-    break;
-  }
-  await p.close();
-}
-if (
-  check(
-    "4d. a trove whose list is WINDOWED was found at run time",
-    windowed != null,
-    windowed
-      ? `${windowed.id.slice(0, 10)}… draws ${windowed.rows.drawn} of ${windowed.rows.loaded} rows`
-      : "NO EVIDENCE — no open WETH trove in the first 200 draws short of its loaded rows, so 4c is unexercised",
-  )
-) {
-  const countBefore = await marketNoteCount(windowed.page);
-  const drawnBefore = await windowed.page.locator("[data-market-note]").count();
-  check(
-    "4e. undrawn, it shows FEWER notes than the count states — the trap §38 recorded",
-    countBefore > drawnBefore,
-    `count ${countBefore} vs ${drawnBefore} drawn, ${windowed.rows.drawn} of ${windowed.rows.loaded} rows`,
-  );
-  const whole = await drawWholeList(windowed.page);
-  const drawnAfter = await windowed.page.locator("[data-market-note]").count();
-  check(
-    "4f. drawn whole, the count and the list agree",
-    whole.complete && (await marketNoteCount(windowed.page)) === drawnAfter && drawnAfter === countBefore,
-    `${drawnBefore} → ${drawnAfter} notes over ${whole.drawn} of ${whole.loaded} rows, ${whole.presses} press(es)`,
-  );
-  await windowed.page.close();
-}
-
-const noteRowB = pageB.locator(`[data-market-note="price-gap:weth:${FROM_BLOCK_B}-head"]`);
-const textB = await openNote(noteRowB.first());
-const [headB, oracleB] = await Promise.all([api("/api/head"), api("/api/oracle/liquity-v2")]);
-const FROM_PRICE_B = newestDataB.collateralPrice;
-const FROM_DEBT_B = newestDataB.stateAfter.debt;
-const FROM_COLL_B = newestDataB.stateAfter.coll;
-const crBeforeB = ((FROM_COLL_B * FROM_PRICE_B) / FROM_DEBT_B) * 100;
-check(
-  `5a. TROVE_B's live note names its earlier end as this trove's ${endLabelB} at block ${FROM_BLOCK_B.toLocaleString("en-US")}`,
-  new RegExp(
-    `the WETH price was .* at this trove.s ${endLabelB} at block ${FROM_BLOCK_B.toLocaleString("en-US")}`,
-    "i",
-  ).test(textB),
-  textB.slice(0, 200),
-);
-check(
-  `5b. the note's earlier price is the route's own figure for that row, ${formatPrice(FROM_PRICE_B)}`,
-  textB.includes(formatPrice(FROM_PRICE_B)),
-  textB.slice(0, 120),
-);
-const gotPriceB = lastArrowPair(textB);
-check(
-  "5c. the note's later price is within 0.5% of the WETH oracle route's price, read just now",
-  gotPriceB != null && pctWithin(gotPriceB, oracleB.data.weth, 0.005),
-  `page ${gotPriceB}, route ${oracleB.data.weth}`,
-);
-const blockB = blockNear(textB, "runs from block", headB.blockNumber, 200);
-check(
-  "5d. the note's later block is within 200 blocks of /api/head",
-  blockB.ok,
-  `page ${blockB.got}, head ${headB.blockNumber}`,
-);
-// CR recomputed from the price the PAGE ITSELF rendered — see usdp/8's own
-// 1g for why this avoids cross-read drift between two separate fetches.
-const crAfterB = gotPriceB != null ? (crBeforeB * gotPriceB) / FROM_PRICE_B : NaN;
-check(
-  "5e. the note's CR is recomputed from the row's own state and the page's own live price",
-  textB.includes(formatPercent0(crBeforeB)) && textB.includes(formatPercent0(crAfterB)),
-  `wanted ${formatPercent0(crBeforeB)} → ${formatPercent0(crAfterB)}`,
-);
-check("5f. the note names the branch minimum, 110%", textB.includes(formatPercent0(110)), "");
-check(
-  "5g. the note states that the position card's live ratio carries the interest accrued since",
-  /interest has accrued since block .*position card.s live ratio, which includes it, differs/i.test(textB),
-  textB.slice(-300),
-);
-
-// ── 4. Moonwell wallet — one live MAMO note ─────────────────────────────────
-
-const MAMO_WALLET = "0x719eae70d4a83f35bf82a2740699f5db84be919d";
-const MAMO_MARKET = "0x2f90bb22eb3979f5ffad31ea6c3f0792ca66da32";
-const chainMoonwell = await api(`/api/chain/moonwell-base/position?wallet=${MAMO_WALLET}`);
-const mamoMarket = chainMoonwell.markets.find((m) => m.market.toLowerCase() === MAMO_MARKET);
-check("0c. the fixture wallet's MAMO market answers on the overlay", mamoMarket != null && mamoMarket.entered === true);
-
-const mamoPage = await open(`${BASE}/base/moonwell/${MAMO_WALLET}`, 25000);
-const idsMamo = await mamoPage
-  .locator("[data-market-note]")
-  .evaluateAll((els) => els.map((e) => e.getAttribute("data-market-note")));
-const liveMamo = idsMamo.filter((i) => i.endsWith("-head"));
-check(
-  "6a. the wallet shows exactly one live MAMO note",
-  liveMamo.length === 1,
-  `${liveMamo.length}: ${liveMamo.join(", ")}`,
-);
-const liveMamoId = `share-rate-step:${MAMO_MARKET}:50516316-head`;
-check(
-  "6b. the live note's id matches the pinned earlier end, block 50,516,316",
-  liveMamo[0] === liveMamoId,
-  liveMamo[0] ?? "(none)",
-);
-
-const mamoRow = mamoPage.locator(`[data-market-note="${liveMamoId}"]`);
-const mamoText = await openNote(mamoRow.first());
-const freshMoonwell = await api(`/api/chain/moonwell-base/position?wallet=${MAMO_WALLET}`);
-const freshMamo = freshMoonwell.markets.find((m) => m.market.toLowerCase() === MAMO_MARKET);
-const FROM_RATE_MAMO = 7100000 / 346117650.66876537;
-check(
-  "6c. the note's earlier rate is the pinned historical implied rate, 0.020513",
-  mamoText.includes(formatShareRate(FROM_RATE_MAMO)),
-  `wanted ${formatShareRate(FROM_RATE_MAMO)}`,
-);
-const gotRateMamo = lastArrowPair(mamoText);
-check(
-  "6d. the note's later rate is within 0.5% of the freshly-read overlay exchangeRate",
-  gotRateMamo != null && pctWithin(gotRateMamo, freshMamo.exchangeRate, 0.005),
-  `page ${gotRateMamo}, overlay ${freshMamo.exchangeRate}`,
-);
-const wantUnits = Number(freshMamo.mtokenBalanceRaw) / 1e8;
-check(
-  "6e. the wallet's live mMAMO holding matches the pinned figure, 0.13887953",
-  Math.abs(wantUnits - 0.13887953) < 1e-6,
-  `overlay states ${wantUnits}`,
-);
-check(
-  "6e2. the note states that same holding, 0.139 mMAMO (formatUnits' 3-decimal display)",
-  mamoText.includes("0.139"),
-  mamoText.slice(0, 300),
-);
-check('6f. the note names the quantity "share rate"', mamoText.includes("share rate"), mamoText.slice(0, 80));
 
 // ── 5. The switch — Display's item, the count, the no-notes page ──────────
 
@@ -625,7 +252,7 @@ if (v1Wallet) {
   );
 }
 
-// ── 6. Markdown export on usdp/8 carries both live sentences ───────────────
+// ── 6. Markdown export on usdp/8 carries the live sentence ─────────────────
 
 const exportPage = await open(`${BASE}/sepolia/polaris/usdp/8`);
 const copyMarkdown = async () => {
@@ -644,17 +271,13 @@ check(
   md8.includes("Market notes") ? md8.match(/\*\*Market notes:\*\*[^\n]*/)?.[0] : "absent",
 );
 check(
-  "9b. the export's Market notes section carries the price live sentence (since … at the latest block)",
-  /Since this CDP.s adjustment at block 11,610,231 the pETH oracle price has moved/.test(md8),
-);
-check(
   "9c. the export's Market notes section carries the rate live sentence",
   /Since this CDP.s adjustment at block 11,610,231 the USDp market.s primary rate has moved/.test(md8),
 );
 const tableRows = (md) => (md.match(/^\| \d+ \| /gm) ?? []).length;
 const usdp8Timeline = await api("/api/polaris/timeline?market=usdp&id=8");
 check(
-  "9d. the live notes add no row to the timeline table — its count is the route's own event count",
+  "9d. the live note adds no row to the timeline table — its count is the route's event count",
   tableRows(md8) === usdp8Timeline.events.length,
   `table ${tableRows(md8)} rows, route ${usdp8Timeline.events.length} events`,
 );

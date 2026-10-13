@@ -231,13 +231,10 @@ async function open(context, url) {
   return page;
 }
 
-// Scoped to rate-step notes: since 2026-09-06 a CDP can also carry a
-// price-gap note (lib/shared/market-note.ts's polarisPriceGapNotesFor) on
-// the SAME page, so a bare `[data-market-note]` count would no longer say
-// anything about rate steps specifically. `RATE_STEP_SELECTOR` is this
-// file's one query for "a rate-step note" — every count and open/close
-// check below reads through it, so this file keeps testing exactly what it
-// always tested regardless of what other note kinds coexist.
+// Scoped to rate-step notes: `RATE_STEP_SELECTOR` is this file's one query
+// for "a rate-step note" — every count and open/close check below reads
+// through it, so this file tests rate steps whatever other note kinds a
+// page carries.
 const RATE_STEP_SELECTOR = '[data-market-note^="rate-step:"]';
 
 /** Open every rate-step note's header, then its "(i) how this note was
@@ -511,10 +508,7 @@ check(
     : "",
 );
 // Re-assert the open state after the poll above — a pre-hydration click is
-// lost, not replayed, so this is the guard against a false positive. Scoped
-// to rate-step notes: usdp/27 also carries one price-gap note since
-// 2026-09-06 (its own +46.96% stretch), which `openNotesAndDerivations`
-// above never touches.
+// lost, not replayed, so this is the guard against a false positive.
 const stillOpen = await page27.locator(`${RATE_STEP_SELECTOR}[data-market-note-open]`).count();
 check(
   "3d. both rate-step notes are still open after reading them (no silent close)",
@@ -536,12 +530,9 @@ check(
   bodyText.match(/.{0,60}\bpp\b.{0,60}/i)?.[0] ?? "",
 );
 
-// ── 4. the markdown export — "Market notes: 3" and the row annotations ────
-// usdp/27 carries 3 notes in total since 2026-09-06 (2 rate-step + 1
-// price-gap, lib/shared/market-note.ts's polarisPriceGapNotesFor) — the
-// export's "Market notes:" line counts every kind, so it moved from 2 to 3;
-// the per-kind annotation count below stays scoped to the rate-step wording
-// and is unaffected.
+// ── 4. the markdown export — "Market notes: 2" and the row annotations ────
+// usdp/27 carries its 2 rate-step notes; the export's "Market notes:" line
+// counts every note.
 
 const copyMarkdown = async (page) => {
   await page
@@ -555,8 +546,8 @@ const copyMarkdown = async (page) => {
 const md = await copyMarkdown(page27);
 const tableRows = (m) => (m.match(/^\| \d+ \| /gm) ?? []).length;
 check(
-  '4. the markdown export states "Market notes: 3" (2 rate-step + 1 price-gap) and adds no row to the event table',
-  /\*\*Market notes:\*\*\s*3\b/.test(md) && tableRows(md) === fixtureNotes["usdp/27"].count,
+  '4. the markdown export states "Market notes: 2" and adds no row to the event table',
+  /\*\*Market notes:\*\*\s*2\b/.test(md) && tableRows(md) === fixtureNotes["usdp/27"].count,
   `table rows ${tableRows(md)}, route says ${fixtureNotes["usdp/27"].count}; "Market notes" line ${md.match(/\*\*Market notes:\*\*[^\n]*/)?.[0] ?? "absent"}`,
 );
 const annotationCount = (md.match(/market note: the USDp market's primary rate was /g) ?? []).length;
@@ -589,8 +580,8 @@ for (const key of ["usdp/296"]) {
   const run = MERGED_RUNS[key][0];
   const wantId = `rate-step:${market}:${run.fromBlock}-${run.toBlock}`;
   const page = await open(context, polarisUrl(market, id));
-  // The CDP also carries a price-gap note and a live note; this section is
-  // about the rate-step rows, so it counts through the same scoped selector
+  // The CDP also carries a live note; this section is about the historical
+  // rate-step rows, so it counts through the same scoped selector
   // every other count here reads.
   await page
     .locator(RATE_STEP_SELECTOR)

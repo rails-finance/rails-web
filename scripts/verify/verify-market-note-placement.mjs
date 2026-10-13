@@ -1,14 +1,13 @@
 #!/usr/bin/env node
-// Market-note placement and eligibility — the two pure rules, run directly.
+// Market-note placement and eligibility — the pure rules, run directly.
 // ----------------------------------------------------------------------------
 // A market note is a receipted fact about the MARKET, placed between two of the
 // account's own events (lib/shared/market-note.ts). One placement rule and one
 // selector per kind decide where a note lands and whether it exists at all, and
 // every one of them is the kind of rule that fails silently: a note anchored one
 // row early still renders, still reads well, and claims an ordering the chain
-// never stated; a selector whose eligibility test is too loose renders a slice
-// for an account that held nothing, or a price move read off a row that carries
-// a stale price.
+// never stated; a selector whose threshold is off states a move that was never
+// worth a row, or drops one that was.
 //
 // So all are proved here against the FILE THE PAGE IMPORTS, not a restatement
 // of it — node loads the TypeScript module directly under type stripping
@@ -21,50 +20,16 @@
 // NO SERVER, SO NO ROUTE-READ CHECK 0. The house pattern is a check 0 read from
 // a route, so the fixture cannot come from the thing under test. There is no
 // route here: this file runs the rules over synthetic event lists. Its check 0
-// is the equivalent control — that the module actually loaded and the two
-// functions came from it — because a run that silently judged nothing is the
-// one outcome worse than a red one. The one real-world fixture below (the
-// blocks around the MAMO share-rate step) is pinned from the DEPLOYED site and
-// from the market-wide series measured on the server, 2026-09-03/04, not
-// derived from this code:
+// is the equivalent control — that the module loaded and the rules
+// came from it — because a run that silently judged nothing is the one outcome
+// worse than a red one. The placement fixture (sections 1–4) is a stretch's two
+// blocks and the account rows around it; placement reads only blocks and ids,
+// so the note there is any kind's. The rate-step fixture (section 8) is pinned
+// from the raw tables, independently of this code.
 //
-//   wallet 0x719eae70d4a83f35bf82a2740699f5db84be919d, 2,405 events
-//   its last MAMO mint at block 50,516,316
-//   the step: 50,516,524 → 50,516,566, 0.020513 → 0.075460, 3.6787×
-//   BOTH ends are other wallets' redeems — 0x54fc…6d69 (tx 0xc5c3…66d3, log
-//   27) and 0x8407…17c3 — and four more wallets redeemed between the
-//   account's mint and the step's opening observation, all still at 0.020513
-//   the first of the account's events at or past 50,516,566: 50,516,570,
-//   id 0x6bac80e2797127c7c8de61fb7d8b86b2e8264be924c89bab2c72c0882883a495-5
-//
-// Proved it can fail 2026-09-04 — three separate mutations of
-// lib/shared/market-note.ts, each restored after its run, each landing on a
-// DIFFERENT check and each exiting 1 rather than crashing:
-//
-//   A  `e.blockNumber >= note.to.block` → `>`  (the anchor rule)
-//      FAIL  1a. asc — the event AT toBlock is the anchor — anchored
-//            0x6bac…3a495-5, wanted e_to                     1 of 17 failed
-//   B  the observation match `txHash + logIndex` → `blockNumber` (the link)
-//      FAIL  5e. neither end is this account's event — eventId e_decoy-3
-//                                                              1 of 17 failed
-//   C  the eligibility filter loses `side === "supply" && mTokensAfter != null`
-//      FAIL  5a / 5e / 5f / 6a / 6b / 6c                      6 of 17 failed
-//
-// (A's full run is recorded at the foot of this file.)
-//
-// The Liquity V2 price-gap arm (section 7) was proved the same way, 2026-09-04,
-// by setting `RUNWAY_SHARE` from 0.25 to 1 in lib/shared/market-note.ts and
-// restoring it after the run — the threshold no longer reaches the one real
-// stretch, and four checks that depend on it go red while every check that does
-// NOT depend on the threshold stays green, which is the point:
-//
-//   FAIL  7. the threshold is a share of the position's own runway, exported — RUNWAY_SHARE = 1
-//   FAIL  7a. a move that consumes more than a quarter of the runway renders — 0 note(s) · consumed NaN% of a 34.8% runway (wanted 84%)
-//   FAIL  7b. the two ratios hold the earlier state and move only the price — undefined% → undefined%
-//   FAIL  7c. the change is signed against the earlier price — NaN%
-//   PASS  7d–7l  (the terminal arms, the two data traps and the three non-stretches)
-//   FAIL  7m. a price gap anchors on the later of its own two events — anchored undefined…
-//   5 CHECK(S) FAILED of 31   (exit 1)
+// Proved it can fail 2026-09-04 with `e.blockNumber >= note.to.block` flipped
+// to `>` in `anchorMarketNotes`: 1a goes red and nothing else does (the run is
+// recorded at the foot of this file).
 //
 // Run: node scripts/verify/verify-market-note-placement.mjs
 
@@ -90,8 +55,7 @@ if (!process.execArgv.includes("--experimental-strip-types")) {
 }
 
 const mod = await import("../../lib/shared/market-note.ts");
-const { anchorMarketNotes, shareRateNotesFor, priceGapNotesFor, rateStepNotesFor, RUNWAY_SHARE, RATE_STEP_MIN_PP } =
-  mod;
+const { anchorMarketNotes, rateStepNotesFor, RATE_STEP_MIN_PP } = mod;
 
 let failures = 0;
 let checked = 0;
@@ -106,34 +70,9 @@ console.log("Market notes — placement + eligibility (pure, no server)\n");
 // ── fixtures ────────────────────────────────────────────────────────────────
 
 const WALLET = "0x719eae70d4a83f35bf82a2740699f5db84be919d";
-/** The two wallets whose redeems bracket the step. NEITHER is the account: the
- *  series is the market's, and four more wallets redeemed between the
- *  account's last mint and the step's opening observation, all still at
- *  0.020513. A rule that assumed the near end was the account's own event
- *  would have found nothing here. */
-const FROM_WALLET = "0x54fc16fe6c49cb06417e56bbadf235650dd76d69";
-const TO_WALLET = "0x8407699e359ae158bd7ec0668600cc19a79f17c3";
-const MARKET = { address: "0x2f90bb22eb3979f5ffad31ea6c3f0792ca66da32", key: "mamo", symbol: "MAMO" };
-const MINT_BLOCK = 50_516_316;
+/** The stretch's two ends. Nothing on the account's side sits between them. */
 const FROM_BLOCK = 50_516_524;
 const TO_BLOCK = 50_516_566;
-
-/** The step as the share-rate endpoint states it (plan §4.4), with the bracket
- *  measured on the market-wide series 2026-09-04. */
-const STEP = {
-  fromBlock: FROM_BLOCK,
-  toBlock: TO_BLOCK,
-  fromRate: 0.020513,
-  toRate: 0.07546,
-  ratio: 3.6787,
-  from: {
-    txHash: "0xc5c304aab49debce74892c5fbb65340e29841f3891aaa2902994292156fd66d3",
-    logIndex: 27,
-    wallet: FROM_WALLET,
-    kind: "redeem",
-  },
-  to: { txHash: `0x${"b".repeat(64)}`, logIndex: 7, wallet: TO_WALLET, kind: "redeem" },
-};
 
 /** A plain event at a block — only the block and the id matter to placement. */
 const ev = (id, blockNumber) => ({
@@ -151,70 +90,43 @@ const ev = (id, blockNumber) => ({
   etherscanUrl: "",
 });
 
-/** A Moonwell supply event that states an mToken balance after it — what the
- *  eligibility rule reads. */
-const supply = (id, blockNumber, mTokensAfter, market = MARKET.key) => ({
-  ...ev(id, blockNumber),
-  actionType: "mint",
-  actionLabel: "Supply",
-  context: {
-    protocol: "moonwell",
-    data: {
-      eventType: "mint",
-      market,
-      marketSymbol: MARKET.symbol,
-      side: "supply",
-      mTokensAfter: String(mTokensAfter),
-    },
-  },
-});
-
-/** A borrow in the SAME market: no mToken balance of its own, and it moves
- *  none. The eligibility rule must read past it to the mint below. */
-const borrow = (id, blockNumber) => ({
-  ...ev(id, blockNumber),
-  context: {
-    protocol: "moonwell",
-    data: { eventType: "borrow", market: MARKET.key, marketSymbol: MARKET.symbol, side: "debt" },
-  },
-});
-
-/** The account's own history around the step, oldest first. Its last supply
- *  into the market is at 50,516,316 — 208 blocks before the step opens, with
- *  borrows of its own in between. */
+/** The account's history around the stretch, oldest first: three rows
+ *  before it opens, two after it closes. */
 const HISTORY = [
-  supply("e_mint1-1", 50_512_452, 4_874_297.65),
-  supply("e_mint3-1", MINT_BLOCK, 735_562_000),
-  borrow("e_borrow-3", 50_516_400),
+  ev("e_supply1-1", 50_512_452),
+  ev("e_supply3-1", 50_516_316),
+  ev("e_borrow-3", 50_516_400),
   ev("0x6bac80e2797127c7c8de61fb7d8b86b2e8264be924c89bab2c72c0882883a495-5", 50_516_570),
   ev("e_liq-27", 50_516_849),
 ];
 const desc = (list) => [...list].reverse();
 const note = (over = {}) => ({
-  id: "share-rate-step:mamo:step",
-  kind: "share-rate-step",
-  marketSymbol: "MAMO",
-  marketAddress: MARKET.address,
-  unitLabel: "MAMO per mMAMO",
+  id: "rate-step:usdc:stretch",
+  kind: "rate-step",
+  marketSymbol: "USDC",
+  marketAddress: `0x${"a".repeat(40)}`,
+  unitLabel: "% per year",
   from: {
     block: FROM_BLOCK,
     timestamp: 0,
-    value: 0.020513,
-    txHash: STEP.from.txHash,
-    logIndex: STEP.from.logIndex,
-    wallet: FROM_WALLET,
-    kind: "redeem",
+    value: 0.04,
+    txHash: `0x${"c".repeat(64)}`,
+    logIndex: 27,
+    wallet: "",
+    kind: "borrow",
   },
   to: {
     block: TO_BLOCK,
     timestamp: 0,
-    value: 0.07546,
-    txHash: STEP.to.txHash,
-    logIndex: STEP.to.logIndex,
-    wallet: TO_WALLET,
-    kind: "redeem",
+    value: 0.06,
+    txHash: `0x${"b".repeat(64)}`,
+    logIndex: 7,
+    wallet: "",
+    kind: "repay",
   },
-  ratio: 3.6787,
+  deltaPp: 2,
+  setsBetween: null,
+  observed: { from: null, to: null },
   ...over,
 });
 
@@ -224,13 +136,13 @@ const anchorOf = (notes, events, dir) => {
   return keys.length === 1 ? keys[0] : keys.length === 0 ? null : keys;
 };
 
+const near = (a, b) => Math.abs(a - b) / b < 0.001;
+
 // ── 0. control: the rules under test came from the shipped module ───────────
 
 check(
-  "0. the module loaded and all three rules are functions from it",
-  typeof anchorMarketNotes === "function" &&
-    typeof shareRateNotesFor === "function" &&
-    typeof priceGapNotesFor === "function",
+  "0. the module loaded and both rules are functions from it",
+  typeof anchorMarketNotes === "function" && typeof rateStepNotesFor === "function",
   `lib/shared/market-note.ts exports ${Object.keys(mod).length} names`,
 );
 
@@ -287,267 +199,7 @@ check(
   `anchored ${anchorOf([note()], filtered, "asc")}, wanted ${HISTORY[4].id}`,
 );
 
-// ── 5. eligibility ─────────────────────────────────────────────────────────
-
-const notes = (events, steps = [STEP]) => shareRateNotesFor(steps, MARKET, events);
-check(
-  "5a. held the market's mTokens across the step → one note, with a slice",
-  notes(HISTORY).length === 1 && notes(HISTORY)[0].slice?.units === 735_562_000,
-  `${notes(HISTORY).length} note(s), slice units ${notes(HISTORY)[0]?.slice?.units} — read past a borrow of its own` +
-    ` at block 50,516,400, which states no mToken balance and moves none`,
-);
-const emptied = [supply("e_mint1-1", 50_512_452, 4_874_297.65), supply("e_out-1", FROM_BLOCK, 0), ...HISTORY.slice(2)];
-check(
-  "5b. the last supply-side event before the step left 0 mTokens → no note",
-  notes(emptied).length === 0,
-  `${notes(emptied).length} note(s)`,
-);
-const late = HISTORY.filter((e) => e.blockNumber > FROM_BLOCK);
-check(
-  "5c. the step's fromBlock precedes the position's first event → no note",
-  notes(late).length === 0,
-  `first event at block ${late[0].blockNumber}, step opens at ${FROM_BLOCK}`,
-);
-const otherMarket = HISTORY.map((e) =>
-  e.context?.data.side === "supply" ? supply(e.id, e.blockNumber, e.context.data.mTokensAfter, "weth") : e,
-);
-check(
-  "5d. the position's mTokens are in ANOTHER market → no note",
-  notes(otherMarket).length === 0,
-  `${notes(otherMarket).length} note(s)`,
-);
-
-// The account's OWN event in the very block of the opening observation is the
-// trap: the ends of a step belong to whoever transacted next in the market, so
-// a match on block would claim that unrelated row as the observation and link
-// the receipt at it.
-const decoy = [...HISTORY, ev("e_decoy-3", FROM_BLOCK)];
-// Guarded: a mutation that produces NO note must read as a red check, not as
-// a crash — run-all treats a script that dies before its verdict as evidence
-// of nothing at all, which is the worst of the three outcomes.
-const EMPTY_NOTE = { from: { wallet: "" }, to: { wallet: "" }, slice: { units: NaN, before: NaN, after: NaN } };
-const both = notes(decoy)[0] ?? EMPTY_NOTE;
-check(
-  "5e. neither end is this account's event → no eventId, even with an event of its own in that block",
-  both.from.eventId === undefined &&
-    both.to.eventId === undefined &&
-    both.from.wallet === FROM_WALLET &&
-    both.from.kind === "redeem" &&
-    both.from.logIndex === STEP.from.logIndex &&
-    both.to.wallet === TO_WALLET,
-  `from ${both.from.wallet.slice(0, 8)}\u2026 ${both.from.kind} log ${both.from.logIndex} \u00b7 to ${both.to.wallet.slice(0, 8)}\u2026 \u00b7 eventId ${both.from.eventId ?? "(none)"}`,
-);
-const ownLog = [
-  ...HISTORY,
-  { ...ev("owned-27", FROM_BLOCK), txHash: STEP.from.txHash, id: `${STEP.from.txHash}-${STEP.from.logIndex}` },
-];
-check(
-  "5f. an end that IS an event on this page is linked to it, matched on tx + log index",
-  (notes(ownLog)[0] ?? EMPTY_NOTE).from.eventId === `${STEP.from.txHash}-${STEP.from.logIndex}`,
-  `eventId ${(notes(ownLog)[0] ?? EMPTY_NOTE).from.eventId ?? "(none)"}`,
-);
-
-// ── 6. slice arithmetic ────────────────────────────────────────────────────
-// 735.56M mMAMO at 0.020513 and at 0.075460 MAMO per mMAMO. The expected
-// figures are the deployed site's own (15.09M / 55.5M), computed here from the
-// pinned rates rather than read back from the note.
-
-const slice = (notes(HISTORY)[0] ?? EMPTY_NOTE).slice;
-const near = (a, b) => Math.abs(a - b) / b < 0.001;
-check(
-  "6a. slice before = units × the rate at the last observation before the step",
-  near(slice.before, 735_562_000 * 0.020513),
-  `${slice.before.toLocaleString("en-US")} MAMO (≈15.09M)`,
-);
-check(
-  "6b. slice after = units × the rate at the first observation after it",
-  near(slice.after, 735_562_000 * 0.07546),
-  `${slice.after.toLocaleString("en-US")} MAMO (≈55.5M)`,
-);
-check(
-  "6c. the two ends stand in the step's own ratio",
-  near(slice.after / slice.before, STEP.toRate / STEP.fromRate),
-  `${(slice.after / slice.before).toFixed(4)}× vs ${(STEP.toRate / STEP.fromRate).toFixed(4)}×`,
-);
-
-// ── 7. Liquity V2 price gaps — the endpoint rule and the threshold ─────────
-// The second kind of note (plan §11). Its two silent-failure modes are the
-// mirror of the share-rate ones: an endpoint rule that accepts a row whose
-// price is stale or missing states a move that never happened, and a threshold
-// that is not measured against THIS position's own runway papers a timeline
-// with stretches that meant nothing to it.
-//
-// The real-world fixture below is read from the DEPLOYED timeline route
-// (/api/trove/WETH/78653…2915/timeline, 2026-09-04) and not from this code:
-//
-//   adjust  block 24,354,005  price 2,643.20398  debt 41,043.73  coll 26.209  CR 168.79%
-//   adjust  block 24,393,692  price 1,865.53                                  (−29.42%)
-//   liquidation block 25,252,291 price 1,550.01512377
-//
-// (Plan §11.1 illustrates the copy with a 206% → 145% trove; that is not this
-// trove's state — its own ratio at 24,354,005 is 168.79%, and the ratios in
-// checks 7f/7g are computed here from the pinned debt, collateral and prices.)
-
-const BRANCH = { collateralType: "WETH", mcr: 1.1, priceFeed: `0x${"c".repeat(40)}` };
-
-/** A Liquity V2 row. Only the fields the two rules read are set; the id
- *  carries its log index the way the backend writes it (`${txHash}_${n}`),
- *  which is the separator the chain-order tie-break has to know about. */
-const trove = (n, blockNumber, collateralPrice, over = {}) => {
-  const { eventType = "trove", operation = "adjustTrove", debt = 41_043.73, coll = 26.209, cr } = over;
-  const txHash = `0x${String(n).padStart(2, "0").repeat(32).slice(0, 64)}`;
-  return {
-    id: `${txHash}_${n}`,
-    txHash,
-    blockNumber,
-    timestamp: 0,
-    wallet: WALLET,
-    actionType: operation,
-    actionLabel: operation,
-    flows: [],
-    etherscanUrl: "",
-    context: {
-      protocol: "liquity-v2-troves",
-      data: {
-        eventType,
-        operation,
-        collateralType: "WETH",
-        collateralPrice,
-        stateAfter: {
-          debt,
-          coll,
-          collateralRatio: cr ?? (debt > 0 ? ((coll * collateralPrice) / debt) * 100 : 0),
-        },
-      },
-    },
-  };
-};
-
-const A_BLOCK = 24_354_005;
-const B_BLOCK = 24_393_692;
-const LIQ_BLOCK = 25_252_291;
-const PRICE_A = 2_643.20398;
-const PRICE_B = 1_865.53;
-const PRICE_LIQ = 1_550.01512377;
-const gaps = (events) => priceGapNotesFor(events, BRANCH);
-
-check(
-  "7. the threshold is a share of the position's own runway, exported",
-  RUNWAY_SHARE === 0.25,
-  `RUNWAY_SHARE = ${RUNWAY_SHARE}`,
-);
-
-// 7a. The real stretch: −29.42% against a trove whose own ratio left it 34.8%
-// above the branch minimum. Expected consumed is computed here from the pinned
-// figures, never read back off the note.
-const WANT_CR_A = ((26.209 * PRICE_A) / 41_043.73) * 100;
-const WANT_RUNWAY = 1 - 1.1 / (WANT_CR_A / 100);
-const WANT_CONSUMED = Math.abs(PRICE_B / PRICE_A - 1) / WANT_RUNWAY;
-const pair = [trove(1, A_BLOCK, PRICE_A), trove(2, B_BLOCK, PRICE_B)];
-const g = gaps(pair)[0] ?? { from: {}, to: {}, position: {}, consumed: NaN, changePct: NaN, endedBy: "" };
-check(
-  "7a. a move that consumes more than a quarter of the runway renders",
-  gaps(pair).length === 1 && near(g.consumed, WANT_CONSUMED) && g.endedBy === "adjustment",
-  `${gaps(pair).length} note(s) · consumed ${(g.consumed * 100).toFixed(0)}% of a ${(WANT_RUNWAY * 100).toFixed(1)}% runway (wanted ${(WANT_CONSUMED * 100).toFixed(0)}%)`,
-);
-check(
-  "7b. the two ratios hold the earlier state and move only the price",
-  near(g.position.crBefore, WANT_CR_A) && near(g.position.crAfter, (WANT_CR_A * PRICE_B) / PRICE_A),
-  `${g.position.crBefore?.toFixed(2)}% → ${g.position.crAfter?.toFixed(2)}% against the branch minimum ${g.position.mcrPct}%`,
-);
-check(
-  "7c. the change is signed against the earlier price",
-  near(g.changePct, (PRICE_B / PRICE_A - 1) * 100),
-  `${g.changePct?.toFixed(2)}%`,
-);
-
-// 7d/7e. The threshold does work in both directions. A tiny move on a roomy
-// trove is not a note; the same tiny move ending in a liquidation always is.
-const roomy = { debt: 41_043.73, coll: (41_043.73 * 2.4444444) / PRICE_A };
-const smallMove = [trove(1, A_BLOCK, PRICE_A, roomy), trove(2, B_BLOCK, PRICE_A * 0.98, roomy)];
-check(
-  "7d. a 2% move on a 55% runway is not stated",
-  gaps(smallMove).length === 0,
-  `${gaps(smallMove).length} note(s) — consumed ≈ ${((0.02 / (1 - 1.1 / 2.4444444)) * 100).toFixed(0)}%, under the ${(RUNWAY_SHARE * 100).toFixed(0)}% threshold`,
-);
-const smallToLiq = [
-  trove(1, A_BLOCK, PRICE_A, roomy),
-  trove(2, B_BLOCK, PRICE_A * 0.98, { ...roomy, eventType: "liquidation", operation: "liquidate" }),
-];
-check(
-  "7e. the SAME move renders when the stretch ends in a liquidation",
-  gaps(smallToLiq).length === 1 && gaps(smallToLiq)[0].endedBy === "liquidation",
-  `${gaps(smallToLiq).length} note(s), endedBy ${gaps(smallToLiq)[0]?.endedBy}`,
-);
-const smallToRedemption = [
-  trove(1, A_BLOCK, PRICE_A, roomy),
-  trove(2, B_BLOCK, PRICE_A * 0.98, { ...roomy, eventType: "redemption", operation: "redeemCollateral" }),
-];
-const smallToZombie = [
-  trove(1, A_BLOCK, PRICE_A, roomy),
-  trove(2, B_BLOCK, PRICE_A * 0.98, { ...roomy, operation: "adjustZombieTrove" }),
-];
-check(
-  "7f. so does a redemption, and a zombie adjustment reads as redemption-class",
-  gaps(smallToRedemption)[0]?.endedBy === "redemption" && gaps(smallToZombie)[0]?.endedBy === "redemption",
-  `redemption → ${gaps(smallToRedemption)[0]?.endedBy}, adjustZombieTrove → ${gaps(smallToZombie)[0]?.endedBy}`,
-);
-
-// 7g. The zero-price data trap (plan §11.2), which would otherwise state a
-// move that was never read. 7h. A batch_manager row, a trap until server
-// mig 294 priced it at its own position, is now an end.
-const zeroPriced = [trove(1, A_BLOCK, PRICE_A), trove(2, B_BLOCK, 0), trove(3, LIQ_BLOCK, PRICE_LIQ)];
-const zg = gaps(zeroPriced);
-check(
-  "7g. a row whose collateralPrice is 0 is not an endpoint — the stretch spans it",
-  zg.length === 1 && zg[0].from.block === A_BLOCK && zg[0].to.block === LIQ_BLOCK,
-  `${zg.length} note(s), ${zg[0]?.from.block} → ${zg[0]?.to.block} (never ${B_BLOCK}, whose price is 0)`,
-);
-const batched = [
-  trove(1, A_BLOCK, PRICE_A),
-  trove(2, B_BLOCK, PRICE_B, { eventType: "batch_manager", operation: "setBatchManagerAnnualInterestRate" }),
-  trove(3, LIQ_BLOCK, PRICE_LIQ),
-];
-const bg = gaps(batched);
-check(
-  "7h. a batch_manager row ends a stretch (priced at its own position since server mig 294) and cannot start one",
-  bg.length === 1 &&
-    bg[0].from.block === A_BLOCK &&
-    bg[0].to.block === B_BLOCK &&
-    bg[0].to.kind === "setBatchManagerAnnualInterestRate",
-  `${bg.length} note(s), ${bg[0]?.from.block} → ${bg[0]?.to.block} (${bg[0]?.to.kind})`,
-);
-
-// 7i–7k. Three things that are not a stretch at all.
-const sameBlock = [trove(1, A_BLOCK, PRICE_A), trove(2, A_BLOCK, PRICE_B)];
-check(
-  "7i. two rows in the SAME block are one moment, not a stretch",
-  gaps(sameBlock).length === 0,
-  `${gaps(sameBlock).length} note(s)`,
-);
-const samePrice = [trove(1, A_BLOCK, PRICE_A), trove(2, B_BLOCK, PRICE_A)];
-check("7j. two identical readings state no move", gaps(samePrice).length === 0, `${gaps(samePrice).length} note(s)`);
-const opensOnRedemption = [
-  trove(1, A_BLOCK, PRICE_A, { eventType: "redemption", operation: "redeemCollateral" }),
-  trove(2, B_BLOCK, PRICE_B),
-];
-check(
-  "7k. a stretch opens on one of the trove's OWN operations, never on a redemption",
-  gaps(opensOnRedemption).length === 0,
-  `${gaps(opensOnRedemption).length} note(s)`,
-);
-const noDebt = [trove(1, A_BLOCK, PRICE_A, { debt: 0 }), trove(2, B_BLOCK, PRICE_B, { debt: 0 })];
-check("7l. no debt is no runway, so no note", gaps(noDebt).length === 0, `${gaps(noDebt).length} note(s)`);
-
-// 7m. The anchor rule is shared, so a price gap lands on B itself.
-const anchoredGap = anchorMarketNotes(gaps(pair), pair, "desc");
-check(
-  "7m. a price gap anchors on the later of its own two events",
-  anchoredGap.size === 1 && [...anchoredGap.keys()][0] === pair[1].id,
-  `anchored ${[...anchoredGap.keys()][0]?.slice(0, 12)}… · B is ${pair[1].id.slice(0, 12)}…`,
-);
-
-// ── 8. Polaris primary-rate step — the third kind, both ends the CDP's own ─
+// ── 8. Polaris primary-rate step — both ends the CDP's touches ─────────────
 // The real-world fixture below (the primary stretch) was pinned by psql
 // over the RAW tables (polaris_cdp_updated + polaris_primary_rate_set) on
 // the onboarding box, 2026-09-05 — never derived from this code. usdp CDP 27's
@@ -722,28 +374,26 @@ check(
   `${rsWithDebt[0]?.interest?.before} → ${rsWithDebt[0]?.interest?.after}`,
 );
 
-// (o) mixing a `-`-id share-rate-step note with a `:`-id rate-step note in one
-// anchorMarketNotes call proves the new polaris parser is additive: the other
-// kind's placement is unaffected.
+// (o) placing a note among `-`-id events and a rate step among `:`-id polaris
+// events in one anchorMarketNotes call: neither id shape disturbs the other.
 const mixedNotes = [note(), rsReal[0]];
 const mixedEvents = [...HISTORY, RS_A, RS_B].sort((a, b) => a.blockNumber - b.blockNumber);
 const mixedAnchors = anchorMarketNotes(mixedNotes, mixedEvents, "asc");
 check(
-  "8o. a share-rate-step note (`-` id) and a rate-step note (`:` id) anchor together, neither disturbing the other",
+  "8o. notes among `-`-id events and `:`-id events anchor together, neither disturbing the other",
   mixedAnchors.size === 2,
   `${mixedAnchors.size} anchor(s)`,
 );
 
 // ── 9. The live notes as one card — which notes join, and in what order ─────
-// Synthetic notes: only `kind`, `live`, `id` and the move each kind states
-// (`deltaPp`, `changePct`, `ratio`) reach the rule. The shapes are the example
-// wallet's (Aave V3 Core 0x0af1…6a6a, 2026-09-30): five borrow-rate notes at
-// the head, plus a Polaris CDP's price gap and rate step.
+// Synthetic notes: only `kind`, `live`, `id` and the move a rate step states
+// (`deltaPp`) reach the rule. The shapes are the example wallet's (Aave V3
+// Core 0x0af1…6a6a, 2026-09-30): five borrow-rate notes at the head.
 
 {
   const { liveNoteGroup, orderLiveNotes, LIVE_NOTE_GROUP_ID } = mod;
   const rate = (id, deltaPp, live = true) => ({ id, kind: "rate-step", deltaPp, ...(live ? { live: true } : {}) });
-  const gap = (id, changePct) => ({ id, kind: "price-gap", changePct, live: true });
+  const terms = (id) => ({ id, kind: "vault-terms", live: true });
   check(
     "9. the group rule is exported from the module the page imports",
     typeof liveNoteGroup === "function" && typeof orderLiveNotes === "function",
@@ -759,11 +409,11 @@ check(
   check("9b. one live note makes no group (it keeps its own row)", liveNoteGroup([rate("a", 1)]) === null);
   const mixedLive = liveNoteGroup([rate("h", 3, false), rate("a", 1), rate("t", 9, false)]);
   check("9c. a historical note never joins a group", mixedLive === null);
-  const polaris = orderLiveNotes([gap("p", -0.5), rate("r", 4), gap("q", 2)]);
+  const mixedKinds = orderLiveNotes([terms("p"), rate("r", 4), rate("s", 6), terms("q")]);
   check(
-    "9d. kinds keep the builder's order (a Polaris price gap before its rate); each kind is ordered by its own move",
-    polaris.map((n) => n.id).join("") === "qpr",
-    polaris.map((n) => n.id).join(""),
+    "9d. kinds keep the builder's order; each kind is ordered by its move",
+    mixedKinds.map((n) => n.id).join("") === "pqsr",
+    mixedKinds.map((n) => n.id).join(""),
   );
 }
 

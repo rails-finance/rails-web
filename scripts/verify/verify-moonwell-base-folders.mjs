@@ -52,10 +52,6 @@
 //   G10 the coverage states the seed's rows and nothing else, with no anchor
 //   G11 the members route refuses what it cannot open, with its own sentence
 //   G12 the flat answer is still flat
-//   N1  (exploiter) the historical market notes the grouped page draws are the
-//       ones the whole history yields
-//   N2  a folder that could move the balance withholds a note; one that could
-//       not leaves it
 //   H0–H4 (exploiter, in a browser) the page asks for rows, the count line
 //       states the whole history (the flat page states a cut when the history
 //       is deeper than the flat preload, and the whole history when not), no boundary
@@ -96,7 +92,6 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 import { BASE, hostFetch, bypassHeaders, reserveTimeline } from "./lib/host.mjs";
-import { showNoteRows } from "./lib/market-notes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "../..");
@@ -154,7 +149,6 @@ const { groupMoonwellReplay } = await import("../../lib/moonwell-base/timeline-f
 const { marketMapFromRoster } = await import("../../lib/sources/chain/moonwell-events.ts");
 const { resolveMoonwellRoster } = await import("../../lib/sources/chain/moonwell-roster.ts");
 const { rehydrateChainTimelineWire } = await import("../../lib/shared/timeline-wire.ts");
-const { shareRateNotesFor } = await import("../../lib/shared/market-note.ts");
 const { TIMELINE_WINDOW_ROWS } = await import("../../lib/shared/timeline-opening-balance.ts");
 const { MOONWELL_BASE_DEPLOYMENT, MOONWELL_BASE_DEPLOY_BLOCK, MOONWELL_BASE_WETH_ROUTER } = await import(
   "../../lib/moonwell-base/asset-catalog.ts"
@@ -662,36 +656,13 @@ async function runFixture(f) {
   return { grouped, whole, folders, events };
 }
 
-// ── N — the market notes on a grouped page ─────────────────────────────────
-
-async function notesExpectation(whole) {
-  const markets = new Map();
-  for (const e of whole.events) {
-    const d = e.context.data;
-    if (d.side !== "supply") continue;
-    const address = d.market.toLowerCase();
-    if (!markets.has(address)) markets.set(address, { address, key: d.market, symbol: d.marketSymbol });
-  }
-  const ids = [];
-  const steps = new Map();
-  for (const m of markets.values()) {
-    const r = await getJson(`/api/chain/moonwell-base/share-rate?market=${m.address}`);
-    const s = Array.isArray(r.body?.steps) ? r.body.steps : [];
-    steps.set(m.address, s);
-    for (const n of shareRateNotesFor(s, m, whole.events)) ids.push(n.id);
-  }
-  return { ids: ids.sort(), markets, steps };
-}
-
 // ── H — the page ───────────────────────────────────────────────────────────
 
-async function runPage(f, got, noteIds) {
+async function runPage(f, got) {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const id = (s) => `${s} [${f.id}]`;
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 }, extraHTTPHeaders: bypassHeaders() });
-  // Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
-  await showNoteRows(ctx);
   const countLine = async (page) =>
     page
       .waitForFunction(
@@ -776,20 +747,6 @@ async function runPage(f, got, noteIds) {
     );
     await page.keyboard.press("Escape");
 
-    // N1 — the notes on this page.
-    if (noteIds) {
-      await page.waitForTimeout(1500);
-      const drawnIds = (
-        await page.$$eval("[data-market-note]", (els) => els.map((el) => el.getAttribute("data-market-note")))
-      )
-        .filter((x) => x && !x.endsWith("-head"))
-        .sort();
-      check(
-        id("N1 the grouped page draws the historical notes the whole history yields"),
-        noteIds.length > 0 && canonical(drawnIds) === canonical(noteIds),
-        `page ${drawnIds.join(", ") || "none"} · whole history ${noteIds.join(", ") || "none"}`,
-      );
-    }
     await page.close();
   } finally {
     await browser.close();
@@ -803,44 +760,8 @@ for (const f of FIXTURES) {
   const got = await runFixture(f);
   if (!got || !f.page) continue;
 
-  const expectation = await notesExpectation(got.whole);
-  // N2 — the rule, on this position's own notes: a folder over the held row
-  // withholds the note, one after the step leaves it.
-  {
-    const [address, steps] = [...expectation.steps].find(([, s]) => s.length > 0) ?? [];
-    const market = address ? expectation.markets.get(address) : null;
-    const notes = market ? shareRateNotesFor(steps, market, got.whole.events) : [];
-    if (notes.length === 0) {
-      skip("N2 a folder that could move the balance withholds a note", "this position yields no historical note");
-    } else {
-      const step = steps.find((s) =>
-        notes.some((n) => n.id === `share-rate-step:${address}:${s.fromBlock}-${s.toBlock}`),
-      );
-      const synthetic = (firstBlock, lastBlock) => ({
-        responseId: "synthetic",
-        firstBlock,
-        lastBlock,
-        other: 0,
-        legs: [{ verb: "Sent", asset: address }],
-      });
-      const over = shareRateNotesFor(steps, market, got.whole.events, [synthetic(step.fromBlock - 1, step.fromBlock)]);
-      const after = shareRateNotesFor(steps, market, got.whole.events, [synthetic(step.toBlock + 1, step.toBlock + 2)]);
-      const elsewhere = shareRateNotesFor(steps, market, got.whole.events, [
-        {
-          ...synthetic(step.fromBlock - 1, step.fromBlock),
-          legs: [{ verb: "Sent", asset: "0x0000000000000000000000000000000000000001" }],
-        },
-      ]);
-      check(
-        "N2 a folder that could move the balance withholds a note; one that could not leaves it",
-        over.length === notes.length - 1 && after.length === notes.length && elsewhere.length === notes.length,
-        `${notes.length} note(s); a Sent folder over the step leaves ${over.length}, one after it ${after.length}, one in another market ${elsewhere.length}`,
-      );
-    }
-  }
-
-  if (BROWSER) await runPage(f, got, expectation.ids);
-  else skip(`H0–H4, N1 [${f.id}]`, "BROWSER=0");
+  if (BROWSER) await runPage(f, got);
+  else skip(`H0–H4 [${f.id}]`, "BROWSER=0");
 }
 
 const counted = passes + failures;
