@@ -17,7 +17,6 @@ import { useParams } from "next/navigation";
 import { morphoExplorer } from "@/lib/morpho/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
@@ -61,21 +60,14 @@ import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morpho/morpho-flows-note";
 import { useMorphoFlows } from "@/hooks/useMorphoFlows";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { MorphoBorrowRoom, morphoRiskColumn } from "@/components/protocol/morpho/morpho-risk-slot";
-import { morphoHasDebt } from "@/lib/morpho/position-legs";
+import { morphoExports } from "@/components/protocol/morpho/morpho-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import {
   MorphoPositionExplanation,
   MorphoClosedPositionExplanation,
 } from "@/components/protocol/morpho/morpho-position-explanation";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MorphoNeighboursProvider } from "@/lib/morpho/timeline-neighbours";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the V4 spoke page.
-const MorphoExportMenu = dynamic(
-  () => import("@/components/protocol/morpho/morpho-export-menu").then((m) => m.MorphoExportMenu),
-  { ssr: false },
-);
 
 interface MorphoPositionViewProps {
   /** `<marketId>-<user>`, as it appears in the URL. */
@@ -437,6 +429,21 @@ export default function MorphoPositionView({
     });
   }, [liveView, morphoEvents]);
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = liveView
+    ? morphoExports({
+        view: liveView,
+        chain,
+        events: morphoEvents,
+        csvFilename: `morpho-${positionId.slice(0, 10)}-activity.csv`,
+        // A folder's members are not in `morphoEvents`, so a grouped page
+        // reads the whole history for the CSV as a windowed one does.
+        fetchAllEvents: historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory,
+        history: markdownHistoryScope(historyWindow, morphoEvents, servedFolders),
+        scopeNote: exportScopeNote(historyWindow, morphoEvents, "this position's whole history", servedFolders),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flows.focus}>
       <div className="py-8 space-y-6">
@@ -447,20 +454,11 @@ export default function MorphoPositionView({
           priceReason={ORACLE_USD_REASON.morpho}
           closed={liveView != null && liveView.status !== "open"}
           closing={closing}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {liveView && (
-            <MorphoExportMenu
-              view={liveView}
-              chain={chain}
-              events={morphoEvents}
-              csvFilename={`morpho-${positionId.slice(0, 10)}-activity.csv`}
-              // A folder's members are not in `morphoEvents`, so a grouped page
-              // reads the whole history for the CSV as a windowed one does.
-              fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-              history={markdownHistoryScope(historyWindow, morphoEvents, servedFolders)}
-              scopeNote={exportScopeNote(historyWindow, morphoEvents, "this position's whole history", servedFolders)}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -472,22 +470,14 @@ export default function MorphoPositionView({
                 v={
                   historyWindow.state === "whole" && liquidationCount > 0 ? { ...liveView, liquidationCount } : liveView
                 }
-                receipts
+                surface="detail"
                 viewHref={tl.viewHref}
-                // Closed by default, remembered per viewer and position (ui-jobs
-                // 209). The LTV, the room left to borrow and the distance bar
-                // come from the live market read.
-                positionSummary
-                risk={
-                  liveView.status === "open"
-                    ? morphoRiskColumn(chain ?? null, morphoHasDebt(liveView.borrowSharesRaw))
-                    : null
-                }
-                debtDetail={chain ? <MorphoBorrowRoom chain={chain} /> : undefined}
-                // The Explanation is now pure layman prose about those same face
-                // figures — no secondary figure-strips. The borrow-capacity strip
-                // is absorbed into the risk slot above; the market rates live on
-                // the market view (where pool-wide rate context belongs).
+                // The LTV, the rate and the room left to borrow come from the
+                // live market read.
+                live={chain}
+                exports={exports}
+                // The Explanation is layman prose about the card's figures; the
+                // market rates live on the market view.
                 // A terminal position narrates from the replay + the timeline
                 // already on the page (no chain overlay needed); the open pane
                 // still needs the live overlay for the oracle and health facts
