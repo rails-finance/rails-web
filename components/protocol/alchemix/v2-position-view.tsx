@@ -24,29 +24,30 @@ import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { isAlchemixV2Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { alchemixMarketWord, alchemixV2PositionName } from "@/lib/alchemix/naming";
+import { alchemixMarketWord, alchemixV2AccountLabel, alchemixV2PositionName } from "@/lib/alchemix/naming";
 import { alchemixExplorer } from "@/lib/alchemix/explorer";
-import { v3PositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
+import { v2PositionPath, v3PositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { v2FrozenDebtProv, v2SharesProv, v2UnderlyingProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
 import { computeAlchemixV2Economics, v2CreditTotalsWithheld } from "@/lib/alchemix/v2-economics";
 import {
-  V2ClosedPill,
+  V2_STATUS,
   closedOn,
-  v2CollateralColumn,
-  v2DebtColumn,
+  v2CollateralHead,
+  v2DebtHead,
+  v2Outcome,
   v3SuccessorLinks,
 } from "@/components/protocol/alchemix/v2-position-card";
+import { AlchemixIdentity } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixMenuRows } from "@/components/protocol/alchemix/alchemix-menu-rows";
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
 import type { AlchemixV2PositionData } from "@/types/api/alchemix";
 import { AmountText } from "@/components/shared/amount-text";
@@ -112,129 +113,134 @@ export function AlchemixV2PositionView({
   const held = p.collateral.filter((c) => c.underlying && !c.readStale);
   const successorHref = (lineKey: string, tokenId: string) => v3PositionPath(deployment, lineKey, tokenId);
 
+  // The card's slots (rails-ops TO-DO-position-card 322, 323): a closed card,
+  // the figures at close as heads and "Now on V3" beside the outcome. What the
+  // wind-down was, and every token the account held, are the Explanation.
+  const explanation = (
+    <div className="space-y-2">
+      {/* Every token the account held at close, where there is more than the
+          one the headline leads with. Each at its decimals. */}
+      {held.length > 1 ? (
+        <ul className="space-y-0.5 tabular-nums">
+          {held.map((c) => {
+            const u = c.underlying!;
+            const i = p.collateral.indexOf(c);
+            return (
+              <li key={c.yieldToken.address}>
+                <Prov
+                  info={v2SharesProv(
+                    c.yieldToken.symbol,
+                    c.yieldToken.address,
+                    c.shares.raw,
+                    c.yieldToken.decimals,
+                    p.frozenAtBlock,
+                    coords,
+                  )}
+                  value={formatUnitsExact(c.shares.raw, c.yieldToken.decimals)}
+                  symbol={c.yieldToken.symbol}
+                >
+                  <AmountText value={c.shares.formatted} format="headline" symbol={c.yieldToken.symbol} />{" "}
+                  {c.yieldToken.symbol} shares
+                </Prov>
+                , worth{" "}
+                <Prov info={underlyingProvAt(i)!} value={formatUnitsExact(u.raw, u.decimals)} symbol={u.symbol}>
+                  <AmountText value={u.formatted} format="headline" symbol={u.symbol} /> {u.symbol}
+                </Prov>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      <p>
+        Alchemix V2 was wound down on {closedOn(p.closedAt)}. The figures above are the Alchemist&rsquo;s reading at
+        block {block(p.frozenAtBlock)}, and nothing has moved them since. That day the collateral was swept to the{" "}
+        <a
+          href={explorerUrl(chainId, "address", p.closure.sweptTo)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link-muted"
+        >
+          Alchemix DAO Safe
+        </a>
+        {p.closure.sweepTxHash ? (
+          <>
+            {" "}
+            in{" "}
+            <a
+              href={explorerUrl(chainId, "tx", p.closure.sweepTxHash)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-muted"
+            >
+              one transaction
+            </a>
+          </>
+        ) : null}
+        {p.v3Successors.length > 0
+          ? ", and the V3 position this wallet holds is what this one became. The two are one obligation at two points in time, so no figure here is added to a V3 one."
+          : "."}
+      </p>
+      {economics ? (
+        <p>
+          V2 paid debt down every block from the collateral&rsquo;s harvested yield, with no log at those blocks, so the
+          flows below do not add up to the debt at close.
+          {creditWithheld
+            ? " A Repay or a Liquidate logged before 11 May 2022 does not state the debt it cleared, so no total of either is given."
+            : ""}
+        </p>
+      ) : null}
+      {p.v3Successors.length > 0 ? null : (
+        <Link href={deployment.basePath} className="link inline-block">
+          Browse V3 positions
+        </Link>
+      )}
+    </div>
+  );
+  const cardSlots: PositionCardSlots = {
+    surface: "detail",
+    status: V2_STATUS,
+    identity: (
+      <AlchemixIdentity
+        name={alchemixV2PositionName(p.syntheticSymbol, p.account)}
+        chain={p.chainName ?? `chain ${p.chainId}`}
+      />
+    ),
+    heads: [v2DebtHead(p, debtProv), v2CollateralHead(p, underlyingProvAt)],
+    outcome: v2Outcome(p, v3SuccessorLinks(p, successorHref)),
+    counters: null,
+    explainer: { body: explanation, viewHref: tl.viewHref },
+    learnMore: null,
+    menu: {
+      leading: () => (
+        <AlchemixMenuRows
+          idTitle={`Account ${alchemixV2AccountLabel(p.account)}`}
+          idValue={p.account}
+          idSubtitle="Copy the account address"
+          outside={
+            p.accountUrl ? { title: "The account on the explorer", subtitle: "Open it", url: p.accountUrl } : null
+          }
+          pagePath={v2PositionPath(deployment, p.lineKey, p.account)}
+        />
+      ),
+      exports: null,
+    },
+  };
+
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
-        <DetailTopRow session={deployment.session} wallet={p.account} owner={{ wallet: p.account }} closed />
+        <DetailTopRow
+          session={deployment.session}
+          wallet={p.account}
+          owner={{ wallet: p.account }}
+          closed
+          // The card's ⋮ carries the menu; the event route, which draws no
+          // card, keeps the wallet row's Tools.
+          tools={onEventPage}
+        />
 
         {/* ── The position card ──────────────────────────────────────────── */}
-        {!onEventPage && (
-          <PositionCardShell receipts>
-            <OpenPositionStats
-              statusPill={<V2ClosedPill />}
-              leadingIdentity={
-                <>
-                  <span className="text-xs font-bold tracking-wide text-foreground/80">
-                    {alchemixV2PositionName(p.syntheticSymbol, p.account)}
-                  </span>
-                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
-                    <span>{p.chainName ?? `chain ${p.chainId}`}</span>
-                  </span>
-                </>
-              }
-              columns={[
-                v2DebtColumn(p, debtProv),
-                v2CollateralColumn(p, underlyingProvAt),
-                {
-                  label: "Now on V3",
-                  value:
-                    p.v3Successors.length > 0 ? (
-                      <StatValue>{v3SuccessorLinks(p, successorHref)}</StatValue>
-                    ) : (
-                      <StatValue color="text-rb-500">None</StatValue>
-                    ),
-                  footnote:
-                    p.v3Successors.length > 0 ? (
-                      <StatFootnote>held by this wallet now</StatFootnote>
-                    ) : (
-                      <StatFootnote>this wallet holds no V3 position on {p.syntheticSymbol}</StatFootnote>
-                    ),
-                },
-              ]}
-            />
-
-            <div className="mt-3 space-y-1.5">
-              {/* Every token the account held at close, where there is more than
-                the one the column leads with. Each at its own decimals. */}
-              {held.length > 1 ? (
-                <ul className="space-y-0.5 text-[11px] leading-relaxed text-rb-500">
-                  {held.map((c) => {
-                    const u = c.underlying!;
-                    const i = p.collateral.indexOf(c);
-                    return (
-                      <li key={c.yieldToken.address} className="tabular-nums">
-                        <Prov
-                          info={v2SharesProv(
-                            c.yieldToken.symbol,
-                            c.yieldToken.address,
-                            c.shares.raw,
-                            c.yieldToken.decimals,
-                            p.frozenAtBlock,
-                            coords,
-                          )}
-                          value={formatUnitsExact(c.shares.raw, c.yieldToken.decimals)}
-                          symbol={c.yieldToken.symbol}
-                        >
-                          <AmountText value={c.shares.formatted} format="headline" symbol={c.yieldToken.symbol} />{" "}
-                          {c.yieldToken.symbol} shares
-                        </Prov>
-                        , worth{" "}
-                        <Prov info={underlyingProvAt(i)!} value={formatUnitsExact(u.raw, u.decimals)} symbol={u.symbol}>
-                          <AmountText value={u.formatted} format="headline" symbol={u.symbol} /> {u.symbol}
-                        </Prov>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-
-              <p className="text-xs leading-relaxed text-rb-500">
-                Alchemix V2 was wound down on {closedOn(p.closedAt)}. The figures above are the Alchemist&rsquo;s own
-                reading at block {block(p.frozenAtBlock)}, and nothing has moved them since. That day the collateral was
-                swept to the{" "}
-                <a
-                  href={explorerUrl(chainId, "address", p.closure.sweptTo)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-muted"
-                >
-                  Alchemix DAO Safe
-                </a>
-                {p.closure.sweepTxHash ? (
-                  <>
-                    {" "}
-                    in{" "}
-                    <a
-                      href={explorerUrl(chainId, "tx", p.closure.sweepTxHash)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="link-muted"
-                    >
-                      one transaction
-                    </a>
-                  </>
-                ) : null}
-                {p.v3Successors.length > 0
-                  ? ", and the V3 position this wallet holds is what this one became. The two are one obligation at two points in time, so no figure here is added to a V3 one."
-                  : "."}
-              </p>
-              {economics ? (
-                <p className="text-[11px] leading-relaxed text-rb-500">
-                  V2 paid debt down every block from the collateral&rsquo;s harvested yield, with no log at those
-                  blocks, so the flows below do not add up to the debt at close.
-                  {creditWithheld
-                    ? " A Repay or a Liquidate logged before 11 May 2022 does not state the debt it cleared, so no total of either is given."
-                    : ""}
-                </p>
-              ) : null}
-              {p.v3Successors.length > 0 ? null : (
-                <Link href={deployment.basePath} className="link inline-block text-xs">
-                  Browse V3 positions
-                </Link>
-              )}
-            </div>
-          </PositionCardShell>
-        )}
+        {!onEventPage && <PositionCard slots={cardSlots} />}
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}
         {onEventPage ? null : economics ? (

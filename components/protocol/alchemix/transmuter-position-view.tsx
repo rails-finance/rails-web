@@ -25,8 +25,7 @@ import { useMountedNow } from "@/hooks/useMountedNow";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline, type TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -35,19 +34,22 @@ import { useWalletContext } from "@/components/nav/wallet-context";
 import { isTransmuterEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { alchemixPositionName } from "@/lib/alchemix/naming";
 import { alchemixExplorer } from "@/lib/alchemix/explorer";
-import type { AlchemixDeployment } from "@/lib/alchemix/lines";
+import { transmuterPositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { transmuterEmittedProv, transmuterMaturityProv } from "@/lib/alchemix/transmuter-provenance";
 import { computeTransmuterEconomics } from "@/lib/alchemix/transmuter-economics";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import { logIndexOf, splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
 import {
-  claimColumn,
-  maturityColumn,
+  transmuterHeads,
   transmuterMaturityEstimate,
-  stakedColumn,
-  transmuterState,
+  transmuterOutcome,
+  transmuterPanel,
+  transmuterStatus,
+  type TransmuterCardProvs,
 } from "@/components/protocol/alchemix/transmuter-position-card";
+import { AlchemixIdentity } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixMenuRows } from "@/components/protocol/alchemix/alchemix-menu-rows";
 import {
   TransmuterEventCard,
   coordsForTransmuterLeg,
@@ -55,8 +57,6 @@ import {
   type TransmuterEvent,
 } from "@/components/protocol/alchemix/transmuter-event-card";
 import type { AlchemixTransmuterPositionData } from "@/types/api/alchemix";
-
-const STATE_WORD = { maturing: "Maturing", matured: "Matured", claimed: "Claimed" } as const;
 
 export function TransmuterPositionView({
   deployment,
@@ -71,7 +71,6 @@ export function TransmuterPositionView({
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const p = position;
   const mytSymbol = p.claim?.claimed?.symbol ?? p.mytSymbol ?? "vault shares";
-  const state = transmuterState(p);
   const holder = p.owner ?? p.claim?.claimer ?? null;
   // Who held the position (its creator, its owner, the address that claimed
   // it): a leg one of them sent paid the gas.
@@ -148,6 +147,75 @@ export function TransmuterPositionView({
 
   const name = alchemixPositionName(p.syntheticSymbol, p.nftId, "transmuter");
 
+  // The card's slots (rails-ops TO-DO-position-card 322, 323): Deposited and
+  // Matures at as the heads; the panel while outstanding, the outcome once
+  // claimed. What a Transmuter position is, and an early claim's cost, are
+  // the Explanation.
+  const provs: TransmuterCardProvs = {
+    staked: transmuterEmittedProv("amount_staked", p.staked.symbol, p.staked.raw, stakeCoords),
+    maturity: transmuterMaturityProv(p.maturity.startBlock, p.maturity.maturationBlock, stakeCoords, maturity),
+    claimed:
+      claimCoords && p.claim?.claimed
+        ? transmuterEmittedProv("amount_claimed", mytSymbol, p.claim.claimed.raw, claimCoords)
+        : undefined,
+    returned:
+      claimCoords && p.claim?.unclaimed
+        ? transmuterEmittedProv("amount_unclaimed", p.claim.unclaimed.symbol, p.claim.unclaimed.raw, claimCoords)
+        : undefined,
+  };
+  const explanation = (
+    <div className="space-y-2">
+      <p>
+        A Transmuter position locks {p.syntheticSymbol} until a maturity counted in blocks, converting a little every
+        block, and a claim pays out the converted part in {mytSymbol}. The holder can claim before maturity: the claim
+        then hands back the part not yet converted as {p.syntheticSymbol}, less an early exit fee, so claiming early
+        gives up converting that part and pays the fee on it. Every figure here is one of the Transmuter&rsquo;s events,
+        replayed, or arithmetic over them; none is read from the contract at a block.
+      </p>
+      {early && p.claim?.claimed ? (
+        <p>
+          {earlyClaimSentence(early, p.syntheticSymbol, mytSymbol, p.claim.claimed.raw, false)} The claim&rsquo;s card
+          below carries the arithmetic.
+        </p>
+      ) : null}
+      {p.owner ? (
+        <p>
+          The position is a token that can be sold until it is claimed, so the address above is who holds it now and
+          need not be who staked.
+        </p>
+      ) : null}
+    </div>
+  );
+  const outcome = transmuterOutcome(p, provs, claimed?.timestamp ?? null);
+  const common = {
+    surface: "detail" as const,
+    status: transmuterStatus(p),
+    identity: <AlchemixIdentity name={name} chain={p.chainName ?? `chain ${p.chainId}`} />,
+    heads: transmuterHeads(p, maturity, provs),
+    counters: null,
+    explainer: { body: explanation, viewHref: tl.viewHref },
+    learnMore: null,
+    menu: {
+      leading: () => (
+        <AlchemixMenuRows
+          idTitle={`Position #${p.nftId}`}
+          idValue={p.nftId}
+          idSubtitle="Copy the position ID"
+          outside={
+            p.transmuterUrl
+              ? { title: "The line's Transmuter", subtitle: "Open the contract on the explorer", url: p.transmuterUrl }
+              : null
+          }
+          pagePath={transmuterPositionPath(deployment, p.lineKey, p.nftId)}
+        />
+      ),
+      exports: null,
+    },
+  };
+  const cardSlots: PositionCardSlots = outcome
+    ? { ...common, outcome }
+    : { ...common, panel: transmuterPanel(p, maturity) };
+
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
@@ -156,86 +224,13 @@ export function TransmuterPositionView({
           wallet={holder}
           owner={{ wallet: holder, prefix: p.owner ? undefined : <span>Claimed by</span> }}
           closed={p.status === "claimed"}
+          // The card's ⋮ carries the menu; the event route, which draws no
+          // card, keeps the wallet row's Tools.
+          tools={onEventPage}
         />
 
         {/* ── The position card ──────────────────────────────────────────── */}
-        {!onEventPage && (
-          <PositionCardShell receipts>
-            <OpenPositionStats
-              statusPill={
-                <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-                  {STATE_WORD[state]}
-                </span>
-              }
-              leadingIdentity={
-                <>
-                  <span className="text-xs font-bold tracking-wide text-foreground/80">{name}</span>
-                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
-                    <span>{p.chainName ?? `chain ${p.chainId}`}</span>
-                  </span>
-                </>
-              }
-              columns={[
-                stakedColumn(p, transmuterEmittedProv("amount_staked", p.staked.symbol, p.staked.raw, stakeCoords)),
-                maturityColumn(
-                  p,
-                  transmuterMaturityProv(p.maturity.startBlock, p.maturity.maturationBlock, stakeCoords, maturity),
-                  maturity,
-                ),
-                claimColumn(
-                  p,
-                  claimCoords && p.claim
-                    ? {
-                        claimed: p.claim.claimed
-                          ? transmuterEmittedProv("amount_claimed", mytSymbol, p.claim.claimed.raw, claimCoords)
-                          : undefined,
-                        returned: p.claim.unclaimed
-                          ? transmuterEmittedProv(
-                              "amount_unclaimed",
-                              p.claim.unclaimed.symbol,
-                              p.claim.unclaimed.raw,
-                              claimCoords,
-                            )
-                          : undefined,
-                      }
-                    : undefined,
-                ),
-              ]}
-            />
-            <div className="mt-3 space-y-1.5">
-              <p className="text-xs leading-relaxed text-rb-500">
-                A Transmuter position locks {p.syntheticSymbol} until a maturity counted in blocks, converting a little
-                every block, and a claim pays out the converted part in {mytSymbol}. The holder can claim before
-                maturity: the claim then hands back the part not yet converted as {p.syntheticSymbol}, less an early
-                exit fee, so claiming early gives up converting that part and pays the fee on it. Every figure here is
-                one of the Transmuter&rsquo;s own events, replayed, or arithmetic over them; none is read from the
-                contract at a block.
-              </p>
-              {early && p.claim?.claimed ? (
-                <p className="text-xs leading-relaxed text-foreground/80">
-                  {earlyClaimSentence(early, p.syntheticSymbol, mytSymbol, p.claim.claimed.raw, false)} The
-                  claim&rsquo;s card below carries the arithmetic.
-                </p>
-              ) : null}
-              {p.owner ? (
-                <p className="text-[11px] leading-relaxed text-rb-500">
-                  The position is a token that can be sold until it is claimed, so the address above is who holds it now
-                  and need not be who staked.
-                </p>
-              ) : null}
-              {p.transmuterUrl ? (
-                <a
-                  href={p.transmuterUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link inline-block text-xs"
-                >
-                  The line&rsquo;s Transmuter contract
-                </a>
-              ) : null}
-            </div>
-          </PositionCardShell>
-        )}
+        {!onEventPage && <PositionCard slots={cardSlots} />}
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}
         {onEventPage ? null : economics ? (
