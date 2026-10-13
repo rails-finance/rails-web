@@ -136,6 +136,7 @@ const FAMILIES = {
       "lib/liquity-v1/event-templates.ts",
       "components/protocol/liquity-v1/liquity-v1-event-explainer.tsx",
       "components/protocol/liquity-v1/liquity-v1-position-explanation.tsx",
+      "components/protocol/liquity-v1/liquity-v1-sheet.tsx",
     ],
     nodes: {
       section: "position_words",
@@ -149,6 +150,7 @@ const FAMILIES = {
       "lib/liquity-v1/position-nodes.tsx",
       "components/protocol/liquity-v1/liquity-v1-event-explainer.tsx",
       "components/protocol/liquity-v1/liquity-v1-event-card.tsx",
+      "components/protocol/liquity-v1/liquity-v1-sheet.tsx",
     ],
   },
   compound: {
@@ -256,6 +258,7 @@ const FAMILIES = {
       "lib/polaris/event-templates.ts",
       "components/protocol/polaris/polaris-event-explainer.tsx",
       "components/protocol/polaris/polaris-position-explanation.tsx",
+      "components/protocol/polaris/polaris-sheet.ts",
     ],
     nodes: {
       section: "position_words",

@@ -22,7 +22,9 @@
 // cells, the interest since the previous event is a sub-line of its side, and
 // the price row lists every price the USD figures use. While the read is
 // pending the cells stand as placeholders; where it failed, the event's
-// balance, the basket and the captured price stand.
+// balance, the basket and the captured price stand. Once it lands, the T2 draws
+// as the Aave family's balance sheet (aave-family-sheet.tsx; ui-jobs 330) and
+// the cells stand for the rows the sheet leaves out.
 
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import type { SparkContext, SparkSnapshotItem } from "@/lib/shared/types/event-shape";
@@ -56,6 +58,12 @@ import { formatNumber } from "@/lib/utils/format";
 import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
 import { sparkRiskCells } from "./spark-account-state";
+import { TRANSFER_LABEL } from "./spark-event-header";
+import { aaveFamilySheet } from "@/components/protocol/aave-v3/aave-family-sheet";
+import { reserveSymbol } from "@/components/protocol/aave-v3/aave-v3-position-state";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import { isGatewayWithdrawal } from "@/lib/spark/liquidation-fee";
 import { AmountText } from "@/components/shared/amount-text";
 import { statePricePills, type TouchedLeg } from "@/components/protocol/aave-v3/aave-v3-position-state";
 import {
@@ -81,6 +89,10 @@ export interface SparkEventDetailProps {
   previous?: { blockNumber: number; txHash: string };
   /** The timeline event's time. */
   eventTs?: number;
+  /** The timeline event's id, to find it among the page's flows. */
+  eventId?: string;
+  /** The event's word ("Supply"), naming its rows on the sheet. */
+  label?: string;
   /** The card has opened: the reads start then. */
   active?: boolean;
 }
@@ -163,8 +175,11 @@ export function useSparkEventBody({
   reserveAddress,
   previous,
   eventTs,
+  eventId,
+  label,
   active = true,
 }: SparkEventDetailProps): AaveV3EventBody {
+  const focus = useFlowFocus();
   const coords: SparkCoords = { txHash, blockNumber };
   const read = useSparkEventState({
     ctx,
@@ -433,8 +448,34 @@ export function useSparkEventBody({
     </>
   );
 
+  // The sheet (ui-jobs 330), on the read lane once the read has landed: the
+  // Aave family's builder over the same position reads. The assets repaid in
+  // full: the debt assets the page's flows moved up to this event that the
+  // account owes none of after it.
+  let sheet: EventSheet | null | undefined = market ? null : undefined;
+  if (market && ready && risk) {
+    let repaid: string[] | undefined;
+    const at = focus && eventId ? focus.events.findIndex((e) => e.id === eventId) : -1;
+    if (focus?.model && at >= 0) {
+      const debtLines = new Set(focus.model.buckets.filter((b) => b.side === "debt").map((b) => b.key));
+      const owes = new Set(ready.reserves.filter((r) => BigInt(r.debt.after || "0") > BigInt(0)).map(reserveSymbol));
+      const once = new Set<string>();
+      for (const e of focus.events.slice(0, at + 1))
+        for (const l of e.legs) if (l.symbol && !l.accrual && debtLines.has(l.bucket)) once.add(l.symbol);
+      repaid = [...once].filter((s) => !owes.has(s));
+    }
+    const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
+    const word = isGatewayWithdrawal(ctx)
+      ? "Withdraw"
+      : isTransfer
+        ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL]
+        : (label ?? ctx.eventType);
+    sheet = aaveFamilySheet({ state: ready, prev: read.prevRaw, coords: v3Coords, label: word, eventTs, repaid });
+  }
+
   return {
     cells,
+    sheet,
     cellsData:
       waiting
         ? { "data-spark-account-state": "loading", "data-position-state": "loading" }

@@ -47,6 +47,7 @@ import {
   liqRouteProv,
   redemptionLegProv,
   redemptionNetProv,
+  redemptionDebtSplitProv,
   type LiquityV1Coords,
 } from "@/lib/liquity-v1/event-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
@@ -274,14 +275,7 @@ export function useLiquityV1Opened({
       );
   }
   if (split?.full) {
-    const splitProv: Provenance = {
-      kind: "chain-derived",
-      pclass: "indexed",
-      summary:
-        "Debt a full redemption cancelled, in two parts — the redeemer's LUSD paid for all of it except the last 200 LUSD, the liquidation reserve, which the GasPool burned (TroveManager._redeemCloseTrove).",
-      formula: "debt before − 200 LUSD reserve",
-      inputs: [{ label: "debt before", value: ctx.debtBefore, kind: "chain", pclass: "emitted" }],
-    };
+    const splitProv = redemptionDebtSplitProv(ctx.debtBefore);
     debtLines.push(
       <span key="rd">
         <P info={splitProv}>{fmtLusd(split.lusdRedeemed)}</P> redeemed
