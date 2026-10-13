@@ -540,22 +540,6 @@ export const liqPremiumProv = (
   ],
 });
 
-/** Accrued interest = current debt (via the live index) − replayed principal.
- *  A difference of two chain quantities — chain-derived, survives the
- *  on-chain-only gate. */
-export const morphoAccruedProv = (sym: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `Accrued interest (${sym}) — the current debt (borrow shares through the live market index) minus the replayed Σ(borrow − repay) principal. A difference of two chain figures, computed in the browser; it grows as the market's totals accrue.`,
-  contract: MORPHO,
-  via: "current debt − borrowed principal",
-  formula: "current − principal",
-  inputs: [
-    { label: "current", kind: "chain", pclass: "state", note: `live debt (${sym}) with interest — toAssetsUp` },
-    { label: "principal", kind: "chain", pclass: "indexed", note: "replayed Σ(borrow − repay) assets" },
-  ],
-});
-
 // ── The market around an event (/api/chain/morpho/at-block) ─────────────────
 
 const oracleReadVerify = (block: number): ProvVerify => ({

@@ -27,7 +27,6 @@
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
@@ -82,8 +81,8 @@ import {
   AaveV3PositionExplanation,
   AaveV3ClosedPositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
-import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
-import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
+import { aaveV3Exports } from "@/components/protocol/aave-v3/aave-v3-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import {
   computeAaveV3Economics,
   isWethGateway,
@@ -110,13 +109,6 @@ import {
 import { loadAaveFamilyReserveRates, type ReserveRateLookup } from "@/lib/api/fetch-aave-family-reserve-rates";
 import type { MarketNote } from "@/lib/shared/market-note";
 import { v3ViewWithLiveRead } from "@/lib/aave-v3/chain-position-view";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the V4 spoke page.
-const AaveV3ExportMenu = dynamic(
-  () => import("@/components/protocol/aave-v3/aave-v3-export-menu").then((m) => m.AaveV3ExportMenu),
-  { ssr: false },
-);
 
 type AaveV3Event = BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
 
@@ -731,6 +723,29 @@ export default function AaveV3PositionDetail({
     [market],
   );
 
+  // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
+  const exports = view
+    ? aaveV3Exports({
+        wallet,
+        marketName: MARKET_NAME[market] ?? "Core",
+        view: liveView ?? view,
+        chain,
+        captions,
+        events: aaveEvents,
+        notes,
+        liveNotes,
+        csvFilename: `aave-v3-${market}-${wallet.slice(0, 10)}-activity.csv`,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        queued: {
+          protocol: "aave-v3",
+          params: { wallet, market },
+          totalEvents: preloadTotal,
+        },
+        history: markdownHistoryScope(historyWindow, aaveEvents, servedFolders),
+        scopeNote: exportScopeNote(historyWindow, aaveEvents, "this wallet's whole history", servedFolders),
+      })
+    : null;
+
   return (
     <V3PoolProvider pool={poolIdentity}>
       <FlowFocusContext.Provider value={flowFocus}>
@@ -741,28 +756,11 @@ export default function AaveV3PositionDetail({
             owner={{ wallet }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
+            // The exports ride the card's ⋮; the event route, which draws no
+            // card, keeps them in the wallet row's Tools.
+            tools={onEventPage}
           >
-            {view && (
-              <AaveV3ExportMenu
-                wallet={wallet}
-                marketName={MARKET_NAME[market] ?? "Core"}
-                view={liveView ?? view}
-                chain={chain}
-                captions={captions}
-                events={aaveEvents}
-                notes={notes}
-                liveNotes={liveNotes}
-                csvFilename={`aave-v3-${market}-${wallet.slice(0, 10)}-activity.csv`}
-                fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-                queued={{
-                  protocol: "aave-v3",
-                  params: { wallet, market },
-                  totalEvents: preloadTotal,
-                }}
-                history={markdownHistoryScope(historyWindow, aaveEvents, servedFolders)}
-                scopeNote={exportScopeNote(historyWindow, aaveEvents, "this wallet's whole history", servedFolders)}
-              />
-            )}
+            {onEventPage && exports && <ExportMenu {...exports} />}
           </DetailTopRow>
 
           {loading ? (
@@ -775,13 +773,12 @@ export default function AaveV3PositionDetail({
                   receipts
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // Closed by default, remembered per viewer and position (ui-jobs
-                  // 209). The room left to borrow and the distance bar from the
-                  // Pool read sit in the opened layer under Debt and Health
-                  // factor, inside the card's receipts scope.
-                  positionSummary
-                  debtDetail={chain ? <AaveV3BorrowRoom chain={chain} /> : undefined}
-                  riskDetail={chain ? <AaveV3RiskDetail chain={chain} /> : undefined}
+                  // The Pool read's room to borrow and eMode go in the panel,
+                  // inside the card's receipts scope; the health factor pulses
+                  // until the read answers.
+                  chain={chain}
+                  hfPending={!chainSettled}
+                  exports={exports}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The LTV strip is absorbed
                   // into the risk slot above; the reserve rates live on the market
@@ -890,7 +887,7 @@ export default function AaveV3PositionDetail({
                   ) : null
                 }
               />
-              {/* The inspector's layer: armed from Tools in the top row, every
+              {/* The inspector's layer: armed from the card's ⋮, every
               traced value on the page becomes a click target and its receipt
               pins into a popover at the value (prototype: this page). */}
               <ProvInspectorLayer />

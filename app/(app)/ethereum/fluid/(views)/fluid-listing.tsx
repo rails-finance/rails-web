@@ -35,7 +35,7 @@ export function FluidListing({ initialItems, initialTotal, initialKey, initialSe
       defaults={FLUID_LIST_DEFAULTS}
       sortOptions={FLUID_SORT_OPTIONS}
       searchPlaceholder="Search owner wallet or NFT id"
-      renderCard={(p) => <FluidPositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <FluidPositionCard v={viewFromSummary(p)} surface="listing" />}
       hrefFor={(p) => `/ethereum/fluid/${p.nftId}`}
       keyFor={(p) => p.nftId}
       strategy={serverStrategy<FluidPositionSummary, FluidListFilters>({

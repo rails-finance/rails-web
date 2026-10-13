@@ -39,7 +39,7 @@ export function LlamalendListing({ initialItems, initialTotal, initialKey, initi
       defaults={LLAMALEND_LIST_DEFAULTS}
       sortOptions={LLAMALEND_SORT_OPTIONS}
       searchPlaceholder="Search user address"
-      renderCard={(p) => <LlamalendPositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <LlamalendPositionCard v={viewFromSummary(p)} surface="listing" />}
       hrefFor={(p) => `/ethereum/llamalend/${p.controller}/${p.user}`}
       keyFor={(p) => `${p.controller}-${p.user}`}
       strategy={serverStrategy<LlamalendPositionSummary, LlamalendListFilters>({

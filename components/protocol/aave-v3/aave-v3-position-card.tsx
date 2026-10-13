@@ -1,34 +1,58 @@
 "use client";
 
-// Aave V3 position card — ON-CHAIN VALUES tier. The lean sibling of the bespoke
-// interpreted header (PositionHeader in the old detail page): through the SAME
-// shared grammar (OpenPositionStats + StatValue + AssetAmount) as Spark / Morpho
-// / Maker so the explorers line up.
+// The Aave V3 position card, for Aave V3 on Ethereum and Base and for
+// Seamless (the deployment rides `AaveV3CardDeploymentProvider`). It is a slot
+// builder (rails-ops TO-DO-position-card 322): `useAaveV3CardSlots` turns the
+// position's view and the page's live Pool read into one `PositionCardSlots`
+// object, and the shared `PositionCard` (components/shared/position-card.tsx)
+// draws it on the position page and in the listing row.
 //
 // An Aave V3 account is cross-collateralised: one wallet supplies and borrows
 // MANY reserves within one market (Core / Prime / EtherFi is a separate Pool =
-// a separate account). Every headline value is read from the chain — each reserve's
+// a separate account). Every figure is read from the chain — each reserve's
 // supplied / borrowed balance is the index's scaled-balance reduction
 // (0008/0011): the current rebased figure, interest included, equal to the
-// aToken / variableDebtToken `balanceOf` at the indexed head. A LISTING card
-// carries no health factor (rails-ops decision 0018): a listing exists to find
-// a position, and risk is read live on the position page — whose own Pool
+// aToken / variableDebtToken `balanceOf` at the indexed head. The headlines are
+// each side's oracle-USD total with the reserves' icons beside it; the panel
+// holds one row per reserve, the borrow rate, the interest inside each side,
+// the room to borrow, the liquidation read and the eMode category. A LISTING
+// card carries no health factor (rails-ops decision 0018): a listing exists to
+// find a position, and risk is read live on the position page — whose Pool
 // getUserAccountData read is the only HF this card ever shows.
 
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { formatDate } from "@/lib/date";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import { useState, type ReactNode } from "react";
+import { Link2 } from "lucide-react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
+import { Icon } from "@/components/icons/icon";
+import { ToolsMenuItem } from "@/components/shared/tools-menu";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { ExactSpan } from "@/components/shared/amount-text";
+import { DustToggle, splitDust, useDustOpen } from "@/components/shared/dust-reserves";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { formatDate } from "@/lib/date";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
-import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { reserveDataProv, avgBorrowRateProv, type V3PoolLane } from "@/lib/aave-v3/position-provenance";
+import { formatUsd } from "@/lib/shared/format-event";
+import { fmtLiqPrice, fmtUsd } from "@/lib/aave-v4/format";
+import { CARD_VOCAB, ratioLabel, notRecordedNote } from "@/lib/shared/card-vocab";
+import {
+  accountDataProv,
+  avgBorrowRateProv,
+  reserveDataProv,
+  userEmodeProv,
+  type V3PoolLane,
+} from "@/lib/aave-v3/position-provenance";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { aaveV3LiquidationRead, type AaveV3CardCaptions } from "@/lib/aave-v3/chain-truth-tower";
@@ -38,20 +62,8 @@ import {
   type AaveV3CardDeployment,
 } from "@/lib/aave-v3/card-deployment";
 import { aaveV3PositionModal, type AaveV3Deployment } from "@/lib/aave-v3/event-templates";
-import { formatUsd } from "@/lib/shared/format-event";
-import { fmtLiqPrice } from "@/lib/aave-v4/format";
-import { CARD_VOCAB, ratioLabel, notRecordedNote } from "@/lib/shared/card-vocab";
-import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
-import {
-  useReserveDisclosure,
-  ReserveDisclosureToggle,
-  ReserveDisclosureList,
-} from "@/components/shared/reserve-disclosure";
 import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aave-v3-positions";
-import { ExactSpan } from "@/components/shared/amount-text";
-import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
-import { ShareBar } from "@/components/shared/share-bar";
+import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -92,7 +104,7 @@ export interface AaveV3PositionView {
   /** Unix seconds of the most recent event (activity-meta). */
   lastActivityAt: number;
   /** On-chain oracle USD (IAaveOracle, chain-derived) per reserve, keyed by
-   *  lowercased token address. Feeds the card's USD footnotes; a reserve the
+   *  lowercased token address. Feeds the card's USD figures; a reserve the
    *  oracle didn't price is simply absent (the total then omits). */
   priceByAddress?: Record<string, number>;
   atBlock?: number;
@@ -102,7 +114,8 @@ export interface AaveV3PositionView {
   healthFactor?: number | null;
   /** True when no live read stands behind `healthFactor` — every listing
    *  view, and the position page until its chain read lands — so the HF
-   *  column is omitted rather than asserted. */
+   *  headline is omitted (or pending, on a page still reading) rather than
+   *  asserted. */
   chainHfStale?: boolean;
 }
 
@@ -114,7 +127,7 @@ function reserveUsd(v: AaveV3PositionView, address: string, amount: number): num
 
 /** Total USD across a set of reserves, with the STRICT guard from Aave's on-chain
  *  USD: null the moment any contributing reserve is unpriced, so a partial total is
- *  never asserted (it degrades to no footnote). */
+ *  never asserted (the side then shows its token amounts). */
 function totalUsd(v: AaveV3PositionView, reserves: AaveV3ReserveAmount[]): number | null {
   let sum = 0;
   let any = false;
@@ -130,7 +143,7 @@ function totalUsd(v: AaveV3PositionView, reserves: AaveV3ReserveAmount[]): numbe
 }
 
 /** Reserves sorted by oracle-USD value, largest first — so the capped icon
- *  cluster and the detail-page leg lines foreground worth, not naked token
+ *  cluster and the panel's reserve rows foreground worth over token
  *  count (76 wstETH outranks 8.5K sDAI). Falls back to the incoming
  *  raw-balance order the moment any leg is unpriced or `priceByAddress` is
  *  absent — a rank the oracle can't back is never asserted. */
@@ -150,168 +163,6 @@ const dustUsdOf =
   (v: AaveV3PositionView) =>
   (r: AaveV3ReserveAmount): number | null =>
     r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
-
-/** Per-reserve token amounts, demoted beneath the USD headline — still the
- *  strict chain reads (each line traced, exact figure on hover), just no longer
- *  giving dust equal billing with the aggregate. */
-function ReserveFootnoteLines({
-  reserves,
-  side,
-  atBlock,
-  usdOf,
-}: {
-  reserves: AaveV3ReserveAmount[];
-  side: "supply" | "debt";
-  atBlock?: number;
-  /** Prices each line for the dust rule (components/shared/dust-reserves). */
-  usdOf: (r: AaveV3ReserveAmount) => number | null;
-}) {
-  const dep = useAaveV3CardDeployment();
-  const { lines, control } = useDustLines(reserves, usdOf);
-  if (reserves.length === 0) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {lines.map((r) => {
-        if (r.decimalsUnread)
-          return (
-            <div key={r.address}>
-              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
-            </div>
-          );
-        const exact = formatUnitsExact(r.amountRaw, r.decimals);
-        return (
-          <div key={r.address}>
-            <Prov info={side === "supply" ? dep.supply(r.symbol, atBlock) : dep.debt(r.symbol, atBlock)}>
-              <ExactSpan exact={exact} symbol={r.symbol}>
-                {formatCompact(r.amount)} {r.symbol}
-              </ExactSpan>
-            </Prov>
-          </div>
-        );
-      })}
-      {control}
-    </div>
-  );
-}
-
-/** The opened layer's per-reserve lines (ui-jobs 209): each amount traced as
- *  in `ReserveFootnoteLines`, with a bar for its share of the side's oracle
- *  USD. Drawn only where the side's total is priced (`totalUsd` non-null):
- *  a share the oracle can't back is not drawn. */
-function ReserveShareLines({
-  reserves,
-  side,
-  atBlock,
-  usdOf,
-  total,
-}: {
-  reserves: AaveV3ReserveAmount[];
-  side: "supply" | "debt";
-  atBlock?: number;
-  usdOf: (r: AaveV3ReserveAmount) => number | null;
-  total: number;
-}) {
-  const dep = useAaveV3CardDeployment();
-  const { lines, control } = useDustLines(reserves, usdOf);
-  if (reserves.length === 0) return null;
-  return (
-    <div className="mt-1.5 grid max-w-72 grid-cols-[auto_minmax(3rem,1fr)] items-center gap-x-3 gap-y-1 text-xs text-rb-500 tabular-nums">
-      {lines.map((r) => (
-        <div key={r.address} className="contents">
-          <div className="whitespace-nowrap">
-            <Prov info={side === "supply" ? dep.supply(r.symbol, atBlock) : dep.debt(r.symbol, atBlock)}>
-              <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
-                {formatCompact(r.amount)} {r.symbol}
-              </ExactSpan>
-            </Prov>
-          </div>
-          <ShareBar share={(usdOf(r) ?? 0) / total} side={side === "supply" ? "collateral" : "debt"} />
-        </div>
-      ))}
-      {control && <div className="col-span-2">{control}</div>}
-    </div>
-  );
-}
-
-/** "incl. $X interest since 12 Sep 2026" — the interest inside the column's
- *  balance above: added since the balance last started from zero
- *  (computeAaveV3CardCaptions). Hidden below a cent — dust isn't worth a line. */
-function InterestCaption({
-  side,
-  usd,
-  since,
-}: {
-  side: "supply" | "debt";
-  usd: number | null | undefined;
-  since?: number | null;
-}) {
-  const receipt = useAaveV3CardDeployment().interestCaption;
-  if (usd == null || usd < 0.01 || !receipt) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      incl. <Prov info={receipt(side)}>{formatUsd(usd)}</Prov> interest
-      {since != null ? ` since ${formatDate(since)}` : ""}
-    </div>
-  );
-}
-
-/** "X% borrow rate" — the live Pool rate on the single borrowed reserve, or the
- *  debt-USD-weighted average across several (computeAaveV3CardCaptions gates). */
-function BorrowRateCaption({ rate, pool }: { rate: AaveV3CardCaptions["borrowRate"] | undefined; pool?: string }) {
-  // The receipt names the page's own Pool and route when the page declared one
-  // (a Base lender); Ethereum's market Pool, resolved from the address the
-  // read hit (the page's market Pool when the read names none), otherwise.
-  const lane = useV3Pool();
-  const laneOrPool: V3PoolLane = lane.positionRoute ? { ...lane, address: pool || lane.address } : pool || lane.address;
-  if (!rate) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      <Prov
-        info={
-          rate.avg
-            ? avgBorrowRateProv(laneOrPool)
-            : reserveDataProv("Variable borrow APR", "currentVariableBorrowRate", rate.symbol, laneOrPool)
-        }
-      >
-        {rate.pct.toFixed(2)}%
-      </Prov>{" "}
-      {rate.avg ? "avg borrow rate" : "borrow rate"}
-    </div>
-  );
-}
-
-/** Compact liquidation read beneath the Health Factor stat — the V4 spoke-card
- *  treatment: the tangible restatement of HF, not a peer of it. One supplied
- *  reserve carrying ≥99.5% of the oracle-priced collateral anchors a
- *  single-asset liquidation price (oracle price ÷ HF — both legs on-chain, so
- *  it survives the gate); otherwise the 1 − 1/HF combined-collateral drop.
- *  Nothing when there's no debt, HF ≤ 1 (the headline already says
- *  liquidatable), or HF reads ∞. */
-function LiquidationFootnote({ v }: { v: AaveV3PositionView }) {
-  const dep = useAaveV3CardDeployment();
-  const read = aaveV3LiquidationRead(v);
-  if (read.sameAsset) {
-    // One token on both sides: its price cancels out of the health factor.
-    return (
-      <div className="text-xs mt-0.5 text-rb-500 inline-flex items-center gap-1">
-        <TokenChipIcon symbol={read.sameAsset.symbol} size={14} filterable={false} />
-        {read.sameAsset.symbol} on both sides: only interest moves it
-      </div>
-    );
-  }
-  if (read.single) {
-    return (
-      <div className="text-xs mt-0.5 text-rb-500 inline-flex items-center gap-1">
-        Liquidates at
-        <TokenChipIcon symbol={read.single.symbol} size={14} filterable={false} />
-        <Prov info={dep.liqPrice(read.single.symbol)}>{fmtLiqPrice(read.single.liqPrice)}</Prov>
-      </div>
-    );
-  }
-  if (read.dropPct == null) return null;
-  // Multi-collateral: 1 − 1/HF, a pure function of the traced HF above.
-  return <div className="text-xs mt-0.5 text-rb-500">Liquidates on a {read.dropPct.toFixed(0)}% drop</div>;
-}
 
 /** Neutral HF headline (Rails doesn't color-code risk): "∞" above 100 — the
  *  figure stops meaning anything as a ratio there — else the family's format
@@ -333,95 +184,94 @@ function scaleRaw(raw: string | null | undefined, decimals: number): number {
   return Number(rawBigInt(raw)) / 10 ** decimals;
 }
 
-/** A vertical stack of the wallet's reserves on one side, each traced. */
-function ReserveStack({
+/** A side's oracle-USD total as a headline figure, its cents on hover. */
+function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
+  return (
+    <RevealTip tip={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+      <Prov info={info}>{formatUsd(usd)}</Prov>
+    </RevealTip>
+  );
+}
+
+/** A headline's reserves as token amounts, one per line, each traced: an
+ *  unpriced side's figure, and a closed account's highest recorded balances
+ *  (no USD there: the peaks are maxima at different moments, so pricing them
+ *  at one block would assert a portfolio that never existed). */
+function ReserveAmounts({
   reserves,
-  side,
-  atBlock,
-  usdOf,
+  receipt,
 }: {
   reserves: AaveV3ReserveAmount[];
-  side: "supply" | "debt";
-  atBlock?: number;
-  /** Prices each line for the dust rule (components/shared/dust-reserves). */
-  usdOf: (r: AaveV3ReserveAmount) => number | null;
+  receipt: (r: AaveV3ReserveAmount) => Provenance;
 }) {
-  const dep = useAaveV3CardDeployment();
-  const { lines, control } = useDustLines(reserves, usdOf);
-  if (reserves.length === 0) return <StatDash />;
   return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.address}>
-          <Prov info={side === "supply" ? dep.supply(r.symbol, atBlock) : dep.debt(r.symbol, atBlock)}>
-            {r.decimalsUnread ? (
-              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
-            ) : (
-              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-            )}
-          </Prov>
-        </StatValue>
-      ))}
-      {control}
-    </div>
-  );
-}
-
-/** A vertical stack of per-reserve PEAK amounts (highest recorded), each traced
- *  to its own receipt — the scaled-delta reducer's largest running claim
- *  (aToken transfers included on the supply side), valued at the index of the
- *  moment it stood, interest to then included. No USD: the peaks are maxima at
- *  different moments, so pricing them at one block would assert a portfolio
- *  that never existed. */
-function PeakStack({ reserves, side }: { reserves: AaveV3ReserveAmount[]; side: "supply" | "debt" }) {
-  const dep = useAaveV3CardDeployment();
-  if (reserves.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
+    <span className="flex flex-col gap-1">
       {reserves.map((r) => (
-        <StatValue key={r.address}>
-          <Prov info={side === "supply" ? dep.peakSupply(r.symbol) : dep.peakDebt(r.symbol)}>
-            {r.decimalsUnread ? (
-              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
-            ) : (
-              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-            )}
-          </Prov>
-        </StatValue>
+        <Prov key={r.address} info={receipt(r)}>
+          {r.decimalsUnread ? (
+            <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+          ) : (
+            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+          )}
+        </Prov>
       ))}
-    </div>
+    </span>
   );
 }
 
-export function AaveV3PositionCard({
-  v,
-  receipts = false,
-  rowExtra,
-  explanation,
-  viewHref,
-  captions,
-  deployment,
-  peaks = true,
-  pricesPending = false,
-  positionSummary,
-  debtDetail,
-  riskDetail,
-}: {
+/** A reserve's share of its side's oracle USD. */
+function shareProv(side: "supply" | "debt", symbol: string): Provenance {
+  const whole = side === "supply" ? "everything the account supplies" : "everything the account owes";
+  return {
+    kind: "derived",
+    summary: `Share of the side — ${symbol}'s part of ${whole}, by dollar value at the price the Pool's oracle reports for each reserve.`,
+    formula: "reserve USD ÷ side USD",
+  };
+}
+
+/** The ⋮'s row for this position: a link to its page. An Aave V3 account has
+ *  no ID or NFT of its own; the wallet and the market name it. */
+function AaveV3MenuRows({ pagePath }: { pagePath: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <ToolsMenuItem
+      icon={copied ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
+      title="Link to this position"
+      subtitle={copied ? "Copied" : "Copy the page's address"}
+      onClick={() =>
+        void navigator.clipboard.writeText(`${window.location.origin}${pagePath}`).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        })
+      }
+    />
+  );
+}
+
+/** The position page of each deployment, for the ⋮'s link. */
+function pagePathOf(session: string, v: AaveV3PositionView): string {
+  if (session === "aave-v3-base") return `/base/aave-v3/${v.wallet}`;
+  if (session === "seamless") return `/base/seamless/${v.wallet}`;
+  return `/ethereum/aave-v3/${v.wallet}?market=${v.market}`;
+}
+
+export interface AaveV3PositionCardProps {
   v: AaveV3PositionView;
+  /** The position page's card (`detail`: receipts, panel, ⋮, (i)); absent in
+   *  a listing row. */
   receipts?: boolean;
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
-   *  forwarded to `PositionCardShell`. Closed, the card is its header and
-   *  three headlines; opened, each headline's detail and the Explanation. */
-  positionSummary?: boolean;
-  /** Opened-layer lines under Debt from the page's Pool read (the room left
-   *  to borrow). Only drawn on a disclosing card. */
-  debtDetail?: React.ReactNode;
-  /** Opened-layer lines under Health factor from the page's Pool read (the
-   *  distance bar). Only drawn on a disclosing card. */
-  riskDetail?: React.ReactNode;
-  /** The page is still reading the oracle prices: the USD headlines hold
-   *  their space with a placeholder, so nothing moves when the dollars land. */
-  pricesPending?: boolean;
+  /** The card's (i) Explanation. */
+  explanation?: ReactNode;
+  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** Detail-page figures (accrued interest, borrow rate) — computed from the
+   *  event stream + live Pool read (computeAaveV3CardCaptions). */
+  captions?: AaveV3CardCaptions;
+  /** The page's live Pool read: the room to borrow and the eMode category. */
+  chain?: AaveV3PositionChainResponse | null;
+  /** The page is still waiting on its live Pool read: the health factor holds
+   *  its place with a pulsing bar until the read lands. */
+  hfPending?: boolean;
   /** Which deployment the row describes — its session, market label and the
    *  receipts behind every figure. Ethereum's indexed lane by default; a Base
    *  lender passes its own (lib/aave-v3/card-deployment.tsx). */
@@ -431,460 +281,425 @@ export function AaveV3PositionCard({
    *  of showing a dash as if nothing was ever held; the position page's
    *  sweep supplies the peaks, so it keeps the default. */
   peaks?: boolean;
-  /** Context content riding the shell's heading-button row (the detail page
-   *  passes the compact liquidation runway). */
-  rowExtra?: React.ReactNode;
-  /** The card's Explanation section (the V4/trove "About this position" home) —
-   *  narration bullets + the risk strips describing the position NOW. */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  /** Detail-page stat captions (accrued interest, borrow rate) — computed from
-   *  the event stream + live Pool read (computeAaveV3CardCaptions). Listing
-   *  cards omit them; the liquidation caption needs neither and always rides. */
-  captions?: AaveV3CardCaptions;
-}) {
-  if (deployment) {
-    return (
-      <AaveV3CardDeploymentProvider value={deployment}>
-        <AaveV3PositionCardBody
-          v={v}
-          receipts={receipts}
-          rowExtra={rowExtra}
-          explanation={explanation}
-          viewHref={viewHref}
-          captions={captions}
-          peaks={peaks}
-          pricesPending={pricesPending}
-          positionSummary={positionSummary}
-          debtDetail={debtDetail}
-          riskDetail={riskDetail}
-        />
-      </AaveV3CardDeploymentProvider>
-    );
-  }
-  return (
-    <AaveV3PositionCardBody
-      v={v}
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      captions={captions}
-      peaks={peaks}
-      pricesPending={pricesPending}
-      positionSummary={positionSummary}
-      debtDetail={debtDetail}
-      riskDetail={riskDetail}
-    />
-  );
+  /** The page is still reading the oracle prices: the USD headlines pulse in
+   *  place, so nothing moves when the dollars land. */
+  pricesPending?: boolean;
+  /** The ⋮'s export shapes (`aaveV3Exports`); `null` leaves the ⋮ with the
+   *  link to the position and the provenance row. */
+  exports?: PositionCardExports | null;
 }
 
-function AaveV3PositionCardBody({
+/** The Aave V3 family's slots for the shared position card. */
+export function useAaveV3CardSlots({
   v,
   receipts = false,
-  rowExtra,
   explanation,
   viewHref,
   captions,
+  chain,
+  hfPending = false,
   peaks = true,
   pricesPending = false,
-  positionSummary,
-  debtDetail,
-  riskDetail,
-}: {
-  v: AaveV3PositionView;
-  receipts?: boolean;
-  pricesPending?: boolean;
-  positionSummary?: boolean;
-  debtDetail?: React.ReactNode;
-  riskDetail?: React.ReactNode;
-  rowExtra?: React.ReactNode;
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  captions?: AaveV3CardCaptions;
-  peaks?: boolean;
-}) {
+  exports,
+}: Omit<AaveV3PositionCardProps, "deployment">): PositionCardSlots {
   const dep = useAaveV3CardDeployment();
-  // Only a deployment that reads the HF live for the page carries a receipt
-  // for it; a listing deployment has none, and the column stays off.
-  const hfProv = dep.healthFactor;
+  const lane = useV3Pool();
+  const dust = useDustOpen();
+  const detail = receipts;
+
   const marketLabel = dep.marketLabel(v.market);
-  // What the market chip is and what the count badge counts, on hover.
+  // What the market label is, on hover (270 item 6: it carries information).
   const marketTitle = marketLabel
     ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
     : undefined;
-  const collUsd = totalUsd(v, v.supplies);
-  const debtUsd = totalUsd(v, v.borrows);
-  // Prices still loading: each side draws as priced, with a placeholder where
-  // the dollars will be, so nothing moves when they land.
-  const collPending = pricesPending && collUsd == null;
-  const debtPending = pricesPending && debtUsd == null;
-  // `receipts` is the render-site switch (listing defaults false; only the
-  // detail page passes it) — computed here (not just below) because the
-  // reserve-list disclosure hooks must run on every render, before the
-  // closed/liquidated early return. A priced side's list only exists on the
-  // detail page (the footnote lines); an unpriced side's list is the
-  // headline itself and collapses on every surface.
-  const isDetail = receipts;
-  // The closed/opened card (ui-jobs 209): the per-side reserve chevrons give
-  // way to the card's one header chevron, and every line under a headline
-  // moves into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!positionSummary;
-  // Value order for the cluster and the leg lines — the three visible icons
-  // are the three largest by oracle USD, and the detail legs match. Dust
-  // reserves (under a cent) leave the icon stack, its "+N" and the list
-  // count; the lines put them behind the "N dust reserves hidden" control.
-  const usdOf = dustUsdOf(v);
-  const suppliesRanked = rankByValue(v, v.supplies);
-  const borrowsRanked = rankByValue(v, v.borrows);
-  const suppliesShown = splitDust(suppliesRanked, usdOf).shown;
-  const borrowsShown = splitDust(borrowsRanked, usdOf).shown;
-  const supplyListCount = collUsd == null && !collPending ? suppliesShown.length : isDetail ? suppliesShown.length : 0;
-  const debtListCount = debtUsd == null && !debtPending ? borrowsShown.length : isDetail ? borrowsShown.length : 0;
-  // The closed chevron states the split it hides, largest first.
-  const splitLabel = (rows: typeof borrowsShown) =>
-    rows.map((r) => `${formatCompact(r.amount)} ${r.symbol}`).join(" · ");
-  const supplyDisclosure = useReserveDisclosure(supplyListCount);
-  const debtDisclosure = useReserveDisclosure(debtListCount);
-  // The "?" cell every state panel owns — the same content function serves
-  // Aave V3 on Ethereum, Aave V3 on Base, and Seamless; only the deployment
-  // named by the card's own session (set via AaveV3CardDeploymentProvider)
-  // changes the prose.
+  const marketBadge = marketLabel ? (
+    <span
+      className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
+      title={marketTitle}
+      data-tooltip={marketTitle}
+      tabIndex={detail ? 0 : undefined}
+    >
+      {marketLabel}
+    </span>
+  ) : null;
+  // The listing names the wallet (its controls are buttons, which can sit
+  // inside the row's <Link>) and the market; the position page names the wallet in its
+  // top row (ui-jobs 228) and keeps the market at the heading's right end.
+  const identity = detail ? (
+    (marketBadge ?? undefined)
+  ) : (
+    <span className="flex items-center gap-2">
+      <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmarkProtocol={dep.session} />
+      {marketBadge}
+    </span>
+  );
+
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    eventTotal: v.eventTotal,
+    liquidationCount: v.liquidationCount,
+    countNote: v.countNote,
+    countRule: v.countRule,
+    liquidationRule: v.liquidationRule,
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+
+  // The "?" every state panel owns — the same content function serves Aave V3
+  // on Ethereum, Aave V3 on Base, and Seamless; only the deployment named by
+  // the card's session changes the prose.
   const positionDeployment: AaveV3Deployment =
     dep.session === "aave-v3-base" || dep.session === "seamless" ? dep.session : "aave-v3";
+  const learnMore = aaveV3PositionModal(v.status, positionDeployment, v.borrows.length > 0);
+  const menuSlot = {
+    leading: () => <AaveV3MenuRows pagePath={pagePathOf(dep.session, v)} />,
+    exports: exports ?? null,
+  };
+  const explainer = { body: explanation ?? null, viewHref };
 
   // Closed / liquidated: the account holds no open reserves, so the headline is
   // what each asset held at its height — highest recorded per-reserve supply +
   // debt (chain-state MAX over the account's life, per asset; no USD).
   if (v.status === "closed" || v.status === "liquidated") {
-    const noPeaksNote = peaks ? undefined : (
-      <div className="text-xs mt-0.5 text-rb-500">{notRecordedNote("position")}</div>
-    );
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={aaveV3PositionModal(v.status, positionDeployment)}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the highest recorded balances are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcome={v.status}
-          leadingIdentity={
-            <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-              {/* The detail page draws the wallet on its own row above the card
-                  (ui-jobs 228); the listing card keeps it. */}
-              {!receipts && (
-                <WalletPill
-                  wallet={v.wallet}
-                  ensName={null}
-                  filterProtocol={dep.session}
-                  bookmarkProtocol={dep.session}
-                />
-              )}
-              {!receipts && marketLabel}
-            </span>
-          }
-          identity={
-            <span className="flex items-center gap-3">
-              {receipts && marketLabel && <span className="text-xs font-semibold text-rb-500">{marketLabel}</span>}
-              <PositionCardMeta
-                lastActivityAt={v.lastActivityAt}
-                eventCount={v.txCount}
-                eventTotal={v.eventTotal}
-                liquidationCount={v.liquidationCount}
-                countNote={v.countNote}
-                countRule={v.countRule}
-                liquidationRule={v.liquidationRule}
-              />
-            </span>
-          }
-          closedAt={v.lastActivityAt}
-          // The peaks are supplied balances, collateral or not.
-          collateralLabel="Highest recorded supplied"
-          collateral={peaks ? <PeakStack reserves={v.peakSupplies} side="supply" /> : <StatDash />}
-          collateralFootnote={noPeaksNote}
-          debt={peaks ? <PeakStack reserves={v.peakBorrows} side="debt" /> : <StatDash />}
-          debtFootnote={noPeaksNote}
-        />
-      </PositionCardShell>
-    );
+    const notRecorded = peaks ? undefined : notRecordedNote("position");
+    const peakHead = (
+      id: string,
+      label: string,
+      reserves: AaveV3ReserveAmount[],
+      receipt: (symbol: string) => Provenance,
+    ): PositionCardHead => ({
+      id,
+      label,
+      value:
+        peaks && reserves.length > 0 ? <ReserveAmounts reserves={reserves} receipt={(r) => receipt(r.symbol)} /> : null,
+      sub: notRecorded,
+    });
+    const liquidated = v.status === "liquidated";
+    const status: PositionCardStatus = liquidated
+      ? { word: "Liquidated", tone: "danger" }
+      : { word: "Closed", tone: "muted" };
+    const common = {
+      status,
+      // The peaks are supplied balances, collateral or not.
+      heads: [
+        peakHead("peak-supplied", "Highest recorded supplied", v.peakSupplies, dep.peakSupply),
+        peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt),
+      ],
+      identity,
+      counters,
+      outcome: {
+        word: liquidated ? "Liquidated" : "Closed",
+        dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
+      },
+    };
+    if (!detail) return { ...common, surface: "listing", menu: null };
+    return { ...common, surface: "detail", explainer, learnMore, menu: menuSlot };
   }
 
-  // Detail render (receipts): the V4 spoke-card header grammar — a neutral
-  // mode-word pill (what the account is doing NOW: Borrowing / Supply only /
-  // Liquidatable, not a lifecycle word). The LISTING render keeps the
-  // lifecycle pill: status is the listing's filter axis. The wallet pill
-  // (facehash + copyable address + bookmark) renders on both surfaces.
-  const modeWord =
-    v.borrows.length > 0
-      ? v.healthFactor != null && v.healthFactor < 1
-        ? "Liquidatable"
-        : "Borrowing"
-      : "Supply only";
+  const collUsd = totalUsd(v, v.supplies);
+  const debtUsd = totalUsd(v, v.borrows);
+  // Prices still loading: the side's figure pulses where the dollars will be.
+  const collPending = pricesPending && collUsd == null;
+  const debtPending = pricesPending && debtUsd == null;
+  // Value order for the cluster and the panel rows — the three visible icons
+  // are the three largest by oracle USD. Dust reserves (under a cent) leave the
+  // icon stack and its "+N"; the panel puts them behind the dust row.
+  const usdOf = dustUsdOf(v);
+  const suppliesRanked = rankByValue(v, v.supplies);
+  const borrowsRanked = rankByValue(v, v.borrows);
+  const suppliesSplit = splitDust(suppliesRanked, usdOf);
+  const borrowsSplit = splitDust(borrowsRanked, usdOf);
 
-  // `isDetail` (== `receipts`) doubles as the surface discriminator: the
-  // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
-  // capped cluster only), the detail page keeps the full traced list.
+  const sideHead = (
+    id: string,
+    label: string,
+    reserves: AaveV3ReserveAmount[],
+    shown: AaveV3ReserveAmount[],
+    usd: number | null,
+    pending: boolean,
+    usdWhat: string,
+    side: "supply" | "debt",
+  ): PositionCardHead => ({
+    id,
+    label,
+    value:
+      reserves.length === 0 ? null : usd != null ? (
+        <UsdFigure usd={usd} info={dep.usd(usdWhat)} />
+      ) : (
+        // A partial USD total is never asserted: an unpriced side shows its
+        // token amounts.
+        <ReserveAmounts
+          reserves={reserves}
+          receipt={(r) => (side === "supply" ? dep.supply(r.symbol, v.atBlock) : dep.debt(r.symbol, v.atBlock))}
+        />
+      ),
+    pending: reserves.length > 0 && pending,
+    assets: reserves.length > 0 && usd != null ? <InlineAssetCluster symbols={loadedSymbols(shown)} /> : undefined,
+  });
 
-  const marketBadge = marketLabel && (
-    <span
-      className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
-      title={marketTitle}
-      data-tooltip={marketTitle}
-      tabIndex={receipts ? 0 : undefined}
-    >
-      {marketLabel}
-    </span>
-  );
-
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={aaveV3PositionModal(v.status, positionDeployment, v.borrows.length > 0)}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        statusPill={
-          receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {modeWord}
-            </span>
+  // The health factor: the position page's live read. Omitted on every
+  // listing view and on a deployment with no live HF receipt — an unasserted
+  // layer, per the chain-state charter; pending on a page still reading. A
+  // read wallet with no debt reads "No debt" (HF is undefined, ∞ in protocol
+  // terms) — but only when the card shows no debt either. The balances are
+  // the index's, which trails the live read: a debt the read no longer finds
+  // gets a dash and the reason in the notice.
+  const hfProv = dep.healthFactor;
+  const hfRead = !v.chainHfStale && !!hfProv;
+  const noDebtRead = hfRead && v.healthFactor == null && v.borrows.length > 0;
+  const hfHead: PositionCardHead | null =
+    hfProv && (hfRead || (detail && hfPending))
+      ? {
+          id: "health-factor",
+          label: ratioLabel("pooled"),
+          pending: !hfRead,
+          value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? (
+            <span className="text-rb-400">No debt</span>
           ) : (
-            <LifecyclePill status={v.status} />
-          )
+            <Prov info={hfProv(v.market, v.atBlock)}>{hfLabel(v.healthFactor)}</Prov>
+          ),
         }
-        // The protocol name is redundant inside the Aave V3 explorer, so the wallet
-        // leads and the Pool (Core / Prime / EtherFi — which cross-collateralised
-        // account) follows. WalletPill on both surfaces (buttons, not anchors, so it
-        // lives safely inside the listing card's <Link>); the bookmark rides the
-        // pill — it bookmarks the wallet, so the address row is its accurate home.
-        // The detail card (ui-jobs 270 item 6): the Pool label sits at the
-        // right end of the header, beside the activity, and the left end is
-        // the status's. The listing card keeps the wallet and the Pool at the left.
-        leadingIdentity={
-          receipts ? undefined : (
-            <span className="flex items-center gap-2">
-              <WalletPill
-                wallet={v.wallet}
-                ensName={null}
-                filterProtocol={dep.session}
-                bookmarkProtocol={dep.session}
-              />
-              {marketBadge}
-            </span>
-          )
-        }
-        // Right-hand activity-meta cluster: time-ago, transaction count, liquidation.
-        identity={
-          <span className="flex items-center gap-3">
-            {receipts && marketBadge}
-            <PositionCardMeta
-              lastActivityAt={v.lastActivityAt}
-              eventCount={v.txCount}
-              eventTotal={v.eventTotal}
-              liquidationCount={v.liquidationCount}
-              countNote={v.countNote}
-              countRule={v.countRule}
-              liquidationRule={v.liquidationRule}
-            />
+      : null;
+
+  const heads = [
+    sideHead(
+      "collateral",
+      CARD_VOCAB.collateral,
+      v.supplies,
+      suppliesSplit.shown,
+      collUsd,
+      collPending,
+      "Collateral",
+      "supply",
+    ),
+    sideHead("debt", CARD_VOCAB.debt, v.borrows, borrowsSplit.shown, debtUsd, debtPending, "Borrowed", "debt"),
+    ...(hfHead ? [hfHead] : []),
+  ];
+
+  // No Borrowing or Supply only tag (270): the figures say which it is. A
+  // health factor below 1 is the one live state the tag names.
+  const status: PositionCardStatus | null =
+    v.status === "unread"
+      ? { word: "Not loaded", tone: "muted" }
+      : hfRead && v.borrows.length > 0 && v.healthFactor != null && v.healthFactor < 1
+        ? { word: "Liquidatable", tone: "caution" }
+        : null;
+
+  const notice = noDebtRead ? (
+    <div className="mb-2 text-xs text-rb-500">
+      The Pool reads no debt{v.atBlock != null ? ` at block ${v.atBlock.toLocaleString("en-US")}` : ""}; the balances
+      shown predate the account&rsquo;s latest events
+    </div>
+  ) : undefined;
+
+  const common = { status, heads, identity, counters, notice };
+  if (!detail) return { ...common, surface: "listing", menu: null };
+
+  // ── The panel: the supplied side on the left, the borrowed side and the
+  //    risk on the right.
+  const reserveRows = (
+    side: "supply" | "debt",
+    split: { shown: AaveV3ReserveAmount[]; dust: AaveV3ReserveAmount[] },
+    total: number | null,
+  ): PositionPanelRow[] => {
+    const dustByValue = [...split.dust].sort((a, b) => (usdOf(b) ?? 0) - (usdOf(a) ?? 0));
+    const lines = dust.open ? [...split.shown, ...dustByValue] : split.shown;
+    const rows: PositionPanelRow[] = lines.map((r) => {
+      const usd = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
+      const share = total != null && total > 0 && usd != null ? (usd / total) * 100 : null;
+      return {
+        id: `${side}-${r.address.toLowerCase()}`,
+        label: r.symbol,
+        tip:
+          side === "supply"
+            ? `The ${r.symbol} this wallet supplies: the balance the reserve's aToken reports, interest included, with its dollar value at the price the Pool's oracle reports and its share of everything supplied.`
+            : `The ${r.symbol} this wallet owes: the balance the reserve's variable debt token reports, interest included, with its dollar value at the price the Pool's oracle reports and its share of everything owed.`,
+        value: r.decimalsUnread ? (
+          <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+        ) : (
+          <span>
+            <Prov info={side === "supply" ? dep.supply(r.symbol, v.atBlock) : dep.debt(r.symbol, v.atBlock)}>
+              <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+                {formatCompact(r.amount)}
+              </ExactSpan>
+            </Prov>
+            {usd != null && (
+              <>
+                {" · "}
+                <Prov info={dep.usd(`${side === "supply" ? "Supplied" : "Borrowed"} ${r.symbol}`)}>
+                  {formatUsd(usd)}
+                </Prov>
+              </>
+            )}
+            {share != null && (
+              <>
+                {" · "}
+                <Prov info={shareProv(side, r.symbol)}>{share < 1 ? "<1" : share.toFixed(0)}%</Prov>
+              </>
+            )}
           </span>
+        ),
+      };
+    });
+    if (split.dust.length > 0)
+      rows.push({
+        id: `${side}-dust`,
+        label: "Dust",
+        tip: "A balance worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind.",
+        value: <DustToggle count={split.dust.length} open={dust.open} onToggle={dust.toggle} />,
+      });
+    return rows;
+  };
+
+  const interestRow = (side: "supply" | "debt"): PositionPanelRow | null => {
+    const usd = side === "supply" ? captions?.supplyInterestUsd : captions?.debtInterestUsd;
+    const since = side === "supply" ? captions?.supplyInterestSince : captions?.debtInterestSince;
+    if (usd == null || usd < 0.01 || !dep.interestCaption) return null;
+    return {
+      id: `${side}-interest`,
+      label: side === "supply" ? "Interest earned" : "Interest charged",
+      tip:
+        side === "supply"
+          ? "The interest inside the supplied balance, in dollars: what the balance holds beyond its deposits and withdrawals since it last started from zero."
+          : "The interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
+      value: (
+        <span>
+          <Prov info={dep.interestCaption(side)}>{formatUsd(usd)}</Prov>
+          {since != null ? ` since ${formatDate(since)}` : ""}
+        </span>
+      ),
+    };
+  };
+
+  // The rate's receipt names the page's Pool and route when the page
+  // declared one (a Base lender); Ethereum's market Pool, resolved from the
+  // address the read hit, otherwise.
+  const ratePool: V3PoolLane = lane.positionRoute
+    ? { ...lane, address: captions?.pool || lane.address }
+    : captions?.pool || lane.address;
+  const rate = captions?.borrowRate;
+  const rateRow: PositionPanelRow | null = rate
+    ? {
+        id: "borrow-rate",
+        label: rate.avg ? "Average borrow rate" : "Borrow rate",
+        tip: rate.avg
+          ? "The variable borrow rates of the borrowed reserves, averaged by what each debt is worth, as the Pool gives them at the latest block."
+          : `The variable borrow rate the Pool charges on ${rate.symbol ?? "the borrowed reserve"} at the latest block.`,
+        value: (
+          <Prov
+            info={
+              rate.avg
+                ? avgBorrowRateProv(ratePool)
+                : reserveDataProv("Variable borrow APR", "currentVariableBorrowRate", rate.symbol, ratePool)
+            }
+          >
+            {rate.pct.toFixed(2)}%
+          </Prov>
+        ),
+      }
+    : null;
+
+  // The room left to borrow: `availableBorrowsBase` from the page's Pool read,
+  // on an account that borrows.
+  const chainPool: V3PoolLane | null = chain
+    ? lane.positionRoute
+      ? { ...lane, address: chain.pool || lane.address }
+      : chain.pool
+    : null;
+  const roomRow: PositionPanelRow | null =
+    chain && chainPool && chain.totalDebtUsd > 0 && chain.totalCollateralUsd > 0
+      ? {
+          id: "borrow-room",
+          label: "Room to borrow",
+          tip: "How much more the account can borrow, in dollars, before it reaches its loan-to-value limit, as the Pool gives it at the latest block.",
+          value: (
+            <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", chainPool)}>
+              {fmtUsd(chain.availableBorrowsUsd).display}
+            </Prov>
+          ),
         }
-        columns={[
-          // The V4 spoke-card grammar: ONE oracle-USD figure leads each side
-          // (the asset cluster carries the identities), the per-reserve token
-          // amounts demote to traced footnote lines. When any contributing
-          // reserve is unpriced the token stack stays the headline — a partial
-          // USD total is never asserted.
-          {
-            label: CARD_VOCAB.collateral,
-            assetIcons:
-              v.supplies.length > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} />
-                  {disclosing ? null : (
-                    <ReserveDisclosureToggle
-                      disclosure={supplyDisclosure}
-                      count={suppliesShown.length}
-                      closedLabel={splitLabel(suppliesShown)}
-                    />
-                  )}
-                </span>
-              ) : undefined,
-            value:
-              collUsd != null ? (
-                <UsdHeadline usd={collUsd} info={dep.usd("Collateral")} />
-              ) : collPending ? (
-                <UsdPlaceholder />
-              ) : supplyDisclosure.collapsible && !disclosing ? null : (
-                <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
-              ),
-            footnote: disclosing ? (
-              <PositionCardDetail>
-                {collUsd != null ? (
-                  <ReserveShareLines
-                    reserves={suppliesRanked}
-                    side="supply"
-                    atBlock={v.atBlock}
-                    usdOf={usdOf}
-                    total={collUsd}
-                  />
-                ) : collPending ? (
-                  <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
-                ) : null}
-              </PositionCardDetail>
-            ) : (
-              <>
-                {collUsd == null && !collPending && supplyDisclosure.collapsible && (
-                  <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
-                  </ReserveDisclosureList>
-                )}
-                {isDetail && (collUsd != null || collPending) && (
-                  <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
-                  </ReserveDisclosureList>
-                )}
-                <InterestCaption
-                  side="supply"
-                  usd={captions?.supplyInterestUsd}
-                  since={captions?.supplyInterestSince}
-                />
-              </>
+      : null;
+
+  // The liquidation read, a pure function of the traced health factor: one
+  // supplied reserve carrying ≥99.5% of the priced collateral anchors a
+  // liquidation price; otherwise the drop the whole collateral can take.
+  const liq = hfRead && !noDebtRead ? aaveV3LiquidationRead(v) : null;
+  const liqRow: PositionPanelRow | null = !liq
+    ? null
+    : liq.sameAsset
+      ? {
+          id: "liquidation",
+          label: "Liquidation",
+          tip: "One token is supplied and borrowed, so its price stands on both sides of the health factor and cancels; only the interest gap can bring the account to liquidation.",
+          value: (
+            <span className="inline-flex items-center gap-1">
+              <TokenChipIcon symbol={liq.sameAsset.symbol} size={14} filterable={false} />
+              {liq.sameAsset.symbol} on both sides: only interest moves it
+            </span>
+          ),
+        }
+      : liq.single
+        ? {
+            id: "liquidates-at",
+            label: "Liquidates at",
+            tip: `The ${liq.single.symbol} price at which the health factor reaches 1 and the account can be liquidated: the price the Pool's oracle reports, divided by the health factor.`,
+            value: (
+              <span className="inline-flex items-center gap-1">
+                <TokenChipIcon symbol={liq.single.symbol} size={14} filterable={false} />
+                <Prov info={dep.liqPrice(liq.single.symbol)}>{fmtLiqPrice(liq.single.liqPrice)}</Prov>
+              </span>
             ),
-          },
-          {
-            label: CARD_VOCAB.debt,
-            assetIcons:
-              v.borrows.length > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} />
-                  {disclosing ? null : (
-                    <ReserveDisclosureToggle
-                      disclosure={debtDisclosure}
-                      count={borrowsShown.length}
-                      closedLabel={splitLabel(borrowsShown)}
-                    />
-                  )}
-                </span>
-              ) : undefined,
-            value:
-              debtUsd != null ? (
-                <UsdHeadline usd={debtUsd} info={dep.usd("Borrowed")} />
-              ) : debtPending ? (
-                <UsdPlaceholder />
-              ) : debtDisclosure.collapsible && !disclosing ? null : (
-                <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
-              ),
-            footnote: disclosing ? (
-              <PositionCardDetail>
-                {debtUsd != null ? (
-                  <ReserveShareLines
-                    reserves={borrowsRanked}
-                    side="debt"
-                    atBlock={v.atBlock}
-                    usdOf={usdOf}
-                    total={debtUsd}
-                  />
-                ) : debtPending ? (
-                  <ReserveFootnoteLines reserves={borrowsRanked} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
-                ) : null}
-                <BorrowRateCaption rate={captions?.borrowRate} pool={captions?.pool} />
-                {debtDetail}
-              </PositionCardDetail>
-            ) : (
-              <>
-                {debtUsd == null && !debtPending && debtDisclosure.collapsible && (
-                  <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
-                  </ReserveDisclosureList>
-                )}
-                {isDetail && (debtUsd != null || debtPending) && (
-                  <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <ReserveFootnoteLines reserves={borrowsRanked} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
-                  </ReserveDisclosureList>
-                )}
-                <BorrowRateCaption rate={captions?.borrowRate} pool={captions?.pool} />
-                <InterestCaption side="debt" usd={captions?.debtInterestUsd} since={captions?.debtInterestSince} />
-                {/* The rate and interest captions weigh by price: their two
-                    lines are held while the prices load. */}
-                {debtPending && captions?.borrowRate == null && (
-                  <div aria-hidden className="mt-0.5 text-xs leading-5">
-                    &nbsp;
-                    <br />
-                    &nbsp;
-                  </div>
-                )}
-              </>
-            ),
-          },
-          // The live HF — the position page's own chain read. Omitted (not
-          // dashed) on every listing view and until the page's read lands
-          // (`chainHfStale`), and on a deployment with no live HF receipt —
-          // an unasserted layer, per the chain-state charter. A read wallet
-          // with no debt reads "No debt" (HF is undefined, ∞ in protocol terms)
-          // — but only when the card shows no debt either. The balances are
-          // the index's, which trails the live read: a debt the read no longer
-          // finds gets a dash and the reason, never "No debt" beside it.
-          v.chainHfStale || !hfProv
-            ? null
-            : {
-                label: ratioLabel("pooled"),
-                value:
-                  v.healthFactor == null && v.borrows.length > 0 ? (
-                    <StatDash />
-                  ) : v.healthFactor == null ? (
-                    <StatValue color="text-rb-400">No debt</StatValue>
-                  ) : (
-                    <StatValue>
-                      <Prov info={hfProv(v.market, v.atBlock)}>{hfLabel(v.healthFactor)}</Prov>
-                    </StatValue>
-                  ),
-                // The liquidation read beneath HF — its tangible restatement
-                // (single collateral → oracle liq price, multi → 1 − 1/HF drop).
-                footnote:
-                  v.healthFactor == null && v.borrows.length > 0 ? (
-                    <div className="text-xs mt-0.5 text-rb-500">
-                      The Pool reads no debt{v.atBlock != null ? ` at block ${v.atBlock.toLocaleString("en-US")}` : ""};
-                      the balances shown predate the account&rsquo;s latest events
-                    </div>
-                  ) : disclosing ? (
-                    <PositionCardDetail>
-                      <LiquidationFootnote v={v} />
-                      {riskDetail}
-                    </PositionCardDetail>
-                  ) : (
-                    <LiquidationFootnote v={v} />
-                  ),
-              },
-        ]}
-      />
-    </PositionCardShell>
-  );
+          }
+        : liq.dropPct != null
+          ? {
+              id: "liquidation-drop",
+              label: "Liquidates on a drop of",
+              tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the account can be liquidated: 1 − 1 ÷ health factor.",
+              value: `${liq.dropPct.toFixed(0)}%`,
+            }
+          : null;
+
+  const emode = chain?.emode ?? null;
+  const emodeRow: PositionPanelRow | null =
+    emode && chainPool
+      ? {
+          id: "emode",
+          label: "eMode",
+          tip: "The efficiency-mode category the account has chosen: a reserve in it is borrowed against at the category's loan-to-value and liquidation threshold, as the Pool gives them at the latest block.",
+          value: <Prov info={userEmodeProv(emode.label, chainPool)}>{emode.label}</Prov>,
+        }
+      : null;
+
+  const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
+    rows.filter((r): r is PositionPanelRow => r != null);
+
+  return {
+    ...common,
+    surface: "detail",
+    explainer,
+    learnMore,
+    menu: menuSlot,
+    panel: [
+      [...reserveRows("supply", suppliesSplit, collUsd), ...present([interestRow("supply"), emodeRow])],
+      [...reserveRows("debt", borrowsSplit, debtUsd), ...present([rateRow, interestRow("debt"), roomRow, liqRow])],
+    ],
+  };
 }
 
-/** Where a USD headline will be once the prices land: the headline's height,
- *  no figure. */
-function UsdPlaceholder() {
-  return (
-    <StatValue>
-      <span
-        aria-label="Reading prices"
-        className="inline-block h-[1em] w-28 animate-pulse rounded bg-rb-200 align-middle dark:bg-rb-700"
-      />
-    </StatValue>
-  );
+function AaveV3PositionCardBody(props: Omit<AaveV3PositionCardProps, "deployment">) {
+  return <PositionCard slots={useAaveV3CardSlots(props)} />;
+}
+
+/** The Aave V3 family's position card: its slots, drawn by the shared card. */
+export function AaveV3PositionCard({ deployment, ...props }: AaveV3PositionCardProps) {
+  if (deployment) {
+    return (
+      <AaveV3CardDeploymentProvider value={deployment}>
+        <AaveV3PositionCardBody {...props} />
+      </AaveV3CardDeploymentProvider>
+    );
+  }
+  return <AaveV3PositionCardBody {...props} />;
 }
 
 function statusOf(hasOpen: boolean, liquidationCount: number): AaveV3PositionView["status"] {
@@ -965,7 +780,7 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     // A Base lender's row names the block its chain figures were read at.
     atBlock: row.chainBlock ?? undefined,
     // A listing view never carries a health factor (0018): the row's snapshot
-    // HF is not read, and the position page's own live read is the only one
+    // HF is not read, and the position page's live read is the only one
     // the card shows.
     healthFactor: null,
     chainHfStale: true,
