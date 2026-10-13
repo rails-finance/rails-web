@@ -117,11 +117,17 @@ browser bundle):
 
 ## Finishing a change
 
-**A change is finished when it typechecks, its verifiers have RUN, and it is
-committed — in the same session that wrote it.** A tree of green, unverified,
-uncommitted work costs a whole second session to pick up: the next reader has to
-re-derive what it was for before they can finish it. If you must stop mid-change,
-commit what stands and say in the message what is unfinished.
+**A change is finished when it typechecks, passes `pnpm check` and Prettier, is read
+in screenshots, and is committed — in the same session that wrote it.** A tree of
+green, uncommitted work costs a whole second session to pick up: the next reader has
+to re-derive what it was for before they can finish it. If you must stop mid-change,
+commit what stands and say in the message what is unfinished. The browser verifiers
+under `scripts/verify/` are not a per-change gate: they run once a day against the
+head of preview, on the `rails-web-preview` worktree, and a change's TO-DO item says
+which day's pass covers it (`rails-ops/playbooks/worktrees-and-local-main.md`, rule 1).
+A change still keeps every hook a verifier reads (`data-event-number`,
+`data-group-frame` and the rest: grep `scripts/verify` for the ones near the code you
+touch) and fixes a selector or text it made stale in the same commit.
 
 **Write the prose once.** The argument for a change belongs in its `rails-ops`
 decision, and nowhere else. A code header states the RULE and points at the
