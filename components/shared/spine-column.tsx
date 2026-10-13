@@ -167,9 +167,11 @@ export interface SpineColumnProps {
    *  legs the card's header publishes (`usePublishSpineLegs`) are drawn; with
    *  neither, the triangle stands in. */
   warningLegs?: SpineWarningLeg[];
-  /** icon="rate-change": the rate before and after (%), drawn in the right
-   *  flank where a row's leg numbers stand ("4.12% → 3.60%"). Unset, the
-   *  glyph carries an up or down arrow. */
+  /** icon="rate-change": the rate before and after (%). The right flank,
+   *  where a row's leg numbers stand, states the change in points ("0.52
+   *  pts") with the up or down arrow beside the % icon; a rate that did not
+   *  move reads "0.00 pts" with no arrow. Unset, the glyph carries the arrow
+   *  alone. */
   rateSpan?: [number, number];
   /** Direction for rate-change arrow (none drawn when unset) or delegate
    *  badge */
@@ -913,28 +915,37 @@ export function SpineColumn({
         );
         return warningTip ? <RevealTip tip={warningTip}>{legs}</RevealTip> : legs;
       }
-      case "rate-change":
+      case "rate-change": {
+        if (rateSpan) {
+          // The change alone, in points: the arrow beside the % icon says
+          // which way, and a rate that did not move draws no arrow.
+          const pts = Math.abs(rateSpan[1] - rateSpan[0]).toFixed(2);
+          const moved = pts !== "0.00";
+          const direction = rateSpan[1] > rateSpan[0] ? "up" : "down";
+          return nodeRow(
+            <RateIcon size={T} />,
+            <>
+              {moved ? <DirectionArrow direction={direction} size={Math.round(scale.arrowSize * 0.7)} /> : <span />}
+              <span
+                className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
+                data-spine-rate={moved ? direction : "flat"}
+              >
+                {moved && <span className="sr-only">{direction === "up" ? "up " : "down "}</span>}
+                {pts} pts
+              </span>
+            </>,
+          );
+        }
         return nodeRow(
           <RateIcon size={T} />,
-          rateSpan ? (
-            <span
-              className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
-              style={{ gridColumn: "4 / 6" }}
-              data-spine-rate=""
-            >
-              <span className="font-normal text-rb-500">{rateSpan[0].toFixed(2)}%</span>
-              <span className="px-1 font-normal text-rb-500" aria-hidden>
-                &rarr;
-              </span>
-              {rateSpan[1].toFixed(2)}%
-            </span>
-          ) : iconDirection ? (
+          iconDirection ? (
             <>
               <DirectionArrow direction={iconDirection} size={Math.round(scale.arrowSize * 0.7)} />
               <span />
             </>
           ) : undefined,
         );
+      }
       case "delegate":
         // A delegation is a people event, not a rate tweak: a person glyph
         // with a join (+) / leave (−) badge. iconDirection up = join
