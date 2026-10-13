@@ -2,9 +2,10 @@
 
 // Composer: fills the shared event card's slots (components/shared/
 // event-card.tsx; ui-jobs 309) from a Compound V2 event: the head, the
-// account's Collateral and Debt ledger cells with the market's cells after
-// them, the forensics and the Comptroller's lines as notes, the price row and
-// the explanation.
+// balance sheet (ui-jobs 330; compound-v2-event-sheet.tsx) where the page
+// replays the account, else the account's Collateral and Debt ledger cells
+// with the market's cells after them, the forensics and the Comptroller's
+// lines as notes, the price row and the explanation.
 //
 // Two shapes Moonwell's composer never met:
 //   • liquidation — ONE card per liquidation (the index merged its repay leg),
@@ -22,6 +23,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { compoundV2EventProse, type CompoundV2Event } from "@/lib/compound-v2/event-prose";
 import { compoundV2HeadSpec } from "./compound-v2-event-header";
 import { useCompoundV2Cells } from "./compound-v2-event-detail";
+import { useCompoundV2Sheet } from "./compound-v2-event-sheet";
 import {
   CompoundV2EventExplainer,
   CompoundV2ExplainerTeaser,
@@ -133,6 +135,15 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
     eventTs: event.timestamp,
   });
 
+  const sheet = useCompoundV2Sheet({
+    ctx,
+    eventId: event.id,
+    label: event.actionLabel,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+  });
+
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -165,6 +176,7 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
           : undefined,
     },
     cells,
+    sheet,
     ledgers,
     notes,
     price: { gas: ownerPaidGas(event, ctx.txFrom), prices },
