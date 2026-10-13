@@ -20,6 +20,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { isGatewayWithdrawal } from "@/lib/spark/liquidation-fee";
+import { sparkRowLabel } from "@/lib/spark/event-label";
 
 export interface SparkEventHeaderProps {
   actionLabel: string;
@@ -41,10 +42,6 @@ export interface SparkEventHeaderProps {
    *  transaction's rows (lib/spark/liquidation-fee.ts). */
   feeOf?: SparkContext;
 }
-
-/** A transfer's verb, kept before the amount (the custody row's label, as Aave
- *  V3's "Transferred out"). */
-export const TRANSFER_LABEL = { transfer_in: "Transfer in", transfer_out: "Transfer out" } as const;
 
 /** The row's head spec. */
 export function sparkHeadSpec({
@@ -106,13 +103,7 @@ export function sparkHeadSpec({
   // A fee and a gateway withdrawal read as acts with their verbs, the amount on
   // the spine's outgoing flank; only a plain transfer is a custody move.
   const isTransferRow = !feeOf && !viaGateway && (transferOut || ctx.eventType === "transfer_in");
-  const label = feeOf
-    ? "Liquidation fee"
-    : viaGateway
-      ? "Withdraw"
-      : isTransferRow
-        ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL]
-        : actionLabel;
+  const label = sparkRowLabel(ctx, actionLabel, feeOf);
   const named = getProtocolContract(ctx.counterparty, MAINNET_CHAIN_ID);
   const party =
     ctx.counterparty != null
