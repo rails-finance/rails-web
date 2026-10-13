@@ -147,7 +147,7 @@ interface EventCardSlotsCommon {
   /** A hook the shell runs while the body is open, for a family whose cells,
    *  notes or price wait on a read a closed row must not make (Liquity V1's
    *  receipt read): what it returns stands in for those slots, which hold
-   *  the closed card's values (the cells `pending`). */
+   *  the closed card's values (the cells `pending`). A sheet may come from it too. */
   useOpened?: () => EventCardOpened;
 }
 
@@ -168,7 +168,7 @@ interface EventCardSlotsStandIn {
 export type EventCardSlots = EventCardSlotsCommon & (EventCardSlotsOfEvent | EventCardSlotsStandIn);
 
 /** The slots `useOpened` returns once the body opens. */
-export type EventCardOpened = Partial<Pick<EventCardSlots, "cells" | "notes" | "price">>;
+export type EventCardOpened = Partial<Pick<EventCardSlots, "cells" | "sheet" | "notes" | "price">>;
 
 /** The body of a card whose slots wait on `useOpened`: mounted with the open
  *  panel, so its read starts when the card opens. */
@@ -183,10 +183,11 @@ function OpenedBody({
 }) {
   const opened = useOpened();
   const price = opened.price ?? slots.price;
+  const sheet = opened.sheet !== undefined ? opened.sheet : slots.sheet;
   return (
     <>
-      {slots.sheet ? (
-        <EventSheetView sheet={slots.sheet} breakdown={breakdown} data={slots.cellsData} />
+      {sheet ? (
+        <EventSheetView sheet={sheet} breakdown={breakdown} data={slots.cellsData} />
       ) : (
         <EventCellGrid cells={opened.cells ?? slots.cells} />
       )}

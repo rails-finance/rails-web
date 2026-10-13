@@ -8,6 +8,7 @@ import { liquityEventPageMarkdown, liquityEventPath } from "@/lib/liquity/event-
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { readTroveCollSurplus } from "@/lib/sources/chain/liquity-coll-surplus";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { liquityBranchObs, type DayObs } from "@/lib/shared/price-series";
 
 // One Liquity V2 event as raw Markdown (rails-ops TO-DO-ui-jobs 287): the text
 // the event menu's Copy for LLM copies, served at `…/event/<eventId>.md`
@@ -37,7 +38,7 @@ const text = (status: number, body: string) =>
 
 /** The branch's daily price as the page's hook keeps it: the observations, or
  *  null where the read failed or answered none. */
-async function dailyPrices(branch: string, readerIp: string | undefined): Promise<[number, number][] | null> {
+async function dailyPrices(branch: string, readerIp: string | undefined): Promise<DayObs[] | null> {
   if (!RAILS_API_URL) return null;
   try {
     const res = await fetch(
@@ -45,13 +46,7 @@ async function dailyPrices(branch: string, readerIp: string | undefined): Promis
       createAuthFetchOptions({ cache: "no-store" }, readerIp),
     );
     if (!res.ok) return null;
-    const d = (await res.json()) as { obs?: unknown };
-    const obs = d?.obs;
-    const ok =
-      Array.isArray(obs) &&
-      obs.length > 0 &&
-      obs.every((o) => Array.isArray(o) && o.length === 2 && typeof o[0] === "number" && typeof o[1] === "number");
-    return ok ? (obs as [number, number][]) : null;
+    return liquityBranchObs(await res.json());
   } catch {
     return null;
   }

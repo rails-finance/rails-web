@@ -137,8 +137,8 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
     caption: event.actionLabel,
     actor: { by: extBy ?? undefined },
     cells,
-    // The balance sheet, where the page holds the ilk read at the block; else
-    // the cells draw.
+    // The balance sheet, where the page holds the ilk read at the block; an
+    // opened card reads the block and returns the sheet from `useOpened`.
     sheet,
     // The Collateral and Debt cells open into their ledgers where the page
     // ties its timeline to the Lifetime flows panel.
@@ -149,7 +149,7 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
         </MakerLedgerProvider>
       ),
     },
-    useOpened: () => useMakerOpened(ctx, coords, event.id, undefined),
+    useOpened: () => ({ ...useMakerOpened(ctx, coords, event.id, undefined), sheet: useMakerSheet(ctx, coords, true) }),
     explainer: {
       body: (
         <MakerDAOEventExplainer ctx={ctx} eventId={event.id} txHash={event.txHash} blockNumber={event.blockNumber} />

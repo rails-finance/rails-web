@@ -37,6 +37,7 @@ import type { BaseActivityEvent, LiquityV1Context } from "@/lib/shared/types/eve
 import { isLiquityV1Event } from "@/lib/shared/types/event-shape";
 import type { LiquityFlowEvent } from "@/lib/shared/liquity-flows";
 import { LIQUITY_V1_RESERVE, redemptionSplit } from "@/lib/liquity-v1/event-figures";
+import type { DayObs } from "@/lib/shared/price-series";
 
 const DAY_S = 86_400;
 const EPS = 1e-9;
@@ -56,9 +57,9 @@ export interface LiquityV1FlowInput {
   events: BaseActivityEvent[];
   /** Receipt reads by transaction hash (lower case). */
   reads: Map<string, LiquityV1FlowRead> | null;
-  /** ETH's closing price per UTC day, `[day, usd]` ascending (Liquity V2's
-   *  WETH branch), where the page read it. */
-  daily: [number, number][] | null;
+  /** ETH's closing price per UTC day, `[day, usd, block?]` ascending (Liquity
+   *  V2's WETH branch), where the page read it. */
+  daily: DayObs[] | null;
   /** The ETH the life's closing transaction left in the CollSurplusPool. */
   surplus: { tx: string; eth: number } | null;
 }
@@ -101,7 +102,7 @@ export function liquityV1FlowTxs(events: BaseActivityEvent[], cap = 250): string
 }
 
 export function liquityV1FlowEvents(input: LiquityV1FlowInput): LiquityV1FlowEvents {
-  const daily = new Map(input.daily ?? []);
+  const daily = new Map((input.daily ?? []).map(([d, usd]) => [d, usd]));
   const prices = { block: 0, dayClose: 0, nearest: 0 };
   let feesUnread = 0;
   let redistributions = 0;
