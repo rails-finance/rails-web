@@ -32,21 +32,18 @@
 // explorer, so it is stated under every timeline.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 
 import {
   CompoundPositionCard,
   cardSideUsd,
   type CompoundPositionView,
-  compoundBorrowing,
 } from "@/components/protocol/compound/compound-position-card";
 import { CompoundEventCard } from "@/components/protocol/compound/compound-event-card";
 import {
   CompoundPositionExplanation,
   CompoundClosedPositionExplanation,
 } from "@/components/protocol/compound/compound-position-explanation";
-import { CompoundBorrowRoom, compoundRiskColumn } from "@/components/protocol/compound/compound-risk-slot";
 import { compoundExplorer } from "@/lib/compound/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
@@ -79,7 +76,8 @@ import {
 } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import { ExportMenu, type WholeHistoryFetch } from "@/components/shared/export-menu";
+import { compoundExports } from "@/components/protocol/compound/compound-export-menu";
 import type { CompoundBaseMarketRows } from "@/lib/compound-base/timeline-folders";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { previousEventById, previousEventByTx } from "@/lib/compound/row-facts";
@@ -98,13 +96,6 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import { decodeEventId } from "@/lib/shared/page-metadata";
 import { SweepInFlight } from "@/components/shared/sweep-in-flight";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, as on the Ethereum page.
-const CompoundExportMenu = dynamic(
-  () => import("@/components/protocol/compound/compound-export-menu").then((m) => m.CompoundExportMenu),
-  { ssr: false },
-);
 
 const TIMELINE_ROUTE = "/api/chain/compound-base/timeline";
 const FOLDER_ROUTE = "/api/chain/compound-base/timeline/folder";
@@ -307,6 +298,19 @@ function MarketSection({
 
   const live = chain && !chain.chainStale ? chain : null;
   const holds = holdsSomething(live);
+  // The card ⋮'s exports: this market's position and its rows. A grouped
+  // answer's folders hold members the page has not loaded, so the CSV reads
+  // them first.
+  const exports = compoundExports({
+    wallet,
+    views: [view],
+    chainByMarket: chain ? { [market.key]: chain } : {},
+    events: compoundEvents,
+    history: markdownHistoryScope(undefined, compoundEvents, servedFolders),
+    scopeNote: exportScopeNote(undefined, compoundEvents, "this wallet's whole history in this market", servedFolders),
+    fetchAllEvents: servedFolders && servedFolders.length > 0 ? fetchMarketHistory : undefined,
+    csvFilename: `compound-base-${market.key}-${wallet.slice(0, 10)}-activity.csv`,
+  });
   // The event route draws the sub-nav and the event's card in page mode with
   // the shared column; no position card, no flows panel.
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
@@ -318,18 +322,15 @@ function MarketSection({
           {!onEventPage && (
             <CompoundPositionCard
               v={view}
-              receipts
+              surface="detail"
               viewHref={tl.viewHref}
               vocab={vocab}
               session="compound-base"
-              // Closed by default, remembered per viewer and position (ui-jobs
-              // 209); the risk headline and the room to borrow from the Comet read.
-              positionSummary
-              risk={
-                // A stale read states no figure, so it draws no risk column.
-                view.status === "open" && !(chain && !live) ? compoundRiskColumn(live, compoundBorrowing(view)) : null
-              }
-              debtDetail={live ? <CompoundBorrowRoom chain={live} /> : undefined}
+              pagePath={`/base/compound-v3/${wallet}#market-${market.key}`}
+              exports={exports}
+              // The risk headline and the panel's room and absorb rows from the
+              // Comet read; a stale read states no figure, so it draws none.
+              live={chain && !live ? undefined : live}
               explanation={
                 view.status !== "open" ? (
                   <CompoundClosedPositionExplanation v={view} principalOnly={!replay?.baseAtChain} />
@@ -771,17 +772,22 @@ export default function CompoundBaseWalletView({
               owner={{ wallet }}
               assets={stripAssets}
               closed={views.length > 0 && views.every((v) => v.status !== "open")}
+              // Each market's card carries its exports on its ⋮; the event
+              // route, which draws no card, keeps the wallet's in the Tools.
+              tools={pinnedRoute}
             >
-              {views.length > 0 && (
-                <CompoundExportMenu
-                  wallet={wallet}
-                  views={views}
-                  chainByMarket={chainByMarket}
-                  events={compoundEvents}
-                  history={markdownHistoryScope(undefined, compoundEvents, allFolders)}
-                  scopeNote={exportScopeNote(undefined, compoundEvents, "this wallet's whole history", allFolders)}
-                  fetchAllEvents={allFolders && allFolders.length > 0 ? fetchAllHistory : undefined}
-                  csvFilename={`compound-base-${wallet.slice(0, 10)}-activity.csv`}
+              {pinnedRoute && views.length > 0 && (
+                <ExportMenu
+                  {...compoundExports({
+                    wallet,
+                    views,
+                    chainByMarket,
+                    events: compoundEvents,
+                    history: markdownHistoryScope(undefined, compoundEvents, allFolders),
+                    scopeNote: exportScopeNote(undefined, compoundEvents, "this wallet's whole history", allFolders),
+                    fetchAllEvents: allFolders && allFolders.length > 0 ? fetchAllHistory : undefined,
+                    csvFilename: `compound-base-${wallet.slice(0, 10)}-activity.csv`,
+                  })}
                 />
               )}
             </DetailTopRow>
