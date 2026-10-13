@@ -16,6 +16,7 @@
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { formatExact } from "@/lib/utils/format";
 import { LIQUITY_V1_ADDRESSES } from "./asset-catalog";
+import { ratioConstantProv } from "./position-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const TROVE_MANAGER = { name: "Liquity V1 TroveManager", address: LIQUITY_V1_ADDRESSES.TROVE_MANAGER };
@@ -609,3 +610,93 @@ export const surplusUsdProv = (claimable: number, priceUsd: number): Provenance 
     { label: "price", value: formatExact(priceUsd), kind: "chain", pclass: "oracle" },
   ],
 });
+
+// ── The event sheet (ui-jobs 330) ────────────────────────────────────────────
+
+/** Collateral an event moved, in dollars, at the PriceFeed price at its block. */
+export const sheetMoveUsdProv = (coords: LiquityV1Coords, vals: { amount: string; priceUsd: number }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: "ETH moved, in USD — the amount times the PriceFeed price at this block.",
+  formula: "amount × price at block",
+  inputs: [
+    { label: "amount", value: vals.amount, kind: "chain" },
+    { label: "price at block", value: formatExact(vals.priceUsd), kind: "chain", pclass: "oracle" },
+    ...eventInputs(coords),
+  ],
+});
+
+/** Debt an event moved, in dollars, at LUSD's $1 face. */
+export const sheetFaceUsdProv = (what: string, amount: string): Provenance => ({
+  kind: "chain-derived",
+  summary: `${what}, in USD — the LUSD counted at the $1 redemption face value the protocol uses.`,
+  formula: "LUSD × $1",
+  inputs: [{ label: "LUSD", value: amount, kind: "chain" }],
+});
+
+/** The debt a full redemption cancelled, in its two parts. */
+export const redemptionDebtSplitProv = (debtBefore: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary:
+    "Debt cancelled — a full redemption's debt in two parts: the redeemer's LUSD paid for all of it except the last 200 LUSD, the liquidation reserve, which the GasPool burned (TroveManager._redeemCloseTrove).",
+  formula: "debt before − 200 LUSD reserve",
+  inputs: [{ label: "debt before", value: debtBefore, kind: "chain", pclass: "emitted" }],
+});
+
+/** The ETH price at which the Trove's ratio meets the 110% minimum. */
+export const sheetLiqPriceProv = (
+  coords: LiquityV1Coords,
+  vals: { debt: string; coll: string; mcr: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Liquidation price — the ETH price at which this Trove's collateral ratio meets the minimum, ${vals.mcr}: the debt times the minimum ratio, divided by the collateral, after this event.`,
+  formula: "debt × minimum ratio ÷ collateral",
+  contract: TROVE_MANAGER,
+  inputs: [
+    { label: "debt", value: `${vals.debt} LUSD`, kind: "chain", note: "after" },
+    { label: "collateral", value: `${vals.coll} ETH`, kind: "chain", note: "after" },
+    { label: "minimum ratio", value: vals.mcr, kind: "chain", pclass: "state", note: "TroveManager.MCR constant" },
+  ],
+});
+
+/** The debt above the minimum debt: what could be repaid before the Trove
+ *  falls to it. */
+export const sheetToMinimumProv = (debt: string, minimum: string): Provenance => ({
+  kind: "chain-derived",
+  summary: `LUSD above the minimum — the debt above the ${minimum} LUSD minimum a Trove must keep (1,800 LUSD of net debt plus the 200 LUSD liquidation reserve), counting the debt after this event.`,
+  formula: "debt after − minimum debt",
+  inputs: [
+    { label: "debt", value: `${debt} LUSD`, kind: "chain", note: "after" },
+    {
+      label: "minimum debt",
+      value: `${minimum} LUSD`,
+      kind: "chain",
+      pclass: "state",
+      note: "BorrowerOperations MIN_NET_DEBT + reserve",
+    },
+  ],
+});
+
+/** A level's change across the event, measured against the Trove's state
+ *  before it. */
+const acrossProv = (what: string, formula: string): Provenance => ({
+  kind: "derived",
+  summary: `${what} — the figure after this event less the figure before it, with the Trove's state before this event as the previous event left it.`,
+  formula,
+});
+
+export const sheetRatioChangeProv = (): Provenance =>
+  acrossProv(
+    "Collateral ratio change across this event, in percentage points, both at this block's price",
+    "ratio after − ratio before",
+  );
+export const sheetLiqPriceChangeProv = (): Provenance =>
+  acrossProv("Liquidation price change across this event", "price after − price before");
+export const sheetToMinimumChangeProv = (): Provenance =>
+  acrossProv("Change in the LUSD above the minimum debt across this event", "debt above the minimum after − before");
+
+export const minimumRatioProv = (): Provenance => ratioConstantProv("Minimum collateral ratio (MCR), 110%", "MCR");
+export const recoveryRatioProv = (): Provenance =>
+  ratioConstantProv("Critical collateral ratio (CCR), 150%, the system ratio below which Recovery Mode starts", "CCR");

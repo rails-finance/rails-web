@@ -6,10 +6,12 @@
 // debt); a liquidation / redemption shows the warning spine instead. T2 waits
 // on the receipt read, which starts when the card opens (`useOpened`).
 
+import { useCallback, useState } from "react";
 import type { BaseActivityEvent, LiquityV1Context } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 
+import { useLiquityV1Sheet } from "./liquity-v1-sheet";
 import { liquityV1HeadSpec } from "./liquity-v1-event-header";
 import { LIQUITY_V1_CELL_HEADS, useLiquityV1Opened } from "./liquity-v1-event-detail";
 import { LiquityV1EventExplainer, liquityV1LearnMoreContent } from "./liquity-v1-event-explainer";
@@ -100,6 +102,16 @@ export function LiquityV1EventCard({
     currentPrice,
     gas: event.gas,
   };
+  // The receipt read, and with it the sheet, starts when the card first opens.
+  const [active, setActive] = useState(false);
+  const onOpen = useCallback(() => setActive(true), []);
+  const sheet = useLiquityV1Sheet({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    active,
+  });
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -115,6 +127,8 @@ export function LiquityV1EventCard({
     // Collateral, Debt and Collateral ratio; V1 has no interest rate. The
     // figures, the price row and the notes are built once the card opens.
     cells: { pending: LIQUITY_V1_CELL_HEADS },
+    sheet,
+    onOpen,
     useOpened: () => useLiquityV1Opened(opened),
     // The Collateral and Debt cells open into their ledgers where the page
     // ties its timeline to the Lifetime flows panel.

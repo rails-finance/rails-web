@@ -107,6 +107,7 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
     // A transfer: the holder it reached only received it (ui-jobs 304).
     actor: ctx.eventType === "transfer" ? { byOwner: false } : undefined,
     cells: body.cells,
+    sheet: body.sheet,
     ledgers: {
       provider: (children) => (
         <PolarisLedgerProvider eventId={event.id} eventTs={event.timestamp} flowRow={ctx.eventType !== "transfer"}>

@@ -51,6 +51,8 @@ import { crPct1, crPct2, polarisCrAtEvent, polarisCrReceipt, type PolarisCrAtEve
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber, formatExact } from "@/lib/utils/format";
 import { TipLabel } from "@/components/shared/tip-label";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import { polarisSheet } from "./polaris-sheet";
 
 /** The primary rate, glossed where a row first states it. */
 const PRIMARY_RATE_TIP =
@@ -64,6 +66,9 @@ const priceFormat = polarisValueFormat;
 /** The opened card's parts. */
 export interface PolarisEventBody {
   cells: EventCells;
+  /** T2 as a balance sheet (ui-jobs 330) for an open, an adjust and a close;
+   *  a liquidation and a transfer keep the cells. */
+  sheet?: EventSheet;
   notes?: ReactNode;
   /** pETH at the block in the market's unit, for the price row. */
   price?: EventPriceChip;
@@ -329,11 +334,26 @@ export function polarisEventBody(ctx: PolarisContext, coords: PolarisCoords, led
         }
       : undefined;
 
+  const sheet = polarisSheet(ctx, coords);
+
+  // The sheet states the primary rate in its Limits panel and the open's
+  // escrow stays a line beneath it; the cells carry both in the grid.
+  const escrowLine =
+    sheet && ctx.eventType === "open" ? (
+      <div className="px-5 py-1 text-xs text-rb-500 tabular-nums">
+        <Prov info={gasCompEscrowProv(coords)} value={String(POLARIS_LIQ_CONSTANTS.gasComp.amount)}>
+          <span>+{POLARIS_LIQ_CONSTANTS.gasComp.amount}</span>
+        </Prov>{" "}
+        {PETH.symbol} gas compensation escrow, sent with the collateral
+      </div>
+    ) : undefined;
+
   const notes =
-    forensics || ctx.primaryRate != null ? (
+    forensics || escrowLine || (!sheet && ctx.primaryRate != null) ? (
       <>
         {forensics && <LiquidationForensics {...forensics} />}
-        {ctx.primaryRate != null && (
+        {escrowLine}
+        {!sheet && ctx.primaryRate != null && (
           // px-5 mirrors the grid's inset so the line sits on the cells' left
           // edge. The figure only: the "set by the market, not the holder"
           // clause lives in the explanation bullet and the receipt.
@@ -357,6 +377,7 @@ export function polarisEventBody(ctx: PolarisContext, coords: PolarisCoords, led
             { symbolText: true, inputs: { "Collateral ratio": ["collateral", "debt"] } },
           )
         : { none: "the event carries no figure of the CDP" },
+    sheet,
     notes,
     price,
   };

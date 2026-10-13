@@ -64,6 +64,10 @@ export interface SheetRow {
 /** One side of the sheet. */
 export interface SheetSide {
   side: FlowSide;
+  /** The side's heading, in place of "Collateral" / "Debt": a lender's
+   *  position has neither (Maple's "Pool claim"). `data-sheet-side` keeps the
+   *  `side` value. */
+  name?: string;
   /** The icons of the assets the side holds, after its name. */
   icons: string[];
   /** The carry-forward layer above the event's rows, drawn with the
@@ -287,7 +291,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
   const touched = s.rows.length > 0;
   const carry = breakdown && (s.carry.length > 0 || s.before);
   const listed = breakdown && ((s.assets?.length ?? 0) > 0 || (s.repaid?.length ?? 0) > 0);
-  const name = s.side === "collateral" ? WORDS.collateral : WORDS.debt;
+  const name = s.name ?? (s.side === "collateral" ? WORDS.collateral : WORDS.debt);
   return (
     <section
       className="min-w-0 rounded-xl bg-background px-4 pb-2 pt-3 text-sm"
