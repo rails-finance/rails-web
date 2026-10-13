@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { morphoEventHeading, morphoEventPageDescription } from "@/lib/morpho/explorer";
 import { loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
@@ -50,21 +51,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: wallet,
     market: `${(market ?? rawMarket).slice(0, 10)}…`,
     canonicalPath: `/base/morpho/${wallet}/${market ?? rawMarket}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: morphoEventHeading(event), timestamp: event.timestamp } : null,
+    description: event ? morphoEventPageDescription("base", wallet, event.timestamp) : undefined,
   });
 }
 
-// THIN: renders the exact same parent position page, same params — the
-// nested `event/[eventId]` segment sits inside the same `[market]` layout,
-// so every provider still wraps it, and `MorphoBasePositionView` (this
-// page's client half) never learns a new prop. It finds out it is on an
-// event route from `useParams().eventId` itself, inside `ChainTruthTimeline`
-// — see that component's pinned-mode branch. `params` here carries an extra
-// `eventId` key the parent's own `Props` type doesn't declare; passing the
-// same promise through is still structurally valid (the parent only reads
-// `wallet`/`market` off it). The parent's own address/market-segment gate
-// (`notFound()`) runs unchanged, so a malformed subject 404s the same way
-// here.
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent position page's
+// server half, same params; its client half (`MorphoBasePositionView`) reads
+// `eventId` from the route and draws the sub-nav and the event's card in page
+// mode with the shared column. The parent's address and market-segment gate
+// runs unchanged, so a malformed subject 404s the same way.
 export default async function MorphoBaseEventPage({ params }: Props) {
   // A pinned event page stays flat (rails-ops decision 0019, leg C note): a
   // grouped answer serves a folder's members only when it is opened, and the
