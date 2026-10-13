@@ -241,7 +241,8 @@ const noDollar = (name, text) => {
   // and its Auction Settlement echo per bid). Since ui-jobs 250 (`9301aba`)
   // the row is a group frame (lib/group-rows.mjs): its header is named "5
   // auction slices, 7 Apr 2025 to 8 Apr 2025: sold 2 WETH, raised 2,435 ZCHF",
-  // its text the spine's two sums and "Auction (5)", and its ⋮ "Show 10
+  // its text the spine's two sums and "Auction 5" (the count a chip since
+  // ui-jobs 331), and its ⋮ "Show 10
   // grouped events" opens the members. Pinned from the live page; the auction
   // closed in Apr 2025, so its sums (the five slices above added up) cannot move.
   const runFrame = page.locator(CLOSED_GROUP, {
@@ -256,7 +257,7 @@ const noDollar = (name, text) => {
     "auction run card collapses the settlement echoes",
     runCount === 1 &&
       /: sold 2 WETH, raised 2,435 ZCHF$/.test(runLabel) &&
-      /^2 2\.4K Auction \(5\)/.test(runText) &&
+      /^2 2\.4K Auction 5\b/.test(runText) &&
       !/Auction Settlement/.test(t) &&
       rowsCollapsed === 9,
     `${runCount} run row(s), label "${runLabel}", text "${runText}", ${rowsCollapsed} event rows at rest (19 events, 10 of them inside the run)`,

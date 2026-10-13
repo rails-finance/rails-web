@@ -53,8 +53,8 @@ const DOT_COLORS: Record<"default" | Tone, string> = {
 };
 
 /** The tone a warning leg's magnitude takes, and the T1 word with it
- *  (color-grammar.md §5). The arrows stay grey and the token icons keep their
- *  colours. */
+ *  (color-grammar.md §5). The flank triangle takes the tone too (ui-jobs 331);
+ *  the token icons keep their colours. */
 export const WARNING_TONE_TEXT: Record<Tone, string> = {
   caution: "text-tone-caution",
   critical: "text-tone-critical",
@@ -743,10 +743,19 @@ function spokenWarningLegs(legs: SpineWarningLeg[], unreadOf: ReturnType<typeof 
   return said.length ? said.join(", ") : null;
 }
 
+/** A taken leg's ring: its stroke and the ground left between it and the token. */
+const RING_WIDTH = 2;
+const RING_GAP = 2;
+
 /** A warning event's legs, one node each: the token, "→", and the magnitude
  *  in the event's tone. Both point out of the position — the collateral left
  *  it and the debt was cleared — so a redemption reads as a withdraw plus a
- *  repay. */
+ *  repay.
+ *
+ *  A taken leg wears a ring in the tone's ink at the node size, the token
+ *  drawn smaller inside it with a gap of page ground, so the node's footprint
+ *  and the line's halo hold (ui-jobs 331). The locked leg (Liquity V1's
+ *  collateral surplus) stayed with the owner and draws bare. */
 function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; tone: Tone; filterable: boolean }) {
   const scale = useTimelineScale();
   const unreadOf = useUnreadTokenOf();
@@ -773,9 +782,28 @@ function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; 
                 <LockBadge size={scale.tokenSize} />
               </div>
             ) : (
-              <TokenChipIcon symbol={leg.symbol} address={leg.address} size={scale.tokenSize} filterable={filterable} />
+              <span
+                className="flex items-center justify-center rounded-full shrink-0"
+                style={{
+                  width: scale.tokenSize,
+                  height: scale.tokenSize,
+                  border: `${RING_WIDTH}px solid ${SPINE_COLORS[tone]}`,
+                }}
+                data-spine-ring={tone}
+              >
+                <TokenChipIcon
+                  symbol={leg.symbol}
+                  address={leg.address}
+                  size={scale.tokenSize - 2 * (RING_WIDTH + RING_GAP)}
+                  filterable={filterable}
+                />
+              </span>
             )}
-            {leg.locked ? <span /> : <ArrowFromDot direction="right" size={scale.arrowSize} />}
+            {leg.locked ? (
+              <span />
+            ) : (
+              <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
+            )}
             {txt && !leg.locked ? (
               <span
                 className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
