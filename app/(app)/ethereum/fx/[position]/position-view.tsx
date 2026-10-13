@@ -13,6 +13,7 @@
 // quantifies the gap between the two (the socialized lane), always surfaced.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -31,6 +32,7 @@ import {
 import { withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { fxExplorer } from "@/lib/fx/explorer";
 import { FX_TICK_REBALANCE_RUNS } from "@/lib/fx/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { FxEventCard } from "@/components/protocol/fx/fx-event-card";
@@ -439,6 +441,11 @@ export default function FxPositionView({
     });
   }, [view, fxEvents]);
 
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column (ui-jobs 236); the summary, flows and panels stay on the
+  // position page.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -470,7 +477,7 @@ export default function FxPositionView({
           <DetailBodySkeleton />
         ) : (
           <>
-            {view && (
+            {view && !onEventPage && (
               // The Explanation pane: layman narration of the card's own face
               // figures, in two moods — the pool's own figures present, or still
               // pending (the card shows dashes and the pane says so plainly).
@@ -511,7 +518,7 @@ export default function FxPositionView({
             {/* Lifetime flows: the bars and the line over the position's replay
               (lib/fx/flows.ts), in fxUSD, in place of the tower (TO-DO-ui-jobs
               206). */}
-            {view && (
+            {view && !onEventPage && (
               <LifetimeFlowsPanel
                 scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                 read={flows.read}
@@ -531,7 +538,7 @@ export default function FxPositionView({
               intervals the card's collateral line and the rebalance cards'
               own-position slices read from. Only meaningful once the position
               has events to bound the intervals. */}
-            {view && hasOwnEvents && (
+            {view && !onEventPage && hasOwnEvents && (
               <FxDriftPanel
                 drift={drift}
                 state={driftState}
@@ -545,7 +552,7 @@ export default function FxPositionView({
             {/* Chain-only positions: the contract minted them via a path that
               emits no Operate (roster verified against getNextPositionId), so
               an empty timeline is the truthful record, not missing data. */}
-            {view && fxEvents.length === 0 && (
+            {view && !onEventPage && fxEvents.length === 0 && (
               <div className="text-sm text-rb-500">
                 This position has no recorded events — it was created by a path that logs nothing, so only the
                 pool&rsquo;s own current figures above describe it.
@@ -558,6 +565,17 @@ export default function FxPositionView({
                 // lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="fx"
+                eventPage={
+                  parsed
+                    ? (slot) =>
+                        fxExplorer.eventPage({
+                          ...slot,
+                          pool: parsed.pool,
+                          positionId: parsed.positionId,
+                          owner: view?.owner ?? null,
+                        })
+                    : undefined
+                }
                 closed={view ? view.status !== "open" : undefined}
                 tl={tl}
                 runs={FX_TICK_REBALANCE_RUNS}

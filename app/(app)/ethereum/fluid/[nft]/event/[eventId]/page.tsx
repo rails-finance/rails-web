@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadFluidPositionTail } from "@/lib/fluid/position-page-data";
+import { pairLabel } from "@/lib/fluid/asset-catalog";
+import { fluidEventPageDescription } from "@/lib/fluid/explorer";
 import FluidPositionPage from "../../page";
 
 interface Props {
@@ -27,15 +29,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: `#${nft}`,
     canonicalPath: `/ethereum/fluid/${nft}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    description: event
+      ? fluidEventPageDescription(
+          pairLabel(
+            tail.position?.supplySymbol ?? null,
+            tail.position?.borrowSymbol ?? null,
+            tail.position?.supplyPoolPair,
+            tail.position?.borrowPoolPair,
+          ),
+          nft,
+          event.timestamp,
+        )
+      : undefined,
   });
 }
 
 // THIN: renders the exact same parent position page, same params — the
 // nested `event/[eventId]` segment sits inside the same `[nft]` layout, so
-// every provider still wraps it, and `FluidPositionView` (this page's client
-// half) never learns a new prop. It finds out it is on an event route from
-// `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra `eventId`
+// every provider still wraps it. `FluidPositionView` reads `useParams().eventId`
+// and draws the sub-nav and the event's card in page mode beside the shared
+// column (`ChainTruthTimeline`'s `eventPage`, ui-jobs 236). `params` here carries an extra `eventId`
 // key the parent's own `Props` type doesn't declare; passing the same promise
 // through is still structurally valid (the parent only reads `nft` off it).
 export default async function FluidEventPage({ params }: Props) {

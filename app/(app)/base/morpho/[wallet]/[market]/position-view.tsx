@@ -259,7 +259,7 @@ export default function MorphoBasePositionView({
             {timelineState === "ready" && timeline ? (
               pos ? (
                 <div className="space-y-10">
-                  {!sweptClean && (
+                  {!pinnedRoute && !sweptClean && (
                     <p className="text-sm text-rb-500">
                       The history below is what the sweep could read; the note under the list says where it stopped or
                       what it missed. The position card and the lifetime economics are withheld until a sweep reads
@@ -268,11 +268,12 @@ export default function MorphoBasePositionView({
                       singleton and is unaffected.
                     </p>
                   )}
-                  {!sweptClean && liveCard}
+                  {!pinnedRoute && !sweptClean && liveCard}
                   <MorphoBasePositionSection
                     wallet={wallet}
                     pos={pos}
                     chain={live}
+                    onEventPage={pinnedRoute}
                     coverage={timeline.coverage}
                     sweptClean={sweptClean}
                     vaultOwner={vaultOwner}

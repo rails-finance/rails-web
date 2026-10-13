@@ -21,6 +21,8 @@
 // lands.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { llamalendExplorer } from "@/lib/llamalend/explorer";
 import { DRAINED_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -129,6 +131,9 @@ export default function LlamalendPositionView({
   // Keyed on the timeline, not the row: a pair this Controller has never seen
   // is a real answer the server can seed, and its `initialPosition` is null.
   const seeded = initialEvents != null;
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card or flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const [view, setView] = useState<LlamalendPositionView | null>(() =>
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
@@ -397,7 +402,7 @@ export default function LlamalendPositionView({
           <DetailBodySkeleton />
         ) : (
           <>
-            {liveView && (
+            {!onEventPage && liveView && (
               <LlamalendPositionCard
                 v={liveView}
                 bands={chain?.hasLoan ? chain.bands : null}
@@ -460,7 +465,7 @@ export default function LlamalendPositionView({
             {/* Lifetime flows: the bars and the line over the position's replay
           (lib/llamalend/flows.ts), in the market's borrowed token, in place of
           the tower (TO-DO-ui-jobs 206). */}
-            {liveView && (
+            {!onEventPage && liveView && (
               <LifetimeFlowsPanel
                 scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                 read={flows.read}
@@ -482,6 +487,9 @@ export default function LlamalendPositionView({
               // — lets pinned mode (the per-event share route) force a landed
               // card's detail panel open on its first mount.
               persistKeyPrefix="llamalend"
+              eventPage={(slot) =>
+                llamalendExplorer.eventPage({ ...slot, controller, user, marketLabel: liveView?.marketLabel })
+              }
               closed={liveView ? liveView.status !== "open" : undefined}
               tl={tl}
               runs={LLAMALEND_LIQUIDATION_RUNS}

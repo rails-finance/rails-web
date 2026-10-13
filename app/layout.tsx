@@ -14,6 +14,7 @@ import { HeaderBar } from "@/components/nav/header-bar";
 import { NavigationProgress } from "@/components/nav/navigation-progress";
 import { WalletContextProvider } from "@/components/nav/wallet-context";
 import { ThemeScript } from "@/components/ThemeScript";
+import { BetaStrip } from "@/components/shared/beta-strip";
 import { WorkInProgressStrip } from "@/components/shared/work-in-progress-strip";
 import { StructuredData } from "@/components/StructuredData";
 import { SITE_URL, TWITTER_HANDLE } from "@/lib/shared/page-metadata";
@@ -191,7 +192,14 @@ export default function RootLayout({
         <Providers>
           <WalletContextProvider>
             <NavigationProgress />
-            <HeaderBar />
+            {/* The beta notice sits ABOVE the header: on home the header is
+                absolute at the top and would cover a strip placed under it.
+                The relative wrapper makes that absolute header anchor below the
+                strip. Draws nothing on a route that carries the strip below. */}
+            <BetaStrip />
+            <div className="relative">
+              <HeaderBar />
+            </div>
             {/* Renders only on a route inside an unlaunched explorer, or on an
                 unlaunched chain's coverage page — nothing at all elsewhere.
                 Mounted here so no such route can be missed. */}

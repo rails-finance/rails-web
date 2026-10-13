@@ -16,6 +16,7 @@
 // leaves the risk surfaces unrendered.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -34,6 +35,7 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { fluidExplorer } from "@/lib/fluid/explorer";
 import { useFluidTimelineRuns } from "@/lib/fluid/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { FluidEventCard } from "@/components/protocol/fluid/fluid-event-card";
@@ -338,6 +340,7 @@ export default function FluidPositionView({
   // The timeline ties to the panel only where the panel draws.
   const flowFocus = flowsOn && flows.read !== "failed" ? flows.focus : null;
 
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const liveRisk = chain != null && view?.status === "open";
 
   // The top row's price dropdown. Fluid runs no USD feed: a vault's own oracle
@@ -460,7 +463,7 @@ export default function FluidPositionView({
           <DetailBodySkeleton />
         ) : (
           <>
-            {view && (
+            {!onEventPage && view && (
               <FluidPositionCard
                 v={view}
                 receipts
@@ -485,7 +488,7 @@ export default function FluidPositionView({
             {/* Lifetime flows: the bars and the line over the position's replay
             (lib/fluid/flows.ts), in the vault's debt token, in place of the
             tower (TO-DO-ui-jobs 206). A smart vault keeps the tower. */}
-            {view && flowsOn && flowColl && flowDebt && (
+            {!onEventPage && view && flowsOn && flowColl && flowDebt && (
               <LifetimeFlowsPanel
                 scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                 read={flows.read}
@@ -497,7 +500,8 @@ export default function FluidPositionView({
                 learnMore={fluidFlowsContent()}
               />
             )}
-            {view &&
+            {!onEventPage &&
+              view &&
               !flowsOn &&
               (() => {
                 const towerData = computeFluidEconomics(view, lifetimeEvents, chain, precomputedLifetime);
@@ -516,6 +520,15 @@ export default function FluidPositionView({
                 // lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="fluid"
+                eventPage={(slot) =>
+                  fluidExplorer.eventPage({
+                    ...slot,
+                    nftId,
+                    pair: view ? fluidPairText(view, chain) : "",
+                    vault: view?.vault ?? "",
+                    owner: view?.owner ?? null,
+                  })
+                }
                 closed={view ? view.status !== "open" : undefined}
                 tl={tl}
                 runs={timelineRuns}
