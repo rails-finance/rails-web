@@ -28,7 +28,7 @@ import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { frankencoinBookContent, frankencoinChallengeContent } from "@/lib/shared/learn-more-content";
+import { frankencoinModal } from "@/lib/frankencoin/event-templates";
 import {
   zchfSupplyProv,
   equityProv,
@@ -197,7 +197,7 @@ function BookCard({ book, supply }: { book: FrankencoinBook; supply: number }) {
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold text-foreground">The minting book</span>
-        <LearnMore content={frankencoinBookContent(book)} inline />
+        <LearnMore content={frankencoinModal("book")} inline />
       </div>
 
       {book.bookStale ? (
@@ -273,7 +273,7 @@ function EnforcementCard({ book }: { book: FrankencoinBook }) {
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold text-foreground">The enforcement record</span>
-        <LearnMore content={frankencoinChallengeContent()} inline />
+        <LearnMore content={frankencoinModal("challenge")} inline />
       </div>
 
       {book.bookStale ? (

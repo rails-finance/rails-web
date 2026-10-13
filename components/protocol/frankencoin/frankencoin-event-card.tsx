@@ -2,7 +2,8 @@
 
 // Frankencoin's event card on the shared shell's slots (ui-jobs 309 step 8):
 // the head from frankencoin-event-header.tsx, T2 from frankencoin-cells.tsx,
-// the explanation and the Learn More from frankencoin-event-explainer.tsx.
+// the explanation (the pane draws every bullet; no teaser) and the Learn More
+// from frankencoin-event-explainer.tsx.
 // Gas stands in the price row where the owner signed the transaction
 // (lib/shared/index-gas.ts).
 //
@@ -21,17 +22,12 @@ import { FrankencoinLedgerProvider } from "./frankencoin-ledger";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { type FrankencoinCoords } from "@/lib/frankencoin/event-provenance";
-import { frankencoinExplainerTeaser } from "@/lib/frankencoin/explainer-clauses";
 import { useFrankencoinHeadSpec } from "./frankencoin-event-header";
 import { useFrankencoinCells } from "./frankencoin-cells";
 import { FrankencoinEventExplainer, frankencoinLearnMoreContent } from "./frankencoin-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { FRANKENCOIN_WORDS } from "@/lib/frankencoin/event-templates";
 import { useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
-import { useFrankencoinEventRead, type FrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
-import type { FrankencoinForcedSaleFact } from "@/lib/frankencoin/page-facts";
-import type { FrankencoinModalForcedSale } from "@/lib/shared/learn-more-content";
-import { shortAddress } from "@/lib/frankencoin/asset-catalog";
 
 export interface FrankencoinEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "frankencoin"; data: FrankencoinContext } };
@@ -47,21 +43,10 @@ const num = (s?: string): number => {
 export function FrankencoinEventCard({ event, isLast, eventNumber }: FrankencoinEventCardProps) {
   const ctx = event.context.data;
   const facts = useFrankencoinPageFacts();
-  // The receipt read the teaser's lead can use (a new owner's kind); the same
-  // request serves the grid and the explanation.
-  const { read } = useFrankencoinEventRead(ctx, event.txHash, event.id);
 
   // A settlement row in a forced sale's transaction belongs to that sale: it
-  // says so in its title and badge and opens the forced-sale modal, whose
-  // worked example is the position's own sale (the one that sold something).
+  // says so in its title and badge and opens the forced-sale modal.
   const forcedTx = (facts?.txKinds[event.txHash] ?? []).includes("forced_sale");
-  const exampleSale = facts ? [...facts.forcedSales].reverse().find((f) => f.amount > 0) : undefined;
-  const { read: exampleRead } = useFrankencoinEventRead(
-    exampleSale?.ctx ?? ctx,
-    exampleSale?.txHash ?? event.txHash,
-    exampleSale?.eventId ?? event.id,
-  );
-  const forcedExample = exampleSale ? forcedModalExample(exampleSale, exampleRead) : null;
 
   const critical = ctx.eventType === "challenge_succeeded" || ctx.eventType === "denied";
   const caution =
@@ -73,13 +58,6 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
     ctx.collateral != null && ctx.collateralBefore != null ? num(ctx.collateral) - num(ctx.collateralBefore) : null;
   const openColl = ctx.eventType === "open" || ctx.eventType === "clone" ? num(ctx.collateral) : 0;
   const collMove = dColl ?? (openColl > 0 ? openColl : 0);
-
-  const coords: FrankencoinCoords = {
-    txHash: event.txHash,
-    blockNumber: event.blockNumber,
-    position: ctx.position,
-    hub: ctx.hub,
-  };
 
   // The ZCHF the owner's own action moved: minted to the wallet or repaid into
   // the position, on the rows whose header states it.
@@ -136,7 +114,8 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
         ? { icon: "delegate", iconDirection: "up", isLast: !!isLast }
         : { tokens, isLast: !!isLast };
 
-  const actionLabel = ctx.eventType === "auction_settlement" && forcedTx ? "Forced Sale Settlement" : event.actionLabel;
+  const actionLabel =
+    ctx.eventType === "auction_settlement" && forcedTx ? FRANKENCOIN_WORDS.forced_settlement : event.actionLabel;
   const head = useFrankencoinHeadSpec({
     actionLabel,
     ctx,
@@ -190,39 +169,10 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
           blockNumber={event.blockNumber}
           timestamp={event.timestamp}
           eventId={event.id}
-          skipLead
         />
       ),
-      first: frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read),
     },
-    learnMore: <LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash, forcedExample)} />,
+    learnMore: <LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash)} />,
   };
   return <EventCard slots={slots} avatar={null} />;
-}
-
-/** The forced-sale modal's worked example, from the sale's receipt read. */
-function forcedModalExample(
-  sale: FrankencoinForcedSaleFact,
-  read: FrankencoinEventRead | null,
-): FrankencoinModalForcedSale | null {
-  const f = read?.forced;
-  if (!f || f.expiration == null || f.challengePeriod == null) return null;
-  const dec = sale.ctx.collateralDecimals;
-  const scale = (raw: string, d: number) => Number(raw) / 10 ** d;
-  return {
-    symbol: sale.ctx.collateralSymbol,
-    expiration: f.expiration,
-    period: f.challengePeriod,
-    soldAt: sale.timestamp,
-    unit: scale(f.priceRaw, 36 - dec),
-    declared: f.liqPriceRaw != null ? scale(f.liqPriceRaw, 36 - dec) : null,
-    sold: scale(f.soldRaw, dec),
-    cost: Number(f.cost),
-    buyer: f.buyer ? shortAddress(f.buyer) : null,
-    branch: f.branch,
-    debt: Number(f.debtCleared),
-    reserveBack: Number(f.reserveToBuyer),
-    owner: Number(f.ownerReceived),
-    loss: Number(f.loss),
-  };
 }

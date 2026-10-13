@@ -20,20 +20,6 @@ export interface FrankencoinChallengeFacts {
   challenger: string | null;
 }
 
-/** A phase-2 sale on this position, for the modal's worked example. */
-export interface FrankencoinSaleExample {
-  number: string;
-  symbol: string;
-  /** The declared price in force, ZCHF per unit. */
-  liqPrice: number;
-  /** One phase, seconds. */
-  phase: number;
-  startedAt: number;
-  soldAt: number;
-  bid: number;
-  sold: number;
-}
-
 /** One forced sale on this position, oldest first. */
 export interface FrankencoinForcedSaleFact {
   txHash: string;
@@ -56,7 +42,6 @@ export interface FrankencoinPageFacts {
   challenges: Record<string, FrankencoinChallengeFacts>;
   /** The kinds each transaction recorded, keyed by tx hash. */
   txKinds: Record<string, string[]>;
-  saleExample: FrankencoinSaleExample | null;
   forcedSales: FrankencoinForcedSaleFact[];
   /** Collateral each transaction's sales sold (forced sale amounts and
    *  challenge slices), whole units, keyed by tx hash. */
@@ -138,32 +123,6 @@ export function frankencoinPageFacts(
     if (ctx.eventType === "challenge_started" && ctx.challengeNumber != null)
       challenges[challengeKey(ctx)] = { start: e.timestamp, challenger: ctx.challenger ?? null };
   }
-  let saleExample: FrankencoinSaleExample | null = null;
-  if (challengePeriod != null && challengePeriod > 0) {
-    for (const e of events) {
-      const ctx = e.context.data;
-      if (ctx.eventType !== "challenge_succeeded") continue;
-      const started = challenges[challengeKey(ctx)];
-      const settlement = events.find((s) => s.txHash === e.txHash && s.context.data.eventType === "auction_settlement")
-        ?.context.data;
-      const liqPrice = Number(settlement?.liqPriceBefore ?? settlement?.liqPrice ?? NaN);
-      const bid = Number(ctx.bid ?? NaN);
-      const sold = Number(ctx.acquiredCollateral ?? NaN);
-      if (!started || !(liqPrice > 0) || !(bid > 0) || !(sold > 0)) continue;
-      if (e.timestamp <= started.start + challengePeriod) continue;
-      // The latest sale on the position is the one a reader has just looked at.
-      saleExample = {
-        number: ctx.challengeNumber ?? "",
-        symbol: ctx.collateralSymbol,
-        liqPrice,
-        phase: challengePeriod,
-        startedAt: started.start,
-        soldAt: e.timestamp,
-        bid,
-        sold,
-      };
-    }
-  }
   forcedSales.sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp);
   priceRaises.sort((a, b) => a - b);
   withdrawals.sort((a, b) => a - b);
@@ -174,7 +133,6 @@ export function frankencoinPageFacts(
     familyOriginal,
     challenges,
     txKinds,
-    saleExample,
     forcedSales,
     txSold,
     deniedAt,

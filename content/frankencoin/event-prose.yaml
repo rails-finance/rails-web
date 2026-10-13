@@ -1,0 +1,1940 @@
+# Frankencoin prose: every string a Frankencoin event's explanation, the
+# position card's explanation and the "?" modals print (Minting Hub V1 and V2 on
+# Ethereum). The page reads this file and nothing else; the code chooses which
+# strings to say and fills their figures (lib/frankencoin/event-prose.ts for an
+# event, components/protocol/frankencoin/frankencoin-position-explanation.tsx
+# for the position card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+#
+# Frankencoin has no oracle and no USD: debt is in ZCHF, collateral in the
+# position's token, and the one price is the liquidation price its owner
+# declared. Every Quick Link is a docs.frankencoin.com page with its anchor.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  units2: |-
+    ZCHF at two places, grouped (1,704.25)
+  fc_coll: |-
+    a collateral amount at up to eight places, never a false zero (0.0123 WBTC)
+  fc_price: |-
+    a declared price in ZCHF at up to two places (95,000)
+  pct_plain: |-
+    a fraction as a percent at up to two places (0.38 → 38%)
+  date: |-
+    a date (18 Nov 2025)
+  date_time: |-
+    a date and time in UTC (18 Nov 2025, 09:05 UTC)
+  fc_span: |-
+    a span to the minute, or in seconds under a minute (19 min, 1 day 2 h, 12 s)
+  count: |-
+    a whole number, grouped (1,204)
+  number: |-
+    a number as the card prints it
+  address: |-
+    an address, shortened and linked
+  text: |-
+    a word or name as given
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  coll_symbol:
+    rounding: text
+    means: |-
+      the position's collateral token
+  coll_change:
+    rounding: fc_coll
+    means: |-
+      the collateral a sale took, as the row prints it
+  repaid:
+    rounding: units2
+    means: |-
+      the ZCHF of debt a sale cleared, as the row prints it
+  received:
+    rounding: units2
+    means: |-
+      the ZCHF the wallet received from a mint, from the receipt
+  interest:
+    rounding: units2
+    means: |-
+      the interest a mint paid up front, from the receipt
+  paid:
+    rounding: units2
+    means: |-
+      the ZCHF the wallet paid for a repayment, from the receipt
+  reserve_back:
+    rounding: units2
+    means: |-
+      the position's reserve share released toward a repayment or a forced sale
+  rolled:
+    rounding: address
+    means: |-
+      the position the same transaction repaid and emptied: a roll into this one
+  parent:
+    rounding: address
+    means: |-
+      the position a clone was cloned from
+  root:
+    rounding: address
+    means: |-
+      the family's original position, where the parent is a clone too
+  veto_end:
+    rounding: date_time
+    means: |-
+      when an original's veto window ended
+  denied_at:
+    rounding: date
+    means: |-
+      when governance denied the position
+  ceiling:
+    rounding: units2
+    means: |-
+      the most debt the collateral backs at the declared price
+  room:
+    rounding: units2
+    means: |-
+      that most less the debt the position carries
+  raise_at:
+    rounding: date
+    means: |-
+      the latest price raise before the event
+  pause_end:
+    rounding: date_time
+    means: |-
+      when the pause a price raise started ends
+  price_before:
+    rounding: fc_price
+    means: |-
+      the declared liquidation price before the event
+  price_after:
+    rounding: fc_price
+    means: |-
+      the declared liquidation price after the event
+  sale:
+    rounding: text
+    means: |-
+      the sale that wrote a settlement row: the challenge sale, the forced sale or the sale
+  sold:
+    rounding: fc_coll
+    means: |-
+      collateral a sale took that the recorded collateral never showed
+  denier:
+    rounding: address
+    means: |-
+      the account that denied the position
+  message:
+    rounding: text
+    means: |-
+      the message the denial carried
+  challenger:
+    rounding: address
+    means: |-
+      the account that started the challenge
+  size:
+    rounding: fc_coll
+    means: |-
+      the collateral the challenge covers
+  phase_end:
+    rounding: date_time
+    means: |-
+      when the challenge's fixed-price phase ends
+  after:
+    rounding: fc_span
+    means: |-
+      how long after the challenge started it was averted
+  buyer:
+    rounding: address
+    means: |-
+      who bought the collateral
+  cooldown:
+    rounding: date_time
+    means: |-
+      when the minting pause an averted challenge started ends
+  acquired:
+    rounding: fc_coll
+    means: |-
+      the position's collateral a phase-2 bid bought
+  bid:
+    rounding: units2
+    means: |-
+      the ZCHF that bid paid
+  unit:
+    rounding: fc_price
+    means: |-
+      that bid's price per unit of collateral
+  share:
+    rounding: pct_plain
+    means: |-
+      that price over the declared price
+  shortfall:
+    rounding: units2
+    means: |-
+      the debt the bid less the reward left uncovered
+  owner_got:
+    rounding: units2
+    means: |-
+      the ZCHF the owner received from an excess
+  excess:
+    rounding: units2
+    means: |-
+      the ZCHF of an excess the reserve kept
+  cleared:
+    rounding: units2
+    means: |-
+      the debt a sale cleared
+  amount:
+    rounding: fc_coll
+    means: |-
+      the collateral a forced sale sold
+  cost:
+    rounding: units2
+    means: |-
+      the ZCHF the forced sale's buyer paid
+  since:
+    rounding: fc_span
+    means: |-
+      how long after expiry the forced sale came
+  loss:
+    rounding: units2
+    means: |-
+      the debt a forced sale's price left uncovered, which the reserve paid
+  left:
+    rounding: units2
+    means: |-
+      the debt a forced sale left owing
+  gap:
+    rounding: fc_span
+    means: |-
+      how long before this call an earlier forced sale bought all the collateral
+  from:
+    rounding: address
+    means: |-
+      the owner before a transfer
+  to:
+    rounding: address
+    means: |-
+      the owner after a transfer or a creation step
+  step:
+    rounding: count
+    means: |-
+      this step among the creation's ownership handovers
+  steps:
+    rounding: count
+    means: |-
+      how many handovers the creation made
+  final:
+    rounding: address
+    means: |-
+      the owner the creation's last handover reached
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  # The position card's figures, drawn by the card with their receipts.
+  coll:
+    rounding: fc_coll
+    means: |-
+      the collateral the position holds now
+  debt:
+    rounding: units2
+    means: |-
+      the ZCHF the position owes now, gross
+  net:
+    rounding: units2
+    means: |-
+      the ZCHF a full repayment takes while the reserve covers every share
+  reserve:
+    rounding: units2
+    means: |-
+      the debt's reserve share, held in the reserve
+  price:
+    rounding: fc_price
+    means: |-
+      the declared liquidation price now
+  challenged:
+    rounding: fc_coll
+    means: |-
+      the collateral under a running challenge
+  until:
+    rounding: date
+    means: |-
+      when the running minting pause ends
+  expiry:
+    rounding: date
+    means: |-
+      the position's expiration
+  days:
+    rounding: count
+    means: |-
+      the days left to expiry
+  rate:
+    rounding: pct_plain
+    means: |-
+      the yearly rate a mint made now pays
+  fee:
+    rounding: pct_plain
+    means: |-
+      the share of a mint made now that goes to interest
+  veto_days:
+    rounding: number
+    means: |-
+      the days an original's veto window ran
+  original:
+    rounding: address
+    means: |-
+      the family's original position
+  times:
+    rounding: count
+    means: |-
+      how often the position was challenged
+  times_word:
+    rounding: text
+    means: |-
+      time or times
+  date:
+    rounding: date
+    means: |-
+      the day of a denial or a closing sale
+  closed:
+    rounding: date
+    means: |-
+      the day the position closed
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence ──
+words:
+  sale_challenge: |-
+    The challenge sale
+  sale_forced: |-
+    The forced sale
+  sale_other: |-
+    The sale
+  forced_settlement: |-
+    Forced Sale Settlement
+  time_one: |-
+    time
+  time_many: |-
+    times
+
+# ── The position card's explanation (zone Z1): an unheaded lead, then bullets
+# under Holdings, Risk, Rate and History when two of them hold two or more
+# bullets. Risk holds at most four: the declared price with the room it leaves,
+# a running challenge, a running pause and the expiry.
+# Read by positionWords / positionNodes (lib/frankencoin/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── The lead ──
+  lead_both: |-
+    This position holds {coll} {coll_symbol} of collateral and owes {debt} ZCHF.
+  lead_coll: |-
+    This position holds {coll} {coll_symbol} of collateral and has no debt.
+  lead_debt: |-
+    This position owes {debt} ZCHF.
+  lead_closed: |-
+    This position is closed.
+  # ── Holdings ──
+  repay_need: |-
+    Repaying takes {net} ZCHF: the other {reserve} ZCHF of the debt is its reserve share.
+  # ── Risk ──
+  price_room: |-
+    The owner declared {price} ZCHF per {coll_symbol}: at that price the collateral backs {room} ZCHF more debt.
+  price_full: |-
+    The owner declared {price} ZCHF per {coll_symbol}: at that price the debt uses all the collateral backs.
+  price_idle: |-
+    The owner declared {price} ZCHF per {coll_symbol}: at that price the collateral could back {ceiling} ZCHF.
+  price_only: |-
+    The owner declared {price} ZCHF per {coll_symbol} as the liquidation price.
+  challenged_now: |-
+    {challenged} {coll_symbol} of the collateral is under challenge right now.
+  paused: |-
+    Minting and withdrawals are paused until {until} after a price raise.
+  expires: |-
+    It expires on {expiry}, in {days} days; then anyone may buy its collateral in a forced sale.
+  expires_v1: |-
+    It expires on {expiry}, in {days} days, and cannot mint after that.
+  expired: |-
+    It expired on {expiry}: it cannot mint, and anyone may buy its collateral in a forced sale.
+  expired_v1: |-
+    It expired on {expiry} and can no longer mint.
+  # ── Rate ──
+  rate: |-
+    A mint today pays {rate} a year up front to expiry, {fee} of the amount.
+  rate_v1: |-
+    A mint today pays the {rate} yearly rate fixed at opening up front, {fee} of the amount.
+  rate_only: |-
+    A mint today pays {rate} a year, charged up front to expiry.
+  # ── History ──
+  veto: |-
+    It waited out a veto window of {veto_days} days before it could mint.
+  clone: |-
+    A clone of {original}: it runs on that original's terms and skipped the veto window.
+  clone_deep: |-
+    Cloned from {parent}, a clone of the family's original {original}: it skipped the veto window.
+  never: |-
+    It has never been challenged.
+  never_closed: |-
+    It was never challenged.
+  challenged_count: |-
+    It has been challenged {times} {times_word} and remains open.
+  denied: |-
+    It was denied in its veto window on {date}, which closed minting for good.
+  disabled: |-
+    Minting is disabled for good.
+  forced_close: |-
+    It expired on {expiry}, and a forced sale {since} later closed it.
+  sale_close: |-
+    A challenge sale on {date} left less than the minimum collateral, which closed it.
+  closed_before: |-
+    It closed on {closed}, before its terms ran out on {expiry}.
+  closed_after: |-
+    It closed on {closed}, after its terms ran out on {expiry}.
+  terms_ran: |-
+    Its terms ran to {expiry}.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  mint.received:
+    when: |-
+      the receipt shows what the wallet received from a mint
+    text: |-
+      The wallet received {received} ZCHF; the reserve took the rest as its share and the interest.
+  mint.interest:
+    when: |-
+      the receipt shows the interest a mint paid
+    text: |-
+      The {interest} ZCHF of interest pays for the term to expiry and is not returned on repayment.
+  mint.interest_min:
+    when: |-
+      a Hub V1 mint with under 28 days to expiry
+    text: |-
+      The {interest} ZCHF of interest pays for 28 days, Hub V1's minimum, and is not returned.
+  mint.roll:
+    when: |-
+      the same transaction repaid and emptied one other position
+    text: |-
+      The same transaction repaid and emptied {rolled}: a roll of that position into this one.
+  repay.paid:
+    when: |-
+      the receipt shows a reserve share released toward a repayment
+    text: |-
+      The wallet paid {paid} ZCHF; the released reserve share covered the other {reserve_back} ZCHF.
+  coll.understated:
+    when: |-
+      a Hub V1 clone creation, whose recorded collateral understates the real balance
+    text: |-
+      The collateral recorded for this event understates the real balance, so no amount is shown.
+  price.raised:
+    when: |-
+      the declared price rose
+    text: |-
+      Raised the declared liquidation price from {price_before} to {price_after} ZCHF per {coll_symbol}.
+  price.lowered:
+    when: |-
+      the declared price fell
+    text: |-
+      Lowered the declared liquidation price from {price_before} to {price_after} ZCHF per {coll_symbol}.
+  price.pause:
+    when: |-
+      the declared price rose
+    text: |-
+      Minting and withdrawals pause until {pause_end}, so the new price can be challenged first.
+  price.no_pause:
+    when: |-
+      the declared price fell with no pause running
+    text: |-
+      The lower price applies at once and starts no pause.
+  price.pause_runs:
+    when: |-
+      the declared price fell while an earlier raise's pause runs
+    text: |-
+      The pause from the raise on {raise_at} still runs to {pause_end}.
+  pause.ended:
+    when: |-
+      the first withdrawal after a raise's pause ended
+    text: |-
+      The pause from the price raise on {raise_at} ended before this withdrawal.
+  limit.room:
+    when: |-
+      the collateral backs more than the debt at the declared price
+    text: |-
+      At the declared price the collateral backs {ceiling} ZCHF, {room} ZCHF more than the debt.
+  limit.full:
+    when: |-
+      the debt uses all the collateral backs at the declared price
+    text: |-
+      At the declared price the collateral backs the debt and no more.
+  limit.no_debt:
+    when: |-
+      the position carries no debt
+    text: |-
+      At the declared price the collateral could back {ceiling} ZCHF of debt.
+
+templates:
+  - id: frankencoin.open
+    title: |-
+      Position opened
+    when: |-
+      open
+    L5: creation
+    variants:
+      terms: |-
+        the opening's receipt and terms are read
+      plain: |-
+        the opening's terms are not read
+    sentences:
+      open.what:
+        when: |-
+          the opening deposited collateral
+        text: |-
+          This position opened as a new original and took its first collateral.
+      open.what_empty:
+        when: |-
+          the opening deposited no collateral
+        text: |-
+          This position opened as a new original, with no collateral yet.
+      open.price:
+        when: |-
+          always
+        text: |-
+          Its owner declared the liquidation price, which challenges test in place of an oracle.
+      open.fee:
+        when: |-
+          terms, where an opening fee was paid
+        text: |-
+          The opening fee went to the reserve as equity income and is not returned.
+      open.veto:
+        when: |-
+          terms, where nobody denied it in its veto window
+        text: |-
+          Governance could veto it until {veto_end}, and nobody did.
+      open.vetoed:
+        when: |-
+          terms, where governance denied it in its veto window
+        text: |-
+          Governance vetoed it in its veto window, on {denied_at}.
+    order:
+      - open.what
+      - open.what_empty
+      - open.price
+      - open.fee
+      - mint.received
+      - open.veto
+      - open.vetoed
+    groups:
+      happened: [open.what, open.what_empty, open.price, open.fee]
+      adds_up: [mint.received]
+      leaves: [open.veto, open.vetoed]
+    alternates:
+      - [open.what, open.what_empty]
+      - [open.veto, open.vetoed]
+
+  - id: frankencoin.clone
+    title: |-
+      Position cloned
+    when: |-
+      clone
+    L5: creation
+    variants:
+      parent: |-
+        cloned from the family's original
+      deep: |-
+        cloned from a clone of the family's original
+    sentences:
+      clone.what:
+        when: |-
+          parent
+        text: |-
+          Cloned from {parent}: a new position contract on that family's terms.
+      clone.what_deep:
+        when: |-
+          deep
+        text: |-
+          Cloned from {parent}, a clone of the family's original {root}.
+      clone.what_plain:
+        when: |-
+          parent, where the row names no parent
+        text: |-
+          Cloned from a position of an accepted family: a new position contract on its terms.
+      clone.price:
+        when: |-
+          always
+        text: |-
+          It started at the declared price of the position it was cloned from.
+    order:
+      - clone.what
+      - clone.what_deep
+      - clone.what_plain
+      - clone.price
+      - mint.received
+      - mint.roll
+      - coll.understated
+    groups:
+      happened: [clone.what, clone.what_deep, clone.what_plain, clone.price]
+      adds_up: [mint.received]
+      leaves: [mint.roll, coll.understated]
+    alternates:
+      - [clone.what, clone.what_deep, clone.what_plain]
+
+  - id: frankencoin.mint
+    title: |-
+      Mint
+    when: |-
+      mint
+    L5: minting
+    variants:
+      first: |-
+        the position's first debt
+      more: |-
+        the position already owed
+    sentences:
+      mint.what_first:
+        when: |-
+          first
+        text: |-
+          This mint is the position's first debt.
+      mint.what:
+        when: |-
+          more
+        text: |-
+          Minted more ZCHF against the collateral.
+    order:
+      - mint.what_first
+      - mint.what
+      - mint.received
+      - mint.interest
+      - mint.interest_min
+      - mint.roll
+    groups:
+      happened: [mint.what_first, mint.what]
+      adds_up: [mint.received, mint.interest, mint.interest_min]
+      leaves: [mint.roll]
+    alternates:
+      - [mint.what_first, mint.what]
+      - [mint.interest, mint.interest_min]
+
+  - id: frankencoin.repay
+    title: |-
+      Repay
+    when: |-
+      repay
+    L5: minting
+    variants:
+      partial: |-
+        the position still owes debt
+      cleared: |-
+        the repay cleared the debt and collateral remains
+      closed: |-
+        the repay cleared the debt and the position holds nothing
+    sentences:
+      repay.what:
+        when: |-
+          partial
+        text: |-
+          Repaid part of the debt.
+      repay.what_cleared:
+        when: |-
+          cleared
+        text: |-
+          Cleared the debt; the collateral stays in the position.
+      repay.what_closed:
+        when: |-
+          closed
+        text: |-
+          Cleared the debt and closed the position.
+      repay.next:
+        when: |-
+          cleared
+        text: |-
+          With no debt left, the collateral can be withdrawn or back a future mint.
+    order:
+      - repay.what
+      - repay.what_cleared
+      - repay.what_closed
+      - repay.paid
+      - repay.next
+    groups:
+      happened: [repay.what, repay.what_cleared, repay.what_closed]
+      adds_up: [repay.paid]
+      leaves: [repay.next]
+    alternates:
+      - [repay.what, repay.what_cleared, repay.what_closed]
+
+  - id: frankencoin.add_collateral
+    title: |-
+      Add collateral
+    when: |-
+      add_collateral
+    L5: minting
+    variants:
+      default: |-
+        always
+    sentences:
+      add.what:
+        when: |-
+          the collateral figure is recorded
+        text: |-
+          Added collateral to the position.
+    order:
+      - add.what
+      - coll.understated
+    groups:
+      happened: [add.what, coll.understated]
+    alternates:
+      - [add.what, coll.understated]
+
+  - id: frankencoin.withdraw_collateral
+    title: |-
+      Withdraw collateral
+    when: |-
+      withdraw_collateral
+    L5: minting
+    variants:
+      partial: |-
+        collateral remains
+      emptied: |-
+        the withdrawal emptied the position
+    sentences:
+      withdraw.what:
+        when: |-
+          partial
+        text: |-
+          Withdrew part of the collateral.
+      withdraw.what_emptied:
+        when: |-
+          emptied
+        text: |-
+          Withdrew the last collateral: nothing remains on either side.
+      limit.at:
+        when: |-
+          partial, where the collateral left backs the debt and no more
+        text: |-
+          The withdrawal stopped at the limit: the collateral left backs the debt at the declared price.
+    order:
+      - withdraw.what
+      - withdraw.what_emptied
+      - limit.at
+      - limit.room
+      - pause.ended
+      - coll.understated
+    groups:
+      happened: [withdraw.what, withdraw.what_emptied, coll.understated]
+      leaves: [limit.at, limit.room, pause.ended]
+    alternates:
+      - [withdraw.what, withdraw.what_emptied, coll.understated]
+      - [limit.at, limit.room]
+
+  - id: frankencoin.adjust_price
+    title: |-
+      Adjust price
+    when: |-
+      adjust_price
+    L5: price
+    variants:
+      raised: |-
+        the declared price rose
+      lowered: |-
+        the declared price fell
+      set: |-
+        the declared price did not move
+    sentences:
+      price.set:
+        when: |-
+          set
+        text: |-
+          Set the declared liquidation price to {price_after} ZCHF per {coll_symbol}.
+    order:
+      - price.raised
+      - price.lowered
+      - price.set
+      - price.pause
+      - price.no_pause
+      - price.pause_runs
+      - limit.room
+      - limit.full
+      - limit.no_debt
+    groups:
+      happened: [price.raised, price.lowered, price.set]
+      leaves: [price.pause, price.no_pause, price.pause_runs, limit.room, limit.full, limit.no_debt]
+    alternates:
+      - [price.raised, price.lowered, price.set]
+      - [price.pause, price.no_pause, price.pause_runs]
+      - [limit.room, limit.full, limit.no_debt]
+
+  - id: frankencoin.adjust
+    title: |-
+      Adjust
+    when: |-
+      adjust
+    L5: minting
+    variants:
+      change: |-
+        the adjust moved the collateral, the debt or the price
+      none: |-
+        the adjust moved nothing
+    sentences:
+      adjust.coll_in:
+        when: |-
+          change, where collateral came in
+        text: |-
+          Deposited collateral.
+      adjust.repaid:
+        when: |-
+          change, where the debt fell
+        text: |-
+          Repaid part of the debt.
+      adjust.coll_out:
+        when: |-
+          change, where collateral went out
+        text: |-
+          Withdrew collateral.
+      adjust.minted:
+        when: |-
+          change, where the debt rose
+        text: |-
+          Minted more ZCHF.
+      adjust.none:
+        when: |-
+          none
+        text: |-
+          Updated the position without changing its collateral, debt or price.
+    order:
+      - adjust.none
+      - adjust.coll_in
+      - adjust.repaid
+      - adjust.coll_out
+      - adjust.minted
+      - price.raised
+      - price.lowered
+      - mint.received
+      - repay.paid
+      - price.pause
+      - price.no_pause
+      - price.pause_runs
+      - pause.ended
+      - mint.roll
+      - coll.understated
+    groups:
+      happened: [adjust.none, adjust.coll_in, adjust.repaid, adjust.coll_out, adjust.minted, price.raised, price.lowered]
+      adds_up: [mint.received, repay.paid]
+      leaves: [price.pause, price.no_pause, price.pause_runs, pause.ended, mint.roll, coll.understated]
+    alternates:
+      - [adjust.coll_in, adjust.coll_out, coll.understated]
+      - [adjust.repaid, adjust.minted]
+      - [price.raised, price.lowered]
+      - [mint.received, repay.paid]
+      - [price.pause, price.no_pause, price.pause_runs, pause.ended, mint.roll]
+
+  - id: frankencoin.close
+    title: |-
+      Close
+    when: |-
+      close
+    L5: lifecycle
+    variants:
+      default: |-
+        always
+    sentences:
+      close.what:
+        when: |-
+          always
+        text: |-
+          Closed the position: its collateral and debt are both zero.
+    order:
+      - close.what
+      - repay.paid
+      - pause.ended
+    groups:
+      happened: [close.what]
+      adds_up: [repay.paid]
+      leaves: [pause.ended]
+
+  - id: frankencoin.auction_settlement
+    title: |-
+      Auction settlement
+    when: |-
+      auction_settlement
+    L5: challenge
+    variants:
+      challenge: |-
+        a challenge's phase-2 sale wrote it
+      forced: |-
+        a forced sale wrote it
+      other: |-
+        no sale row shares the transaction
+    sentences:
+      settle.both:
+        when: |-
+          the sale took collateral and cleared debt
+        text: |-
+          {sale} took {coll_change} {coll_symbol} of collateral and cleared {repaid} ZCHF of debt.
+      settle.coll:
+        when: |-
+          the sale took collateral only
+        text: |-
+          {sale} took {coll_change} {coll_symbol} of collateral.
+      settle.debt:
+        when: |-
+          the sale cleared debt only
+        text: |-
+          {sale} cleared {repaid} ZCHF of debt.
+      settle.unrecorded:
+        when: |-
+          challenge, forced, where the sale sold collateral the record never showed
+        text: |-
+          {sale} sold {sold} {coll_symbol} that the recorded collateral never showed, so this row stays at zero.
+      settle.nothing:
+        when: |-
+          forced, where the position was already empty
+        text: |-
+          {sale} found nothing to sell: the collateral and debt were already zero.
+      settle.unchanged:
+        when: |-
+          the sale moved neither side
+        text: |-
+          {sale} left the collateral and debt unchanged.
+      settle.closed:
+        when: |-
+          the sale left nothing on either side
+        text: |-
+          Nothing is left on either side, so the position is closed.
+      settle.see_challenge:
+        when: |-
+          challenge
+        text: |-
+          The Challenge Succeeded row after it records the bid, the reward and where the ZCHF went.
+      settle.see_forced:
+        when: |-
+          forced
+        text: |-
+          The Forced Sale row after it names the buyer, the price and where the ZCHF went.
+    order:
+      - settle.both
+      - settle.coll
+      - settle.debt
+      - settle.unrecorded
+      - settle.nothing
+      - settle.unchanged
+      - settle.closed
+      - settle.see_challenge
+      - settle.see_forced
+      - coll.understated
+    groups:
+      happened: [settle.both, settle.coll, settle.debt, settle.unrecorded, settle.nothing, settle.unchanged]
+      leaves: [settle.closed, settle.see_challenge, settle.see_forced, coll.understated]
+    alternates:
+      - [settle.both, settle.coll, settle.debt, settle.unrecorded, settle.nothing, settle.unchanged]
+      - [settle.see_challenge, settle.see_forced]
+
+  - id: frankencoin.denied
+    title: |-
+      Position denied
+    when: |-
+      denied
+    L5: lifecycle
+    variants:
+      by: |-
+        the row names who denied it
+      anon: |-
+        the row names nobody
+    sentences:
+      denied.what_by:
+        when: |-
+          by
+        text: |-
+          Denied by {denier} during its veto window.
+      denied.what:
+        when: |-
+          anon
+        text: |-
+          Denied during its veto window.
+      denied.message:
+        when: |-
+          the denial carried a message
+        text: |-
+          The veto's message reads “{message}”.
+      denied.next:
+        when: |-
+          always
+        text: |-
+          Minting is closed for good; the owner can still withdraw the collateral.
+    order:
+      - denied.what_by
+      - denied.what
+      - denied.message
+      - denied.next
+    groups:
+      happened: [denied.what_by, denied.what, denied.message]
+      leaves: [denied.next]
+    alternates:
+      - [denied.what_by, denied.what]
+
+  - id: frankencoin.challenge_started
+    title: |-
+      Challenge started
+    when: |-
+      challenge_started
+    L5: challenge
+    variants:
+      timed: |-
+        the challenge period is known and above zero
+      zero: |-
+        the challenge period is zero
+      untimed: |-
+        the challenge period is not known
+    sentences:
+      challenge.what:
+        when: |-
+          the row names the challenger
+        text: |-
+          {challenger} challenged {size} {coll_symbol} of the collateral, betting the declared price is too high.
+      challenge.what_anon:
+        when: |-
+          the row names no challenger
+        text: |-
+          A challenger challenged {size} {coll_symbol} of the collateral, betting the declared price is too high.
+      challenge.stake:
+        when: |-
+          always
+        text: |-
+          The challenger put up the same amount of {coll_symbol} as its stake.
+      challenge.phase_one:
+        when: |-
+          timed
+        text: |-
+          Until {phase_end} anyone can buy that stake at the declared price, which averts the challenge.
+      challenge.zero:
+        when: |-
+          zero
+        text: |-
+          The challenge period is 0 seconds, so the position's collateral could be bid for at once.
+    order:
+      - challenge.what
+      - challenge.what_anon
+      - challenge.stake
+      - challenge.phase_one
+      - challenge.zero
+    groups:
+      happened: [challenge.what, challenge.what_anon, challenge.stake]
+      leaves: [challenge.phase_one, challenge.zero]
+    alternates:
+      - [challenge.what, challenge.what_anon]
+
+  - id: frankencoin.challenge_averted
+    title: |-
+      Challenge averted
+    when: |-
+      challenge_averted
+    L5: challenge
+    variants:
+      bought: |-
+        someone bought the challenger's stake
+      withdrawn: |-
+        the challenger withdrew its challenge
+      unread: |-
+        the receipt is not read
+    sentences:
+      avert.what:
+        when: |-
+          the challenge's start is known
+        text: |-
+          The challenge was averted in phase 1, {after} after it started.
+      avert.what_plain:
+        when: |-
+          the challenge's start is not known
+        text: |-
+          The challenge was averted in phase 1.
+      avert.owner:
+        when: |-
+          bought, by the owner
+        text: |-
+          The owner bought the challenger's stake at the declared price, ending the challenge.
+      avert.buyer:
+        when: |-
+          bought, by another account
+        text: |-
+          {buyer} bought the challenger's stake at the declared price, ending the challenge.
+      avert.withdrawn:
+        when: |-
+          withdrawn
+        text: |-
+          The challenger withdrew its challenge and took back its stake; nobody paid anything.
+      avert.unread:
+        when: |-
+          unread
+        text: |-
+          Someone bought the challenger's stake at the declared price, which ends the challenge.
+      avert.pause:
+        when: |-
+          bought, withdrawn, where averting started a minting pause
+        text: |-
+          The position's collateral and debt did not move; minting is paused until {cooldown}.
+      avert.untouched:
+        when: |-
+          no minting pause is known
+        text: |-
+          The position's collateral and debt did not move.
+    order:
+      - avert.what
+      - avert.what_plain
+      - avert.owner
+      - avert.buyer
+      - avert.withdrawn
+      - avert.unread
+      - avert.pause
+      - avert.untouched
+    groups:
+      happened: [avert.what, avert.what_plain, avert.owner, avert.buyer, avert.withdrawn, avert.unread]
+      leaves: [avert.pause, avert.untouched]
+    alternates:
+      - [avert.what, avert.what_plain]
+      - [avert.owner, avert.buyer, avert.withdrawn, avert.unread]
+      - [avert.pause, avert.untouched]
+
+  - id: frankencoin.challenge_succeeded
+    title: |-
+      Challenge succeeded
+    when: |-
+      challenge_succeeded
+    L5: challenge
+    variants:
+      read: |-
+        the sale's receipt is read
+      unread: |-
+        the receipt is not read
+    sentences:
+      won.what:
+        when: |-
+          always
+        text: |-
+          The falling-price auction sold {acquired} {coll_symbol} of the position's collateral for {bid} ZCHF.
+      won.price:
+        when: |-
+          the bid paid more than zero
+        text: |-
+          That is {unit} ZCHF per {coll_symbol}, {share} of the declared price.
+      won.price_plain:
+        when: |-
+          the bid paid more than zero and the declared price is not read
+        text: |-
+          That is {unit} ZCHF per {coll_symbol}.
+      won.zero:
+        when: |-
+          the bid was zero on a 0-second challenge period
+        text: |-
+          The bid was zero: with a 0-second challenge period the price had reached zero.
+      won.shortfall:
+        when: |-
+          read, where the bid fell short of the debt
+        text: |-
+          The bid fell {shortfall} ZCHF short of the debt, and the reserve paid the gap.
+      won.excess:
+        when: |-
+          read, where the bid exceeded the debt
+        text: |-
+          The bid exceeded the debt: the owner received {owner_got} ZCHF and the reserve kept {excess} ZCHF.
+      won.no_debt:
+        when: |-
+          read, where the position had no debt
+        text: |-
+          The position had no debt, so the reserve and the owner shared the bid after the reward.
+      won.owner_keeps:
+        when: |-
+          read, where the sale cleared debt
+        text: |-
+          The owner keeps the ZCHF minted earlier and no longer owes the {cleared} ZCHF cleared.
+    order:
+      - won.what
+      - won.price
+      - won.price_plain
+      - won.zero
+      - won.shortfall
+      - won.excess
+      - won.no_debt
+      - won.owner_keeps
+    groups:
+      happened: [won.what]
+      adds_up: [won.price, won.price_plain, won.zero, won.shortfall, won.excess, won.no_debt]
+      leaves: [won.owner_keeps]
+    alternates:
+      - [won.price, won.price_plain, won.zero]
+      - [won.shortfall, won.excess, won.no_debt]
+
+  - id: frankencoin.forced_sale
+    title: |-
+      Forced sale
+    when: |-
+      forced_sale
+    L5: forced_sale
+    variants:
+      sold: |-
+        the sale's receipt is read
+      unread: |-
+        the receipt is not read
+      nothing_after: |-
+        it sold nothing after an earlier sale took all the collateral
+      nothing: |-
+        it sold nothing
+    sentences:
+      forced.what:
+        when: |-
+          sold, where the buyer paid
+        text: |-
+          {buyer} bought {amount} {coll_symbol} of the expired position's collateral for {cost} ZCHF.
+      forced.what_free:
+        when: |-
+          sold, where the price was zero
+        text: |-
+          {buyer} bought {amount} {coll_symbol} of the expired position's collateral and paid nothing.
+      forced.what_unread:
+        when: |-
+          unread
+        text: |-
+          {amount} {coll_symbol} of the expired position's collateral was sold in a forced sale.
+      forced.price:
+        when: |-
+          sold, where the price was above zero
+        text: |-
+          That is {share} of the declared price, {since} after expiry.
+      forced.price_zero:
+        when: |-
+          sold, where the price had reached zero
+        text: |-
+          The price had fallen to zero: the sale came {since} after expiry.
+      forced.reserve:
+        when: |-
+          sold, where the reserve sent the position's share to the buyer
+        text: |-
+          The position's {reserve_back} ZCHF reserve share went to the buyer toward the debt.
+      forced.full:
+        when: |-
+          sold, where the price and the share covered the debt
+        text: |-
+          The debt was cleared in full, and the owner received the rest of the price.
+      forced.shortfall:
+        when: |-
+          sold, where the last collateral fell short of the debt
+        text: |-
+          The price fell short of the debt, so the reserve paid {loss} ZCHF and the owner nothing.
+      forced.partial:
+        when: |-
+          sold, where collateral remains and debt is left
+        text: |-
+          The price repaid part of the debt; the owner received nothing and still owes {left} ZCHF.
+      forced.no_debt:
+        when: |-
+          sold, where the position had no debt and the price was above zero
+        text: |-
+          The position had no debt, so the whole price went to the owner.
+      forced.no_debt_zero:
+        when: |-
+          sold, where the position had no debt and the price was zero
+        text: |-
+          The position had no debt and the price was zero, so no ZCHF moved.
+      forced.nothing_after:
+        when: |-
+          nothing_after
+        text: |-
+          This call sold nothing: a forced sale {gap} earlier had bought all the collateral.
+      forced.nothing:
+        when: |-
+          nothing
+        text: |-
+          This forced sale sold nothing: the position held no collateral by then.
+    order:
+      - forced.what
+      - forced.what_free
+      - forced.what_unread
+      - forced.nothing_after
+      - forced.nothing
+      - forced.price
+      - forced.price_zero
+      - forced.reserve
+      - forced.full
+      - forced.shortfall
+      - forced.partial
+      - forced.no_debt
+      - forced.no_debt_zero
+    groups:
+      happened: [forced.what, forced.what_free, forced.what_unread, forced.nothing_after, forced.nothing]
+      adds_up: [forced.price, forced.price_zero, forced.reserve]
+      leaves: [forced.full, forced.shortfall, forced.partial, forced.no_debt, forced.no_debt_zero]
+    alternates:
+      - [forced.what, forced.what_free, forced.what_unread, forced.nothing_after, forced.nothing]
+      - [forced.price, forced.price_zero]
+      - [forced.full, forced.shortfall, forced.partial, forced.no_debt, forced.no_debt_zero]
+
+  - id: frankencoin.transfer
+    title: |-
+      Ownership transferred
+    when: |-
+      ownership_transferred after creation
+    L5: ownership
+    variants:
+      default: |-
+        always
+    sentences:
+      own.what:
+        when: |-
+          both owners are known
+        text: |-
+          Ownership passed from {from} to {to}.
+      own.what_to:
+        when: |-
+          only the new owner is known
+        text: |-
+          Ownership passed to {to}.
+      own.what_plain:
+        when: |-
+          neither owner is known
+        text: |-
+          The position changed owners.
+      own.means:
+        when: |-
+          always
+        text: |-
+          The new owner now controls the collateral, the debt and the declared price.
+    order:
+      - own.what
+      - own.what_to
+      - own.what_plain
+      - own.means
+    groups:
+      happened: [own.what, own.what_to, own.what_plain]
+      leaves: [own.means]
+    alternates:
+      - [own.what, own.what_to, own.what_plain]
+
+  - id: frankencoin.handover
+    title: |-
+      Owner set at mint
+    when: |-
+      ownership_transferred inside the creating transaction
+    L5: creation
+    variants:
+      single: |-
+        one handover to the owner
+      single_hub: |-
+        one handover to the MintingHub
+      start: |-
+        the first of several handovers
+      middle: |-
+        a handover between the first and the last
+      last: |-
+        the last of several handovers
+    sentences:
+      hand.single:
+        when: |-
+          single
+        text: |-
+          At creation the position was handed to {to}, the owner it was created for.
+      hand.single_hub:
+        when: |-
+          single_hub
+        text: |-
+          At creation the position was handed to {to}, the MintingHub.
+      hand.start:
+        when: |-
+          start, where the first owner is an account
+        text: |-
+          Step {step} of {steps} of the creation: the new position starts out owned by {to}.
+      hand.start_hub:
+        when: |-
+          start, where the first owner is the MintingHub
+        text: |-
+          Step {step} of {steps} of the creation: the MintingHub {to} owns the new position.
+      hand.middle:
+        when: |-
+          middle
+        text: |-
+          Step {step} of {steps} of the creation: {to} held ownership within the transaction.
+      hand.last:
+        when: |-
+          last
+        text: |-
+          Step {step} of {steps} of the creation: ownership reached {to}, the owner it was created for.
+      hand.ends:
+        when: |-
+          start, middle
+        text: |-
+          The position ends this transaction owned by {final}.
+      hand.means:
+        when: |-
+          always
+        text: |-
+          The handover is part of creating the position.
+    order:
+      - hand.single
+      - hand.single_hub
+      - hand.start
+      - hand.start_hub
+      - hand.middle
+      - hand.last
+      - hand.ends
+      - hand.means
+    groups:
+      happened: [hand.single, hand.single_hub, hand.start, hand.start_hub, hand.middle, hand.last]
+      leaves: [hand.ends, hand.means]
+    alternates:
+      - [hand.single, hand.single_hub, hand.start, hand.start_hub, hand.middle, hand.last]
+
+  - id: frankencoin.fallback
+    title: |-
+      Position event
+    when: |-
+      any other event type
+    L5: fallback
+    variants:
+      default: |-
+        always
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          This event recorded a {event_type} on the position.
+    order:
+      - fallback.what
+    groups:
+      happened: [fallback.what]
+
+# ── The documentation pages the modals link, by id ──
+doc_urls:
+  STRUCTURE: |-
+    https://docs.frankencoin.com/#structure-and-purpose
+  NO_ORACLE: |-
+    https://docs.frankencoin.com/faq#how-does-frankencoin-differ-from-other-stablecoins
+  FCS: |-
+    https://docs.frankencoin.com/faq#what-does-fcs-represent
+  OPEN_TERMS: |-
+    https://docs.frankencoin.com/positions/open#proposal-terms
+  OPEN_INTEREST: |-
+    https://docs.frankencoin.com/positions/open#interest-and-minting-capacity
+  OPEN_PRICE: |-
+    https://docs.frankencoin.com/positions/open#set-the-liquidation-price
+  OPEN_RESERVE: |-
+    https://docs.frankencoin.com/positions/open#reserve-and-auction-duration
+  CLONE: |-
+    https://docs.frankencoin.com/positions/clone#choose-a-position-to-clone
+  ADJUST_OWNER: |-
+    https://docs.frankencoin.com/positions/adjust#select-the-position
+  ADJUST_MINT: |-
+    https://docs.frankencoin.com/positions/adjust#minting-and-repayment
+  ADJUST_COLLATERAL: |-
+    https://docs.frankencoin.com/positions/adjust#adding-or-withdrawing-collateral
+  ADJUST_LOWER: |-
+    https://docs.frankencoin.com/positions/adjust#lowering-the-liquidation-price
+  ADJUST_RAISE: |-
+    https://docs.frankencoin.com/positions/adjust#increasing-the-liquidation-price
+  AUCTION: |-
+    https://docs.frankencoin.com/positions/auctions#auction-design
+  AUCTION_START: |-
+    https://docs.frankencoin.com/positions/auctions#how-to-initiate-an-auction
+  RESERVE_CHALLENGE: |-
+    https://docs.frankencoin.com/reserve#challenge-settlement
+  RESERVE_LOSSES: |-
+    https://docs.frankencoin.com/reserve#protection-mechanisms-during-liquidation
+  VETO: |-
+    https://docs.frankencoin.com/governance#fcs-qualification
+  EXPIRY: |-
+    https://docs.frankencoin.com/risks#missing-maturity-dates
+
+# ── The "?" modals (zone Z4): the event modals, the position card's and the
+# system view's minting book. Each stops at the mechanism and hands it to a
+# Quick Link; no figure of one position appears here. A concept with
+# `only: <form>` is drawn for that form alone: `handover` on a creation
+# handover, `forced` on a position a forced sale ended. ──
+L5:
+  minting:
+    title: |-
+      How minting and repaying work
+    intro: |-
+      A Frankencoin position mints new ZCHF against the collateral it holds. The debt is the gross amount minted, and the owner can mint, repay or move collateral within the position's limits.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Gross debt
+        text: |-
+          a mint adds its whole amount to the debt, and the wallet receives it less the reserve share and the interest.
+      - bold: |-
+          Interest up front
+        text: |-
+          the system base rate plus the position's risk premium, in force at the mint, is charged up front for the time left to expiry.
+        text_v1: |-
+          the position's rate, fixed when it opened, is charged up front to expiry, for at least 4 weeks (28 days of interest).
+      - bold: |-
+          Not returned
+        text: |-
+          the interest stays paid when the owner repays early and goes to the reserve as equity, in which FCS holders share.
+      - bold: |-
+          Reserve share
+        text: |-
+          a set share of each mint stays in the reserve and comes back on repayment while the reserve covers every position's share.
+      - bold: |-
+          The limit
+        text: |-
+          the debt may not exceed the collateral times the declared price, and an original and its clones share one minting limit.
+    links:
+      - label: |-
+          Minting and repayment
+        doc: ADJUST_MINT
+      - label: |-
+          Interest and minting capacity
+        doc: OPEN_INTEREST
+      - label: |-
+          The reserve share
+        doc: OPEN_RESERVE
+      - label: |-
+          Adding or withdrawing collateral
+        doc: ADJUST_COLLATERAL
+
+  price:
+    title: |-
+      How the declared price works
+    intro: |-
+      Frankencoin has no price oracle. Each position stores a liquidation price in ZCHF per unit of collateral, declared by its owner and tested by challenges.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          What it limits
+        text: |-
+          the collateral times the declared price is the most debt the position may carry.
+      - bold: |-
+          Lowering
+        text: |-
+          applies at once, as long as the debt still fits under the new price.
+      - bold: |-
+          Raising
+        text: |-
+          pauses minting and collateral withdrawals for three days, so the new price can be challenged before it backs new ZCHF.
+      - bold: |-
+          In one adjust
+        text: |-
+          the mint runs before the price change, so a raise cannot back a mint made in the same transaction.
+      - bold: |-
+          Challenges
+        text: |-
+          anyone who thinks the price too high can start an auction that tests it.
+    links:
+      - label: |-
+          Setting the liquidation price
+        doc: OPEN_PRICE
+      - label: |-
+          Lowering the price
+        doc: ADJUST_LOWER
+      - label: |-
+          Raising the price
+        doc: ADJUST_RAISE
+      - label: |-
+          Challenges and auctions
+        doc: AUCTION
+
+  creation:
+    title: |-
+      How a position is created
+    intro: |-
+      Every Frankencoin position is a contract with one owner, its collateral and its debt. It starts as a new original that proposes terms, or as a clone of an accepted position.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          The handover
+        only: handover
+        text: |-
+          the creating transaction can pass ownership through the hub and a helper contract before it reaches the owner.
+      - bold: |-
+          Original
+        text: |-
+          proposes its collateral, price, rate and limits, pays a 1,000 ZCHF opening fee and waits a veto window of at least three days.
+      - bold: |-
+          Veto
+        text: |-
+          in that window, holders of more than 1% of the votes, which the FCS share token carries, can deny it for good.
+      - bold: |-
+          Clone
+        text: |-
+          copies an accepted position's terms and price, skips the veto window and shares its family's minting limit.
+      - bold: |-
+          Fixed terms
+        text: |-
+          the collateral token, reserve share, challenge period and expiry stay fixed, while the owner can change the price, collateral and debt.
+    links:
+      - label: |-
+          Opening a new position
+        doc: OPEN_TERMS
+      - label: |-
+          Cloning a position
+        doc: CLONE
+      - label: |-
+          Who can veto
+        doc: VETO
+      - label: |-
+          The share token FCS
+        doc: FCS
+
+  ownership:
+    title: |-
+      Position ownership
+    intro: |-
+      A position is a contract, and its owner is whoever holds it now. A new owner takes over the collateral, the debt and the right to adjust the position.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Only the owner adjusts
+        text: |-
+          minting, repaying, moving collateral and changing the declared price belong to the owner.
+      - bold: |-
+          Others can act
+        text: |-
+          a challenge, or a forced sale after expiry, runs with no action from the owner.
+    links:
+      - label: |-
+          The position's owner
+        doc: ADJUST_OWNER
+      - label: |-
+          Challenges and auctions
+        doc: AUCTION
+
+  challenge:
+    title: |-
+      How Frankencoin challenges work
+    intro: |-
+      A challenger who thinks a position's declared price is too high posts the same collateral and starts a two-phase auction. Each phase lasts the position's challenge period.
+    stepsHeading: |-
+      The two phases:
+    steps:
+      - |-
+        Phase 1: anyone, the owner included, can buy the challenger's collateral at the declared price, which averts the challenge.
+      - |-
+        An averted challenge leaves the position's collateral and debt as they were, and pauses its minting for a day.
+      - |-
+        Phase 2: if nobody bought, the position's collateral is sold at a price falling from the declared price to zero.
+      - |-
+        From each phase-2 bid the challenger takes 2% and gets back its collateral; the rest repays the debt.
+      - |-
+        A shortfall comes from the position's reserve share, then equity; an excess goes to the reserve and the owner.
+    extraParagraphs:
+      - |-
+        One challenge can settle in several slices: each phase-2 bid settles separately under the same challenge number.
+    links:
+      - label: |-
+          Auction design
+        doc: AUCTION
+      - label: |-
+          Starting a challenge
+        doc: AUCTION_START
+      - label: |-
+          How a challenge settles
+        doc: RESERVE_CHALLENGE
+      - label: |-
+          Who covers a loss
+        doc: RESERVE_LOSSES
+
+  forced_sale:
+    title: |-
+      How a forced sale works
+    intro: |-
+      Once a Minting Hub V2 position passes its expiration, anyone can buy its collateral through the hub at a price set by time since expiry. No challenge is involved.
+    stepsHeading: |-
+      The price and the money:
+    steps:
+      - |-
+        First challenge period after expiry: the price falls evenly from 10× the declared price to 1×.
+      - |-
+        Second challenge period: the price falls from the declared price to zero, after which the collateral goes for nothing.
+      - |-
+        Anyone, the owner included, can buy any amount up to all the collateral at that moment's price.
+      - |-
+        When price and reserve share cover the debt, the share goes to the buyer and the owner gets the rest.
+      - |-
+        Otherwise the price repays what it can, and selling the last collateral leaves the reserve to pay the gap.
+    links:
+      - label: |-
+          Expiry and the forced sale
+        doc: EXPIRY
+      - label: |-
+          Who covers a loss
+        doc: RESERVE_LOSSES
+
+  lifecycle:
+    title: |-
+      A Frankencoin position's lifecycle
+    intro: |-
+      A position runs on clocks: a veto window before an original may mint, an expiration after which no position may, and pauses in between.
+    detailsHeading: |-
+      The lifecycle edges:
+    details:
+      - bold: |-
+          Veto window
+        text: |-
+          a new original waits at least three days before its first mint, and a veto in that window disables minting for good.
+      - bold: |-
+          Pause
+        text: |-
+          raising the declared price pauses minting for three days, so the new price can be challenged first.
+      - bold: |-
+          Expiration
+        text: |-
+          past its expiration a position cannot mint, and on Minting Hub V2 anyone can buy its collateral at a falling price.
+      - bold: |-
+          Closing
+        text: |-
+          a position closes when its collateral and debt are both gone, and its last repayment releases its reserve share.
+    links:
+      - label: |-
+          The veto window
+        doc: OPEN_TERMS
+      - label: |-
+          The pause after a raise
+        doc: ADJUST_RAISE
+      - label: |-
+          Expiry and the forced sale
+        doc: EXPIRY
+      - label: |-
+          Withdrawing to close
+        doc: ADJUST_COLLATERAL
+
+  fallback:
+    title: |-
+      How Frankencoin works
+    intro: |-
+      Frankencoin (ZCHF) is a Swiss-franc stablecoin minted against collateral with no price oracle. Owners declare their positions' prices, challenges test them, and a reserve absorbs shortfalls.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Positions are contracts
+        text: |-
+          each borrower owns a position contract, whose address is its identity and whose ownership can change by transfer.
+      - bold: |-
+          Native units
+        text: |-
+          debt is in ZCHF, collateral in the position's token, and the one price is the owner's declared liquidation price.
+      - bold: |-
+          No health factor
+        text: |-
+          a position's risk is its challenges, its declared price, its expiry and any running pause.
+    links:
+      - label: |-
+          Frankencoin's structure
+        doc: STRUCTURE
+      - label: |-
+          Auctions in place of an oracle
+        doc: NO_ORACLE
+
+  position_open:
+    title: |-
+      About this position
+    intro: |-
+      The card reads the position contract now: its collateral, the ZCHF it owes, the liquidation price its owner declared and the terms it runs on.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Owner-declared price
+        text: |-
+          the owner sets the liquidation price, and the collateral times that price is the most debt the position may carry.
+      - bold: |-
+          Interest up front
+        text: |-
+          each mint pays the base rate plus the position's risk premium up front to expiry, and nothing accrues after.
+        text_v1: |-
+          each mint pays the rate fixed at opening up front, to expiry and for at least 4 weeks, and nothing accrues after.
+      - bold: |-
+          Reserve share
+        text: |-
+          part of every mint stays in the reserve and comes back on repayment while the reserve covers every position's share.
+      - bold: |-
+          Challenges
+        text: |-
+          anyone who thinks the declared price too high can post the same collateral and start a two-phase auction against the position.
+      - bold: |-
+          Expiry
+        text: |-
+          past its expiry the position cannot mint, and on Minting Hub V2 anyone may buy its collateral at a falling price.
+        text_v1: |-
+          past its expiry the position cannot mint.
+    links:
+      - label: |-
+          The liquidation price
+        doc: OPEN_PRICE
+      - label: |-
+          Interest and expiry
+        doc: OPEN_INTEREST
+      - label: |-
+          The reserve share
+        doc: OPEN_RESERVE
+      - label: |-
+          Challenges and auctions
+        doc: AUCTION
+
+  position_closed:
+    title: |-
+      About this position
+    intro: |-
+      This position is closed: it holds no collateral and owes no ZCHF. The card shows its lifetime peaks, the most collateral and debt it ever held.
+    intro_forced: |-
+      This position is closed: a forced sale after its expiration sold its collateral and cleared its debt. The card shows its lifetime peaks.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Interest up front
+        text: |-
+          each mint paid interest at once for the time left to expiry, so the debt never grew between mints.
+        text_v1: |-
+          each mint paid the rate fixed at opening at once, to expiry and for at least 4 weeks, so the debt never grew between mints.
+      - bold: |-
+          Reserve share
+        text: |-
+          part of every mint was held in the reserve and released as the position repaid, while the reserve covered every share.
+      - bold: |-
+          Forced sale
+        only: forced
+        text: |-
+          after expiry anyone could buy the collateral at a falling price, the payment repaying the debt first.
+    links:
+      - label: |-
+          Interest and expiry
+        doc: OPEN_INTEREST
+      - label: |-
+          The reserve share
+        doc: OPEN_RESERVE
+      - label: |-
+          Expiry and the forced sale
+        doc: EXPIRY
+
+  position_denied:
+    title: |-
+      About this position
+    intro: |-
+      This position was denied: holders of more than 1% of the governance votes vetoed it in its veto window, before it minted any ZCHF.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Veto window
+        text: |-
+          a new original waits at least three days, a period its owner chose, before its first mint, and a veto ends minting for good.
+      - bold: |-
+          Clones skip the wait
+        text: |-
+          only originals have a veto window, and a clone uses an accepted original's terms and can mint at once.
+      - bold: |-
+          Forced sale
+        only: forced
+        text: |-
+          after expiry anyone could buy the collateral at a falling price, the payment repaying the debt first.
+    links:
+      - label: |-
+          Who can veto
+        doc: VETO
+      - label: |-
+          The veto window
+        doc: OPEN_TERMS
+      - label: |-
+          Cloning a position
+        doc: CLONE
+      - label: |-
+          Expiry and the forced sale
+        doc: EXPIRY
+
+  position_expired:
+    title: |-
+      About this position
+    intro: |-
+      This position passed its expiration with debt outstanding. It can no longer mint, and on Minting Hub V2 anyone can buy its collateral at a falling price.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Owner-set expiration
+        text: |-
+          the expiry is a term the owner chose at opening, and the position's mints paid interest up to it.
+      - bold: |-
+          Owner-declared price
+        text: |-
+          Frankencoin has no oracle, and the liquidation price is the owner's declaration, which challenges test.
+    links:
+      - label: |-
+          Expiry and the forced sale
+        doc: EXPIRY
+      - label: |-
+          Interest and expiry
+        doc: OPEN_INTEREST
+
+  book:
+    title: |-
+      What the minting book counts
+    intro: |-
+      The book is every position Frankencoin's two Minting Hubs have opened. Each count names what it is out of.
+    detailsHeading: |-
+      The counts:
+    details:
+      - bold: |-
+          Positions ever
+        text: |-
+          every position opened, on Hub V1 from 2023 or Hub V2 from 2024.
+      - bold: |-
+          Originals and clones
+        text: |-
+          an original proposed its terms, paid the opening fee and faced a veto window, and a clone copied an accepted position's terms.
+      - bold: |-
+          Open at head
+        text: |-
+          the positions open now, while the others closed or were denied.
+      - bold: |-
+          Denied
+        text: |-
+          originals vetoed in their veto window, since a clone has no veto window.
+      - bold: |-
+          Challenges and forced sales
+        text: |-
+          every auction started, and every position whose collateral was bought after expiry through the V2 hub.
+    links:
+      - label: |-
+          Opening a new position
+        doc: OPEN_TERMS
+      - label: |-
+          Cloning a position
+        doc: CLONE
+      - label: |-
+          Challenges and auctions
+        doc: AUCTION
+      - label: |-
+          Expiry and the forced sale
+        doc: EXPIRY

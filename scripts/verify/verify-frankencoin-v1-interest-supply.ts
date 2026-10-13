@@ -20,7 +20,8 @@
 
 import { chromium } from "playwright";
 import { frankencoinChargedTerm } from "../../lib/frankencoin/use-event-read";
-import { frankencoinMintingContent } from "../../lib/shared/learn-more-content";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 let pass = 0;
@@ -39,8 +40,16 @@ check("V1, 10 days left: charged the 28-day minimum", t("v1", 10)?.days === 28 &
 check("V1, 60 days left: charged 60", t("v1", 60)?.days === 60 && t("v1", 60)?.minimum === false);
 check("V2, 10 days left: charged 10", t("v2", 10)?.days === 10 && t("v2", 10)?.minimum === false);
 
-const interestText = (hub: "v1" | "v2") =>
-  frankencoinMintingContent(hub).details?.find((d) => d.bold === "Interest up front")?.text ?? "";
+// The minting modal's "Interest up front" concept, read from the strings file
+// (content/frankencoin/event-prose.yaml): `text_v1` is its Hub V1 form.
+const { parseContent } = createRequire(import.meta.url)("../yaml-loader.cjs");
+const STRINGS = parseContent(
+  readFileSync(new URL("../../content/frankencoin/event-prose.yaml", import.meta.url), "utf8"),
+);
+const interestText = (hub: "v1" | "v2"): string => {
+  const d = STRINGS.L5.minting.details.find((x: { bold: string }) => x.bold === "Interest up front");
+  return (hub === "v1" ? d?.text_v1 : d?.text) ?? "";
+};
 const v1 = interestText("v1");
 const v2 = interestText("v2");
 check("modal V1: rate fixed when the position opened", /fixed when it opened/.test(v1), v1);

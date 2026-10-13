@@ -74,15 +74,6 @@ export function forcedCurvePoint(
   return { since, period, stage, multiple: declared != null && declared > 0 ? unit / declared : null };
 }
 
-/** "first day", "second 2-day period": a challenge period named by its place
- *  after expiry. */
-export const periodAfterExpiry = (which: "first" | "second", period: number): string =>
-  period === 86400
-    ? `${which} day`
-    : period % 86400 === 0
-      ? `${which} ${period / 86400}-day period`
-      : `${which} period of ${phaseText(period)}`;
-
 /** An exact decimal string with its whole part grouped: "2,322.994071369077767177". */
 export const groupExact = (s: string): string => {
   const [whole, frac] = s.split(".");

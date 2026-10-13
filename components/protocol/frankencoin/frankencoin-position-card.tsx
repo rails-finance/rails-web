@@ -47,7 +47,7 @@ import {
   liveInterestProv,
 } from "@/lib/frankencoin/live-provenance";
 import { ppmToPct, shortAddress } from "@/lib/frankencoin/asset-catalog";
-import { frankencoinPositionContent } from "@/lib/frankencoin/position-content";
+import { frankencoinPositionModal } from "@/lib/frankencoin/event-templates";
 import type { Provenance } from "@/components/shared/provenance";
 import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/lib/sources/api/frankencoin-positions";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
@@ -98,9 +98,6 @@ export interface FrankencoinPositionView {
 export interface FrankencoinEnding {
   /** The forced sale that sold collateral (the last one that did). */
   forcedAt: number | null;
-  /** The most collateral one transaction's sales sold (a forced sale or a
-   *  challenge's slices), whole units. */
-  soldMost: number | null;
   deniedAt: number | null;
   /** The position closed in a challenge sale's transaction. */
   closedByChallenge?: boolean;
@@ -375,7 +372,7 @@ export function FrankencoinPositionCard({
         rowExtra={rowExtra}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={frankencoinPositionContent({ status: v.status, forcedSale: forcedAt != null })}
+        learnMore={frankencoinPositionModal({ status: v.status, forcedSale: forcedAt != null, hub: v.hub })}
         positionSummary={positionSummary}
       >
         <ClosedPositionStats
@@ -435,7 +432,7 @@ export function FrankencoinPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={frankencoinPositionContent({ status: "open" })}
+      learnMore={frankencoinPositionModal({ status: "open", hub: v.hub })}
       positionSummary={positionSummary}
     >
       <OpenPositionStats
@@ -489,7 +486,7 @@ export function FrankencoinPositionCard({
                 <Detail>
                   {v.liqPrice != null && v.liqPrice > 0 ? (
                     <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-                      <Prov info={liqPriceProv(v)}>
+                      <Prov info={liqPriceProv(v)} value={String(v.liqPrice)}>
                         <span>
                           liq. price <AmountText value={v.liqPrice} /> ZCHF/{v.collateralSymbol}
                         </span>

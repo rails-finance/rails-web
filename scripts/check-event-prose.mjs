@@ -434,6 +434,36 @@ const FAMILIES = {
       "components/protocol/moonwell/moonwell-event-card.tsx",
     ],
   },
+  frankencoin: {
+    generator: "lib/frankencoin/event-prose.ts",
+    loader: "lib/frankencoin/event-templates.ts",
+    entry: "export function frankencoinEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "frankencoin",
+    fallback: "frankencoin.fallback",
+    builtVariants: () => [],
+    wordConsts: { FRANKENCOIN_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/frankencoin/event-prose.ts",
+      "lib/frankencoin/event-templates.ts",
+      "components/protocol/frankencoin/frankencoin-event-explainer.tsx",
+      "components/protocol/frankencoin/frankencoin-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/frankencoin/frankencoin-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/frankencoin/event-prose.ts",
+      "lib/frankencoin/event-templates.ts",
+      "lib/frankencoin/position-nodes.tsx",
+      "components/protocol/frankencoin/frankencoin-event-explainer.tsx",
+      "components/protocol/frankencoin/frankencoin-event-card.tsx",
+    ],
+  },
 };
 
 /** The engine every family runs on: no prose either. */

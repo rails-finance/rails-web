@@ -47,6 +47,10 @@ export type Rounding =
   | "usd_value"
   | "pct_plain"
   | "hf"
+  | "fc_coll"
+  | "fc_price"
+  | "fc_span"
+  | "date_time"
   | "coll_amount"
   | "spoke_amount";
 
