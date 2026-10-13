@@ -113,7 +113,7 @@ export interface EventCardHeadRow {
 /** The slot every card fills, whatever it stands for. */
 interface EventCardSlotsCommon {
   spine: SpineColumnProps;
-  /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"); empty, the
+  /** The phone caption's kind ("Repay", "Rate 3.60%"); empty, the
    *  timeline's word for the event. */
   caption: string;
   actor?: EventCardActor;

@@ -114,8 +114,9 @@ export function LiquityEventCard({
   const rateUp = isRateChange
     ? (ctx.stateAfter?.annualInterestRate ?? 0) >= (ctx.stateBefore?.annualInterestRate ?? 0)
     : false;
-  // A rate change states its rate before and after, on the flank and in the
-  // phone caption ("Rate 4.12% → 3.60%").
+  // A rate change draws its change signed on the spine's flank; the timeline
+  // row's phone caption states the rate after ("Rate 3.60%"). Before and
+  // after stand in the opened card and the event page.
   const rateSpan: [number, number] | undefined =
     isRateChange && ctx.stateBefore && ctx.stateAfter
       ? [ctx.stateBefore.annualInterestRate, ctx.stateAfter.annualInterestRate]
@@ -297,7 +298,7 @@ export function LiquityEventCard({
     },
     spine,
     head,
-    caption: rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityL1Label(ctx),
+    caption: rateSpan ? `Rate ${rateSpan[1].toFixed(2)}%` : liquityL1Label(ctx),
     // A third party's act names who acted: the redeemer, the batch manager
     // moving a delegated Trove's rate.
     actor: {
