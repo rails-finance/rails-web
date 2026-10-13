@@ -8,7 +8,8 @@ export type TimelineDisplayKey =
   | "showCollateralRatio"
   | "showMarketNotes"
   | "openAllMarketNotes"
-  | "showTxHashes";
+  | "showTxHashes"
+  | "showFullBreakdown";
 
 export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside
@@ -33,6 +34,10 @@ export interface TimelineDisplayState {
    *  number pill shows its transaction's short hash in place of the number.
    *  Off by default. The event page's pill keeps the number. */
   showTxHashes: boolean;
+  /** "Show full breakdown" in an event card's ⋮ (ui-jobs 330): every sheet on
+   *  the timeline draws its carry-forward layer and the protocol's parameters.
+   *  Off by default; an event page always draws them. */
+  showFullBreakdown: boolean;
   toggle: (key: TimelineDisplayKey) => void;
 }
 
@@ -43,6 +48,7 @@ const DEFAULTS = {
   showMarketNotes: true,
   openAllMarketNotes: false,
   showTxHashes: false,
+  showFullBreakdown: false,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences
