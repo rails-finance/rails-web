@@ -148,6 +148,7 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
     // The transaction-sender test (ui-jobs 304).
     actor: { sent: { txFrom: ctx.txFrom, owner: event.wallet } },
     cells: body.cells,
+    sheet: body.sheet,
     // A ledger row's Collateral and Debt open into their ledgers where the
     // page ties its timeline to the Lifetime flows panel.
     ledgers: {

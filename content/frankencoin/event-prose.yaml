@@ -344,6 +344,36 @@ words:
     time
   time_many: |-
     times
+  # The event sheet's read-more, one per row: what the figure is and where it
+  # is read. Read by components/protocol/frankencoin/frankencoin-sheet.tsx.
+  tip_coll_last: |-
+    The position's collateral after its previous event, from that event's MintingUpdate log.
+  tip_coll_before: |-
+    The position's collateral just before this event, read from the chain one block earlier.
+  tip_coll_event: |-
+    The collateral this event moved: this MintingUpdate's balance less the previous one.
+  tip_coll_total: |-
+    The position's collateral after this event, from the MintingUpdate log, in the collateral's units since Frankencoin prices nothing in dollars.
+  tip_debt_last: |-
+    The position's ZCHF debt after its previous event, from that event's MintingUpdate log.
+  tip_debt_event: |-
+    The ZCHF debt this event added or removed: this MintingUpdate's debt less the previous one.
+  tip_debt_total: |-
+    The position's ZCHF debt after this event, from the MintingUpdate log, in ZCHF since Frankencoin prices nothing in dollars.
+  tip_liq_price: |-
+    The liquidation price the owner declared, in ZCHF per collateral token, after this event, from the MintingUpdate log. A challenge auction tests it.
+  tip_headroom: |-
+    How far the collateral's market price stands above the declared liquidation price. This page holds no market price for the collateral.
+  tip_challenge: |-
+    The collateral in a challenge auction now, from the position's challengedAmount at the latest block.
+  tip_expiry: |-
+    When the position expires, from its expiration() at the latest block. It is fixed for the life of the position.
+  tip_interest: |-
+    The position's yearly interest rate: the rate in force at this event where the receipt shows one, else the position's rate at the latest block.
+  tip_reserve: |-
+    The share of each mint held back in the system reserve, from the position's reserveContribution() at the latest block. Repaying returns it.
+  tip_phase: |-
+    The length of each of a challenge's two phases, from the position's challengePeriod() at the latest block.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
