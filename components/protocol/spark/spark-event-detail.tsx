@@ -58,7 +58,7 @@ import { formatNumber } from "@/lib/utils/format";
 import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
 import { sparkRiskCells } from "./spark-account-state";
-import { TRANSFER_LABEL } from "./spark-event-header";
+import { TRANSFER_LABEL } from "@/lib/spark/event-label";
 import { aaveFamilySheet } from "@/components/protocol/aave-v3/aave-family-sheet";
 import { reserveSymbol } from "@/components/protocol/aave-v3/aave-v3-position-state";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";

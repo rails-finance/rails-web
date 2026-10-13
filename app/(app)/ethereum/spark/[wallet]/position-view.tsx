@@ -25,6 +25,7 @@ import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
@@ -48,6 +49,7 @@ import { SPARK_FOLDER_REGISTER, SPARK_TIMELINE_RUNS } from "@/lib/spark/timeline
 import { fetchSparkGroupedTimeline, type SparkGroupedTimelineResult } from "@/lib/api/fetch-spark-timeline";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { sparkExplorer } from "@/lib/spark/explorer";
 import { SparkEventCard } from "@/components/protocol/spark/spark-event-card";
 import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
@@ -329,6 +331,9 @@ export default function SparkPositionDetail({
     () => aaveV3Neighbours(timelineEvents.filter(isSparkEvent) as SparkTimelineEvent[]),
     [timelineEvents],
   );
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; the position card and Lifetime flows stay off it.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const sharedBlocks = useMemo(() => {
     const txs = new Map<number, Set<string>>();
     for (const e of timelineEvents) {
@@ -789,7 +794,7 @@ export default function SparkPositionDetail({
           <DetailBodySkeleton />
         ) : (
           <>
-            {liveView && (
+            {!onEventPage && liveView && (
               <SparkPositionCard
                 v={cardView ?? liveView}
                 receipts
@@ -829,7 +834,7 @@ export default function SparkPositionDetail({
                 }
               />
             )}
-            {towerData && (
+            {!onEventPage && towerData && (
               <LifetimeFlowsPanel
                 read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
                 explanation={sparkEconomicsExplanation(
@@ -852,6 +857,13 @@ export default function SparkPositionDetail({
               // lets pinned mode (the per-event share route) force a landed
               // card's detail panel open on its first mount.
               persistKeyPrefix="spark"
+              eventPage={(slot) =>
+                sparkExplorer.eventPage({
+                  ...slot,
+                  wallet,
+                  siblings: neighbours.get(slot.event.id)?.siblings,
+                })
+              }
               closed={liveView ? liveView.status !== "open" : undefined}
               notes={notes}
               liveNotes={liveNotes}

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadSparkPositionTail } from "@/lib/spark/position-page-data";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
+import { sparkEventHeading, sparkEventPageDescription } from "@/lib/spark/explorer";
+import type { SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import SparkPositionPage from "../../page";
 
 interface Props {
@@ -33,23 +36,23 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const grouped = servedFoldersFromParam(sp.folders);
   const tail = await loadSparkPositionTail(wallet, grouped);
   const event = tail.events?.find((e) => e.id === decoded) ?? null;
+  const siblings = event
+    ? (tail.events?.filter((e) => e.txHash === event.txHash && isSparkEvent(e)) as SparkTimelineEvent[])
+    : undefined;
   return eventMetadata({
     session: "spark",
     subject: wallet,
     canonicalPath: `/ethereum/spark/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: sparkEventHeading(event, siblings), timestamp: event.timestamp } : null,
+    description: event ? sparkEventPageDescription(wallet, event.timestamp) : undefined,
   });
 }
 
-// THIN: renders the exact same parent position page, same params — the
-// nested `event/[eventId]` segment sits inside the same `[wallet]` layout, so
-// every provider still wraps it, and `SparkPositionDetail` (this page's
-// client half) never learns a new prop. It finds out it is on an event route
-// from `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra `eventId`
-// key the parent's own `Props` type doesn't declare; passing the same
-// promise through is still structurally valid (the parent only reads
-// `wallet` off it, and `?folders=1` off `searchParams`).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent position page's
+// server half, same params; its client half (`SparkPositionDetail`) reads
+// `eventId` from the route and draws the sub-nav and the event's card in page
+// mode with the shared column (`ChainTruthTimeline`'s `eventPage`). The card
+// reads the position's history, so the read is the parent's.
 export default async function SparkEventPage({ params, searchParams }: Props) {
   return SparkPositionPage({ params, searchParams });
 }

@@ -303,6 +303,27 @@ words:
   ledgers_shared: |-
     Another of the owner's transactions shares this block, so the account is not read: the cells state the event's balances.
 
+# ── The event page (ui-jobs 236, 307): the side column's paragraph, the facts'
+# labels and the metadata description. {account} is the shortened address and
+# {day} the long date. Read by lib/spark/explorer.ts. ──
+page_words:
+  paragraph: |-
+    This page is one transaction from this account's SparkLend history.
+  timeline_link: |-
+    See the whole history in the timeline.
+  timeline_hint: |-
+    Open this event in the account's timeline
+  market: |-
+    Market
+  market_value: |-
+    SparkLend
+  account: |-
+    Account
+  copy_account: |-
+    Copy the account's address
+  description: |-
+    One transaction from the SparkLend account {account}, on {day}.
+
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
 # bullets. Risk holds at most four: borrowing against the limit, the fall to
