@@ -10,7 +10,7 @@ import {
   type LiquityForkDeployment,
 } from "@/components/protocol/liquity-fork/liquity-fork-event-card";
 import * as provs from "@/lib/asymmetry/event-provenance";
-import { DEBT_SYMBOL, ASYMMETRY_DOCS, MIN_DEBT } from "@/lib/asymmetry/asset-catalog";
+import { DEBT_SYMBOL, ASYMMETRY_DOCS, MIN_DEBT, resolveBranch } from "@/lib/asymmetry/asset-catalog";
 
 // The general Asymmetry docs link plus the question-level docs links per card
 // topic (ASYMMETRY_DOCS — read and verified against docs.asymmetry.finance,
@@ -23,6 +23,19 @@ export const ASYMMETRY_FORK = {
   docsByTopic: ASYMMETRY_DOCS,
 };
 
+// The ratios are BorrowerOperations getters on this fork.
+const branchOf: LiquityForkDeployment["branch"] = (symbol) => {
+  const b = resolveBranch(symbol);
+  return (
+    b && {
+      collateralAddr: b.collateralAddr,
+      mcr: b.mcr,
+      ccr: b.ccr,
+      constants: { name: `Asymmetry ${b.symbol} BorrowerOperations` },
+    }
+  );
+};
+
 const DEPLOYMENT: LiquityForkDeployment = {
   family: "asymmetry",
   words: ASYMMETRY_FORK,
@@ -30,6 +43,7 @@ const DEPLOYMENT: LiquityForkDeployment = {
   minDebt: MIN_DEBT,
   provs,
   gas: true,
+  branch: branchOf,
 };
 
 export interface AsymmetryEventCardProps {

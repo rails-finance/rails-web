@@ -7,7 +7,8 @@
 //        and sUSDS on a deposit or withdrawal; sUSDS and its USDS worth on a
 //        transfer, with the other address), who deposited when it was another
 //        address, and the referral code a deposit carried.
-//   T2 — the opened card: sUSDS held and its worth before → after as cells,
+//   T2 — the opened card, a balance sheet (sky-savings-sheet.tsx); the cells below
+//        stand for a kind the sheet cannot state: sUSDS held and its worth before → after as cells,
 //        the interest earned to date and since the previous event under the
 //        worth; one sUSDS's worth in the price row; the Savings Rate at the
 //        event's block and the referral code as notes (ui-jobs 309).
@@ -63,6 +64,7 @@ import {
   eventValueProv,
   type SkyEventCoords,
 } from "@/lib/sky-savings/provenance";
+import { skySavingsSheet } from "@/components/protocol/sky-savings/sky-savings-sheet";
 import { skyEventContent } from "@/lib/sky-savings/learn-more";
 import { skyEventBullets, skyInterestSince, type SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
 
@@ -347,6 +349,8 @@ export function SkySavingsEventCard({
     // A transfer received: the sender acted (ui-jobs 304).
     actor: kind === "received" ? { byOwner: false } : undefined,
     cells,
+    // T2 as a balance sheet (ui-jobs 330); undefined leaves the cells.
+    sheet: skySavingsSheet({ c, coords, previous, sinceRaw }),
     ledgers: { none: "no flows panel on Sky Savings" },
     notes,
     price,

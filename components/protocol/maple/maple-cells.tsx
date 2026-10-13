@@ -47,6 +47,8 @@ import {
 import { formatNumber } from "@/lib/utils/format";
 import { dayStamp } from "@/components/shared/event-ledger";
 import type { MapleHeld } from "./maple-ledger";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import { mapleSheet } from "./maple-sheet";
 
 export interface MapleCellsProps {
   ctx: MapleContext;
@@ -58,6 +60,8 @@ export interface MapleCellsProps {
   prevAt?: number;
   /** The row's id, for its Lifetime flows ledger. */
   eventId?: string;
+  /** Token contracts by symbol, from the event's flows, for the sheet's icons. */
+  addresses?: Record<string, string | undefined>;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -82,14 +86,16 @@ const ACT: Partial<Record<MapleContext["eventType"], string>> = {
   request_fill: "fill",
 };
 
-export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, prevAt }: MapleCellsProps): {
+export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, prevAt, addresses }: MapleCellsProps): {
   cells: EventCellSpec[];
+  sheet?: EventSheet;
   notes: ReactNode;
   held: MapleHeld | null;
 } {
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const stats: ChainTruthStat[] = [];
   let held: MapleHeld | null = null;
+  let claimTransition: ChainTruthTransition | undefined;
 
   // The claim at the block rate, where the index holds one for this block.
   if (ctx.valueAfter != null && ctx.valueBefore != null) {
@@ -100,6 +106,7 @@ export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, pre
       changeProv: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
       beforeProv: claimBeforeProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords),
     });
+    claimTransition = full(transition);
     const interest = Number(ctx.interestSincePrev ?? "0");
     const act = ACT[ctx.eventType];
     const interestProv = interestSincePrevProv(ctx.assetSymbol, ctx.poolSymbol, coords, ctx.raw?.interestSincePrev);
@@ -294,5 +301,9 @@ export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, pre
     else notes.push(st);
   }
   const cells = useChainTruthCells(cellStats);
-  return { cells, notes: notes.length > 0 ? <StatNotes stats={notes} /> : undefined, held };
+  // T2 as a balance sheet (ui-jobs 330): the claim and its ledger move into
+  // the sheet; the rate the event settled at, a cell, stands as a note.
+  const sheet = mapleSheet({ ctx, coords, claim: claimTransition, addresses });
+  const shownNotes = sheet ? [...notes, ...cellStats.filter((c) => c.key === "rate")] : notes;
+  return { cells, sheet, notes: shownNotes.length > 0 ? <StatNotes stats={shownNotes} /> : undefined, held };
 }
