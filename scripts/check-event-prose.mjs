@@ -223,13 +223,14 @@ const FAMILIES = {
     prefix: "spark",
     fallback: "spark.fallback",
     builtVariants: () => [],
-    wordConsts: { SPARK_WORDS: "words" },
+    wordConsts: { SPARK_WORDS: "words", SPARK_PAGE_WORDS: "page_words" },
     modalWords: null,
     readers: [
       "lib/spark/event-prose.ts",
       "lib/spark/event-templates.ts",
       "components/protocol/spark/spark-event-explainer.tsx",
       "components/protocol/spark/spark-position-explanation.tsx",
+      "lib/spark/explorer.ts",
     ],
     nodes: {
       section: "position_words",

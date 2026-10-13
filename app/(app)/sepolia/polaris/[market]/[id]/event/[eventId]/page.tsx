@@ -3,6 +3,7 @@ import { eventMetadata, decodeEventId, positionMetadata } from "@/lib/shared/pag
 import { normalizeCdpId, normalizeMarket, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { loadPolarisPositionTail } from "@/lib/polaris/position-page-data";
 import { polarisPositionHref } from "@/lib/polaris/routes";
+import { polarisEventHeading, polarisEventPageDescription } from "@/lib/polaris/explorer";
 import PolarisPositionPage from "../../page";
 
 interface Props {
@@ -45,7 +46,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: `#${id}`,
     market: POLARIS_MARKET_CONFIG[market].stable.symbol,
     canonicalPath: `${polarisPositionHref(market, id)}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: polarisEventHeading(event), timestamp: event.timestamp } : null,
+    description: event ? polarisEventPageDescription(market, id, event.timestamp) : undefined,
   });
 }
 

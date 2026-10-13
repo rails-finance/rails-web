@@ -29,6 +29,7 @@ export type SparkL5Key =
 interface SparkProseFile extends ProseFile<SparkL5Key> {
   words: Words;
   position_words: Words;
+  page_words: Words;
   doc_urls: Words;
 }
 
@@ -39,6 +40,10 @@ export const PROSE = eventProseEngine<SparkL5Key, SparkEchoKey>(FILE, { doc: FIL
 
 /** Words the generator and the renderers put into a sentence. */
 export const SPARK_WORDS = FILE.words;
+
+/** The event page's side column: the paragraph, the facts' labels and the
+ *  metadata description. */
+export const SPARK_PAGE_WORDS = FILE.page_words;
 
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 
