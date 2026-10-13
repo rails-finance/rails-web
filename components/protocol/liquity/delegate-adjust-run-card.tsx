@@ -135,6 +135,7 @@ export function DelegateAdjustRunCard({
       show={showMenu.show}
       hide={hide}
       membersId={membersId}
+      range={numberRange}
       closed={
         <EventCard
           avatar={null}

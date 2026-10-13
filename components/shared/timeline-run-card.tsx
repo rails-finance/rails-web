@@ -287,7 +287,8 @@ export function TimelineRunCard({
   const netTokens = adverse || spineIcon === "custody" ? [] : netLegs(legAggs);
   // The group opens from its row's ⋮ ("Show 48 grouped events") and closes
   // from a member's ("Hide …"); the range of event numbers rides the items'
-  // sub-line. A closed group's number column is empty.
+  // sub-line. The bracket carries the range at its ends, closed and open,
+  // and the closed row's number column is empty (ui-jobs 331 point 4).
   const contextRange = useContext(GroupNumbersContext);
   const numberRange = eventRange ?? contextRange;
   const rangeText = groupRangeText(numberRange);
@@ -512,6 +513,7 @@ export function TimelineRunCard({
       show={showMenu.show}
       hide={hide}
       membersId={membersId}
+      range={numberRange}
       closed={
         <EventCard
           avatar={null}
