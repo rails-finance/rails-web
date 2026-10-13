@@ -40,8 +40,9 @@ import { compoundAbsorbSplit, compoundAmount, impliedYearlyRate } from "@/lib/co
 import { formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
+import { createReadStore } from "./read-store";
 
-interface Factors {
+export interface AbsorbFactors {
   readBlock: number;
   factors: Record<string, { borrow: number; liquidate: number; liquidation: number }>;
   prevBlock?: number;
@@ -57,6 +58,16 @@ export interface CompoundPreviousRow {
   timestamp: number;
   /** The signed base balance after it. */
   baseAfter?: string;
+}
+
+const store = createReadStore<AbsorbFactors>();
+const keyOf = (coords: CompoundCoords, marketKey: string) =>
+  `${coords.chainId ?? 1}:${marketKey}:${coords.blockNumber}:${coords.txHash ?? ""}`;
+
+/** The factors the card's breakdown read, once it has (the breakdown mounts
+ *  while the card is open); null before. */
+export function useAbsorbFactors(coords: CompoundCoords, marketKey: string, enabled: boolean): AbsorbFactors | null {
+  return store.use(enabled && coords.blockNumber != null ? keyOf(coords, marketKey) : null);
 }
 
 const pct = (f: number) => `${Math.round(f * 1000) / 10}%`;
@@ -87,7 +98,7 @@ export function CompoundAbsorbBreakdown({
   const split = compoundAbsorbSplit(ctx);
   const legs = (ctx.absorbedCollateral ?? []).filter((l) => Number.isFinite(Number(l.usdValue)));
   const creditedUsd = Number(ctx.usdValue);
-  const [factors, setFactors] = useState<Factors | null>(null);
+  const [factors, setFactors] = useState<AbsorbFactors | null>(null);
   // The factors are an archive read, which can take a few seconds cold: the
   // row says it is reading them, and says so if the read fails.
   const [factorsState, setFactorsState] = useState<"loading" | "ready" | "failed">("loading");
@@ -106,9 +117,10 @@ export function CompoundAbsorbBreakdown({
     const attempt = (left: number): Promise<void> =>
       fetch(url, { signal: ac.signal })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d: Factors | null) => {
+        .then((d: AbsorbFactors | null) => {
           if (d && d.factors && Object.keys(d.factors).length > 0) {
             setFactors(d);
+            store.set(keyOf(coords, marketKey), d);
             setFactorsState("ready");
           } else if (left > 0) return attempt(left - 1);
           else setFactorsState("failed");

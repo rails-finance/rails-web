@@ -168,6 +168,7 @@ const FAMILIES = {
       "lib/compound/event-templates.ts",
       "components/protocol/compound/compound-event-explainer.tsx",
       "components/protocol/compound/compound-position-explanation.tsx",
+      "components/protocol/compound/compound-event-sheet.tsx",
     ],
     nodes: {
       section: "position_words",
