@@ -38,13 +38,16 @@ export function groupMenuWords(count: number, range: string | null) {
  *  the first on the row the summed nodes held, every member's ⋮ offering
  *  "Hide". A `group-open` event on the frame opens it (the timeline's rewind).
  *
- *  The ends carry the range (ui-jobs 331 point 4), closed and open: the
- *  highest number level with the bracket's top edge, the lowest with its
- *  bottom edge, in the row number's style (`num-pill`) at the number column's
- *  x (`.group-range`). A group of one draws the top number alone. Open, the
- *  members keep their own numbers. The ends are drawing only: no
- *  `data-event-number` (the verifiers read that as a row), `aria-hidden`
- *  (the group's name and the ⋮ words carry the range), no pointer. */
+ *  Closed, the ends carry the range (ui-jobs 331 point 4): the highest
+ *  number centred on the bracket's top edge, the lowest on its bottom edge,
+ *  in the row number's style (`num-pill`) at the number column's x
+ *  (`.group-range`). A group of one draws the top number alone. The top edge
+ *  stands at the number column's height (`.group-bracket`) in both states,
+ *  so on opening the first member's number takes the high number's place and
+ *  the corner stays put; open, the members' numbers say the range and the
+ *  ends draw none. The ends are drawing only: no `data-event-number` (the
+ *  verifiers read that as a row), `aria-hidden` (the group's name and the ⋮
+ *  words carry the range), no pointer. */
 export function GroupFrame({
   open,
   show,
@@ -84,9 +87,9 @@ export function GroupFrame({
       <div
         aria-hidden
         data-group-bracket=""
-        className="pointer-events-none absolute inset-y-0 left-0 z-20 w-3 rounded-l-xl border-y border-l border-rb-300 dark:border-rb-500"
+        className="group-bracket pointer-events-none absolute bottom-0 left-0 z-20 w-3 rounded-l-xl border-y border-l border-rb-300 dark:border-rb-500"
       />
-      {ends && (
+      {ends && !open && (
         <>
           <span aria-hidden data-group-range="hi" className="group-range group-range-hi">
             <span className="num-pill">{ends[1]}</span>

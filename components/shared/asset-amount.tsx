@@ -1,19 +1,20 @@
 "use client";
 
-// AssetAmount — a position card's headline value, the convenient unification of
-// the two reveal-on-hover wishes: the number renders compact (170.18M) and the
-// ticker collapses into its glyph, with the exact value + full ticker shown on
-// hover / tap. Lives inside <StatValue> (which owns the big type), so this only
-// composes the compact number, the token glyph, and the single shared RevealTip.
+// AssetAmount — a position card's headline value: the number renders compact
+// (170.18M) and the ticker collapses into its glyph. A click on the glyph opens
+// the asset's popover (asset-popover.tsx), whose first line is the exact value
+// and full ticker; a click on the number is the provenance inspector's. Lives
+// inside <StatValue> (which owns the big type), so this only composes the
+// compact number, the token glyph and its popover.
 
 import { TokenChipIcon } from "./token-chip-icon";
-import { RevealTip } from "./reveal-tip";
+import { AssetPopover } from "./asset-popover";
 import { formatCompact, formatExact, withRealMinus } from "@/lib/utils/format";
 
 export interface AssetAmountProps {
   value: number;
   symbol: string;
-  /** Exact value for the tooltip; defaults to the full grouped number. */
+  /** Exact value for the popover; defaults to the full grouped number. */
   exact?: string;
   iconSize?: number;
   /** Render a negative value's minus as the real U+2212 rather than the
@@ -56,30 +57,37 @@ export function AssetAmount({
   exactUnit,
 }: AssetAmountProps) {
   // Full pipeline precision (String(n) round-trip, no 3-dp re-rounding) — the
-  // strict-truth figure behind the compact headline, for both the hover tip and
+  // strict-truth figure behind the compact headline, for both the popover and
   // the provenance trace.
   const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
   const shown = display ?? formatCompact(value);
   const compact = signed ? withRealMinus(shown) : shown;
+  const exactLine = `${full} ${exactUnit ?? symbol}`;
   return (
-    <RevealTip tip={`${full} ${exactUnit ?? symbol}`} label={`${full} ${exactUnit ?? symbol}`} className="gap-2">
+    <span className="relative inline-flex items-center gap-2">
       {/* data-prov-exact: the provenance inspector reads the exact figure from
           here when this cell is clicked, so its receipt can headline the compact
           form and anchor the trace to the full one (number only — the ticker
           rides data-prov-symbol). data-prov-hidden marks the glyph as decoration
           so its fallback letter never leaks into the text capture ("3.27K" +
-          "A" + tooltip read as one garbled string before). */}
-      <span data-prov-exact={full} data-prov-symbol={exactUnit ?? symbol}>
+          "A" read as one garbled string before). The sr-only line names the
+          exact value to a screen reader. */}
+      <span data-prov-exact={full} data-prov-symbol={exactUnit ?? symbol} aria-hidden="true">
         {compact}
       </span>
+      <span className="sr-only" data-prov-hidden="">
+        {exactLine}
+      </span>
       {unit && (
-        <span data-prov-hidden="" className="text-[0.55em] font-medium text-rb-500">
+        <span data-prov-hidden="" aria-hidden="true" className="text-[0.55em] font-medium text-rb-500">
           {symbol}
         </span>
       )}
       <span data-prov-hidden="" className="inline-flex items-center justify-center rounded-full bg-raised p-0.5">
-        <TokenChipIcon symbol={symbol} address={address} size={iconSize} filterable={false} />
+        <AssetPopover symbol={symbol} address={address} figure={exactLine}>
+          <TokenChipIcon symbol={symbol} address={address} size={iconSize} filterable={false} untitled />
+        </AssetPopover>
       </span>
-    </RevealTip>
+    </span>
   );
 }
