@@ -6,6 +6,7 @@
 // already refused the page when the gate did not pass.
 
 import { useMemo } from "react";
+import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -26,6 +27,7 @@ import { vaultTermsNotes, type MarketNote } from "@/lib/shared/market-note";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { SKY_CHAIN_ID, SUSDS, USDS } from "@/lib/sky-savings/constants";
 import { pctString, rayNumber, toutAt, usdcPerUsdsAt } from "@/lib/sky-savings/math";
+import { skySavingsExplorer } from "@/lib/sky-savings/explorer";
 import { skyFlowTimeline, skyLifetimeTotals } from "@/lib/sky-savings/flows";
 import { skyFlowsExplanation } from "@/lib/sky-savings/flows-explanation";
 import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
@@ -57,6 +59,9 @@ export default function SkySavingsPositionView({
   todayDay: number;
 }) {
   const open = position.status === "open";
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; the summary, the price strip and Lifetime flows stay off it.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const skyEvents = useMemo(() => events.filter(isSkySavingsEvent) as SkySavingsEvent[], [events]);
   const tl = useTimelineEvents(skyEvents, {
     storageKey: `sky-savings-${position.holder}`,
@@ -181,31 +186,38 @@ export default function SkySavingsPositionView({
         priceReason={ORACLE_USD_REASON["sky-savings"]}
       />
 
-      <p className="text-xs text-rb-500" data-sky-asof={asOf.block}>
-        Sky Savings · sUSDS on Ethereum · every figure at <BlockRef block={asOf.block} chainId={SKY_CHAIN_ID} />, the
-        newest block when the page loaded
-      </p>
+      {!onEventPage && (
+        <p className="text-xs text-rb-500" data-sky-asof={asOf.block}>
+          Sky Savings · sUSDS on Ethereum · every figure at <BlockRef block={asOf.block} chainId={SKY_CHAIN_ID} />, the
+          newest block when the page loaded
+        </p>
+      )}
 
-      <SkySavingsPositionCard
-        p={position}
-        asOf={asOf}
-        surface="detail"
-        viewHref={tl.viewHref}
-        rowExtra={checked}
-        explanation={
-          <SkySavingsPositionExplanation position={position} asOf={asOf} totals={totals} firstAt={firstAt} />
-        }
-      />
+      {!onEventPage && (
+        <SkySavingsPositionCard
+          p={position}
+          asOf={asOf}
+          surface="detail"
+          viewHref={tl.viewHref}
+          rowExtra={checked}
+          explanation={
+            <SkySavingsPositionExplanation position={position} asOf={asOf} totals={totals} firstAt={firstAt} />
+          }
+        />
+      )}
 
-      <LifetimeFlowsPanel
-        read={flowTimeline || (days && rates) ? "done" : "failed"}
-        explanation={skyFlowsExplanation(position, totals)}
-        learnMore={skyFlowsContent()}
-        scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
-      />
+      {!onEventPage && (
+        <LifetimeFlowsPanel
+          read={flowTimeline || (days && rates) ? "done" : "failed"}
+          explanation={skyFlowsExplanation(position, totals)}
+          learnMore={skyFlowsContent()}
+          scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
+        />
+      )}
 
       <ChainTruthTimeline
         persistKeyPrefix="sky-savings"
+        eventPage={(slot) => skySavingsExplorer.eventPage({ ...slot, holder: position.holder })}
         closed={!open}
         tl={tl}
         notes={notes}

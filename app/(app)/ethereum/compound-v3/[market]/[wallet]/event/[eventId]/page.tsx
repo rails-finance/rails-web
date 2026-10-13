@@ -3,6 +3,7 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { marketOf } from "@/lib/compound/asset-catalog";
 import { loadCompoundPositionTail } from "@/lib/compound/position-page-data";
+import { compoundEventHeading, compoundEventPageDescription } from "@/lib/compound/explorer";
 import CompoundPositionPage from "../../page";
 
 interface Props {
@@ -38,19 +39,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     subject: wallet,
     market: marketOf(market).baseSymbol,
     canonicalPath: `/ethereum/compound-v3/${market}/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: compoundEventHeading(event, "ethereum"), timestamp: event.timestamp } : null,
+    description: event ? compoundEventPageDescription(event, wallet, "ethereum") : undefined,
   });
 }
 
-// THIN: renders the exact same parent position page, same params — the
-// nested `event/[eventId]` segment sits inside the same `[market]/[wallet]`
-// layout, so every provider still wraps it, and `CompoundPositionView` (this
-// page's client half) never learns a new prop. It finds out it is on an
-// event route from `useParams().eventId` itself, inside `ChainTruthTimeline`
-// — see that component's pinned-mode branch. `params` here carries an extra
-// `eventId` key the parent's own `Props` type doesn't declare; passing the
-// same promise through is still structurally valid (the parent only reads
-// `market`/`wallet` off it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent position page's
+// server half, same params; its client half (`CompoundPositionView`) reads
+// `eventId` from the route and draws the sub-nav and the event's card in page
+// mode with the shared column (`ChainTruthTimeline`'s `eventPage`).
 export default async function CompoundEventPage({ params, searchParams }: Props) {
   return CompoundPositionPage({ params, searchParams });
 }

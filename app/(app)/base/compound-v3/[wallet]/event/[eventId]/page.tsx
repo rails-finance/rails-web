@@ -4,6 +4,7 @@ import { loadCompoundBaseTail } from "@/lib/compound-base/position-page-data";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import type { CometChainTimelineResult } from "@/lib/sources/chain/compound-v3-events";
+import { compoundEventHeading, compoundEventPageDescription } from "@/lib/compound/explorer";
 import CompoundBaseWalletPage from "../../page";
 
 interface Props {
@@ -36,19 +37,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "compound-base",
     subject: shortSubject(wallet),
     canonicalPath: `/base/compound-v3/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: compoundEventHeading(event, "base"), timestamp: event.timestamp } : null,
+    description: event ? compoundEventPageDescription(event, wallet, "base") : undefined,
   });
 }
 
-// THIN: renders the exact same parent position page, same params — the
-// nested `event/[eventId]` segment sits inside the same `[wallet]` layout, so
-// every provider still wraps it, and `CompoundBaseWalletView` (this page's
-// client half) never learns a new prop. It finds out it is on an event route
-// from `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra `eventId`
-// key the parent's own `Props` type doesn't declare; passing the same
-// promise through is still structurally valid (the parent only reads
-// `wallet` off it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent position page's
+// server half, same params; its client half (`CompoundBaseWalletView`) reads
+// `eventId` from the route and draws the sub-nav and the event's card in page
+// mode with the shared column (`ChainTruthTimeline`'s `eventPage`).
 export default async function CompoundBaseEventPage({ params }: Props) {
   // A pinned event page stays flat (rails-ops decision 0019, leg C note): a
   // grouped answer serves a folder's members only when it is opened, and the

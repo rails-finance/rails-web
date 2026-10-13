@@ -10,6 +10,8 @@
 // Lifetime flows panel and the timeline carry the whole page.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { mapleExplorer } from "@/lib/maple/explorer";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -119,6 +121,9 @@ export default function MaplePositionView({
   // Keyed on the timeline, not the row: a wallet with no Maple position is a
   // real answer the server can seed, and its `initialPosition` is null.
   const seeded = initialEvents != null;
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card, pool band, flows panel or contract note.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const [view, setView] = useState<MaplePositionView | null>(() =>
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
@@ -538,7 +543,7 @@ export default function MaplePositionView({
             )}
           </DetailTopRow>
 
-          {protocolContract && (
+          {!onEventPage && protocolContract && (
             <ContractIdentityCard
               kicker="Protocol contract"
               name={protocolContract.name}
@@ -556,7 +561,7 @@ export default function MaplePositionView({
             <DetailBodySkeleton />
           ) : (
             <>
-              {view && (
+              {!onEventPage && view && (
                 <MaplePositionCard
                   v={view}
                   receipts
@@ -577,11 +582,11 @@ export default function MaplePositionView({
                   }
                 />
               )}
-              {Object.keys(walletPoolState).length > 0 && <MaplePoolStatsBand poolState={walletPoolState} />}
+              {!onEventPage && Object.keys(walletPoolState).length > 0 && <MaplePoolStatsBand poolState={walletPoolState} />}
               {/* Lifetime flows: the bars and the line over the pool's replay
             (lib/maple/flows.ts), in its funds asset, in place of the tower
             (TO-DO-ui-jobs 206). */}
-              {view && (
+              {!onEventPage && view && (
                 <LifetimeFlowsPanel
                   scrubber={
                     flows.timeline ? (
@@ -608,6 +613,7 @@ export default function MaplePositionView({
                 // lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="maple"
+                eventPage={(slot) => mapleExplorer.eventPage({ ...slot, wallet })}
                 closed={view ? view.status !== "open" : undefined}
                 tl={tl}
                 // Tenure-first header: when the account started, how long it has

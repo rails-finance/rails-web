@@ -27,6 +27,8 @@
 // the tail itself, exactly as it did before the route had a server half.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { liquityForkExplorer } from "@/lib/liquity-fork/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -131,6 +133,9 @@ export default function BasedollarTroveDetail({
   // whole (summary AND timeline) or not at all, so a seeded view never
   // states an empty history for a trove whose timeline read simply failed.
   const seeded = initialTrove != null;
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const [view, setView] = useState<BasedollarTroveView | null>(() =>
     initialTrove ? viewFromSummary(initialTrove) : null,
   );
@@ -481,7 +486,7 @@ export default function BasedollarTroveDetail({
           <DetailBodySkeleton />
         ) : (
           <>
-            {view && (
+            {!onEventPage && view && (
               <BasedollarPositionCard
                 v={view}
                 receipts
@@ -515,7 +520,8 @@ export default function BasedollarTroveDetail({
                 }
               />
             )}
-            {view &&
+            {!onEventPage &&
+              view &&
               (() => {
                 const towerData = computeBasedollarEconomics(view, lifetimeEvents, precomputedLifetime);
                 const forkOpts = {
@@ -553,6 +559,17 @@ export default function BasedollarTroveDetail({
               // per-event share route) force a landed card's detail panel open
               // on its first mount.
               persistKeyPrefix="basedollar"
+              eventPage={(slot) =>
+                liquityForkExplorer.eventPage({
+                  ...slot,
+                  deployment: "basedollar",
+                  collateralType,
+                  troveId,
+                  owner: view?.owner ?? null,
+                  lastOwner: view?.lastOwner ?? null,
+                  ownerEns: view?.ownerEns ?? null,
+                })
+              }
               tl={tl}
               runs={FORK_RUNS}
               folderRegister={LIQUITY_FORK_FOLDER_REGISTER}

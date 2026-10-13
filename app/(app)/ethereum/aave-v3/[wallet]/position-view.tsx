@@ -48,6 +48,8 @@ import {
 } from "@/lib/api/fetch-aave-v3-position";
 import { MARKET_NAME, POOL_BY_MARKET, type AaveV3MarketKey } from "@/lib/aave-v3/asset-catalog";
 import { V3PoolProvider } from "@/lib/aave-v3/pool-context";
+import { useParams } from "next/navigation";
+import { aaveV3Explorer } from "@/lib/aave-v3/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
 import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
@@ -156,6 +158,9 @@ export default function AaveV3PositionDetail({
   // so this is the one flag that distinguishes "nothing to show" from "nothing
   // arrived".
   const seeded = initialEvents != null;
+  // The event route draws the sub-nav and the event's card in page mode with
+  // the shared column; no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const [view, setView] = useState<AaveV3PositionView | null>(() =>
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
@@ -764,7 +769,7 @@ export default function AaveV3PositionDetail({
             <DetailBodySkeleton />
           ) : (
             <>
-              {cardView && (
+              {!onEventPage && cardView && (
                 <AaveV3PositionCard
                   v={cardView}
                   receipts
@@ -798,7 +803,7 @@ export default function AaveV3PositionDetail({
                   }
                 />
               )}
-              {towerData && (
+              {!onEventPage && towerData && (
                 <LifetimeFlowsPanel
                   read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
                   explanation={aaveV3EconomicsExplanation(towerData)}
@@ -816,6 +821,15 @@ export default function AaveV3PositionDetail({
                 // lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="aave-v3"
+                eventPage={(slot) =>
+                  aaveV3Explorer.eventPage({
+                    ...slot,
+                    market: MARKET_NAME[market] ?? "Core",
+                    wallet,
+                    deployment: "ethereum",
+                    siblings: neighbours.get(slot.event.id)?.siblings,
+                  })
+                }
                 closed={liveView ? liveView.status !== "open" : undefined}
                 notes={notes}
                 liveNotes={liveNotes}
