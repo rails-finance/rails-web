@@ -22,6 +22,7 @@
 import type { Metadata } from "next";
 
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { vaultEventPageDescription } from "@/lib/vaults/explorer";
 import { findVaultTailEvent } from "@/lib/vaults/event-share-card";
 import { baseVaultHref } from "@/lib/vaults/routes";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -64,12 +65,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ...(await ssrHop()),
       })
     : null;
+  const vaultName = (await morphoBaseRosterEntry(address))?.name;
   return eventMetadata({
     session: "morpho-base",
     subject: ADDRESS.test(who) ? who : decodeURIComponent(holder),
-    market: (await morphoBaseRosterEntry(address))?.name,
+    market: vaultName,
     canonicalPath: `${baseVaultHref(address, holder)}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: KIND_LABEL[event.kind], timestamp: event.timestamp } : null,
+    description: event
+      ? vaultEventPageDescription("morpho-base", "base", vaultName ?? null, address, who, event.timestamp)
+      : undefined,
   });
 }
 

@@ -63,11 +63,13 @@
 
 import { Fragment, useMemo } from "react";
 
+import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { Prov } from "@/components/shared/provenance";
 import { shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
 import { utcInstant } from "@/components/vaults/aave-vault-format";
+import { vaultExplorer } from "@/lib/vaults/explorer";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
 import { chainMeta, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -137,6 +139,8 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
     holder: timeline.holder,
   };
   const { reconcile } = timeline;
+  // The event route draws the sub-nav and the event's card beside the shared column (ui-jobs 236).
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const shareUnit = shareSymbol ?? "shares";
   const shareDecimals = timeline.events[0]?.shareDecimals ?? 18;
   const assetDecimals = timeline.events[0]?.assetDecimals ?? 18;
@@ -190,14 +194,16 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
 
   return (
     <section className="mb-6" data-skel-section="vault-timeline" data-vault-timeline={timeline.holder}>
-      <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+      {!onEventPage && (
+        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+      )}
 
       {/* Where the rows came from. A row at or below the lane's own `finalized`
           block never changes, so it may be kept; anything above it may not.
           When half of a life came out of the store the reader is told which
           half, at which cut, and that the check below ran on the two together
           — a stored page and a swept one must never render the same. */}
-      <HistoryLine coords={coords} timeline={timeline} />
+      {!onEventPage && <HistoryLine coords={coords} timeline={timeline} />}
 
       {timeline.unread ? (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-unread">
@@ -255,7 +261,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
           . The rows and the flows are drawn once the whole life is stored, on a later visit. Every figure above this is
           unaffected — they are calls answered at block {n(timeline.blockNumber)}.
         </p>
-      ) : (
+      ) : onEventPage ? null : (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-reconciled">
           Every share transfer this address sent or received, newest first, replayed.{" "}
           <Prov info={vaultTimelineGateProv(coords, reconcile)}>
@@ -293,6 +299,16 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
             // The two spellings must agree — a prefix that missed the vault
             // would force a key no card ever reads.
             persistKeyPrefix={`aave-vault:${timeline.vault}`}
+            eventPage={(slot) =>
+              vaultExplorer.eventPage({
+                ...slot,
+                family: "aave-vaults",
+                deployment: "ethereum",
+                vaultName,
+                vault: timeline.vault,
+                holder: timeline.holder,
+              })
+            }
             renderCard={(event, meta) => {
               const row = byId.get(event.id);
               if (!row) return null;
@@ -323,7 +339,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
         </div>
       )}
 
-      {drawn && (
+      {drawn && !onEventPage && (
         <p className="mt-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-figure="timeline-accrual">
           <Prov info={vaultTimelineAccrualProv(coords, family)}>
             {/* An Umbrella token's line says what its accounting IS and stops.

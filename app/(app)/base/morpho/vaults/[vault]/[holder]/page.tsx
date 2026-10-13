@@ -55,7 +55,11 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { assetText } from "@/lib/shared/vault-amount-text";
-import { vaultHolderMaxWithdrawProv, vaultSharePriceProv, type MorphoVaultCoords } from "@/lib/morpho-base/vault-provenance";
+import {
+  vaultHolderMaxWithdrawProv,
+  vaultSharePriceProv,
+  type MorphoVaultCoords,
+} from "@/lib/morpho-base/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { aaveVaultPositionContent } from "@/lib/shared/learn-more-content";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
@@ -103,7 +107,15 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
  *  Rendered inside a `<Suspense>` because its reads are log sweeps and the rest
  *  of the page is `eth_call`s that have already answered; the vault's figures
  *  paint first and this arrives when the chain has spoken. */
-async function VaultTimelineSection({ data, holder }: { data: MorphoBaseVaultResponse; holder: string }) {
+async function VaultTimelineSection({
+  data,
+  holder,
+  onEventPage,
+}: {
+  data: MorphoBaseVaultResponse;
+  holder: string;
+  onEventPage: boolean;
+}) {
   // The stored tail, read BEFORE the loader so the loader can sweep a head
   // instead of a life. A tail that is absent, stale or wrong costs this page a
   // whole-life sweep and nothing else — the gate runs on the merged rows either
@@ -176,7 +188,7 @@ async function VaultTimelineSection({ data, holder }: { data: MorphoBaseVaultRes
     <>
       {/* The lifetime flows, drawn under exactly the condition the rows are —
           the feeder answers null on every path the gate refused. */}
-      {data.holder && (
+      {!onEventPage && data.holder && (
         <VaultFlowsTower
           computed={economics}
           holder={holder}
@@ -376,7 +388,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function MorphoBaseVaultPositionPage({ params }: Props) {
-  const { vault, holder } = await params;
+  const { vault, holder, eventId } = (await params) as Awaited<Props["params"]> & { eventId?: string };
+  // The event route re-renders this page (ui-jobs 236): the sub-nav and the
+  // event's card beside the shared column, nothing else.
+  const onEventPage = eventId != null;
   const address = vault.toLowerCase();
   if (!(await isMorphoBaseRosterVault(address))) notFound();
 
@@ -411,6 +426,18 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
     },
   ];
 
+  const timelineSlot = data.holder ? (
+    <Suspense
+      fallback={
+        <div className="mb-6" data-skel-section="vault-timeline-pending">
+          <SkeletonBlock height={180} />
+        </div>
+      }
+    >
+      <VaultTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
+    </Suspense>
+  ) : null;
+
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -426,32 +453,35 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
             priceReason={ORACLE_USD_REASON["morpho-base"]}
             owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
           />
-          <h1 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
-            <span className="font-mono">{subject}</span>
-            <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>
-          </h1>
-          {/* How the subject was REACHED — a fact about the page rather than
+          {!onEventPage && (
+            <>
+              <h1 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
+                <span className="font-mono">{subject}</span>
+                <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>
+              </h1>
+              {/* How the subject was REACHED — a fact about the page rather than
               about the address, and stated here because the header is always
               drawn. The card below carries the identity itself; the census has
               no row for an address it has never seen, so a card is not
               somewhere this note could always live. */}
-          {lookup.lane === "ens" && lookup.address && (
-            <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
-              {lookup.typed} · resolved through mainnet ENS
-            </p>
+              {lookup.lane === "ens" && lookup.address && (
+                <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
+                  {lookup.typed} · resolved through mainnet ENS
+                </p>
+              )}
+              {lookup.lane === "basename" && lookup.address && (
+                <p className="mt-1 text-[11px] text-rb-500" data-holder-basename={lookup.typed}>
+                  {lookup.typed} · resolved through Basenames on Base
+                </p>
+              )}
+            </>
           )}
-          {lookup.lane === "basename" && lookup.address && (
-            <p className="mt-1 text-[11px] text-rb-500" data-holder-basename={lookup.typed}>
-              {lookup.typed} · resolved through Basenames on Base
-            </p>
-          )}
-
           {data.chainStale ? (
             <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
               This vault could not be read from chain just now, so no figure is stated for this address in it. The page
               states nothing it could not read.
             </p>
-          ) : (
+          ) : onEventPage ? null : (
             <>
               <p className="mt-2 text-[12px] text-rb-500">
                 {/* The venue is on the rail above by construction now
@@ -535,39 +565,30 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
           </p>
         )}
 
-        {!data.chainStale && (
-          <MorphoBaseVaultExposureView
-            data={data}
-            lookup={lookup}
-            showLookup={false}
-            positionCard={
-              data.holder ? (
-                <Suspense
-                  fallback={
-                    <div className="mb-6" data-skel-section="vault-position-card-pending">
-                      <SkeletonBlock height={120} />
-                    </div>
-                  }
-                >
-                  <VaultPositionCardSection data={data} holder={data.holder.address} lookup={lookup} />
-                </Suspense>
-              ) : null
-            }
-            timeline={
-              data.holder ? (
-                <Suspense
-                  fallback={
-                    <div className="mb-6" data-skel-section="vault-timeline-pending">
-                      <SkeletonBlock height={180} />
-                    </div>
-                  }
-                >
-                  <VaultTimelineSection data={data} holder={data.holder.address} />
-                </Suspense>
-              ) : null
-            }
-          />
-        )}
+        {!data.chainStale &&
+          (onEventPage ? (
+            timelineSlot
+          ) : (
+            <MorphoBaseVaultExposureView
+              data={data}
+              lookup={lookup}
+              showLookup={false}
+              positionCard={
+                data.holder ? (
+                  <Suspense
+                    fallback={
+                      <div className="mb-6" data-skel-section="vault-position-card-pending">
+                        <SkeletonBlock height={120} />
+                      </div>
+                    }
+                  >
+                    <VaultPositionCardSection data={data} holder={data.holder.address} lookup={lookup} />
+                  </Suspense>
+                ) : null
+              }
+              timeline={timelineSlot}
+            />
+          ))}
 
         <ProvInspectorLayer />
       </div>

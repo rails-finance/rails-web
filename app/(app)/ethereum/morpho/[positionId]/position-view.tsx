@@ -13,6 +13,8 @@
 // receipts scope, read by the page-level inspector.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { morphoExplorer } from "@/lib/morpho/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -100,6 +102,9 @@ export default function MorphoPositionView({
   initialOpening,
   initialGrouped,
 }: MorphoPositionViewProps) {
+  // The event route (rails-ops TO-DO-ui-jobs 236): the sub-nav and the event's
+  // card in page mode with the shared column; no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   // Keyed on the timeline, not the row: a pair the singleton has never seen is
   // a real answer the server can seed, and its `initialPosition` is null.
   const seeded = initialEvents != null;
@@ -462,7 +467,7 @@ export default function MorphoPositionView({
           <DetailBodySkeleton />
         ) : (
           <>
-            {liveView && (
+            {!onEventPage && liveView && (
               <MorphoPositionCard
                 v={
                   historyWindow.state === "whole" && liquidationCount > 0 ? { ...liveView, liquidationCount } : liveView
@@ -514,7 +519,7 @@ export default function MorphoPositionView({
             {/* Lifetime flows: the bars and the line over the position's replay
               (lib/morpho/flows.ts), in the loan token, in place of the tower
               (TO-DO-ui-jobs 206). */}
-            {liveView && (
+            {!onEventPage && liveView && (
               <LifetimeFlowsPanel
                 scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                 read={flows.read}
@@ -538,6 +543,16 @@ export default function MorphoPositionView({
                 // — lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="morpho"
+                eventPage={(slot) => {
+                  const { market, user } = splitMorphoPositionId(positionId);
+                  return morphoExplorer.eventPage({
+                    ...slot,
+                    marketId: market,
+                    marketLabel: liveView?.marketLabel ?? null,
+                    wallet: user,
+                    deployment: "ethereum",
+                  });
+                }}
                 closed={liveView?.status !== "open"}
                 tl={tl}
                 runs={MORPHO_LIQUIDATION_RUNS}

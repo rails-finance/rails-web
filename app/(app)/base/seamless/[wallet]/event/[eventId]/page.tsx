@@ -4,6 +4,7 @@ import { loadSeamlessTail } from "@/lib/seamless/position-page-data";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { ChainTimelineResponse } from "@/lib/api/fetch-chain-timeline";
+import { aaveV3EventHeading, aaveV3EventPageDescription } from "@/lib/aave-v3/explorer";
 import SeamlessPositionPage from "../../page";
 
 interface Props {
@@ -36,7 +37,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "seamless",
     subject: shortSubject(wallet),
     canonicalPath: `/base/seamless/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: aaveV3EventHeading(event, "seamless"), timestamp: event.timestamp } : null,
+    description: event ? aaveV3EventPageDescription("Seamless", wallet, event.timestamp, "seamless") : undefined,
   });
 }
 

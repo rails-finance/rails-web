@@ -41,10 +41,12 @@
 
 import { useMemo } from "react";
 
+import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { Prov } from "@/components/shared/provenance";
 import { shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
+import { vaultExplorer } from "@/lib/vaults/explorer";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
 import { chainMeta } from "@/lib/shared/chains";
@@ -92,6 +94,8 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
     holder: timeline.holder,
   };
   const { reconcile } = timeline;
+  // The event route draws the sub-nav and the event's card beside the shared column (ui-jobs 236).
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const shareUnit = shareSymbol ?? "shares";
   const shareDecimals = timeline.events[0]?.shareDecimals ?? 18;
   const assetDecimals = timeline.events[0]?.assetDecimals ?? 18;
@@ -130,7 +134,9 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
 
   return (
     <section className="mb-6" data-skel-section="vault-timeline" data-vault-timeline={timeline.holder}>
-      <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+      {!onEventPage && (
+        <h2 className="text-sm font-semibold text-foreground">This address&rsquo;s own events in the vault</h2>
+      )}
 
       {timeline.unread ? (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-unread">
@@ -184,7 +190,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
               : " Both sweeps were run a second time and returned the same number of logs.")}{" "}
           The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}, not a replay.
         </p>
-      ) : (
+      ) : onEventPage ? null : (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-reconciled">
           Every share transfer this address sent or received, newest first, replayed.{" "}
           <Prov info={yearnVaultTimelineGateProv(coords, reconcile)}>
@@ -219,6 +225,16 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
             // The two spellings must agree — a prefix that missed the vault
             // would force a key no card ever reads.
             persistKeyPrefix={`yearn-vault:${timeline.vault}`}
+            eventPage={(slot) =>
+              vaultExplorer.eventPage({
+                ...slot,
+                family: "yearn",
+                deployment: "ethereum",
+                vaultName,
+                vault: timeline.vault,
+                holder: timeline.holder,
+              })
+            }
             renderCard={(event, meta) => {
               const row = byId.get(event.id);
               if (!row) return null;
@@ -256,7 +272,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
         </div>
       )}
 
-      {drawn && (
+      {drawn && !onEventPage && (
         <p className="mt-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-figure="timeline-accrual">
           <Prov info={yearnVaultTimelineAccrualProv(coords)}>
             A strategy&rsquo;s report moves the share price over time rather than at once, and is not a row here
