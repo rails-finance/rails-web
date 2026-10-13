@@ -34,7 +34,14 @@ import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
-import type { DayObs } from "@/lib/shared/price-series";
+import type { DayObs, PriceLevel, PriceMarks, PricePoint } from "@/lib/shared/price-series";
+import { branchMcr } from "@/lib/liquity/event-safety";
+import {
+  getLiquidationThreshold,
+  LIQUIDATION_PRICE_FORMULA,
+  liquidationPriceSummary,
+  troveLiquidationPrice,
+} from "@/lib/utils/liquidation-utils";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -71,6 +78,8 @@ export interface LiquityFlowEvent {
   reserve?: number;
   /** The branch's collateral price at the block, where recorded. */
   price: number | null;
+  /** A redemption's redemption price (the PriceFeed's redemption leg), where recorded. */
+  redemptionPrice?: number | null;
   /** The rate and the batch's management fee in force after the event. */
   rate: number;
   fee: number;
@@ -240,6 +249,9 @@ export interface LiquityFlowOptions {
    *  read one (Liquity V2's daily route); null or absent keeps each event's
    *  price between events. */
   dailyColl?: DayObs[] | null;
+  /** Liquity V2's price view: each row's price marked on the collateral's
+   *  line and the liquidation level beside it, for the branch named. */
+  priceView?: { collateralType: string };
 }
 
 /** A replayed event's legs, for the tests and the Explanation. */
@@ -380,6 +392,63 @@ function accrualFactor(rate: number, fee: number, sinceTs: number, atTs: number)
   return 1 + ((rate + fee) / 100) * (dt / ONE_YEAR_S);
 }
 
+/** A Liquity V2 Trove's liquidation level each day: the card's "Liquidates
+ *  at" (`troveLiquidationPrice`, debt × MCR ÷ collateral) replayed from the
+ *  rows. After each event the level is its recorded balances', moved between
+ *  events by the interest the debt builds (`accrualFactor`, the flows
+ *  replay's), to each day's end. An event that leaves no debt or no
+ *  collateral (a liquidation, a close) ends the line on its day at the level
+ *  that stood before it. On an open Trove the last point is today's, at the
+ *  live read's balances where the page has them, as the card's figure is.
+ *  Each point carries the block of the row whose balances it rests on, null
+ *  for the live read. Null with no events or an unknown branch. */
+export function liquityLiqLevel(
+  events: LiquityFlowEvent[],
+  o: { collateralType: string; now: number; live?: Pick<LiquityLive, "coll" | "debt"> | null },
+): Pick<PriceLevel, "points" | "end"> | null {
+  const evs = replayLiquity(events).map((r) => r.ev);
+  if (evs.length === 0 || branchMcr(o.collateralType) == null) return null;
+  const liq = (debt: number, coll: number) =>
+    troveLiquidationPrice({ debt, collateral: coll, collateralType: o.collateralType });
+  const holds = (e: LiquityFlowEvent) => e.collAfter > DUST && e.debtAfter > DUST;
+  const accrued = (e: LiquityFlowEvent, at: number) => e.debtAfter * accrualFactor(e.rate, e.fee, e.ts, at);
+  const today = Math.floor(o.now / DAY_S);
+  const last = evs[evs.length - 1];
+  const open = holds(last);
+  const firstDay = Math.floor(evs[0].ts / DAY_S);
+  const lastDay = open ? Math.max(today, Math.floor(last.ts / DAY_S)) : Math.floor(last.ts / DAY_S);
+  const points: PricePoint[] = [];
+  let i = -1;
+  for (let d = firstDay; d <= lastDay; d++) {
+    const end = Math.min((d + 1) * DAY_S, o.now);
+    const from = i;
+    while (i + 1 < evs.length && evs[i + 1].ts <= end) i++;
+    if (i < 0) continue;
+    const e = evs[i];
+    let level: number | null = null;
+    let block: number | null = e.block;
+    if (holds(e)) {
+      if (d === today && open && i === evs.length - 1 && o.live?.coll != null && o.live.debt != null) {
+        level = liq(o.live.debt, o.live.coll);
+        block = null;
+      } else level = liq(accrued(e, end), e.collAfter);
+    } else {
+      // The day's first event to leave nothing: the level before it, from the
+      // last event that held both.
+      let k = from + 1;
+      while (k <= i && holds(evs[k])) k++;
+      const prev = k > 0 ? evs[k - 1] : null;
+      if (k <= i && prev && holds(prev)) {
+        level = liq(accrued(prev, evs[k].ts), prev.collAfter);
+        block = prev.block;
+      }
+    }
+    if (level != null && level > 0) points.push([d, level, block]);
+  }
+  if (points.length === 0) return null;
+  return { points, end: open ? "today" : last.kind === "liquidation" ? "liquidation" : "close" };
+}
+
 /** The Trove's events as the Lifetime flows panel's timeline. Null with no
  *  events. */
 export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOptions): FlowTimeline | null {
@@ -495,6 +564,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
       pending.push({ bucket: LQ.batchFee, symbol: o.debtSymbol, usd: o.live.batchFee as number });
   }
 
+  const priceMarks = o.priceView ? liquityPriceMarks(events, replayed, o, o.priceView.collateralType, daily) : null;
+
   return {
     buckets,
     days,
@@ -517,6 +588,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     ...(daily.length > 0
       ? { priceSource: "Liquity V2 branch PriceFeed, the last Trove operation's price each day" }
       : {}),
+    ...(priceMarks ? { priceMarks: { [coll]: priceMarks } } : {}),
     seriesCarry: true,
     carriedWhy: {
       [coll]:
@@ -531,6 +603,51 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
       family === "v1"
         ? liquityV1FlowWords(daily.length > 0)
         : liquityFlowWords(o.collSymbol, o.debtSymbol, daily.length > 0),
+  };
+}
+
+/** Liquity V2's price view marks for the collateral: each row's price on
+ *  its day (a redemption's with its redemption price), the liquidation level
+ *  (`liquityLiqLevel`), and the days before the branch's daily series, which
+ *  the rows alone price. */
+function liquityPriceMarks(
+  events: LiquityFlowEvent[],
+  replayed: LiquityReplayed[],
+  o: LiquityFlowOptions,
+  collateralType: string,
+  daily: DayObs[],
+): PriceMarks {
+  const marks: NonNullable<PriceMarks["events"]> = [];
+  for (const { ev, borrowedPrice, price } of replayed) {
+    if (borrowedPrice || !(price > 0)) continue;
+    marks.push({
+      day: Math.floor(ev.ts / DAY_S),
+      price,
+      block: ev.block ?? null,
+      tone: ev.kind === "liquidation" ? "liquidation" : ev.kind === "redemption" ? "redemption" : "event",
+      ...(ev.kind === "redemption" && ev.redemptionPrice != null && ev.redemptionPrice > 0
+        ? { redemptionPrice: ev.redemptionPrice }
+        : {}),
+    });
+  }
+  const level = liquityLiqLevel(events, { collateralType, now: o.now, live: o.live });
+  const mcrPct = getLiquidationThreshold(collateralType);
+  const firstDay = Math.floor(replayed[0].ev.ts / DAY_S);
+  const dailyFrom = daily[0]?.[0];
+  const today = Math.floor(o.now / DAY_S);
+  const sparseBefore = dailyFrom == null ? today + 1 : firstDay < dailyFrom ? dailyFrom : undefined;
+  return {
+    events: marks,
+    ...(level
+      ? {
+          level: {
+            ...level,
+            formula: `${LIQUIDATION_PRICE_FORMULA.replace("MCR", `${mcrPct}%`)} after each event, with interest accruing between`,
+            summary: liquidationPriceSummary(collateralType, mcrPct),
+          },
+        }
+      : {}),
+    ...(sparseBefore != null ? { sparseBefore } : {}),
   };
 }
 
@@ -760,6 +877,7 @@ export function liquityV2FlowEvents(events: BaseActivityEvent[]): LiquityFlowEve
       debtFromRedist: op ? raw18(op.raw?.debtIncreaseFromRedist, op.debtIncreaseFromRedist) : 0,
       surplus: c.liquidation ? num(c.liquidation.collSurplus) : 0,
       price: c.collateralPrice > 0 ? c.collateralPrice : null,
+      ...(c.redemption && c.redemption.redemptionPrice > 0 ? { redemptionPrice: c.redemption.redemptionPrice } : {}),
       rate: after.rate,
       fee,
       rateBy: rateByOf(c.operation),

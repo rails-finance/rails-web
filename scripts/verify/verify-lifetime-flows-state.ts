@@ -29,7 +29,11 @@
 // (lib/shared/flows-price.ts, ui-jobs 328): "Value · Price" is no input to the
 // stops, so the cursor keeps its stop and the Value view its line; both strips
 // take one time axis; the price series keep the route's blocks; carried days
-// draw dotted, nothing before the first point, the step mark by grain.
+// draw dotted, nothing before the first point, the step mark by grain. A
+// Liquity V2 Trove's liquidation level (`liquityLiqLevel`, ui-jobs 328 step 3)
+// is the card's debt × MCR ÷ collateral after each event, moved by the
+// interest between events, ended at a liquidation on the level before it, and
+// today's at the live read; each row's price is a mark at its block.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
 import { createFlowFocusStore, rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
@@ -82,7 +86,16 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
-import { flowPriceSeries, pricePieces, priceReadout, stripGeometry } from "@/lib/shared/flows-price";
+import {
+  flowPriceSeries,
+  levelAt,
+  pricePieces,
+  priceReadout,
+  redemptionsOn,
+  runwayPct,
+  runwayShare,
+  stripGeometry,
+} from "@/lib/shared/flows-price";
 import { eventPriceSeries } from "@/lib/shared/price-series";
 import { binUnitFor, flowBins, groupOperations, isBusy, throughput } from "@/lib/shared/flows-busy";
 import { AAVE_V3_BASE_FLOW_BUCKETS } from "@/lib/aave-v3-base/flows";
@@ -98,7 +111,14 @@ import { mapleFlowBuckets } from "@/lib/maple/flows";
 import { morphoFlowBuckets } from "@/lib/morpho/flows";
 import { polarisFlowBuckets } from "@/lib/polaris/flows";
 import { pwnFlowBuckets } from "@/lib/pwn/flows";
-import { liquityFlowBuckets } from "@/lib/shared/liquity-flows";
+import {
+  liquityFlowBuckets,
+  liquityFlowTimeline,
+  liquityLiqLevel,
+  liquityV2FlowEvents,
+  type LiquityFlowEvent,
+} from "@/lib/shared/liquity-flows";
+import { troveLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import {
   binInputFromWire,
   binRanges,
@@ -2085,4 +2105,184 @@ test("the price view's series: a face side and the unit's own token draw no line
     flowPriceSeries({ ...base, sideUnits: { collateral: { symbol: "A", scale: 0 }, debt: { symbol: "B", scale: 0 } } }),
     [],
   );
+});
+
+// ── Liquity V2: the liquidation level and the rows' marks (ui-jobs 328, step 3)
+
+const YEAR = 31_536_000;
+const lqEv = (o: Partial<LiquityFlowEvent> & Pick<LiquityFlowEvent, "id" | "ts" | "block">): LiquityFlowEvent => ({
+  kind: "owner",
+  collAfter: 0,
+  debtAfter: 0,
+  collOp: null,
+  debtOp: null,
+  upfrontFee: 0,
+  collFromRedist: 0,
+  debtFromRedist: 0,
+  surplus: 0,
+  price: 2000,
+  rate: 5,
+  fee: 0,
+  ...o,
+});
+const D = 86_400;
+const OPEN = lqEv({ id: "a_1", ts: 100 * D + 3600, block: 1000, collAfter: 10, debtAfter: 10_000, debtOp: 10_000 });
+const ADD = lqEv({
+  id: "b_1",
+  ts: 102 * D + 7200,
+  block: 1200,
+  collAfter: 20,
+  debtAfter: 10_010,
+  collOp: 10,
+  debtOp: 0,
+});
+const LIQ = lqEv({
+  id: "c_1",
+  ts: 105 * D + 600,
+  block: 1500,
+  kind: "liquidation",
+  collAfter: 0,
+  debtAfter: 0,
+  price: 500,
+});
+const liqWeth = (debt: number, coll: number) =>
+  troveLiquidationPrice({ debt, collateral: coll, collateralType: "WETH" })!;
+
+test("the liquidation level: after an event, moved by accrual between events, ended at a liquidation", () => {
+  const lv = liquityLiqLevel([OPEN, ADD, LIQ], { collateralType: "WETH", now: 120 * D })!;
+  assert.equal(lv.end, "liquidation");
+  assert.deepEqual(
+    lv.points.map((p) => p[0]),
+    [100, 101, 102, 103, 104, 105],
+  );
+  // After the open: the card's formula on its balances, the debt grown to the day's end.
+  const grown = (e: LiquityFlowEvent, at: number) => e.debtAfter * (1 + (e.rate / 100) * ((at - e.ts) / YEAR));
+  assert.ok(Math.abs(lv.points[0][1] - liqWeth(grown(OPEN, 101 * D), 10)) < 1e-9);
+  assert.equal(lv.points[0][2], 1000);
+  // Moved by the accrual on a day without events, on the same row.
+  assert.ok(lv.points[1][1] > lv.points[0][1]);
+  assert.ok(Math.abs(lv.points[1][1] - liqWeth(grown(OPEN, 102 * D), 10)) < 1e-9);
+  assert.equal(lv.points[1][2], 1000);
+  // The deposit halves it, on its row's block.
+  assert.ok(Math.abs(lv.points[2][1] - liqWeth(grown(ADD, 103 * D), 20)) < 1e-9);
+  assert.equal(lv.points[2][2], 1200);
+  // The liquidation's day: the level that stood before it, and nothing after.
+  assert.ok(Math.abs(lv.points[5][1] - liqWeth(grown(ADD, LIQ.ts), 20)) < 1e-9);
+  assert.equal(lv.points[5][2], 1200);
+});
+
+test("the liquidation level: an open Trove reaches today at the live read, the card's figure", () => {
+  const live = { coll: 20, debt: 10_123.45 };
+  const lv = liquityLiqLevel([OPEN, ADD], { collateralType: "WETH", now: 110 * D + 500, live })!;
+  assert.equal(lv.end, "today");
+  const last = lv.points[lv.points.length - 1];
+  assert.equal(last[0], 110);
+  assert.equal(last[1], liqWeth(live.debt, live.coll));
+  assert.equal(last[2], null);
+  // Without the live read, the recorded debt grown to now.
+  const bare = liquityLiqLevel([OPEN, ADD], { collateralType: "WETH", now: 110 * D + 500 })!;
+  const b = bare.points[bare.points.length - 1];
+  assert.ok(Math.abs(b[1] - liqWeth(10_010 * (1 + 0.05 * ((110 * D + 500 - ADD.ts) / YEAR)), 20)) < 1e-9);
+  assert.equal(b[2], 1200);
+  // A closed Trove ends at its close; a debt redeemed to nothing breaks the line until it borrows again.
+  const close = lqEv({ id: "d_1", ts: 104 * D, block: 1400, collAfter: 0, debtAfter: 0, collOp: -20, debtOp: -10_010 });
+  assert.equal(liquityLiqLevel([OPEN, ADD, close], { collateralType: "WETH", now: 120 * D })!.end, "close");
+  const zero = lqEv({ id: "e_1", ts: 103 * D + 10, block: 1300, kind: "redemption", collAfter: 15, debtAfter: 0 });
+  const again = lqEv({ id: "f_1", ts: 106 * D + 10, block: 1600, collAfter: 15, debtAfter: 5000, debtOp: 5000 });
+  const gap = liquityLiqLevel([OPEN, ADD, zero, again], { collateralType: "WETH", now: 107 * D })!;
+  assert.deepEqual(
+    gap.points.map((p) => p[0]),
+    [100, 101, 102, 103, 106, 107],
+  );
+});
+
+test("the price view's Liquity V2 marks: each row at its block, redemptions at their redemption price, the level on the series", () => {
+  const red = lqEv({
+    id: "r_1",
+    ts: 103 * D + 50,
+    block: 1300,
+    kind: "redemption",
+    collAfter: 19,
+    debtAfter: 8000,
+    collOp: -1,
+    debtOp: -2010,
+    price: 2010,
+    redemptionPrice: 2015,
+  });
+  const evs = [OPEN, ADD, red];
+  const t = liquityFlowTimeline(evs, {
+    collSymbol: "WETH",
+    debtSymbol: "BOLD",
+    live: { price: 2100, coll: 19, debt: 8100 },
+    surplusClaimed: false,
+    now: 104 * D + 100,
+    dailyColl: [
+      [101, 2001, 1100],
+      [102, 2002, 1250],
+      [103, 2003, 1350],
+    ],
+    priceView: { collateralType: "WETH" },
+  })!;
+  const [s] = flowPriceSeries(t);
+  assert.equal(s.asset.symbol, "WETH");
+  assert.deepEqual(
+    s.events!.map((e) => [e.day, e.price, e.block, e.tone, e.redemptionPrice ?? null]),
+    [
+      [100, 2000, 1000, "event", null],
+      [102, 2000, 1200, "event", null],
+      [103, 2010, 1300, "redemption", 2015],
+    ],
+  );
+  // The days before the branch's series are the rows alone, drawn dotted.
+  assert.equal(s.sparseBefore, 101);
+  const pieces = pricePieces(s, 100, 104);
+  assert.ok(pieces.dotted.some((p) => p[0][0] === 100 && p[p.length - 1][0] === 101));
+  assert.ok(pieces.solid.some((p) => p[0][0] === 101));
+  // The level's last point is the card's figure at the live read.
+  assert.equal(levelAt(s, 104)![1], liqWeth(8100, 19));
+  assert.equal(levelAt(s, 105), null);
+  assert.equal(s.level!.formula, "debt × 110% ÷ collateral after each event, with interest accruing between");
+  // The runway at today, as the card: (price − level) ÷ price.
+  const share = runwayShare(2100, levelAt(s, 104)![1]);
+  assert.equal(runwayPct(share), String(Math.round(((2100 - liqWeth(8100, 19)) / 2100) * 100)));
+  assert.deepEqual(
+    redemptionsOn(s, 103).map((e) => e.redemptionPrice),
+    [2015],
+  );
+  // Without the option, no marks: the forks and V1 are unchanged.
+  const plain = liquityFlowTimeline(evs, {
+    collSymbol: "WETH",
+    debtSymbol: "BOLD",
+    live: null,
+    surplusClaimed: false,
+    now: 104 * D + 100,
+  })!;
+  assert.equal(plain.priceMarks, undefined);
+});
+
+test("the price view's Liquity V2 marks on a liquidated rETH Trove: blocks match rows, the level ends on the liquidation's day", () => {
+  const rows = JSON.parse(readFileSync(join(__dirname, "fixtures", "liquity-flows-v2-liquidated.json"), "utf8"))
+    .events as BaseActivityEvent[];
+  const evs = liquityV2FlowEvents(rows);
+  const t = liquityFlowTimeline(evs, {
+    collSymbol: "rETH",
+    debtSymbol: "BOLD",
+    live: null,
+    surplusClaimed: false,
+    now: Date.UTC(2026, 9, 13) / 1000,
+    priceView: { collateralType: "rETH" },
+  })!;
+  const [s] = flowPriceSeries(t);
+  const byBlock = new Map(evs.map((e) => [e.block, e]));
+  for (const m of s.events!) {
+    const row = byBlock.get(m.block!);
+    assert.ok(row, `a mark at block ${m.block} has a row`);
+    assert.equal(m.day, Math.floor(row.ts / D));
+    if (m.tone === "redemption") assert.ok(m.redemptionPrice! > 0);
+  }
+  assert.equal(s.events!.length, evs.filter((e) => e.price != null).length);
+  const liq = evs.find((e) => e.kind === "liquidation")!;
+  const pts = s.level!.points;
+  assert.equal(s.level!.end, "liquidation");
+  assert.equal(pts[pts.length - 1][0], Math.floor(liq.ts / D));
 });

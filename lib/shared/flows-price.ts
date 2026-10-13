@@ -14,7 +14,14 @@
 //   touching a carried day is dotted. Before the first observation the strip
 //   draws nothing. An event series draws the step mark (architecture/
 //   market-notes.md §1): each observation held flat to the next, a dashed
-//   riser there. The grammar follows `series.grain`.
+//   riser there. The grammar follows `series.grain`. Days before
+//   `series.sparseBefore` are the rows alone (decision 3's sparse rule):
+//   every segment dotted, each row marked.
+// - A family's rows (`series.events`) are marks on their days at their own
+//   price; a redemption row adds an orange mark at its redemption price. The
+//   liquidation level (`series.level`) is a second line on the same axis, one
+//   point per day, held between days and stepped on the day it moves; it has
+//   no point after the day it ends.
 // - Both strips place a day at its close on one time axis (`stripGeometry`),
 //   so the cursor, the pips and the end labels sit on the same x in either
 //   view.
@@ -22,7 +29,14 @@
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
 import type { FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { dayObsPriceSeries, priceAt, type PriceAt, type PriceSeries } from "@/lib/shared/price-series";
+import {
+  dayObsPriceSeries,
+  priceAt,
+  type PriceAt,
+  type PriceEvent,
+  type PricePoint,
+  type PriceSeries,
+} from "@/lib/shared/price-series";
 
 /** A held asset's price series as the panel draws it. */
 export interface FlowPriceSeries extends PriceSeries {
@@ -57,7 +71,7 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
       source,
       scale: t.unit?.scale ?? 0,
     });
-    if (s) out.push({ ...s, side: m.side, unitLabel });
+    if (s) out.push({ ...s, ...t.priceMarks?.[asset], side: m.side, unitLabel });
   }
   const rank = (s: FlowPriceSeries) => (s.side === "collateral" ? 0 : 1e6) + (meta.get(s.key)?.order ?? 0);
   return out.sort((a, b) => rank(a) - rank(b));
@@ -243,10 +257,11 @@ export function pricePieces(series: PriceSeries, from: number, to: number): Pric
   const days = priceDays(series, from, to);
   for (const d of days) (d.carried ? out.carried : out.observed).push(d.day);
   if (days.length === 1) out.solid.push([[days[0].day, days[0].price]]);
+  const sparse = series.sparseBefore;
   for (let i = 1; i < days.length; i++) {
     const a = days[i - 1];
     const b = days[i];
-    const kind = a.carried || b.carried ? out.dotted : out.solid;
+    const kind = a.carried || b.carried || (sparse != null && b.day <= sparse) ? out.dotted : out.solid;
     const last = kind[kind.length - 1];
     const tail = last?.[last.length - 1];
     if (tail && tail[0] === a.day) last.push([b.day, b.price]);
@@ -265,4 +280,39 @@ export function priceReadout(series: PriceSeries, day: number, gapDays: number):
   const p = priceAt(series, day);
   if (!p) return null;
   return { ...p, old: p.carried && p.ageDays > gapDays };
+}
+
+/** The liquidation level on `day`: the level's point for that day, null on
+ *  a day it has none (before its first day, after the day it ends). */
+export function levelAt(series: PriceSeries, day: number): PricePoint | null {
+  const pts = series.level?.points;
+  if (!pts?.length) return null;
+  let lo = 0;
+  let hi = pts.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (pts[mid][0] <= day) lo = mid + 1;
+    else hi = mid;
+  }
+  const p = pts[lo - 1];
+  return p && p[0] === day ? p : null;
+}
+
+/** The runway as the position card states it: the share the price can fall
+ *  before it meets the level, `(price − level) ÷ price`; at or below zero the
+ *  position is liquidatable. */
+export function runwayShare(price: number, level: number): number {
+  return (price - level) / price;
+}
+
+/** The runway in the card's words (components/shared/price-runway.tsx): the
+ *  whole percent, "over 99" where it rounds to 100 above a positive level. */
+export function runwayPct(share: number): string {
+  const m = share * 100;
+  return Math.round(m) >= 100 && m < 100 ? "over 99" : String(Math.round(m));
+}
+
+/** The series' redemption marks on `day`, in row order. */
+export function redemptionsOn(series: PriceSeries, day: number): PriceEvent[] {
+  return (series.events ?? []).filter((e) => e.day === day && e.redemptionPrice != null);
 }

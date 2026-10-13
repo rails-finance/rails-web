@@ -11,6 +11,7 @@ import { formatExact } from "@/lib/utils/format";
 import { stateOriginVia } from "@/lib/shared/trove-state-origin";
 import { scalingOf, TROVE_MANAGER } from "@/lib/liquity/event-provenance";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
+import { LIQUIDATION_PRICE_FORMULA, liquidationPriceSummary } from "@/lib/utils/liquidation-utils";
 
 export { trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-provenance";
 
@@ -124,8 +125,8 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
   };
   const liqProv: Provenance = {
     kind: "derived",
-    summary: `Liquidation price — the ${sym} price at which the trove's collateral ratio would equal the branch's minimum${mcrPct != null ? ` of ${mcrPct}%` : ""}. Below that price the trove can be liquidated.`,
-    formula: "debt × MCR ÷ collateral",
+    summary: liquidationPriceSummary(sym, mcrPct),
+    formula: LIQUIDATION_PRICE_FORMULA,
     inputs: [
       debtLeaf,
       { label: "MCR", value: `${mcrPct ?? "—"}%`, kind: "chain", pclass: "indexed", note: "branch constant" },

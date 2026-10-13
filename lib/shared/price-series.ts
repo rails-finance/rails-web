@@ -28,7 +28,36 @@ export interface PriceSeries {
   /** The store's per-point sources (`seed:<table>`, `read:<family>`). */
   sources?: string[];
   points: PricePoint[];
+  /** The position's own rows priced on their days, each a mark on the line
+   *  at the row's price (which may differ from the day's close). */
+  events?: PriceEvent[];
+  /** The position's liquidation level in `unit`, a second line on the same axis. */
+  level?: PriceLevel;
+  /** Days before this one are the rows alone and draw by the sparse rule:
+   *  every segment dotted, the observations marked by `events`. */
+  sparseBefore?: number;
 }
+/** A row's price on its day: [the row's day, price, block]; a redemption row
+ *  adds the redemption price it was redeemed at. */
+export interface PriceEvent {
+  day: number;
+  price: number;
+  block: number | null;
+  tone: "event" | "redemption" | "liquidation";
+  redemptionPrice?: number;
+}
+/** A liquidation level per day ([day, level, block of the row it rests on,
+ *  null for a live read]), the line ending where the position did. */
+export interface PriceLevel {
+  points: PricePoint[];
+  /** The caption's formula in words. */
+  formula: string;
+  /** The level's receipt: what it is and how it moves. */
+  summary: string;
+  end: "liquidation" | "close" | "today";
+}
+/** What a family adds to an asset's series for the price view. */
+export type PriceMarks = Pick<PriceSeries, "events" | "level" | "sparseBefore">;
 /** A daily wire's observation: [day, price, block], the block absent on an older server. */
 export type DayObs = [number, number, (number | null)?];
 

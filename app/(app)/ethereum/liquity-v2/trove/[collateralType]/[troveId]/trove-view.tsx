@@ -391,6 +391,7 @@ export default function TroveView({
             surplusClaimed: flowSurplusClaimed,
             now: flowsNow,
             dailyColl: flowDaily.obs,
+            priceView: { collateralType: flowCollSymbol },
             live: flowOpen
               ? {
                   price: flowPrice ?? null,

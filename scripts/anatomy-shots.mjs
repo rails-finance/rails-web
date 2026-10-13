@@ -323,6 +323,19 @@ const SHOTS = [
     crop: ["P2"],
     setup: openFlowsExplanation,
   },
+  {
+    // The Price view on a Trove (ui-jobs 328 step 3): the liquidation level,
+    // the event marks, the redemption marks and the level readout.
+    name: "trove-flows-price",
+    path: TROVE,
+    widths: [1280, 390],
+    codes: ["F18", "F19"],
+    crop: ["P2"],
+    setup: async (page) => {
+      await click(page, '[data-flows-view="price"]');
+      await seen(page, sel("F19.4"), 10000);
+    },
+  },
   { name: "trove-timeline", path: TROVE, widths: [1280, 390], codes: ["L", "T"], crop: ["L1"], cropBelow: 640 },
   { name: "listing", path: "/ethereum/aave-v3", widths: [1280, 390], codes: ["H", "N", "C"], cropTop: 900 },
   { name: "listing-foot", path: "/ethereum/aave-v3", widths: [1280], codes: ["N3", "H8"], crop: ["N3", "H8"] },

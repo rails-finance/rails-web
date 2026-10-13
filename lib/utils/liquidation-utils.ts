@@ -37,6 +37,15 @@ export function troveLiquidationPrice({
   return (debt * (getLiquidationThreshold(collateralType) / 100)) / collateral;
 }
 
+/** The liquidation price's formula, as the card's receipt and the Lifetime
+ *  flows price view state it. */
+export const LIQUIDATION_PRICE_FORMULA = "debt × MCR ÷ collateral";
+
+/** The liquidation price's receipt sentence (the card's "Liquidates at"). */
+export function liquidationPriceSummary(symbol: string, mcrPct: number | null | undefined): string {
+  return `Liquidation price — the ${symbol} price at which the trove's collateral ratio would equal the branch's minimum${mcrPct != null ? ` of ${mcrPct}%` : ""}. Below that price the trove can be liquidated.`;
+}
+
 /**
  * Magnitude-aware formatter for a liquidation price — liq prices vary widely
  * (BTC ~$100k, USDC ~$1), so neither "$100,000.00" nor "$0" should render.
