@@ -13,7 +13,7 @@ import { buildHubViews, hubUnderlyings } from "@/lib/aave-v4/hub-view";
 import { AaveV4HubViews } from "@/components/protocol/aave-v4/aave-v4-hub-views";
 import { AaveV4HubsLoadingSkeleton } from "@/components/protocol/aave-v4/aave-v4-hubs-loading-skeleton";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
-import { aaveV4HubsContent } from "@/lib/shared/learn-more-content";
+import { aaveV4Modal } from "@/lib/aave-v4/event-templates";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices-context";
 import { PriceStrip } from "@/components/shared/price-strip";
@@ -62,7 +62,7 @@ function HubsContent() {
         <SubPageHeader
           protocol={PROTOCOL}
           title="Hub comparison"
-          learnMore={aaveV4HubsContent()}
+          learnMore={aaveV4Modal("hubs")}
           stamp={
             data?.updatedAt && (
               <p className="mt-2 text-[11px] text-rb-500">

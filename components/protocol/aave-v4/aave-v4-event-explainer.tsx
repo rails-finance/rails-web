@@ -1,63 +1,65 @@
 "use client";
 
-// Plain-English explainer for an Aave V4 event — a layman PARAGRAPH (not
-// bullets), composed from state-keyed clauses in lib/aave-v4/explainer-clauses.tsx,
-// plus the per-event "Learn More" modal on the mechanic. The card shows the
-// paragraph's LEAD sentence as its teaser; this pane renders the REST (skipLead),
-// so the first sentence is never duplicated. Every figure here is the card's own
-// face value, Prov-traced (an echo of the header / detail receipt, or — on the
-// first event of a multi-action transaction — a primary for a sibling event's
-// figure that lives beyond this card's scope).
+// The Explanation pane (zone Z2) of an Aave V4 event: the generator's
+// sentences (lib/aave-v4/event-prose.ts, its strings in
+// content/aave-v4/event-prose.yaml), one bullet each, under the three event
+// headings when two of them hold two or more bullets. Each figure the header
+// also prints echoes that receipt. The health factor and collateral sentences
+// read the position state the open card reads, so the card passes this pane
+// as its body with no teaser.
 
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { formatExact } from "@/lib/utils/format";
+import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
 import {
-  aaveV4LiquidationContent,
-  aaveV4SupplyContent,
-  aaveV4WithdrawContent,
-  aaveV4BorrowContent,
-  aaveV4RepayContent,
-  aaveV4CollateralToggleContent,
-  aaveV4EventFallbackContent,
-} from "@/lib/shared/learn-more-content";
-import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { aaveV4EventSlots, coordsFor, type AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
-import { useHealthFactorAround, hfOf, premiumAt } from "@/lib/aave-v4/use-health-factor-around";
+  aaveV4EventProse,
+  aaveV4ExplanationRuns,
+  coordsFor,
+  type AaveV4EchoKey,
+  type AaveV4Event,
+} from "@/lib/aave-v4/event-prose";
+import type { EventProvDetail } from "@/lib/aave-v4/position-provenance";
+import { useHealthFactorAround, hfOf } from "@/lib/aave-v4/use-health-factor-around";
+import { amountProv, repaidProv, seizedProv } from "./aave-v4-head";
 
 export interface AaveV4EventExplainerProps {
   ctx: AaveV4Context;
   event: AaveV4Event;
-  /** Same-transaction sibling events (defaults to just this one) — the seam the
-   *  combined-act narration and cross-reference clauses read. */
+  /** This transaction's events (defaults to just this one). */
   siblings?: AaveV4Event[];
-  /** The card shows the lead sentence as the teaser; render only the rest here. */
-  skipLead?: boolean;
   /** The previous event's borrow rate on this asset (decimal), to say when it moved. */
   previousRate?: number;
   /** For a repay that clears its debt: the interest that debt accrued over its life. */
   debtLifeInterest?: number;
 }
 
-/** Mechanic modal content for this event — never-empty floor: every event type
- *  maps to a modal, the default falling back to the generic Aave V4 explainer.
- *  Used by the card composer, which renders the "?" trigger on the footer row
- *  (this pane renders prose only). */
+/** The event's "?" modal: it depends on the event's kind only. */
 export function aaveV4LearnMoreContent(ctx: AaveV4Context): LearnMoreContent {
-  switch (ctx.eventType) {
-    case "liquidation":
-      return aaveV4LiquidationContent(ctx.spokeName);
-    case "supply":
-      return aaveV4SupplyContent();
-    case "withdraw":
-      return aaveV4WithdrawContent();
-    case "borrow":
-      return aaveV4BorrowContent();
-    case "repay":
-      return aaveV4RepayContent();
-    case "collateral_toggle":
-      return aaveV4CollateralToggleContent();
-    default:
-      return aaveV4EventFallbackContent();
+  return aaveV4EventProse({ ctx }).L5.content;
+}
+
+/** The receipt each echoed figure registers against: the header's amount, or
+ *  a liquidation's legs. */
+function echoFor(key: AaveV4EchoKey, ctx: AaveV4Context, coord: EventProvDetail): ProseEcho | null {
+  switch (key) {
+    case "amount": {
+      const p = amountProv(ctx, coord);
+      return { info: p.info, value: p.value, symbol: ctx.reserveSymbol };
+    }
+    case "seized":
+      return {
+        info: seizedProv(ctx, coord),
+        value: formatExact(Number(ctx.liquidatedCollateralAmount)),
+        symbol: ctx.collateralSymbol,
+      };
+    case "cleared":
+      return {
+        info: repaidProv(ctx, coord),
+        value: formatExact(Number(ctx.debtToCover)),
+        symbol: ctx.reserveSymbol,
+      };
   }
 }
 
@@ -65,14 +67,13 @@ export function AaveV4EventExplainer({
   ctx,
   event,
   siblings,
-  skipLead,
   previousRate,
   debtLifeInterest,
 }: AaveV4EventExplainerProps) {
   const coord = coordsFor(event);
   // The same read the opened grid's Health factor cell makes (one request,
-  // shared, with the same arguments), so the prose can say how the factor
-  // moved and whether a supply counted as collateral.
+  // shared, with the same arguments), so the prose can say where the factor
+  // stands and whether a supply counted as collateral.
   const hfRead = useHealthFactorAround(
     ctx.eventType !== "collateral_toggle",
     ctx.spokeAddress,
@@ -82,19 +83,22 @@ export function AaveV4EventExplainer({
   );
   const hf =
     hfRead.status === "ok"
-      ? {
-          before: hfOf(hfRead.before.wad),
-          after: hfOf(hfRead.after.wad),
-          collateral: hfRead.collateral,
-          collateralFactor: hfRead.after.collateralFactor ?? hfRead.before.collateralFactor ?? null,
-          collateralCount: hfRead.after.collateralCount ?? hfRead.before.collateralCount,
-          premiumAfter: premiumAt(hfRead, "after"),
-        }
+      ? { before: hfOf(hfRead.before.wad), after: hfOf(hfRead.after.wad), collateral: hfRead.collateral }
       : undefined;
-  const clauses = eventClauses(
-    aaveV4EventSlots(ctx, coord, siblings ?? [event], event, hf, previousRate, debtLifeInterest),
+  const prose = aaveV4EventProse({
+    ctx,
+    siblings: siblings ?? [event],
+    self: event,
+    hf,
+    previousRate,
+    debtLifeInterest,
+  });
+  const echo = (key: AaveV4EchoKey) => echoFor(key, ctx, coord);
+  const items = aaveV4ExplanationRuns(prose).flatMap((run) =>
+    run.sentences.map((s) => {
+      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+      return run.heading ? { group: run.heading, node } : node;
+    }),
   );
-  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
-
   return <ProseExplainer items={items} />;
 }

@@ -307,6 +307,73 @@ const FAMILIES = {
       "components/protocol/aave-v3/aave-v3-event-explainer.tsx",
     ],
   },
+  makerdao: {
+    generator: "lib/makerdao/event-prose.ts",
+    loader: "lib/makerdao/event-templates.ts",
+    entry: "export function makerEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "maker",
+    fallback: "maker.fallback",
+    builtVariants: (gen) => {
+      const out = [];
+      // [c, d].filter(Boolean).join("_") || "none": deposit or withdraw, draw or repay, either, both or none.
+      if (/const variant = \[c, d\]\.filter\(Boolean\)\.join\("_"\) \|\| "none"/.test(gen))
+        for (const c of ["deposit", "withdraw", ""])
+          for (const d of ["draw", "repay", ""]) out.push(["maker.adjust", [c, d].filter(Boolean).join("_") || "none"]);
+      return out;
+    },
+    wordConsts: { MAKER_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/makerdao/event-prose.ts",
+      "lib/makerdao/event-templates.ts",
+      "components/protocol/makerdao/makerdao-event-explainer.tsx",
+      "components/protocol/makerdao/makerdao-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/makerdao/makerdao-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/makerdao/event-prose.ts",
+      "lib/makerdao/event-templates.ts",
+      "lib/makerdao/event-figures.ts",
+      "lib/makerdao/position-nodes.tsx",
+      "components/protocol/makerdao/makerdao-event-explainer.tsx",
+      "components/protocol/makerdao/makerdao-event-card.tsx",
+    ],
+  },
+  "aave-v4": {
+    generator: "lib/aave-v4/event-prose.ts",
+    loader: "lib/aave-v4/event-templates.ts",
+    entry: "export function aaveV4EventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "aave4",
+    fallback: "aave4.fallback",
+    builtVariants: () => [],
+    wordConsts: { V4_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/aave-v4/event-prose.ts",
+      "lib/aave-v4/event-templates.ts",
+      "components/protocol/aave-v4/aave-v4-event-explainer.tsx",
+      "components/protocol/aave-v4/aave-v4-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/aave-v4/aave-v4-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/aave-v4/event-prose.ts",
+      "lib/aave-v4/event-templates.ts",
+      "lib/aave-v4/position-nodes.tsx",
+      "components/protocol/aave-v4/aave-v4-event-explainer.tsx",
+    ],
+  },
   morpho: {
     generator: "lib/morpho/event-prose.ts",
     loader: "lib/morpho/event-templates.ts",
@@ -365,6 +432,36 @@ const FAMILIES = {
       "lib/moonwell/position-nodes.tsx",
       "components/protocol/moonwell/moonwell-event-explainer.tsx",
       "components/protocol/moonwell/moonwell-event-card.tsx",
+    ],
+  },
+  frankencoin: {
+    generator: "lib/frankencoin/event-prose.ts",
+    loader: "lib/frankencoin/event-templates.ts",
+    entry: "export function frankencoinEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "frankencoin",
+    fallback: "frankencoin.fallback",
+    builtVariants: () => [],
+    wordConsts: { FRANKENCOIN_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/frankencoin/event-prose.ts",
+      "lib/frankencoin/event-templates.ts",
+      "components/protocol/frankencoin/frankencoin-event-explainer.tsx",
+      "components/protocol/frankencoin/frankencoin-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/frankencoin/frankencoin-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/frankencoin/event-prose.ts",
+      "lib/frankencoin/event-templates.ts",
+      "lib/frankencoin/position-nodes.tsx",
+      "components/protocol/frankencoin/frankencoin-event-explainer.tsx",
+      "components/protocol/frankencoin/frankencoin-event-card.tsx",
     ],
   },
 };

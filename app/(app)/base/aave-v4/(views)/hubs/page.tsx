@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { aaveV4BaseHubContent } from "@/lib/shared/learn-more-content";
+import { aaveV4Modal } from "@/lib/aave-v4/event-templates";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { explorerUrl, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatNumber } from "@/lib/utils/format";
@@ -115,7 +115,7 @@ export default function AaveV4BaseHubPage() {
         <SubPageHeader
           protocol={PROTOCOL}
           title="Equities hub"
-          learnMore={aaveV4BaseHubContent()}
+          learnMore={aaveV4Modal("base_hub")}
           stamp={
             block != null && (
               <p className="mt-2 text-[11px] text-rb-500">

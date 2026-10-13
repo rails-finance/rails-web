@@ -36,7 +36,7 @@ export function liveMintedProv(position?: string): Provenance {
     summary:
       "ZCHF this position has minted NOW — the position's own minted() slot at the latest block. This is the debt owed to the system, in native ZCHF (Frankencoin runs no oracle; nothing here is a dollar). Repaying it (less the reserve contribution already held back) is what closes the position.",
     contract: positionContract(position),
-    via: `${LANE_VIA} · minted() @ head`,
+    via: `${LANE_VIA} · Position.minted(): minted ZCHF`,
   };
 }
 
@@ -48,7 +48,7 @@ export function liveCollateralProv(sym: string, position?: string): Provenance {
     verify: recompute("collateral token balanceOf(position)"),
     summary: `${sym} this position holds NOW — the collateral token's balanceOf(position) at the latest block. The position contract itself custodies the collateral; MintingUpdate's emitted collateral figure equals exactly this read at its block.`,
     contract: positionContract(position),
-    via: `${LANE_VIA} · collateral().balanceOf(position) @ head`,
+    via: `${LANE_VIA} · collateral().balanceOf(position): collateral balance`,
   };
 }
 
@@ -60,7 +60,7 @@ export function liveLiqPriceProv(sym: string, decimals: number, position?: strin
     verify: recompute("price()"),
     summary: `The liquidation price, ZCHF per ${sym} — the position's own price() slot at the latest block, divided by its on-chain scale of 1e(36 − ${decimals} collateral decimals). ⚠️ OWNER-DECLARED, not an oracle: Frankencoin has no price feed, and this figure is enforced socially — anyone who thinks it too high can start a challenge auction against it. Raising it triggers a 3-day minting cooldown.`,
     contract: positionContract(position),
-    via: `${LANE_VIA} · price() @ head ÷ 1e${36 - decimals}`,
+    via: `${LANE_VIA} · Position.price(): liquidation price, ÷ 1e${36 - decimals}`,
   };
 }
 
@@ -76,6 +76,6 @@ export function liveInterestProv(hub: "v1" | "v2", position?: string): Provenanc
         : "On V1 the rate was fixed at the position's opening."
     }`,
     contract: positionContract(position),
-    via: `${LANE_VIA} · annualInterestPPM() @ head`,
+    via: `${LANE_VIA} · Position.annualInterestPPM(): annual interest, parts per million`,
   };
 }

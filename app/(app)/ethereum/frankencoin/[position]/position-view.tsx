@@ -53,10 +53,7 @@ import {
   type FrankencoinPositionView,
   type FrankencoinEnding,
 } from "@/components/protocol/frankencoin/frankencoin-position-card";
-import {
-  FrankencoinPositionExplanation,
-  type FrankencoinEventTally,
-} from "@/components/protocol/frankencoin/frankencoin-position-explanation";
+import { FrankencoinPositionExplanation } from "@/components/protocol/frankencoin/frankencoin-position-explanation";
 import { FrankencoinChallengeCard } from "@/components/protocol/frankencoin/frankencoin-challenge-card";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -250,23 +247,11 @@ export default function FrankencoinPositionView({
     if (frankEvents.length > 0) prefetchFrankencoinEventReads(frankEvents);
   }, [frankEvents]);
 
-  // The clone's parent (PositionOpened names it) and the last mint, whose rate
-  // a closed card states.
+  // The clone's parent (PositionOpened names it).
   const cloneParent = useMemo(
     () => frankEvents.find((e) => e.context.data.eventType === "clone")?.context.data.original ?? null,
     [frankEvents],
   );
-  const lastMint = useMemo(() => {
-    for (let i = frankEvents.length - 1; i >= 0; i--) {
-      const e = frankEvents[i];
-      const d = e.context.data;
-      const after = Number(d.minted ?? NaN);
-      const before = Number(d.mintedBefore ?? NaN);
-      if (Number.isFinite(after) && Number.isFinite(before) && after > before && d.eventType !== "auction_settlement")
-        return e;
-    }
-    return null;
-  }, [frankEvents]);
 
   // How a terminal position ended: the forced sale that sold its collateral
   // and the denial, from the timeline.
@@ -285,52 +270,10 @@ export default function FrankencoinPositionView({
       (pageFacts.txKinds[lastLedger.txHash] ?? []).includes("challenge_succeeded");
     return {
       forcedAt: last?.timestamp ?? null,
-      soldMost: saleAmounts.length > 0 ? Math.max(...saleAmounts) : null,
       deniedAt: denied?.timestamp ?? null,
       closedByChallenge,
     };
   }, [pageFacts, frankEvents]);
-
-  // How the timeline's events divide over the transactions, for the card's
-  // counter sentence. Whole history only: a window's rows are not the count.
-  const eventTally = useMemo<FrankencoinEventTally | null>(() => {
-    if (cutoffBlock != null || frankEvents.length === 0) return null;
-    const byTx = new Map<string, typeof frankEvents>();
-    for (const e of frankEvents) {
-      const list = byTx.get(e.txHash) ?? [];
-      list.push(e);
-      byTx.set(e.txHash, list);
-    }
-    let biggest: (typeof frankEvents)[number][] = [];
-    for (const list of byTx.values()) if (list.length > biggest.length) biggest = list;
-    const kinds = biggest.map((e) => e.context.data);
-    const count = (pred: (c: (typeof kinds)[number]) => boolean) => kinds.filter(pred).length;
-    const parts: string[] = [];
-    const plural = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`);
-    if (count((c) => c.eventType === "clone")) parts.push("the clone");
-    if (count((c) => c.eventType === "open")) parts.push("the opening");
-    if (count((c) => c.firstState === true)) parts.push("the first deposit and mint");
-    const prices = count((c) => c.eventType === "adjust_price");
-    if (prices) parts.push(plural(prices, "a price change", "price changes"));
-    const handovers = count((c) => c.eventType === "ownership_transferred" && c.initialization === true);
-    if (handovers) parts.push(plural(handovers, "an ownership handover", "ownership handovers"));
-    const described = count(
-      (c) =>
-        c.eventType === "clone" ||
-        c.eventType === "open" ||
-        c.firstState === true ||
-        c.eventType === "adjust_price" ||
-        (c.eventType === "ownership_transferred" && c.initialization === true),
-    );
-    return {
-      total: frankEvents.length,
-      biggest: {
-        count: biggest.length,
-        opening: kinds.some((c) => c.eventType === "clone" || c.eventType === "open"),
-        parts: described === biggest.length ? parts : [],
-      },
-    };
-  }, [frankEvents, cutoffBlock]);
 
   // The event route (rails-ops TO-DO-ui-jobs 236): the sub-nav and the
   // event's card in page mode with the shared column; no position card, no
@@ -512,10 +455,7 @@ export default function FrankencoinPositionView({
                           openedAt={summary?.openedAt}
                           challengeCount={summary?.challengeCount}
                           denied={summary?.status === "denied"}
-                          txCount={summary?.txCount}
-                          eventTally={eventTally}
                           cloneParent={cloneParent}
-                          lastMint={lastMint}
                           ending={ending}
                           closedAt={summary?.lastActivityAt ?? null}
                         />

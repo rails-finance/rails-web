@@ -42,7 +42,7 @@ import {
 import { formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
-import { makerdaoPositionContent } from "@/lib/makerdao/position-content";
+import { makerPositionModal } from "@/lib/makerdao/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 
@@ -207,7 +207,7 @@ export function MakerVaultCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={makerdaoPositionContent({ status: v.status, ilk: v.ilk, debtSymbol: debtSym, lse: v.lse })}
+        learnMore={makerPositionModal(v.status, !!v.lse)}
         positionSummary={positionSummary}
       >
         <ClosedPositionStats
@@ -273,7 +273,7 @@ export function MakerVaultCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={makerdaoPositionContent({ status: v.status, ilk: v.ilk, debtSymbol: debtSym, lse: v.lse })}
+      learnMore={makerPositionModal(v.status, !!v.lse)}
       positionSummary={positionSummary}
     >
       <OpenPositionStats

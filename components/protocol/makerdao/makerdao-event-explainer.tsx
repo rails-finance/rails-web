@@ -1,25 +1,23 @@
 "use client";
 
-// Plain-English explainer for a Maker vault event — a layman PARAGRAPH (not
-// bullets), composed from state-keyed clauses in lib/makerdao/explainer-clauses.tsx,
-// plus the per-event "Learn More" modal on the mechanic. The card shows the
-// paragraph's LEAD sentence as its teaser; this pane renders the REST (skipLead),
-// so the first sentence is never duplicated. Every figure here is the card's own
-// face value, Prov-traced (an echo of the header delta / detail grid / forensics
-// receipt); the debt is quoted in DAI (or USDS), dart × the rate at the block,
-// the figure the header draws.
-//
-// A frob is ONE vault operation carrying two signed deltas — collateral and
-// debt — so the narration decomposes the pair: deposit, withdraw, draw, repay,
-// or a combination in one transaction.
+// The Explanation pane (zone Z2) of a MakerDAO vault event: the generator's
+// sentences (lib/makerdao/event-prose.ts, its strings in
+// content/makerdao/event-prose.yaml), one bullet each, under the three event
+// headings when two of them hold two or more bullets. Each figure the header
+// or the detail grid also prints echoes that receipt. The pane reads the ilk
+// at the row's block when it opens, which can add a sentence, so the card
+// passes the body alone and no teaser.
 
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
-import type { MakerCoords } from "@/lib/makerdao/event-provenance";
-import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { makerdaoVaultContent, makerdaoLiquidationContent } from "@/lib/shared/learn-more-content";
-import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { makerdaoEventSlots, type MakerRowExtras } from "@/lib/makerdao/explainer-clauses";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
+import { debtDeltaOf, dinkProv, inkAfterProv, type MakerCoords } from "@/lib/makerdao/event-provenance";
+import { formatNumber } from "@/lib/utils/format";
+import { makerEventProse, makerExplanationRuns, type MakerEchoKey } from "@/lib/makerdao/event-prose";
+import type { MakerRowExtras } from "@/lib/makerdao/event-figures";
+import { resultingState } from "@/lib/makerdao/event-figures";
 import { makerOwnerAt, openedForSigner, useMakerVaultHistory, type MakerEvent } from "@/lib/makerdao/vault-history";
 import { useIlkAtRow } from "./makerdao-cells";
 
@@ -29,35 +27,10 @@ export interface MakerDAOEventExplainerProps {
   eventId?: string;
   txHash?: string;
   blockNumber?: number;
-  /** The card shows the lead sentence as the teaser; render only the rest here. */
-  skipLead?: boolean;
-}
-
-/** Mechanic modal content for this event — never-empty floor: every event type
- *  maps to a modal (fork and give ride the vault-operations content; the grab
- *  and LockStake auction rows ride the liquidation content). Used by the card
- *  composer, which renders the "?" trigger on the footer row (this pane
- *  renders prose only). */
-export function makerdaoLearnMoreContent(ctx: MakerDAOContext, returned = false): LearnMoreContent {
-  if (ctx.eventType === "grab" || ctx.eventType.startsWith("lse-")) return makerdaoLiquidationContent();
-  const o = { debtSym: ilkDebtSymbol(ctx.ilk), ilk: ctx.ilk };
-  const vc = (k: Parameters<typeof makerdaoVaultContent>[0]) => makerdaoVaultContent(k, o);
-  if (ctx.eventType === "give") return vc("ownership");
-  if (ctx.eventType !== "frob") return vc("adjust");
-  if (ctx.isOpen) return vc("open");
-  if (returned) return vc("returned");
-  const dink = Number(ctx.dink) || 0;
-  const dart = Number(ctx.dart) || 0;
-  if (dink !== 0 && dart !== 0) return vc("adjust");
-  if (dink > 0) return vc("deposit");
-  if (dink < 0) return vc("withdraw");
-  if (dart > 0) return vc("generate");
-  if (dart < 0) return vc("repay");
-  return vc("adjust");
 }
 
 /** What the page holds about one row (lib/makerdao/vault-history.tsx), as the
- *  explainer's extras. */
+ *  generator's extras. */
 export function useMakerRowExtras(
   ctx: MakerDAOContext,
   eventId: string | undefined,
@@ -98,11 +71,40 @@ export function useMakerRowExtras(
   };
 }
 
-export function MakerDAOEventExplainer({ ctx, eventId, txHash, blockNumber, skipLead }: MakerDAOEventExplainerProps) {
+/** The header's and the detail grid's receipt each echoed figure registers
+ *  against: the collateral delta (a frob labels the header axis, so its value
+ *  is the bare magnitude; grab and fork keep the sign), the debt delta, and
+ *  the collateral after the row. */
+function echoFor(key: MakerEchoKey, ctx: MakerDAOContext, coords: MakerCoords): ProseEcho | null {
+  const sym = ctx.collateralSymbol;
+  const labeled = ctx.eventType === "frob";
+  switch (key) {
+    case "coll_change":
+      return { info: dinkProv(sym, coords), value: chainTruthDeltaValue(Number(ctx.dink) || 0, labeled), symbol: sym };
+    case "debt_change": {
+      const dsym = ilkDebtSymbol(ctx.ilk);
+      const debt = debtDeltaOf(ctx, dsym, coords);
+      return { info: debt.prov, value: chainTruthDeltaValue(debt.value, labeled), symbol: dsym };
+    }
+    case "coll_after":
+      return {
+        info: inkAfterProv(sym, coords),
+        value: formatNumber(resultingState(ctx).inkAfter),
+        symbol: sym,
+      };
+  }
+}
+
+export function MakerDAOEventExplainer({ ctx, eventId, txHash, blockNumber }: MakerDAOEventExplainerProps) {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const extras = useMakerRowExtras(ctx, eventId, txHash, blockNumber);
-  const clauses = eventClauses(makerdaoEventSlots(ctx, coords, extras));
-  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
-
+  const prose = makerEventProse({ ctx, extras });
+  const echo = (key: MakerEchoKey) => echoFor(key, ctx, coords);
+  const items = makerExplanationRuns(prose).flatMap((run) =>
+    run.sentences.map((s) => {
+      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+      return run.heading ? { group: run.heading, node } : node;
+    }),
+  );
   return <ProseExplainer items={items} />;
 }

@@ -79,7 +79,7 @@ const labelOf = (ctx: AaveV4Context): string =>
  *  `ctx.amount` is a magnitude whose direction is carried by `eventType`, so
  *  the delta states it as `exact` rather than through `chainTruthDeltaValue`,
  *  which would prepend a sign. */
-function amountProv(ctx: AaveV4Context, coord: AaveV4AmountCoord): { info: Provenance; value: string } {
+export function amountProv(ctx: AaveV4Context, coord: AaveV4AmountCoord): { info: Provenance; value: string } {
   const amount = parseFloat(ctx.amount ?? "0") || 0;
   const label = labelOf(ctx);
   return {
@@ -91,6 +91,31 @@ function amountProv(ctx: AaveV4Context, coord: AaveV4AmountCoord): { info: Prove
       AMOUNT_LOG[ctx.eventType],
     ),
   };
+}
+
+/** A liquidation's collateral leg receipt: what the liquidator took. */
+export function seizedProv(ctx: AaveV4Context, coord: AaveV4AmountCoord): Provenance {
+  return eventLogProv(
+    "Collateral seized in the liquidation",
+    "collateralAmountRemoved",
+    {
+      ...coord,
+      asset: ctx.collateralSymbol,
+      raw: ctx.raw?.liquidatedCollateralAmount,
+      origin: ctx.origin?.liquidatedCollateralAmount,
+    },
+    "LiquidationCall",
+  );
+}
+
+/** A liquidation's debt leg receipt: what the liquidator repaid. */
+export function repaidProv(ctx: AaveV4Context, coord: AaveV4AmountCoord): Provenance {
+  return eventLogProv(
+    "Debt repaid by the liquidation",
+    "debtAmountRestored",
+    { ...coord, asset: ctx.reserveSymbol, raw: ctx.raw?.amount, origin: ctx.origin?.amount },
+    "LiquidationCall",
+  );
 }
 
 export function useAaveV4HeadSpec({
@@ -126,17 +151,7 @@ export function useAaveV4HeadSpec({
         exact: formatExact(n),
         symbol: ctx.collateralSymbol,
         suffix: suffix(ctx.collateralSymbol),
-        prov: eventLogProv(
-          "Collateral seized in the liquidation",
-          "collateralAmountRemoved",
-          {
-            ...coord,
-            asset: ctx.collateralSymbol,
-            raw: ctx.raw?.liquidatedCollateralAmount,
-            origin: ctx.origin?.liquidatedCollateralAmount,
-          },
-          "LiquidationCall",
-        ),
+        prov: seizedProv(ctx, coord),
       });
     }
     if (ctx.debtToCover) {
@@ -147,12 +162,7 @@ export function useAaveV4HeadSpec({
         exact: formatExact(n),
         symbol: ctx.reserveSymbol ?? "???",
         suffix: suffix(ctx.reserveSymbol),
-        prov: eventLogProv(
-          "Debt repaid by the liquidation",
-          "debtAmountRestored",
-          { ...coord, asset: ctx.reserveSymbol, raw: ctx.raw?.amount, origin: ctx.origin?.amount },
-          "LiquidationCall",
-        ),
+        prov: repaidProv(ctx, coord),
       });
     }
   } else if (amount > 0) {

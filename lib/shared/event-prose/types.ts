@@ -46,7 +46,13 @@ export type Rounding =
   | "number"
   | "usd_value"
   | "pct_plain"
-  | "hf";
+  | "hf"
+  | "fc_coll"
+  | "fc_price"
+  | "fc_span"
+  | "date_time"
+  | "coll_amount"
+  | "spoke_amount";
 
 export type ProseValue = number | string | null;
 
