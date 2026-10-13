@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadPwnPositionTail } from "@/lib/pwn/position-page-data";
+import { isPwnEvent } from "@/lib/shared/types/event-shape";
+import { pwnEventHeading, pwnEventPageDescription } from "@/lib/pwn/explorer";
 import PwnLoanPage from "../../page";
 
 interface Props {
@@ -33,7 +35,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "pwn",
     subject: raw,
     canonicalPath: `/ethereum/pwn/${raw}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: pwnEventHeading(event), timestamp: event.timestamp } : null,
+    description:
+      event && isPwnEvent(event)
+        ? pwnEventPageDescription(event.context.data.loanId, raw.toLowerCase(), event.timestamp)
+        : undefined,
   });
 }
 
