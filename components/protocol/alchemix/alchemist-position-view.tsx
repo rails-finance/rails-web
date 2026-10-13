@@ -51,6 +51,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
@@ -125,6 +126,7 @@ import {
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
 import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
+import { alchemixExplorer } from "@/lib/alchemix/explorer";
 import type {
   AlchemixHealth,
   AlchemixLineEventWindow,
@@ -261,6 +263,9 @@ export function AlchemistPositionView({
   v2History = null,
 }: AlchemistPositionViewProps) {
   const registry = useReceiptRegistry();
+  // The event route (rails-ops TO-DO-ui-jobs 236): the sub-nav and the event's
+  // card in page mode, nothing else.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const chainId = deployment.chainId;
   const sym = position.syntheticSymbol;
   const mytSymbol = position.figures.collateral?.mytSymbol ?? "shares";
@@ -723,128 +728,130 @@ export function AlchemistPositionView({
         />
 
         {/* ── The position card: the current figures, one reading, one block ── */}
-        <PositionCardShell
-          receipts
-          explanation={
-            explanationProps && hasAlchemixPositionExplanation(explanationProps) ? (
-              <AlchemixPositionExplanation {...explanationProps} />
-            ) : undefined
-          }
-          learnMore={live ? alchemixPositionContent(position.status, `${deployment.basePath}/info`) : undefined}
-        >
-          <OpenPositionStats
-            statusPill={<AlchemixStatusPill status={position.status} />}
-            leadingIdentity={
-              <>
-                <span className="text-xs font-bold tracking-wide text-foreground/80">
-                  {alchemixPositionName(sym, tokenId)}
-                </span>
-                <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
-                  <span>{position.chainName ?? `chain ${chainId}`}</span>
-                </span>
-              </>
+        {!onEventPage && (
+          <PositionCardShell
+            receipts
+            explanation={
+              explanationProps && hasAlchemixPositionExplanation(explanationProps) ? (
+                <AlchemixPositionExplanation {...explanationProps} />
+              ) : undefined
             }
-            identity={
-              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className={`${OVERLAY_HEADING} text-rb-500`}>Now</span>
-                {live ? (
-                  // data-prov-exempt: the block the reading was taken at, a
-                  // coordinate linked to the explorer, not a figure.
-                  <span className="text-[11px] tabular-nums text-rb-500" data-prov-exempt="">
-                    one reading at{" "}
-                    <BlockRef block={live.asOfBlock} chainId={chainId as ChainId} linkClassName="link-muted" />
+            learnMore={live ? alchemixPositionContent(position.status, `${deployment.basePath}/info`) : undefined}
+          >
+            <OpenPositionStats
+              statusPill={<AlchemixStatusPill status={position.status} />}
+              leadingIdentity={
+                <>
+                  <span className="text-xs font-bold tracking-wide text-foreground/80">
+                    {alchemixPositionName(sym, tokenId)}
                   </span>
-                ) : null}
-              </span>
-            }
-            columns={
-              live
-                ? [
-                    amountColumn("Debt", live.debt ? { ...live.debt, asOfBlock: live.asOfBlock } : null, sym, {
-                      prov: liveFigureProv("Debt", sym, live.debt?.raw ?? null, live.asOfBlock, coords),
-                      note: eventsAloneNote,
-                      hideBlock: true,
-                    }),
-                    // The asset underneath leads; the share count is what the
-                    // position holds and stays beside it.
-                    collateralColumn(
-                      { ...live.collateral, asOfBlock: live.asOfBlock },
-                      mytSymbol,
-                      {
-                        shares: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
-                        underlying: live.collateral.underlying
-                          ? underlyingProv(
-                              live.collateral.underlying.symbol ?? "the asset underneath",
-                              live.collateral.underlying.raw,
-                              live.collateral.underlying.decimals,
-                              live.asOfBlock,
-                              live.collateral.underlying.sharePriceRaw,
-                              live.collateral.underlying.sharePriceAsOfBlock,
-                              coords,
-                            )
-                          : undefined,
-                        usd: live.collateral.usd
-                          ? usdProv(
-                              live.collateral.underlying?.symbol ?? "the asset underneath",
-                              live.collateral.usd.pricePerUnit,
-                              live.collateral.usd.priceSource,
-                              live.collateral.usd.pricedAt,
-                            )
-                          : undefined,
-                        sharePrice: live.collateral.underlying
-                          ? sharePriceProv(
-                              mytSymbol,
-                              live.collateral.underlying.symbol ?? "the asset underneath",
-                              live.collateral.underlying.sharePriceRaw,
-                              live.collateral.underlying.decimals,
-                              live.collateral.underlying.sharePriceAsOfBlock,
-                              live.collateral.mytAddress ?? null,
-                              coords,
-                            )
-                          : undefined,
-                      },
-                      // Headline card: figure + chip, no ticker text (matches
-                      // Debt/Set-aside above); the "held as … mixUSDC" and
-                      // "1 mixUSDC = …" sublines keep their ticker text.
-                      { hideBlock: true },
-                    ),
-                    // Rule 1. Its own slot, its own block, added to nothing.
-                    amountColumn(
-                      "Set aside for repayment",
-                      live.earmarked ? { ...live.earmarked, asOfBlock: live.asOfBlock } : null,
-                      sym,
-                      {
-                        prov: liveFigureProv(
-                          "Set aside for repayment",
-                          sym,
-                          live.earmarked?.raw ?? null,
-                          live.asOfBlock,
-                          coords,
-                        ),
+                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
+                    <span>{position.chainName ?? `chain ${chainId}`}</span>
+                  </span>
+                </>
+              }
+              identity={
+                <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className={`${OVERLAY_HEADING} text-rb-500`}>Now</span>
+                  {live ? (
+                    // data-prov-exempt: the block the reading was taken at, a
+                    // coordinate linked to the explorer, not a figure.
+                    <span className="text-[11px] tabular-nums text-rb-500" data-prov-exempt="">
+                      one reading at{" "}
+                      <BlockRef block={live.asOfBlock} chainId={chainId as ChainId} linkClassName="link-muted" />
+                    </span>
+                  ) : null}
+                </span>
+              }
+              columns={
+                live
+                  ? [
+                      amountColumn("Debt", live.debt ? { ...live.debt, asOfBlock: live.asOfBlock } : null, sym, {
+                        prov: liveFigureProv("Debt", sym, live.debt?.raw ?? null, live.asOfBlock, coords),
+                        note: eventsAloneNote,
                         hideBlock: true,
-                      },
-                    ),
-                    live.health
-                      ? healthColumn(live.health, live.debt?.raw ?? null, coords, position.status === "closed")
-                      : null,
-                  ]
-                : []
-            }
-          />
-          {position.refusedReason ? (
-            <p className="mt-3 text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
-          ) : null}
-          {live ? null : (
-            <p className="text-sm text-rb-500">
-              {livePending
-                ? "Reading the position now…"
-                : "The current figures did not come back. Reload the page to read them again."}
-            </p>
-          )}
-        </PositionCardShell>
+                      }),
+                      // The asset underneath leads; the share count is what the
+                      // position holds and stays beside it.
+                      collateralColumn(
+                        { ...live.collateral, asOfBlock: live.asOfBlock },
+                        mytSymbol,
+                        {
+                          shares: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
+                          underlying: live.collateral.underlying
+                            ? underlyingProv(
+                                live.collateral.underlying.symbol ?? "the asset underneath",
+                                live.collateral.underlying.raw,
+                                live.collateral.underlying.decimals,
+                                live.asOfBlock,
+                                live.collateral.underlying.sharePriceRaw,
+                                live.collateral.underlying.sharePriceAsOfBlock,
+                                coords,
+                              )
+                            : undefined,
+                          usd: live.collateral.usd
+                            ? usdProv(
+                                live.collateral.underlying?.symbol ?? "the asset underneath",
+                                live.collateral.usd.pricePerUnit,
+                                live.collateral.usd.priceSource,
+                                live.collateral.usd.pricedAt,
+                              )
+                            : undefined,
+                          sharePrice: live.collateral.underlying
+                            ? sharePriceProv(
+                                mytSymbol,
+                                live.collateral.underlying.symbol ?? "the asset underneath",
+                                live.collateral.underlying.sharePriceRaw,
+                                live.collateral.underlying.decimals,
+                                live.collateral.underlying.sharePriceAsOfBlock,
+                                live.collateral.mytAddress ?? null,
+                                coords,
+                              )
+                            : undefined,
+                        },
+                        // Headline card: figure + chip, no ticker text (matches
+                        // Debt/Set-aside above); the "held as … mixUSDC" and
+                        // "1 mixUSDC = …" sublines keep their ticker text.
+                        { hideBlock: true },
+                      ),
+                      // Rule 1. Its own slot, its own block, added to nothing.
+                      amountColumn(
+                        "Set aside for repayment",
+                        live.earmarked ? { ...live.earmarked, asOfBlock: live.asOfBlock } : null,
+                        sym,
+                        {
+                          prov: liveFigureProv(
+                            "Set aside for repayment",
+                            sym,
+                            live.earmarked?.raw ?? null,
+                            live.asOfBlock,
+                            coords,
+                          ),
+                          hideBlock: true,
+                        },
+                      ),
+                      live.health
+                        ? healthColumn(live.health, live.debt?.raw ?? null, coords, position.status === "closed")
+                        : null,
+                    ]
+                  : []
+              }
+            />
+            {position.refusedReason ? (
+              <p className="mt-3 text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
+            ) : null}
+            {live ? null : (
+              <p className="text-sm text-rb-500">
+                {livePending
+                  ? "Reading the position now…"
+                  : "The current figures did not come back. Reload the page to read them again."}
+              </p>
+            )}
+          </PositionCardShell>
+        )}
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}
-        {economics ? (
+        {onEventPage ? null : economics ? (
           <ChainTruthTower
             data={economics.data}
             title="Lifetime flows"
@@ -875,6 +882,18 @@ export function AlchemistPositionView({
                 <AlchemixUnderlyingContext.Provider value={underlyingUnit}>
                   <ChainTruthTimeline
                     persistKeyPrefix="alchemix-v3"
+                    eventPage={(slot) =>
+                      alchemixExplorer.eventPage({
+                        ...slot,
+                        deployment,
+                        kind: "alchemist",
+                        lineName: position.lineDisplayName,
+                        syntheticSymbol: sym,
+                        id: tokenId,
+                        owner: position.owner,
+                        rows: alchemistEvents,
+                      })
+                    }
                     closed={position.status === "closed"}
                     tl={tl}
                     runs={timelineRuns}

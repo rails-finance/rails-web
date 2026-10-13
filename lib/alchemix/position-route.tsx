@@ -13,8 +13,11 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { positionMetadata } from "@/lib/shared/page-metadata";
+import { decodeEventId, eventMetadata, positionMetadata } from "@/lib/shared/page-metadata";
 import { positionImage } from "@/lib/share/position-image";
+import { eventCardModel } from "@/lib/share/event-model";
+import { eventImage } from "@/lib/share/event-image";
+import { alchemixEventHeading, alchemixEventPageDescription } from "@/lib/alchemix/explorer";
 import { AlchemistPositionView } from "@/components/protocol/alchemix/alchemist-position-view";
 import { isLineOnChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { loadAlchemistPositionTail, loadAlchemistLiveState } from "@/lib/alchemix/position-page-data";
@@ -115,6 +118,55 @@ async function loadV2History(
     events: joined ? positions.flatMap((p) => p.events) : [],
     joined,
   };
+}
+
+export interface AlchemixEventParams extends AlchemixPositionParams {
+  eventId: string;
+}
+
+/** The event page's metadata (rails-ops TO-DO-ui-jobs 236): the event named
+ *  through the adapter, found in the page's cached tail. An event past the
+ *  served window takes the generic words. */
+export async function alchemixEventMetadata(
+  deployment: AlchemixDeployment,
+  { lineKey, tokenId, eventId }: AlchemixEventParams,
+): Promise<Metadata> {
+  const decoded = decodeEventId(eventId);
+  const tail = await loadAlchemistPositionTail(deployment.chainId, lineKey, tokenId);
+  const event = tail.events?.find((e) => e.id === decoded) ?? null;
+  const sym = tail.position?.syntheticSymbol ?? lineKey;
+  return eventMetadata({
+    session: deployment.session,
+    subject: tokenId,
+    market: alchemixMarketWord(sym),
+    canonicalPath: `${deployment.basePath}/${lineKey}/${tokenId}/event/${encodeURIComponent(decoded)}`,
+    event:
+      event && tail.events
+        ? { actionLabel: alchemixEventHeading(event, tail.events), timestamp: event.timestamp }
+        : null,
+    description: event ? alchemixEventPageDescription(deployment, sym, tokenId, event.timestamp) : undefined,
+  });
+}
+
+/** The event's share card, from the page's cached tail; an event past the
+ *  served window falls back to the static roster card. */
+export function alchemixEventImage(deployment: AlchemixDeployment, params: AlchemixEventParams) {
+  return eventImage({
+    session: deployment.session,
+    load: async () => {
+      const { lineKey, tokenId, eventId } = params;
+      if (!isLineOnChain(deployment.chainId, lineKey) || !ALCHEMIX_TOKEN_ID.test(tokenId)) return null;
+      const decoded = decodeEventId(eventId);
+      const tail = await loadAlchemistPositionTail(deployment.chainId, lineKey, tokenId);
+      const event = tail.events?.find((e) => e.id === decoded);
+      if (!event) return null;
+      return eventCardModel(event, {
+        session: deployment.session,
+        subject: tokenId,
+        market: alchemixMarketWord(tail.position?.syntheticSymbol ?? lineKey),
+      });
+    },
+  });
 }
 
 /** The position's share card — a second consumer of the same server read the

@@ -6,7 +6,10 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { positionMetadata } from "@/lib/shared/page-metadata";
+import { decodeEventId, eventMetadata, positionMetadata } from "@/lib/shared/page-metadata";
+import { eventCardModel } from "@/lib/share/event-model";
+import { eventImage } from "@/lib/share/event-image";
+import { alchemixEventHeading, alchemixEventPageDescription } from "@/lib/alchemix/explorer";
 import { positionImage } from "@/lib/share/position-image";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { formatNumber } from "@/lib/utils/format";
@@ -63,6 +66,55 @@ export async function TransmuterPositionPage({
     );
   }
   return <TransmuterPositionView key={`${lineKey}:${nftId}`} deployment={deployment} position={read.position} />;
+}
+
+export interface TransmuterEventParams extends TransmuterPositionParams {
+  eventId: string;
+}
+
+/** The event page's metadata (rails-ops TO-DO-ui-jobs 236): the event named
+ *  through the adapter, found in the page's cached read. */
+export async function transmuterEventMetadata(
+  deployment: AlchemixDeployment,
+  { lineKey, nftId, eventId }: TransmuterEventParams,
+): Promise<Metadata> {
+  const decoded = decodeEventId(eventId);
+  const { position } = await loadTransmuterPosition(deployment.chainId, lineKey, nftId);
+  const event = position?.events.find((e) => e.id === decoded) ?? null;
+  const sym = position?.syntheticSymbol ?? lineKey;
+  return eventMetadata({
+    session: deployment.session,
+    subject: nftId,
+    market: alchemixMarketWord(sym, "transmuter"),
+    canonicalPath: `${transmuterPositionPath(deployment, lineKey, nftId)}/event/${encodeURIComponent(decoded)}`,
+    event:
+      event && position
+        ? { actionLabel: alchemixEventHeading(event, position.events), timestamp: event.timestamp }
+        : null,
+    description: event
+      ? alchemixEventPageDescription(deployment, sym, nftId, event.timestamp, "transmuter")
+      : undefined,
+  });
+}
+
+/** The event's share card, from the page's cached read. */
+export function transmuterEventImage(deployment: AlchemixDeployment, params: TransmuterEventParams) {
+  return eventImage({
+    session: deployment.session,
+    load: async () => {
+      const { lineKey, nftId, eventId } = params;
+      if (!isLineOnChain(deployment.chainId, lineKey) || !ALCHEMIX_TOKEN_ID.test(nftId)) return null;
+      const decoded = decodeEventId(eventId);
+      const { position } = await loadTransmuterPosition(deployment.chainId, lineKey, nftId);
+      const event = position?.events.find((e) => e.id === decoded);
+      if (!position || !event) return null;
+      return eventCardModel(event, {
+        session: deployment.session,
+        subject: nftId,
+        market: alchemixMarketWord(position.syntheticSymbol, "transmuter"),
+      });
+    },
+  });
 }
 
 /** The share card, from the same cached read the page awaits. */
