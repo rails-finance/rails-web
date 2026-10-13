@@ -37,9 +37,9 @@ import { AaveEthereumVaultPositionView } from "@/components/vaults/aave-ethereum
 import { AaveVaultTimeline } from "@/components/vaults/aave-vault-timeline";
 import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
 import { VaultPositionCard } from "@/components/vaults/vault-position-card";
-import { VaultContextStrip, VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
-import { RiskFooterStrip } from "@/components/shared/risk-footer-strip";
+import { VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { holderListingSegment } from "@/lib/shared/protocols";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
@@ -279,18 +279,9 @@ async function VaultPositionCardSection({
     <VaultPositionCard
       row={onPage}
       receipts
-      // The identity block that used to sit under this card is gone: what it
-      // carried — the resolved name and the link out — rides the card itself.
-      holderIdentity={{ ensName: lookup.ensName }}
       learnMore={aaveVaultPositionContent(data.vault.family, data.vault.asset.symbol, data.vault.symbol)}
-      // The context strip rides the card's heading-button row, the trove card's
-      // own grammar. It was three paragraphs under this card until 2026-09-09
-      // (see components/vaults/aave-ethereum-vault-view.tsx's HolderSection).
-      rowExtra={
-        <RiskFooterStrip>
-          <VaultContextStrip {...strip} />
-        </RiskFooterStrip>
-      }
+      // What is redeemable, the exit and the cooldown: rows of the card's panel.
+      context={strip}
       explanation={<PositionCardExplanation row={onPage} maxRedeemRead={data.holder.maxRedeem != null} />}
     />
   );
@@ -346,11 +337,15 @@ function vaultContextStrip(data: AaveEthereumVaultResponse) {
  *  the daily census at the census block. */
 function PositionCardExplanation({ row, maxRedeemRead }: { row: VaultPositionRow; maxRedeemRead: boolean }) {
   const n = (v: number) => v.toLocaleString("en-US");
+  const open = row.live ? row.live.live : row.census.live;
   const items = [
     `Shares, claim and share of the vault are calls answered at block ${n(row.live?.blockNumber ?? 0)} — the same block every figure under this card is read at.`,
-    maxRedeemRead
-      ? `"Redeemable now" on the row above is the vault's own maxRedeem() for this address at that same block, in share units — what the contract says can be redeemed then, not what the shares are worth. On a stake token it answers zero outside the holder's unstake window, and that zero is a state rather than an absence.`
-      : `"Redeemable now" reads "Not loaded": the vault's own maxRedeem() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
+    // A closed card draws no panel, so it has no Redeemable now row.
+    !open
+      ? null
+      : maxRedeemRead
+        ? `"Redeemable now" in the panel above is the vault's maxRedeem() for this address at that same block, in share units — what the contract says can be redeemed then; the Claim row states what the shares are worth. On a stake token it answers zero outside the holder's unstake window, and that zero is a state rather than an absence.`
+        : `"Redeemable now" reads "Not loaded": the vault's maxRedeem() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
     `Transfers, first seen and last activity are counted by the census: one whole-Transfer sweep of this vault, proven complete by Σ balanceOf equalling totalSupply() wei-exact, swept to block ${n(row.census.block)}.`,
     `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"} — never shares multiplied by a price.`,
     row.value.usdE8 != null
@@ -359,7 +354,7 @@ function PositionCardExplanation({ row, maxRedeemRead }: { row: VaultPositionRow
         ? "Value · USD is stated as not priced: the daily census has not yet run its price pass over this vault, so no oracle was asked."
         : `Value · USD is stated as not priced: the chain's Aave V3 oracle declined ${row.value.assetSymbol ?? "this vault's asset"} at block ${n(row.value.pricedBlock)} — reverted or answered zero — and the card carries an empty slot rather than a figure from some other feed.`,
     "Nothing here is annualised; the blocks are stated rather than reconciled into one.",
-  ];
+  ].filter((text): text is string => text != null);
   return (
     <div className="space-y-2 text-sm text-rb-500">
       <p className="leading-relaxed">This card draws two lanes, and each figure names the block its own lane read.</p>
@@ -467,7 +462,17 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
             fallbackHref={ethereumVaultsListingHref()}
             assets={shareAssets}
             priceReason={ORACLE_USD_REASON["aave-vaults"]}
-            owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
+            owner={{
+              wallet: lookup.address,
+              ensName: lookup.ensName,
+              filterProtocol: null,
+              // The bookmark the card's wallet pill carried: the position page's
+              // card leaves the wallet to this row.
+              bookmarkProtocol: "aave-vaults",
+              bookmarkListing: holderListingSegment("aave-vaults"),
+            }}
+            // The card's ⋮ carries the menu; the event route draws no card.
+            tools={onEventPage}
           />
           {!onEventPage && (
             <>
