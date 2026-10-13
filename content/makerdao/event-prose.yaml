@@ -278,6 +278,41 @@ words:
     left for another vault
   fork_in: |-
     arrived from another vault
+  # The balance sheet's read-more, one per row: what the figure is and where it is read.
+  tip_coll_last: |-
+    The vault's {coll_symbol} after its previous event, from the Vat's log.
+  tip_coll_before: |-
+    The vault's {coll_symbol} just before this event, at Maker's {coll_symbol} price at this block.
+  tip_coll_event: |-
+    The {coll_symbol} this event moved, from the Vat's log, at Maker's {coll_symbol} price at this block.
+  tip_coll_total: |-
+    The vault's collateral after this event in dollars: its {coll_symbol} from the Vat's log times Maker's {coll_symbol} price at this block.
+  tip_debt_last: |-
+    The vault's debt after its previous event, from the Vat's log, at $1 per {debt_symbol}.
+  tip_debt_interest: |-
+    The stability fee the debt accrued between the previous event and this one, at $1 per {debt_symbol}.
+  tip_debt_interest_asset: |-
+    The stability fee in {debt_symbol}, counted at its $1.00 face.
+  tip_debt_before: |-
+    The debt just before this event: the previous event's debt plus the stability fee since.
+  tip_debt_event: |-
+    The debt this event moved: the normalized debt it changed times the ilk's rate at this block.
+  tip_debt_total: |-
+    The vault's debt after this event: its normalized debt from the Vat's log times the ilk's rate at this block, at $1 per {debt_symbol}.
+  tip_ratio: |-
+    The collateral's dollar value divided by the debt after this event, at Maker's {coll_symbol} price at this block.
+  tip_liquidates_at: |-
+    The {coll_symbol} price at which the vault's collateral ratio meets the ilk's minimum: the debt times the minimum ratio, divided by the collateral.
+  tip_drawable: |-
+    The {debt_symbol} the vault could still draw before it reaches the minimum ratio: its collateral's value divided by the minimum ratio, less the debt.
+  tip_stability_fee: |-
+    The yearly rate the ilk's debt accrues, set by Maker governance in the Jug.
+  tip_minimum_ratio: |-
+    The collateral ratio below which a {ilk} vault can be liquidated, the Spotter's value at this block.
+  tip_debt_ceiling: |-
+    The most {debt_symbol} the Vat lets the ilk carry across all its vaults, set by Maker governance.
+  tip_minimum_debt: |-
+    The least {debt_symbol} a vault of this ilk may owe while it owes anything, set by Maker governance.
 
 # ── The vault card's explanation (zone Z1): a lead with no colon, then
 # bullets under Holdings, Risk, Rate and History when two of them hold two or

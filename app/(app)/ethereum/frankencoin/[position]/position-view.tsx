@@ -237,6 +237,15 @@ export default function FrankencoinPositionView({
       ...frankencoinPageFacts(frankEvents, chain?.challengePeriod ?? null, chain?.original ?? null),
       opening: openingRead?.opening ?? null,
       openingPending,
+      terms:
+        chain && !chain.chainStale
+          ? {
+              expiration: chain.expiration,
+              annualInterestPPM: chain.annualInterestPPM,
+              reserveContributionPPM: chain.reserveContributionPPM,
+              challengedAmount: chain.challengedAmount,
+            }
+          : null,
     }),
     [frankEvents, chain, openingRead, openingPending],
   );
