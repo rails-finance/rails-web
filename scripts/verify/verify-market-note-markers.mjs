@@ -9,8 +9,8 @@
 // diamond closes it and returns focus to the marker. Display carries
 // "Market notes" and "Open all market notes"; the toolbar's "Market
 // notes · N" pill is gone. A marker stays when a Types of event filter hides
-// every event. On a phone the list view keeps note rows, its Display offers the
-// switch alone, and the spine view (`?timeline=spine`) keeps its markers.
+// every event. On a phone the list view rests notes as markers too, its Display offers
+// both switches, and the spine view (`?timeline=spine`) keeps its markers.
 //
 // The vault is 28699 of verify-makerdao-rate-step.mjs, which pins what its
 // notes state; this script holds the markers. The note count
@@ -209,18 +209,25 @@ console.log(`Market notes — against ${BASE}\n`);
     '10b. no "Market notes · N" pill on the phone',
     (await page.getByRole("button", { name: /^Market notes ·/i }).count()) === 0,
   );
-  const rows = await page.locator("[data-market-note]:visible").count();
-  check("10c. the phone list view keeps note rows", rows > 0, `${rows} rows`);
+  check(
+    "10c. at rest the phone list view draws markers and no note row",
+    (await page.locator("[data-note-marker]:visible").count()) > 0 &&
+      (await page.locator("[data-market-note]:visible").count()) === 0,
+  );
   await displayTrigger(page).click();
   await page.waitForTimeout(400);
   const mk = page.getByRole("button", { name: /^Market Notes$/i });
   const oa = page.getByRole("button", { name: /^Open All Market Notes$/i });
   check(
-    "11. the phone's Display offers the markers switch alone",
-    (await mk.count()) === 1 && (await oa.count()) === 0,
+    '11. the phone\'s Display offers "Market Notes" and "Open All Market Notes"',
+    (await mk.count()) === 1 && (await oa.count()) === 1,
   );
-  await mk.click();
-  await page.waitForTimeout(400);
+  await oa.click();
+  await page.waitForTimeout(500);
+  const rows = await page.locator("[data-market-note]:visible").count();
+  check("10d. Open All Market Notes draws the phone list view's note rows", rows > 0, `${rows} rows`);
+  await oa.click();
+  await page.waitForTimeout(300);
   check("11b. …and it hides the phone's note rows", (await page.locator("[data-market-note]:visible").count()) === 0);
   await ctx.close();
 }
@@ -316,19 +323,23 @@ const GROUP_ID = "live-notes:head";
 }
 {
   const { ctx, page } = await open(390, URL_GROUP);
-  const card = page.locator("[data-live-note-group]:visible");
-  await card
+  const marker = page.locator(`[data-note-marker="${GROUP_ID}"]`);
+  await marker
     .first()
     .waitFor({ state: "attached", timeout: 60000 })
     .catch(() => {});
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+  const atRest = (await marker.count()) === 1 && (await page.locator("[data-live-note-group]").count()) === 0;
+  await marker.first().click();
+  await page.waitForTimeout(500);
+  const card = page.locator("[data-live-note-group]:visible");
   const n = await card.locator('[data-market-note$="-head"]').count();
   const headRows = await page.locator('[data-market-note$="-head"]:visible').count();
   check(
-    "15. the phone list view draws the live notes as one card",
-    (await card.count()) === 1 && n >= 2 && headRows === n,
-    `${await card.count()} card(s), ${n} lines, ${headRows} live rows`,
+    "15. the phone list view rests the live notes as one marker, and opening it draws one card",
+    atRest && (await card.count()) === 1 && n >= 2 && headRows === n,
+    `marker at rest ${atRest}, ${await card.count()} card(s), ${n} lines, ${headRows} live rows`,
   );
-  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
   check("15b. no horizontal scroll at 390", sw <= 390, `scrollWidth ${sw}`);
   await ctx.close();
 }

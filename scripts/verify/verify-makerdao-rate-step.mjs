@@ -939,10 +939,13 @@ check(
     ((flatLive && headStated == null) || (headStated != null && Math.abs(headStated - live28699.atBlock) < 200)),
   `row states ${headStated ?? "(none)"}, route atBlock ${live28699.atBlock}, blockTimestamp ${live28699.blockTimestamp}`,
 );
+// The Elapsed cell moved into the opened note's lead line ("… since the
+// vault's last event, 129 days ago", market-note-row.tsx liftTimeCells).
+const elapsedStated = /\d+\s+(?:second|minute|hour|day|week|month|year)s?\s+ago/.test(openHead);
 check(
-  "3d1. the live row carries an Elapsed figure — only possible because the overlay returns the head block's own timestamp (no row while the fee is flat)",
-  (flatLive && openHead === "" ? true : /Elapsed/.test(openHead)) && live28699.blockTimestamp > 1_700_000_000,
-  `Elapsed ${/Elapsed/.test(openHead)}, blockTimestamp ${live28699.blockTimestamp}`,
+  "3d1. the live row states the elapsed time in its lead line — only possible because the overlay returns the head block's timestamp (no row while the fee is flat)",
+  (flatLive && openHead === "" ? true : elapsedStated) && live28699.blockTimestamp > 1_700_000_000,
+  `elapsed in lead line ${elapsedStated}, blockTimestamp ${live28699.blockTimestamp}`,
 );
 
 const pinned = r28699.notes[r28699.notes.length - 1]; // the four-step run 22,676,311 → 25,917,081
