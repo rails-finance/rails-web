@@ -43,6 +43,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
+import { moonwellExplorer } from "@/lib/moonwell/explorer";
 
 import { MoonwellPositionCard } from "@/components/protocol/moonwell/moonwell-position-card";
 import {
@@ -176,8 +177,10 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
 
   const [timeline, setTimeline] = useState<MoonwellBaseTimeline | null>(null);
   const [timelineState, setTimelineState] = useState<"loading" | "ready" | "unavailable" | "failed">("loading");
-  // The event route renders this same view; `ChainTruthTimeline` reads the
-  // same param for its pinned mode.
+  // The event route (rails-ops TO-DO-ui-jobs 236) renders this same view: the
+  // sub-nav and the event's card in page mode with the shared column, no
+  // position card, no flows panel. `ChainTruthTimeline` reads the same param
+  // for its pinned mode.
   const routeParams = useParams<{ eventId?: string | string[] }>();
   const pinnedRoute = routeParams?.eventId != null;
 
@@ -510,7 +513,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                 </div>
               ) : (
                 <>
-                  {view && data && (
+                  {!pinnedRoute && view && data && (
                     <MoonwellPositionCard
                       v={view}
                       receipts
@@ -543,7 +546,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                   {/* Lifetime flows: the bars and the line over the account's
                   replay (lib/shared/ctoken-flows.ts), in place of the tower
                   (TO-DO-ui-jobs 206). */}
-                  {view && (
+                  {!pinnedRoute && view && (
                     <LifetimeFlowsPanel
                       scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                       read={flows.read}
@@ -558,7 +561,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
 
                   {timelineState === "ready" && timeline ? (
                     <>
-                      <TimelineFillWell fill={timeline.coverage.fill} />
+                      {!pinnedRoute && <TimelineFillWell fill={timeline.coverage.fill} />}
                       <ChainTruthTimeline
                         tl={tl}
                         runs={MOONWELL_ACTIVITY_RUNS}
@@ -569,6 +572,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                         readFolderMembers={readFolderMembers}
                         segments={segments}
                         persistKeyPrefix="moonwell"
+                        eventPage={(slot) => moonwellExplorer.eventPage({ ...slot, wallet, deployment: "base" })}
                         closed={view?.status !== "open"}
                         toolbarLeading={
                           <TimelineActivityHeader
