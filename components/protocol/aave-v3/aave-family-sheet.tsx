@@ -139,6 +139,7 @@ function sheetSide(
       amount: {
         text: signed,
         symbol: sym,
+        address: r.reserve,
         info: exactBalanceChangeProv(sym, leg, coords, { before: groupExact(before), after: groupExact(after) }),
         value: `${c.sign < 0 ? "−" : "+"}${groupExact(c.magnitude)}`,
       },
@@ -184,6 +185,7 @@ function sheetSide(
         amount: {
           text: fmtPositionAmount(part.interest),
           symbol: part.symbol,
+          address: r?.reserve,
           info: prevEventInterestProv(part.symbol, leg, coords),
           value: part.interest,
         },
@@ -292,6 +294,7 @@ function sheetSide(
               amount: {
                 text: fmtPositionAmount(after),
                 symbol: sym,
+                address: r.reserve,
                 info: exactBalanceProv(
                   sym,
                   leg,

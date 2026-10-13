@@ -27,7 +27,9 @@
 import { useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import { LedgerIcon } from "@/components/shared/event-ledger";
+import { AssetPopover } from "@/components/shared/asset-popover";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { ChangeSwapValue, type SwapFigure } from "@/components/shared/change-swap-value";
 import { ListChevronsIcon } from "@/components/shared/list-chevrons-icon";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
@@ -47,8 +49,9 @@ export interface SheetRow {
   label: ReactNode;
   /** Muted words after the label: an asset's price ("· $0.9997"). */
   note?: ReactNode;
-  /** The asset figure; its icon follows it. */
-  amount?: SheetFigure & { symbol?: string };
+  /** The asset figure; its icon follows it, and opens the asset's popover.
+   *  `address`: the token's contract, where the family's data carries it. */
+  amount?: SheetFigure & { symbol?: string; address?: string };
   usd?: SheetFigure;
 }
 
@@ -132,6 +135,7 @@ const WORDS = {
   hide: "Hide breakdown",
   tokens: "Asset",
   usd: "USD",
+  oracle: "The protocol's oracle, at this block",
 };
 
 type Col = "tokens" | "usd";
@@ -161,11 +165,45 @@ const TONE: Record<Tone, string> = {
   sub: "text-xs text-rb-500 sm:text-sm",
 };
 
-function AmountCell({ a }: { a: NonNullable<SheetRow["amount"]> }) {
+/** Where a row's price comes from, as its USD receipt states it: the
+ *  receipt's contract, or the oracle where the receipt's price input is the
+ *  oracle's. */
+function priceSourceOf(r: SheetRow): string | undefined {
+  const info = r.usd?.info;
+  const sym = r.amount?.symbol;
+  if (!info || !sym) return undefined;
+  if (info.contract?.name) return info.contract.name;
+  const input = info.inputs?.find((x) => x.label === `${sym} price`);
+  return input?.pclass === "oracle" ? WORDS.oracle : undefined;
+}
+
+/** The asset figure and its icon; the icon opens the asset's popover, which
+ *  states the row's price (`note`) and its source where the row has them. */
+function AmountCell({ r }: { r: SheetRow }) {
+  const a = r.amount!;
+  const focusAddress = useFlowFocus()?.model?.addresses?.[a.symbol ?? ""];
   return (
     <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
       <Fig f={a} />
-      {a.symbol && <LedgerIcon symbol={a.symbol} muted />}
+      {a.symbol && (
+        <span className="inline-flex size-3.5 shrink-0 items-center justify-center" data-ledger-icon={a.symbol}>
+          <AssetPopover
+            symbol={a.symbol}
+            address={a.address ?? focusAddress}
+            price={r.note ?? undefined}
+            priceSource={r.note != null ? priceSourceOf(r) : undefined}
+            className="opacity-70"
+          >
+            <TokenChipIcon
+              symbol={a.symbol}
+              address={a.address ?? focusAddress}
+              size={14}
+              filterable={false}
+              untitled
+            />
+          </AssetPopover>
+        </span>
+      )}
     </span>
   );
 }
@@ -194,7 +232,7 @@ function Row({
         {r.note != null && <span className="text-rb-500"> · {r.note}</span>}
       </span>
       <span className={`${pad} text-right tabular-nums ${t} max-sm:hidden`} data-sheet-col="amount">
-        {r.amount && <AmountCell a={r.amount} />}
+        {r.amount && <AmountCell r={r} />}
       </span>
       <span
         className={`${pad} text-right tabular-nums whitespace-nowrap ${t} ${USD_RULE} max-sm:hidden`}
@@ -203,11 +241,7 @@ function Row({
         {r.usd && <Fig f={r.usd} />}
       </span>
       <span className={`${pad} text-right tabular-nums whitespace-nowrap ${t} sm:hidden`} data-sheet-col="phone">
-        {phone === "amount" && r.amount ? (
-          <AmountCell a={r.amount} />
-        ) : phone === "usd" && r.usd ? (
-          <Fig f={r.usd} />
-        ) : null}
+        {phone === "amount" && r.amount ? <AmountCell r={r} /> : phone === "usd" && r.usd ? <Fig f={r.usd} /> : null}
       </span>
     </div>
   );
