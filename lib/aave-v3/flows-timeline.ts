@@ -590,6 +590,7 @@ export function flowSeriesTimeline(
     live: live ?? { collateralUsd: series.live.collateralUsd, debtUsd: series.live.debtUsd },
     todayPrices,
     dailyPrices: Object.fromEntries(Object.entries(series.prices).map(([a, p]) => [a, p.obs])),
+    priceSource: "AaveOracle, the last price recorded each day",
     today: series.today,
     totalEvents: series.totalEvents,
     ...(series.totalTxs != null ? { totalTxs: series.totalTxs } : {}),

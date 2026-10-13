@@ -235,6 +235,9 @@ export function LifetimeFlowsPanel({
                       {(flowsKey.basis || (flowsKey.chart && flowsKey.chart.length > 0)) && (
                         <ExplainGroup title="Chart" data-flow-chart-words="">
                           {flowsKey.basis && <ExplainBullet data-flow-basis="">{flowsKey.basis}</ExplainBullet>}
+                          {flowsKey.priceBasis && (
+                            <ExplainBullet data-flow-price-basis="">{flowsKey.priceBasis}</ExplainBullet>
+                          )}
                           {flowsKey.chart?.map((t) => (
                             <ExplainBullet key={t}>{t}</ExplainBullet>
                           ))}

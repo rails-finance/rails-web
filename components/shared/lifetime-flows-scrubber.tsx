@@ -102,6 +102,7 @@ import {
   type SeriesBin,
 } from "@/lib/shared/flows-series";
 import { fetchFlowBinSeries } from "@/lib/api/fetch-aave-v3-flow-series";
+import { flowPriceSeries } from "@/lib/shared/flows-price";
 
 /** Days the slider advances per tick while playing, and the tick. */
 const PLAY_DAYS = 7;
@@ -141,6 +142,9 @@ export type FlowsKeyItems = {
    *  bullets: "The line is in USD, each day valued at that day's closing
    *  price." */
   basis?: string;
+  /** What the price view's line is, the bullet after `basis`, where the
+   *  panel has a price series (ui-jobs 328). */
+  priceBasis?: string;
   /** The Explanation's Totals: what came in over the bars' stops. */
   totals?: FlowsTotalsData;
 };
@@ -633,6 +637,13 @@ export function LifetimeFlowsScrubber({
   const basisUnit = model?.sideUnits
     ? `${model.sideUnits.collateral.symbol} and ${model.sideUnits.debt.symbol}`
     : (model?.unit?.symbol ?? "USD");
+  // The price view's series (ui-jobs 328): the held assets' daily prices the
+  // timeline carries.
+  const prices = useMemo(() => (lined ? flowPriceSeries(timeline) : []), [lined, timeline]);
+  const priceBasis =
+    prices.length > 0
+      ? `Price: each held asset's price in ${prices[0].unitLabel}, a point per day at the last price recorded that day, dotted where a day has none and the price before it is carried.`
+      : undefined;
   const totals = useMemo(
     () => (bars && model ? flowsTotals(bars, from > 0 ? dayStamp(dayStart(bars, 0)) : null) : null),
     [bars, model, from],
@@ -656,9 +667,10 @@ export function LifetimeFlowsScrubber({
           ? `The line is in USD, each ${bin} valued at that ${bin}’s closing price.`
           : `The line is in ${basisUnit}, each point the amount at the ${bin}’s close.`
         : undefined,
+      priceBasis,
       totals: totals ?? undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals]);
+  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals, priceBasis]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
   if (!model || !bars || !words) return null;
@@ -683,6 +695,7 @@ export function LifetimeFlowsScrubber({
           from={from}
           busy={busy}
           series={lifetime?.series ?? null}
+          prices={prices}
           failed={lifetime?.failed ?? false}
           onLedgerNote={ledgerNote ?? undefined}
           renderBars={(stop, when, isLive, atLive) => (

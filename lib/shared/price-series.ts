@@ -121,6 +121,20 @@ export function flowsPriceSeries(
   return out;
 }
 
+/** A daily wire's observations for one asset (a panel's
+ *  `FlowTimeline.dailyPrices` entry) as a daily series: the block from the
+ *  third element or null, each price divided by 10^`scale` where the wire
+ *  states it in grains of the unit. Null where no price is usable. */
+export function dayObsPriceSeries(
+  obs: readonly DayObs[],
+  opts: { key: string; asset: PriceSeries["asset"]; unit: string; source: string; scale?: number },
+): PriceSeries | null {
+  const div = 10 ** (opts.scale ?? 0);
+  const points = fromDayObs(div === 1 ? obs : obs.map(([d, p, b]) => [d, p / div, b] as DayObs));
+  if (points.length === 0) return null;
+  return { key: opts.key, asset: opts.asset, unit: opts.unit, grain: "daily", source: opts.source, points };
+}
+
 const isDayObs = (o: unknown): o is DayObs =>
   Array.isArray(o) &&
   (o.length === 2 || o.length === 3) &&

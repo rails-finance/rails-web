@@ -150,8 +150,9 @@ export function CompoundEventCard({
     ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
     : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
+  const rowLabel = compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals);
   const head = useCompoundHeadSpec({
-    actionLabel: compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals),
+    actionLabel: rowLabel,
     ctx,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -161,7 +162,7 @@ export function CompoundEventCard({
   });
   // The collateral and debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
-  const { cells, ledgers, notes, prices } = useCompoundCells({
+  const { cells, sheet, ledgers, notes, prices } = useCompoundCells({
     ctx,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -169,6 +170,7 @@ export function CompoundEventCard({
     eventId: event.id,
     previous: prevRow(previous),
     previousTx: prevRow(previousTx),
+    label: rowLabel,
   });
 
   const slots: EventCardSlots = {
@@ -189,6 +191,7 @@ export function CompoundEventCard({
       byOwner: kind === "transfer_in" || kind === "transfer_collateral_in" ? false : undefined,
     },
     cells,
+    sheet,
     ledgers,
     notes,
     price: { gas: ownerPaidGas(event, ctx.txFrom), prices },

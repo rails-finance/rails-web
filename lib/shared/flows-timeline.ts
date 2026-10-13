@@ -325,6 +325,11 @@ export interface FlowTimeline {
   /** Per asset, the days a new daily price was recorded: [day, usd, block?]. The last
    *  oracle price recorded on or before each day's end, across every wallet. */
   dailyPrices?: Record<string, DayObs[]>;
+  /** The price view's caption for `dailyPrices`: the oracle or store and how
+   *  a day's price is chosen ("AaveOracle, the last price recorded each day").
+   *  Unset, an asset with `carriedWhy` reads as priced by its events and any
+   *  other as the daily price store's. */
+  priceSource?: string;
   /** Today's UTC day number. With it the slider runs to today while anything
    *  is still held after the last event; without it, one stop past that event. */
   today?: number;

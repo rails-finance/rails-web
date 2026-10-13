@@ -38,6 +38,12 @@ import { useFluidTimelineRuns } from "@/lib/fluid/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { FluidEventCard } from "@/components/protocol/fluid/fluid-event-card";
 import {
+  FluidSheetProvider,
+  legAddresses,
+  previousRows,
+  type FluidSheetFacts,
+} from "@/components/protocol/fluid/fluid-sheet";
+import {
   FluidPositionCard,
   fluidLegName,
   fluidPairText,
@@ -406,6 +412,26 @@ export default function FluidPositionView({
     );
   }, [view, chain, fluidEvents]);
 
+  // The event sheet's facts (ui-jobs 330): the vault's terms from the live
+  // read, and each row's previous balance-bearing row on the page.
+  const sheetFacts = useMemo<FluidSheetFacts>(
+    () => ({
+      terms:
+        chain && chain.found && !chain.chainStale
+          ? {
+              vault: chain.vault,
+              block: chain.blockNumber,
+              collateralFactor: chain.collateralFactor,
+              liquidationThreshold: chain.liquidationThreshold,
+              liquidationPenalty: chain.liquidationPenalty,
+            }
+          : null,
+      previous: previousRows(fluidEvents),
+      addresses: legAddresses(fluidEvents),
+    }),
+    [chain, fluidEvents],
+  );
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -483,40 +509,42 @@ export default function FluidPositionView({
                   />
                 );
               })()}
-            <ChainTruthTimeline
-              csvExportCeiling={INDEX_ROW_CEILING}
-              // Matches `FluidEventCard`'s own `persistKey={`fluid:${event.id}`}` —
-              // lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="fluid"
-              closed={view ? view.status !== "open" : undefined}
-              tl={tl}
-              runs={timelineRuns}
-              countTooltip="Counts events, not rows: an Open row combines the mint and the first operation, and a round-trip row combines one transfer per hop."
-              toolbarLeading={
-                view ? (
-                  <TimelineActivityHeader
-                    events={fluidEvents}
-                    closed={view.status !== "open"}
-                    // When the position was minted, not when the window opens —
-                    // otherwise a position with 1,400 events reads as days old
-                    // because its oldest loaded card is.
-                    firstAt={opening?.firstTimestamp}
-                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  />
-                ) : undefined
-              }
-              renderCard={(event, meta) =>
-                isFluidEvent(event) ? (
-                  <FluidEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isLast={meta.isLast}
-                    siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                  />
-                ) : null
-              }
-            />
+            <FluidSheetProvider value={sheetFacts}>
+              <ChainTruthTimeline
+                csvExportCeiling={INDEX_ROW_CEILING}
+                // Matches `FluidEventCard`'s own `persistKey={`fluid:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="fluid"
+                closed={view ? view.status !== "open" : undefined}
+                tl={tl}
+                runs={timelineRuns}
+                countTooltip="Counts events, not rows: an Open row combines the mint and the first operation, and a round-trip row combines one transfer per hop."
+                toolbarLeading={
+                  view ? (
+                    <TimelineActivityHeader
+                      events={fluidEvents}
+                      closed={view.status !== "open"}
+                      // When the position was minted, not when the window opens —
+                      // otherwise a position with 1,400 events reads as days old
+                      // because its oldest loaded card is.
+                      firstAt={opening?.firstTimestamp}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    />
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isFluidEvent(event) ? (
+                    <FluidEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isLast={meta.isLast}
+                      siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                    />
+                  ) : null
+                }
+              />
+            </FluidSheetProvider>
             <ProvInspectorLayer />
           </>
         )}

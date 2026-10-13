@@ -1,7 +1,8 @@
 "use client";
 
 // Fluid's event card on the shared shell's slots (ui-jobs 309 step 8): the
-// head from fluid-event-header.tsx, T2 from fluid-cells.tsx, the explanation
+// head from fluid-event-header.tsx, T2 from fluid-sheet.tsx (an operate or a
+// liquidation) or fluid-cells.tsx (an NFT move), the explanation
 // and the Learn More from fluid-event-explainer.tsx. Gas stands in the price
 // row where the owner in force signed the transaction (lib/shared/index-gas.ts).
 
@@ -18,6 +19,7 @@ import { pairLabel } from "@/lib/fluid/asset-catalog";
 import { fluidExplainerTeaser, fundedSameTx, transferRoundTrip, type FluidEvent } from "@/lib/fluid/explainer-clauses";
 import { useFluidHeadSpec } from "./fluid-event-header";
 import { useFluidCells } from "./fluid-cells";
+import { fluidSheet, useFluidSheetFacts } from "./fluid-sheet";
 import { FluidEventExplainer, fluidLearnMoreContent } from "./fluid-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { fluidMintContent } from "@/lib/shared/learn-more-content";
@@ -145,14 +147,24 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
     ? undefined
     : ownerPaidGas({ wallet: owner, gas: gasRow }, ctx.txFrom ?? openedBy?.context.data.txFrom);
   const price = gas ? { gas, prices: [] } : undefined;
+  const opening = openedBy != null || fundedSameTx(sibs, event);
   const body = useFluidCells({
     ctx,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
     wallet: event.wallet,
     mintedTo: openedBy?.context.data.transferTo,
-    opening: openedBy != null || fundedSameTx(sibs, event),
+    opening,
     price,
+  });
+  const sheetFacts = useFluidSheetFacts();
+  const sheet = fluidSheet({
+    ctx,
+    coords,
+    opening,
+    facts: sheetFacts,
+    eventId: event.id,
+    addresses: { collateral: colRow.address, debt: debtRow.address },
   });
 
   const slots: EventCardSlots = {
@@ -174,6 +186,7 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
       sent: { txFrom: ctx.txFrom ?? openedBy?.context.data.txFrom, caller: ctx.initiator, owner },
     },
     cells: body.cells,
+    sheet,
     // The Collateral and Debt cells open into their ledgers where the page
     // ties its timeline to the Lifetime flows panel.
     ledgers: {

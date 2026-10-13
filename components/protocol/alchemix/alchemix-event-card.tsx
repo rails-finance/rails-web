@@ -200,6 +200,7 @@ export function AlchemixEventCard({
     head: header,
     caption: chainTruthCaption(header) ?? "",
     cells: detail.cells,
+    sheet: detail.sheet,
     ledgers: { none: "no flows panel on the Alchemist yet" },
     notes: detail.notes,
     price: gasPrice(alchemixOwnerGas(legs)),

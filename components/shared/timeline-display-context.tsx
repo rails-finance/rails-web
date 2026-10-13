@@ -11,6 +11,9 @@ export type TimelineDisplayKey =
   | "showTxHashes"
   | "followChart";
 
+/** The Lifetime flows panel's strip: the flows line or the price line. */
+export type FlowsView = "value" | "price";
+
 export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside
    * the icon. Off by default — the icon alone identifies the asset. */
@@ -40,8 +43,14 @@ export interface TimelineDisplayState {
    *  this provider, through the page's flow-focus store
    *  (`useFollowPreference`). */
   followChart: boolean;
+  /** "Value · Price" on the Lifetime flows control row (ui-jobs 328): the
+   *  strip under the bars draws the flows line or the held assets' prices.
+   *  Set from the panel, which stands outside this provider, through the
+   *  page's flow-focus store (`useFollowPreference`). */
+  flowsView: FlowsView;
   toggle: (key: TimelineDisplayKey) => void;
   set: (key: TimelineDisplayKey, value: boolean) => void;
+  setFlowsView: (view: FlowsView) => void;
 }
 
 const DEFAULTS = {
@@ -52,6 +61,7 @@ const DEFAULTS = {
   openAllMarketNotes: false,
   showTxHashes: false,
   followChart: false,
+  flowsView: "value" as FlowsView,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences
@@ -62,6 +72,7 @@ const Ctx = createContext<TimelineDisplayState>({
   ...DEFAULTS,
   toggle: () => {},
   set: () => {},
+  setFlowsView: () => {},
 });
 
 /** A stored preference drops the retired switches: `collapseRuns` (like
@@ -128,6 +139,16 @@ export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
+  const setFlowsView = useCallback((view: FlowsView) => {
+    setState((prev) => {
+      if (prev.flowsView === view) return prev;
+      const next = { ...prev, flowsView: view };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
   const toggle = useCallback((key: TimelineDisplayKey) => {
     setState((prev) => {
       const next = { ...prev, [key]: !prev[key] };
@@ -138,7 +159,7 @@ export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  return <Ctx.Provider value={{ ...state, toggle, set }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...state, toggle, set, setFlowsView }}>{children}</Ctx.Provider>;
 }
 
 export function useTimelineDisplay(): TimelineDisplayState {
