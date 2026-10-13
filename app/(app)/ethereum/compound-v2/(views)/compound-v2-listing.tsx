@@ -35,7 +35,7 @@ export function CompoundV2Listing({ initialItems, initialTotal, initialKey, init
       defaults={COMPOUND_V2_LIST_DEFAULTS}
       sortOptions={COMPOUND_V2_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      renderCard={(p) => <CompoundV2PositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <CompoundV2PositionCard v={viewFromSummary(p)} surface="listing" />}
       hrefFor={(p) => `/ethereum/compound-v2/${p.wallet}`}
       keyFor={(p) => p.wallet}
       strategy={serverStrategy<CompoundV2PositionSummary, CompoundV2ListFilters>({
