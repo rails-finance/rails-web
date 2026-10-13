@@ -1,28 +1,34 @@
 "use client";
 
-// Maple position card — the lender-side analog of the Spark / Moonwell
-// position cards, through the SAME shared grammar (OpenPositionStats +
-// StatValue) so it lines up with the other explorers.
+// Maple position card, the lender-side analog of the Spark / Moonwell position
+// cards. A slot builder (rails-ops TO-DO-position-card 322, 323): `mapleCardSlots`
+// turns the wallet's view into one `PositionCardSlots` object and the shared
+// `PositionCard` (components/shared/position-card.tsx) draws it.
 //
 // A Maple lender position is one wallet's ERC-4626 pool shares (plus any
-// shares escrowed in the withdrawal queue — still the wallet's position, it
-// exits at the pool's exit rate when processed). The two columns carry the
-// two states a lender's money can be in: the pool claim (shares × the exit
-// rate read at head — Maple's own bookkeeping of an off-chain-collateralized
+// shares escrowed in the withdrawal queue, still the wallet's position, it
+// exits at the pool's exit rate when processed). The two headlines carry the
+// two states a lender's money can be in: the pool claim (shares x the exit
+// rate read at head, Maple's bookkeeping of an off-chain-collateralized
 // loan book; the provenance says so) and the withdrawal queue (escrowed
-// shares awaiting a FIFO fill). Amounts stay in the pool's own asset — Rails
-// never pins a stablecoin to $1.
+// shares awaiting a FIFO fill). The panel holds the claim's parts: shares and
+// exit rate per pool, the interest earned, the requests and the queued
+// shares. Amounts stay in the pool's asset; Rails never pins a stablecoin
+// to $1, so no headline carries a USD line.
 
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import type { ReactNode } from "react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatExact, formatUnitsExact, formatNumber } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
 import {
   positionCurrentValueProv,
   positionPrincipalProv,
@@ -37,17 +43,11 @@ import {
 import type { MapleCardCaptions } from "@/lib/maple/economics";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
 import { maplePositionContent } from "@/lib/maple/position-content";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
-import {
-  useReserveDisclosure,
-  ReserveDisclosureToggle,
-  ReserveDisclosureList,
-} from "@/components/shared/reserve-disclosure";
 import type { MaplePositionSummary, MaplePoolAmount, MaplePeakAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { TipLabel } from "@/components/shared/tip-label";
+import { MapleMenuRows } from "./maple-menu-rows";
 
 export interface MaplePositionView {
   wallet: string;
@@ -76,6 +76,8 @@ const claimAmount = (p: MaplePoolAmount): number => p.currentValue ?? p.deposite
 const claimProv = (p: MaplePoolAmount) =>
   p.currentValue != null ? positionCurrentValueProv(p.assetSymbol, p.symbol) : positionPrincipalProv(p.assetSymbol);
 
+const heldIn = (p: MaplePoolAmount): boolean => p.shares + p.escrowedShares > 0;
+
 /** A card figure in full to three decimals with its token named, the rows'
  *  rule (Polaris's CardAmount). The unit and glyph wrap as one piece, so a
  *  nine-figure claim does not push the card past a phone's width. */
@@ -98,110 +100,40 @@ function CardAmount({ value, symbol, exact }: { value: number; symbol: string; e
   );
 }
 
-/** A vertical stack of the wallet's pool claims, each traced. */
-function ClaimStack({ v }: { v: MaplePositionView }) {
-  const live = v.pools.filter((p) => p.shares + p.escrowedShares > 0);
-  if (live.length === 0) return <StatDash />;
+/** The claim headline: each live pool's claim in its token, traced. */
+function ClaimLines({ v }: { v: MaplePositionView }) {
+  const live = v.pools.filter(heldIn);
+  if (live.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
       {live.map((p) => (
-        <StatValue key={p.pool}>
+        <div key={p.pool}>
           <Prov info={claimProv(p)}>
             {/* The tip states the claim in its own token; the shares behind
-                it are the line beneath. */}
+                it are a panel row. */}
             <CardAmount
               value={claimAmount(p)}
               symbol={p.assetSymbol}
               exact={p.currentValue != null ? undefined : String(p.depositedPrincipal)}
             />
           </Prov>
-        </StatValue>
-      ))}
-    </div>
-  );
-}
-
-/** Per-pool share amounts, demoted beneath the claim — the exact lanes. */
-function ClaimFootnoteLines({ v }: { v: MaplePositionView }) {
-  const live = v.pools.filter((p) => p.shares + p.escrowedShares > 0);
-  if (live.length === 0) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {live.map((p) => {
-        const exact = formatUnitsExact(p.sharesRaw, 6);
-        return (
-          <div key={p.pool}>
-            <Prov info={positionSharesProv(p.symbol)}>
-              <ExactSpan exact={exact} symbol={p.symbol}>
-                {formatNumber(p.shares)} {p.symbol}
-              </ExactSpan>
-            </Prov>
-            {p.currentValue != null && v.poolState?.[p.pool] != null && (
-              <>
-                {" "}
-                <Prov info={poolExitRateProv(p.assetSymbol, p.symbol, v.poolState[p.pool].blockNumber)}>
-                  <span className="text-rb-500">@ {v.poolState[p.pool].exitRate.toFixed(4)}</span>
-                </Prov>
-              </>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** "incl. X interest" — earned interest already included in the claim above —
- *  or, where the claim holds none of it, "all interest withdrawn". */
-function InterestCaption({ captions }: { captions?: MapleCardCaptions }) {
-  // The claim holds none of what the position earned: the figure lives in
-  // Lifetime flows, and the card points there.
-  if (captions?.interestWithdrawn)
-    return <div className="text-xs mt-0.5 text-rb-500">all interest withdrawn · total in Lifetime flows</div>;
-  const it = captions?.interestEarned;
-  if (!it || it.amount < 0.01) return null;
-  return (
-    <>
-      <div className="text-xs mt-0.5 text-rb-500">
-        incl.{" "}
-        <Prov info={interestEarnedProv(it.symbol)}>
-          <span>
-            <AmountText value={it.amount} format="number" /> {it.symbol}
-          </span>
-        </Prov>{" "}
-        interest earned
-      </div>
-      {/* A pool the wallet has left: its interest is not in the claim above. */}
-      {(captions?.earnedElsewhere ?? []).map((e) => (
-        <div key={e.symbol} className="text-xs mt-0.5 text-rb-500">
-          <Prov info={interestEarnedLifetimeProv(e.symbol)}>
-            <span>
-              <AmountText value={e.amount} format="number" /> {e.symbol}
-            </span>
-          </Prov>{" "}
-          earned in the {e.symbol} pool, all withdrawn
         </div>
       ))}
-    </>
+    </div>
   );
 }
 
-/** The queue column: escrowed shares, valued at the exit rate when read. */
-function QueueStack({ v }: { v: MaplePositionView }) {
+/** The queue headline: escrowed shares, valued at the exit rate when read. */
+function QueueLines({ v }: { v: MaplePositionView }) {
   const queued = v.pools.filter((p) => p.escrowedShares > 0);
-  if (queued.length === 0)
-    return (
-      <StatValue>
-        <span className="text-rb-500">None</span>
-      </StatValue>
-    );
+  if (queued.length === 0) return <span className="text-rb-500">None</span>;
   return (
     <div className="flex flex-col gap-1">
       {queued.map((p) => {
         const st = v.poolState?.[p.pool];
         const value = st != null ? mapleExitAssets(p.escrowedSharesRaw, st) : null;
         return (
-          <StatValue key={p.pool}>
+          <div key={p.pool}>
             <Prov info={positionEscrowProv(p.symbol)}>
               <CardAmount
                 value={value ?? p.escrowedShares}
@@ -209,212 +141,277 @@ function QueueStack({ v }: { v: MaplePositionView }) {
                 exact={value != null ? undefined : formatUnitsExact(p.escrowedSharesRaw, 6)}
               />
             </Prov>
-          </StatValue>
+          </div>
         );
       })}
     </div>
   );
 }
 
-/** A vertical stack of per-pool PEAK holdings (highest recorded), no USD.
- *  The share peak leads — the position IS shares, and the slot-exact lane
- *  carries every wallet including the transfer-acquired majority, whose
- *  deposited-principal peak is zero. The principal peak rides beneath it as
- *  a footnote when the wallet ever deposited. Valuing the peak at today's
- *  exit rate would price a past holding at a present rate, so no asset
- *  value is asserted. */
-function PeakStack({ lines }: { lines: MaplePeakAmount[] }) {
+/** A closed card's peak: the highest share balance per pool. The share peak
+ *  leads, since the position IS shares and the slot-exact lane carries every
+ *  wallet including the transfer-acquired majority, whose deposited-principal
+ *  peak is zero. Valuing the peak at today's exit rate would price a past
+ *  holding at a present rate, so no asset value is asserted. */
+function PeakLines({ lines }: { lines: MaplePeakAmount[] }) {
   const held = lines.filter((p) => p.peakShares > 0);
-  if (held.length === 0) return <StatDash />;
+  if (held.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
       {held.map((p) => (
         <div key={p.pool}>
-          <StatValue>
-            <Prov info={peakSharesProv(p.symbol)}>
-              <CardAmount value={p.peakShares} symbol={p.symbol} exact={String(p.peakShares)} />
-            </Prov>
-          </StatValue>
-          {p.peakDeposited > 0 && (
-            <div className="text-xs mt-0.5 text-rb-500">
-              <Prov info={peakDepositedProv(p.assetSymbol)}>
-                <span>
-                  peak deposited <AmountText value={p.peakDeposited} format="number" /> {p.assetSymbol}
-                </span>
-              </Prov>
-            </div>
-          )}
+          <Prov info={peakSharesProv(p.symbol)}>
+            <CardAmount value={p.peakShares} symbol={p.symbol} exact={String(p.peakShares)} />
+          </Prov>
         </div>
       ))}
     </div>
   );
 }
 
-export function MaplePositionCard({
+/** The principal peak beneath the share peak, for each pool that ever recorded one. */
+function PeakDepositedLines({ lines }: { lines: MaplePeakAmount[] }) {
+  const deposited = lines.filter((p) => p.peakShares > 0 && p.peakDeposited > 0);
+  if (deposited.length === 0) return null;
+  return (
+    <>
+      {deposited.map((p) => (
+        <div key={p.pool}>
+          <Prov info={peakDepositedProv(p.assetSymbol)}>
+            <span>
+              peak deposited <AmountText value={p.peakDeposited} format="number" /> {p.assetSymbol}
+            </span>
+          </Prov>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** The panel rows for the interest the claim holds: "all withdrawn" where the
+ *  claim holds none of it, the amount otherwise, and one row per pool the
+ *  wallet has left. */
+function interestRows(captions?: MapleCardCaptions): PositionPanelRow[] {
+  // The claim holds none of what the position earned: the figure lives in
+  // Lifetime flows, and the card points there.
+  if (captions?.interestWithdrawn)
+    return [
+      {
+        id: "interest-earned",
+        label: "Interest earned",
+        value: "All withdrawn, total in Lifetime flows",
+        tip: "The claim holds none of the interest the position earned; the total is in the Lifetime flows panel.",
+      },
+    ];
+  const it = captions?.interestEarned;
+  if (!it || it.amount < 0.01) return [];
+  return [
+    {
+      id: "interest-earned",
+      label: "Interest earned",
+      value: (
+        <Prov info={interestEarnedProv(it.symbol)}>
+          <span>
+            <AmountText value={it.amount} format="number" /> {it.symbol}
+          </span>
+        </Prov>
+      ),
+      tip: "What the claim holds beyond the principal the wallet put in, replayed from the wallet's events and the exit rate at head.",
+    },
+    // A pool the wallet has left: its interest is not in the claim.
+    ...(captions?.earnedElsewhere ?? []).map((e) => ({
+      id: `interest-${e.symbol}`,
+      label: `Interest earned, ${e.symbol} pool`,
+      value: (
+        <>
+          <Prov info={interestEarnedLifetimeProv(e.symbol)}>
+            <span>
+              <AmountText value={e.amount} format="number" /> {e.symbol}
+            </span>
+          </Prov>
+          , all withdrawn
+        </>
+      ),
+      tip: `Interest the wallet earned in the ${e.symbol} pool, which it has left; none of it is in the claim.`,
+    })),
+  ];
+}
+
+/** How many withdrawal requests the wallet made, and what became of them. */
+function requestValue(requestCount: number, cancelledRequests?: number): string {
+  const n = requestCount;
+  const c = cancelledRequests ?? 0;
+  if (c <= 0 || c > n) return String(n);
+  if (c === n) return n === 1 ? "1, cancelled" : `${n}, all cancelled`;
+  return `${n}, ${c} cancelled`;
+}
+
+export interface MaplePositionCardProps {
+  v: MaplePositionView;
+  /** `detail` on the wallet's page (receipts, panel, (i)); `listing` in a row. */
+  surface: "detail" | "listing";
+  /** Requests the wallet cancelled, where the page holds its whole history:
+   *  the requests row then says what became of them. */
+  cancelledRequests?: number;
+  /** The card's Explanation section (narration describing the position NOW). */
+  explanation?: ReactNode;
+  /** Copy-this-view control: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** Detail-page stat captions (earned interest), computed from the event
+   *  stream and the pool chain read (computeMapleCardCaptions). */
+  captions?: MapleCardCaptions;
+  /** The ⋮'s export shapes. `null`: the ⋮ holds the wallet's rows and the
+   *  provenance row alone. */
+  exports?: PositionCardExports | null;
+}
+
+/** The Maple lender's slots for the shared position card. */
+export function mapleCardSlots({
   v,
-  receipts = false,
-  rowExtra,
+  surface,
+  cancelledRequests,
   explanation,
   viewHref,
   captions,
-  cancelledRequests,
-}: {
-  v: MaplePositionView;
-  receipts?: boolean;
-  /** Requests the wallet cancelled, where the page holds its whole history:
-   *  the queue footnote then says what became of them. */
-  cancelledRequests?: number;
-  /** Context content riding the shell's heading-button row. */
-  rowExtra?: React.ReactNode;
-  /** The card's Explanation section (narration describing the position NOW). */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  /** Detail-page stat captions (earned interest) — computed from the event
-   *  stream + the pool chain read (computeMapleCardCaptions). Listing cards
-   *  omit them. */
-  captions?: MapleCardCaptions;
-}) {
-  // The "Pool claim" side's own list of live pools — collapsed by default
-  // once it would list two or more (ui-jobs 57). Computed here (not just
-  // below) because the hook must run on every render, before the closed
-  // early return.
-  const liveCount = v.pools.filter((p) => p.shares + p.escrowedShares > 0).length;
-  const claimDisclosure = useReserveDisclosure(liveCount);
+  exports,
+}: MaplePositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
+  const closed = v.status === "closed";
+  const live = v.pools.filter(heldIn);
 
-  // Closed: the wallet holds no shares and no queue position — the headline
-  // is what it held at its height (the peak share balance per pool, with the
-  // peak deposited principal beneath where one was ever recorded). No debt
-  // column: a lender never carries one, and ClosedPositionStats drops the
-  // slot for supply-only positions. rowExtra deliberately does not ride here
-  // — the live risk strip describes the chain NOW and never a past life.
-  if (v.status === "closed") {
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={maplePositionContent({ status: "closed" })}
-      >
-        <ClosedPositionStats
-          outcome="closed"
-          leadingIdentity={
-            receipts ? undefined : (
-              <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
-            )
-          }
-          identity={<PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} />}
-          closedAt={v.lastActivityAt}
-          collateralLabel="Highest recorded pool shares"
-          collateral={<PeakStack lines={v.peakPools} />}
-        />
-      </PositionCardShell>
-    );
+  // The wallet is on the page's wallet row above a detail card.
+  const identity = detail ? undefined : (
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
+  );
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    // The foot strip reads transactions, warnings, then the age (ui-jobs 270).
+    ...(detail ? { order: "age-last" as const, countNounVisible: !closed } : {}),
+  };
+  // Closed, or some shares wait in the withdrawal queue: the wallet still
+  // earns on them until the request fills.
+  const status: PositionCardStatus | null = closed
+    ? { word: "Closed", tone: "muted" }
+    : v.inQueue
+      ? { word: "In withdrawal queue", tone: "caution" }
+      : null;
+  const common = { status, identity, counters };
+
+  const menuLeading = () => (
+    <MapleMenuRows address={v.wallet} pagePath={`/ethereum/maple/${v.wallet}`} noun="position" idLabel="Wallet" />
+  );
+
+  if (closed) {
+    // Nothing held now: the headline is the wallet's height, the peak share
+    // balance per pool, with the peak deposited principal beneath where one
+    // was ever recorded.
+    const heads: PositionCardHead[] = [
+      {
+        id: "peak-shares",
+        label: "Highest recorded pool shares",
+        value: <PeakLines lines={v.peakPools} />,
+        sub: <PeakDepositedLines lines={v.peakPools} />,
+      },
+    ];
+    const outcome = { word: "Closed", dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined };
+    if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null };
+    return {
+      ...common,
+      heads,
+      outcome,
+      surface: "detail",
+      explainer: { body: explanation ?? null, viewHref },
+      learnMore: maplePositionContent({ status: "closed" }),
+      menu: { leading: menuLeading, exports: exports ?? null },
+    };
   }
 
-  const modeWord = v.inQueue ? "In withdrawal queue" : "Lending";
-  const modeTip = v.inQueue
-    ? "Some of the wallet's shares wait in the withdrawal queue to be paid out; they earn interest until then."
-    : "The wallet's shares are in the pool earning interest, with none waiting in the withdrawal queue.";
-  const live = v.pools.filter((p) => p.shares + p.escrowedShares > 0);
-  const requestLine = (() => {
-    const n = v.requestCount;
-    const c = cancelledRequests ?? 0;
-    const noun = `request${n === 1 ? "" : "s"}`;
-    if (c <= 0 || c > n) return `${n} ${noun} lifetime`;
-    if (c === n) return n === 1 ? "1 request, cancelled" : `${n} requests, all cancelled`;
-    return `${n} ${noun}, ${c} cancelled`;
-  })();
+  const heads: PositionCardHead[] = [
+    {
+      id: "pool-claim",
+      label: "Pool claim",
+      labelTip:
+        "What the wallet's shares pay out now: the shares times the pool's exit rate, the amount one share pays on withdrawal.",
+      value: live.length > 0 ? <ClaimLines v={v} /> : null,
+    },
+    {
+      // This wallet's queued shares; the pool band's "Pool queue" is everyone's.
+      id: "queued",
+      label: "Queued by this wallet",
+      value: <QueueLines v={v} />,
+    },
+  ];
+  if (!detail) return { ...common, heads, surface: "listing", menu: null };
 
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={maplePositionContent({ status: "open", inQueue: v.inQueue })}
-    >
-      <OpenPositionStats
-        statusPill={
-          receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              <TipLabel text={modeWord} tip={modeTip} />
-            </span>
-          ) : (
-            <RevealTip
-              tip="Open: the wallet holds pool shares now, or has shares waiting in the withdrawal queue."
-              label="Open: the wallet holds pool shares now, or has shares waiting in the withdrawal queue."
-              focusable
-              className="focus-ring rounded-sm"
-            >
-              <LifecyclePill status={v.status} />
-            </RevealTip>
-          )
-        }
-        leadingIdentity={
-          receipts ? undefined : (
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
-          )
-        }
-        identity={
-          <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} countNounVisible={receipts} />
-        }
-        columns={[
+  const shareRows: PositionPanelRow[] = live
+    .filter((p) => p.shares > 0)
+    .map((p) => ({
+      id: `shares-${p.pool}`,
+      label: `${p.symbol} held`,
+      value: (
+        <span className="tabular-nums">
+          <Prov info={positionSharesProv(p.symbol)}>
+            <ExactSpan exact={formatUnitsExact(p.sharesRaw, 6)} symbol={p.symbol}>
+              {formatNumber(p.shares)} {p.symbol}
+            </ExactSpan>
+          </Prov>
+          {p.currentValue != null && v.poolState?.[p.pool] != null && (
+            <>
+              {" "}
+              <Prov info={poolExitRateProv(p.assetSymbol, p.symbol, v.poolState[p.pool].blockNumber)}>
+                <span className="text-rb-500">@ {v.poolState[p.pool].exitRate.toFixed(4)}</span>
+              </Prov>
+            </>
+          )}
+        </span>
+      ),
+      tip: `${p.symbol} the wallet holds in the pool now, read from the share token's balance, and the rate one share pays on withdrawal. Shares waiting in the withdrawal queue are counted in the claim and listed apart.`,
+    }));
+  const queueRows: PositionPanelRow[] = [
+    ...(v.requestCount > 0
+      ? [
           {
-            label: "Pool claim",
-            labelTip:
-              "What the wallet's shares pay out now: the shares times the pool's exit rate, the amount one share pays on withdrawal.",
-            // Beside a single claim the amount carries its own token badge, so
-            // the cluster draws only for the collapsed list of several.
-            assetIcons: claimDisclosure.collapsible ? (
-              <span className="inline-flex items-center gap-1">
-                <InlineAssetCluster
-                  symbols={v.pools.filter((p) => p.shares + p.escrowedShares > 0).map((p) => p.assetSymbol)}
-                />
-                <ReserveDisclosureToggle
-                  disclosure={claimDisclosure}
-                  count={liveCount}
-                  // Each pool's claim in its own token, so a closed list still
-                  // reads: "5,000.409 USDC · 5,000.459 USDT".
-                  closedLabel={live.map((p, i) => (
-                    <span key={p.pool}>
-                      {i > 0 ? " · " : ""}
-                      <AmountText value={claimAmount(p)} format="number" /> {p.assetSymbol}
-                    </span>
-                  ))}
-                />
-              </span>
-            ) : undefined,
-            value: claimDisclosure.collapsible ? null : <ClaimStack v={v} />,
-            footnote: (
-              <>
-                {claimDisclosure.collapsible ? (
-                  <ReserveDisclosureList disclosure={claimDisclosure}>
-                    <ClaimStack v={v} />
-                    <ClaimFootnoteLines v={v} />
-                  </ReserveDisclosureList>
-                ) : (
-                  <ClaimFootnoteLines v={v} />
-                )}
-                <InterestCaption captions={captions} />
-              </>
-            ),
+            id: "requests",
+            label: "Withdrawal requests",
+            value: requestValue(v.requestCount, cancelledRequests),
+            tip: "Withdrawal requests the wallet has made across the pools, over its whole recorded history, and how many it cancelled.",
           },
-          {
-            // This wallet's queued shares; the pool band's "Pool queue" is
-            // everyone's.
-            label: "Queued by this wallet",
-            value: <QueueStack v={v} />,
-            footnote: v.requestCount > 0 ? <div className="text-xs mt-0.5 text-rb-500">{requestLine}</div> : undefined,
-          },
-          // No health-factor column: a lender has no liquidation surface —
-          // default risk socializes through the pool's exit rate
-          // (unrealizedLosses), and the access band carries that live.
-        ]}
-      />
-    </PositionCardShell>
-  );
+        ]
+      : []),
+    ...v.pools
+      .filter((p) => p.escrowedShares > 0)
+      .map((p) => ({
+        id: `queued-${p.pool}`,
+        label: `${p.symbol} in the queue`,
+        value: (
+          <Prov info={positionEscrowProv(p.symbol)}>
+            <ExactSpan exact={formatUnitsExact(p.escrowedSharesRaw, 6)} symbol={p.symbol}>
+              {formatNumber(p.escrowedShares)} {p.symbol}
+            </ExactSpan>
+          </Prov>
+        ),
+        tip: `${p.symbol} the wallet has escrowed in the withdrawal queue, read from the queue contract. They earn interest until the request fills, at the pool's exit rate.`,
+      })),
+  ];
+
+  // No health factor or liquidation row: a lender has no liquidation surface;
+  // default risk socializes through the pool's exit rate (unrealizedLosses),
+  // and the pool band carries that live.
+  return {
+    ...common,
+    heads,
+    surface: "detail",
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore: maplePositionContent({ status: "open", inQueue: v.inQueue }),
+    menu: { leading: menuLeading, exports: exports ?? null },
+    panel: [[...shareRows, ...interestRows(captions)], queueRows],
+  };
+}
+
+/** The Maple lender card: its slots, drawn by the shared card. */
+export function MaplePositionCard(props: MaplePositionCardProps) {
+  return <PositionCard slots={mapleCardSlots(props)} />;
 }
 
 /** Build a card view from the listing summary row. */

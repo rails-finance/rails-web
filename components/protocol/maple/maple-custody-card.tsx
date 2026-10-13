@@ -1,21 +1,24 @@
 "use client";
 
-// Maple custody card — the detail card for a known-infrastructure address
-// (the Chainlink CCIP bridge escrows). Same grammar as the lender position
-// card (PositionCardShell + OpenPositionStats, every figure <Prov>-traced),
-// but custody claims instead of lending claims: the escrow HOLDS pool shares
-// that back bridged balances on other networks — it does not lend, so there
-// is no principal, no interest, no queue column (the Compound V3 lesson:
-// custody is custody, not a deposit). Amounts stay in the pool's own asset —
-// Rails never pins a stablecoin to $1.
+// Maple custody card, the detail card for a known-infrastructure address (the
+// Chainlink CCIP bridge escrows). A slot builder for the shared position card
+// (rails-ops TO-DO-position-card 322), with every figure <Prov>-traced, but
+// custody claims instead of lending claims: the escrow HOLDS pool shares that
+// back bridged balances on other networks. It does not lend, so there is no
+// principal, no interest, no queue (the Compound V3 lesson: custody is custody,
+// and no deposit). Amounts stay in the pool's asset; Rails never pins a
+// stablecoin to $1.
 //
 // Every figure rides the one custody chain read (one multicall, one block;
 // lib/sources/chain/maple-custody.ts): the direct share balance, its value at
 // the pool's exit price, and the escrow's fraction of the pool supply.
 
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import {
+  PositionCard,
+  type PositionCardHead,
+  type PositionCardSlots,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -29,15 +32,15 @@ import {
 import type { CcipEscrow } from "@/lib/shared/known-infrastructure";
 import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
+import { MapleMenuRows } from "./maple-menu-rows";
 
-/** The headline stack: what the locked shares redeem for, in the pool's own
- *  asset — shares alone when the value derivation degraded. */
-function CustodyStack({ holdings }: { holdings: MapleCustodyHolding[] }) {
-  if (holdings.length === 0) return <StatDash />;
+/** The first headline: what the locked shares redeem for, in the pool's own
+ *  asset, or shares alone when the value derivation degraded. */
+function CustodyLines({ holdings }: { holdings: MapleCustodyHolding[] }) {
   return (
     <div className="flex flex-col gap-1">
       {holdings.map((h) => (
-        <StatValue key={h.pool}>
+        <div key={h.pool}>
           <Prov
             info={
               h.exitValue != null
@@ -51,57 +54,24 @@ function CustodyStack({ holdings }: { holdings: MapleCustodyHolding[] }) {
               exact={`${formatUnitsExact(h.raw.shares, 6)} ${h.symbol} locked`}
             />
           </Prov>
-        </StatValue>
+        </div>
       ))}
     </div>
   );
 }
 
-/** Per-pool share amounts beneath the headline — the exact locked balances,
- *  each with the exit rate it was valued at (the lender card's footnote
- *  idiom). */
-function CustodyFootnoteLines({ holdings }: { holdings: MapleCustodyHolding[] }) {
-  if (holdings.length === 0) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {holdings.map((h) => {
-        const exact = `${formatUnitsExact(h.raw.shares, 6)} ${h.symbol}`;
-        return (
-          <div key={h.pool}>
-            <Prov info={custodySharesProv(h.symbol, h.blockNumber)}>
-              <ExactSpan exact={exact} symbol={h.symbol}>
-                {formatCompact(h.shares)} {h.symbol}
-              </ExactSpan>
-            </Prov>
-            {h.exitValue != null && (
-              <>
-                {" "}
-                <Prov info={poolExitRateProv(h.assetSymbol, h.symbol, h.blockNumber)}>
-                  <span className="text-rb-500">@ {h.exitRate.toFixed(4)}</span>
-                </Prov>
-              </>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /** The escrow's fraction of each pool's whole share supply. */
-function SupplyShareStack({ holdings }: { holdings: MapleCustodyHolding[] }) {
-  const valued = holdings.filter((h) => h.supplyShare != null);
-  if (valued.length === 0) return <StatDash />;
+function SupplyShareLines({ holdings }: { holdings: MapleCustodyHolding[] }) {
   return (
     <div className="flex flex-col gap-1">
-      {valued.map((h) => (
-        <StatValue key={h.pool}>
+      {holdings.map((h) => (
+        <div key={h.pool}>
           <Prov info={custodySupplyShareProv(h.symbol, h.blockNumber)}>
             <span data-prov-exact={`${((h.supplyShare ?? 0) * 100).toFixed(4)}% of ${h.symbol} supply`}>
               {((h.supplyShare ?? 0) * 100).toFixed(2)}%
             </span>
           </Prov>
-        </StatValue>
+        </div>
       ))}
     </div>
   );
@@ -157,39 +127,80 @@ function CustodyExplanation({ infra, holdings }: { infra: CcipEscrow; holdings: 
 
 export function MapleCustodyCard({
   infra,
+  wallet,
   holdings,
   viewHref,
 }: {
   infra: CcipEscrow;
+  /** The escrow contract's address. */
+  wallet: string;
   holdings: MapleCustodyHolding[];
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
+  /** Copy-this-view control: the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
 }) {
   const live = holdings.filter((h) => h.shares > 0);
-  return (
-    <PositionCardShell receipts explanation={<CustodyExplanation infra={infra} holdings={live} />} viewHref={viewHref}>
-      <OpenPositionStats
-        statusPill={
-          <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-            Custody
-          </span>
-        }
-        leadingIdentity={<span className="text-sm font-semibold text-foreground">{infra.name}</span>}
-        columns={[
-          {
-            // AssetAmount's towed glyph identifies the asset — an escrow holds
-            // exactly one pool's shares, so a cluster would only repeat it.
-            label: "Held in custody",
-            value: <CustodyStack holdings={live} />,
-            footnote: <CustodyFootnoteLines holdings={live} />,
-          },
-          {
-            label: "Share of pool supply",
-            value: <SupplyShareStack holdings={live} />,
-          },
-        ]}
-      />
-    </PositionCardShell>
-  );
+  const valued = live.filter((h) => h.supplyShare != null);
+
+  const heads: PositionCardHead[] = [
+    {
+      // AssetAmount's towed glyph identifies the asset: an escrow holds
+      // one pool's shares, so a cluster would only repeat it.
+      id: "held-in-custody",
+      label: "Held in custody",
+      value: live.length > 0 ? <CustodyLines holdings={live} /> : null,
+    },
+    {
+      id: "supply-share",
+      label: "Share of pool supply",
+      value: valued.length > 0 ? <SupplyShareLines holdings={valued} /> : null,
+    },
+  ];
+
+  // The exact locked balance of each pool, with the exit rate it was valued at.
+  const rows: PositionPanelRow[] = live.map((h) => ({
+    id: `locked-${h.pool}`,
+    label: `${h.symbol} locked`,
+    value: (
+      <span className="tabular-nums">
+        <Prov info={custodySharesProv(h.symbol, h.blockNumber)}>
+          <ExactSpan exact={`${formatUnitsExact(h.raw.shares, 6)} ${h.symbol}`} symbol={h.symbol}>
+            {formatCompact(h.shares)} {h.symbol}
+          </ExactSpan>
+        </Prov>
+        {h.exitValue != null && (
+          <>
+            {" "}
+            <Prov info={poolExitRateProv(h.assetSymbol, h.symbol, h.blockNumber)}>
+              <span className="text-rb-500">@ {h.exitRate.toFixed(4)}</span>
+            </Prov>
+          </>
+        )}
+      </span>
+    ),
+    tip: `${h.symbol} the contract holds, read from the share token's balance, and the rate one share pays on withdrawal, read from the pool in the same block.`,
+  }));
+
+  const slots: PositionCardSlots = {
+    surface: "detail",
+    status: null,
+    heads,
+    // Custody is what this address is.
+    identity: (
+      <span className="flex items-center gap-2 text-xs text-rb-500">
+        <span className="text-sm font-semibold text-foreground">{infra.name}</span>
+        Custody
+      </span>
+    ),
+    counters: null,
+    explainer: { body: <CustodyExplanation infra={infra} holdings={live} />, viewHref },
+    learnMore: null,
+    menu: {
+      leading: () => (
+        <MapleMenuRows address={wallet} pagePath={`/ethereum/maple/${wallet}`} noun="address" idLabel="Contract" />
+      ),
+      exports: null,
+    },
+    panel: [rows, []],
+  };
+  return <PositionCard slots={slots} />;
 }
