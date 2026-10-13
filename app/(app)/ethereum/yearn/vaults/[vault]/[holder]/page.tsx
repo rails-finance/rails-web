@@ -43,6 +43,7 @@ import { notFound } from "next/navigation";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { yearnVaultSharePriceProv } from "@/lib/yearn/vault-provenance";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
@@ -202,6 +203,12 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
       price: sharePrice,
       unit: sharePrice ? data.vault.asset.symbol : undefined,
       label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
+      info: yearnVaultSharePriceProv({
+        blockNumber: data.blockNumber,
+        vault: data.vault.address,
+        vaultName: data.vault.name ?? undefined,
+        assetSymbol: data.vault.asset.symbol,
+      }),
     },
   ];
 

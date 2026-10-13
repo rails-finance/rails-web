@@ -55,7 +55,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { assetText } from "@/lib/shared/vault-amount-text";
-import { vaultHolderMaxWithdrawProv, type MorphoVaultCoords } from "@/lib/morpho-base/vault-provenance";
+import { vaultHolderMaxWithdrawProv, vaultSharePriceProv, type MorphoVaultCoords } from "@/lib/morpho-base/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { aaveVaultPositionContent } from "@/lib/shared/learn-more-content";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
@@ -401,6 +401,13 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
       price: !data.chainStale && data.sharePrice.value > 0 ? data.sharePrice.value : undefined,
       unit: !data.chainStale && data.sharePrice.value > 0 ? data.vault.asset.symbol : undefined,
       label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
+      info: vaultSharePriceProv({
+        blockNumber: data.blockNumber,
+        vault: data.vault.address,
+        vaultName: data.vault.name || undefined,
+        assetSymbol: data.vault.asset.symbol,
+        shareSymbol: data.vault.symbol || undefined,
+      }),
     },
   ];
 

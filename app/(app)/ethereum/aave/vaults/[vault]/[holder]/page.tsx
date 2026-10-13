@@ -48,6 +48,7 @@ import { cooldownSentence } from "@/lib/aave-vaults/cooldown-words";
 import {
   aaveVaultCooldownStateProv,
   aaveVaultMaxRedeemProv,
+  aaveVaultSharePriceProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
@@ -416,6 +417,17 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
       price: sharePrice,
       unit: sharePrice ? data.vault.asset.symbol : undefined,
       label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
+      info: aaveVaultSharePriceProv(
+        {
+          blockNumber: data.blockNumber,
+          vault: data.vault.address,
+          vaultName: data.vault.name ?? undefined,
+          assetSymbol: data.vault.asset.symbol,
+          shareSymbol: data.vault.symbol ?? undefined,
+          reserveSymbol: data.umbrella?.reserve?.symbol,
+        },
+        data.vault.shareDecimals ?? 18,
+      ),
     },
   ];
 
