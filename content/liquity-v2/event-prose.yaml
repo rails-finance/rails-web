@@ -524,6 +524,51 @@ L2_words:
     Minimum ratio
   critical_ratio: |-
     Critical ratio
+  # The sheet's read-more, one per row: what the figure is and where it is read.
+  tip_coll_last: |-
+    The Trove's {coll_symbol} after its previous event, from the TroveManager's log, at Liquity's {coll_symbol} price at that event.
+  tip_coll_market: |-
+    What the {coll_symbol} price's move between the previous event and this one did to the collateral's dollar value, at Liquity's oracle price at both blocks.
+  tip_coll_before: |-
+    The Trove's {coll_symbol} just before this event, at Liquity's {coll_symbol} price at this block.
+  tip_coll_event: |-
+    The {coll_symbol} this event moved, from the TroveManager's log, at Liquity's {coll_symbol} price at this block.
+  tip_coll_redistribution: |-
+    The {coll_symbol} that liquidated Troves passed to this one, applied at this event, from the TroveManager's log.
+  tip_coll_total: |-
+    The Trove's collateral after this event in dollars: its {coll_symbol} from the TroveManager's log times Liquity's {coll_symbol} price at this block.
+  tip_debt_last: |-
+    The Trove's debt after its previous event, from the TroveManager's log, at $1 per {debt_symbol}.
+  tip_debt_interest: |-
+    The {accrual_noun} the debt accrued between the previous event and this one, at $1 per {debt_symbol}.
+  tip_debt_interest_asset: |-
+    The interest in {debt_symbol}, counted at its $1.00 face.
+  tip_debt_fee: |-
+    The batch manager's management fee the debt accrued since the previous event, in {debt_symbol}.
+  tip_debt_before: |-
+    The debt just before this event: the previous event's debt plus the {accrual_noun} since.
+  tip_debt_event: |-
+    The debt this event moved: the debt after, from the TroveManager's log, less the debt before, any upfront fee and any redistributed debt.
+  tip_debt_upfront_fee: |-
+    A one-off borrowing fee this operation added to the Trove's debt, from the TroveManager's log.
+  tip_debt_redistribution: |-
+    The debt that liquidated Troves passed to this one, applied at this event.
+  tip_debt_total: |-
+    The Trove's debt after this event, from the TroveManager's log, at $1 per {debt_symbol}.
+  tip_cr: |-
+    The collateral's dollar value divided by the debt after this event, at Liquity's {coll_symbol} price at this block.
+  tip_ltv: |-
+    The debt divided by the collateral's dollar value after this event, at Liquity's {coll_symbol} price at this block.
+  tip_liquidates_at: |-
+    The {coll_symbol} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.
+  tip_rate: |-
+    The annual interest rate on the Trove's debt after this event, from the TroveManager's log.
+  tip_delegate_fee: |-
+    The batch's annual management fee, set by its batch manager and charged on top of the interest rate.
+  tip_minimum_ratio: |-
+    The collateral ratio below which a Trove on the {coll_symbol} branch can be liquidated, a constant of the branch's contracts.
+  tip_critical_ratio: |-
+    The branch-wide collateral ratio below which the {coll_symbol} branch restricts borrowing, a constant of the branch's contracts.
 
 # ── Copy for LLM: the block's context header ──
 context_words:

@@ -15,7 +15,9 @@
 // repaid ones. Beneath the sides, the Risk and Limits panels: label and value
 // rows, each value a level that swaps to its change since the previous event
 // (change-swap-value.tsx), the protocol's parameters as muted rows with the
-// breakdown on.
+// breakdown on. Every row the family gives a `tip` ends its label with a "?"
+// that opens the tip on a click or a tap (reveal-tip.tsx), the totals and the
+// repaid row included.
 //
 // A row above the panels holds the card's breakdown switch, "Show breakdown" /
 // "Hide breakdown", which changes this card alone and starts off each time the
@@ -25,6 +27,7 @@
 // column draws the other.
 
 import { useState, type ReactNode } from "react";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetPopover } from "@/components/shared/asset-popover";
@@ -53,6 +56,9 @@ export interface SheetRow {
    *  `address`: the token's contract, where the family's data carries it. */
   amount?: SheetFigure & { symbol?: string; address?: string };
   usd?: SheetFigure;
+  /** The row's read-more: what the figure is and where it comes from, behind
+   *  a "?" at the end of the label. */
+  tip?: string;
 }
 
 /** One side of the sheet. */
@@ -75,6 +81,10 @@ export interface SheetSide {
   /** The side's total after the event, in dollars; `none` names why there is
    *  none. */
   total: SheetFigure | { none: string };
+  /** The total's read-more, behind a "?" in its label cell. */
+  totalTip?: string;
+  /** The repaid assets row's read-more. */
+  repaidTip?: string;
 }
 
 /** A label and value row of the Risk or Limits panel. */
@@ -86,6 +96,8 @@ export interface SheetStat {
   change?: SwapFigure | null;
   /** The level's tone, where it carries one (a ratio's zone colour). */
   tone?: string;
+  /** The row's read-more, behind a "?" at the end of the label. */
+  tip?: string;
 }
 
 export interface SheetPanel {
@@ -136,6 +148,8 @@ const WORDS = {
   tokens: "Asset",
   usd: "USD",
   oracle: "The protocol's oracle, at this block",
+  about: (name: string) => `About ${name}`,
+  total: (side: string) => `${side} total`,
 };
 
 type Col = "tokens" | "usd";
@@ -148,6 +162,27 @@ const Fig = ({ f }: { f: SheetFigure }) =>
   ) : (
     <>{f.text}</>
   );
+
+/** A row's "?": opens its read-more on a click or a tap, inside the label
+ *  cell so the value columns keep their place. The "?" is drawn by CSS, so a
+ *  row's text reads as its label alone. */
+function RowHelp({ tip, name }: { tip: string; name: string }) {
+  return (
+    <RevealTip
+      className="ml-1 align-baseline"
+      tip={<span className="block w-64 max-w-[calc(100vw-48px)] whitespace-normal leading-snug">{tip}</span>}
+    >
+      <button
+        type="button"
+        data-sheet-help=""
+        aria-label={WORDS.about(name)}
+        className="inline-flex size-4 items-center justify-center rounded-full border border-rb-300 text-[10px] font-semibold leading-none text-rb-500 before:content-['?'] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-rb-600"
+      />
+    </RevealTip>
+  );
+}
+
+const nameOf = (label: ReactNode, key: string) => (typeof label === "string" ? label : key);
 
 /** The three columns: label, asset figure and its icon, USD. Under 640px the
  *  label and one value column. */
@@ -230,6 +265,7 @@ function Row({
       <span className={`min-w-0 ${pad} ${t} ${indent ? "pl-4" : ""}`}>
         {r.label}
         {r.note != null && <span className="text-rb-500"> · {r.note}</span>}
+        {r.tip && <RowHelp tip={r.tip} name={nameOf(r.label, r.key)} />}
       </span>
       <span className={`${pad} text-right tabular-nums ${t} max-sm:hidden`} data-sheet-col="amount">
         {r.amount && <AmountCell r={r} />}
@@ -301,6 +337,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
                   note: s.repaid!.join(", "),
                   amount: { text: "0.00" },
                   usd: { text: "$0" },
+                  tip: s.repaidTip,
                 }}
                 tone="muted"
                 col={col}
@@ -314,6 +351,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
         <div className="contents" data-sheet-row="total">
           <span className={`min-w-0 self-center py-2 text-sm ${touched ? "" : "text-rb-500"}`}>
             {touched ? null : WORDS.untouched}
+            {s.totalTip && <RowHelp tip={s.totalTip} name={WORDS.total(name)} />}
           </span>
           <span className="py-2 max-sm:hidden" />
           <span
@@ -338,7 +376,10 @@ function StatRows({ rows, muted, name }: { rows: SheetStat[]; muted?: boolean; n
     <>
       {rows.map((r) => (
         <div key={r.key} className="contents" data-sheet-row={r.key}>
-          <span className={`min-w-0 py-1.5 ${muted ? "text-rb-500" : "text-foreground"}`}>{r.label}</span>
+          <span className={`min-w-0 py-1.5 ${muted ? "text-rb-500" : "text-foreground"}`}>
+            {r.label}
+            {r.tip && <RowHelp tip={r.tip} name={nameOf(r.label, r.key)} />}
+          </span>
           <span className={`py-1.5 text-right ${muted ? "text-rb-500" : "text-foreground"}`}>
             {"none" in r.value ? (
               <span className="text-rb-500">{r.value.none}</span>

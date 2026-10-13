@@ -68,6 +68,39 @@ const WORDS = {
   unread: "Not available at this block",
 };
 
+/** Each row's read-more: what the figure is and where it is read. */
+const TIPS = {
+  event: (sym: string, side: FlowSide) =>
+    `The ${sym} this transaction moved on the ${side === "collateral" ? "supplied" : "borrowed"} side, read from the Pool before and after it, at the oracle's ${sym} price at this block.`,
+  last: (side: FlowSide) =>
+    `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars once the previous transaction on this timeline had run, read from the Pool at that block.`,
+  interest: (side: FlowSide) =>
+    `The interest every reserve on this side ${side === "collateral" ? "earned" : "accrued"} since the previous event, at the oracle's prices at this block.`,
+  interestAsset: (sym: string) =>
+    `The interest on ${sym} since the previous event, at the oracle's ${sym} price at this block.`,
+  market: (side: FlowSide) =>
+    `The change the oracle's prices made to the dollar value of the ${side === "collateral" ? "collateral" : "debt"} held between the previous event and this one.`,
+  before: (side: FlowSide) =>
+    `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars just before this transaction, read from the Pool at the oracle's prices at this block.`,
+  asset: (sym: string) =>
+    `The ${sym} owed after this transaction, read from the Pool, at the oracle's ${sym} price at this block.`,
+  repaid: "The assets this account once borrowed and owes none of after this event.",
+  total: (side: FlowSide) =>
+    `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars after this transaction, read from the Pool at the oracle's prices at this block.`,
+  health:
+    "The Pool's health factor for the account after this transaction: the collateral times the weighted liquidation threshold, divided by the debt; at or below 1 the position can be liquidated.",
+  fall: "How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.",
+  ltv: "The debt's dollar value as a share of the collateral's after this transaction, at the oracle's prices at this block.",
+  borrowable:
+    "What the account can still borrow in dollars before it reaches its max LTV: the max LTV times the collateral, less the debt.",
+  max_ltv:
+    "The share of the collateral the account can borrow against, each reserve's LTV weighted by its dollar value, from the Pool's configuration at this block.",
+  threshold:
+    "The share of the collateral above which the debt makes the position liquidatable, each reserve's threshold weighted by its dollar value, from the Pool's configuration at this block.",
+  emode:
+    "The efficiency-mode category the account had chosen; a reserve in it is borrowed against at the category's LTV and liquidation threshold.",
+};
+
 type Leg = "supply" | "debt";
 const ZERO = BigInt(0);
 const legOf = (r: AaveV3PositionStateReserve, leg: Leg) => (leg === "supply" ? r.supply : r.debt);
@@ -150,6 +183,7 @@ function sheetSide(
               info: atBlockUsdProv(sym, `The ${sym} this transaction moved`, groupExact(c.magnitude), p),
             }
           : undefined,
+      tip: TIPS.event(sym, side),
     };
   });
 
@@ -166,6 +200,7 @@ function sheetSide(
         key: "last",
         label: SHEET_WORDS.last,
         usd: { text: prevUsd.after.text, info: prevUsd.after.prov, value: prevUsd.after.value },
+        tip: TIPS.last(side),
       });
     // Interest per reserve, at this block's price.
     const since = interestSincePrevious(state, prev);
@@ -201,6 +236,7 @@ function sheetSide(
                 ),
               }
             : undefined,
+        tip: TIPS.interestAsset(part.symbol),
       };
     });
     if (sub.length > 0)
@@ -218,6 +254,7 @@ function sheetSide(
               },
             }
           : undefined,
+        tip: TIPS.interest(side),
         sub,
       });
     // The market move: the rest of the change in the Pool's total, which the
@@ -267,6 +304,7 @@ function sheetSide(
               }),
             },
           },
+          tip: TIPS.market(side),
         });
     }
   }
@@ -275,6 +313,7 @@ function sheetSide(
       key: "before",
       label: SHEET_WORDS.before,
       usd: { text: usd.before.text, info: usd.before.prov, value: usd.before.value },
+      tip: TIPS.before(side),
     };
 
   // With the breakdown, the Debt side lists every reserve it owes.
@@ -305,6 +344,7 @@ function sheetSide(
                 value: groupExact(after),
               },
               usd: u ? { text: sheetUsd(u.value), info: u.prov, value: u.exact } : undefined,
+              tip: TIPS.asset(sym),
             };
           })
       : undefined;
@@ -316,8 +356,9 @@ function sheetSide(
     carry,
     before: beforeRow,
     rows,
-    ...(side === "debt" ? { assets, repaid } : {}),
+    ...(side === "debt" ? { assets, repaid, repaidTip: TIPS.repaid } : {}),
     total: usd ? { text: usd.after.text, info: usd.after.prov, value: usd.after.value } : { none: WORDS.unread },
+    totalTip: TIPS.total(side),
   };
 }
 
@@ -351,8 +392,11 @@ export function aaveFamilySheet({
     return {
       sides,
       panels: [
-        { panel: "risk", rows: [{ key: "health-factor", label: WORDS.health, value: { none: WORDS.unread } }] },
-        { panel: "limits", rows: [{ key: "ltv", label: WORDS.ltv, value: { none: WORDS.unread } }] },
+        {
+          panel: "risk",
+          rows: [{ key: "health-factor", label: WORDS.health, tip: TIPS.health, value: { none: WORDS.unread } }],
+        },
+        { panel: "limits", rows: [{ key: "ltv", label: WORDS.ltv, tip: TIPS.ltv, value: { none: WORDS.unread } }] },
       ],
     };
   const a = acc.after;
@@ -380,6 +424,7 @@ export function aaveFamilySheet({
     {
       key: "health-factor",
       label: WORDS.health,
+      tip: TIPS.health,
       value: { text: hfFig.text, info: hfFig.prov, value: hfFig.value },
       change:
         hf != null && hfPrev != null && hf < 100 && hfPrev < 100
@@ -389,6 +434,7 @@ export function aaveFamilySheet({
     {
       key: "collateral-can-fall",
       label: WORDS.fall,
+      tip: TIPS.fall,
       value:
         drop != null
           ? { text: `${drop.toFixed(0)}%`, info: dropProv }
@@ -413,6 +459,7 @@ export function aaveFamilySheet({
     {
       key: "ltv",
       label: WORDS.ltv,
+      tip: TIPS.ltv,
       value:
         ltv != null
           ? {
@@ -432,6 +479,7 @@ export function aaveFamilySheet({
     {
       key: "borrowable",
       label: WORDS.borrowable,
+      tip: TIPS.borrowable,
       value: hasCollateral
         ? {
             text: room === ZERO ? "$0" : fmtPositionUsd(roomUsd),
@@ -455,6 +503,7 @@ export function aaveFamilySheet({
         {
           key: "max-ltv",
           label: WORDS.max_ltv,
+          tip: TIPS.max_ltv,
           value: {
             text: bpsPct(a.ltvBps),
             info: accountRatioProv("ltv", "after", coords, { bps: a.ltvBps, emode: inEmode }),
@@ -463,6 +512,7 @@ export function aaveFamilySheet({
         {
           key: "liquidation-threshold",
           label: WORDS.threshold,
+          tip: TIPS.threshold,
           value: {
             text: bpsPct(a.liquidationThresholdBps),
             info: accountRatioProv("lt", "after", coords, { bps: a.liquidationThresholdBps, emode: inEmode }),
@@ -472,7 +522,12 @@ export function aaveFamilySheet({
           ? [
               (() => {
                 const f = emodeFigure(state, state.emode!.after, "after", coords);
-                return { key: "emode", label: WORDS.emode, value: { text: f.text, info: f.prov, value: f.value } };
+                return {
+                  key: "emode",
+                  label: WORDS.emode,
+                  tip: TIPS.emode,
+                  value: { text: f.text, info: f.prov, value: f.value },
+                };
               })(),
             ]
           : []),

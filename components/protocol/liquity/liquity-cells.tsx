@@ -756,6 +756,32 @@ export function useLiquityCells({
     ],
   };
 
+  // Each row's read-more (L2_words tip_*).
+  const TIP = {
+    collLast: fillText(L2_WORDS.tip_coll_last, { coll_symbol: collSym }),
+    collMarket: fillText(L2_WORDS.tip_coll_market, { coll_symbol: collSym }),
+    collBefore: fillText(L2_WORDS.tip_coll_before, { coll_symbol: collSym }),
+    collEvent: fillText(L2_WORDS.tip_coll_event, { coll_symbol: collSym }),
+    collRedist: fillText(L2_WORDS.tip_coll_redistribution, { coll_symbol: collSym }),
+    collTotal: fillText(L2_WORDS.tip_coll_total, { coll_symbol: collSym }),
+    debtLast: fillText(L2_WORDS.tip_debt_last, { debt_symbol: debtSym }),
+    debtInterest: fillText(L2_WORDS.tip_debt_interest, { accrual_noun: accrualNoun(accrual), debt_symbol: debtSym }),
+    debtInterestAsset: fillText(L2_WORDS.tip_debt_interest_asset, { debt_symbol: debtSym }),
+    debtFee: fillText(L2_WORDS.tip_debt_fee, { debt_symbol: debtSym }),
+    debtBefore: fillText(L2_WORDS.tip_debt_before, { accrual_noun: accrualNoun(accrual) }),
+    debtEvent: L2_WORDS.tip_debt_event,
+    debtUpfront: L2_WORDS.tip_debt_upfront_fee,
+    debtRedist: L2_WORDS.tip_debt_redistribution,
+    debtTotal: fillText(L2_WORDS.tip_debt_total, { debt_symbol: debtSym }),
+    cr: fillText(L2_WORDS.tip_cr, { coll_symbol: collSym }),
+    ltv: fillText(L2_WORDS.tip_ltv, { coll_symbol: collSym }),
+    liquidatesAt: fillText(L2_WORDS.tip_liquidates_at, { coll_symbol: collSym }),
+    rate: L2_WORDS.tip_rate,
+    delegateFee: L2_WORDS.tip_delegate_fee,
+    minimumRatio: fillText(L2_WORDS.tip_minimum_ratio, { coll_symbol: collSym }),
+    criticalRatio: fillText(L2_WORDS.tip_critical_ratio, { coll_symbol: collSym }),
+  };
+
   // Collateral: what the previous event left at its price, the price's move
   // since, the balance before this event at this block's price, the event's
   // move (and any redistribution it applied), the balance after.
@@ -777,6 +803,7 @@ export function useLiquityCells({
       },
       usd:
         priceNow > 0 ? { text: sheetUsd(opColl * priceNow), info: usdMoveProv(collSym, opColl, priceNow) } : undefined,
+      tip: TIP.collEvent,
     });
   if (Math.abs(redistColl) >= DUST_COLL)
     collRows.push({
@@ -787,6 +814,7 @@ export function useLiquityCells({
         priceNow > 0
           ? { text: sheetUsd(redistColl * priceNow), info: usdMoveProv(collSym, redistColl, priceNow) }
           : undefined,
+      tip: TIP.collRedist,
     });
   const collCarry: EventSheet["sides"][number]["carry"] = [];
   if (prevCtx && beforeColl > 0) {
@@ -800,6 +828,7 @@ export function useLiquityCells({
             info: atPriceProv(collSym, beforeColl, prevPrice, "the previous event"),
           }
         : undefined,
+      tip: TIP.collLast,
     });
     // The same price at both events moves nothing: the row is left out.
     if (prevPrice && priceNow > 0 && Math.round(beforeColl * (priceNow - prevPrice) * 100) !== 0)
@@ -810,6 +839,7 @@ export function useLiquityCells({
           text: sheetUsd(beforeColl * (priceNow - prevPrice), true),
           info: marketMoveProv(collSym, beforeColl, prevPrice, priceNow),
         },
+        tip: TIP.collMarket,
       });
   }
   const collSide: EventSheet["sides"][number] = {
@@ -823,10 +853,12 @@ export function useLiquityCells({
             label: SHEET_WORDS.before,
             amount: { text: formatColl(beforeColl), symbol: collSym, info: collBeforeProv },
             usd: beforeCollAtEventUsd > 0 ? { text: sheetUsd(beforeCollAtEventUsd), info: usdBeforeProv } : undefined,
+            tip: TIP.collBefore,
           }
         : undefined,
     rows: collRows,
     total: { text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0", info: usdAfterProv ?? collAfterProv },
+    totalTip: TIP.collTotal,
   };
 
   // Debt: the debt the previous event recorded, the interest (and any
@@ -852,6 +884,7 @@ export function useLiquityCells({
         value: sheetDebtCp?.value,
       },
       usd: { text: sheetUsd(opDebt), info: debtMoveProv },
+      tip: TIP.debtEvent,
     });
   if (upfrontFee >= DUST_DEBT)
     debtRows.push({
@@ -859,6 +892,7 @@ export function useLiquityCells({
       label: L2_WORDS.sheet_upfront_fee,
       amount: { text: toLocaleStringHelper(upfrontFee), symbol: debtSym, info: feeP?.info, value: feeP?.value },
       usd: { text: sheetUsd(upfrontFee), info: faceUsdProv(debtSym, toLocaleStringHelper(upfrontFee), "after") },
+      tip: TIP.debtUpfront,
     });
   if (Math.abs(redistDebt) >= DUST_DEBT)
     debtRows.push({
@@ -866,6 +900,7 @@ export function useLiquityCells({
       label: L2_WORDS.sheet_redistribution,
       amount: { text: debtFig(redistDebt), symbol: debtSym, info: debtMoveProv },
       usd: { text: sheetUsd(redistDebt), info: debtMoveProv },
+      tip: TIP.debtRedist,
     });
   const debtCarry: EventSheet["sides"][number]["carry"] = [];
   if (prevCtx && beforeDebt > 0) {
@@ -874,12 +909,14 @@ export function useLiquityCells({
       label: SHEET_WORDS.last,
       amount: { text: toLocaleStringHelper(beforeDebt), symbol: debtSym, info: debtBeforeProv },
       usd: { text: sheetUsd(beforeDebt), info: faceUsdProv(debtSym, toLocaleStringHelper(beforeDebt), "before") },
+      tip: TIP.debtLast,
     });
     if (accrualTotal >= DUST_DEBT)
       debtCarry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
         usd: { text: sheetUsd(accrualTotal), info: accrualProv },
+        tip: TIP.debtInterest,
         sub: [
           {
             key: `interest-${debtSym}`,
@@ -894,6 +931,7 @@ export function useLiquityCells({
               text: sheetUsd(accrual.batched && accrual.split ? accrual.interest : accrualTotal),
               info: accrualProv,
             },
+            tip: TIP.debtInterestAsset,
           },
           ...(accrual.batched && accrual.split && accrual.fee >= DUST_DEBT
             ? [
@@ -902,6 +940,7 @@ export function useLiquityCells({
                   label: L2_WORDS.sheet_fee,
                   amount: { text: fmtAccrued(accrual.fee), symbol: debtSym, info: accrualProv },
                   usd: { text: sheetUsd(accrual.fee), info: accrualProv },
+                  tip: TIP.debtFee,
                 },
               ]
             : []),
@@ -919,6 +958,7 @@ export function useLiquityCells({
             label: SHEET_WORDS.before,
             amount: { text: toLocaleStringHelper(debtBeforeEvent), symbol: debtSym, info: debtBeforeEventProv },
             usd: { text: sheetUsd(debtBeforeEvent), info: debtBeforeEventProv },
+            tip: TIP.debtBefore,
           }
         : undefined,
     rows: debtRows,
@@ -926,6 +966,7 @@ export function useLiquityCells({
       text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
       info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after"),
     },
+    totalTip: TIP.debtTotal,
   };
 
   // Risk: the collateral ratio and the price that liquidates the Trove;
@@ -965,6 +1006,7 @@ export function useLiquityCells({
           ? { none: L2_WORDS.not_applicable }
           : { text: formatRatio(afterCollRatio, mode, 2), info: crAfterProv },
       tone: open ? crColor(afterCollRatio, ctx.collateralType) : undefined,
+      tip: mode === "ltv" ? TIP.ltv : TIP.cr,
       change:
         open && prevCr != null
           ? {
@@ -979,6 +1021,7 @@ export function useLiquityCells({
     {
       key: "liquidates-at",
       label: L2_WORDS.liquidates_at,
+      tip: TIP.liquidatesAt,
       value:
         liqAfter != null
           ? { text: usd2(liqAfter), info: liqProv }
@@ -997,6 +1040,7 @@ export function useLiquityCells({
     {
       key: "rate",
       label: L2_WORDS.interest_rate,
+      tip: TIP.rate,
       value: isClose
         ? { none: L2_WORDS.closed }
         : rateAfter > 0
@@ -1018,6 +1062,7 @@ export function useLiquityCells({
           {
             key: "delegate-fee",
             label: L2_WORDS.delegate_fee,
+            tip: TIP.delegateFee,
             value: { text: `${fmtRateNum(batchFee.fee)}%`, info: batchFeeProv },
           },
         ]
@@ -1035,6 +1080,7 @@ export function useLiquityCells({
         {
           key: "minimum-ratio",
           label: L2_WORDS.minimum_ratio,
+          tip: TIP.minimumRatio,
           value: {
             text: `${(branch.mcr * 100).toFixed(0)}%`,
             info: paramProv("minimum collateral ratio (MCR)", branch.mcr * 100),
@@ -1043,6 +1089,7 @@ export function useLiquityCells({
         {
           key: "critical-ratio",
           label: L2_WORDS.critical_ratio,
+          tip: TIP.criticalRatio,
           value: {
             text: `${(branch.ccr * 100).toFixed(0)}%`,
             info: paramProv("critical collateral ratio (CCR)", branch.ccr * 100),
