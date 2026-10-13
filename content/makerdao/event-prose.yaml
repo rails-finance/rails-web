@@ -978,18 +978,27 @@ templates:
       - [fallback.what, fallback.unloaded]
 
 # ── The documentation pages the modals link, by id ──
-# Every docs.makerdao.com path answered 307 to developers.skyeco.com/ on
-# 2026-10-09 (rails-ops reference/official-docs/makerdao.md); the links stay on
-# the listed host at page level until the host is ruled on.
+# The docs dump in the Sky ecosystem GitHub org (sky-ecosystem/mcd-docs-content,
+# branch master, frozen Feb 2024) stands in for docs.makerdao.com, which answered 307
+# to developers.skyeco.com on 2026-10-09; official by Miles's ruling of 13 Oct 2026
+# (rails-ops reference/official-docs/makerdao.md, section 5).
 doc_urls:
   VAT: |-
-    https://docs.makerdao.com/smart-contract-modules/core-module/vat-detailed-documentation
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/core-module/vat-detailed-documentation.md#vault-management
+  VAT_GLOSSARY: |-
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/core-module/vat-detailed-documentation.md#glossary-vat---vault-engine
   RATES: |-
-    https://docs.makerdao.com/smart-contract-modules/rates-module
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/rates-module/README.md#stability-fee-accumulation
+  RATES_DRIP: |-
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/rates-module/README.md#who-calls-drip
   LIQUIDATIONS: |-
-    https://docs.makerdao.com/smart-contract-modules/dog-and-clipper-detailed-documentation
-  OVERVIEW: |-
-    https://docs.makerdao.com/
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/dog-and-clipper-detailed-documentation.md#dogbark-performs-several-actions
+  LIQUIDATIONS_TAKE: |-
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/dog-and-clipper-detailed-documentation.md#clippertake-performs-several-initial-checks
+  CDP_MANAGER: |-
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/proxy-module/cdp-manager-detailed-documentation.md#key-functionalities-as-defined-in-the-smart-contract
+  OSM: |-
+    https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules/oracle-module/oracle-security-module-osm-detailed-documentation.md#1-introduction
 
 # ── The "?" modals (zone Z4): the event modals, the vault card's and the rate
 # note's. Each stops at the mechanism and hands it to a Quick Link; no figure
@@ -1033,8 +1042,8 @@ L5:
           Rates module (stability fees)
         doc: RATES
       - label: |-
-          Maker protocol docs
-        doc: OVERVIEW
+          Oracle Security Module (price delay)
+        doc: OSM
 
   deposit:
     title: |-
@@ -1061,8 +1070,8 @@ L5:
           Vat, the core accounting
         doc: VAT
       - label: |-
-          Maker protocol docs
-        doc: OVERVIEW
+          CDP manager (vault permissions)
+        doc: CDP_MANAGER
 
   withdraw:
     title: |-
@@ -1089,8 +1098,8 @@ L5:
           Vat, the core accounting
         doc: VAT
       - label: |-
-          Maker protocol docs
-        doc: OVERVIEW
+          CDP manager (vault permissions)
+        doc: CDP_MANAGER
 
   generate:
     title: |-
@@ -1117,13 +1126,10 @@ L5:
     links:
       - label: |-
           Rates module (stability fees)
-        doc: RATES
+        doc: RATES_DRIP
       - label: |-
           Vat, the core accounting
         doc: VAT
-      - label: |-
-          Maker protocol docs
-        doc: OVERVIEW
 
   repay:
     title: |-
@@ -1158,9 +1164,6 @@ L5:
       - label: |-
           Vat, the core accounting
         doc: VAT
-      - label: |-
-          Maker protocol docs
-        doc: OVERVIEW
 
   adjust:
     title: |-
@@ -1198,8 +1201,8 @@ L5:
           Rates module (stability fees)
         doc: RATES
       - label: |-
-          Maker protocol docs
-        doc: OVERVIEW
+          CDP manager (vault permissions)
+        doc: CDP_MANAGER
 
   returned:
     title: |-
@@ -1227,7 +1230,7 @@ L5:
     links:
       - label: |-
           Liquidations 2.0 (Dog and Clipper)
-        doc: LIQUIDATIONS
+        doc: LIQUIDATIONS_TAKE
       - label: |-
           Vat, the core accounting
         doc: VAT
@@ -1262,8 +1265,8 @@ L5:
           only the owner, or an address it allowed on this vault, can give the vault away.
     links:
       - label: |-
-          Maker protocol docs
-        doc: OVERVIEW
+          CDP manager (vault ownership)
+        doc: CDP_MANAGER
       - label: |-
           Vat, the core accounting
         doc: VAT
@@ -1287,7 +1290,7 @@ L5:
     links:
       - label: |-
           Vat, the core accounting
-        doc: VAT
+        doc: VAT_GLOSSARY
 
   liquidation:
     title: |-

@@ -1,5 +1,5 @@
 {
-  "note": "Family key to the hosts of the protocol's official documentation (rails-ops/standards/prose-limits-and-zones.md, 4.3; Miles, 8 Oct 2026). check:prose-limits fails a modal or strings-file link whose host is not in its family's list. A family key is the content/<dir> name where a strings file exists, the roster id elsewhere. aave.com covers its /docs, /help and /faq pages; fxprotocol.gitbook.io, ebisu.gitbook.io and developers.skyeco.com are official by Miles's ruling (8 Oct 2026, ui-jobs 315).",
+  "note": "Family key to the hosts of the protocol's official documentation (rails-ops/standards/prose-limits-and-zones.md, 4.3; Miles, 8 Oct 2026). check:prose-limits fails a modal or strings-file link whose host is not in its family's list. A family key is the content/<dir> name where a strings file exists, the roster id elsewhere. aave.com covers its /docs, /help and /faq pages; fxprotocol.gitbook.io, ebisu.gitbook.io and developers.skyeco.com are official by Miles's ruling (8 Oct 2026, ui-jobs 315); github.com is official for makerdao by Miles's ruling of 13 Oct 2026 (ui-jobs 315), for the Sky org's frozen docs dump only.",
   "families": {
     "liquity-v2": ["docs.liquity.org"],
     "liquity-v1": ["docs.liquity.org"],
@@ -10,7 +10,7 @@
     "morpho": ["docs.morpho.org", "docs.pendle.finance"],
     "compound": ["docs.compound.xyz", "docs.compound.finance"],
     "compound-v2": ["docs.compound.xyz", "docs.compound.finance"],
-    "makerdao": ["docs.makerdao.com"],
+    "makerdao": ["docs.makerdao.com", "github.com"],
     "alchemix": ["docs.alchemix.fi"],
     "fx": ["fxprotocol.gitbook.io"],
     "ebisu": ["ebisu.gitbook.io"],
