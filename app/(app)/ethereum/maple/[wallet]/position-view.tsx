@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { mapleExplorer } from "@/lib/maple/explorer";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMapleEvent } from "@/lib/shared/types/event-shape";
 import { fetchMaplePositions } from "@/lib/api/fetch-maple-positions";
@@ -78,14 +77,10 @@ import { summariseExternalActors, withOpeningActors } from "@/lib/shared/externa
 import { MapleCustodyCard } from "@/components/protocol/maple/maple-custody-card";
 import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
+import { ExportMenu } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
+import { maplePositionToMarkdown } from "@/lib/maple/position-to-markdown";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const MapleExportMenu = dynamic(
-  () => import("@/components/protocol/maple/maple-export-menu").then((m) => m.MapleExportMenu),
-  { ssr: false },
-);
 
 interface MaplePositionViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -406,6 +401,32 @@ export default function MaplePositionView({
   // Stat captions (earned interest) — the event stream feeds the split; the
   // rate rides the listing row's per-pool chain read.
   const captions = view ? computeMapleCardCaptions(view, lifetimeEvents, precomputedLifetime) : null;
+  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
+  // draws no card, keeps them in the wallet row's Tools.
+  const exports: PositionCardExports | null = view
+    ? {
+        buildMarkdown: () =>
+          maplePositionToMarkdown({
+            view,
+            events: mapleEvents,
+            captions,
+            history: markdownHistoryScope(historyWindow, mapleEvents, servedFolders),
+            generatedAt: new Date(),
+          }),
+        events: mapleEvents,
+        csvFilename: `maple-${wallet}-activity.csv`,
+        // A folder's members are not in `mapleEvents`, so a grouped page
+        // reads the whole history for the CSV as a windowed one does.
+        fetchAllEvents: historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory,
+        queued: {
+          protocol: "maple",
+          params: { wallet },
+          totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+        },
+        scopeNote: exportScopeNote(historyWindow, mapleEvents, "this wallet's whole history", servedFolders),
+      }
+    : null;
+
   // The pools the wallet received shares in by transfer: their interest counts
   // from each batch's worth when it arrived, which the card's Explanation says.
   const receivedPools = view
@@ -488,7 +509,8 @@ export default function MaplePositionView({
       <div className="py-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <DetailBackButton session="maple" wallet={wallet} />
-          <ToolsMenu />
+          {/* The card's ⋮ carries Show provenance once the card draws. */}
+          {!(custody != null && custody.length > 0) && <ToolsMenu />}
         </div>
         <ContractIdentityCard
           kicker="Bridge infrastructure"
@@ -504,7 +526,7 @@ export default function MaplePositionView({
           </p>
         </ContractIdentityCard>
         {custody != null && custody.length > 0 && (
-          <MapleCustodyCard infra={infra} holdings={custody} viewHref={tl.viewHref} />
+          <MapleCustodyCard infra={infra} wallet={wallet} holdings={custody} viewHref={tl.viewHref} />
         )}
         <ProvInspectorLayer />
       </div>
@@ -522,25 +544,11 @@ export default function MaplePositionView({
             assets={stripAssets}
             priceReason={ORACLE_USD_REASON.maple}
             closed={view != null && view.status !== "open"}
+            // The exports ride the card's ⋮; the event route, which draws no card,
+            // keeps them in the wallet row's Tools.
+            tools={onEventPage}
           >
-            {view && (
-              <MapleExportMenu
-                view={view}
-                events={mapleEvents}
-                captions={captions}
-                csvFilename={`maple-${wallet}-activity.csv`}
-                // A folder's members are not in `mapleEvents`, so a grouped page
-                // reads the whole history for the CSV as a windowed one does.
-                fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-                queued={{
-                  protocol: "maple",
-                  params: { wallet },
-                  totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-                }}
-                history={markdownHistoryScope(historyWindow, mapleEvents, servedFolders)}
-                scopeNote={exportScopeNote(historyWindow, mapleEvents, "this wallet's whole history", servedFolders)}
-              />
-            )}
+            {onEventPage && exports && <ExportMenu {...exports} />}
           </DetailTopRow>
 
           {!onEventPage && protocolContract && (
@@ -564,8 +572,9 @@ export default function MaplePositionView({
               {!onEventPage && view && (
                 <MaplePositionCard
                   v={view}
-                  receipts
+                  surface="detail"
                   viewHref={tl.viewHref}
+                  exports={exports}
                   captions={captions ?? undefined}
                   cancelledRequests={cancelledRequests}
                   // The Explanation pane: layman narration of the card's own face
@@ -582,7 +591,9 @@ export default function MaplePositionView({
                   }
                 />
               )}
-              {!onEventPage && Object.keys(walletPoolState).length > 0 && <MaplePoolStatsBand poolState={walletPoolState} />}
+              {!onEventPage && Object.keys(walletPoolState).length > 0 && (
+                <MaplePoolStatsBand poolState={walletPoolState} />
+              )}
               {/* Lifetime flows: the bars and the line over the pool's replay
             (lib/maple/flows.ts), in its funds asset, in place of the tower
             (TO-DO-ui-jobs 206). */}

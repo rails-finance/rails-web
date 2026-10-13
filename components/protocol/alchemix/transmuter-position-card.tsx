@@ -1,9 +1,10 @@
-// One Transmuter position, as a listing row, and the stat columns its page
-// reuses.
+// One Transmuter position on the shared position card (rails-ops
+// TO-DO-position-card 322, 323): the listing row, and the heads, panel and
+// outcome its page's card reuses.
 //
 // A TRANSMUTER POSITION HAS NO GRADE. Nothing about it is read from the
 // contract at a block: the stake, the maturity block and the claim are the
-// Transmuter's own logs, replayed. So the row states no grade sentence and no
+// Transmuter's logs, replayed. So the card states no grade sentence and no
 // reading block, only the blocks the logs name.
 //
 // MATURITY IS A BLOCK, STATED AGAINST A BLOCK. `timeToTransmute` is measured
@@ -18,19 +19,21 @@
 //
 // THE CLAIM IS TWO AMOUNTS IN TWO UNITS: the converted part, paid out in vault
 // shares, and the rest of the stake handed back as the synthetic. Neither is
-// drawn in the other's unit.
-//
-// THE CHROME IS THE HOUSE'S, as on the Alchemist row: PositionCardShell,
-// OpenPositionStats, WalletPill, StatValue.
+// drawn in the other's unit. A claimed position is a closed card: its stake and
+// maturity as heads, Claimed as the outcome, what was paid out beside it.
 
 import type { ReactNode } from "react";
 import { Clock } from "lucide-react";
 import { useMountedNow } from "@/hooks/useMountedNow";
-import { OpenPositionStats, type OpenPositionStatsColumn } from "@/components/shared/open-position-stats";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
+import {
+  PositionCard,
+  type PositionCardHead,
+  type PositionCardListingSlots,
+  type PositionCardOutcome,
+  type PositionCardStatus,
+  type PositionPanelColumns,
+} from "@/components/shared/position-card";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatValue, StatFootnote } from "@/components/shared/stat-value";
-import { WalletPill } from "@/components/shared/wallet-pill";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -41,6 +44,7 @@ import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { BlockRef } from "@/components/shared/block-ref";
+import { AlchemixIdentity, alchemixChip } from "@/components/protocol/alchemix/alchemix-position-card";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -58,50 +62,27 @@ export function transmuterState(p: AlchemixTransmuterPositionSummary): Transmute
   return p.maturity.matured ? "matured" : "maturing";
 }
 
-const STATE_WORD: Record<TransmuterState, string> = {
-  maturing: "Maturing",
-  matured: "Matured",
-  claimed: "Claimed",
-};
-
-/** The listing axis: the roster's lifecycle-pill frame, carrying the
- *  Transmuter's own three words. */
-export function TransmuterStatePill({ state }: { state: TransmuterState }) {
-  const cls =
-    state === "claimed"
-      ? "bg-rb-300 dark:bg-rb-700 text-foreground/70"
-      : state === "matured"
-        ? "bg-teal-500/15 text-teal-700 dark:text-teal-300"
-        : "bg-blue-500/15 text-blue-700 dark:text-blue-300";
-  return (
-    <span className={`font-bold tracking-wider uppercase px-2 py-0.5 rounded-xs text-xs ${cls}`}>
-      {STATE_WORD[state]}
-    </span>
-  );
+/** The tag: Claimed, the one end state. A maturing or matured position is
+ *  live, and the Matures at headline says which. */
+export function transmuterStatus(p: AlchemixTransmuterPositionSummary): PositionCardStatus | null {
+  return p.status === "claimed" ? { word: "Claimed", tone: "muted" } : null;
 }
 
-/** An amount from a log: the headline form, the exact figure on hover. Number
- *  + chip only, no ticker text after it — the chip carries the symbol on
- *  hover, the grammar every other protocol's headline figures use
- *  (`components/shared/asset-amount.tsx`). */
-function amountValue(a: AlchemixAmount, symbol: string, prov?: Provenance): ReactNode {
-  const n = Number(a.raw.split(".")[0]) / 10 ** WAD_DECIMALS;
+/** An amount from a log: the headline form, the exact figure on hover, inside
+ *  its receipt where the surface has one. */
+function amountFigure(a: AlchemixAmount, symbol: string, prov?: Provenance): ReactNode {
+  const exact = formatUnitsExact(a.raw, WAD_DECIMALS);
   const figure = (
-    <span className="inline-flex items-center gap-1.5">
-      <AmountText value={n} format="headline" symbol={symbol} />
-      <TokenChipIcon symbol={symbol} size={20} filterable={false} />
+    <span title={`${exact} ${symbol}`}>
+      <AmountText value={Number(a.raw.split(".")[0]) / 10 ** WAD_DECIMALS} format="headline" symbol={symbol} />
     </span>
   );
-  return (
-    <StatValue title={`${formatUnitsExact(a.raw, WAD_DECIMALS)} ${symbol}`}>
-      {prov ? (
-        <Prov info={prov} value={formatUnitsExact(a.raw, WAD_DECIMALS)} symbol={symbol}>
-          {figure}
-        </Prov>
-      ) : (
-        figure
-      )}
-    </StatValue>
+  return prov ? (
+    <Prov info={prov} value={exact} symbol={symbol}>
+      {figure}
+    </Prov>
+  ) : (
+    figure
   );
 }
 
@@ -113,18 +94,6 @@ export function aboutDuration(blocks: number, chainId: number): string | null {
   if (hours < 1) return "under an hour";
   if (hours < 48) return `about ${Math.round(hours)} hours`;
   return `about ${Math.round(hours / 24)} days`;
-}
-
-export function stakedColumn(p: AlchemixTransmuterPositionSummary, prov?: Provenance): OpenPositionStatsColumn {
-  return {
-    label: "Staked",
-    value: amountValue(p.staked, p.staked.symbol, prov),
-    footnote: (
-      <StatFootnote>
-        <BlockRef block={p.maturity.startBlock} />
-      </StatFootnote>
-    ),
-  };
 }
 
 /** The date a maturing position is estimated to mature, from the blocks still
@@ -158,11 +127,22 @@ export function transmuterMaturityEstimate(
   };
 }
 
-export function maturityColumn(
+/** The receipts the position page hands the card; the listing has none. */
+export interface TransmuterCardProvs {
+  staked?: Provenance;
+  maturity?: Provenance;
+  claimed?: Provenance;
+  returned?: Provenance;
+}
+
+/** Deposited (the stake) and Matures at. `listing` stamps the stake with its
+ *  block; the position page states that block in the panel. */
+export function transmuterHeads(
   p: AlchemixTransmuterPositionSummary,
-  prov?: Provenance,
-  estimate: TransmuterMaturityEstimate | null = null,
-): OpenPositionStatsColumn {
+  estimate: TransmuterMaturityEstimate | null,
+  prov: TransmuterCardProvs = {},
+  listing = false,
+): PositionCardHead[] {
   const m = p.maturity;
   let figure: ReactNode = <BlockRef block={m.maturationBlock} size={20} />;
   let title: string | undefined;
@@ -170,7 +150,7 @@ export function maturityColumn(
   if (estimate) {
     const about = aboutDuration(estimate.blocksRemaining, p.chainId);
     figure = (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums max-sm:text-lg">
         <Clock className="size-4 shrink-0 text-rb-500" aria-hidden />≈ {formatDate(new Date(estimate.atMs))}
       </span>
     );
@@ -180,88 +160,145 @@ export function maturityColumn(
       `that is ${about ?? `${block(estimate.blocksRemaining * estimate.secondsPerBlock)} seconds`} from now.`;
     note = (
       <>
-        <BlockRef block={m.maturationBlock} />
+        <BlockRef block={m.maturationBlock} size={12} />
         {about ? ` · ${about}` : ""}
       </>
     );
   } else if (p.status !== "claimed" && m.referenceBlock != null && m.matured) {
     note = (
       <>
-        matured; the line is indexed to <BlockRef block={m.referenceBlock} />
+        matured; the line is indexed to <BlockRef block={m.referenceBlock} size={12} />
       </>
     );
   }
-  return {
-    label: "Matures at",
-    // The date is wider than a block-count figure; a size down on a phone
-    // keeps it on one line in its half-width column.
-    value: (
-      <StatValue title={title} className={estimate ? "max-sm:text-lg" : undefined}>
-        {" "}
-        {prov ? <Prov info={prov}>{figure}</Prov> : figure}
-      </StatValue>
-    ),
-    footnote: note ? (
-      <StatFootnote>
-        <span className="tabular-nums">{note}</span>
-      </StatFootnote>
-    ) : undefined,
-  };
+  return [
+    {
+      id: "deposited",
+      label: "Deposited",
+      value: amountFigure(p.staked, p.staked.symbol, prov.staked),
+      assets: alchemixChip(p.staked.symbol),
+      sub: listing ? <BlockRef block={m.startBlock} size={12} /> : undefined,
+    },
+    {
+      id: "matures-at",
+      label: "Matures at",
+      value: <span title={title}>{prov.maturity ? <Prov info={prov.maturity}>{figure}</Prov> : figure}</span>,
+      sub: note ? <span className="tabular-nums">{note}</span> : undefined,
+    },
+  ];
 }
 
-export function claimColumn(
+/** An outstanding position's panel: the blocks the stake and its maturity
+ *  name, and the claim not yet made. */
+export function transmuterPanel(
   p: AlchemixTransmuterPositionSummary,
-  prov?: { claimed?: Provenance; returned?: Provenance },
-): OpenPositionStatsColumn {
+  estimate: TransmuterMaturityEstimate | null,
+): PositionPanelColumns {
+  return [
+    [
+      {
+        id: "staked-at",
+        label: "Staked at",
+        value: <BlockRef block={p.maturity.startBlock} />,
+        tip: "The block the stake was made at, from the Transmuter's PositionCreated log.",
+      },
+      ...(estimate
+        ? [
+            {
+              id: "maturity-block",
+              label: "Maturity block",
+              value: <BlockRef block={p.maturity.maturationBlock} />,
+              tip: "The block the stake finishes converting at, settled from the conversion time in force when the position was created. The date above is an estimate from it at the chain's block time.",
+            },
+          ]
+        : []),
+    ],
+    [
+      {
+        id: "claimed",
+        label: "Claimed",
+        value: <span className="text-rb-500">Not yet</span>,
+        tip: "A claim pays out the converted part of the stake in vault shares and burns the position. None has been made.",
+      },
+    ],
+  ];
+}
+
+/** A claimed position's outcome: Claimed, the claim's block (and how early it
+ *  came), and what it paid out beside it. `at` is the claim's time where the
+ *  surface has its log. */
+export function transmuterOutcome(
+  p: AlchemixTransmuterPositionSummary,
+  prov: TransmuterCardProvs = {},
+  at?: number | null,
+): PositionCardOutcome | undefined {
   const c = p.claim;
-  if (!c) {
-    return {
-      label: "Claimed",
-      value: <StatValue color="text-rb-500">Not yet</StatValue>,
-    };
-  }
+  if (p.status !== "claimed" || !c) return undefined;
   const mytSymbol = c.claimed?.symbol ?? p.mytSymbol ?? "vault shares";
   const early = transmuterEarlyClaim(p);
   const returned =
     c.unclaimed && c.unclaimed.raw !== "0" ? (
-      <div className="mt-0.5 leading-snug">
+      <div className="text-xs mt-0.5 leading-snug text-rb-500">
         and{" "}
         <span className="inline-flex items-center gap-1 tabular-nums">
-          {prov?.returned ? (
-            <Prov
-              info={prov.returned}
-              value={formatUnitsExact(c.unclaimed.raw, WAD_DECIMALS)}
-              symbol={c.unclaimed.symbol}
-            >
-              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />
-              <TokenChipIcon symbol={c.unclaimed.symbol} size={16} filterable={false} />
-            </Prov>
-          ) : (
-            <>
-              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />
-              <TokenChipIcon symbol={c.unclaimed.symbol} size={16} filterable={false} />
-            </>
-          )}
+          {amountFigure(c.unclaimed, c.unclaimed.symbol, prov.returned)}
+          <TokenChipIcon symbol={c.unclaimed.symbol} size={14} filterable={false} />
         </span>{" "}
         handed back unconverted
       </div>
     ) : null;
   return {
-    label: "Claimed",
-    value: c.claimed ? (
-      amountValue(c.claimed, mytSymbol, prov?.claimed)
-    ) : (
-      <StatValue color="text-rb-500">Not stated</StatValue>
-    ),
+    word: "Claimed",
+    dates: at != null ? [{ at }] : undefined,
     footnote: (
-      <StatFootnote>
-        <span className="tabular-nums">
-          <BlockRef block={c.blockNumber} />
-          {early ? `, ${block(early.blocksEarly)} blocks before maturity` : ""}
-        </span>
-        {returned}
-      </StatFootnote>
+      <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+        <BlockRef block={c.blockNumber} size={12} />
+        {early ? `, ${block(early.blocksEarly)} blocks before maturity` : ""}
+      </div>
     ),
+    extra: {
+      label: "Paid out",
+      value: (
+        <div className="mt-2">
+          <span className="inline-flex items-center gap-1.5 text-lg font-bold text-foreground/80">
+            {c.claimed ? (
+              <>
+                {amountFigure(c.claimed, mytSymbol, prov.claimed)}
+                <TokenChipIcon symbol={mytSymbol} size={20} filterable={false} />
+              </>
+            ) : (
+              <span className="text-rb-500">Not stated</span>
+            )}
+          </span>
+          {returned}
+        </div>
+      ),
+    },
+  };
+}
+
+export function transmuterListingSlots(
+  p: AlchemixTransmuterPositionSummary,
+  session: SessionProtocol,
+  estimate: TransmuterMaturityEstimate | null,
+): PositionCardListingSlots {
+  const holder = p.owner ?? p.claim?.claimer ?? null;
+  return {
+    surface: "listing",
+    status: transmuterStatus(p),
+    identity: (
+      <AlchemixIdentity
+        name={alchemixPositionName(p.syntheticSymbol, p.nftId, "transmuter")}
+        chain={p.chainName ?? `chain ${p.chainId}`}
+        wallet={holder}
+        session={session}
+        prefix={p.owner ? undefined : "claimed by"}
+      />
+    ),
+    heads: transmuterHeads(p, estimate, {}, true),
+    outcome: transmuterOutcome(p),
+    counters: null,
+    menu: null,
   };
 }
 
@@ -272,31 +309,7 @@ export function TransmuterPositionCard({
   p: AlchemixTransmuterPositionSummary;
   session: SessionProtocol;
 }) {
-  const holder = p.owner ?? p.claim?.claimer ?? null;
   const now = useMountedNow();
   const estimate = transmuterMaturityEstimate(p, now == null ? null : now * 1000);
-  return (
-    <PositionCardShell>
-      <OpenPositionStats
-        statusPill={<TransmuterStatePill state={transmuterState(p)} />}
-        leadingIdentity={
-          <>
-            <span className="text-xs font-bold tracking-wide text-foreground/80">
-              {alchemixPositionName(p.syntheticSymbol, p.nftId, "transmuter")}
-            </span>
-            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
-              <span>{p.chainName ?? `chain ${p.chainId}`}</span>
-              {holder ? (
-                <span className="inline-flex items-center gap-1.5">
-                  {p.owner ? null : "claimed by"}
-                  <WalletPill wallet={holder} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
-                </span>
-              ) : null}
-            </span>
-          </>
-        }
-        columns={[stakedColumn(p), maturityColumn(p, undefined, estimate), claimColumn(p)]}
-      />
-    </PositionCardShell>
-  );
+  return <PositionCard slots={transmuterListingSlots(p, session, estimate)} />;
 }
