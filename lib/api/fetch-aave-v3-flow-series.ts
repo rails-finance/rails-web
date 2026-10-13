@@ -37,9 +37,10 @@ export interface FlowSeries {
     [number, string, number][]?,
   ][];
   assets: Record<string, { symbol: string; decimals: number }>;
-  /** Per held asset: [day, usd] on each day a new price was recorded, and the
-   *  longest run of held days that recorded none. */
-  prices: Record<string, { obs: [number, number][]; maxGapDays: number }>;
+  /** Per held asset: [day, usd, block] on each day a new price was recorded
+   *  (the block absent on an older server, null where none was stored), and
+   *  the longest run of held days that recorded none. */
+  prices: Record<string, { obs: [number, number, (number | null)?][]; maxGapDays: number }>;
   live: { collateralUsd: number; debtUsd: number };
   unpricedLegs: number;
   /** The Aave V3 Pool family: the whole history per [bucket, asset, token
