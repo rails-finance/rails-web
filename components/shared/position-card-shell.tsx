@@ -17,7 +17,7 @@
 // declares it — <ProvUnscoped> below is what keeps the dev unscoped-<Prov>
 // tripwire quiet for listing rows while leaving it loud everywhere else.
 
-import { CARD_PAD_X } from "@/lib/shared/ui-grammar";
+import { POSITION_CARD_FRAME } from "@/lib/shared/ui-grammar";
 import type { ReactNode } from "react";
 import {
   POSITION_CARD_SCOPE,
@@ -87,7 +87,7 @@ export function PositionCardShell({
       data-skel-section={receipts ? "detail-card" : "listing-row"}
       data-anatomy={receipts ? "P1" : undefined}
       data-prov-scope={receipts ? POSITION_CARD_SCOPE : undefined}
-      className={`rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised ${CARD_PAD_X} py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500`}
+      className={POSITION_CARD_FRAME}
     >
       {children}
       {receipts && (

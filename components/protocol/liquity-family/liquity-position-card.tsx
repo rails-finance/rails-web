@@ -10,6 +10,13 @@
 // footnote, the delegate glyph + deprecation banner, FadeNumber animation,
 // the compact/full debt-precision split, StatValue); V2 lost nothing.
 //
+// The card is a slot builder (rails-ops TO-DO-position-card 322, ui-jobs
+// 307): `useLiquityCardSlots` turns the Trove's view and the page's live read
+// into one `PositionCardSlots` object, and the shared `PositionCard`
+// (components/shared/position-card.tsx) draws it. All four deployments take
+// the same face: the tag, the four headlines with USD under the two asset
+// figures, the panel, the ⋮ and the counters in the foot.
+//
 // Every headline value is read from the chain — the Trove's latest emitted
 // coll/debt (batched debt derived from batch shares) on the listing, or the
 // detail page's live branch read (`live`) when it has landed on an open
@@ -27,13 +34,16 @@
 import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import { AlertTriangle, Users } from "lucide-react";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardPanel, type PositionPanelRow } from "@/components/shared/position-card-panel";
-import { LifecyclePill } from "@/components/shared/position-card-pills";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardMenu,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelColumns,
+} from "@/components/shared/position-card";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { UsersGlyph } from "@/components/shared/rate-pill";
@@ -109,6 +119,7 @@ import {
   DEBT_ADDRESS as BASEDOLLAR_DEBT_ADDRESS,
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
+import { TroveMenuRows } from "./trove-menu-rows";
 import {
   CLAIMABLE_BY_OWNER,
   collSurplusClaimableProv,
@@ -122,7 +133,7 @@ import type {
   LiquityTroveView,
 } from "./types";
 
-// PositionCardShell renders this card inside Link-wrapped rows on
+// The shared card renders inside Link-wrapped rows on
 // listing/umbrella pages, so an inner <a> would nest anchors (invalid HTML,
 // React hydration error). Render the announcement as a focusable span that
 // opens the URL via click/keypress and stops propagation so the card's outer
@@ -466,78 +477,60 @@ export function liveFromForkChain(c: LiquityForkTroveChainResponse): LiquityTrov
   };
 }
 
-export function LiquityPositionCard({
+/** What a Liquity-family page or listing hands the card. */
+export interface LiquityPositionCardProps {
+  protocol: LiquityFamilyId;
+  v: LiquityTroveView;
+  /** `detail` on the Trove page (receipts, panel, (i)); `listing` in a row. */
+  surface: "detail" | "listing";
+  /** The detail page's live branch read (open Trove only). */
+  live?: LiquityTroveLive | null;
+  /** Listing: debt in approximate notation ("48.1k"); detail: full precision. */
+  compact?: boolean;
+  /** The (i) pane's prose. */
+  explanation?: ReactNode;
+  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  explanationDefaultOpen?: boolean;
+  onExplanationToggle?: (open: boolean) => void;
+  /** A liquidated Trove's collateral surplus, read at the head. */
+  surplus?: LiquityTroveSurplus | null;
+  /** The panel's two columns from the page's live read (the queue on the
+   *  left, the yearly cost on the right); the card adds Liquidates at to the
+   *  right one. */
+  panel?: PositionPanelColumns;
+  /** The ⋮'s export shapes. `null`: the ⋮ holds the Trove's rows and the
+   *  provenance row alone. Absent: no ⋮ (the home hero's inert embed). */
+  exports?: PositionCardExports | null;
+  /** The listing row's ⋮ (Liquity V2's `TroveListingMenu`). */
+  listingMenu?: ReactNode;
+  /** A line at the foot (V2's snapshot and loading status). */
+  foot?: ReactNode;
+}
+
+/** The Liquity family's slots for the shared position card: the four
+ *  headlines, the panel, the tag, the ⋮ and the counters, from the Trove's
+ *  view and the page's live read. */
+export function useLiquityCardSlots({
   protocol,
   v,
-  receipts = false,
-  rowExtra,
-  explanation,
-  viewHref,
+  surface,
   live,
   compact = false,
-  showActivityMeta = true,
-  footer,
+  explanation,
+  viewHref,
   explanationDefaultOpen,
   onExplanationToggle,
   surplus,
-  positionSummary,
-  panelColumns,
-  debtDetail,
-  riskDetail,
-  headerSet = false,
-  cardMenu,
-}: {
-  protocol: LiquityFamilyId;
-  v: LiquityTroveView;
-  /** Detail render: receipts scope + the Explanation heading-button
-   *  (PositionCardShell). Listing omits it. */
-  receipts?: boolean;
-  rowExtra?: ReactNode;
-  explanation?: ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  live?: LiquityTroveLive | null;
-  /** Listing passes true: debt headline in approximate notation ("48.1k");
-   *  detail = full precision ("48,148.74"). */
-  compact?: boolean;
-  /** true = time-ago + counters; "counts" = counters only (detail page — the
-   *  timeline header already says "X ago"); false = none. Default true. */
-  showActivityMeta?: boolean | "counts";
-  /** Content under the stats grid (V2's detail-page snapshot/enhancement status line). */
-  footer?: ReactNode;
-  explanationDefaultOpen?: boolean;
-  onExplanationToggle?: (open: boolean) => void;
-  /** Detail page, liquidated Trove: the collateral surplus read at the head.
-   *  While some is claimable the terminal card leads with it in place of the
-   *  two lifetime maxima. */
-  surplus?: LiquityTroveSurplus | null;
-  /** The "Position summary" heading (TO-DO-position-card 270), forwarded to
-   *  `PositionCardShell`. */
-  positionSummary?: boolean;
-  /** The inset panel's two columns from the page's live read
-   *  (TO-DO-position-card 322); the card adds Liquidates at to the right one. */
-  panelColumns?: [PositionPanelRow[], PositionPanelRow[]];
-  /** Off the `headerSet` face (the forks, until 323): lines under Debt from
-   *  the page's live read (the yearly cost, the redemption queue). */
-  debtDetail?: ReactNode;
-  /** Off the `headerSet` face: lines under Collateral ratio (the price bar). */
-  riskDetail?: ReactNode;
-  /** The card face of TO-DO-position-card 270 and 322, on Liquity V2 first:
-   *  a status tag only for an ended Trove and the delegate flag, no asset
-   *  names or IDs in the header, `cardMenu` at its right end, USD under each
-   *  asset figure, four headlines (Collateral, Debt, Collateral ratio,
-   *  Interest rate) and the inset panel beneath them. The listing (no
-   *  `receipts`, 324) has no panel. */
-  headerSet?: boolean;
-  /** The card's ⋮ menu (ToolsMenu `card` variant), at the top right of the
-   *  header with `headerSet`. */
-  cardMenu?: ReactNode;
-}) {
+  panel,
+  exports,
+  listingMenu,
+  foot,
+}: LiquityPositionCardProps): PositionCardSlots {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
-  const summaryFace = !!receipts && !!positionSummary;
   const ops = OPS[protocol];
   const ct = v.collateralType;
+  const detail = surface === "detail";
 
   // Live override (detail page only, open Trove only): value and receipt
   // travel together. `liveFromForkChain` already returns null on a stale read.
@@ -588,8 +581,8 @@ export function LiquityPositionCard({
   );
   const mcrPct = ops.mcrPct(ct);
   const liqPrice = debt > 0 && coll > 0 && mcrPct != null ? (debt * (mcrPct / 100)) / coll : null;
-  const animate = !!receipts; // FadeNumber animateOnMount
-  const pending = !!receipts && !!v.pricePending; // skeleton slots while a detail-page price is expected
+  const animate = detail; // FadeNumber animateOnMount
+  const pending = detail && !!v.pricePending; // skeleton slots while a detail-page price is expected
 
   const fp = ops.faceProv({ v, live: lv, coll, debt, rate, priceUsd, collUsd, crPct, liqPrice, mcrPct });
   const learnMore = ops.positionContent({ ...v, isZombie: zombie });
@@ -598,10 +591,8 @@ export function LiquityPositionCard({
   // on a burned/closed trove so a closed row still names who held it.
   const ownerAddr = v.owner ?? v.lastOwner ?? null;
   // Reverse-resolve the owner's primary ENS name web-side (a lane that
-  // doesn't carry one, e.g. the forks, leaves ownerEns null). Batched across
-  // the page's pills; WalletPill itself would fall back to the same hook,
-  // but resolving here means the card and any other reader of `ownerEns`
-  // (the identity row's WalletPill included) agree on one resolved name.
+  // doesn't carry one, e.g. the forks, leaves ownerEns null), so the card and
+  // the identity row's WalletPill agree on one resolved name.
   const resolvedEns = useEnsName(ownerAddr);
   const ownerEns = v.ownerEns ?? resolvedEns;
 
@@ -625,193 +616,260 @@ export function LiquityPositionCard({
     </div>
   );
 
-  // The header set's pieces (ui-jobs 270, 295): the foot strip (transactions,
-  // warnings, age), the heading's right end (the ⋮), and the small tag
-  // naming an ended or redeemed-down Trove.
-  const set = headerSet && !!receipts;
-  // The listing card under the header set (ui-jobs 246): status, the owner
-  // as text, the activity and the headline figures; no action icons, and
-  // the branch's ticker once, as the collateral's icon.
-  const listSet = headerSet && !receipts;
-  const inertIdentity = listSet ? (
-    <TroveIdentityRow
-      protocol={protocol}
-      troveId={v.id}
-      owner={v.owner}
-      lastOwner={v.lastOwner}
-      ownerEns={ownerEns}
-      shortId={ops.shortId}
-      inert
-    />
-  ) : undefined;
-  const footStrip = set ? (
-    <PositionCardMeta
-      lastActivityAt={v.lastActivityAt}
-      eventCount={v.txCount}
-      liquidationCount={v.liquidationCount}
-      redemptionCount={v.redemptionCount}
-      order="age-last"
-    />
-  ) : undefined;
-  const delegateFlag = v.isBatched && v.status === "open" && (
-    // Delegate marker: the name is in the Explanation; pink marks an outside party.
-    <RevealTip
-      tip={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
-      label={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
-      className="text-pink-500/90"
-    >
-      <Users className="w-3.5 h-3.5" aria-hidden="true" />
-    </RevealTip>
-  );
-  const tag = (word: string, cls: string) => (
-    <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${cls}`} data-anatomy="C6">
-      {word}
-    </span>
-  );
-  const MUTED_TAG = "bg-rb-300 dark:bg-rb-700 text-foreground/70";
+  const ended = v.status === "closed" || v.status === "liquidated";
+  const status: PositionCardStatus | null =
+    v.status === "liquidated"
+      ? { word: "Liquidated", tone: "danger" }
+      : v.status === "closed"
+        ? { word: "Closed", tone: "muted" }
+        : zombie
+          ? { word: "Zombie", tone: "muted" }
+          : null;
 
-  const meta =
-    showActivityMeta !== false ? (
-      <PositionCardMeta
-        lastActivityAt={showActivityMeta !== "counts" ? v.lastActivityAt : null}
-        eventCount={v.txCount}
-        liquidationCount={v.liquidationCount}
-        redemptionCount={v.redemptionCount}
+  // The listing names the owner as text and, on a live Trove, flags a
+  // delegate; the Trove page states both in its Explanation and under
+  // Interest rate.
+  const identity = detail ? undefined : (
+    <>
+      <TroveIdentityRow
+        protocol={protocol}
+        troveId={v.id}
+        owner={v.owner}
+        lastOwner={v.lastOwner}
+        ownerEns={ownerEns}
+        shortId={ops.shortId}
+        inert
       />
-    ) : undefined;
+      {v.isBatched && v.status === "open" && (
+        // Delegate marker: the name is in the Explanation; pink marks an outside party.
+        <RevealTip
+          tip={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+          label={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+          className="text-pink-500/90"
+        >
+          <Users className="w-3.5 h-3.5" aria-hidden="true" />
+        </RevealTip>
+      )}
+    </>
+  );
+
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    liquidationCount: v.liquidationCount,
+    redemptionCount: v.redemptionCount,
+    // The foot strip reads transactions, warnings, then the age (ui-jobs 270).
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
 
   // Closed / liquidated: the Trove reads 0/0 on chain, so the headline is
   // what it held at its height — the route's real per-life peaks. Each peak
   // is its own lifetime maximum. A liquidated trove's last event IS its
-  // close — there is no separate closure timestamp, so lastActivityAt
-  // doubles as closedAt. explanation threads through (past-tense closed-life
-  // narration); rowExtra deliberately does not — the live risk strips
-  // describe the chain NOW and never ride a past life.
-  if (v.status === "closed" || v.status === "liquidated") {
-    // A liquidation's surplus the owner has not claimed leads the card: what
-    // can still be claimed says more to the owner than the life's maxima.
+  // close, so lastActivityAt doubles as the closing date.
+  let heads: PositionCardHead[];
+  let outcome: PositionCardOutcome | undefined;
+  if (ended) {
+    // A surplus the owner can still claim takes a line under Outcome, in
+    // view while there is something to claim; once claimed it goes, and the
+    // claim stays on the timeline.
     const claimable = surplus && surplus.claimable > 1e-9 ? surplus : null;
     const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? claimable.claimable * priceUsd : null;
-    const peakCollateralStat =
-      v.peakCollateral > 0 ? (
-        <StatValue>
-          <Prov info={ops.peakCollateralProv(v)}>
-            <HighlightableValue
-              type="peakCollateral"
-              state="after"
-              value={v.peakCollateral}
-              variant="card"
-              className="text-rb-500"
-            >
-              {formatPrice(v.peakCollateral)}
-            </HighlightableValue>
-          </Prov>
-        </StatValue>
-      ) : (
-        <StatDash />
-      );
-    const peakDebtStat =
-      v.peakDebt > 0 ? (
-        <StatValue>
-          <Prov info={ops.peakDebtProv(v)}>
-            <HighlightableValue type="peakDebt" state="after" value={v.peakDebt} variant="card" className="text-rb-500">
-              {compact ? formatApproximate(v.peakDebt) : formatPrice(v.peakDebt)}
-            </HighlightableValue>
-          </Prov>
-        </StatValue>
-      ) : (
-        <StatDash />
-      );
-    // One state for the card: the life's peaks stay the headline figures, and
-    // a surplus the owner can still claim is its own line under Outcome, in
-    // view on the closed card while there is something to claim, so the card
-    // does not change meaning when the head read lands. Once claimed it goes;
-    // the claim stays on the timeline.
-    const claimableFootnote = claimable ? (
-      <div className="text-xs mt-0.5 text-rb-500">
-        <Prov info={collSurplusClaimableProv(claimable, ct)}>
-          <span className="font-semibold text-foreground/80 tabular-nums">{forkCollAmount(claimable.claimable)}</span>
-        </Prov>{" "}
-        {ct}
-        {claimableUsd != null && (
-          <>
-            {" "}
-            (<Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>)
-          </>
-        )}{" "}
-        {CLAIMABLE_BY_OWNER}
-      </div>
-    ) : undefined;
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={learnMore}
-        explanationDefaultOpen={explanationDefaultOpen}
-        onExplanationToggle={onExplanationToggle}
-        positionSummary={positionSummary}
-        footerEnd={footStrip}
-      >
-        {deprecationBanner}
-        <ClosedPositionStats
-          tag={
-            set
-              ? v.status === "liquidated"
-                ? tag("Liquidated", "bg-red-500/20 text-red-500")
-                : tag("Closed", MUTED_TAG)
-              : undefined
-          }
-          outcome={v.status}
-          closedAt={v.lastActivityAt}
-          leadingIdentity={
-            set ? undefined : listSet ? (
-              inertIdentity
-            ) : (
-              <>
-                <span className="text-xs font-bold tracking-wide text-foreground/80">{ct}</span>
-                <TroveIdentityRow
-                  protocol={protocol}
-                  troveId={v.id}
-                  owner={v.owner}
-                  lastOwner={v.lastOwner}
-                  ownerEns={ownerEns}
-                  // A closed life keeps its NFT link in the header on both
-                  // surfaces — the terminal Explanation pane carries no NFT
-                  // bullet to hand it to.
-                  nftUrl={v.nftUrl}
-                  shortId={ops.shortId}
-                  showOwner={!receipts}
-                />
-              </>
-            )
-          }
-          identity={set ? undefined : meta}
-          menu={headerSet ? cardMenu : undefined}
-          collateralIcon={collIcon(v.peakCollateral, claimableUsd != null)}
-          debtIcon={debtIcon(v.peakDebt)}
-          collateral={peakCollateralStat}
-          outcomeFootnote={claimableFootnote}
-          debt={peakDebtStat}
-        />
-        {footer}
-      </PositionCardShell>
+    heads = [
+      {
+        id: "peak-collateral",
+        label: CARD_VOCAB.peakCollateral,
+        labelIcon: collIcon(v.peakCollateral, claimableUsd != null),
+        value:
+          v.peakCollateral > 0 ? (
+            <Prov info={ops.peakCollateralProv(v)}>
+              <HighlightableValue
+                type="peakCollateral"
+                state="after"
+                value={v.peakCollateral}
+                variant="card"
+                className="text-rb-500"
+              >
+                {formatPrice(v.peakCollateral)}
+              </HighlightableValue>
+            </Prov>
+          ) : null,
+      },
+      {
+        id: "peak-debt",
+        label: CARD_VOCAB.peakDebt,
+        labelIcon: debtIcon(v.peakDebt),
+        value:
+          v.peakDebt > 0 ? (
+            <Prov info={ops.peakDebtProv(v)}>
+              <HighlightableValue
+                type="peakDebt"
+                state="after"
+                value={v.peakDebt}
+                variant="card"
+                className="text-rb-500"
+              >
+                {compact ? formatApproximate(v.peakDebt) : formatPrice(v.peakDebt)}
+              </HighlightableValue>
+            </Prov>
+          ) : null,
+      },
+    ];
+    outcome = {
+      word: v.status === "liquidated" ? "Liquidated" : "Closed",
+      dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
+      footnote: claimable ? (
+        <div className="text-xs mt-0.5 text-rb-500">
+          <Prov info={collSurplusClaimableProv(claimable, ct)}>
+            <span className="font-semibold text-foreground/80 tabular-nums">{forkCollAmount(claimable.claimable)}</span>
+          </Prov>{" "}
+          {ct}
+          {claimableUsd != null && (
+            <>
+              {" "}
+              (<Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>)
+            </>
+          )}{" "}
+          {CLAIMABLE_BY_OWNER}
+        </div>
+      ) : undefined,
+    };
+  } else {
+    const managerName =
+      v.batch?.managerName ?? (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : "Batch manager");
+    const manager = (
+      <span className="inline-flex items-center gap-1">
+        <span className="text-pink-500/90" aria-hidden="true">
+          <UsersGlyph />
+        </span>
+        {managerName}
+      </span>
     );
+    heads = [
+      {
+        id: "collateral",
+        label: CARD_VOCAB.collateral,
+        value: (
+          <Prov info={fp.coll}>
+            <HighlightableValue type="collateral" state="after" value={coll} className="text-foreground/80">
+              <FadeNumber
+                value={coll}
+                formatFn={protocol === "liquity-v2" ? undefined : forkCollateralFace}
+                animateOnMount={animate}
+              />
+            </HighlightableValue>
+          </Prov>
+        ),
+        assets: collIcon(coll, true, lv?.entireCollRaw),
+        usd:
+          collUsd !== null && collUsd > 0 ? (
+            <Prov info={fp.collUsd}>
+              <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
+                <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
+              </HighlightableValue>
+            </Prov>
+          ) : pending && coll > 0 ? (
+            <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+          ) : null,
+      },
+      {
+        id: "debt",
+        label: CARD_VOCAB.debt,
+        value: (
+          <Prov info={fp.debt}>
+            <HighlightableValue type="debt" state="after" value={debt} className="text-foreground/80">
+              <FadeNumber value={debt} formatFn={compact ? formatApproximate : formatPrice} animateOnMount={animate} />
+            </HighlightableValue>
+          </Prov>
+        ),
+        assets: debtIcon(debt, lv?.entireDebtRaw),
+        usd:
+          debt > 0 ? (
+            <Prov info={debtUsdProv(cfg.debtSymbol, debt)}>
+              <span className="font-bold text-green-400">{formatUsdValue(debt)}</span>
+            </Prov>
+          ) : null,
+      },
+      {
+        id: "collateral-ratio",
+        label: ratioLabel("cdp"),
+        value:
+          crPct != null && crPct > 0 ? (
+            <Prov info={fp.cr}>
+              <HighlightableValue
+                type="collRatio"
+                state="after"
+                value={parseFloat(crPct.toFixed(1))}
+                className="text-foreground/80"
+              >
+                <FadeNumber value={crPct} decimals={1} animateOnMount={animate} />%
+              </HighlightableValue>
+            </Prov>
+          ) : null,
+        pending: !(crPct != null && crPct > 0) && pending && debt > 0,
+      },
+      {
+        id: "interest-rate",
+        label: "Interest rate",
+        value: (
+          <Prov info={fp.rate}>
+            <HighlightableValue type="interestRate" state="after" value={rate} className="text-foreground/80">
+              <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
+            </HighlightableValue>
+          </Prov>
+        ),
+        // A rate a batch manager sets: who sets it, in the slot the USD line
+        // takes under the asset figures.
+        sub: v.isBatched ? (
+          v.batch?.managerAddress ? (
+            <RevealTip
+              tip={`Batch manager ${v.batch.managerAddress}`}
+              label={`${managerName}, batch manager ${v.batch.managerAddress}`}
+              focusable={detail}
+              className="focus-ring rounded-sm"
+            >
+              {manager}
+            </RevealTip>
+          ) : (
+            manager
+          )
+        ) : undefined,
+      },
+    ];
   }
 
-  // The face of TO-DO-position-card 270 and 322: four headlines with USD
-  // under each asset, the additive values in the panel beneath them.
-  const face = set || listSet;
-  const collUsdLine =
-    collUsd !== null && collUsd > 0 ? (
-      <Prov info={fp.collUsd}>
-        <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
-          <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
-        </HighlightableValue>
-      </Prov>
-    ) : pending && coll > 0 ? (
-      <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
-    ) : null;
+  const common = { status, heads, identity, notice: deprecationBanner || undefined, counters, outcome };
+  if (!detail) return { ...common, surface: "listing", menu: listingMenu ?? null };
+
+  const menu: PositionCardMenu | null =
+    exports === undefined
+      ? null
+      : {
+          leading: () => (
+            <TroveMenuRows
+              troveId={v.id}
+              nftUrl={v.nftUrl ?? null}
+              pagePath={`${cfg.trovePath}/${ct}/${v.id}`}
+              shortId={ops.shortId}
+            />
+          ),
+          exports,
+        };
+  const detailCommon = {
+    ...common,
+    surface: "detail" as const,
+    explainer: {
+      body: explanation ?? null,
+      defaultOpen: explanationDefaultOpen,
+      onToggle: onExplanationToggle,
+      viewHref,
+    },
+    learnMore,
+    menu,
+    foot,
+  };
+  if (outcome) return { ...detailCommon, outcome };
+
+  // The panel: the page's left column, and its right with Liquidates at last.
   const liqValue =
     liqPrice !== null ? (
       <span className="inline-flex items-center gap-1">
@@ -821,268 +879,17 @@ export function LiquityPositionCard({
     ) : pending && debt > 0 && coll > 0 ? (
       <span className="inline-block h-3 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
     ) : null;
-  const rateValue = (
-    <Prov info={fp.rate}>
-      <HighlightableValue type="interestRate" state="after" value={rate} asBlock>
-        <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
-      </HighlightableValue>
-    </Prov>
-  );
-  // The inset panel beneath the headlines (Trove page only): the page's
-  // left column, and its right with Liquidates at last.
-  const panel = set ? (
-    <PositionCardPanel
-      columns={[
-        panelColumns?.[0] ?? [],
-        [
-          ...(panelColumns?.[1] ?? []),
-          ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : []),
-        ],
-      ]}
-    />
-  ) : undefined;
+  return {
+    ...detailCommon,
+    outcome: undefined,
+    panel: [
+      panel?.[0] ?? [],
+      [...(panel?.[1] ?? []), ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : [])],
+    ],
+  };
+}
 
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={learnMore}
-      explanationDefaultOpen={explanationDefaultOpen}
-      onExplanationToggle={onExplanationToggle}
-      positionSummary={positionSummary}
-      footerEnd={footStrip}
-    >
-      {deprecationBanner}
-      <OpenPositionStats
-        // The face goes two by two on a phone; the old face one per row.
-        stackOnPhone={summaryFace && !face}
-        panel={panel}
-        // Detail render (receipts): the house grammar's neutral mode-word
-        // pill — "Borrowing", or "Zombie" once redeemed below the floor. The
-        // LISTING render keeps the lifecycle pill, with ZOMBIE standing in
-        // for OPEN on a redeemed-down Trove.
-        statusPill={
-          // The Trove page names a batch manager under the Interest rate
-          // headline, so its header carries no delegate flag.
-          set ? (
-            zombie ? (
-              tag("Zombie", MUTED_TAG)
-            ) : undefined
-          ) : receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {zombie ? "Zombie" : "Borrowing"}
-            </span>
-          ) : zombie ? (
-            <span className="font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs bg-rb-300 dark:bg-rb-700 text-foreground/70">
-              ZOMBIE
-            </span>
-          ) : (
-            <LifecyclePill status="open" />
-          )
-        }
-        leadingIdentity={
-          set ? undefined : listSet ? (
-            <>
-              {inertIdentity}
-              {delegateFlag}
-            </>
-          ) : (
-            <>
-              <span className="text-xs font-bold tracking-wide text-foreground/80">{ct}</span>
-              <TroveIdentityRow
-                protocol={protocol}
-                troveId={v.id}
-                owner={v.owner}
-                lastOwner={v.lastOwner}
-                ownerEns={ownerEns}
-                nftUrl={v.nftUrl}
-                // V2's detail page (receipts) carries the OpenSea link in its
-                // footnote NFT bullet, so drop the redundant header chip
-                // there. Listing cards have no footnote, and the forks'
-                // Explanation pane states the Trove NFT without linking it
-                // (lib/shared/liquity-fork-position-content.ts) — both keep
-                // the header chip as the only way to reach the NFT.
-                showNftLink={!receipts || protocol !== "liquity-v2"}
-                shortId={ops.shortId}
-                showOwner={!receipts}
-              />
-              {/* Delegate marker — name lives in the row below the card, the
-                pink icon here is just a status flag (pink = external party). */}
-              {v.isBatched && (
-                <RevealTip
-                  tip={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
-                  label={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
-                  focusable
-                  className="text-pink-500/90 focus-ring rounded-sm"
-                >
-                  <Users className="w-3.5 h-3.5" aria-hidden="true" />
-                </RevealTip>
-              )}
-            </>
-          )
-        }
-        identity={set ? undefined : meta}
-        menu={headerSet ? cardMenu : undefined}
-        columns={[
-          {
-            label: CARD_VOCAB.collateral,
-            value: (
-              <StatValue>
-                <span className="flex items-center gap-1.5">
-                  <Prov info={fp.coll}>
-                    <HighlightableValue type="collateral" state="after" value={coll} className="text-foreground/80">
-                      <FadeNumber
-                        value={coll}
-                        formatFn={protocol === "liquity-v2" ? undefined : forkCollateralFace}
-                        animateOnMount={animate}
-                      />
-                    </HighlightableValue>
-                  </Prov>
-                  {collIcon(coll, true, lv?.entireCollRaw)}
-                </span>
-              </StatValue>
-            ),
-            footnote: face ? (
-              <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">{collUsdLine}</div>
-            ) : (
-              <div className="text-xs mt-0.5 min-h-[1rem]">
-                {collUsd !== null && collUsd > 0 ? (
-                  <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
-                    {collUsdLine}
-                  </span>
-                ) : (
-                  collUsdLine
-                )}
-              </div>
-            ),
-          },
-          {
-            label: CARD_VOCAB.debt,
-            value: (
-              <StatValue>
-                <span className="flex items-center gap-1.5">
-                  <Prov info={fp.debt}>
-                    <HighlightableValue type="debt" state="after" value={debt} className="text-foreground/80">
-                      <FadeNumber
-                        value={debt}
-                        formatFn={compact ? formatApproximate : formatPrice}
-                        animateOnMount={animate}
-                      />
-                    </HighlightableValue>
-                  </Prov>
-                  {debtIcon(debt, lv?.entireDebtRaw)}
-                </span>
-              </StatValue>
-            ),
-            footnote: face ? (
-              <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
-                {debt > 0 && (
-                  <Prov info={debtUsdProv(cfg.debtSymbol, debt)}>
-                    <span className="font-bold text-green-400">{formatUsdValue(debt)}</span>
-                  </Prov>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="text-xs mt-0.5 text-rb-500">{rateValue} interest rate</div>
-                {summaryFace && debtDetail}
-              </>
-            ),
-          },
-          {
-            label: ratioLabel("cdp"),
-            value:
-              crPct != null && crPct > 0 ? (
-                <StatValue>
-                  <Prov info={fp.cr}>
-                    <HighlightableValue
-                      type="collRatio"
-                      state="after"
-                      value={parseFloat(crPct.toFixed(1))}
-                      className="text-foreground/80"
-                    >
-                      <FadeNumber value={crPct} decimals={1} animateOnMount={animate} />%
-                    </HighlightableValue>
-                  </Prov>
-                </StatValue>
-              ) : pending && debt > 0 ? (
-                <div className="h-9 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse mt-2" />
-              ) : (
-                <StatDash />
-              ),
-            // Off the face, the liquidation price sits beneath the ratio as its
-            // tangible restatement; on the face it leads the panel.
-            footnote: face ? undefined : (
-              <>
-                <div className="text-xs mt-0.5 text-rb-500 min-h-[1rem]">
-                  {liqValue && (
-                    <span className="inline-flex items-center gap-1">
-                      Liquidates at
-                      {liqValue}
-                    </span>
-                  )}
-                </div>
-                {summaryFace && riskDetail}
-              </>
-            ),
-          },
-          ...(face
-            ? [
-                {
-                  label: "Interest rate",
-                  value: (
-                    <StatValue>
-                      <Prov info={fp.rate}>
-                        <HighlightableValue
-                          type="interestRate"
-                          state="after"
-                          value={rate}
-                          className="text-foreground/80"
-                        >
-                          <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
-                        </HighlightableValue>
-                      </Prov>
-                    </StatValue>
-                  ),
-                  // A rate a batch manager sets: who sets it, in the slot the
-                  // USD line takes under the asset figures.
-                  footnote: v.isBatched ? (
-                    <div className="text-xs mt-0.5 min-h-[1rem] text-rb-500" data-rate-manager="">
-                      {(() => {
-                        const name =
-                          v.batch?.managerName ??
-                          (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : "Batch manager");
-                        const inner = (
-                          <span className="inline-flex items-center gap-1">
-                            <span className="text-pink-500/90" aria-hidden="true">
-                              <UsersGlyph />
-                            </span>
-                            {name}
-                          </span>
-                        );
-                        return v.batch?.managerAddress ? (
-                          <RevealTip
-                            tip={`Batch manager ${v.batch.managerAddress}`}
-                            label={`${name}, batch manager ${v.batch.managerAddress}`}
-                            focusable={!!receipts}
-                            className="focus-ring rounded-sm"
-                          >
-                            {inner}
-                          </RevealTip>
-                        ) : (
-                          inner
-                        );
-                      })()}
-                    </div>
-                  ) : undefined,
-                },
-              ]
-            : []),
-        ]}
-      />
-      {footer}
-    </PositionCardShell>
-  );
+/** The Liquity-family Trove card: its slots, drawn by the shared card. */
+export function LiquityPositionCard(props: LiquityPositionCardProps) {
+  return <PositionCard slots={useLiquityCardSlots(props)} />;
 }

@@ -47,7 +47,7 @@ export type WholeHistoryFetch = {
   missing: number;
 };
 
-type Props = {
+export type ExportMenuProps = {
   /** Builds the Markdown snapshot. Called at click time so `new Date()` inside
    *  the serializer stamps the moment of export, not of render. */
   buildMarkdown: () => string;
@@ -91,7 +91,7 @@ export function ExportMenu({
   queued,
   variant,
   leading,
-}: Props) {
+}: ExportMenuProps) {
   const [copied, setCopied] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [csvError, setCsvError] = useState<string | null>(null);

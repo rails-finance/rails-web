@@ -130,10 +130,10 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
       renderCard={(t) => (
         <LiquityPositionCard
           protocol="liquity-v2"
+          surface="listing"
           v={viewFromTroveSummary(t, prices)}
           compact
-          headerSet
-          cardMenu={<TroveListingMenu trove={t} prices={prices ?? undefined} />}
+          listingMenu={<TroveListingMenu trove={t} prices={prices ?? undefined} />}
         />
       )}
       hrefFor={(t) => `/ethereum/liquity-v2/trove/${t.collateralType}/${t.id}`}

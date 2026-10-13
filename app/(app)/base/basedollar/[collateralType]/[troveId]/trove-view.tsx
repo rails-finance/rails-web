@@ -31,7 +31,6 @@ import { useParams } from "next/navigation";
 import { liquityForkExplorer } from "@/lib/liquity-fork/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import { isCollSurplusClaimEvent, isBasedollarEvent } from "@/lib/shared/types/event-shape";
@@ -67,10 +66,7 @@ import {
   viewFromSummary,
   type BasedollarTroveView,
 } from "@/components/protocol/basedollar/basedollar-position-card";
-import {
-  LiquityForkDebtDetail,
-  LiquityForkRiskDetail,
-} from "@/components/protocol/liquity-fork/liquity-fork-risk-slot";
+import { liquityForkPanelColumns } from "@/components/protocol/liquity-fork/liquity-fork-risk-slot";
 import {
   LiquityForkPositionExplanation,
   LiquityForkClosedExplanation,
@@ -90,15 +86,10 @@ import {
 } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
+import { ExportMenu } from "@/components/shared/export-menu";
+import { liquityForkExports } from "@/components/protocol/liquity-fork/liquity-fork-export-menu";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const LiquityForkExportMenu = dynamic(
-  () => import("@/components/protocol/liquity-fork/liquity-fork-export-menu").then((m) => m.LiquityForkExportMenu),
-  { ssr: false },
-);
 
 // Redemption touches collapse into one expandable run row — the V2 trove
 // treatment via ChainTruthTimeline's runs seam; the spec is shared across the
@@ -445,6 +436,24 @@ export default function BasedollarTroveDetail({
       />
     ) : null;
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = view
+    ? liquityForkExports({
+        protocolLabel: "Basedollar",
+        debtSymbol: DEBT_SYMBOL,
+        view,
+        chain,
+        events: basedollarEvents,
+        csvFilename: `basedollar-${collateralType}-${troveId.slice(0, 10)}-activity.csv`,
+        // A grouped page's `events` hold only the ungrouped rows, so its
+        // CSV reads the whole history too.
+        fetchAllEvents: historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory,
+        claimRow,
+        history: markdownHistoryScope(historyWindow, basedollarEvents, servedFolders),
+        scopeNote: exportScopeNote(historyWindow, basedollarEvents, "this Trove's whole history", servedFolders),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flows.focus}>
       <div className="py-8 space-y-6">
@@ -463,23 +472,11 @@ export default function BasedollarTroveDetail({
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {view && (
-            <LiquityForkExportMenu
-              protocolLabel="Basedollar"
-              debtSymbol={DEBT_SYMBOL}
-              view={view}
-              chain={chain}
-              events={basedollarEvents}
-              csvFilename={`basedollar-${collateralType}-${troveId.slice(0, 10)}-activity.csv`}
-              // A grouped page's `events` hold only the ungrouped rows, so its
-              // CSV reads the whole history too.
-              fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-              claimRow={claimRow}
-              history={markdownHistoryScope(historyWindow, basedollarEvents, servedFolders)}
-              scopeNote={exportScopeNote(historyWindow, basedollarEvents, "this Trove's whole history", servedFolders)}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -493,21 +490,10 @@ export default function BasedollarTroveDetail({
                 surplus={surplus}
                 viewHref={tl.viewHref}
                 live={liveRisk ? chain : undefined}
-                // Closed by default, remembered per viewer and Trove with its
-                // Explanation (ui-jobs 209). The live read's lines sit in the
-                // opened layer: the yearly cost under Debt; the price bar, the
-                // room to the branch minimum, the branch ratio and the
-                // redemption queue under Collateral ratio. Inside the card's
-                // receipts scope, so the Provenance list stays 1:1 with them.
-                positionSummary
-                debtDetail={liveRisk ? <LiquityForkDebtDetail chain={chain} /> : undefined}
-                riskDetail={liveRisk ? <LiquityForkRiskDetail chain={chain} /> : undefined}
-                // The Explanation is now pure prose about those same face figures.
-                // The CR strip is absorbed into the opened layer above; the
-                // redemption card's branch-context figures live on the protocol
-                // view — the card keeps its own queue exposure (the redemption
-                // runway) and the trove's own rate (a card stat). A terminal life
-                // gets the past-tense closed narration instead — never no pane.
+                // The live read's rows in the panel, inside the card's receipts scope.
+                panel={liveRisk ? liquityForkPanelColumns(chain) : undefined}
+                exports={exports}
+                // A terminal life gets the past-tense closed narration — never no pane.
                 explanation={
                   terminalPane ??
                   (liveRisk ? (

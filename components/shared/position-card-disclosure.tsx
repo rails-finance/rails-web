@@ -28,6 +28,7 @@ export function PositionSummaryProvider({ value, children }: { value: boolean; c
 /** One headline: its heading, then the figures and the lines under them. */
 export function PositionCardRow({
   index,
+  head,
   label,
   labelTip,
   headerIcon,
@@ -35,6 +36,8 @@ export function PositionCardRow({
   children,
 }: {
   index: number;
+  /** The headline's name (`data-card-head`), on the shared card's rows. */
+  head?: string;
   /** Retired with the open and closed card; ignored. */
   defaultOpen?: boolean;
   label: string;
@@ -44,7 +47,7 @@ export function PositionCardRow({
   children: ReactNode;
 }) {
   return (
-    <div className={className} data-card-row={index}>
+    <div className={className} data-card-row={index} data-card-head={head}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
         <TipLabel text={label} tip={labelTip} />
         {headerIcon}
@@ -84,6 +87,12 @@ export function PositionCardHeader({
 /** The words "Position summary"; nothing on a card without the summary face. */
 export function PositionSummaryHeading() {
   if (!usePositionSummary()) return null;
+  return <PositionSummaryTitle />;
+}
+
+/** The "Position summary" heading, which the shared card draws on
+ *  every detail render. */
+export function PositionSummaryTitle() {
   return (
     <h2 className={`${SECTION_HEADING} text-rb-500`} data-position-summary="">
       Position summary

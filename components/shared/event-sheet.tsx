@@ -27,7 +27,7 @@
 // column draws the other.
 
 import { useState, type ReactNode } from "react";
-import { RevealTip } from "@/components/shared/reveal-tip";
+import { RowHelp } from "@/components/shared/row-help";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetPopover } from "@/components/shared/asset-popover";
@@ -152,7 +152,6 @@ const WORDS = {
   tokens: "Asset",
   usd: "USD",
   oracle: "The protocol's oracle, at this block",
-  about: (name: string) => `About ${name}`,
   total: (side: string) => `${side} total`,
 };
 
@@ -166,25 +165,6 @@ const Fig = ({ f }: { f: SheetFigure }) =>
   ) : (
     <>{f.text}</>
   );
-
-/** A row's "?": opens its read-more on a click or a tap, inside the label
- *  cell so the value columns keep their place. The "?" is drawn by CSS, so a
- *  row's text reads as its label alone. */
-function RowHelp({ tip, name }: { tip: string; name: string }) {
-  return (
-    <RevealTip
-      className="ml-1 align-baseline"
-      tip={<span className="block w-64 max-w-[calc(100vw-48px)] whitespace-normal leading-snug">{tip}</span>}
-    >
-      <button
-        type="button"
-        data-sheet-help=""
-        aria-label={WORDS.about(name)}
-        className="inline-flex size-4 items-center justify-center rounded-full border border-rb-300 text-[10px] font-semibold leading-none text-rb-500 before:content-['?'] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-rb-600"
-      />
-    </RevealTip>
-  );
-}
 
 const nameOf = (label: ReactNode, key: string) => (typeof label === "string" ? label : key);
 

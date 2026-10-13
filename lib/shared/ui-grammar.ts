@@ -198,3 +198,7 @@ export const COUNT_BADGE =
  */
 export const CARD_PAD_X = "px-5";
 export const CARD_INSET_START = "pl-5";
+
+/** The position card's frame: the raised rounded box, with the listing row's
+ *  blue hover border (the row <Link> declares the group). */
+export const POSITION_CARD_FRAME = `rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised ${CARD_PAD_X} py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500`;

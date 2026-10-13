@@ -1,17 +1,19 @@
 "use client";
 
-// Asymmetry Trove card — a thin instantiation of the shared Liquity-family
-// card (components/protocol/liquity-family/liquity-position-card.tsx). The
-// markup, provenance and learn-more content are the shared card's; this file
-// only threads the "asymmetry" protocol id through and re-exports the names
-// the listing + trove-detail call sites already import.
+// Asymmetry Trove card — a thin instantiation of the shared Liquity-family card
+// (components/protocol/liquity-family/liquity-position-card.tsx), which
+// builds the shared position card's slots. This file threads the "asymmetry"
+// protocol id through and re-exports the names the listing + trove-detail
+// call sites import.
 
+import type { ReactNode } from "react";
 import {
   LiquityPositionCard,
   viewFromForkSummary,
   liveFromForkChain,
 } from "@/components/protocol/liquity-family/liquity-position-card";
 import type { LiquityTroveSurplus, LiquityTroveView } from "@/components/protocol/liquity-family/types";
+import type { PositionCardExports, PositionPanelColumns } from "@/components/shared/position-card";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 
@@ -20,24 +22,20 @@ export type AsymmetryTroveView = LiquityTroveView;
 export function AsymmetryPositionCard({
   v,
   receipts = false,
-  rowExtra,
   explanation,
   viewHref,
   live,
   compact,
   surplus,
-  positionSummary,
-  debtDetail,
-  riskDetail,
+  panel,
+  exports,
 }: {
   v: AsymmetryTroveView;
+  /** The Trove page's render (receipts, panel, (i)); the listing omits it. */
   receipts?: boolean;
-  /** Context content riding the shell's heading-button row (the compact runway). */
-  rowExtra?: React.ReactNode;
   /** The card's Explanation section (live narration + risk strips). */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `LiquityPositionCard`
-   *  — the page's `useTimelineEvents().viewHref`. */
+  explanation?: ReactNode;
+  /** Copy-this-view control: the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
   /** The detail page's live branch read — see LiquityPositionCard for the
    *  live-override behaviour. Listings omit it. */
@@ -46,26 +44,23 @@ export function AsymmetryPositionCard({
   compact?: boolean;
   /** A liquidated Trove's collateral surplus, read at the head. */
   surplus?: LiquityTroveSurplus | null;
-  /** The closed/opened card (ui-jobs 209) and its opened-layer lines — see
-   *  LiquityPositionCard. */
-  positionSummary?: boolean;
-  debtDetail?: React.ReactNode;
-  riskDetail?: React.ReactNode;
+  /** The panel's rows from the live read (`liquityForkPanelColumns`). */
+  panel?: PositionPanelColumns;
+  /** The card ⋮'s export shapes (`liquityForkExports`). */
+  exports?: PositionCardExports | null;
 }) {
   return (
     <LiquityPositionCard
       protocol="asymmetry"
       v={v}
-      receipts={receipts}
-      rowExtra={rowExtra}
+      surface={receipts ? "detail" : "listing"}
       explanation={explanation}
       viewHref={viewHref}
       live={live ? liveFromForkChain(live) : live}
       compact={compact}
       surplus={surplus}
-      positionSummary={positionSummary}
-      debtDetail={debtDetail}
-      riskDetail={riskDetail}
+      panel={panel}
+      exports={exports}
     />
   );
 }

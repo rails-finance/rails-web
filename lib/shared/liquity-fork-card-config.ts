@@ -17,6 +17,9 @@ export interface LiquityForkCardConfig {
   id: LiquityFamilyId;
   /** Display name threaded into the learn-more content ("Liquity V2" | "Asymmetry" | "Ebisu" | "Basedollar"). */
   name: string;
+  /** The Trove page's path before `/<branch>/<troveId>`, for the card ⋮'s
+   *  page link. */
+  trovePath: string;
   /** The deployment's stablecoin display symbol ("BOLD" | "USDaf" | "ebUSD" | "BD"). */
   debtSymbol: string;
   /** One live-verified docs/site link, threaded into the learn-more content. */
@@ -33,6 +36,7 @@ export interface LiquityForkCardConfig {
 export const LIQUITY_FORK_CARD_CONFIGS: Record<LiquityFamilyId, LiquityForkCardConfig> = {
   "liquity-v2": {
     id: "liquity-v2",
+    trovePath: "/ethereum/liquity-v2/trove",
     name: "Liquity V2",
     debtSymbol: "BOLD",
     docsLink: { label: "Liquity docs", url: "https://docs.liquity.org" },
@@ -41,6 +45,7 @@ export const LIQUITY_FORK_CARD_CONFIGS: Record<LiquityFamilyId, LiquityForkCardC
   },
   asymmetry: {
     id: "asymmetry",
+    trovePath: "/ethereum/asymmetry",
     name: "Asymmetry",
     debtSymbol: "USDaf",
     docsLink: { label: "Asymmetry docs", url: "https://docs.asymmetry.finance" },
@@ -48,6 +53,7 @@ export const LIQUITY_FORK_CARD_CONFIGS: Record<LiquityFamilyId, LiquityForkCardC
   },
   ebisu: {
     id: "ebisu",
+    trovePath: "/ethereum/ebisu",
     name: "Ebisu",
     debtSymbol: "ebUSD",
     docsLink: { label: "Ebisu", url: "https://ebisu.money" },
@@ -55,6 +61,7 @@ export const LIQUITY_FORK_CARD_CONFIGS: Record<LiquityFamilyId, LiquityForkCardC
   },
   basedollar: {
     id: "basedollar",
+    trovePath: "/base/basedollar",
     name: "Basedollar",
     debtSymbol: "BD",
     docsLink: { label: "Basedollar", url: "https://basedollar.money" },

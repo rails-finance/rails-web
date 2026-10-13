@@ -21,7 +21,6 @@ import {
 } from "@/lib/liquity/trove-page-words";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
@@ -62,12 +61,7 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state";
-// Lazy chunk: the export dropdown plus its Markdown/CSV serializers are
-// interaction-only, so they stay out of the page's initial bundle. A
-// mount-time prefetch (below) has the chunk cached before the toolbar renders.
-const TroveExportMenu = dynamic(() => import("@/components/trove/TroveExportMenu").then((m) => m.TroveExportMenu), {
-  loading: () => null,
-});
+import { troveExports } from "@/components/trove/TroveExportMenu";
 import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
@@ -172,12 +166,6 @@ export default function TroveView({
     if (seeded) void loadEnhancements();
     else void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Warm the export-menu chunk while the data fetch is in flight, so the
-  // toolbar paints whole when the loading gate clears (no button pop-in).
-  useEffect(() => {
-    void import("@/components/trove/TroveExportMenu");
   }, []);
 
   const loadData = async () => {
@@ -566,21 +554,17 @@ export default function TroveView({
           trovesAhead={trovesAhead}
           queueDebtTotal={queueDebtTotal}
           debtInFrontLoading={debtInFrontLoading}
-          positionSummary
           viewHref={tl.viewHref}
           surplus={surplus}
-          cardMenu={
-            <TroveExportMenu
-              variant="card"
-              trove={troveData}
-              liveState={liveState}
-              prices={prices}
-              debtInFront={debtInFront}
-              trovesAhead={trovesAhead}
-              events={tl.sortedEvents}
-              csvFilename={`liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`}
-            />
-          }
+          exports={troveExports({
+            trove: troveData,
+            liveState,
+            prices,
+            debtInFront,
+            trovesAhead,
+            events: tl.sortedEvents,
+            csvFilename: `liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`,
+          })}
           loadingStatus={{
             message: getEnhancementStatus(),
             snapshotDate: lastEventTs ?? undefined,
