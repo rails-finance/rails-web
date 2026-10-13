@@ -1,27 +1,15 @@
-// Opens every headline row on the page's position cards that stands closed
-// (rails-ops ui-jobs 209, 295: on a card with progressive disclosure each row
-// opens on a chevron, the ratio row closed by default, and a closed
-// row's lines are not in the DOM; the (i) Explanation row draws either way).
-// A page whose cards do not disclose has no "Position summary" heading, and
-// this returns 0. The row toggles draw once the page hydrates, and clicks are
-// retried until the deadline, so a click made before hydration is made again.
+// Waits for the page's position card (rails-ops TO-DO-position-card 270,
+// 322). The card has no open or closed rows any more: every headline draws
+// its lines and the (i) Explanation row is the one toggle, so there is
+// nothing to open. Returns as soon as the "Position summary" heading or a
+// detail card frame (P1, the families without the heading) is in the DOM, or
+// at the deadline on a page with neither. Returns 0, the rows it opened,
+// for the callers that log it.
 export async function openPositionCards(page, deadlineMs = 10_000) {
-  const closed = page.locator('[data-card-row-toggle][aria-expanded="false"]');
-  const deadline = Date.now() + deadlineMs;
-  let opened = 0;
-  while (Date.now() < deadline) {
-    if ((await page.locator("[data-card-row-toggle]").count()) === 0) {
-      if ((await page.locator("[data-position-summary]").count()) === 0) return opened;
-      await page.waitForTimeout(300);
-      continue;
-    }
-    if ((await closed.count()) === 0) return opened;
-    await closed
-      .first()
-      .dispatchEvent("click", undefined, { timeout: 3000 })
-      .then(() => (opened += 1))
-      .catch(() => {});
-    await page.waitForTimeout(300);
-  }
-  return opened;
+  await page
+    .locator('[data-position-summary], [data-anatomy="P1"]')
+    .first()
+    .waitFor({ state: "attached", timeout: deadlineMs })
+    .catch(() => {});
+  return 0;
 }
