@@ -1,7 +1,8 @@
 "use client";
 
 // MakerDAO's event card on the shared shell's slots (ui-jobs 309 step 8): the
-// head from makerdao-event-header.tsx, T2 from makerdao-cells.tsx, the
+// head from makerdao-event-header.tsx, T2 from makerdao-sheet.tsx (the
+// cells in makerdao-cells.tsx where it states none), the
 // explanation from makerdao-event-explainer.tsx and the Learn More from the
 // generator (lib/makerdao/event-prose.ts). The index
 // carries no gas for Maker's rows, so the price row states none.
@@ -17,6 +18,7 @@ import { debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-provenance";
 import { useMakerHeadSpec } from "./makerdao-event-header";
 import { MakerLedgerProvider } from "./makerdao-ledger";
 import { useMakerCells, useMakerOpened } from "./makerdao-cells";
+import { useMakerSheet } from "./makerdao-sheet";
 import { MakerDAOEventExplainer, useMakerRowExtras } from "./makerdao-event-explainer";
 import { makerEventModal } from "@/lib/makerdao/event-prose";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -119,6 +121,7 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
     txContext: isGive ? history.txContext.get(makerTxHashOf(event)) : undefined,
   });
   const cells = useMakerCells(ctx, coords, event.id);
+  const sheet = useMakerSheet(ctx, coords);
 
   const slots: EventCardSlots = {
     event: {
@@ -134,6 +137,9 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
     caption: event.actionLabel,
     actor: { by: extBy ?? undefined },
     cells,
+    // The balance sheet, where the page holds the ilk read at the block; else
+    // the cells draw.
+    sheet,
     // The Collateral and Debt cells open into their ledgers where the page
     // ties its timeline to the Lifetime flows panel.
     ledgers: {

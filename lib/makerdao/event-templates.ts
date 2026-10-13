@@ -42,6 +42,9 @@ export const PROSE = eventProseEngine<MakerL5Key, MakerEchoKey>(FILE, { doc: FIL
 /** Words the generator puts into a sentence. */
 export const MAKER_WORDS = FILE.words;
 
+/** A word with its {name}s filled. */
+export const fillText = PROSE.fillText;
+
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 
 /** A position_words string as written, for a bullet that draws its {name}s as
