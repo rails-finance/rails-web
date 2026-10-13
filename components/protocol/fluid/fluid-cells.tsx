@@ -75,7 +75,7 @@ const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Nu
 /** Before→after transition where BOTH boundaries are the settled reads (the
  *  liquidation-attribution rows) — no reconstruction: the change is the exact
  *  difference of the two eth_call figures. */
-function settledTransition(
+export function settledTransition(
   side: "collateral" | "debt",
   sym: string,
   before: string | undefined,
