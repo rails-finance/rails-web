@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DRAINED_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isDolomiteEvent } from "@/lib/shared/types/event-shape";
 import { fetchDolomitePositions } from "@/lib/api/fetch-dolomite-positions";
@@ -45,6 +46,7 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { DOLOMITE_LIQUIDATION_RUNS } from "@/lib/dolomite/timeline-runs";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { dolomiteExplorer } from "@/lib/dolomite/explorer";
 import { DolomiteEventCard } from "@/components/protocol/dolomite/dolomite-event-card";
 import {
   DolomitePositionCard,
@@ -123,6 +125,9 @@ export default function DolomitePositionView({
   // Keyed on the timeline, not the row: an account Dolomite has never seen is a
   // real answer the server can seed, and its `initialPosition` is null.
   const seeded = initialEvents != null;
+  // The event route draws the sub-nav and the event's card beside the shared
+  // column (ui-jobs 236): no position card, no flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const [view, setView] = useState<DolomitePositionView | null>(() =>
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
@@ -394,7 +399,7 @@ export default function DolomitePositionView({
             <DetailBodySkeleton />
           ) : (
             <>
-              {liveView && cardView && (
+              {!onEventPage && liveView && cardView && (
                 <DolomitePositionCard
                   v={cardView}
                   receipts
@@ -441,7 +446,7 @@ export default function DolomitePositionView({
               )}
               {/* Lifetime flows: the bars and the line over the account's replay
           (lib/dolomite/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
-              {liveView && (
+              {!onEventPage && liveView && (
                 <LifetimeFlowsPanel
                   scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                   read={flows.read}
@@ -459,6 +464,7 @@ export default function DolomitePositionView({
                 // — lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="dolomite"
+                eventPage={(slot) => dolomiteExplorer.eventPage({ ...slot, owner, accountNumber })}
                 closed={liveView ? liveView.status !== "open" : undefined}
                 tl={tl}
                 runs={DOLOMITE_LIQUIDATION_RUNS}

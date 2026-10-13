@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
+import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
+import { makerdaoEventPageDescription } from "@/lib/makerdao/explorer";
 import { loadMakerVaultTail } from "@/lib/makerdao/position-page-data";
 import MakerVaultPage from "../../page";
 
@@ -35,15 +37,18 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     subject: vault,
     canonicalPath: `/ethereum/makerdao/${vault}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    description:
+      event && isMakerDAOEvent(event)
+        ? makerdaoEventPageDescription(event.context.data.ilk, vault, event.timestamp)
+        : undefined,
   });
 }
 
 // THIN: renders the exact same parent vault page, same params — the nested
 // `event/[eventId]` segment sits inside the same `[vault]` layout, so every
-// provider still wraps it, and `MakerVaultDetailView` (this page's client
-// half) never learns a new prop. It finds out it is on an event route from
-// `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra `eventId`
+// provider still wraps it. `MakerVaultDetailView` reads `useParams().eventId`
+// and draws the sub-nav and the event's card in page mode beside the shared
+// column (`ChainTruthTimeline`'s `eventPage`, ui-jobs 236). `params` here carries an extra `eventId`
 // key the parent's own `Props` type doesn't declare; passing the same promise
 // through is still structurally valid (the parent only reads `vault` off it).
 export default async function MakerdaoEventPage({ params, searchParams }: Props) {

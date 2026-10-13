@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
@@ -65,6 +66,7 @@ import {
 } from "@/lib/polaris/live-provenance";
 import { usePolarisUiState } from "@/hooks/usePolarisUiState";
 import { AmountText } from "@/components/shared/amount-text";
+import { polarisExplorer } from "@/lib/polaris/explorer";
 
 /** What the ETH/USD row is, and why it is in the menu. */
 const ETH_USD_LABEL = "ETH/USD — the protocol's medianiser";
@@ -132,6 +134,9 @@ export default function PolarisPositionView({
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
   const [indexPending, setIndexPending] = useState(!indexSeeded);
   const stable = POLARIS_MARKET_CONFIG[market].stable.symbol;
+  // The event route draws the sub-nav and the timeline alone: the card in page
+  // mode beside the shared side column (ui-jobs 236, 307).
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
 
   // Whether the reader left the card's Explanation pane open on THIS CDP.
   // Per CDP, not per explorer: a reader studying one position wants its
@@ -483,9 +488,11 @@ export default function PolarisPositionView({
           )}
         </DetailTopRow>
 
-        <p className="text-xs text-rb-500">
-          Sepolia testnet · {stable} market · CDP #{cdpId} — every figure on this page is a test figure.
-        </p>
+        {!onEventPage && (
+          <p className="text-xs text-rb-500">
+            Sepolia testnet · {stable} market · CDP #{cdpId} — every figure on this page is a test figure.
+          </p>
+        )}
 
         {loading ? (
           <DetailBodySkeleton />
@@ -495,40 +502,44 @@ export default function PolarisPositionView({
           </div>
         ) : (
           <>
-            <PolarisPositionCard
-              v={view}
-              receipts
-              viewHref={tl.viewHref}
-              rowExtra={riskStrip}
-              explanationDefaultOpen={explanationOpen}
-              onExplanationToggle={setExplanationOpen}
-              explanation={
-                chain ? (
-                  <PolarisPositionExplanation
-                    chain={chain}
-                    stableSymbol={stable}
-                    terminal={summary && summary.status !== "open" ? summary.status : null}
-                    lifetime={lifetime}
-                    transferCount={summary?.transferCount}
-                  />
-                ) : undefined
-              }
-            />
+            {!onEventPage && (
+              <>
+                <PolarisPositionCard
+                  v={view}
+                  receipts
+                  viewHref={tl.viewHref}
+                  rowExtra={riskStrip}
+                  explanationDefaultOpen={explanationOpen}
+                  onExplanationToggle={setExplanationOpen}
+                  explanation={
+                    chain ? (
+                      <PolarisPositionExplanation
+                        chain={chain}
+                        stableSymbol={stable}
+                        terminal={summary && summary.status !== "open" ? summary.status : null}
+                        lifetime={lifetime}
+                        transferCount={summary?.transferCount}
+                      />
+                    ) : undefined
+                  }
+                />
 
-            {/* Lifetime flows: the bars and the line over the CDP's replay
+                {/* Lifetime flows: the bars and the line over the CDP's replay
               (lib/polaris/flows.ts), in the market's stablecoin, in place of
               the tower (TO-DO-ui-jobs 206). */}
-            <LifetimeFlowsPanel
-              scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-              read={flows.read}
-              explanation={
-                <div className="space-y-2 text-sm text-rb-500">
-                  <PolarisFlowsNote facts={flows.facts} stable={stable} />
-                </div>
-              }
-              learnMore={polarisFlowsContent(stable)}
-              outcome={lifetime ? polarisPsmOutcome(lifetime, stable, chain?.price?.pethInDebt) : undefined}
-            />
+                <LifetimeFlowsPanel
+                  scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flows.read}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <PolarisFlowsNote facts={flows.facts} stable={stable} />
+                    </div>
+                  }
+                  learnMore={polarisFlowsContent(stable)}
+                  outcome={lifetime ? polarisPsmOutcome(lifetime, stable, chain?.price?.pethInDebt) : undefined}
+                />
+              </>
+            )}
 
             {indexPending && polarisEvents.length === 0 ? (
               <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
@@ -555,6 +566,15 @@ export default function PolarisPositionView({
                   sinceTouch
                     ? () => <PolarisSinceLastTouchRow window={sinceTouch} market={market} stable={stable} />
                     : undefined
+                }
+                eventPage={(slot) =>
+                  polarisExplorer.eventPage({
+                    ...slot,
+                    market,
+                    cdpId,
+                    holder: summary?.owner ?? view.owner,
+                    closed: view.status !== "open",
+                  })
                 }
                 displayItems={POLARIS_DISPLAY_ITEMS}
                 toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
