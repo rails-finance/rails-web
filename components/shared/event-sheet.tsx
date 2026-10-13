@@ -29,6 +29,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { LedgerIcon } from "@/components/shared/event-ledger";
 import { ChangeSwapValue, type SwapFigure } from "@/components/shared/change-swap-value";
+import { ListChevronsIcon } from "@/components/shared/list-chevrons-icon";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
 /** A figure on the sheet, with its receipt. */
@@ -363,25 +364,9 @@ export function EventSheetView({
   return (
     <div className="px-5 py-2" data-sheet="" data-sheet-breakdown={on ? "on" : "off"} {...data}>
       <div
-        className={`mb-2 flex items-center justify-between gap-3 ${breakdown ? "sm:hidden" : ""}`}
+        className={`mb-2 flex items-center justify-end gap-3 ${breakdown ? "sm:hidden" : ""}`}
         data-sheet-controls=""
       >
-        {breakdown ? (
-          <span />
-        ) : (
-          <button
-            type="button"
-            aria-label={shown ? WORDS.hide : WORDS.show}
-            data-sheet-switch=""
-            onClick={(e) => {
-              e.stopPropagation();
-              setShown((v) => !v);
-            }}
-            className="min-h-7 rounded-md bg-sunken px-2.5 text-xs font-semibold text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 max-sm:min-h-9"
-          >
-            {shown ? WORDS.hide : WORDS.show}
-          </button>
-        )}
         <div
           role="group"
           aria-label={WORDS.column}
@@ -403,6 +388,21 @@ export function EventSheetView({
             </button>
           ))}
         </div>
+        {!breakdown && (
+          <button
+            type="button"
+            aria-label={shown ? WORDS.hide : WORDS.show}
+            title={shown ? WORDS.hide : WORDS.show}
+            data-sheet-switch=""
+            onClick={(e) => {
+              e.stopPropagation();
+              setShown((v) => !v);
+            }}
+            className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-sunken text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 max-sm:min-h-9 max-sm:min-w-9"
+          >
+            <ListChevronsIcon open={shown} className="h-4 w-4" />
+          </button>
+        )}
       </div>
       <div className="flex flex-col gap-2.5">
         {sheet.sides.map((s) => (
