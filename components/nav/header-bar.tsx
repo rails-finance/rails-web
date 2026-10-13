@@ -53,7 +53,8 @@ function RailsLogo() {
   );
 }
 
-/** Release-stage pill right of the wordmark — the site is in beta, and the
+/** Release-stage pill right of the wordmark, on app routes below `md` only
+ *  (marketing carries the beta strip alone). The site is in beta, and the
  *  chrome says so once, site-wide, instead of a per-rail label. It travels
  *  with the mark, so on the app surfaces from `md` up BrandRail draws it.
  *  Caution-500 is the house "not settled yet" signal (the anatomy the old
@@ -126,12 +127,12 @@ export function HeaderBar() {
       }`}
     >
       <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
-        {/* The mark and the beta pill. On an app route this bar exists only
-            below `md`, where there is no rail to hold them. Marketing is
-            untouched at every width. */}
+        {/* The mark, and the beta pill on app routes only (this bar shows
+            there below `md`, where there is no rail to hold them). Marketing
+            carries the beta strip alone. */}
         <div className="flex items-center">
           <RailsLogo />
-          <BetaPill />
+          {!isMarketing && <BetaPill />}
         </div>
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
