@@ -8,7 +8,9 @@
 // deployment: the family key, its words, its stable and its provenance
 // vocabulary (lib/<fork>/event-provenance.ts).
 //
-// T2: Collateral and Debt (ledger cells), Collateral ratio and Interest rate
+// T2: the balance sheet (liquity-fork-sheet.tsx) where the event states a
+// Trove's balances; a batch manager's rows keep the cells: Collateral and Debt
+// (ledger cells), Collateral ratio and Interest rate
 // (liquity-fork-state-stats.tsx). The price row states the owner's gas where
 // the chain gives a whole figure and the branch price the cells are valued at;
 // a redemption's fee and whole-redemption figures and a liquidation's legs and
@@ -42,6 +44,7 @@ import {
 import { LiquityForkEventExplainer, liquityForkLearnMoreContent } from "./liquity-fork-event-explainer";
 import { liquityForkStateFigures, liquityForkStateStats, type LiquityForkStateProvs } from "./liquity-fork-state-stats";
 import { buildForkLiquidationForensics, forkLiquidationStats, forkRedemptionStats } from "./liquity-fork-forensics";
+import { liquityForkSheet, type LiquityForkSheetBranch } from "./liquity-fork-sheet";
 
 /** A fork's provenance vocabulary: every builder the card's parts read. */
 export type LiquityForkCardProvs = LiquityForkExplainerProvs &
@@ -60,6 +63,9 @@ export interface LiquityForkDeployment {
   /** The chain gives the owner's gas as one whole figure. False on an L2 whose
    *  execution fee leaves out the L1 data fee (Basedollar on Base). */
   gas: boolean;
+  /** The branch of a collateral symbol: its token and governance ratios, which
+   *  the balance sheet's Risk and Limits panels read. */
+  branch?: (collateralSymbol: string) => LiquityForkSheetBranch | undefined;
 }
 
 export interface LiquityForkEventCardProps {
@@ -205,6 +211,16 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     flows: event.flows,
   });
 
+  const sheet = liquityForkSheet({
+    ctx,
+    coords,
+    debtSymbol,
+    provs,
+    branch: fork.branch?.(ctx.collateralSymbol),
+    actionLabel: event.actionLabel,
+    flows: event.flows,
+  });
+
   const teaser = liquityForkExplainerTeaser(ctx, coords, fork.words, provs);
   const slots: EventCardSlots = {
     event: {
@@ -224,6 +240,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
       ctx.eventType === "setBatchManagerAnnualInterestRate" || ctx.eventType === "applyPendingDebt"
         ? { byOwner: false }
         : undefined,
+    sheet,
     cells: cells.length > 0 ? cells : { none: "the batch row carries no figure of the Trove" },
     ledgers: {
       provider: (children) => (
