@@ -64,30 +64,33 @@ export function DeltaToggle({
     );
   }
 
+  // The figure beside the glyph is a click-opened tip when it is a <Prov>
+  // value (RevealTip stops the click it receives), so it stands outside the
+  // button: a click on the figure opens its tip, a click on the glyph toggles.
+  // The button's padding widens the glyph's hit area into the gap beside it.
   return (
-    <button
-      type="button"
-      onClick={() => setShowDelta((v) => !v)}
-      aria-pressed={showDelta}
-      aria-label={showDelta ? "Show before and after values" : "Show total change"}
-      title={showDelta ? "Show before → after" : "Show total change"}
-      className="group inline-flex items-center gap-1 cursor-pointer"
-    >
+    <span className="group inline-flex items-center gap-1">
       {showDelta ? (
-        <>
-          <span className="text-sm font-semibold text-foreground tabular-nums">{delta}</span>
-          <span className="text-sm font-semibold text-rb-500">=</span>
-        </>
+        <span className="text-sm font-semibold text-foreground tabular-nums">{delta}</span>
       ) : (
         <>
           <span className={`${beforeClass} tabular-nums group-hover:text-rb-700 dark:group-hover:text-rb-300`}>
             {before}
           </span>
           {beforeExtra}
-          <TransitionArrow size={size} />
         </>
       )}
-    </button>
+      <button
+        type="button"
+        onClick={() => setShowDelta((v) => !v)}
+        aria-pressed={showDelta}
+        aria-label={showDelta ? "Show before and after values" : "Show total change"}
+        title={showDelta ? "Show before → after" : "Show total change"}
+        className="-mx-0.5 inline-flex cursor-pointer items-center px-1 py-1"
+      >
+        {showDelta ? <span className="text-sm font-semibold text-rb-500">=</span> : <TransitionArrow size={size} />}
+      </button>
+    </span>
   );
 }
 
