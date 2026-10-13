@@ -30,6 +30,7 @@ import { AlertTriangle, Check, Hash, Link2 } from "lucide-react";
 import {
   PositionCard,
   type PositionCardExports,
+  type PositionCardCounters,
   type PositionCardHead,
   type PositionCardMenu,
   type PositionCardOutcome,
@@ -37,7 +38,6 @@ import {
   type PositionCardStatus,
   type PositionPanelRow,
 } from "@/components/shared/position-card";
-import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -188,8 +188,8 @@ function cloneTip(root: string | null, parent: string | null): string {
   return `A clone${of ? ` of ${shortAddress(of)}` : ""}: a position of its own on that original's terms, sharing its minting limit.`;
 }
 
-/** The listing's challenge marker: caution triangle + count, named as
- *  challenges (never "liquidations": Frankencoin's vocabulary). The position
+/** The listing's challenge marker after the counts: caution triangle and
+ *  count, named as challenges (Frankencoin's vocabulary). The position
  *  page states the tally in the panel or the closed card's Challenges. */
 function ChallengeMarker({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -321,15 +321,14 @@ export function useFrankencoinCardSlots({
         <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmarkProtocol="frankencoin" />
       )}
       <PositionIdentity v={v} cloneParent={cloneParent} />
-      <ChallengeMarker count={v.challengeCount} />
     </span>
   );
 
-  const counters: PositionCardMetaProps = {
+  const counters: PositionCardCounters = {
     lastActivityAt: v.lastActivityAt,
     eventCount: v.txCount,
     // The foot strip reads transactions, then the age (ui-jobs 270).
-    ...(detail ? { order: "age-last" as const } : {}),
+    ...(detail ? { order: "age-last" as const } : { extra: <ChallengeMarker count={v.challengeCount} /> }),
   };
 
   // A running challenge stays in view above the headlines, on any position

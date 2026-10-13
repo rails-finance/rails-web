@@ -338,15 +338,7 @@ export function makerVaultCardSlots({
     const outcome: PositionCardOutcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: v.lastActivityAt != null ? [{ at: v.lastActivityAt }] : undefined,
-      // The shell's Outcome column has no tip of its own: the sentence rides
-      // under the dates.
-      footnote: (
-        <div className="mt-0.5 text-xs text-rb-500">
-          <RevealTip tip={endTip} label={`${v.status === "liquidated" ? "Liquidated" : "Closed"}: ${endTip}`} focusable>
-            <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">What this means</span>
-          </RevealTip>
-        </div>
-      ),
+      tip: endTip,
     };
     if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null };
     return { ...common, ...detailCommon, heads, outcome };

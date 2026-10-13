@@ -25,6 +25,7 @@ import {
   type PositionCardOutcome,
   type PositionCardSlots,
   type PositionCardStatus,
+  type PositionPanelColumns,
   type PositionPanelRow,
 } from "@/components/shared/position-card";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
@@ -394,6 +395,8 @@ export function useSparkCardSlots({
   let heads: PositionCardHead[];
   let outcome: PositionCardOutcome | undefined;
   let notice: ReactNode;
+  // A closed card's panel: the peaks of reserves that never backed borrowing.
+  let closedPanel: PositionPanelColumns | undefined;
   if (ended) {
     // The wallet holds no open reserves, so the headline is what each asset
     // held at its height.
@@ -405,17 +408,6 @@ export function useSparkCardSlots({
         value: v.peakSupplies.some((r) => !isOther(r)) ? (
           <PeakLines reserves={v.peakSupplies.filter((r) => !isOther(r))} side="supply" />
         ) : null,
-        sub:
-          peakOthers.length > 0 ? (
-            <div className="mt-2" data-spark-not-collateral="">
-              <div className="font-semibold">
-                <TipLabel text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
-              </div>
-              <div className="mt-1 text-sm font-semibold tabular-nums text-foreground/80">
-                <PeakLines reserves={peakOthers} side="supply" />
-              </div>
-            </div>
-          ) : undefined,
       },
       {
         id: "peak-debt",
@@ -423,6 +415,23 @@ export function useSparkCardSlots({
         value: v.peakBorrows.length > 0 ? <PeakLines reserves={v.peakBorrows} side="debt" /> : null,
       },
     ];
+    if (peakOthers.length > 0) {
+      closedPanel = [
+        [
+          {
+            id: "peak-not-collateral",
+            label: "Supplied, not collateral",
+            tip: PEAK_NOT_COLLATERAL_TIP,
+            value: (
+              <span data-spark-not-collateral="">
+                <PeakLines reserves={peakOthers} side="supply" />
+              </span>
+            ),
+          },
+        ],
+        [],
+      ];
+    }
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: [{ at: v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt }],
@@ -504,7 +513,7 @@ export function useSparkCardSlots({
     learnMore: ended ? sparkPositionModal(v.status) : sparkPositionModal(v.status, v.borrows.length > 0),
     menu: { leading: () => <SparkMenuRows wallet={v.wallet} />, exports: exports ?? null },
   };
-  if (outcome) return { ...detailCommon, outcome };
+  if (outcome) return { ...detailCommon, outcome, panel: closedPanel };
 
   // ── The panel: the supply side on the left, the debt and its risk on the
   //    right. A side whose total is unpriced has its reserves as the headline
