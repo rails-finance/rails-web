@@ -480,9 +480,16 @@ body {
   .spine-num {
     top: var(--node-y);
   }
-  /* A group's range on its bracket (components/shared/group-frame.tsx,
-     ui-jobs 331 point 4): the number column's box at its x, the text level
-     with the bracket's top edge (hi) or bottom edge (lo). */
+  /* A group's bracket and its range (components/shared/group-frame.tsx,
+     ui-jobs 331 point 4). The top edge runs through the centre of the
+     number column's box (`.spine-num`, 13px tall from `num-pill`), so the
+     closed group's high number and the open group's first member number
+     stand in one place. The range takes the column's box at its x: the high
+     number at the column's height, the low number centred on the bottom
+     edge. */
+  .group-bracket {
+    top: calc(var(--node-y) + 6.5px);
+  }
   .group-range {
     position: absolute;
     z-index: 20;
@@ -492,16 +499,11 @@ body {
     pointer-events: none;
   }
   .group-range-hi {
-    top: 0;
-    transform: translateY(-50%);
+    top: var(--node-y);
   }
   .group-range-lo {
     bottom: 0;
     transform: translateY(50%);
-  }
-  /* Two groups in a row: room between one tail number and the next top. */
-  div:has(> .group-frame) + div > .group-frame {
-    margin-top: 12px;
   }
   @media (max-width: 639.98px) {
     .spine-row:not(.spine-seg) > .spine-cell {
