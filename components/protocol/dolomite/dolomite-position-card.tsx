@@ -1,12 +1,13 @@
 "use client";
 
-// Dolomite position card — one Account.Info, through the SAME shared grammar
-// (OpenPositionStats + StatValue) as the other explorers.
+// Dolomite position card: one Account.Info, as a slot builder for the shared
+// position card (components/shared/position-card.tsx; rails-ops
+// TO-DO-position-card 322).
 //
 // THE GRAIN IS THE PAIR: the card is one (owner, accountNumber), never an
 // owner. Dolomite is cross-margin WITHIN an account number and isolated
 // ACROSS them — one card per owner would assert a single collateralisation
-// across accounts that are independently liquidated. The identity row carries
+// across accounts that are independently liquidated. The identity slot carries
 // Dolomite's own vocabulary: account 0 is the owner's "Dolomite Balance";
 // every other number is an isolated "Borrow Position".
 //
@@ -17,27 +18,28 @@
 // principal: par is a SCALED balance and interest lives in the index). A
 // negative balance IS debt — the core has no Borrow action.
 //
-// STATUS IS TWO-AXIS. The lifecycle pill says open/closed/liquidated, where
-// 'liquidated' names only a CLOSED account; an OPEN account that has been
-// liquidated stays an OPEN card with the meta cluster's count. The detail
-// render swaps the lifecycle pill for the mode word (Lending / Borrowing).
+// STATUS IS TWO-AXIS. The tag says Closed or Liquidated, where 'liquidated'
+// names only a CLOSED account; an OPEN account that has been liquidated stays
+// an OPEN card with the counters' warning count.
 //
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
-import { Prov } from "@/components/shared/provenance";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
-import { ShareBar } from "@/components/shared/share-bar";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   positionCurrentProv,
   positionParProv,
@@ -51,16 +53,23 @@ import type { DolomiteCardCaptions } from "@/lib/dolomite/economics";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { dolomitePositionContent } from "@/lib/dolomite/position-content";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
+import { formatUsd } from "@/lib/shared/format-event";
 import type {
   DolomitePositionSummary,
   DolomiteBalanceAmount,
   DolomitePeakAmount,
 } from "@/lib/sources/api/dolomite-positions";
+import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { accountLabelTip } from "@/lib/dolomite/asset-catalog";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
+import { DolomiteMenuRows } from "@/components/protocol/dolomite/dolomite-menu-rows";
+import {
+  DolomiteMarginRatio,
+  dolomiteHasRisk,
+  dolomiteRiskRows,
+} from "@/components/protocol/dolomite/dolomite-risk-slot";
 
 export interface DolomitePositionView {
   owner: string;
@@ -136,127 +145,69 @@ const legExact = (r: DolomiteBalanceAmount): string =>
     ? formatUnitsExact(r.currentRaw, r.decimals)
     : `${formatUnitsExact(r.parRaw.replace("-", ""), r.decimals)} (par)`;
 
-/** Per-market token amounts, demoted beneath the USD headline — still the
- *  strict chain reads (each line traced, exact figure on hover). Keyed by MARKET ID
+/** One side's balances as lines in the figure type, each traced, for a head whose
+ *  USD total is not stated (a market on the side is unpriced). Keyed by MARKET ID
  *  (symbols collide on this roster: rUSD/srUSD/wsrUSD/cUSD/stcUSD). */
-function FootnoteLines({ v, side }: { v: DolomitePositionView; side: "supply" | "debt" }) {
-  const all = side === "supply" ? v.supplies : v.borrows;
-  const { lines, control } = useDustLines(all, dustUsdOf(v));
-  if (all.length === 0) return null;
+function LegLines({ lines, side }: { lines: DolomiteBalanceAmount[]; side: "supply" | "debt" }) {
   return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
+    <span className="flex flex-col gap-1">
       {lines.map((r) => (
-        <div key={r.marketId}>
+        <Prov key={r.marketId} info={legProv(r, side)}>
           {r.decimalsUnread ? (
             <TokenAmountNotLoaded label={r.symbol} />
           ) : (
-            <Prov info={legProv(r, side)}>
-              <ExactSpan exact={legExact(r)} symbol={r.symbol}>
-                {formatCompact(legAmount(r))} {r.symbol}
-              </ExactSpan>
-            </Prov>
+            <AssetAmount value={legAmount(r)} symbol={r.symbol} exact={legExact(r)} address={r.token} />
           )}
-        </div>
+        </Prov>
       ))}
-      {control}
-    </div>
+    </span>
   );
 }
 
-/** The opened card's per-market lines (ui-jobs 209): each amount beside a bar
- *  filled to its share of the side's oracle-USD total. */
-function ShareLines({ v, side, total }: { v: DolomitePositionView; side: "supply" | "debt"; total: number }) {
-  const all = side === "supply" ? v.supplies : v.borrows;
-  const usdOf = dustUsdOf(v);
-  const { lines, control } = useDustLines(all, usdOf);
-  if (all.length === 0) return null;
+/** A closed card's per-market PEAK amounts (highest recorded PAR, the scaled
+ *  balance, labeled so on hover), each traced; no USD (the oracle prices only
+ *  the present). */
+function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply" | "debt" }) {
   return (
-    <div className="mt-1.5 grid max-w-72 grid-cols-[auto_minmax(3rem,1fr)] items-center gap-x-3 gap-y-1 text-xs text-rb-500 tabular-nums">
+    <span className="flex flex-col gap-1">
       {lines.map((r) => (
-        <div key={r.marketId} className="contents">
-          <div className="whitespace-nowrap">
-            {r.decimalsUnread ? (
-              <TokenAmountNotLoaded label={r.symbol} />
-            ) : (
-              <Prov info={legProv(r, side)}>
-                <ExactSpan exact={legExact(r)} symbol={r.symbol}>
-                  {formatCompact(legAmount(r))} {r.symbol}
-                </ExactSpan>
-              </Prov>
-            )}
-          </div>
-          <ShareBar share={(usdOf(r) ?? 0) / total} side={side === "supply" ? "collateral" : "debt"} />
-        </div>
+        <Prov
+          key={r.marketId}
+          info={r.tokens ? dolomitePeakTokenProv(r.symbol, side) : dolomitePeakParProv(r.symbol, side)}
+        >
+          {r.decimalsUnread ? (
+            <TokenAmountNotLoaded label={r.symbol} />
+          ) : (
+            <AssetAmount
+              value={r.amount}
+              symbol={r.symbol}
+              address={r.token}
+              exact={
+                r.tokens
+                  ? formatUnitsExact(r.amountRaw, r.decimals)
+                  : `${formatUnitsExact(r.amountRaw, r.decimals)} (par: multiply by the market's interest index for tokens)`
+              }
+            />
+          )}
+        </Prov>
       ))}
-      {control && <div className="col-span-2">{control}</div>}
-    </div>
+    </span>
   );
 }
 
-/** "X% borrow rate" — the live per-second rate (annualized) on the single
- *  borrowed market, or the debt-USD-weighted average. */
-function BorrowRateCaption({ rate }: { rate: DolomiteCardCaptions["borrowRate"] | undefined }) {
-  if (!rate) return null;
+/** The oracle-USD figure that leads a side, with its exact dollars on hover. */
+function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      <Prov info={rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol)}>{rate.pct.toFixed(2)}%</Prov>{" "}
-      {rate.avg ? "avg borrow rate" : "borrow rate"}
-    </div>
+    <RevealTip tip={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+      <Prov info={info}>{formatUsd(usd)}</Prov>
+    </RevealTip>
   );
 }
 
-/** A vertical stack of one side's balances, each traced. */
-function LegStack({ v, side }: { v: DolomitePositionView; side: "supply" | "debt" }) {
-  const all = side === "supply" ? v.supplies : v.borrows;
-  const { lines, control } = useDustLines(all, dustUsdOf(v));
-  if (all.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.marketId}>
-          <Prov info={legProv(r, side)}>
-            {r.decimalsUnread ? (
-              <TokenAmountNotLoaded label={r.symbol} />
-            ) : (
-              <AssetAmount value={legAmount(r)} symbol={r.symbol} exact={legExact(r)} address={r.token} />
-            )}
-          </Prov>
-        </StatValue>
-      ))}
-      {control}
-    </div>
-  );
-}
-
-/** A vertical stack of per-market PEAK amounts (highest recorded PAR — the
- *  scaled balance, labeled so on hover), each traced; no USD (the oracle
- *  prices the present, not history). */
-function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply" | "debt" }) {
-  if (lines.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.marketId}>
-          <Prov info={r.tokens ? dolomitePeakTokenProv(r.symbol, side) : dolomitePeakParProv(r.symbol, side)}>
-            {r.decimalsUnread ? (
-              <TokenAmountNotLoaded label={r.symbol} />
-            ) : (
-              <AssetAmount
-                value={r.amount}
-                symbol={r.symbol}
-                address={r.token}
-                exact={
-                  r.tokens
-                    ? formatUnitsExact(r.amountRaw, r.decimals)
-                    : `${formatUnitsExact(r.amountRaw, r.decimals)} (par: multiply by the market's interest index for tokens)`
-                }
-              />
-            )}
-          </Prov>
-        </StatValue>
-      ))}
-    </div>
-  );
+/** A line's share of its side's oracle-USD total, as the panel states it. */
+function shareText(share: number): string {
+  if (share >= 0.995) return "100%";
+  return share < 0.01 ? "<1%" : `${Math.round(share * 100)}%`;
 }
 
 /** An account's name that explains the account number on hover or tap: the
@@ -291,192 +242,242 @@ function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean })
   );
 }
 
-export function DolomitePositionCard({
+export interface DolomitePositionCardProps {
+  v: DolomitePositionView;
+  /** `detail` on the account page (receipts, panel, (i)); `listing` in a row. */
+  surface: "detail" | "listing";
+  /** The page's live core read. Its margin ratio is the third headline, and its
+   *  liquidation line and drop are panel rows. */
+  chain?: DolomiteChainResponse | null;
+  /** The core read is still in flight: the margin ratio waits behind a pulsing bar. */
+  chainPending?: boolean;
+  /** The card's Explanation section (narration describing the account NOW). */
+  explanation?: React.ReactNode;
+  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** Detail-page captions (borrow rate), from the market-state read. */
+  captions?: DolomiteCardCaptions;
+  /** The ⋮'s export shapes. `null`: the ⋮ holds the account's rows and the
+   *  provenance row alone. */
+  exports?: PositionCardExports | null;
+}
+
+/** The Dolomite account's slots for the shared position card: the three
+ *  headlines, the panel, the tag, the ⋮ and the counters, from the account's
+ *  view and the page's live read. */
+export function useDolomiteCardSlots({
   v,
-  receipts = false,
-  rowExtra,
+  surface,
+  chain,
+  chainPending = false,
   explanation,
   viewHref,
   captions,
-  positionSummary,
-  risk,
-}: {
-  v: DolomitePositionView;
-  receipts?: boolean;
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per account —
-   *  forwarded to `PositionCardShell`. Closed, the card is its header and
-   *  three headlines; opened, each headline's detail. */
-  positionSummary?: boolean;
-  /** The third headline from the page's live core read: the margin ratio and
-   *  its opened-layer lines. Omitted until the read lands, and on a listing. */
-  risk?: { value: React.ReactNode; detail?: React.ReactNode };
-  /** Context content riding the shell's heading-button row. */
-  rowExtra?: React.ReactNode;
-  /** The card's Explanation section (narration describing the account NOW). */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  /** Detail-page stat captions (borrow rate) — from the market-state read.
-   *  Listing cards omit them. */
-  captions?: DolomiteCardCaptions;
-}) {
+  exports,
+}: DolomitePositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
+  const usdOf = dustUsdOf(v);
+  // Dust lines (under a cent) leave the icon stack and its "+N"; the panel puts
+  // them behind the "N dust reserves hidden" control.
+  const supplyLines = useDustLines(v.supplies, usdOf);
+  const borrowLines = useDustLines(v.borrows, usdOf);
   const collUsd = totalUsd(v, v.supplies);
   const debtUsd = totalUsd(v, v.borrows);
-  // Dust lines (under a cent) leave the icon stack and its "+N"; the lines
-  // put them behind the "N dust reserves hidden" control.
-  const suppliesShown = splitDust(v.supplies, dustUsdOf(v)).shown;
-  const borrowsShown = splitDust(v.borrows, dustUsdOf(v)).shown;
-  // The closed/opened card (ui-jobs 209): every line under a headline moves
-  // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!positionSummary;
+  const suppliesShown = splitDust(v.supplies, usdOf).shown;
+  const borrowsShown = splitDust(v.borrows, usdOf).shown;
 
-  // Closed / liquidated: every par is back at zero, so the headline is what
-  // each market lane held at its height — the highest recorded par (no USD:
-  // the oracle prices the PRESENT, not history). The LIQUIDATED outcome
-  // appears only here: an open survivor never reaches this branch, however
-  // many liquidations its meta cluster counts.
-  if (v.status === "closed" || v.status === "liquidated") {
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={dolomitePositionContent({
-          status: v.status,
-          peaksInTokens: [...v.peakSupplies, ...v.peakBorrows].every((r) => r.tokens),
-          liquidations: v.liquidations,
-          liquidationCount: v.liquidationCount,
-        })}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the highest recorded balances are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcome={v.status}
-          leadingIdentity={<AccountIdentity v={v} tip={receipts} />}
-          identity={
-            <PositionCardMeta
-              lastActivityAt={v.lastActivityAt}
-              eventCount={v.txCount}
-              eventTotal={v.eventTotal}
-              countNote={dolomiteCountNote(v.liquidationCount)}
-              liquidationCount={v.liquidationCount}
-            />
-          }
-          closedAt={v.lastActivityAt}
-          outcomeDates={outcomeDates(v)}
-          collateral={<PeakStack lines={v.peakSupplies} side="supply" />}
-          debt={<PeakStack lines={v.peakBorrows} side="debt" />}
-        />
-      </PositionCardShell>
-    );
+  const status: PositionCardStatus | null =
+    v.status === "liquidated"
+      ? { word: "Liquidated", tone: "danger" }
+      : v.status === "closed"
+        ? { word: "Closed", tone: "muted" }
+        : null;
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    eventTotal: v.eventTotal,
+    countNote: dolomiteCountNote(v.liquidationCount),
+    liquidationCount: v.liquidationCount,
+    // The foot strip reads transactions, warnings, then the age (ui-jobs 270).
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+  const common = { status, identity: <AccountIdentity v={v} tip={detail} />, counters };
+
+  // Closed / liquidated: every par is back at zero, so the heads are what each
+  // market lane held at its height, the highest recorded par. The LIQUIDATED
+  // outcome appears only here: an open survivor never reaches this branch,
+  // however many liquidations its meta cluster counts.
+  let heads: PositionCardHead[];
+  let outcome: PositionCardOutcome | undefined;
+  if (v.status !== "open") {
+    heads = [
+      {
+        id: "peak-collateral",
+        label: CARD_VOCAB.peakCollateral,
+        value: v.peakSupplies.length > 0 ? <PeakLines lines={v.peakSupplies} side="supply" /> : null,
+      },
+      {
+        id: "peak-debt",
+        label: CARD_VOCAB.peakDebt,
+        value: v.peakBorrows.length > 0 ? <PeakLines lines={v.peakBorrows} side="debt" /> : null,
+      },
+    ];
+    outcome = {
+      word: v.status === "liquidated" ? "Liquidated" : "Closed",
+      dates: outcomeDates(v) ?? (v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined),
+    };
+  } else {
+    // ONE oracle-USD figure leads each side; the per-market token amounts are
+    // panel rows. When any contributing market is unpriced the token lines stay
+    // the headline: a partial USD total is never asserted.
+    heads = [
+      {
+        id: "collateral",
+        label: CARD_VOCAB.collateral,
+        value:
+          collUsd != null ? (
+            <UsdFigure usd={collUsd} info={dolomiteUsdProv("Collateral")} />
+          ) : v.supplies.length > 0 ? (
+            <LegLines lines={supplyLines.lines} side="supply" />
+          ) : null,
+        assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} /> : undefined,
+      },
+      {
+        id: "debt",
+        label: CARD_VOCAB.debt,
+        value:
+          debtUsd != null ? (
+            <UsdFigure usd={debtUsd} info={dolomiteUsdProv("Borrowed")} />
+          ) : v.borrows.length > 0 ? (
+            <LegLines lines={borrowLines.lines} side="debt" />
+          ) : null,
+        assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} /> : undefined,
+      },
+    ];
+    // The margin ratio rides the detail page's live core read; the listing
+    // snapshot carries none, so a listing card has two headlines.
+    if (detail) {
+      heads.push({
+        id: "margin-ratio",
+        label: "Margin ratio",
+        labelTip:
+          "The account's adjusted supply value divided by its adjusted borrow value, both read from the Dolomite core. Below the account's liquidation line it can be liquidated.",
+        value: chain ? (
+          dolomiteHasRisk(chain) ? (
+            <DolomiteMarginRatio chain={chain} />
+          ) : !chain.chainStale && v.borrows.length === 0 ? (
+            <span className="text-rb-400">No debt</span>
+          ) : null
+        ) : null,
+        pending: chainPending && !chain,
+      });
+    }
   }
 
-  // Detail render (receipts): a neutral mode-word pill — Lending / Borrowing,
-  // what the account is doing NOW. The LISTING render keeps the lifecycle
-  // pill (the whole card sits inside a row <Link>).
-  const modeWord = v.borrows.length > 0 ? "Borrowing" : "Lending";
-  // `receipts` is the render-site switch (listing defaults false; only the
-  // detail page passes it), so it doubles as the surface discriminator: the
-  // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
-  // capped cluster only), the detail page keeps the full traced list.
-  const isDetail = receipts;
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
 
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={dolomitePositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        statusPill={
-          receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {modeWord}
-            </span>
+  const detailCommon = {
+    ...common,
+    heads,
+    surface: "detail" as const,
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore:
+      v.status === "open"
+        ? dolomitePositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })
+        : dolomitePositionContent({
+            status: v.status,
+            peaksInTokens: [...v.peakSupplies, ...v.peakBorrows].every((r) => r.tokens),
+            liquidations: v.liquidations,
+            liquidationCount: v.liquidationCount,
+          }),
+    menu: {
+      leading: () => (
+        <DolomiteMenuRows
+          accountNumber={v.accountNumber}
+          pagePath={`/ethereum/dolomite/${v.owner}/${v.accountNumber}`}
+        />
+      ),
+      exports: exports ?? null,
+    },
+  };
+  if (outcome) return { ...detailCommon, outcome };
+
+  const rate = captions?.borrowRate;
+  return {
+    ...detailCommon,
+    outcome: undefined,
+    panel: [
+      [...marketRows(v, "supply", supplyLines, collUsd), ...marketRows(v, "debt", borrowLines, debtUsd)],
+      [
+        ...(rate
+          ? [
+              {
+                id: "borrow-rate",
+                label: rate.avg ? "Average borrow rate" : "Borrow rate",
+                value: (
+                  <Prov info={rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol)}>
+                    {rate.pct.toFixed(2)}%
+                  </Prov>
+                ),
+                tip: rate.avg
+                  ? "The borrow rates of the markets this account owes in, averaged and weighted by each debt's oracle value. Each is read from the Dolomite core and annualised."
+                  : `The current borrow rate on the ${rate.symbol} market, read from the Dolomite core and annualised.`,
+              },
+            ]
+          : []),
+        ...(chain && v.status === "open" && dolomiteHasRisk(chain) ? dolomiteRiskRows(chain) : []),
+      ],
+    ],
+  };
+}
+
+/** One side's panel rows: each market's amount with its share of the side's
+ *  oracle-USD total (the share is stated where the side has several markets and
+ *  a stated total), then the dust control where lines are hidden. */
+function marketRows(
+  v: DolomitePositionView,
+  side: "supply" | "debt",
+  { lines, control }: { lines: DolomiteBalanceAmount[]; control: React.ReactNode },
+  total: number | null,
+): PositionPanelRow[] {
+  const all = side === "supply" ? v.supplies : v.borrows;
+  const usdOf = dustUsdOf(v);
+  const sharing = total != null && total > 0 && all.length > 1;
+  const rows: PositionPanelRow[] = lines.map((r) => {
+    const usd = usdOf(r);
+    return {
+      id: `${side}-${r.marketId}`,
+      label: `${r.symbol} ${side === "supply" ? "supplied" : "borrowed"}`,
+      value: (
+        <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+          {r.decimalsUnread ? (
+            <TokenAmountNotLoaded label={r.symbol} />
           ) : (
-            <LifecyclePill status={v.status} />
-          )
-        }
-        leadingIdentity={<AccountIdentity v={v} tip={receipts} />}
-        identity={
-          <PositionCardMeta
-            lastActivityAt={v.lastActivityAt}
-            eventCount={v.txCount}
-            eventTotal={v.eventTotal}
-            countNote={dolomiteCountNote(v.liquidationCount)}
-            liquidationCount={v.liquidationCount}
-          />
-        }
-        columns={[
-          // ONE oracle-USD figure leads each side; the per-market token
-          // amounts demote to traced footnote lines. When any contributing
-          // market is unpriced the token stack stays the headline — a partial
-          // USD total is never asserted.
-          {
-            label: CARD_VOCAB.collateral,
-            assetIcons:
-              v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} /> : undefined,
-            value:
-              collUsd != null ? (
-                <UsdHeadline usd={collUsd} info={dolomiteUsdProv("Collateral")} />
-              ) : (
-                <LegStack v={v} side="supply" />
-              ),
-            footnote: disclosing ? (
-              <PositionCardDetail>
-                {collUsd != null && <ShareLines v={v} side="supply" total={collUsd} />}
-              </PositionCardDetail>
-            ) : isDetail && collUsd != null ? (
-              <FootnoteLines v={v} side="supply" />
-            ) : undefined,
-          },
-          {
-            label: CARD_VOCAB.debt,
-            assetIcons: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} /> : undefined,
-            value:
-              debtUsd != null ? (
-                <UsdHeadline usd={debtUsd} info={dolomiteUsdProv("Borrowed")} />
-              ) : (
-                <LegStack v={v} side="debt" />
-              ),
-            footnote: disclosing ? (
-              <PositionCardDetail>
-                {debtUsd != null && <ShareLines v={v} side="debt" total={debtUsd} />}
-                <BorrowRateCaption rate={captions?.borrowRate} />
-              </PositionCardDetail>
-            ) : (
-              <>
-                {isDetail && debtUsd != null && <FootnoteLines v={v} side="debt" />}
-                <BorrowRateCaption rate={captions?.borrowRate} />
-              </>
-            ),
-          },
-          // The margin ratio rides the detail page's live core read; the
-          // listing snapshot carries none, so a listing card has two
-          // headlines. The page's card holds the third slot empty until the
-          // read lands.
-          ...(disclosing || risk
-            ? [
-                risk
-                  ? {
-                      label: "Margin ratio",
-                      value: risk.value,
-                      footnote: risk.detail ? <PositionCardDetail>{risk.detail}</PositionCardDetail> : undefined,
-                    }
-                  : null,
-              ]
-            : []),
-        ]}
-      />
-    </PositionCardShell>
-  );
+            <Prov info={legProv(r, side)}>
+              <ExactSpan exact={legExact(r)} symbol={r.symbol}>
+                {formatCompact(legAmount(r))} {r.symbol}
+              </ExactSpan>
+            </Prov>
+          )}
+          {sharing && usd != null && <span className="text-rb-500">{shareText(usd / total)}</span>}
+        </span>
+      ),
+      tip: `This account's ${r.symbol} ${side === "supply" ? "balance" : "debt"}: its par times the market's ${side === "supply" ? "supply" : "borrow"} index, so interest is included, read from the Dolomite core.${sharing ? ` The percentage is its share of the ${side === "supply" ? "collateral" : "debt"}'s oracle value.` : ""}`,
+    };
+  });
+  if (control)
+    rows.push({
+      id: `${side}-dust`,
+      label: side === "supply" ? "Collateral dust" : "Debt dust",
+      value: control,
+      tip: "Balances worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open the control to list them above.",
+    });
+  return rows;
+}
+
+/** The Dolomite account card: its slots, drawn by the shared card. */
+export function DolomitePositionCard(props: DolomitePositionCardProps) {
+  return <PositionCard slots={useDolomiteCardSlots(props)} />;
 }
 
 /** Why the transaction count and the event count differ. The index counts
