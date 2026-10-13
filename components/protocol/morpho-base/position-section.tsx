@@ -21,6 +21,7 @@ import { PositionCardDetail } from "@/components/shared/position-card-disclosure
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { useCallback, useMemo } from "react";
 
+import { morphoExplorer } from "@/lib/morpho/explorer";
 import { MorphoEventCard } from "@/components/protocol/morpho/morpho-event-card";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
 import {
@@ -92,6 +93,9 @@ export interface MorphoBasePositionSectionProps {
    *  ungrouped ones and `rowPlan` puts the folders back between them. Null
    *  on a flat answer. */
   grouped?: MorphoChainTimelineResponse | null;
+  /** The event route (rails-ops TO-DO-ui-jobs 236): the event's card in page
+   *  mode with the shared column; no position card, no flows panel. */
+  onEventPage?: boolean;
 }
 
 export function MorphoBasePositionSection({
@@ -102,6 +106,7 @@ export function MorphoBasePositionSection({
   sweptClean,
   vaultOwner = null,
   grouped = null,
+  onEventPage = false,
 }: MorphoBasePositionSectionProps) {
   const events = useMemo(() => pos.events.filter(isMorphoEvent), [pos.events]);
 
@@ -247,14 +252,15 @@ export function MorphoBasePositionSection({
           grammar is a borrower's — collateral against debt, peaks of each —
           and would read "nothing ever borrowed against its collateral" over a
           position that never had collateral. */}
-        {sweptClean &&
+        {!onEventPage &&
+          sweptClean &&
           !borrowerSide &&
           (live ? (
             <MorphoLenderOpenCard p={live} receipts vault={vaultOwner} positionSummary />
           ) : (
             <LenderClosedCard pos={pos} wallet={wallet} receipts vault={vaultOwner} positionSummary />
           ))}
-        {sweptClean && borrowerSide && (
+        {!onEventPage && sweptClean && borrowerSide && (
           <MorphoPositionCard
             v={{ ...view, vaultOwner }}
             receipts
@@ -306,7 +312,7 @@ export function MorphoBasePositionSection({
         {/* Lifetime flows: the bars and the line over the position's replay
           (lib/morpho/flows.ts), in the loan token, in place of the tower
             (TO-DO-ui-jobs 206). */}
-        {flowsOn && (
+        {!onEventPage && flowsOn && (
           <LifetimeFlowsPanel
             scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
             read={flows.read}
@@ -333,6 +339,15 @@ export function MorphoBasePositionSection({
           readFolderMembers={readFolderMembers}
           segments={segments}
           persistKeyPrefix="morpho"
+          eventPage={(slot) =>
+            morphoExplorer.eventPage({
+              ...slot,
+              marketId: pos.marketId,
+              marketLabel: pos.marketLabel,
+              wallet,
+              deployment: "base",
+            })
+          }
           closed={view.status !== "open"}
           toolbarLeading={
             <TimelineActivityHeader

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { parseFxPositionSlug } from "@/lib/fx/asset-catalog";
 import { loadFxPositionTail } from "@/lib/fx/position-page-data";
+import { fxEventHeading, fxEventPageDescription } from "@/lib/fx/explorer";
 import FxPositionPage from "../../page";
 
 interface Props {
@@ -28,19 +29,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "fx",
     subject: slug,
     canonicalPath: `/ethereum/fx/${slug}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: fxEventHeading(event), timestamp: event.timestamp } : null,
+    description: event && parsed ? fxEventPageDescription(parsed.pool, parsed.positionId, event.timestamp) : undefined,
   });
 }
 
-// THIN: renders the exact same parent position page, same params — the
-// nested `event/[eventId]` segment sits inside the same `[position]` layout,
-// so every provider still wraps it, and `FxPositionView` (this page's client
-// half) never learns a new prop. It finds out it is on an event route from
-// `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra `eventId`
-// key the parent's own `Props` type doesn't declare; passing the same promise
-// through is still structurally valid (the parent only reads `position` off
-// it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent position page's
+// server half, same params; its client half (`FxPositionView`) reads
+// `eventId` from the route and draws the sub-nav and the event's card in page
+// mode with the shared column (`ChainTruthTimeline`'s `eventPage`). `params`
+// carries an extra `eventId` key the parent's `Props` does not declare;
+// passing the same promise through is structurally valid.
 export default async function FxEventPage({ params }: Props) {
   return FxPositionPage({ params });
 }

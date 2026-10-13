@@ -51,6 +51,7 @@ import {
   type AaveFamilyAccountSwitches,
 } from "@/lib/aave-v3/account-switches";
 import { aaveV3Neighbours, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
+import { aaveV3Explorer } from "@/lib/aave-v3/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -644,7 +645,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
               </div>
             ) : (
               <>
-                {view && data && (
+                {!pinnedRoute && view && data && (
                   <AaveV3PositionCard
                     v={view}
                     receipts
@@ -680,7 +681,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                 {/* Lifetime flows: the bars and the line over the account's
               replay (lib/aave-v3-base/flows.ts), in place of the tower
               (TO-DO-ui-jobs 206). */}
-                {view && (
+                {!pinnedRoute && view && (
                   <LifetimeFlowsPanel
                     scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                     read={timelineState === "failed" || timelineState === "unavailable" ? "failed" : flows.read}
@@ -695,13 +696,22 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
 
                 {timelineState === "ready" && timeline ? (
                   <>
-                    <TimelineFillWell fill={timeline.coverage.fill} />
+                    {!pinnedRoute && <TimelineFillWell fill={timeline.coverage.fill} />}
                     <ChainTruthTimeline
                       // Matches `AaveV3CtEventCard`'s own
                       // `persistKey={`aave-v3:${event.id}`}` — lets pinned mode
                       // (the per-event share route) force a landed card's detail
                       // panel open on its first mount.
                       persistKeyPrefix="aave-v3"
+                      eventPage={(slot) =>
+                        aaveV3Explorer.eventPage({
+                          ...slot,
+                          market: "Seamless",
+                          wallet,
+                          deployment: "seamless",
+                          siblings: neighbours.get(slot.event.id)?.siblings,
+                        })
+                      }
                       closed={view?.status !== "open"}
                       tl={tl}
                       // Both grouping paths: the specs group a flat answer in the
