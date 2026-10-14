@@ -29,7 +29,7 @@ import {
 import { useLifeCount } from "@/lib/shared/life-count-store";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { FLOWS_SCOPE, ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
-import { ProvScopeIconToggle } from "@/components/shared/prov-inspector";
+import { ToolsMenu } from "@/components/shared/tools-menu";
 import { FlowsKeyNodeContext, FlowsSectionsContext } from "@/components/shared/lifetime-flows-combined";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -173,7 +173,7 @@ export function LifetimeFlowsPanel({
               aria-expanded={!collapsed}
               aria-controls={bodyId}
               aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 justify-start rounded-md px-2`}
+              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 justify-start rounded-md px-2`}
               data-flows-toggle=""
             >
               <span className="flex min-w-0 items-center gap-1.5">
@@ -186,18 +186,22 @@ export function LifetimeFlowsPanel({
           ) : (
             <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
-          {/* Inspect provenance on the panel alone (ui-jobs 284), beside the
-              title; collapsed, nothing stands to inspect, so it goes. The
-              how-to-read is each section's "?" in the body. */}
-          <div className="pointer-events-auto -my-2 shrink-0" data-flows-menu-slot="">
-            <ProvScopeIconToggle scope={FLOWS_SCOPE} hint="click a value in this panel to trace it" />
-          </div>
-          <span className="flex-1" />
           {!sections && scrubber != null && (
-            <div className="pointer-events-auto -mr-1 shrink-0 text-rb-500" data-flows-menu-slot="">
+            <div className="pointer-events-auto shrink-0 text-rb-500" data-flows-menu-slot="">
               <HeaderHelp flowsKey={flowsKey} />
             </div>
           )}
+          {/* The ⋮ at the right end (ui-jobs 295): Inspect provenance on the
+              panel alone (ui-jobs 284); each section's "?" carries the
+              how-to-read. Collapsed, nothing stands to inspect: no ⋮. */}
+          <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
+            <ToolsMenu
+              variant="panel"
+              label={`${title} menu`}
+              heading={title}
+              provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
+            />
+          </div>
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {scrubber != null ? (

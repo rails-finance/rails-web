@@ -462,7 +462,7 @@ function SideBlock({
         segments={st.bar}
         max={axis.max}
         ticks={axis.ticks}
-        height="h-10 sm:h-11"
+        height={heads ? "h-8" : "h-10 sm:h-11"}
         today={atLive ? null : coll ? model.today.collateral : model.today.debt}
         active={active}
         onHover={onHover}

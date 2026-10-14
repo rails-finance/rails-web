@@ -160,34 +160,6 @@ export function ProvScopeToggle({
   );
 }
 
-/** The same control as a small icon button, where a section has no ⋮ (the
- *  Lifetime flows header): the crosshair, pressed while the section is
- *  armed; its name says which. */
-export function ProvScopeIconToggle({ scope, hint }: { scope: string; hint: string }) {
-  const pressed = useSyncExternalStore(
-    provInspector.subscribe,
-    () => provInspector.getArmed() && provInspector.getScope() === scope,
-    () => false,
-  );
-  const name = pressed ? SCOPE_WORDS.hide : SCOPE_WORDS.show;
-  return (
-    <button
-      type="button"
-      className={`inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 sm:size-7 ${
-        pressed ? "bg-teal-500/15 text-teal-700 dark:text-teal-300" : "text-rb-500 hover:text-foreground"
-      }`}
-      aria-pressed={pressed}
-      aria-label={name}
-      title={pressed ? SCOPE_WORDS.armed_hint : `${name}: ${hint}`}
-      data-menu-item="show-provenance"
-      data-prov-scope-toggle={scope}
-      onClick={(e) => provInspector.setArmed(!pressed, scope, e.currentTarget)}
-    >
-      <Crosshair size={15} aria-hidden />
-    </button>
-  );
-}
-
 /** The scoped row's words. */
 const SCOPE_WORDS = {
   show: "Inspect provenance",

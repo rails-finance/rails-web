@@ -1,7 +1,7 @@
 // The provenance inspector armed on one section (rails-ops TO-DO-ui-jobs 284).
 // ---------------------------------------------------------------------------
 // "Inspect provenance" arms the inspector on one section: the position card (a
-// row of C17's ⋮, Liquity V2), Lifetime flows (its header's crosshair), one event (a
+// row of C17's ⋮, Liquity V2), Lifetime flows (a row of its ⋮), one event (a
 // row of the event page card's ⋮ in T1). Only the values inside that section
 // become targets (`[data-prov-pickable]` inside `[data-prov-scope="<scope>"]`,
 // none outside) and only that section wears the ring (`[data-prov-lit]`, no
@@ -125,13 +125,13 @@ async function ladder(page, scope, opener, label) {
 const CARD = '[data-prov-scope="position-card"]';
 const C17 = "[data-card-menu]";
 const C17_TRIGGER = `${C17} > button`;
-// Lifetime flows arms from its header's crosshair, beside the title.
-const FLOWS_TRIGGER = '[data-anatomy="F1"] [data-prov-scope-toggle="flows"]';
+const FLOWS_MENU = "[data-panel-menu]";
+const FLOWS_TRIGGER = `${FLOWS_MENU} > button`;
 
 // ── 1. Liquity V2 Trove, 1280 and 390 ───────────────────────────────────────
 for (const width of [1280, 390]) {
   const { ctx, page, errors } = await open(width, TROVE, `${CARD} [data-prov-covered], ${CARD} .prov-locate-box`);
-  await page.waitForSelector(FLOWS_TRIGGER, { timeout: 60000 }).catch(() => {});
+  await page.waitForSelector(FLOWS_MENU, { timeout: 60000 }).catch(() => {});
   const tag = `trove @${width}`;
 
   // The C17 row: "Inspect provenance", no page-wide row.
@@ -184,14 +184,14 @@ for (const width of [1280, 390]) {
   // Lifetime flows: its ⋮ row arms the panel alone and leaves the card rows as
   // the reader set them.
   if (width >= 640) {
-    await armScope(page, "flows");
+    await armScope(page, "flows", { menu: FLOWS_MENU });
     await page.waitForTimeout(500);
     const flows = await marks(page, "flows");
     const rowsNow = await page.$$eval("[data-card-row-toggle]", (els) =>
       els.map((e) => e.getAttribute("aria-expanded")),
     );
     check(
-      `${tag}: the flows crosshair arms Lifetime flows alone, and the panel alone wears the ring`,
+      `${tag}: the flows ⋮ row arms Lifetime flows alone, and the panel alone wears the ring`,
       (await litOnly(page, "flows")) && flows.inside > 0 && flows.outside === 0,
       `inside ${flows.inside}, outside ${flows.outside}`,
     );

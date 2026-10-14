@@ -267,21 +267,20 @@ const headerLayout = (card) =>
     flowsGap != null && flowsGap >= 0 && flowsGap <= 8,
     `${flowsGap}px`,
   );
-  const flowsHead = await f1
+  const flowsMenu = await f1
     .evaluate((row) => {
-      const toggle = row.querySelector('[data-prov-scope-toggle="flows"]');
-      const title = row.querySelector("[data-flows-toggle]");
-      if (!toggle || !title) return null;
+      const menu = row.querySelector("[data-panel-menu]");
+      if (!menu) return null;
       return {
-        gap: Math.round(toggle.getBoundingClientRect().left - title.getBoundingClientRect().right),
-        menu: !!row.querySelector('[aria-haspopup="menu"]'),
+        rightGap: Math.round(row.getBoundingClientRect().right - menu.getBoundingClientRect().right),
+        help: !!row.querySelector('[data-anatomy="F16"]'),
       };
     })
     .catch(() => null);
   check(
-    "2b. the Lifetime flows header holds Inspect provenance beside its title and no ⋮",
-    !!flowsHead && flowsHead.gap >= 0 && flowsHead.gap <= 24 && !flowsHead.menu,
-    JSON.stringify(flowsHead),
+    "2b. the Lifetime flows ⋮ stands at the header's right end, no ? in the header",
+    !!flowsMenu && flowsMenu.rightGap <= 6 && !flowsMenu.help,
+    JSON.stringify(flowsMenu),
   );
   // A press before hydration is lost: pressed until the modal shows.
   const howTo = page.locator('[data-flow-help="F16"] button').first();

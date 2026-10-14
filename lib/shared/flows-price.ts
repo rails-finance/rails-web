@@ -132,7 +132,8 @@ function niceStepAbove(x: number): number {
   return 10 * k;
 }
 
-/** A y scale over `values`, padded, with two or three round ticks inside. */
+/** A y scale over `values`, padded, with two or three round ticks inside and
+ *  one round step under the lowest. */
 export function priceAxis(values: number[]): { min: number; max: number; ticks: number[] } {
   const good = values.filter((v) => Number.isFinite(v));
   if (good.length === 0) return { min: 0, max: 1, ticks: [] };
@@ -154,7 +155,19 @@ export function priceAxis(values: number[]): { min: number; max: number; ticks: 
     if (ticks.length < 2) step = niceStepAbove(step / 2.1);
   }
   while (ticks.length > 3) ticks = ticks.filter((_, i) => i % 2 === 0);
-  return { min: lo - span * 0.08, max: hi + span * 0.08, ticks };
+  // One round step under the lowest price for context (WBTC at 75K to 100K
+  // also shows 50K), the domain taken down to it; never under zero.
+  let min = lo - span * 0.08;
+  if (ticks.length >= 2) {
+    const gap = ticks[1] - ticks[0];
+    const places = Math.max(0, 2 - Math.floor(Math.log10(gap)));
+    const below = parseFloat((ticks[0] - gap).toFixed(places));
+    if (below >= 0) {
+      ticks = [below, ...ticks];
+      min = Math.min(min, below - gap * 0.08);
+    }
+  }
+  return { min, max: hi + span * 0.08, ticks };
 }
 
 /** "$2,451.37" · "1.0002 USDC" · "$0.0001234": a price in its unit. */

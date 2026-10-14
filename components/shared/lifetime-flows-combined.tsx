@@ -163,7 +163,41 @@ const LIQ_HUE = FLOW_TICK.liquidation;
 /** The bars' and the events' how-to-read; the price chart's names its
  *  series. */
 const BARS_HELP = lifetimeFlowsBarsContent();
-const EVENTS_HELP = lifetimeFlowsEventsContent();
+
+/** The events row's how-to-read, from the position's model: each side's
+ *  events by the family's names for them (its buckets' events), and the
+ *  marks the family draws (the warning tones its buckets carry, the marks it
+ *  names, the ticks the position has). */
+function eventsHelp(model: FlowModel, hasDebt: boolean): LearnMoreContent {
+  const has = new Set(model.ticks.map((t) => t.tick));
+  const wordsOf = (side: "collateral" | "debt") => [
+    ...new Set(
+      model.buckets
+        .filter((b) => b.side === side && b.tone !== "liquidation" && b.tone !== "redemption")
+        .map((b) => b.event ?? b.label)
+        .filter((w): w is string => !!w && !triangles.has(w)),
+    ),
+  ];
+  const toned = (tone: "liquidation" | "redemption") => model.buckets.find((b) => b.tone === tone)?.event ?? undefined;
+  const named = model.words.marks ?? {};
+  const liq = named.liquidation ?? toned("liquidation") ?? (has.has("liquidation") ? "a liquidation" : undefined);
+  const red = named.redemption ?? toned("redemption") ?? (has.has("redemption") ? "a redemption" : undefined);
+  // A kind the family draws as a triangle is not a dot.
+  const triangles = new Set([toned("liquidation"), toned("redemption")].filter(Boolean));
+  const caution = named.caution ?? (has.has("caution") ? "a change the owner did not make" : undefined);
+  return lifetimeFlowsEventsContent({
+    sides: [
+      { hue: "Blue", label: model.labels.collateral, events: wordsOf("collateral") },
+      ...(hasDebt ? [{ hue: "Green" as const, label: model.labels.debt, events: wordsOf("debt") }] : []),
+    ],
+    both: has.has("both"),
+    liquidation: liq,
+    redemption: red,
+    caution,
+    delegateRate: has.has("rate-delegate") || named["rate-delegate"] != null,
+    ownerRate: has.has("rate-owner") || named["rate-owner"] != null,
+  });
+}
 
 /** This position's Key, under the bars' how-to-read: provided by the panel,
  *  which the scrubber hands the Key's items. */
@@ -401,7 +435,7 @@ export function CombinedFlows({
   // Outside the window the bars hold the window's first day, greyed.
   const barStop = cur.barStop ?? 0;
   const barAssets = useMemo(() => assetsAt(bars, barStop), [bars, barStop]);
-  const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
+  const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-8 pointer-coarse:size-11`;
   const tickHere = cur.event && !cur.live ? model.ticks.find((t) => t.day === cur.stop) : undefined;
   // What an open segment panel reads: the date in words and the cursor's
   // steps, so the panel restates its figures as the cursor moves.
@@ -481,7 +515,7 @@ export function CombinedFlows({
     ),
     ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
   };
-  const lastLabel = closed ? closeDay : "Today";
+  const eventsContent = useMemo(() => eventsHelp(model, hasDebt), [model, hasDebt]);
   const priceHelp = priced
     ? lifetimeFlowsPriceContent({
         symbol: priced.asset.symbol,
@@ -605,7 +639,7 @@ export function CombinedFlows({
                   >
                     Events
                   </span>
-                  <SectionHelp content={EVENTS_HELP} name="the events" anatomy="F7.1" />
+                  <SectionHelp content={eventsContent} name="the events" anatomy="F7.1" />
                 </div>
                 <PipRow
                   model={model}
@@ -637,27 +671,19 @@ export function CombinedFlows({
             </div>
           </div>
 
-          {/* The steps: the start, then the previous and next day with
-              events and today at the right; under 640px the start and the
-              end are icons. */}
-          <div
-            className="mt-1 flex items-center justify-between gap-2"
-            style={{ paddingLeft: w > 0 ? Math.max(0, geo.x0 - STRIP_PAD) : 0 }}
-            data-flow-controls=""
-            data-anatomy="F5"
-            {...KEEP_PANEL}
-          >
-            <button
-              type="button"
-              className={`${CTRL_GHOST} ${CTRL_OFF} min-h-11 rounded-md px-1.5 text-xs font-semibold sm:min-h-8`}
-              aria-label={`Jump to opening, ${dayStamp(dayStart(model, 0))}`}
-              onClick={() => go(0)}
-              data-flow-jump="start"
-            >
-              <SkipBack size={16} aria-hidden className="sm:hidden" />
-              <span className="hidden sm:inline">{dayStamp(dayStart(model, 0))}</span>
-            </button>
-            <div className="flex items-center gap-1">
+          {/* The steps, grouped at the right end: the opening, the previous
+              and next day with events, today. */}
+          <div className="mt-1 flex items-center justify-end" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
+            <div className="-mr-1.5 flex items-center gap-x-1">
+              <button
+                type="button"
+                className={btn}
+                aria-label={`Jump to opening, ${dayStamp(dayStart(model, 0))}`}
+                onClick={() => go(0)}
+                data-flow-jump="start"
+              >
+                <SkipBack size={16} aria-hidden />
+              </button>
               <button type="button" className={btn} aria-label="Previous event" onClick={stepBack}>
                 <ChevronLeft size={18} aria-hidden />
               </button>
@@ -666,7 +692,7 @@ export function CombinedFlows({
               </button>
               <button
                 type="button"
-                className={`${CTRL_GHOST} ${CTRL_OFF} min-h-11 rounded-md px-1.5 text-xs font-semibold sm:min-h-8`}
+                className={btn}
                 aria-label={closed ? `Jump to close, ${closeDay}` : "Jump to today"}
                 onClick={() => {
                   go(last);
@@ -674,8 +700,7 @@ export function CombinedFlows({
                 }}
                 data-flow-jump="end"
               >
-                <SkipForward size={16} aria-hidden className="sm:hidden" />
-                <span className="hidden sm:inline">{lastLabel}</span>
+                <SkipForward size={16} aria-hidden />
               </button>
             </div>
           </div>
@@ -762,9 +787,7 @@ export function lineStripScale(model: FlowModel, series: FlowBinSeries | null, h
   const every = axis.ticks.length > 1 ? Math.ceil(24 / (((STRIP_H - 8) * axis.ticks[1]) / axis.max)) : 1;
   const yTicks = axes
     ? []
-    : axis.ticks
-        .filter((_, i) => i % every === 0)
-        .filter((t, i, a) => t !== 0 && (i === 0 || axisLabel(t) !== axisLabel(a[i - 1])));
+    : axis.ticks.filter((_, i) => i % every === 0).filter((t, i, a) => i === 0 || axisLabel(t) !== axisLabel(a[i - 1]));
   // Each side's top, its axis's end, in its token (a side that never held
   // anything has none).
   const sideTops =
@@ -1058,10 +1081,16 @@ function LineStrip({
   const x = (i: number) => xClose(points[i].to);
   const y = (v: number, k?: "collateral" | "debt") =>
     STRIP_H - 2 - (v / (k && axes ? axes[k].max : axis.max)) * (STRIP_H - 8);
+  // Before a side first holds anything it draws no line: its runs start at
+  // its first point above zero, the step up from zero drawn there.
+  const firstHeld = (k: "collateral" | "debt") => points.findIndex((p) => (p[k] ?? 0) > 0);
   const runs = (k: "collateral" | "debt") => {
     const out: number[][] = [];
     let cur: number[] = [];
+    const from = firstHeld(k);
+    if (from < 0) return out;
     points.forEach((p, i) => {
+      if (i < from) return;
       if (p[k] == null) {
         if (cur.length) out.push(cur);
         cur = [];
@@ -1070,13 +1099,18 @@ function LineStrip({
     if (cur.length) out.push(cur);
     return out;
   };
-  // The first run of each side starts at zero in the lead-in and steps up at
-  // the first event's day to that day's close.
+  // A side's first run steps up from zero: at the first event's day to that
+  // day's close where it held something from the first point, else at its
+  // first point above zero.
   const firstClose = model.valued[0] ?? { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
+  const leadOf = (k: "collateral" | "debt", seq: number[]): string[] => {
+    if (seq[0] !== firstHeld(k)) return [];
+    if (seq[0] === 0 && firstClose[k] > 0) return [`${x0},${y(0)}`, `${x0},${y(firstClose[k], k)}`];
+    return [`${x(seq[0])},${y(0)}`];
+  };
   const lineOf = (k: "collateral" | "debt", seq: number[]) => {
     const pts = seq.map((i) => `${x(i)},${y(points[i][k] as number, k)}`);
-    const lead = seq[0] === 0 ? [`${STRIP_PAD},${y(0)}`, `${x0},${y(0)}`, `${x0},${y(firstClose[k], k)}`] : [];
-    return [...lead, ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
+    return [...leadOf(k, seq), ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
   };
   // Where the side's value at a point rests on an old price (the model's
   // `stale`, as the readout's label), or on a price or a read the page does
@@ -1091,9 +1125,10 @@ function LineStrip({
   const piecesOf = (k: "collateral" | "debt", seq: number[]) => {
     const solid: string[] = [];
     const dotted: { d: string; idx: number[] }[] = [];
-    if (seq[0] === 0) {
+    const lead = leadOf(k, seq);
+    if (lead.length > 0) {
       const p0 = `${x(seq[0])},${y(points[seq[0]][k] as number, k)}`;
-      solid.push(`M${STRIP_PAD},${y(0)}L${x0},${y(0)}L${x0},${y(firstClose[k], k)}L${p0}`);
+      solid.push([...lead, p0].map((p, j) => `${j ? "L" : "M"}${p}`).join(""));
     }
     for (let j = 1; j < seq.length; j++) {
       const a = seq[j - 1];
@@ -1129,7 +1164,7 @@ function LineStrip({
     setOldTip(lines.length ? { x: px, y: y(points[best][k] as number, k), lines } : null);
   };
   const area = (k: "collateral" | "debt", seq: number[]) =>
-    `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? STRIP_PAD : x(seq[0])},${STRIP_H}Z`;
+    `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${leadOf(k, seq).length === 2 ? x0 : x(seq[0])},${STRIP_H}Z`;
   const shade = windowFrom != null && windowFrom > startDay ? xDay(windowFrom) : null;
   const sides = hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const);
 
@@ -1152,22 +1187,20 @@ function LineStrip({
             data-flow-window=""
           />
         )}
-        {/* Faint gridlines at the value labels' ticks, the zero line being
-            the plot's floor. */}
-        {yTicks
-          .filter((t) => t > 0)
-          .map((t) => (
-            <line
-              key={t}
-              x1={STRIP_PAD}
-              x2={w - STRIP_PAD}
-              y1={y(t)}
-              y2={y(t)}
-              className="stroke-rb-400/20 dark:stroke-rb-500/25"
-              strokeWidth={1}
-              data-flow-gridline=""
-            />
-          ))}
+        {/* Faint gridlines at the value labels' ticks, the zero line the
+            plot's floor. */}
+        {yTicks.map((t) => (
+          <line
+            key={t}
+            x1={STRIP_PAD}
+            x2={w - STRIP_PAD}
+            y1={y(t)}
+            y2={y(t)}
+            className="stroke-rb-400/20 dark:stroke-rb-500/25"
+            strokeWidth={1}
+            data-flow-gridline=""
+          />
+        ))}
         {sides.map((k) =>
           runs(k).map((seq) => {
             const pieces = piecesOf(k, seq);
@@ -1570,7 +1603,7 @@ function SectionHelp({
 /** The cursor's date under the events, at the cursor's x; pressed, the two
  *  timeline buttons beside it: show the timeline to that day, and the
  *  timeline following the chart. Escape or a press elsewhere puts them
- *  away. */
+ *  away. While the timeline follows the chart its chain stays, in teal. */
 function CursorDate({
   x,
   w,
@@ -1621,10 +1654,13 @@ function CursorDate({
     const dw = dateRef.current?.offsetWidth ?? 0;
     setLeft(Math.max(0, Math.min(w - dw, x - dw / 2)));
   });
-  const iconBtn = "inline-flex size-11 shrink-0 items-center justify-center rounded-md sm:size-8";
-  const buttons = byDays && open && (
+  const iconBtn =
+    "inline-flex size-11 shrink-0 items-center justify-center rounded-md sm:size-8 pointer-coarse:size-11";
+  // While the timeline follows the chart, the chain stands beside the date
+  // in teal, and a press on it lets go.
+  const buttons = byDays && (open || follow) && (
     <span className="flex items-center gap-1" role="group" aria-label="Timeline">
-      {!follow && (
+      {open && !follow && (
         <button
           type="button"
           className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} ${iconBtn}`}

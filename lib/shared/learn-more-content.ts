@@ -72,22 +72,44 @@ export function lifetimeFlowsPriceContent(opts: {
   };
 }
 
-export function lifetimeFlowsEventsContent(): LearnMoreContent {
+/** The events row's marks for one position, in its family's words: each
+ *  side's events by the names its timeline gives them, and the marks the
+ *  family draws. */
+export interface FlowEventsHelp {
+  sides: { hue: "Blue" | "Green"; label: string; events: string[] }[];
+  /** Both sides' hues, half and half, where the position has both. */
+  both: boolean;
+  /** The family's names for its warning marks, where it draws them. */
+  liquidation?: string;
+  redemption?: string;
+  caution?: string;
+  delegateRate?: boolean;
+  ownerRate?: boolean;
+}
+
+const listWords = (xs: string[]) =>
+  xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+
+export function lifetimeFlowsEventsContent(h: FlowEventsHelp): LearnMoreContent {
+  const details: { bold: string; text: string }[] = [];
+  for (const s of h.sides)
+    if (s.events.length > 0) details.push({ bold: `${s.hue} dot`, text: `${s.label}: ${listWords(s.events)}.` });
+  if (h.both) details.push({ bold: "Half blue, half green", text: "a day that moved both sides." });
+  if (h.liquidation) details.push({ bold: "Red triangle", text: `${h.liquidation}.` });
+  if (h.redemption) details.push({ bold: "Orange triangle", text: `${h.redemption}.` });
+  if (h.caution)
+    details.push({ bold: h.redemption ? "Orange triangle, also" : "Orange triangle", text: `${h.caution}.` });
+  if (h.delegateRate) details.push({ bold: "Pink dot", text: "the delegate set the interest rate." });
+  if (h.ownerRate) details.push({ bold: "Ring", text: "the owner changed the interest rate." });
+  details.push({
+    bold: "On the list",
+    text: "Hover or tap a mark for its day's events; a click moves the cursor there. Each day's last event in the list carries a chart button that moves the cursor to that day and holds it there.",
+  });
   return {
     title: "How to read the events",
-    intro: "Each mark is a day with events, on the charts' time axis.",
+    intro: "Each mark is a day with events, on the charts' time axis, in the colour of what moved.",
     detailsHeading: "The marks:",
-    details: [
-      { bold: "Red triangle", text: "a liquidation." },
-      { bold: "Orange triangle", text: "a redemption, or a change the owner did not make." },
-      { bold: "Pink dot", text: "a delegate's rate change." },
-      { bold: "Ring", text: "the owner's rate change." },
-      { bold: "Dot", text: "any other event, in the colour of the side it moved." },
-      {
-        bold: "On the list",
-        text: "Hover or tap a mark for its day's events; a click moves the cursor there. Each day's last event in the list carries a chart button that moves the cursor to that day and holds it there.",
-      },
-    ],
+    details,
   };
 }
 

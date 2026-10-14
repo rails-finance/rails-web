@@ -60,8 +60,8 @@ import { ExplainBullet } from "@/components/shared/explain-groups";
 import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
 
 /** Set by the combined panel (`lifetime-flows-combined.tsx`): each side's
- *  headline, drawn on its own line over its bar, and no scale under the
- *  bars. */
+ *  headline, drawn on its own line over its bar, the bars 32px tall, and no
+ *  scale under them. */
 export const FlowBarsHeadsContext = createContext<Partial<Record<FlowSide, ReactNode>> | null>(null);
 
 const PLAY_MS = 220;
@@ -489,7 +489,7 @@ export function Rescaled({
             data-anatomy={side === "collateral" ? "F3.1" : "F3.2"}
           >
             {heads?.[side]}
-            <div className="relative h-10 sm:h-11">
+            <div className={`relative ${heads ? "h-8" : "h-10 sm:h-11"}`}>
               <div
                 role="img"
                 aria-label={`${word}: ${spokenUsd(st.now, u)}.`}

@@ -79,7 +79,7 @@ import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
-import { List, ListEnd, X } from "lucide-react";
+import { Link2, List, X } from "lucide-react";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -1927,24 +1927,28 @@ function ChainTruthTimelineBody({
         {(rewind || filterPills.length > 0) && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-anatomy="L2" data-narrowing-row="">
             {rewind && (
-              <span className={NARROWING_PILL} data-flow-rewind-chip="" data-anatomy="L2.1">
+              // In the chart's teal with its chain: the cut is the Lifetime
+              // flows cursor's day.
+              <span
+                className="inline-flex items-center rounded-full bg-teal-500/15 text-xs text-teal-700 dark:text-teal-300"
+                data-flow-rewind-chip=""
+                data-anatomy="L2.1"
+              >
                 <button
                   type="button"
                   onClick={() => focusStore?.set({ go: focusStore.get().go + 1 })}
                   title={`Bring the last event of ${rewind.word} into view`}
-                  // The neutral filter-pill style (ui-jobs 227): the glyph muted,
-                  // the words in the text colour, as TimelineFilterPill draws them.
                   className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-l-full py-1 pl-2.5 pr-1.5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
                   data-flow-rewind-go=""
                 >
-                  <ListEnd size={13} aria-hidden className="text-rb-500" />
+                  <Link2 size={13} aria-hidden />
                   Timeline to {rewind.word}
                 </button>
                 <button
                   type="button"
                   onClick={releaseRewind}
                   aria-label={`Clear the cut at ${rewind.word}`}
-                  className={NARROWING_PILL_X}
+                  className="inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 transition-colors hover:bg-teal-500/20 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1"
                   data-flow-rewind-release=""
                 >
                   <X className="size-3.5" aria-hidden />
