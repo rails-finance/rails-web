@@ -38,7 +38,7 @@ import {
 import { Maximize2, Minimize2 } from "lucide-react";
 import { readFlowsView, writeFlowsView } from "@/lib/shared/flows-view-store";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
-import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
+import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
@@ -141,22 +141,15 @@ export function LifetimeFlowsPanel({
   const { remembered } = useSkeletonSizes();
   // The timeline's event count, for the waiting cue's scale line.
   const lifeCount = useLifeCount(pathname);
-  // Compact by default; the viewer's choice is kept (flows-view-store). A
-  // return to compact clears any cut the cursor made: compact has no cursor.
+  // Collapsed by default (the charts hidden); the viewer's choice is kept
+  // (flows-view-store). The cursor and any cut it made survive the toggle.
   const [compact, setCompact] = useState(true);
   useEffect(() => setCompact(readFlowsView() === "compact"), []);
-  const focus = useFlowFocus();
   const toggleView = () => {
     const next = !compact;
     setCompact(next);
     writeFlowsView(next ? "compact" : "full");
-    if (next) focus?.store.set({ rewind: null });
   };
-  // A card's "View on chart" needs the cursor: it opens the full view.
-  useEffect(() => {
-    if (move === 0) return;
-    setCompact(false);
-  }, [move]);
   const viewButton = (
     <button
       type="button"
@@ -165,7 +158,7 @@ export function LifetimeFlowsPanel({
       aria-controls={bodyId}
       aria-label={compact ? `Expand ${title}` : `Shrink ${title}`}
       title={compact ? `Expand ${title}` : `Shrink ${title}`}
-      className={`${CTRL_GHOST} ${CTRL_OFF} size-8 shrink-0 rounded-md pointer-coarse:size-11`}
+      className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-sunken text-rb-500 transition-colors hover:bg-rb-300 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:hover:bg-rb-700 pointer-coarse:size-11"
       data-flows-view-toggle={compact ? "compact" : "full"}
     >
       {compact ? <Maximize2 size={16} aria-hidden /> : <Minimize2 size={16} aria-hidden />}
@@ -230,16 +223,14 @@ export function LifetimeFlowsPanel({
           {/* The ⋮ at the right end (ui-jobs 295): Inspect provenance on the
               panel alone (ui-jobs 284); each section's "?" carries the
               how-to-read. Collapsed, nothing stands to inspect: no ⋮. */}
-          {!compact && (
-            <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
-              <ToolsMenu
-                variant="panel"
-                label={`${title} menu`}
-                heading={title}
-                provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
-              />
-            </div>
-          )}
+          <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
+            <ToolsMenu
+              variant="panel"
+              label={`${title} menu`}
+              heading={title}
+              provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
+            />
+          </div>
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {scrubber != null ? (

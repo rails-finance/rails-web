@@ -209,8 +209,9 @@ export const FlowsKeyNodeContext = createContext<ReactNode>(null);
  *  how-to-read, so the panel's header draws none. */
 export const FlowsSectionsContext = createContext<((on: boolean) => void) | null>(null);
 /** The panel's view (lib/shared/flows-view-store.ts): collapsed, the
- *  headlines and their bars at today and nothing under them; the toggle that
- *  opens the rest stands right after the bars in both states. */
+ *  headlines and bars, the events and the steps, with the two charts
+ *  hidden; the toggle that opens them stands centred under the bars in
+ *  both states. */
 export const FlowsCompactContext = createContext<{ compact: boolean; toggle: ReactNode }>({
   compact: false,
   toggle: null,
@@ -278,13 +279,9 @@ export function CombinedFlows({
     setAt(i >= 0 ? i : lastRef.current);
   }, [model, series, from]);
   const go = (i: number) => setAt(Math.max(0, Math.min(last, i)));
-  // The compact view draws today: the cursor goes home and unfreezes.
+  // Collapsed, the charts hide; the bars, the events and the steps keep
+  // the cursor.
   const { compact, toggle: viewToggle } = useContext(FlowsCompactContext);
-  useEffect(() => {
-    if (!compact) return;
-    setAt(lastRef.current);
-    setFrozen(false);
-  }, [compact, last]);
 
   // On a page that ties the panel to its timeline, the day is the unit the
   // two share. A click on the strip freezes the cursor on a day; the chart and
@@ -588,21 +585,22 @@ export function CombinedFlows({
       <SegmentTipContext.Provider value={byDays || null}>
         <div className="text-sm" data-flows-combined="" data-flow-frozen={frozen ? "" : undefined}>
           <Steady>{barsBlock}</Steady>
-          {/* The view's toggle, right after the bars, in both states. */}
+          {/* The view's toggle, centred under the bars, in both states: the
+              charts open beneath it, the events and steps keep their place. */}
           {viewToggle && (
-            <div className="mt-1 flex justify-end" data-flows-view-row="">
+            <div className="mt-3 flex justify-center" data-flows-view-row="">
               {viewToggle}
             </div>
           )}
 
-          {/* Kept mounted while collapsed, so the charts measure their width
-              from the first frame and draw at once on expanding. */}
-          <div className={compact ? "hidden" : undefined} data-flows-more="">
+          <div>
             <div {...KEEP_PANEL}>
-              <div ref={stripRef} className={viewToggle ? "mt-4" : "mt-8"}>
+              <div ref={stripRef} className={viewToggle ? "mt-2" : "mt-8"}>
                 {/* The value line, then the price chart, then the events: one
-                  time axis and one cursor, which either chart moves. */}
-                <div className="relative">
+                  time axis and one cursor, which either chart moves. The
+                  charts stay mounted while collapsed, so they draw at once
+                  on expanding. */}
+                <div className={compact ? "hidden" : "relative"} data-flows-charts="value">
                   <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
                     <LineStrip
                       model={model}
@@ -621,7 +619,7 @@ export function CombinedFlows({
                   </StripSlider>
                 </div>
                 {priced && priceHelp && (
-                  <div className="mt-10" data-flow-price-section="">
+                  <div className={compact ? "hidden" : "mt-10"} data-flow-price-section="">
                     <div className="mb-2 flex items-center justify-between gap-3" data-anatomy="F19.1">
                       <PriceHeading series={prices} selected={priced} onPick={setAssetKey} />
                       <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
@@ -657,7 +655,7 @@ export function CombinedFlows({
                   </div>
                 )}
                 {/* The events: a labelled row of pips on the time axis. */}
-                <div className="mt-6" data-flow-events-section="">
+                <div className={compact ? "mt-2" : "mt-6"} data-flow-events-section="">
                   <div className="flex items-center justify-between gap-3">
                     <span
                       className={`${SECTION_HEADING} text-rb-500`}

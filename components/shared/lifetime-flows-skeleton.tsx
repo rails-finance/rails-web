@@ -62,7 +62,8 @@ export function LifetimeFlowsWaiting({ count }: { count: LifeCount | null }) {
 
 export function LifetimeFlowsSkeleton({ compact = false }: { compact?: boolean }) {
   if (compact)
-    // Collapsed: the headlines over their bars, and the toggle's row.
+    // Collapsed: the headlines over their bars, the toggle, the events pill
+    // and the steps.
     return (
       <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton="compact">
         <div className="mb-2 flex h-[53px] flex-wrap items-start gap-x-6 sm:h-7 sm:items-center">
@@ -71,8 +72,14 @@ export function LifetimeFlowsSkeleton({ compact = false }: { compact?: boolean }
         </div>
         <div className={`${BLOCK} h-10 sm:h-11`} />
         <div className={`${BLOCK} mt-3 h-10 sm:h-11`} />
-        <div className="mt-1 flex justify-end">
-          <div className={`${BLOCK} size-8`} />
+        <div className="mt-3 flex justify-center">
+          <div className={`${BLOCK} size-8 rounded-full`} />
+        </div>
+        {/* The events pill, the cursor's date and the steps. */}
+        <div className="mt-2 h-4" />
+        <div className={`${BLOCK} mt-1.5 h-11 rounded-full sm:h-[38px]`} />
+        <div className="mt-6 flex justify-end">
+          <div className={`${BLOCK} h-11 w-[184px] sm:h-8`} />
         </div>
       </div>
     );
