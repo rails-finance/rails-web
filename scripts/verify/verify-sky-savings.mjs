@@ -183,6 +183,11 @@ check("mixed: the api states its referral codes", mixedCodes.length >= 2, JSON.s
 const rates = await api(`/rates`);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.addInitScript(() => {
+  try {
+    localStorage.setItem("rails-flows-view-v1", "full");
+  } catch {}
+});
 for (const [name, holder] of Object.entries(HOLDERS)) {
   const pos = positions[name];
   await page.goto(`${BASE}/ethereum/sky-savings/${holder}`, { waitUntil: "networkidle", timeout: 120000 });
@@ -374,6 +379,11 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
 // At 390px, consecutive Savings Rate changes draw as one row that counts them.
 {
   const phone = await browser.newPage({ viewport: { width: 390, height: 900 } });
+  await phone.addInitScript(() => {
+    try {
+      localStorage.setItem("rails-flows-view-v1", "full");
+    } catch {}
+  });
   const pos = positions.small;
   await phone.goto(`${BASE}/ethereum/sky-savings/${HOLDERS.small}`, { waitUntil: "networkidle", timeout: 120000 });
   const got = await phone.evaluate(() => ({
@@ -424,6 +434,11 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
 {
   const pos = positions.mixed;
   const p2 = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await p2.addInitScript(() => {
+    try {
+      localStorage.setItem("rails-flows-view-v1", "full");
+    } catch {}
+  });
   await p2.goto(`${BASE}/ethereum/sky-savings/${HOLDERS.mixed}`, { waitUntil: "networkidle", timeout: 120000 });
   const heads = p2.locator('[role="button"][class*="group/evt"]');
   const nh = await heads.count();

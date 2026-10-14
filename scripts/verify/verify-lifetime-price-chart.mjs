@@ -373,6 +373,13 @@ for (const pg of PAGES) {
       isMobile: width < 640,
       extraHTTPHeaders: bypassHeaders(),
     });
+    // The full Lifetime flows panel: the compact view (the default) has no
+    // scrubber or events row.
+    await ctx.addInitScript(() => {
+      try {
+        localStorage.setItem("rails-flows-view-v1", "full");
+      } catch {}
+    });
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
