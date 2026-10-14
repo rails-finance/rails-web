@@ -23,6 +23,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -33,6 +34,7 @@ import {
 } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Link2, ListEnd, SkipBack, SkipForward } from "lucide-react";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
   lifetimeFlowsBarsContent,
   lifetimeFlowsEventsContent,
@@ -1539,29 +1541,10 @@ function PriceHeading({
   const grain = selected.grain === "event" ? null : "Daily";
   const asset =
     series.length > 1 ? (
-      <span className="relative inline-flex items-center">
-        <select
-          value={selected.key}
-          onChange={(e) => onPick(e.target.value)}
-          aria-label="Asset"
-          className="cursor-pointer appearance-none rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-5 text-sm font-semibold text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 dark:text-teal-400"
-          data-price-picker=""
-          {...KEEP_PANEL}
-        >
-          {series.map((s) => (
-            <option key={s.key} value={s.key} data-price-asset={s.asset.symbol}>
-              {s.asset.symbol}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={12}
-          aria-hidden
-          className="pointer-events-none absolute right-1.5 text-teal-600 dark:text-teal-400"
-        />
-      </span>
+      <AssetPicker series={series} selected={selected} onPick={onPick} />
     ) : (
-      <span className="text-foreground" data-price-asset={selected.asset.symbol}>
+      <span className="inline-flex items-center gap-1 text-foreground" data-price-asset={selected.asset.symbol}>
+        <AssetIcon s={selected} />
         {selected.asset.symbol}
       </span>
     );
@@ -1575,6 +1558,133 @@ function PriceHeading({
       {asset}
       <span>{selected.unitLabel} price</span>
     </p>
+  );
+}
+
+/** An asset's mark at the heading's text size, as the headlines draw it. */
+function AssetIcon({ s }: { s: FlowPriceSeries }) {
+  return (
+    <span className="inline-flex size-4 shrink-0 items-center justify-center" aria-hidden>
+      <TokenChipIcon symbol={s.asset.symbol} address={s.asset.address} size={14} filterable={false} untitled />
+    </span>
+  );
+}
+
+/** The heading's asset list: a button naming the asset with its mark, a
+ *  listbox of the held assets with theirs. Arrows, Home and End move,
+ *  Enter or Space picks, Escape and a press elsewhere close. */
+function AssetPicker({
+  series,
+  selected,
+  onPick,
+}: {
+  series: FlowPriceSeries[];
+  selected: FlowPriceSeries;
+  onPick: (key: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const listId = useId();
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: globalThis.PointerEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    // The chosen option takes focus as the list opens.
+    listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+  const close = () => {
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
+  const pick = (key: string) => {
+    onPick(key);
+    close();
+  };
+  const onListKey = (e: React.KeyboardEvent<HTMLUListElement>) => {
+    const items = [...(listRef.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])];
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const to =
+      e.key === "ArrowDown"
+        ? Math.min(items.length - 1, at + 1)
+        : e.key === "ArrowUp"
+          ? Math.max(0, at - 1)
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? items.length - 1
+              : null;
+    if (to != null) {
+      e.preventDefault();
+      items[to]?.focus();
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const key = (document.activeElement as HTMLElement | null)?.dataset.priceKey;
+      if (key) pick(key);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    } else if (e.key === "Tab") setOpen(false);
+  };
+  return (
+    <span ref={wrapRef} className="relative inline-flex" {...KEEP_PANEL}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-label={`Asset: ${selected.asset.symbol}`}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-1 text-sm font-semibold text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 sm:min-h-0 dark:text-teal-400"
+        data-price-picker=""
+      >
+        <AssetIcon s={selected} />
+        {selected.asset.symbol}
+        <ChevronDown size={12} aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <ul
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          aria-label="Asset"
+          onKeyDown={onListKey}
+          className="overlay-panel absolute left-0 top-full z-50 mt-1 min-w-full overflow-hidden py-1"
+        >
+          {series.map((s) => {
+            const on = s.key === selected.key;
+            return (
+              <li
+                key={s.key}
+                role="option"
+                aria-selected={on}
+                aria-label={s.asset.symbol}
+                tabIndex={-1}
+                onClick={() => pick(s.key)}
+                className={`mx-1 flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-semibold outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] sm:min-h-8 ${on ? "text-teal-700 dark:text-teal-400" : "text-foreground"}`}
+                data-price-asset={s.asset.symbol}
+                data-price-key={s.key}
+              >
+                <AssetIcon s={s} />
+                {s.asset.symbol}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </span>
   );
 }
 

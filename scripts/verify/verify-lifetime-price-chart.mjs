@@ -421,11 +421,19 @@ for (const pg of PAGES) {
     check(`${tag}: one pip row under the charts`, before.pips.length === 1, `${before.pips.length} rows`);
 
     // The picker: each held asset with a series.
-    // The heading's list (several assets) or the asset's name (one).
+    // The heading's list (several assets: open it to read its options) or
+    // the asset's name (one).
+    const picker = page.locator("button[data-price-picker]");
+    if ((await picker.count()) > 0) {
+      await picker.click();
+      await page.waitForSelector('[role="listbox"] [data-price-asset]', { timeout: 5000 }).catch(() => {});
+    }
     const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
+    if ((await picker.count()) > 0) await page.keyboard.press("Escape");
     const pick = async (sym) => {
-      const select = page.locator("select[data-price-picker]");
-      if ((await select.count()) > 0) await select.selectOption({ label: sym });
+      if ((await picker.count()) === 0) return;
+      await picker.click();
+      await page.locator(`[role="listbox"] [data-price-asset="${sym}"]`).click();
     };
     const want = [...series.keys()];
     check(
