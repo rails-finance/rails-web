@@ -8,14 +8,16 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chai
  *   • custody escrows (`ccip-lock-release`) hold protocol tokens for someone
  *     else. A Maple page for one renders the custody view, not a position.
  *   • protocol contracts (settlement, router, adapter, gateway, multicall,
- *     amm-pool) are what a user's tokens move through or into on the way to a
- *     trade, a swap or an ETH wrap. A transfer to or from one keeps its
- *     timeline row, and the chip names the contract ("to CoW Protocol").
+ *     amm-pool, lending-pool) are what a user's tokens move through or into on
+ *     the way to a trade, a swap, an ETH wrap or a loan. A transfer to or from
+ *     one keeps its timeline row, and the chip names the contract ("to CoW
+ *     Protocol").
  *
  * Neither class is ever a roster position. The server keeps the second class
  * out of its listings from the same rows (rails-server-onboarding mig 227,
  * `protocol_plumbing_contracts`); keep the two lists in step. The build is
- * rails-ops TO-DO-ui-jobs §14.
+ * rails-ops TO-DO-ui-jobs §14. The SyrupRouters and the lending pools are not
+ * in the server's table yet: that change is TO-DO-ui-jobs §37.
  *
  * The key carries the chain because an address is only a fact on the chain it
  * was verified on: GPv2Settlement sits at the same address on Ethereum and
@@ -38,6 +40,14 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chai
  *   • A WETH gateway is named for what it does, not for whose deployment it
  *     is: Aave and Seamless both run `WrappedTokenGatewayV3`, and the source
  *     name does not say which.
+ *   • Maple's two SyrupRouters (Etherscan `SyrupRouter`, 2026-10-02) answer
+ *     `pool()` with syrupUSDC and syrupUSDT. Every deposit entry point calls
+ *     `_deposit(msg.sender, …)`, which deposits into the pool for the router
+ *     and transfers the shares to that caller, so a transfer from a router
+ *     is the receiving wallet's own deposit.
+ *   • The lending pools (Etherscan `Morpho`, `FluidLiquidityProxy`,
+ *     2026-10-02) hold their markets' collateral and loans for every user at
+ *     once, so they are busy open Maple holders that are nobody's position.
  */
 interface KnownContractBase {
   /** Short display name for party chips, e.g. "CoW Protocol". */
@@ -55,7 +65,7 @@ export interface CcipEscrow extends KnownContractBase {
 }
 
 export interface ProtocolContract extends KnownContractBase {
-  kind: "settlement" | "router" | "adapter" | "gateway" | "multicall" | "amm-pool";
+  kind: "settlement" | "router" | "adapter" | "gateway" | "multicall" | "amm-pool" | "lending-pool";
   /** A noun phrase that completes "The recipient is …" / "The sender is …" in
    *  an event's explanation. Says what the contract does, nothing more. */
   role: string;
@@ -143,6 +153,27 @@ const router = (name: string, contractName: string, owner: string): ProtocolCont
   contractName,
   role: `${owner} router, which routes a swap across other trading venues`,
 });
+const syrupRouter = (poolSymbol: string, asset: string): ProtocolContract => ({
+  name: `Maple SyrupRouter · ${poolSymbol}`,
+  kind: "router",
+  contractName: "SyrupRouter",
+  protocolIcon: "maple",
+  role: `Maple’s SyrupRouter for ${poolSymbol}, which deposits a wallet’s ${asset} into the pool and passes the shares to that wallet in the same transaction`,
+});
+const MORPHO_BLUE: ProtocolContract = {
+  name: "Morpho Blue",
+  kind: "lending-pool",
+  contractName: "Morpho",
+  protocolIcon: "morpho",
+  role: "Morpho Blue’s singleton contract, which holds the collateral and the loans of every Morpho Blue market",
+};
+const FLUID_LIQUIDITY: ProtocolContract = {
+  name: "Fluid Liquidity",
+  kind: "lending-pool",
+  contractName: "FluidLiquidityProxy",
+  protocolIcon: "fluid",
+  role: "Fluid’s Liquidity contract, which holds the assets of every Fluid vault and lending market",
+};
 const ENSO: ProtocolContract = {
   name: "Enso shortcuts",
   kind: "router",
@@ -181,6 +212,10 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [MAINNET_CHAIN_ID, "0xe359219083033e98a42051d3dd41b64924ed4b3d", UNISWAP_V3_POOL],
   [MAINNET_CHAIN_ID, "0x000000000004444c5dc75cb358380d2e3de08a90", UNISWAP_V4],
   [MAINNET_CHAIN_ID, "0x4800cc349f5e541bad9c147a80f3beca245ffbae", PANCAKE_PAIR],
+  [MAINNET_CHAIN_ID, "0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76", syrupRouter("syrupUSDC", "USDC")],
+  [MAINNET_CHAIN_ID, "0xf007476bb27430795138c511f18f821e8d1e5ee2", syrupRouter("syrupUSDT", "USDT")],
+  [MAINNET_CHAIN_ID, "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb", MORPHO_BLUE],
+  [MAINNET_CHAIN_ID, "0x52aa899454998be5b000ad077a46bbe360f4e497", FLUID_LIQUIDITY],
   // ── Base ──
   [BASE_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", COW],
   [BASE_CHAIN_ID, "0xa0d9c1e9e48ca30c8d8c3b5d69ff5dc1f6dffc24", WETH_GATEWAY],

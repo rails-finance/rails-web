@@ -49,7 +49,8 @@ import {
   escrowAfterProv,
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
-import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
+import { getCcipEscrow, getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { shortAddress } from "@/lib/maple/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 
@@ -436,6 +437,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
 
     case "transfer_in": {
       const bridge = Boolean(getCcipEscrow(ctx.counterparty));
+      const named = getProtocolContract(ctx.counterparty, MAINNET_CHAIN_ID);
       return bridge
         ? {
             changed: [transferValueClause()],
@@ -456,36 +458,77 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
               ),
             ],
           }
-        : {
-            happened: [
-              clause(
-                <>
-                  Received {transferShareFig("in")} from{" "}
-                  {ctx.counterparty ? (
+        : named?.contractName === "SyrupRouter"
+          ? {
+              happened: [
+                clause(
+                  <>
+                    Received {transferShareFig("in")} from Maple&rsquo;s SyrupRouter. This wallet called the router,
+                    which took its {asset}, deposited it in the pool and passed the shares on.
+                  </>,
+                ),
+              ],
+              changed: [transferValueClause()],
+              meansNow: [
+                clause(
+                  <>
+                    The pool records the deposit under the router&rsquo;s address, so this transfer is where the
+                    wallet&rsquo;s deposit shows on its own record.
+                  </>,
+                ),
+              ],
+            }
+          : named
+            ? {
+                happened: [
+                  clause(
                     <>
-                      <span className="font-mono">{shortAddress(ctx.counterparty)}</span>, an address with no label here
-                    </>
-                  ) : (
-                    <>another wallet</>
-                  )}
-                  . The wallet paid nothing into the pool for them.
-                </>,
-              ),
-            ],
-            changed: [transferValueClause()],
-            meansNow: [
-              clause(
-                <>
-                  Pool shares move between wallets like any token, so the transfer moved the claim on the pool&rsquo;s{" "}
-                  {asset} into this position with no pool event.
-                </>,
-              ),
-            ],
-          };
+                      Received {transferShareFig("in")} from {named.name}, {named.role}.
+                    </>,
+                  ),
+                ],
+                changed: [transferValueClause()],
+                meansNow: [
+                  clause(
+                    <>
+                      Pool shares move between addresses like any token, so the transfer moved the claim on the
+                      pool&rsquo;s {asset} into this position with no pool event.
+                    </>,
+                  ),
+                ],
+              }
+            : {
+                happened: [
+                  clause(
+                    <>
+                      Received {transferShareFig("in")} from{" "}
+                      {ctx.counterparty ? (
+                        <>
+                          <span className="font-mono">{shortAddress(ctx.counterparty)}</span>, an address with no label
+                          here
+                        </>
+                      ) : (
+                        <>another wallet</>
+                      )}
+                      . The wallet paid nothing into the pool for them.
+                    </>,
+                  ),
+                ],
+                changed: [transferValueClause()],
+                meansNow: [
+                  clause(
+                    <>
+                      Pool shares move between wallets like any token, so the transfer moved the claim on the
+                      pool&rsquo;s {asset} into this position with no pool event.
+                    </>,
+                  ),
+                ],
+              };
     }
 
     case "transfer_out": {
       const bridge = Boolean(getCcipEscrow(ctx.counterparty));
+      const named = getProtocolContract(ctx.counterparty, MAINNET_CHAIN_ID);
       return bridge
         ? {
             changed: [transferValueClause()],
@@ -507,7 +550,17 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
             ],
           }
         : {
-            happened: [clause(<>Sent {transferShareFig("out")} to another wallet.</>)],
+            happened: [
+              clause(
+                named ? (
+                  <>
+                    Sent {transferShareFig("out")} to {named.name}, {named.role}.
+                  </>
+                ) : (
+                  <>Sent {transferShareFig("out")} to another wallet.</>
+                ),
+              ),
+            ],
             changed: [transferValueClause()],
             meansNow: [
               clause(

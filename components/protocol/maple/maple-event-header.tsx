@@ -17,7 +17,8 @@ import {
   externalActorProv,
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
-import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
+import { getKnownInfrastructure } from "@/lib/shared/known-infrastructure";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatWait } from "@/lib/maple/row-times";
 import { TRANSFER_LABEL } from "@/lib/maple/event-label";
 import { formatNumber } from "@/lib/utils/format";
@@ -44,6 +45,10 @@ export interface MapleEventHeaderProps {
   /** Queue fills: unix seconds of the request this fill paid, where loaded. */
   requestAt?: number;
 }
+
+/** A Maple SyrupRouter: shares it sends are the receiving wallet's own deposit. */
+const isSyrupRouter = (address: string | null | undefined): boolean =>
+  getKnownInfrastructure(address, MAINNET_CHAIN_ID)?.contractName === "SyrupRouter";
 
 /** T1's head row spec (the card's `head` slot). */
 export function useMapleHeadSpec({
@@ -98,20 +103,22 @@ export function useMapleHeadSpec({
         ? requestAt != null && timestamp >= requestAt
           ? `paid to the wallet, ${formatWait(timestamp - requestAt)} after the request`
           : "paid to the wallet"
-        : undefined;
+        : ctx.eventType === "transfer_in" && isSyrupRouter(ctx.counterparty)
+          ? "deposited through the router"
+          : undefined;
   const note = what ? `${ctx.assetSymbol} pool · ${what}` : `${ctx.assetSymbol} pool`;
 
   // Party chips: a transfer counterparty is a NEUTRAL party of the event
   // itself; only a true external action is a verdict. A known infrastructure
-  // counterparty (the CCIP bridge escrow) renders its registry name over the
-  // truncated address — the chip's existing `name` seam; unknowns keep the
-  // bare address.
+  // counterparty (the CCIP bridge escrow, a SyrupRouter, a lending pool)
+  // renders its registry name over the truncated address — the chip's
+  // existing `name` seam; unknowns keep the bare address.
   const party =
     ctx.eventType === "transfer_in" && ctx.counterparty
       ? {
           prefix: "from",
           address: ctx.counterparty,
-          name: getCcipEscrow(ctx.counterparty)?.name,
+          name: getKnownInfrastructure(ctx.counterparty, MAINNET_CHAIN_ID)?.name,
           prov: transferAmountProv(ctx.poolSymbol, "in", coords),
           ens: true,
         }
@@ -119,7 +126,7 @@ export function useMapleHeadSpec({
         ? {
             prefix: "to",
             address: ctx.counterparty,
-            name: getCcipEscrow(ctx.counterparty)?.name,
+            name: getKnownInfrastructure(ctx.counterparty, MAINNET_CHAIN_ID)?.name,
             prov: transferAmountProv(ctx.poolSymbol, "out", coords),
             ens: true,
           }
