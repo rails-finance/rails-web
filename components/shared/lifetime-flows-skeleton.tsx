@@ -62,27 +62,39 @@ export function LifetimeFlowsWaiting({ count }: { count: LifeCount | null }) {
 
 export function LifetimeFlowsSkeleton({ compact = false }: { compact?: boolean }) {
   if (compact)
-    // The compact view's shape: the headlines over their bars, the value
-    // chart and the price chart under its heading, side by side from md.
+    // Collapsed: the headlines over their bars, and the toggle's row.
     return (
-      <div
-        className="mt-2 grid animate-pulse grid-cols-2 items-end gap-x-5 gap-y-6 md:grid-cols-3"
-        aria-hidden
-        data-flows-skeleton="compact"
-      >
-        <div className="col-span-2 self-start md:col-span-1">
-          <div className={`${BLOCK} mb-1.5 h-7 w-32`} />
-          <div className={`${BLOCK} h-8`} />
-          <div className={`${BLOCK} mb-1.5 mt-4 h-7 w-28`} />
-          <div className={`${BLOCK} h-8`} />
+      <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton="compact">
+        <div className="mb-2 flex h-[53px] flex-wrap items-start gap-x-6 sm:h-7 sm:items-center">
+          <div className={`${BLOCK} h-7 w-32`} />
+          <div className={`${BLOCK} h-7 w-28`} />
         </div>
-        <div className={`${BLOCK} h-20 opacity-60`} />
-        <div>
-          <div className={`${BLOCK} mb-2 h-5 w-40`} />
-          <div className={`${BLOCK} h-20 opacity-60`} />
+        <div className={`${BLOCK} h-10 sm:h-11`} />
+        <div className={`${BLOCK} mt-3 h-10 sm:h-11`} />
+        <div className="mt-1 flex justify-end">
+          <div className={`${BLOCK} size-8`} />
         </div>
       </div>
     );
+  return (
+    <div
+      className="mt-2 grid animate-pulse grid-cols-2 items-end gap-x-5 gap-y-6 md:grid-cols-3"
+      aria-hidden
+      data-flows-skeleton="compact"
+    >
+      <div className="col-span-2 self-start md:col-span-1">
+        <div className={`${BLOCK} mb-1.5 h-7 w-32`} />
+        <div className={`${BLOCK} h-8`} />
+        <div className={`${BLOCK} mb-1.5 mt-4 h-7 w-28`} />
+        <div className={`${BLOCK} h-8`} />
+      </div>
+      <div className={`${BLOCK} h-20 opacity-60`} />
+      <div>
+        <div className={`${BLOCK} mb-2 h-5 w-40`} />
+        <div className={`${BLOCK} h-20 opacity-60`} />
+      </div>
+    </div>
+  );
   return (
     <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton="">
       {/* Headlines, and the date at the row's right end (it wraps under them

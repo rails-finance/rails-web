@@ -208,10 +208,13 @@ export const FlowsKeyNodeContext = createContext<ReactNode>(null);
 /** Told while the combined panel is mounted: its sections carry the
  *  how-to-read, so the panel's header draws none. */
 export const FlowsSectionsContext = createContext<((on: boolean) => void) | null>(null);
-/** The panel's compact view (lib/shared/flows-view-store.ts): the bars, the
- *  value chart and the price chart side by side, drawn at today, with no
- *  cursor, steps or events row. */
-export const FlowsCompactContext = createContext(false);
+/** The panel's view (lib/shared/flows-view-store.ts): collapsed, the
+ *  headlines and their bars at today and nothing under them; the toggle that
+ *  opens the rest stands right after the bars in both states. */
+export const FlowsCompactContext = createContext<{ compact: boolean; toggle: ReactNode }>({
+  compact: false,
+  toggle: null,
+});
 
 const STRIP_H = 80;
 /** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
@@ -276,7 +279,7 @@ export function CombinedFlows({
   }, [model, series, from]);
   const go = (i: number) => setAt(Math.max(0, Math.min(last, i)));
   // The compact view draws today: the cursor goes home and unfreezes.
-  const compact = useContext(FlowsCompactContext);
+  const { compact, toggle: viewToggle } = useContext(FlowsCompactContext);
   useEffect(() => {
     if (!compact) return;
     setAt(lastRef.current);
@@ -580,256 +583,157 @@ export function CombinedFlows({
     </div>
   );
 
-  if (compact)
-    return (
-      <FlowCursorContext.Provider value={cursor}>
-        <SegmentTipContext.Provider value={byDays || null}>
-          <div className="text-sm" data-flows-combined="" data-flows-view="compact">
-            <CompactFlows
-              barsBlock={barsBlock}
-              line={
-                lineReady
-                  ? (cw, cgeo) => (
-                      <LineStrip
-                        model={model}
-                        scale={lineScale}
-                        failed={failed}
-                        geo={cgeo}
-                        w={cw}
-                        today={today}
-                        cx={0}
-                        dim={false}
-                        ready
-                        still
-                        head={{ collateral: head.collateral.now, debt: head.debt.now }}
-                        hasDebt={hasDebt}
-                        windowFrom={from > 0 ? startDay + from : null}
-                      />
-                    )
-                  : null
-              }
-              price={
-                priced && priceHelp
-                  ? {
-                      heading: (
-                        <div className="mb-2 flex items-center justify-between gap-2" data-anatomy="F19.1">
-                          <PriceHeading series={prices} selected={priced} onPick={setAssetKey} />
-                          <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
-                        </div>
-                      ),
-                      strip: (cw, cgeo) => (
-                        <PriceStrip
-                          s={priced}
-                          scale={priceScales.get(priced.key)!}
-                          geo={cgeo}
-                          w={cw}
-                          today={today}
-                          cx={0}
-                          dim={false}
-                          still
-                          cursorPrice={null}
-                          cursorLevel={null}
-                          windowFrom={from > 0 ? startDay + from : null}
-                          startDay={startDay}
-                        />
-                      ),
-                    }
-                  : null
-              }
-              geoOf={(cw) => stripGeometry(cw, startDay, today, span, labelW)}
-            />
-          </div>
-        </SegmentTipContext.Provider>
-      </FlowCursorContext.Provider>
-    );
-
   return (
     <FlowCursorContext.Provider value={cursor}>
       <SegmentTipContext.Provider value={byDays || null}>
         <div className="text-sm" data-flows-combined="" data-flow-frozen={frozen ? "" : undefined}>
           <Steady>{barsBlock}</Steady>
+          {/* The view's toggle, right after the bars, in both states. */}
+          {viewToggle && (
+            <div className="mt-1 flex justify-end" data-flows-view-row="">
+              {viewToggle}
+            </div>
+          )}
 
-          <div {...KEEP_PANEL}>
-            <div ref={stripRef} className="mt-8">
-              {/* The value line, then the price chart, then the events: one
+          {/* Kept mounted while collapsed, so the charts measure their width
+              from the first frame and draw at once on expanding. */}
+          <div className={compact ? "hidden" : undefined} data-flows-more="">
+            <div {...KEEP_PANEL}>
+              <div ref={stripRef} className={viewToggle ? "mt-4" : "mt-8"}>
+                {/* The value line, then the price chart, then the events: one
                   time axis and one cursor, which either chart moves. */}
-              <div className="relative">
-                <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
-                  <LineStrip
+                <div className="relative">
+                  <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
+                    <LineStrip
+                      model={model}
+                      scale={lineScale}
+                      failed={failed}
+                      geo={geo}
+                      w={w}
+                      today={today}
+                      cx={cx}
+                      dim={dim}
+                      ready={lineReady}
+                      head={{ collateral: head.collateral.now, debt: head.debt.now }}
+                      hasDebt={hasDebt}
+                      windowFrom={from > 0 ? startDay + from : null}
+                    />
+                  </StripSlider>
+                </div>
+                {priced && priceHelp && (
+                  <div className="mt-10" data-flow-price-section="">
+                    <div className="mb-2 flex items-center justify-between gap-3" data-anatomy="F19.1">
+                      <PriceHeading series={prices} selected={priced} onPick={setAssetKey} />
+                      <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
+                    </div>
+                    <div className="relative">
+                      <StripSlider
+                        {...sliderProps}
+                        ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
+                        view="price"
+                        tip={(shown) =>
+                          shown && (
+                            <PriceTip x={cx} w={w}>
+                              <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
+                            </PriceTip>
+                          )
+                        }
+                      >
+                        <PriceStrip
+                          s={priced}
+                          scale={priceScales.get(priced.key)!}
+                          geo={geo}
+                          w={w}
+                          today={today}
+                          cx={cx}
+                          dim={dim}
+                          cursorPrice={cursorPrice}
+                          cursorLevel={cursorLevel}
+                          windowFrom={from > 0 ? startDay + from : null}
+                          startDay={startDay}
+                        />
+                      </StripSlider>
+                    </div>
+                  </div>
+                )}
+                {/* The events: a labelled row of pips on the time axis. */}
+                <div className="mt-6" data-flow-events-section="">
+                  <div className="flex items-center justify-between gap-3">
+                    <span
+                      className={`${SECTION_HEADING} text-rb-500`}
+                      style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
+                      data-flow-events-label=""
+                    >
+                      Events
+                    </span>
+                    <SectionHelp content={eventsContent} name="the events" anatomy="F7.1" />
+                  </div>
+                  <PipRow
                     model={model}
-                    scale={lineScale}
-                    failed={failed}
                     geo={geo}
                     w={w}
                     today={today}
+                    stops={stops}
+                    at={Math.min(at, last)}
                     cx={cx}
                     dim={dim}
-                    ready={lineReady}
-                    head={{ collateral: head.collateral.now, debt: head.debt.now }}
-                    hasDebt={hasDebt}
-                    windowFrom={from > 0 ? startDay + from : null}
+                    ready={ready}
+                    onPick={go}
                   />
-                </StripSlider>
-              </div>
-              {priced && priceHelp && (
-                <div className="mt-10" data-flow-price-section="">
-                  <div className="mb-2 flex items-center justify-between gap-3" data-anatomy="F19.1">
-                    <PriceHeading series={prices} selected={priced} onPick={setAssetKey} />
-                    <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
-                  </div>
-                  <div className="relative">
-                    <StripSlider
-                      {...sliderProps}
-                      ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
-                      view="price"
-                      tip={(shown) =>
-                        shown && (
-                          <PriceTip x={cx} w={w}>
-                            <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
-                          </PriceTip>
-                        )
-                      }
-                    >
-                      <PriceStrip
-                        s={priced}
-                        scale={priceScales.get(priced.key)!}
-                        geo={geo}
-                        w={w}
-                        today={today}
-                        cx={cx}
-                        dim={dim}
-                        cursorPrice={cursorPrice}
-                        cursorLevel={cursorLevel}
-                        windowFrom={from > 0 ? startDay + from : null}
-                        startDay={startDay}
-                      />
-                    </StripSlider>
-                  </div>
                 </div>
-              )}
-              {/* The events: a labelled row of pips on the time axis. */}
-              <div className="mt-6" data-flow-events-section="">
-                <div className="flex items-center justify-between gap-3">
-                  <span
-                    className={`${SECTION_HEADING} text-rb-500`}
-                    style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
-                    data-flow-events-label=""
-                  >
-                    Events
-                  </span>
-                  <SectionHelp content={eventsContent} name="the events" anatomy="F7.1" />
-                </div>
-                <PipRow
-                  model={model}
-                  geo={geo}
+                {/* The cursor's date under the cursor line; pressed, it shows the
+                  timeline's two buttons beside it. */}
+                <CursorDate
+                  x={cx}
                   w={w}
-                  today={today}
-                  stops={stops}
-                  at={Math.min(at, last)}
-                  cx={cx}
-                  dim={dim}
-                  ready={ready}
-                  onPick={go}
+                  word={cursorWord}
+                  byDays={byDays}
+                  follow={follow}
+                  applied={!!committed && !committed.live && applied === committedEnd}
+                  committedWord={committedWord}
+                  live={!!committed?.live}
+                  onApply={apply}
                 />
               </div>
-              {/* The cursor's date under the cursor line; pressed, it shows the
-                  timeline's two buttons beside it. */}
-              <CursorDate
-                x={cx}
-                w={w}
-                word={cursorWord}
-                byDays={byDays}
-                follow={follow}
-                applied={!!committed && !committed.live && applied === committedEnd}
-                committedWord={committedWord}
-                live={!!committed?.live}
-                onApply={apply}
-              />
             </div>
-          </div>
 
-          {/* The steps, grouped at the right end: the opening, the previous
+            {/* The steps, grouped at the right end: the opening, the previous
               and next day with events, today. */}
-          <div className="mt-1 flex items-center justify-end" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
-            <div className="-mr-1.5 flex items-center gap-x-1">
-              <button
-                type="button"
-                className={btn}
-                aria-label={`Jump to opening, ${dayStamp(dayStart(model, 0))}`}
-                onClick={() => go(0)}
-                data-flow-jump="start"
-              >
-                <SkipBack size={16} aria-hidden />
-              </button>
-              <button type="button" className={btn} aria-label="Previous event" onClick={stepBack}>
-                <ChevronLeft size={18} aria-hidden />
-              </button>
-              <button type="button" className={btn} aria-label="Next event" onClick={stepOn}>
-                <ChevronRight size={18} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className={btn}
-                aria-label={closed ? `Jump to close, ${closeDay}` : "Jump to today"}
-                onClick={() => {
-                  go(last);
-                  setFrozen(false);
-                }}
-                data-flow-jump="end"
-              >
-                <SkipForward size={16} aria-hidden />
-              </button>
+            <div className="mt-1 flex items-center justify-end" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
+              <div className="-mr-1.5 flex items-center gap-x-1">
+                <button
+                  type="button"
+                  className={btn}
+                  aria-label={`Jump to opening, ${dayStamp(dayStart(model, 0))}`}
+                  onClick={() => go(0)}
+                  data-flow-jump="start"
+                >
+                  <SkipBack size={16} aria-hidden />
+                </button>
+                <button type="button" className={btn} aria-label="Previous event" onClick={stepBack}>
+                  <ChevronLeft size={18} aria-hidden />
+                </button>
+                <button type="button" className={btn} aria-label="Next event" onClick={stepOn}>
+                  <ChevronRight size={18} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={btn}
+                  aria-label={closed ? `Jump to close, ${closeDay}` : "Jump to today"}
+                  onClick={() => {
+                    go(last);
+                    setFrozen(false);
+                  }}
+                  data-flow-jump="end"
+                >
+                  <SkipForward size={16} aria-hidden />
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </SegmentTipContext.Provider>
     </FlowCursorContext.Provider>
-  );
-}
-
-/** The compact view's layout: the bars, then the value chart, then the
- *  price chart, three columns from md; under md the bars take the row and
- *  the two charts share the next. Each chart sizes its own axis to its
- *  column. */
-function CompactFlows({
-  barsBlock,
-  line,
-  price,
-  geoOf,
-}: {
-  barsBlock: ReactNode;
-  line: ((w: number, geo: StripGeometry) => ReactNode) | null;
-  price: { heading: ReactNode; strip: (w: number, geo: StripGeometry) => ReactNode } | null;
-  geoOf: (w: number) => StripGeometry;
-}) {
-  const [lineRef, lw] = useWidth();
-  const [priceRef, pw] = useWidth();
-  const charts = (line ? 1 : 0) + (price ? 1 : 0);
-  return (
-    <div
-      className={`grid grid-cols-2 items-end gap-x-5 gap-y-6 ${charts === 2 ? "md:grid-cols-3" : charts === 1 ? "md:grid-cols-2" : ""}`}
-      data-flows-compact=""
-    >
-      <div className={`min-w-0 ${charts > 0 ? "col-span-2 md:col-span-1" : "col-span-2"} self-start`}>{barsBlock}</div>
-      {/* Both columns stay mounted, so each measures its width from the
-          first frame and draws once its series lands. */}
-      <div
-        ref={lineRef}
-        className={`min-w-0 ${line ? (price ? "" : "col-span-2 md:col-span-1") : "hidden"}`}
-        data-flow-strip-view="value"
-      >
-        {line && lw > 0 && line(lw, geoOf(lw))}
-      </div>
-      <div
-        className={`min-w-0 ${price ? (line ? "" : "col-span-2 md:col-span-1") : "hidden"}`}
-        data-flow-price-section=""
-      >
-        {price?.heading}
-        <div ref={priceRef} data-flow-strip-view="price">
-          {price && pw > 0 && price.strip(pw, geoOf(pw))}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1180,15 +1084,12 @@ function LineStrip({
   cx,
   dim,
   ready,
-  still,
   head,
   hasDebt,
   windowFrom,
 }: {
   model: FlowModel;
   scale: LineScale;
-  /** The compact view: drawn at today, with no cursor. */
-  still?: boolean;
   failed: boolean;
   geo: StripGeometry;
   w: number;
@@ -1373,13 +1274,9 @@ function LineStrip({
             )),
           ),
         )}
-        {!still && (
-          <>
-            <CursorLine x={cx} />
-            <CursorDot x={cx} y={y(head.collateral, "collateral")} hue={LINE_HUE.collateral} />
-            {hasDebt && <CursorDot x={cx} y={y(head.debt, "debt")} hue={LINE_HUE.debt} />}
-          </>
-        )}
+        <CursorLine x={cx} />
+        <CursorDot x={cx} y={y(head.collateral, "collateral")} hue={LINE_HUE.collateral} />
+        {hasDebt && <CursorDot x={cx} y={y(head.debt, "debt")} hue={LINE_HUE.debt} />}
       </svg>
       <div aria-hidden data-prov-exempt="" data-flow-line-axis="">
         {sideTops.map((x, i) => (
@@ -1471,9 +1368,7 @@ function PriceStrip({
   cursorLevel,
   windowFrom,
   startDay,
-  still,
 }: {
-  still?: boolean;
   s: FlowPriceSeries;
   scale: PriceScale;
   geo: StripGeometry;
@@ -1638,7 +1533,7 @@ function PriceStrip({
           })}
         </g>
         {dim && <AfterCursor x={cx} w={w} />}
-        {!still && <CursorLine x={cx} />}
+        <CursorLine x={cx} />
         {cursorLevel != null && <CursorDot x={cx} y={y(cursorLevel)} hue={LIQ_HUE} />}
         {cursorPrice != null && <CursorDot x={cx} y={y(cursorPrice)} hue={hue} />}
       </svg>

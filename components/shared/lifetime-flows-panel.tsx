@@ -246,7 +246,7 @@ export function LifetimeFlowsPanel({
             <FlowsKeyContext.Provider value={setFlowsKey}>
               <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
                 <FlowsSectionsContext.Provider value={setSections}>
-                  <FlowsCompactContext.Provider value={compact}>
+                  <FlowsCompactContext.Provider value={{ compact, toggle: viewButton }}>
                     <div className="mt-2">{scrubber}</div>
                   </FlowsCompactContext.Provider>
                 </FlowsSectionsContext.Provider>
@@ -270,7 +270,6 @@ export function LifetimeFlowsPanel({
           )}
           <ProvenanceInfoTabs
             className="mt-3"
-            rowExtra={<span className="ml-auto flex items-center self-center">{viewButton}</span>}
             explanation={
               explanation == null && !outcome && !flowsKey ? undefined : (
                 <>
