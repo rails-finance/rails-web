@@ -102,7 +102,7 @@ export function useLiquityCells({
 
   // The grid's figures: before rebuilt where the event logs only the after,
   // the ratio before at this event's price (lib/liquity/event-prose.ts `liquityL2`).
-  const { isClose, isLiquidation, isRedemption, rateOnly: isBatchManagerOp } = l2;
+  const { isClose, isLiquidation, isRedemption } = l2;
   const collPrice = l2.price;
   const beforeDebt = l2.debt.before;
   const beforeColl = l2.coll.before;
@@ -540,7 +540,6 @@ export function useLiquityCells({
           ],
     };
   };
-  if (isBatchManagerOp) return { cells: [rateCell(false)] };
 
   // ── Collateral ──
   const collAfter = l2.coll.after;
@@ -1097,11 +1096,31 @@ export function useLiquityCells({
         },
       ]
     : [];
+  // A rate change states the year's interest and any management fee at the
+  // new rate under Limits, the lines its rate cell carries.
+  const rateSub =
+    ctx.operation === "adjustTroveInterestRate" || ctx.operation === "setBatchManagerAnnualInterestRate"
+      ? (rateCell(isClose).sub ?? [])
+      : [];
   const sheet: EventSheet = {
     sides: [collSide, debtSide],
     panels: [
       { panel: "risk", rows: risk },
-      { panel: "limits", rows: limits, breakdown: params },
+      {
+        panel: "limits",
+        rows: limits,
+        breakdown: params,
+        caption:
+          rateSub.length > 0 ? (
+            <span data-rate-yearly="">
+              {rateSub.map((line, i) => (
+                <span key={i} className="block">
+                  {line.content}
+                </span>
+              ))}
+            </span>
+          ) : undefined,
+      },
     ],
   };
   return { cells, sheet };

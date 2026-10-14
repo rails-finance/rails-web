@@ -36,11 +36,13 @@ export type SpineIcon =
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Show timeline to {date}" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
 
-/** The spine's inks: neutral, or a warning tone on a warning node and its
- *  dotted stretch. Delegation signals via the pink glyph badge
- *  (color-grammar.md §4b), never the line. */
-export const SPINE_COLORS: Record<"default" | Tone, string> = {
+/** The spine's inks: neutral; a warning tone on a warning node and its
+ *  dotted stretch; the external-party pink (color-grammar.md §4b) on the
+ *  dotted stretch below a third party's act on the position. */
+export type SpineInk = "default" | "party" | Tone;
+export const SPINE_COLORS: Record<SpineInk, string> = {
   default: "rgb(101 115 140)", // rb-500
+  party: "var(--color-pink-500)",
   caution: "var(--tone-caution)",
   critical: "var(--tone-critical)",
 };
@@ -169,7 +171,8 @@ export interface SpineColumnProps {
   warningLegs?: SpineWarningLeg[];
   /** icon="rate-change": the rate before and after (%). The right flank,
    *  where a row's leg numbers stand, states the rate after ("0.50%") with
-   *  no sign and no arrow. Unset, the glyph carries the arrow alone. */
+   *  no sign, an up or down arrow beside the node where the rate moved from a
+   *  prior rate. Unset, the glyph carries the arrow alone. */
   rateSpan?: [number, number];
   /** Direction for rate-change arrow (none drawn when unset) or delegate
    *  badge */
@@ -890,13 +893,16 @@ export function SpineColumn({
   // (spine-line.tsx): solid neutral ink beside what the owner actioned, dotted
   // beside what they did not, in the tone (mobile decision 18). The node marks
   // it (`data-spine-dotted`); the boundary's stretch the row draws itself.
+  // A third party's act (`dotted`, `externalParty`, a row whose card names
+  // another actor) runs dotted in the party pink; a warning keeps its tone.
   const effectiveColor = effectiveIcon === "warning" ? warningTone : "default";
-  const isDotted =
-    !!dotted || !!undrawn || effectiveIcon === "warning" || !!externalParty || spineRow?.byOwner === false;
-  const spineRgb = SPINE_COLORS[isDotted ? effectiveColor : "default"];
+  const byParty = !!dotted || !!externalParty || spineRow?.byOwner === false;
+  const isDotted = byParty || !!undrawn || effectiveIcon === "warning";
+  const lineInk: SpineInk = effectiveIcon === "warning" ? warningTone : byParty ? "party" : "default";
+  const spineRgb = SPINE_COLORS[isDotted ? lineInk : "default"];
   const dotClass = DOT_COLORS[effectiveColor];
   const nodeAttrs = {
-    ...(isDotted ? { "data-spine-dotted": effectiveColor } : {}),
+    ...(isDotted ? { "data-spine-dotted": lineInk } : {}),
     ...(isLast ? { "data-spine-end": "" } : {}),
   };
   const spineEl = undrawn && isLast && (
@@ -943,17 +949,23 @@ export function SpineColumn({
       }
       case "rate-change": {
         if (rateSpan) {
-          // The rate after, to two decimals; data-spine-rate carries the
-          // direction of the move.
+          // The rate after, to two decimals, at the leg values' x
+          // (`SpineVal`'s pl-5); the arrow column points up or down where the
+          // rate moved from a prior rate, and stays empty with none.
+          // data-spine-rate carries the direction.
           const delta = rateSpan[1] - rateSpan[0];
-          const moved = Math.abs(delta).toFixed(2) !== "0.00";
+          const moved = rateSpan[0] > 0 && Math.abs(delta).toFixed(2) !== "0.00";
           const direction = !moved ? "flat" : delta > 0 ? "up" : "down";
           return nodeRow(
             <RateIcon size={T} />,
             <>
-              <span />
+              {direction === "flat" ? (
+                <span />
+              ) : (
+                <DirectionArrow direction={direction} size={Math.round(scale.arrowSize * 0.7)} />
+              )}
               <span
-                className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
+                className="justify-self-start whitespace-nowrap pl-5 text-base font-semibold tabular-nums"
                 data-spine-rate={direction}
               >
                 {rateSpan[1].toFixed(2)}%

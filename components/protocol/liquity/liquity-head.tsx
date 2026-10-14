@@ -101,12 +101,11 @@ export function liquityHeadSpec(
 
   const spec: ChainTruthRowSpec = { label, status, deltas: [], unsignedDeltas: true };
   if (op === "setBatchManagerAnnualInterestRate") {
-    // The debt's move since the Trove's previous event: interest, the
-    // management fee and any upfront fee, split in the explanation. The spine
-    // carries no value on a rate change, so the figure stays at every width.
+    // The manager moved the rate and nothing else: the debt's move since the
+    // Trove's previous event (interest, the management fee, any upfront fee)
+    // stands in the opened card's Debt side and the explanation.
     spec.ratePill = pill("delegate", true);
     spec.manager = manager;
-    if (hasDebt) spec.deltas = [debt({ label: L1_WORDS.debt, signed: true, axisVerb: true, noSpineCounterpart: true })];
   } else if (op === "setInterestBatchManager") {
     if (rate > 0) spec.ratePill = pill("delegate", true);
     spec.manager = manager;
