@@ -346,6 +346,8 @@ export interface TimelineToolbarProps {
   displayItems: TimelineDisplayItem[];
   /** Optional left-side eyebrow (e.g. "replayed from chain"). */
   leading?: React.ReactNode;
+  /** A control beside Display, before it (the "Follow the chart" toggle). */
+  beforeDisplay?: React.ReactNode;
   /** A title on the count line, for a family whose count is a true but
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
    *  renders identically to today. */
@@ -729,6 +731,7 @@ export function TimelineToolbar({
   tl,
   displayItems,
   leading,
+  beforeDisplay,
   countTooltip,
   countDetail,
   monthReach,
@@ -983,6 +986,7 @@ export function TimelineToolbar({
               </svg>
             </button>
           )}
+          {!still && beforeDisplay}
           {!still && displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
         </div>
       </div>

@@ -179,7 +179,7 @@
 // ── THE REWIND RUN (ui-jobs 305) ───────────────────────────────────────────
 //   On the Liquity V2 control Trove, the cut the Lifetime flows chart puts on
 //   the timeline, in both modes of "Timeline follows the chart"
-//   (`[data-flow-follow]` behind the cursor's date, its state `[data-flow-following]`, stored as `followChart` in timeline-display-v3):
+//   (`[data-flow-follow]`, the toggle beside the timeline's Display, stored as `followChart` in timeline-display-v3):
 //   R1 off: the arrow keys move the chart and cut nothing; "Show timeline to
 //      {date}" cuts at the cursor's day, writes `?to=`, and the cut stands
 //      while the cursor moves on.
@@ -1594,17 +1594,20 @@ const rewindRead = (page) =>
     );
     return {
       to: new URL(location.href).searchParams.get("to"),
-      chip:
-        document
-          .querySelector("[data-flow-rewind-go]")
-          ?.textContent?.trim()
-          .replace(/^Timeline to /, "") ?? null,
+      // "Timeline to {day}" names the cut; "Following the chart" none.
+      chip: (() => {
+        const t = document.querySelector("[data-flow-rewind-go]")?.textContent?.trim() ?? "";
+        return t.startsWith("Timeline to ") ? t.replace(/^Timeline to /, "") : null;
+      })(),
+      followPill: document.querySelector("[data-flow-rewind-go]")?.textContent?.trim() === "Following the chart",
       date: document.querySelector("[data-flow-date]")?.textContent?.trim() ?? null,
       cards: document.querySelectorAll("[data-event-id]").length,
       newest: days.length ? Math.max(...days) : null,
-      // The apply and follow buttons stand behind the cursor's date.
-      apply: document.querySelector("[data-flow-cursor-word]") != null,
-      follow: document.querySelector("[data-flow-following]")?.getAttribute("data-flow-following") ?? null,
+      // The show-timeline button stands behind the cursor's date, which
+      // offers it while the timeline is not following; the follow toggle
+      // stands beside the timeline's Display.
+      apply: document.querySelector("[data-flow-cursor-word]:not([disabled])") != null,
+      follow: document.querySelector("[data-flow-follow]")?.getAttribute("data-flow-follow") ?? null,
       y: Math.round(window.scrollY),
     };
   });
@@ -1631,7 +1634,7 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
   page.setDefaultTimeout(180_000);
   try {
     await page.goto(`${BASE}${REWIND_PATH}`, { waitUntil: "domcontentloaded" });
-    await page.locator(`[data-flow-following="${mode}"]`).first().waitFor({ state: "visible" });
+    await page.locator(`[data-flow-follow="${mode}"]`).first().waitFor({ state: "visible" });
     await page.waitForFunction(() => document.querySelector("[data-ctrl-waking]") == null, null, { timeout: 120_000 });
     await page.waitForFunction(() => document.querySelector("[data-flow-day-mark]") != null);
     await page.waitForTimeout(1500);
@@ -1647,8 +1650,8 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
     };
     const whole = await rewindRead(page);
     check(
-      `R  ${mode}: the page opens whole, no chip, no ?to=`,
-      whole.chip == null && whole.to == null,
+      `R  ${mode}: the page opens whole, no cut, no ?to=${follow ? ', the pill reading "Following the chart"' : ""}`,
+      whole.chip == null && whole.to == null && whole.followPill === follow,
       JSON.stringify(whole),
     );
     if (!follow) {
@@ -1709,8 +1712,8 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
       await page.waitForTimeout(500);
       const released = await rewindRead(page);
       check(
-        "R2 on: the chip's × sends the cursor to the close and the list goes whole",
-        released.chip == null && released.to == null && released.cards === whole.cards,
+        "R2 on: the chip's × stops following and the list goes whole",
+        released.chip == null && released.to == null && released.cards === whole.cards && released.follow === "off",
         JSON.stringify(released),
       );
       await page.goto(link, { waitUntil: "domcontentloaded" });

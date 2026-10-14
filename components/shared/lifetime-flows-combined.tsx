@@ -32,7 +32,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Link2, ListEnd, SkipBack, SkipForward } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ListEnd, SkipBack, SkipForward } from "lucide-react";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
@@ -662,13 +662,11 @@ export function CombinedFlows({
                 x={cx}
                 w={w}
                 word={cursorWord}
-                byDays={byDays}
-                follow={follow}
+                offers={byDays && !follow}
                 canApply={canApply}
                 committedWord={committedWord}
                 live={!!committed?.live}
                 onApply={apply}
-                onFollow={() => focus?.store.set({ follow: !follow })}
               />
             </div>
           </div>
@@ -1710,36 +1708,38 @@ function SectionHelp({
   );
 }
 
-/** The cursor's date under the events, at the cursor's x; pressed, the two
- *  timeline buttons beside it: show the timeline to that day, and the
- *  timeline following the chart. Escape or a press elsewhere puts them
- *  away. While the timeline follows the chart its chain stays, in teal. */
+/** The cursor's date under the events, at the cursor's x. On a page tied to
+ *  its timeline, pressed, "Show the timeline to" that day beside it; Escape
+ *  or a press elsewhere puts it away. While the timeline follows the chart
+ *  (the timeline's own toggle) the date only names the day: the timeline
+ *  already stands at it. */
 function CursorDate({
   x,
   w,
   word,
-  byDays,
-  follow,
+  offers,
   canApply,
   committedWord,
   live,
   onApply,
-  onFollow,
 }: {
   x: number;
   w: number;
   word: string;
-  byDays: boolean;
-  follow: boolean;
+  /** The page ties the panel to its timeline, and the timeline is not
+   *  following the chart. */
+  offers: boolean;
   canApply: boolean;
   committedWord: string;
   live: boolean;
   onApply: () => void;
-  onFollow: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!offers) setOpen(false);
+  }, [offers]);
   useEffect(() => {
     if (!open) return;
     const away = (e: globalThis.PointerEvent) => {
@@ -1757,7 +1757,7 @@ function CursorDate({
       document.removeEventListener("keydown", esc);
     };
   }, [open]);
-  // The date centred on the cursor, kept inside the row; the buttons open to
+  // The date centred on the cursor, kept inside the row; the button opens to
   // its right where there is room, else to its left.
   const dateRef = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
@@ -1766,56 +1766,9 @@ function CursorDate({
   });
   const iconBtn =
     "inline-flex size-11 shrink-0 items-center justify-center rounded-md sm:size-8 pointer-coarse:size-11";
-  // While the timeline follows the chart, the chain stands beside the date
-  // in teal, and a press on it lets go.
-  const buttons = byDays && (open || follow) && (
-    <span className="flex items-center gap-1" role="group" aria-label="Timeline">
-      {open && !follow && (
-        <button
-          type="button"
-          className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} ${iconBtn}`}
-          disabled={!canApply}
-          aria-label={live ? "Show the timeline to today" : `Show the timeline to ${committedWord}`}
-          title={
-            canApply
-              ? live
-                ? "Show the timeline up to today"
-                : `Show the timeline up to the end of ${committedWord}`
-              : `The timeline is cut at ${committedWord}`
-          }
-          onClick={onApply}
-          data-flow-apply=""
-          data-anatomy="F6"
-        >
-          <ListEnd size={16} aria-hidden />
-        </button>
-      )}
-      <button
-        type="button"
-        className={`${CTRL_GHOST} ${follow ? CTRL_ON_ACCENT : CTRL_OFF} ${iconBtn}`}
-        aria-pressed={follow}
-        aria-label="Timeline follows the chart"
-        title={
-          follow
-            ? "The timeline is cut at the cursor's day as it moves"
-            : "Cut the timeline at the cursor's day as it moves"
-        }
-        onClick={onFollow}
-        data-flow-follow={follow ? "on" : "off"}
-        data-anatomy="F17"
-      >
-        <Link2 size={16} aria-hidden />
-      </button>
-    </span>
-  );
-  const flip = left != null && left + (dateRef.current?.offsetWidth ?? 0) + 96 > w;
+  const flip = left != null && left + (dateRef.current?.offsetWidth ?? 0) + 56 > w;
   return (
-    <div
-      ref={ref}
-      className="relative mt-1 h-11 sm:h-8"
-      data-flow-cursor-date=""
-      data-flow-following={byDays ? (follow ? "on" : "off") : undefined}
-    >
+    <div ref={ref} className="relative mt-1 h-11 sm:h-8" data-flow-cursor-date="">
       <div
         className={`absolute top-0 flex items-center gap-1 ${flip ? "flex-row-reverse" : ""}`}
         style={
@@ -1825,16 +1778,35 @@ function CursorDate({
         <button
           ref={dateRef}
           type="button"
-          className={`${CTRL_GHOST} ${open ? CTRL_ON_ACCENT : CTRL_OFF} min-h-11 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold tabular-nums sm:min-h-8`}
-          aria-expanded={byDays ? open : undefined}
-          aria-label={byDays ? `${word}: timeline options` : word}
-          onClick={() => byDays && setOpen((v) => !v)}
-          disabled={!byDays}
+          className={`${CTRL_GHOST} ${open ? CTRL_ON_ACCENT : CTRL_OFF} min-h-11 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold tabular-nums disabled:cursor-default disabled:hover:bg-transparent sm:min-h-8`}
+          aria-expanded={offers ? open : undefined}
+          aria-label={offers ? `${word}: show the timeline to this day` : word}
+          onClick={() => offers && setOpen((v) => !v)}
+          disabled={!offers}
           data-flow-cursor-word=""
         >
           {word}
         </button>
-        {buttons}
+        {offers && open && (
+          <button
+            type="button"
+            className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} ${iconBtn}`}
+            disabled={!canApply}
+            aria-label={live ? "Show the timeline to today" : `Show the timeline to ${committedWord}`}
+            title={
+              canApply
+                ? live
+                  ? "Show the timeline up to today"
+                  : `Show the timeline up to the end of ${committedWord}`
+                : `The timeline is cut at ${committedWord}`
+            }
+            onClick={onApply}
+            data-flow-apply=""
+            data-anatomy="F6"
+          >
+            <ListEnd size={16} aria-hidden />
+          </button>
+        )}
       </div>
     </div>
   );

@@ -80,6 +80,7 @@ import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, X } from "lucide-react";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -96,8 +97,6 @@ import {
   TimelineToolbar,
   CHAIN_TRUTH_DISPLAY_ITEMS,
   MARKET_NOTE_ITEMS,
-  NARROWING_PILL,
-  NARROWING_PILL_X,
   TimelineFilterPill,
   timelineFilterPills,
   eventCountState,
@@ -1190,15 +1189,21 @@ function ChainTruthTimelineBody({
   /** The month this code asked the page to read, and the cut it read for. */
   const askedMonth = useRef<number | null>(null);
   const askedCut = useRef<number | null>(null);
-  // While the timeline follows the chart, the chip's × sends the cursor to
-  // today, which leaves the list whole.
+  // The chip's × releases the cut; while the timeline follows the chart it
+  // also stops following, which leaves the list whole where the chart stands.
   const releaseRewind = useCallback(() => {
     if (!focusStore) return;
     const st = focusStore.get();
-    if (st.follow && st.cursor && !st.cursor.live)
-      focusStore.set({ move: { ts: Date.now() / 1000, n: (st.move?.n ?? 0) + 1, free: true } });
+    if (st.follow) focusStore.set({ follow: false });
     if (st.rewind) focusStore.set({ rewind: null });
   }, [focusStore]);
+  // "Follow the chart" stands beside Display where the page's Lifetime flows
+  // chart is drawn, its cursor the one the timeline would follow.
+  const chartDrawn = useFlowFocusState((st) => st.cursor != null);
+  const followToggle =
+    focusStore && chartDrawn && !tl.datesAxis ? (
+      <FollowChartToggle on={following} onToggle={() => focusStore.set({ follow: !focusStore.get().follow })} />
+    ) : null;
   // A pill per filter narrowing the list (the narrowing row, L2).
   const filterPills = timelineFilterPills(tl);
   /** "Clear all": every filter reset and the cut released. */
@@ -1904,6 +1909,7 @@ function ChainTruthTimelineBody({
             tl={toolbarTl}
             displayItems={items}
             leading={toolbarLeading}
+            beforeDisplay={followToggle}
             countTooltip={countTooltip}
             countDetail={countDetail}
             still={still}
@@ -1924,11 +1930,12 @@ function ChainTruthTimelineBody({
         {/* THE NARROWING ROW (L2): everything narrowing the list, one pill
             each — the cut's chip, then a pill per filter — and "Clear all"
             once two stand. No narrowing, no row. */}
-        {(rewind || filterPills.length > 0) && (
+        {(rewind || following || filterPills.length > 0) && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-anatomy="L2" data-narrowing-row="">
-            {rewind && (
+            {(rewind || following) && (
               // In the chart's teal with its chain: the cut is the Lifetime
-              // flows cursor's day.
+              // flows cursor's day, or, following with the cursor at today,
+              // the chart it follows.
               <span
                 className="inline-flex items-center rounded-full bg-teal-500/15 text-xs text-teal-700 dark:text-teal-300"
                 data-flow-rewind-chip=""
@@ -1936,18 +1943,22 @@ function ChainTruthTimelineBody({
               >
                 <button
                   type="button"
-                  onClick={() => focusStore?.set({ go: focusStore.get().go + 1 })}
-                  title={`Bring the last event of ${rewind.word} into view`}
+                  onClick={() => rewind && focusStore?.set({ go: focusStore.get().go + 1 })}
+                  title={
+                    rewind
+                      ? `Bring the last event of ${rewind.word} into view`
+                      : "The timeline follows the chart's cursor"
+                  }
                   className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-l-full py-1 pl-2.5 pr-1.5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
                   data-flow-rewind-go=""
                 >
                   <Link2 size={13} aria-hidden />
-                  Timeline to {rewind.word}
+                  {rewind ? `Timeline to ${rewind.word}` : "Following the chart"}
                 </button>
                 <button
                   type="button"
                   onClick={releaseRewind}
-                  aria-label={`Clear the cut at ${rewind.word}`}
+                  aria-label={following ? "Stop following the chart" : `Clear the cut at ${rewind?.word ?? ""}`}
                   className="inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 transition-colors hover:bg-teal-500/20 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1"
                   data-flow-rewind-release=""
                 >
@@ -1958,7 +1969,7 @@ function ChainTruthTimelineBody({
             {filterPills.map((pill) => (
               <TimelineFilterPill key={pill.axis} pill={pill} />
             ))}
-            {(rewind ? 1 : 0) + filterPills.length >= 2 && (
+            {(rewind || following ? 1 : 0) + filterPills.length >= 2 && (
               <button
                 type="button"
                 onClick={clearAllNarrowing}
@@ -2248,5 +2259,30 @@ function ChainTruthTimelineBody({
         )}
       </div>
     </SpineViewProvider>
+  );
+}
+
+/** "Follow the chart" beside Display (ui-jobs 305): the timeline cut at the
+ *  Lifetime flows cursor wherever it goes, kept with Display's preferences
+ *  (`followChart`). Teal and pressed while on; icon-only under 640px. */
+function FollowChartToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      aria-label="Follow the chart"
+      title={
+        on
+          ? "The timeline is cut at the chart's cursor as it moves"
+          : "Cut the timeline at the chart's cursor as it moves"
+      }
+      onClick={onToggle}
+      className={`${CTRL_GHOST} ${on ? CTRL_ON_ACCENT : CTRL_OFF} h-7 gap-2 rounded-md px-1.5 text-xs sm:px-2.5`}
+      data-flow-follow={on ? "on" : "off"}
+      data-anatomy="L1.10"
+    >
+      <Link2 size={16} aria-hidden />
+      <span className="hidden sm:inline">Follow the chart</span>
+    </button>
   );
 }

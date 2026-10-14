@@ -118,11 +118,11 @@ export function useRewindParam(store: FlowFocusStore | null): void {
   }, [store]);
 }
 
-/** "Timeline follows the chart" (ui-jobs 305) kept with Display's other
- *  preferences. The scrubber row stands outside the timeline's Display
- *  provider, so it sets the store's `follow`; this hook, mounted inside the
- *  provider, keeps the two level: the stored preference into the store on
- *  load, the row's change into the preference. */
+/** "Follow the chart" (ui-jobs 305) kept with Display's other preferences.
+ *  The toggle beside Display sets the store's `follow`, which the chart and
+ *  the timeline read; this hook, mounted inside the Display provider, keeps
+ *  the two level: the stored preference into the store on load, a change
+ *  into the preference. */
 export function useFollowPreference(store: FlowFocusStore | null): void {
   const { followChart, set } = useTimelineDisplay();
   useEffect(() => {

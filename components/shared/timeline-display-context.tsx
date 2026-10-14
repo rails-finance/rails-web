@@ -34,11 +34,10 @@ export interface TimelineDisplayState {
    *  number pill shows its transaction's short hash in place of the number.
    *  Off by default. The event page's pill keeps the number. */
   showTxHashes: boolean;
-  /** "Timeline follows the chart" on the Lifetime flows scrubber row
-   *  (ui-jobs 305): the timeline is cut at the chart's cursor wherever it
-   *  goes. Off by default. Set from the scrubber row, which stands outside
-   *  this provider, through the page's flow-focus store
-   *  (`useFollowPreference`). */
+  /** "Follow the chart", the toggle beside the timeline's Display (ui-jobs
+   *  305): the timeline is cut at the Lifetime flows cursor wherever it goes.
+   *  Off by default. Set through the page's flow-focus store, which the
+   *  timeline and the chart share (`useFollowPreference`). */
   followChart: boolean;
   toggle: (key: TimelineDisplayKey) => void;
   set: (key: TimelineDisplayKey, value: boolean) => void;

@@ -217,6 +217,8 @@ const applyNoEventDay = async (page) => {
   for (const f of [0.35, 0.5, 0.62, 0.2, 0.75, 0.42, 0.28, 0.55, 0.68, 0.15]) {
     await page.mouse.click(box.x + box.width * f, box.y + box.height / 2);
     await page.waitForTimeout(300);
+    // The show-timeline button stands behind the cursor's date.
+    await page.locator("[data-flow-cursor-word]:not([disabled])").first().click().catch(() => {});
     const apply = page.locator(`${sel("F6")}:not([disabled])`).first();
     if (!(await apply.count())) continue;
     await apply.click();
@@ -257,15 +259,16 @@ const SHOTS = [
   },
   { name: "flows", path: AAVE, widths: [1280, 390], codes: ["P2", "F"], crop: ["P2"] },
   {
-    // The price view (ui-jobs 328): "Value · Price" pressed to Price.
+    // The price chart (ui-jobs 328) with its tip at the cursor, the price
+    // strip focused.
     name: "flows-price",
     path: AAVE,
     widths: [1280, 390],
-    codes: ["F18", "F19"],
+    codes: ["F19"],
     crop: ["P2"],
     setup: async (page) => {
-      await click(page, '[data-flows-view="price"]');
       await seen(page, sel("F19"), 10000);
+      await page.locator(sel("F19")).first().focus();
     },
   },
   {
@@ -329,11 +332,11 @@ const SHOTS = [
     name: "trove-flows-price",
     path: TROVE,
     widths: [1280, 390],
-    codes: ["F18", "F19"],
+    codes: ["F19"],
     crop: ["P2"],
     setup: async (page) => {
-      await click(page, '[data-flows-view="price"]');
       await seen(page, sel("F19.4"), 10000);
+      await page.locator(sel("F19")).first().focus();
     },
   },
   { name: "trove-timeline", path: TROVE, widths: [1280, 390], codes: ["L", "T"], crop: ["L1"], cropBelow: 640 },
