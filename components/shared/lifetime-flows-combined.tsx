@@ -52,9 +52,6 @@ import {
   pricePieces,
   levelAt,
   priceReadout,
-  redemptionsOn,
-  runwayPct,
-  runwayShare,
   STRIP_PAD,
   stripGeometry,
   type FlowPriceSeries,
@@ -621,7 +618,14 @@ export function CombinedFlows({
                 {priced && priceHelp && (
                   <div className={compact ? "hidden" : "mt-10"} data-flow-price-section="">
                     <div className="mb-2 flex items-center justify-between gap-3" data-anatomy="F19.1">
-                      <PriceHeading series={prices} selected={priced} onPick={setAssetKey} />
+                      <PriceHeading
+                        series={prices}
+                        selected={priced}
+                        onPick={setAssetKey}
+                        day={cursorDay}
+                        gapDays={model.gapDays}
+                        isLive={cur.live}
+                      />
                       <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
                     </div>
                     <div className="relative">
@@ -629,13 +633,6 @@ export function CombinedFlows({
                         {...sliderProps}
                         ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
                         view="price"
-                        tip={(shown) =>
-                          shown && (
-                            <PriceTip x={cx} w={w}>
-                              <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
-                            </PriceTip>
-                          )
-                        }
                       >
                         <PriceStrip
                           s={priced}
@@ -1012,37 +1009,6 @@ function StripSlider({
           {cursorWord}
         </span>
       )}
-    </div>
-  );
-}
-
-/** The price strip's readout as a tip at the cursor: beside the cursor line
- *  at the strip's top, on the side with room, else centred on it inside the
- *  strip. */
-function PriceTip({ x, w, children }: { x: number; w: number; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [left, setLeft] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const tw = ref.current?.offsetWidth ?? 0;
-    if (x + 8 + tw <= w) setLeft(x + 8);
-    else if (x - 8 - tw >= 0) setLeft(x - 8 - tw);
-    else setLeft(Math.max(0, Math.min(w - tw, x - tw / 2)));
-  });
-  return (
-    <div
-      ref={ref}
-      className="absolute top-1 z-40 rounded-lg border px-2.5 py-1.5 shadow-lg max-sm:bottom-full max-sm:top-auto max-sm:mb-1"
-      style={{
-        left: left ?? 0,
-        maxWidth: w,
-        visibility: left == null ? "hidden" : undefined,
-        background: "var(--rb-tooltip-bg)",
-        borderColor: "var(--rb-tooltip-border)",
-      }}
-      data-flow-price-tip=""
-      data-anatomy="F19.2"
-    >
-      {children}
     </div>
   );
 }
@@ -1548,12 +1514,18 @@ function PriceHeading({
   series,
   selected,
   onPick,
+  day,
+  gapDays,
+  isLive,
 }: {
   series: FlowPriceSeries[];
   selected: FlowPriceSeries;
   onPick: (key: string) => void;
+  /** The cursor's day: the heading's figures follow it. */
+  day: number;
+  gapDays: number;
+  isLive: boolean;
 }) {
-  const grain = selected.grain === "event" ? null : "Daily";
   const asset =
     series.length > 1 ? (
       <AssetPicker series={series} selected={selected} onPick={onPick} />
@@ -1564,15 +1536,89 @@ function PriceHeading({
       </span>
     );
   return (
-    <p
-      className={`flex flex-wrap items-center gap-x-1.5 ${SECTION_HEADING} text-rb-500`}
+    <div
+      className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 ${SECTION_HEADING} text-rb-500`}
       style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
       data-price-heading=""
     >
-      {grain && <span>{grain}</span>}
       {asset}
-      <span>{selected.unitLabel} price</span>
-    </p>
+      <PriceFigures s={selected} day={day} gapDays={gapDays} isLive={isLive} />
+    </div>
+  );
+}
+
+/** The heading's figures at the cursor's day: the price, and the
+ *  liquidation level where the series has one, each with its receipt. At
+ *  today the price takes the live green (color-grammar §5a; green-600 on the
+ *  light surface, where green-400 reads pale) and the level red; in history
+ *  the price is plain and the level muted. */
+function PriceFigures({
+  s,
+  day,
+  gapDays,
+  isLive,
+}: {
+  s: FlowPriceSeries;
+  day: number;
+  gapDays: number;
+  isLive: boolean;
+}) {
+  const r = priceReadout(s, day, gapDays);
+  const dayWord = isLive ? "today" : dayStamp(day * 86_400);
+  const lv = s.level ? levelAt(s, day) : null;
+  const levelProv: Provenance | null = lv
+    ? {
+        kind: "derived",
+        summary: `${s.level!.summary} ${
+          lv[2] == null
+            ? "Here at the trove's debt and collateral as the TroveManager reports them now, the card's figure."
+            : `Here at the debt and collateral the trove's event at block ${lv[2].toLocaleString("en-US")} recorded, the debt grown by its interest to the end of ${dayWord}.`
+        }`,
+        formula: s.level!.formula,
+        ...(lv[2] != null ? { source: { block: lv[2] } } : {}),
+      }
+    : null;
+  return (
+    <span
+      className="inline-flex flex-wrap items-baseline gap-x-1.5 tabular-nums"
+      aria-live="polite"
+      data-anatomy="F19.2"
+    >
+      {r ? (
+        <span
+          className={`font-semibold ${isLive ? "text-green-600 dark:text-green-400" : "text-foreground"}`}
+          data-price-readout=""
+          data-price-day={r.point[0]}
+          data-price-block={r.point[2] ?? ""}
+          data-price-carried={r.carried ? r.ageDays : undefined}
+        >
+          <Prov info={readoutProv(s, r, dayWord, dayStamp(r.point[0] * 86_400))} value={String(r.point[1])}>
+            {formatPrice(r.point[1], s.unitLabel)}
+          </Prov>
+        </span>
+      ) : (
+        <span data-price-readout="" data-price-none="">
+          No price recorded
+        </span>
+      )}
+      {lv && levelProv && (
+        <span
+          className="whitespace-nowrap"
+          data-liq-readout=""
+          data-liq-day={lv[0]}
+          data-liq-block={lv[2] ?? ""}
+          data-liq-value={lv[1]}
+          data-anatomy="F19.3"
+        >
+          · Liquidates at{" "}
+          <span className={`font-semibold ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}>
+            <Prov info={levelProv} value={String(lv[1])}>
+              {formatPrice(lv[1], s.unitLabel)}
+            </Prov>
+          </span>
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -1810,190 +1856,6 @@ function readoutProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord:
       : `${s.asset.symbol} price — in ${s.unitLabel} on ${dayWord}, from ${s.source}.`,
     ...(block != null ? { source: { block } } : {}),
   };
-}
-
-function ageProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord: string): Provenance {
-  const block = r.point[2];
-  return {
-    kind: "derived",
-    summary: `Days carried — from ${pointWord}, the price's day, to ${dayWord}; no ${s.asset.symbol} price is recorded between them.`,
-    formula: "cursor's day − price's day",
-    ...(block != null ? { source: { block } } : {}),
-  };
-}
-
-/** The price at the cursor's day, in HTML so it carries its receipt: the
- *  asset, its price in its unit, and the day's observation or the carried one
- *  with its age. Where the series has a liquidation level, a second line: the
- *  level on that day, the runway as the position card states it, and the
- *  day's redemptions at their redemption price. */
-function PriceReadout({
-  s,
-  day,
-  gapDays,
-  isLive,
-}: {
-  s: FlowPriceSeries;
-  day: number;
-  gapDays: number;
-  isLive: boolean;
-}) {
-  const r = priceReadout(s, day, gapDays);
-  const dayWord = isLive ? "today" : dayStamp(day * 86_400);
-  const second = <LevelReadout s={s} day={day} r={r} isLive={isLive} dayWord={dayWord} />;
-  if (!r)
-    return (
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <p className="text-xs text-rb-500" data-price-readout="" data-price-none="">
-          No price recorded
-        </p>
-        {second}
-      </div>
-    );
-  const pointWord = dayStamp(r.point[0] * 86_400);
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <p
-        className="flex min-w-0 items-baseline gap-x-1.5 whitespace-nowrap text-xs tabular-nums"
-        aria-live="polite"
-        data-price-readout=""
-        data-price-day={r.point[0]}
-        data-price-block={r.point[2] ?? ""}
-        data-price-carried={r.carried ? r.ageDays : undefined}
-        data-anatomy="F19.2"
-      >
-        <span className="font-semibold text-foreground">
-          <Prov info={readoutProv(s, r, dayWord, pointWord)} value={String(r.point[1])}>
-            {formatPrice(r.point[1], s.unitLabel)}
-          </Prov>
-        </span>
-        {r.carried && (
-          <span className="min-w-0 truncate text-rb-500">
-            <Prov info={ageProv(s, r, dayWord, pointWord)}>
-              carried {r.ageDays} {r.ageDays === 1 ? "day" : "days"}
-            </Prov>
-          </span>
-        )}
-        {r.old && (
-          <span
-            className="rounded border border-rb-300 px-1 text-[11px] font-medium text-rb-600 dark:border-rb-600 dark:text-rb-400"
-            data-price-old=""
-          >
-            Old price
-          </span>
-        )}
-      </p>
-      {second}
-    </div>
-  );
-}
-
-/** The readout's second line: the liquidation level on the cursor's day, the
- *  runway from the day's price to it, and the day's redemptions. */
-function LevelReadout({
-  s,
-  day,
-  r,
-  isLive,
-  dayWord,
-}: {
-  s: FlowPriceSeries;
-  day: number;
-  r: PriceAt | null;
-  isLive: boolean;
-  dayWord: string;
-}) {
-  const lv = s.level ? levelAt(s, day) : null;
-  const red = redemptionsOn(s, day);
-  if (!lv && red.length === 0) return null;
-  const sym = s.asset.symbol;
-  const levelProv: Provenance | null = lv
-    ? {
-        kind: "derived",
-        summary: `${s.level!.summary} ${
-          lv[2] == null
-            ? "Here at the trove's debt and collateral as the TroveManager reports them now, the card's figure."
-            : `Here at the debt and collateral the trove's event at block ${lv[2].toLocaleString("en-US")} recorded, the debt grown by its interest to the end of ${dayWord}.`
-        }`,
-        formula: s.level!.formula,
-        ...(lv[2] != null ? { source: { block: lv[2] } } : {}),
-      }
-    : null;
-  const share = lv && r ? runwayShare(r.point[1], lv[1]) : null;
-  const underwater = share != null && share <= 0;
-  const runwayBlock = r?.point[2] ?? lv?.[2] ?? null;
-  const runwayProv: Provenance | null =
-    share != null && lv && r
-      ? {
-          kind: "derived",
-          summary: underwater
-            ? `Runway — the ${sym} price on ${dayWord} is at or under the liquidation price: the trove can be liquidated.`
-            : `Runway — how far the ${sym} price on ${dayWord} can fall before it meets the liquidation price, as the position card states it.`,
-          formula: "(price − liquidation price) ÷ price",
-          inputs: [
-            { label: "price", value: formatPrice(r.point[1], s.unitLabel), kind: "chain", pclass: "oracle" },
-            { label: "liquidation price", value: formatPrice(lv[1], s.unitLabel), kind: "derived" },
-          ],
-          ...(runwayBlock != null ? { source: { block: runwayBlock } } : {}),
-        }
-      : null;
-  const lastRed = red[red.length - 1];
-  const redProv: Provenance | null = lastRed
-    ? {
-        kind: "chain",
-        pclass: "emitted",
-        summary: `Redemption price — the ${sym} price the branch's PriceFeed gave the redemption of this trove, from the Redemption event's _redemptionPrice.`,
-        ...(lastRed.block != null ? { source: { block: lastRed.block } } : {}),
-      }
-    : null;
-  return (
-    <p
-      className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-xs tabular-nums text-rb-500"
-      data-liq-readout=""
-      data-liq-day={lv?.[0]}
-      data-liq-block={lv ? (lv[2] ?? "") : undefined}
-      data-liq-value={lv?.[1]}
-      data-runway-block={share != null ? (runwayBlock ?? "") : undefined}
-      data-runway-share={share ?? undefined}
-      data-redeemed-block={lastRed ? (lastRed.block ?? "") : undefined}
-      data-redeemed-price={lastRed?.redemptionPrice}
-      data-anatomy="F19.3"
-    >
-      {lv && levelProv && (
-        <span className="whitespace-nowrap">
-          Liquidates at{" "}
-          <span className="font-semibold" style={{ color: LIQ_HUE }}>
-            <Prov info={levelProv} value={String(lv[1])}>
-              {formatPrice(lv[1], s.unitLabel)}
-            </Prov>
-          </span>
-        </span>
-      )}
-      {share != null && runwayProv && (
-        <span className="whitespace-nowrap" data-runway="">
-          {underwater ? (
-            <span className="font-semibold text-red-600 dark:text-red-400">
-              <Prov info={runwayProv}>{isLive ? "Liquidatable now" : "Liquidatable"}</Prov>
-            </span>
-          ) : (
-            <>
-              {sym} can fall <Prov info={runwayProv}>{runwayPct(share)}%</Prov> before liquidation
-            </>
-          )}
-        </span>
-      )}
-      {lastRed && redProv && (
-        <span className="whitespace-nowrap" data-redeemed="">
-          {red.length > 1 ? `Redeemed ${red.length} times, last at ` : "Redeemed at "}
-          <span className="font-semibold" style={{ color: FLOW_TICK.redemption }}>
-            <Prov info={redProv} value={String(lastRed.redemptionPrice)}>
-              {formatPrice(lastRed.redemptionPrice!, s.unitLabel)}
-            </Prov>
-          </span>
-        </span>
-      )}
-    </p>
-  );
 }
 
 /** The event pips under the strip, on the shared time axis, the cursor

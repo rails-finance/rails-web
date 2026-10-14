@@ -300,8 +300,6 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
     .$eval("[data-liq-readout]", (e) => ({
       day: e.getAttribute("data-liq-day"),
       value: e.getAttribute("data-liq-value"),
-      share: e.getAttribute("data-runway-share"),
-      runway: e.querySelector("[data-runway]")?.textContent ?? null,
     }))
     .catch(() => null);
   if (pg.trove === "live" || pg.trove === "redeemed") {
@@ -318,48 +316,10 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
       end != null && Number(end.day) === today && card != null && formatLiquidationPrice(Number(end.value)) === card,
       `level ${end?.day} ${end?.value} (${end ? formatLiquidationPrice(Number(end.value)) : "-"}), card ${card}`,
     );
-    const sentence = await page.evaluate(() => {
-      const m = document.body.innerHTML.match(/would need to fall <span[^>]*>([\d.]+)%<\/span>/);
-      return m ? Number(m[1]) : null;
-    });
-    const pct = end?.share != null ? Number(end.share) * 100 : null;
-    check(
-      `${tag}: the runway at the last stop is the card's`,
-      pct != null &&
-        sentence != null &&
-        Math.abs(pct - sentence) <= 0.05 + 1e-9 &&
-        (end.runway ?? "").includes(`${Math.round(pct)}%`),
-      `chart ${pct?.toFixed(3)}% "${end?.runway}", card ${sentence}%`,
-    );
   }
-  if (pg.trove === "redeemed") {
-    // Back from today to the nearest day with redemptions.
-    let found = null;
-    for (let i = 0; i < 60 && !found; i++) {
-      found = await page.$eval("[data-liq-readout]", (e) => e.getAttribute("data-redeemed-block")).catch(() => null);
-      if (!found) {
-        await page.keyboard.press("ArrowLeft");
-        await page.waitForTimeout(60);
-      }
-    }
-    const lv = await page.$eval("[data-liq-readout]", (e) => ({
-      day: Number(e.getAttribute("data-liq-day")),
-      block: e.getAttribute("data-redeemed-block"),
-      price: Number(e.getAttribute("data-redeemed-price")),
-      text: e.querySelector("[data-redeemed]")?.textContent ?? "",
-    }));
-    const reds = rows.filter((x) => x.redemption && x.redemptionPrice != null && Math.floor(x.ts / DAY) === lv.day);
-    const lastRed = reds[reds.length - 1];
-    check(
-      `${tag}: a redemption day reads "Redeemed at" the last redemption's price, at its block`,
-      found != null &&
-        lastRed != null &&
-        String(lastRed.block) === lv.block &&
-        near(lastRed.redemptionPrice, lv.price) &&
-        /Redeemed (at|\d+ times, last at) \$/.test(lv.text),
-      `day ${lv.day}: ${lv.text} @${lv.block}; rows ${reds.length}, last ${lastRed?.block} ${lastRed?.redemptionPrice}`,
-    );
-  }
+  // The runway and the redemption price left the chart's readout for the
+  // card's "Collateral can fall" and the event cards (heading figures, 14 Oct
+  // 2026): the heading states the price and the level alone.
 }
 
 const browser = await chromium.launch();
