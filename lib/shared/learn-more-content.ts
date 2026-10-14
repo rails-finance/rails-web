@@ -8,17 +8,15 @@ import { indefiniteArticle } from "@/lib/utils/format";
 
 // ── Lifetime flows: how to read the charts ───────────────────────────────────
 
-/** The "?" on every Lifetime flows header (rails-ops TO-DO-ui-jobs §264): how
- *  to read the panel on any explorer. One text, no protocol and no figures;
- *  what is specific to a protocol's position is its (i). The colours are the
- *  chart's tokens: collateral blue-500, debt green-400, liquidation red-500,
- *  caution orange, a delegate's rate change pink-500. Each behaviour was
- *  checked on desktop and at 390 by touch, 5 Oct 2026. */
-export function lifetimeFlowsReadingContent(): LearnMoreContent {
+/** The Lifetime flows panel's how-to-read, one per section, each behind its
+ *  section's "?": the bars and the value line, the price chart, the events
+ *  row. One text on every explorer (ui-jobs §264); the price chart's names
+ *  its series' source. */
+export function lifetimeFlowsBarsContent(): LearnMoreContent {
   return {
-    title: "How to read these charts",
+    title: "How to read the bars and the line",
     intro:
-      "The panel draws the position's whole life: a bar for what it holds and one for what it owes, and a line of both over time, moved by one cursor.",
+      "A bar for what the position holds and one for what it owes, and a line of both over its life, moved by one cursor with the price chart and the events.",
     detailsHeading: "The parts:",
     details: [
       {
@@ -27,19 +25,67 @@ export function lifetimeFlowsReadingContent(): LearnMoreContent {
       },
       {
         bold: "The line",
-        text: "Collateral and debt at the close of each day, week or month since the position opened. The line is in USD, each point valued at that close's price; where the two sides share no price it is in their tokens, as the (i) says. A dotted stretch rests on an old or missing price. The marks under it are days with events: a red triangle for a liquidation, an orange one for a redemption or a change the owner did not make, a pink dot for a delegate's rate change, a ring for the owner's, otherwise a dot in the side's colour.",
+        text: "Collateral and debt at the close of each day, week or month since the position opened. The line is in USD, each point valued at that close's price; where the two sides share no price it is in their tokens, as the (i) says. A dotted stretch rests on an old or missing price.",
       },
       {
         bold: "The cursor",
-        text: "Press the line and drag to move it; it stops at each close, on each day with events and at today. The figures and the bars follow it. A click or tap holds it on a day and dims the line after it; the last of the buttons under the line lets go and returns to today. The buttons between step through the days with events or play the life through.",
+        text: "Press either chart and drag to move it; it stops at each close, on each day with events and at today. The figures and the bars follow it. A click or tap holds it on a day and dims the charts after it. The start date jumps to the opening, the arrows step through the days with events, and Today returns to today.",
       },
       {
-        bold: "Show timeline to [day]",
-        text: "Cuts the transaction list below at the close of the cursor's day, and the page's link keeps that day. The × on the chip above the list removes the cut.",
+        bold: "The cursor's date",
+        text: "Under the events, the day the cursor is on. Press it for two buttons: one shows the transaction list up to that day's close, the other keeps the list cut at the cursor wherever it moves. The × on the chip above the list removes the cut.",
       },
+    ],
+  };
+}
+
+export function lifetimeFlowsPriceContent(opts: {
+  symbol: string;
+  unit: string;
+  source: string;
+  perEvent: boolean;
+  level?: string | null;
+}): LearnMoreContent {
+  const { symbol, unit, source, perEvent, level } = opts;
+  return {
+    title: "How to read the price chart",
+    intro: `The ${symbol} price in ${unit} over the position's life, on the same days as the line above. The list over the chart picks the asset.`,
+    detailsHeading: "The parts:",
+    details: [
       {
-        bold: "The chart button on an event",
-        text: "Each day's last event in the list carries one. It moves the cursor to that day and holds it there.",
+        bold: "The source",
+        text: `${source}. ${perEvent ? "One point per event." : "One point per day."} Each event is marked at its own price, and a redemption also at its redemption price. A dotted stretch carries the last price over days with none recorded.`,
+      },
+      ...(level
+        ? [
+            {
+              bold: "Liquidates at",
+              text: `The red line: the price at which the position can be liquidated, ${level}. The figure at the cursor stands under the price.`,
+            },
+          ]
+        : []),
+      {
+        bold: "The figure at the cursor",
+        text: "The price on the cursor's day. With the inspector on, it opens its receipt.",
+      },
+    ],
+  };
+}
+
+export function lifetimeFlowsEventsContent(): LearnMoreContent {
+  return {
+    title: "How to read the events",
+    intro: "Each mark is a day with events, on the charts' time axis.",
+    detailsHeading: "The marks:",
+    details: [
+      { bold: "Red triangle", text: "a liquidation." },
+      { bold: "Orange triangle", text: "a redemption, or a change the owner did not make." },
+      { bold: "Pink dot", text: "a delegate's rate change." },
+      { bold: "Ring", text: "the owner's rate change." },
+      { bold: "Dot", text: "any other event, in the colour of the side it moved." },
+      {
+        bold: "On the list",
+        text: "Hover or tap a mark for its day's events; a click moves the cursor there. Each day's last event in the list carries a chart button that moves the cursor to that day and holds it there.",
       },
     ],
   };

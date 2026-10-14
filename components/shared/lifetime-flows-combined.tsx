@@ -1,31 +1,27 @@
 "use client";
 
 // The Lifetime flows panel on a position with a series (rails-ops
-// reference/lifetime-flows-scrubber.md): the headlines with the date on their
-// row, the bars, and the collateral and debt line under them as a short strip,
-// one cursor for both. The strip's horizontal axis is the slider: a press, a
-// press and drag (mouse, pen and touch alike; hovering moves nothing) or the
-// arrow keys move the cursor there, and play walks it along. The cursor stands on the line's points and on every day
-// with events (tapping an event dot jumps to it); what the headlines and the
-// bars state there is `combinedAt` (lib/shared/flows-combined.ts). The strip
-// after the cursor is dimmed. The dashed outline marks where each bar ends today. Before the bars'
+// reference/lifetime-flows-scrubber.md), in one stacked layout: each side's
+// headline on its own line over its bar (no scale under the bars), the
+// collateral and debt line, the held asset's price chart under its heading
+// ("Daily [asset] USD price", a list where there are several, on the bar
+// tracks' ground, its readout a tip at the cursor), and the events row; each
+// of the three sections carries its own "?" how-to-read. One time axis
+// (`stripGeometry`) and one cursor: a press, a press and drag (mouse, pen and
+// touch alike; hovering moves nothing) or the arrow keys on either chart move
+// it. It stands on the line's points and on every day with events (tapping an
+// event dot jumps to it); what the headlines and the bars state there is
+// `combinedAt` (lib/shared/flows-combined.ts). The charts after the cursor are
+// dimmed. The dashed outline marks where each bar ends today. Before the bars'
 // window opens the bars grey out at the window's first day and say so. Under
-// the strip, the playback controls, and on a page tied to its timeline "Show
-// timeline to {date}". The line's key sits in the panel's Explanation and its basis
-// beside the (i).
-//
-// "Value · Price · Both" on the control row (ui-jobs 328) picks the strips:
-// the flows line, one held asset's price in the family's unit (`PriceStrip`,
-// lib/shared/flows-price.ts, on the bar tracks' ground, with the asset picker
-// over it, its readout as a tip at the cursor and
-// the series' caption under it), or the two stacked, with the bars at half
-// height. The strips take one time axis (`stripGeometry`), one cursor, which
-// either strip moves, and one pip row; the bars, the end labels and the
-// controls stay. The choice is a Display preference; the control is drawn only
-// where the panel has a price series.
+// the events, the cursor's date, which opens the timeline's two buttons (show
+// the timeline to that day, the timeline following the chart); under that the
+// steps: the start, the previous and next day with events, today.
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -35,15 +31,20 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight, Link2, ListEnd, Pause, Play, SkipBack, SkipForward } from "lucide-react";
-import { FlowBarsHalfContext, Headline, Rescaled, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
+import { ChevronDown, ChevronLeft, ChevronRight, Link2, ListEnd, SkipBack, SkipForward } from "lucide-react";
+import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
+import {
+  lifetimeFlowsBarsContent,
+  lifetimeFlowsEventsContent,
+  lifetimeFlowsPriceContent,
+} from "@/lib/shared/learn-more-content";
+import { FlowBarsHeadsContext, Headline, Rescaled, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { FLOWS_SCOPE, Prov, useProvArmedFor, type Provenance } from "@/components/shared/provenance";
-import type { FlowsView } from "@/components/shared/timeline-display-context";
 import {
   formatPrice,
-  formatPriceAxis,
+  priceAxisLabels,
   labelWidth,
   priceAxis,
   pricePieces,
@@ -159,15 +160,23 @@ export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--colo
 /** The liquidation level's hue: the liquidation tick's red. */
 const LIQ_HUE = FLOW_TICK.liquidation;
 
+/** The bars' and the events' how-to-read; the price chart's names its
+ *  series. */
+const BARS_HELP = lifetimeFlowsBarsContent();
+const EVENTS_HELP = lifetimeFlowsEventsContent();
+
+/** This position's Key, under the bars' how-to-read: provided by the panel,
+ *  which the scrubber hands the Key's items. */
+export const FlowsKeyNodeContext = createContext<ReactNode>(null);
+
+/** Told while the combined panel is mounted: its sections carry the
+ *  how-to-read, so the panel's header draws none. */
+export const FlowsSectionsContext = createContext<((on: boolean) => void) | null>(null);
+
 const STRIP_H = 80;
 /** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
 const OLD_TIP_W = 282;
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
-/** A walk of the whole line takes about this long, a point no faster than
- *  PLAY_MIN_MS nor slower than PLAY_MAX_MS. */
-const PLAY_WALK_MS = 9000;
-const PLAY_MIN_MS = 45;
-const PLAY_MAX_MS = 220;
 
 export interface CombinedFlowsProps {
   /** The whole life's model: the headlines and the line. */
@@ -213,8 +222,6 @@ export function CombinedFlows({
   );
   const last = stops.length - 1;
   const [at, setAt] = useState(last);
-  const [playing, setPlaying] = useState(false);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   // A new series (the first read landing) puts the cursor at today, or on
   // the day a frozen cursor stands on (`keepDay`, kept below).
   const lastRef = useRef(last);
@@ -227,26 +234,7 @@ export function CombinedFlows({
     const i = keep == null ? -1 : stopsRef.current.findIndex((x) => !x.live && x.stop === keep);
     setAt(i >= 0 ? i : lastRef.current);
   }, [model, series, from]);
-  const halt = useCallback(() => {
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
-    setPlaying(false);
-  }, []);
-  useEffect(() => halt, [halt]);
-  useEffect(() => {
-    if (playing && at >= last) halt();
-  }, [playing, at, last, halt]);
-  const go = (i: number) => {
-    halt();
-    setAt(Math.max(0, Math.min(last, i)));
-  };
-  const play = () => {
-    if (timer.current) return halt();
-    if (at >= last) setAt(0);
-    setPlaying(true);
-    const ms = Math.max(PLAY_MIN_MS, Math.min(PLAY_MAX_MS, PLAY_WALK_MS / Math.max(1, last)));
-    timer.current = setInterval(() => setAt((i) => Math.min(last, i + 1)), ms);
-  };
+  const go = (i: number) => setAt(Math.max(0, Math.min(last, i)));
 
   // On a page that ties the panel to its timeline, the day is the unit the
   // two share. A click on the strip freezes the cursor on a day; the chart and
@@ -260,20 +248,12 @@ export function CombinedFlows({
   // opens a short tip with its line, value and share.
   const focus = useFlowFocus();
   const byDays = focus != null;
-  // "Value · Price": the store's, which the page keeps level with Display's
-  // preference (`useFollowPreference`); a page without the store keeps it
-  // here, read once from the stored preferences.
-  const storeView = useFlowFocusState((s) => s.view);
-  const [ownView, setOwnView] = useState<FlowsView>("value");
+  const flowsKey = useContext(FlowsKeyNodeContext);
+  const setSections = useContext(FlowsSectionsContext);
   useEffect(() => {
-    if (focus) return;
-    try {
-      const v = (JSON.parse(localStorage.getItem("timeline-display-v3") ?? "{}") as { flowsView?: unknown }).flowsView;
-      if (v === "price" || v === "both") setOwnView(v);
-    } catch {}
-  }, [focus]);
-  const view: FlowsView = prices.length === 0 ? "value" : focus ? storeView : ownView;
-  const setView = (v: FlowsView) => (focus ? focus.store.set({ view: v }) : setOwnView(v));
+    setSections?.(true);
+    return () => setSections?.(false);
+  }, [setSections]);
   const [assetKey, setAssetKey] = useState<string | null>(null);
   const priced = prices.find((p) => p.key === assetKey) ?? prices[0] ?? null;
   const [frozen, setFrozen] = useState(false);
@@ -340,53 +320,16 @@ export function CombinedFlows({
   };
   // "Timeline follows the chart" (ui-jobs 305): the timeline reads the
   // cursor itself (`timelineCut`), and the stored cut, which the address bar
-  // carries, is the day the cursor is frozen on, kept level here. Play writes
-  // it once it stops; a cut from the address bar still putting the cursor on
-  // its day is left standing.
+  // carries, is the day the cursor is frozen on, kept level here; a cut from
+  // the address bar still putting the cursor on its day is left standing.
   const follow = useFlowFocusState((s) => s.follow);
   const restoring = useFlowFocusState((s) => s.restore != null);
   useEffect(() => {
-    if (!focus || !follow || playing || restoring || restoreTo.current != null) return;
+    if (!focus || !follow || restoring || restoreTo.current != null) return;
     const want = frozen && committed && !committed.live ? committedEnd : null;
     if ((focus.store.get().rewind?.endTs ?? null) === want) return;
     focus.store.set({ rewind: want == null ? null : { endTs: want, word: committedWord } });
   });
-  // The button names the day the cursor is on, in the cut pill's format. The
-  // row gives it what the controls leave; the longer wording goes first and
-  // the shorter ones follow where the width runs out (no shrunk text).
-  const cursorTs = committed ? (committed.live ? Date.now() / 1000 : dayStart(model, committed.stop)) : 0;
-  const applyLabels = committed?.live
-    ? ["Show timeline to today", "Show to today", "Show to today"]
-    : [`Show timeline to ${committedWord}`, `Show to ${committedWord}`, `Show to ${shortDate(cursorTs)}`];
-  const rowRef = useRef<HTMLDivElement>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
-  const measureRef = useRef<HTMLSpanElement>(null);
-  const followRef = useRef<HTMLButtonElement>(null);
-  const [labelLevel, setLabelLevel] = useState(0);
-  const labelKey = applyLabels.join("|");
-  useLayoutEffect(() => {
-    const row = rowRef.current;
-    const controls = controlsRef.current;
-    const probe = measureRef.current;
-    if (!row || !controls || !probe) return;
-    const fit = () => {
-      // Button chrome: 12px padding each side, the 16px icon and its 6px gap;
-      // 12px between the controls and the button. Below sm the button has a
-      // row of its own (TO-DO-ui-jobs §247), after the follow setting.
-      // "Timeline follows the chart" stands before the button, 8px apart, on
-      // either row.
-      const own = window.matchMedia("(max-width: 639.98px)").matches;
-      const follows = (followRef.current?.offsetWidth ?? 0) + 8;
-      const room = row.clientWidth - (own ? 0 : controls.offsetWidth + 12) - follows - 24 - 22;
-      const widths = Array.from(probe.children).map((c) => (c as HTMLElement).offsetWidth);
-      const i = widths.findIndex((w) => w <= room);
-      setLabelLevel(i < 0 ? widths.length - 1 : i);
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(row);
-    return () => ro.disconnect();
-  }, [labelKey, byDays, follow]);
   const move = useFlowFocusState((s) => s.move);
   const moved = useRef<number | null>(null);
   useEffect(() => {
@@ -394,11 +337,10 @@ export function CombinedFlows({
     moved.current = move.n;
     const i = stopForDay(stops, Math.floor(move.ts / 86_400) - model.start / DAY_MS);
     if (i != null) {
-      halt();
       setAt(i);
       setFrozen(!move.free);
     }
-  }, [move, stops, model.start, halt]);
+  }, [move, stops, model.start]);
   // A cut restored from the address bar (`useRewindParam`): the cursor goes
   // to its day's close, frozen there.
   const restore = useFlowFocusState((s) => s.restore);
@@ -414,12 +356,11 @@ export function CombinedFlows({
     restored.current = restore.n;
     // Taken once: a panel mounted later starts at today.
     focus?.store.set({ restore: null });
-    halt();
     restoreTo.current = day;
     keepDay.current = day;
     setRestoreDay(day);
     setFrozen(true);
-  }, [restore, model.start, model.liveStop, halt, focus?.store]);
+  }, [restore, model.start, model.liveStop, focus?.store]);
   useEffect(() => {
     const to = restoreTo.current == null ? null : restoreTo.current - startDay;
     if (to == null) return;
@@ -490,10 +431,9 @@ export function CombinedFlows({
   const geo = useMemo(() => stripGeometry(w, startDay, today, span, labelW), [w, startDay, today, span, labelW]);
   const xStop = (s: CombinedStop) => geo.xClose(s.live ? today : startDay + s.stop);
   const atStop = stops[Math.min(at, last)];
-  const showLine = view !== "price" || !priced;
-  const showPrice = view !== "value" && priced != null;
+  const showPrice = priced != null;
   const lineReady = lineScale.points.length > 0;
-  const ready = showLine ? lineReady || showPrice : priced != null;
+  const ready = lineReady || showPrice;
   const cx = ready && atStop ? xStop(atStop) : STRIP_PAD + geo.inner;
   const dim = ready && atStop != null && !atStop.live;
   const cursorDay = cur.live ? today : startDay + cur.stop;
@@ -501,55 +441,73 @@ export function CombinedFlows({
   const cursorLevel = priced ? (levelAt(priced, cursorDay)?.[1] ?? null) : null;
   const sliderLabel = `Date, by ${(series?.bin ?? "week") === "day" ? "day" : `${series?.bin ?? "week"} and by day with events`}: moves the headlines and the bars`;
 
+  const valueText = tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine;
+  const cursorWord = atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop));
+  const sliderProps = {
+    geo,
+    w,
+    stops,
+    at: Math.min(at, last),
+    xStop,
+    cx,
+    ready,
+    valueText,
+    cursorWord,
+    onPick: go,
+    freeze: byDays ? { frozen, onTap: tapStop } : null,
+    startDay,
+  };
+  // Each side's headline, on its own line over its bar, the bars' "?" at the
+  // first one's right end.
+  const bareHeadline = (side: "collateral" | "debt") => (
+    <Headline
+      side={side}
+      st={head[side]}
+      model={model}
+      when={when}
+      isLive={liveReceipts}
+      assets={assets}
+      partial={partialOf(side)}
+    />
+  );
+  const heads = {
+    collateral: (
+      <div className="mb-1.5 flex items-center justify-between gap-3" data-flow-headline-row="collateral">
+        {bareHeadline("collateral")}
+        <SectionHelp content={BARS_HELP} name="the bars and the line" anatomy="F16" extra={flowsKey} />
+      </div>
+    ),
+    ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
+  };
+  const lastLabel = closed ? closeDay : "Today";
+  const priceHelp = priced
+    ? lifetimeFlowsPriceContent({
+        symbol: priced.asset.symbol,
+        unit: priced.unitLabel,
+        source: `${priced.asset.symbol} in ${priced.unitLabel}: ${priced.source}`,
+        perEvent: priced.grain === "event",
+        level: priced.level?.formula ?? null,
+      })
+    : null;
+
   return (
     <FlowCursorContext.Provider value={cursor}>
       <SegmentTipContext.Provider value={byDays || null}>
         <div className="text-sm" data-flows-combined="" data-flow-frozen={frozen ? "" : undefined}>
-          {/* Keyed on the bars' height, so "Both" does not hold the full
-              bars' height. */}
-          <Steady key={showLine && showPrice ? "half" : "full"}>
-            {/* The headlines, and the date they are at on the same row's
-                right end. */}
-            <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">
-              <Headline
-                side="collateral"
-                st={head.collateral}
-                model={model}
-                when={when}
-                isLive={liveReceipts}
-                assets={assets}
-                partial={partialOf("collateral")}
-              />
-              {hasDebt && (
-                <Headline
-                  side="debt"
-                  st={head.debt}
-                  model={model}
-                  when={when}
-                  isLive={liveReceipts}
-                  assets={assets}
-                  partial={partialOf("debt")}
-                />
-              )}
-              <div className="ml-auto flex min-w-0 items-center gap-2">
-                <OldPriceLabel note={head.isLive ? null : oldPriceAt(model, cur.stop)} />
-                <p
-                  className="min-w-0 text-xs font-semibold tabular-nums text-foreground sm:text-sm"
-                  aria-live="polite"
-                  data-flow-date=""
-                  data-anatomy="F2.1"
-                >
-                  {dateLine}
-                </p>
-              </div>
-            </div>
+          <Steady>
             <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
+              <OldPriceLabel note={head.isLive ? null : oldPriceAt(model, cur.stop)} />
+              {/* The cursor's date, for a screen reader; the eye reads it
+                  under the events. */}
+              <p className="sr-only" aria-live="polite" data-flow-date="" data-anatomy="F2.1">
+                {dateLine}
+              </p>
               <div
                 className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
                 aria-hidden={outside || undefined}
                 {...(outside ? { inert: true } : {})}
               >
-                <FlowBarsHalfContext.Provider value={showLine && showPrice}>
+                <FlowBarsHeadsContext.Provider value={heads}>
                   {busy ? (
                     <Rescaled
                       model={bars}
@@ -564,7 +522,7 @@ export function CombinedFlows({
                   ) : (
                     renderBars(barStop, when, liveReceipts, cur.live)
                   )}
-                </FlowBarsHalfContext.Provider>
+                </FlowBarsHeadsContext.Provider>
               </div>
               {outside && (
                 <p
@@ -578,274 +536,156 @@ export function CombinedFlows({
           </Steady>
 
           <div {...KEEP_PANEL}>
-            <div ref={stripRef} className="mt-4">
-              {showPrice && (
-                <div className="mb-1 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-                  <PricePicker series={prices} selected={priced!.key} onPick={setAssetKey} />
-                </div>
-              )}
-              {/* "Both" stacks the two strips on one time axis: one cursor,
-                  driven from either, the pips under the lower one. */}
-              {showLine && (
-                <div className="relative">
-                  <StripSlider
+            <div ref={stripRef} className="mt-8">
+              {/* The value line, then the price chart, then the events: one
+                  time axis and one cursor, which either chart moves. */}
+              <div className="relative">
+                <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
+                  <LineStrip
+                    model={model}
+                    scale={lineScale}
+                    failed={failed}
                     geo={geo}
                     w={w}
-                    stops={stops}
-                    at={Math.min(at, last)}
-                    xStop={xStop}
+                    today={today}
                     cx={cx}
-                    ready={ready}
-                    ariaLabel={sliderLabel}
-                    valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
-                    cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
-                    onPick={go}
-                    freeze={byDays ? { frozen, onTap: tapStop } : null}
-                    view="value"
-                    startDay={startDay}
-                  >
-                    <LineStrip
-                      model={model}
-                      scale={lineScale}
-                      failed={failed}
-                      geo={geo}
-                      w={w}
-                      today={today}
-                      cx={cx}
-                      dim={dim}
-                      ready={lineReady}
-                      head={{ collateral: head.collateral.now, debt: head.debt.now }}
-                      hasDebt={hasDebt}
-                      windowFrom={from > 0 ? startDay + from : null}
-                    />
-                  </StripSlider>
+                    dim={dim}
+                    ready={lineReady}
+                    head={{ collateral: head.collateral.now, debt: head.debt.now }}
+                    hasDebt={hasDebt}
+                    windowFrom={from > 0 ? startDay + from : null}
+                  />
+                </StripSlider>
+              </div>
+              {priced && priceHelp && (
+                <div className="mt-10" data-flow-price-section="">
+                  <div className="mb-2 flex items-center justify-between gap-3" data-anatomy="F19.1">
+                    <PriceHeading series={prices} selected={priced} onPick={setAssetKey} />
+                    <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
+                  </div>
+                  <div className="relative">
+                    <StripSlider
+                      {...sliderProps}
+                      ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
+                      view="price"
+                      tip={(shown) =>
+                        shown && (
+                          <PriceTip x={cx} w={w}>
+                            <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
+                          </PriceTip>
+                        )
+                      }
+                    >
+                      <PriceStrip
+                        s={priced}
+                        scale={priceScales.get(priced.key)!}
+                        geo={geo}
+                        w={w}
+                        today={today}
+                        cx={cx}
+                        dim={dim}
+                        cursorPrice={cursorPrice}
+                        cursorLevel={cursorLevel}
+                        windowFrom={from > 0 ? startDay + from : null}
+                        startDay={startDay}
+                      />
+                    </StripSlider>
+                  </div>
                 </div>
               )}
-              {showPrice && priced && (
-                <div className={`relative${showLine ? " mt-3" : ""}`}>
-                  <StripSlider
-                    geo={geo}
-                    w={w}
-                    stops={stops}
-                    at={Math.min(at, last)}
-                    xStop={xStop}
-                    cx={cx}
-                    ready={ready}
-                    ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
-                    valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
-                    cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
-                    onPick={go}
-                    freeze={byDays ? { frozen, onTap: tapStop } : null}
-                    view="price"
-                    startDay={startDay}
-                    tip={(shown) =>
-                      shown && (
-                        <PriceTip x={cx} w={w}>
-                          <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
-                        </PriceTip>
-                      )
-                    }
+              {/* The events: a labelled row of pips on the time axis. */}
+              <div className="mt-6" data-flow-events-section="">
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    className="text-xs font-semibold text-rb-500"
+                    style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
+                    data-flow-events-label=""
                   >
-                    <PriceStrip
-                      s={priced}
-                      scale={priceScales.get(priced.key)!}
-                      geo={geo}
-                      w={w}
-                      today={today}
-                      cx={cx}
-                      dim={dim}
-                      cursorPrice={cursorPrice}
-                      cursorLevel={cursorLevel}
-                      windowFrom={from > 0 ? startDay + from : null}
-                      startDay={startDay}
-                    />
-                  </StripSlider>
+                    Events
+                  </span>
+                  <SectionHelp content={EVENTS_HELP} name="the events" anatomy="F7.1" />
                 </div>
-              )}
-              {/* The event ticks, under the plot on the time axis, the cursor
-                  running through them; one row for both views. The keyboard
-                  hears each day's events through the slider's value. */}
-              <PipRow
-                model={model}
-                geo={geo}
-                w={w}
-                today={today}
-                stops={stops}
-                at={Math.min(at, last)}
-                cx={cx}
-                dim={dim}
-                ready={ready}
-                onPick={go}
-              />
-              {/* The first day sits under the end of the lead-in, and the end
-                  under today's close, a few px clear of the ticks. */}
-              <div className="mt-1.5">
-                <TrackEnds
-                  start={dayStamp(dayStart(model, 0))}
-                  end={closed ? closeDay : "Today"}
-                  startInset={w > 0 ? Math.max(0, geo.x0 - STRIP_PAD) : 0}
-                  endInset={w > 0 ? Math.max(0, STRIP_PAD + geo.inner - geo.xClose(today)) : 0}
+                <PipRow
+                  model={model}
+                  geo={geo}
+                  w={w}
+                  today={today}
+                  stops={stops}
+                  at={Math.min(at, last)}
+                  cx={cx}
+                  dim={dim}
+                  ready={ready}
+                  onPick={go}
                 />
               </div>
-              {showPrice && priced && (
-                <p
-                  className="mt-1 text-[11px] leading-snug text-rb-500"
-                  data-prov-exempt=""
-                  data-price-caption={priced.key}
-                >
-                  {priced.asset.symbol} in {priced.unitLabel}: {priced.source}
-                  {priced.grain === "event" ? ", one point per event" : ", one point per day"}
-                  {priced.events?.length ? "; each event marked at its own price" : ""}
-                  {priced.events?.some((e) => e.redemptionPrice != null)
-                    ? ", a redemption also at its redemption price"
-                    : ""}
-                  {priced.sparseBefore != null && priced.sparseBefore > startDay && priced.sparseBefore <= today
-                    ? `; before ${dayStamp(priced.sparseBefore * 86_400)}, the events alone`
-                    : ""}
-                  {priced.level && (
-                    <>
-                      {" · "}
-                      <span data-liq-caption="">Liquidates at: {priced.level.formula}</span>
-                    </>
-                  )}
-                </p>
-              )}
+              {/* The cursor's date under the cursor line; pressed, it shows the
+                  timeline's two buttons beside it. */}
+              <CursorDate
+                x={cx}
+                w={w}
+                word={cursorWord}
+                byDays={byDays}
+                follow={follow}
+                canApply={canApply}
+                committedWord={committedWord}
+                live={!!committed?.live}
+                onApply={apply}
+                onFollow={() => focus?.store.set({ follow: !follow })}
+              />
             </div>
           </div>
 
-          {/* The playback controls at the left; "Timeline follows the chart" and
-              "Show timeline to {date}" at the right, on a page that ties the
-              panel to its timeline. Below sm the two take a row of their own,
-              the button the width the setting leaves. While the timeline follows
-              the chart the button is not drawn. */}
-          <div ref={rowRef} className="relative mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div ref={controlsRef} className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <div className="-ml-2 flex items-center gap-x-1" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
-                <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
-                  <SkipBack size={16} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  aria-label={byDays ? "Previous day with events" : "Previous date"}
-                  onClick={stepBack}
-                >
-                  <ChevronLeft size={18} aria-hidden />
-                </button>
-                <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
-                  {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  aria-label={byDays ? "Next day with events" : "Next date"}
-                  onClick={stepOn}
-                >
-                  <ChevronRight size={18} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  aria-label={closed ? "Jump to close" : "Jump to today"}
-                  onClick={() => {
-                    go(last);
-                    setFrozen(false);
-                  }}
-                >
-                  <SkipForward size={16} aria-hidden />
-                </button>
-              </div>
-              {prices.length > 0 && (
-                <div
-                  className="inline-flex shrink-0 rounded-md border border-rb-200 p-0.5 dark:border-rb-700"
-                  role="group"
-                  aria-label="Strip"
-                  data-flows-view-toggle=""
-                  data-anatomy="F18"
-                  {...KEEP_PANEL}
-                >
-                  {(["value", "price", "both"] as const).map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      aria-pressed={view === v}
-                      className={`${CTRL_GHOST} ${view === v ? CTRL_ON_ACCENT : CTRL_OFF} min-h-10 rounded px-2.5 text-xs font-semibold sm:min-h-8`}
-                      title={
-                        v === "value"
-                          ? "The collateral and debt line"
-                          : v === "price"
-                            ? "Each held asset's price"
-                            : "The line and the price, one cursor"
-                      }
-                      onClick={() => setView(v)}
-                      data-flows-view={v}
-                    >
-                      {v === "value" ? "Value" : v === "price" ? "Price" : "Both"}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {byDays && (
-              <span
-                ref={measureRef}
-                aria-hidden
-                className="pointer-events-none invisible absolute -z-10 flex flex-col text-xs font-semibold whitespace-nowrap"
+          {/* The steps: the start, then the previous and next day with
+              events and today at the right; under 640px the start and the
+              end are icons. */}
+          <div
+            className="mt-1 flex items-center justify-between gap-2"
+            style={{ paddingLeft: w > 0 ? Math.max(0, geo.x0 - STRIP_PAD) : 0 }}
+            data-flow-controls=""
+            data-anatomy="F5"
+            {...KEEP_PANEL}
+          >
+            <button
+              type="button"
+              className={`${CTRL_GHOST} ${CTRL_OFF} min-h-11 rounded-md px-1.5 text-xs font-semibold sm:min-h-8`}
+              aria-label={`Jump to opening, ${dayStamp(dayStart(model, 0))}`}
+              onClick={() => go(0)}
+              data-flow-jump="start"
+            >
+              <SkipBack size={16} aria-hidden className="sm:hidden" />
+              <span className="hidden sm:inline">{dayStamp(dayStart(model, 0))}</span>
+            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className={btn}
+                aria-label={byDays ? "Previous day with events" : "Previous date"}
+                onClick={stepBack}
               >
-                {applyLabels.map((t, i) => (
-                  <span key={i} className="w-max">
-                    {t}
-                  </span>
-                ))}
-              </span>
-            )}
-            {byDays && (
-              <div className="flex w-full items-center justify-end gap-2 sm:ml-auto sm:w-auto">
-                <button
-                  ref={followRef}
-                  type="button"
-                  className={`${CTRL_GHOST} ${follow ? CTRL_ON_ACCENT : CTRL_OFF} min-h-11 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:min-h-9`}
-                  aria-pressed={follow}
-                  aria-label="Timeline follows the chart"
-                  title={
-                    follow
-                      ? "The timeline is cut at the cursor's day as it moves"
-                      : "Cut the timeline at the cursor's day as it moves"
-                  }
-                  onClick={() => focus?.store.set({ follow: !follow })}
-                  data-flow-follow={follow ? "on" : "off"}
-                  data-anatomy="F17"
-                  {...KEEP_PANEL}
-                >
-                  <Link2 size={16} aria-hidden />
-                  <span className="sm:hidden">Follow</span>
-                  <span className="hidden sm:inline">Timeline follows the chart</span>
-                </button>
-                {!follow && (
-                  <button
-                    type="button"
-                    className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} min-h-11 min-w-0 flex-1 justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:min-h-9 sm:flex-none`}
-                    disabled={!canApply}
-                    title={
-                      canApply
-                        ? committed?.live
-                          ? "Show the timeline up to today"
-                          : `Show the timeline up to the end of ${committedWord}`
-                        : committed?.live
-                          ? "Move the cursor to a past day to cut the timeline there"
-                          : `The timeline is cut at ${committedWord}`
-                    }
-                    onClick={apply}
-                    data-flow-apply=""
-                    data-anatomy="F6"
-                    {...KEEP_PANEL}
-                  >
-                    <ListEnd size={16} aria-hidden />
-                    {applyLabels[Math.min(labelLevel, applyLabels.length - 1)]}
-                  </button>
-                )}
-              </div>
-            )}
+                <ChevronLeft size={18} aria-hidden />
+              </button>
+              <button
+                type="button"
+                className={btn}
+                aria-label={byDays ? "Next day with events" : "Next date"}
+                onClick={stepOn}
+              >
+                <ChevronRight size={18} aria-hidden />
+              </button>
+              <button
+                type="button"
+                className={`${CTRL_GHOST} ${CTRL_OFF} min-h-11 rounded-md px-1.5 text-xs font-semibold sm:min-h-8`}
+                aria-label={closed ? `Jump to close, ${closeDay}` : "Jump to today"}
+                onClick={() => {
+                  go(last);
+                  setFrozen(false);
+                }}
+                data-flow-jump="end"
+              >
+                <SkipForward size={16} aria-hidden className="sm:hidden" />
+                <span className="hidden sm:inline">{lastLabel}</span>
+              </button>
+            </div>
           </div>
         </div>
       </SegmentTipContext.Provider>
@@ -921,14 +761,18 @@ export function lineStripScale(model: FlowModel, series: FlowBinSeries | null, h
     axes = { collateral: axisFor(pk.collateral), debt: axisFor(pk.debt) };
   }
   // A token axis (Morpho) labels its values without the symbol.
-  const axisLabel = (t: number) => (model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t));
+  // Compact on the axis: "$4M", "$250k".
+  const axisLabel = (t: number) =>
+    model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t).replace(/\.0(?=[kMB])/, "");
   // Labels at least 24px apart: every k-th of the axis's ticks. A label that
   // reads as the one under it ("$0" thrice on a position worth cents) is left
   // out.
   const every = axis.ticks.length > 1 ? Math.ceil(24 / (((STRIP_H - 8) * axis.ticks[1]) / axis.max)) : 1;
   const yTicks = axes
     ? []
-    : axis.ticks.filter((_, i) => i % every === 0).filter((t, i, a) => i === 0 || axisLabel(t) !== axisLabel(a[i - 1]));
+    : axis.ticks
+        .filter((_, i) => i % every === 0)
+        .filter((t, i, a) => t !== 0 && (i === 0 || axisLabel(t) !== axisLabel(a[i - 1])));
   // Each side's top, its axis's end, in its token (a side that never held
   // anything has none).
   const sideTops =
@@ -1147,7 +991,7 @@ function PriceTip({ x, w, children }: { x: number; w: number; children: ReactNod
   return (
     <div
       ref={ref}
-      className="absolute top-1 z-40 rounded-lg border px-2.5 py-1.5 shadow-lg"
+      className="absolute top-1 z-40 rounded-lg border px-2.5 py-1.5 shadow-lg max-sm:bottom-full max-sm:top-auto max-sm:mb-1"
       style={{
         left: left ?? 0,
         maxWidth: w,
@@ -1451,7 +1295,7 @@ export function priceStripScale(s: FlowPriceSeries, startDay: number, today: num
     ...events.flatMap((e) => (e.redemptionPrice != null ? [e.price, e.redemptionPrice] : [e.price])),
   ];
   const axis = priceAxis(values);
-  return { pieces, level, events, axis, labels: axis.ticks.map((t) => formatPriceAxis(t, s.unitLabel)) };
+  return { pieces, level, events, axis, labels: priceAxisLabels(axis.ticks) };
 }
 type PriceScale = ReturnType<typeof priceStripScale>;
 
@@ -1650,68 +1494,210 @@ function PriceStrip({
         {cursorPrice != null && <CursorDot x={cx} y={y(cursorPrice)} hue={hue} />}
       </svg>
       <div aria-hidden data-prov-exempt="" data-price-axis="">
-        <AxisLabels ticks={axis.ticks} y={y} label={(t) => formatPriceAxis(t, s.unitLabel)} />
+        <AxisLabels ticks={axis.ticks} y={y} label={(t) => scale.labels[axis.ticks.indexOf(t)] ?? ""} />
       </div>
     </>
   );
 }
 
-/** The price view's asset picker, in the manner of the event ledger's wide
- *  side (ui-jobs 306): the first PICKER_SHOWN held assets with a series and a
- *  line "Show all N assets" where there are more. One asset at a time. */
-const PICKER_SHOWN = 3;
-function PricePicker({
+/** The price chart's heading, "Daily [WBTC ▾] USD price", at the plot's
+ *  left: the asset a list where the position holds several with a series. */
+function PriceHeading({
   series,
   selected,
   onPick,
 }: {
   series: FlowPriceSeries[];
-  selected: string;
+  selected: FlowPriceSeries;
   onPick: (key: string) => void;
 }) {
-  const [all, setAll] = useState(false);
-  const firstN = series.slice(0, PICKER_SHOWN);
-  const listed = all
-    ? series
-    : firstN.some((s) => s.key === selected)
-      ? firstN
-      : [...firstN, ...series.filter((s) => s.key === selected)];
-  const hidden = series.length - listed.length;
+  const grain = selected.grain === "event" ? null : "Daily";
+  const asset =
+    series.length > 1 ? (
+      <span className="relative inline-flex items-center">
+        <select
+          value={selected.key}
+          onChange={(e) => onPick(e.target.value)}
+          aria-label="Asset"
+          className="cursor-pointer appearance-none rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-5 text-sm font-semibold text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 dark:text-teal-400"
+          data-price-picker=""
+          {...KEEP_PANEL}
+        >
+          {series.map((s) => (
+            <option key={s.key} value={s.key} data-price-asset={s.asset.symbol}>
+              {s.asset.symbol}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={12}
+          aria-hidden
+          className="pointer-events-none absolute right-1.5 text-teal-600 dark:text-teal-400"
+        />
+      </span>
+    ) : (
+      <span className="text-foreground" data-price-asset={selected.asset.symbol}>
+        {selected.asset.symbol}
+      </span>
+    );
   return (
-    <div
-      className="flex flex-wrap items-center gap-1"
-      role="group"
-      aria-label="Asset"
-      data-price-picker=""
-      data-anatomy="F19.1"
-      {...KEEP_PANEL}
+    <p
+      className="flex flex-wrap items-center gap-x-1.5 text-sm font-semibold text-rb-500"
+      style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
+      data-price-heading=""
     >
-      {listed.map((s) => {
-        const on = s.key === selected;
-        return (
-          <button
-            key={s.key}
-            type="button"
-            aria-pressed={on}
-            className={`${CTRL_GHOST} ${on ? CTRL_ON_ACCENT : CTRL_OFF} min-h-9 rounded-md px-2 text-xs font-semibold sm:min-h-7`}
-            onClick={() => onPick(s.key)}
-            data-price-asset={s.asset.symbol}
-          >
-            {s.asset.symbol}
-          </button>
-        );
-      })}
-      {(hidden > 0 || all) && series.length > PICKER_SHOWN && (
+      {grain && <span>{grain}</span>}
+      {asset}
+      <span>{selected.unitLabel} price</span>
+    </p>
+  );
+}
+
+/** A section's "?" at its right end, opening its how-to-read in the
+ *  learn-more modal. */
+function SectionHelp({
+  content,
+  name,
+  anatomy,
+  extra,
+}: {
+  content: LearnMoreContent;
+  name: string;
+  anatomy: string;
+  extra?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="shrink-0 text-rb-500" data-flow-help={anatomy} {...KEEP_PANEL}>
+      <LearnMoreButton onClick={() => setOpen(true)} ariaLabel={`How to read ${name}`} />
+      {open && <LearnMoreModal content={content} onClose={() => setOpen(false)} anatomy={anatomy} extra={extra} />}
+    </span>
+  );
+}
+
+/** The cursor's date under the events, at the cursor's x; pressed, the two
+ *  timeline buttons beside it: show the timeline to that day, and the
+ *  timeline following the chart. Escape or a press elsewhere puts them
+ *  away. */
+function CursorDate({
+  x,
+  w,
+  word,
+  byDays,
+  follow,
+  canApply,
+  committedWord,
+  live,
+  onApply,
+  onFollow,
+}: {
+  x: number;
+  w: number;
+  word: string;
+  byDays: boolean;
+  follow: boolean;
+  canApply: boolean;
+  committedWord: string;
+  live: boolean;
+  onApply: () => void;
+  onFollow: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: globalThis.PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  // The date centred on the cursor, kept inside the row; the buttons open to
+  // its right where there is room, else to its left.
+  const dateRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    const dw = dateRef.current?.offsetWidth ?? 0;
+    setLeft(Math.max(0, Math.min(w - dw, x - dw / 2)));
+  });
+  const iconBtn = "inline-flex size-11 shrink-0 items-center justify-center rounded-md sm:size-8";
+  const buttons = byDays && open && (
+    <span className="flex items-center gap-1" role="group" aria-label="Timeline">
+      {!follow && (
         <button
           type="button"
-          className="px-1 text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
-          aria-expanded={all}
-          onClick={() => setAll((v) => !v)}
-          data-price-show-all={series.length}
+          className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} ${iconBtn}`}
+          disabled={!canApply}
+          aria-label={live ? "Show the timeline to today" : `Show the timeline to ${committedWord}`}
+          title={
+            canApply
+              ? live
+                ? "Show the timeline up to today"
+                : `Show the timeline up to the end of ${committedWord}`
+              : `The timeline is cut at ${committedWord}`
+          }
+          onClick={onApply}
+          data-flow-apply=""
+          data-anatomy="F6"
         >
-          {all ? `Show ${PICKER_SHOWN} assets` : `Show all ${series.length} assets`}
+          <ListEnd size={16} aria-hidden />
         </button>
       )}
+      <button
+        type="button"
+        className={`${CTRL_GHOST} ${follow ? CTRL_ON_ACCENT : CTRL_OFF} ${iconBtn}`}
+        aria-pressed={follow}
+        aria-label="Timeline follows the chart"
+        title={
+          follow
+            ? "The timeline is cut at the cursor's day as it moves"
+            : "Cut the timeline at the cursor's day as it moves"
+        }
+        onClick={onFollow}
+        data-flow-follow={follow ? "on" : "off"}
+        data-anatomy="F17"
+      >
+        <Link2 size={16} aria-hidden />
+      </button>
+    </span>
+  );
+  const flip = left != null && left + (dateRef.current?.offsetWidth ?? 0) + 96 > w;
+  return (
+    <div
+      ref={ref}
+      className="relative mt-1 h-11 sm:h-8"
+      data-flow-cursor-date=""
+      data-flow-following={byDays ? (follow ? "on" : "off") : undefined}
+    >
+      <div
+        className={`absolute top-0 flex items-center gap-1 ${flip ? "flex-row-reverse" : ""}`}
+        style={
+          flip ? { right: Math.max(0, w - (left ?? 0) - (dateRef.current?.offsetWidth ?? 0)) } : { left: left ?? 0 }
+        }
+      >
+        <button
+          ref={dateRef}
+          type="button"
+          className={`${CTRL_GHOST} ${open ? CTRL_ON_ACCENT : CTRL_OFF} min-h-11 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold tabular-nums sm:min-h-8`}
+          aria-expanded={byDays ? open : undefined}
+          aria-label={byDays ? `${word}: timeline options` : word}
+          onClick={() => byDays && setOpen((v) => !v)}
+          disabled={!byDays}
+          data-flow-cursor-word=""
+        >
+          {word}
+        </button>
+        {buttons}
+      </div>
     </div>
   );
 }
@@ -1763,7 +1749,7 @@ function PriceReadout({
     return (
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="text-xs text-rb-500" data-price-readout="" data-price-none="">
-          No {s.asset.symbol} price recorded by {dayWord}
+          No price recorded
         </p>
         {second}
       </div>
@@ -1780,23 +1766,18 @@ function PriceReadout({
         data-price-carried={r.carried ? r.ageDays : undefined}
         data-anatomy="F19.2"
       >
-        <span className="font-semibold text-foreground">{s.asset.symbol}</span>{" "}
         <span className="font-semibold text-foreground">
           <Prov info={readoutProv(s, r, dayWord, pointWord)} value={String(r.point[1])}>
             {formatPrice(r.point[1], s.unitLabel)}
           </Prov>
-        </span>{" "}
-        <span className="min-w-0 truncate text-rb-500">
-          on {pointWord}
-          {r.carried && (
-            <>
-              ,{" "}
-              <Prov info={ageProv(s, r, dayWord, pointWord)}>
-                carried {r.ageDays} {r.ageDays === 1 ? "day" : "days"}
-              </Prov>
-            </>
-          )}
         </span>
+        {r.carried && (
+          <span className="min-w-0 truncate text-rb-500">
+            <Prov info={ageProv(s, r, dayWord, pointWord)}>
+              carried {r.ageDays} {r.ageDays === 1 ? "day" : "days"}
+            </Prov>
+          </span>
+        )}
         {r.old && (
           <span
             className="rounded border border-rb-300 px-1 text-[11px] font-medium text-rb-600 dark:border-rb-600 dark:text-rb-400"

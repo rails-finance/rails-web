@@ -83,9 +83,8 @@ import {
 import { isBusy } from "@/lib/shared/flows-busy";
 import {
   AxisLabels,
-  barHeight,
   BusyFlows,
-  FlowBarsHalfContext,
+  FlowBarsHeadsContext,
   DateRow,
   flowsTotals,
   Headline,
@@ -453,16 +452,17 @@ function SideBlock({
   // On a page that ties the panel to its timeline, a segment opens a short
   // tip with its line, value and share instead of its panel.
   const focus = useContext(SegmentTipContext) != null;
-  const half = useContext(FlowBarsHalfContext);
+  const heads = useContext(FlowBarsHeadsContext);
 
   return (
     <div className="mt-3 first:mt-0" data-flow-side={side}>
+      {heads?.[side]}
       <Strip
         side={side}
         segments={st.bar}
         max={axis.max}
         ticks={axis.ticks}
-        height={barHeight(half)}
+        height="h-10 sm:h-11"
         today={atLive ? null : coll ? model.today.collateral : model.today.debt}
         active={active}
         onHover={onHover}
@@ -493,7 +493,7 @@ function SideBlock({
         }
       />
       {/* Each bar on its own axis where the sides have no common unit. */}
-      {(last || model.sideAxes) && <AxisLabels ticks={axis.ticks} max={axis.max} unit={u} />}
+      {!heads && (last || model.sideAxes) && <AxisLabels ticks={axis.ticks} max={axis.max} unit={u} />}
     </div>
   );
 }

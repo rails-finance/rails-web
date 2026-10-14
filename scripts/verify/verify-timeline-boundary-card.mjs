@@ -179,7 +179,7 @@
 // ── THE REWIND RUN (ui-jobs 305) ───────────────────────────────────────────
 //   On the Liquity V2 control Trove, the cut the Lifetime flows chart puts on
 //   the timeline, in both modes of "Timeline follows the chart"
-//   (`[data-flow-follow]`, stored as `followChart` in timeline-display-v3):
+//   (`[data-flow-follow]` behind the cursor's date, its state `[data-flow-following]`, stored as `followChart` in timeline-display-v3):
 //   R1 off: the arrow keys move the chart and cut nothing; "Show timeline to
 //      {date}" cuts at the cursor's day, writes `?to=`, and the cut stands
 //      while the cursor moves on.
@@ -1602,8 +1602,9 @@ const rewindRead = (page) =>
       date: document.querySelector("[data-flow-date]")?.textContent?.trim() ?? null,
       cards: document.querySelectorAll("[data-event-id]").length,
       newest: days.length ? Math.max(...days) : null,
-      apply: document.querySelector("[data-flow-apply]") != null,
-      follow: document.querySelector("[data-flow-follow]")?.getAttribute("data-flow-follow") ?? null,
+      // The apply and follow buttons stand behind the cursor's date.
+      apply: document.querySelector("[data-flow-cursor-word]") != null,
+      follow: document.querySelector("[data-flow-following]")?.getAttribute("data-flow-following") ?? null,
       y: Math.round(window.scrollY),
     };
   });
@@ -1630,7 +1631,7 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
   page.setDefaultTimeout(180_000);
   try {
     await page.goto(`${BASE}${REWIND_PATH}`, { waitUntil: "domcontentloaded" });
-    await page.locator(`[data-flow-follow="${mode}"]`).first().waitFor({ state: "visible" });
+    await page.locator(`[data-flow-following="${mode}"]`).first().waitFor({ state: "visible" });
     await page.waitForFunction(() => document.querySelector("[data-ctrl-waking]") == null, null, { timeout: 120_000 });
     await page.waitForFunction(() => document.querySelector("[data-flow-day-mark]") != null);
     await page.waitForTimeout(1500);
@@ -1657,6 +1658,7 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
         moved.chip == null && moved.cards === whole.cards && moved.date !== whole.date && moved.apply,
         JSON.stringify(moved),
       );
+      await page.locator("[data-flow-cursor-word]").first().click();
       await page.locator("[data-flow-apply]").first().click();
       await page.waitForTimeout(500);
       const cut = await rewindRead(page);

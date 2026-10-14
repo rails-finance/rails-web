@@ -16,7 +16,7 @@
 //
 // Scoped arming (rails-ops TO-DO-ui-jobs 284): a section's "Inspect provenance"
 // (`[data-prov-scope-toggle="<scope>"]`: a row of the position card's ⋮, the
-// Lifetime flows ⋮ or the event page card's ⋮) arms that section alone, and
+// Lifetime flows header's crosshair or the event page card's ⋮) arms that section alone, and
 // that section wears `[data-prov-lit]`. The Liquity V2 Trove page has no
 // page-level tool: its card menu (C17) carries the card's row, so there
 // `openInspectorHome` and `armInspector` reach that row and the card's values

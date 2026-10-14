@@ -267,36 +267,37 @@ const headerLayout = (card) =>
     flowsGap != null && flowsGap >= 0 && flowsGap <= 8,
     `${flowsGap}px`,
   );
-  const flowsMenu = await f1
+  const flowsHead = await f1
     .evaluate((row) => {
-      const menu = row.querySelector("[data-panel-menu]");
-      if (!menu) return null;
+      const toggle = row.querySelector('[data-prov-scope-toggle="flows"]');
+      const title = row.querySelector("[data-flows-toggle]");
+      if (!toggle || !title) return null;
       return {
-        rightGap: Math.round(row.getBoundingClientRect().right - menu.getBoundingClientRect().right),
-        help: !!row.querySelector('[data-anatomy="F16"]'),
+        gap: Math.round(toggle.getBoundingClientRect().left - title.getBoundingClientRect().right),
+        menu: !!row.querySelector('[aria-haspopup="menu"]'),
       };
     })
     .catch(() => null);
   check(
-    "2b. the Lifetime flows ⋮ stands at the header's right end, the ? in it",
-    !!flowsMenu && flowsMenu.rightGap <= 6 && !flowsMenu.help,
-    JSON.stringify(flowsMenu),
+    "2b. the Lifetime flows header holds Inspect provenance beside its title and no ⋮",
+    !!flowsHead && flowsHead.gap >= 0 && flowsHead.gap <= 24 && !flowsHead.menu,
+    JSON.stringify(flowsHead),
   );
-  // A press before hydration is lost: pressed until the row shows.
-  const howTo = page.locator('[data-menu-item="how-to-read"]');
-  for (let i = 0; i < 10 && !(await howTo.isVisible()); i++) {
-    await f1.locator("[data-panel-menu] > button").click();
+  // A press before hydration is lost: pressed until the modal shows.
+  const howTo = page.locator('[data-flow-help="F16"] button').first();
+  const modalSel = '[role="dialog"][aria-label="How to read the bars and the line"]';
+  for (let i = 0; i < 10 && !(await page.locator(modalSel).isVisible()); i++) {
+    await howTo.click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(500);
   }
-  await howTo.click({ timeout: 5000 }).catch(() => {});
   const modal = await page
-    .locator('[role="dialog"][aria-label="How to read these charts"]')
+    .locator(modalSel)
     .waitFor({ state: "visible", timeout: 5000 })
     .then(() => true)
     .catch(() => false);
   const stillOpen = await f1.locator("[data-flows-toggle]").getAttribute("aria-expanded");
   check(
-    "2c. its row opens How to read these charts and the panel stays open",
+    "2c. the bars' ? opens How to read the bars and the line and the panel stays open",
     modal && stillOpen === "true",
     stillOpen,
   );

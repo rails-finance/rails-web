@@ -1,20 +1,19 @@
 // The Lifetime flows panel's price view (rails-ops
 // reference/lifetime-flows-scrubber.md; ui-jobs 328, step 2).
 // ---------------------------------------------------------------------------
-// "Value · Price · Both" on the panel's control row picks the strips under
-// the bars: the line, one held asset's price line, or both stacked; the
-// cursor, the pip row and the end labels stay. The readout is the price
-// strip's tip, shown while the strip has focus. Per page, at 1280 and 390:
-//   - the toggle is drawn and `aria-pressed` follows the view; the Value
-//     view's line is the same before and after a trip to Price;
+// The panel stacks the value line over one held asset's price chart, one
+// cursor for both, the events under them. The readout is the price chart's
+// tip, shown while the chart has focus. Per page, at 1280 and 390:
+//   - the two strips stand, value over price, and the value line is the same
+//     before and after the cursor's trip along the price chart;
 //   - the strip draws no day the series lacks: every day drawn as observed is
 //     a day of the page's own price answer, every day drawn carried is not;
 //   - at three stops the readout's block (`data-price-block`, the value its
 //     <Prov> carries as `source.block`) is the block of the answer's point on
 //     the readout's day, and the price figure is inside a <Prov>;
-//   - the caption names the series' source;
-//   - the pip row is one row in both views, its pips on the same x;
-//   - the picker lists each held asset with a series.
+//   - the price chart's how-to-read names the series' source;
+//   - one pip row under the charts;
+//   - the heading's list names each held asset with a series.
 // Pages: Aave V3 Core 0xfb93…2a71 and 0xfb45…750a (liquidated), whose answer
 // is /api/aave-v3/flows; three Liquity V2 Troves, whose answer is
 // /api/liquity-v2/prices/daily (checked over the answer's own days: before
@@ -388,12 +387,17 @@ for (const pg of PAGES) {
     await page.goto(`${BASE}${pg.path}`, { waitUntil: "domcontentloaded", timeout: 240000 });
     await page.waitForSelector("[data-flows-combined] [data-flow-strip] svg", { timeout: 180000 }).catch(() => {});
     await page.waitForTimeout(2500);
-    const toggle = page.locator("[data-flows-view-toggle]").first();
-    if (!check(`${tag}: the Value · Price · Both toggle is drawn`, (await toggle.count()) === 1)) {
+    const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
+      els.map((e) => e.getAttribute("data-flow-strip-view")),
+    );
+    if (
+      !check(`${tag}: the value line and the price chart stand stacked`, views.join() === "value,price", views.join())
+    ) {
       await ctx.close();
       continue;
     }
-    await toggle.scrollIntoViewIfNeeded();
+    const PRICE = '[data-flow-strip-view="price"]';
+    await page.locator(PRICE).scrollIntoViewIfNeeded();
     if (!body) {
       // The answer was read before the listener saw it: read it as the page does.
       const u = new URL(`${BASE}${pg.path}`);
@@ -405,48 +409,24 @@ for (const pg of PAGES) {
     }
     const series = answerSeries(pg.answer, body, pg.path.split("/")[4]);
 
-    const pressed = () =>
-      page.$$eval("[data-flows-view]", (bs) =>
-        bs.map((b) => `${b.dataset.flowsView}:${b.getAttribute("aria-pressed")}`),
-      );
     const valueLine = () =>
-      page.$$eval("[data-flows-combined] [data-flow-strip] svg path", (ps) =>
+      page.$$eval('[data-flows-combined] [data-flow-strip-view="value"] svg path', (ps) =>
         ps.map((p) => p.getAttribute("d")).join("|"),
       );
     const pips = () =>
       page.$$eval("[data-flows-combined] [data-flow-pips]", (rows) =>
         rows.map((r) => [...r.querySelectorAll("[data-flow-pip]")].map((p) => p.style.left).join(",")),
       );
-    const before = { pressed: await pressed(), line: await valueLine(), pips: await pips() };
-    check(
-      `${tag}: Value is pressed by default`,
-      before.pressed.join() === "value:true,price:false,both:false",
-      before.pressed.join(),
-    );
-
-    await page.locator('[data-flows-view="price"]').click();
-    await page.waitForSelector("[data-price-line]", { timeout: 10000 }).catch(() => {});
-    const inPrice = { pressed: await pressed(), pips: await pips() };
-    check(
-      `${tag}: Price pressed after the press`,
-      inPrice.pressed.join() === "value:false,price:true,both:false",
-      inPrice.pressed.join(),
-    );
-    check(
-      `${tag}: the pip row is one row in both views, its pips on the same x`,
-      before.pips.length === 1 && inPrice.pips.length === 1 && before.pips[0] === inPrice.pips[0],
-      `${before.pips.length}/${inPrice.pips.length} rows`,
-    );
-    const strip = await page.$eval("[data-flow-strip]", (e) => e.getAttribute("data-flow-strip-view"));
-    check(`${tag}: the strip is the price strip`, strip === "price", String(strip));
+    const before = { line: await valueLine(), pips: await pips() };
+    check(`${tag}: one pip row under the charts`, before.pips.length === 1, `${before.pips.length} rows`);
 
     // The picker: each held asset with a series.
-    const showAll = page.locator("[data-price-show-all]");
-    if ((await showAll.count()) > 0) {
-      await showAll.click();
-      await page.waitForTimeout(200);
-    }
+    // The heading's list (several assets) or the asset's name (one).
     const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
+    const pick = async (sym) => {
+      const select = page.locator("select[data-price-picker]");
+      if ((await select.count()) > 0) await select.selectOption({ label: sym });
+    };
     const want = [...series.keys()];
     check(
       `${tag}: the picker lists each held asset with a series`,
@@ -454,9 +434,10 @@ for (const pg of PAGES) {
       `listed ${listed.join(",")}; answer ${want.join(",")}`,
     );
 
-    // Each listed asset: the drawn days against the answer, and the caption.
+    // Each listed asset: the drawn days against the answer, and the price
+    // chart's how-to-read naming the source.
     for (const sym of listed) {
-      await page.locator(`[data-price-asset="${sym}"]`).click();
+      await pick(sym);
       await page.waitForTimeout(250);
       const drawn = await page.$eval("[data-price-line]", (g) => ({
         observed: (g.getAttribute("data-price-observed") ?? "").split(",").filter(Boolean).map(Number),
@@ -474,17 +455,24 @@ for (const pg of PAGES) {
         drawn.observed.length > 0 && extra.length === 0 && wrong.length === 0,
         `${drawn.observed.length} observed, ${drawn.carried.length} carried; extra ${extra.slice(0, 3)}; carried but answered ${wrong.slice(0, 3)}`,
       );
-      const caption = await page.locator("[data-price-caption]").textContent();
-      check(`${tag} ${sym}: the caption names the source`, pg.source.test(caption ?? ""), caption ?? "");
+      await page.locator('[data-flow-help="F19.7"] button').click();
+      const help = await page
+        .locator('[role="dialog"][aria-label="How to read the price chart"]')
+        .textContent({ timeout: 5000 })
+        .catch(() => "");
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(150);
+      check(`${tag} ${sym}: the price chart's how-to-read names the source`, pg.source.test(help ?? ""), help ?? "");
     }
     // Back to the first asset for the stops.
-    await page.locator(`[data-price-asset="${listed[0]}"]`).click();
+    await pick(listed[0]);
     const rows = pg.trove ? await troveRows(pg.path) : null;
     if (rows) await checkTroveMarks(page, tag, pg, rows);
     const obs0 = series.get(listed[0]) ?? new Map();
 
-    // Three stops: the opening, the middle and the day before today.
-    const sl = page.locator("[data-flow-strip]").first();
+    // Three stops: the opening, the middle and the day before today; the
+    // price strip focused, which shows its readout as the cursor's tip.
+    const sl = page.locator(PRICE).first();
     await sl.focus();
     const max = Number(await sl.getAttribute("aria-valuemax"));
     const targets = [0, Math.floor(max / 2), Math.max(0, max - 1)];
@@ -531,24 +519,15 @@ for (const pg of PAGES) {
 
     if (rows) await checkTroveEnd(page, tag, pg, rows, sl);
 
-    // Back to Value: the line is the one it was.
-    await page.locator('[data-flows-view="value"]').click();
-    await page.waitForTimeout(400);
-    await page.locator("[data-flow-strip]").first().focus();
+    // The value line is the one it was: the stops moved the cursor only.
+    await sl.focus();
     await page.keyboard.press("End");
     await page.waitForTimeout(300);
-    const after = { pressed: await pressed(), line: await valueLine() };
     check(
-      `${tag}: Value pressed again`,
-      after.pressed.join() === "value:true,price:false,both:false",
-      after.pressed.join(),
-    );
-    check(
-      `${tag}: the Value view's line is unchanged by the trip`,
-      after.line === before.line && before.line.length > 0,
+      `${tag}: the value line is unchanged by the stops`,
+      (await valueLine()) === before.line && before.line.length > 0,
     );
     check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
-    // Leave the preference at Value for the next page.
     await ctx.close();
   }
 }

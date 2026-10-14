@@ -118,34 +118,25 @@ export function useRewindParam(store: FlowFocusStore | null): void {
   }, [store]);
 }
 
-/** "Timeline follows the chart" (ui-jobs 305) and the panel's "Value ·
- *  Price" (ui-jobs 328) kept with Display's other preferences. The scrubber
- *  row stands outside the timeline's Display provider, so it sets the store's
- *  `follow` and `view`; this hook, mounted inside the provider, keeps the two
- *  level: the stored preference into the store on load, the row's change into
- *  the preference. */
+/** "Timeline follows the chart" (ui-jobs 305) kept with Display's other
+ *  preferences. The scrubber row stands outside the timeline's Display
+ *  provider, so it sets the store's `follow`; this hook, mounted inside the
+ *  provider, keeps the two level: the stored preference into the store on
+ *  load, the row's change into the preference. */
 export function useFollowPreference(store: FlowFocusStore | null): void {
-  const { followChart, set, flowsView, setFlowsView } = useTimelineDisplay();
+  const { followChart, set } = useTimelineDisplay();
   useEffect(() => {
     if (store && store.get().follow !== followChart) store.set({ follow: followChart });
   }, [store, followChart]);
   useEffect(() => {
-    if (store && store.get().view !== flowsView) store.set({ view: flowsView });
-  }, [store, flowsView]);
-  useEffect(() => {
     if (!store) return;
     let last = store.get().follow;
-    let lastView = store.get().view;
     return store.subscribe(() => {
-      const { follow, view } = store.get();
+      const { follow } = store.get();
       if (follow !== last) {
         last = follow;
         set("followChart", follow);
       }
-      if (view !== lastView) {
-        lastView = view;
-        setFlowsView(view);
-      }
     });
-  }, [store, set, setFlowsView]);
+  }, [store, set]);
 }

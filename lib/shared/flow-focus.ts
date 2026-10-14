@@ -560,9 +560,6 @@ export interface FlowFocusState {
    *  others (`useFollowPreference`). While it is on, `rewind` holds the day the
    *  cursor is frozen on, so the address bar carries a frozen cut only. */
   follow: boolean;
-  /** "Value · Price · Both" (ui-jobs 328): the strips the panel draws under its bars,
-   *  kept with Display's preferences as `follow` is. */
-  view: "value" | "price" | "both";
   /** Bumped to bring the cut's top card into view and flash its header (the
    *  chip's text). "Show timeline to {date}" cuts without it: the page stays where it is. */
   go: number;
@@ -584,7 +581,6 @@ export function createFlowFocusStore(): FlowFocusStore {
     move: null,
     rewind: null,
     follow: false,
-    view: "value",
     go: 0,
     restore: null,
   };

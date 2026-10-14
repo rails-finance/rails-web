@@ -17,9 +17,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { CircleHelp } from "lucide-react";
 import { DiscChevron } from "@/components/shared/expand-chevron";
-import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -31,10 +29,12 @@ import {
 import { useLifeCount } from "@/lib/shared/life-count-store";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { FLOWS_SCOPE, ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
+import { ProvScopeIconToggle } from "@/components/shared/prov-inspector";
+import { FlowsKeyNodeContext, FlowsSectionsContext } from "@/components/shared/lifetime-flows-combined";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
-import { LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { lifetimeFlowsReadingContent } from "@/lib/shared/learn-more-content";
+import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
@@ -71,40 +71,20 @@ export interface LifetimeFlowsPanelProps {
 }
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
-const READING = lifetimeFlowsReadingContent();
+const BARS_HELP = lifetimeFlowsBarsContent();
 
-/** The ⋮ at the header's right end (ui-jobs 295): How to read these charts,
- *  one text on every explorer (§264), in the modal the "?" opened; then "Inspect
- *  provenance", which arms the inspector on this panel alone (ui-jobs 284). */
-function FlowsMenu({ title, flowsKey }: { title: string; flowsKey: FlowsKeyItems | null }) {
-  const [reading, setReading] = useState(false);
+/** The bars' how-to-read at the header's right end, for a panel whose body
+ *  draws no section of its own to carry it (a position with no series). */
+function HeaderHelp({ flowsKey }: { flowsKey: FlowsKeyItems | null }) {
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <ToolsMenu
-        variant="panel"
-        label={`${title} menu`}
-        heading={title}
-        provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
-      >
-        {(close) => (
-          <ToolsMenuItem
-            item="how-to-read"
-            icon={<CircleHelp size={16} />}
-            title={READING.title}
-            subtitle="The bars, the line and the controls"
-            onClick={() => {
-              close();
-              setReading(true);
-            }}
-          />
-        )}
-      </ToolsMenu>
-      {reading && (
+      <LearnMoreButton onClick={() => setOpen(true)} ariaLabel="How to read the bars and the line" />
+      {open && (
         <LearnMoreModal
-          content={READING}
-          onClose={() => setReading(false)}
+          content={BARS_HELP}
+          onClose={() => setOpen(false)}
           anatomy="F16"
-          // This position's key under the shared text; none while the chart has not drawn.
           extra={flowsKey ? <FlowsKey {...flowsKey} /> : undefined}
         />
       )}
@@ -125,6 +105,8 @@ export function LifetimeFlowsPanel({
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
   // The scrubber's Key, drawn inside the Explanation.
   const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
+  // Whether the body draws its sections, each with its "?".
+  const [sections, setSections] = useState(false);
   // Collapsed, per protocol. No collapsed attribute is written until the
   // store has been read: the pre-paint script owns it for the first frames.
   const [collapsed, setCollapsed] = useState(false);
@@ -191,7 +173,7 @@ export function LifetimeFlowsPanel({
               aria-expanded={!collapsed}
               aria-controls={bodyId}
               aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 justify-start rounded-md px-2`}
+              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 justify-start rounded-md px-2`}
               data-flows-toggle=""
             >
               <span className="flex min-w-0 items-center gap-1.5">
@@ -204,15 +186,27 @@ export function LifetimeFlowsPanel({
           ) : (
             <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
-          {/* Collapsed, nothing stands to inspect or read: no ⋮. */}
-          <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
-            <FlowsMenu title={title} flowsKey={flowsKey} />
+          {/* Inspect provenance on the panel alone (ui-jobs 284), beside the
+              title; collapsed, nothing stands to inspect, so it goes. The
+              how-to-read is each section's "?" in the body. */}
+          <div className="pointer-events-auto -my-2 shrink-0" data-flows-menu-slot="">
+            <ProvScopeIconToggle scope={FLOWS_SCOPE} hint="click a value in this panel to trace it" />
           </div>
+          <span className="flex-1" />
+          {!sections && scrubber != null && (
+            <div className="pointer-events-auto -mr-1 shrink-0 text-rb-500" data-flows-menu-slot="">
+              <HeaderHelp flowsKey={flowsKey} />
+            </div>
+          )}
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {scrubber != null ? (
             <FlowsKeyContext.Provider value={setFlowsKey}>
-              <div className="mt-2">{scrubber}</div>
+              <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
+                <FlowsSectionsContext.Provider value={setSections}>
+                  <div className="mt-2">{scrubber}</div>
+                </FlowsSectionsContext.Provider>
+              </FlowsKeyNodeContext.Provider>
             </FlowsKeyContext.Provider>
           ) : read === "failed" ? (
             <p

@@ -173,22 +173,23 @@ export function formatPrice(v: number, unitLabel: string): string {
 
 const sig3 = (x: number) => x.toLocaleString("en-US", { maximumSignificantDigits: 3, useGrouping: false });
 
-/** "$2.4k" · "$102k" · "0.998": an axis label, about three significant digits, no symbol for a token. */
-export function formatPriceAxis(v: number, unitLabel: string): string {
-  const a = Math.abs(v);
-  const body =
-    a >= 1e9
-      ? `${sig3(a / 1e9)}B`
-      : a >= 1e6
-        ? `${sig3(a / 1e6)}M`
-        : a >= 1e4
-          ? `${sig3(a / 1e3)}k`
-          : a >= 1000
-            ? a.toLocaleString("en-US", { maximumFractionDigits: 0 })
-            : a === 0
-              ? "0"
-              : sig3(a);
-  return unitLabel === "USD" ? `$${body}` : body;
+/** The price axis's labels, in the heading's unit with no sign: thousands
+ *  and up compact ("2.45k", "1.2M"), below at the fewest places that keep
+ *  every label distinct ("1.5", "1", "0.95"), trailing zeros dropped. */
+export function priceAxisLabels(ticks: number[]): string[] {
+  const compact = (a: number) =>
+    a >= 1e9 ? `${sig3(a / 1e9)}B` : a >= 1e6 ? `${sig3(a / 1e6)}M` : a >= 1e4 ? `${sig3(a / 1e3)}k` : null;
+  const at = (d: number) =>
+    ticks.map((v) => {
+      const c = compact(Math.abs(v));
+      if (c) return `${v < 0 ? "−" : ""}${c}`;
+      return Number(v.toFixed(d)).toLocaleString("en-US", { maximumFractionDigits: d });
+    });
+  for (let d = 0; d <= 8; d++) {
+    const labels = at(d);
+    if (new Set(labels).size === labels.length) return labels;
+  }
+  return at(8);
 }
 
 // ── What the strip draws ────────────────────────────────────────────────────
