@@ -7,7 +7,7 @@
 // and eMode. A balance the block
 // lists is stated there and nowhere else — the grid's cell for that reserve is
 // the statement only until the read lands (§47). A reserve row under a cent is
-// dust and sits behind a "N dust reserve(s) hidden" line per side, unless it is
+// dust and sits behind a "Show dust" line per side, unless it is
 // the reserve the event touched — that row always draws (§52).
 //
 // The rendered card is checked against the SAME answer the page reads —

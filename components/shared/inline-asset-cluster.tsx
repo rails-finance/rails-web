@@ -1,3 +1,7 @@
+"use client";
+
+import { useContext } from "react";
+import { QuietTipsContext } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "./token-chip-icon";
 
 // Compact inline icon cluster for "value + icons" rows on position cards.
@@ -17,6 +21,8 @@ export interface InlineAssetClusterProps {
 }
 
 export function InlineAssetCluster({ symbols, size = 28, overlap = 9, max = 3 }: InlineAssetClusterProps) {
+  // Inside the breakdown button the title falls quiet with the figure's tips.
+  const quiet = useContext(QuietTipsContext);
   if (symbols.length === 0) return null;
   const overflows = symbols.length > max;
   const visible = overflows ? symbols.slice(0, max) : symbols;
@@ -39,7 +45,7 @@ export function InlineAssetCluster({ symbols, size = 28, overlap = 9, max = 3 }:
         // live on the surfaces that trace them.
         <span
           data-prov-exempt=""
-          title={hidden.join(", ")}
+          title={quiet ? undefined : hidden.join(", ")}
           className="relative inline-flex items-center justify-center rounded-full bg-raised text-[10px] font-semibold tabular-nums text-rb-500"
           style={{ marginLeft: -overlap, zIndex: 0, width: size + 4, height: size + 4 }}
         >

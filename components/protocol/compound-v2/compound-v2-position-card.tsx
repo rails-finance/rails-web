@@ -29,6 +29,7 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
+import { TitleTip } from "@/components/shared/reveal-tip";
 import { type ReactNode, useState } from "react";
 import { Check, Copy, Link2 } from "lucide-react";
 import {
@@ -44,6 +45,7 @@ import {
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -222,9 +224,9 @@ function TokenStack({ lines }: { lines: ReactNode[] }) {
 /** A side's USD headline, its full figure on hover. */
 function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   return (
-    <span title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+    <TitleTip title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
       <Prov info={info}>{formatUsd(usd)}</Prov>
-    </span>
+    </TitleTip>
   );
 }
 
@@ -245,9 +247,6 @@ function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): Reac
     </div>
   );
 }
-
-const shareText = (share: number): string =>
-  share > 0 && share < 0.01 ? "under 1%" : `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`;
 
 /** The account's ID and its page on the card's ⋮: the wallet address with a
  *  copy, and the link to this position. */
@@ -408,6 +407,8 @@ export function useCompoundV2CardSlots({
         ) : (
           <TokenStack lines={suppliesShown.map(supplyUnit)} />
         ),
+      total:
+        collUsd != null ? { usd: collUsd.usd, info: compoundV2UsdProvOnchain("Collateral", collUsd.fixed) } : undefined,
       assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
     },
     {
@@ -419,6 +420,8 @@ export function useCompoundV2CardSlots({
         ) : (
           <TokenStack lines={borrowsShown.map(borrowUnit)} />
         ),
+      total:
+        debtUsd != null ? { usd: debtUsd.usd, info: compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed) } : undefined,
       assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
     },
   ];
@@ -481,74 +484,56 @@ export function useCompoundV2CardSlots({
   // Each side's market rows, and the panel: the liquidation line on the left;
   // the rate, the room to borrow and the drop on the right.
   const lineRows = compoundV2LineRows(chain);
-  const supplyRows: PositionPanelRow[] = supplyLines.lines.map((r) => {
-    const share =
-      collUsd && collUsd.usd > 0 && v.supplies.length > 1
-        ? (lineUsd(v, r.market, supplyAmount(r)) ?? 0) / collUsd.usd
-        : null;
-    return {
-      id: `supply-${r.market}`,
-      label: `${r.symbol} supplied`,
-      value: (
-        <>
-          <Prov info={supplyProv(r)}>
-            <ExactSpan
-              exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
-              symbol={r.current != null ? r.cSymbol : r.symbol}
-            >
-              {formatCompact(supplyAmount(r))} {r.symbol}
-            </ExactSpan>
-          </Prov>
-          {share != null && <span className="text-rb-500"> · {shareText(share)}</span>}
-          {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
-        </>
-      ),
-      tip:
-        (r.current != null
-          ? `The ${r.symbol} supplied to this market with its interest: the ${r.cSymbol} balance times the market's exchange rate, read from the chain.`
-          : `The ${r.symbol} deposited to this market without its interest: deposits less withdrawals, replayed from the account's events.`) +
-        (share != null ? " The percentage is its share of the collateral's dollar value." : ""),
-    };
-  });
-  if (supplyLines.control)
-    supplyRows.push({
-      id: "supply-dust",
-      label: "Dust",
-      value: supplyLines.control,
-      tip: "Supplied balances worth under a cent at the oracle price, kept out of the list. The control shows them.",
-    });
-  const borrowRows: PositionPanelRow[] = borrowLines.lines.map((r) => {
-    const share =
-      debtUsd && debtUsd.usd > 0 && v.borrows.length > 1 ? (lineUsd(v, r.market, r.amount) ?? 0) / debtUsd.usd : null;
-    return {
-      id: `borrow-${r.market}`,
-      label: `${r.symbol} borrowed`,
-      value: (
-        <>
-          <Prov info={borrowProv(r)}>
-            <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
-              {formatCompact(r.amount)} {r.symbol}
-            </ExactSpan>
-          </Prov>
-          {!r.live && <StaleDebtNote />}
-          {share != null && <span className="text-rb-500"> · {shareText(share)}</span>}
-          {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
-        </>
-      ),
-      tip:
-        (r.live
-          ? `The ${r.symbol} owed now, interest included: the market's borrowBalanceStored, read from the chain at the latest block.`
-          : `The ${r.symbol} owed at the account's last borrow, repay or liquidation: the accountBorrows that event recorded, without the interest since.`) +
-        (share != null ? " The percentage is its share of the debt's dollar value." : ""),
-    };
-  });
-  if (borrowLines.control)
-    borrowRows.push({
-      id: "borrow-dust",
-      label: "Dust",
-      value: borrowLines.control,
-      tip: "Borrowed balances worth under a cent at the oracle price, kept out of the list. The control shows them.",
-    });
+  const usdCell = (usd: number | null, what: string, fixed: boolean) =>
+    usd != null ? <UsdFigure usd={usd} info={compoundV2UsdProvOnchain(what, fixed)} /> : undefined;
+  const supplyBreakdown: AssetBreakdown = {
+    assets: supplyLines.lines.map((r) => {
+      const usd = lineUsd(v, r.market, supplyAmount(r));
+      return {
+        id: `supply-${r.market}`,
+        symbol: r.symbol,
+        usd,
+        amount: (
+          <>
+            <Prov info={supplyProv(r)}>
+              <ExactSpan
+                exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
+                symbol={r.current != null ? r.cSymbol : r.symbol}
+              >
+                {formatCompact(supplyAmount(r))}
+              </ExactSpan>
+            </Prov>
+            {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
+          </>
+        ),
+        usdText: usdCell(usd, `${r.symbol} supplied`, isFixed(v, r.market)),
+      };
+    }),
+    dust: supplyLines.control ?? undefined,
+  };
+  const borrowBreakdown: AssetBreakdown = {
+    assets: borrowLines.lines.map((r) => {
+      const usd = lineUsd(v, r.market, r.amount);
+      return {
+        id: `borrow-${r.market}`,
+        symbol: r.symbol,
+        usd,
+        amount: (
+          <>
+            <Prov info={borrowProv(r)}>
+              <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+                {formatCompact(r.amount)}
+              </ExactSpan>
+            </Prov>
+            {!r.live && <StaleDebtNote />}
+            {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
+          </>
+        ),
+        usdText: usdCell(usd, `${r.symbol} borrowed`, isFixed(v, r.market)),
+      };
+    }),
+    dust: borrowLines.control ?? undefined,
+  };
   const rate = captions?.borrowRate;
   const rateRows: PositionPanelRow[] = rate
     ? [
@@ -571,9 +556,9 @@ export function useCompoundV2CardSlots({
     // the panel keeps the additive values.
     heads: heads.map((h) =>
       h.id === "collateral" && v.supplies.length > 1
-        ? { ...h, assetRows: supplyRows }
+        ? { ...h, breakdown: supplyBreakdown }
         : h.id === "debt" && v.borrows.length > 1
-          ? { ...h, assetRows: borrowRows }
+          ? { ...h, breakdown: borrowBreakdown }
           : h,
     ),
     outcome: undefined,

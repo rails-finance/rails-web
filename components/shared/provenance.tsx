@@ -261,6 +261,15 @@ export function ProvUnscoped({ children }: { children: ReactNode }) {
   return <ProvUnscopedCtx.Provider value={true}>{children}</ProvUnscopedCtx.Provider>;
 }
 
+const ProvInertCtx = createContext(false);
+
+/** A subtree whose figures keep their receipts (rows in the inspector, the
+ *  coverage stamp) but take no armed click: a figure inside a control (the
+ *  position card's breakdown button), whose receipt another copy carries. */
+export function ProvInert({ children }: { children: ReactNode }) {
+  return <ProvInertCtx.Provider value={true}>{children}</ProvInertCtx.Provider>;
+}
+
 /** A subtree whose figures read as plain text: a tooltip that repeats a
  *  figure the card already traces registers no second receipt. */
 export function ProvDetached({ children }: { children: ReactNode }) {
@@ -1148,7 +1157,8 @@ export function Prov({
   // subscribe meaningfully; outside a scope there is no registry to resolve a
   // receipt from, so the tool ignores the span.
   // Scoped arming (ui-jobs 284): armed on another section leaves this one inert.
-  const inspecting = useProvArmedFor(scope?.scopeId) && registry != null;
+  const inert = useContext(ProvInertCtx);
+  const inspecting = useProvArmedFor(scope?.scopeId) && registry != null && !inert;
   // Structured capture. `display` = the value as it READS on the card: the
   // rendered text minus decoration (`[data-prov-hidden]` — hover tooltips, token
   // glyphs), whitespace-collapsed. The exact figure comes from the `value` prop,

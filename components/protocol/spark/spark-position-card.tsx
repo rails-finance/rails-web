@@ -15,6 +15,7 @@
 // carries no health factor (rails-ops decision 0018): the position page's
 // Pool.getUserAccountData read is the only health factor the card shows.
 
+import { TitleTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link2 } from "lucide-react";
@@ -34,6 +35,7 @@ import { TipLabel } from "@/components/shared/tip-label";
 import type { SparkLife } from "@/lib/spark/lives";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -107,9 +109,6 @@ const PEAK_NOT_COLLATERAL_TIP =
 
 const HF_TIP =
   "The collateral, each asset counted up to its liquidation threshold, divided by the debt, at SparkLend's oracle prices. At or below 1, anyone can liquidate the account.";
-
-const DUST_TIP =
-  "A balance worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind.";
 
 /** "24 days · 7 Oct - 31 Oct 2025", one line per life. */
 function LivesLines({ lives }: { lives: readonly SparkLife[] }) {
@@ -366,7 +365,7 @@ export function useSparkCardSlots({
   const borrowsRanked = rankByValue(v, v.borrows);
   const othersRanked = rankByValue(v, otherSupplies);
   // The panel's reserve rows under the dust rule: dust sits behind the
-  // "N dust reserves hidden" control, drawn as a "Dust" row.
+  // "Show dust" control, drawn as a "Dust" row.
   const supplyLines = useDustLines(suppliesRanked, usdOf);
   const debtLines = useDustLines(borrowsRanked, usdOf);
 
@@ -483,13 +482,15 @@ export function useSparkCardSlots({
           reserves.length > 0 ? (
             <InlineAssetCluster symbols={loadedSymbols(splitDust(ranked, usdOf).shown)} />
           ) : undefined,
+        total:
+          usd != null ? { usd, info: sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed") } : undefined,
         // One oracle-USD figure leads each side; where a reserve is unpriced the
         // token amounts are the headline, so a partial total is never asserted.
         value:
           reserves.length === 0 ? null : usd != null ? (
-            <span title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+            <TitleTip title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
               <Prov info={sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed")}>{formatUsd(usd)}</Prov>
-            </span>
+            </TitleTip>
           ) : (
             <TokenStack
               reserves={ranked}
@@ -551,48 +552,36 @@ export function useSparkCardSlots({
   // ── Each side's reserve rows, and the panel: the supply side's values on
   //    the left, the debt's and its risk on the right. A side whose total is
   //    unpriced has its reserves as the headline and no reserve rows.
-  const reserveRow = (r: SparkReserveAmount, s: "supply" | "debt"): PositionPanelRow => {
-    const usd = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
-    return {
-      id: `${s}-${r.address.toLowerCase()}`,
-      label: `${r.symbol} ${s === "supply" ? "supplied" : "borrowed"}`,
-      value: (
-        <>
-          <ReserveAmountText r={r} side={s} atBlock={v.atBlock} withSymbol={false} />
-          {usd != null && (
-            <span className="text-rb-500">
-              {" · "}
-              <Prov info={sparkUsdProvOnchain(`${r.symbol} ${s === "supply" ? "supplied" : "borrowed"}`)}>
-                {formatUsd(usd)}
-              </Prov>
-            </span>
-          )}
-        </>
-      ),
-      tip:
-        s === "supply"
-          ? `The ${r.symbol} the account supplies as collateral, its spToken balance at the indexed head, interest included.`
-          : `The ${r.symbol} the account owes, its variable debt token balance at the indexed head, interest included.`,
-    };
-  };
-  const dustRow = (control: ReactNode, s: "supply" | "debt"): PositionPanelRow[] =>
-    control ? [{ id: `${s}-dust`, label: "Dust", value: control, tip: DUST_TIP }] : [];
 
   // Each priced side's reserves open under its headline (the chevron by the
   // icons); the panel keeps the additive values.
-  const supplyRows =
-    collUsd != null
-      ? [...supplyLines.lines.map((r) => reserveRow(r, "supply")), ...dustRow(supplyLines.control, "supply")]
-      : [];
-  const debtRows =
-    debtUsd != null
-      ? [...debtLines.lines.map((r) => reserveRow(r, "debt")), ...dustRow(debtLines.control, "debt")]
-      : [];
+  const breakdownOf = (
+    lines: { lines: SparkReserveAmount[]; control: ReactNode },
+    s: "supply" | "debt",
+  ): AssetBreakdown => ({
+    assets: lines.lines.map((r) => {
+      const usd = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
+      return {
+        id: `${s}-${r.address.toLowerCase()}`,
+        symbol: r.symbol,
+        address: r.address,
+        usd,
+        amount: <ReserveAmountText r={r} side={s} atBlock={v.atBlock} withSymbol={false} />,
+        usdText:
+          usd != null ? (
+            <Prov info={sparkUsdProvOnchain(`${r.symbol} ${s === "supply" ? "supplied" : "borrowed"}`)}>
+              {formatUsd(usd)}
+            </Prov>
+          ) : undefined,
+      };
+    }),
+    dust: lines.control ?? undefined,
+  });
   const headsWithRows = heads.map((h) =>
-    h.id === "collateral" && supplyRows.length > 1
-      ? { ...h, assetRows: supplyRows }
-      : h.id === "debt" && debtRows.length > 1
-        ? { ...h, assetRows: debtRows }
+    h.id === "collateral" && collUsd != null && v.supplies.length > 1
+      ? { ...h, breakdown: breakdownOf(supplyLines, "supply") }
+      : h.id === "debt" && debtUsd != null && v.borrows.length > 1
+        ? { ...h, breakdown: breakdownOf(debtLines, "debt") }
         : h,
   );
   const left: PositionPanelRow[] = [];

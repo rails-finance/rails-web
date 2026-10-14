@@ -20,6 +20,7 @@
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
+import { TitleTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import {
   PositionCard,
@@ -32,6 +33,7 @@ import {
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
@@ -173,9 +175,9 @@ function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply
 function UsdFigure({ usd, what }: { usd: number; what: string }) {
   const dep = useMoonwellDeployment();
   return (
-    <span title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+    <TitleTip title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
       <Prov info={dep.card.usd(what)}>{formatUsd(usd)}</Prov>
-    </span>
+    </TitleTip>
   );
 }
 
@@ -285,7 +287,7 @@ export function useMoonwellCardSlots({
   );
   const debtUsd = totalUsd(v, v.borrows);
   // Dust lines (under a cent) leave the icon cluster and the panel's rows;
-  // the "N dust reserves hidden" control puts them back.
+  // the "Show dust" control puts them back.
   const collDust = useDustLines(vc.supplies, supplyLineUsd(v));
   const otherDust = useDustLines(vo.supplies, supplyLineUsd(v));
   const debtDust = useDustLines(v.borrows, borrowLineUsd(v));
@@ -370,6 +372,7 @@ export function useMoonwellCardSlots({
           ),
         assets:
           vc.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
+        total: collUsd != null ? { usd: collUsd, info: dep.card.usd("Collateral") } : undefined,
       },
       {
         id: "debt",
@@ -387,6 +390,7 @@ export function useMoonwellCardSlots({
             </AmountStack>
           ),
         assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
+        total: debtUsd != null ? { usd: debtUsd, info: dep.card.usd("Borrowed") } : undefined,
       },
     ];
     // One market on a side: its amount with its icon, the dollars beneath
@@ -497,41 +501,61 @@ export function useMoonwellCardSlots({
   // Each side's markets open under its headline (the chevron by the icons);
   // the panel keeps the additive values and the supplies that are not
   // collateral.
-  const collRows = [
-    ...collDust.lines.map((r) => supplyRow(r, "collateral", collUsd)),
-    ...dustRow("dust-collateral", collDust.control),
-  ];
+  const usdCell = (usd: number | null, what: string) =>
+    usd != null ? (
+      <span className="text-foreground">
+        <UsdFigure usd={usd} what={what} />
+      </span>
+    ) : undefined;
+  const collBreakdown: AssetBreakdown = {
+    assets: collDust.lines.map((r) => {
+      const usd = lineUsd(v, r.address, supplyAmount(r));
+      return {
+        id: `collateral-${r.address}`,
+        symbol: r.symbol,
+        address: r.address,
+        usd,
+        amount: (
+          <Prov info={supplyProv(r)}>
+            <ExactSpan
+              exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
+              symbol={r.current != null ? mSymbolOf(r) : r.symbol}
+            >
+              {formatCompact(supplyAmount(r))}
+            </ExactSpan>
+          </Prov>
+        ),
+        usdText: usdCell(usd, `${r.symbol} supplied`),
+      };
+    }),
+    dust: collDust.control ?? undefined,
+  };
   const left: PositionPanelRow[] = [
     ...(collateralFactors ? [collateralFactors] : []),
     ...otherDust.lines.map((r) => supplyRow(r, "other", otherUsd)),
     ...dustRow("dust-not-collateral", otherDust.control),
   ];
   const rate = captions?.borrowRate;
-  const debtRows: PositionPanelRow[] = [
-    ...debtDust.lines.map((r): PositionPanelRow => {
+  const debtBreakdown: AssetBreakdown = {
+    assets: debtDust.lines.map((r) => {
       const usd = lineUsd(v, r.address, r.amount);
       return {
         id: `debt-${r.address}`,
-        label: `${r.symbol} borrowed`,
-        tip: `The ${r.symbol} this account owes: the market's borrow balance, with its oracle value and its share of the debt.`,
-        value: (
-          <LineValue
-            amount={
-              <Prov info={borrowProv(r)}>
-                <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
-                  {formatCompact(r.amount)} {r.symbol}
-                </ExactSpan>
-              </Prov>
-            }
-            usd={usd}
-            share={usd != null && debtUsd ? usd / debtUsd : null}
-            usdWhat={`${r.symbol} borrowed`}
-          />
+        symbol: r.symbol,
+        address: r.address,
+        usd,
+        amount: (
+          <Prov info={borrowProv(r)}>
+            <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+              {formatCompact(r.amount)}
+            </ExactSpan>
+          </Prov>
         ),
+        usdText: usdCell(usd, `${r.symbol} borrowed`),
       };
     }),
-    ...dustRow("dust-debt", debtDust.control),
-  ];
+    dust: debtDust.control ?? undefined,
+  };
   const right: PositionPanelRow[] = [
     ...(rate
       ? [
@@ -549,9 +573,9 @@ export function useMoonwellCardSlots({
   ];
   const headsWithRows = heads.map((h) =>
     h.id === "collateral" && vc.supplies.length > 1
-      ? { ...h, assetRows: collRows }
+      ? { ...h, breakdown: collBreakdown }
       : h.id === "debt" && v.borrows.length > 1
-        ? { ...h, assetRows: debtRows }
+        ? { ...h, breakdown: debtBreakdown }
         : h,
   );
   return { ...detailCommon, heads: headsWithRows, outcome: undefined, panel: [left, right] };

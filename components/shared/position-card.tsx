@@ -31,23 +31,25 @@
 // `data-card-row=<i>` and adds `data-card-head=<id>`; the counters carry
 // `data-card-counters`, inside a listing card's `data-card-foot`.
 
-import { useId, useState, type ReactNode } from "react";
-import { DiscChevron } from "@/components/shared/expand-chevron";
-import { POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { AnchoredPanel } from "@/components/shared/asset-popover";
+import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
+import { QuietTipsContext } from "@/components/shared/reveal-tip";
+import { formatUsd } from "@/lib/shared/format-event";
+import { OVERLAY_HEADING, POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   POSITION_CARD_SCOPE,
+  Prov,
+  ProvInert,
   ProvReceiptsScope,
   ProvUnscoped,
+  type Provenance,
   useProvScopeLit,
   useReceiptRegistry,
 } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import {
-  PositionCardPanel,
-  type PositionPanelColumns,
-  type PositionPanelRow,
-} from "@/components/shared/position-card-panel";
+import { PositionCardPanel, type PositionPanelColumns } from "@/components/shared/position-card-panel";
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { RowHelp } from "@/components/shared/row-help";
 import { TipLabel } from "@/components/shared/tip-label";
@@ -99,10 +101,13 @@ export interface PositionCardHead {
   /** A short third line in the muted label colour: the batch manager under
    *  Interest rate, "interest-free". */
   sub?: ReactNode;
-  /** The side's assets, one row each (amount, USD, share): on a detail card
-   *  a chevron after the icon cluster opens them under the figure, growing
-   *  the card. */
-  assetRows?: PositionPanelRow[];
+  /** A side of two or more assets: on a detail card the donut button after
+   *  the icon cluster opens their breakdown in a popover (a bottom sheet on
+   *  a phone), one side at a time (`asset-donut.tsx`). */
+  breakdown?: AssetBreakdown;
+  /** The side's USD total and its receipt: the breakdown's heading states it
+   *  exact, and carries the receipt the headline (inside the button) cannot. */
+  total?: { usd: number; info: Provenance };
 }
 
 /** The (i) Explanation at the foot of a detail card. */
@@ -305,21 +310,49 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
   );
 }
 
-function HeadBody({ head, detail }: { head: PositionCardHead; detail: boolean }) {
-  const rows = detail ? (head.assetRows ?? []) : [];
-  const [open, setOpen] = useState(false);
-  const listId = useId();
-  const chevron = rows.length > 0 && (
+function HeadBody({
+  head,
+  toggle,
+}: {
+  head: PositionCardHead;
+  /** The breakdown's button, where the side has one on a detail card. */
+  toggle?: {
+    open: boolean;
+    panelId: string;
+    onToggle: () => void;
+    buttonRef: (el: HTMLButtonElement | null) => void;
+  };
+}) {
+  // The figure, the side's icons and "+N" as one button: it opens the
+  // breakdown. The figure inside keeps its receipt row but takes no click
+  // and no tip; the breakdown's heading carries both.
+  const trigger = toggle && (
     <button
+      ref={toggle.buttonRef}
       type="button"
-      onClick={() => setOpen((v) => !v)}
-      aria-expanded={open}
-      aria-controls={listId}
-      aria-label={open ? `Hide the ${head.label.toLowerCase()} assets` : `Show the ${head.label.toLowerCase()} assets`}
-      className="-m-1.5 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md p-1.5 text-rb-500 hover:text-foreground focus-ring sm:min-h-0 sm:min-w-0"
+      onClick={(e) => {
+        // The card can be a link: the press is the button's alone.
+        e.preventDefault();
+        e.stopPropagation();
+        toggle.onToggle();
+      }}
+      aria-haspopup="dialog"
+      aria-expanded={toggle.open}
+      aria-controls={toggle.open ? toggle.panelId : undefined}
+      aria-label={[
+        head.total ? `${head.label} ${formatUsd(head.total.usd)}` : head.label,
+        head.breakdown ? `${head.breakdown.assets.length} assets` : null,
+        "show breakdown",
+      ]
+        .filter(Boolean)
+        .join(", ")}
+      className={`-mx-1.5 -my-1 flex cursor-pointer flex-wrap items-center gap-x-1.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${toggle.open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
       data-card-assets-toggle={head.id}
     >
-      <DiscChevron isOpen={open} />
+      <QuietTipsContext.Provider value={true}>
+        <ProvInert>{head.value}</ProvInert>
+        <span className="inline-flex shrink-0 items-center">{head.assets}</span>
+      </QuietTipsContext.Provider>
     </button>
   );
   return (
@@ -330,23 +363,13 @@ function HeadBody({ head, detail }: { head: PositionCardHead; detail: boolean })
         <StatDash />
       ) : (
         <StatValue>
-          {head.assets || chevron ? (
-            chevron ? (
-              // The icons and the chevron kept whole, onto a line of their own
-              // where the column is narrow.
-              <span className="flex flex-wrap items-center gap-x-1.5">
-                {head.value}
-                <span className="inline-flex shrink-0 items-center gap-1.5">
-                  {head.assets}
-                  {chevron}
-                </span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5">
-                {head.value}
-                {head.assets}
-              </span>
-            )
+          {trigger ? (
+            trigger
+          ) : head.assets ? (
+            <span className="flex items-center gap-1.5">
+              {head.value}
+              {head.assets}
+            </span>
           ) : (
             head.value
           )}
@@ -362,48 +385,96 @@ function HeadBody({ head, detail }: { head: PositionCardHead; detail: boolean })
           {head.sub}
         </div>
       )}
-      {open && rows.length > 0 && (
-        <dl
-          id={listId}
-          className="mt-2 grid grid-cols-1 gap-y-0 text-sm sm:grid-cols-[auto_minmax(0,1fr)] sm:items-baseline sm:gap-x-4 sm:gap-y-1"
-          data-card-assets={head.id}
-        >
-          {rows.map((r) => (
-            <div key={r.id} className="contents" data-card-asset-row={r.id}>
-              {/* Under 640px the label over its value: the column is half the card. */}
-              <dt className="text-rb-500 max-sm:mt-1.5 max-sm:text-xs">
-                {r.label}
-                {r.tip && <RowHelp tip={r.tip} name={r.label} />}
-              </dt>
-              <dd className="min-w-0 break-words tabular-nums text-foreground">{r.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
     </>
   );
 }
 
 function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
   const n = heads.length;
+  // The breakdowns: the donut button opens its side's in a popover anchored
+  // to it (a bottom sheet on a phone), one side at a time; the card keeps
+  // its shape.
+  const [open, setOpen] = useState<string | null>(null);
+  const buttons = useRef<Record<string, HTMLButtonElement | null>>({});
+  const panelId = useId();
+  const sideOf = (h: PositionCardHead) => (h.id === "debt" ? "debt" : "collateral");
+  const has = (h: PositionCardHead) => detail && !!h.breakdown && h.breakdown.assets.length > 1;
+  const toggleOf = (h: PositionCardHead) =>
+    has(h)
+      ? {
+          open: open === h.id,
+          panelId: `${panelId}-${h.id}`,
+          onToggle: () => setOpen((o) => (o === h.id ? null : h.id)),
+          buttonRef: (el: HTMLButtonElement | null) => {
+            buttons.current[h.id] = el;
+          },
+        }
+      : undefined;
+  const openHead = heads.find((h) => h.id === open && has(h));
+  const close = (refocus: boolean) => {
+    const id = open;
+    setOpen(null);
+    if (refocus && id) buttons.current[id]?.focus();
+  };
+  const exact = (usd: number) =>
+    "$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
   return (
-    <div className={OPEN_GRID[n] ?? OPEN_GRID[3]} data-anatomy="C10">
-      {heads.map((h, i) => (
-        <PositionCardRow
-          key={h.id}
-          index={i}
-          head={h.id}
-          label={h.label}
-          labelTip={h.labelTip}
-          headerIcon={h.labelIcon}
-          // Three on a phone: the third spans the row, so it is not stranded
-          // beside an empty cell.
-          className={n === 3 && i === 2 ? "col-span-2 sm:col-span-1" : undefined}
-        >
-          <HeadBody head={h} detail={detail} />
-        </PositionCardRow>
-      ))}
-    </div>
+    <>
+      <div className={OPEN_GRID[n] ?? OPEN_GRID[3]} data-anatomy="C10">
+        {heads.map((h, i) => (
+          <PositionCardRow
+            key={h.id}
+            index={i}
+            head={h.id}
+            label={h.label}
+            labelTip={h.labelTip}
+            headerIcon={h.labelIcon}
+            // Three on a phone: the third spans the row, so it is not stranded
+            // beside an empty cell.
+            className={n === 3 && i === 2 ? "col-span-2 sm:col-span-1" : undefined}
+          >
+            <HeadBody head={h} toggle={toggleOf(h)} />
+          </PositionCardRow>
+        ))}
+      </div>
+      {openHead?.breakdown && (
+        // The overlay renders in a portal, but its events still pass through
+        // the card's React handlers: this stops them here.
+        <span className="contents" onClick={(e) => e.stopPropagation()}>
+          <AnchoredPanel
+            id={`${panelId}-${openHead.id}`}
+            label={title}
+            anchor={() => buttons.current[openHead.id] ?? null}
+            onClose={() => close(true)}
+            fit={420}
+            drop
+            name="breakdown-panel"
+            // The slices grade toward the overlay's ground.
+            surface="overlay"
+            className="[--donut-ground:var(--surface-overlay)] max-sm:[--donut-ground:var(--surface-raised)] dark:[--donut-ground:var(--color-rb-900)]"
+          >
+            <p className="mb-3 flex items-baseline gap-2 pr-8 sm:pr-0" data-breakdown-heading="">
+              <span className={OVERLAY_HEADING}>{openHead.label}</span>
+              {openHead.total && (
+                <Prov info={openHead.total.info} echo>
+                  <span className="text-sm font-semibold tabular-nums text-foreground">
+                    {exact(openHead.total.usd)}
+                  </span>
+                </Prov>
+              )}
+            </p>
+            <AssetBreakdownPanel
+              key={openHead.id}
+              id={`${panelId}-${openHead.id}-body`}
+              name={openHead.label}
+              side={sideOf(openHead)}
+              breakdown={openHead.breakdown}
+            />
+          </AnchoredPanel>
+        </span>
+      )}
+    </>
   );
 }
 
@@ -432,7 +503,7 @@ function ClosedGrid({
           labelTip={h.labelTip}
           headerIcon={h.labelIcon}
         >
-          <HeadBody head={h} detail={detail} />
+          <HeadBody head={h} />
         </PositionCardRow>
       ))}
       {peaks.length < 2 && <div className="hidden sm:block" />}

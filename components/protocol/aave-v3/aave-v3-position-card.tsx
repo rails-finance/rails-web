@@ -35,6 +35,7 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -217,16 +218,6 @@ function ReserveAmounts({
       ))}
     </span>
   );
-}
-
-/** A reserve's share of its side's oracle USD. */
-function shareProv(side: "supply" | "debt", symbol: string): Provenance {
-  const whole = side === "supply" ? "everything the account supplies" : "everything the account owes";
-  return {
-    kind: "derived",
-    summary: `Share of the side — ${symbol}'s part of ${whole}, by dollar value at the price the Pool's oracle reports for each reserve.`,
-    formula: "reserve USD ÷ side USD",
-  };
 }
 
 /** The ⋮'s row for this position: a link to its page. An Aave V3 account has
@@ -462,6 +453,7 @@ export function useAaveV3CardSlots({
           />
         ),
       pending: reserves.length > 0 && pending,
+      total: usd != null ? { usd, info: dep.usd(usdWhat) } : undefined,
       assets: reserves.length > 0 && usd != null ? <InlineAssetCluster symbols={loadedSymbols(shown)} /> : undefined,
     };
   };
@@ -526,58 +518,40 @@ export function useAaveV3CardSlots({
 
   // ── Each side's reserve rows, and the panel: the supplied side's values
   //    on the left, the borrowed side's and the risk on the right.
-  const reserveRows = (
+  const reserveBreakdown = (
     side: "supply" | "debt",
     split: { shown: AaveV3ReserveAmount[]; dust: AaveV3ReserveAmount[] },
-    total: number | null,
-  ): PositionPanelRow[] => {
+  ): AssetBreakdown => {
     const dustByValue = [...split.dust].sort((a, b) => (usdOf(b) ?? 0) - (usdOf(a) ?? 0));
     const lines = dust.open ? [...split.shown, ...dustByValue] : split.shown;
-    const rows: PositionPanelRow[] = lines.map((r) => {
-      const usd = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
-      const share = total != null && total > 0 && usd != null ? (usd / total) * 100 : null;
-      return {
-        id: `${side}-${r.address.toLowerCase()}`,
-        label: r.symbol,
-        tip:
-          side === "supply"
-            ? `The ${r.symbol} this wallet supplies: the balance the reserve's aToken reports, interest included, with its dollar value at the price the Pool's oracle reports and its share of everything supplied.`
-            : `The ${r.symbol} this wallet owes: the balance the reserve's variable debt token reports, interest included, with its dollar value at the price the Pool's oracle reports and its share of everything owed.`,
-        value: r.decimalsUnread ? (
-          <TokenAmountNotLoaded address={r.address} label={r.symbol} />
-        ) : (
-          <span>
+    return {
+      assets: lines.map((r) => {
+        const usd = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
+        return {
+          id: `${side}-${r.address.toLowerCase()}`,
+          symbol: r.symbol,
+          address: r.address,
+          usd,
+          amount: r.decimalsUnread ? (
+            <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+          ) : (
             <Prov info={side === "supply" ? dep.supply(r.symbol, v.atBlock) : dep.debt(r.symbol, v.atBlock)}>
               <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
                 {formatCompact(r.amount)}
               </ExactSpan>
             </Prov>
-            {usd != null && (
-              <>
-                {" · "}
-                <Prov info={dep.usd(`${side === "supply" ? "Supplied" : "Borrowed"} ${r.symbol}`)}>
-                  {formatUsd(usd)}
-                </Prov>
-              </>
-            )}
-            {share != null && (
-              <>
-                {" · "}
-                <Prov info={shareProv(side, r.symbol)}>{share < 1 ? "<1" : share.toFixed(0)}%</Prov>
-              </>
-            )}
-          </span>
-        ),
-      };
-    });
-    if (split.dust.length > 0)
-      rows.push({
-        id: `${side}-dust`,
-        label: "Dust",
-        tip: "A balance worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind.",
-        value: <DustToggle count={split.dust.length} open={dust.open} onToggle={dust.toggle} />,
-      });
-    return rows;
+          ),
+          usdText:
+            usd != null ? (
+              <Prov info={dep.usd(`${side === "supply" ? "Supplied" : "Borrowed"} ${r.symbol}`)}>{formatUsd(usd)}</Prov>
+            ) : undefined,
+        };
+      }),
+      dust:
+        split.dust.length > 0 ? (
+          <DustToggle count={split.dust.length} open={dust.open} onToggle={dust.toggle} />
+        ) : undefined,
+    };
   };
 
   const interestRow = (side: "supply" | "debt"): PositionPanelRow | null => {
@@ -706,9 +680,9 @@ export function useAaveV3CardSlots({
   // the panel keeps the additive values.
   const withRows = heads.map((h) =>
     h.id === "collateral" && v.supplies.length > 1
-      ? { ...h, assetRows: reserveRows("supply", suppliesSplit, collUsd) }
+      ? { ...h, breakdown: reserveBreakdown("supply", suppliesSplit) }
       : h.id === "debt" && v.borrows.length > 1
-        ? { ...h, assetRows: reserveRows("debt", borrowsSplit, debtUsd) }
+        ? { ...h, breakdown: reserveBreakdown("debt", borrowsSplit) }
         : h,
   );
   return {

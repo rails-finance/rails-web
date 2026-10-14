@@ -25,6 +25,13 @@ import { provInspector } from "@/components/shared/provenance";
  *  tip), a nested RevealTip shows its children and opens no second bubble. */
 export const QuietTipsContext = createContext(false);
 
+/** A span with a hover title that, like RevealTip, falls quiet inside
+ *  QuietTipsContext (a figure inside a button). */
+export function TitleTip({ title, children }: { title: string; children: ReactNode }) {
+  const quiet = useContext(QuietTipsContext);
+  return <span title={quiet ? undefined : title}>{children}</span>;
+}
+
 export function RevealTip({
   tip,
   children,

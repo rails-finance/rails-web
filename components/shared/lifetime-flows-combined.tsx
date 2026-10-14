@@ -1023,18 +1023,20 @@ function PriceTip({ x, w, children }: { x: number; w: number; children: ReactNod
   );
 }
 
-/** The value labels in the lead-in at the plot's left, each just above its
- *  gridline (under it at the top). */
+/** The value labels in the lead-in at the plot's left, each centred on its
+ *  gridline. */
 function AxisLabels({ ticks, y, label }: { ticks: number[]; y: (v: number) => number; label: (v: number) => string }) {
   return (
     <>
       {ticks.map((t) => {
         const ty = y(t);
         return (
+          // Centred on its gridline, on the card's ground so it stands clear
+          // of the line under it.
           <span
             key={t}
-            className="pointer-events-none absolute text-[10px] leading-none tabular-nums text-rb-500"
-            style={{ left: STRIP_PAD + 1, ...(ty < 14 ? { top: ty + 2 } : { top: ty - 11 }) }}
+            className="pointer-events-none absolute -translate-y-1/2 rounded-sm bg-raised px-0.5 text-[10px] leading-none tabular-nums text-rb-500"
+            style={{ left: STRIP_PAD, top: Math.max(5, Math.min(STRIP_H - 5, ty)) }}
           >
             {label(t)}
           </span>
@@ -1197,7 +1199,7 @@ function LineStrip({
             x2={w - STRIP_PAD}
             y1={y(t)}
             y2={y(t)}
-            className="stroke-rb-400/20 dark:stroke-rb-500/25"
+            className="stroke-rb-400/12 dark:stroke-rb-500/15"
             strokeWidth={1}
             data-flow-gridline=""
           />
@@ -1408,7 +1410,7 @@ function PriceStrip({
             x2={w - STRIP_PAD}
             y1={y(t)}
             y2={y(t)}
-            className="stroke-rb-400/20 dark:stroke-rb-500/25"
+            className="stroke-rb-400/12 dark:stroke-rb-500/15"
             strokeWidth={1}
             data-flow-gridline=""
           />

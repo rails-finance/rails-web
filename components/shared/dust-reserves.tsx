@@ -6,7 +6,7 @@
 // whose card lists them.
 //
 // RULE: a line whose priced USD value is under a cent is dust. A line with no
-// price is held, not dust. Dust lines sit behind an "N dust reserves hidden"
+// price is held, not dust. Dust lines sit behind a "Show dust"
 // control. On a position card, opening it shows them after the other lines,
 // largest USD first, and a side whose lines are all dust shows them all and
 // no control, so the side never reads as empty. The headline USD total keeps
@@ -43,19 +43,19 @@ export function useDustOpen(): { open: boolean; toggle: () => void } {
   return { open: open || armed, toggle: () => setOpen((o) => !o) };
 }
 
-/** The dotted-underline "N dust reserves hidden" / "Hide dust" control. */
+/** The dotted-underline "Show dust" / "Hide dust" control. */
 export function DustToggle({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
   if (count === 0) return null;
   return (
     <button
       type="button"
-      className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+      className="text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
       data-dust-hidden={count}
       title="Dust: a balance worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open to see it."
       aria-expanded={open}
       onClick={onToggle}
     >
-      {open ? "Hide dust" : `${count} dust reserve${count === 1 ? "" : "s"} hidden`}
+      {open ? "Hide dust" : "Show dust"}
     </button>
   );
 }

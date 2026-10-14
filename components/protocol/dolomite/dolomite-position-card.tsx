@@ -36,6 +36,7 @@ import {
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
@@ -204,12 +205,6 @@ function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   );
 }
 
-/** A line's share of its side's oracle-USD total, as the panel states it. */
-function shareText(share: number): string {
-  if (share >= 0.995) return "100%";
-  return share < 0.01 ? "<1%" : `${Math.round(share * 100)}%`;
-}
-
 /** An account's name that explains the account number on hover or tap: the
  *  card header and a transfer row's other account carry the same tip. The
  *  tip is a paragraph, so it wraps at a fixed width. */
@@ -340,6 +335,7 @@ export function useDolomiteCardSlots({
           ) : v.supplies.length > 0 ? (
             <LegLines lines={supplyLines.lines} side="supply" />
           ) : null,
+        total: collUsd != null ? { usd: collUsd, info: dolomiteUsdProv("Collateral") } : undefined,
         assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} /> : undefined,
       },
       {
@@ -351,6 +347,7 @@ export function useDolomiteCardSlots({
           ) : v.borrows.length > 0 ? (
             <LegLines lines={borrowLines.lines} side="debt" />
           ) : null,
+        total: debtUsd != null ? { usd: debtUsd, info: dolomiteUsdProv("Borrowed") } : undefined,
         assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} /> : undefined,
       },
     ];
@@ -428,15 +425,15 @@ export function useDolomiteCardSlots({
   const rate = captions?.borrowRate;
   // Each side's markets open under its headline (the chevron by the icons);
   // the panel keeps the rate and the risk.
-  const supplyRows = marketRows(v, "supply", supplyLines, collUsd);
-  const debtRows = marketRows(v, "debt", borrowLines, debtUsd);
+  const supplyBreakdown = marketBreakdown(v, "supply", supplyLines);
+  const debtBreakdown = marketBreakdown(v, "debt", borrowLines);
   return {
     ...detailCommon,
     heads: detailCommon.heads.map((h) =>
       h.id === "collateral" && v.supplies.length > 1
-        ? { ...h, assetRows: supplyRows }
+        ? { ...h, breakdown: supplyBreakdown }
         : h.id === "debt" && v.borrows.length > 1
-          ? { ...h, assetRows: debtRows }
+          ? { ...h, breakdown: debtBreakdown }
           : h,
     ),
     outcome: undefined,
@@ -465,48 +462,39 @@ export function useDolomiteCardSlots({
   };
 }
 
-/** One side's panel rows: each market's amount with its share of the side's
- *  oracle-USD total (the share is stated where the side has several markets and
- *  a stated total), then the dust control where lines are hidden. */
-function marketRows(
+/** One side's markets for the donut's breakdown (asset-donut.tsx), with the
+ *  dust control where lines are hidden. */
+function marketBreakdown(
   v: DolomitePositionView,
   side: "supply" | "debt",
   { lines, control }: { lines: DolomiteBalanceAmount[]; control: React.ReactNode },
-  total: number | null,
-): PositionPanelRow[] {
-  const all = side === "supply" ? v.supplies : v.borrows;
+): AssetBreakdown {
   const usdOf = dustUsdOf(v);
-  const sharing = total != null && total > 0 && all.length > 1;
-  const rows: PositionPanelRow[] = lines.map((r) => {
-    const usd = usdOf(r);
-    return {
-      id: `${side}-${r.marketId}`,
-      label: `${r.symbol} ${side === "supply" ? "supplied" : "borrowed"}`,
-      value: (
-        <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-          {r.decimalsUnread ? (
-            <TokenAmountNotLoaded label={r.symbol} />
-          ) : (
-            <Prov info={legProv(r, side)}>
-              <ExactSpan exact={legExact(r)} symbol={r.symbol}>
-                {formatCompact(legAmount(r))} {r.symbol}
-              </ExactSpan>
-            </Prov>
-          )}
-          {sharing && usd != null && <span className="text-rb-500">{shareText(usd / total)}</span>}
-        </span>
-      ),
-      tip: `This account's ${r.symbol} ${side === "supply" ? "balance" : "debt"}: its par times the market's ${side === "supply" ? "supply" : "borrow"} index, so interest is included, read from the Dolomite core.${sharing ? ` The percentage is its share of the ${side === "supply" ? "collateral" : "debt"}'s oracle value.` : ""}`,
-    };
-  });
-  if (control)
-    rows.push({
-      id: `${side}-dust`,
-      label: side === "supply" ? "Collateral dust" : "Debt dust",
-      value: control,
-      tip: "Balances worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open the control to list them above.",
-    });
-  return rows;
+  return {
+    assets: lines.map((r) => {
+      const usd = usdOf(r);
+      return {
+        id: `${side}-${r.marketId}`,
+        symbol: r.symbol,
+        address: r.token,
+        usd,
+        amount: r.decimalsUnread ? (
+          <TokenAmountNotLoaded label={r.symbol} />
+        ) : (
+          <Prov info={legProv(r, side)}>
+            <ExactSpan exact={legExact(r)} symbol={r.symbol}>
+              {formatCompact(legAmount(r))}
+            </ExactSpan>
+          </Prov>
+        ),
+        usdText:
+          usd != null ? (
+            <UsdFigure usd={usd} info={dolomiteUsdProv(`${r.symbol} ${side === "supply" ? "supplied" : "borrowed"}`)} />
+          ) : undefined,
+      };
+    }),
+    dust: control ?? undefined,
+  };
 }
 
 /** The Dolomite account card: its slots, drawn by the shared card. */

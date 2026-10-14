@@ -240,6 +240,15 @@
   --rb-chart-grid: oklch(0.8979 calc(0.0183 * var(--paper-chroma)) var(--paper-hue));
   --rb-tooltip-bg: oklch(0.991 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
   --rb-tooltip-border: oklch(0.9159 calc(0.0154 * var(--paper-chroma)) var(--paper-hue));
+
+  /* The position card's asset donut (components/shared/asset-donut.tsx):
+     each side's tone (collateral blue, debt green, as the headlines), graded
+     toward the card's ground by size rank there; the rest in a muted grey. */
+  --donut-collateral: var(--color-blue-500);
+  --donut-debt: var(--color-green-400);
+  /* The faintest slice's strength, in percent. */
+  --donut-floor: 25;
+  --donut-other: var(--color-rb-300);
 }
 
 .dark {
@@ -287,6 +296,9 @@
   --rb-chart-grid: #14161e;
   --rb-tooltip-bg: #050507;
   --rb-tooltip-border: #14161e;
+
+  --donut-floor: 35;
+  --donut-other: var(--color-rb-500);
 
   /* Notice panel — dark side: a deep translucent caution wash + a brighter left
      rule so the panel reads against the dark canvas. */

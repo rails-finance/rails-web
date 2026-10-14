@@ -36,6 +36,7 @@ import {
 import type { PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -309,10 +310,6 @@ function CompoundMenuRows({ pagePath }: { pagePath: string }) {
 const COUNT_TIP =
   "Every transaction on this position except absorbs, which another account sends. The timeline counts events, and one transaction can write two or more: an absorb writes one for each seized asset and one for the debt, and one transaction can add collateral and borrow.";
 
-const COLLATERAL_ROW_TIP =
-  "The amount of this asset posted as collateral, and its share of the collateral's value at the Comet's oracle prices.";
-const LENT_ROW_TIP = "The base the account lends to the market, which earns the supply rate.";
-
 /** What a Compound V3 page or listing hands the card. */
 export interface CompoundPositionCardProps {
   v: CompoundPositionView;
@@ -520,6 +517,10 @@ export function useCompoundCardSlots({
         ),
       assets:
         supplyUsd != null && supplySymbols.length > 0 ? <InlineAssetCluster symbols={supplySymbols} /> : undefined,
+      total:
+        supplyUsd != null
+          ? { usd: supplyUsd, info: compoundUsdProvOnchain(lending ? "Lent base" : "Collateral", coords) }
+          : undefined,
       sub: lending ? lentBasis : undefined,
     };
     // One supply line: its amount with its icon, the dollars beneath (the
@@ -574,53 +575,42 @@ export function useCompoundCardSlots({
     const risk = borrowing && live !== undefined ? compoundRiskSlots(live) : null;
     heads = [supplyHead, debtHead, ...(risk ? [risk.head] : [])];
 
-    // The supply lines, opened under the supply headline (the chevron by the
-    // icons): one row per line, with its share of the side's value where the
-    // side holds two or more priced lines.
-    const shareOf = (l: SupplyLeg) => {
-      if (supplyUsd == null || supplyUsd <= 0 || lines.length < 2) return null;
-      const u = usdOf(l);
-      return u == null ? null : u / supplyUsd;
-    };
-    const supplyRows: PositionPanelRow[] = lines.map((l) => {
-      const c = l.collateral;
-      const share = shareOf(l);
-      const figure = c?.decimalsUnread ? (
-        <TokenAmountNotLoaded address={c.address} label={c.symbol} />
-      ) : (
-        <Prov
-          info={
-            c
-              ? vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })
-              : baseProv(v, eff, "lend", vocab, lane)
-          }
-        >
-          <ExactSpan exact={c ? formatUnitsExact(c.amountRaw, c.decimals) : baseExact} symbol={l.symbol}>
-            {formatCompact(l.amount)} {l.symbol}
-          </ExactSpan>
-        </Prov>
-      );
-      return {
-        id: c ? `collateral-${c.symbol.toLowerCase()}` : "lent",
-        label: c ? c.symbol : "Lent",
-        tip: c ? COLLATERAL_ROW_TIP : LENT_ROW_TIP,
-        value:
-          share != null ? (
-            <>
-              {figure} <span className="text-rb-500">· {(share * 100).toFixed(1)}%</span>
-            </>
+    // The supply lines, the donut's breakdown (asset-donut.tsx) where the side
+    // holds two or more.
+    const supplyBreakdown: AssetBreakdown = {
+      assets: lines.map((l) => {
+        const c = l.collateral;
+        const usd = usdOf(l);
+        return {
+          id: c ? `collateral-${c.symbol.toLowerCase()}` : "lent",
+          symbol: l.symbol,
+          address: l.address,
+          usd,
+          amount: c?.decimalsUnread ? (
+            <TokenAmountNotLoaded address={c.address} label={c.symbol} />
           ) : (
-            figure
+            <Prov
+              info={
+                c
+                  ? vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })
+                  : baseProv(v, eff, "lend", vocab, lane)
+              }
+            >
+              <ExactSpan exact={c ? formatUnitsExact(c.amountRaw, c.decimals) : baseExact} symbol={l.symbol}>
+                {formatCompact(l.amount)}
+              </ExactSpan>
+            </Prov>
           ),
-      };
-    });
-    if (dustControl)
-      supplyRows.push({
-        id: "dust",
-        label: "Dust",
-        tip: "Balances worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind.",
-        value: dustControl,
-      });
+          usdText:
+            usd != null ? (
+              <Prov info={compoundUsdProvOnchain(c ? `${l.symbol} collateral` : "Lent base", coords)}>
+                {formatUsdValue(usd)}
+              </Prov>
+            ) : undefined,
+        };
+      }),
+      dust: dustControl ?? undefined,
+    };
     // Panel, right: the borrower's room and the absorb line, then the block
     // the live balance was read at (interest accrues every block).
     const right: PositionPanelRow[] = [...(risk?.rows ?? [])];
@@ -631,7 +621,7 @@ export function useCompoundCardSlots({
         tip: "The block the Comet's balance was read at. Interest accrues every block, so the balance moves between loads.",
         value: v.current.block.toLocaleString("en-US"),
       });
-    if (!oneLine && supplyRows.length > 1) heads[0] = { ...heads[0], assetRows: supplyRows };
+    if (!oneLine && lines.length > 1) heads[0] = { ...heads[0], breakdown: supplyBreakdown };
     panel = [[], right];
   }
 

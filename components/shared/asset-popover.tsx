@@ -106,7 +106,7 @@ export function AssetPopover({
         // The panel renders in a portal, but its events still pass through
         // the card's React handlers: this stops them here.
         <span className="contents" onClick={(e) => e.stopPropagation()}>
-          <AssetPanelShell id={panelId} label={label} anchor={() => triggerRef.current} onClose={close}>
+          <AnchoredPanel id={panelId} label={label} anchor={() => triggerRef.current} onClose={close}>
             <AssetPanelBody
               symbol={symbol}
               name={name}
@@ -116,7 +116,7 @@ export function AssetPopover({
               price={price}
               priceSource={priceSource}
             />
-          </AssetPanelShell>
+          </AnchoredPanel>
         </span>
       )}
     </span>
@@ -189,30 +189,50 @@ function AssetPanelBody({
   );
 }
 
-/** The anchored popover above 640px, the bottom sheet under it. */
-function AssetPanelShell({
+/** The anchored popover above 640px, the bottom sheet under it: the asset
+ *  panel's shell, shared with the position card's breakdowns. */
+export function AnchoredPanel({
   id,
   label,
   anchor,
   onClose,
+  fit,
+  drop,
+  sheetHeader,
+  name = "asset-popover-panel",
+  surface = "tooltip",
+  className,
   children,
 }: {
   id: string;
   label: string;
   anchor: () => HTMLElement | null;
   onClose: () => void;
+  /** Width to the content, up to this many pixels, in place of the asset
+   *  panel's fixed width. */
+  fit?: number;
+  /** Under the anchor, as a dropdown, where the room below allows. */
+  drop?: boolean;
+  /** The bottom sheet's heading row. */
+  sheetHeader?: ReactNode;
+  /** The panel's data attribute (`data-<name>="popover" | "sheet"`). */
+  name?: string;
+  /** The tooltip's surface (the asset panel), or the dropdown menus'
+   *  (`.overlay-panel`). */
+  surface?: "tooltip" | "overlay";
+  className?: string;
   children: ReactNode;
 }) {
   const phone = useMediaQuery(PHONE_QUERY);
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; tall: boolean } | null>(null);
   const latest = useRef({ anchor, onClose });
   useLayoutEffect(() => {
     latest.current = { anchor, onClose };
   });
 
   // Over the icon, clamped inside the viewport; under it where the room above
-  // is short. Re-placed on scroll and resize.
+  // is short (a dropdown the other way round). Re-placed on scroll and resize.
   useLayoutEffect(() => {
     if (phone) return;
     const place = () => {
@@ -222,13 +242,26 @@ function AssetPanelShell({
       const r = a.getBoundingClientRect();
       const vw = document.documentElement.clientWidth;
       const vh = window.innerHeight;
-      const width = Math.min(POP_W, vw - GUTTER * 2);
+      const width = Math.min(fit != null ? el.offsetWidth : POP_W, vw - GUTTER * 2);
       const h = el.offsetHeight;
       const mid = r.left + r.width / 2;
       const left = Math.min(Math.max(GUTTER, mid - width / 2), vw - GUTTER - width);
       const above = r.top - 8 - h;
-      const top = above >= GUTTER || r.bottom + 8 + h > vh - GUTTER ? Math.max(GUTTER, above) : r.bottom + 8;
-      setPos((p) => (p && p.top === top && p.left === left && p.width === width ? p : { top, left, width }));
+      const roomBelow = r.bottom + 8 + h <= vh - GUTTER;
+      const top = drop
+        ? roomBelow
+          ? r.bottom + 8
+          : above >= GUTTER
+            ? above
+            : Math.max(GUTTER, vh - GUTTER - h)
+        : above >= GUTTER || !roomBelow
+          ? Math.max(GUTTER, above)
+          : r.bottom + 8;
+      // Taller than the viewport: it scrolls (else nothing clips a tip in it).
+      const tall = el.scrollHeight > vh - GUTTER * 2;
+      setPos((p) =>
+        p && p.top === top && p.left === left && p.width === width && p.tall === tall ? p : { top, left, width, tall },
+      );
     };
     place();
     window.addEventListener("scroll", place, true);
@@ -269,8 +302,8 @@ function AssetPanelShell({
   if (typeof document === "undefined") return null;
   if (phone)
     return (
-      <MobileSheet label={label} mode="live" dismiss onClose={onClose}>
-        <div id={id} data-asset-popover-panel="sheet" className="text-sm">
+      <MobileSheet label={label} mode="live" dismiss onClose={onClose} header={sheetHeader}>
+        <div id={id} {...{ [`data-${name}`]: "sheet" }} className={`text-sm ${className ?? ""}`}>
           {children}
         </div>
       </MobileSheet>
@@ -282,15 +315,22 @@ function AssetPanelShell({
       role="dialog"
       aria-label={label}
       tabIndex={-1}
-      data-asset-popover-panel="popover"
-      className="fixed z-50 rounded-2xl border p-3 text-foreground shadow-lg outline-none"
+      {...{ [`data-${name}`]: "popover" }}
+      className={`fixed z-50 p-3 text-foreground outline-none ${surface === "overlay" ? "overlay-panel" : "rounded-2xl border shadow-lg"} ${className ?? ""}`}
       style={{
         top: pos?.top ?? 0,
         left: pos?.left ?? 0,
-        width: pos?.width ?? POP_W,
+        ...(fit != null
+          ? {
+              width: pos && pos.width < fit ? pos.width : undefined,
+              maxWidth: fit,
+              ...(pos?.tall ? { maxHeight: `calc(100vh - ${GUTTER * 2}px)`, overflowY: "auto" as const } : {}),
+            }
+          : { width: pos?.width ?? POP_W }),
         visibility: pos ? undefined : "hidden",
-        background: "var(--rb-tooltip-bg)",
-        borderColor: "var(--rb-tooltip-border)",
+        ...(surface === "tooltip"
+          ? { background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }
+          : {}),
       }}
     >
       {children}
