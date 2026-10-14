@@ -1886,6 +1886,19 @@ label[for] {
     inset 0 0 0 2px rgb(45 212 191 / 0.45),
     inset 0 0 40px 6px rgb(45 212 191 / 0.14);
 }
+/* armed on one section (ui-jobs 284), the halo's ring on that section alone:
+   the position card, Lifetime flows or the event page's event. */
+[data-prov-lit] {
+  box-shadow:
+    0 0 0 2px rgb(13 148 136 / 0.5),
+    0 0 24px 4px rgb(13 148 136 / 0.16);
+  animation: prov-halo-in 0.3s ease;
+}
+.dark [data-prov-lit] {
+  box-shadow:
+    0 0 0 2px rgb(45 212 191 / 0.45),
+    0 0 24px 4px rgb(45 212 191 / 0.14);
+}
 @keyframes prov-halo-in {
   from {
     opacity: 0;

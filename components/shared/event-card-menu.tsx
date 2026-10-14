@@ -1,12 +1,12 @@
 "use client";
 
-// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308), at the header's
-// right end before the number pill (ui-jobs 295), the same on every family:
-// Open event page, and inside a group Hide or Show {n} grouped events. The
-// explorer link is the row's hash under Display's Transaction hashes (ui-jobs
-// 294); copy link and Show provenance are on the event page's actions row
-// (`components/shared/event-page-aside.tsx`), which reuses `useMenuCopied` and
-// `eventMarkdownHref` from here.
+// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308), at the T1 row's
+// right end (ui-jobs 295), the same on every family: Open event page, and
+// inside a group Hide or Show {n} grouped events. On the event page it holds
+// the event's Inspect provenance (`provScope`). The explorer link is the row's
+// hash under Display's Transaction hashes (ui-jobs 294); copy link is on the
+// event page's actions row (`components/shared/event-page-aside.tsx`), which
+// reuses `useMenuCopied` and `eventMarkdownHref` from here.
 
 import { createContext, useContext, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -71,6 +71,7 @@ export function useEventMenuRows(shareHref: string | null, groupShow: boolean): 
 export function EventCardMenu({
   shareHref,
   groupShow,
+  provScope,
 }: {
   /** A closed group's row: its one item, "Show 48 grouped events", the only
    *  way to open the group (ui-jobs 250, third revision). */
@@ -78,6 +79,8 @@ export function EventCardMenu({
   /** The event page's path (`useEventShareHref`); null outside a timeline,
    *  where the page row is left out. */
   shareHref: string | null;
+  /** The event page's row: Inspect provenance, armed on this event. */
+  provScope?: { id: string; hint: string };
 }) {
   const pathname = usePathname();
   const group = useContext(GroupHideContext);
@@ -85,7 +88,7 @@ export function EventCardMenu({
   const onEventPage = pagePath != null && pathname === pagePath;
 
   return (
-    <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading}>
+    <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading} provScope={provScope}>
       {(close) =>
         groupShow ? (
           <ToolsMenuItem

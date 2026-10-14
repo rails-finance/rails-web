@@ -1866,15 +1866,7 @@ async function verifyLiquityMarkdown(subject) {
   const COPY_LINK_BTN = `${ACTIONS} [data-menu-item="copy-link"]`;
   const VIEW_MD = `${ACTIONS} [data-menu-item="view-markdown"]`;
   const COPY_HASH = `${ACTIONS} [data-menu-item="copy-tx-hash"]`;
-  const WANT = [
-    "view-timeline",
-    "view-explorer",
-    "view-markdown",
-    "copy-link",
-    "copy-tx-hash",
-    "copy-for-llm",
-    "show-provenance",
-  ];
+  const WANT = ["view-timeline", "view-explorer", "view-markdown", "copy-link", "copy-tx-hash", "copy-for-llm"];
   const TX_ID = /^(0x[0-9a-f]{64})/i.exec(decodedId)?.[1]?.toLowerCase() ?? null;
   {
     const { ctx, page, errors } = await open(1280, link);
@@ -1887,7 +1879,7 @@ async function verifyLiquityMarkdown(subject) {
       els.map((e) => e.getAttribute("data-menu-item")),
     );
     check(
-      `${name} event page: the actions row holds the seven items in order`,
+      `${name} event page: the actions row holds the six items in order`,
       JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
     );
@@ -1904,8 +1896,9 @@ async function verifyLiquityMarkdown(subject) {
     const target = await row.getAttribute("target").catch(() => null);
     check(`${name} event page: View as Markdown links to the route`, href === mdPath, href ?? "");
     check(`${name} event page: View as Markdown opens a new tab`, target === "_blank", target ?? "");
+    // The card's ⋮ in T1 carries the event's Inspect provenance alone.
     const menus = await page.locator("[data-event-menu]").count();
-    check(`${name} event page: no event menu`, menus === 0, `${menus} found`);
+    check(`${name} event page: one event menu`, menus === 1, `${menus} found`);
     const pillHref = await page
       .locator('[data-event-number-link="timeline"]')
       .first()

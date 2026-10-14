@@ -4,7 +4,7 @@
 // place beside the card, the same on every family: the page's h1 (the
 // family's header in its title form, ui-jobs 286), the actions row (the
 // timeline, the explorer, the Markdown, Copy link, Copy transaction hash, Copy
-// for LLM, Show provenance; ui-jobs 291, 294, 284 and 308), the paragraph
+// for LLM; ui-jobs 291 and 294), the paragraph
 // with the timeline link, the facts table (the family's rows, then the
 // event's place, block and transaction), and the previous and next links.
 // The family supplies the data and its words (`EventPageContract`); the
@@ -17,7 +17,6 @@ import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { eventMarkdownHref, useMenuCopied } from "@/components/shared/event-card-menu";
 import { useEventShareHref } from "@/components/shared/event-share-context";
-import { ProvScopeToggle } from "@/components/shared/prov-inspector";
 import { useChainId } from "@/lib/shared/chain-context";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { EVENT_PAGE_WORDS as W } from "@/lib/shared/event-page-words";
@@ -195,13 +194,6 @@ function EventActions({ c }: { c: EventPageContract }) {
         {copied === "hash" ? W.copied : W.copy_hash}
       </button>
       {md && <CopyForLlm href={md.href} build={md.build} />}
-      <ProvScopeToggle
-        variant="plain"
-        scope={c.eventId}
-        className={ACTION}
-        words={{ show: W.show_provenance, hide: W.hide_provenance }}
-        title={W.provenance_hint}
-      />
     </div>
   );
 }

@@ -8,12 +8,13 @@ import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
 import { EventPageAside, EventPageContext } from "@/components/shared/event-page-aside";
+import { EVENT_PAGE_WORDS } from "@/lib/shared/event-page-words";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
 import { InfoDisclosure, InfoTabsDisclosure, type InfoDisclosureTab } from "@/components/shared/info-disclosure";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } from "@/components/shared/mobile-spine";
@@ -434,6 +435,7 @@ export function EventCard(props: EventCardProps) {
   // The scope's name for scoped arming (ui-jobs 284): the event's id, read from
   // its share path; a card outside a timeline falls back to the card's key.
   const scopeId = eventIdFromShareHref(shareHref) ?? cardId;
+  const lit = useProvScopeLit(scopeId);
   // Which info section is expanded — the section heading is the button,
   // bridging into the pane below.
   const [openInfoTab, setOpenInfoTab] = useState<string | null>(null);
@@ -545,20 +547,25 @@ export function EventCard(props: EventCardProps) {
   const rowNum = captionCtx?.n != null ? { number: captionCtx.n, last: captionCtx.nLast } : num;
   const numberNode = rowNum ? <PlainNumber number={rowNum.number} last={rowNum.last} /> : null;
   // The event menu (⋮) at the right end of the T1 row, at both widths: after
-  // the header on desktop, at the caption's right on a phone. A press on it
-  // stays with the menu (Escape still reaches the menu's document listener).
+  // the header on desktop, at the caption's right on a phone. On the event
+  // page it carries the event's "Inspect provenance". A press on it stays
+  // with the menu (Escape still reaches the menu's document listener).
   const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu);
   const headMenu =
-    !pageMode && menuRows ? (
+    pageMode || menuRows ? (
       <span
-        className="-my-1 inline-flex items-center"
+        className="inline-flex items-center"
         data-event-head-menu=""
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu shareHref={groupMenu ? null : shareHref} groupShow={groupMenu} />
+        <EventCardMenu
+          shareHref={groupMenu ? null : shareHref}
+          groupShow={groupMenu}
+          provScope={pageMode ? { id: scopeId, hint: EVENT_PAGE_WORDS.provenance_hint } : undefined}
+        />
       </span>
     ) : null;
 
@@ -683,9 +690,15 @@ export function EventCard(props: EventCardProps) {
         </div>
       )}
       {/* The ⋮, once: the T1 row's right end on desktop, the caption's right
-          on a phone. */}
+          on a timeline row under 640px. Its slot is the line box it sits on,
+          centred in it: the header row's first line (\`pt-4\`, 24px, the
+          \`evt-meta\` height), or the caption's (\`pb-2.5\`, 20px). */}
       {headMenu && (
-        <div className="pointer-events-auto absolute right-4 top-3 max-sm:right-0 max-sm:top-auto max-sm:bottom-[5px]">
+        <div
+          className={`pointer-events-auto absolute right-4 top-4 flex h-6 items-center${
+            inTimeline ? " max-sm:right-0 max-sm:top-auto max-sm:bottom-2.5 max-sm:h-5" : ""
+          }`}
+        >
           {headMenu}
         </div>
       )}
@@ -764,6 +777,7 @@ export function EventCard(props: EventCardProps) {
             ref={rowRef}
             data-skel-section="detail-event"
             data-prov-scope={scopeId}
+            data-prov-lit={lit ? "" : undefined}
             className={`${
               pageMode
                 ? "flex w-full flex-col max-sm:!px-0 sm:flex-row sm:items-start"

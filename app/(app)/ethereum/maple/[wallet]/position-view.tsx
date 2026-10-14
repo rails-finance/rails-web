@@ -509,7 +509,7 @@ export default function MaplePositionView({
       <div className="py-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <DetailBackButton session="maple" wallet={wallet} />
-          {/* The card's ⋮ carries Show provenance once the card draws. */}
+          {/* The card's ⋮ carries Inspect provenance once the card draws. */}
           {!(custody != null && custody.length > 0) && <ToolsMenu />}
         </div>
         <ContractIdentityCard

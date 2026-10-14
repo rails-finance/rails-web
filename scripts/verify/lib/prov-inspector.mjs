@@ -11,19 +11,20 @@
 //
 // `openInspectorHome` leaves the toggle in the DOM and says whether the page
 // has one at all; `armInspector` leaves the tool ARMED and says so, and is
-// idempotent — it reads the armed halo, which outlives the menu that arms it.
+// idempotent — it reads the armed state (`HALO`: the page-wide halo, or the
+// ring on the one armed section), which outlives the menu that arms it.
 //
-// Scoped arming (rails-ops TO-DO-ui-jobs 284): a section's "Show provenance"
+// Scoped arming (rails-ops TO-DO-ui-jobs 284): a section's "Inspect provenance"
 // (`[data-prov-scope-toggle="<scope>"]`: a row of the position card's ⋮, the
-// Lifetime flows ⋮ or an event's ⋮, or a button in the Liquity V2 event page's
-// actions row) arms that section alone. The Liquity V2 Trove page has no
+// Lifetime flows ⋮ or the event page card's ⋮) arms that section alone, and
+// that section wears `[data-prov-lit]`. The Liquity V2 Trove page has no
 // page-level tool: its card menu (C17) carries the card's row, so there
 // `openInspectorHome` and `armInspector` reach that row and the card's values
 // are the targets. `armScope` arms a named section from its control.
 
 export const INSPECTOR = "button.prov-inspect-toggle";
 export const TOOLS_TRIGGER = "[data-tools-menu] > button";
-export const HALO = ".prov-inspect-halo";
+export const HALO = ".prov-inspect-halo, [data-prov-lit]";
 export const SCOPE_TOGGLE = "[data-prov-scope-toggle]";
 const CARD_ROW = '[data-card-menu] [data-prov-scope-toggle="position-card"]';
 
@@ -56,9 +57,9 @@ export async function armInspector(page) {
   return Boolean(await page.$(HALO));
 }
 
-/** Arm one section from its "Show provenance". `menu` is the ⋮ wrapper that
- *  holds the row (a locator or selector), opened first; without it the
- *  control is on the page (the event page's actions row). Already armed on
+/** Arm one section from its "Inspect provenance". `menu` is the ⋮ wrapper
+ *  that holds the row (a locator or selector), opened first; without it the
+ *  control is on the page. Already armed on
  *  that section is a no-op. Returns whether the halo shows and the control
  *  reads pressed. */
 export async function armScope(page, scope, { menu = null } = {}) {

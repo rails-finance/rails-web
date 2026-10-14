@@ -18,7 +18,7 @@
 //
 // The `card` variant is the position card's one menu (ui-jobs 270, 246): a ⋮
 // trigger at the right end of the card's heading (ui-jobs 295), the position's rows
-// (`leading`) first, the export shapes, then "Show provenance", which arms the
+// (`leading`) first, the export shapes, then "Inspect provenance", which arms the
 // inspector on the card alone (ui-jobs 284). The `event` and `panel` menus end
 // on the same row for their section where the caller names one (`provScope`).
 // Below sm these open as a sheet with each row full width.
@@ -137,7 +137,7 @@ export function ToolsMenu({
    *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ at its header's
    *  right end, the card menu named by `label` and `heading`. `panel`: the
    *  same for a panel's header (Lifetime flows), its last row the panel's
-   *  "Show provenance" (`provScope`). */
+   *  "Inspect provenance" (`provScope`). */
   variant?: "tools" | "card" | "event" | "panel";
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */
@@ -164,7 +164,7 @@ export function ToolsMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   // The event and panel menus: the card menu's trigger and rows, named by
-  // `label` and `heading`; a panel's ends on its section's "Show provenance".
+  // `label` and `heading`; a panel's ends on its section's "Inspect provenance".
   const eventMenu = variant === "event" || variant === "panel";
   const card = variant === "card" || eventMenu;
   const scope =
@@ -257,7 +257,7 @@ export function ToolsMenu({
           ? { "data-event-menu": "" }
           : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
     return (
-      <div ref={ref} className="relative" {...wrapperData}>
+      <div ref={ref} className="relative flex" {...wrapperData}>
         <button
           ref={triggerRef}
           type="button"

@@ -110,32 +110,20 @@ export function ProvInspectorToggle({
 
 /** Arm the inspector on one section (ui-jobs 284): the position card
  *  ("position-card"), Lifetime flows ("flows") or one event (its id). Only the
- *  values inside that section become targets; the halo, the exit button and
- *  the Escape ladder are the page-level tool's. Pressed while that section is
- *  armed, where a press puts the mode down. A row of a ⋮ menu (`menu`), or a
- *  plain button the caller dresses (`plain`, the Liquity V2 event page's
- *  actions row). */
+ *  values inside that section become targets, and that section wears the
+ *  ring (`useProvScopeLit`); the exit button and the Escape ladder are the
+ *  page-level tool's. Pressed while that section is armed, where a press puts
+ *  the mode down. A row of a ⋮ menu. */
 export function ProvScopeToggle({
   scope,
-  variant = "menu",
-  words,
   hint,
-  title,
-  className,
   onPick,
   openerRef,
 }: {
   scope: string;
-  variant?: "menu" | "plain";
-  /** The control's words; the menu row's default is "Show provenance" /
-   *  "Hide provenance". */
-  words?: { show: string; hide: string };
   /** The menu row's subtitle at rest: what the row arms ("Trace a value on
    *  this card"). */
   hint?: string;
-  /** The `plain` button's tooltip. */
-  title?: string;
-  className?: string;
   /** Called after the click, so the menu that holds the row can close. */
   onPick?: () => void;
   /** The control focus returns to when the mode is put down; where absent,
@@ -147,26 +135,10 @@ export function ProvScopeToggle({
     () => provInspector.getArmed() && provInspector.getScope() === scope,
     () => false,
   );
-  const w = words ?? SCOPE_WORDS;
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     provInspector.setArmed(!pressed, scope, openerRef?.current ?? e.currentTarget);
     onPick?.();
   };
-  if (variant === "plain") {
-    return (
-      <button
-        type="button"
-        className={className}
-        title={title}
-        aria-pressed={pressed}
-        data-menu-item="show-provenance"
-        data-prov-scope-toggle={scope}
-        onClick={onClick}
-      >
-        {pressed ? w.hide : w.show}
-      </button>
-    );
-  }
   return (
     <button
       type="button"
@@ -179,25 +151,32 @@ export function ProvScopeToggle({
     >
       <Crosshair aria-hidden />
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-foreground">{pressed ? w.hide : w.show}</span>
+        <span className="block text-sm font-semibold text-foreground">
+          {pressed ? SCOPE_WORDS.hide : SCOPE_WORDS.show}
+        </span>
         <span className="block text-xs text-rb-500">{pressed ? SCOPE_WORDS.armed_hint : hint}</span>
       </span>
     </button>
   );
 }
 
-/** The scoped row's words, where the caller brings none. */
+/** The scoped row's words. */
 const SCOPE_WORDS = {
-  show: "Show provenance",
-  hide: "Hide provenance",
+  show: "Inspect provenance",
+  hide: "Stop inspecting",
   armed_hint: "Click a value to trace it · esc exits",
 };
 
 /** Mount once per page (beside the timeline, outside any card). Renders
- *  nothing at rest; owns the armed halo, its close control, the Escape ladder,
- *  and the pinned popover. */
+ *  nothing at rest; owns the page-wide halo, the close control, the Escape
+ *  ladder, and the pinned popover. */
 export function ProvInspectorLayer() {
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
+  const scoped = useSyncExternalStore(
+    provInspector.subscribe,
+    () => provInspector.getScope() != null,
+    () => false,
+  );
   const pin = useSyncExternalStore(provInspector.subscribe, provInspector.getPin, () => null);
   // Where the way out lives. A page with the dock still has the toggle in
   // sight, so the halo adds nothing; a page whose toggle is a row of a menu
@@ -223,11 +202,11 @@ export function ProvInspectorLayer() {
   if (typeof document === "undefined" || !armed) return null;
   return (
     <>
-      {/* The armed halo: the whole viewport wears the tool's teal while the
-          inspector is on (the browser-extension "operating" treatment) —
-          the mode state is unmistakable at any scroll position. Pointer-
-          transparent chrome; sits under the popover. */}
-      {createPortal(<div className="prov-inspect-halo" aria-hidden data-prov-chrome="" />, document.body)}
+      {/* The armed halo: armed page-wide, the whole viewport wears the tool's
+          teal (the browser-extension "operating" treatment). Armed on one
+          section, that section wears the ring instead (`useProvScopeLit`).
+          Pointer-transparent chrome; sits under the popover. */}
+      {!scoped && createPortal(<div className="prov-inspect-halo" aria-hidden data-prov-chrome="" />, document.body)}
       {/* The halo's own way out, where nothing else on the page offers one. */}
       {!dock &&
         createPortal(

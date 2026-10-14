@@ -1,12 +1,13 @@
 // The provenance inspector armed on one section (rails-ops TO-DO-ui-jobs 284).
 // ---------------------------------------------------------------------------
-// "Show provenance" arms the inspector on one section: the position card (a
+// "Inspect provenance" arms the inspector on one section: the position card (a
 // row of C17's ⋮, Liquity V2), Lifetime flows (a row of its ⋮), one event (a
-// button in the event page's actions row, ui-jobs 308). Only the values inside that section become targets
-// (`[data-prov-pickable]` inside `[data-prov-scope="<scope>"]`, none outside);
-// the halo and the Escape ladder are the page-level tool's, and putting the
+// row of the event page card's ⋮ in T1). Only the values inside that section
+// become targets (`[data-prov-pickable]` inside `[data-prov-scope="<scope>"]`,
+// none outside) and only that section wears the ring (`[data-prov-lit]`, no
+// page-wide halo); the Escape ladder is the page-level tool's, and putting the
 // mode down hands focus back to the control that armed it. The page-level tool
-// (H7.3, the Tools menu) still marks every section.
+// (H7.3, the Tools menu) still marks every section under the halo.
 //
 // Pages: the story Trove and its Repay #148 event page (Liquity V2), an Aave
 // V3 Core wallet.
@@ -86,6 +87,13 @@ function marksBySection(page) {
 }
 
 const halo = async (page) => Boolean(await page.$(HALO));
+/** Armed on `scope` alone: that section wears the ring, nothing else does,
+ *  and the page-wide halo is absent. */
+const litOnly = (page, scope) =>
+  page.evaluate((s) => {
+    const lit = [...document.querySelectorAll("[data-prov-lit]")].map((e) => e.getAttribute("data-prov-scope"));
+    return lit.length === 1 && lit[0] === s && !document.querySelector(".prov-inspect-halo");
+  }, scope);
 const focusIs = (page, sel) => page.evaluate((q) => !!document.activeElement?.matches(q), sel);
 
 /** The Escape ladder: pick a value inside the section, Escape closes the
@@ -126,7 +134,7 @@ for (const width of [1280, 390]) {
   await page.waitForSelector(FLOWS_MENU, { timeout: 60000 }).catch(() => {});
   const tag = `trove @${width}`;
 
-  // The C17 row: "Show provenance", no page-wide row.
+  // The C17 row: "Inspect provenance", no page-wide row.
   await page.locator(C17_TRIGGER).click();
   await page.waitForSelector('[data-prov-scope-toggle="position-card"]', { timeout: 5000 }).catch(() => {});
   const rows = await page.evaluate(() => ({
@@ -135,8 +143,8 @@ for (const width of [1280, 390]) {
     sheet: !!document.querySelector('[role="dialog"] [data-prov-scope-toggle="position-card"]'),
   }));
   check(
-    `${tag}: C17 holds "Show provenance" and no page-wide inspector row`,
-    /^Show provenance/.test(rows.scoped ?? "") && !rows.global && (width >= 640 || rows.sheet),
+    `${tag}: C17 holds "Inspect provenance" and no page-wide inspector row`,
+    /^Inspect provenance/.test(rows.scoped ?? "") && !rows.global && (width >= 640 || rows.sheet),
     JSON.stringify(rows),
   );
   await page.locator('[data-prov-scope-toggle="position-card"]').click();
@@ -146,8 +154,8 @@ for (const width of [1280, 390]) {
     els.map((e) => e.getAttribute("aria-expanded")),
   );
   check(
-    `${tag}: the C17 row arms the card alone`,
-    (await halo(page)) && card.inside > 0 && card.outside === 0,
+    `${tag}: the C17 row arms the card alone, and the card alone wears the ring`,
+    (await litOnly(page, "position-card")) && card.inside > 0 && card.outside === 0,
     `inside ${card.inside}, outside ${card.outside}`,
   );
   check(
@@ -156,15 +164,15 @@ for (const width of [1280, 390]) {
     JSON.stringify(cardRows),
   );
   check(`${tag}: focus sits on C17's trigger after the pick`, await focusIs(page, C17_TRIGGER));
-  // The row reads "Hide provenance" while the card is armed.
+  // The row reads "Stop inspecting" while the card is armed.
   await page.locator(C17_TRIGGER).click();
   await page.waitForSelector('[data-prov-scope-toggle="position-card"]', { timeout: 5000 }).catch(() => {});
   const hideRow = await page.locator('[data-prov-scope-toggle="position-card"]').first();
   const hideText = await hideRow.textContent().catch(() => "");
   const hidePressed = await hideRow.getAttribute("aria-pressed").catch(() => null);
   check(
-    `${tag}: the row reads "Hide provenance" while the card is armed`,
-    /^Hide provenance/.test(hideText ?? "") && hidePressed === "true",
+    `${tag}: the row reads "Stop inspecting" while the card is armed`,
+    /^Stop inspecting/.test(hideText ?? "") && hidePressed === "true",
     hideText ?? "",
   );
   // Close the menu without Escape (Escape belongs to the armed mode's ladder).
@@ -183,8 +191,8 @@ for (const width of [1280, 390]) {
       els.map((e) => e.getAttribute("aria-expanded")),
     );
     check(
-      `${tag}: the flows ⋮ row arms Lifetime flows alone`,
-      (await halo(page)) && flows.inside > 0 && flows.outside === 0,
+      `${tag}: the flows ⋮ row arms Lifetime flows alone, and the panel alone wears the ring`,
+      (await litOnly(page, "flows")) && flows.inside > 0 && flows.outside === 0,
       `inside ${flows.inside}, outside ${flows.outside}`,
     );
     check(
@@ -199,42 +207,58 @@ for (const width of [1280, 390]) {
 }
 
 // ── 2. The Repay #148 event page, 1280 and 390 ─────────────────────────────
+// The event's "Inspect provenance" is a row of the card's ⋮ in T1; the actions
+// row carries none.
 for (const width of [1280, 390]) {
-  const BTN = "[data-event-page-actions] [data-prov-scope-toggle]";
-  const { ctx, page, errors } = await open(width, EVENT_PAGE, BTN);
+  const MENU = "[data-event-id] [data-event-menu]";
+  const TRIGGER = `${MENU} > button`;
+  const ROW = `[data-prov-scope-toggle="${EVENT_ID}"]`;
+  const { ctx, page, errors } = await open(width, EVENT_PAGE, TRIGGER);
   const tag = `event page @${width}`;
-  const scope = await page.locator(BTN).getAttribute("data-prov-scope-toggle");
+  const inActions = await page.locator("[data-event-page-actions] [data-prov-scope-toggle]").count();
+  check(`${tag}: the actions row holds no provenance control`, inActions === 0, `${inActions} found`);
+  const openRow = async () => {
+    for (let i = 0; i < 4 && (await page.locator(ROW).count()) === 0; i++) {
+      await page
+        .locator(TRIGGER)
+        .click()
+        .catch(() => {});
+      await page.waitForSelector(ROW, { timeout: 4000 }).catch(() => {});
+    }
+    return page.locator(ROW).first();
+  };
   const cardScope = await page.locator("[data-event-id] [data-prov-scope]").first().getAttribute("data-prov-scope");
-  check(
-    `${tag}: the button arms the event's id, the card's scope`,
-    scope === EVENT_ID && cardScope === EVENT_ID,
-    `${scope} / ${cardScope}`,
-  );
-  check(`${tag}: the button reads "Show provenance"`, (await page.locator(BTN).textContent()) === "Show provenance");
-  await page.locator(BTN).click();
+  check(`${tag}: the card's scope is the event's id`, cardScope === EVENT_ID, cardScope ?? "");
+  const row = await openRow();
+  const rowText = (await row.textContent().catch(() => "")) ?? "";
+  check(`${tag}: the ⋮ row reads "Inspect provenance"`, /^Inspect provenance/.test(rowText), rowText);
+  await row.click();
   await page.waitForTimeout(500);
   const m = await marks(page, EVENT_ID);
   const inAside = await page.locator("[data-event-page-side] [data-prov-pickable]").count();
   check(
-    `${tag}: armed, marks only inside the event (card and aside)`,
-    (await halo(page)) && m.inside > 0 && m.outside === 0,
+    `${tag}: armed, marks only inside the event (card and aside), which alone wears the ring`,
+    (await litOnly(page, EVENT_ID)) && m.inside > 0 && m.outside === 0,
     `inside ${m.inside} (aside ${inAside}), outside ${m.outside}`,
   );
-  check(`${tag}: the button reads "Hide provenance"`, (await page.locator(BTN).textContent()) === "Hide provenance");
-  await page.locator(BTN).click();
+  check(`${tag}: focus sits on the ⋮ after the pick`, await focusIs(page, TRIGGER));
+  const hide = await openRow();
+  const hideText = (await hide.textContent().catch(() => "")) ?? "";
+  check(`${tag}: the row reads "Stop inspecting" while armed`, /^Stop inspecting/.test(hideText), hideText);
+  await hide.click();
   await page.waitForTimeout(400);
   const off = await marks(page, EVENT_ID);
-  check(`${tag}: "Hide provenance" puts the mode down`, !(await halo(page)) && off.total === 0, `${off.total} marked`);
-  await page.locator(BTN).click();
+  check(`${tag}: "Stop inspecting" puts the mode down`, !(await halo(page)) && off.total === 0, `${off.total} marked`);
+  await (await openRow()).click();
   await page.waitForTimeout(400);
-  await ladder(page, EVENT_ID, BTN, tag);
+  await ladder(page, EVENT_ID, TRIGGER, tag);
   check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
   await ctx.close();
 }
 
 // ── 3. Aave V3 Core: the Tools menu marks all ───────────────────────────
-// An event's "Show provenance" left the row's ⋮ for the event page's actions
-// row (ui-jobs 308), checked at 1280 and 390 in section 2.
+// An event's "Inspect provenance" is on the event page's ⋮ alone, checked at
+// 1280 and 390 in section 2.
 {
   const { ctx, page, errors } = await open(1280, AAVE, "[data-event-id]");
   const tag = "aave-v3 @1280";

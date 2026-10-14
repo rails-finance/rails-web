@@ -407,6 +407,17 @@ export function useProvArmedFor(scopeId: string | null | undefined): boolean {
   );
 }
 
+/** Whether the inspector is armed on the section `scopeId` alone: the
+ *  section then wears the ring (`[data-prov-lit]`, app/globals.css), in the
+ *  page-wide halo's place. */
+export function useProvScopeLit(scopeId: string | null | undefined): boolean {
+  return useSyncExternalStore(
+    provInspector.subscribe,
+    () => provInspector.getArmed() && scopeId != null && provInspector.getScope() === scopeId,
+    () => false,
+  );
+}
+
 /** Lazily create a surface's ReceiptRegistry — stable across renders. The
  *  shell that owns the scope owns the registry. */
 export function useReceiptRegistry(): ReceiptRegistry {

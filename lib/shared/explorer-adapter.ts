@@ -62,7 +62,7 @@ export interface EventPageContract {
   total: number;
   blockNumber: number;
   txHash: string;
-  /** The card's receipts scope, which Show provenance arms (ui-jobs 284). */
+  /** The card's receipts scope, which Inspect provenance arms (ui-jobs 284). */
   eventId: string;
   /** Null at the first or last event. */
   previousHref: string | null;

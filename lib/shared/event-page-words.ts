@@ -17,8 +17,6 @@ export const EVENT_PAGE_WORDS = {
   copy_llm: "Copy for LLM",
   copy_llm_hint: "Copy this event as Markdown for an AI assistant",
   copied: "Copied",
-  show_provenance: "Show provenance",
-  hide_provenance: "Hide provenance",
   provenance_hint: "Click a value on this event to trace it",
   event: "Event",
   event_of: (n: number, total: number) => `${n.toLocaleString("en-US")} of ${total.toLocaleString("en-US")}`,

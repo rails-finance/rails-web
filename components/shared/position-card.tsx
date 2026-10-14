@@ -36,6 +36,7 @@ import {
   POSITION_CARD_SCOPE,
   ProvReceiptsScope,
   ProvUnscoped,
+  useProvScopeLit,
   useReceiptRegistry,
 } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
@@ -410,6 +411,7 @@ function DetailMenu({ menu }: { menu: PositionCardMenu }) {
 export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const registry = useReceiptRegistry();
   const detail = slots.surface === "detail";
+  const lit = useProvScopeLit(detail ? POSITION_CARD_SCOPE : null);
   const closed = slots.outcome != null;
   const { extra: countersExtra, ...meta } = slots.counters ?? {};
   const counters = slots.counters ? (
@@ -465,6 +467,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-skel-section={detail ? "detail-card" : "listing-row"}
       data-anatomy={detail ? "P1" : undefined}
       data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
+      data-prov-lit={lit ? "" : undefined}
       className={POSITION_CARD_FRAME}
     >
       {slots.notice}
