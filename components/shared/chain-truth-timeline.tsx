@@ -1202,7 +1202,16 @@ function ChainTruthTimelineBody({
   const chartDrawn = useFlowFocusState((st) => st.cursor != null);
   const followToggle =
     focusStore && chartDrawn && !tl.datesAxis ? (
-      <FollowChartToggle on={following} onToggle={() => focusStore.set({ follow: !focusStore.get().follow })} />
+      <FollowChartToggle
+        on={following}
+        onToggle={() => {
+          const st = focusStore.get();
+          // Turning following off keeps the cut where the cursor stands,
+          // however it got there.
+          if (st.follow) focusStore.set({ follow: false, rewind: timelineCut(st) });
+          else focusStore.set({ follow: true });
+        }}
+      />
     ) : null;
   // A pill per filter narrowing the list (the narrowing row, L2).
   const filterPills = timelineFilterPills(tl);

@@ -1603,10 +1603,9 @@ const rewindRead = (page) =>
       date: document.querySelector("[data-flow-date]")?.textContent?.trim() ?? null,
       cards: document.querySelectorAll("[data-event-id]").length,
       newest: days.length ? Math.max(...days) : null,
-      // The show-timeline button stands behind the cursor's date, which
-      // offers it while the timeline is not following; the follow toggle
-      // stands beside the timeline's Display.
-      apply: document.querySelector("[data-flow-cursor-word]:not([disabled])") != null,
+      // The cursor's date is the show-timeline button while the timeline is
+      // not following; the follow toggle stands beside the timeline's Display.
+      apply: document.querySelector("button[data-flow-apply]") != null,
       follow: document.querySelector("[data-flow-follow]")?.getAttribute("data-flow-follow") ?? null,
       y: Math.round(window.scrollY),
     };
@@ -1661,7 +1660,6 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
         moved.chip == null && moved.cards === whole.cards && moved.date !== whole.date && moved.apply,
         JSON.stringify(moved),
       );
-      await page.locator("[data-flow-cursor-word]").first().click();
       await page.locator("[data-flow-apply]").first().click();
       await page.waitForTimeout(500);
       const cut = await rewindRead(page);
