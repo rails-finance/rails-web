@@ -565,12 +565,8 @@ export function useAaveV3CardSlots({
         side === "supply"
           ? "The interest inside the supplied balance, in dollars: what the balance holds beyond its deposits and withdrawals since it last started from zero."
           : "The interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
-      value: (
-        <span>
-          <Prov info={dep.interestCaption(side)}>{formatUsd(usd)}</Prov>
-          {since != null ? ` since ${formatDate(since)}` : ""}
-        </span>
-      ),
+      sub: since != null ? `since ${formatDate(since)}` : undefined,
+      value: <Prov info={dep.interestCaption(side)}>{formatUsd(usd)}</Prov>,
     };
   };
 

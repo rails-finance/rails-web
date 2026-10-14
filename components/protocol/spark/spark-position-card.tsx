@@ -302,12 +302,8 @@ function interestRow(
   return {
     id: side === "supply" ? "supply-interest" : "borrow-interest",
     label: side === "supply" ? "Supply interest" : "Borrow interest",
-    value: (
-      <>
-        <Prov info={sparkInterestCaptionProv(side)}>{formatUsd(usd)}</Prov>
-        {since != null && <span className="text-rb-500"> since {formatDate(since)}</span>}
-      </>
-    ),
+    sub: since != null ? `since ${formatDate(since)}` : undefined,
+    value: <Prov info={sparkInterestCaptionProv(side)}>{formatUsd(usd)}</Prov>,
     tip: `The ${side === "supply" ? "supply" : "borrow"} interest added since the balance last started from zero; lifetime interest is in the Lifetime flows panel.`,
   };
 }

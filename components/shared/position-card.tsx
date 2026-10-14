@@ -583,7 +583,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       ) : (
         <OpenGrid heads={slots.heads} detail={detail} />
       )}
-      {detail && slots.panel && <PositionCardPanel columns={slots.panel} />}
+      {detail && slots.panel && <PositionCardPanel columns={slots.panel} heads={slots.heads.length} />}
       {/* A listing card's recency and counts, together at its bottom right. */}
       {!detail && counters && (
         <div className="mt-2 flex items-center justify-end gap-2" data-card-foot="">
