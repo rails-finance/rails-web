@@ -1,7 +1,7 @@
 // The position card's stats (rails-ops TO-DO-position-card 322): the
 // additive values as a grid beneath the headlines, in the card itself with no
-// inset of its own. Each stat is a muted heading (its "?" read-more beside
-// it, a qualifier such as "since 6 Sep 2026" on a second muted line) over its
+// inset of its own. Each stat is a muted heading (a press on it opens its
+// read-more; a qualifier such as "since 6 Sep 2026" on a second muted line) over its
 // value in the bold value type. Under three headlines at lg the stats stand
 // under the headline they belong to, two columns to a headline: the
 // collateral side's under the first, the debt side's under the second, the
@@ -10,7 +10,7 @@
 // a phone. The listing card has no stats (324).
 
 import type { ReactNode } from "react";
-import { RowHelp } from "@/components/shared/row-help";
+import { HeadingTip } from "@/components/shared/tip-label";
 
 export type PositionPanelGroup = "collateral" | "debt" | "risk";
 
@@ -56,8 +56,7 @@ function Stat({ r }: { r: PositionPanelRow }) {
   return (
     <div className="row-span-2 grid min-w-0 grid-rows-subgrid" data-panel-row={r.id}>
       <dt className="self-start pb-1 text-xs font-medium text-rb-500">
-        {r.label}
-        {r.tip && <RowHelp tip={r.tip} name={r.label} />}
+        <HeadingTip text={r.label} tip={r.tip} />
         {r.sub != null && <span className="block font-normal">{r.sub}</span>}
       </dt>
       <dd className="min-w-0 pb-4 text-base font-semibold tabular-nums text-foreground">{r.value}</dd>

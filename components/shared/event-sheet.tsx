@@ -28,6 +28,7 @@
 
 import { useState, type ReactNode } from "react";
 import { RowHelp } from "@/components/shared/row-help";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetPopover } from "@/components/shared/asset-popover";
@@ -250,9 +251,8 @@ function Row({
   return (
     <div className="contents" data-sheet-row={r.key}>
       <span className={`min-w-0 ${pad} ${t} ${indent ? "pl-4" : ""}`}>
-        {r.label}
+        <HeadingTip text={r.label} tip={r.tip} name={nameOf(r.label, r.key)} />
         {r.note != null && <span className="text-rb-500"> · {r.note}</span>}
-        {r.tip && <RowHelp tip={r.tip} name={nameOf(r.label, r.key)} />}
       </span>
       <span className={`${pad} text-right tabular-nums ${t} max-sm:hidden`} data-sheet-col="amount">
         {r.amount && <AmountCell r={r} />}
@@ -337,8 +337,13 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
         )}
         <div className="contents" data-sheet-row="total">
           <span className={`min-w-0 self-center py-2 text-sm ${touched ? "" : "text-rb-500"}`}>
-            {touched ? null : (s.untouched ?? WORDS.untouched)}
-            {s.totalTip && <RowHelp tip={s.totalTip} name={WORDS.total(name)} />}
+            {/* An untouched side's words open the total's read-more; a touched
+                side's total line has no words, so its "?" stands alone. */}
+            {touched ? (
+              s.totalTip && <RowHelp tip={s.totalTip} name={WORDS.total(name)} />
+            ) : (
+              <HeadingTip text={s.untouched ?? WORDS.untouched} tip={s.totalTip} name={WORDS.total(name)} />
+            )}
           </span>
           <span className="py-2 max-sm:hidden" />
           <span
@@ -364,8 +369,7 @@ function StatRows({ rows, muted, name }: { rows: SheetStat[]; muted?: boolean; n
       {rows.map((r) => (
         <div key={r.key} className="contents" data-sheet-row={r.key}>
           <span className={`min-w-0 py-1.5 ${muted ? "text-rb-500" : "text-foreground"}`}>
-            {r.label}
-            {r.tip && <RowHelp tip={r.tip} name={nameOf(r.label, r.key)} />}
+            <HeadingTip text={r.label} tip={r.tip} name={nameOf(r.label, r.key)} />
           </span>
           <span className={`py-1.5 text-right ${muted ? "text-rb-500" : "text-foreground"}`}>
             {"none" in r.value ? (

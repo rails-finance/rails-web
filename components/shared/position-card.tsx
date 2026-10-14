@@ -52,7 +52,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { PositionCardPanel, type PositionPanelColumns } from "@/components/shared/position-card-panel";
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { RowHelp } from "@/components/shared/row-help";
-import { TipLabel } from "@/components/shared/tip-label";
+import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { StatDash, StatValue } from "@/components/shared/stat-value";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ExportMenu, type ExportMenuProps } from "@/components/shared/export-menu";
@@ -257,6 +257,7 @@ function PositionCardRow({
   labelTip,
   headerIcon,
   help,
+  explain,
   className,
   children,
 }: {
@@ -268,15 +269,17 @@ function PositionCardRow({
   headerIcon?: ReactNode;
   /** A "?" read-more after the label (the Outcome's `tip`). */
   help?: string;
+  /** A detail card: the label itself opens its read-more. */
+  explain?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   return (
     <div className={className} data-card-row={index} data-card-head={head}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
-        <TipLabel text={label} tip={labelTip} />
+        {explain ? <HeadingTip text={label} tip={labelTip ?? help} /> : <TipLabel text={label} tip={labelTip} />}
         {headerIcon}
-        {help && <RowHelp tip={help} name={label} />}
+        {help && !explain && <RowHelp tip={help} name={label} />}
       </div>
       {children}
     </div>
@@ -430,6 +433,7 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
             label={h.label}
             labelTip={h.labelTip}
             headerIcon={h.labelIcon}
+            explain={detail}
             // Three on a phone: the third spans the row, so it is not stranded
             // beside an empty cell.
             className={n === 3 && i === 2 ? "col-span-2 sm:col-span-1" : undefined}
@@ -502,12 +506,19 @@ function ClosedGrid({
           label={h.label}
           labelTip={h.labelTip}
           headerIcon={h.labelIcon}
+          explain={detail}
         >
           <HeadBody head={h} />
         </PositionCardRow>
       ))}
       {peaks.length < 2 && <div className="hidden sm:block" />}
-      <PositionCardRow index={2} head="outcome" label="Outcome" help={detail ? outcome.tip : undefined}>
+      <PositionCardRow
+        index={2}
+        head="outcome"
+        label="Outcome"
+        help={detail ? outcome.tip : undefined}
+        explain={detail}
+      >
         <div className={`text-lg font-bold mt-2 ${OUTCOME_TONE[tone]}`}>{outcome.word}</div>
         {outcome.dates?.map((d, i) => (
           <div key={d.label ?? i} className="text-xs text-rb-500 mt-0.5">
