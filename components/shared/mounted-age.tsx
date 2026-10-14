@@ -6,17 +6,20 @@
 // hours old by hydration. See hooks/useMountedNow.
 
 import { useMountedNow } from "@/hooks/useMountedNow";
-import { formatDuration } from "@/lib/date";
+import { formatAgeShort, formatDuration } from "@/lib/date";
 
 export function MountedAge({
   from,
   prefix = "",
   suffix = "",
+  short = false,
 }: {
   /** Unix seconds. */
   from: number;
   prefix?: string;
   suffix?: string;
+  /** The short scale ("41 mins", `formatAgeShort`). */
+  short?: boolean;
 }) {
   const now = useMountedNow();
   if (now == null)
@@ -28,7 +31,7 @@ export function MountedAge({
   return (
     <>
       {prefix}
-      {formatDuration(from, now)}
+      {short ? formatAgeShort(from, now) : formatDuration(from, now)}
       {suffix}
     </>
   );

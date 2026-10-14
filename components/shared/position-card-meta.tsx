@@ -94,7 +94,7 @@ export function PositionCardMeta({
       className="gap-1 focus-ring rounded-sm"
     >
       <Icon name="clock-zap" size={12} />
-      <MountedAge from={toSeconds(lastActivityAt as number)} suffix=" ago" />
+      <MountedAge from={toSeconds(lastActivityAt as number)} short />
     </RevealTip>
   );
 

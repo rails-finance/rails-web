@@ -127,6 +127,23 @@ export function formatDuration(startDate: string | number | Date, endDate: strin
   return `${days} ${days === 1 ? "day" : "days"}`;
 }
 
+/** How long ago, on one short scale: "now", "41 mins", "3 hrs", "2 days",
+ *  "5 mths", "1 yr". The position card's recency, after its clock icon. */
+export function formatAgeShort(startDate: string | number | Date, endDate: string | number | Date): string {
+  const ms = toDate(endDate).getTime() - toDate(startDate).getTime();
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 1) return "now";
+  const unit = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  if (mins < 60) return unit(mins, "min", "mins");
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return unit(hrs, "hr", "hrs");
+  const days = Math.floor(hrs / 24);
+  if (days < 31) return unit(days, "day", "days");
+  const mths = Math.floor(days / 30.44);
+  if (mths < 12) return unit(mths, "mth", "mths");
+  return unit(Math.floor(days / 365.25), "yr", "yrs");
+}
+
 export function formatDateRange(startDate: string | number | Date, endDate: string | number | Date): string {
   const startDateObj = toDate(startDate);
   const endDateObj = toDate(endDate);
