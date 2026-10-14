@@ -936,7 +936,8 @@ body {
    paint, so a tower the reader collapsed on a previous page never flashes open
    on the way to hydration. React takes the attribute over once its effect has
    read the store. */
-[data-flows-collapsed="1"] [data-flows-body] {
+[data-flows-collapsed="1"] [data-flows-body],
+[data-flows-collapsed="1"] [data-flows-menu-slot] {
   display: none;
 }
 

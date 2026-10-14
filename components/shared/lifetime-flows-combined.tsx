@@ -14,13 +14,15 @@
 // timeline to {date}". The line's key sits in the panel's Explanation and its basis
 // beside the (i).
 //
-// "Value · Price" on the control row (ui-jobs 328) swaps the strip in place:
-// the flows line, or one held asset's price in the family's unit
-// (`PriceStrip`, lib/shared/flows-price.ts), with the asset picker and the
-// readout at the cursor's day over it and the series' caption under it. Both
-// strips take one time axis (`stripGeometry`), one cursor and one pip row;
-// the bars, the end labels and the controls stay. The choice is a Display
-// preference; the control is drawn only where the panel has a price series.
+// "Value · Price · Both" on the control row (ui-jobs 328) picks the strips:
+// the flows line, one held asset's price in the family's unit (`PriceStrip`,
+// lib/shared/flows-price.ts, on the bar tracks' ground, with the asset picker
+// over it, its readout as a tip at the cursor and
+// the series' caption under it), or the two stacked, with the bars at half
+// height. The strips take one time axis (`stripGeometry`), one cursor, which
+// either strip moves, and one pip row; the bars, the end labels and the
+// controls stay. The choice is a Display preference; the control is drawn only
+// where the panel has a price series.
 
 import {
   useCallback,
@@ -34,10 +36,10 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronLeft, ChevronRight, Link2, ListEnd, Pause, Play, SkipBack, SkipForward } from "lucide-react";
-import { Headline, Rescaled, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
+import { FlowBarsHalfContext, Headline, Rescaled, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { FLOWS_SCOPE, Prov, useProvArmedFor, type Provenance } from "@/components/shared/provenance";
 import type { FlowsView } from "@/components/shared/timeline-display-context";
 import {
   formatPrice,
@@ -267,7 +269,7 @@ export function CombinedFlows({
     if (focus) return;
     try {
       const v = (JSON.parse(localStorage.getItem("timeline-display-v3") ?? "{}") as { flowsView?: unknown }).flowsView;
-      if (v === "price") setOwnView("price");
+      if (v === "price" || v === "both") setOwnView(v);
     } catch {}
   }, [focus]);
   const view: FlowsView = prices.length === 0 ? "value" : focus ? storeView : ownView;
@@ -488,7 +490,10 @@ export function CombinedFlows({
   const geo = useMemo(() => stripGeometry(w, startDay, today, span, labelW), [w, startDay, today, span, labelW]);
   const xStop = (s: CombinedStop) => geo.xClose(s.live ? today : startDay + s.stop);
   const atStop = stops[Math.min(at, last)];
-  const ready = view === "price" ? priced != null : lineScale.points.length > 0;
+  const showLine = view !== "price" || !priced;
+  const showPrice = view !== "value" && priced != null;
+  const lineReady = lineScale.points.length > 0;
+  const ready = showLine ? lineReady || showPrice : priced != null;
   const cx = ready && atStop ? xStop(atStop) : STRIP_PAD + geo.inner;
   const dim = ready && atStop != null && !atStop.live;
   const cursorDay = cur.live ? today : startDay + cur.stop;
@@ -500,7 +505,9 @@ export function CombinedFlows({
     <FlowCursorContext.Provider value={cursor}>
       <SegmentTipContext.Provider value={byDays || null}>
         <div className="text-sm" data-flows-combined="" data-flow-frozen={frozen ? "" : undefined}>
-          <Steady>
+          {/* Keyed on the bars' height, so "Both" does not hold the full
+              bars' height. */}
+          <Steady key={showLine && showPrice ? "half" : "full"}>
             {/* The headlines, and the date they are at on the same row's
                 right end. */}
             <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">
@@ -542,20 +549,22 @@ export function CombinedFlows({
                 aria-hidden={outside || undefined}
                 {...(outside ? { inert: true } : {})}
               >
-                {busy ? (
-                  <Rescaled
-                    model={bars}
-                    s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0 }).bars!}
-                    hasDebt={hasDebt}
-                    when={when}
-                    isLive={liveReceipts}
-                    assets={barAssets}
-                    headlines={false}
-                    outline={!cur.live}
-                  />
-                ) : (
-                  renderBars(barStop, when, liveReceipts, cur.live)
-                )}
+                <FlowBarsHalfContext.Provider value={showLine && showPrice}>
+                  {busy ? (
+                    <Rescaled
+                      model={bars}
+                      s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0 }).bars!}
+                      hasDebt={hasDebt}
+                      when={when}
+                      isLive={liveReceipts}
+                      assets={barAssets}
+                      headlines={false}
+                      outline={!cur.live}
+                    />
+                  ) : (
+                    renderBars(barStop, when, liveReceipts, cur.live)
+                  )}
+                </FlowBarsHalfContext.Provider>
               </div>
               {outside && (
                 <p
@@ -570,32 +579,73 @@ export function CombinedFlows({
 
           <div {...KEEP_PANEL}>
             <div ref={stripRef} className="mt-4">
-              {view === "price" && priced && (
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
-                  <PricePicker series={prices} selected={priced.key} onPick={setAssetKey} />
+              {showPrice && (
+                <div className="mb-1 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                  <PricePicker series={prices} selected={priced!.key} onPick={setAssetKey} />
                 </div>
               )}
-              <div className="relative">
-                <StripSlider
-                  geo={geo}
-                  w={w}
-                  stops={stops}
-                  at={Math.min(at, last)}
-                  xStop={xStop}
-                  cx={cx}
-                  ready={ready}
-                  ariaLabel={
-                    view === "price" && priced ? `${sliderLabel}, over the ${priced.asset.symbol} price` : sliderLabel
-                  }
-                  valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
-                  cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
-                  onPick={go}
-                  freeze={byDays ? { frozen, onTap: tapStop } : null}
-                  view={view}
-                  startDay={startDay}
-                >
-                  {view === "price" && priced ? (
+              {/* "Both" stacks the two strips on one time axis: one cursor,
+                  driven from either, the pips under the lower one. */}
+              {showLine && (
+                <div className="relative">
+                  <StripSlider
+                    geo={geo}
+                    w={w}
+                    stops={stops}
+                    at={Math.min(at, last)}
+                    xStop={xStop}
+                    cx={cx}
+                    ready={ready}
+                    ariaLabel={sliderLabel}
+                    valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
+                    cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
+                    onPick={go}
+                    freeze={byDays ? { frozen, onTap: tapStop } : null}
+                    view="value"
+                    startDay={startDay}
+                  >
+                    <LineStrip
+                      model={model}
+                      scale={lineScale}
+                      failed={failed}
+                      geo={geo}
+                      w={w}
+                      today={today}
+                      cx={cx}
+                      dim={dim}
+                      ready={lineReady}
+                      head={{ collateral: head.collateral.now, debt: head.debt.now }}
+                      hasDebt={hasDebt}
+                      windowFrom={from > 0 ? startDay + from : null}
+                    />
+                  </StripSlider>
+                </div>
+              )}
+              {showPrice && priced && (
+                <div className={`relative${showLine ? " mt-3" : ""}`}>
+                  <StripSlider
+                    geo={geo}
+                    w={w}
+                    stops={stops}
+                    at={Math.min(at, last)}
+                    xStop={xStop}
+                    cx={cx}
+                    ready={ready}
+                    ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
+                    valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
+                    cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
+                    onPick={go}
+                    freeze={byDays ? { frozen, onTap: tapStop } : null}
+                    view="price"
+                    startDay={startDay}
+                    tip={(shown) =>
+                      shown && (
+                        <PriceTip x={cx} w={w}>
+                          <PriceReadout s={priced} day={cursorDay} gapDays={model.gapDays} isLive={cur.live} />
+                        </PriceTip>
+                      )
+                    }
+                  >
                     <PriceStrip
                       s={priced}
                       scale={priceScales.get(priced.key)!}
@@ -609,24 +659,9 @@ export function CombinedFlows({
                       windowFrom={from > 0 ? startDay + from : null}
                       startDay={startDay}
                     />
-                  ) : (
-                    <LineStrip
-                      model={model}
-                      scale={lineScale}
-                      failed={failed}
-                      geo={geo}
-                      w={w}
-                      today={today}
-                      cx={cx}
-                      dim={dim}
-                      ready={ready}
-                      head={{ collateral: head.collateral.now, debt: head.debt.now }}
-                      hasDebt={hasDebt}
-                      windowFrom={from > 0 ? startDay + from : null}
-                    />
-                  )}
-                </StripSlider>
-              </div>
+                  </StripSlider>
+                </div>
+              )}
               {/* The event ticks, under the plot on the time axis, the cursor
                   running through them; one row for both views. The keyboard
                   hears each day's events through the slider's value. */}
@@ -652,7 +687,7 @@ export function CombinedFlows({
                   endInset={w > 0 ? Math.max(0, STRIP_PAD + geo.inner - geo.xClose(today)) : 0}
                 />
               </div>
-              {view === "price" && priced && (
+              {showPrice && priced && (
                 <p
                   className="mt-1 text-[11px] leading-snug text-rb-500"
                   data-prov-exempt=""
@@ -729,17 +764,23 @@ export function CombinedFlows({
                   data-anatomy="F18"
                   {...KEEP_PANEL}
                 >
-                  {(["value", "price"] as const).map((v) => (
+                  {(["value", "price", "both"] as const).map((v) => (
                     <button
                       key={v}
                       type="button"
                       aria-pressed={view === v}
                       className={`${CTRL_GHOST} ${view === v ? CTRL_ON_ACCENT : CTRL_OFF} min-h-10 rounded px-2.5 text-xs font-semibold sm:min-h-8`}
-                      title={v === "value" ? "The collateral and debt line" : "Each held asset's price"}
+                      title={
+                        v === "value"
+                          ? "The collateral and debt line"
+                          : v === "price"
+                            ? "Each held asset's price"
+                            : "The line and the price, one cursor"
+                      }
                       onClick={() => setView(v)}
                       data-flows-view={v}
                     >
-                      {v === "value" ? "Value" : "Price"}
+                      {v === "value" ? "Value" : v === "price" ? "Price" : "Both"}
                     </button>
                   ))}
                 </div>
@@ -930,6 +971,7 @@ function StripSlider({
   freeze,
   view,
   startDay,
+  tip,
   children,
 }: {
   geo: StripGeometry;
@@ -949,12 +991,29 @@ function StripSlider({
   /** On a page that ties the panel to its timeline: a click or a tap (a press
    *  that does not drag) freezes the cursor. */
   freeze: { frozen: boolean; onTap: (i: number) => void } | null;
-  view: FlowsView;
+  view: "value" | "price";
   startDay: number;
+  /** A tip at the cursor (the price strip's readout), given whether it
+   *  shows: while a pointer is over the strip or drags it, while the strip
+   *  has focus, after a tap until a press lands elsewhere, and while the
+   *  inspector is armed on the panel. */
+  tip?: (shown: boolean) => ReactNode;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const [over, setOver] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [tapped, setTapped] = useState(false);
+  const armed = useProvArmedFor(FLOWS_SCOPE);
+  useEffect(() => {
+    if (!tapped) return;
+    const away = (e: globalThis.PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setTapped(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [tapped]);
   /** The stop nearest the pointer, on the strip's time axis. */
   const nearest = (clientX: number): number | null => {
     const el = ref.current;
@@ -971,6 +1030,9 @@ function StripSlider({
   const [grabbing, setGrabbing] = useState(false);
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // A press on the tip is the tip's (its receipts), not the strip's.
+    if ((e.target as Element).closest?.("[data-flow-price-tip]")) return;
+    if (e.pointerType !== "mouse") setTapped(true);
     const i = nearest(e.clientX);
     if (i == null) return;
     dragging.current = true;
@@ -1043,9 +1105,14 @@ function StripSlider({
       onPointerUp={onUp}
       onPointerCancel={onCancel}
       onLostPointerCapture={onCancel}
+      onPointerEnter={(e) => e.pointerType === "mouse" && setOver(true)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && setOver(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       onKeyDown={onKey}
     >
       {children}
+      {tip && w > 0 && ready && tip(over || focused || tapped || grabbing || armed)}
       {grabbing && w > 0 && ready && (
         <span
           aria-hidden
@@ -1061,6 +1128,37 @@ function StripSlider({
           {cursorWord}
         </span>
       )}
+    </div>
+  );
+}
+
+/** The price strip's readout as a tip at the cursor: beside the cursor line
+ *  at the strip's top, on the side with room, else centred on it inside the
+ *  strip. */
+function PriceTip({ x, w, children }: { x: number; w: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [left, setLeft] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const tw = ref.current?.offsetWidth ?? 0;
+    if (x + 8 + tw <= w) setLeft(x + 8);
+    else if (x - 8 - tw >= 0) setLeft(x - 8 - tw);
+    else setLeft(Math.max(0, Math.min(w - tw, x - tw / 2)));
+  });
+  return (
+    <div
+      ref={ref}
+      className="absolute top-1 z-40 rounded-lg border px-2.5 py-1.5 shadow-lg"
+      style={{
+        left: left ?? 0,
+        maxWidth: w,
+        visibility: left == null ? "hidden" : undefined,
+        background: "var(--rb-tooltip-bg)",
+        borderColor: "var(--rb-tooltip-border)",
+      }}
+      data-flow-price-tip=""
+      data-anatomy="F19.2"
+    >
+      {children}
     </div>
   );
 }
@@ -1413,6 +1511,16 @@ function PriceStrip({
   return (
     <>
       <svg width={w} height={STRIP_H} aria-hidden className="block">
+        {/* The plot's ground: the bar tracks' silhouette (`bg-sunken`). */}
+        <rect
+          x={geo.x0}
+          y={0}
+          width={Math.max(0, w - STRIP_PAD - geo.x0)}
+          height={STRIP_H}
+          rx={6}
+          style={{ fill: "var(--surface-sunken)" }}
+          data-price-ground=""
+        />
         {shade != null && (
           <rect
             x={shade}

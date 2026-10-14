@@ -1,9 +1,10 @@
 // The Lifetime flows panel's price view (rails-ops
 // reference/lifetime-flows-scrubber.md; ui-jobs 328, step 2).
 // ---------------------------------------------------------------------------
-// "Value · Price" on the panel's control row swaps the strip under the bars
-// for one held asset's price line; the cursor, the pip row and the end labels
-// stay. Per page, at 1280 and 390:
+// "Value · Price · Both" on the panel's control row picks the strips under
+// the bars: the line, one held asset's price line, or both stacked; the
+// cursor, the pip row and the end labels stay. The readout is the price
+// strip's tip, shown while the strip has focus. Per page, at 1280 and 390:
 //   - the toggle is drawn and `aria-pressed` follows the view; the Value
 //     view's line is the same before and after a trip to Price;
 //   - the strip draws no day the series lacks: every day drawn as observed is
@@ -388,7 +389,7 @@ for (const pg of PAGES) {
     await page.waitForSelector("[data-flows-combined] [data-flow-strip] svg", { timeout: 180000 }).catch(() => {});
     await page.waitForTimeout(2500);
     const toggle = page.locator("[data-flows-view-toggle]").first();
-    if (!check(`${tag}: the Value · Price toggle is drawn`, (await toggle.count()) === 1)) {
+    if (!check(`${tag}: the Value · Price · Both toggle is drawn`, (await toggle.count()) === 1)) {
       await ctx.close();
       continue;
     }
@@ -419,7 +420,7 @@ for (const pg of PAGES) {
     const before = { pressed: await pressed(), line: await valueLine(), pips: await pips() };
     check(
       `${tag}: Value is pressed by default`,
-      before.pressed.join() === "value:true,price:false",
+      before.pressed.join() === "value:true,price:false,both:false",
       before.pressed.join(),
     );
 
@@ -428,7 +429,7 @@ for (const pg of PAGES) {
     const inPrice = { pressed: await pressed(), pips: await pips() };
     check(
       `${tag}: Price pressed after the press`,
-      inPrice.pressed.join() === "value:false,price:true",
+      inPrice.pressed.join() === "value:false,price:true,both:false",
       inPrice.pressed.join(),
     );
     check(
@@ -537,7 +538,11 @@ for (const pg of PAGES) {
     await page.keyboard.press("End");
     await page.waitForTimeout(300);
     const after = { pressed: await pressed(), line: await valueLine() };
-    check(`${tag}: Value pressed again`, after.pressed.join() === "value:true,price:false", after.pressed.join());
+    check(
+      `${tag}: Value pressed again`,
+      after.pressed.join() === "value:true,price:false,both:false",
+      after.pressed.join(),
+    );
     check(
       `${tag}: the Value view's line is unchanged by the trip`,
       after.line === before.line && before.line.length > 0,

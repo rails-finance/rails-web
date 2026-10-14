@@ -10,7 +10,17 @@
 // (lifetime-flows-tip.tsx): how its flows add up to what is held. The
 // window's throughput is a bullet in the panel's Explanation (FlowsTotalsBullets).
 
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -48,6 +58,15 @@ import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { ExplainBullet } from "@/components/shared/explain-groups";
 import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
+
+/** The panel's bars at half their height: set where "Both" stacks the two
+ *  strips under them (`lifetime-flows-combined.tsx`). */
+export const FlowBarsHalfContext = createContext(false);
+
+/** A bar track's height class, full or half. */
+export function barHeight(half: boolean): string {
+  return half ? "h-5 sm:h-[22px]" : "h-10 sm:h-11";
+}
 
 const PLAY_MS = 220;
 const HUE: Record<FlowSide, string> = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
@@ -442,6 +461,7 @@ export function Rescaled({
   // On a page that ties the panel to its timeline, the track opens a short
   // tip naming what is held instead of the side's panel.
   const tip = useContext(SegmentTipContext) != null;
+  const half = useContext(FlowBarsHalfContext);
   return (
     <div>
       {headlines && (
@@ -472,7 +492,7 @@ export function Rescaled({
             data-flow-side={side}
             data-anatomy={side === "collateral" ? "F3.1" : "F3.2"}
           >
-            <div className="relative h-10 sm:h-11">
+            <div className={`relative ${barHeight(half)}`}>
               <div
                 role="img"
                 aria-label={`${word}: ${spokenUsd(st.now, u)}.`}

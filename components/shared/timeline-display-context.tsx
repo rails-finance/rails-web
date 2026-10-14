@@ -12,7 +12,7 @@ export type TimelineDisplayKey =
   | "followChart";
 
 /** The Lifetime flows panel's strip: the flows line or the price line. */
-export type FlowsView = "value" | "price";
+export type FlowsView = "value" | "price" | "both";
 
 export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside

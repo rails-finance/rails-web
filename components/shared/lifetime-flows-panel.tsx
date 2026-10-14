@@ -204,7 +204,8 @@ export function LifetimeFlowsPanel({
           ) : (
             <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
-          <div className="pointer-events-auto -mr-1 shrink-0">
+          {/* Collapsed, nothing stands to inspect or read: no ⋮. */}
+          <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
             <FlowsMenu title={title} flowsKey={flowsKey} />
           </div>
         </div>
