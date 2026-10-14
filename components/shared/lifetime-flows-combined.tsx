@@ -61,7 +61,7 @@ import {
   type StripGeometry,
 } from "@/lib/shared/flows-price";
 import type { PriceAt } from "@/lib/shared/price-series";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
@@ -635,7 +635,7 @@ export function CombinedFlows({
               <div className="mt-6" data-flow-events-section="">
                 <div className="flex items-center justify-between gap-3">
                   <span
-                    className="text-xs font-semibold text-rb-500"
+                    className={`${SECTION_HEADING} text-rb-500`}
                     style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
                     data-flow-events-label=""
                   >
@@ -1549,7 +1549,7 @@ function PriceHeading({
     );
   return (
     <p
-      className="flex flex-wrap items-center gap-x-1.5 text-sm font-semibold text-rb-500"
+      className={`flex flex-wrap items-center gap-x-1.5 ${SECTION_HEADING} text-rb-500`}
       style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
       data-price-heading=""
     >
@@ -1646,7 +1646,7 @@ function AssetPicker({
             setOpen(true);
           }
         }}
-        className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-1 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 sm:min-h-0"
+        className={`inline-flex min-h-11 cursor-pointer items-center gap-1 rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-1 ${SECTION_HEADING} text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 sm:min-h-0`}
         data-price-picker=""
       >
         <AssetIcon s={selected} />
@@ -1672,7 +1672,7 @@ function AssetPicker({
                 aria-label={s.asset.symbol}
                 tabIndex={-1}
                 onClick={() => pick(s.key)}
-                className={`mx-1 flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-semibold outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] sm:min-h-8 ${on ? "bg-[var(--surface-hover)] text-foreground" : "text-foreground"}`}
+                className={`mx-1 flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 ${SECTION_HEADING} outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] sm:min-h-8 ${on ? "bg-[var(--surface-hover)] text-foreground" : "text-foreground"}`}
                 data-price-asset={s.asset.symbol}
                 data-price-key={s.key}
               >
