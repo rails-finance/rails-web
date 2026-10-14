@@ -13,7 +13,8 @@
 // Two surfaces. `detail` (the position page) is a receipts scope with the
 // heading, the ⋮, the panel, the (i), the "?" and the counters at the foot.
 // `listing` is inert content inside a row <Link>: the headlines, the lifecycle
-// pill and the family's listing ⋮, with no heading, panel or (i) (324).
+// pill and the family's listing ⋮, with no heading, panel or (i) (324), and
+// the counters (recency, counts) together at the card's bottom right.
 //
 // A card is open or closed by its slots: a closed card carries `outcome` (its
 // peaks as `heads`, the Outcome column, and a panel only for lines with no
@@ -28,7 +29,7 @@
 // `data-skel-section` and `data-prov-scope="position-card"`, and adds
 // `data-position-card-shell` and `data-card-status`; each headline keeps
 // `data-card-row=<i>` and adds `data-card-head=<id>`; the counters carry
-// `data-card-counters`.
+// `data-card-counters`, inside a listing card's `data-card-foot`.
 
 import type { ReactNode } from "react";
 import { POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
@@ -441,7 +442,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             </>
           )}
         </span>
-        {detail ? slots.identity : counters}
+        {detail && slots.identity}
       </div>
       {/* The card's ⋮ at the top right of the header, whatever wraps beside it. */}
       {menu && <span className="-my-1 flex shrink-0 items-center">{menu}</span>}
@@ -457,6 +458,12 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         <OpenGrid heads={slots.heads} />
       )}
       {detail && slots.panel && <PositionCardPanel columns={slots.panel} />}
+      {/* A listing card's recency and counts, together at its bottom right. */}
+      {!detail && counters && (
+        <div className="mt-2 flex items-center justify-end gap-2" data-card-foot="">
+          {counters}
+        </div>
+      )}
     </div>
   );
 
