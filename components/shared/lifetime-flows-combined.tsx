@@ -4,8 +4,8 @@
 // reference/lifetime-flows-scrubber.md), in one stacked layout: each side's
 // headline on its own line over its bar (no scale under the bars), the
 // collateral and debt line, the held asset's price chart under its heading
-// ("Daily [asset] USD price", a list where there are several, on the bar
-// tracks' ground, its readout a tip at the cursor), and the events row; each
+// ("Daily [asset] USD price", a list where there are several, on the page's
+// surface, its readout a tip at the cursor), and the events row; each
 // of the three sections carries its own "?" how-to-read. One time axis
 // (`stripGeometry`) and one cursor: a press, a press and drag (mouse, pen and
 // touch alike; hovering moves nothing) or the arrow keys on either chart move
@@ -1383,16 +1383,6 @@ function PriceStrip({
   return (
     <>
       <svg width={w} height={STRIP_H} aria-hidden className="block">
-        {/* The plot's ground: the bar tracks' silhouette (`bg-sunken`). */}
-        <rect
-          x={geo.x0}
-          y={0}
-          width={Math.max(0, w - STRIP_PAD - geo.x0)}
-          height={STRIP_H}
-          rx={6}
-          style={{ fill: "var(--surface-sunken)" }}
-          data-price-ground=""
-        />
         {shade != null && (
           <rect
             x={shade}
