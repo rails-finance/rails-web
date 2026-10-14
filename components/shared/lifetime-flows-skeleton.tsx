@@ -9,7 +9,7 @@
 // (i) row.
 //
 // Over it, the waiting cue (ui-jobs 333): after 1.2 s an activity bar and the
-// scale of the read ("Adding up 44,898 events…" where the timeline has stated
+// scale of the read ("Loading 44,898 events…" where the timeline has stated
 // the count), and after 4 s, on a position past the timeline's preload, a
 // line that large positions take longer. Both appear on CSS delays, so the
 // cue keeps time while the main thread parses a large answer. The times are
@@ -25,9 +25,9 @@ const BLOCK = "rounded-md bg-rb-300/70 dark:bg-rb-700/60";
 
 /** The cue's words: the scale of the read where the count is known. */
 export function flowsWaitingLine(count: LifeCount | null): string {
-  if (!count) return "Reading the flow history…";
+  if (!count) return "Loading the flow history…";
   const n = count.n.toLocaleString("en-US");
-  return `Adding up ${count.atLeast ? "at least " : ""}${n} ${count.n === 1 ? "event" : "events"}…`;
+  return `Loading ${count.atLeast ? "at least " : ""}${n} ${count.n === 1 ? "event" : "events"}…`;
 }
 
 /** The activity bar and the lines over the skeleton; aria-hidden, since the

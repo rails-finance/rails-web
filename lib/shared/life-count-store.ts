@@ -2,7 +2,7 @@
 
 // The position's event count as the timeline's toolbar states it, handed to
 // the Lifetime flows panel so its loading state can name the scale of the
-// read ("Adding up 44,898 events…", rails-ops TO-DO-ui-jobs 333). The
+// read ("Loading 44,898 events…", rails-ops TO-DO-ui-jobs 333). The
 // timeline publishes it under the page's path and the panel reads it there:
 // the two are siblings on every position page, with no shared provider
 // between them. A page that draws two timelines (Compound V3 Base, one per
