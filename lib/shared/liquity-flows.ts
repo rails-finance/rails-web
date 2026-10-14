@@ -42,6 +42,7 @@ import {
   liquidationPriceSummary,
   troveLiquidationPrice,
 } from "@/lib/utils/liquidation-utils";
+import { compareWithinBlock } from "@/lib/shared/event-order";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -820,7 +821,7 @@ export function liquityV2FlowEvents(events: BaseActivityEvent[]): LiquityFlowEve
   let prev = { coll: 0, debt: 0, rate: 0 };
   let prevEvent: BaseActivityEvent | undefined;
   const sorted = [...events].sort(
-    (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || logIndex(a.id) - logIndex(b.id),
+    (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || compareWithinBlock(a, b),
   );
   for (const e of sorted) {
     if (!isLiquityEvent(e)) continue;
@@ -916,7 +917,7 @@ export function liquityForkFlowEvents(
   const out: LiquityFlowEvent[] = [];
   let fee = 0;
   const sorted = [...events].sort(
-    (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || logIndex(a.id) - logIndex(b.id),
+    (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || compareWithinBlock(a, b),
   );
   for (const e of sorted) {
     if (!is(e)) continue;

@@ -46,6 +46,7 @@ import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/sh
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { compareEventsInOrder } from "@/lib/shared/event-order";
 
 export interface TroveViewProps {
   collateralType: string;
@@ -235,24 +236,10 @@ export default function TroveView({
     return enhancementLoading.blockchain ? troveWords("trove_loading_state") : null;
   };
 
-  // Liquity-narrowed + chronologically exact. Sort primarily by
-  // blockNumber/timestamp, then by log_index (parsed from the event id, which
-  // is always `${txHash}_${logIndex}`) — essential when a single tx emits
-  // multiple TroveUpdated logs at the same block: without it the within-tx
-  // order is whatever the API returned (DESC). useTimelineEvents() below
-  // re-sorts by timestamp alone, but Array.prototype.sort is stable — pre-
-  // ordering here means its resort preserves this log_index tie-break rather
-  // than losing it.
-  const liquityEvents = useMemo(() => {
-    const logIndex = (e: BaseActivityEvent) => {
-      const tail = e.id.split("_").pop();
-      const n = Number(tail);
-      return Number.isFinite(n) ? n : 0;
-    };
-    return events
-      .filter(isLiquityEvent)
-      .sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp || logIndex(a) - logIndex(b));
-  }, [events]);
+  // Liquity-narrowed, in the order the events happened
+  // (lib/shared/event-order.ts: the block's position, then the log inside one
+  // transaction).
+  const liquityEvents = useMemo(() => events.filter(isLiquityEvent).sort(compareEventsInOrder), [events]);
 
   // A liquidated trove's surplus: claimable or claimed, read at the head
   // (the index records the credit, never the claim).

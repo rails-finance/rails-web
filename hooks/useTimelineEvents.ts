@@ -105,6 +105,7 @@ import {
 import type { ServedFolder, ServedTimelineRow } from "@/lib/shared/timeline-folder";
 import { folderDays as foldersByDay } from "@/lib/shared/timeline-folder-reductions";
 import { folderAdmits, folderMatchCount, type FolderFilterAxes } from "@/lib/shared/timeline-folder-filter";
+import { compareWithinBlock } from "@/lib/shared/event-order";
 
 /** One row of a SERVED timeline in display order: an event (with its index in
  *  `displayedEvents`, for the date prefix and the spine flags) or a folder the
@@ -531,7 +532,12 @@ export function useTimelineEvents(
   const hiddenCounterpartySet = useMemo(() => new Set(hiddenCounterparties), [hiddenCounterparties]);
   const hiddenVersionSet = useMemo(() => new Set(hiddenVersions), [hiddenVersions]);
 
-  const sortedEvents = useMemo(() => [...events].sort((a, b) => a.timestamp - b.timestamp), [events]);
+  // Oldest first; events of one block or one transaction in the order they
+  // happened (lib/shared/event-order.ts), else as the family passed them.
+  const sortedEvents = useMemo(
+    () => [...events].sort((a, b) => a.timestamp - b.timestamp || compareWithinBlock(a, b)),
+    [events],
+  );
 
   // Events summarised below the cut. They are not in `events` and never will
   // be, so every number they contribute to is seeded from the opening balance

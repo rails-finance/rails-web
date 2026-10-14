@@ -27,6 +27,7 @@ import {
   type HeroTowerEvent,
   type LiveExampleData,
 } from "./live-example";
+import { compareEventsInOrder } from "@/lib/shared/event-order";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
@@ -158,17 +159,9 @@ export async function getLiveExampleData(): Promise<LiveExampleData | null> {
   const events = timelineRes?.events;
   if (!trove || !events || events.length === 0) return null;
 
-  // Chronological sort with the same tri-key as the trove page — log_index
-  // (the id tail, `${txHash}_${logIndex}`) breaks same-block ties so the bars
-  // provider's running-state walk processes within-tx logs in emit order.
-  const logIndex = (e: BaseActivityEvent) => {
-    const tail = e.id.split("_").pop();
-    const n = Number(tail);
-    return Number.isFinite(n) ? n : 0;
-  };
-  const sorted = [...events].sort(
-    (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp || logIndex(a) - logIndex(b),
-  );
+  // The trove page's order (lib/shared/event-order.ts), so the bars
+  // provider's running-state walk takes the events as they happened.
+  const sorted = [...events].sort(compareEventsInOrder);
 
   const liquity = sorted.filter(isLiquityEvent);
 

@@ -15,6 +15,7 @@ import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-le
 import { liquityEventProse, type LiquityEventContext, type LiquityEventProse } from "@/lib/liquity/event-prose";
 import type { LiquityEventLedgers } from "@/lib/liquity/event-markdown";
 import type { DayObs } from "@/lib/shared/price-series";
+import { compareEventsInOrder } from "@/lib/shared/event-order";
 
 type LiquityEvent = BaseActivityEvent & { context: { protocol: "liquity-v2-troves"; data: LiquityContext } };
 
@@ -25,17 +26,10 @@ export interface LiquityProseRow {
   c: LiquityEventContext;
 }
 
-const logIndex = (e: BaseActivityEvent) => {
-  const n = Number(e.id.split("_").pop());
-  return Number.isFinite(n) ? n : 0;
-};
-
-/** A trove's Liquity V2 events in the trove page's order: block, time, then
- *  the log's index in the block. */
+/** A trove's Liquity V2 events in the trove page's order, the order they
+ *  happened (lib/shared/event-order.ts). */
 export function liquityTroveHistory(events: BaseActivityEvent[]): LiquityEvent[] {
-  return events
-    .filter(isLiquityEvent)
-    .sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp || logIndex(a) - logIndex(b));
+  return events.filter(isLiquityEvent).sort(compareEventsInOrder);
 }
 
 export interface LiquityPositionInput {
