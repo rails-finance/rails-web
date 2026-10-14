@@ -36,6 +36,7 @@ import {
   CTRL_ON_ACCENT,
   CTRL_ON_HOVER,
   ctrlWaking,
+  SECTION_HEADING,
 } from "@/lib/shared/ui-grammar";
 import { formatDate, formatDateRange, formatDateShortYear, formatDayMonth, formatDuration } from "@/lib/date";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
@@ -78,8 +79,13 @@ function subscribeHeadForm(onChange: () => void): () => void {
 }
 const dateFormOnServer = () => false;
 
+/** A value the reader flips between two forms, under a dashed line. */
+function Flips({ children }: { children: React.ReactNode }) {
+  return <span className="underline decoration-rb-400 decoration-dashed underline-offset-[3px]">{children}</span>;
+}
+
 /** The heading's one statement, a button that flips between its two forms. */
-function HeadToggle({ tenure, date, dur }: { tenure: boolean; date: string; dur: React.ReactNode }) {
+function HeadToggle({ tenure, date, dur }: { tenure: boolean; date: React.ReactNode; dur: React.ReactNode }) {
   return (
     <button
       type="button"
@@ -87,7 +93,7 @@ function HeadToggle({ tenure, date, dur }: { tenure: boolean; date: string; dur:
       aria-pressed={tenure}
       aria-label={tenure ? "Show the start date" : "Show how long"}
       onClick={() => writeHeadTenure(!tenure)}
-      className="cursor-pointer rounded-sm text-foreground focus-ring"
+      className="cursor-pointer rounded-sm focus-ring"
     >
       {tenure ? dur : date}
     </button>
@@ -182,7 +188,7 @@ export function TimelineActivityHeader({
       .join("; ");
     return (
       <div
-        className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm"
+        className={`flex flex-wrap items-baseline gap-x-1 gap-y-1 ${SECTION_HEADING} text-rb-500`}
         data-timeline-lives={lives.length}
         title={clock == null ? undefined : `${lives.length} stretches, each starting from an empty account: ${all}`}
       >
@@ -192,7 +198,7 @@ export function TimelineActivityHeader({
             l.to == null ? `since ${formatDate(l.from)}` : sameDay ? formatDate(l.from) : formatDateRange(l.from, l.to);
           return (
             <span key={l.from} className="inline-flex items-baseline gap-1">
-              <span className="text-foreground">
+              <span>
                 {i > 0 ? "again " : l.to == null ? "Active " : ""}
                 {i === 0 && l.to != null ? when.charAt(0).toUpperCase() + when.slice(1) : when}
               </span>
@@ -212,11 +218,22 @@ export function TimelineActivityHeader({
   }
   if (!tenurePending && !closed && reopenedAt != null && reopenedAt > first) {
     return (
-      <div className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm" data-timeline-activity-head="">
+      <div
+        className={`flex flex-wrap items-baseline gap-x-1 gap-y-1 ${SECTION_HEADING} text-rb-500`}
+        data-timeline-activity-head=""
+      >
         <HeadToggle
           tenure={tenure}
-          date={`Open again since ${formatDateShortYear(reopenedAt)}`}
-          dur={<>Open again for {dur(reopenedAt, null)}</>}
+          date={
+            <>
+              Open again since <Flips>{formatDateShortYear(reopenedAt)}</Flips>
+            </>
+          }
+          dur={
+            <>
+              Open again for <Flips>{dur(reopenedAt, null)}</Flips>
+            </>
+          }
         />
         <span className={HEAD_META}>· first opened {formatDateShortYear(first)}</span>
       </div>
@@ -227,24 +244,24 @@ export function TimelineActivityHeader({
     // data-prov-exempt: a span between two event timestamps ("40 days"),
     // timeline chrome the coverage tripwire reads as a figure.
     <div
-      className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm"
+      className={`flex flex-wrap items-baseline gap-x-1 gap-y-1 ${SECTION_HEADING} text-rb-500`}
       data-timeline-activity-head=""
       data-prov-exempt=""
     >
       {tenurePending ? (
-        <span className="text-muted-foreground">{closed ? "Opened" : `${lead} since`} —</span>
+        <span>{closed ? "Opened" : `${lead} since`} —</span>
       ) : (
         <HeadToggle
           tenure={tenure}
-          date={closed ? `Opened ${formatDateShortYear(first)}` : `${lead} since ${formatDateShortYear(first)}`}
+          date={
+            <>
+              {closed ? "Opened" : `${lead} since`} <Flips>{formatDateShortYear(first)}</Flips>
+            </>
+          }
           dur={
-            closed ? (
-              <>Open for {dur(first, last)}</>
-            ) : (
-              <>
-                {lead} for {dur(first, null)}
-              </>
-            )
+            <>
+              {closed ? "Open" : lead} for <Flips>{closed ? dur(first, last) : dur(first, null)}</Flips>
+            </>
           }
         />
       )}
@@ -835,15 +852,15 @@ export function TimelineToolbar({
   return (
     <div ref={stripRef} className="relative space-y-3" data-anatomy="L1" {...ctrlWaking(hydrated)}>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        {/* Inset to the cards' content line (CARD_INSET_START); the controls
-            stay on the page edge. */}
-        <div className={`min-w-0 ${CARD_INSET_START}`} data-anatomy="L1.1">
+        {/* Inset to the cards' content line (CARD_INSET_START), on a line of
+            its own; the controls stay on the page edge. */}
+        <div className={`min-w-0 basis-full ${CARD_INSET_START}`} data-anatomy="L1.1">
           {leading}
         </div>
         {/* Below sm the count takes a row of its own above the controls — on a
             phone it used to wrap mid-figure (Miles, 2026-09-02). From sm up it
             is the first item of the one control row, as before. */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
           {/* data-prov-exempt: the count line is an index row count ("180
               events", "Showing 1,000 of 3,942 events"), the "event numbers"
               class, not a chain-state figure. Stamped here so a timeline nested inside a
