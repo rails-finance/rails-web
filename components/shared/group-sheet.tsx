@@ -171,7 +171,9 @@ export function GroupSheetCollector({
   count: number;
   /** The summed rows' label ("Redemptions"). */
   label: string;
-  onSheet: (merged: { sheet: EventSheet; price?: EventCardPrice } | null) => void;
+  /** The merged sheet; null where the members do not read as one;
+   *  undefined while they are still being collected. */
+  onSheet: (merged: { sheet: EventSheet; price?: EventCardPrice } | null | undefined) => void;
 }) {
   const [cards, setCards] = useState<Map<string, CollectedCard>>(() => new Map());
   const collect = useCallback((card: CollectedCard) => {
@@ -192,7 +194,8 @@ export function GroupSheetCollector({
     const sheet = mergeGroupSheet(ordered, label);
     return sheet ? { sheet, price: mergeGroupPrice(ordered) } : null;
   }, [cards, count, label]);
-  useEffect(() => onSheet(merged), [merged, onSheet]);
+  const complete = cards.size === count;
+  useEffect(() => onSheet(complete ? merged : undefined), [complete, merged, onSheet]);
   return (
     <SheetCollectContext.Provider value={collect}>
       <div

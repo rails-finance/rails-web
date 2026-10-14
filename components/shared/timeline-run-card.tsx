@@ -1,5 +1,6 @@
 "use client";
 
+import { SheetSkeleton } from "@/components/shared/event-sheet";
 import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
@@ -231,8 +232,13 @@ export function TimelineRunCard({
   const membersId = useId();
   // The summary card's balance sheet, read from the members' own
   // (`group-sheet.tsx`) once it opens; null where they do not read as one.
-  const [merged, setMerged] = useState<{ sheet: EventSheet; price?: EventCardPrice } | null>(null);
-  const onSheet = useCallback((m: { sheet: EventSheet; price?: EventCardPrice } | null) => setMerged(m), []);
+  // Undefined until the members are read and collected: the summary then
+  // stands as the sheet's skeleton, never the sums it may replace.
+  const [merged, setMerged] = useState<{ sheet: EventSheet; price?: EventCardPrice } | null | undefined>(undefined);
+  const onSheet = useCallback(
+    (m: { sheet: EventSheet; price?: EventCardPrice } | null | undefined) => setMerged(m),
+    [],
+  );
 
   const [fromTs, toTs] =
     firstTimestamp <= lastTimestamp ? [firstTimestamp, lastTimestamp] : [lastTimestamp, firstTimestamp];
@@ -426,6 +432,12 @@ export function TimelineRunCard({
   const summary = merged ? (
     <div data-group-summary="" data-group-sheet="">
       {collector}
+    </div>
+  ) : merged === undefined && (sheetMembers != null || (onOpen && !members)) ? (
+    <div data-group-summary="">
+      {collector}
+      {onOpen && !members && <AskMembers onOpen={onOpen} askedRef={askedRef} />}
+      <SheetSkeleton />
     </div>
   ) : (
     <div data-group-summary="">

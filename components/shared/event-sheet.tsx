@@ -27,7 +27,6 @@
 // column draws the other.
 
 import { useState, type ReactNode } from "react";
-import { RowHelp } from "@/components/shared/row-help";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -149,6 +148,7 @@ const WORDS = {
   risk: "Risk",
   limits: "Limits",
   untouched: "Not changed by this event",
+  after: "After this event",
   repaid: (n: number) => `${n} repaid ${n === 1 ? "asset" : "assets"}`,
   column: "Column shown",
   show: "Show breakdown",
@@ -336,14 +336,14 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
           <div aria-hidden className="col-span-full mt-1 border-t border-rb-300 dark:border-rb-600" />
         )}
         <div className="contents" data-sheet-row="total">
-          <span className={`min-w-0 self-center py-2 text-sm ${touched ? "" : "text-rb-500"}`}>
-            {/* An untouched side's words open the total's read-more; a touched
-                side's total line has no words, so its "?" stands alone. */}
-            {touched ? (
-              s.totalTip && <RowHelp tip={s.totalTip} name={WORDS.total(name)} />
-            ) : (
-              <HeadingTip text={s.untouched ?? WORDS.untouched} tip={s.totalTip} name={WORDS.total(name)} />
-            )}
+          <span className="min-w-0 self-center py-2 text-sm text-rb-500">
+            {/* The total line's words open its read-more: "After this event"
+                on a side the event moved, the side's own words elsewhere. */}
+            <HeadingTip
+              text={touched ? WORDS.after : (s.untouched ?? WORDS.untouched)}
+              tip={s.totalTip}
+              name={WORDS.total(name)}
+            />
           </span>
           <span className="py-2 max-sm:hidden" />
           <span
@@ -408,6 +408,54 @@ function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
       </div>
       {p.caption && <p className="mt-2 text-xs leading-relaxed text-rb-500">{p.caption}</p>}
     </section>
+  );
+}
+
+/** The sheet before its figures land: its control row, its side panels
+ *  (the first as a side the event moved: a row and the total; the rest the
+ *  total alone) and its Risk and Limits pair, each line at the loaded line's
+ *  height with a bar where its figure will stand, so the swap moves nothing. */
+export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panels?: number }) {
+  const bar = (w: string) => <span className={`block h-3 rounded bg-rb-200 dark:bg-rb-700 ${w}`} />;
+  return (
+    <div className="animate-pulse px-5 py-2" aria-busy="true" data-sheet-skeleton="">
+      <div className="mb-2 flex justify-end">
+        <span className="block size-7 rounded-md bg-sunken" />
+      </div>
+      <div className="flex flex-col gap-2.5">
+        {Array.from({ length: sides }, (_, i) => (
+          <div key={i} className="rounded-xl bg-background px-4 pb-2 pt-3 text-sm">
+            <div className="mb-2 flex h-5 items-center">{bar("w-20")}</div>
+            {i === 0 && (
+              <>
+                <div className="flex h-9 items-center justify-between">
+                  {bar("w-28")}
+                  {bar("w-16")}
+                </div>
+                <div className="mt-1 border-t border-rb-300 dark:border-rb-600" />
+              </>
+            )}
+            <div className="flex h-10 items-center justify-end">{bar("w-20")}</div>
+          </div>
+        ))}
+        {panels > 0 && (
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            {Array.from({ length: panels }, (_, i) => (
+              <div key={i} className="rounded-xl bg-background px-4 py-3 text-sm">
+                <div className="mb-1 flex h-5 items-center">{bar("w-14")}</div>
+                {[0, 1].map((r) => (
+                  <div key={r} className="flex h-8 items-center justify-between">
+                    {bar("w-24")}
+                    {bar("w-12")}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <span className="sr-only">Reading the position at this block</span>
+    </div>
   );
 }
 

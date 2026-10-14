@@ -32,7 +32,7 @@ import { useRowTarget } from "@/components/shared/row-target";
 import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
-import { EventSheetView, type EventSheet } from "@/components/shared/event-sheet";
+import { EventSheetView, SheetSkeleton, type EventSheet } from "@/components/shared/event-sheet";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -190,6 +190,8 @@ function OpenedBody({
     <>
       {sheet ? (
         <EventSheetView sheet={sheet} breakdown={breakdown} data={slots.cellsData} />
+      ) : sheet === null ? (
+        <PendingSheet cells={opened.cells ?? slots.cells} />
       ) : (
         <EventCellGrid cells={opened.cells ?? slots.cells} />
       )}
@@ -197,6 +199,14 @@ function OpenedBody({
       {hasPriceRow(price) && <EventPriceRow price={price} />}
     </>
   );
+}
+
+/** A sheet whose figures are on their way: its skeleton, with as many side
+ *  panels as the cells name ledgers. Never the cells: the card goes from the
+ *  skeleton to the sheet. */
+function PendingSheet({ cells }: { cells: EventCells }) {
+  const ledgers = "pending" in cells ? cells.pending.filter((c) => c.kind === "ledger").length : 0;
+  return <SheetSkeleton sides={ledgers > 0 ? ledgers : 2} />;
 }
 
 /** What the shell takes beside the slots: the timeline's and the event
@@ -290,6 +300,8 @@ function drawnOf(slots: EventCardSlots, pageMode: boolean, breakdown: boolean): 
       <>
         {slots.sheet ? (
           <EventSheetView sheet={slots.sheet} breakdown={breakdown} data={slots.cellsData} />
+        ) : slots.sheet === null ? (
+          <PendingSheet cells={slots.cells} />
         ) : (
           <EventCellGrid cells={slots.cells} data={slots.cellsData} />
         )}
