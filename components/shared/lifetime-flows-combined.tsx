@@ -2102,10 +2102,9 @@ function PipRow({
         if (i >= 0) onPick(i);
       }}
     >
+      {/* No cursor line here: the dots are pressed, and the line stands on
+          the charts above. */}
       <div aria-hidden>
-        {w > 0 && ready && (
-          <i className="pointer-events-none absolute inset-y-0 w-px bg-foreground" style={{ left: cx - 0.5 }} />
-        )}
         {w > 0 &&
           visiblePips(model.ticks, (d) => xClose(startDay + d)).map((t) => (
             <FlowPip

@@ -1933,9 +1933,9 @@ function ChainTruthTimelineBody({
         {(rewind || following || filterPills.length > 0) && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-anatomy="L2" data-narrowing-row="">
             {(rewind || following) && (
-              // In the chart's teal with its chain: the cut is the Lifetime
-              // flows cursor's day, or, following with the cursor at today,
-              // the chart it follows.
+              // In the chart's teal: the cut is the Lifetime flows cursor's
+              // day, or, following with the cursor at today, the chart it
+              // follows.
               <span
                 className="inline-flex items-center rounded-full bg-teal-500/15 text-xs text-teal-700 dark:text-teal-300"
                 data-flow-rewind-chip=""
@@ -1952,7 +1952,10 @@ function ChainTruthTimelineBody({
                   className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-l-full py-1 pl-2.5 pr-1.5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
                   data-flow-rewind-go=""
                 >
-                  <Link2 size={13} aria-hidden />
+                  {/* The chain while the timeline follows the chart; a cut
+                      the one-shot button made, or one left standing once
+                      following stopped, reads without it. */}
+                  {following && <Link2 size={13} aria-hidden data-flow-rewind-chain="" />}
                   {rewind ? `Timeline to ${rewind.word}` : "Following the chart"}
                 </button>
                 <button
