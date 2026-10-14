@@ -275,8 +275,10 @@ export function CombinedFlows({
     go(i);
     setFrozen(true);
   };
-  const stepBack = () => go(byDays ? eventStep(stops, at, -1) : at - 1);
-  const stepOn = () => go(byDays ? eventStep(stops, at, 1) : at + 1);
+  // The arrows step from event to event (a day's dot on the events row), on
+  // every page; forward from the last event reaches today.
+  const stepBack = () => go(eventStep(stops, at, -1));
+  const stepOn = () => go(eventStep(stops, at, 1));
   const committed = stops[Math.min(at, last)];
   const committedEnd = committed
     ? committed.live
@@ -408,7 +410,7 @@ export function CombinedFlows({
       at: atClose ? `at close, ${closeDay}` : head.isLive ? `today (${dayStamp(Date.now() / 1000)})` : `at ${dateText}`,
       prev: stepBack,
       next: stepOn,
-      canPrev: byDays ? eventStep(stops, at, -1) !== at : at > 0,
+      canPrev: eventStep(stops, at, -1) !== at,
       canNext: at < last,
       live: !outside,
     }),
@@ -656,20 +658,10 @@ export function CombinedFlows({
               <span className="hidden sm:inline">{dayStamp(dayStart(model, 0))}</span>
             </button>
             <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className={btn}
-                aria-label={byDays ? "Previous day with events" : "Previous date"}
-                onClick={stepBack}
-              >
+              <button type="button" className={btn} aria-label="Previous event" onClick={stepBack}>
                 <ChevronLeft size={18} aria-hidden />
               </button>
-              <button
-                type="button"
-                className={btn}
-                aria-label={byDays ? "Next day with events" : "Next date"}
-                onClick={stepOn}
-              >
+              <button type="button" className={btn} aria-label="Next event" onClick={stepOn}>
                 <ChevronRight size={18} aria-hidden />
               </button>
               <button

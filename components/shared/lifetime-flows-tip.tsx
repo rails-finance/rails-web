@@ -334,7 +334,7 @@ function PanelDate({ cursor }: { cursor: FlowCursor | null }) {
         <button
           type="button"
           className={btn}
-          aria-label="Previous date"
+          aria-label="Previous event"
           disabled={!cursor.canPrev}
           onClick={cursor.prev}
         >
@@ -345,7 +345,7 @@ function PanelDate({ cursor }: { cursor: FlowCursor | null }) {
         {words}
       </span>
       {cursor.next && (
-        <button type="button" className={btn} aria-label="Next date" disabled={!cursor.canNext} onClick={cursor.next}>
+        <button type="button" className={btn} aria-label="Next event" disabled={!cursor.canNext} onClick={cursor.next}>
           <ChevronRight size={14} aria-hidden />
         </button>
       )}

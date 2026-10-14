@@ -361,11 +361,11 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   const bare = [...line.matchAll(/(?:^|[^$\d.,])([\d][\d.,]*[KMBT]?)(?![\d.,KMBT%])/g)].map((m) => m[1]);
   check(`${name} page: every figure in the bar's sum is in dollars`, /\$/.test(line) && bare.length === 0, line);
   const stops = [await lineAt()];
-  await page.getByRole("button", { name: "Previous date", exact: true }).click();
+  await page.getByRole("button", { name: "Previous event", exact: true }).click();
   await page.waitForTimeout(300);
   stops.push(await lineAt());
   check(
-    `${name} page: the balancing item reads Interest earned at the last stop and the one before`,
+    `${name} page: the balancing item reads Interest earned at the last stop and the event before`,
     stops.every((z) => /interest earned/i.test(z) && !/market move|price change/i.test(z)),
     stops.map((z) => z.replace(/\s+/g, " ").slice(0, 160)).join(" || "),
   );
