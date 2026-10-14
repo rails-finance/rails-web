@@ -54,6 +54,8 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { formatMonthDayYear } from "@/lib/date";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { troveCardTips } from "@/lib/liquity/trove-card-tips";
+import type { PositionPanelRow } from "@/components/shared/position-card-panel";
 import {
   formatApproximate,
   formatExactFromString,
@@ -879,12 +881,22 @@ export function useLiquityCardSlots({
     ) : pending && debt > 0 && coll > 0 ? (
       <span className="inline-block h-3 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
     ) : null;
+  // Each heading's read-more (decision 0038), in the branch's symbols.
+  const tips = troveCardTips(ct, cfg.debtSymbol, ratioLabel("cdp") !== "Collateral ratio");
+  const HEAD_TIP = tips.heads;
+  const ROW_TIP = tips.rows;
+  const tipRow = (r: PositionPanelRow): PositionPanelRow =>
+    r.tip || !ROW_TIP[r.id] ? r : { ...r, tip: ROW_TIP[r.id] };
   return {
     ...detailCommon,
+    heads: detailCommon.heads.map((h) => (h.labelTip || !HEAD_TIP[h.id] ? h : { ...h, labelTip: HEAD_TIP[h.id] })),
     outcome: undefined,
     panel: [
-      panel?.[0] ?? [],
-      [...(panel?.[1] ?? []), ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : [])],
+      (panel?.[0] ?? []).map(tipRow),
+      [
+        ...(panel?.[1] ?? []),
+        ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : []),
+      ].map(tipRow),
     ],
   };
 }

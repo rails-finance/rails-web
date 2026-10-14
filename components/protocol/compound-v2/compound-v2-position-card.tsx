@@ -480,6 +480,16 @@ export function useCompoundV2CardSlots({
     notice: v.borrows.some((b) => isCompoundV2Deprecated(b.market)) ? notice : undefined,
   };
   if (!detail) return { ...withNotice, heads, surface: "listing", menu: null };
+  // The headlines' read-mores on a detail card.
+  const HEAD_TIP = {
+    collateral:
+      "What the account supplies to Compound's markets, in dollars at Compound's oracle prices, earning each market's supply rate. The markets entered as collateral back its borrowing.",
+    debt: "What the account owes Compound's markets, in dollars at Compound's oracle prices, including the interest accrued at each market's borrow rate.",
+  };
+  const tipped = (h: PositionCardHead): PositionCardHead =>
+    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+      ? h
+      : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
 
   // Each side's market rows, and the panel: the liquidation line on the left;
   // the rate, the room to borrow and the drop on the right.
@@ -554,13 +564,15 @@ export function useCompoundV2CardSlots({
     ...detailCommon,
     // Each side's markets open under its headline (the chevron by the icons);
     // the panel keeps the additive values.
-    heads: heads.map((h) =>
-      h.id === "collateral" && v.supplies.length > 1
-        ? { ...h, breakdown: supplyBreakdown }
-        : h.id === "debt" && v.borrows.length > 1
-          ? { ...h, breakdown: borrowBreakdown }
-          : h,
-    ),
+    heads: heads
+      .map(tipped)
+      .map((h) =>
+        h.id === "collateral" && v.supplies.length > 1
+          ? { ...h, breakdown: supplyBreakdown }
+          : h.id === "debt" && v.borrows.length > 1
+            ? { ...h, breakdown: borrowBreakdown }
+            : h,
+      ),
     outcome: undefined,
     panel: [lineRows.collateral, [...rateRows, ...lineRows.debt]],
   };

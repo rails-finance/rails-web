@@ -99,6 +99,7 @@ const FAMILIES = {
         "components/protocol/liquity/delegate-adjust-run-card.tsx",
         "components/trove/use-trove-explanation-items.tsx",
         "lib/liquity/trove-page-words.tsx",
+        "lib/liquity/trove-card-tips.ts",
       ],
     },
     faq: { file: "components/transaction-timeline/explanation/shared/faqUrls.ts", table: "export const FAQ_URLS" },

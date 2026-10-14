@@ -149,6 +149,11 @@ const WORDS = {
   limits: "Limits",
   untouched: "Not changed by this event",
   after: "After this event",
+  // The headings' read-mores (decision 0038), the same on every family.
+  tipCollateral: "The position's collateral: what this event moved, then the total it stands at after.",
+  tipDebt: "The position's debt: what this event moved, then the total it stands at after, interest included.",
+  tipRisk: "How far the position stands from liquidation after this event.",
+  tipLimits: "The protocol's limits on the position and the room left inside them after this event.",
   repaid: (n: number) => `${n} repaid ${n === 1 ? "asset" : "assets"}`,
   column: "Column shown",
   show: "Show breakdown",
@@ -283,7 +288,12 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
       aria-label={name}
     >
       <div className="mb-2 flex items-center gap-2.5">
-        <h3 className="text-sm font-semibold text-rb-500">{name}</h3>
+        <h3 className="text-sm font-semibold text-rb-500">
+          <HeadingTip
+            text={name}
+            tip={s.name ? undefined : s.side === "collateral" ? WORDS.tipCollateral : WORDS.tipDebt}
+          />
+        </h3>
         {s.icons.length > 0 && <InlineAssetCluster symbols={s.icons} size={16} overlap={5} max={4} />}
       </div>
       <div className={GRID}>
@@ -397,7 +407,9 @@ function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
       data-sheet-panel={p.panel}
       aria-label={name}
     >
-      <h3 className="mb-1 text-sm font-semibold text-rb-500">{name}</h3>
+      <h3 className="mb-1 text-sm font-semibold text-rb-500">
+        <HeadingTip text={name} tip={p.panel === "risk" ? WORDS.tipRisk : WORDS.tipLimits} />
+      </h3>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3">
         <StatRows rows={p.rows} name={name} />
         {breakdown && p.breakdown && p.breakdown.length > 0 && (

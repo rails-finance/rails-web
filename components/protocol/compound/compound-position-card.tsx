@@ -625,7 +625,16 @@ export function useCompoundCardSlots({
     panel = [[], right];
   }
 
-  const common = { status, heads, identity, counters, outcome };
+  // The headlines' read-mores on a detail card.
+  const HEAD_TIP = {
+    collateral: `The collateral supplied to the ${v.base.symbol} market, in dollars at its price feeds. Collateral earns no interest and backs borrowing of ${v.base.symbol}.`,
+    debt: `The ${v.base.symbol} borrowed from the market, including the interest accrued at its borrow rate.`,
+  };
+  const tipped = (h: PositionCardHead): PositionCardHead =>
+    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+      ? h
+      : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
+  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome };
   if (!detail) return { ...common, surface: "listing", menu: null };
 
   const menu: PositionCardMenu = {

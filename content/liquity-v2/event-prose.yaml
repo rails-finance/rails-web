@@ -669,6 +669,25 @@ L5_words:
 # Read by troveWords / troveNodes (lib/liquity/event-templates.ts). A {name} is a value the
 # caller passes; a bullet's links and receipts are drawn around it.
 trove_words:
+  # ── The Trove card's headings: the read-more each one opens (decision 0038) ──
+  card_tip_collateral: |-
+    The {coll_symbol} the Trove holds, its dollar value at the branch's {coll_symbol} price beneath. It backs the debt, and a liquidation or a redemption takes from it.
+  card_tip_debt: |-
+    The {debt_symbol} the Trove owes, including the interest accrued since its last event. Repaying it in full closes the Trove.
+  card_tip_cr: |-
+    The collateral's dollar value divided by the debt. Below the {coll_symbol} branch's minimum ratio the Trove can be liquidated.
+  card_tip_ltv: |-
+    The debt divided by the collateral's dollar value. Above the {coll_symbol} branch's maximum the Trove can be liquidated.
+  card_tip_rate: |-
+    The annual rate the debt accrues interest at, chosen by the owner or set by its batch manager. Redemptions take Troves with lower rates first.
+  card_tip_debt_in_front: |-
+    The {debt_symbol} debt of the {coll_symbol} branch's Troves paying a lower interest rate. Redemptions take that debt before they reach this Trove.
+  card_tip_troves_in_front: |-
+    How many of the {coll_symbol} branch's Troves pay a lower interest rate and stand ahead of this one for redemption.
+  card_tip_costs: |-
+    A year's interest at today's rate: the debt times the annual interest rate. It moves with the rate and the debt.
+  card_tip_liquidates_at: |-
+    The {coll_symbol} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.
   # ── The Trove listing: its heading, noun and search box ──
   listing_title: |-
     Liquity V2 Troves

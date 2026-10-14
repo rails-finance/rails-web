@@ -186,6 +186,15 @@ function scaleRaw(raw: string | null | undefined, decimals: number): number {
 }
 
 /** A side's oracle-USD total as a headline figure, its cents on hover. */
+/** The headlines' read-mores on a detail card. */
+const SIDE_TIP = {
+  supply:
+    "What the account supplies to the Pool, in dollars at the Pool's oracle prices, earning each asset's supply rate. The assets enabled as collateral back its borrowing.",
+  debt: "What the account owes the Pool, in dollars at the Pool's oracle prices, including the interest accrued at each asset's variable borrow rate.",
+} as const;
+const HF_TIP =
+  "The collateral, each asset counted up to its liquidation threshold, divided by the debt. Below 1 the account can be liquidated.";
+
 function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   return (
     <RevealTip tip={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
@@ -418,6 +427,7 @@ export function useAaveV3CardSlots({
       return {
         id,
         label,
+        labelTip: detail ? SIDE_TIP[side] : undefined,
         value: (
           <Prov info={side === "supply" ? dep.supply(one.symbol, v.atBlock) : dep.debt(one.symbol, v.atBlock)}>
             <AssetAmount
@@ -441,6 +451,7 @@ export function useAaveV3CardSlots({
     return {
       id,
       label,
+      labelTip: detail ? SIDE_TIP[side] : undefined,
       value:
         reserves.length === 0 ? null : usd != null ? (
           <UsdFigure usd={usd} info={dep.usd(usdWhat)} />
@@ -473,6 +484,7 @@ export function useAaveV3CardSlots({
       ? {
           id: "health-factor",
           label: ratioLabel("pooled"),
+          labelTip: detail && ratioLabel("pooled") === "Health factor" ? HF_TIP : undefined,
           pending: !hfRead,
           value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? (
             <span className="text-rb-400">No debt</span>

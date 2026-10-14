@@ -483,6 +483,7 @@ export function FlowMomentCard({
       return {
         key: `asset-${a.symbol}`,
         label: a.symbol,
+        tip: `The ${a.symbol} on this side at the day's close, at that day's closing price.`,
         amount: { text: l.tokens?.after ?? fmtPositionAmount(a.tokens), symbol: a.symbol, info: provs.totalTokens },
         usd:
           l.usd && shownFor(a)
@@ -497,6 +498,7 @@ export function FlowMomentCard({
                     {
                       key: `asset-${a.symbol}-held`,
                       label: `${heldWord(side)} at ${dayStamp(sinceDay(a) * DAY_S)}`,
+                      tip: `What the ${a.symbol}'s last event left on this side, at this day's closing price.`,
                       amount: { text: held.tokens?.text ?? "", symbol: a.symbol, info: provs.token?.(held) },
                       usd: usdOf(held),
                     },
@@ -505,6 +507,7 @@ export function FlowMomentCard({
               {
                 key: `asset-${a.symbol}-interest`,
                 label: interest.label,
+                tip: `The interest the ${a.symbol} accrued between its last event and this day's close.`,
                 amount: { text: interest.tokens?.text ?? "", symbol: a.symbol, info: provs.token?.(interest) },
                 usd: usdOf(interest),
               },
@@ -535,6 +538,8 @@ export function FlowMomentCard({
       rows: [],
       total,
       untouched: "No events this day",
+      totalTip:
+        "The side's total at the day's close: what its last events left, with the interest since, at that day's closing prices.",
     };
   };
   const sheet: EventSheet = { sides: sides.map(sheetSide), panels: [] };

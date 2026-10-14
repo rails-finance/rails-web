@@ -587,7 +587,16 @@ export function useMorphoCardSlots({
     }
   }
 
-  const common = { status, heads, identity, counters, outcome };
+  // The headlines' read-mores on a detail card.
+  const HEAD_TIP = {
+    collateral: `The ${collSym} supplied to this market as collateral. It earns no interest and backs the loan up to the market's LLTV.`,
+    debt: `The ${v.loanSymbol} the position owes this market, including the interest accrued at the market's borrow rate.`,
+  };
+  const tipped = (h: PositionCardHead): PositionCardHead =>
+    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+      ? h
+      : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
+  const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome };
   if (!detail) return { ...common, surface: "listing", menu: null };
 
   const menu: PositionCardMenu = {

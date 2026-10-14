@@ -571,13 +571,25 @@ export function useMoonwellCardSlots({
       : []),
     ...moonwellRiskRows(chain),
   ];
-  const headsWithRows = heads.map((h) =>
-    h.id === "collateral" && vc.supplies.length > 1
-      ? { ...h, breakdown: collBreakdown }
-      : h.id === "debt" && v.borrows.length > 1
-        ? { ...h, breakdown: debtBreakdown }
-        : h,
-  );
+  // The headlines' read-mores on a detail card.
+  const HEAD_TIP = {
+    collateral:
+      "What the account supplies to Moonwell's markets, in dollars at Moonwell's oracle prices, earning each market's supply rate. The markets entered as collateral back its borrowing.",
+    debt: "What the account owes Moonwell's markets, in dollars at Moonwell's oracle prices, including the interest accrued at each market's borrow rate.",
+  };
+  const tipped = (h: PositionCardHead): PositionCardHead =>
+    h.labelTip || !(h.label === CARD_VOCAB.collateral || h.label === CARD_VOCAB.debt)
+      ? h
+      : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
+  const headsWithRows = heads
+    .map(tipped)
+    .map((h) =>
+      h.id === "collateral" && vc.supplies.length > 1
+        ? { ...h, breakdown: collBreakdown }
+        : h.id === "debt" && v.borrows.length > 1
+          ? { ...h, breakdown: debtBreakdown }
+          : h,
+    );
   return { ...detailCommon, heads: headsWithRows, outcome: undefined, panel: [left, right] };
 }
 

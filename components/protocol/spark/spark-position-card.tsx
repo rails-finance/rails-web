@@ -101,6 +101,9 @@ const LIQ_FEE_ROW_NOTE = "a liquidation's fee to the Spark treasury is a row of 
 const COLLATERAL_TIP =
   "What the account supplies that backs its borrowing, valued at SparkLend's oracle prices (the price feed SparkLend liquidates with). A supply is held as spTokens, SparkLend's receipt token, whose balance grows as interest accrues.";
 
+const DEBT_TIP =
+  "What the account owes SparkLend, valued at SparkLend's oracle prices, including the interest accrued at each asset's borrow rate. A borrow is held as variable debt tokens, whose balance grows as interest accrues.";
+
 const NOT_COLLATERAL_TIP =
   "Supplied and earning the supply rate, but backing no borrowing: its collateral switch is off, or SparkLend gives it a liquidation threshold of 0 (USDC, USDT, USDS and PYUSD).";
 
@@ -446,7 +449,7 @@ export function useSparkCardSlots({
         return {
           id,
           label: id === "collateral" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
-          labelTip: detail && id === "collateral" ? COLLATERAL_TIP : undefined,
+          labelTip: detail ? (id === "collateral" ? COLLATERAL_TIP : DEBT_TIP) : undefined,
           value: (
             <Prov
               info={
@@ -473,7 +476,7 @@ export function useSparkCardSlots({
       return {
         id,
         label: id === "collateral" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
-        labelTip: detail && id === "collateral" ? COLLATERAL_TIP : undefined,
+        labelTip: detail ? (id === "collateral" ? COLLATERAL_TIP : DEBT_TIP) : undefined,
         assets:
           reserves.length > 0 ? (
             <InlineAssetCluster symbols={loadedSymbols(splitDust(ranked, usdOf).shown)} />
