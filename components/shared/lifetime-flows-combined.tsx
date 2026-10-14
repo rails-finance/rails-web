@@ -208,6 +208,10 @@ export const FlowsKeyNodeContext = createContext<ReactNode>(null);
 /** Told while the combined panel is mounted: its sections carry the
  *  how-to-read, so the panel's header draws none. */
 export const FlowsSectionsContext = createContext<((on: boolean) => void) | null>(null);
+/** The panel's compact view (lib/shared/flows-view-store.ts): the bars, the
+ *  value chart and the price chart side by side, drawn at today, with no
+ *  cursor, steps or events row. */
+export const FlowsCompactContext = createContext(false);
 
 const STRIP_H = 80;
 /** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
@@ -271,6 +275,13 @@ export function CombinedFlows({
     setAt(i >= 0 ? i : lastRef.current);
   }, [model, series, from]);
   const go = (i: number) => setAt(Math.max(0, Math.min(last, i)));
+  // The compact view draws today: the cursor goes home and unfreezes.
+  const compact = useContext(FlowsCompactContext);
+  useEffect(() => {
+    if (!compact) return;
+    setAt(lastRef.current);
+    setFrozen(false);
+  }, [compact, last]);
 
   // On a page that ties the panel to its timeline, the day is the unit the
   // two share. A click on the strip freezes the cursor on a day; the chart and
@@ -528,50 +539,115 @@ export function CombinedFlows({
       })
     : null;
 
+  const barsBlock = (
+    <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
+      <OldPriceLabel note={head.isLive ? null : oldPriceAt(model, cur.stop)} />
+      {/* The cursor's date, for a screen reader; the eye reads it
+          under the events. */}
+      <p className="sr-only" aria-live="polite" data-flow-date="" data-anatomy="F2.1">
+        {dateLine}
+      </p>
+      <div
+        className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
+        aria-hidden={outside || undefined}
+        {...(outside ? { inert: true } : {})}
+      >
+        <FlowBarsHeadsContext.Provider value={heads}>
+          {busy ? (
+            <Rescaled
+              model={bars}
+              s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0 }).bars!}
+              hasDebt={hasDebt}
+              when={when}
+              isLive={liveReceipts}
+              assets={barAssets}
+              headlines={false}
+              outline={!cur.live}
+            />
+          ) : (
+            renderBars(barStop, when, liveReceipts, cur.live)
+          )}
+        </FlowBarsHeadsContext.Provider>
+      </div>
+      {outside && (
+        <p
+          className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-rb-500 shadow-sm dark:border-rb-700"
+          data-flow-outside-window=""
+        >
+          Before the bars&rsquo; window, {windowDay}
+        </p>
+      )}
+    </div>
+  );
+
+  if (compact)
+    return (
+      <FlowCursorContext.Provider value={cursor}>
+        <SegmentTipContext.Provider value={byDays || null}>
+          <div className="text-sm" data-flows-combined="" data-flows-view="compact">
+            <CompactFlows
+              barsBlock={barsBlock}
+              line={
+                lineReady
+                  ? (cw, cgeo) => (
+                      <LineStrip
+                        model={model}
+                        scale={lineScale}
+                        failed={failed}
+                        geo={cgeo}
+                        w={cw}
+                        today={today}
+                        cx={0}
+                        dim={false}
+                        ready
+                        still
+                        head={{ collateral: head.collateral.now, debt: head.debt.now }}
+                        hasDebt={hasDebt}
+                        windowFrom={from > 0 ? startDay + from : null}
+                      />
+                    )
+                  : null
+              }
+              price={
+                priced && priceHelp
+                  ? {
+                      heading: (
+                        <div className="mb-2 flex items-center justify-between gap-2" data-anatomy="F19.1">
+                          <PriceHeading series={prices} selected={priced} onPick={setAssetKey} />
+                          <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
+                        </div>
+                      ),
+                      strip: (cw, cgeo) => (
+                        <PriceStrip
+                          s={priced}
+                          scale={priceScales.get(priced.key)!}
+                          geo={cgeo}
+                          w={cw}
+                          today={today}
+                          cx={0}
+                          dim={false}
+                          still
+                          cursorPrice={null}
+                          cursorLevel={null}
+                          windowFrom={from > 0 ? startDay + from : null}
+                          startDay={startDay}
+                        />
+                      ),
+                    }
+                  : null
+              }
+              geoOf={(cw) => stripGeometry(cw, startDay, today, span, labelW)}
+            />
+          </div>
+        </SegmentTipContext.Provider>
+      </FlowCursorContext.Provider>
+    );
+
   return (
     <FlowCursorContext.Provider value={cursor}>
       <SegmentTipContext.Provider value={byDays || null}>
         <div className="text-sm" data-flows-combined="" data-flow-frozen={frozen ? "" : undefined}>
-          <Steady>
-            <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
-              <OldPriceLabel note={head.isLive ? null : oldPriceAt(model, cur.stop)} />
-              {/* The cursor's date, for a screen reader; the eye reads it
-                  under the events. */}
-              <p className="sr-only" aria-live="polite" data-flow-date="" data-anatomy="F2.1">
-                {dateLine}
-              </p>
-              <div
-                className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
-                aria-hidden={outside || undefined}
-                {...(outside ? { inert: true } : {})}
-              >
-                <FlowBarsHeadsContext.Provider value={heads}>
-                  {busy ? (
-                    <Rescaled
-                      model={bars}
-                      s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0 }).bars!}
-                      hasDebt={hasDebt}
-                      when={when}
-                      isLive={liveReceipts}
-                      assets={barAssets}
-                      headlines={false}
-                      outline={!cur.live}
-                    />
-                  ) : (
-                    renderBars(barStop, when, liveReceipts, cur.live)
-                  )}
-                </FlowBarsHeadsContext.Provider>
-              </div>
-              {outside && (
-                <p
-                  className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-rb-500 shadow-sm dark:border-rb-700"
-                  data-flow-outside-window=""
-                >
-                  Before the bars&rsquo; window, {windowDay}
-                </p>
-              )}
-            </div>
-          </Steady>
+          <Steady>{barsBlock}</Steady>
 
           <div {...KEEP_PANEL}>
             <div ref={stripRef} className="mt-8">
@@ -708,6 +784,52 @@ export function CombinedFlows({
         </div>
       </SegmentTipContext.Provider>
     </FlowCursorContext.Provider>
+  );
+}
+
+/** The compact view's layout: the bars, then the value chart, then the
+ *  price chart, three columns from md; under md the bars take the row and
+ *  the two charts share the next. Each chart sizes its own axis to its
+ *  column. */
+function CompactFlows({
+  barsBlock,
+  line,
+  price,
+  geoOf,
+}: {
+  barsBlock: ReactNode;
+  line: ((w: number, geo: StripGeometry) => ReactNode) | null;
+  price: { heading: ReactNode; strip: (w: number, geo: StripGeometry) => ReactNode } | null;
+  geoOf: (w: number) => StripGeometry;
+}) {
+  const [lineRef, lw] = useWidth();
+  const [priceRef, pw] = useWidth();
+  const charts = (line ? 1 : 0) + (price ? 1 : 0);
+  return (
+    <div
+      className={`grid grid-cols-2 items-end gap-x-5 gap-y-6 ${charts === 2 ? "md:grid-cols-3" : charts === 1 ? "md:grid-cols-2" : ""}`}
+      data-flows-compact=""
+    >
+      <div className={`min-w-0 ${charts > 0 ? "col-span-2 md:col-span-1" : "col-span-2"} self-start`}>{barsBlock}</div>
+      {/* Both columns stay mounted, so each measures its width from the
+          first frame and draws once its series lands. */}
+      <div
+        ref={lineRef}
+        className={`min-w-0 ${line ? (price ? "" : "col-span-2 md:col-span-1") : "hidden"}`}
+        data-flow-strip-view="value"
+      >
+        {line && lw > 0 && line(lw, geoOf(lw))}
+      </div>
+      <div
+        className={`min-w-0 ${price ? (line ? "" : "col-span-2 md:col-span-1") : "hidden"}`}
+        data-flow-price-section=""
+      >
+        {price?.heading}
+        <div ref={priceRef} data-flow-strip-view="price">
+          {price && pw > 0 && price.strip(pw, geoOf(pw))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1058,12 +1180,15 @@ function LineStrip({
   cx,
   dim,
   ready,
+  still,
   head,
   hasDebt,
   windowFrom,
 }: {
   model: FlowModel;
   scale: LineScale;
+  /** The compact view: drawn at today, with no cursor. */
+  still?: boolean;
   failed: boolean;
   geo: StripGeometry;
   w: number;
@@ -1248,9 +1373,13 @@ function LineStrip({
             )),
           ),
         )}
-        <CursorLine x={cx} />
-        <CursorDot x={cx} y={y(head.collateral, "collateral")} hue={LINE_HUE.collateral} />
-        {hasDebt && <CursorDot x={cx} y={y(head.debt, "debt")} hue={LINE_HUE.debt} />}
+        {!still && (
+          <>
+            <CursorLine x={cx} />
+            <CursorDot x={cx} y={y(head.collateral, "collateral")} hue={LINE_HUE.collateral} />
+            {hasDebt && <CursorDot x={cx} y={y(head.debt, "debt")} hue={LINE_HUE.debt} />}
+          </>
+        )}
       </svg>
       <div aria-hidden data-prov-exempt="" data-flow-line-axis="">
         {sideTops.map((x, i) => (
@@ -1342,7 +1471,9 @@ function PriceStrip({
   cursorLevel,
   windowFrom,
   startDay,
+  still,
 }: {
+  still?: boolean;
   s: FlowPriceSeries;
   scale: PriceScale;
   geo: StripGeometry;
@@ -1507,7 +1638,7 @@ function PriceStrip({
           })}
         </g>
         {dim && <AfterCursor x={cx} w={w} />}
-        <CursorLine x={cx} />
+        {!still && <CursorLine x={cx} />}
         {cursorLevel != null && <CursorDot x={cx} y={y(cursorLevel)} hue={LIQ_HUE} />}
         {cursorPrice != null && <CursorDot x={cx} y={y(cursorPrice)} hue={hue} />}
       </svg>

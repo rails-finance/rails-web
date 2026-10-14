@@ -91,7 +91,7 @@ import {
   TrackEnds,
   type FlowsTotalsData,
 } from "@/components/shared/lifetime-flows-busy";
-import { CombinedFlows, FLOW_TICK, LINE_HUE } from "@/components/shared/lifetime-flows-combined";
+import { CombinedFlows, FLOW_TICK, FlowsCompactContext, LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import {
   binInputFromTimeline,
   binSeries,
@@ -614,6 +614,7 @@ export function LifetimeFlowsScrubber({
   const bin: SeriesBin = model ? (series || focused ? seriesRouteBinFor(spanDays) : lifetimeBinFor(spanDays)) : "week";
   const binInput = useMemo(() => (series ? null : binInputFromTimeline(timeline)), [series, timeline]);
   const lined = series != null || binInput != null;
+  const compact = useContext(FlowsCompactContext);
   const [lifetime, setLifetime] = useState<{ series: FlowBinSeries | null; failed: boolean } | null>(null);
   const seriesKey = series ? `${series.path}?${new URLSearchParams(series.params).toString()}&bin=${bin}` : null;
   useEffect(() => setLifetime(null), [seriesKey, timeline]);
@@ -681,7 +682,13 @@ export function LifetimeFlowsScrubber({
     return (
       <FlowUnitContext.Provider value={model.unit ?? null}>
         <FlowSideUnitsContext.Provider value={model.sideUnits ?? null}>
-          {busy ? (
+          {/* Compact, a position with no daily series draws its bars at
+              today, with no scrubber. */}
+          {compact ? (
+            <div data-flows-view="compact" data-flows-compact="">
+              <PlainBars model={bars} stop={bars.liveStop} when="now" isLive atLive onKey={setHatches} />
+            </div>
+          ) : busy ? (
             <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
           ) : (
             <ScrubberBody model={bars} onKey={setHatches} />

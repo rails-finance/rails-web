@@ -30,9 +30,15 @@ import { useLifeCount } from "@/lib/shared/life-count-store";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { FLOWS_SCOPE, ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
 import { ToolsMenu } from "@/components/shared/tools-menu";
-import { FlowsKeyNodeContext, FlowsSectionsContext } from "@/components/shared/lifetime-flows-combined";
+import {
+  FlowsCompactContext,
+  FlowsKeyNodeContext,
+  FlowsSectionsContext,
+} from "@/components/shared/lifetime-flows-combined";
+import { Maximize2, Minimize2 } from "lucide-react";
+import { readFlowsView, writeFlowsView } from "@/lib/shared/flows-view-store";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
-import { useFlowFocusState } from "@/components/shared/flow-focus-context";
+import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
@@ -135,6 +141,36 @@ export function LifetimeFlowsPanel({
   const { remembered } = useSkeletonSizes();
   // The timeline's event count, for the waiting cue's scale line.
   const lifeCount = useLifeCount(pathname);
+  // Compact by default; the viewer's choice is kept (flows-view-store). A
+  // return to compact clears any cut the cursor made: compact has no cursor.
+  const [compact, setCompact] = useState(true);
+  useEffect(() => setCompact(readFlowsView() === "compact"), []);
+  const focus = useFlowFocus();
+  const toggleView = () => {
+    const next = !compact;
+    setCompact(next);
+    writeFlowsView(next ? "compact" : "full");
+    if (next) focus?.store.set({ rewind: null });
+  };
+  // A card's "View on chart" needs the cursor: it opens the full view.
+  useEffect(() => {
+    if (move === 0) return;
+    setCompact(false);
+  }, [move]);
+  const viewButton = (
+    <button
+      type="button"
+      onClick={toggleView}
+      aria-expanded={!compact}
+      aria-controls={bodyId}
+      aria-label={compact ? `Expand ${title}` : `Shrink ${title}`}
+      title={compact ? `Expand ${title}` : `Shrink ${title}`}
+      className={`${CTRL_GHOST} ${CTRL_OFF} size-8 shrink-0 rounded-md pointer-coarse:size-11`}
+      data-flows-view-toggle={compact ? "compact" : "full"}
+    >
+      {compact ? <Maximize2 size={16} aria-hidden /> : <Minimize2 size={16} aria-hidden />}
+    </button>
+  );
   if (scrubber == null && read === "done") return null;
   const loading = scrubber == null && read !== "failed";
 
@@ -194,21 +230,25 @@ export function LifetimeFlowsPanel({
           {/* The ⋮ at the right end (ui-jobs 295): Inspect provenance on the
               panel alone (ui-jobs 284); each section's "?" carries the
               how-to-read. Collapsed, nothing stands to inspect: no ⋮. */}
-          <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
-            <ToolsMenu
-              variant="panel"
-              label={`${title} menu`}
-              heading={title}
-              provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
-            />
-          </div>
+          {!compact && (
+            <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
+              <ToolsMenu
+                variant="panel"
+                label={`${title} menu`}
+                heading={title}
+                provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
+              />
+            </div>
+          )}
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {scrubber != null ? (
             <FlowsKeyContext.Provider value={setFlowsKey}>
               <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
                 <FlowsSectionsContext.Provider value={setSections}>
-                  <div className="mt-2">{scrubber}</div>
+                  <FlowsCompactContext.Provider value={compact}>
+                    <div className="mt-2">{scrubber}</div>
+                  </FlowsCompactContext.Provider>
                 </FlowsSectionsContext.Provider>
               </FlowsKeyNodeContext.Provider>
             </FlowsKeyContext.Provider>
@@ -224,12 +264,13 @@ export function LifetimeFlowsPanel({
               <p className="sr-only" role="status">
                 {flowsWaitingLine(lifeCount)}
               </p>
-              <LifetimeFlowsSkeleton />
+              <LifetimeFlowsSkeleton compact={compact} />
               <LifetimeFlowsWaiting count={lifeCount} />
             </div>
           )}
           <ProvenanceInfoTabs
             className="mt-3"
+            rowExtra={<span className="ml-auto flex items-center self-center">{viewButton}</span>}
             explanation={
               explanation == null && !outcome && !flowsKey ? undefined : (
                 <>
