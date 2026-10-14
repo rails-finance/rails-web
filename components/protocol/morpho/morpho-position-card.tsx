@@ -48,7 +48,7 @@ import {
   morphoBorrowRateNowProv,
 } from "@/lib/morpho/event-provenance";
 import { capacityProv, lltvProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
-import { formatNumber } from "@/lib/utils/format";
+import { formatNumber, formatExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
 import { capacityShare } from "@/lib/shared/capacity-share";
@@ -471,7 +471,7 @@ export function useMorphoCardSlots({
             label: "Costs per year",
             value: (
               <>
-                ~<AmountText value={debtNow * apr} /> {v.loanSymbol}
+                ~<AmountText value={debtNow * apr} format="compact" /> {v.loanSymbol}
               </>
             ),
             tip: "The debt now times the borrow rate: what a year costs while the rate holds.",
@@ -509,8 +509,12 @@ export function useMorphoCardSlots({
           id: "room-to-borrow",
           label: "Room to borrow",
           value: (
-            <Prov info={capacityProv("Available to borrow", "collateral value × lltv − live debt", chainCoords)}>
-              <AmountText value={Math.max(0, chain.maxBorrow - chain.currentDebt)} /> {chain.loanSymbol}
+            <Prov
+              info={capacityProv("Available to borrow", "collateral value × lltv − live debt", chainCoords)}
+              value={formatExact(Math.max(0, chain.maxBorrow - chain.currentDebt))}
+            >
+              <AmountText value={Math.max(0, chain.maxBorrow - chain.currentDebt)} format="compact" />{" "}
+              {chain.loanSymbol}
             </Prov>
           ),
           tip: "How much more the position can borrow: the collateral's value at the market's oracle times the LLTV, less the debt.",
@@ -533,7 +537,7 @@ export function useMorphoCardSlots({
                     : capacityProv("Collateral value", "collateral × oracle price", chainCoords)
                 }
               >
-                <AmountText value={collValue} /> {v.loanSymbol}
+                <AmountText value={collValue} format="compact" /> {v.loanSymbol}
               </Prov>
             ),
             tip: "The collateral valued in the loan token at the market's oracle, the price Morpho's liquidation test uses.",

@@ -710,7 +710,7 @@ export function useLiquityCardSlots({
                 variant="card"
                 className="text-rb-500"
               >
-                {compact ? formatApproximate(v.peakDebt) : formatPrice(v.peakDebt)}
+                {formatApproximate(v.peakDebt)}
               </HighlightableValue>
             </Prov>
           ) : null,
@@ -777,9 +777,9 @@ export function useLiquityCardSlots({
         id: "debt",
         label: CARD_VOCAB.debt,
         value: (
-          <Prov info={fp.debt}>
+          <Prov info={fp.debt} value={exactOf(debt, lv?.entireDebtRaw, 18)}>
             <HighlightableValue type="debt" state="after" value={debt} className="text-foreground/80">
-              <FadeNumber value={debt} formatFn={compact ? formatApproximate : formatPrice} animateOnMount={animate} />
+              <FadeNumber value={debt} formatFn={formatApproximate} animateOnMount={animate} />
             </HighlightableValue>
           </Prov>
         ),

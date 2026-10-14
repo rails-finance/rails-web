@@ -42,7 +42,7 @@ import {
 import { pct } from "@/components/shared/ratio-bar";
 import { fluidPositionContent } from "@/lib/fluid/position-content";
 import { pairLabel, poolShareLabel, vaultKindLabel } from "@/lib/fluid/asset-catalog";
-import { formatNumber } from "@/lib/utils/format";
+import { formatNumber, formatExact } from "@/lib/utils/format";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
@@ -168,8 +168,8 @@ function sigmaRow(
   const gap = Number.isFinite(headline) ? headline - n : NaN;
   const showGap = Number.isFinite(gap) && gap > 0 && formatNumber(gap) !== "0";
   const sigmaFig = (
-    <Prov info={positionSigmaProv(side, sym)}>
-      <AmountText value={n} /> {sym}
+    <Prov info={positionSigmaProv(side, sym)} value={formatExact(n)}>
+      <AmountText value={n} format="compact" /> {sym}
     </Prov>
   );
   return {
@@ -179,8 +179,8 @@ function sigmaRow(
     value: showGap ? (
       <>
         {sigmaFig} +{" "}
-        <Prov info={accruedInterestProv(side, sym)}>
-          <AmountText value={gap} /> {sym}
+        <Prov info={accruedInterestProv(side, sym)} value={formatExact(gap)}>
+          <AmountText value={gap} format="compact" /> {sym}
         </Prov>{" "}
         interest
       </>

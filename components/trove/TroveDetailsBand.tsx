@@ -86,7 +86,7 @@ export function TroveDetailsBand({
       <span className="inline-flex flex-wrap items-center gap-x-2" data-anatomy="C15·liquity">
         <TokenFigure symbol="BOLD">
           <Prov info={costsProv} value={formatExact(annualInterestCost)} symbol="BOLD">
-            ~<FadeNumber value={annualInterestCost} formatFn={formatPrice} animateOnMount={true} />
+            ~<FadeNumber value={annualInterestCost} formatFn={formatApproximate} animateOnMount={true} />
           </Prov>
         </TokenFigure>
         {trove.batch.isMember && (
@@ -142,7 +142,7 @@ export function TroveDetailsBand({
             Costs:{" "}
             <Prov info={costsProv} value={formatExact(annualInterestCost)}>
               <span className="text-foreground/80 font-semibold">
-                ~<FadeNumber value={annualInterestCost} formatFn={formatPrice} animateOnMount={true} />
+                ~<FadeNumber value={annualInterestCost} formatFn={formatApproximate} animateOnMount={true} />
               </span>
             </Prov>{" "}
             BOLD / year

@@ -78,7 +78,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
       label: "Costs per year",
       value: amount(
         <Prov info={costsProv} value={formatExact(annualCost)}>
-          ~{formatPrice(annualCost)}
+          ~{formatApproximate(annualCost)}
         </Prov>,
         debtSym,
       ),

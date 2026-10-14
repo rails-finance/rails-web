@@ -549,7 +549,7 @@ export function useFrankencoinCardSlots({
       label: "Repays in full",
       value: (
         <TokenFigure symbol="ZCHF">
-          <AmountText value={v.minted - v.reserveHeld} />
+          <AmountText value={v.minted - v.reserveHeld} format="compact" />
         </TokenFigure>
       ),
       tip: "The ZCHF that repays the debt: the rest of the debt is the reserve share held back at minting, which repaying returns.",

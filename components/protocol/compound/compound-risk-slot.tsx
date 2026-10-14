@@ -76,7 +76,7 @@ export function compoundRiskSlots(chain: CompoundMarketChainResponse | null): {
       value: (
         <>
           <Prov info={capacityProv("Liquidation line", "Σ collateral × price × liquidate factor ÷ base price", coords)}>
-            <AmountText value={toBase(chain, chain.liquidationCapacity)} /> {chain.baseSymbol}
+            <AmountText value={toBase(chain, chain.liquidationCapacity)} format="compact" /> {chain.baseSymbol}
           </Prov>{" "}
           of debt
         </>
