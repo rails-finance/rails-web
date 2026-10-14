@@ -351,8 +351,10 @@ async function checkModal(name, { title, links }) {
   const all200 = statuses.every((s) => s === 200);
   const last = links[links.length - 1];
   check(
-    `5. ${name} ("${title}"): ≥ 2 docs links, each 200, the app last`,
-    docs.length >= 2 && all200 && last?.url === APP_URL,
+    // The testnet app is no longer a modal link (f7dfc4c5, ui-jobs 314/315):
+    // every Quick Link is an anchored docs page.
+    `5. ${name} ("${title}"): ≥ 2 docs links, each 200, no app link`,
+    docs.length >= 2 && all200 && docs.length === links.length && last?.url !== APP_URL,
     `${links.map((l) => l.label).join(" | ")}; docs statuses ${statuses.join(",")}`,
   );
 }
