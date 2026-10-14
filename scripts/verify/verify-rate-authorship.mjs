@@ -236,7 +236,7 @@ console.log("§3 Liquity V2 'How Borrowing Works' modal — on a batched trove")
   }, MODAL_SEL);
   assert(/How Borrowing Works/i.test(modal), "the borrowing modal is the one open");
   assert(
-    modal.includes("the borrower sets the rate, or delegates it to a batch manager"),
+    /the borrower sets the rate,? or delegates it to a batch manager/.test(modal),
     "the modal names the delegation route",
   );
   assert(!modal.includes("the borrower chooses the rate"), "the modal no longer asserts sole borrower authorship");

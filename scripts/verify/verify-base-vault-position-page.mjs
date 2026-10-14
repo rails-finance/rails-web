@@ -645,7 +645,9 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false }
   const out = await page.evaluate(() => {
     const q = (s, a) => document.querySelector(s)?.getAttribute(a) ?? null;
     return {
-      text: document.body.innerText,
+      // The beta strip (H14, "Tell us what you think.") is site chrome, not the
+      // page's copy, so the register check reads the body without it.
+      text: document.body.innerText.replace(document.querySelector('[data-anatomy="H14"]')?.innerText ?? "", ""),
       historySource: q("[data-history-source]", "data-history-source"),
       historyCut: q("[data-history-source]", "data-history-cut"),
       historyTail: q("[data-history-source]", "data-history-tail-rows"),

@@ -844,7 +844,14 @@ async function readListingDom(qs = "") {
   // chrome (memory `vaults-section-build`). The section's prose is not on this
   // page any more — it is read off /base/morpho/vaults/info by `readInfoDom`
   // and L9 judges the two together.
-  const bodyText = (await page.locator("body").innerText()).replace(/\s+/g, " ").trim();
+  // The beta strip (H14, "Tell us what you think.") is site chrome above every
+  // page, not the section's copy, so the register rules read the body without it.
+  const betaText = await page
+    .locator('[data-anatomy="H14"]')
+    .first()
+    .innerText({ timeout: 1000 })
+    .catch(() => "");
+  const bodyText = (await page.locator("body").innerText()).replace(betaText, "").replace(/\s+/g, " ").trim();
   // The face's one line — the census line under the section rail
   // (components/vaults/vault-census-line.tsx).
   const stance = (await page.locator("[data-stance]").count())

@@ -108,8 +108,9 @@ const railBg = await rail.evaluate((el) => {
 console.log("   ", JSON.stringify(railBg));
 check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
 check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
-// The beta pill: at the FOOT, below the bookmark, and drawn as a label coming
-// out of the browser's left edge — square left corners, rounded right, x=0.
+// The beta pill: at the FOOT, below the bookmark, drawn as a full-width strip
+// across the rail from the browser's left edge, square on every corner, x=0
+// (c0534d67, 13 Oct 2026).
 const pill = await page.evaluate(() => {
   const r = document.querySelector('aside[aria-label="Rails"]');
   const el = [...r.querySelectorAll("span")].find((s) => /^beta$/i.test(s.textContent.trim()));
@@ -122,6 +123,8 @@ const pill = await page.evaluate(() => {
     topLeftRadius: cs.borderTopLeftRadius,
     bottomLeftRadius: cs.borderBottomLeftRadius,
     topRightRadius: cs.borderTopRightRadius,
+    width: Math.round(b.width),
+    railWidth: Math.round(r.getBoundingClientRect().width),
     belowBookmark: b.top >= mark.bottom,
     inLowerHalf: b.top > window.innerHeight / 2,
   };
@@ -134,7 +137,8 @@ if (pill) {
     pill.topLeftRadius === "0px" && pill.bottomLeftRadius === "0px",
     `the beta pill is square on its left (${pill.topLeftRadius} / ${pill.bottomLeftRadius})`,
   );
-  check(pill.topRightRadius !== "0px", `the beta pill is rounded on its right (${pill.topRightRadius})`);
+  check(pill.topRightRadius === "0px", `the beta pill is square on its right (${pill.topRightRadius})`);
+  check(pill.width === pill.railWidth, `the beta pill spans the rail (${pill.width} of ${pill.railWidth}px)`);
   check(pill.belowBookmark, "the beta pill sits below the bookmark");
   check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
 }
