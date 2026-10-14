@@ -354,6 +354,29 @@ export function useDolomiteCardSlots({
         assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} /> : undefined,
       },
     ];
+    // One market on a side: its amount with its icon, the dollars beneath
+    // (the Liquity V2 headline).
+    const single = (i: 0 | 1, list: DolomiteBalanceAmount[], side: "supply" | "debt", usd: number | null) => {
+      const r = list.length === 1 && !list[0].decimalsUnread ? list[0] : null;
+      if (!r) return;
+      heads[i] = {
+        ...heads[i],
+        value: (
+          <Prov info={legProv(r, side)}>
+            <AssetAmount value={legAmount(r)} symbol={r.symbol} exact={legExact(r)} address={r.token} />
+          </Prov>
+        ),
+        assets: undefined,
+        usd:
+          usd != null ? (
+            <span className="font-bold text-green-400">
+              <UsdFigure usd={usd} info={dolomiteUsdProv(side === "supply" ? "Collateral" : "Borrowed")} />
+            </span>
+          ) : null,
+      };
+    };
+    single(0, v.supplies, "supply", collUsd);
+    single(1, v.borrows, "debt", debtUsd);
     // The margin ratio rides the detail page's live core read; the listing
     // snapshot carries none, so a listing card has two headlines.
     if (detail) {
@@ -410,9 +433,9 @@ export function useDolomiteCardSlots({
   return {
     ...detailCommon,
     heads: detailCommon.heads.map((h) =>
-      h.id === "collateral" && supplyRows.length > 0
+      h.id === "collateral" && v.supplies.length > 1
         ? { ...h, assetRows: supplyRows }
-        : h.id === "debt" && debtRows.length > 0
+        : h.id === "debt" && v.borrows.length > 1
           ? { ...h, assetRows: debtRows }
           : h,
     ),

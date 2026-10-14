@@ -443,31 +443,64 @@ export function useSparkCardSlots({
       reserves: SparkReserveAmount[],
       ranked: SparkReserveAmount[],
       usd: number | null,
-    ): PositionCardHead => ({
-      id,
-      label: id === "collateral" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
-      labelTip: detail && id === "collateral" ? COLLATERAL_TIP : undefined,
-      assets:
-        reserves.length > 0 ? (
-          <InlineAssetCluster symbols={loadedSymbols(splitDust(ranked, usdOf).shown)} />
-        ) : undefined,
-      // One oracle-USD figure leads each side; where a reserve is unpriced the
-      // token amounts are the headline, so a partial total is never asserted.
-      value:
-        reserves.length === 0 ? null : usd != null ? (
-          <span title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
-            <Prov info={sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed")}>{formatUsd(usd)}</Prov>
-          </span>
-        ) : (
-          <TokenStack
-            reserves={ranked}
-            side={id === "collateral" ? "supply" : "debt"}
-            atBlock={v.atBlock}
-            usdOf={usdOf}
-            inert={!detail}
-          />
-        ),
-    });
+    ): PositionCardHead => {
+      // One reserve: its amount with its icon, the dollars beneath (the
+      // Liquity V2 headline).
+      const one = reserves.length === 1 && !reserves[0].decimalsUnread ? reserves[0] : null;
+      if (one)
+        return {
+          id,
+          label: id === "collateral" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
+          labelTip: detail && id === "collateral" ? COLLATERAL_TIP : undefined,
+          value: (
+            <Prov
+              info={
+                id === "collateral"
+                  ? positionSupplyProv(one.symbol, v.atBlock)
+                  : positionDebtProv(one.symbol, v.atBlock)
+              }
+            >
+              <AssetAmount
+                value={one.amount}
+                symbol={one.symbol}
+                address={one.address}
+                exact={formatUnitsExact(one.amountRaw, one.decimals)}
+              />
+            </Prov>
+          ),
+          usd:
+            usd != null ? (
+              <Prov info={sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed")}>
+                <span className="font-bold text-green-400">{formatUsd(usd)}</span>
+              </Prov>
+            ) : null,
+        };
+      return {
+        id,
+        label: id === "collateral" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
+        labelTip: detail && id === "collateral" ? COLLATERAL_TIP : undefined,
+        assets:
+          reserves.length > 0 ? (
+            <InlineAssetCluster symbols={loadedSymbols(splitDust(ranked, usdOf).shown)} />
+          ) : undefined,
+        // One oracle-USD figure leads each side; where a reserve is unpriced the
+        // token amounts are the headline, so a partial total is never asserted.
+        value:
+          reserves.length === 0 ? null : usd != null ? (
+            <span title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+              <Prov info={sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed")}>{formatUsd(usd)}</Prov>
+            </span>
+          ) : (
+            <TokenStack
+              reserves={ranked}
+              side={id === "collateral" ? "supply" : "debt"}
+              atBlock={v.atBlock}
+              usdOf={usdOf}
+              inert={!detail}
+            />
+          ),
+      };
+    };
     heads = [
       side("collateral", collSupplies, suppliesRanked, collUsd),
       side("debt", v.borrows, borrowsRanked, debtUsd),
@@ -556,9 +589,9 @@ export function useSparkCardSlots({
       ? [...debtLines.lines.map((r) => reserveRow(r, "debt")), ...dustRow(debtLines.control, "debt")]
       : [];
   const headsWithRows = heads.map((h) =>
-    h.id === "collateral" && supplyRows.length > 0
+    h.id === "collateral" && supplyRows.length > 1
       ? { ...h, assetRows: supplyRows }
-      : h.id === "debt" && debtRows.length > 0
+      : h.id === "debt" && debtRows.length > 1
         ? { ...h, assetRows: debtRows }
         : h,
   );

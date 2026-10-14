@@ -522,6 +522,35 @@ export function useCompoundCardSlots({
         supplyUsd != null && supplySymbols.length > 0 ? <InlineAssetCluster symbols={supplySymbols} /> : undefined,
       sub: lending ? lentBasis : undefined,
     };
+    // One supply line: its amount with its icon, the dollars beneath (the
+    // Liquity V2 headline, as the debt side draws it).
+    const oneLine = lines.length === 1 && legs.length === 1 && !lines[0].collateral?.decimalsUnread ? lines[0] : null;
+    if (oneLine) {
+      const c = oneLine.collateral;
+      supplyHead.value = (
+        <Prov
+          info={
+            c
+              ? vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })
+              : baseProv(v, eff, "lend", vocab, lane)
+          }
+        >
+          <AssetAmount
+            value={oneLine.amount}
+            symbol={oneLine.symbol}
+            address={oneLine.address}
+            exact={c ? formatUnitsExact(c.amountRaw, c.decimals) : baseExact}
+          />
+        </Prov>
+      );
+      supplyHead.assets = undefined;
+      supplyHead.usd =
+        supplyUsd != null ? (
+          <Prov info={compoundUsdProvOnchain(lending ? "Lent base" : "Collateral", coords)}>
+            <span className="font-bold text-green-400">{formatUsdValue(supplyUsd)}</span>
+          </Prov>
+        ) : null;
+    }
     // Debt side: the borrowed base as a POSITIVE magnitude, its USD beneath.
     const borrowing = eff.side === "borrow";
     const debtHead: PositionCardHead = {
@@ -602,7 +631,7 @@ export function useCompoundCardSlots({
         tip: "The block the Comet's balance was read at. Interest accrues every block, so the balance moves between loads.",
         value: v.current.block.toLocaleString("en-US"),
       });
-    if (supplyRows.length > 0) heads[0] = { ...heads[0], assetRows: supplyRows };
+    if (!oneLine && supplyRows.length > 1) heads[0] = { ...heads[0], assetRows: supplyRows };
     panel = [[], right];
   }
 

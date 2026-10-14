@@ -419,23 +419,52 @@ export function useAaveV3CardSlots({
     pending: boolean,
     usdWhat: string,
     side: "supply" | "debt",
-  ): PositionCardHead => ({
-    id,
-    label,
-    value:
-      reserves.length === 0 ? null : usd != null ? (
-        <UsdFigure usd={usd} info={dep.usd(usdWhat)} />
-      ) : (
-        // A partial USD total is never asserted: an unpriced side shows its
-        // token amounts.
-        <ReserveAmounts
-          reserves={reserves}
-          receipt={(r) => (side === "supply" ? dep.supply(r.symbol, v.atBlock) : dep.debt(r.symbol, v.atBlock))}
-        />
-      ),
-    pending: reserves.length > 0 && pending,
-    assets: reserves.length > 0 && usd != null ? <InlineAssetCluster symbols={loadedSymbols(shown)} /> : undefined,
-  });
+  ): PositionCardHead => {
+    // One reserve: its amount with its icon, the dollars beneath (the
+    // Liquity V2 headline).
+    const one = reserves.length === 1 && !reserves[0].decimalsUnread ? reserves[0] : null;
+    if (one)
+      return {
+        id,
+        label,
+        value: (
+          <Prov info={side === "supply" ? dep.supply(one.symbol, v.atBlock) : dep.debt(one.symbol, v.atBlock)}>
+            <AssetAmount
+              value={one.amount}
+              symbol={one.symbol}
+              address={one.address}
+              exact={formatUnitsExact(one.amountRaw, one.decimals)}
+            />
+          </Prov>
+        ),
+        pending: false,
+        usd:
+          usd != null ? (
+            <Prov info={dep.usd(usdWhat)}>
+              <span className="font-bold text-green-400">{formatUsd(usd)}</span>
+            </Prov>
+          ) : pending ? (
+            <span className="inline-block h-3 w-16 animate-pulse rounded-md bg-rb-200 dark:bg-rb-700" />
+          ) : null,
+      };
+    return {
+      id,
+      label,
+      value:
+        reserves.length === 0 ? null : usd != null ? (
+          <UsdFigure usd={usd} info={dep.usd(usdWhat)} />
+        ) : (
+          // A partial USD total is never asserted: an unpriced side shows its
+          // token amounts.
+          <ReserveAmounts
+            reserves={reserves}
+            receipt={(r) => (side === "supply" ? dep.supply(r.symbol, v.atBlock) : dep.debt(r.symbol, v.atBlock))}
+          />
+        ),
+      pending: reserves.length > 0 && pending,
+      assets: reserves.length > 0 && usd != null ? <InlineAssetCluster symbols={loadedSymbols(shown)} /> : undefined,
+    };
+  };
 
   // The health factor: the position page's live read. Omitted on every
   // listing view and on a deployment with no live HF receipt — an unasserted
@@ -676,9 +705,9 @@ export function useAaveV3CardSlots({
   // Each side's reserves open under its headline (the chevron by the icons);
   // the panel keeps the additive values.
   const withRows = heads.map((h) =>
-    h.id === "collateral" && v.supplies.length > 0
+    h.id === "collateral" && v.supplies.length > 1
       ? { ...h, assetRows: reserveRows("supply", suppliesSplit, collUsd) }
-      : h.id === "debt" && v.borrows.length > 0
+      : h.id === "debt" && v.borrows.length > 1
         ? { ...h, assetRows: reserveRows("debt", borrowsSplit, debtUsd) }
         : h,
   );

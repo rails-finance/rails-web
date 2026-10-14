@@ -389,6 +389,49 @@ export function useMoonwellCardSlots({
         assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
       },
     ];
+    // One market on a side: its amount with its icon, the dollars beneath
+    // (the Liquity V2 headline).
+    if (vc.supplies.length === 1) {
+      const r = vc.supplies[0];
+      heads[0] = {
+        ...heads[0],
+        value: (
+          <Prov info={supplyProv(r)}>
+            <AssetAmount
+              value={supplyAmount(r)}
+              symbol={r.symbol}
+              exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
+              {...(r.current != null ? { exactUnit: mSymbolOf(r) } : {})}
+            />
+          </Prov>
+        ),
+        assets: undefined,
+        usd:
+          collUsd != null ? (
+            <span className="font-bold text-green-400">
+              <UsdFigure usd={collUsd} what="Collateral" />
+            </span>
+          ) : null,
+      };
+    }
+    if (v.borrows.length === 1) {
+      const r = v.borrows[0];
+      heads[1] = {
+        ...heads[1],
+        value: (
+          <Prov info={borrowProv(r)}>
+            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+          </Prov>
+        ),
+        assets: undefined,
+        usd:
+          debtUsd != null ? (
+            <span className="font-bold text-green-400">
+              <UsdFigure usd={debtUsd} what="Borrowed" />
+            </span>
+          ) : null,
+      };
+    }
     // The health factor rides the detail page's live Comptroller read; the
     // listing snapshot carries none, so a listing card asserts no health
     // column (never dashed, never staled).
@@ -505,9 +548,9 @@ export function useMoonwellCardSlots({
     ...moonwellRiskRows(chain),
   ];
   const headsWithRows = heads.map((h) =>
-    h.id === "collateral" && collRows.length > 0
+    h.id === "collateral" && vc.supplies.length > 1
       ? { ...h, assetRows: collRows }
-      : h.id === "debt" && debtRows.length > 0
+      : h.id === "debt" && v.borrows.length > 1
         ? { ...h, assetRows: debtRows }
         : h,
   );
