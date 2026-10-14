@@ -133,7 +133,7 @@ export function FlowPip({ tick, left, opacity }: { tick: FlowTick; left: number;
   if (tick === "liquidation" || tick === "redemption" || tick === "caution")
     return (
       <svg
-        className="pointer-events-none absolute top-[3px] -translate-x-1/2"
+        className="pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
         width={PIP_TRIANGLE}
         height={PIP_TRIANGLE}
         viewBox="1.5 2.5 21 19"
@@ -146,7 +146,7 @@ export function FlowPip({ tick, left, opacity }: { tick: FlowTick; left: number;
   const ring = tick === "rate-owner";
   return (
     <i
-      className={`pointer-events-none absolute -translate-x-1/2 rounded-full ${ring ? "top-[3.5px] size-[6px] border-[1.5px]" : "top-1 size-[5px]"}`}
+      className={`pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${ring ? "size-[6px] border-[1.5px]" : "size-[5px]"}`}
       style={{
         left,
         opacity,
@@ -2047,7 +2047,9 @@ function PipRow({
   return (
     <div
       ref={pipRef}
-      className="relative h-5 cursor-pointer sm:h-3.5"
+      // A pill on the sunken ground, padded only vertically so each pip keeps
+      // its x on the charts' axis; the whole pill takes the press.
+      className="relative h-11 cursor-pointer rounded-full bg-sunken py-3 sm:h-[38px]"
       data-flow-pips=""
       data-anatomy="F4.1"
       onPointerMove={(e) => {

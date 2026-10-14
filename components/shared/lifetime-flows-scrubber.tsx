@@ -1046,18 +1046,21 @@ function ScrubberBody({
             the same through the slider's value. */}
           <div
             ref={pipRef}
-            className="relative mx-2 h-4 sm:h-3"
+            className="relative mx-2 h-10 py-3 sm:h-9"
             data-flow-pips=""
             data-anatomy="F4.1"
             onPointerMove={(e) => e.pointerType === "mouse" && setPip(pipAt(e.clientX))}
             onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
             onClick={(e) => setPip(pipAt(e.clientX))}
           >
+            {/* The pill's ground reaches past the row's inset, so each pip
+                keeps its place on the axis. */}
+            <span aria-hidden className="pointer-events-none absolute inset-y-0 -inset-x-2 rounded-full bg-sunken" />
             <div aria-hidden>
               {model.ticks.map((t, i) => (
                 <i
                   key={i}
-                  className="pointer-events-none absolute bottom-0 h-2.5 w-[2px] rounded-[1px]"
+                  className="pointer-events-none absolute top-1/2 h-2.5 w-[2px] -translate-y-1/2 rounded-[1px]"
                   style={{ left: pct(t.day, model.liveStop), background: TICK[t.tick] }}
                 />
               ))}
