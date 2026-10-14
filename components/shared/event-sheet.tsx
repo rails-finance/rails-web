@@ -85,6 +85,9 @@ export interface SheetSide {
   /** The side's total after the event, in dollars; `none` names why there is
    *  none. */
   total: SheetFigure | { none: string };
+  /** The total line's words where the side has no rows; unset, "Not changed
+   *  by this event" (a moment's card: "No events this day"). */
+  untouched?: string;
   /** The total's read-more, behind a "?" in its label cell. */
   totalTip?: string;
   /** The repaid assets row's read-more. */
@@ -334,7 +337,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
         )}
         <div className="contents" data-sheet-row="total">
           <span className={`min-w-0 self-center py-2 text-sm ${touched ? "" : "text-rb-500"}`}>
-            {touched ? null : WORDS.untouched}
+            {touched ? null : (s.untouched ?? WORDS.untouched)}
             {s.totalTip && <RowHelp tip={s.totalTip} name={WORDS.total(name)} />}
           </span>
           <span className="py-2 max-sm:hidden" />

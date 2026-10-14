@@ -6,33 +6,24 @@
 // of its own, the cut timeline opens with this card for that moment. It wears
 // an event card's shell with a clock on the spine, and states only what the
 // flow model holds exactly for that day (lib/shared/flow-moment.ts). Its T2 is
-// the event card's: Collateral and Debt as ledger cells
-// (components/shared/event-ledger.tsx), closed on the side's closing line,
-// opened on each asset as its last event left it (Held / Owed), the interest
-// since (grown by its reserve's index, or on a side counted at its $1 face
-// built at the rate in force), and the asset's total, in tokens and in USD
-// where a price was recorded that day. How each side was reached is the
+// the event sheet (components/shared/event-sheet.tsx, ui-jobs 330): each side
+// at what it stands at the close, with no rows (nothing moved), and under the
+// breakdown each asset's total, with what its last event left (Held / Owed)
+// and the interest since (grown by its reserve's index, or on a side counted
+// at its $1 face built at the rate in force), in tokens and in USD where a
+// price was recorded that day. How each side was reached is the
 // Explanation's. It is not an event: no number, no filter, not counted, and
 // it goes when the cut is cleared.
 
 import { EventHeadChevron } from "@/components/shared/event-number-pill";
 import { EventCard } from "@/components/shared/event-card";
 import { EventCaptionContext } from "@/components/shared/mobile-spine";
-import { Prov, type Provenance } from "@/components/shared/provenance";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import type { Provenance } from "@/components/shared/provenance";
 import { fmtPositionAmount } from "@/components/shared/position-row";
-import { RevealTip } from "@/components/shared/reveal-tip";
 import { usdShown } from "@/lib/shared/usd-display";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
-import {
-  AssetLedgers,
-  ClosedTokens,
-  usdAt,
-  LedgerCell,
-  LedgerTable,
-  dayStamp,
-  type LedgerProvs,
-} from "@/components/shared/event-ledger";
+import { dayStamp, type LedgerProvs } from "@/components/shared/event-ledger";
+import type { EventSheet, SheetSide } from "@/components/shared/event-sheet";
 import { signedTokens, signedUsd, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import { fmtTokens, tokenDecimals } from "@/lib/shared/flow-focus";
 import { apportionSigned, wholeUsd } from "@/lib/shared/flows-sum";
@@ -466,15 +457,14 @@ export function FlowMomentCard({
     return { ledger, provs };
   };
 
-  /** The closed row's token figure: the ledger's total. */
-  const closedFigure = (l: Ledger, a: MomentAsset) => l.tokens?.after ?? fmtPositionAmount(a.tokens);
-
-  const cell = (side: FlowSide) => {
+  // ── The open card: the event sheet (ui-jobs 330) at the close ──────────
+  // A quiet day moves nothing: each side states what it stands at, the
+  // breakdown lists each asset with what its last event left and the
+  // interest since.
+  const sheetSide = (side: FlowSide): SheetSide => {
     const s = moment.sides[side];
     const usd = sideUsd(side);
     const multi = s.assets.length > 1;
-    // Several assets add only in USD: each one's whole dollars apportioned to
-    // the side's total.
     const shares =
       multi && usd != null
         ? apportionSigned(
@@ -484,104 +474,70 @@ export function FlowMomentCard({
         : s.assets.map((a) => (a.usd != null ? Math.round(a.usd) : null));
     const built = s.assets.map((a, i) => ({ a, ...assetLedger(side, a, shares[i]) }));
     const shownFor = (a: MomentAsset) => a.usd != null && usdShown(a.usd);
-    const sideTotal =
-      multi && usd != null
-        ? { before: null, after: wholeUsd(usd, unitOf(model, side)), dollars: Math.round(usd) }
-        : null;
     const totalProv = flowSegmentProv(heldSeg(side), side, when, false, model.daily);
-    const ledger =
-      built.length === 0 ? null : multi ? (
-        <AssetLedgers
-          moment
-          side={side}
-          assets={built.map((b) => b.ledger)}
-          usd={sideTotal}
-          at={when}
-          totalUsdProv={totalProv}
-          usdShownFor={(l) => {
-            const b = built.find((x) => x.ledger === l);
-            return !!b && l.usd != null && shownFor(b.a);
-          }}
-          provsFor={(l) => built.find((x) => x.ledger.symbol === l.symbol)?.provs}
-        />
-      ) : (
-        <LedgerTable
-          ledger={
-            shownFor(built[0].a)
-              ? built[0].ledger
-              : { ...built[0].ledger, usd: null, rows: built[0].ledger.rows.map((r) => ({ ...r, usd: null })) }
-          }
-          provs={built[0].provs}
-          name={model.labels[side]}
-          at={when}
-          daily={model.daily}
-        />
-      );
-    // Closed: the cell's closing line, as an event card's: one asset's tokens
-    // (USD after a divider), or several assets' USD total and an icon each.
-    const closed =
-      built.length === 0 ? (
-        <span className="text-sm text-rb-500">none</span>
-      ) : multi && usd != null ? (
-        <span className="flex flex-wrap items-center justify-end gap-1">
-          <span className="text-sm font-semibold tabular-nums text-foreground">
-            <Prov info={totalProv}>{wholeUsd(usd, unitOf(model, side))}</Prov>
-          </span>
-          <span className="ml-1 inline-flex items-center gap-1" data-closed-assets="">
-            {built.map(({ a, ledger: l }) => (
-              <Prov key={a.symbol} info={tokensProv(side, a)}>
-                <RevealTip
-                  tip={`${closedFigure(l, a)} ${a.symbol}`}
-                  label={`${closedFigure(l, a)} ${a.symbol}`}
-                  align="end"
-                >
-                  <TokenChipIcon symbol={a.symbol} size={16} filterable={false} untitled />
-                </RevealTip>
-              </Prov>
-            ))}
-          </span>
-        </span>
-      ) : (
-        <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-          {built.map(({ a, ledger: l }) => (
-            <span key={a.symbol} className="flex flex-wrap items-center justify-end gap-1">
-              <ClosedTokens
-                usd={
-                  !multi && a.usd != null && shownFor(a)
-                    ? {
-                        after: <Prov info={usdProv(a)}>{wholeUsd(a.usd, unitOf(model, side))}</Prov>,
-                        ...usdAt({ price: a.price, symbol: a.symbol, after: a.tokens }),
-                      }
-                    : undefined
-                }
-              >
-                <Prov info={tokensProv(side, a)} icon={<TokenChipIcon symbol={a.symbol} size={16} />}>
-                  <span className="text-sm font-semibold tabular-nums">{closedFigure(l, a)}</span>
-                </Prov>
-              </ClosedTokens>
-            </span>
-          ))}
-        </span>
-      );
-    return (
-      <LedgerCell
-        key={side}
-        side={side}
-        ledger={ledger}
-        data={{ "data-receipt-cell": side, "data-flow-moment-cell": side }}
-        label={model.labels[side]}
-      >
-        {closed}
-      </LedgerCell>
-    );
+    const carry: SheetSide["carry"] = built.map(({ a, ledger: l, provs }) => {
+      const held = l.rows.find((r) => r.role === "flow");
+      const interest = l.rows.find((r) => r.role === "interest");
+      const usdOf = (r: LedgerRow | undefined) =>
+        r?.usd && shownFor(a) ? { text: r.usd.text, info: provs.usd?.(r) } : undefined;
+      return {
+        key: `asset-${a.symbol}`,
+        label: a.symbol,
+        amount: { text: l.tokens?.after ?? fmtPositionAmount(a.tokens), symbol: a.symbol, info: provs.totalTokens },
+        usd:
+          l.usd && shownFor(a)
+            ? { text: l.usd.after, info: provs.totalUsd ?? totalProv }
+            : s.face
+              ? { text: wholeUsd(a.tokens, unitOf(model, side)), info: provs.totalTokens }
+              : undefined,
+        sub: interest
+          ? [
+              ...(held
+                ? [
+                    {
+                      key: `asset-${a.symbol}-held`,
+                      label: `${heldWord(side)} at ${dayStamp(sinceDay(a) * DAY_S)}`,
+                      amount: { text: held.tokens?.text ?? "", symbol: a.symbol, info: provs.token?.(held) },
+                      usd: usdOf(held),
+                    },
+                  ]
+                : []),
+              {
+                key: `asset-${a.symbol}-interest`,
+                label: interest.label,
+                amount: { text: interest.tokens?.text ?? "", symbol: a.symbol, info: provs.token?.(interest) },
+                usd: usdOf(interest),
+              },
+            ]
+          : undefined,
+      };
+    });
+    // A side counted at its $1 face (a Liquity Trove's debt): its tokens are
+    // its dollars.
+    const faceUsd = s.face && built.length > 0 ? s.assets.reduce((t, a) => t + a.tokens, 0) : null;
+    const total: SheetSide["total"] =
+      built.length === 0
+        ? { none: "none" }
+        : faceUsd != null
+          ? { text: wholeUsd(faceUsd, unitOf(model, side)), info: totalProv }
+          : usd != null && (multi || shownFor(built[0].a))
+            ? { text: wholeUsd(usd, unitOf(model, side)), info: totalProv }
+            : {
+                none: built
+                  .map(({ a, ledger: l }) => `${l.tokens?.after ?? fmtPositionAmount(a.tokens)} ${a.symbol}`)
+                  .join(", "),
+              };
+    return {
+      side,
+      name: model.labels[side],
+      icons: s.assets.map((a) => a.symbol),
+      carry,
+      rows: [],
+      total,
+      untouched: "No events this day",
+    };
   };
-  const detail = (
-    <div className="px-5 py-2" data-flow-moment-detail="">
-      <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-flow-row-dense sm:grid-cols-2" data-receipt="open">
-        {sides.map((s) => cell(s))}
-      </div>
-    </div>
-  );
+  const sheet: EventSheet = { sides: sides.map(sheetSide), panels: [] };
 
   // ── The Explanation: how each side's figures were reached ──────────────
   /** A side's balances, grown by interest since the one event day that
@@ -631,8 +587,8 @@ export function FlowMomentCard({
                   ? " The debt is grown by the interest since its last event, at the rate the market charged between that event and the next (after the last, the rate that meets today's live debt), so this is the Controller's debt to within how the rate moved between them."
                   : " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held.";
         })()}{" "}
-        Each side&rsquo;s toggle opens its ledger: each asset as its last event left it, the interest since, and what it
-        comes to at the close.
+        The breakdown lists each asset: what it comes to at the close, and where interest built, what its last event
+        left and the interest since.
       </p>
       {sides.map((s) => {
         const n = sideNote(s);
@@ -659,11 +615,9 @@ export function FlowMomentCard({
             spine: { icon: "moment", isLast: false, tip: null },
             head: { row: header },
             caption: "Position at close",
-            // The sides are drawn as ledger cells against the moment's model,
-            // in the notes' place.
-            cells: { none: "The moment states each side's balances at the close in its ledger cells." },
-            ledgers: { none: "Each side's cell opens the Lifetime flows ledger the moment reads." },
-            notes: detail,
+            cells: { none: "The moment states each side's balances at the close in its sheet." },
+            sheet,
+            ledgers: { none: "The moment's sheet reads the Lifetime flows model." },
             explainer: { body: explainer },
             learnMore: null,
           }}
