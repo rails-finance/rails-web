@@ -21,8 +21,35 @@ export interface EventGas {
   usd: number;
   /** The run's transaction count, where the gas covers a no-change run. */
   run?: number | null;
-  /** The figure's receipt; drawn as a <Prov> where given. */
+  /** The transaction receipt's gas used, where the index sends it. */
+  gasUsed?: number;
+  /** The figure's receipt; where a family gives none, the transaction
+   *  receipt's own (gasReceipt). */
   info?: Provenance;
+}
+
+/** The gas figure's receipt from the transaction receipt's fields, as
+ *  Liquity V2 states it (lib/liquity/event-provenance.ts eventGasProv): the
+ *  gas used times the effective gas price, in ETH, and in USD at ETH's price
+ *  at the block; a run's figure sums its transactions. */
+export function gasReceipt(gas: EventGas): Provenance {
+  const run = gas.run != null && gas.run > 1;
+  return {
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary: run
+      ? `Gas across the ${gas.run} transactions this row stands for — each one's gas used times its effective gas price, summed, in ETH and in USD at ETH's price at each block.`
+      : "Gas for this transaction — the gas used times the effective gas price, in ETH, and in USD at ETH's price at the block.",
+    formula: "gasUsed × effectiveGasPrice",
+    via: "transaction receipt",
+    inputs: [
+      ...(gas.gasUsed != null && !run
+        ? [{ label: "gas used", value: gas.gasUsed.toLocaleString("en-US"), kind: "chain" as const }]
+        : []),
+      { label: "gas cost", value: `${gas.eth} ETH`, kind: "chain" as const },
+      ...(gas.usd > 0 ? [{ label: "USD", value: `$${gas.usd.toFixed(2)}`, kind: "chain-derived" as const }] : []),
+    ],
+  };
 }
 
 /** A symbol's price at the event, as a then/today chip. */
@@ -94,7 +121,7 @@ export interface EventCardPrice {
 /** An index's or a receipt's gas, as the row states it; none where nothing
  *  was paid. */
 export function eventGas(gas: GasCost | null | undefined): EventGas | undefined {
-  return gas && gas.gasCostEth > 0 ? { eth: gas.gasCostEth, usd: gas.gasCostUsd } : undefined;
+  return gas && gas.gasCostEth > 0 ? { eth: gas.gasCostEth, usd: gas.gasCostUsd, gasUsed: gas.gasUsed } : undefined;
 }
 
 /** The slot for a card whose row states gas alone; none without gas. */
@@ -161,7 +188,9 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
       onKeyDown={(e) => e.stopPropagation()}
     >
       <Fuel size={14} aria-hidden className="shrink-0" />
-      <span>{gas.info ? <Prov info={gas.info}>{figure(unit)}</Prov> : figure(unit)}</span>
+      <span>
+        <Prov info={gas.info ?? gasReceipt(gas)}>{figure(unit)}</Prov>
+      </span>
     </button>
   );
 }
