@@ -30,6 +30,7 @@
 // overlay — the cdpManager's own entire figures at head, the primary truth on
 // the detail page).
 
+import { TokenFigure } from "@/components/shared/token-figure";
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy, Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
@@ -672,11 +673,13 @@ export function polarisCardSlots({
       label: "Costs per year",
       tip: "A year of interest at today's rate on the debt recorded at the last touch, the base the contract accrues on; the rate moves.",
       value: (
-        <Prov info={polarisAnnualCostProv(v.market)} value={String(annualCost)} symbol={stable}>
-          <span>
-            ~<CardSumAmount value={annualCost} /> {stable}
-          </span>
-        </Prov>
+        <TokenFigure symbol={stable}>
+          <Prov info={polarisAnnualCostProv(v.market)} value={String(annualCost)} symbol={stable}>
+            <span>
+              ~<CardSumAmount value={annualCost} />
+            </span>
+          </Prov>
+        </TokenFigure>
       ),
     });
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { TokenFigure } from "@/components/shared/token-figure";
 import { Users } from "lucide-react";
 import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
@@ -83,12 +84,11 @@ export function TroveDetailsBand({
   if (bare && part === "costs") {
     return (
       <span className="inline-flex flex-wrap items-center gap-x-2" data-anatomy="C15·liquity">
-        <span>
-          <Prov info={costsProv} value={formatExact(annualInterestCost)}>
+        <TokenFigure symbol="BOLD">
+          <Prov info={costsProv} value={formatExact(annualInterestCost)} symbol="BOLD">
             ~<FadeNumber value={annualInterestCost} formatFn={formatPrice} animateOnMount={true} />
-          </Prov>{" "}
-          BOLD
-        </span>
+          </Prov>
+        </TokenFigure>
         {trove.batch.isMember && (
           <span className="inline-flex items-center gap-1">
             <Prov info={feeProv} value={formatExact(trove.batch.managementFee)}>
@@ -114,10 +114,11 @@ export function TroveDetailsBand({
     if (debtInFront == null) return <span className="font-normal text-rb-500/70">Unavailable</span>;
     return (
       <span data-anatomy="C16·liquity">
-        <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
-          {formatApproximate(debtInFront)}
-        </Prov>{" "}
-        BOLD
+        <TokenFigure symbol="BOLD">
+          <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
+            {formatApproximate(debtInFront)}
+          </Prov>
+        </TokenFigure>
       </span>
     );
   }

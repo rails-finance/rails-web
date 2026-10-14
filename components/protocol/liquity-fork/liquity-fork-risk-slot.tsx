@@ -12,15 +12,13 @@ import type { ReactNode } from "react";
 import type { PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
 import { forkLiveVocab, FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
 import { Prov, type Provenance } from "@/components/shared/provenance";
+import { TokenFigure } from "@/components/shared/token-figure";
 import { pct } from "@/components/shared/ratio-bar";
 import { formatApproximate, formatExact, formatPrice } from "@/lib/utils/format";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 
-const amount = (figure: ReactNode, symbol: string) => (
-  <span>
-    {figure} {symbol}
-  </span>
-);
+// A debt-token figure: the figure, then the token's icon.
+const amount = (figure: ReactNode, symbol: string) => <TokenFigure symbol={symbol}>{figure}</TokenFigure>;
 
 export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): PositionPanelColumns {
   if (chain.chainStale || (chain.status !== "active" && chain.status !== "zombie")) return [[], []];

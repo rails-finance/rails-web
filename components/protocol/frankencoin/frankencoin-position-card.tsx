@@ -25,6 +25,7 @@
 // the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay,
 // the position's slots at head, the primary truth on the detail page).
 
+import { TokenFigure } from "@/components/shared/token-figure";
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Hash, Link2 } from "lucide-react";
 import {
@@ -547,9 +548,9 @@ export function useFrankencoinCardSlots({
       id: "repay",
       label: "Repays in full",
       value: (
-        <>
-          <AmountText value={v.minted - v.reserveHeld} /> ZCHF
-        </>
+        <TokenFigure symbol="ZCHF">
+          <AmountText value={v.minted - v.reserveHeld} />
+        </TokenFigure>
       ),
       tip: "The ZCHF that repays the debt: the rest of the debt is the reserve share held back at minting, which repaying returns.",
     });
