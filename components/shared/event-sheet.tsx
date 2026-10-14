@@ -88,6 +88,9 @@ export interface SheetSide {
   /** The total line's words where the side has no rows; unset, "Not changed
    *  by this event" (a moment's card: "No events this day"). */
   untouched?: string;
+  /** The total line's words where the side has rows; unset, "After this
+   *  event" (a group's summary: "After these events"). */
+  after?: string;
   /** The total's read-more, behind a "?" in its label cell. */
   totalTip?: string;
   /** The repaid assets row's read-more. */
@@ -350,7 +353,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             {/* The total line's words open its read-more: "After this event"
                 on a side the event moved, the side's own words elsewhere. */}
             <HeadingTip
-              text={touched ? WORDS.after : (s.untouched ?? WORDS.untouched)}
+              text={touched ? (s.after ?? WORDS.after) : (s.untouched ?? WORDS.untouched)}
               tip={s.totalTip}
               name={WORDS.total(name)}
             />

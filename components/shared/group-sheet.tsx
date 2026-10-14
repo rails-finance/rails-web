@@ -138,6 +138,7 @@ export function mergeGroupSheet(cards: CollectedCard[], label: string): EventShe
       repaid: undefined,
       total: lastSide.total,
       totalTip: lastSide.totalTip,
+      after: "After these events",
     });
   }
   return { sides, panels: last.panels };
