@@ -31,7 +31,8 @@
 // `data-card-row=<i>` and adds `data-card-head=<id>`; the counters carry
 // `data-card-counters`, inside a listing card's `data-card-foot`.
 
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
+import { DiscChevron } from "@/components/shared/expand-chevron";
 import { POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   POSITION_CARD_SCOPE,
@@ -42,7 +43,11 @@ import {
 } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { PositionCardPanel, type PositionPanelColumns } from "@/components/shared/position-card-panel";
+import {
+  PositionCardPanel,
+  type PositionPanelColumns,
+  type PositionPanelRow,
+} from "@/components/shared/position-card-panel";
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { RowHelp } from "@/components/shared/row-help";
 import { TipLabel } from "@/components/shared/tip-label";
@@ -94,6 +99,10 @@ export interface PositionCardHead {
   /** A short third line in the muted label colour: the batch manager under
    *  Interest rate, "interest-free". */
   sub?: ReactNode;
+  /** The side's assets, one row each (amount, USD, share): on a detail card
+   *  a chevron after the icon cluster opens them under the figure, growing
+   *  the card. */
+  assetRows?: PositionPanelRow[];
 }
 
 /** The (i) Explanation at the foot of a detail card. */
@@ -296,7 +305,23 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
   );
 }
 
-function HeadBody({ head }: { head: PositionCardHead }) {
+function HeadBody({ head, detail }: { head: PositionCardHead; detail: boolean }) {
+  const rows = detail ? (head.assetRows ?? []) : [];
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  const chevron = rows.length > 0 && (
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      aria-expanded={open}
+      aria-controls={listId}
+      aria-label={open ? `Hide the ${head.label.toLowerCase()} assets` : `Show the ${head.label.toLowerCase()} assets`}
+      className="-m-1.5 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md p-1.5 text-rb-500 hover:text-foreground focus-ring sm:min-h-0 sm:min-w-0"
+      data-card-assets-toggle={head.id}
+    >
+      <DiscChevron isOpen={open} />
+    </button>
+  );
   return (
     <>
       {head.pending ? (
@@ -305,11 +330,23 @@ function HeadBody({ head }: { head: PositionCardHead }) {
         <StatDash />
       ) : (
         <StatValue>
-          {head.assets ? (
-            <span className="flex items-center gap-1.5">
-              {head.value}
-              {head.assets}
-            </span>
+          {head.assets || chevron ? (
+            chevron ? (
+              // The icons and the chevron kept whole, onto a line of their own
+              // where the column is narrow.
+              <span className="flex flex-wrap items-center gap-x-1.5">
+                {head.value}
+                <span className="inline-flex shrink-0 items-center gap-1.5">
+                  {head.assets}
+                  {chevron}
+                </span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                {head.value}
+                {head.assets}
+              </span>
+            )
           ) : (
             head.value
           )}
@@ -325,11 +362,29 @@ function HeadBody({ head }: { head: PositionCardHead }) {
           {head.sub}
         </div>
       )}
+      {open && rows.length > 0 && (
+        <dl
+          id={listId}
+          className="mt-2 grid grid-cols-1 gap-y-0 text-sm sm:grid-cols-[auto_minmax(0,1fr)] sm:items-baseline sm:gap-x-4 sm:gap-y-1"
+          data-card-assets={head.id}
+        >
+          {rows.map((r) => (
+            <div key={r.id} className="contents" data-card-asset-row={r.id}>
+              {/* Under 640px the label over its value: the column is half the card. */}
+              <dt className="text-rb-500 max-sm:mt-1.5 max-sm:text-xs">
+                {r.label}
+                {r.tip && <RowHelp tip={r.tip} name={r.label} />}
+              </dt>
+              <dd className="min-w-0 break-words tabular-nums text-foreground">{r.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </>
   );
 }
 
-function OpenGrid({ heads }: { heads: PositionCardHead[] }) {
+function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
   const n = heads.length;
   return (
     <div className={OPEN_GRID[n] ?? OPEN_GRID[3]} data-anatomy="C10">
@@ -345,7 +400,7 @@ function OpenGrid({ heads }: { heads: PositionCardHead[] }) {
           // beside an empty cell.
           className={n === 3 && i === 2 ? "col-span-2 sm:col-span-1" : undefined}
         >
-          <HeadBody head={h} />
+          <HeadBody head={h} detail={detail} />
         </PositionCardRow>
       ))}
     </div>
@@ -377,7 +432,7 @@ function ClosedGrid({
           labelTip={h.labelTip}
           headerIcon={h.labelIcon}
         >
-          <HeadBody head={h} />
+          <HeadBody head={h} detail={detail} />
         </PositionCardRow>
       ))}
       {peaks.length < 2 && <div className="hidden sm:block" />}
@@ -455,7 +510,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       {slots.outcome ? (
         <ClosedGrid heads={slots.heads} outcome={slots.outcome} tone={slots.status?.tone ?? "muted"} detail={detail} />
       ) : (
-        <OpenGrid heads={slots.heads} />
+        <OpenGrid heads={slots.heads} detail={detail} />
       )}
       {detail && slots.panel && <PositionCardPanel columns={slots.panel} />}
       {/* A listing card's recency and counts, together at its bottom right. */}

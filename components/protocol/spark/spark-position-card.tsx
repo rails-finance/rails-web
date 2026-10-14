@@ -515,9 +515,9 @@ export function useSparkCardSlots({
   };
   if (outcome) return { ...detailCommon, outcome, panel: closedPanel };
 
-  // ── The panel: the supply side on the left, the debt and its risk on the
-  //    right. A side whose total is unpriced has its reserves as the headline
-  //    and no reserve rows here.
+  // ── Each side's reserve rows, and the panel: the supply side's values on
+  //    the left, the debt's and its risk on the right. A side whose total is
+  //    unpriced has its reserves as the headline and no reserve rows.
   const reserveRow = (r: SparkReserveAmount, s: "supply" | "debt"): PositionPanelRow => {
     const usd = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
     return {
@@ -545,10 +545,24 @@ export function useSparkCardSlots({
   const dustRow = (control: ReactNode, s: "supply" | "debt"): PositionPanelRow[] =>
     control ? [{ id: `${s}-dust`, label: "Dust", value: control, tip: DUST_TIP }] : [];
 
+  // Each priced side's reserves open under its headline (the chevron by the
+  // icons); the panel keeps the additive values.
+  const supplyRows =
+    collUsd != null
+      ? [...supplyLines.lines.map((r) => reserveRow(r, "supply")), ...dustRow(supplyLines.control, "supply")]
+      : [];
+  const debtRows =
+    debtUsd != null
+      ? [...debtLines.lines.map((r) => reserveRow(r, "debt")), ...dustRow(debtLines.control, "debt")]
+      : [];
+  const headsWithRows = heads.map((h) =>
+    h.id === "collateral" && supplyRows.length > 0
+      ? { ...h, assetRows: supplyRows }
+      : h.id === "debt" && debtRows.length > 0
+        ? { ...h, assetRows: debtRows }
+        : h,
+  );
   const left: PositionPanelRow[] = [];
-  if (collUsd != null) {
-    left.push(...supplyLines.lines.map((r) => reserveRow(r, "supply")), ...dustRow(supplyLines.control, "supply"));
-  }
   const supplyInterest = interestRow("supply", captions?.supplyInterestUsd, captions?.supplyInterestSince);
   if (supplyInterest) left.push(supplyInterest);
   if (otherSupplies.length > 0) {
@@ -572,9 +586,6 @@ export function useSparkCardSlots({
   }
 
   const right: PositionPanelRow[] = [];
-  if (debtUsd != null) {
-    right.push(...debtLines.lines.map((r) => reserveRow(r, "debt")), ...dustRow(debtLines.control, "debt"));
-  }
   const rate = captions?.borrowRate;
   if (rate) {
     right.push({
@@ -637,7 +648,7 @@ export function useSparkCardSlots({
     }
   }
 
-  return { ...detailCommon, outcome: undefined, panel: [left, right] };
+  return { ...detailCommon, heads: headsWithRows, outcome: undefined, panel: [left, right] };
 }
 
 /** The SparkLend position card: its slots, drawn by the shared card. */

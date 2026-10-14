@@ -545,14 +545,15 @@ export function useCompoundCardSlots({
     const risk = borrowing && live !== undefined ? compoundRiskSlots(live) : null;
     heads = [supplyHead, debtHead, ...(risk ? [risk.head] : [])];
 
-    // Panel, left: one row per supply line, with its share of the side's
-    // value where the side holds two or more priced lines.
+    // The supply lines, opened under the supply headline (the chevron by the
+    // icons): one row per line, with its share of the side's value where the
+    // side holds two or more priced lines.
     const shareOf = (l: SupplyLeg) => {
       if (supplyUsd == null || supplyUsd <= 0 || lines.length < 2) return null;
       const u = usdOf(l);
       return u == null ? null : u / supplyUsd;
     };
-    const left: PositionPanelRow[] = lines.map((l) => {
+    const supplyRows: PositionPanelRow[] = lines.map((l) => {
       const c = l.collateral;
       const share = shareOf(l);
       const figure = c?.decimalsUnread ? (
@@ -585,7 +586,7 @@ export function useCompoundCardSlots({
       };
     });
     if (dustControl)
-      left.push({
+      supplyRows.push({
         id: "dust",
         label: "Dust",
         tip: "Balances worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind.",
@@ -601,7 +602,8 @@ export function useCompoundCardSlots({
         tip: "The block the Comet's balance was read at. Interest accrues every block, so the balance moves between loads.",
         value: v.current.block.toLocaleString("en-US"),
       });
-    panel = [left, right];
+    if (supplyRows.length > 0) heads[0] = { ...heads[0], assetRows: supplyRows };
+    panel = [[], right];
   }
 
   const common = { status, heads, identity, counters, outcome };

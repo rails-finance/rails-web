@@ -435,8 +435,8 @@ export function useCompoundV2CardSlots({
   };
   if (!detail) return { ...withNotice, heads, surface: "listing", menu: null };
 
-  // The panel: the supplied markets and the liquidation line on the left; the
-  // borrowed markets, the rate, the room to borrow and the drop on the right.
+  // Each side's market rows, and the panel: the liquidation line on the left;
+  // the rate, the room to borrow and the drop on the right.
   const lineRows = compoundV2LineRows(chain);
   const supplyRows: PositionPanelRow[] = supplyLines.lines.map((r) => {
     const share =
@@ -524,12 +524,17 @@ export function useCompoundV2CardSlots({
   return {
     ...withNotice,
     ...detailCommon,
-    heads,
+    // Each side's markets open under its headline (the chevron by the icons);
+    // the panel keeps the additive values.
+    heads: heads.map((h) =>
+      h.id === "collateral" && supplyRows.length > 0
+        ? { ...h, assetRows: supplyRows }
+        : h.id === "debt" && borrowRows.length > 0
+          ? { ...h, assetRows: borrowRows }
+          : h,
+    ),
     outcome: undefined,
-    panel: [
-      [...supplyRows, ...lineRows.collateral],
-      [...borrowRows, ...rateRows, ...lineRows.debt],
-    ],
+    panel: [lineRows.collateral, [...rateRows, ...lineRows.debt]],
   };
 }
 

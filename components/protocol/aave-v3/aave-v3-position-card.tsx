@@ -495,8 +495,8 @@ export function useAaveV3CardSlots({
   const common = { status, heads, identity, counters, notice };
   if (!detail) return { ...common, surface: "listing", menu: null };
 
-  // ── The panel: the supplied side on the left, the borrowed side and the
-  //    risk on the right.
+  // ── Each side's reserve rows, and the panel: the supplied side's values
+  //    on the left, the borrowed side's and the risk on the right.
   const reserveRows = (
     side: "supply" | "debt",
     split: { shown: AaveV3ReserveAmount[]; dust: AaveV3ReserveAmount[] },
@@ -673,16 +673,23 @@ export function useAaveV3CardSlots({
   const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
     rows.filter((r): r is PositionPanelRow => r != null);
 
+  // Each side's reserves open under its headline (the chevron by the icons);
+  // the panel keeps the additive values.
+  const withRows = heads.map((h) =>
+    h.id === "collateral" && v.supplies.length > 0
+      ? { ...h, assetRows: reserveRows("supply", suppliesSplit, collUsd) }
+      : h.id === "debt" && v.borrows.length > 0
+        ? { ...h, assetRows: reserveRows("debt", borrowsSplit, debtUsd) }
+        : h,
+  );
   return {
     ...common,
+    heads: withRows,
     surface: "detail",
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [
-      [...reserveRows("supply", suppliesSplit, collUsd), ...present([interestRow("supply"), emodeRow])],
-      [...reserveRows("debt", borrowsSplit, debtUsd), ...present([rateRow, interestRow("debt"), roomRow, liqRow])],
-    ],
+    panel: [present([interestRow("supply"), emodeRow]), present([rateRow, interestRow("debt"), roomRow, liqRow])],
   };
 }
 

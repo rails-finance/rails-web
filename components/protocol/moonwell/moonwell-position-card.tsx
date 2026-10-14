@@ -451,15 +451,20 @@ export function useMoonwellCardSlots({
     v,
     vc.supplies.map((r) => r.address),
   );
-  const left: PositionPanelRow[] = [
+  // Each side's markets open under its headline (the chevron by the icons);
+  // the panel keeps the additive values and the supplies that are not
+  // collateral.
+  const collRows = [
     ...collDust.lines.map((r) => supplyRow(r, "collateral", collUsd)),
     ...dustRow("dust-collateral", collDust.control),
+  ];
+  const left: PositionPanelRow[] = [
     ...(collateralFactors ? [collateralFactors] : []),
     ...otherDust.lines.map((r) => supplyRow(r, "other", otherUsd)),
     ...dustRow("dust-not-collateral", otherDust.control),
   ];
   const rate = captions?.borrowRate;
-  const right: PositionPanelRow[] = [
+  const debtRows: PositionPanelRow[] = [
     ...debtDust.lines.map((r): PositionPanelRow => {
       const usd = lineUsd(v, r.address, r.amount);
       return {
@@ -483,6 +488,8 @@ export function useMoonwellCardSlots({
       };
     }),
     ...dustRow("dust-debt", debtDust.control),
+  ];
+  const right: PositionPanelRow[] = [
     ...(rate
       ? [
           {
@@ -497,7 +504,14 @@ export function useMoonwellCardSlots({
       : []),
     ...moonwellRiskRows(chain),
   ];
-  return { ...detailCommon, outcome: undefined, panel: [left, right] };
+  const headsWithRows = heads.map((h) =>
+    h.id === "collateral" && collRows.length > 0
+      ? { ...h, assetRows: collRows }
+      : h.id === "debt" && debtRows.length > 0
+        ? { ...h, assetRows: debtRows }
+        : h,
+  );
+  return { ...detailCommon, heads: headsWithRows, outcome: undefined, panel: [left, right] };
 }
 
 /** The Moonwell position card: its slots, drawn by the shared card. */

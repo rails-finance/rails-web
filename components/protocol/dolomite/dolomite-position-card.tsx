@@ -403,11 +403,22 @@ export function useDolomiteCardSlots({
   if (outcome) return { ...detailCommon, outcome };
 
   const rate = captions?.borrowRate;
+  // Each side's markets open under its headline (the chevron by the icons);
+  // the panel keeps the rate and the risk.
+  const supplyRows = marketRows(v, "supply", supplyLines, collUsd);
+  const debtRows = marketRows(v, "debt", borrowLines, debtUsd);
   return {
     ...detailCommon,
+    heads: detailCommon.heads.map((h) =>
+      h.id === "collateral" && supplyRows.length > 0
+        ? { ...h, assetRows: supplyRows }
+        : h.id === "debt" && debtRows.length > 0
+          ? { ...h, assetRows: debtRows }
+          : h,
+    ),
     outcome: undefined,
     panel: [
-      [...marketRows(v, "supply", supplyLines, collUsd), ...marketRows(v, "debt", borrowLines, debtUsd)],
+      [],
       [
         ...(rate
           ? [
