@@ -1646,7 +1646,7 @@ function AssetPicker({
             setOpen(true);
           }
         }}
-        className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-1 text-sm font-semibold text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 sm:min-h-0 dark:text-teal-400"
+        className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-1 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 sm:min-h-0"
         data-price-picker=""
       >
         <AssetIcon s={selected} />
@@ -1672,7 +1672,7 @@ function AssetPicker({
                 aria-label={s.asset.symbol}
                 tabIndex={-1}
                 onClick={() => pick(s.key)}
-                className={`mx-1 flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-semibold outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] sm:min-h-8 ${on ? "text-teal-700 dark:text-teal-400" : "text-foreground"}`}
+                className={`mx-1 flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-sm font-semibold outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] sm:min-h-8 ${on ? "bg-[var(--surface-hover)] text-foreground" : "text-foreground"}`}
                 data-price-asset={s.asset.symbol}
                 data-price-key={s.key}
               >
