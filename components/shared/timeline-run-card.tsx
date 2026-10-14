@@ -4,11 +4,14 @@ import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
-import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Calculator } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
+import { GroupSheetCollector } from "@/components/shared/group-sheet";
+import type { EventSheet } from "@/components/shared/event-sheet";
+import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { CountChip } from "@/components/shared/count-chip";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { type SpineColumnProps, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
@@ -226,6 +229,10 @@ export function TimelineRunCard({
   }, [open, onOpen]);
   const hideVal = useHeaderValueHideClass();
   const membersId = useId();
+  // The summary card's balance sheet, read from the members' own
+  // (`group-sheet.tsx`) once it opens; null where they do not read as one.
+  const [merged, setMerged] = useState<{ sheet: EventSheet; price?: EventCardPrice } | null>(null);
+  const onSheet = useCallback((m: { sheet: EventSheet; price?: EventCardPrice } | null) => setMerged(m), []);
 
   const [fromTs, toTs] =
     firstTimestamp <= lastTimestamp ? [firstTimestamp, lastTimestamp] : [lastTimestamp, firstTimestamp];
@@ -410,8 +417,20 @@ export function TimelineRunCard({
     return `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural} ${spanWords(fromTs, toTs)} ${clauses}${price}${spanText}.`;
   })();
 
-  const summary = (
+  // The members the sheet reads: a client-grouped run's cards, or a served
+  // folder's once read (the summary's open asks for them).
+  const sheetMembers = onOpen ? members : children;
+  const collector = sheetMembers != null && (
+    <GroupSheetCollector members={sheetMembers} count={count} label={kindWord} onSheet={onSheet} />
+  );
+  const summary = merged ? (
+    <div data-group-summary="" data-group-sheet="">
+      {collector}
+    </div>
+  ) : (
     <div data-group-summary="">
+      {collector}
+      {onOpen && !members && <AskMembers onOpen={onOpen} askedRef={askedRef} />}
       {t2 && (
         <p className="px-5 pt-3 text-sm leading-relaxed text-rb-500" data-anatomy="T2" data-group-sentence="">
           {t2}
@@ -523,6 +542,8 @@ export function TimelineRunCard({
             head: { row: head },
             caption: "",
             cells: { none: "A run's figures are its members' sums, stated in the summary." },
+            sheet: merged?.sheet,
+            price: merged?.price,
             ledgers: { none: "A run's ledgers are its members'." },
             notes: hasSums ? summary : undefined,
             explainer: { body: null },
@@ -543,6 +564,16 @@ export function TimelineRunCard({
       members={body}
     />
   );
+}
+
+/** A served folder's members read, started when its summary card opens. */
+function AskMembers({ onOpen, askedRef }: { onOpen: () => void; askedRef: React.MutableRefObject<boolean> }) {
+  useEffect(() => {
+    if (askedRef.current) return;
+    askedRef.current = true;
+    onOpen();
+  }, [onOpen, askedRef]);
+  return null;
 }
 
 /** A state figure as the card's grid states it: whole units from a thousand,

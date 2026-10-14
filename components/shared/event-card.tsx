@@ -9,6 +9,7 @@ import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
 import { EventPageAside, EventPageContext } from "@/components/shared/event-page-aside";
 import { EVENT_PAGE_WORDS } from "@/lib/shared/event-page-words";
+import { SheetCollectContext, type CollectedCard } from "@/components/shared/group-sheet";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
@@ -341,7 +342,36 @@ function useOwnerIsAccount(sent: SentFacts | undefined): boolean | undefined {
   return kind && kind.owner === owner ? kind.account : undefined;
 }
 
+/** A member of a group whose summary card reads its members' sheets
+ *  (`group-sheet.tsx`): it hands up its slots and draws nothing. */
+function CollectedEventCard({
+  slots,
+  collect,
+}: {
+  slots: EventCardSlots;
+  collect: (card: CollectedCard) => () => void;
+}) {
+  const { event, sheet, price } = slots;
+  useEffect(() => {
+    if (!event) return;
+    return collect({
+      id: event.id,
+      timestamp: event.timestamp,
+      blockNumber: event.blockNumber,
+      number: event.number,
+      sheet,
+      price,
+    });
+  }, [collect, event, sheet, price]);
+  return null;
+}
+
 export function EventCard(props: EventCardProps) {
+  const collect = useContext(SheetCollectContext);
+  return collect ? <CollectedEventCard slots={props.slots} collect={collect} /> : <EventCardView {...props} />;
+}
+
+function EventCardView(props: EventCardProps) {
   const {
     avatar,
     group,
