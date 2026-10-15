@@ -27,11 +27,12 @@
 //
 // Hooks for the verifiers: the frame keeps `data-anatomy="P1"`,
 // `data-skel-section` and `data-prov-scope="position-card"`, and adds
-// `data-position-card-shell` and `data-card-status`; each headline keeps
+// `data-position-card-shell` and `data-card-status` (and, outside production,
+// `data-card-over-cap` on a card past the caps); each headline keeps
 // `data-card-row=<i>` and adds `data-card-head=<id>`; the counters carry
 // `data-card-counters`, inside a listing card's `data-card-foot`.
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { QuietTipsContext } from "@/components/shared/reveal-tip";
@@ -49,7 +50,14 @@ import {
 } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { PositionCardPanel, type PositionPanelColumns } from "@/components/shared/position-card-panel";
+import {
+  POSITION_CARD_MAX_HEADS,
+  POSITION_CARD_MAX_STATS,
+  PositionCardPanel,
+  panelTracks,
+  tracksStyle,
+  type PositionPanelColumns,
+} from "@/components/shared/position-card-panel";
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
 import { RowHelp } from "@/components/shared/row-help";
 import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
@@ -259,6 +267,7 @@ function PositionCardRow({
   help,
   explain,
   className,
+  style,
   children,
 }: {
   index: number;
@@ -272,10 +281,11 @@ function PositionCardRow({
   /** A detail card: the label itself opens its read-more. */
   explain?: boolean;
   className?: string;
+  style?: CSSProperties;
   children: ReactNode;
 }) {
   return (
-    <div className={className} data-card-row={index} data-card-head={head}>
+    <div className={className} style={style} data-card-row={index} data-card-head={head}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
         {explain ? <HeadingTip text={label} tip={labelTip ?? help} /> : <TipLabel text={label} tip={labelTip} />}
         {headerIcon}
@@ -392,7 +402,17 @@ function HeadBody({
   );
 }
 
-function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
+function OpenGrid({
+  heads,
+  detail,
+  tracks,
+}: {
+  heads: PositionCardHead[];
+  detail: boolean;
+  /** At lg, the tracks each headline spans, shared with the stats beneath
+   *  (`panelTracks`); null keeps the plain grid. */
+  tracks: number[] | null;
+}) {
   const n = heads.length;
   // The breakdowns: the donut button opens its side's in a popover anchored
   // to it (a bottom sheet on a phone), one side at a time; the card keeps
@@ -424,7 +444,11 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
   const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
   return (
     <>
-      <div className={OPEN_GRID[n] ?? OPEN_GRID[3]} data-anatomy="C10">
+      <div
+        className={`${OPEN_GRID[n] ?? OPEN_GRID[3]}${tracks ? " lg:grid-cols-(--card-tracks)" : ""}`}
+        style={tracks ? tracksStyle(tracks) : undefined}
+        data-anatomy="C10"
+      >
         {heads.map((h, i) => (
           <PositionCardRow
             key={h.id}
@@ -436,7 +460,12 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
             explain={detail}
             // Three on a phone: the third spans the row, so it is not stranded
             // beside an empty cell.
-            className={n === 3 && i === 2 ? "col-span-2 sm:col-span-1" : undefined}
+            className={
+              [n === 3 && i === 2 && "col-span-2 sm:col-span-1", tracks && "lg:col-span-(--head-span)"]
+                .filter(Boolean)
+                .join(" ") || undefined
+            }
+            style={tracks ? ({ "--head-span": tracks[i] } as CSSProperties) : undefined}
           >
             <HeadBody head={h} toggle={toggleOf(h)} />
           </PositionCardRow>
@@ -546,6 +575,30 @@ function DetailMenu({ menu }: { menu: PositionCardMenu }) {
   );
 }
 
+// The caps (Miles, 15 Oct 2026): at most 4 headlines and 6 stats on a card.
+// The slots are built at render from what the position holds (a stat shows
+// only where its figure exists), so no static count or tuple type can see the
+// number a card reaches; the shell counts what it is handed. Outside
+// production an over-cap card warns once in the console and carries
+// `data-card-over-cap`; it renders as it is, since which value goes is
+// Miles's call (warn-level until he rules on the cards over today).
+const warnedOverCap = new Set<string>();
+function overCap(slots: PositionCardSlots): string | null {
+  if (process.env.NODE_ENV === "production") return null;
+  const heads = slots.heads.length;
+  const stats = slots.surface === "detail" && slots.panel ? slots.panel[0].length + slots.panel[1].length : 0;
+  if (heads <= POSITION_CARD_MAX_HEADS && stats <= POSITION_CARD_MAX_STATS) return null;
+  const key = `${heads}h${stats}s`;
+  const ids = slots.heads.map((h) => h.id).join(",");
+  if (typeof window !== "undefined" && !warnedOverCap.has(ids + key)) {
+    warnedOverCap.add(ids + key);
+    console.warn(
+      `[position-card] ${heads} headlines and ${stats} stats: the card holds at most ${POSITION_CARD_MAX_HEADS} and ${POSITION_CARD_MAX_STATS}. Headlines: ${ids}`,
+    );
+  }
+  return key;
+}
+
 export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const registry = useReceiptRegistry();
   const detail = slots.surface === "detail";
@@ -560,6 +613,9 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
     </span>
   ) : null;
   const menu = detail ? slots.menu && <DetailMenu menu={slots.menu} /> : slots.menu;
+  const panel = detail ? slots.panel : undefined;
+  const tracks = closed ? null : panelTracks(panel, slots.heads.length);
+  const over = overCap(slots);
 
   const header = (
     <div className="flex items-start gap-2 mb-3" data-anatomy="C5" {...(detail ? { "data-card-header": "" } : {})}>
@@ -592,9 +648,9 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       {slots.outcome ? (
         <ClosedGrid heads={slots.heads} outcome={slots.outcome} tone={slots.status?.tone ?? "muted"} detail={detail} />
       ) : (
-        <OpenGrid heads={slots.heads} detail={detail} />
+        <OpenGrid heads={slots.heads} detail={detail} tracks={tracks} />
       )}
-      {detail && slots.panel && <PositionCardPanel columns={slots.panel} heads={slots.heads.length} />}
+      {panel && <PositionCardPanel columns={panel} tracks={tracks} />}
       {/* A listing card's recency and counts, together at its bottom right. */}
       {!detail && counters && (
         <div className="mt-2 flex items-center justify-end gap-2" data-card-foot="">
@@ -612,6 +668,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-anatomy={detail ? "P1" : undefined}
       data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
       data-prov-lit={lit ? "" : undefined}
+      data-card-over-cap={over ?? undefined}
       className={POSITION_CARD_FRAME}
     >
       {slots.notice}

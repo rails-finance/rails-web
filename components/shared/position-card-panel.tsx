@@ -2,14 +2,19 @@
 // additive values as a grid beneath the headlines, in the card itself with no
 // inset of its own. Each stat is a muted heading (a press on it opens its
 // read-more; a qualifier such as "since 6 Sep 2026" on a second muted line) over its
-// value in the bold value type. Under three headlines at lg the stats stand
-// under the headline they belong to, two columns to a headline: the
-// collateral side's under the first, the debt side's under the second, the
-// risk figures under the third. Elsewhere, and on cards with another number
-// of headlines, they flow in order: six columns at lg, three from sm, two on
-// a phone. The listing card has no stats (324).
-
-import type { ReactNode } from "react";
+// value in the bold value type. The listing card has no stats (324).
+//
+// A card carries at most 4 headlines and 6 stats, and at lg the stats are one
+// row (Miles, 15 Oct 2026). Under three headlines at lg each stat stands
+// under the headline it belongs to: the collateral side's under the first,
+// the debt side's under the second, the risk figures under the third. The
+// row is one track per stat (`panelTracks`), and each headline spans as many
+// tracks as its group holds, so a debt side of three widens the Debt column
+// rather than sending its third stat to a row of its own. Where every group
+// holds two or fewer the headlines keep equal thirds, two tracks apiece.
+// Elsewhere, and on cards with another number of headlines, the stats flow
+// in order: six columns at lg, three from sm, two on a phone.
+import type { CSSProperties, ReactNode } from "react";
 import { HeadingTip } from "@/components/shared/tip-label";
 
 export type PositionPanelGroup = "collateral" | "debt" | "risk";
@@ -64,11 +69,37 @@ function Stat({ r }: { r: PositionPanelRow }) {
   );
 }
 
-export function PositionCardPanel({ columns, heads }: { columns: PositionPanelColumns; heads: number }) {
+/** The caps a position card holds to (Miles, 15 Oct 2026). */
+export const POSITION_CARD_MAX_HEADS = 4;
+export const POSITION_CARD_MAX_STATS = 6;
+
+/** At lg, the stats of a three-headline open card stand under their
+ *  headlines on one row: how many tracks each headline spans, in order. Null
+ *  where the stats flow instead (another number of headlines, no stats, or a
+ *  grouping that would need more than six tracks: an empty group still takes
+ *  one, under its headline). */
+export function panelTracks(columns: PositionPanelColumns | undefined, heads: number): number[] | null {
+  if (!columns || heads !== 3) return null;
+  const rows = [...columns[0], ...columns[1]];
+  if (rows.length === 0) return null;
+  const counts = GROUPS.map((g) => rows.filter((r) => groupOf(r) === g).length);
+  if (counts.every((n) => n <= 2)) return [2, 2, 2];
+  const spans = counts.map((n) => Math.max(n, 1));
+  return spans.reduce((a, b) => a + b, 0) <= POSITION_CARD_MAX_STATS ? spans : null;
+}
+
+/** The grid template at lg for a card whose headlines span `tracks`: read by
+ *  both the headline grid and the stats grid, so their columns line up. */
+export const tracksStyle = (tracks: number[]) =>
+  ({ "--card-tracks": `repeat(${tracks.reduce((a, b) => a + b, 0)}, minmax(0, 1fr))` }) as CSSProperties;
+
+const GROUPS: PositionPanelGroup[] = ["collateral", "debt", "risk"];
+
+export function PositionCardPanel({ columns, tracks }: { columns: PositionPanelColumns; tracks: number[] | null }) {
   const rows = [...columns[0], ...columns[1]];
   if (rows.length === 0) return null;
   const flow = "grid grid-cols-2 gap-x-4 sm:grid-cols-3";
-  if (heads !== 3)
+  if (!tracks)
     return (
       <dl className={`mt-6 -mb-4 ${flow} lg:grid-cols-6`} data-position-panel="" data-anatomy="C18">
         {rows.map((r) => (
@@ -76,19 +107,28 @@ export function PositionCardPanel({ columns, heads }: { columns: PositionPanelCo
         ))}
       </dl>
     );
-  const groups: PositionPanelGroup[] = ["collateral", "debt", "risk"];
   return (
-    <dl className={`mt-6 -mb-4 ${flow} lg:grid-cols-3`} data-position-panel="" data-anatomy="C18">
-      {groups.map((g) => {
+    <dl
+      className={`mt-6 -mb-4 ${flow} lg:grid-cols-(--card-tracks)`}
+      style={tracksStyle(tracks)}
+      data-position-panel=""
+      data-anatomy="C18"
+    >
+      {GROUPS.map((g, i) => {
         const own = rows.filter((r) => groupOf(r) === g);
         // Under lg the group gives way and its stats join the one flow; at lg
-        // it is a column of two whose rows are the grid's, so the values line
-        // up across the groups too.
+        // it spans its headline's tracks on the grid's own columns and rows,
+        // so the stats line up under the headline and across the groups.
         return (
           <div
             key={g}
-            className="contents lg:grid lg:grid-cols-2 lg:grid-rows-subgrid lg:gap-x-4"
-            style={own.length > 0 ? { gridRow: `span ${2 * Math.ceil(own.length / 2)}` } : undefined}
+            className="contents lg:col-span-(--group-span) lg:grid lg:grid-cols-subgrid lg:grid-rows-subgrid"
+            style={
+              {
+                "--group-span": tracks[i],
+                ...(own.length > 0 ? { gridRow: "span 2" } : {}),
+              } as CSSProperties
+            }
             data-panel-group={g}
           >
             {own.map((r) => (
