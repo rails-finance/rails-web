@@ -65,9 +65,9 @@ const REDEMPTION_RUN: TimelineRunSpec = {
 /** Consecutive batch-manager rate adjusts (setBatchManagerAnnualInterestRate)
  *  collapse the same way — pure delegate automation, no owner action. The
  *  spine's flank states the rate after the last change, its arrow the way
- *  the members moved it; the header names the delegate when every member
- *  names the same one (always true in practice — a manager change puts a
- *  join/leave row between the runs). */
+ *  the members moved it; the spoken label names the delegate when every
+ *  member names the same one (always true in practice — a manager change
+ *  puts a join/leave row between the runs). */
 const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
   match: (e) => isLiquityEvent(e) && e.context.data.operation === "setBatchManagerAnnualInterestRate",
   min: MIN_DELEGATE_ADJUST_RUN,
@@ -93,7 +93,9 @@ const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
         if (delta > 0) up = true;
         else down = true;
       }
-      const moves = up && down ? "both" : up ? "up" : down ? "down" : undefined;
+      // Every change one way points that way; changes both ways, or none
+      // that moved the rate, take the neutral double-headed arrow.
+      const moves = up && !down ? "up" : down && !up ? "down" : "both";
       const managers = new Set(events.map((e) => (isLiquityEvent(e) ? e.context.data.batchManager : undefined)));
       const manager = managers.size === 1 ? [...managers][0] : undefined;
       return (

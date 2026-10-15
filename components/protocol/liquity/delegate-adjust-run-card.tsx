@@ -24,7 +24,7 @@ import { troveWords } from "@/lib/liquity/event-templates";
  * It draws as every group does (`group-frame.tsx`): the bracket, no node of
  * its own, the dotted segment for the members not drawn, and its ⋮ to show
  * them; its words are "Adjusted" with the count's chip after it (ui-jobs
- * 331) and the delegate's name. The spine's flank carries the rate after the
+ * 331), the delegate named in the spoken label alone. The spine's flank carries the rate after the
  * last change in the pink delegate pill, its arrow the way the members moved
  * the rate (`moves`).
  */
@@ -35,7 +35,7 @@ export interface DelegateAdjustRunCardProps {
   /** The delegate's rate after the chronologically LAST adjust of the run (%). */
   toRate?: number;
   /** Which way the members moved the rate: every change up, every change
-   *  down, or both. */
+   *  down, or "both" otherwise (changes both ways, or none that moved it). */
   moves?: "up" | "down" | "both";
   /** The delegate's display name — only when every member names the same one. */
   managerName?: string;
@@ -93,7 +93,6 @@ export function DelegateAdjustRunCard({
         {troveWords("run_adjusted")}
         <CountChip count={count} />
       </span>
-      {managerName && <span className="text-sm font-bold text-pink-500">{managerName}</span>}
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-rb-500">{range}</span>
       </span>

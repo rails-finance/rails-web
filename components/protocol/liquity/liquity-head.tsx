@@ -105,9 +105,9 @@ export function liquityHeadSpec(
     // The manager moved the rate and nothing else: the debt's move since the
     // Trove's previous event (interest, the management fee, any upfront fee)
     // stands in the opened card's Debt side and the explanation. The rate
-    // stands on the spine's flank, as on a join.
+    // stands on the spine's flank, as on a join; the delegate is named on
+    // the join alone.
     spec.ratePill = pill("delegate", true, true);
-    spec.manager = manager;
   } else if (op === "setInterestBatchManager") {
     if (rate > 0) spec.ratePill = pill("delegate", true, true);
     spec.manager = manager;
@@ -116,7 +116,8 @@ export function liquityHeadSpec(
       ...(hasColl ? [coll({ label: L1_WORDS.supply, axisVerb: true })] : []),
       ...(hasDebt ? [debt({ label: L1_WORDS.borrow, axisVerb: true })] : []),
     ];
-    if (rate > 0) spec.ratePill = pill(op === "openTroveAndJoinBatch" ? "delegate" : undefined);
+    // The rate stands on the spine, below the two legs.
+    if (rate > 0) spec.ratePill = pill(op === "openTroveAndJoinBatch" ? "delegate" : undefined, false, true);
   } else if (op === "redeemCollateral") {
     // The word in the caution tone; the spine draws the legs as two nodes.
     // On a pinned event page below sm, the legs follow the word: the
@@ -183,10 +184,10 @@ export function liquityHeadSpec(
     };
   }
 
-  // The rate a move set, after the amounts; a leave's stands on the spine's
-  // flank, as a join's does.
-  if (op === "adjustTroveInterestRate" && rate > 0) spec.ratePill = pill();
-  if (op === "removeFromBatch" && rate > 0) spec.ratePill = pill(undefined, false, true);
+  // The rate a move set, after the amounts, where the spine's flank does not
+  // carry it.
+  if ((op === "adjustTroveInterestRate" || op === "removeFromBatch") && rate > 0)
+    spec.ratePill = pill(undefined, false, true);
 
   if (ctx.blockGrouping?.isGrouped)
     spec.sameBlock = { index: ctx.blockGrouping.sameBlockIndex, count: ctx.blockGrouping.sameBlockCount };

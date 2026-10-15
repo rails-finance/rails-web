@@ -175,11 +175,12 @@ export interface SpineColumnProps {
    *  right flank, where a row's leg numbers stand, states the rate after
    *  ("0.50%") in a rate pill with no sign, an up or down arrow beside the
    *  node where the rate moved from a prior rate. Unset, the glyph carries
-   *  the arrow alone. */
+   *  the arrow alone. With `tokens` (an opening), the % node stands below the
+   *  token rows with the rate on its flank. */
   rateSpan?: [number, number];
   /** The flank's arrow where a group's members set it: "up" or "down" when
-   *  every change went that way, "both" (a neutral double-headed arrow) when
-   *  they went both ways. Overrides the direction `rateSpan` gives. */
+   *  every change went that way, "both" (a neutral double-headed arrow)
+   *  otherwise. Overrides the direction `rateSpan` gives. */
   rateMoves?: "up" | "down" | "both";
   /** The flank's rate pill in the delegate's pink with the people glyph (a
    *  rate a delegate set); unset, the neutral pill of an owner's rate. */
@@ -1191,8 +1192,9 @@ export function SpineColumn({
   return (
     <div
       className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch"
-      // The spine carries no receipts (TO-DO-mobile-timeline decision 13):
-      // its figures re-state the card's, which carries them.
+      // The spine carries no receipts of its own (TO-DO-mobile-timeline
+      // decision 13): its figures re-state the card's, which carries them.
+      // The rate pill on a rate flank echoes the card's rate receipt.
       data-prov-exempt=""
     >
       <div
@@ -1203,6 +1205,7 @@ export function SpineColumn({
       >
         {leadIn}
         {effectiveIcon ? node : tokenRows}
+        {!effectiveIcon && rateSpan && nodeRow(<RateIcon size={T} />, rateFlank(rateSpan))}
       </div>
       <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>
       {legsEl}

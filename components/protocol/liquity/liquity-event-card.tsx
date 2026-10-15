@@ -125,14 +125,25 @@ export function LiquityEventCard({
   // spine's flank, in a rate pill echoing the detail grid's rate receipt; the
   // timeline row's phone caption states it ("Rate 3.60%"). Before and after
   // stand in the opened card and the event page.
+  // An opening's rate stands as a third node below its two legs, with no
+  // prior rate to point an arrow from.
+  const isOpen = ctx.operation === "openTrove" || ctx.operation === "openTroveAndJoinBatch";
+  const rateAfter = ctx.stateAfter?.annualInterestRate ?? 0;
   const rateSpan: [number, number] | undefined =
-    (isRateChange || (isDelegate && (ctx.stateAfter?.annualInterestRate ?? 0) > 0)) && ctx.stateBefore && ctx.stateAfter
-      ? [ctx.stateBefore.annualInterestRate, ctx.stateAfter.annualInterestRate]
-      : undefined;
+    isOpen && rateAfter > 0
+      ? [0, rateAfter]
+      : (isRateChange || (isDelegate && rateAfter > 0)) && ctx.stateBefore && ctx.stateAfter
+        ? [ctx.stateBefore.annualInterestRate, ctx.stateAfter.annualInterestRate]
+        : undefined;
   const rateP = rateSpan ? rateAfterProv(ctx, { txHash: event.txHash, blockNumber: event.blockNumber }) : undefined;
   const rateFlank = {
     rateSpan,
-    rateTone: isDelegate || ctx.operation === "setBatchManagerAnnualInterestRate" ? ("delegate" as const) : undefined,
+    // The delegate's pink where the delegate set the rate; a leave's rate is
+    // the owner's own.
+    rateTone:
+      isJoin || ctx.operation === "setBatchManagerAnnualInterestRate" || ctx.operation === "openTroveAndJoinBatch"
+        ? ("delegate" as const)
+        : undefined,
     rateProv: rateP ? { info: rateP.info, value: rateP.value, echo: true } : undefined,
   };
 
@@ -250,7 +261,7 @@ export function LiquityEventCard({
               // reads as a rendering hole — mark the event with the neutral
               // "nothing moved" glyph.
               { icon: "no-change", isLast: !!isLast }
-            : { tokens: tokenRows(), isLast: !!isLast };
+            : { tokens: tokenRows(), ...(isOpen ? rateFlank : {}), isLast: !!isLast };
 
   // T2's price row: the gas the owner paid (the generator leaves a third
   // party's out), the redemption's outcome and the collateral's price at
@@ -311,7 +322,7 @@ export function LiquityEventCard({
     },
     spine,
     head,
-    caption: rateSpan ? `Rate ${rateSpan[1].toFixed(2)}%` : liquityL1Label(ctx),
+    caption: isRateChange && rateSpan ? `Rate ${rateSpan[1].toFixed(2)}%` : liquityL1Label(ctx),
     // A third party's act names who acted: the redeemer, the batch manager
     // moving a delegated Trove's rate.
     actor: {

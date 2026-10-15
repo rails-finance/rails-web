@@ -1090,7 +1090,10 @@ export function locateEntries(getTargets: () => ProvReceiptEntry[]): () => void 
     .map((e) => e.el)
     .filter((el): el is HTMLElement => el != null && el.isConnected);
   if (els.length > 0) {
-    if (!els.some(meaningfullyVisible)) els[0].scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // Scroll to a drawn instance: one the width hides (a header value the
+    // spine carries) has no box to scroll to.
+    const drawn = els.find((el) => el.getClientRects().length > 0);
+    if (drawn && !els.some(meaningfullyVisible)) drawn.scrollIntoView({ block: "nearest", behavior: "smooth" });
     for (const el of els) activateEl(el);
   }
   return () => {
