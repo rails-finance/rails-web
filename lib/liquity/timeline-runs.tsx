@@ -105,6 +105,7 @@ const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
           fromRate={firstCtx?.stateAfter?.annualInterestRate}
           toRate={lastCtx?.stateAfter?.annualInterestRate}
           moves={moves}
+          events={chrono}
           managerName={manager ? getBatchManagerName(manager) : undefined}
           firstTimestamp={events[0].timestamp}
           lastTimestamp={events[events.length - 1].timestamp}

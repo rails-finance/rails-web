@@ -1,9 +1,20 @@
 "use client";
 
-import { useContext, useId, useState } from "react";
+import { useCallback, useContext, useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { EventCard } from "@/components/shared/event-card";
+import { SheetSkeleton, type EventSheet } from "@/components/shared/event-sheet";
+import type { EventCardPrice } from "@/components/shared/event-price-row";
+import { GroupSheetCollector, type CollectedCard } from "@/components/shared/group-sheet";
+import {
+  mergeDelegateRunSheet,
+  PreviousEventContext,
+  type DelegateRunStep,
+} from "@/components/protocol/liquity/delegate-run-sheet";
+import { isLiquityEvent, type BaseActivityEvent } from "@/lib/shared/types/activity";
+import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
+import { rateAfterProv } from "@/lib/liquity/event-provenance";
 import { CountChip } from "@/components/shared/count-chip";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
@@ -43,6 +54,8 @@ export interface DelegateAdjustRunCardProps {
   firstTimestamp: number;
   lastTimestamp: number;
   isLast?: boolean;
+  /** The run's adjustments, oldest first: the sheet's debt and rate. */
+  events: BaseActivityEvent[];
   /** The run's member cards, rendered when expanded. */
   children: ReactNode;
 }
@@ -56,9 +69,42 @@ export function DelegateAdjustRunCard({
   firstTimestamp,
   lastTimestamp,
   isLast,
+  events,
   children,
 }: DelegateAdjustRunCardProps) {
   const [open, setOpen] = useState(false);
+  // The summary card's balance sheet, read from the members' own once it
+  // opens (`delegate-run-sheet.tsx`); the skeleton stands until they are read.
+  const [merged, setMerged] = useState<{ sheet: EventSheet; price?: EventCardPrice } | null | undefined>(undefined);
+  const onSheet = useCallback(
+    (m: { sheet: EventSheet; price?: EventCardPrice } | null | undefined) => setMerged(m),
+    [],
+  );
+  // Each adjustment's rate and debt move, its accrual measured from the
+  // Trove's previous event.
+  const previousOf = useContext(PreviousEventContext);
+  const steps = useMemo<DelegateRunStep[]>(
+    () =>
+      events.flatMap((e, i) => {
+        if (!isLiquityEvent(e)) return [];
+        const c = e.context.data;
+        if (!c.stateBefore || !c.stateAfter) return [];
+        const prev = previousOf?.(e.id) ?? (i > 0 ? events[i - 1] : undefined);
+        return [
+          {
+            id: e.id,
+            timestamp: e.timestamp,
+            before: c.stateBefore.annualInterestRate,
+            after: c.stateAfter.annualInterestRate,
+            prov: rateAfterProv(c, { txHash: e.txHash, blockNumber: e.blockNumber }),
+            move: batchRateDebtMove(c, prev, e),
+            debt: [c.stateBefore.debt, c.stateAfter.debt] as [number, number],
+          },
+        ];
+      }),
+    [events, previousOf],
+  );
+  const merge = useCallback((cards: CollectedCard[]) => mergeDelegateRunSheet(cards, steps), [steps]);
 
   const [fromTs, toTs] =
     firstTimestamp <= lastTimestamp ? [firstTimestamp, lastTimestamp] : [lastTimestamp, firstTimestamp];
@@ -145,14 +191,26 @@ export function DelegateAdjustRunCard({
             head: { row: <div className="pl-5 pt-4 pb-3">{words}</div> },
             caption: "",
             cells: { none: troveWords("run_cells_none") },
+            sheet: merged?.sheet,
+            price: merged?.price,
             ledgers: { none: troveWords("run_ledgers_none") },
-            // On a phone the words open beneath the caption as the card.
-            notes: <div className="px-5 pt-4 pb-3">{words}</div>,
+            notes: (
+              <div data-group-summary="" data-group-sheet={merged ? "" : undefined}>
+                <GroupSheetCollector
+                  members={children}
+                  count={count}
+                  label={troveWords("run_adjusted")}
+                  merge={merge}
+                  onSheet={onSheet}
+                />
+                {merged === undefined && <SheetSkeleton />}
+              </div>
+            ),
             explainer: { body: null },
             learnMore: null,
           }}
           // On a phone the caption carries the word, the count's chip and the
-          // range, and the words open beneath it as the card.
+          // range.
           phoneCaption={
             <>
               {troveWords("run_adjusted")}
@@ -161,7 +219,7 @@ export function DelegateAdjustRunCard({
           }
           spokenCaption={troveWords("run_spoken", { range: spokenRange })}
           label={troveWords("run_label", { count_text: countText, by, range: spokenRange, movement })}
-          group="words"
+          group="summary"
         />
       }
       members={children}

@@ -769,6 +769,29 @@ trove_words:
     The run moves the rate alone; its words are the body.
   run_ledgers_none: |-
     A rate adjustment moves no asset.
+  # The run's balance sheet: the debt's moves summed across the run, the rate's sequence under Limits.
+  run_sheet_untouched: |-
+    Not changed by these events
+  run_sheet_interest: |-
+    Interest and management fee
+  run_sheet_upfront: |-
+    Upfront fees
+  run_sheet_event: |-
+    #{number} · {date}
+  run_sheet_sum: |-
+    {what} across this run — the total over its {count} rate adjustments. Showing the breakdown lists each adjustment; each event’s card holds its receipt.
+  run_sheet_move: |-
+    Debt adjustment #{number} added{usd} — the interest and management fee accrued since the Trove’s previous event and any upfront fee, as that event’s card states them.
+  run_sheet_move_formula: |-
+    debt after − debt the previous event recorded
+  run_sheet_rate_formula: |-
+    rate after the last adjustment − rate before the first
+  run_sheet_face: |-
+    , in USD at $1.00 face
+  run_sheet_before_rate: |-
+    The annual interest rate before the run’s first adjustment — the rate the Trove’s previous event left, which the first adjustment logged as its rate before.
+  run_sheet_rate_change: |-
+    Interest rate change across the run, in percentage points — the rate after the last adjustment less the rate before the first.
   # ── The position card's explanation: the lead and bullets under the stats ──
   # A {name} is a figure or a linked value the hook draws in its receipt; the rest is the sentence.
   # The bullets sit under the four headings below (rails-ops standards/prose-limits-and-zones.md

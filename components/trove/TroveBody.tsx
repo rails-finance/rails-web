@@ -9,7 +9,7 @@
 // the browser; the example's arrive with the home page, and it draws no top
 // row, no export shapes and a still timeline toolbar.
 
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import type { TroveSummary } from "@/types/api/trove";
 import type { TroveStateData } from "@/types/api/troveState";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -48,6 +48,7 @@ import { LiquityTroveMetaContext, type LiquityTroveMeta } from "@/components/pro
 import { UsersGlyph } from "@/components/shared/rate-pill";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
+import { PreviousEventContext } from "@/components/protocol/liquity/delegate-run-sheet";
 import type { SpineKey } from "@/components/shared/mobile-spine";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 
@@ -216,6 +217,15 @@ export function TroveBody({
     chrono.forEach((e, i) => map.set(e.id, i));
     return map;
   }, [chrono]);
+  // The same lookup for a delegate run's sheet, whose first member's accrual
+  // runs from the event before the run.
+  const previousOf = useCallback(
+    (id: string) => {
+      const idx = chronoIndex.get(id);
+      return idx != null && idx > 0 ? chrono[idx - 1] : undefined;
+    },
+    [chronoIndex, chrono],
+  );
 
   const economics = computeLiquityEconomics(economicsEvents, {
     currentPrice,
@@ -272,47 +282,49 @@ export function TroveBody({
 
         <CollSurplusCtx.Provider value={surplusState}>
           <LiquityTroveMetaContext.Provider value={troveMeta}>
-            <ChainTruthTimeline
-              // Matches `LiquityEventCard`'s own `persistKey={`liquity-v2:${event.id}`}`
-              // — lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="liquity-v2"
-              closed={closed}
-              tl={tlWithGlyph}
-              boundary={boundary}
-              runs={LIQUITY_TIMELINE_RUNS}
-              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              spineKey={LIQUITY_SPINE_KEY}
-              emptyLabel={troveWords("history_empty")}
-              still={still}
-              toolbarLeading={
-                <TimelineActivityHeader events={liquityEvents} closed={closed} firstAt={trove.activity?.createdAt} />
-              }
-              renderCard={(event, meta) => {
-                if (isCollSurplusClaimEvent(event))
+            <PreviousEventContext.Provider value={previousOf}>
+              <ChainTruthTimeline
+                // Matches `LiquityEventCard`'s own `persistKey={`liquity-v2:${event.id}`}`
+                // — lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="liquity-v2"
+                closed={closed}
+                tl={tlWithGlyph}
+                boundary={boundary}
+                runs={LIQUITY_TIMELINE_RUNS}
+                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                spineKey={LIQUITY_SPINE_KEY}
+                emptyLabel={troveWords("history_empty")}
+                still={still}
+                toolbarLeading={
+                  <TimelineActivityHeader events={liquityEvents} closed={closed} firstAt={trove.activity?.createdAt} />
+                }
+                renderCard={(event, meta) => {
+                  if (isCollSurplusClaimEvent(event))
+                    return (
+                      <CollSurplusClaimCard
+                        event={event}
+                        isLast={meta.isLast}
+                        eventNumber={meta.eventNumber}
+                        persistPrefix="liquity-v2"
+                      />
+                    );
+                  if (!isLiquityEvent(event)) return null;
+                  const idx = chronoIndex.get(event.id);
+                  const previousEvent = idx != null && idx > 0 ? chrono[idx - 1] : undefined;
                   return (
-                    <CollSurplusClaimCard
+                    <LiquityEventCard
                       event={event}
+                      addressDisplay="hidden"
                       isLast={meta.isLast}
+                      previousEvent={previousEvent}
                       eventNumber={meta.eventNumber}
-                      persistPrefix="liquity-v2"
+                      currentPrice={currentPrice}
                     />
                   );
-                if (!isLiquityEvent(event)) return null;
-                const idx = chronoIndex.get(event.id);
-                const previousEvent = idx != null && idx > 0 ? chrono[idx - 1] : undefined;
-                return (
-                  <LiquityEventCard
-                    event={event}
-                    addressDisplay="hidden"
-                    isLast={meta.isLast}
-                    previousEvent={previousEvent}
-                    eventNumber={meta.eventNumber}
-                    currentPrice={currentPrice}
-                  />
-                );
-              }}
-            />
+                }}
+              />
+            </PreviousEventContext.Provider>
           </LiquityTroveMetaContext.Provider>
         </CollSurplusCtx.Provider>
       </div>

@@ -97,6 +97,7 @@ const FAMILIES = {
         "components/trove/TroveBody.tsx",
         "app/(app)/ethereum/liquity-v2/trove/[collateralType]/[troveId]/event/[eventId]/event-view.tsx",
         "components/protocol/liquity/delegate-adjust-run-card.tsx",
+        "components/protocol/liquity/delegate-run-sheet.tsx",
         "components/trove/use-trove-explanation-items.tsx",
         "lib/liquity/trove-page-words.tsx",
         "lib/liquity/trove-card-tips.ts",

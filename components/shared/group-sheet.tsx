@@ -20,7 +20,9 @@ import type { EventSheet, SheetRow, SheetSide } from "@/components/shared/event-
 import { sheetUsd } from "@/components/shared/event-sheet";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 
-const WORDS = { before: "Before the group" };
+const WORDS = { before: "Before the group", after: "After these events" };
+/** A group's words on its sheet, the same on every family's. */
+export const GROUP_SHEET_WORDS = WORDS;
 
 /** What a member's card hands up. */
 export interface CollectedCard {
@@ -38,7 +40,7 @@ export const SheetCollectContext = createContext<((card: CollectedCard) => () =>
 
 /** A figure as the sheet states it ("−3.6626", "$11,945", "+$1.20"), as a
  *  number; null for anything else. */
-function parseSheetNumber(text: unknown): number | null {
+export function parseSheetNumber(text: unknown): number | null {
   if (typeof text !== "string") return null;
   const t = text.replace(/[−–]/g, "-").replace(/[$,+\s]/g, "");
   if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
@@ -46,7 +48,7 @@ function parseSheetNumber(text: unknown): number | null {
 }
 
 /** The places after the point a sheet figure states. */
-const placesOf = (text: string) => /\.(\d+)/.exec(text)?.[1].length ?? 0;
+export const placesOf = (text: string) => /\.(\d+)/.exec(text)?.[1].length ?? 0;
 
 function sumProv(what: string, n: number): Provenance {
   return {
@@ -138,7 +140,7 @@ export function mergeGroupSheet(cards: CollectedCard[], label: string): EventShe
       repaid: undefined,
       total: lastSide.total,
       totalTip: lastSide.totalTip,
-      after: "After these events",
+      after: WORDS.after,
     });
   }
   return { sides, panels: last.panels };
@@ -165,6 +167,7 @@ export function GroupSheetCollector({
   members,
   count,
   label,
+  merge,
   onSheet,
 }: {
   members: ReactNode;
@@ -172,6 +175,10 @@ export function GroupSheetCollector({
   count: number;
   /** The summed rows' label ("Redemptions"). */
   label: string;
+  /** The family's own reading of its members' sheets (oldest first), in
+   *  place of `mergeGroupSheet`: a Liquity V2 delegate run sums its members'
+   *  accruals and states the rate's sequence. */
+  merge?: (cards: CollectedCard[]) => EventSheet | null;
   /** The merged sheet; null where the members do not read as one;
    *  undefined while they are still being collected. */
   onSheet: (merged: { sheet: EventSheet; price?: EventCardPrice } | null | undefined) => void;
@@ -192,9 +199,9 @@ export function GroupSheetCollector({
       (a, b) =>
         (a.number ?? 0) - (b.number ?? 0) || (a.blockNumber ?? 0) - (b.blockNumber ?? 0) || a.timestamp - b.timestamp,
     );
-    const sheet = mergeGroupSheet(ordered, label);
+    const sheet = merge ? merge(ordered) : mergeGroupSheet(ordered, label);
     return sheet ? { sheet, price: mergeGroupPrice(ordered) } : null;
-  }, [cards, count, label]);
+  }, [cards, count, label, merge]);
   const complete = cards.size === count;
   useEffect(() => onSheet(complete ? merged : undefined), [complete, merged, onSheet]);
   return (
