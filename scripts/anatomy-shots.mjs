@@ -27,7 +27,9 @@
 // The check (`--check`) lists codes used in the code that the key lacks, and
 // key codes that no element or fallback carries (retired codes excepted). It
 // exits 1 on any gap. A change that adds, moves, renames or removes a UI part
-// updates the key and reruns this script in the same commit.
+// updates the key and runs the check in the same commit. The shots are drawn
+// by hand for a one-off read (Miles, 15 Oct 2026): rails-ops keeps no PNGs,
+// the attributes in the code are the record, and nothing retakes a picture.
 
 import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve, extname } from "node:path";
