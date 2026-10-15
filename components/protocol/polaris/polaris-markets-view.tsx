@@ -334,8 +334,7 @@ export function PolarisMarketsStamp({ chain }: { chain: PolarisMarketsChainRespo
   if (chain.chainStale || chain.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Sepolia testnet · chain snapshot · <BlockRef block={chain.blockNumber} chainId={POLARIS_CHAIN_ID} /> · every
-      figure a test figure
+      Chain snapshot · <BlockRef block={chain.blockNumber} chainId={POLARIS_CHAIN_ID} />
     </p>
   );
 }
