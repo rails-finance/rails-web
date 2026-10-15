@@ -150,7 +150,7 @@ export function DelegateRunRatePill({
           </>
         )}
         {r.showRange && (
-          <span className="font-normal">
+          <span className="font-normal -ml-1.5">
             {troveNodes("run_rate_range", { low: fig("low", r.low), high: fig("high", r.high) })}
           </span>
         )}
