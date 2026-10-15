@@ -161,11 +161,13 @@ export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coo
 
   // One rounding rule for a figure wherever it appears — the row, the spine,
   // the opened grid and the card all state it in full to three decimals —
-  // and each amount names its token in words beside the glyph.
+  // and each amount names its token in words beside the glyph. A verb's
+  // amount carries no ticker: at ≥sm its figure and glyph hand off to the
+  // spine, and the ticker would stand alone after the verb.
   const shown: ChainTruthDelta[] = deltas.map((d) => ({
     ...d,
     display: d.display ?? formatNumber(Math.abs(d.value)),
-    suffix: d.symbol,
+    ...(d.axisVerb ? {} : { suffix: d.symbol }),
   }));
 
   const party =
@@ -182,7 +184,8 @@ export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coo
     // dropped verb would read as if the PSM's own share was the holder's
     // action.
     label: isOpen ? "Open" : isAdjust && holderDeltaCount > 0 ? "" : actionLabel,
-    status: isOpen ? "open" : undefined,
+    // Open and Close take Liquity V2's status pills.
+    status: isOpen ? "open" : ctx.eventType === "close" ? "close" : undefined,
     critical: ctx.eventType === "liquidate",
     deltas: shown,
     party,
