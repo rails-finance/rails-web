@@ -183,8 +183,10 @@ export function liquityHeadSpec(
     };
   }
 
-  // The rate a move set, after the amounts.
-  if ((op === "adjustTroveInterestRate" || op === "removeFromBatch") && rate > 0) spec.ratePill = pill();
+  // The rate a move set, after the amounts; a leave's stands on the spine's
+  // flank, as a join's does.
+  if (op === "adjustTroveInterestRate" && rate > 0) spec.ratePill = pill();
+  if (op === "removeFromBatch" && rate > 0) spec.ratePill = pill(undefined, false, true);
 
   if (ctx.blockGrouping?.isGrouped)
     spec.sameBlock = { index: ctx.blockGrouping.sameBlockIndex, count: ctx.blockGrouping.sameBlockCount };

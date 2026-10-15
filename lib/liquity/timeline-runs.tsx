@@ -64,10 +64,10 @@ const REDEMPTION_RUN: TimelineRunSpec = {
 
 /** Consecutive batch-manager rate adjusts (setBatchManagerAnnualInterestRate)
  *  collapse the same way — pure delegate automation, no owner action. The
- *  header states the net movement (the chronologically first adjusted rate →
- *  the last) and, when every member names the same delegate (always true in
- *  practice — a manager change puts a join/leave row between the runs), the
- *  delegate's display name. */
+ *  spine's flank states the rate after the last change, its arrow the way
+ *  the members moved it; the header names the delegate when every member
+ *  names the same one (always true in practice — a manager change puts a
+ *  join/leave row between the runs). */
 const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
   match: (e) => isLiquityEvent(e) && e.context.data.operation === "setBatchManagerAnnualInterestRate",
   min: MIN_DELEGATE_ADJUST_RUN,
@@ -81,6 +81,19 @@ const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
       const chronoLast = chrono[chrono.length - 1];
       const firstCtx = isLiquityEvent(chronoFirst) ? chronoFirst.context.data : undefined;
       const lastCtx = isLiquityEvent(chronoLast) ? chronoLast.context.data : undefined;
+      // Which way the members moved the rate: each change, before → after.
+      let up = false;
+      let down = false;
+      for (const e of events) {
+        if (!isLiquityEvent(e)) continue;
+        const { stateBefore, stateAfter } = e.context.data;
+        if (!stateBefore || !stateAfter || stateBefore.annualInterestRate <= 0) continue;
+        const delta = stateAfter.annualInterestRate - stateBefore.annualInterestRate;
+        if (Math.abs(delta).toFixed(2) === "0.00") continue;
+        if (delta > 0) up = true;
+        else down = true;
+      }
+      const moves = up && down ? "both" : up ? "up" : down ? "down" : undefined;
       const managers = new Set(events.map((e) => (isLiquityEvent(e) ? e.context.data.batchManager : undefined)));
       const manager = managers.size === 1 ? [...managers][0] : undefined;
       return (
@@ -89,6 +102,7 @@ const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
           count={events.length}
           fromRate={firstCtx?.stateAfter?.annualInterestRate}
           toRate={lastCtx?.stateAfter?.annualInterestRate}
+          moves={moves}
           managerName={manager ? getBatchManagerName(manager) : undefined}
           firstTimestamp={events[0].timestamp}
           lastTimestamp={events[events.length - 1].timestamp}

@@ -8,8 +8,7 @@ import { CountChip } from "@/components/shared/count-chip";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { Prov, type Provenance } from "@/components/shared/provenance";
-import { UsersGlyph } from "@/components/shared/rate-pill";
+import type { Provenance } from "@/components/shared/provenance";
 import { formatDate } from "@/lib/date";
 import { troveWords } from "@/lib/liquity/event-templates";
 
@@ -25,8 +24,9 @@ import { troveWords } from "@/lib/liquity/event-templates";
  * It draws as every group does (`group-frame.tsx`): the bracket, no node of
  * its own, the dotted segment for the members not drawn, and its ⋮ to show
  * them; its words are "Adjusted" with the count's chip after it (ui-jobs
- * 331), the pink delegate pill with the people glyph and the net rate
- * movement (first rate → last).
+ * 331) and the delegate's name. The spine's flank carries the rate after the
+ * last change in the pink delegate pill, its arrow the way the members moved
+ * the rate (`moves`).
  */
 export interface DelegateAdjustRunCardProps {
   count: number;
@@ -34,6 +34,9 @@ export interface DelegateAdjustRunCardProps {
   fromRate?: number;
   /** The delegate's rate after the chronologically LAST adjust of the run (%). */
   toRate?: number;
+  /** Which way the members moved the rate: every change up, every change
+   *  down, or both. */
+  moves?: "up" | "down" | "both";
   /** The delegate's display name — only when every member names the same one. */
   managerName?: string;
   /** Chronological bounds of the run (either display order). */
@@ -48,6 +51,7 @@ export function DelegateAdjustRunCard({
   count,
   fromRate,
   toRate,
+  moves,
   managerName,
   firstTimestamp,
   lastTimestamp,
@@ -89,18 +93,6 @@ export function DelegateAdjustRunCard({
         {troveWords("run_adjusted")}
         <CountChip count={count} />
       </span>
-      {hasMovement && (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-400 text-xs font-bold">
-          <UsersGlyph />
-          <Prov value={`${fromRate.toFixed(2)}%`} info={rateProv("first", fromTs)}>
-            <span>{fromRate.toFixed(2)}%</span>
-          </Prov>
-          <span aria-hidden="true">→</span>
-          <Prov value={`${toRate.toFixed(2)}%`} info={rateProv("last", toTs)}>
-            <span>{toRate.toFixed(2)}%</span>
-          </Prov>
-        </span>
-      )}
       {managerName && <span className="text-sm font-bold text-pink-500">{managerName}</span>}
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-rb-500">{range}</span>
@@ -114,9 +106,18 @@ export function DelegateAdjustRunCard({
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && toggle() };
   const hide = { ...words2.hide, hide: () => open && toggle() };
-  // No asset moved: the members' % glyph alone, no flank, and the words
-  // stand; the batch manager acted, so the line runs dotted.
-  const column: SpineColumnProps = { icon: "rate-change", dotted: true, isLast: !!isLast };
+  // No asset moved: the members' % glyph, the rate after the last change on
+  // its flank, and the words stand; the batch manager acted, so the line runs
+  // dotted.
+  const column: SpineColumnProps = {
+    icon: "rate-change",
+    rateSpan: toRate != null ? [fromRate ?? 0, toRate] : undefined,
+    rateMoves: moves,
+    rateTone: "delegate",
+    rateProv: toRate != null ? { info: rateProv("last", toTs), value: `${toRate.toFixed(2)}%` } : undefined,
+    dotted: true,
+    isLast: !!isLast,
+  };
 
   const spokenRange = sameDay
     ? formatDate(fromTs)

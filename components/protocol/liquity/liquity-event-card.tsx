@@ -16,7 +16,13 @@ import { EventMarkdownContext, EventPageContext } from "@/components/shared/even
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { collChangeProv, debtChangeProv, eventGasProv, eventPriceProv } from "@/lib/liquity/event-provenance";
+import {
+  collChangeProv,
+  debtChangeProv,
+  eventGasProv,
+  eventPriceProv,
+  rateAfterProv,
+} from "@/lib/liquity/event-provenance";
 import { eventPriceTitle } from "@/lib/liquity/trove-page-words";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
@@ -115,13 +121,20 @@ export function LiquityEventCard({
     ? (ctx.stateAfter?.annualInterestRate ?? 0) >= (ctx.stateBefore?.annualInterestRate ?? 0)
     : false;
   const isJoin = isDelegate ? ctx.operation === "setInterestBatchManager" : false;
-  // A rate change, and a delegate's join, draw the rate after on the spine's
-  // flank; the timeline row's phone caption states it ("Rate 3.60%"). Before
-  // and after stand in the opened card and the event page.
+  // A rate change, a delegate's join and a leave draw the rate after on the
+  // spine's flank, in a rate pill echoing the detail grid's rate receipt; the
+  // timeline row's phone caption states it ("Rate 3.60%"). Before and after
+  // stand in the opened card and the event page.
   const rateSpan: [number, number] | undefined =
-    (isRateChange || (isJoin && (ctx.stateAfter?.annualInterestRate ?? 0) > 0)) && ctx.stateBefore && ctx.stateAfter
+    (isRateChange || (isDelegate && (ctx.stateAfter?.annualInterestRate ?? 0) > 0)) && ctx.stateBefore && ctx.stateAfter
       ? [ctx.stateBefore.annualInterestRate, ctx.stateAfter.annualInterestRate]
       : undefined;
+  const rateP = rateSpan ? rateAfterProv(ctx, { txHash: event.txHash, blockNumber: event.blockNumber }) : undefined;
+  const rateFlank = {
+    rateSpan,
+    rateTone: isDelegate || ctx.operation === "setBatchManagerAnnualInterestRate" ? ("delegate" as const) : undefined,
+    rateProv: rateP ? { info: rateP.info, value: rateP.value, echo: true } : undefined,
+  };
 
   const isRedemption = ctx.operation === "redeemCollateral";
   const isLiquidation = ctx.operation === "liquidate";
@@ -224,9 +237,9 @@ export function LiquityEventCard({
     : isDelegate
       ? // Delegation reads as an external-party event via the pink +/- glyph
         // badge (color-grammar.md §4b); the spine line stays neutral.
-        { icon: "delegate", iconDirection: isJoin ? "up" : "down", rateSpan, isLast: !!isLast }
+        { icon: "delegate", iconDirection: isJoin ? "up" : "down", ...rateFlank, isLast: !!isLast }
       : isRateChange
-        ? { icon: "rate-change", iconDirection: rateUp ? "up" : "down", rateSpan, isLast: !!isLast }
+        ? { icon: "rate-change", iconDirection: rateUp ? "up" : "down", ...rateFlank, isLast: !!isLast }
         : ctx.operation === "transferTrove"
           ? // The Trove NFT changed hands; no collateral or BOLD moved. The
             // custody plane in its neutral disc (detail-page-anatomy.md, "The

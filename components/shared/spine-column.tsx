@@ -5,6 +5,8 @@ import { createContext, useContext, useLayoutEffect, useState, type ReactNode } 
 import { ArrowRightToLine, Clock, Layers, Lock, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { DelegateRatePillShell, RatePillShell } from "@/components/shared/rate-pill";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine } from "@/components/shared/activity-timeline";
@@ -169,11 +171,22 @@ export interface SpineColumnProps {
    *  legs the card's header publishes (`usePublishSpineLegs`) are drawn; with
    *  neither, the triangle stands in. */
   warningLegs?: SpineWarningLeg[];
-  /** icon="rate-change" or "delegate": the rate before and after (%). The right flank,
-   *  where a row's leg numbers stand, states the rate after ("0.50%") with
-   *  no sign, an up or down arrow beside the node where the rate moved from a
-   *  prior rate. Unset, the glyph carries the arrow alone. */
+  /** icon="rate-change" or "delegate": the rate before and after (%). The
+   *  right flank, where a row's leg numbers stand, states the rate after
+   *  ("0.50%") in a rate pill with no sign, an up or down arrow beside the
+   *  node where the rate moved from a prior rate. Unset, the glyph carries
+   *  the arrow alone. */
   rateSpan?: [number, number];
+  /** The flank's arrow where a group's members set it: "up" or "down" when
+   *  every change went that way, "both" (a neutral double-headed arrow) when
+   *  they went both ways. Overrides the direction `rateSpan` gives. */
+  rateMoves?: "up" | "down" | "both";
+  /** The flank's rate pill in the delegate's pink with the people glyph (a
+   *  rate a delegate set); unset, the neutral pill of an owner's rate. */
+  rateTone?: "delegate";
+  /** The receipt the flank's rate traces: `echo` where another figure on the
+   *  card registers it (the detail grid's rate). */
+  rateProv?: { info: Provenance; value: string; echo?: boolean };
   /** Direction for rate-change arrow (none drawn when unset) or delegate
    *  badge */
   iconDirection?: "up" | "down";
@@ -549,6 +562,27 @@ function DirectionArrow({ direction, size }: { direction: "up" | "down"; size: n
   );
 }
 
+/** A group's rate arrow where its changes went both ways: one vertical shaft
+ *  with a head at each end, in the spine's neutral ink. */
+function BothWaysArrow({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--color-rb-500)"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3v18" />
+      <path d="m7 8 5-5 5 5" />
+      <path d="m7 16 5 5 5-5" />
+    </svg>
+  );
+}
+
 /** Two-person glyph for delegation (batch manager join/leave) events */
 function UsersIcon({ size, color = "var(--color-rb-500)" }: { size: number; color?: string }) {
   return (
@@ -836,6 +870,9 @@ export function SpineColumn({
   warningLegs,
   iconDirection,
   rateSpan,
+  rateMoves,
+  rateTone,
+  rateProv,
   dotted,
   undrawn,
   isLast,
@@ -940,19 +977,31 @@ export function SpineColumn({
   const rateFlank = ([before, after]: [number, number]) => {
     const delta = after - before;
     const moved = before > 0 && Math.abs(delta).toFixed(2) !== "0.00";
-    const direction = !moved ? "flat" : delta > 0 ? "up" : "down";
+    const direction = rateMoves ?? (!moved ? "flat" : delta > 0 ? "up" : "down");
+    const Shell = rateTone === "delegate" ? DelegateRatePillShell : RatePillShell;
+    const text = `${after.toFixed(2)}%`;
     return (
       <>
         {direction === "flat" ? (
           <span />
+        ) : direction === "both" ? (
+          <BothWaysArrow size={Math.round(scale.arrowSize * 0.7)} />
         ) : (
           <DirectionArrow direction={direction} size={Math.round(scale.arrowSize * 0.7)} />
         )}
         <span
-          className="justify-self-start whitespace-nowrap pl-5 text-base font-semibold tabular-nums"
+          className="justify-self-start whitespace-nowrap pl-5 leading-[0] tabular-nums"
           data-spine-rate={direction}
         >
-          {after.toFixed(2)}%
+          <Shell>
+            {rateProv ? (
+              <Prov echo={rateProv.echo} info={rateProv.info} value={rateProv.value}>
+                {text}
+              </Prov>
+            ) : (
+              text
+            )}
+          </Shell>
         </span>
       </>
     );
