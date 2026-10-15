@@ -433,8 +433,8 @@ const headerLayout = (card) =>
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")))
     .catch(() => []);
   check(
-    "4b. a press on it opens the menu: Open event page (ui-jobs 308; provenance is on the event page)",
-    JSON.stringify(items) === JSON.stringify(["view-page"]),
+    "4b. a press on it opens the menu: Open event page (ui-jobs 308; provenance is on the event page), then Hide the row's type of event where the timeline has more than one",
+    items[0] === "view-page" && items.slice(1).every((i) => i === "hide-type") && items.length <= 2,
     JSON.stringify(items),
   );
   const closed = await card.locator('[data-anatomy="T2"]').count();

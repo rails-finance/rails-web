@@ -48,7 +48,7 @@ export function ToolsMenuItem({
   expanded,
 }: {
   icon: ReactNode;
-  title: string;
+  title: ReactNode;
   subtitle: string;
   onClick?: () => void;
   disabled?: boolean;

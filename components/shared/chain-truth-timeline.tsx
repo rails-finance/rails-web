@@ -130,6 +130,8 @@ import {
 } from "@/components/shared/mobile-spine";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { EventShareProvider } from "@/components/shared/event-share-context";
+import { EventTypeHideContext, hideTypeWords } from "@/components/shared/event-card-menu";
+import { getEventActionKey } from "@/lib/shared/event-filter-helpers";
 import { EventPageContext, EventPageTitle } from "@/components/shared/event-page-aside";
 import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-adapter";
 import { setCardOpen } from "@/lib/shared/card-open-store";
@@ -1685,7 +1687,12 @@ function ChainTruthTimelineBody({
   const wrapRunRow = (row: TimelineRow & { kind: "run" }, node: ReactNode, marked = false): ReactNode => {
     // Under day marks a run holding a day's last event is found by this, to
     // open it (the rewind's top).
-    if (!row.spec.asOneEvent) return dayMarks ? <div data-flow-run={row.events[0].id}>{node}</div> : node;
+    if (!row.spec.asOneEvent) {
+      // A group's ⋮ hides its members' type (each member's row re-provides
+      // its own).
+      const grouped = dayMarks ? <div data-flow-run={row.events[0].id}>{node}</div> : node;
+      return <EventTypeHideContext.Provider value={hideTypeOf(row.events[0])}>{grouped}</EventTypeHideContext.Provider>;
+    }
     const lead = row.events[0];
     // The phone spine view's caption, as a single card's (its `caption` prop
     // can name the kind instead).
@@ -1702,21 +1709,33 @@ function ChainTruthTimelineBody({
             value={marked ? markFor(row.events[newestOf(row.events)].timestamp, lead.id) : null}
           >
             <EventShareProvider href={shareHrefFor(lead.id)}>
-              <div
-                id={`event-${lead.id}`}
-                data-event-id={lead.id}
-                data-row-at={lead.timestamp}
-                className={`rounded-xl transition-shadow duration-[2000ms] ${
-                  highlightId === lead.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
-                }`}
-              >
-                {node}
-              </div>
+              <EventTypeHideContext.Provider value={hideTypeOf(lead)}>
+                <div
+                  id={`event-${lead.id}`}
+                  data-event-id={lead.id}
+                  data-row-at={lead.timestamp}
+                  className={`rounded-xl transition-shadow duration-[2000ms] ${
+                    highlightId === lead.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+                  }`}
+                >
+                  {node}
+                </div>
+              </EventTypeHideContext.Provider>
             </EventShareProvider>
           </EventDayMarkContext.Provider>
         </EventDateContext.Provider>
       </EventCaptionContext.Provider>
     );
+  };
+
+  // A row's ⋮ hides its type of event: the Types of event filter's untick,
+  // under the filter's own label. A group's row takes its members' type.
+  const hideTypeOf = (e: BaseActivityEvent) => {
+    if (still || tl.eventOptions.length <= 1) return null;
+    const key = getEventActionKey(e);
+    const option = tl.eventOptions.find((o) => o.key === key);
+    if (!option) return null;
+    return { ...hideTypeWords(option.label, option.suffix), hide: () => tl.toggleHiddenAction(key) };
   };
 
   const renderEventRow = (
@@ -1743,48 +1762,50 @@ function ChainTruthTimelineBody({
     >
       <EventDayMarkContext.Provider value={opts?.mark ? markFor(event.timestamp, event.id) : null}>
         <EventShareProvider href={shareHrefFor(event.id)}>
-          <EventCaptionContext.Provider
-            value={{
-              kind: event.actionLabel,
-              ts: event.timestamp,
-              n: opts?.eventNumber ?? (tl.eventNumberOf(event) || undefined),
-            }}
-          >
-            {/* The scroll/highlight target for a `?at=` landing (and, in pinned
+          <EventTypeHideContext.Provider value={hideTypeOf(event)}>
+            <EventCaptionContext.Provider
+              value={{
+                kind: event.actionLabel,
+                ts: event.timestamp,
+                n: opts?.eventNumber ?? (tl.eventNumberOf(event) || undefined),
+              }}
+            >
+              {/* The scroll/highlight target for a `?at=` landing (and, in pinned
             mode below, for the lone card) — `id` for `getElementById`,
             `data-event-id` as the brief's documented alternative for anything
             that prefers a data-attribute query. The ring fades over the
             `duration-[2000ms]` already on the wrapper; `highlightId` is only
             ever set when `prefers-reduced-motion` did NOT ask for none. */}
-            {/* The tip reaches the card's own <SpineColumn> through context: a
+              {/* The tip reaches the card's own <SpineColumn> through context: a
             member of an expanded run re-provides null, so the run's folder
             node above it keeps the one dot. */}
-            <SpineTipContext.Provider
-              value={!closed && !opts?.inRun && !liveHoldsTip && event.id === tipEventId ? tipSide : null}
-            >
-              <div
-                id={`event-${event.id}`}
-                data-event-id={event.id}
-                data-row-at={event.timestamp}
-                className={`rounded-xl transition-shadow duration-[2000ms] ${
-                  highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
-                }`}
+              <SpineTipContext.Provider
+                value={!closed && !opts?.inRun && !liveHoldsTip && event.id === tipEventId ? tipSide : null}
               >
-                <UnreadTokensProvider tokens={event.decimalsUnread}>
-                  {renderCard(event, {
-                    eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
-                    // Line ends only — the dot is the tip's (see `tipEventId`).
-                    // Inside an expanded run the LAST member still owns the spine
-                    // terminus so the dotted segment ends where the timeline does.
-                    isLast:
-                      opts?.isLastMember !== undefined
-                        ? opts.isLastMember
-                        : flatIdx === events.length - 1 && !bottomTerminusTaken,
-                  })}
-                </UnreadTokensProvider>
-              </div>
-            </SpineTipContext.Provider>
-          </EventCaptionContext.Provider>
+                <div
+                  id={`event-${event.id}`}
+                  data-event-id={event.id}
+                  data-row-at={event.timestamp}
+                  className={`rounded-xl transition-shadow duration-[2000ms] ${
+                    highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+                  }`}
+                >
+                  <UnreadTokensProvider tokens={event.decimalsUnread}>
+                    {renderCard(event, {
+                      eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
+                      // Line ends only — the dot is the tip's (see `tipEventId`).
+                      // Inside an expanded run the LAST member still owns the spine
+                      // terminus so the dotted segment ends where the timeline does.
+                      isLast:
+                        opts?.isLastMember !== undefined
+                          ? opts.isLastMember
+                          : flatIdx === events.length - 1 && !bottomTerminusTaken,
+                    })}
+                  </UnreadTokensProvider>
+                </div>
+              </SpineTipContext.Provider>
+            </EventCaptionContext.Provider>
+          </EventTypeHideContext.Provider>
         </EventShareProvider>
       </EventDayMarkContext.Provider>
     </EventDateContext.Provider>

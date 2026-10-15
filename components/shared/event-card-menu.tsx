@@ -1,16 +1,17 @@
 "use client";
 
 // The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308), at the T1 row's
-// right end (ui-jobs 295), the same on every family: Open event page, and
-// inside a group Hide or Show {n} grouped events. On the event page it holds
+// right end (ui-jobs 295), the same on every family: Open event page, inside
+// a group Hide or Show {n} grouped events, and on a timeline Hide the row's
+// type of event, the Types of event filter's untick. On the event page it holds
 // the event's Inspect provenance (`provScope`). The explorer link is the row's
 // hash under Display's Transaction hashes (ui-jobs 294); copy link is on the
 // event page's actions row (`components/shared/event-page-aside.tsx`), which
 // reuses `useMenuCopied` and `eventMarkdownHref` from here.
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, EyeOff } from "lucide-react";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 
 /** The menu's words. */
@@ -19,6 +20,7 @@ const WORDS = {
   heading: "Event",
   view_page: "Open event page",
   view_page_hint: "Open this event's page",
+  hide_type_hint: "Tick it in Types of event to bring them back",
 };
 
 /** The clipboard write for a text that arrives later (a fetch): a
@@ -59,13 +61,35 @@ export function eventMarkdownHref(shareHref: string): string {
  *  ("Hide 48 grouped events"). The same handler as the group's pill. */
 export const GroupHideContext = createContext<{ title: string; subtitle: string; hide: () => void } | null>(null);
 
+/** A timeline row's type, for its ⋮ ("Hide “Redeemed” events"): the same
+ *  as unticking the type in the Types of event filter (the timeline
+ *  provides it per row; a group's row takes its members' type). */
+export const EventTypeHideContext = createContext<{ title: ReactNode; subtitle: string; hide: () => void } | null>(
+  null,
+);
+
+/** The type row's words: the filter's own label for the type, and its mark
+ *  where the filter draws one (Liquity V2's delegate-set "Interest rate"). */
+export function hideTypeWords(label: string, suffix?: ReactNode): { title: ReactNode; subtitle: string } {
+  return {
+    title: (
+      <>
+        Hide “{label}
+        {suffix && <span className="ml-1 inline-flex align-middle">{suffix}</span>}” events
+      </>
+    ),
+    subtitle: WORDS.hide_type_hint,
+  };
+}
+
 /** Whether the ⋮ has a row: the event page from anywhere but that page,
- *  or a group's show or hide. */
+ *  a group's show or hide, or the row's type to hide. */
 export function useEventMenuRows(shareHref: string | null, groupShow: boolean): boolean {
   const pathname = usePathname();
   const group = useContext(GroupHideContext);
+  const hideType = useContext(EventTypeHideContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
-  return groupShow || group != null || (pagePath != null && pathname !== pagePath);
+  return groupShow || group != null || hideType != null || (pagePath != null && pathname !== pagePath);
 }
 
 export function EventCardMenu({
@@ -84,24 +108,41 @@ export function EventCardMenu({
 }) {
   const pathname = usePathname();
   const group = useContext(GroupHideContext);
+  const hideType = useContext(EventTypeHideContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
   const onEventPage = pagePath != null && pathname === pagePath;
+  const hideTypeRow = (close: () => void) =>
+    hideType && (
+      <ToolsMenuItem
+        item="hide-type"
+        icon={<EyeOff size={16} />}
+        title={hideType.title}
+        subtitle={hideType.subtitle}
+        onClick={() => {
+          close();
+          hideType.hide();
+        }}
+      />
+    );
 
   return (
     <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading} provScope={provScope}>
       {(close) =>
         groupShow ? (
-          <ToolsMenuItem
-            item="show-group"
-            expanded={false}
-            icon={<ChevronDown size={16} />}
-            title={groupShow.title}
-            subtitle={groupShow.subtitle}
-            onClick={() => {
-              close();
-              groupShow.show();
-            }}
-          />
+          <>
+            <ToolsMenuItem
+              item="show-group"
+              expanded={false}
+              icon={<ChevronDown size={16} />}
+              title={groupShow.title}
+              subtitle={groupShow.subtitle}
+              onClick={() => {
+                close();
+                groupShow.show();
+              }}
+            />
+            {hideTypeRow(close)}
+          </>
         ) : (
           <>
             {shareHref && !onEventPage && (
@@ -127,6 +168,7 @@ export function EventCardMenu({
                 }}
               />
             )}
+            {hideTypeRow(close)}
           </>
         )
       }
