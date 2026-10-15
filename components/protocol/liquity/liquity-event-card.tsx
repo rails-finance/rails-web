@@ -114,14 +114,14 @@ export function LiquityEventCard({
   const rateUp = isRateChange
     ? (ctx.stateAfter?.annualInterestRate ?? 0) >= (ctx.stateBefore?.annualInterestRate ?? 0)
     : false;
-  // A rate change draws its change signed on the spine's flank; the timeline
-  // row's phone caption states the rate after ("Rate 3.60%"). Before and
-  // after stand in the opened card and the event page.
+  const isJoin = isDelegate ? ctx.operation === "setInterestBatchManager" : false;
+  // A rate change, and a delegate's join, draw the rate after on the spine's
+  // flank; the timeline row's phone caption states it ("Rate 3.60%"). Before
+  // and after stand in the opened card and the event page.
   const rateSpan: [number, number] | undefined =
-    isRateChange && ctx.stateBefore && ctx.stateAfter
+    (isRateChange || (isJoin && (ctx.stateAfter?.annualInterestRate ?? 0) > 0)) && ctx.stateBefore && ctx.stateAfter
       ? [ctx.stateBefore.annualInterestRate, ctx.stateAfter.annualInterestRate]
       : undefined;
-  const isJoin = isDelegate ? ctx.operation === "setInterestBatchManager" : false;
 
   const isRedemption = ctx.operation === "redeemCollateral";
   const isLiquidation = ctx.operation === "liquidate";
@@ -224,7 +224,7 @@ export function LiquityEventCard({
     : isDelegate
       ? // Delegation reads as an external-party event via the pink +/- glyph
         // badge (color-grammar.md §4b); the spine line stays neutral.
-        { icon: "delegate", iconDirection: isJoin ? "up" : "down", isLast: !!isLast }
+        { icon: "delegate", iconDirection: isJoin ? "up" : "down", rateSpan, isLast: !!isLast }
       : isRateChange
         ? { icon: "rate-change", iconDirection: rateUp ? "up" : "down", rateSpan, isLast: !!isLast }
         : ctx.operation === "transferTrove"

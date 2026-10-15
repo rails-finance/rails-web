@@ -242,9 +242,8 @@ export interface ChainTruthRowSpec {
   /** A rate the position holder (or a delegate acting for them) CHOSE — never a
    *  utilization rate. Renders as the same lozenge Liquity V2 uses (individual
    *  rb-500, or party-pink `tone: "delegate"` with the people glyph), and echoes
-   *  the detail grid's rate receipt so pill and grid pulse as one identity. Not
-   *  subject to the `hideClass` value hand-off — a rate is not a moved amount,
-   *  and the spine never carries it. */
+   *  the detail grid's rate receipt so pill and grid pulse as one identity.
+   *  Subject to the `hideClass` value hand-off only with `onSpine`. */
   ratePill?: {
     pct: number;
     tone?: "delegate";
@@ -259,6 +258,9 @@ export interface ChainTruthRowSpec {
      *  change): drawn `3.20% → 3.60%` inside the one lozenge, as the Liquity V2
      *  delegate run's header draws it. Only the after-rate echoes the receipt. */
     fromPct?: number;
+    /** The spine's flank carries the rate (Liquity V2's delegate rows): the
+     *  pill takes the value hand-off the moved amounts take. */
+    onSpine?: boolean;
   };
   /** Opening event: render the `label` as Liquity V2's green "Open" status pill
    *  instead of the plain text label. A status affordance on the label word, the
@@ -811,10 +813,9 @@ export function ChainTruthRow({
     );
   });
 
-  // Rate pill — a chosen rate, in the lozenge, outside hideClass: the ≥sm
-  // spine carries moved amounts and the pill stays visible in
-  // both value modes. Echoes the detail grid's rate receipt (same prov, same
-  // value key) so the two pulse as one. Both tones state two places.
+  // Rate pill — a chosen rate, in the lozenge, outside hideClass unless the
+  // spine's flank carries it (`onSpine`). Echoes the detail grid's rate
+  // receipt (same prov, same value key) so the two pulse as one.
   const rateNode =
     spec.ratePill &&
     (() => {
@@ -829,12 +830,13 @@ export function ChainTruthRow({
           node
         );
       const Shell = rp.tone === "delegate" ? DelegateRatePillShell : RatePillShell;
+      const box = rp.onSpine && hideClass ? `leading-[0] ${hideClass}` : "leading-[0]";
       // The plain span holds the lozenge out of the row's flex layout, so it
       // keeps its inline-flex box; its zero line height leaves the lozenge's
       // box as the span's height.
       if (rp.fromPct != null)
         return (
-          <span className="leading-[0]">
+          <span className={box}>
             <Shell>
               <span>{rp.fromPct.toFixed(2)}%</span>
               <span aria-hidden="true">→</span>
@@ -843,7 +845,7 @@ export function ChainTruthRow({
           </span>
         );
       return (
-        <span className="leading-[0]">
+        <span className={box}>
           <Shell>{echo(<>{rp.pct.toFixed(2)}%</>)}</Shell>
         </span>
       );

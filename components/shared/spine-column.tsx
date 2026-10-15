@@ -169,7 +169,7 @@ export interface SpineColumnProps {
    *  legs the card's header publishes (`usePublishSpineLegs`) are drawn; with
    *  neither, the triangle stands in. */
   warningLegs?: SpineWarningLeg[];
-  /** icon="rate-change": the rate before and after (%). The right flank,
+  /** icon="rate-change" or "delegate": the rate before and after (%). The right flank,
    *  where a row's leg numbers stand, states the rate after ("0.50%") with
    *  no sign, an up or down arrow beside the node where the rate moved from a
    *  prior rate. Unset, the glyph carries the arrow alone. */
@@ -933,6 +933,30 @@ export function SpineColumn({
   /** A node row: the glyph on the spine, and what stands on its right flank
    *  (two empty cells unless given). The grid is `.spine-grid`. */
   const nodeRow = (glyph: ReactNode, right?: ReactNode) => <NodeRow glyph={glyph} right={right} />;
+  /** The right flank of a rate node: the rate after, to two decimals, at the
+   *  leg values' x (`SpineVal`'s pl-5); the arrow column points up or down
+   *  where the rate moved from a prior rate, and stays empty with none.
+   *  data-spine-rate carries the direction. */
+  const rateFlank = ([before, after]: [number, number]) => {
+    const delta = after - before;
+    const moved = before > 0 && Math.abs(delta).toFixed(2) !== "0.00";
+    const direction = !moved ? "flat" : delta > 0 ? "up" : "down";
+    return (
+      <>
+        {direction === "flat" ? (
+          <span />
+        ) : (
+          <DirectionArrow direction={direction} size={Math.round(scale.arrowSize * 0.7)} />
+        )}
+        <span
+          className="justify-self-start whitespace-nowrap pl-5 text-base font-semibold tabular-nums"
+          data-spine-rate={direction}
+        >
+          {after.toFixed(2)}%
+        </span>
+      </>
+    );
+  };
   // The node: a glyph that states why there is no flow, else the token rows.
   const node: ReactNode = (() => {
     switch (effectiveIcon) {
@@ -948,31 +972,7 @@ export function SpineColumn({
         return warningTip ? <RevealTip tip={warningTip}>{legs}</RevealTip> : legs;
       }
       case "rate-change": {
-        if (rateSpan) {
-          // The rate after, to two decimals, at the leg values' x
-          // (`SpineVal`'s pl-5); the arrow column points up or down where the
-          // rate moved from a prior rate, and stays empty with none.
-          // data-spine-rate carries the direction.
-          const delta = rateSpan[1] - rateSpan[0];
-          const moved = rateSpan[0] > 0 && Math.abs(delta).toFixed(2) !== "0.00";
-          const direction = !moved ? "flat" : delta > 0 ? "up" : "down";
-          return nodeRow(
-            <RateIcon size={T} />,
-            <>
-              {direction === "flat" ? (
-                <span />
-              ) : (
-                <DirectionArrow direction={direction} size={Math.round(scale.arrowSize * 0.7)} />
-              )}
-              <span
-                className="justify-self-start whitespace-nowrap pl-5 text-base font-semibold tabular-nums"
-                data-spine-rate={direction}
-              >
-                {rateSpan[1].toFixed(2)}%
-              </span>
-            </>,
-          );
-        }
+        if (rateSpan) return nodeRow(<RateIcon size={T} />, rateFlank(rateSpan));
         return nodeRow(
           <RateIcon size={T} />,
           iconDirection ? (
@@ -987,11 +987,13 @@ export function SpineColumn({
         // A delegation is a people event, not a rate tweak: a person glyph
         // with a join (+) / leave (−) badge. iconDirection up = join
         // (setInterestBatchManager), down = leave (removeFromBatch).
+        // A join's `rateSpan` puts the delegate's rate on the right flank.
         return nodeRow(
           <div className="relative">
             <UsersIcon size={T} />
             <DelegateBadge size={T} join={iconDirection !== "down"} />
           </div>,
+          rateSpan ? rateFlank(rateSpan) : undefined,
         );
       case "external":
         // A third-party action with NOTHING TO DRAW: the people glyph in the

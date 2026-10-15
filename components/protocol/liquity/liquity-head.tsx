@@ -90,12 +90,13 @@ export function liquityHeadSpec(
     ...extra,
   });
   const rate = stateAfter.annualInterestRate;
-  const pill = (tone?: "delegate", lead?: boolean): ChainTruthRowSpec["ratePill"] => ({
+  const pill = (tone?: "delegate", lead?: boolean, onSpine?: boolean): ChainTruthRowSpec["ratePill"] => ({
     pct: rate,
     tone,
     prov: rateP?.info,
     echoValue: rateP?.value,
     lead,
+    onSpine,
   });
   const manager = ctx.batchManager ? getBatchManagerName(ctx.batchManager) : undefined;
 
@@ -103,11 +104,12 @@ export function liquityHeadSpec(
   if (op === "setBatchManagerAnnualInterestRate") {
     // The manager moved the rate and nothing else: the debt's move since the
     // Trove's previous event (interest, the management fee, any upfront fee)
-    // stands in the opened card's Debt side and the explanation.
-    spec.ratePill = pill("delegate", true);
+    // stands in the opened card's Debt side and the explanation. The rate
+    // stands on the spine's flank, as on a join.
+    spec.ratePill = pill("delegate", true, true);
     spec.manager = manager;
   } else if (op === "setInterestBatchManager") {
-    if (rate > 0) spec.ratePill = pill("delegate", true);
+    if (rate > 0) spec.ratePill = pill("delegate", true, true);
     spec.manager = manager;
   } else if (op === "openTrove" || op === "openTroveAndJoinBatch") {
     spec.deltas = [
