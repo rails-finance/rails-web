@@ -51,11 +51,15 @@
    them; new ports use rb-* and the semantic tokens below.
 */
 :root {
-  /* Stacking scale for the layers above the page. A window may open one more
-     window from inside it, and no further: each tier is one above what it
-     covers. Overlays take their z-index from here. Ordinary in-page stacking
-     (sticky headers, chart layers, the header at 40) stays as plain numbers. */
+  /* Stacking scale for the layers above the page, lowest first: dropdown,
+     inspect-halo, inspect-exit, modal, popover, modal-over-popover, progress.
+     A window may open one more window from inside it, and no further: each
+     tier is one above what it covers. Overlays take their z-index from here.
+     Ordinary in-page stacking (sticky headers, chart layers, the header at 40)
+     stays as plain numbers. */
   --z-dropdown: 50; /* in-page dropdowns and tooltips, below every window */
+  --z-inspect-halo: 55; /* the provenance inspector's armed ring on the viewport */
+  --z-inspect-exit: 56; /* the inspector's exit chip, over its halo */
   --z-modal: 9999;
   --z-popover: 10000;
   --z-modal-over-popover: 10001;
@@ -1852,13 +1856,13 @@ label[for] {
   }
 }
 /* the armed halo's own way out, on a page whose toggle is behind a menu that
-   has closed. Sits over the halo (z 55) and under the popover (z 60), and at
+   has closed. Sits over the halo and under the popover (z 60), and at
    the LEFT end of the bottom edge: the right end is where the dock sits on the
    pages that still have one, and where a card's end flank lands — a pick that
    hit this chip instead would put the tool down rather than trace a value. */
 .prov-inspect-exit {
   position: fixed;
-  z-index: 56;
+  z-index: var(--z-inspect-exit);
   left: 12px;
   bottom: max(12px, env(safe-area-inset-bottom));
   display: inline-flex;
@@ -1896,7 +1900,7 @@ label[for] {
 .prov-inspect-halo {
   position: fixed;
   inset: 0;
-  z-index: 55;
+  z-index: var(--z-inspect-halo);
   pointer-events: none;
   box-shadow:
     inset 0 0 0 2px rgb(13 148 136 / 0.5),
