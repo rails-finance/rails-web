@@ -195,7 +195,6 @@ export function useAaveV4HeadSpec({
     label: ctx.alsoToggledCollateral ? "Enable" : labelOf(ctx),
     status: ctx.alsoToggledCollateral ? "open" : undefined,
     critical: isLiq || undefined,
-    unsignedDeltas: true,
     deltas,
     asset:
       ctx.eventType === "collateral_toggle" && ctx.reserveSymbol

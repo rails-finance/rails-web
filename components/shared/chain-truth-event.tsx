@@ -235,10 +235,6 @@ export interface ChainTruthRowSpec {
   /** A custody row that keeps its action label before the amounts (Aave V3's
    *  "Transferred out"); the amounts stay bare. Unset: no label, as above. */
   custodyLabel?: boolean;
-  /** Draw the deltas' magnitudes without a sign, where the label's verb says
-   *  the direction and the ≥sm spine draws it as an arrow (SparkLend: a "+681"
-   *  on a Borrow read as a gain at 390px). The receipts keep the signed value. */
-  unsignedDeltas?: boolean;
   /** A rate the position holder (or a delegate acting for them) CHOSE — never a
    *  utilization rate. Renders as the same lozenge Liquity V2 uses (individual
    *  rb-500, or party-pink `tone: "delegate"` with the people glyph), and echoes
@@ -733,22 +729,23 @@ export function ChainTruthRow({
         symbol={d.symbol}
         label={
           opts.named && d.readableLabel
-            ? readableName(d.value, d.symbol, !(d.label || spec.custody) || !!d.signed)
+            ? readableName(d.value, d.symbol, (!(d.label || spec.custody) && !!spec.critical) || !!d.signed)
             : undefined
         }
       />
     </span>
   );
   const deltaNodes = spec.deltas.map((d, i) => {
-    // Labeled deltas (redemption's Cleared/Reduced) show a bare magnitude —
-    // the label carries the direction; unlabeled ones keep the ± sign. A
-    // custody row is bare too: the to/from chip is its direction.
+    // Header amounts are unsigned on every family: the verb carries the
+    // direction (rails-ops detail-page-anatomy, "Shared row rules"). A
+    // critical row (a liquidation) keeps its ± signs; `signed` keeps one
+    // figure's sign. The receipts keep the signed value.
     // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
     // keeps the sign from running into the "<" ("− <0.01").
     const bare = (Boolean(d.label) || Boolean(spec.custody)) && !d.signed;
     const magnitude = d.display ?? fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
     const text =
-      bare || (spec.unsignedDeltas && !d.signed)
+      bare || (!spec.critical && !d.signed)
         ? magnitude
         : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
     // On a redemption or a liquidation the word alone carries the tone; the

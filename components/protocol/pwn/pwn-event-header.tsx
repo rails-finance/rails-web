@@ -115,5 +115,5 @@ export function usePwnHeadSpec({
         }
       : undefined;
 
-  return { label: actionLabel, critical: isSeizure, deltas, unsignedDeltas: true, note, party };
+  return { label: actionLabel, critical: isSeizure, deltas, note, party };
 }

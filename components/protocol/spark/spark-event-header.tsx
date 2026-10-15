@@ -128,8 +128,6 @@ export function sparkHeadSpec({
     // kept before the amounts (Aave V3's custodyLabel).
     custody: isTransferRow,
     custodyLabel: isTransferRow,
-    // The verb carries the direction; a liquidation keeps its signs.
-    unsignedDeltas: ctx.eventType !== "liquidation",
     deltas,
     party,
     externalActor:

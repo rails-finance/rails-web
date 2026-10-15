@@ -66,7 +66,7 @@ export function liquityHeadSpec(
   const collSym = ctx.collateralType;
   const debtSym = ctx.assetType ?? "BOLD";
   const status = statusOf(op);
-  if (!stateAfter || !stateBefore) return { label, status, deltas: [], unsignedDeltas: true };
+  if (!stateAfter || !stateBefore) return { label, status, deltas: [] };
 
   const collCp = collChangeProv(ctx, coords);
   const debtCp = debtChangeProv(ctx, coords);
@@ -100,7 +100,7 @@ export function liquityHeadSpec(
   });
   const manager = ctx.batchManager ? getBatchManagerName(ctx.batchManager) : undefined;
 
-  const spec: ChainTruthRowSpec = { label, status, deltas: [], unsignedDeltas: true };
+  const spec: ChainTruthRowSpec = { label, status, deltas: [] };
   if (op === "setBatchManagerAnnualInterestRate") {
     // The manager moved the rate and nothing else: the debt's move since the
     // Trove's previous event (interest, the management fee, any upfront fee)
