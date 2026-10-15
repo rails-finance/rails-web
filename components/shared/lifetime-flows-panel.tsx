@@ -9,7 +9,8 @@
 // totals the scrubber reports with any outcome bullet, the Chart bullets and
 // the Key. Until the scrubber's timeline lands the panel says it is reading,
 // with the waiting cue over the skeleton (ui-jobs 333); where that read fails,
-// that it was not read.
+// that it was not read. A life the one-day rule gives nothing to draw
+// (`flowsLife`) hides the panel; the scrubber stays mounted to say so.
 //
 // Mounted by the position views directly, with no <ChainTruthTower>, so the
 // towers can be removed without removing the scrubber (rails-ops
@@ -18,7 +19,13 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { DiscChevron } from "@/components/shared/expand-chevron";
-import { FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
+import {
+  FlowsKey,
+  FlowsKeyContext,
+  FlowsLifeContext,
+  type FlowsKeyItems,
+} from "@/components/shared/lifetime-flows-scrubber";
+import type { FlowsLife } from "@/lib/shared/flows-combined";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import {
@@ -111,6 +118,8 @@ export function LifetimeFlowsPanel({
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
   // The scrubber's Key, drawn inside the Explanation.
   const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
+  // What the life draws under the one-day rule, as the scrubber reports it.
+  const [life, setLife] = useState<FlowsLife>("full");
   // Whether the body draws its sections, each with its "?".
   const [sections, setSections] = useState(false);
   // Collapsed, per protocol. No collapsed attribute is written until the
@@ -167,6 +176,7 @@ export function LifetimeFlowsPanel({
   );
   if (scrubber == null && read === "done") return null;
   const loading = scrubber == null && read !== "failed";
+  const none = scrubber != null && life === "none";
 
   return (
     // Its own receipts scope: every traced figure in the panel registers here.
@@ -177,6 +187,8 @@ export function LifetimeFlowsPanel({
         data-skel-section="detail-economics"
         {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
         data-lifetime-flows-panel=""
+        data-flows-life={scrubber != null ? life : undefined}
+        hidden={none || undefined}
         data-anatomy="P2"
         {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
         {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
@@ -235,15 +247,17 @@ export function LifetimeFlowsPanel({
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {scrubber != null ? (
-            <FlowsKeyContext.Provider value={setFlowsKey}>
-              <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
-                <FlowsSectionsContext.Provider value={setSections}>
-                  <FlowsCompactContext.Provider value={{ compact, toggle: viewButton }}>
-                    <div className="mt-2">{scrubber}</div>
-                  </FlowsCompactContext.Provider>
-                </FlowsSectionsContext.Provider>
-              </FlowsKeyNodeContext.Provider>
-            </FlowsKeyContext.Provider>
+            <FlowsLifeContext.Provider value={setLife}>
+              <FlowsKeyContext.Provider value={setFlowsKey}>
+                <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
+                  <FlowsSectionsContext.Provider value={setSections}>
+                    <FlowsCompactContext.Provider value={{ compact, toggle: viewButton }}>
+                      <div className="mt-2">{scrubber}</div>
+                    </FlowsCompactContext.Provider>
+                  </FlowsSectionsContext.Provider>
+                </FlowsKeyNodeContext.Provider>
+              </FlowsKeyContext.Provider>
+            </FlowsLifeContext.Provider>
           ) : read === "failed" ? (
             <p
               className="mt-2 flex h-24 items-center justify-center rounded-md bg-sunken px-3 text-center text-xs text-rb-500"
@@ -274,7 +288,7 @@ export function LifetimeFlowsPanel({
                   )}
                   {scrubber != null && flowsKey && (
                     <>
-                      {(flowsKey.basis || (flowsKey.chart && flowsKey.chart.length > 0)) && (
+                      {(flowsKey.basis || flowsKey.priceBasis || (flowsKey.chart && flowsKey.chart.length > 0)) && (
                         <ExplainGroup title="Chart" data-flow-chart-words="">
                           {flowsKey.basis && <ExplainBullet data-flow-basis="">{flowsKey.basis}</ExplainBullet>}
                           {flowsKey.priceBasis && (

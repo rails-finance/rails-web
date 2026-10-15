@@ -39,6 +39,20 @@ export function closeStop(model: FlowModel): number | null {
   return held.some((h) => (h.amount ?? 0) > 0) ? null : model.lastDay;
 }
 
+/** What the Lifetime flows panel draws for a life (the one-day rule, rails-ops
+ *  standards/detail-page-anatomy.md, "Lifetime flows"): everything; the price
+ *  chart alone; or nothing. A life whose events all fall on one UTC day draws
+ *  no scrubber: closed, or open and begun today (UTC), it draws nothing; open
+ *  and begun before today, the price chart alone. `today` is the UTC day
+ *  number. */
+export type FlowsLife = "full" | "price" | "none";
+
+export function flowsLife(model: FlowModel, today: number): FlowsLife {
+  if (model.eventDays.length > 1) return "full";
+  if (closeStop(model) != null) return "none";
+  return today > model.start / DAY_MS ? "price" : "none";
+}
+
 /** The cursor's stops, ascending: every point of the line and every day with
  *  events, one stop per day; the last is the live stop. Without a series, the
  *  event days and the live stop. On a closed position the live stop stands

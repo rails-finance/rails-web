@@ -92,6 +92,7 @@ import {
   FlowsKey,
   FlowsKeyContext,
   FlowsLedgerNoteContext,
+  FlowsLifeContext,
   LifetimeFlowsScrubber,
   type FlowsKeyItems,
 } from "@/components/shared/lifetime-flows-scrubber";
@@ -109,6 +110,7 @@ import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
 import { priceKeyFor } from "@/lib/aave/prices";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { AaveV4BaseReserveNotice } from "@/components/protocol/aave-v4/aave-v4-base-reserve-notice";
+import type { FlowsLife } from "@/lib/shared/flows-combined";
 
 export interface AaveV4SpokeViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -967,7 +969,11 @@ function AaveV4SpokeTowerBlock({
   // The line's key and basis, reported by the scrubber: the key in the
   // Explanation, the basis beside the (i).
   const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
-  const ledgerShown = flowTimeline == null || ledgerOpen;
+  // A life the one-day rule gives nothing to draw (`flowsLife`): the ledger
+  // stands alone, as where there is no timeline.
+  const [life, setLife] = useState<FlowsLife>("full");
+  const scrubbed = flowTimeline != null && life !== "none";
+  const ledgerShown = !scrubbed || ledgerOpen;
   const title = (
     <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime flows</span>
   );
@@ -984,15 +990,17 @@ function AaveV4SpokeTowerBlock({
       <div className="rounded-2xl bg-raised px-5 py-4">
         <div className="space-y-3">
           {flowTimeline != null && (
-            <div>
+            <div hidden={!scrubbed || undefined}>
               <div className="flex min-h-[28px] items-center">{title}</div>
               <div className="mt-2">
                 <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
                   <FlowsKeyContext.Provider value={setFlowsKey}>
-                    <LifetimeFlowsScrubber
-                      timeline={flowTimeline}
-                      series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
-                    />
+                    <FlowsLifeContext.Provider value={setLife}>
+                      <LifetimeFlowsScrubber
+                        timeline={flowTimeline}
+                        series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
+                      />
+                    </FlowsLifeContext.Provider>
                   </FlowsKeyContext.Provider>
                 </FlowsLedgerNoteContext.Provider>
               </div>
@@ -1023,7 +1031,7 @@ function AaveV4SpokeTowerBlock({
               surplusSymbols={surplusSymbols}
               hideSurplus={hideSurplus}
               onToggleHideSurplus={() => setHideSurplus((v) => !v)}
-              title={flowTimeline == null ? title : undefined}
+              title={!scrubbed ? title : undefined}
               historyComplete={historyComplete}
             />
           </div>

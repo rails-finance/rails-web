@@ -104,6 +104,7 @@ import {
 } from "@/lib/shared/flows-series";
 import { fetchFlowBinSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { flowPriceSeries } from "@/lib/shared/flows-price";
+import { flowsLife, type FlowsLife } from "@/lib/shared/flows-combined";
 
 /** Days the slider advances per tick while playing, and the tick. */
 const PLAY_DAYS = 7;
@@ -127,6 +128,11 @@ const hlKey = (s: FlowSegment) => (s.link ? `link:${s.link}` : s.key);
  *  told what the ledger shows while the slider is off its last stop ("Shows
  *  the position today"), and null at the last stop, where the two agree. */
 export const FlowsLedgerNoteContext = createContext<((note: string | null) => void) | null>(null);
+
+/** Set around the scrubber by the panel that holds it: told what the life
+ *  draws under the one-day rule (`flowsLife`), so the panel stands aside
+ *  where it draws nothing. */
+export const FlowsLifeContext = createContext<((life: FlowsLife) => void) | null>(null);
 
 /** The Key: each kind of exit the position has had over its life, and the
  *  dashed outline where it has other stops. The scrubber reports it; the panel
@@ -645,6 +651,14 @@ export function LifetimeFlowsScrubber({
   const prices = useMemo(() => (lined ? flowPriceSeries(timeline) : []), [lined, timeline]);
   // The health view (Aave V3 Ethereum) leads the list and has no unit.
   const priceUnit = prices.find((p) => !p.health)?.unitLabel;
+  // The one-day rule: a life on one UTC day draws no scrubber; an open one
+  // begun before today keeps the price chart where it has one.
+  const ruled = model ? flowsLife(model, timeline.today ?? Math.floor(Date.now() / DAY_MS)) : "full";
+  const life: FlowsLife = ruled === "price" && prices.length === 0 ? "none" : ruled;
+  const reportLife = useContext(FlowsLifeContext);
+  useLayoutEffect(() => {
+    reportLife?.(life);
+  }, [reportLife, life]);
   const priceBasis =
     priceUnit != null
       ? `Price: each held asset's price in ${priceUnit}, a point per day at the last price recorded that day, dotted where a day has none and the price before it is carried.`
@@ -659,6 +673,11 @@ export function LifetimeFlowsScrubber({
   );
   useEffect(() => {
     if (!words) return;
+    // Nothing drawn, no Key; the price chart alone, its basis and the totals.
+    if (life !== "full") {
+      reportKey?.(life === "none" ? null : { items: [], outline: null, priceBasis, totals: totals ?? undefined });
+      return;
+    }
     const drawn = busy ? null : hatches;
     reportKey?.({
       items: drawn?.items ?? [],
@@ -675,10 +694,10 @@ export function LifetimeFlowsScrubber({
       priceBasis,
       totals: totals ?? undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals, priceBasis]);
+  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals, priceBasis, life]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
-  if (!model || !bars || !words) return null;
+  if (!model || !bars || !words || life === "none") return null;
   if (!lined)
     return (
       <FlowUnitContext.Provider value={model.unit ?? null}>
@@ -702,6 +721,7 @@ export function LifetimeFlowsScrubber({
           series={lifetime?.series ?? null}
           prices={prices}
           failed={lifetime?.failed ?? false}
+          priceOnly={life === "price"}
           onLedgerNote={ledgerNote ?? undefined}
           renderBars={(stop, when, isLive, atLive) => (
             <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />

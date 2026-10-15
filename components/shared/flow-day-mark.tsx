@@ -10,7 +10,9 @@
 // stays where it is (Miles, 1 Oct 2026); where the panel is off screen a short
 // note beside the date says the chart moved and which way it lies ("Chart
 // moved ↑"). The timeline is untouched. The button hides while the chart
-// is frozen on that day. The day's other events state their time only.
+// is frozen on that day, and stands only while the chart's cursor is drawn
+// (a life the one-day rule gives no scrubber has none). The day's other
+// events state their time only.
 
 import { useEffect, useState } from "react";
 import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
@@ -48,6 +50,7 @@ export function moveChartToDay(
 export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean }) {
   const focus = useFlowFocus();
   const frozenHere = useFlowFocusState((s) => s.frozenDay === utcDay(ts));
+  const chartDrawn = useFlowFocusState((s) => s.cursor != null);
   const date = dayStamp(ts);
   // The note that the chart moved, for a moment, where the panel is off
   // screen; a screen reader hears it wherever the panel is.
@@ -64,7 +67,7 @@ export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean
       data-anatomy="T7"
       {...(flash ? { "data-flow-day-flash": "" } : {})}
     >
-      {focus?.model && !frozenHere && (
+      {focus?.model && chartDrawn && !frozenHere && (
         <button
           type="button"
           className="header-badge-tip -my-2 inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-colors hover:bg-rb-100 hover:text-foreground focus-ring sm:-my-1 sm:size-6 dark:hover:bg-rb-800"

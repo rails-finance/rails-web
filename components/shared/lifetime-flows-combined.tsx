@@ -235,6 +235,9 @@ export interface CombinedFlowsProps {
   /** The held assets' price series, for the price view (none: no toggle). */
   prices: FlowPriceSeries[];
   failed: boolean;
+  /** The price chart alone (the one-day rule, `flowsLife`): no bars, no value
+   *  line, no events row or steps, and no tie to the timeline. */
+  priceOnly?: boolean;
   /** A ledger's note while the cursor is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
   /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
@@ -250,6 +253,7 @@ export function CombinedFlows({
   series,
   prices,
   failed,
+  priceOnly = false,
   onLedgerNote,
   renderBars,
 }: CombinedFlowsProps) {
@@ -297,7 +301,10 @@ export function CombinedFlows({
   // forward steps go by days with events. A second click on the frozen day,
   // Escape or the jump to today releases the freeze. A click on a segment
   // opens a short tip with its line, value and share.
-  const focus = useFlowFocus();
+  // The price chart alone stands apart from the timeline: no cursor for it
+  // to follow, no card's "View on chart".
+  const focusCtx = useFlowFocus();
+  const focus = priceOnly ? null : focusCtx;
   const byDays = focus != null;
   const flowsKey = useContext(FlowsKeyNodeContext);
   const setSections = useContext(FlowsSectionsContext);
@@ -392,21 +399,21 @@ export function CombinedFlows({
   const move = useFlowFocusState((s) => s.move);
   const moved = useRef<number | null>(null);
   useEffect(() => {
-    if (!move || moved.current === move.n) return;
+    if (!focus || !move || moved.current === move.n) return;
     moved.current = move.n;
     const i = stopForDay(stops, Math.floor(move.ts / 86_400) - model.start / DAY_MS);
     if (i != null) {
       setAt(i);
       setFrozen(!move.free);
     }
-  }, [move, stops, model.start]);
+  }, [focus, move, stops, model.start]);
   // A cut restored from the address bar (`useRewindParam`): the cursor goes
   // to its day's close, frozen there.
   const restore = useFlowFocusState((s) => s.restore);
   const restored = useRef<number | null>(null);
   const restoreTo = useRef<number | null>(null);
   useEffect(() => {
-    if (!restore || restored.current === restore.n) return;
+    if (!focus || !restore || restored.current === restore.n) return;
     const day = Math.floor(restore.endTs / 86_400);
     const stop = day - model.start / DAY_MS;
     // A model that does not reach the day yet (a preload's) waits for the
@@ -419,7 +426,7 @@ export function CombinedFlows({
     keepDay.current = day;
     setRestoreDay(day);
     setFrozen(true);
-  }, [restore, model.start, model.liveStop, focus?.store]);
+  }, [focus, restore, model.start, model.liveStop]);
   useEffect(() => {
     const to = restoreTo.current == null ? null : restoreTo.current - startDay;
     if (to == null) return;
@@ -596,11 +603,15 @@ export function CombinedFlows({
   return (
     <FlowCursorContext.Provider value={cursor}>
       <SegmentTipContext.Provider value={byDays || null}>
-        <div className="text-sm" data-flows-combined="" data-flow-frozen={frozen ? "" : undefined}>
-          <Steady>{barsBlock}</Steady>
+        <div
+          className="text-sm"
+          data-flows-combined={priceOnly ? "price" : ""}
+          data-flow-frozen={frozen ? "" : undefined}
+        >
+          {!priceOnly && <Steady>{barsBlock}</Steady>}
           {/* The view's toggle, centred under the bars, in both states: the
               charts open beneath it, the events and steps keep their place. */}
-          {viewToggle && (
+          {viewToggle && !priceOnly && (
             <div className="mt-3 flex justify-center" data-flows-view-row="">
               {viewToggle}
             </div>
@@ -608,12 +619,12 @@ export function CombinedFlows({
 
           <div>
             <div {...KEEP_PANEL}>
-              <div ref={stripRef} className={viewToggle ? "mt-2" : "mt-8"}>
+              <div ref={stripRef} className={priceOnly ? undefined : viewToggle ? "mt-2" : "mt-8"}>
                 {/* The value line, then the price chart, then the events: one
                   time axis and one cursor, which either chart moves. The
                   charts stay mounted while collapsed, so they draw at once
                   on expanding. */}
-                <div className={compact ? "hidden" : "relative"} data-flows-charts="value">
+                <div className={compact || priceOnly ? "hidden" : "relative"} data-flows-charts="value">
                   <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
                     <LineStrip
                       model={model}
@@ -632,7 +643,7 @@ export function CombinedFlows({
                   </StripSlider>
                 </div>
                 {priced && priceHelp && (
-                  <div className={compact ? "hidden" : "mt-10"} data-flow-price-section="">
+                  <div className={priceOnly ? undefined : compact ? "hidden" : "mt-10"} data-flow-price-section="">
                     <div className="mb-2 flex items-center justify-between gap-3" data-anatomy="F19.1">
                       <PriceHeading
                         series={prices}
@@ -668,7 +679,7 @@ export function CombinedFlows({
                   </div>
                 )}
                 {/* The events: a labelled row of pips on the time axis. */}
-                <div className={compact ? "mt-2" : "mt-6"} data-flow-events-section="">
+                <div className={priceOnly ? "hidden" : compact ? "mt-2" : "mt-6"} data-flow-events-section="">
                   <div className="flex items-center justify-between gap-3">
                     <span
                       className={`${SECTION_HEADING} text-rb-500`}
@@ -710,7 +721,12 @@ export function CombinedFlows({
 
             {/* The steps, grouped at the right end: the opening, the previous
               and next day with events, today. */}
-            <div className="mt-1 flex items-center justify-end" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
+            <div
+              className={priceOnly ? "hidden" : "mt-1 flex items-center justify-end"}
+              data-flow-controls=""
+              data-anatomy="F5"
+              {...KEEP_PANEL}
+            >
               <div className="-mr-1.5 flex items-center gap-x-1">
                 <button
                   type="button"
