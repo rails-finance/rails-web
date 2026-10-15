@@ -12,6 +12,7 @@ import Link from "next/link";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import { CHAINS } from "@/lib/shared/chains";
 
 /** Two scales, set here so every protocol gets the same treatment (rails-ops
  *  TO-DO-ui-jobs 67, retuned by 68, 69).
@@ -53,7 +54,7 @@ export function ProtocolIdentity({
   const entry = protocolForSession(session);
   if (!entry) return null;
   const s = SCALE[scale];
-  return (
+  const link = (
     <Link href={entry.href} data-rail-identity={entry.id} className={`group inline-flex items-center ${s.gap}`}>
       <ProtocolIcon
         id={entry.id}
@@ -63,5 +64,20 @@ export function ProtocolIdentity({
         {entry.label}
       </span>
     </Link>
+  );
+  if (!CHAINS[entry.chainId]?.testnet) return link;
+  // An explorer on a testnet says so once, beside its name, on every page of
+  // it; the pill wears the card's muted status tag (C6).
+  return (
+    <span className="inline-flex items-center gap-2">
+      {link}
+      <span
+        className="rounded-xs bg-rb-300 px-1.5 py-0.5 text-[11px] font-semibold text-foreground/70 dark:bg-rb-700"
+        data-testnet-pill=""
+        data-anatomy="H3.1"
+      >
+        Testnet
+      </span>
+    </span>
   );
 }

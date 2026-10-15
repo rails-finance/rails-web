@@ -313,6 +313,16 @@ position_words:
     At the feed's price of {price} {stable} per pETH, the collateral is worth {worth} {stable}.
   equity: |-
     Less the debt, equity is {equity} {stable}: a valuation at this block that says nothing of profit.
+  debt_sum: |-
+    The debt is {recorded} {stable} recorded at the last touch{legs} pending since.
+  debt_touch: |-
+    A touch is any transaction on the CDP; the next one writes the pending amounts into its figures.
+  sum_interest: |-
+    interest
+  sum_gain: |-
+    stability gain
+  sum_psm: |-
+    net PSM share
   drop: |-
     pETH's price can fall {drop} before this CDP reaches the {mcr} minimum.
   drop_far: |-
