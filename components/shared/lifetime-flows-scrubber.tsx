@@ -643,9 +643,11 @@ export function LifetimeFlowsScrubber({
   // The price view's series (ui-jobs 328): the held assets' daily prices the
   // timeline carries.
   const prices = useMemo(() => (lined ? flowPriceSeries(timeline) : []), [lined, timeline]);
+  // The health view (Aave V3 Ethereum) leads the list and has no unit.
+  const priceUnit = prices.find((p) => !p.health)?.unitLabel;
   const priceBasis =
-    prices.length > 0
-      ? `Price: each held asset's price in ${prices[0].unitLabel}, a point per day at the last price recorded that day, dotted where a day has none and the price before it is carried.`
+    priceUnit != null
+      ? `Price: each held asset's price in ${priceUnit}, a point per day at the last price recorded that day, dotted where a day has none and the price before it is carried.`
       : undefined;
   const totals = useMemo(
     () => (bars && model ? flowsTotals(bars, from > 0 ? dayStamp(dayStart(bars, 0)) : null) : null),
