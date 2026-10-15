@@ -152,9 +152,9 @@ function adjustLabel(dColl: bigint | null, dDebt: bigint | null): string {
 }
 
 const LABELS: Record<PolarisEventType, string> = {
-  open: "Open CDP",
+  open: "Open",
   adjust: "Adjust",
-  close: "Close CDP",
+  close: "Close",
   liquidate: "Liquidated",
   transfer: "Transfer",
 };

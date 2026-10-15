@@ -321,7 +321,7 @@ export function AnchoredPanel({
       aria-label={label}
       tabIndex={-1}
       {...{ [`data-${name}`]: "popover" }}
-      className={`fixed z-50 p-3 text-foreground outline-none ${surface === "overlay" ? "overlay-panel" : "rounded-2xl border shadow-lg"} ${className ?? ""}`}
+      className={`fixed z-[var(--z-popover)] p-3 text-foreground outline-none ${surface === "overlay" ? "overlay-panel" : "rounded-2xl border shadow-lg"} ${className ?? ""}`}
       style={{
         top: pos?.top ?? 0,
         left: pos?.left ?? 0,

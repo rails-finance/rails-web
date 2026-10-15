@@ -561,7 +561,7 @@ function PipTip({ at }: { at: PipOpen }) {
       ref={ref}
       role="tooltip"
       data-prov-hidden=""
-      className="pointer-events-none absolute bottom-full z-50 mb-1.5 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+      className="pointer-events-none absolute bottom-full z-[var(--z-dropdown)] mb-1.5 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
       style={{
         left: at.x,
         transform: `translateX(calc(-50% + ${dx}px))`,
@@ -1089,7 +1089,7 @@ function ScrubberBody({
               <span
                 aria-hidden
                 data-prov-hidden=""
-                className="pointer-events-none absolute bottom-full z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+                className="pointer-events-none absolute bottom-full z-[var(--z-dropdown)] -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
                 style={{
                   left: `calc(${stop / model.liveStop} * (100% - 16px) + 8px)`,
                   background: "var(--rb-tooltip-bg)",

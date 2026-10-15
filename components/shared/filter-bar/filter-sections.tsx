@@ -153,7 +153,7 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
 
             {open && (
               <div
-                className="absolute top-full left-0 mt-2 z-50 min-w-[220px] max-h-[420px] overflow-y-auto overlay-panel"
+                className="absolute top-full left-0 mt-2 z-[var(--z-dropdown)] min-w-[220px] max-h-[420px] overflow-y-auto overlay-panel"
                 role="menu"
               >
                 {/* Canonical dropdown header: title + Reset, then a divider. */}

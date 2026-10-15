@@ -163,7 +163,7 @@ export function WalletMenu({
           </MobileSheet>
         ) : (
           <div
-            className="overlay-panel absolute left-0 top-full z-50 mt-2 min-w-[240px] overflow-hidden py-1"
+            className="overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 min-w-[240px] overflow-hidden py-1"
             role="menu"
           >
             {rows}

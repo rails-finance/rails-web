@@ -648,7 +648,7 @@ function Density({
           <span
             role="tooltip"
             data-prov-hidden=""
-            className="pointer-events-none absolute bottom-full z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+            className="pointer-events-none absolute bottom-full z-[var(--z-dropdown)] mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
             style={{
               left: Math.max(70, Math.min(w - 70, x(shown))),
               background: "var(--rb-tooltip-bg)",

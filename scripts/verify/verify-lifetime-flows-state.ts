@@ -350,6 +350,45 @@ test("the busy treatment: bins, throughput, operations", () => {
   // six times turned over 6 times (against today's $20 it read 300).
   assert.equal(throughput(cycled(1)).turnover, null, "one deposit is no turnover");
   assert.equal(throughput(cycled(6)).turnover, 6, "turnover against the peak");
+  // The peak counts what the collateral held between a day's events: two
+  // round trips of $3.4k and $3.9k inside one day, $3.85 held at the close
+  // (the Yearn holder 0xb634…3b3b), turn over about twice, which is not busy.
+  const roundTrips = (high: boolean) => {
+    const ev = (i: number, bucket: string, usd: number, amount: number) => ({
+      id: `e${i}`,
+      ts: 20_000 * 86_400 + 600 * i,
+      block: i,
+      tick: "collateral" as const,
+      legs: [{ bucket, usd, symbol: "A" }],
+      balances: [{ asset: "a", symbol: "A", side: "collateral" as const, amount }],
+      prices: [{ asset: "a", usd: 1 }],
+    });
+    const days = daysFromEvents(
+      ["deposited", "withdrawn"],
+      [
+        ev(1, "deposited", 3_400, 3_400),
+        ev(2, "withdrawn", 3_400, 0),
+        ev(3, "deposited", 3_980, 3_980),
+        ev(4, "withdrawn", 3_976.15, 3.85),
+      ],
+    );
+    if (!high) for (const d of days) delete d.collateralHigh;
+    return buildFlowModel({
+      buckets: [
+        { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
+        { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out" },
+      ],
+      days,
+      live: { collateralUsd: 3.85, debtUsd: 0 },
+    }) as FlowModel;
+  };
+  assert.equal(roundTrips(true).collateralHigh[0], 3_980, "the high after the second deposit");
+  assert.equal(isBusy(roundTrips(true)), false, "two round trips in a day");
+  assert.equal(throughput(roundTrips(true)).turnover, null, "turned over under twice");
+  // Without a high from the events, the day's high is at least its inflow
+  // over its events: $7,380 over four.
+  assert.equal(roundTrips(false).collateralHigh[0], 1_845, "the day's inflow over its events");
+  assert.equal(isBusy(roundTrips(false)), false);
   assert.deepEqual(
     [binUnitFor(90), binUnitFor(91), binUnitFor(1095), binUnitFor(1096)],
     ["day", "week", "week", "month"],

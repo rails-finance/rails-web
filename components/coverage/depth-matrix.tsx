@@ -130,7 +130,7 @@ function CellNote({
     <span
       id={id}
       role="tooltip"
-      className={`absolute top-full z-50 mt-2 w-max ${maxWidthClass} text-left rounded-md bg-foreground px-2.5 py-1.5 text-xs text-background shadow-lg ${clampRight ? "right-0" : "left-0"} ${open ? "" : "hidden"}`}
+      className={`absolute top-full z-[var(--z-dropdown)] mt-2 w-max ${maxWidthClass} text-left rounded-md bg-foreground px-2.5 py-1.5 text-xs text-background shadow-lg ${clampRight ? "right-0" : "left-0"} ${open ? "" : "hidden"}`}
     >
       {sentenceCase(text)}
     </span>

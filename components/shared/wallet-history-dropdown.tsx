@@ -97,7 +97,7 @@ export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, pro
   const hasAny = sessions.length > 0;
 
   return (
-    <div className="absolute left-0 right-0 top-full mt-2 z-30 rounded-xl border border-rb-200 dark:border-rb-800 bg-white dark:bg-rb-900 shadow-lg overflow-hidden">
+    <div className="absolute left-0 right-0 top-full mt-2 z-[var(--z-dropdown)] rounded-xl border border-rb-200 dark:border-rb-800 bg-white dark:bg-rb-900 shadow-lg overflow-hidden">
       <div className="p-3 space-y-2">
         {/* Explicit scope: these bookmarks belong to THIS protocol only. */}
         <div className="flex items-center gap-1.5 px-1 pb-2 border-b border-rb-200 dark:border-rb-800">

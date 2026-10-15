@@ -297,6 +297,11 @@ export interface FlowDayRow {
   cumAsset?: { bucket: string; symbol: string; usd: number }[];
   /** The day's events' figures that rest on something not read (`FlowEvent.unsure`). */
   unsure?: FlowUnsure[];
+  /** The most the collateral was worth after any of the day's events, each
+   *  balance at the last price an event carried, where every held collateral
+   *  asset had one (`daysFromEvents`). Unset, the model takes the day's
+   *  collateral inflow over its events as the least the day's high was. */
+  collateralHigh?: number;
 }
 
 /** The token a family states its flows in, where it is not USD: every
@@ -479,6 +484,11 @@ export interface FlowModel {
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
   valued: { collateral: number; debt: number }[];
+  /** The most the collateral was worth during each stop before the live one:
+   *  the day row's `collateralHigh`, else the day's collateral inflow over its
+   *  events, and never under the stop's close. The busy rule's peak
+   *  (`lib/shared/flows-busy.ts`). */
+  collateralHigh: number[];
   /** Held assets on an old price, per stop (only stops that have any). */
   stale: Map<number, StalePrice[]>;
   /** Per stop, the held and owed figures that rest on a price or a read the
@@ -632,7 +642,14 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
     prices: Map<string, { usd: number; ts: number }>;
     cells: Set<string>;
     unsure: Map<string, FlowUnsure>;
+    /** The most the collateral was worth after one of the day's events; null
+     *  once an event leaves a held collateral asset without a price. */
+    high: number | null;
   } | null = null;
+  // Every balance and price the events have stated so far, for the value of
+  // the collateral after each event.
+  const runBal = new Map<string, FlowEvent["balances"][number]>();
+  const runPrice = new Map<string, number>();
   let n = 0;
   let txs = 0;
   let lastTx: string | null = null;
@@ -653,6 +670,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
         usd: cumAsset[c],
       })),
       ...(cur.unsure.size ? { unsure: [...cur.unsure.values()] } : {}),
+      ...(cur.high != null ? { collateralHigh: cur.high } : {}),
     });
     cur = null;
   };
@@ -668,6 +686,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       prices: new Map(),
       cells: new Set(),
       unsure: new Map(),
+      high: 0,
     };
     n += 1;
     // A transaction's events are consecutive; the card leaves some out.
@@ -689,6 +708,21 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       }
     }
     for (const b of ev.balances) cur.balances.set(`${b.side}:${b.asset}`, b);
+    for (const p of ev.prices) if (p.usd > 0) runPrice.set(p.asset, p.usd);
+    for (const b of ev.balances) runBal.set(`${b.side}:${b.asset}`, b);
+    if (cur.high != null) {
+      let coll: number | null = 0;
+      for (const b of runBal.values()) {
+        if (b.side !== "collateral" || !(b.amount > 0)) continue;
+        const usd = runPrice.get(b.asset);
+        if (usd == null) {
+          coll = null;
+          break;
+        }
+        coll += b.amount * usd;
+      }
+      cur.high = coll == null ? null : Math.max(cur.high, coll);
+    }
     for (const u of ev.unsure ?? []) {
       const k = `${u.side}|${u.symbol ?? ""}|${u.why}`;
       const had = cur.unsure.get(k);
@@ -897,6 +931,20 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     if (unsureHere.length) unsure.set(stop, unsureHere);
   }
 
+  // What the collateral reached during each stop: an event day's high where
+  // its row states one, else the day's collateral inflow over its events (the
+  // day's largest deposit is at least that, and the balance after it at least
+  // the deposit).
+  const collIn = (c: Record<string, number>) =>
+    t.buckets.filter((b) => b.side === "collateral" && b.dir === "in").reduce((s, b) => s + (c[b.key] ?? 0), 0);
+  const collateralHigh = valued.map((v) => v.collateral);
+  days.forEach((d, i) => {
+    const stop = d.day - startDay;
+    const count = Math.max(1, d.events - (i > 0 ? days[i - 1].events : 0));
+    const high = d.collateralHigh ?? (collIn(d.cum) - (i > 0 ? collIn(days[i - 1].cum) : 0)) / count;
+    collateralHigh[stop] = Math.max(collateralHigh[stop], high);
+  });
+
   const last = rows[rows.length - 1];
   const today = {
     collateral: t.live.collateralUsd + outOf("collateral", last.cum),
@@ -948,6 +996,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     repricings,
     live: t.live,
     valued,
+    collateralHigh,
     stale,
     unsure,
     unsureFlows,
@@ -1276,6 +1325,7 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
     ticks: shift(m.ticks),
     repricings: shift(m.repricings),
     valued,
+    collateralHigh: m.collateralHigh.slice(from),
     stale: new Map([...m.stale].filter(([d]) => d >= from).map(([d, v]) => [d - from, v])),
     unsure: new Map([...m.unsure].filter(([d]) => d >= from).map(([d, v]) => [d - from, v])),
     // A reason before the window stands from its opening: the bars there count what it left.

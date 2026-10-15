@@ -108,7 +108,7 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] overflow-y-auto" onClick={onClose}>
       {/* Backdrop */}
       <div
         className="fixed inset-0 backdrop-blur-sm pointer-events-none"

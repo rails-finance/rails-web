@@ -244,8 +244,8 @@ function NavigationProgressBar() {
       ref={bar}
       aria-hidden="true"
       data-nav-progress-bar=""
-      // z above the header (z-40), the chain switcher's overlay (z-50) and the
-      // bookmarks modal (z-[9999]): the acknowledgement of a click must never
+      // z above the header (z-40), the chain switcher's overlay and the
+      // bookmarks modal: the acknowledgement of a click must never
       // be the thing that is covered. It is 2px and pointer-events-none, so
       // sitting on top costs nothing.
       className="pointer-events-none fixed inset-x-0 top-0 z-[var(--z-progress)] h-0.5 origin-left"

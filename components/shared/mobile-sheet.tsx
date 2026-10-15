@@ -158,7 +158,7 @@ export function MobileSheet({ label, onClose, mode = "modal", header, dismiss = 
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999]">
+    <div className="fixed inset-0 z-[var(--z-modal)]">
       <div
         className={`absolute inset-0 transition-opacity duration-300 ${
           live ? "bg-black/20" : "bg-black/50 backdrop-blur-sm"

@@ -1015,7 +1015,7 @@ function StripSlider({
           aria-hidden
           data-prov-hidden=""
           data-flow-drag-date=""
-          className="pointer-events-none absolute bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+          className="pointer-events-none absolute bottom-full z-[var(--z-dropdown)] mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
           style={{
             left: Math.max(36, Math.min(w - 36, cx)),
             background: "var(--rb-tooltip-bg)",
@@ -1276,7 +1276,7 @@ function LineStrip({
           role="tooltip"
           data-prov-hidden=""
           data-flow-old-tip=""
-          className="pointer-events-none absolute z-50 rounded-2xl border p-3 text-xs font-medium text-foreground shadow-lg"
+          className="pointer-events-none absolute z-[var(--z-dropdown)] rounded-2xl border p-3 text-xs font-medium text-foreground shadow-lg"
           style={{
             left: Math.max(4, Math.min(w - OLD_TIP_W - 4, oldTip.x - OLD_TIP_W / 2)),
             bottom: STRIP_H - oldTip.y + 10,
@@ -1752,7 +1752,7 @@ function AssetPicker({
           role="listbox"
           aria-label="Asset"
           onKeyDown={onListKey}
-          className="overlay-panel absolute left-0 top-full z-50 mt-1 min-w-full overflow-hidden py-1"
+          className="overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-1 min-w-full overflow-hidden py-1"
         >
           {series.map((s) => {
             const on = s.key === selected.key;
@@ -2017,7 +2017,7 @@ function PipRow({
           role="tooltip"
           data-prov-hidden=""
           data-flow-pip-tip=""
-          className="pointer-events-none absolute bottom-full z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+          className="pointer-events-none absolute bottom-full z-[var(--z-dropdown)] mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
           style={{ left: pip.x, background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
         >
           {pip.text}

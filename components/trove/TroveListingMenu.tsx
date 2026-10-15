@@ -43,7 +43,7 @@ function TroveExplanationDialog({
   }, [onClose]);
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-[9999] overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 z-[var(--z-modal)] overflow-y-auto" onClick={onClose}>
       <div
         className="pointer-events-none fixed inset-0 backdrop-blur-sm"
         style={{ background: "var(--backdrop-bg)" }}
