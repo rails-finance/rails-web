@@ -1,7 +1,17 @@
 "use client";
 
-import { createContext, useEffect, useRef, type ReactNode } from "react";
+import {
+  Fragment,
+  createContext,
+  isValidElement,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { GroupHideContext } from "@/components/shared/event-card-menu";
+import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 
 // A group on the timeline (rails-ops TO-DO-ui-jobs 250 points 3 and 4, 240,
 // 331 point 4): a closed group is a row on the spine, its legs summed as
@@ -10,6 +20,86 @@ import { GroupHideContext } from "@/components/shared/event-card-menu";
 // way to close it. A bracket frame marks the group closed and open and
 // carries the range: the newest member's number at its top end, the oldest at
 // its tail. The tone sits on the nodes, the T1 word and the dotted segment.
+
+/** Members an open group draws at first, and adds each time the end of what
+ *  it drew nears the viewport: a page of rows (rails-ops decision 0039, rule
+ *  5: a large group opens as all its rows, windowed). */
+export const GROUP_MEMBER_BATCH = TIMELINE_PAGE_ROWS;
+
+/** The event a landing is bringing into view: an open group holding it draws
+ *  its members down to it. Provided by the timeline; the id is the member
+ *  row's React key (`renderEventRow` keys each row by its event's id). */
+export const MemberRevealContext = createContext<string | null>(null);
+
+/** An open group's members as one list: arrays and unkeyed fragments
+ *  flattened, each member keeping its key. */
+export function flatMembers(node: ReactNode, out: ReactNode[] = []): ReactNode[] {
+  if (Array.isArray(node)) for (const n of node) flatMembers(n, out);
+  else if (isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment && node.key == null)
+    flatMembers(node.props.children, out);
+  else if (node != null && node !== false && node !== true) out.push(node);
+  return out;
+}
+
+/** How many of `total` members an open group draws: `shown`, raised to the
+ *  batch holding the member at `revealAt`. */
+export function membersDrawn(total: number, shown: number, revealAt: number): number {
+  const reveal = revealAt >= 0 ? Math.ceil((revealAt + 1) / GROUP_MEMBER_BATCH) * GROUP_MEMBER_BATCH : 0;
+  return Math.min(total, Math.max(shown, reveal));
+}
+
+/**
+ * An open group's members, drawn a batch at a time: the first
+ * `GROUP_MEMBER_BATCH`, then the next as the sentinel below them comes within
+ * 600px of the viewport, or on its button. A prefix of the list, so each
+ * member keeps its number and its place, and keyboard and reading order stay
+ * the document's. The page's row window works the same way
+ * (`chain-truth-timeline.tsx`, WINDOWING). Closing the group unmounts this, so
+ * a reopen starts at one batch.
+ */
+function WindowedMembers({ id, members, lead }: { id?: string; members: ReactNode; lead?: ReactNode }) {
+  const list = flatMembers(members);
+  const [shown, setShown] = useState(GROUP_MEMBER_BATCH);
+  const revealId = useContext(MemberRevealContext);
+  const revealAt = revealId == null ? -1 : list.findIndex((m) => isValidElement(m) && m.key === revealId);
+  const drawn = membersDrawn(list.length, shown, revealAt);
+  // A landing's reveal stays drawn once the landing is done.
+  useEffect(() => {
+    if (drawn > shown) setShown(drawn);
+  }, [drawn, shown]);
+  const hasMore = drawn < list.length;
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!hasMore || !el || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setShown((s) => s + GROUP_MEMBER_BATCH);
+      },
+      { rootMargin: "600px 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasMore, drawn]);
+  const next = Math.min(GROUP_MEMBER_BATCH, list.length - drawn);
+  return (
+    <div id={id} className="flex flex-col gap-2" data-group-members={list.length} data-group-members-drawn={drawn}>
+      {lead}
+      {hasMore ? list.slice(0, drawn) : list}
+      {hasMore && (
+        <div ref={sentinelRef} data-group-more="" className="flex justify-center pl-5">
+          <button
+            type="button"
+            onClick={() => setShown(drawn + GROUP_MEMBER_BATCH)}
+            className="rounded-md border border-teal-600/40 px-3 py-1.5 text-xs font-medium text-teal-600 hover:bg-teal-600/10 dark:border-teal-400/40 dark:text-teal-400 dark:hover:bg-teal-400/10"
+          >
+            {`Show the next ${next.toLocaleString("en-US")} grouped ${next === 1 ? "event" : "events"}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** The event numbers a client-grouped folder holds, lowest and highest, for
  *  its node (`renderRunFolders` provides it). */
@@ -54,6 +144,7 @@ export function GroupFrame({
   hide,
   closed,
   members,
+  membersLead,
   membersId,
   range,
 }: {
@@ -65,6 +156,9 @@ export function GroupFrame({
   hide: { title: string; subtitle: string; hide: () => void };
   closed: ReactNode;
   members: ReactNode;
+  /** A line above the members that is not one of them (a served folder's
+   *  stale line): drawn whatever the window holds. */
+  membersLead?: ReactNode;
   membersId?: string;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -103,9 +197,7 @@ export function GroupFrame({
       )}
       {open ? (
         <GroupHideContext.Provider value={hide}>
-          <div id={membersId} className="flex flex-col gap-2">
-            {members}
-          </div>
+          <WindowedMembers id={membersId} members={members} lead={membersLead} />
         </GroupHideContext.Provider>
       ) : (
         // The dotted stretch below the group's node runs on through the

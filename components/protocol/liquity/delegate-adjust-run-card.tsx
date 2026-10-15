@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useId, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { EventCard } from "@/components/shared/event-card";
@@ -17,6 +17,7 @@ import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 import { CountChip } from "@/components/shared/count-chip";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
+import { RunLandingContext } from "@/components/shared/timeline-run-card";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
 import { troveWords } from "@/lib/liquity/event-templates";
@@ -201,6 +202,11 @@ export function DelegateAdjustRunCard({
   children,
 }: DelegateAdjustRunCardProps) {
   const [open, setOpen] = useState(false);
+  // A `?at=` landing on a member opens the run, as `TimelineRunCard` does.
+  const landing = useContext(RunLandingContext);
+  useEffect(() => {
+    if (landing) setOpen(true);
+  }, [landing]);
   // The summary card's balance sheet, read from the members' own once it
   // opens (`delegate-run-sheet.tsx`); the skeleton stands until they are read.
   const [merged, setMerged] = useState<{ sheet: EventSheet; price?: EventCardPrice } | null | undefined>(undefined);

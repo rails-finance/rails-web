@@ -35,10 +35,34 @@ export function groupNoun(label) {
   return /^[\d,]+ ([^,]+),/.exec(label ?? "")?.[1] ?? null;
 }
 
+/** An open group draws its members a batch at a time (decision 0039, rule 5;
+ *  `GROUP_MEMBER_BATCH` in group-frame.tsx): the next batch's button, under
+ *  the drawn members, while more remain. */
+export const GROUP_MORE = "[data-group-more] button";
+
+/** Press an open group's next-batch button from inside the page until every
+ *  member is drawn (`data-group-members-drawn` reaches `data-group-members`).
+ *  A Playwright click would scroll the button into view and trip the
+ *  window's sentinel under it. */
+export async function drawAllMembers(page, frameHandle, { max = 200 } = {}) {
+  for (let i = 0; i < max; i++) {
+    const pressed = await frameHandle.evaluate((el) => {
+      const b = el.querySelector(":scope > [data-group-members] > [data-group-more] button");
+      if (!b) return false;
+      b.click();
+      return true;
+    });
+    if (!pressed) return true;
+    await page.waitForTimeout(50);
+  }
+  return false;
+}
+
 /** Open a closed group from its ⋮: `frame` is a Locator on a closed
  *  `[data-group-frame]`. Retries the trigger, since a press before hydration is
- *  lost. Resolves true once the frame reads "open". */
-export async function openGroup(page, frame, { tries = 6 } = {}) {
+ *  lost. Resolves true once the frame reads "open", with every member drawn
+ *  unless `allMembers` is false. */
+export async function openGroup(page, frame, { tries = 6, allMembers = true } = {}) {
   const handle = await frame.elementHandle();
   if (!handle) return false;
   for (let attempt = 0; attempt < tries; attempt++) {
@@ -58,7 +82,10 @@ export async function openGroup(page, frame, { tries = 6 } = {}) {
         .waitForFunction((el) => el.getAttribute("data-group-frame") === "open", handle, { timeout: 5000 })
         .then(() => true)
         .catch(() => false);
-      if (open) return true;
+      if (open) {
+        if (allMembers) await drawAllMembers(page, handle);
+        return true;
+      }
     }
     await page.waitForTimeout(700);
   }

@@ -26,6 +26,25 @@ function numberRange(ns: (number | null | undefined)[]): [number, number] | null
   return [lo, hi];
 }
 
+const runMemos = new WeakMap<readonly object[], Map<(events: never) => unknown, unknown>>();
+
+/**
+ * A run's header sums, computed once per member list (rails-ops decision 0039,
+ * rule 5). `settleRunRows` interns a run's members, so a re-render, or a
+ * resettle that leaves the run whole, hands back the same array and the sums
+ * are read from here. `summarise` is the key: a module-level function (or one
+ * made once per spec factory call), never a closure made during render.
+ */
+export function runMemo<E, R>(events: readonly E[], summarise: (events: readonly E[]) => R): R {
+  const key = events as unknown as readonly object[];
+  let byFn = runMemos.get(key);
+  if (!byFn) runMemos.set(key, (byFn = new Map()));
+  if (byFn.has(summarise)) return byFn.get(summarise) as R;
+  const sums = summarise(events);
+  byFn.set(summarise, sums);
+  return sums;
+}
+
 /** What the folder knows about its place on the timeline: a stable key, the
  *  run's spine-terminus flag, and the members' already-rendered cards for the
  *  in-place expand. */

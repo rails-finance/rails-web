@@ -12,7 +12,7 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { RedemptionRunCard } from "@/components/shared/redemption-run-card";
-import { renderRunFolders } from "@/lib/shared/run-folders";
+import { renderRunFolders, runMemo } from "@/lib/shared/run-folders";
 import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
@@ -40,24 +40,29 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
   debtSymbol: string;
 }): TimelineRunSpec[] {
   const { is, debtSymbol } = opts;
+  // Collateral is after − before over the emitted absolutes; debt is what
+  // each redemption cancelled (TroveOperation), which leaves out the interest
+  // accrued between touches. The folder sums magnitudes. A trove page is one
+  // branch, so the collateral symbol is constant across the run. Made once per
+  // call, so `runMemo` adds a run's members once.
+  const redemptionSums = (events: readonly BaseActivityEvent[]) => {
+    let totalColl = 0;
+    let totalDebt = 0;
+    let collSym = "";
+    for (const e of events) {
+      if (!is(e)) continue;
+      totalColl += Math.abs(Number(e.context.data.collDelta) || 0);
+      totalDebt += Math.abs(forkDebtMove(e.context.data).value);
+      collSym = e.context.data.collateralSymbol;
+    }
+    return { totalColl, totalDebt, collSym };
+  };
   return [
     {
       match: (e) => is(e) && e.context.data.eventType === "redeemCollateral",
       render: (run, meta) =>
         renderRunFolders(run, meta, (events, folder) => {
-          // Collateral is after − before over the emitted absolutes; debt is
-          // what each redemption cancelled (TroveOperation), which leaves out
-          // the interest accrued between touches. The folder sums magnitudes. A trove page is one
-          // branch, so the collateral symbol is constant across the run.
-          let totalColl = 0;
-          let totalDebt = 0;
-          let collSym = "";
-          for (const e of events) {
-            if (!is(e)) continue;
-            totalColl += Math.abs(Number(e.context.data.collDelta) || 0);
-            totalDebt += Math.abs(forkDebtMove(e.context.data).value);
-            collSym = e.context.data.collateralSymbol;
-          }
+          const { totalColl, totalDebt, collSym } = runMemo(events, redemptionSums);
           return (
             <RedemptionRunCard
               key={folder.key}

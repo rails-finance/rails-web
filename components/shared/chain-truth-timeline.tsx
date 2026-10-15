@@ -110,6 +110,7 @@ import { anchorMarketNotes, liveNoteGroup, type MarketNote } from "@/lib/shared/
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { folderTerminus } from "@/lib/shared/run-folders";
 import { settleRunRows } from "@/lib/shared/timeline-chunks";
+import { MemberRevealContext } from "@/components/shared/group-frame";
 import type { DisplayedTimelineRow, TimelineEventsState } from "@/hooks/useTimelineEvents";
 import { FolderMembersProvider, useFolderMembers, type FolderMembersReader } from "@/lib/shared/folder-members";
 import { filteredEventCount } from "@/lib/shared/timeline-folder-filter";
@@ -1123,10 +1124,12 @@ function ChainTruthTimelineBody({
     const el = document.getElementById(`event-${pendingLandingId}`);
     if (!el) {
       // Inside a collapsed run the member mounts once its folder opens: name
-      // it to the run, then look again (bounded, ~5 s).
+      // it to the run, then look again (bounded, ~5 s). A group's member
+      // window draws down to the event on the next commit, so a served
+      // folder's member is looked for again the same way.
       const row = rows[idx];
-      if (row.kind !== "run" || landingTries > 50) return;
-      setLandingRunMember(pendingLandingId);
+      if (row.kind === "event" || landingTries > 50) return;
+      if (row.kind === "run") setLandingRunMember(pendingLandingId);
       const t = setTimeout(() => setLandingTries((n) => n + 1), 100);
       return () => clearTimeout(t);
     }
@@ -2074,132 +2077,136 @@ function ChainTruthTimelineBody({
                   flash={flashId === MOMENT_FLASH}
                 />
               )}
-              {windowed.map((row, rowIdx) => {
-                const marked = opensDay(rowIdx);
-                const rowNode =
-                  row.kind === "event" ? (
-                    renderEventRow(row.event, row.flatIdx, {
-                      mark: marked,
-                      // Measured against the row drawn above. A folder or a
-                      // run above spans a range of days, so the row under
-                      // it carries the date.
-                      datePrefix: dateOnce(
-                        row.event.timestamp,
-                        rowIdx > 0 && windowed[rowIdx - 1].kind === "event"
-                          ? rowSpan(windowed[rowIdx - 1]).bottom
-                          : null,
-                      ),
-                    })
-                  ) : row.kind === "folder" ? (
-                    <SpineTipContext.Provider
-                      key={`folder_${row.folder.responseId}`}
-                      // The folder's own node is the tip when the folder IS the
-                      // newest row; its members re-provide null, so one dot.
-                      value={!liveHoldsTip && rowIdx === tipRowIdx ? tipSide : null}
-                    >
-                      {/* The folder's newest moment (see `data-row-at`). */}
-                      <div
-                        data-row-at={row.folder.lastAt}
-                        data-flow-folder={dayMarks ? row.folder.responseId : undefined}
+              {/* A landing inside a group draws the group's members down to
+                its event (`GroupFrame`'s member window). */}
+              <MemberRevealContext.Provider value={pendingLandingId}>
+                {windowed.map((row, rowIdx) => {
+                  const marked = opensDay(rowIdx);
+                  const rowNode =
+                    row.kind === "event" ? (
+                      renderEventRow(row.event, row.flatIdx, {
+                        mark: marked,
+                        // Measured against the row drawn above. A folder or a
+                        // run above spans a range of days, so the row under
+                        // it carries the date.
+                        datePrefix: dateOnce(
+                          row.event.timestamp,
+                          rowIdx > 0 && windowed[rowIdx - 1].kind === "event"
+                            ? rowSpan(windowed[rowIdx - 1]).bottom
+                            : null,
+                        ),
+                      })
+                    ) : row.kind === "folder" ? (
+                      <SpineTipContext.Provider
+                        key={`folder_${row.folder.responseId}`}
+                        // The folder's own node is the tip when the folder IS the
+                        // newest row; its members re-provide null, so one dot.
+                        value={!liveHoldsTip && rowIdx === tipRowIdx ? tipSide : null}
                       >
-                        <ServedFolderRow
-                          folder={row.folder}
-                          register={folderRegister as ServedFolderRegister}
-                          forceOpen={
-                            splitByFilter(row) ||
-                            row.folder.responseId === landedFolderId ||
-                            row.folder.responseId === revealFolderId ||
-                            (cut != null && row.folder.lastAt > cut)
-                          }
-                          memberPasses={
-                            cut != null
-                              ? (e) => e.timestamp <= cut && (!tl.isFiltered || tl.memberPasses(e))
-                              : tl.isFiltered
-                                ? tl.memberPasses
-                                : null
-                          }
-                          onlyDates={
-                            tl.dateRange !== null &&
-                            tl.visibleActionKeys.size === tl.eventOptions.length &&
-                            tl.visibleAssetKeys.size === tl.assetOptions.length &&
-                            tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length &&
-                            tl.visibleVersionKeys.size === tl.versionOptions.length
-                          }
-                          // A served folder has no run around it to scope its
-                          // spine terminus to, so its place in the displayed list
-                          // is the whole answer — suppressed where the boundary
-                          // now sits below it.
-                          isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
-                          renderMember={(event, eventNumber, isLastMember, isNewest, above) =>
-                            renderEventRow(event, row.flatIdx, {
-                              inRun: true,
-                              eventNumber,
-                              // Against the member above: `datePrefixAt` indexes
-                              // the flat displayed list, and a folder's members
-                              // are not in it. The first member carries the date.
-                              datePrefix: dateOnce(event.timestamp, above ? above.timestamp : null),
-                              mark: marked && isNewest && utcDay(event.timestamp) === utcDay(rowSpan(row).top),
-                              isLastMember:
-                                isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
-                            })
-                          }
-                        />
-                      </div>
-                    </SpineTipContext.Provider>
-                  ) : (
-                    <SpineTipContext.Provider
-                      key={`run_${row.events[0].id}`}
-                      // The run's own folder node is the tip when the newest
-                      // event is among its members; the members re-provide null.
-                      value={!liveHoldsTip && row.events.some((e) => e.id === tipEventId) ? tipSide : null}
-                    >
-                      <UnreadTokensProvider tokens={unreadTokensIn(row.events)}>
-                        {wrapRunRow(
-                          row,
-                          row.spec.render(row.events, {
-                            isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
-                            children: row.events.map((e, k) =>
-                              renderEventRow(e, row.flatIdx + k, {
+                        {/* The folder's newest moment (see `data-row-at`). */}
+                        <div
+                          data-row-at={row.folder.lastAt}
+                          data-flow-folder={dayMarks ? row.folder.responseId : undefined}
+                        >
+                          <ServedFolderRow
+                            folder={row.folder}
+                            register={folderRegister as ServedFolderRegister}
+                            forceOpen={
+                              splitByFilter(row) ||
+                              row.folder.responseId === landedFolderId ||
+                              row.folder.responseId === revealFolderId ||
+                              (cut != null && row.folder.lastAt > cut)
+                            }
+                            memberPasses={
+                              cut != null
+                                ? (e) => e.timestamp <= cut && (!tl.isFiltered || tl.memberPasses(e))
+                                : tl.isFiltered
+                                  ? tl.memberPasses
+                                  : null
+                            }
+                            onlyDates={
+                              tl.dateRange !== null &&
+                              tl.visibleActionKeys.size === tl.eventOptions.length &&
+                              tl.visibleAssetKeys.size === tl.assetOptions.length &&
+                              tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length &&
+                              tl.visibleVersionKeys.size === tl.versionOptions.length
+                            }
+                            // A served folder has no run around it to scope its
+                            // spine terminus to, so its place in the displayed list
+                            // is the whole answer — suppressed where the boundary
+                            // now sits below it.
+                            isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
+                            renderMember={(event, eventNumber, isLastMember, isNewest, above) =>
+                              renderEventRow(event, row.flatIdx, {
                                 inRun: true,
-                                mark: marked && !row.spec.asOneEvent && k === newestOf(row.events),
-                              }),
-                            ),
-                            eventNumbers: row.events.map((e) => tl.eventNumberOf(e)),
-                            landingId: landingRunMember ?? undefined,
-                          }),
-                          marked,
-                        )}
-                      </UnreadTokensProvider>
-                    </SpineTipContext.Provider>
+                                eventNumber,
+                                // Against the member above: `datePrefixAt` indexes
+                                // the flat displayed list, and a folder's members
+                                // are not in it. The first member carries the date.
+                                datePrefix: dateOnce(event.timestamp, above ? above.timestamp : null),
+                                mark: marked && isNewest && utcDay(event.timestamp) === utcDay(rowSpan(row).top),
+                                isLastMember:
+                                  isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
+                              })
+                            }
+                          />
+                        </div>
+                      </SpineTipContext.Provider>
+                    ) : (
+                      <SpineTipContext.Provider
+                        key={`run_${row.events[0].id}`}
+                        // The run's own folder node is the tip when the newest
+                        // event is among its members; the members re-provide null.
+                        value={!liveHoldsTip && row.events.some((e) => e.id === tipEventId) ? tipSide : null}
+                      >
+                        <UnreadTokensProvider tokens={unreadTokensIn(row.events)}>
+                          {wrapRunRow(
+                            row,
+                            row.spec.render(row.events, {
+                              isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
+                              children: row.events.map((e, k) =>
+                                renderEventRow(e, row.flatIdx + k, {
+                                  inRun: true,
+                                  mark: marked && !row.spec.asOneEvent && k === newestOf(row.events),
+                                }),
+                              ),
+                              eventNumbers: row.events.map((e) => tl.eventNumberOf(e)),
+                              landingId: landingRunMember ?? undefined,
+                            }),
+                            marked,
+                          )}
+                        </UnreadTokensProvider>
+                      </SpineTipContext.Provider>
+                    );
+                  const rowNotes = notesFor(row);
+                  const rowKey =
+                    row.kind === "event"
+                      ? `evt_${row.event.id}`
+                      : row.kind === "folder"
+                        ? `folderrow_${row.folder.responseId}`
+                        : `runrow_${row.events[0].id}`;
+                  if (rowNotes.length === 0) return rowNode;
+                  // Below is older, so a note FOLLOWS the event it is known to
+                  // have happened before. The row itself is untouched — this only
+                  // wraps it.
+                  // Markers in the gap below, at both widths.
+                  const noteRows = (
+                    <NoteGap
+                      notes={rowNotes}
+                      datePrefixFor={(note) => noteDatePrefixAfter(note)}
+                      openIds={openNoteIds}
+                      openAll={openAll}
+                      onToggle={toggleNote}
+                    />
                   );
-                const rowNotes = notesFor(row);
-                const rowKey =
-                  row.kind === "event"
-                    ? `evt_${row.event.id}`
-                    : row.kind === "folder"
-                      ? `folderrow_${row.folder.responseId}`
-                      : `runrow_${row.events[0].id}`;
-                if (rowNotes.length === 0) return rowNode;
-                // Below is older, so a note FOLLOWS the event it is known to
-                // have happened before. The row itself is untouched — this only
-                // wraps it.
-                // Markers in the gap below, at both widths.
-                const noteRows = (
-                  <NoteGap
-                    notes={rowNotes}
-                    datePrefixFor={(note) => noteDatePrefixAfter(note)}
-                    openIds={openNoteIds}
-                    openAll={openAll}
-                    onToggle={toggleNote}
-                  />
-                );
-                return (
-                  <Fragment key={rowKey}>
-                    {rowNode}
-                    {noteRows}
-                  </Fragment>
-                );
-              })}
+                  return (
+                    <Fragment key={rowKey}>
+                      {rowNode}
+                      {noteRows}
+                    </Fragment>
+                  );
+                })}
+              </MemberRevealContext.Provider>
               {/* The bottom is the OLDER end, so the omission here is the
                 CUT's or — where there is no cut — the VIEW's. The two are
                 exclusive by the guard, not by convention: where a cut and a

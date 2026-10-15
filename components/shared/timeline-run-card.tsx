@@ -507,12 +507,7 @@ export function TimelineRunCard({
         </p>
       );
     } else if (members) {
-      body = (
-        <>
-          {staleLine}
-          {members}
-        </>
-      );
+      body = members;
     } else {
       // Undefined members and no error means the read is still out. There is
       // no spinner: a spinner implies a fast answer is coming, and a first
@@ -574,6 +569,7 @@ export function TimelineRunCard({
         />
       }
       members={body}
+      membersLead={onOpen && !error && members ? staleLine : undefined}
     />
   );
 }

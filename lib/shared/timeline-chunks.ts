@@ -34,6 +34,33 @@ export interface RunGroupingSpec<E> {
   asOneEvent?: boolean;
 }
 
+/** The member lists settled so far, by their first member: a few per member,
+ *  dropped with the events. */
+const settledLists = new WeakMap<object, unknown[][]>();
+const LISTS_PER_FIRST = 8;
+
+/**
+ * The list settled before with the same members in the same order, or `kept`.
+ * A run's member array keeps its identity across a resettle that leaves it
+ * whole (a filter, a cursor move or a range elsewhere on the list), so its
+ * header sums, memoised on that identity (`runMemo`, lib/shared/run-folders.tsx),
+ * are added once.
+ */
+export function internMembers<E extends object>(kept: E[]): E[] {
+  const first = kept[0];
+  const lists = (settledLists.get(first) ?? []) as E[][];
+  for (const prev of lists) {
+    if (prev.length !== kept.length) continue;
+    let same = true;
+    for (let k = 0; k < kept.length && same; k++) same = prev[k] === kept[k];
+    if (same) return prev;
+  }
+  lists.push(kept);
+  if (lists.length > LISTS_PER_FIRST) lists.shift();
+  settledLists.set(first, lists);
+  return kept;
+}
+
 export type SettledRunRow<E, S> =
   | { kind: "event"; event: E; flatIdx: number }
   | { kind: "run"; spec: S; events: E[]; flatIdx: number };
@@ -45,7 +72,8 @@ export type SettledRunRow<E, S> =
  * what the page shows. A run is found and qualified on `all`, then sliced to
  * `inRange`: a slice of two or more members stays a group whose header sums
  * the slice, and a lone member sits loose. `flatIdx` counts the admitted
- * events only: it indexes the page's shown list.
+ * events only: it indexes the page's shown list. A run's `events` is interned
+ * (`internMembers`): the same members settle to the same array.
  */
 export function settleRunRows<E extends { txHash: string; timestamp: number }, S extends RunGroupingSpec<E>>(
   all: E[],
@@ -64,7 +92,7 @@ export function settleRunRows<E extends { txHash: string; timestamp: number }, S
       for (const e of kept) loose(e);
       return;
     }
-    out.push({ kind: "run", spec, events: kept, flatIdx });
+    out.push({ kind: "run", spec, events: internMembers(kept), flatIdx });
     flatIdx += kept.length;
   };
   let i = 0;
