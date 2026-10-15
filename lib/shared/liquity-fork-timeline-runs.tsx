@@ -60,6 +60,8 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
   return [
     {
       match: (e) => is(e) && e.context.data.eventType === "redeemCollateral",
+      // One act per call, as the index counts it (decision 0039).
+      actKeyOf: (e) => e.id,
       render: (run, meta) =>
         renderRunFolders(run, meta, (events, folder) => {
           const { totalColl, totalDebt, collSym } = runMemo(events, redemptionSums);

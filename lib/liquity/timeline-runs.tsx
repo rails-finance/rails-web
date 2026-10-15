@@ -45,6 +45,9 @@ function redemptionSums(events: readonly BaseActivityEvent[]) {
  *  redemption math). */
 const REDEMPTION_RUN: TimelineRunSpec = {
   match: (e) => isLiquityEvent(e) && e.context.data.operation === "redeemCollateral",
+  // One act per call: a bot that redeems three times in one transaction makes
+  // three (decision 0039, amended 2026-10-15).
+  actKeyOf: (e) => e.id,
   min: MIN_REDEMPTION_RUN,
   render: (run, meta) =>
     renderRunFolders(run, meta, MIN_REDEMPTION_RUN, (events, folder) => {

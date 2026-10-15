@@ -28,7 +28,7 @@
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { Fragment, useContext, type ReactNode } from "react";
+import { createContext, Fragment, useContext, type ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-pill";
@@ -298,8 +298,9 @@ export interface ChainTruthRowSpec {
   zombie?: { word: string; title: string };
   /** "2 of 3": the event's place among the position's events in one block.
    *  `title` replaces the chip's tip; `lead` draws it first, before the label
-   *  (Aave V4's operations in one transaction). */
-  sameBlock?: { index: number; count: number; title?: string; lead?: boolean };
+   *  (Aave V4's operations in one transaction). `sameTransaction`: every one
+   *  of them is in one transaction, and the tip says so. */
+  sameBlock?: { index: number; count: number; title?: string; lead?: boolean; sameTransaction?: boolean };
   /** A token the event names without moving any (a collateral toggle's
    *  reserve): its icon, then `text`, after the amounts. */
   asset?: { symbol: string; address?: string; text: string };
@@ -557,6 +558,36 @@ export function reconstructTransition(args: {
  *  the row drops its verb for per-axis ones (a combined adjust), those verbs
  *  ("Deposit + Borrow"). Undefined where the row states no word (a custody
  *  move), so the card's kind stands. */
+/** The timeline's events by block: how many the position has in each, and
+ *  their one transaction hash, or null where they span several. Provided by
+ *  ChainTruthTimeline over its unfiltered list; absent off a timeline. */
+export type BlockTransactions = ReadonlyMap<number, { count: number; txHash: string | null }>;
+export const BlockTransactionsContext = createContext<BlockTransactions | null>(null);
+
+/** Index `events` by block for `BlockTransactionsContext`. */
+export function blockTransactionsOf(events: readonly { blockNumber: number; txHash: string }[]): BlockTransactions {
+  const out = new Map<number, { count: number; txHash: string | null }>();
+  for (const e of events) {
+    const cur = out.get(e.blockNumber);
+    if (!cur) out.set(e.blockNumber, { count: 1, txHash: e.txHash });
+    else out.set(e.blockNumber, { count: cur.count + 1, txHash: cur.txHash === e.txHash ? cur.txHash : null });
+  }
+  return out;
+}
+
+/** Whether a block's `count` events are all in the transaction `txHash`: true
+ *  only where the timeline holds every one of them and they share it. */
+export function useSameTransaction(
+  blockNumber: number | undefined,
+  txHash: string | undefined,
+  count: number,
+): boolean {
+  const byBlock = useContext(BlockTransactionsContext);
+  if (!byBlock || blockNumber == null || !txHash) return false;
+  const b = byBlock.get(blockNumber);
+  return !!b && b.count === count && b.txHash === txHash;
+}
+
 export function chainTruthCaption(spec: ChainTruthRowSpec): string | undefined {
   if (spec.label) return spec.label;
   const verbs = spec.deltas.flatMap((d) => (d.label ? [d.label] : []));
@@ -629,7 +660,9 @@ export function ChainTruthRow({
       className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-sunken text-rb-500"
       title={
         spec.sameBlock.title ??
-        `This trove had ${spec.sameBlock.count} events in the same block; this is event ${spec.sameBlock.index} of ${spec.sameBlock.count}, in the order the block recorded them`
+        (spec.sameBlock.sameTransaction
+          ? `This trove had ${spec.sameBlock.count} events in the same transaction; this is event ${spec.sameBlock.index} of ${spec.sameBlock.count}, in the order the transaction recorded them`
+          : `This trove had ${spec.sameBlock.count} events in the same block; this is event ${spec.sameBlock.index} of ${spec.sameBlock.count}, in the order the block recorded them`)
       }
     >
       {spec.sameBlock.index} of {spec.sameBlock.count}

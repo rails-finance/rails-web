@@ -142,6 +142,27 @@ test("5 rows in 2 transactions stay rows; 10 rows in 5 transactions group", () =
   assert.deepEqual(settled(inTransactions(5, 2)), [10]);
 });
 
+test("a redemption counts per call: three hits per transaction group at five calls", () => {
+  // The Liquity V2 case: ten redemptions in four transactions, three, three,
+  // three and one (decision 0039, amended 2026-10-15).
+  const redeem = (r: Row) => r.kind === "redeem";
+  const perCall: RunGroupingSpec<Row> = { match: redeem, actKeyOf: (r) => r.id };
+  const rows = [...inTransactions(3, 3, "redeem"), ...inTransactions(1, 1, "redeem")];
+  const settledBy = (spec: RunGroupingSpec<Row>, rs: Row[]) =>
+    settleRunRows(rs, [spec], all).map((r) => (r.kind === "run" ? r.events.length : "·"));
+  assert.deepEqual(settledBy(perCall, rows), [10]);
+  assert.deepEqual(settledBy(perCall, desc(rows)), [10]);
+  assert.deepEqual(settledBy(perCall, inTransactions(4, 1, "redeem")), ["·", "·", "·", "·"], "four calls stay rows");
+  // The route pass takes the same key.
+  const REDEEM: GroupingSpec<Row> = { kind: "redemption", match: redeem, kindOf: (r) => r.kind, actKeyOf: (r) => r.id };
+  assert.deepEqual(shapeOf(rows, [REDEEM]), [10]);
+  // Any other kind counts per transaction: a liquidation whose three legs
+  // share one transaction is one act, so four such transactions stay rows.
+  const legs = inTransactions(4, 3, "liquidate");
+  assert.deepEqual(settledBy({ match: (r) => r.kind === "liquidate" }, legs), Array(12).fill("·"));
+  assert.deepEqual(settledBy({ match: (r) => r.kind === "liquidate" }, inTransactions(5, 3, "liquidate")), [15]);
+});
+
 test("a run across a month edge is one group", () => {
   const rows = acrossMonth(3, 3);
   assert.deepEqual(shapeOf(rows), [6]);

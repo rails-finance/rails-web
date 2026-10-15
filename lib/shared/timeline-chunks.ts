@@ -1,7 +1,9 @@
 // The group rule for a client-grouped timeline.
 // ----------------------------------------------------------------------------
 // Five or more consecutive transactions of the same act, unbroken by any other
-// row, are one group whatever its length (rails-ops decision 0039). The web's
+// row, are one group whatever its length (rails-ops decision 0039). A spec may
+// count acts by its own key (`actKeyOf`): a redemption counts per
+// `redeemCollateral` call, so three in one transaction are three. The web's
 // route pass (lib/shared/timeline-grouping.ts) and the index apply the same
 // rule; the shared cases are in scripts/verify/verify-group-rule.ts.
 //
@@ -13,7 +15,8 @@
 /** The one floor: a run of fewer transactions than this stays as rows. */
 export const GROUP_MIN_TRANSACTIONS = 5;
 
-/** How many distinct transactions `items` span. */
+/** How many distinct transactions `items` span, or distinct acts where
+ *  `txHashOf` is a spec's `actKeyOf`. */
 export function transactionCount<T>(items: readonly T[], txHashOf: (item: T) => string): number {
   const seen = new Set<string>();
   for (const item of items) seen.add(txHashOf(item));
@@ -29,6 +32,9 @@ export interface RunGroupingSpec<E> {
    *  `GROUP_MIN_TRANSACTIONS` whatever this says. */
   min?: number;
   sameRun?: (prev: E, next: E) => boolean;
+  /** What counts as one act toward the floor. Absent counts transactions
+   *  (`txHash`); a redemption run keys on the event id, one per call. */
+  actKeyOf?: (e: E) => string;
   /** One event's row drawn from several logs of one transaction: not a group,
    *  and qualified at its own `min`. */
   asOneEvent?: boolean;
@@ -110,7 +116,7 @@ export function settleRunRows<E extends { txHash: string; timestamp: number }, S
       const min = spec.min ?? 1;
       if (stretch.length < min) for (const e of stretch) loose(e);
       else run(spec, stretch, min);
-    } else if (transactionCount(stretch, (e) => e.txHash) < GROUP_MIN_TRANSACTIONS) {
+    } else if (transactionCount(stretch, spec.actKeyOf ?? ((e) => e.txHash)) < GROUP_MIN_TRANSACTIONS) {
       for (const e of stretch) loose(e);
     } else {
       run(spec, stretch, 2);

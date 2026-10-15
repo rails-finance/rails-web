@@ -133,7 +133,9 @@ function newestRows(newestFirst: BaseActivityEvent[]): BaseActivityEvent[] {
     let j = i + 1;
     if (kind) while (j < newestFirst.length && op(newestFirst[j]) === kind.operation) j++;
     // A streak of fewer transactions than the floor draws one card per event.
-    const run = kind && transactionCount(newestFirst.slice(i, j), (e) => e.txHash) >= GROUP_MIN_TRANSACTIONS;
+    const run =
+      kind &&
+      transactionCount(newestFirst.slice(i, j), (e) => (kind.perCall ? e.id : e.txHash)) >= GROUP_MIN_TRANSACTIONS;
     if (!run) j = i + 1;
     if (run && rows > 0 && j - i > RUN_EVENT_CAP) break;
     out.push(...newestFirst.slice(i, j));

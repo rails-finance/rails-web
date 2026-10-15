@@ -80,6 +80,7 @@ import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { Link2, List, X } from "lucide-react";
+import { BlockTransactionsContext, blockTransactionsOf } from "@/components/shared/chain-truth-event";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -291,6 +292,10 @@ export interface TimelineRunSpec {
    *  the same run when this returns true (e.g. auction slices grouped by
    *  challenge number). Omit for a plain streak of any matching events. */
   sameRun?: (prev: BaseActivityEvent, next: BaseActivityEvent) => boolean;
+  /** What counts as one act toward the floor. Absent counts transactions;
+   *  a redemption run keys on the event id, one per `redeemCollateral` call
+   *  (decision 0039, amended 2026-10-15). */
+  actKeyOf?: (e: BaseActivityEvent) => string;
   /** This spec's row IS one event's row, not a collapse of like rows: several
    *  logs of ONE TRANSACTION drawn as one card (Alchemix's opening: the NFT's
    *  mint, the deposit that funded it and the forwarding hop). Two things
@@ -545,13 +550,19 @@ export function ChainTruthTimeline(props: ChainTruthTimelineProps) {
       : null;
   // The count the toolbar states, for the Lifetime flows panel's loading cue.
   usePublishLifeCount(usePathname(), lifeCountOf(props.tl));
+  // The same-block chip's wording: whether a block's events share one
+  // transaction, read off the unfiltered list.
+  const sorted = props.tl.sortedEvents;
+  const blockTxs = useMemo(() => blockTransactionsOf(sorted), [sorted]);
   return (
     <SingleWalletProvider value={true}>
       <TimelineDisplayProvider>
         <LedgerAssetFilterContext.Provider value={assetFilter}>
-          <FolderMembersProvider readMembers={props.readFolderMembers} tip={tip}>
-            <ChainTruthTimelineBody {...props} />
-          </FolderMembersProvider>
+          <BlockTransactionsContext.Provider value={blockTxs}>
+            <FolderMembersProvider readMembers={props.readFolderMembers} tip={tip}>
+              <ChainTruthTimelineBody {...props} />
+            </FolderMembersProvider>
+          </BlockTransactionsContext.Provider>
         </LedgerAssetFilterContext.Provider>
       </TimelineDisplayProvider>
     </SingleWalletProvider>

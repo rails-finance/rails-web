@@ -49,6 +49,8 @@ function redemptionSums(events: readonly BaseActivityEvent[]) {
 export const LIQUITY_V1_REDEMPTION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isLiquityV1Event(e) && e.context.data.eventType === "redemption",
+    // One act per redemption call (decision 0039, amended 2026-10-15).
+    actKeyOf: (e) => e.id,
     render: (run, meta) =>
       renderRunFolders(run, meta, (events, folder) => {
         const { totalColl, totalDebt, debtSpan } = runMemo(events, redemptionSums);

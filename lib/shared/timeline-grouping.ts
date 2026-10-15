@@ -82,6 +82,9 @@ export interface GroupingSpec<R> {
   kind: string;
   match: (row: R) => boolean;
   sameRun?: (prev: R, next: R) => boolean;
+  /** What counts as one act toward the floor — the server's `actKeyOf`.
+   *  Absent counts transactions. */
+  actKeyOf?: (row: R) => string;
   kindOf: (row: R) => string;
   countKinds?: readonly string[];
   /** Per-member leg entries, summed per (verb, asset). */
@@ -536,7 +539,7 @@ export function groupIntoRows<R>(
     )
       j++;
     const stretch = rows.slice(i, j);
-    if (transactionCount(stretch, access.txHash) < GROUP_MIN_TRANSACTIONS) {
+    if (transactionCount(stretch, spec.actKeyOf ?? access.txHash) < GROUP_MIN_TRANSACTIONS) {
       for (const row of stretch) loose(row);
     } else {
       emitRun(stretch, i, spec);

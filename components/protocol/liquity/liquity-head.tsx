@@ -21,7 +21,12 @@ import {
   type EventCoords,
 } from "@/lib/liquity/event-provenance";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
-import { ChainTruthRow, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthRow,
+  useSameTransaction,
+  type ChainTruthDelta,
+  type ChainTruthRowSpec,
+} from "@/components/shared/chain-truth-event";
 
 /** The operations whose head states its amounts in its branch, or none. */
 const OWN_AMOUNTS = new Set([
@@ -199,7 +204,13 @@ export function liquityHeadSpec(
 /** The spec, with the surplus claim the page has read. */
 export function useLiquityHeadSpec(ctx: LiquityContext, coords: EventCoords): ChainTruthRowSpec {
   const claim = useSurplusClaimFor(ctx.operation === "liquidate" ? coords.txHash : undefined);
-  return liquityHeadSpec(ctx, coords, claim);
+  const sameTransaction = useSameTransaction(
+    coords.blockNumber,
+    coords.txHash,
+    ctx.blockGrouping?.isGrouped ? ctx.blockGrouping.sameBlockCount : 0,
+  );
+  const spec = liquityHeadSpec(ctx, coords, claim);
+  return sameTransaction && spec.sameBlock ? { ...spec, sameBlock: { ...spec.sameBlock, sameTransaction } } : spec;
 }
 
 /** The event page's title (ui-jobs 286): the head's words and amounts, large,

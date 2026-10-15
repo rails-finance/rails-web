@@ -10,8 +10,10 @@ import { GROUP_MIN_TRANSACTIONS } from "@/lib/shared/timeline-chunks";
 export const MIN_REDEMPTION_RUN = GROUP_MIN_TRANSACTIONS;
 export const MIN_DELEGATE_ADJUST_RUN = GROUP_MIN_TRANSACTIONS;
 
-/** The run kinds, in match order. */
-export const LIQUITY_RUN_KINDS: readonly { operation: string }[] = [
-  { operation: "redeemCollateral" },
+/** The run kinds, in match order. `perCall` counts each event as one act
+ *  toward the floor (a redemption, decision 0039 amended 2026-10-15); the
+ *  others count transactions. */
+export const LIQUITY_RUN_KINDS: readonly { operation: string; perCall?: boolean }[] = [
+  { operation: "redeemCollateral", perCall: true },
   { operation: "setBatchManagerAnnualInterestRate" },
 ];
