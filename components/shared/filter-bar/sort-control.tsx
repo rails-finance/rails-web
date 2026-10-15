@@ -66,7 +66,10 @@ export function SortControl({ options, sortBy, sortOrder, onChange }: SortContro
           />
         </button>
         {open && (
-          <div className="absolute top-full right-0 mt-2 z-50 min-w-[200px] overflow-hidden overlay-panel" role="menu">
+          <div
+            className="absolute top-full right-0 mt-2 z-[var(--z-dropdown)] min-w-[200px] overflow-hidden overlay-panel"
+            role="menu"
+          >
             <div className="flex items-center px-4 py-3">
               <span className={OVERLAY_HEADING}>Sort</span>
             </div>

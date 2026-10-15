@@ -139,7 +139,7 @@ export function CoveredStatsNote() {
         id={noteId}
         role="tooltip"
         style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
-        className={`absolute left-1/2 top-full z-50 mt-2 w-max max-w-[min(56ch,calc(100vw-2rem))] rounded-md bg-foreground px-3 py-2 text-left text-xs leading-relaxed text-background shadow-lg ${
+        className={`absolute left-1/2 top-full z-[var(--z-dropdown)] mt-2 w-max max-w-[min(56ch,calc(100vw-2rem))] rounded-md bg-foreground px-3 py-2 text-left text-xs leading-relaxed text-background shadow-lg ${
           popoverOpen ? "" : "hidden"
         }`}
       >

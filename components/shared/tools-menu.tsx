@@ -302,7 +302,7 @@ export function ToolsMenu({
           ) : (
             <div
               ref={menuRef}
-              className="overlay-panel absolute right-0 top-full z-50 mt-2 min-w-[260px] overflow-hidden py-1"
+              className="overlay-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-2 min-w-[260px] overflow-hidden py-1"
               role="menu"
               aria-label={name}
               onKeyDown={moveFocus}
@@ -352,7 +352,7 @@ export function ToolsMenu({
       {open && (
         <div
           ref={menuRef}
-          className="overlay-panel absolute right-0 top-full z-50 mt-2 min-w-[260px] overflow-hidden py-1"
+          className="overlay-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-2 min-w-[260px] overflow-hidden py-1"
           role="menu"
           onKeyDown={moveFocus}
         >

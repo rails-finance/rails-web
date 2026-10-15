@@ -51,8 +51,11 @@
    them; new ports use rb-* and the semantic tokens below.
 */
 :root {
-  /* Stacking scale for the layers above the page. A modal opened from a popover
-     must sit over it, so each tier is one above what it covers. */
+  /* Stacking scale for the layers above the page. A window may open one more
+     window from inside it, and no further: each tier is one above what it
+     covers. Overlays take their z-index from here. Ordinary in-page stacking
+     (sticky headers, chart layers, the header at 40) stays as plain numbers. */
+  --z-dropdown: 50; /* in-page dropdowns and tooltips, below every window */
   --z-modal: 9999;
   --z-popover: 10000;
   --z-modal-over-popover: 10001;
@@ -931,7 +934,7 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease;
-  z-index: 30;
+  z-index: var(--z-dropdown);
 }
 .header-badge-tip:hover::after,
 .header-badge-tip:focus-visible::after {

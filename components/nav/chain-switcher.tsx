@@ -178,7 +178,7 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
         <div
           role="menu"
           aria-label="Blockchain switcher"
-          className="animate-dropdown-down absolute right-0 top-full z-50 mt-2 flex w-[520px] max-w-[calc(100vw-2rem)] rounded-2xl border border-rb-200 bg-white p-3 shadow-2xl dark:border-rb-800 dark:bg-rb-900"
+          className="animate-dropdown-down absolute right-0 top-full z-[var(--z-dropdown)] mt-2 flex w-[520px] max-w-[calc(100vw-2rem)] rounded-2xl border border-rb-200 bg-white p-3 shadow-2xl dark:border-rb-800 dark:bg-rb-900"
         >
           {/* Triangle pointer */}
           <div className="absolute -top-2 right-4 h-0 w-0 border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-white before:absolute before:-left-[9px] before:-top-[1px] before:h-0 before:w-0 before:border-l-[9px] before:border-r-[9px] before:border-b-[9px] before:border-l-transparent before:border-r-transparent before:border-b-white before:content-[''] dark:border-b-rb-900 dark:before:border-b-rb-900" />
@@ -229,7 +229,7 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
           the glyph, name and count; the same rows underneath. */}
       {isMobile && isOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[var(--z-dropdown)] bg-black/50 backdrop-blur-sm"
           onClick={toggle}
           role="button"
           tabIndex={0}

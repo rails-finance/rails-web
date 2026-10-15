@@ -414,7 +414,7 @@ export function FilterDropdown({
   function renderPanel() {
     return (
       <div
-        className={`absolute top-full ${align === "right" ? "right-0" : "left-0"} mt-1 z-50 min-w-[220px] max-h-[320px] overflow-y-auto overlay-panel`}
+        className={`absolute top-full ${align === "right" ? "right-0" : "left-0"} mt-1 z-[var(--z-dropdown)] min-w-[220px] max-h-[320px] overflow-y-auto overlay-panel`}
       >
         {renderHeading()}
         {renderList()}

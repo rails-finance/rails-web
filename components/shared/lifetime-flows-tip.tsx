@@ -292,7 +292,7 @@ export function FlowPanelShell({
       aria-label={label}
       tabIndex={-1}
       data-flow-panel="popover"
-      className="fixed z-50 max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl border p-3 text-xs text-foreground shadow-lg outline-none"
+      className="fixed z-[var(--z-popover)] max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl border p-3 text-xs text-foreground shadow-lg outline-none"
       style={{
         top: pos?.top ?? 0,
         left: pos?.left ?? 0,

@@ -216,7 +216,7 @@ export function LatestPrices({
         <div
           ref={panelRef}
           style={shift > 0 ? { transform: `translateX(-${shift}px)` } : undefined}
-          className={`overlay-panel absolute left-0 top-full z-50 mt-2 max-h-[min(70vh,26rem)] max-w-[calc(100vw-2rem)] overflow-y-auto py-1 ${
+          className={`overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-2 max-h-[min(70vh,26rem)] max-w-[calc(100vw-2rem)] overflow-y-auto py-1 ${
             showReason ? "w-[20rem]" : "min-w-[200px]"
           }`}
           role="menu"

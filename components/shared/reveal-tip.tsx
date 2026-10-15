@@ -160,7 +160,7 @@ export function RevealTip({
           ref={bubbleRef}
           role="tooltip"
           data-prov-hidden=""
-          className={`pointer-events-none absolute bottom-full ${align === "end" ? "right-0" : "left-0"} z-50 mb-2.5 ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
+          className={`pointer-events-none absolute bottom-full ${align === "end" ? "right-0" : "left-0"} z-[var(--z-dropdown)] mb-2.5 ${wrap ? "w-max max-w-[min(20rem,calc(100vw-1.5rem))] whitespace-normal break-words" : "whitespace-nowrap"} rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
           style={{
             background: "var(--rb-tooltip-bg)",
             borderColor: "var(--rb-tooltip-border)",
