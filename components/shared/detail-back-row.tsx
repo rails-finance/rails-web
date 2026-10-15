@@ -217,7 +217,7 @@ export function DetailTopRow({
               strip={
                 <>
                   {prices(true)}
-                  {showStamp && !closed && <RecencyStamp bare />}
+                  {showStamp && !closed && <RecencyStamp />}
                 </>
               }
             />
