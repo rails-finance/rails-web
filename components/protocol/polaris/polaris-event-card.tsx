@@ -63,9 +63,8 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
       // A deposit moves pETH into the protocol; a withdrawal out to the wallet.
       direction: dColl > 0 ? "right" : "left",
       value: Math.abs(dColl),
-      // The header's rule: in full, three decimals, the token named.
+      // The header's rule: in full, three decimals; the icon names the token.
       display: formatNumber(Math.abs(dColl)),
-      unit: PETH.symbol,
     });
   if (isTouch && dDebt !== 0)
     tokens.push({
@@ -75,7 +74,6 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
       direction: dDebt > 0 ? "left" : "right",
       value: Math.abs(dDebt),
       display: formatNumber(Math.abs(dDebt)),
-      unit: stable,
     });
 
   const spine: SpineColumnProps =
