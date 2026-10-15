@@ -26,7 +26,7 @@
 // close ÷ the index at that event, the chain's balance that day. Without them
 // it stays as the event recorded it.
 
-import type { DayObs, PriceMarks } from "@/lib/shared/price-series";
+import type { DayObs, PriceMarks, PriceSeries } from "@/lib/shared/price-series";
 
 export type FlowSide = "collateral" | "debt";
 
@@ -333,6 +333,9 @@ export interface FlowTimeline {
   /** Per asset, what the price view draws beside `dailyPrices`: the rows'
    *  prices as marks and the liquidation level (Liquity V2). */
   priceMarks?: Record<string, PriceMarks>;
+  /** The position's health factor per day against its line at 1, the price
+   *  view's default where the family has it (ruling 7; Aave V3 Ethereum). */
+  health?: PriceSeries;
   /** Today's UTC day number. With it the slider runs to today while anything
    *  is still held after the last event; without it, one stop past that event. */
   today?: number;

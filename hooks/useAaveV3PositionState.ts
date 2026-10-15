@@ -58,18 +58,57 @@ const READ_TIMEOUT_MS = 25_000;
 const RETRY_AFTER_MS = 2_000;
 const MAX_IN_FLIGHT = 3;
 
-let running = 0;
-const waiting: (() => void)[] = [];
+/** The price chart's background reads take at most this many slots, so a
+ *  card opened while they run is read next. */
+const BACKGROUND_IN_FLIGHT = 2;
 
-/** Run `job` when fewer than MAX_IN_FLIGHT reads are out. */
-async function limited<T>(job: () => Promise<T>): Promise<T> {
-  if (running >= MAX_IN_FLIGHT) await new Promise<void>((go) => waiting.push(go));
+let running = 0;
+let runningBackground = 0;
+const waiting: (() => void)[] = [];
+type Waiter = { key: string; go: () => void; promoted?: boolean };
+const waitingBackground: Waiter[] = [];
+
+/** Start the next waiting read: a card's first, then a background one. */
+function next(): void {
+  if (running >= MAX_IN_FLIGHT) return;
+  if (waiting.length > 0) waiting.shift()!();
+  else if (runningBackground < BACKGROUND_IN_FLIGHT) waitingBackground.shift()?.go();
+}
+
+/** A card asks for a read still queued behind the chart's: it moves to the
+ *  cards' queue. */
+function promote(key: string): void {
+  const i = waitingBackground.findIndex((w) => w.key === key);
+  if (i < 0) return;
+  const [w] = waitingBackground.splice(i, 1);
+  w.promoted = true;
+  waiting.push(w.go);
+  next();
+}
+
+/** Run `job` when fewer than MAX_IN_FLIGHT reads are out; a background
+ *  job also waits for every card's read and for a free background slot. */
+async function limited<T>(job: () => Promise<T>, key: string, background = false): Promise<T> {
+  let bg = background;
+  const free = () =>
+    running < MAX_IN_FLIGHT && (!bg || (waiting.length === 0 && runningBackground < BACKGROUND_IN_FLIGHT));
+  if (!free()) {
+    const w: Waiter = { key, go: () => {} };
+    await new Promise<void>((go) => {
+      w.go = go;
+      if (bg) waitingBackground.push(w);
+      else waiting.push(go);
+    });
+    if (w.promoted) bg = false;
+  }
   running++;
+  if (bg) runningBackground++;
   try {
     return await job();
   } finally {
     running--;
-    waiting.shift()?.();
+    if (bg) runningBackground--;
+    next();
   }
 }
 
@@ -92,12 +131,12 @@ async function attempt(qs: string, market: string): Promise<Settled> {
   }
 }
 
-async function read(key: string, qs: string, market: string): Promise<Settled> {
+async function read(key: string, qs: string, market: string, background = false): Promise<Settled> {
   try {
-    let r = await limited(() => attempt(qs, market));
+    let r = await limited(() => attempt(qs, market), key, background);
     if (r.status === "unavailable" && !r.lasting) {
       await new Promise((go) => setTimeout(go, RETRY_AFTER_MS));
-      r = await limited(() => attempt(qs, market));
+      r = await limited(() => attempt(qs, market), key, background);
     }
     if (r.status === "ready" || r.lasting) settled.set(key, r);
     return r;
@@ -118,6 +157,7 @@ export function prefetchAaveV3PositionState(args: {
   const { wallet, market, block, txHash } = args;
   if (!wallet || !market || block == null || !txHash) return;
   const key = `${wallet.toLowerCase()}:${market}:${block}:${txHash.toLowerCase()}`;
+  if (inFlight.has(key)) promote(key);
   if (settled.has(key) || inFlight.has(key)) return;
   const qs = new URLSearchParams({ wallet, market, block: String(block), tx: txHash }).toString();
   inFlight.set(key, read(key, qs, market));
@@ -147,6 +187,7 @@ export function useAaveV3PositionState(args: {
     setResult(LOADING);
     let live = true;
     let pending = inFlight.get(key);
+    if (pending) promote(key);
     if (!pending) {
       const qs = new URLSearchParams({ wallet, market, block: String(block), tx: txHash }).toString();
       pending = read(key, qs, market);
@@ -161,4 +202,44 @@ export function useAaveV3PositionState(args: {
   }, [enabled, key, wallet, market, block, txHash]);
 
   return enabled ? result : null;
+}
+
+/** Several reads at once (the price chart's health view, ui-jobs 328): every
+ *  answer once all have settled, in the order asked; null until then, and
+ *  with no reads. Shares the cache and the queue with the cards. */
+export function useAaveV3PositionStates(args: {
+  wallet?: string;
+  market?: string;
+  reads: readonly { block: number; txHash: string }[];
+}): Settled[] | null {
+  const { wallet, market, reads } = args;
+  const keys =
+    wallet && market ? reads.map((r) => `${wallet.toLowerCase()}:${market}:${r.block}:${r.txHash.toLowerCase()}`) : [];
+  const joined = keys.join("|");
+  const [result, setResult] = useState<{ joined: string; settled: Settled[] } | null>(null);
+  useEffect(() => {
+    if (!wallet || !market || reads.length === 0) return;
+    let live = true;
+    const pending = reads.map((r, i) => {
+      const key = keys[i];
+      const kept = settled.get(key);
+      if (kept) return Promise.resolve(kept);
+      let p = inFlight.get(key);
+      if (!p) {
+        const qs = new URLSearchParams({ wallet, market, block: String(r.block), tx: r.txHash }).toString();
+        p = read(key, qs, market, true);
+        inFlight.set(key, p);
+      }
+      return p;
+    });
+    Promise.all(pending).then((all) => {
+      if (live) setResult({ joined, settled: all });
+    });
+    return () => {
+      live = false;
+    };
+    // `joined` names every read; `reads` and `keys` follow it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet, market, joined]);
+  return result && result.joined === joined && keys.length > 0 ? result.settled : null;
 }

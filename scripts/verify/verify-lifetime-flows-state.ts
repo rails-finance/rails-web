@@ -141,6 +141,7 @@ import {
   stopForDay,
 } from "@/lib/shared/flows-combined";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
+import { aaveV3HealthReadPicks, aaveV3HealthView } from "@/lib/aave-v3/flows-health";
 import {
   assetTokenSum,
   eventAssetSum,
@@ -2322,4 +2323,80 @@ test("a closed position's chart ends at the close: the axis, the live stop and t
   assert.equal(Math.max(...p.observed, ...p.carried), liqDay);
   // An open position's axis runs to today.
   assert.equal(axisEndDay(model, 30_000), closeStop(model) == null ? 30_000 : model.start / DAY_MS + model.lastDay);
+});
+
+test("Aave V3's health view: the day's prices and the last read's thresholds, the card's figure today, each asset's level (ruling 7)", () => {
+  const W = "0xweth";
+  const U = "0xusdc";
+  const row = (day: number, balances: FlowTimeline["days"][number]["balances"]) => ({
+    day,
+    events: 1,
+    tick: "both" as const,
+    cum: {},
+    balances,
+    prices: [],
+  });
+  const t: FlowTimeline = {
+    buckets: [],
+    days: [
+      row(100, [
+        { side: "collateral", asset: W, symbol: "WETH", amount: 10 },
+        { side: "debt", asset: U, symbol: "USDC", amount: 10_000 },
+      ]),
+      row(103, [{ side: "debt", asset: U, symbol: "USDC", amount: 5_000 }]),
+    ],
+    live: { collateralUsd: 0, debtUsd: 0 },
+    dailyPrices: {
+      [W]: [
+        [100, 2000, 1],
+        [101, 1800, 2],
+        [103, 2100, 3],
+      ],
+      [U]: [[100, 1, 1]],
+    },
+    today: 104,
+  };
+  const reads = [{ day: 100, block: 1000, lt: { [W]: 0.8, [U]: 0 }, emode: 0 }];
+  const hv = aaveV3HealthView(t, reads, {})!;
+  assert.deepEqual(
+    hv.health.points.map((p) => [p[0], +p[1].toFixed(4), p[2]]),
+    [
+      [100, 1.6, 1000],
+      [101, 1.44, 1000],
+      [102, 1.44, 1000],
+      [103, 3.36, 1000],
+      [104, 3.36, 1000],
+    ],
+  );
+  assert.ok(hv.health.level!.points.every((p) => p[1] === 1));
+  // WETH holds all the collateral: its price ÷ the health factor, the card's rule.
+  assert.equal(levelAt({ ...hv.health, ...hv.marks[W] }, 100)![1], 1250);
+  // USDC, a debt: the price at which the health factor reaches 1.
+  assert.ok(Math.abs(levelAt({ ...hv.health, ...hv.marks[U] }, 103)![1] - 3.36) < 1e-9);
+  // Today's point is the card's health factor.
+  const live = aaveV3HealthView(t, reads, { liveHf: 3 })!;
+  assert.deepEqual(live.health.points[live.health.points.length - 1], [104, 3, null]);
+  // A day with no debt has no point, and is a gap, not a carry.
+  const repaid: FlowTimeline = {
+    ...t,
+    days: [...t.days, row(104, [{ side: "debt", asset: U, symbol: "USDC", amount: 0 }])],
+    today: 106,
+  };
+  const r = aaveV3HealthView(repaid, reads, {})!;
+  assert.equal(r.health.points[r.health.points.length - 1][0], 103);
+  assert.equal(pricePieces(r.health, 100, 106).carried.length, 0);
+  // The reads: the last event of each of the most recent days.
+  const picks = aaveV3HealthReadPicks(
+    [
+      { blockNumber: 10, timestamp: 100 * D + 5, txHash: "0xa" },
+      { blockNumber: 12, timestamp: 100 * D + 50, txHash: "0xb" },
+      { blockNumber: 20, timestamp: 101 * D, txHash: "0xc" },
+      { blockNumber: 30, timestamp: 102 * D, txHash: "0xd" },
+    ],
+    2,
+  );
+  assert.deepEqual(
+    picks.map((e) => e.txHash),
+    ["0xc", "0xd"],
+  );
 });

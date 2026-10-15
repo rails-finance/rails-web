@@ -33,6 +33,13 @@ export interface PriceSeries {
   events?: PriceEvent[];
   /** The position's liquidation level in `unit`, a second line on the same axis. */
   level?: PriceLevel;
+  /** A day without a point is a gap, never the last point carried (a
+   *  derived series such as the health factor, which has no figure on a day
+   *  with no debt). */
+  noCarry?: true;
+  /** A derived series' receipt in its family's words (the health factor):
+   *  at the live read, and at a point resting on a block ("{block}", "{day}"). */
+  here?: { live: string; read: string };
   /** Days before this one are the rows alone and draw by the sparse rule:
    *  every segment dotted, the observations marked by `events`. */
   sparseBefore?: number;
@@ -55,6 +62,9 @@ export interface PriceLevel {
   /** The level's receipt: what it is and how it moves. */
   summary: string;
   end: "liquidation" | "close" | "today";
+  /** The receipt's second sentence where it is not a Trove's: at the live
+   *  read, and at a point resting on a block ("{block}", "{day}"). */
+  here?: { live: string; read: string };
 }
 /** What a family adds to an asset's series for the price view. */
 export type PriceMarks = Pick<PriceSeries, "events" | "level" | "sparseBefore">;

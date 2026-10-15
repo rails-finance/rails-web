@@ -45,8 +45,10 @@ export function lifetimeFlowsPriceContent(opts: {
   source: string;
   perEvent: boolean;
   level?: string | null;
+  /** The chart marks the position's events at their prices (Liquity V2). */
+  marks?: boolean;
 }): LearnMoreContent {
-  const { symbol, unit, source, perEvent, level } = opts;
+  const { symbol, unit, source, perEvent, level, marks = true } = opts;
   return {
     title: "How to read the price chart",
     intro: `The ${symbol} price in ${unit} over the position's life, on the same days as the line above. The list over the chart picks the asset.`,
@@ -54,7 +56,7 @@ export function lifetimeFlowsPriceContent(opts: {
     details: [
       {
         bold: "The source",
-        text: `${source}. ${perEvent ? "One point per event." : "One point per day."} Each event is marked at its own price, and a redemption also at its redemption price. A dotted stretch carries the last price over days with none recorded.`,
+        text: `${source}. ${perEvent ? "One point per event." : "One point per day."}${marks ? " Each event is marked at its own price, and a redemption also at its redemption price." : ""} A dotted stretch carries the last price over days with none recorded.`,
       },
       ...(level
         ? [
@@ -67,6 +69,33 @@ export function lifetimeFlowsPriceContent(opts: {
       {
         bold: "The figure at the cursor",
         text: "The price on the cursor's day. With the inspector on, it opens its receipt.",
+      },
+    ],
+  };
+}
+
+/** The price chart's how-to-read on its health view (ruling 7). */
+export function lifetimeFlowsHealthContent(opts: { source: string; assets: boolean }): LearnMoreContent {
+  return {
+    title: "How to read the price chart",
+    intro: `The position's health factor over its life, on the same days as the line above.${opts.assets ? " The list over the chart picks it or one asset's price." : ""}`,
+    detailsHeading: "The parts:",
+    details: [
+      {
+        bold: "The source",
+        text: `Σ collateral × price × liquidation threshold ÷ Σ debt × price: ${opts.source}. One point per day. A dotted stretch takes its thresholds from a later event's read.`,
+      },
+      {
+        bold: "Liquidates below",
+        text: "The red line at 1: below it a liquidator can repay part of the debt and take collateral at a bonus.",
+      },
+      {
+        bold: "An asset's price",
+        text: "Picked from the list, the asset's price and, in red, the price at which the health factor would reach 1 if that asset alone moved, every other balance and price held at the day's. A level more than ten times above or below the price is not drawn.",
+      },
+      {
+        bold: "The figure at the cursor",
+        text: "The health factor on the cursor's day; today's is the card's. With the inspector on, it opens its receipt.",
       },
     ],
   };
