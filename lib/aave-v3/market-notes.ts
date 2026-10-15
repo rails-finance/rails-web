@@ -61,7 +61,7 @@ import {
   type ReserveRateLookup,
   type ReserveRatesRequest,
 } from "@/lib/api/fetch-aave-family-reserve-rates";
-import { RATE_STEP_MIN_PP, type MarketNotePoint, type RateStepNote } from "@/lib/shared/market-note";
+import { liveNoteStated, RATE_STEP_MIN_PP, type MarketNotePoint, type RateStepNote } from "@/lib/shared/market-note";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 
 /**
@@ -70,11 +70,9 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
  *
  * A V3-family account holds reserves nobody borrows — wstETH, weETH, WBTC and
  * cbBTC on the fixtures — whose supply rate is 0.0000% at both ends, because
- * the supply rate IS the borrow interest shared out and there is none. A live
- * note has no move threshold by design ("nothing has moved" is itself the
- * fact), so without this those sides would each draw a row reading
- * "0.00% → 0.00%", which is not a fact worth stating: there is no rate to
- * speak of, rather than a rate that held still.
+ * the supply rate IS the borrow interest shared out and there is none: there
+ * is no rate to speak of. A move that rounds to 0.00 points is hidden as
+ * well (`liveNoteStated`).
  *
  * Historical notes are unaffected — the one-percentage-point threshold
  * (`RATE_STEP_MIN_PP`) already excludes them. Exported so the verifier can
@@ -475,9 +473,8 @@ export interface AaveFamilyLiveRead {
  *
  * The later end is the Pool's own `getReserveData` at the overlay's block —
  * `supplyApr` / `borrowApr`, the same fractions the risk surfaces read — not
- * a log. Unthresholded like every other live note: "nothing has moved" is
- * itself the fact. The one gate is `AAVE_RATE_STEP_LIVE_FLOOR`, which is
- * about there being a rate at all rather than about the move.
+ * a log. Two gates: `AAVE_RATE_STEP_LIVE_FLOOR`, about there being a rate at
+ * all, and `liveNoteStated`, which hides a move that rounds to 0.00 points.
  *
  * No note where the account has never touched the position while holding that
  * side — a balance that arrived by aToken transfer alone has no touch of its
@@ -559,7 +556,7 @@ export function liveAaveFamilyRateStepNotes(
       });
     }
   }
-  return out;
+  return out.filter(liveNoteStated);
 }
 
 /** A raw token-wei string with something in it. The overlay ships balances as

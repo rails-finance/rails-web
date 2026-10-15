@@ -581,8 +581,6 @@ export default function SparkPositionDetail({
     [sparkEvents, reserveRates, noteOptions],
   );
 
-  // A live note whose move rounds to 0.00 points says nothing; SparkLend
-  // leaves it out (the note modal says so).
   const liveNotes = useMemo<MarketNote[]>(
     () =>
       reserveRates && chain && !chain.chainStale
@@ -591,7 +589,7 @@ export default function SparkPositionDetail({
             reserveRates,
             { blockNumber: chain.blockNumber, timestamp: head?.blockTimestamp, reserves: chain.reserves },
             noteOptions,
-          ).filter((n) => n.kind !== "rate-step" || Math.abs(n.deltaPp) >= 0.005)
+          )
         : [],
     [sparkEvents, reserveRates, chain, head, noteOptions],
   );

@@ -104,9 +104,9 @@ export interface MarketNoteBase {
   anchorEventId?: string;
   /** True when `to` is a live chain read at the head rather than a second of
    *  this position's own events — "what has the market done to this
-   *  position since it last touched it". Never anchored, never gated on any
-   *  move-size threshold: the note renders whenever the position is open and
-   *  the live read exists, because "nothing has moved" is itself the fact.
+   *  position since it last touched it". Never anchored, never gated on the
+   *  historical move threshold; a live rate note whose move rounds to 0.00
+   *  points is hidden (`liveNoteStated`).
    *  One position can have a live and a historical note of the same kind at
    *  once — they answer different questions. */
   live?: true;
@@ -219,6 +219,12 @@ export function orderLiveNotes(notes: readonly MarketNote[]): MarketNote[] {
         a.i - b.i,
     )
     .map((x) => x.note);
+}
+
+/** False for a live rate note whose move rounds to 0.00 points: hidden on
+ *  every family (rails-ops market-notes §9). Every other note is stated. */
+export function liveNoteStated(note: MarketNote): boolean {
+  return !(note.live && note.kind === "rate-step" && Math.abs(note.deltaPp) < 0.005);
 }
 
 /** The head slot's live notes as one group, or null where fewer than two are
@@ -673,9 +679,8 @@ function mergeRateStepRun(run: readonly RateStepNote[]): RateStepNote {
 /**
  * A LIVE Polaris rate step: this CDP's own NEWEST touch that carries a rate
  * against the market's own primary rate read live at the chain head.
- * Unthresholded — unlike `rateStepNotesFor`'s `RATE_STEP_MIN_PP` gate on a
- * historical stretch, a live note renders whatever the move, because
- * "nothing has moved" is itself the fact.
+ * Not held to `rateStepNotesFor`'s `RATE_STEP_MIN_PP` gate on a historical
+ * stretch; a move that rounds to 0.00 points draws no note (`liveNoteStated`).
  *
  * `observed.to` is always null — a live rate has no PrimaryRateSet log of
  * its own, only the contract's current value — and `setsBetween` is null
@@ -717,7 +722,7 @@ export function liveRateStepNote(
     wallet: "",
     kind: "head",
   };
-  return {
+  const note: RateStepNote = {
     id: `rate-step:${market.key}:${a.blockNumber}-head`,
     kind: "rate-step",
     marketSymbol: market.stableSymbol,
@@ -731,6 +736,7 @@ export function liveRateStepNote(
     ...(interest ? { interest } : {}),
     live: true,
   };
+  return liveNoteStated(note) ? note : null;
 }
 
 // ── Formatting — one source for the row, the export and the receipts ─────────

@@ -611,9 +611,9 @@ for (const p of PAGES) {
           .filter(Boolean)
           .join(" · "),
   );
-  // SparkLend draws no live note whose move rounds to 0.00 points (newcomer
-  // round 2, R7), so those sides are expected off the page there.
-  const drawn = p.proto === "spark" ? above.filter((n) => Math.abs(n.liveRate - n.fromRate) >= 0.005) : above;
+  // No family draws a live note whose move rounds to 0.00 points (rails-ops
+  // market-notes §9), so those sides are expected off the page.
+  const drawn = above.filter((n) => Math.abs(n.liveRate - n.fromRate) >= 0.005);
   data.expected = { historical: got, since, above: drawn, below, through };
 }
 
@@ -850,7 +850,7 @@ for (const p of PAGES) {
     if (/[+−-]0\.00 points/.test((await row.textContent()).replace(/\s+/g, " "))) flat = true;
   }
   check(
-    "4b. 0xbdfa… draws no live note whose move rounds to 0.00 points (SparkLend hides them)",
+    "4b. 0xbdfa… draws no live note whose move rounds to 0.00 points (hidden on every family)",
     !flat,
     `${head.length} head row(s)`,
   );
