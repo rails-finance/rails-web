@@ -47,6 +47,7 @@
 // a client-grouped one in the last places. That difference is the served one
 // being right.
 
+import type { ReactNode } from "react";
 import type { RunAggregate } from "@/components/shared/timeline-run-card";
 import type { SpineIcon } from "@/components/shared/spine-column";
 import { scaleBaseUnits, type OpeningBucket, type OpeningFlowBucket } from "@/lib/shared/timeline-opening-balance";
@@ -185,6 +186,12 @@ export interface ServedFolder {
    *  order they occur in it, repeated `txCount` times. Its legs are net per
    *  asset. Absent on every other folder. */
   shape?: string[];
+
+  /** On a Liquity fork `batch_rate` folder: the rate before the first member
+   *  and after the last, and the lowest and highest the run passed through,
+   *  in percent as the members' `interestRate` (rails-ops decision 0039, rule
+   *  6). NULL where the index has no rate. Absent on every other folder. */
+  rate?: { first: number | null; last: number | null; low: number | null; high: number | null };
 }
 
 /** The query parameter a grouped read and a folder open send upstream to ask
@@ -344,6 +351,9 @@ export interface FolderRegisterEntry {
   /** While an opened folder's members are read, say so in words ("Reading 12
    *  deposits…") above the skeleton. Unset draws the skeleton alone. */
   readingLine?: boolean;
+  /** Drawn before the sums in place of a shape label: a family's own figure
+   *  the header states (a delegate run's rate pill). */
+  lead?: ReactNode;
 }
 
 /** One family's whole folder register: served kind → how it draws. */

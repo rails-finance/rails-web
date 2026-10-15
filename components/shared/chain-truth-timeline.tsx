@@ -671,13 +671,14 @@ function ServedFolderRow({
       muted={entry.muted}
       folder
       lead={
-        entry.shapeLabel ? (
+        entry.lead ??
+        (entry.shapeLabel ? (
           // data-prov-exempt: a count of transactions and the kinds they hold,
           // the "event numbers" class, as the folder's own count pill is.
           <span data-prov-exempt="" className="text-sm font-medium text-foreground">
             {entry.shapeLabel}
           </span>
-        ) : undefined
+        ) : undefined)
       }
       extraHeader={extras.length > 0 ? <>{extras}</> : undefined}
       firstTimestamp={folder.firstAt}

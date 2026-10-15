@@ -747,10 +747,16 @@ trove_words:
     {count} rate adjustment
   run_count_many: |-
     {count} rate adjustments
-  run_by: |-
+  run_by: |2-
      by {manager}
   run_movement: |-
     : {from} to {to}
+  run_movement_unchanged: |-
+    : unchanged at {rate}
+  run_rate_unchanged: |-
+    unchanged at {rate}
+  run_rate_range: |-
+    , moved between {low} and {high}
   run_range_days: |-
     {from} to {to}
   run_label: |-
@@ -761,8 +767,18 @@ trove_words:
     last
   run_rate_summary: |-
     The delegate’s annual interest rate after the {which} adjustment of this run — the rate the contract logged at that adjustment. Open the run to see each event’s receipt.
+  run_rate_from_summary: |-
+    The delegate’s annual interest rate before the first adjustment of this run — the rate the contract held when the run began. Open the run to see each event’s receipt.
+  run_rate_bound_summary: |-
+    The {bound} annual interest rate this run passed through — read over the rate before its first adjustment and the rate after each one. Open the run to see each event’s receipt.
+  run_lowest: |-
+    lowest
+  run_highest: |-
+    highest
   run_rate_input: |-
     {which} adjustment
+  run_rate_bound_input: |-
+    {count} adjustments
   run_rate_note: |-
     one of the {count} events collapsed into this row
   run_cells_none: |-

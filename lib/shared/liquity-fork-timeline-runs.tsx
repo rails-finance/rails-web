@@ -16,6 +16,7 @@ import { renderRunFolders } from "@/lib/shared/run-folders";
 import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
+import { DelegateRunRatePill, delegateRunRateProv } from "@/components/protocol/liquity/delegate-adjust-run-card";
 
 /** Runs shorter than this stay as individual cards (the V2 trove threshold). */
 export const MIN_REDEMPTION_RUN = 4;
@@ -116,9 +117,27 @@ const BATCH_RATE_FOLDER: FolderRegisterEntry = {
   byOwner: false,
 };
 
+/** A `batch_rate` folder's header states its rate as the V2 delegate run's
+ *  does, from the index's `rate` (rails-ops decision 0039, rule 6); a folder
+ *  served without one draws the register alone. */
+function batchRateEntry(folder: ServedFolder): FolderRegisterEntry {
+  const r = folder.rate;
+  if (r?.first == null || r.last == null) return BATCH_RATE_FOLDER;
+  const span: [number, number] = [folder.firstAt, folder.lastAt];
+  return {
+    ...BATCH_RATE_FOLDER,
+    lead: (
+      <DelegateRunRatePill
+        rates={{ fromRate: r.first, toRate: r.last, lowRate: r.low ?? undefined, highRate: r.high ?? undefined }}
+        prov={(which) => delegateRunRateProv(which, span, folder.count)}
+      />
+    ),
+  };
+}
+
 export const LIQUITY_FORK_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
   folder.kind === OWNER_RUN_KIND
     ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event")
     : folder.kind === "batch_rate"
-      ? BATCH_RATE_FOLDER
+      ? batchRateEntry(folder)
       : REDEMPTION_FOLDER;

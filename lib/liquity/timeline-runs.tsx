@@ -67,26 +67,40 @@ const REDEMPTION_RUN: TimelineRunSpec = {
  *  spine's flank states the rate after the last change, its arrow the way
  *  the members moved it; the spoken label names the delegate when every
  *  member names the same one (always true in practice — a manager change
- *  puts a join/leave row between the runs). */
+ *  puts a join/leave row between the runs). The header states the rate
+ *  before the first member and after the last, and the lowest and highest
+ *  the run passed through (rails-ops decision 0039, rule 6). */
 const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
   match: (e) => isLiquityEvent(e) && e.context.data.operation === "setBatchManagerAnnualInterestRate",
   min: MIN_DELEGATE_ADJUST_RUN,
   render: (run, meta) =>
     renderRunFolders(run, meta, MIN_DELEGATE_ADJUST_RUN, (events, folder) => {
-      // Net rate movement is chronological (first adjusted rate → last)
-      // whichever way the timeline is sorted — per folder, so a chunked run's
-      // folders each state their own slice's movement.
+      // Net rate movement is chronological (rate before the first adjust →
+      // after the last) whichever way the timeline is sorted — per folder, so
+      // a chunked run's folders each state their own slice's movement.
       const chrono = events[0].timestamp <= events[events.length - 1].timestamp ? events : [...events].reverse();
       const chronoFirst = chrono[0];
       const chronoLast = chrono[chrono.length - 1];
       const firstCtx = isLiquityEvent(chronoFirst) ? chronoFirst.context.data : undefined;
       const lastCtx = isLiquityEvent(chronoLast) ? chronoLast.context.data : undefined;
-      // Which way the members moved the rate: each change, before → after.
+      // A before-rate of zero is a state the event did not read; the header
+      // then draws no movement.
+      const before = firstCtx?.stateBefore?.annualInterestRate;
+      const fromRate = before != null && before > 0 ? before : undefined;
+      // Which way the members moved the rate: each change, before → after;
+      // and the range it passed through, the from-rate included.
       let up = false;
       let down = false;
+      let lowRate = fromRate;
+      let highRate = fromRate;
       for (const e of events) {
         if (!isLiquityEvent(e)) continue;
         const { stateBefore, stateAfter } = e.context.data;
+        if (stateAfter) {
+          const r = stateAfter.annualInterestRate;
+          lowRate = lowRate == null ? r : Math.min(lowRate, r);
+          highRate = highRate == null ? r : Math.max(highRate, r);
+        }
         if (!stateBefore || !stateAfter || stateBefore.annualInterestRate <= 0) continue;
         const delta = stateAfter.annualInterestRate - stateBefore.annualInterestRate;
         if (Math.abs(delta).toFixed(2) === "0.00") continue;
@@ -102,8 +116,10 @@ const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
         <DelegateAdjustRunCard
           key={folder.key}
           count={events.length}
-          fromRate={firstCtx?.stateAfter?.annualInterestRate}
+          fromRate={fromRate}
           toRate={lastCtx?.stateAfter?.annualInterestRate}
+          lowRate={lowRate}
+          highRate={highRate}
           moves={moves}
           events={chrono}
           managerName={manager ? getBatchManagerName(manager) : undefined}

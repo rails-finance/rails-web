@@ -18,18 +18,20 @@ import { CountChip } from "@/components/shared/count-chip";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import type { Provenance } from "@/components/shared/provenance";
 import { formatDate } from "@/lib/date";
 import { troveWords } from "@/lib/liquity/event-templates";
+import { troveNodes } from "@/lib/liquity/trove-nodes";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { DelegateRatePillShell } from "@/components/shared/rate-pill";
 
 /**
  * Delegate-adjust run card — one row standing in for a stretch of consecutive
  * batch-manager rate adjustments (setBatchManagerAnnualInterestRate), the same
  * de-noising treatment RedemptionRunCard gives redemption touches: the events
  * are the delegate's automation, not the owner acting, and no single tick
- * matters — only where the rate went. The header carries the net movement
- * (first adjusted rate → last), and since the member events are already in the
- * client's timeline payload the row expands in place to the individual cards.
+ * matters — only where the rate went. Since the member events are already in
+ * the client's timeline payload the row expands in place to the individual
+ * cards.
  *
  * It draws as every group does (`group-frame.tsx`): the bracket, no node of
  * its own, the dotted segment for the members not drawn, and its ⋮ to show
@@ -37,13 +39,138 @@ import { troveWords } from "@/lib/liquity/event-templates";
  * 331), the delegate named in the spoken label alone. The spine's flank carries the rate after the
  * last change in the pink delegate pill, its arrow the way the members moved
  * the rate (`moves`).
+ *
+ * The header's rate pill states the net effect (rails-ops decision 0039, rule
+ * 6): the rate before the first member → the rate after the last, and the
+ * range the run moved through where it went outside them; a nil net change
+ * reads "unchanged at" the rate, with the range where the rate moved
+ * (`DelegateRunRatePill`, which the served fork `batch_rate` folder draws
+ * too).
  */
-export interface DelegateAdjustRunCardProps {
-  count: number;
-  /** The delegate's rate after the chronologically FIRST adjust of the run (%). */
+
+/** The rates a delegate run's header states (%), each optional. */
+export interface DelegateRunRates {
+  /** The rate before the chronologically first adjust. */
   fromRate?: number;
-  /** The delegate's rate after the chronologically LAST adjust of the run (%). */
+  /** The rate after the chronologically last adjust. */
   toRate?: number;
+  /** The lowest and highest rate the run passed through, the from-rate
+   *  included. */
+  lowRate?: number;
+  highRate?: number;
+}
+
+/** Which of the header's rates a receipt traces. */
+export type DelegateRunRateWhich = "first" | "last" | "low" | "high";
+
+const pct = (r: number) => `${r.toFixed(2)}%`;
+const cents = (r: number) => Math.round(r * 100);
+
+/** What the pill says, at the two decimals it shows: the net move, or
+ *  none, and whether the range is drawn beside it. */
+function rateReading({ fromRate, toRate, lowRate, highRate }: DelegateRunRates) {
+  if (fromRate == null || toRate == null) return undefined;
+  const low = Math.min(fromRate, toRate, lowRate ?? fromRate);
+  const high = Math.max(fromRate, toRate, highRate ?? fromRate);
+  const unchanged = cents(fromRate) === cents(toRate);
+  const showRange = unchanged
+    ? cents(low) !== cents(high)
+    : cents(low) < Math.min(cents(fromRate), cents(toRate)) || cents(high) > Math.max(cents(fromRate), cents(toRate));
+  return { from: fromRate, to: toRate, low, high, unchanged, showRange };
+}
+
+/** The receipt behind one of the header's rates. `span` is the run's
+ *  chronological bounds; `count` its members. */
+export function delegateRunRateProv(which: DelegateRunRateWhich, span: [number, number], count: number): Provenance {
+  const day = (ts: number) => `${shortDate(ts)} ${shortDateYear(ts)}`;
+  const note = troveWords("run_rate_note", { count });
+  if (which === "low" || which === "high") {
+    const bound = troveWords(which === "low" ? "run_lowest" : "run_highest");
+    return {
+      kind: "chain",
+      summary: troveWords("run_rate_bound_summary", { bound }),
+      inputs: [
+        {
+          label: troveWords("run_rate_bound_input", { count: count.toLocaleString("en-US") }),
+          value: day(span[0]) === day(span[1]) ? day(span[0]) : `${day(span[0])} – ${day(span[1])}`,
+          kind: "chain",
+        },
+      ],
+    };
+  }
+  const first = which === "first";
+  return {
+    kind: "chain",
+    summary: first
+      ? troveWords("run_rate_from_summary")
+      : troveWords("run_rate_summary", { which: troveWords("run_last") }),
+    inputs: [
+      {
+        label: troveWords("run_rate_input", { which: troveWords(first ? "run_first" : "run_last") }),
+        value: day(first ? span[0] : span[1]),
+        kind: "chain",
+        note,
+      },
+    ],
+  };
+}
+
+/** The header's rate pill in the delegate's pink: "0.85% → 1.10%", or
+ *  "unchanged at 0.90%", each followed by ", moved between 0.85% and 1.10%"
+ *  where the run went beyond them. Nothing without both ends. */
+export function DelegateRunRatePill({
+  rates,
+  prov,
+  echoLast,
+}: {
+  rates: DelegateRunRates;
+  prov: (which: DelegateRunRateWhich) => Provenance;
+  /** The last rate's receipt is registered by another figure (the spine's
+   *  flank), so the pill echoes it. */
+  echoLast?: boolean;
+}) {
+  const r = rateReading(rates);
+  if (!r) return null;
+  const fig = (which: DelegateRunRateWhich, v: number) => (
+    <Prov echo={echoLast && which === "last"} info={prov(which)} value={pct(v)}>
+      {pct(v)}
+    </Prov>
+  );
+  return (
+    <span className="leading-[0]" data-group-rate={r.unchanged ? "unchanged" : "moved"}>
+      <DelegateRatePillShell>
+        {r.unchanged ? (
+          <span>{troveNodes("run_rate_unchanged", { rate: fig("last", r.to) })}</span>
+        ) : (
+          <>
+            <span>{fig("first", r.from)}</span>
+            <span aria-hidden="true">→</span>
+            <span>{fig("last", r.to)}</span>
+          </>
+        )}
+        {r.showRange && (
+          <span className="font-normal">
+            {troveNodes("run_rate_range", { low: fig("low", r.low), high: fig("high", r.high) })}
+          </span>
+        )}
+      </DelegateRatePillShell>
+    </span>
+  );
+}
+
+/** The pill's fact in the spoken label's words: ": 0.85% to 1.10%" or
+ *  ": unchanged at 0.90%", the range after it as the pill draws it. */
+export function delegateRunMovementWords(rates: DelegateRunRates): string {
+  const r = rateReading(rates);
+  if (!r) return "";
+  const net = r.unchanged
+    ? troveWords("run_movement_unchanged", { rate: pct(r.to) })
+    : troveWords("run_movement", { from: pct(r.from), to: pct(r.to) });
+  return r.showRange ? net + troveWords("run_rate_range", { low: pct(r.low), high: pct(r.high) }) : net;
+}
+
+export interface DelegateAdjustRunCardProps extends DelegateRunRates {
+  count: number;
   /** Which way the members moved the rate: every change up, every change
    *  down, or "both" otherwise (changes both ways, or none that moved it). */
   moves?: "up" | "down" | "both";
@@ -63,6 +190,8 @@ export function DelegateAdjustRunCard({
   count,
   fromRate,
   toRate,
+  lowRate,
+  highRate,
   moves,
   managerName,
   firstTimestamp,
@@ -114,20 +243,8 @@ export function DelegateAdjustRunCard({
   const toggle = () => setOpen((v) => !v);
   const membersId = useId();
 
-  const rateProv = (which: "first" | "last", ts: number): Provenance => ({
-    kind: "chain",
-    summary: troveWords("run_rate_summary", { which: troveWords(which === "first" ? "run_first" : "run_last") }),
-    inputs: [
-      {
-        label: troveWords("run_rate_input", { which: troveWords(which === "first" ? "run_first" : "run_last") }),
-        value: `${shortDate(ts)} ${shortDateYear(ts)}`,
-        kind: "chain",
-        note: troveWords("run_rate_note", { count }),
-      },
-    ],
-  });
-
-  const hasMovement = fromRate != null && toRate != null;
+  const rateProv = (which: DelegateRunRateWhich) => delegateRunRateProv(which, [fromTs, toTs], count);
+  const rates: DelegateRunRates = { fromRate, toRate, lowRate, highRate };
 
   // The run's words, as T1 states them: no asset moved, so the spine draws
   // no node and the words stand (set C gives the spine the rate).
@@ -137,6 +254,7 @@ export function DelegateAdjustRunCard({
         {troveWords("run_adjusted")}
         <CountChip count={count} />
       </span>
+      <DelegateRunRatePill rates={rates} prov={rateProv} echoLast />
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-rb-500">{range}</span>
       </span>
@@ -157,7 +275,7 @@ export function DelegateAdjustRunCard({
     rateSpan: toRate != null ? [fromRate ?? 0, toRate] : undefined,
     rateMoves: moves,
     rateTone: "delegate",
-    rateProv: toRate != null ? { info: rateProv("last", toTs), value: `${toRate.toFixed(2)}%` } : undefined,
+    rateProv: toRate != null ? { info: rateProv("last"), value: pct(toRate) } : undefined,
     dotted: true,
     isLast: !!isLast,
   };
@@ -165,9 +283,7 @@ export function DelegateAdjustRunCard({
   const spokenRange = sameDay
     ? formatDate(fromTs)
     : troveWords("run_range_days", { from: formatDate(fromTs), to: formatDate(toTs) });
-  const movement = hasMovement
-    ? troveWords("run_movement", { from: `${fromRate.toFixed(2)}%`, to: `${toRate.toFixed(2)}%` })
-    : "";
+  const movement = delegateRunMovementWords(rates);
   const by = managerName ? troveWords("run_by", { manager: managerName }) : "";
   const countText = troveWords(count === 1 ? "run_count_one" : "run_count_many", {
     count: count.toLocaleString("en-US"),
