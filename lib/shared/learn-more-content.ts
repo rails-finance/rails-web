@@ -45,8 +45,10 @@ export function lifetimeFlowsPriceContent(opts: {
   source: string;
   perEvent: boolean;
   level?: string | null;
+  /** The chart marks the position's events at their prices (Liquity V2). */
+  marks?: boolean;
 }): LearnMoreContent {
-  const { symbol, unit, source, perEvent, level } = opts;
+  const { symbol, unit, source, perEvent, level, marks = true } = opts;
   return {
     title: "How to read the price chart",
     intro: `The ${symbol} price in ${unit} over the position's life, on the same days as the line above. The list over the chart picks the asset.`,
@@ -54,7 +56,7 @@ export function lifetimeFlowsPriceContent(opts: {
     details: [
       {
         bold: "The source",
-        text: `${source}. ${perEvent ? "One point per event." : "One point per day."} Each event is marked at its own price, and a redemption also at its redemption price. A dotted stretch carries the last price over days with none recorded.`,
+        text: `${source}. ${perEvent ? "One point per event." : "One point per day."}${marks ? " Each event is marked at its own price, and a redemption also at its redemption price." : ""} A dotted stretch carries the last price over days with none recorded.`,
       },
       ...(level
         ? [
@@ -67,6 +69,33 @@ export function lifetimeFlowsPriceContent(opts: {
       {
         bold: "The figure at the cursor",
         text: "The price on the cursor's day. With the inspector on, it opens its receipt.",
+      },
+    ],
+  };
+}
+
+/** The price chart's how-to-read on its health view (ruling 7). */
+export function lifetimeFlowsHealthContent(opts: { source: string; assets: boolean }): LearnMoreContent {
+  return {
+    title: "How to read the price chart",
+    intro: `The position's health factor over its life, on the same days as the line above.${opts.assets ? " The list over the chart picks it or one asset's price." : ""}`,
+    detailsHeading: "The parts:",
+    details: [
+      {
+        bold: "The source",
+        text: `Σ collateral × price × liquidation threshold ÷ Σ debt × price: ${opts.source}. One point per day. A dotted stretch takes its thresholds from a later event's read.`,
+      },
+      {
+        bold: "Liquidates below",
+        text: "The red line at 1: below it a liquidator can repay part of the debt and take collateral at a bonus.",
+      },
+      {
+        bold: "An asset's price",
+        text: "Picked from the list, the asset's price and, in red, the price at which the health factor would reach 1 if that asset alone moved, every other balance and price held at the day's. A level more than ten times above or below the price is not drawn.",
+      },
+      {
+        bold: "The figure at the cursor",
+        text: "The health factor on the cursor's day; today's is the card's. With the inspector on, it opens its receipt.",
       },
     ],
   };
@@ -244,7 +273,7 @@ export function liquityLifetimeFlowsContent(opts: { isBatched?: boolean } = {}):
   return {
     title: "About Lifetime flows",
     intro:
-      "This panel breaks down what the trove costs to carry and traces every unit of debt and collateral that has flowed through it over its lifetime.",
+      "This panel breaks down what the trove costs to carry and traces every unit of debt and collateral that has flowed through it over its lifetime. Debt is valued at BOLD's $1 face.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -1520,29 +1549,33 @@ export function aaveVaultPositionContent(
   };
 }
 
-/** The "?" on the lifetime-flows tower. */
-export function aaveVaultFlowsContent(assetSymbol: string, shareSymbol: string): LearnMoreContent {
+/** The "?" on a vault holder's Lifetime flows panel. */
+export function vaultFlowsContent(assetSymbol: string, shareSymbol: string): LearnMoreContent {
   return {
     title: "How the lifetime flows are counted",
-    intro: `The tower sums this address's own events in this vault — every Transfer of ${shareSymbol} the vault emitted about it, and the ERC-4626 Deposit and Withdraw events that were emitted beside them. It is a sum over the whole history, not over the rows currently drawn below it.`,
-    detailsHeading: "The two sides:",
+    intro: `The bar sums this address's events in this vault over its whole history, in ${assetSymbol}: every Transfer of ${shareSymbol} the vault emitted about it, and the ERC-4626 Deposit and Withdraw events emitted beside them.`,
+    detailsHeading: "The lines:",
     details: [
       {
-        bold: `The share side, in ${shareSymbol}`,
-        text: "minted, transferred in, burned and transferred out. It closes: minted plus transferred in, less burned and transferred out, is the balance the vault's own balanceOf reports at the page's block, wei-exact.",
+        bold: "Deposited and Withdrawn",
+        text: "the assets word of each ERC-4626 Deposit and Withdraw. A mint or a burn that carried no such event is valued at the vault's share price at its block.",
       },
       {
-        bold: `The asset side, in ${assetSymbol}`,
-        text: "the assets word of the ERC-4626 events themselves, and the vault's own convertToAssets of the balance held now. A mint or a burn that carried no such event is in the share totals and in no asset total at all — the page says how many.",
+        bold: "Received by transfer and Sent to another account",
+        text: `a transfer moves ${shareSymbol} and no ${assetSymbol}; its shares are valued at the vault's share price (convertToAssets) at its block.`,
       },
       {
-        bold: "Why the two heights are not comparable",
-        text: `${shareSymbol} and ${assetSymbol} are different tokens with their own decimals. The bars are drawn in each token's own units and nothing converts one side into the other.`,
+        bold: "Still in the vault",
+        text: "at the page's block, the vault's convertToAssets of the balance held; on an earlier day, the shares held after that day's last event at its share price.",
+      },
+      {
+        bold: "Share price change",
+        text: "each bar's last line: what is held less every flow above, the change in the vault's share price since each flow on the shares held. No block between the address's events is read.",
       },
     ],
     extraParagraphs: [
-      "No rate, no yield and no profit or loss is drawn. A cost basis over a pooled fungible share is not something any chain read supplies, and the difference between two share prices read at two blocks the holder happened to transact in is not a return.",
-      "The tower is drawn under exactly the condition the rows are: a history that could not be reconciled against the vault's own balanceOf, and one too large to draw whole, both leave it off the page rather than summing part of a life.",
+      `The share ledger closes: minted plus transferred in, less burned and transferred out, is the balance the vault's balanceOf reports at the page's block, to the wei.`,
+      "The panel is drawn under the condition the rows are: a history that could not be reconciled against the vault's balanceOf, and one too large to draw whole, both leave it off the page.",
     ],
   };
 }

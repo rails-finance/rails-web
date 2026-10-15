@@ -342,8 +342,9 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
         {data.flowsPricedAtEvents
           ? "Each flow is valued at the oracle price at its block, interest at the price of the event that closed each stretch it built up over (since the last event at the latest block's), and what is held now at the latest block's price"
           : "Flows are valued at the oracle price at their block where the event carries one, interest at the price of the event that closed each stretch it built up over, and the rest and what is held now at the latest block's price"}
-        ; the Price change row is the difference, what the tokens gained or lost in value while the position held them.
-        In tokens, what came in plus interest less what left equals what is held now.
+        ; the price moves above are the difference, what the tokens gained or lost in value while the position held
+        them, and the bars carry them with the interest in Market move and interest. In tokens, what came in plus
+        interest less what left equals what is held now.
       </span>,
     );
   }
@@ -415,8 +416,8 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
       ...(shows(hasPriceChange)
         ? [
             {
-              bold: "Price change",
-              text: "in dollars, each flow is valued at the oracle price at its block and what is held at the latest block's price. The Price change row is the difference, so deposited plus interest less everything that left, plus the price change, equals what is held now.",
+              bold: "Market move and interest",
+              text: "in dollars, each flow is valued at the oracle price at its block and what is held at the day's price. Each bar's last line is the difference: the change in price since each flow, with the interest.",
             },
           ]
         : []),
@@ -438,7 +439,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
         : []),
       {
         bold: "Interest",
-        text: "supplied balances earn interest and debts accrue it without an event. On the supply side each asset's interest is a separate row beside what was deposited; on the debt side, interest still owed is a segment of the debt bar and interest already repaid is a row beside what was borrowed. A row of interest is valued stretch by stretch, at the oracle price of the event that ended each stretch, and interest since the last event at the latest block's price; interest still owed is part of the debt now, at the latest block's price.",
+        text: "supplied balances earn interest and debts accrue it without an event. The bars carry it in Market move and interest, and the Explanation states it over the position's life.",
       },
       ...(shows(hasLiquidated)
         ? [

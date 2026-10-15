@@ -54,8 +54,8 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
       ? null
       : externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet);
 
-  // direction "right" = tokens moving away from the account, "left" = toward it.
-  const dir = d > 0 ? ("left" as const) : ("right" as const);
+  // direction "right" = tokens moving toward the protocol (balance up), "left" = toward the wallet.
+  const dir = d > 0 ? ("right" as const) : ("left" as const);
   const coords: DolomiteCoords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,

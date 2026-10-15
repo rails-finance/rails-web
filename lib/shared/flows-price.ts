@@ -22,6 +22,8 @@
 //   liquidation level (`series.level`) is a second line on the same axis, one
 //   point per day, held between days and stepped on the day it moves; it has
 //   no point after the day it ends.
+// - Where the timeline carries the position's health factor (`t.health`,
+//   ruling 7), it is the first series, a ratio with no unit, its line at 1.
 // - Both strips place a day at its close on one time axis (`stripGeometry`),
 //   so the cursor, the pips and the end labels sit on the same x in either
 //   view.
@@ -42,12 +44,16 @@ import {
 export interface FlowPriceSeries extends PriceSeries {
   /** The side the asset was first held on. */
   side: FlowSide;
-  /** The unit as printed: "USD", or the token the family's figures are in. */
+  /** The unit as printed: "USD", the token the family's figures are in, or
+   *  "" for the health factor. */
   unitLabel: string;
+  /** The position's health factor rather than an asset's price. */
+  health?: true;
 }
 
-/** The price series a panel's timeline carries, collateral assets first, each
- *  side in the order its assets were first held. */
+/** The price series a panel's timeline carries: the health factor where it
+ *  has one, then collateral assets, each side in the order its assets were
+ *  first held. */
 export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
   if (t.sideUnits || !t.dailyPrices) return [];
   const face = new Set<FlowSide>(t.words?.moment?.face ?? []);
@@ -74,7 +80,8 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
     if (s) out.push({ ...s, ...t.priceMarks?.[asset], side: m.side, unitLabel });
   }
   const rank = (s: FlowPriceSeries) => (s.side === "collateral" ? 0 : 1e6) + (meta.get(s.key)?.order ?? 0);
-  return out.sort((a, b) => rank(a) - rank(b));
+  out.sort((a, b) => rank(a) - rank(b));
+  return t.health ? [{ ...t.health, side: "collateral", unitLabel: "", health: true }, ...out] : out;
 }
 
 // ── The time axis both strips share ─────────────────────────────────────────
@@ -170,8 +177,13 @@ export function priceAxis(values: number[]): { min: number; max: number; ticks: 
   return { min, max: hi + span * 0.08, ticks };
 }
 
-/** "$2,451.37" · "1.0002 USDC" · "$0.0001234": a price in its unit. */
+/** "$2,451.37" · "1.0002 USDC" · "$0.0001234": a price in its unit; a
+ *  health factor ("" unit) as the Aave family's cards print one, four places
+ *  under 1.1 (rounded down under 1, so a liquidatable figure never reads
+ *  1.0000), two above: "1.0234", "1.84". */
 export function formatPrice(v: number, unitLabel: string): string {
+  if (unitLabel === "")
+    return v < 1 ? (Math.floor(v * 1e4 + 1e-9) / 1e4).toFixed(4) : v < 1.1 ? v.toFixed(4) : v.toFixed(2);
   const a = Math.abs(v);
   const body =
     a >= 100
@@ -226,7 +238,7 @@ export function priceDays(series: PriceSeries, from: number, to: number): PriceD
   if (first == null) return out;
   for (let d = Math.max(from, first); d <= to; d++) {
     const p = priceAt(series, d);
-    if (!p) continue;
+    if (!p || (series.noCarry && p.carried)) continue;
     out.push({ day: d, price: p.point[1], block: p.point[2], carried: p.carried, ageDays: p.ageDays });
   }
   return out;
@@ -272,9 +284,15 @@ export function pricePieces(series: PriceSeries, from: number, to: number): Pric
   for (const d of days) (d.carried ? out.carried : out.observed).push(d.day);
   if (days.length === 1) out.solid.push([[days[0].day, days[0].price]]);
   const sparse = series.sparseBefore;
+  // Without carries a day with no neighbour stands alone, as a point.
+  if (series.noCarry && days.length > 1)
+    days.forEach((d, i) => {
+      if (days[i - 1]?.day !== d.day - 1 && days[i + 1]?.day !== d.day + 1) out.solid.push([[d.day, d.price]]);
+    });
   for (let i = 1; i < days.length; i++) {
     const a = days[i - 1];
     const b = days[i];
+    if (series.noCarry && b.day !== a.day + 1) continue;
     const kind = a.carried || b.carried || (sparse != null && b.day <= sparse) ? out.dotted : out.solid;
     const last = kind[kind.length - 1];
     const tail = last?.[last.length - 1];
@@ -292,7 +310,7 @@ export function pricePieces(series: PriceSeries, from: number, to: number): Pric
  *  own, and whether it is old by the panel's rule (`gapDays`). */
 export function priceReadout(series: PriceSeries, day: number, gapDays: number): (PriceAt & { old: boolean }) | null {
   const p = priceAt(series, day);
-  if (!p) return null;
+  if (!p || (series.noCarry && p.carried)) return null;
   return { ...p, old: p.carried && p.ageDays > gapDays };
 }
 

@@ -15,7 +15,8 @@
 //   - one pip row under the charts;
 //   - the heading's list names each held asset with a series.
 // Pages: Aave V3 Core 0xfb93…2a71 and 0xfb45…750a (liquidated), whose answer
-// is /api/aave-v3/flows; three Liquity V2 Troves, whose answer is
+// is /api/aave-v3/flows, and whose chart opens on the health view (step 4,
+// `checkHealth`); three Liquity V2 Troves, whose answer is
 // /api/liquity-v2/prices/daily (checked over the answer's own days: before
 // them the Trove's rows price the line): WETH 1022…0154 (open, read live),
 // WETH 2241…2759 (open, redeemed several hundred times) and rETH 1939…5964
@@ -48,12 +49,14 @@ const PAGES = [
     path: "/ethereum/aave-v3/0xfb9395e0b216823c9a60d5dfcb8c6ef458232a71?market=core",
     answer: "/api/aave-v3/flows",
     source: /AaveOracle/,
+    health: true,
   },
   {
     id: "aave-v3 0xfb45 (liquidated)",
     path: "/ethereum/aave-v3/0xfb45f0e612424104753f2e2fc9507b3d082e750a?market=core",
     answer: "/api/aave-v3/flows",
     source: /AaveOracle/,
+    health: true,
   },
   {
     id: "liquity-v2 WETH Trove",
@@ -79,6 +82,90 @@ const PAGES = [
 ];
 
 const DAY = 86_400;
+const HEALTH = "Health factor";
+
+/** The Aave family's health factor as its cards print it (hfLabelV3). */
+function hfLabel(hf) {
+  if (hf >= 100) return "∞";
+  if (hf < 1) return (Math.floor(hf * 1e4 + 1e-9) / 1e4).toFixed(4);
+  return hf < 1.1 ? hf.toFixed(4) : hf.toFixed(2);
+}
+
+/** The health view on an Aave V3 page (ruling 7): listed first and shown
+ *  first; its line is 1; each point it draws rests on a block of one of the
+ *  account's events; today's figure is the card's health factor; where the
+ *  card states "Liquidates at", that asset's level today is the card's. */
+async function checkHealth(page, tag, pg, listedAll) {
+  check(`${tag}: the picker lists the health factor first`, listedAll[0] === HEALTH, listedAll.join(","));
+  const heading = await page.$eval("[data-price-heading]", (h) => h.textContent ?? "").catch(() => "");
+  check(
+    `${tag}: the chart opens on the health factor, its line at 1`,
+    heading.includes(`${HEALTH}`) && /Liquidates below\s*1\b/.test(heading),
+    heading,
+  );
+  const u = new URL(`${BASE}${pg.path}`);
+  const wallet = u.pathname.split("/").pop();
+  const tl = await hostFetch(
+    `${BASE}/api/aave-v3/timeline?wallet=${wallet}&market=${u.searchParams.get("market")}&limit=1000`,
+  ).then((r) => r.json());
+  const blocks = new Set((tl.events ?? []).map((e) => e.blockNumber));
+  const sl = page.locator('[data-flow-strip-view="price"]').first();
+  await sl.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(200);
+  const max = Number(await sl.getAttribute("aria-valuemax"));
+  const read = () =>
+    page.$eval("[data-price-readout]", (e) => ({
+      block: e.getAttribute("data-price-block"),
+      text: e.textContent ?? "",
+      none: e.hasAttribute("data-price-none"),
+    }));
+  const end = await read();
+  // The card's health factor: the headline's figure.
+  const cardText = await page.$eval('[data-card-head="health-factor"]', (h) => h.textContent ?? "").catch(() => "");
+  const card = cardText.match(/\d+\.\d+/g)?.pop() ?? null;
+  if (card)
+    check(
+      `${tag}: today's health factor is the card's`,
+      end.block === "" && end.text.trim() === card,
+      `chart ${end.text} (block ${end.block}), card ${card}`,
+    );
+  const bad = [];
+  for (const target of [Math.floor(max / 2), Math.max(0, max - 1)]) {
+    await page.keyboard.press("Home");
+    for (let i = 0; i < Math.floor(target / 4); i++) await page.keyboard.press("PageUp");
+    for (let i = 0; i < target % 4; i++) await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(150);
+    const r = await read();
+    if (!r.none && r.block !== "" && !blocks.has(Number(r.block))) bad.push(`${r.block}`);
+  }
+  check(`${tag}: each health point rests on an event's block`, bad.length === 0, bad.join(","));
+  const liq = await page
+    .$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent?.trim() ?? "")
+    .catch(() => null);
+  const liqSym = await page
+    .$eval(
+      '[data-panel-row="liquidates-at"] dd [data-token-symbol], [data-panel-row="liquidates-at"] dd img',
+      (i) => i.getAttribute("data-token-symbol") ?? i.getAttribute("alt"),
+    )
+    .catch(() => null);
+  if (liq && liqSym) {
+    const picker = page.locator("button[data-price-picker]");
+    await picker.click();
+    await page.locator(`[role="listbox"] [data-price-asset="${liqSym}"]`).click();
+    await sl.focus();
+    await page.keyboard.press("End");
+    await page.waitForTimeout(200);
+    const v = await page.$eval("[data-liq-readout]", (e) => Number(e.getAttribute("data-liq-value"))).catch(() => null);
+    check(
+      `${tag}: ${liqSym}'s level today is the card's "Liquidates at"`,
+      v != null && liq.endsWith(formatLiquidationPrice(v)),
+      `chart ${v} (${v != null ? formatLiquidationPrice(v) : "-"}), card ${liq}`,
+    );
+    await picker.click();
+    await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
+  }
+}
 
 /** The Trove's rows, every page of them, as the page reads them. */
 async function troveRows(path) {
@@ -415,12 +502,22 @@ for (const pg of PAGES) {
     // The heading's list (several assets: open it to read its options) or
     // the asset's name (one).
     const picker = page.locator("button[data-price-picker]");
+    // The health view lands once its position-state reads have.
+    if (pg.health)
+      await page
+        .waitForFunction((h) => document.querySelector("[data-price-heading]")?.textContent?.includes(h), HEALTH, {
+          timeout: 120000,
+        })
+        .catch(() => {});
     if ((await picker.count()) > 0) {
       await picker.click();
       await page.waitForSelector('[role="listbox"] [data-price-asset]', { timeout: 5000 }).catch(() => {});
     }
-    const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
+    const listedAll = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
     if ((await picker.count()) > 0) await page.keyboard.press("Escape");
+    // The health view (Aave V3, ruling 7) is listed first; the assets follow.
+    const listed = listedAll.filter((s) => s !== HEALTH);
+    if (pg.health) await checkHealth(page, tag, pg, listedAll);
     const pick = async (sym) => {
       if ((await picker.count()) === 0) return;
       await picker.click();

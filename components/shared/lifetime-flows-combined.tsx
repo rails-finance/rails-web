@@ -32,12 +32,13 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Link2, ListEnd, SkipBack, SkipForward } from "lucide-react";
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Link2, ListEnd, SkipBack, SkipForward } from "lucide-react";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
   lifetimeFlowsBarsContent,
   lifetimeFlowsEventsContent,
+  lifetimeFlowsHealthContent,
   lifetimeFlowsPriceContent,
 } from "@/lib/shared/learn-more-content";
 import { FlowBarsHeadsContext, Headline, Rescaled, useWidth } from "@/components/shared/lifetime-flows-busy";
@@ -538,15 +539,18 @@ export function CombinedFlows({
     ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
   };
   const eventsContent = useMemo(() => eventsHelp(model, hasDebt), [model, hasDebt]);
-  const priceHelp = priced
-    ? lifetimeFlowsPriceContent({
-        symbol: priced.asset.symbol,
-        unit: priced.unitLabel,
-        source: `${priced.asset.symbol} in ${priced.unitLabel}: ${priced.source}`,
-        perEvent: priced.grain === "event",
-        level: priced.level?.formula ?? null,
-      })
-    : null;
+  const priceHelp = priced?.health
+    ? lifetimeFlowsHealthContent({ source: priced.source, assets: prices.length > 1 })
+    : priced
+      ? lifetimeFlowsPriceContent({
+          symbol: priced.asset.symbol,
+          unit: priced.unitLabel,
+          source: `${priced.asset.symbol} in ${priced.unitLabel}: ${priced.source}`,
+          perEvent: priced.grain === "event",
+          level: priced.level?.formula ?? null,
+          marks: (priced.events?.length ?? 0) > 0,
+        })
+      : null;
 
   const barsBlock = (
     <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
@@ -1578,13 +1582,17 @@ function PriceFigures({
   const r = priceReadout(s, day, gapDays);
   const dayWord = isLive ? "today" : dayStamp(day * 86_400);
   const lv = s.level ? levelAt(s, day) : null;
+  const here = s.level?.here;
   const levelProv: Provenance | null = lv
     ? {
         kind: "derived",
         summary: `${s.level!.summary} ${
           lv[2] == null
-            ? "Here at the trove's debt and collateral as the TroveManager reports them now, the card's figure."
-            : `Here at the debt and collateral the trove's event at block ${lv[2].toLocaleString("en-US")} recorded, the debt grown by its interest to the end of ${dayWord}.`
+            ? (here?.live ??
+              "Here at the trove's debt and collateral as the TroveManager reports them now, the card's figure.")
+            : here
+              ? here.read.replace("{block}", lv[2].toLocaleString("en-US")).replace("{day}", dayWord)
+              : `Here at the debt and collateral the trove's event at block ${lv[2].toLocaleString("en-US")} recorded, the debt grown by its interest to the end of ${dayWord}.`
         }`,
         formula: s.level!.formula,
         ...(lv[2] != null ? { source: { block: lv[2] } } : {}),
@@ -1604,13 +1612,16 @@ function PriceFigures({
           data-price-block={r.point[2] ?? ""}
           data-price-carried={r.carried ? r.ageDays : undefined}
         >
-          <Prov info={readoutProv(s, r, dayWord, dayStamp(r.point[0] * 86_400))} value={String(r.point[1])}>
+          <Prov
+            info={s.health ? healthProv(s, r, dayWord) : readoutProv(s, r, dayWord, dayStamp(r.point[0] * 86_400))}
+            value={String(r.point[1])}
+          >
             {formatPrice(r.point[1], s.unitLabel)}
           </Prov>
         </span>
       ) : (
         <span data-price-readout="" data-price-none="">
-          No price recorded
+          {s.health ? "No health factor" : "No price recorded"}
         </span>
       )}
       {lv && levelProv && (
@@ -1622,10 +1633,10 @@ function PriceFigures({
           data-liq-value={lv[1]}
           data-anatomy="F19.3"
         >
-          · Liquidates at{" "}
+          · {s.health ? "Liquidates below" : "Liquidates at"}{" "}
           <span className={`font-semibold ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}>
             <Prov info={levelProv} value={String(lv[1])}>
-              {formatPrice(lv[1], s.unitLabel)}
+              {s.health ? "1" : formatPrice(lv[1], s.unitLabel)}
             </Prov>
           </span>
         </span>
@@ -1634,8 +1645,15 @@ function PriceFigures({
   );
 }
 
-/** An asset's mark at the heading's text size, as the headlines draw it. */
+/** An asset's mark at the heading's text size, as the headlines draw it;
+ *  the health factor's a pulse. */
 function AssetIcon({ s }: { s: FlowPriceSeries }) {
+  if (s.health)
+    return (
+      <span className="inline-flex size-4 shrink-0 items-center justify-center text-rb-500" aria-hidden>
+        <Activity size={13} />
+      </span>
+    );
   return (
     <span className="inline-flex size-4 shrink-0 items-center justify-center" aria-hidden>
       <TokenChipIcon symbol={s.asset.symbol} address={s.asset.address} size={14} filterable={false} untitled />
@@ -1854,6 +1872,23 @@ function CursorDate({
       )}
     </div>
   );
+}
+
+/** The receipt of the readout's health factor, in the series' words
+ *  (`PriceSeries.here`): the read its point rests on, or the live figure. */
+function healthProv(s: FlowPriceSeries, r: PriceAt, dayWord: string): Provenance {
+  const block = r.point[2];
+  return {
+    kind: "derived",
+    summary:
+      block == null
+        ? (s.here?.live ?? "Health factor — the live figure.")
+        : (s.here?.read ?? "Health factor — on {day}, from the read at block {block}.")
+            .replace("{block}", block.toLocaleString("en-US"))
+            .replace("{day}", dayWord),
+    formula: "Σ collateral × price × liquidation threshold ÷ Σ debt × price",
+    ...(block != null ? { source: { block } } : {}),
+  };
 }
 
 /** The receipt of the readout's price: the series' point at or before the

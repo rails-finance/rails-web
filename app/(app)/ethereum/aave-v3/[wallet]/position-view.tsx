@@ -56,6 +56,8 @@ import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-f
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { aaveV3FlowSeriesTimeline, aaveV3FocusEvents, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
+import { aaveV3HealthReadPicks, aaveV3HealthView, aaveV3ThresholdRead } from "@/lib/aave-v3/flows-health";
+import { useAaveV3PositionStates } from "@/hooks/useAaveV3PositionState";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
@@ -133,6 +135,10 @@ interface AaveV3PositionDetailProps {
    *  0033), from the server read; null on an SSR miss or an older api. */
   initialLaneInterest?: AaveLaneInterest[] | null;
 }
+
+/** The health view's position-state reads, at most (one per day with events,
+ *  the most recent days). */
+const HEALTH_READS_MAX = 60;
 
 export default function AaveV3PositionDetail({
   wallet,
@@ -676,10 +682,37 @@ export default function AaveV3PositionDetail({
     () => ({ path: "/api/aave-v3/flows/series", params: { wallet, market } }),
     [wallet, market],
   );
-  const flowTimeline = useMemo(
-    () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
-    [flowSeries, towerData, view],
+  // The price chart's health view (ui-jobs 328, ruling 7): the thresholds
+  // of the position state at the last event of each of the most recent days
+  // with events the page holds.
+  const healthPicks = useMemo(
+    () =>
+      aaveV3HealthReadPicks(
+        aaveEvents.map((e) => ({
+          blockNumber: e.blockNumber,
+          timestamp: e.timestamp,
+          txHash:
+            e.txHash ||
+            String(e.id)
+              .split(":")
+              .find((x) => /^0x[0-9a-fA-F]{64}$/.test(x)),
+        })),
+        HEALTH_READS_MAX,
+      ).map((e) => ({ block: e.blockNumber, txHash: e.txHash! })),
+    [aaveEvents],
   );
+  const healthStates = useAaveV3PositionStates({ wallet, market, reads: healthPicks });
+  const flowTimeline = useMemo(() => {
+    const t = flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null;
+    if (!t || !healthStates) return t;
+    const reads = healthStates.flatMap((r) =>
+      r.status === "ready" && r.data.complete ? [aaveV3ThresholdRead(r.data)] : [],
+    );
+    const hv = aaveV3HealthView(t, reads, {
+      liveHf: liveView?.status === "open" ? (liveView.healthFactor ?? null) : null,
+    });
+    return hv ? { ...t, health: hv.health, priceMarks: { ...t.priceMarks, ...hv.marks } } : t;
+  }, [flowSeries, towerData, view, healthStates, liveView]);
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(
