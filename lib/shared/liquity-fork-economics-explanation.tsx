@@ -296,13 +296,13 @@ export function liquityForkEconomicsContent({
 }: LiquityForkEconomicsParams): LearnMoreContent {
   return {
     title: "About the Economics",
-    intro: `This panel replays the trove's own events on ${name} into lifetime flows. Its current collateral and ${debtSymbol} debt are the balances the trove's last event recorded; the position card above reads the live figures from the chain.`,
+    intro: `This panel replays the trove's own events on ${name} into lifetime flows. Its current collateral and ${debtSymbol} debt are the balances the trove's last event recorded; the position card above reads the live figures from the chain. Debt is valued at ${debtSymbol}'s $1 face.`,
     stepsHeading: "How the tower is built:",
     steps: [
       "Deposited, withdrawn, borrowed and repaid are summed from the trove's own signed balance deltas, event by event.",
       'Debt increases counted as "borrowed" include new draws, the one-time upfront fee, and interest applied whenever an operation touched the trove.',
       "Redemptions and liquidations are kept apart from voluntary flows — each is its own bar.",
-      `USD values use the branch's own oracle price for collateral and ${debtSymbol}'s $1 redemption face for debt, and appear only once that on-chain price has loaded.`,
+      "USD values use the branch's oracle price for collateral, and appear only once that on-chain price has loaded.",
       "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at the latest block's price.",
     ],
     detailsHeading: "Key concepts:",

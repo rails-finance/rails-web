@@ -273,7 +273,7 @@ export function liquityLifetimeFlowsContent(opts: { isBatched?: boolean } = {}):
   return {
     title: "About Lifetime flows",
     intro:
-      "This panel breaks down what the trove costs to carry and traces every unit of debt and collateral that has flowed through it over its lifetime.",
+      "This panel breaks down what the trove costs to carry and traces every unit of debt and collateral that has flowed through it over its lifetime. Debt is valued at BOLD's $1 face.",
     detailsHeading: "Key concepts:",
     details: [
       {
