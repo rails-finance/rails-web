@@ -481,7 +481,13 @@ export default function LlamalendPositionView({
               // card's detail panel open on its first mount.
               persistKeyPrefix="llamalend"
               eventPage={(slot) =>
-                llamalendExplorer.eventPage({ ...slot, controller, user, marketLabel: liveView?.marketLabel })
+                llamalendExplorer.eventPage({
+                  ...slot,
+                  controller,
+                  user,
+                  marketLabel: liveView?.marketLabel,
+                  loanMark: loanMarks?.get(slot.event.id) ?? null,
+                })
               }
               closed={liveView ? liveView.status !== "open" : undefined}
               tl={tl}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
-import { makerdaoEventPageDescription } from "@/lib/makerdao/explorer";
+import { makerdaoEventHeading, makerdaoEventPageDescription } from "@/lib/makerdao/explorer";
 import { loadMakerVaultTail } from "@/lib/makerdao/position-page-data";
 import MakerVaultPage from "../../page";
 
@@ -36,7 +36,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     session: "makerdao",
     subject: vault,
     canonicalPath: `/ethereum/makerdao/${vault}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: makerdaoEventHeading(event), timestamp: event.timestamp } : null,
     description:
       event && isMakerDAOEvent(event)
         ? makerdaoEventPageDescription(event.context.data.ilk, vault, event.timestamp)

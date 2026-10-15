@@ -1848,7 +1848,14 @@ function ChainTruthTimelineBody({
         nextHref: next ? shareHrefFor(next.id) : null,
         timelineHref: viewInTimelineHref,
       });
-      const shell = { contract, title: <EventPageTitle>{contract.heading}</EventPageTitle> };
+      const shell = {
+        contract,
+        title: (
+          <EventPageTitle
+            title={contract.title === "head" ? { kind: contract.heading, amounts: [] } : contract.title}
+          />
+        ),
+      };
       return (
         <EventDateContext.Provider
           value={`${shortDate(pinnedEvent.timestamp)} ${shortDateYear(pinnedEvent.timestamp)}`}

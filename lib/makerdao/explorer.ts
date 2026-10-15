@@ -5,6 +5,9 @@
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
+import { isMakerDAOEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 
 const WORDS = {
   paragraph: "This page is one transaction from this vault's history.",
@@ -28,6 +31,35 @@ export interface MakerdaoEventPageInput extends EventPageSlot {
   owner: string | null;
 }
 
+/** The event's title: T1's word and the amounts its head states. An open
+ *  keeps the word beside the per-axis verbs; an adjust states only the verbs
+ *  ("Deposit 1 ETH Generate 100 DAI"). Also read on the server. */
+export function makerdaoEventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isMakerDAOEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const dink = Number(ctx.dink) || 0;
+  const dart = Number(ctx.dart) || 0;
+  const isOpen = !!ctx.isOpen;
+  const isAdjust = ctx.eventType === "frob" && !isOpen;
+  const perAxis = isOpen || isAdjust;
+  const debtSymbol = ilkDebtSymbol(ctx.ilk);
+  const debt = ctx.debtChange != null ? Number(ctx.debtChange) || 0 : dart;
+  const title = makeEventTitle(event, isOpen ? "Open" : event.actionLabel, [
+    dink !== 0
+      ? { value: dink, symbol: ctx.collateralSymbol, label: perAxis ? (dink > 0 ? "Deposit" : "Withdraw") : undefined }
+      : null,
+    dart !== 0
+      ? { value: debt, symbol: debtSymbol, label: perAxis ? (dart > 0 ? "Generate" : "Repay") : undefined }
+      : null,
+  ]);
+  return isAdjust && title.amounts.length > 0 ? { ...title, kind: "" } : title;
+}
+
+/** The event's heading: the title in words. Also read on the server. */
+export function makerdaoEventHeading(event: BaseActivityEvent): string {
+  return eventTitleWords(makerdaoEventTitle(event));
+}
+
 /** The page's metadata description, also read on the server. */
 export function makerdaoEventPageDescription(ilk: string, vault: string, timestamp: number): string {
   return `${WORDS.description(ilk, short(vault), formatDateLong(timestamp))} ${WORDS.timeline_link}`;
@@ -35,7 +67,8 @@ export function makerdaoEventPageDescription(ilk: string, vault: string, timesta
 
 export const makerdaoExplorer: ExplorerAdapter<MakerdaoEventPageInput> = {
   eventPage: ({ vault, ilk, owner, event, ...slot }) => ({
-    heading: event.actionLabel,
+    heading: makerdaoEventHeading(event),
+    title: makerdaoEventTitle(event),
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,

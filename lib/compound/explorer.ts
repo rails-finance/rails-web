@@ -9,7 +9,8 @@ import { formatDateLong } from "@/lib/date";
 import { isCompoundEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { COMPOUND_DEPLOYMENT, marketOf, type CometMarket } from "@/lib/compound/asset-catalog";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
-import { compoundRowLabel } from "@/lib/compound/row-facts";
+import { compoundAbsorbSplit, compoundRowLabel } from "@/lib/compound/row-facts";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 
 export type CompoundDeployment = "ethereum" | "base";
 
@@ -46,11 +47,20 @@ export function compoundBaseSymbol(event: BaseActivityEvent, deployment: Compoun
   return isCompoundEvent(event) ? cometOf(event.context.data.market, deployment).baseSymbol : null;
 }
 
-/** The event's heading: T1's word. Also read on the server. */
-export function compoundEventHeading(event: BaseActivityEvent, deployment: CompoundDeployment): string {
-  if (!isCompoundEvent(event)) return event.actionLabel;
+/** The event's title: T1's word and the amount its head states (an absorb's
+ *  cleared debt, else the asset moved). Also read on the server. */
+export function compoundEventTitle(event: BaseActivityEvent, deployment: CompoundDeployment): EventTitle {
+  if (!isCompoundEvent(event)) return makeEventTitle(event, event.actionLabel, []);
   const ctx = event.context.data;
-  return compoundRowLabel(ctx, event.actionLabel ?? "", cometOf(ctx.market, deployment).baseDecimals);
+  const kind = compoundRowLabel(ctx, event.actionLabel ?? "", cometOf(ctx.market, deployment).baseDecimals);
+  const split = compoundAbsorbSplit(ctx);
+  const value = split ? Number(split.cleared) : Number(ctx.assetsDelta) || 0;
+  return makeEventTitle(event, kind, [{ value, symbol: ctx.assetSymbol }]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
+export function compoundEventHeading(event: BaseActivityEvent, deployment: CompoundDeployment): string {
+  return eventTitleWords(compoundEventTitle(event, deployment));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -68,6 +78,7 @@ export const compoundExplorer: ExplorerAdapter<CompoundEventPageInput> = {
     const base = compoundBaseSymbol(event, deployment);
     return {
       heading: compoundEventHeading(event, deployment),
+      title: compoundEventTitle(event, deployment),
       words: {
         paragraph: WORDS.paragraph(base ?? "base asset", deployment),
         timelineLink: WORDS.timeline_link,

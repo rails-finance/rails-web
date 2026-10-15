@@ -68,7 +68,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "moonwell-base",
     subject: wallet,
     canonicalPath: `/base/moonwell/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: moonwellEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: moonwellEventHeading(event, "base"), timestamp: event.timestamp } : null,
     description: event ? moonwellEventPageDescription("base", wallet, event.timestamp) : undefined,
   });
 }

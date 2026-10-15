@@ -7,6 +7,7 @@
 import type { EventPageFact, EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
+import { kindTitle } from "@/lib/shared/event-title";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { transmuterListingPath, v2ListingPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { alchemixPositionName, alchemixV2PositionName, type AlchemixPositionKind } from "@/lib/alchemix/naming";
@@ -111,6 +112,10 @@ export const alchemixExplorer: ExplorerAdapter<AlchemixEventPageInput> = {
       input;
     return {
       heading: alchemixEventHeading(event, rows),
+      // The kind word alone: a card's amounts are in the position's MYT share
+      // token, which only the page's live read names, and a transaction's legs
+      // combine into one row; the server's tab title cannot state them.
+      title: kindTitle(alchemixEventHeading(event, rows)),
       words: {
         paragraph: WORDS.paragraph,
         timelineLink: WORDS.timeline_link,

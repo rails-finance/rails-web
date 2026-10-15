@@ -6,6 +6,8 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isMoonwellEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
 
 const WORDS = {
   paragraph: (deployment: string) => `This page is one transaction from this account's history in ${deployment}.`,
@@ -28,9 +30,34 @@ export interface MoonwellEventPageInput extends EventPageSlot {
   deployment: "ethereum" | "base";
 }
 
-/** The event's heading: T1's word. Also read on the server. */
-export function moonwellEventHeading(event: BaseActivityEvent): string {
-  return event.actionLabel;
+/** The event's title: T1's word and the amounts its head states (a
+ *  liquidation's debt covered and mTokens seized, a transfer's mTokens, else
+ *  the underlying moved). Also read on the server. */
+export function moonwellEventTitle(event: BaseActivityEvent, deployment: "ethereum" | "base" = "ethereum"): EventTitle {
+  if (!isMoonwellEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  // Ethereum names its receipt tokens from the market table; Base's are "m" and the symbol.
+  const mSymbolOf = (key: string | null | undefined, symbol: string) =>
+    (deployment === "ethereum" && key ? MOONWELL_MARKET_BY_KEY[key]?.mSymbol : undefined) ?? `m${symbol}`;
+  const kind = event.actionLabel;
+  if (ctx.eventType === "liquidation")
+    return makeEventTitle(event, kind, [
+      { value: Number(ctx.assetsDelta ?? "0") || 0, symbol: ctx.marketSymbol },
+      {
+        value: Number(ctx.seizeTokens ?? "0") || 0,
+        symbol: ctx.collateralSymbol ? mSymbolOf(ctx.collateralMarket, ctx.collateralSymbol) : "",
+      },
+    ]);
+  if (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out")
+    return makeEventTitle(event, kind, [
+      { value: Number(ctx.mTokensDelta ?? "0") || 0, symbol: mSymbolOf(ctx.market, ctx.marketSymbol) },
+    ]);
+  return makeEventTitle(event, kind, [{ value: Number(ctx.assetsDelta ?? "0") || 0, symbol: ctx.marketSymbol }]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
+export function moonwellEventHeading(event: BaseActivityEvent, deployment: "ethereum" | "base" = "ethereum"): string {
+  return eventTitleWords(moonwellEventTitle(event, deployment));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -46,7 +73,8 @@ export const moonwellExplorer: ExplorerAdapter<MoonwellEventPageInput> = {
   eventPage: ({ wallet, deployment, event, ...slot }) => {
     const ctx = isMoonwellEvent(event) ? event.context.data : null;
     return {
-      heading: moonwellEventHeading(event),
+      heading: moonwellEventHeading(event, deployment),
+      title: moonwellEventTitle(event, deployment),
       words: {
         paragraph: WORDS.paragraph(DEPLOYMENT_NAME[deployment]),
         timelineLink: WORDS.timeline_link,

@@ -9,6 +9,7 @@ import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isAaveV3Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
 import { feeLiquidation } from "@/lib/aave-v3/liquidation-fee";
 import { AAVE_V3_PAGE_WORDS, PROSE } from "@/lib/aave-v3/event-templates";
@@ -32,15 +33,43 @@ export interface AaveV3EventPageInput extends EventPageSlot {
   siblings?: SiblingRows;
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (a
+ *  liquidation's collateral and debt, a swap's two legs, else the reserve
+ *  moved). Also read on the server. */
+export function aaveV3EventTitle(
+  event: BaseActivityEvent,
+  deployment: AaveV3Deployment,
+  siblings?: SiblingRows,
+): EventTitle {
+  if (!isAaveV3Event(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const chainId = chainOf(deployment);
+  const kind = aaveV3CtLabel(ctx, !!feeLiquidation(ctx, siblings, chainId), chainId);
+  const amount = Math.abs(Number(ctx.amount ?? "0")) || 0;
+  if (ctx.eventType === "liquidation")
+    return makeEventTitle(event, kind, [
+      { value: Number(ctx.liquidatedCollateralAmount ?? "0") || 0, symbol: ctx.collateralSymbol ?? "" },
+      { value: Number(ctx.debtToCover ?? "0") || 0, symbol: ctx.reserveSymbol },
+    ]);
+  if (ctx.eventType === "swap" && ctx.swap) {
+    const given = { value: amount, symbol: ctx.reserveSymbol };
+    const received = {
+      value: Math.abs(Number(ctx.swap.receivedAmount ?? "0")) || 0,
+      symbol: ctx.swap.receivedSymbol ?? "",
+      address: ctx.swap.receivedAsset,
+    };
+    return makeEventTitle(event, kind, ctx.swap.kind === "supply_from_swap" ? [received, given] : [given, received]);
+  }
+  return makeEventTitle(event, kind, [{ value: amount, symbol: ctx.reserveSymbol }]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function aaveV3EventHeading(
   event: BaseActivityEvent,
   deployment: AaveV3Deployment,
   siblings?: SiblingRows,
 ): string {
-  if (!isAaveV3Event(event)) return event.actionLabel;
-  const chainId = chainOf(deployment);
-  return aaveV3CtLabel(event.context.data, !!feeLiquidation(event.context.data, siblings, chainId), chainId);
+  return eventTitleWords(aaveV3EventTitle(event, deployment, siblings));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -62,6 +91,7 @@ export function aaveV3EventPageDescription(
 export const aaveV3Explorer: ExplorerAdapter<AaveV3EventPageInput> = {
   eventPage: ({ market, wallet, deployment, siblings, event, ...slot }) => ({
     heading: aaveV3EventHeading(event, deployment, siblings),
+    title: aaveV3EventTitle(event, deployment, siblings),
     words: {
       paragraph:
         deployment === "seamless"

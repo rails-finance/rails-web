@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadLiquityV1PositionTail } from "@/lib/liquity-v1/position-page-data";
-import { liquityV1EventPageDescription } from "@/lib/liquity-v1/explorer";
+import { liquityV1EventHeading, liquityV1EventPageDescription } from "@/lib/liquity-v1/explorer";
 import LiquityV1TrovePage from "../../page";
 
 interface Props {
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "liquity-v1",
     subject: raw,
     canonicalPath: `/ethereum/liquity-v1/${raw}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: liquityV1EventHeading(event), timestamp: event.timestamp } : null,
     description: event ? liquityV1EventPageDescription(raw, event.timestamp) : undefined,
   });
 }

@@ -6,6 +6,7 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isCompoundV2Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 
 const WORDS = {
@@ -24,9 +25,39 @@ export interface CompoundV2EventPageInput extends EventPageSlot {
   wallet: string;
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (a
+ *  liquidation's debt covered and cTokens seized, else what the row moved).
+ *  Also read on the server. */
+export function compoundV2EventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isCompoundV2Event(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const cSym = COMPOUND_V2_MARKET_BY_KEY[ctx.market]?.cSymbol ?? `c${ctx.marketSymbol}`;
+  const kind = event.actionLabel;
+  if (ctx.eventType === "liquidation") {
+    const collM = ctx.collateralMarket ? COMPOUND_V2_MARKET_BY_KEY[ctx.collateralMarket] : undefined;
+    return makeEventTitle(event, kind, [
+      { value: Number(ctx.assetsDelta ?? "0") || 0, symbol: ctx.marketSymbol },
+      {
+        value: Number(ctx.seizeTokens ?? "0") || 0,
+        symbol: ctx.collateralSymbol ? (collM?.cSymbol ?? `c${ctx.collateralSymbol}`) : "",
+      },
+    ]);
+  }
+  if (ctx.eventType === "seize_out" || ctx.eventType === "seize_burn")
+    return makeEventTitle(event, kind, [{ value: Number(ctx.cTokensDelta ?? "0") || 0, symbol: cSym }]);
+  const cTokenLane =
+    ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out" || ctx.eventType === "seize_in";
+  return makeEventTitle(event, kind, [
+    {
+      value: Number((cTokenLane ? ctx.cTokensDelta : ctx.assetsDelta) ?? "0") || 0,
+      symbol: cTokenLane ? cSym : ctx.marketSymbol,
+    },
+  ]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function compoundV2EventHeading(event: BaseActivityEvent): string {
-  return event.actionLabel;
+  return eventTitleWords(compoundV2EventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -48,6 +79,7 @@ export const compoundV2Explorer: ExplorerAdapter<CompoundV2EventPageInput> = {
     const market = marketOf(event);
     return {
       heading: compoundV2EventHeading(event),
+      title: compoundV2EventTitle(event),
       words: {
         paragraph: WORDS.paragraph,
         timelineLink: WORDS.timeline_link,

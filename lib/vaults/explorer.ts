@@ -6,6 +6,7 @@
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
+import { kindTitle } from "@/lib/shared/event-title";
 
 /** The three vault families, as the session key each one's listing sits under. */
 export type VaultFamilyKey = "aave-vaults" | "yearn" | "morpho-base";
@@ -58,6 +59,10 @@ export function vaultEventPageDescription(
 export const vaultExplorer: ExplorerAdapter<VaultEventPageInput> = {
   eventPage: ({ family, deployment, vaultName, vault, holder, event, ...slot }) => ({
     heading: event.actionLabel,
+    // The kind word alone: the amounts are in the vault's asset and share
+    // tokens, whose symbols the server's metadata cannot name without a read,
+    // and the tab title must carry the h1's words.
+    title: kindTitle(event.actionLabel),
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,

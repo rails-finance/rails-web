@@ -5,7 +5,8 @@
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { isMorphoEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { shortMarketId } from "@/lib/morpho/asset-catalog";
 
 const WORDS = {
@@ -34,23 +35,34 @@ export interface MorphoEventPageInput extends EventPageSlot {
   deployment: "ethereum" | "base";
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (the side's
+ *  assets moved, and a liquidation's loan repaid). Also read on the server. */
+export function morphoEventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isMorphoEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  return makeEventTitle(event, event.actionLabel, [
+    {
+      value: Number(ctx.assetsDelta) || 0,
+      symbol: ctx.side === "collateral" ? ctx.collateralSymbol : ctx.loanSymbol,
+    },
+    ctx.eventType === "liquidation" ? { value: Number(ctx.loanRepaid) || 0, symbol: ctx.loanSymbol } : null,
+  ]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function morphoEventHeading(event: BaseActivityEvent): string {
-  return event.actionLabel;
+  return eventTitleWords(morphoEventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
-export function morphoEventPageDescription(
-  deployment: "ethereum" | "base",
-  wallet: string,
-  timestamp: number,
-): string {
+export function morphoEventPageDescription(deployment: "ethereum" | "base", wallet: string, timestamp: number): string {
   return `${WORDS.description(DEPLOYMENT_NAME[deployment], short(wallet), formatDateLong(timestamp))} ${WORDS.timeline_link}`;
 }
 
 export const morphoExplorer: ExplorerAdapter<MorphoEventPageInput> = {
   eventPage: ({ marketId, marketLabel, wallet, deployment, event, ...slot }) => ({
     heading: morphoEventHeading(event),
+    title: morphoEventTitle(event),
     words: {
       paragraph: WORDS.paragraph(DEPLOYMENT_NAME[deployment]),
       timelineLink: WORDS.timeline_link,

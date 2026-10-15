@@ -39,7 +39,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     // alone, not paired with the debt symbol.
     market: collateralType,
     canonicalPath: `/base/basedollar/${collateralType}/${troveId}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: liquityForkEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: liquityForkEventHeading(event, "basedollar"), timestamp: event.timestamp } : null,
     description: event
       ? liquityForkEventPageDescription({
           deployment: "basedollar",

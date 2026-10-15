@@ -5,7 +5,8 @@
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { isDolomiteEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 
 const WORDS = {
   paragraph: "This page is one transaction from this account's history on Dolomite.",
@@ -27,9 +28,19 @@ export interface DolomiteEventPageInput extends EventPageSlot {
   accountNumber: string;
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the market asset moved. Also read on the
+ *  server. */
+export function dolomiteEventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isDolomiteEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  return makeEventTitle(event, event.actionLabel, [
+    { value: Number(ctx.weiDelta ?? "0") || 0, symbol: ctx.marketSymbol, address: ctx.marketToken ?? undefined },
+  ]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function dolomiteEventHeading(event: BaseActivityEvent): string {
-  return event.actionLabel;
+  return eventTitleWords(dolomiteEventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -40,6 +51,7 @@ export function dolomiteEventPageDescription(owner: string, accountNumber: strin
 export const dolomiteExplorer: ExplorerAdapter<DolomiteEventPageInput> = {
   eventPage: ({ owner, accountNumber, event, ...slot }) => ({
     heading: dolomiteEventHeading(event),
+    title: dolomiteEventTitle(event),
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
