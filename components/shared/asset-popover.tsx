@@ -19,7 +19,8 @@
 //   • a card can be a link or a toggle: a click on the trigger or inside the
 //     panel never reaches it.
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { QuietTipsContext } from "@/components/shared/reveal-tip";
 import { createPortal } from "react-dom";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { provInspector } from "@/components/shared/provenance";
@@ -78,8 +79,12 @@ export function AssetPopover({
   const chain = chainId ?? pageChain;
   const contract = address ?? getTokenAddress(symbol, chain);
   const label = WORDS.about(symbol);
+  // Inside another control (the position card's breakdown button) the icon
+  // opens nothing: a button may not sit in a button.
+  const quiet = useContext(QuietTipsContext);
 
   const close = () => setOpen(false);
+  if (quiet) return <span className={`inline-flex items-center ${className ?? ""}`}>{children}</span>;
 
   return (
     <span className="inline-flex items-center">
