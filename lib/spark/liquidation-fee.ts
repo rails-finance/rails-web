@@ -18,6 +18,12 @@ export type SparkTimelineEvent = BaseActivityEvent & { context: { protocol: "spa
 export const isSparkTreasury = (a: string | undefined): boolean => a?.toLowerCase() === SPARK_TREASURY;
 export const isSparkWethGateway = (a: string | undefined): boolean => a?.toLowerCase() === SPARK_WETH_GATEWAY;
 
+/** A supply, borrow or repay the WETH gateway made at the Pool for the owner:
+ *  ETH in or out, WETH in the position. */
+export const isGatewayAct = (ctx: SparkContext): boolean =>
+  (ctx.eventType === "supply" || ctx.eventType === "borrow" || ctx.eventType === "repay") &&
+  isSparkWethGateway(ctx.poolCaller);
+
 /** A transfer out to the WETH gateway: a withdrawal to ETH. */
 export const isGatewayWithdrawal = (ctx: SparkContext): boolean =>
   ctx.eventType === "transfer_out" && isSparkWethGateway(ctx.counterparty);
