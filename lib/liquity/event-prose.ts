@@ -319,7 +319,24 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   if (collCp && Math.abs(collCp.change) >= 0.01) v.coll_change = Math.abs(collCp.change);
   if (debtCp && Math.abs(debtCp.change) >= 0.01) v.debt_change = Math.abs(debtCp.change);
 
-  const accrual = stateBefore && stateAfter ? liquityAccrual(ctx, previousEvent, currentEvent, ledger) : null;
+  let accrual = stateBefore && stateAfter ? liquityAccrual(ctx, previousEvent, currentEvent, ledger) : null;
+  // A batch manager's rate change: no TroveOperation log, so its upfront fee
+  // is the rest of the debt's move once the interest and management fee are
+  // taken out, and the accrual is the split's (`batchRateDebtMove`), which the
+  // Lifetime flows ledger shares.
+  const batchMove =
+    ctx.operation === "setBatchManagerAnnualInterestRate" && accrual
+      ? batchRateDebtMove(ctx, previousEvent, currentEvent)
+      : null;
+  if (batchMove && accrual && accrual.source !== "ledger")
+    accrual = {
+      ...accrual,
+      total: batchMove.interest + batchMove.fee,
+      interest: batchMove.interest,
+      fee: batchMove.fee,
+      batched: true,
+      split: true,
+    };
   const safety = stateBefore && stateAfter ? liquityEventSafety(ctx, previousEvent) : null;
   if (safety) {
     v.mcr = safety.mcr;
@@ -797,7 +814,9 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     debt: {
       before: recordedBefore,
       after: debtAfter,
-      upfrontFee: op?.debtIncreaseFromUpfrontFee ?? 0,
+      upfrontFee: rateOnly
+        ? (batchRateDebtMove(ctx, previousEvent, input.currentEvent)?.upfront ?? 0)
+        : (op?.debtIncreaseFromUpfrontFee ?? 0),
       accrued: false,
       accrualMove: false,
       accrualShown: 0,

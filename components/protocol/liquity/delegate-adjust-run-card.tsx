@@ -14,7 +14,6 @@ import {
 } from "@/components/protocol/liquity/delegate-run-sheet";
 import { isLiquityEvent, type BaseActivityEvent } from "@/lib/shared/types/activity";
 import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
-import { rateAfterProv } from "@/lib/liquity/event-provenance";
 import { CountChip } from "@/components/shared/count-chip";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
@@ -96,7 +95,6 @@ export function DelegateAdjustRunCard({
             timestamp: e.timestamp,
             before: c.stateBefore.annualInterestRate,
             after: c.stateAfter.annualInterestRate,
-            prov: rateAfterProv(c, { txHash: e.txHash, blockNumber: e.blockNumber }),
             move: batchRateDebtMove(c, prev, e),
             debt: [c.stateBefore.debt, c.stateAfter.debt] as [number, number],
           },

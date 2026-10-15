@@ -769,7 +769,7 @@ trove_words:
     The run moves the rate alone; its words are the body.
   run_ledgers_none: |-
     A rate adjustment moves no asset.
-  # The run's balance sheet: the debt's moves summed across the run, the rate's sequence under Limits.
+  # The run's balance sheet: the debt's moves summed across the run, the rate summarised under Limits.
   run_sheet_untouched: |-
     Not changed by these events
   run_sheet_interest: |-
@@ -788,8 +788,6 @@ trove_words:
     rate after the last adjustment − rate before the first
   run_sheet_face: |-
     , in USD at $1.00 face
-  run_sheet_before_rate: |-
-    The annual interest rate before the run’s first adjustment — the rate the Trove’s previous event left, which the first adjustment logged as its rate before.
   run_sheet_rate_change: |-
     Interest rate change across the run, in percentage points — the rate after the last adjustment less the rate before the first.
   # ── The position card's explanation: the lead and bullets under the stats ──

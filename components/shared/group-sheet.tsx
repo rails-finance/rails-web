@@ -20,7 +20,12 @@ import type { EventSheet, SheetRow, SheetSide } from "@/components/shared/event-
 import { sheetUsd } from "@/components/shared/event-sheet";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 
-const WORDS = { before: "Before the group", after: "After these events" };
+const WORDS = {
+  before: "Before the group",
+  after: "After these events",
+  interest: "Interest across these events",
+  market: "Market move across these events",
+};
 /** A group's words on its sheet, the same on every family's. */
 export const GROUP_SHEET_WORDS = WORDS;
 
@@ -102,8 +107,72 @@ function summedRows(rows: SheetRow[], label: string, n: number): SheetRow[] | nu
   return out;
 }
 
+/** One figure summed over the members' figures; null where one does not
+ *  read, undefined where none has one. */
+function sumFigure(
+  figs: (SheetRow["amount"] | SheetRow["usd"] | undefined)[],
+  what: string,
+  n: number,
+  usd: boolean,
+): SheetRow["amount"] | null | undefined {
+  const present = figs.filter((f) => f != null);
+  if (present.length === 0) return undefined;
+  // Amounts in different assets do not add up: the USD column carries them.
+  if (!usd && new Set(present.map((f) => (f as SheetRow["amount"])?.symbol ?? "")).size > 1) return undefined;
+  let total = 0;
+  let places = 0;
+  for (const f of present) {
+    const v = parseSheetNumber(f!.text);
+    if (v == null) return null;
+    total += v;
+    places = Math.max(places, placesOf(f!.text as string));
+  }
+  const first = present[0] as SheetRow["amount"];
+  const text = usd
+    ? sheetUsd(total, total > 0 && present.some((f) => String(f!.text).startsWith("+")))
+    : `${total < 0 ? "−" : ""}${Math.abs(total).toLocaleString("en-US", {
+        minimumFractionDigits: places,
+        maximumFractionDigits: places,
+      })}`;
+  return { text, symbol: first?.symbol, address: first?.address, info: sumProv(what, n) };
+}
+
+/** The members' carry-forward rows past the first member's "Last event" (the
+ *  interest, the market move), each summed over the group: what accrued or
+ *  moved between the members belongs to the group's account as much as what
+ *  accrued before the first. Null where a figure does not read. */
+function summedCarry(memberSides: SheetSide[], n: number): SheetRow[] | null {
+  const byKey = new Map<string, (SheetRow & { sub?: SheetRow[] })[]>();
+  for (const side of memberSides)
+    for (const r of side.carry) if (r.key !== "last") byKey.set(r.key, [...(byKey.get(r.key) ?? []), r]);
+  const out: SheetRow[] = [];
+  for (const [key, rs] of byKey) {
+    const label = key === "interest" ? WORDS.interest : key === "market" ? WORDS.market : rs[0].label;
+    const what = typeof label === "string" ? label : key;
+    // A row stated per asset (the interest's lines) sums its lines.
+    const lines = (r: SheetRow & { sub?: SheetRow[] }) => (r.amount ? [r] : (r.sub ?? []));
+    const amount = sumFigure(
+      rs.flatMap((r) => lines(r).map((x) => x.amount)),
+      what,
+      n,
+      false,
+    );
+    const usd = sumFigure(
+      rs.map((r) => r.usd),
+      `${what} in USD`,
+      n,
+      true,
+    );
+    if (amount === null || usd === null) return null;
+    out.push({ key: `group-${key}`, label, amount: amount ?? undefined, usd: usd ?? undefined, tip: rs[0].tip });
+  }
+  return out;
+}
+
 /** The group's sheet from its members' (oldest first); null where they do
- *  not read as one. */
+ *  not read as one. The debt the group started from is the first member's
+ *  "Last event", and every member's accrual and market move is summed into
+ *  the group's rows, so the rows add up from it to the total after. */
 export function mergeGroupSheet(cards: CollectedCard[], label: string): EventSheet | null {
   const sheets = cards.map((c) => c.sheet);
   if (sheets.length === 0 || sheets.some((s) => !s)) return null;
@@ -119,23 +188,30 @@ export function mergeGroupSheet(cards: CollectedCard[], label: string): EventShe
         ...r,
         key: `${cards[i].id}-${r.key}`,
         label:
-          cards[i].number != null ? (
+          cards[i].number == null ? (
+            r.label
+          ) : typeof r.label === "string" ? (
+            `#${cards[i].number} ${r.label}`
+          ) : (
             <>
               #{cards[i].number} {r.label}
             </>
-          ) : (
-            r.label
           ),
       })),
     );
     const rows = legs.length > 0 ? summedRows(legs, label, cards.length) : [];
     if (rows == null) return null;
+    const carried = summedCarry(memberSides as SheetSide[], cards.length);
+    if (carried == null) return null;
+    const lastEvent = s.carry.find((r) => r.key === "last");
     sides.push({
       ...s,
       icons: [...new Set(memberSides.flatMap((x) => x!.icons))],
-      carry: s.carry,
-      before: s.before && { ...s.before, label: WORDS.before },
-      rows,
+      carry: [],
+      before: lastEvent
+        ? { ...lastEvent, key: "before", label: WORDS.before, tip: undefined }
+        : s.before && { ...s.before, label: WORDS.before },
+      rows: [...carried, ...rows],
       assets: legs,
       repaid: undefined,
       total: lastSide.total,

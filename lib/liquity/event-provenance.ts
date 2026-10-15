@@ -191,7 +191,26 @@ export function rateAfterProv(ctx: LiquityContext, coords?: EventCoords): Figure
 /** The upfront fee this operation charged — emitted on the TroveOperation log
  *  and already included in the trove's recorded debt after the event (the
  *  detail's "N fee" sub-line). */
-export function upfrontFeeProv(ctx: LiquityContext, coords?: EventCoords): FigureProv | undefined {
+export function upfrontFeeProv(
+  ctx: LiquityContext,
+  coords?: EventCoords,
+  batchUpfront?: number,
+): FigureProv | undefined {
+  // A batch manager's rate change logs no fee per Trove: the fee is the rest
+  // of the debt's move (`batchRateDebtMove`).
+  if (ctx.operation === "setBatchManagerAnnualInterestRate" && batchUpfront != null && batchUpfront > 0) {
+    const debtSym = ctx.assetType ?? "BOLD";
+    return {
+      value: formatExact(batchUpfront),
+      info: {
+        kind: "chain-derived",
+        verify: changeVerify(coords),
+        summary: `Upfront fee (${debtSym}) charged by this rate change — the delegate changed the batch's rate within 7 days of its previous change, so the protocol added a one-off fee to every Trove in the batch. No log states it per trove: it is the rest of the debt's move once the interest and management fee since the previous event are taken out.`,
+        formula: "debt after − debt before − interest − management fee",
+        inputs: eventInputs({ ...coords, asset: debtSym }),
+      },
+    };
+  }
   const { troveOperation } = ctx;
   const fee = troveOperation?.debtIncreaseFromUpfrontFee ?? 0;
   if (!troveOperation || fee <= 0) return undefined;

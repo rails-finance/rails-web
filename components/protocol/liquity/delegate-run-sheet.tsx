@@ -11,7 +11,7 @@
 
 import { createContext } from "react";
 import type { Provenance } from "@/components/shared/provenance";
-import type { EventSheet, SheetRow, SheetSide, SheetStat } from "@/components/shared/event-sheet";
+import type { EventSheet, SheetRow, SheetSide } from "@/components/shared/event-sheet";
 import { sheetUsd } from "@/components/shared/event-sheet";
 import { GROUP_SHEET_WORDS, type CollectedCard } from "@/components/shared/group-sheet";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
@@ -23,14 +23,13 @@ import { troveWords } from "@/lib/liquity/event-templates";
  *  member's accrual runs from the event before the run (TroveBody). */
 export const PreviousEventContext = createContext<((id: string) => BaseActivityEvent | undefined) | null>(null);
 
-/** One adjustment of the run, oldest first: its rate before and after, the
- *  receipt of the rate after, and its debt before and after. */
+/** One adjustment of the run, oldest first: its rate before and after, and
+ *  its debt before and after. */
 export interface DelegateRunStep {
   id: string;
   timestamp: number;
   before: number;
   after: number;
-  prov?: { info: Provenance; value: string };
   /** The adjustment's debt move, split; null where its previous event or the
    *  batch fee is unknown (the move then counts as accrual). */
   move: BatchRateDebtMove | null;
@@ -38,8 +37,6 @@ export interface DelegateRunStep {
   debt: [number, number];
 }
 
-const UP = "#22C55E";
-const DOWN = "#EF4444";
 const PLACES = 2;
 const DUST = 0.01;
 
@@ -136,8 +133,8 @@ export function mergeDelegateRunSheet(cards: CollectedCard[], steps: DelegateRun
     untouched: troveWords("run_sheet_untouched"),
   };
 
-  // Limits: the rate after the run, its change across the run; the rate's
-  // sequence with the breakdown on.
+  // Limits: the rate after the run, its change across the run. The rate is
+  // summarised, never listed per adjustment.
   const pts = (d: number) => `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toFixed(2)} pts`;
   const panels = last.panels.map((p) => {
     if (p.panel !== "limits" || steps.length === 0) return p;
@@ -158,46 +155,7 @@ export function mergeDelegateRunSheet(cards: CollectedCard[], steps: DelegateRun
           }
         : r,
     );
-    const sequence: SheetStat[] = [
-      ...(s0.before > 0
-        ? [
-            {
-              key: "rate-before-group",
-              label: GROUP_SHEET_WORDS.before,
-              value: {
-                text: `${s0.before.toFixed(2)}%`,
-                info: { kind: "chain-derived", summary: troveWords("run_sheet_before_rate") } as Provenance,
-              },
-            },
-          ]
-        : []),
-      ...steps.map((st) => {
-        const d = st.after - st.before;
-        const dir = st.before > 0 && Math.abs(d).toFixed(2) !== "0.00" ? (d > 0 ? "up" : "down") : null;
-        return {
-          key: `rate-${st.id}`,
-          label: troveWords("run_sheet_event", {
-            number: numberOf.get(st.id) ?? "",
-            date: `${shortDate(st.timestamp)} ${shortDateYear(st.timestamp)}`,
-          }),
-          value: {
-            text: (
-              <span className="inline-flex items-center gap-1.5">
-                {dir && (
-                  <span aria-hidden="true" style={{ color: dir === "up" ? UP : DOWN }}>
-                    {dir === "up" ? "↑" : "↓"}
-                  </span>
-                )}
-                {st.after.toFixed(2)}%
-              </span>
-            ),
-            info: st.prov?.info,
-            value: st.prov?.value,
-          },
-        };
-      }),
-    ];
-    return { ...p, rows, breakdown: [...sequence, ...(p.breakdown ?? [])] };
+    return { ...p, rows };
   });
 
   return { sides: [collSide, debtSide], panels };

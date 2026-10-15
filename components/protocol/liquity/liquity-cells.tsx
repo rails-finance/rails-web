@@ -221,7 +221,7 @@ export function useLiquityCells({
   // shared builders (event-provenance.ts): the header's rate pills echo the
   // rate receipt, so the identity must be built in one place.
   const rateP = rateAfterProv(ctx, coords);
-  const feeP = upfrontFeeProv(ctx, coords);
+  const feeP = upfrontFeeProv(ctx, coords, l2.debt.upfrontFee);
   const collBeforeProv: Provenance =
     isRedemption && troveOperation
       ? {
