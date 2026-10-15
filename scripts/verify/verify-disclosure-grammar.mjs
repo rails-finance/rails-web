@@ -754,21 +754,29 @@ const UNTOUCHED = "Not changed by this event";
 /** The sheet's words, read off its attributes. */
 const sheetWords = (sheet) =>
   sheet.evaluate((s) => {
-    const label = (r) => r.firstElementChild?.textContent.replace(/\s+/g, " ").trim() ?? "";
+    // The words as they read: a heading tip's accessible name ("Collateral,
+    // explain", decision 0038) sits in an .sr-only span the eye never sees.
+    const seen = (el) => {
+      if (!el) return "";
+      const c = el.cloneNode(true);
+      c.querySelectorAll(".sr-only").forEach((n) => n.remove());
+      return c.textContent.replace(/\s+/g, " ").trim();
+    };
+    const label = (r) => seen(r.firstElementChild);
     const sw = s.querySelector("[data-sheet-switch]");
     return {
       switch: sw ? { label: sw.getAttribute("aria-label"), title: sw.getAttribute("title") } : null,
       sides: [...s.querySelectorAll("[data-sheet-side]")].map((e) => ({
         side: e.getAttribute("data-sheet-side"),
         touched: e.getAttribute("data-sheet-touched"),
-        heading: e.querySelector("h3")?.textContent.trim() ?? "",
+        heading: seen(e.querySelector("h3")),
         untouched: e.textContent.split("Not changed by this event").length - 1,
         carry: [...e.querySelectorAll('[data-sheet-layer="carry"] [data-sheet-row]')].map(label),
         before: [...e.querySelectorAll('[data-sheet-row="before"]')].map(label),
       })),
       panels: [...s.querySelectorAll("[data-sheet-panel]")].map((e) => ({
         panel: e.getAttribute("data-sheet-panel"),
-        heading: e.querySelector("h3")?.textContent.trim() ?? "",
+        heading: seen(e.querySelector("h3")),
         rows: [...e.querySelectorAll("[data-sheet-row]")].filter((r) => !r.closest("[data-sheet-layer]")).map(label),
         params: [...e.querySelectorAll('[data-sheet-layer="parameters"] [data-sheet-row]')].map(label),
       })),
