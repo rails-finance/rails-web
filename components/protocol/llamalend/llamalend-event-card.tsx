@@ -67,8 +67,8 @@ export function LlamalendEventCard({
     user: event.wallet,
   };
 
-  // Spine tokens: the event's own moved amounts. direction "right" = away
-  // from the position, "left" = toward it (collateral in / borrowed drawn).
+  // Spine tokens: the event's own moved amounts. direction "right" = toward
+  // the protocol (collateral in / repay), "left" = toward the wallet (collateral out / borrow).
   //
   // Each row also carries the token's contract, taken from the event's flows,
   // which is what the icon chip actually needs — with only a symbol it falls
@@ -88,7 +88,7 @@ export function LlamalendEventCard({
     tokens.push({
       symbol: ctx.collateralSymbol,
       address: soleFlowAddress(event.flows, ctx.collateralSymbol),
-      direction: coll > 0 ? "left" : "right",
+      direction: coll > 0 ? "right" : "left",
       value: Math.abs(coll),
     });
   if (debt !== 0)
