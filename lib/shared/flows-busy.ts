@@ -25,8 +25,10 @@ function inflowAt(m: FlowModel, side: "collateral" | "debt", row = m.rows[m.rows
 /** Events and transactions before the model's first stop (a window's opening). */
 const baseCounts = (m: FlowModel) => ({ events: m.opening?.events ?? 0, txs: m.opening?.txs ?? 0 });
 
-/** The most the collateral has been in the model's stops, today included. */
-const collateralPeak = (m: FlowModel) => Math.max(m.live.collateralUsd, ...m.valued.map((v) => v.collateral));
+/** The most the collateral has been in the model's stops, today included: each
+ *  stop's high (`FlowModel.collateralHigh`), so a position opened and closed
+ *  inside one day counts what it held between. */
+const collateralPeak = (m: FlowModel) => Math.max(m.live.collateralUsd, ...m.collateralHigh);
 
 /** Busy: more than BUSY_EVENTS events in the model's stops, or deposits over
  *  BUSY_TURNOVER times the most the collateral has been in them. Measured
