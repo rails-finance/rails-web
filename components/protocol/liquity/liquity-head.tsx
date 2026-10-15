@@ -118,6 +118,8 @@ export function liquityHeadSpec(
     ];
     // The rate stands on the spine, below the two legs.
     if (rate > 0) spec.ratePill = pill(op === "openTroveAndJoinBatch" ? "delegate" : undefined, false, true);
+    // An open-and-join is the Trove's first join: it names the delegate.
+    if (op === "openTroveAndJoinBatch") spec.manager = manager;
   } else if (op === "redeemCollateral") {
     // The word in the caution tone; the spine draws the legs as two nodes.
     // On a pinned event page below sm, the legs follow the word: the

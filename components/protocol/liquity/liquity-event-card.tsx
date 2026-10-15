@@ -323,14 +323,12 @@ export function LiquityEventCard({
     spine,
     head,
     caption: isRateChange && rateSpan ? `Rate ${rateSpan[1].toFixed(2)}%` : liquityL1Label(ctx),
-    // A third party's act names who acted: the redeemer, the batch manager
-    // moving a delegated Trove's rate.
+    // A third party's act names who acted: the redeemer. The batch manager
+    // moving a delegated Trove's rate goes unnamed ("Rate 3.60%"), the join
+    // having named it; the spine still runs dotted.
     actor: {
-      by: isRedemption
-        ? ctx.redeemer
-        : ctx.operation === "setBatchManagerAnnualInterestRate"
-          ? ctx.batchManager
-          : undefined,
+      by: isRedemption ? ctx.redeemer : undefined,
+      byOwner: ctx.operation === "setBatchManagerAnnualInterestRate" ? false : undefined,
       custody:
         ctx.operation === "transferTrove" && ctx.transfer
           ? ctx.transfer.toAddress?.toLowerCase() === event.wallet?.toLowerCase()
