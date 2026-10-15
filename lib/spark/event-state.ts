@@ -10,7 +10,7 @@
 import {
   baseToUsd,
   findReserve,
-  humanOf,
+  liquidationBasis,
   wadToNumber,
   type AaveV3PositionState,
   type AaveV3PositionStateReserve,
@@ -103,35 +103,6 @@ function effective(r: AaveV3PositionStateReserve, emode: SparkEmodeRead): { lt: 
   return { lt: r.liquidationThresholdBps ?? 0, ltv: r.ltvBps ?? 0 };
 }
 
-const priceOf = (r: AaveV3PositionStateReserve): number | null =>
-  r.priceBase == null ? null : Number(r.priceBase) / 1e8;
-
-/** The balances before the transaction, valued at the block's oracle prices:
- *  the health factor (Σ collateral × price × threshold ÷ Σ debt × price) and
- *  the loan-to-value (Σ debt × price ÷ Σ collateral × price, the collateral the
- *  Pool counts: switched on, threshold above 0). */
-function atBlockPrices(
-  state: AaveV3PositionState,
-  emode: SparkEmodeRead,
-): { hf: number | null; ltv: number | null } | null {
-  let weighted = 0;
-  let coll = 0;
-  let debt = 0;
-  for (const r of state.reserves) {
-    const p = priceOf(r);
-    if (p == null || r.decimals == null) return null;
-    const supply = Number(humanOf(r.supply.before, r.decimals));
-    const owed = Number(humanOf(r.debt.before, r.decimals));
-    const lt = effective(r, emode).lt;
-    if (r.collateral?.before && supply > 0 && lt > 0) {
-      weighted += supply * p * (lt / 1e4);
-      coll += supply * p;
-    }
-    debt += owed * p;
-  }
-  return { hf: debt > 0 ? weighted / debt : null, ltv: coll > 0 ? debt / coll : null };
-}
-
 export function sparkEventState(
   ctx: SparkContext,
   reserveAddress: string | undefined,
@@ -176,22 +147,10 @@ export function sparkEventState(
     if (best && Math.abs(best.to / best.from - 1) >= 0.005) out.priceMove = best;
   }
   if (isLiq) {
-    const atCall = atBlockPrices(here, emodeBefore);
-    out.liqHfAtCall = atCall?.hf ?? null;
-    out.liqLtvAtCall = atCall?.ltv ?? null;
-    // The collateral's price at the end of N−1: its USD share of the account's
-    // collateral then, over the balance before (the only collateral, or the
-    // move is not stated).
-    const held = here.reserves.filter(
-      (r) => r.collateral?.before && r.decimals != null && Number(humanOf(r.supply.before, r.decimals)) > 0,
-    );
-    if (held.length === 1 && reserve && held[0].reserve === reserve.reserve && reserve.decimals != null) {
-      const amount = Number(humanOf(reserve.supply.before, reserve.decimals));
-      const from = before.collateralUsd / amount;
-      const to = priceOf(reserve);
-      if (to != null && amount > 0 && Math.abs(to / from - 1) >= 0.0005)
-        out.liqPriceMove = { symbol: reserve.symbol ?? "the collateral", from, to };
-    }
+    const basis = liquidationBasis(here);
+    out.liqHfAtCall = basis?.hf ?? null;
+    out.liqLtvAtCall = basis?.ltv ?? null;
+    if (basis?.priceMove) out.liqPriceMove = basis.priceMove;
   }
   return out;
 }
