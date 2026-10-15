@@ -151,6 +151,8 @@ const debtProv = (v: PolarisPositionView): Provenance =>
   v.basis === "chain" ? liveEntireProv("debt", v.market) : latestStateProv("debt", v.market);
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
+/** A floor at the grain it is set in: "115%", "112.5%". */
+const pctShort = (f: number): string => `${Number((f * 100).toFixed(1))}%`;
 
 /** What the Debt label says on a CDP that owes nothing. */
 const COLLATERAL_ONLY_TIP =
@@ -403,10 +405,10 @@ export function polarisCardSlots({
   };
 
   // The listing names the holder and the CDP; the detail page's wallet row
-  // names the holder and the card's ⋮ the CDP, so the card states the market
-  // and the network.
+  // names the holder, the card's ⋮ the CDP and the page heading the testnet,
+  // so the card states the market.
   const identity = detail ? (
-    <span className="text-xs text-rb-500">Sepolia testnet · {stable} market</span>
+    <span className="text-xs text-rb-500">{stable} market</span>
   ) : (
     <span className="flex items-center gap-2">
       {v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmarkProtocol="polaris" />}
@@ -569,26 +571,43 @@ export function polarisCardSlots({
             </span>
           ) : null,
         pending: v.icr == null && v.pricePending && v.debt > 0,
+        sub:
+          mcrInForce != null ? (
+            <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(mcrInForce)}>
+              <span>Minimum ratio {pctShort(mcrInForce)}</span>
+            </Prov>
+          ) : undefined,
       },
     ];
+    // The rate the market charges, on a CDP whose debt accrues it.
+    const owesRecorded = index ? v.debt > 0 : (v.recordedDebt ?? 0) > 0;
+    if (owesRecorded)
+      heads.push({
+        id: "interest-rate",
+        label: "Interest rate",
+        labelTip: "The yearly rate the market charges on debt, set by the market and read at this block.",
+        value:
+          v.interestRate != null ? (
+            <Prov info={liveRateProv("combined", v.market, index)}>
+              <span>{(v.interestRate * 100).toFixed(2)}%</span>
+            </Prov>
+          ) : null,
+        pending: v.interestRate == null && v.pricePending,
+      });
   }
 
-  // The test-figure line stays in view on the detail card; a CDP under the
-  // minimum ratio adds its warning above the headlines.
-  const notice = detail ? (
-    <>
-      <p className="mb-3 text-xs text-rb-500">Every figure on this page is a test figure.</p>
-      {!ended && v.basis === "chain" && v.icr != null && v.mcr != null && v.icr < v.mcr && (
-        <div className="notice-caution flex items-start gap-2 p-3 mb-3 text-sm text-caution-700 dark:text-caution-400">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <p>
-            Below the minimum ratio — {(v.icr * 100).toFixed(1)}% against {(v.mcr * 100).toFixed(0)}%; anyone may
-            liquidate it
-          </p>
-        </div>
-      )}
-    </>
-  ) : undefined;
+  // A CDP under the minimum ratio carries its warning above the headlines. The
+  // testnet is said once, by the pill in the page heading (ProtocolIdentity).
+  const notice =
+    detail && !ended && v.basis === "chain" && v.icr != null && v.mcr != null && v.icr < v.mcr ? (
+      <div className="notice-caution flex items-start gap-2 p-3 mb-3 text-sm text-caution-700 dark:text-caution-400">
+        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+        <p>
+          Below the minimum ratio — {(v.icr * 100).toFixed(1)}% against {(v.mcr * 100).toFixed(0)}%; anyone may
+          liquidate it
+        </p>
+      </div>
+    ) : undefined;
 
   const common = { status, heads, identity, notice, counters };
   if (!detail) return { ...common, notice: undefined, surface: "listing", menu: null, outcome };
@@ -608,8 +627,8 @@ export function polarisCardSlots({
   };
   if (outcome) return { ...detailCommon, outcome };
 
-  // The panel: the market's floor and the CDP's valuation on the left, the
-  // rate and what is pending on the right.
+  // The panel: the CDP's valuation and the market's mode on the left, what
+  // the debt costs and what is pending on the right.
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
   if (v.basis === "chain" && v.equity != null && v.coll > 0) {
@@ -618,25 +637,17 @@ export function polarisCardSlots({
       label: "Equity at the feed",
       tip: "The collateral at the market's price feed less the debt owed, read at this block; it moves with the feed and can be negative.",
       value: (
-        <Prov info={liveEquityProv(v.market)}>
-          <span>
-            <CardFigure value={v.equity} symbol={stable} signed /> {stable}
-          </span>
-        </Prov>
+        <TokenFigure symbol={stable} address={stableAddress}>
+          <Prov info={liveEquityProv(v.market)}>
+            <span>
+              <CardFigure value={v.equity} symbol={stable} signed />
+            </span>
+          </Prov>
+        </TokenFigure>
       ),
     });
   }
   if (v.mcr != null) {
-    left.push({
-      id: "minimum-ratio",
-      label: "Minimum ratio",
-      tip: "The collateral ratio under which anyone may liquidate the CDP, read from the market at this block.",
-      value: (
-        <Prov info={liveMcrProv(v.defensiveMode, v.market, index)} value={pct(v.mcr)}>
-          <span>{pct(v.mcr)}</span>
-        </Prov>
-      ),
-    });
     if (v.defensiveMode) {
       left.push({
         id: "defensive-mode",
@@ -650,19 +661,6 @@ export function polarisCardSlots({
       });
     }
   }
-  const owesRecorded = index ? v.debt > 0 : (v.recordedDebt ?? 0) > 0;
-  if (v.interestRate != null && owesRecorded) {
-    right.push({
-      id: "interest-rate",
-      label: "Interest rate",
-      tip: "The yearly rate the market charges on debt, set by the market and read at this block.",
-      value: (
-        <Prov info={liveRateProv("combined", v.market, index)}>
-          <span>{(v.interestRate * 100).toFixed(2)}% per year</span>
-        </Prov>
-      ),
-    });
-  }
   const annualCost =
     v.basis === "chain" && v.recordedDebt != null && v.recordedDebt > 0 && v.interestRate != null
       ? v.recordedDebt * v.interestRate
@@ -673,7 +671,7 @@ export function polarisCardSlots({
       label: "Costs per year",
       tip: "A year of interest at today's rate on the debt recorded at the last touch, the base the contract accrues on; the rate moves.",
       value: (
-        <TokenFigure symbol={stable}>
+        <TokenFigure symbol={stable} address={stableAddress}>
           <Prov info={polarisAnnualCostProv(v.market)} value={String(annualCost)} symbol={stable}>
             <span>
               ~<CardSumAmount value={annualCost} />
@@ -689,88 +687,18 @@ export function polarisCardSlots({
       label: "Reward pending",
       tip: "pETH the CDP has earned from the protocol's fees and not yet settled; it joins the collateral at the next touch.",
       value: (
-        <Prov info={livePendingProv("bcTokenGain", v.market)}>
-          <span>
-            <AmountText value={v.pendingReward} /> pETH
-          </span>
-        </Prov>
+        <TokenFigure symbol={PETH.symbol} address={PETH.address}>
+          <Prov info={livePendingProv("bcTokenGain", v.market)}>
+            <span>
+              <AmountText value={v.pendingReward} />
+            </span>
+          </Prov>
+        </TokenFigure>
       ),
     });
   }
-  if (v.basis === "chain" && v.blockNumber != null) {
-    right.push({
-      id: "block",
-      label: "As of block",
-      tip: "Every figure on this card is read at this one block; the pending legs move at every block.",
-      // The block is the page's stamp and carries no receipt.
-      value: <span data-prov-exempt="">{v.blockNumber.toLocaleString("en-US")}</span>,
-    });
-  }
 
-  return { ...detailCommon, outcome: undefined, panel: [left, right], foot: debtSum(v) };
-}
-
-/** The entire debt as a sum the reader can add up: the debt the last touch
- *  recorded, then each leg pending since, at the card's block. */
-function debtSum(v: PolarisPositionView): ReactNode {
-  const hasPendingLegs = (v.pendingInterest ?? 0) > 0 || (v.pendingStables ?? 0) > 0 || (v.pendingPsmDebt ?? 0) !== 0;
-  if (v.basis !== "chain" || v.recordedDebt == null || !hasPendingLegs) return undefined;
-  const stable = v.stableSymbol;
-  const psm = v.pendingPsmDebt ?? 0;
-  return (
-    <p className="mt-3 text-xs text-rb-500" data-polaris-debt-sum="">
-      Owed at this block:{" "}
-      <Prov info={liveRecordedDebtProv(v.market)} value={String(v.recordedDebt)}>
-        <span>
-          <CardSumAmount value={v.recordedDebt} />
-        </span>
-      </Prov>{" "}
-      recorded at the last touch
-      {(v.pendingInterest ?? 0) > 0 && (
-        <>
-          {" + "}
-          <Prov info={livePendingProv("accruedInterest", v.market)} value={String(v.pendingInterest)}>
-            <span>
-              <CardSumAmount value={v.pendingInterest ?? 0} />
-            </span>
-          </Prov>{" "}
-          interest
-        </>
-      )}
-      {(v.pendingStables ?? 0) > 0 && (
-        <>
-          {" − "}
-          <Prov info={livePendingProv("accruedStables", v.market)} value={String(v.pendingStables)}>
-            <span>
-              <CardSumAmount value={v.pendingStables ?? 0} />
-            </span>
-          </Prov>{" "}
-          stability gain
-        </>
-      )}
-      {psm !== 0 && (
-        <>
-          {psm < 0 ? " − " : " + "}
-          <Prov info={livePendingProv("mintRedeemDebt", v.market)} value={String(psm)}>
-            <span>
-              <CardSumAmount value={Math.abs(psm)} />
-            </span>
-          </Prov>{" "}
-          net PSM share
-        </>
-      )}
-      {" = "}
-      <Prov info={liveEntireProv("debt", v.market)} value={String(v.debt)}>
-        <span className="font-semibold text-foreground">
-          {v.debt < 0 ? "−" : ""}
-          <CardSumAmount value={Math.abs(v.debt)} />
-        </span>
-      </Prov>{" "}
-      {stable}
-      {v.debt <= 0 ? ": at or below zero, so it owes nothing, and the next touch settles the debt to zero" : ""}. A
-      touch is any transaction on the CDP; these pending legs are written into its figures at the next one.
-    </p>
-  );
+  return { ...detailCommon, outcome: undefined, panel: [left, right] };
 }
 
 /** The Polaris CDP card: its slots, drawn by the shared card. */

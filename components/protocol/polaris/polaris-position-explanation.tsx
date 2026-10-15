@@ -17,9 +17,15 @@ import type { ReactNode } from "react";
 import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 import type { PolarisLifetime } from "@/lib/polaris/economics";
 import { LIFETIME_LEGS, lifetimeLegProv, type PolarisLifetimeLeg } from "@/lib/polaris/event-provenance";
-import { liveEntireProv, liveEquityProv, livePethInDebtProv } from "@/lib/polaris/live-provenance";
+import {
+  liveEntireProv,
+  liveEquityProv,
+  livePendingProv,
+  livePethInDebtProv,
+  liveRecordedDebtProv,
+} from "@/lib/polaris/live-provenance";
 import { PETH } from "@/lib/polaris/asset-catalog";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatExact, formatNumber, formatUnitsExact, withRealMinus } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
@@ -154,6 +160,62 @@ export function PolarisPositionExplanation({
         stable: stableSymbol,
       }),
     );
+  }
+
+  // The debt as a sum: the figure the last touch recorded, then each leg
+  // pending since, which the next touch writes in.
+  const psm = chain.mintRedeemDebtChange ?? 0;
+  const sumLegs: { sign: "+" | "−"; value: number; word: string; prov: Provenance }[] = [];
+  if ((chain.accruedInterest ?? 0) > 0)
+    sumLegs.push({
+      sign: "+",
+      value: chain.accruedInterest,
+      word: positionWords("sum_interest"),
+      prov: livePendingProv("accruedInterest", chain.market),
+    });
+  if ((chain.accruedStables ?? 0) > 0)
+    sumLegs.push({
+      sign: "−",
+      value: chain.accruedStables,
+      word: positionWords("sum_gain"),
+      prov: livePendingProv("accruedStables", chain.market),
+    });
+  if (psm !== 0)
+    sumLegs.push({
+      sign: psm < 0 ? "−" : "+",
+      value: Math.abs(psm),
+      word: positionWords("sum_psm"),
+      prov: livePendingProv("mintRedeemDebt", chain.market),
+    });
+  if (chain.isOpen && chain.recordedDebt != null && sumLegs.length > 0) {
+    add(
+      "holdings",
+      "debt_sum",
+      <span data-polaris-debt-sum="">
+        {positionNodes("debt_sum", {
+          recorded: (
+            <Prov info={liveRecordedDebtProv(chain.market)} value={String(chain.recordedDebt)} symbol={stableSymbol}>
+              <H>
+                <AmountText value={chain.recordedDebt} />
+              </H>
+            </Prov>
+          ),
+          stable: stableSymbol,
+          legs: sumLegs.map((leg) => (
+            <span key={leg.word}>
+              {` ${leg.sign} `}
+              <Prov info={leg.prov} value={String(leg.value)} symbol={stableSymbol}>
+                <H>
+                  <AmountText value={leg.value} />
+                </H>
+              </Prov>{" "}
+              {leg.word}
+            </span>
+          )),
+        })}
+      </span>,
+    );
+    add("holdings", "debt_touch", positionNodes("debt_touch"));
   }
 
   if (chain.isOpen && hasDebt && chain.icr != null) {
