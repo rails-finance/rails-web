@@ -26,11 +26,23 @@ export interface CombinedStop {
   point: number | null;
   /** The day has events. */
   event: boolean;
+  /** On a closed position's live stop: the close day's stop, which it stands
+   *  for. */
+  close?: number;
+}
+
+/** A closed position's close day (`model.lastDay`, the last event's day,
+ *  after which nothing is held), or null while anything is held. The chart
+ *  ends there (rails-ops reference/lifetime-price-chart.md, ruling 14). */
+export function closeStop(model: FlowModel): number | null {
+  const held = model.heldAt[model.heldAt.length - 1] ?? [];
+  return held.some((h) => (h.amount ?? 0) > 0) ? null : model.lastDay;
 }
 
 /** The cursor's stops, ascending: every point of the line and every day with
  *  events, one stop per day; the last is the live stop. Without a series, the
- *  event days and the live stop. `from` is the stop the bars' window opens on
+ *  event days and the live stop. On a closed position the live stop stands
+ *  on the close day, which has no other stop. `from` is the stop the bars' window opens on
  *  (0 where it covers the whole life). `extra` adds one more day (the day
  *  of a cut restored from the address bar) where it has no stop. */
 export function combinedStops(
@@ -40,18 +52,20 @@ export function combinedStops(
   extra: number | null = null,
 ): CombinedStop[] {
   const startDay = model.start / DAY_MS;
+  const close = closeStop(model);
+  const end = close ?? model.liveStop;
   const byStop = new Map<number, { point: number | null; event: boolean }>();
   const n = series?.points.length ?? 0;
   for (let i = 0; i < n - 1; i++) {
     const stop = Math.max(0, Math.min(model.liveStop, series!.points[i][1] - startDay));
-    if (stop < model.liveStop) byStop.set(stop, { point: i, event: false });
+    if (stop < end) byStop.set(stop, { point: i, event: false });
   }
   for (const d of model.eventDays) {
-    if (d >= model.liveStop) continue;
+    if (d >= end) continue;
     const had = byStop.get(d);
     byStop.set(d, { point: had?.point ?? null, event: true });
   }
-  if (extra != null && extra >= 0 && extra < model.liveStop && !byStop.has(extra))
+  if (extra != null && extra >= 0 && extra < end && !byStop.has(extra))
     byStop.set(extra, { point: null, event: false });
   const out: CombinedStop[] = [...byStop]
     .sort((a, b) => a[0] - b[0])
@@ -67,7 +81,8 @@ export function combinedStops(
     barStop: model.liveStop - from,
     live: true,
     point: n > 0 ? n - 1 : null,
-    event: model.eventDays.includes(model.liveStop),
+    event: model.eventDays.includes(close ?? model.liveStop),
+    ...(close != null ? { close } : {}),
   });
   return out;
 }
@@ -75,6 +90,13 @@ export function combinedStops(
 /** The line strip's time axis spans at least this many days (a week, the
  *  line's shortest bin). */
 export const AXIS_MIN_DAYS = 7;
+
+/** The time axis's last day (absolute UTC): a closed position's close day,
+ *  otherwise `today`. */
+export function axisEndDay(model: FlowModel, today: number): number {
+  const close = closeStop(model);
+  return close == null ? today : model.start / DAY_MS + close;
+}
 
 /** The days the line strip's time axis spans, from the first event's day
  *  (`startDay`) to the end of `today` (absolute UTC days): the life, or
@@ -95,11 +117,11 @@ export function eventStep(stops: CombinedStop[], at: number, dir: -1 | 1): numbe
 }
 
 /** The stop for a day's close (`stop`, the whole life's day index): that
- *  day's stop, the live stop for today or later, or null where the day has
- *  no stop. */
+ *  day's stop, the live stop for today or later (for a closed position's
+ *  close day or later), or null where the day has no stop. */
 export function stopForDay(stops: CombinedStop[], stop: number): number | null {
   const last = stops.length - 1;
-  if (last >= 0 && stop >= stops[last].stop) return last;
+  if (last >= 0 && stop >= (stops[last].close ?? stops[last].stop)) return last;
   const i = stops.findIndex((x) => !x.live && x.stop === stop);
   return i >= 0 ? i : null;
 }

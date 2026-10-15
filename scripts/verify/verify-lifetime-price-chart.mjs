@@ -32,7 +32,9 @@
 //     runway's is the price's;
 //   - a day with redemptions states the last one's redemption price at its block;
 //   - on an open Trove the level's last point is today's and equals the
-//     card's "Liquidates at", and the runway at the last stop is the card's.
+//     card's "Liquidates at", and the runway at the last stop is the card's;
+//   - on the liquidated Trove the last stop reads the close day, and the
+//     price line draws no day after it (ruling 14).
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
 
@@ -315,6 +317,28 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
       `${tag}: the level's last point is today's and equals the card's "Liquidates at"`,
       end != null && Number(end.day) === today && card != null && formatLiquidationPrice(Number(end.value)) === card,
       `level ${end?.day} ${end?.value} (${end ? formatLiquidationPrice(Number(end.value)) : "-"}), card ${card}`,
+    );
+  }
+  if (pg.trove === "liquidated") {
+    // A closed position's chart ends at the close (ruling 14): the last stop
+    // reads the close day, plain, and the line draws no day after it.
+    const liqDay = Math.floor(rows.find((r) => r.liquidation).ts / DAY);
+    const close = await page.evaluate(() => {
+      const r = document.querySelector("[data-price-readout]");
+      const g = document.querySelector("[data-price-line]");
+      const days = ["data-price-observed", "data-price-carried"].flatMap((a) =>
+        (g?.getAttribute(a) ?? "").split(",").filter(Boolean).map(Number),
+      );
+      return {
+        day: r?.getAttribute("data-price-day"),
+        green: /text-green/.test(r?.className ?? ""),
+        last: Math.max(...days),
+      };
+    });
+    check(
+      `${tag}: at the last stop the heading reads the close day, and the line ends there`,
+      Number(close.day) <= liqDay && !close.green && close.last === liqDay,
+      `readout day ${close.day}${close.green ? " (live green)" : ""}, line's last day ${close.last}, liquidation ${liqDay}`,
     );
   }
   // The runway and the redemption price left the chart's readout for the
