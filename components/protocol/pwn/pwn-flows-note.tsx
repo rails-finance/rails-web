@@ -24,7 +24,7 @@ export function PwnFlowsNote({ facts, collSymbol, collLabel, creditSymbol, apr, 
   const f = facts;
   const coll = collLabel ? `${collSymbol} ${collLabel}` : collSymbol;
   return (
-    <div className="space-y-2" data-pwn-flows-note="" data-anatomy="F14·pwn">
+    <div className="space-y-2" data-pwn-flows-note="" data-anatomy="F14">
       <p>
         The bars are the loan&apos;s two sides: the collateral the borrower locked ({coll}) and the debt the borrower
         owes the lender.

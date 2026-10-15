@@ -25,7 +25,7 @@ export function LiquityFlowsNote({
   daily = false,
 }: LiquityFlowsNoteProps): ReactNode {
   return (
-    <div className="space-y-2" data-liquity-flows-note="" data-anatomy="F14·liquity">
+    <div className="space-y-2" data-liquity-flows-note="" data-anatomy="F14">
       <p>
         The collateral side adds up to what the Trove holds: {collSymbol} deposited, plus redistribution gains from
         liquidated Troves, less what was withdrawn, taken by redemptions and liquidated (and, after a liquidation, the
@@ -102,7 +102,7 @@ export function LiquityV1FlowsNote({
 }: LiquityV1FlowsNoteProps): ReactNode {
   const n = (k: number, one: string, many: string) => (k === 1 ? one : `${k.toLocaleString("en-US")} ${many}`);
   return (
-    <div className="space-y-2" data-liquity-flows-note="v1" data-anatomy="F14·liquity">
+    <div className="space-y-2" data-liquity-flows-note="v1" data-anatomy="F14">
       <p>
         The collateral side adds up to what the Trove holds: ETH deposited, plus redistribution gains from liquidated
         Troves, less what was withdrawn, taken by redemptions and liquidated (and the surplus left to claim where a

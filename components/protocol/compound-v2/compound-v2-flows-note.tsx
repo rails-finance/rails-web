@@ -28,7 +28,7 @@ export function CompoundV2FlowsNote({ facts }: { facts: CompoundV2FlowsFacts | n
     ...(liquidated ? ["seized in liquidations"] : []),
   ];
   return (
-    <div className="space-y-2" data-compound-v2-flows-note="" data-anatomy="F14·compound-v2">
+    <div className="space-y-2" data-compound-v2-flows-note="" data-anatomy="F14">
       <p>
         A Compound V2 account supplies and borrows on any of its markets under one account liquidity, so each bar adds
         every market in USD, each flow at Compound&apos;s oracle price for its market at its block. The collateral bar

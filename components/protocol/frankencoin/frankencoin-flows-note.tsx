@@ -21,7 +21,7 @@ const count = (k: number, one: string, many: string) => (k === 1 ? one : `${k.to
 export function FrankencoinFlowsNote({ facts, collSymbol, clone }: FrankencoinFlowsNoteProps): ReactNode {
   const f = facts;
   return (
-    <div className="space-y-2" data-frankencoin-flows-note="" data-anatomy="F14·frankencoin">
+    <div className="space-y-2" data-frankencoin-flows-note="" data-anatomy="F14">
       <p>
         Frankencoin has no price oracle, so nothing states what the {collSymbol} is worth in ZCHF: the collateral bar is
         in {collSymbol} and the debt bar in ZCHF, each on its own scale, and the two lengths do not compare. The line

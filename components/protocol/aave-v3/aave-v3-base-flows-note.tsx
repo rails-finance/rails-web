@@ -53,7 +53,7 @@ export function AaveV3BaseFlowsNote({
   const p = facts?.priced;
   const other = p ? p.day + p.nearest + p.today : 0;
   return (
-    <div className="space-y-2" data-aave-base-flows-note="" data-anatomy="F14·aave-v3-base">
+    <div className="space-y-2" data-aave-base-flows-note="" data-anatomy="F14">
       <p>
         An account on {pool} supplies and borrows any of its reserves under one health factor, so each bar adds every
         reserve in USD, each flow at {brand}&apos;s oracle price for its reserve at its block. The collateral bar adds

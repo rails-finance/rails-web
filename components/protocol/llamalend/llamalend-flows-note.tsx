@@ -23,7 +23,7 @@ export function LlamalendFlowsNote({ facts, collSymbol, debtSymbol }: LlamalendF
   const priced = p ? p.row + p.nearest + p.today : 0;
   const soft = facts ? facts.softSold + facts.boughtBack : 0;
   return (
-    <div data-llamalend-flows-note="" data-anatomy="F14·llamalend">
+    <div data-llamalend-flows-note="" data-anatomy="F14">
       <ExplainGroup title="Soft liquidation">
         <ExplainBullet>The AMM sells {collSymbol} as its price falls and buys it back as it rises</ExplainBullet>
         <ExplainBullet>

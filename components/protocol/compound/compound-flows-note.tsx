@@ -25,7 +25,7 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
   const two = roles ? roles.collateral || roles.debt : true;
   const lent = roles?.supply ?? !two;
   return (
-    <div className="space-y-2" data-compound-flows-note="" data-anatomy="F14·compound">
+    <div className="space-y-2" data-compound-flows-note="" data-anatomy="F14">
       <p>
         Each flow is valued in USD at Comet&apos;s oracle price at its block, the price its liquidation engine reads
         {ethQuoted

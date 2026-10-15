@@ -28,7 +28,7 @@ export function MakerFlowsNote({ facts, collSymbol, debtSymbol, ilk, capped }: M
   const p = facts?.pricing;
   const store = facts?.between !== "carried";
   return (
-    <div className="space-y-2" data-makerdao-flows-note="" data-anatomy="F14·makerdao">
+    <div className="space-y-2" data-makerdao-flows-note="" data-anatomy="F14">
       <p>
         Each event records the vault&apos;s collateral and debt after it, and the debt is what the Vat states: the
         vault&apos;s normalized debt × {ilk}&apos;s rate accumulator at the block. So the stability fee between two

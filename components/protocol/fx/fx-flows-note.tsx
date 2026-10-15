@@ -20,7 +20,7 @@ export function FxFlowsNote({ facts, collSymbol, tokenSymbol }: FxFlowsNoteProps
   const p = facts?.pricing;
   const pool = facts ? facts.rebalances + facts.redemptions + facts.poolLiquidations : 0;
   return (
-    <div className="space-y-2" data-fx-flows-note="" data-anatomy="F14·fx">
+    <div className="space-y-2" data-fx-flows-note="" data-anatomy="F14">
       <p>
         Every figure is in fxUSD, the pool&apos;s debt token: fxUSD is not pinned to a dollar, and the pool&apos;s
         oracle prices {collSymbol} in fxUSD, the price it holds the debt against. Each {collSymbol} flow is converted at

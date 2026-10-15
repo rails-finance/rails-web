@@ -25,7 +25,7 @@
 // shell knows, so it declares it: <ProvUnscoped> keeps the dev unscoped-<Prov>
 // warning quiet for listing rows and loud everywhere else.
 //
-// Hooks for the verifiers: the frame keeps `data-anatomy="P1"`,
+// Hooks for the verifiers: the frame keeps `data-anatomy="P1 C1"` (`C1` on a listing card),
 // `data-skel-section` and `data-prov-scope="position-card"`, and adds
 // `data-position-card-shell` and `data-card-status` (and, outside production,
 // `data-card-over-cap` on a card past the caps); each headline keeps
@@ -355,6 +355,7 @@ function HeadBody({
         .join(", ")}
       className={`-mx-1.5 -my-1 flex cursor-pointer flex-wrap items-center gap-x-1.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${toggle.open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
       data-card-assets-toggle={head.id}
+      data-anatomy="C19"
     >
       <QuietTipsContext.Provider value={true}>
         <ProvInert>{head.value}</ProvInert>
@@ -635,7 +636,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-position-card-shell=""
       data-card-status={slots.status ? slots.status.word.toLowerCase() : "live"}
       data-skel-section={detail ? "detail-card" : "listing-row"}
-      data-anatomy={detail ? "P1" : undefined}
+      data-anatomy={detail ? "P1 C1" : "C1"}
       data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
       data-prov-lit={lit ? "" : undefined}
       data-card-over-cap={over ?? undefined}

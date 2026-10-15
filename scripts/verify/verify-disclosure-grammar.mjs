@@ -145,7 +145,7 @@ const headerLayout = (card) =>
 {
   const { ctx, page, errors } = await open(1280, TROVE);
   check("1280 reports a pointer that hovers", await page.evaluate(() => matchMedia("(hover: hover)").matches));
-  const card = page.locator('[data-anatomy="P1"]').first();
+  const card = page.locator('[data-anatomy~="P1"]').first();
   await card
     .locator("[data-position-summary]")
     .waitFor({ timeout: 120000 })

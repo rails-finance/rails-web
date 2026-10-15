@@ -83,7 +83,7 @@ export function TroveDetailsBand({
 
   if (bare && part === "costs") {
     return (
-      <span className="inline-flex flex-wrap items-center gap-x-2" data-anatomy="C15·liquity">
+      <span className="inline-flex flex-wrap items-center gap-x-2">
         <TokenFigure symbol="BOLD">
           <Prov info={costsProv} value={formatExact(annualInterestCost)} symbol="BOLD">
             ~<FadeNumber value={annualInterestCost} formatFn={formatApproximate} animateOnMount={true} />
@@ -113,7 +113,7 @@ export function TroveDetailsBand({
       return <span className="inline-block h-3 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />;
     if (debtInFront == null) return <span className="font-normal text-rb-500/70">Unavailable</span>;
     return (
-      <span data-anatomy="C16·liquity">
+      <span>
         <TokenFigure symbol="BOLD">
           <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
             {formatApproximate(debtInFront)}
@@ -136,7 +136,6 @@ export function TroveDetailsBand({
       {showCosts && (
         <div
           className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${alignStart ? "justify-start" : "justify-end"} ${align} text-xs text-rb-500 leading-relaxed`}
-          data-anatomy="C15·liquity"
         >
           <div className="tabular-nums">
             Costs:{" "}
@@ -162,7 +161,7 @@ export function TroveDetailsBand({
       {!showQueue ? null : debtInFrontLoading ? (
         <div className="h-3 w-48 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
       ) : debtInFront !== null && debtInFront !== undefined ? (
-        <div className={`${align} text-xs text-rb-500 leading-relaxed tabular-nums`} data-anatomy="C16·liquity">
+        <div className={`${align} text-xs text-rb-500 leading-relaxed tabular-nums`}>
           Debt in front:{" "}
           <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
             <span className="text-foreground/80 font-semibold">{formatApproximate(debtInFront)}</span>

@@ -18,7 +18,7 @@ export function FluidFlowsNote({ facts, collSymbol, debtSymbol }: FluidFlowsNote
   const borrower = facts?.borrower ?? true;
   const p = facts?.pricing;
   return (
-    <div className="space-y-2" data-fluid-flows-note="" data-anatomy="F14·fluid">
+    <div className="space-y-2" data-fluid-flows-note="" data-anatomy="F14">
       {borrower ? (
         <p>
           Every figure is in {debtSymbol}, this vault&apos;s debt token: Fluid prices nothing in USD, and the

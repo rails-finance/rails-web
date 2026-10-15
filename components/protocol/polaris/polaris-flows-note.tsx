@@ -18,7 +18,7 @@ const n = (k: number, one: string, many: string) => (k === 1 ? one : `${k.toLoca
 export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): ReactNode {
   const p = facts?.pricing;
   return (
-    <div className="space-y-2" data-polaris-flows-note="" data-anatomy="F14·polaris">
+    <div className="space-y-2" data-polaris-flows-note="" data-anatomy="F14">
       <p>
         Every figure is in {stable}, the market&apos;s stablecoin: this is a testnet, and nothing on it has a market
         price. Each pETH flow is converted at the market&apos;s own price feed at its block, the price the protocol

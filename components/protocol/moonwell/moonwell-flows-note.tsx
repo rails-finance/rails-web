@@ -27,7 +27,7 @@ export function MoonwellFlowsNote({ facts }: { facts: MoonwellFlowsFacts | null 
     ...(liquidated ? ["seized in liquidations"] : []),
   ];
   return (
-    <div className="space-y-2" data-moonwell-flows-note="" data-anatomy="F14·moonwell">
+    <div className="space-y-2" data-moonwell-flows-note="" data-anatomy="F14">
       <p>
         A Moonwell account supplies and borrows on any of its markets under one account liquidity, so each bar adds
         every market in USD, each flow at Moonwell&apos;s oracle price for its market at its block. The collateral bar

@@ -98,7 +98,7 @@ export function DolomiteFlowsNote({ facts }: { facts: DolomiteFlowsFacts | null 
     used.has(DL.repaidTransfer) ? "a transfer in against a debt repays it (Repaid by a transfer in)" : null,
   ].filter((x): x is string => x != null);
   return (
-    <div className="space-y-2" data-dolomite-flows-note="" data-anatomy="F14·dolomite">
+    <div className="space-y-2" data-dolomite-flows-note="" data-anatomy="F14">
       <p>
         A Dolomite account holds one balance per market: above zero it supplies, below zero it owes, and every market
         counts against the account&apos;s one margin line. So each bar adds every market in USD. The collateral bar adds

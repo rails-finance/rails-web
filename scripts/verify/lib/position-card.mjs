@@ -7,7 +7,7 @@
 // for the callers that log it.
 export async function openPositionCards(page, deadlineMs = 10_000) {
   await page
-    .locator('[data-position-summary], [data-anatomy="P1"]')
+    .locator('[data-position-summary], [data-anatomy~="P1"]')
     .first()
     .waitFor({ state: "attached", timeout: deadlineMs })
     .catch(() => {});

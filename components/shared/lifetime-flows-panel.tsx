@@ -160,6 +160,7 @@ export function LifetimeFlowsPanel({
       title={compact ? `Expand ${title}` : `Shrink ${title}`}
       className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-sunken text-rb-500 transition-colors hover:bg-rb-300 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:hover:bg-rb-700 pointer-coarse:size-11"
       data-flows-view-toggle={compact ? "compact" : "full"}
+      data-anatomy="F21"
     >
       {compact ? <Maximize2 size={16} aria-hidden /> : <Minimize2 size={16} aria-hidden />}
     </button>

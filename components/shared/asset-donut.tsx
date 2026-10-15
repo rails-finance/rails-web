@@ -327,7 +327,7 @@ export function AssetBreakdownPanel({
   const R0 = 29 * k;
   const CORNER = 3 * k;
   return (
-    <div id={id} className="flex flex-col items-start text-sm" data-asset-breakdown="">
+    <div id={id} className="flex flex-col items-start text-sm" data-asset-breakdown="" data-anatomy="C19">
       {/* The donut centred over its table. */}
       <div className="flex w-max max-w-full flex-col items-center gap-3">
         {slices.length > 0 && (

@@ -26,7 +26,7 @@ export function MorphoFlowsNote({ facts, loanSymbol, collSymbol, name }: MorphoF
   const borrower = facts?.roles.borrower ?? true;
   const lender = facts?.roles.lender ?? false;
   return (
-    <div className="space-y-2" data-morpho-flows-note="" data-anatomy="F14·morpho">
+    <div className="space-y-2" data-morpho-flows-note="" data-anatomy="F14">
       <p>
         Every figure is in {loanSymbol}, this market&apos;s loan token: {name} prices nothing in USD, and the
         market&apos;s oracle prices {coll} in {loanSymbol}.

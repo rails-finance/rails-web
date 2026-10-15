@@ -213,7 +213,7 @@ export function LiquityFlowsExplanation({
   const open = meta.status === "open";
   const n = (k: number) => k.toLocaleString("en-US");
   return (
-    <div data-liquity-flows-note="" data-anatomy="F14·liquity">
+    <div data-liquity-flows-note="" data-anatomy="F14">
       <ExplainGroup title={open ? "Current position" : "At close"}>
         {!open && !meta.isZombie && (
           <ExplainBullet>Closed: nothing held or owed; the bars keep the lifetime flows</ExplainBullet>

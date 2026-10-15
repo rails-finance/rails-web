@@ -19,7 +19,7 @@ export function MapleFlowsNote({ facts, pools }: MapleFlowsNoteProps): ReactNode
   const a = facts.assetSymbol;
   const s = facts.poolSymbol;
   return (
-    <div className="space-y-2" data-maple-flows-note="" data-anatomy="F14·maple">
+    <div className="space-y-2" data-maple-flows-note="" data-anatomy="F14">
       <p>
         Every figure is in {a}, the {s} pool&apos;s funds asset: Maple prices nothing in USD.
         {pools > 1 &&

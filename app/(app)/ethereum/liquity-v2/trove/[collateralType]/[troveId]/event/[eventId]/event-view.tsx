@@ -167,7 +167,7 @@ export default function EventView({
 
   return (
     <FlowFocusContext.Provider value={flowFocus}>
-      <div className="py-8 space-y-6">
+      <div className="py-8 space-y-6" data-anatomy="P4">
         <DetailTopRow
           session="liquity-v2"
           wallet={owner}
@@ -206,7 +206,12 @@ export default function EventView({
                       ),
                     }}
                   >
-                    <div id={`event-${event.id}`} data-event-id={event.id} className="rounded-xl">
+                    <div
+                      id={`event-${event.id}`}
+                      data-event-id={event.id}
+                      className="rounded-xl"
+                      data-anatomy="T9·liquity"
+                    >
                       <UnreadTokensProvider tokens={event.decimalsUnread}>
                         <LiquityEventCard
                           event={event}
