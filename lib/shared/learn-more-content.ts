@@ -1549,29 +1549,33 @@ export function aaveVaultPositionContent(
   };
 }
 
-/** The "?" on the lifetime-flows tower. */
-export function aaveVaultFlowsContent(assetSymbol: string, shareSymbol: string): LearnMoreContent {
+/** The "?" on a vault holder's Lifetime flows panel. */
+export function vaultFlowsContent(assetSymbol: string, shareSymbol: string): LearnMoreContent {
   return {
     title: "How the lifetime flows are counted",
-    intro: `The tower sums this address's own events in this vault — every Transfer of ${shareSymbol} the vault emitted about it, and the ERC-4626 Deposit and Withdraw events that were emitted beside them. It is a sum over the whole history, not over the rows currently drawn below it.`,
-    detailsHeading: "The two sides:",
+    intro: `The bar sums this address's events in this vault over its whole history, in ${assetSymbol}: every Transfer of ${shareSymbol} the vault emitted about it, and the ERC-4626 Deposit and Withdraw events emitted beside them.`,
+    detailsHeading: "The lines:",
     details: [
       {
-        bold: `The share side, in ${shareSymbol}`,
-        text: "minted, transferred in, burned and transferred out. It closes: minted plus transferred in, less burned and transferred out, is the balance the vault's own balanceOf reports at the page's block, wei-exact.",
+        bold: "Deposited and Withdrawn",
+        text: "the assets word of each ERC-4626 Deposit and Withdraw. A mint or a burn that carried no such event is valued at the vault's share price at its block.",
       },
       {
-        bold: `The asset side, in ${assetSymbol}`,
-        text: "the assets word of the ERC-4626 events themselves, and the vault's own convertToAssets of the balance held now. A mint or a burn that carried no such event is in the share totals and in no asset total at all — the page says how many.",
+        bold: "Received by transfer and Sent to another account",
+        text: `a transfer moves ${shareSymbol} and no ${assetSymbol}; its shares are valued at the vault's share price (convertToAssets) at its block.`,
       },
       {
-        bold: "Why the two heights are not comparable",
-        text: `${shareSymbol} and ${assetSymbol} are different tokens with their own decimals. The bars are drawn in each token's own units and nothing converts one side into the other.`,
+        bold: "Still in the vault",
+        text: "at the page's block, the vault's convertToAssets of the balance held; on an earlier day, the shares held after that day's last event at its share price.",
+      },
+      {
+        bold: "Share price change",
+        text: "each bar's last line: what is held less every flow above, the change in the vault's share price since each flow on the shares held. No block between the address's events is read.",
       },
     ],
     extraParagraphs: [
-      "No rate, no yield and no profit or loss is drawn. A cost basis over a pooled fungible share is not something any chain read supplies, and the difference between two share prices read at two blocks the holder happened to transact in is not a return.",
-      "The tower is drawn under exactly the condition the rows are: a history that could not be reconciled against the vault's own balanceOf, and one too large to draw whole, both leave it off the page rather than summing part of a life.",
+      `The share ledger closes: minted plus transferred in, less burned and transferred out, is the balance the vault's balanceOf reports at the page's block, to the wei.`,
+      "The panel is drawn under the condition the rows are: a history that could not be reconciled against the vault's balanceOf, and one too large to draw whole, both leave it off the page.",
     ],
   };
 }

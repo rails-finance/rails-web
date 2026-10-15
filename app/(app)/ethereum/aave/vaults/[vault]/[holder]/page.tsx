@@ -35,7 +35,8 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { AaveEthereumVaultPositionView } from "@/components/vaults/aave-ethereum-vault-view";
 import { AaveVaultTimeline } from "@/components/vaults/aave-vault-timeline";
-import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
+import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
+import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
 import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -181,13 +182,31 @@ async function VaultTimelineSection({
         })
       : null;
 
+  // The panel's day rows over the same whole life, where the gate passed.
+  const flowTimeline =
+    economics && data.holder
+      ? vaultFlowTimeline(allEvents, {
+          assetSymbol: data.vault.asset.symbol,
+          shareSymbol: data.vault.symbol ?? shortAddr(data.vault.address),
+          shareDecimals: data.vault.shareDecimals,
+          assetDecimals: data.vault.asset.decimals,
+          blockNumber: timeline.blockNumber,
+          blockTimestamp: timeline.blockTimestamp,
+          sharesRaw: data.holder.shares.raw,
+          claimRaw: data.holder.claim?.raw ?? null,
+          vaultAddress: data.vault.address,
+          assetAddress: data.vault.asset.address,
+        })
+      : null;
+
   return (
     <>
-      {/* The lifetime flows, drawn under exactly the condition the rows are —
-          the feeder answers null on every path the gate refused. */}
+      {/* The Lifetime flows panel, drawn under the condition the rows are: the
+          feeder answers null on every path the gate refused. */}
       {!onEventPage && data.holder && (
-        <VaultFlowsTower
+        <VaultFlowsPanel
           computed={economics}
+          timeline={flowTimeline}
           holder={holder}
           blockNumber={timeline.blockNumber}
           sharesRaw={data.holder.shares.raw}

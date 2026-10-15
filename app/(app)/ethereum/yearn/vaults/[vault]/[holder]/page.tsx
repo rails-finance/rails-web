@@ -46,7 +46,8 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { yearnVaultSharePriceProv } from "@/lib/yearn/vault-provenance";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
+import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
+import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
 import { YearnVaultTimeline } from "@/components/vaults/yearn-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
@@ -137,13 +138,31 @@ async function YearnTimelineSection({
       })
     : null;
 
+  // The panel's day rows over the same whole life, where the gate passed.
+  const flowTimeline =
+    economics && data.holder
+      ? vaultFlowTimeline(allEvents, {
+          assetSymbol: data.vault.asset.symbol,
+          shareSymbol: data.vault.symbol ?? shortAddress(data.vault.address),
+          shareDecimals: data.vault.shareDecimals,
+          assetDecimals: data.vault.asset.decimals,
+          blockNumber: timeline.blockNumber,
+          blockTimestamp: timeline.blockTimestamp,
+          sharesRaw: data.holder.shares.raw,
+          claimRaw: data.holder.claim?.raw ?? null,
+          vaultAddress: data.vault.address,
+          assetAddress: data.vault.asset.address,
+        })
+      : null;
+
   return (
     <>
-      {/* The lifetime flows, drawn under exactly the condition the rows are —
-          the feeder answers null on every path the gate refused. */}
+      {/* The Lifetime flows panel, drawn under the condition the rows are: the
+          feeder answers null on every path the gate refused. */}
       {!onEventPage && data.holder && (
-        <VaultFlowsTower
+        <VaultFlowsPanel
           computed={economics}
+          timeline={flowTimeline}
           holder={holder}
           blockNumber={timeline.blockNumber}
           sharesRaw={data.holder.shares.raw}
