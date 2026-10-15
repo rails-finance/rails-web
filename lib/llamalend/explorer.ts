@@ -6,6 +6,8 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isLlamalendEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import type { LlamalendLoanMark } from "@/lib/llamalend/event-figures";
 
 const WORDS = {
   paragraph: "This page is one transaction from this account's loan in the market.",
@@ -33,13 +35,44 @@ export interface LlamalendEventPageInput extends EventPageSlot {
   user: string;
   /** The position card's market label; unset, the event's symbols name it. */
   marketLabel?: string | null;
+  /** The page's read of whether this row opens or closes a loan. */
+  loanMark?: LlamalendLoanMark | null;
 }
 
-/** The event's heading: T1's word. Also read on the server. */
-export function llamalendEventHeading(event: BaseActivityEvent): string {
-  if (isLlamalendEvent(event) && event.context.data.eventType !== "liquidation" && event.context.data.isOpen)
-    return "Open";
-  return event.actionLabel;
+/** The event's title: T1's word and the amounts its head states. A
+ *  liquidation states the collateral and debt it moved; any other row the
+ *  verbs on each axis, led by Open on a loan's first row and Close on a repay
+ *  that clears the debt. `mark` is the page's read of which row opens or closes
+ *  a loan; where the server has none, the row's own flags decide. Also read on
+ *  the server. */
+export function llamalendEventTitle(event: BaseActivityEvent, mark?: LlamalendLoanMark | null): EventTitle {
+  if (!isLlamalendEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const coll = Number(ctx.collateralDelta ?? "0") || 0;
+  const debt = Number(ctx.debtDelta ?? "0") || 0;
+  if (ctx.eventType === "liquidation")
+    return makeEventTitle(event, event.actionLabel, [
+      { value: coll, symbol: ctx.collateralSymbol },
+      { value: debt, symbol: ctx.borrowedSymbol },
+    ]);
+  const opens = mark ? mark.opens : !!ctx.isOpen;
+  const closes = mark
+    ? mark.closes
+    : ctx.eventType === "repay" && ctx.debtAfter != null && Number(ctx.debtAfter) <= 1e-12;
+  const title = makeEventTitle(event, opens ? "Open" : closes ? "Close" : "", [
+    {
+      value: coll,
+      symbol: ctx.collateralSymbol,
+      label: coll > 0 ? (opens ? "Deposit" : "Add") : "Withdraw",
+    },
+    { value: debt, symbol: ctx.borrowedSymbol, label: debt > 0 ? "Borrow" : "Repay" },
+  ]);
+  return title.kind || title.amounts.length > 0 ? title : { ...title, kind: event.actionLabel };
+}
+
+/** The event's heading: the title in words. Also read on the server. */
+export function llamalendEventHeading(event: BaseActivityEvent, mark?: LlamalendLoanMark | null): string {
+  return eventTitleWords(llamalendEventTitle(event, mark));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -49,8 +82,9 @@ export function llamalendEventPageDescription(event: BaseActivityEvent, user: st
 }
 
 export const llamalendExplorer: ExplorerAdapter<LlamalendEventPageInput> = {
-  eventPage: ({ controller, user, marketLabel, event, ...slot }) => ({
-    heading: llamalendEventHeading(event),
+  eventPage: ({ controller, user, marketLabel, loanMark, event, ...slot }) => ({
+    heading: llamalendEventHeading(event, loanMark),
+    title: llamalendEventTitle(event, loanMark),
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,

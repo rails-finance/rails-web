@@ -5,8 +5,9 @@
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { isPolarisEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 
 const WORDS = {
   paragraph: "This page is one transaction from this CDP's history.",
@@ -32,9 +33,51 @@ export interface PolarisEventPageInput extends EventPageSlot {
   closed: boolean;
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (an
+ *  open's or adjust's collateral and debt with their verbs, a close's two
+ *  sides, a liquidation's seized, cleared and claimable). Also read on the
+ *  server. */
+export function polarisEventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isPolarisEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const num = (s?: string) => (Number.isFinite(Number(s ?? "0")) ? Number(s ?? "0") : 0);
+  const stable = ctx.stableSymbol;
+  const coll = num(ctx.collChange);
+  const debt = num(ctx.debtChange);
+  switch (ctx.eventType) {
+    case "open":
+    case "adjust": {
+      const title = makeEventTitle(event, ctx.eventType === "open" ? "Open" : event.actionLabel, [
+        coll !== 0
+          ? { value: coll, symbol: PETH.symbol, address: PETH.address, label: coll > 0 ? "Deposit" : "Withdraw" }
+          : null,
+        debt !== 0
+          ? { value: debt, symbol: stable, address: stableAddress(ctx.market), label: debt > 0 ? "Borrow" : "Repay" }
+          : null,
+      ]);
+      return ctx.eventType === "adjust" && title.amounts.length > 0 ? { ...title, kind: "" } : title;
+    }
+    case "close":
+      return makeEventTitle(event, event.actionLabel, [
+        { value: coll, symbol: PETH.symbol, address: PETH.address },
+        { value: debt, symbol: stable, address: stableAddress(ctx.market) },
+      ]);
+    case "liquidate":
+      return makeEventTitle(event, event.actionLabel, [
+        { value: num(ctx.collLiquidated), symbol: PETH.symbol, address: PETH.address, label: "Seized" },
+        { value: num(ctx.debtLiquidated), symbol: stable, address: stableAddress(ctx.market), label: "Cleared" },
+        { value: num(ctx.collSurplus), symbol: PETH.symbol, address: PETH.address, label: "Claimable" },
+      ]);
+    default:
+      return makeEventTitle(event, event.actionLabel, []);
+  }
+}
+
+const stableAddress = (market: PolarisMarket) => POLARIS_MARKET_CONFIG[market].stable.address;
+
+/** The event's heading: the title in words. Also read on the server. */
 export function polarisEventHeading(event: BaseActivityEvent): string {
-  return event.actionLabel;
+  return eventTitleWords(polarisEventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -46,6 +89,7 @@ export function polarisEventPageDescription(market: PolarisMarket, cdpId: string
 export const polarisExplorer: ExplorerAdapter<PolarisEventPageInput> = {
   eventPage: ({ market, cdpId, holder, closed, event, ...slot }) => ({
     heading: polarisEventHeading(event),
+    title: polarisEventTitle(event),
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,

@@ -12,9 +12,11 @@
 // and position, no figure that carries a receipt, so the provenance tripwire
 // passes over it.
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { titleFigure, type EventTitle } from "@/lib/shared/event-title";
 import { eventMarkdownHref, useMenuCopied } from "@/components/shared/event-card-menu";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { useChainId } from "@/lib/shared/chain-context";
@@ -31,12 +33,30 @@ export const EventPageContext = createContext<EventPageShell | null>(null);
  *  (`ExplorerAdapter.eventMarkdown`). */
 export const EventMarkdownContext = createContext<(() => string) | null>(null);
 
-/** The page's h1 where the family's header has no title form: the
- *  contract's heading, which the browser title also carries. */
-export function EventPageTitle({ children }: { children: ReactNode }) {
+/** The page's h1 (ui-jobs 307): the kind word and the event's main amounts, each
+ *  with its token icon, as the family's contract states them. The figures
+ *  repeat the card's, whose receipts trace them, so the h1 carries no receipt of
+ *  its own. The symbol is spoken, not drawn: the icon is its mark. */
+export function EventPageTitle({ title }: { title: EventTitle }) {
+  const labelled = title.amounts.some((a) => a.label);
   return (
-    <h1 className="text-2xl font-normal leading-tight text-foreground" data-event-page-title="">
-      {children}
+    <h1
+      className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xl font-normal leading-tight text-foreground"
+      data-event-page-title=""
+      data-prov-exempt=""
+    >
+      {title.kind && <span className={title.amounts.length > 0 ? "text-rb-500" : undefined}>{title.kind}</span>}
+      {title.amounts.map((a, i) => (
+        <Fragment key={i}>
+          {i > 0 && !labelled && <span className="text-rb-500">{W.title_and}</span>}
+          <span className="inline-flex items-center gap-2.5" data-event-title-amount="">
+            {a.label && <span className="text-rb-500">{a.label}</span>}
+            <span>{titleFigure(a)}</span>
+            <TokenChipIcon symbol={a.symbol} address={a.address} size={40} filterable={false} />
+            <span className="sr-only">{a.symbol}</span>
+          </span>
+        </Fragment>
+      ))}
     </h1>
   );
 }

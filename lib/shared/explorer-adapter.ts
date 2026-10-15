@@ -7,6 +7,7 @@
 
 import type { ReactNode } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
+import type { EventTitle } from "@/lib/shared/event-title";
 
 /** One row of the event page's facts table: what the card does not show. */
 export interface EventPageFact {
@@ -48,9 +49,13 @@ export interface EventPageSlot {
 
 /** What the event page's side column draws (`components/shared/event-page-aside.tsx`). */
 export interface EventPageContract {
-  /** The event's heading in words: the browser title's last words, and the
-   *  page's h1 where the family's header has no title form. */
+  /** The event's heading in words: the browser title's last words. It spells
+   *  `title` out (`eventTitleWords`), so the h1 and the tab agree. */
   heading: string;
+  /** The page's h1: the kind word and the event's main amounts, drawn with
+   *  their token icons; no amounts where the event moves none. "head" where the
+   *  route draws it from the card's head row (Liquity V2's own title form). */
+  title: EventTitle | "head";
   /** The family's words: the paragraph, the timeline link after it, and the
    *  View in timeline control's tooltip. */
   words: { paragraph: string; timelineLink: string; timelineHint: string };

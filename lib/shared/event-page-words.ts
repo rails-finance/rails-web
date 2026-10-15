@@ -22,6 +22,7 @@ export const EVENT_PAGE_WORDS = {
   event_of: (n: number, total: number) => `${n.toLocaleString("en-US")} of ${total.toLocaleString("en-US")}`,
   block: "Block",
   transaction: "Transaction",
+  title_and: "and",
   previous: "Previous event",
   next: "Next event",
 } as const;

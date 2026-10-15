@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadFluidPositionTail } from "@/lib/fluid/position-page-data";
 import { pairLabel } from "@/lib/fluid/asset-catalog";
-import { fluidEventPageDescription } from "@/lib/fluid/explorer";
+import { fluidEventHeading, fluidEventPageDescription } from "@/lib/fluid/explorer";
 import FluidPositionPage from "../../page";
 
 interface Props {
@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "fluid",
     subject: `#${nft}`,
     canonicalPath: `/ethereum/fluid/${nft}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: fluidEventHeading(event), timestamp: event.timestamp } : null,
     description: event
       ? fluidEventPageDescription(
           pairLabel(

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { asV3Market } from "@/lib/aave-v3/asset-catalog";
 import { loadAaveV3PositionTail } from "@/lib/aave-v3/position-page-data";
@@ -37,11 +38,19 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const grouped = servedFoldersFromParam(sp.folders);
   const tail = await loadAaveV3PositionTail(wallet, market, grouped);
   const event = tail.events?.find((e) => e.id === decoded) ?? null;
+  // The rows of the event's transaction: a liquidation's fee transfer names
+  // itself from them, as the card's h1 does.
+  const siblings = event ? tail.events?.filter((e) => e.txHash === event.txHash && isAaveV3Event(e)) : undefined;
   return eventMetadata({
     session: "aave-v3",
     subject: wallet,
     canonicalPath: `/ethereum/aave-v3/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: aaveV3EventHeading(event, "ethereum"), timestamp: event.timestamp } : null,
+    event: event
+      ? {
+          actionLabel: aaveV3EventHeading(event, "ethereum", siblings as Parameters<typeof aaveV3EventHeading>[2]),
+          timestamp: event.timestamp,
+        }
+      : null,
     description: event ? aaveV3EventPageDescription(MARKET_NAME[market] ?? "Core", wallet, event.timestamp) : undefined,
   });
 }

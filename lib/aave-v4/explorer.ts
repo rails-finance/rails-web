@@ -6,6 +6,7 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isAaveV4Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { aaveV4Label } from "@/lib/aave-v4/event-label";
 
 const WORDS = {
@@ -27,9 +28,28 @@ export interface AaveV4EventPageInput extends EventPageSlot {
   deployment: "ethereum" | "base";
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (a
+ *  liquidation's seized collateral and repaid debt, else the amount moved; a
+ *  collateral toggle moves none). Also read on the server. */
+export function aaveV4EventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isAaveV4Event(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const kind = aaveV4Label(ctx);
+  if (ctx.eventType === "liquidation")
+    return makeEventTitle(event, kind, [
+      {
+        value: Number(ctx.liquidatedCollateralAmount ?? "0") || 0,
+        symbol: ctx.collateralSymbol ?? "",
+        label: "Seized",
+      },
+      { value: Number(ctx.debtToCover ?? "0") || 0, symbol: ctx.reserveSymbol ?? "", label: "Repaid" },
+    ]);
+  return makeEventTitle(event, kind, [{ value: parseFloat(ctx.amount ?? "0") || 0, symbol: ctx.reserveSymbol ?? "" }]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function aaveV4EventHeading(event: BaseActivityEvent): string {
-  return isAaveV4Event(event) ? aaveV4Label(event.context.data) : event.actionLabel;
+  return eventTitleWords(aaveV4EventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -40,6 +60,7 @@ export function aaveV4EventPageDescription(spokeName: string, wallet: string, ti
 export const aaveV4Explorer: ExplorerAdapter<AaveV4EventPageInput> = {
   eventPage: ({ spokeName, wallet, deployment, event, ...slot }) => ({
     heading: aaveV4EventHeading(event),
+    title: aaveV4EventTitle(event),
     words: {
       paragraph: WORDS.paragraph(spokeName),
       timelineLink: WORDS.timeline_link,

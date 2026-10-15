@@ -37,6 +37,9 @@ export const liquityV2Explorer: ExplorerAdapter<LiquityEventPageInput> = {
     const timelineHref = `/ethereum/liquity-v2/trove/${collateralType}/${troveId}?at=${encodeURIComponent(place.event.id)}`;
     return {
       heading: eventHeadingWords(place, currentPrice) ?? place.event.actionLabel,
+      // The route draws it from the card's head row, which states the amounts
+      // with the receipts' tone and the redemption's P/L.
+      title: "head",
       words: {
         paragraph: PAGE_WORDS.paragraph,
         timelineLink: PAGE_WORDS.timeline_link,

@@ -7,6 +7,7 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isSparkEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { sparkRowLabel } from "@/lib/spark/event-label";
 import { sparkFeeLiquidation, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import { PROSE, SPARK_PAGE_WORDS } from "@/lib/spark/event-templates";
@@ -19,10 +20,24 @@ export interface SparkEventPageInput extends EventPageSlot {
   siblings?: readonly SparkTimelineEvent[];
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (a
+ *  liquidation's collateral and debt, else the reserve moved). Also read on the
+ *  server. */
+export function sparkEventTitle(event: BaseActivityEvent, siblings?: readonly SparkTimelineEvent[]): EventTitle {
+  if (!isSparkEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const kind = sparkRowLabel(ctx, event.actionLabel, sparkFeeLiquidation(ctx, siblings));
+  if (ctx.eventType === "liquidation")
+    return makeEventTitle(event, kind, [
+      { value: Number(ctx.assetsDelta) || 0, symbol: ctx.collateralSymbol ?? "", label: "Collateral" },
+      { value: Number(ctx.debtDelta ?? "0") || 0, symbol: ctx.reserveSymbol, label: "Debt" },
+    ]);
+  return makeEventTitle(event, kind, [{ value: Number(ctx.assetsDelta) || 0, symbol: ctx.reserveSymbol }]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function sparkEventHeading(event: BaseActivityEvent, siblings?: readonly SparkTimelineEvent[]): string {
-  if (!isSparkEvent(event)) return event.actionLabel;
-  return sparkRowLabel(event.context.data, event.actionLabel, sparkFeeLiquidation(event.context.data, siblings));
+  return eventTitleWords(sparkEventTitle(event, siblings));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -37,6 +52,7 @@ export function sparkEventPageDescription(wallet: string, timestamp: number): st
 export const sparkExplorer: ExplorerAdapter<SparkEventPageInput> = {
   eventPage: ({ wallet, siblings, event, ...slot }) => ({
     heading: sparkEventHeading(event, siblings),
+    title: sparkEventTitle(event, siblings),
     words: {
       paragraph: SPARK_PAGE_WORDS.paragraph,
       timelineLink: SPARK_PAGE_WORDS.timeline_link,

@@ -5,7 +5,8 @@
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { isFluidEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 
 const WORDS = {
   paragraph: "This page is one transaction from this position's history.",
@@ -31,9 +32,32 @@ export interface FluidEventPageInput extends EventPageSlot {
   owner: string | null;
 }
 
-/** The event's heading: the word T1 states. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (a
+ *  liquidation's seized collateral and cleared debt, else the collateral and
+ *  debt moved; an ownership move states none). Also read on the server. */
+export function fluidEventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isFluidEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const ctx = event.context.data;
+  const supply = ctx.supplySymbol ?? "DEX shares";
+  const borrow = ctx.borrowSymbol ?? "DEX shares";
+  if (ctx.eventType === "liquidated" || ctx.eventType === "absorbed") {
+    const seized = Number(ctx.liqSupplyBefore ?? "0") - Number(ctx.liqSupplyAfter ?? "0");
+    const cleared = Number(ctx.liqBorrowBefore ?? "0") - Number(ctx.liqBorrowAfter ?? "0");
+    return makeEventTitle(event, event.actionLabel, [
+      seized > 0 ? { value: seized, symbol: supply, label: "Seized" } : null,
+      cleared > 0 ? { value: cleared, symbol: borrow, label: "Cleared" } : null,
+    ]);
+  }
+  if (ctx.eventType === "mint" || ctx.eventType === "transfer") return makeEventTitle(event, event.actionLabel, []);
+  return makeEventTitle(event, event.actionLabel, [
+    { value: Number(ctx.colDelta ?? "0") || 0, symbol: supply },
+    { value: Number(ctx.debtDelta ?? "0") || 0, symbol: borrow },
+  ]);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function fluidEventHeading(event: BaseActivityEvent): string {
-  return event.actionLabel;
+  return eventTitleWords(fluidEventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -44,6 +68,7 @@ export function fluidEventPageDescription(pair: string, nftId: string, timestamp
 export const fluidExplorer: ExplorerAdapter<FluidEventPageInput> = {
   eventPage: ({ nftId, pair, vault, owner, event, ...slot }) => ({
     heading: fluidEventHeading(event),
+    title: fluidEventTitle(event),
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
@@ -51,7 +76,14 @@ export const fluidExplorer: ExplorerAdapter<FluidEventPageInput> = {
     },
     facts: [
       { key: "vault", label: WORDS.vault, value: pair, full: vault },
-      { key: "position", label: WORDS.position, value: `#${nftId}`, full: nftId, mono: true, copy: WORDS.copy_position },
+      {
+        key: "position",
+        label: WORDS.position,
+        value: `#${nftId}`,
+        full: nftId,
+        mono: true,
+        copy: WORDS.copy_position,
+      },
       ...(owner
         ? [
             {

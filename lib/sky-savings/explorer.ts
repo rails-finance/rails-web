@@ -6,6 +6,9 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isSkySavingsEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { SUSDS, USDS } from "@/lib/sky-savings/constants";
+import { skyTransition, units } from "@/lib/sky-savings/math";
 import { SKY_EVENT_LABEL } from "@/lib/sky-savings/event-label";
 
 const WORDS = {
@@ -26,9 +29,24 @@ export interface SkySavingsEventPageInput extends EventPageSlot {
   holder: string;
 }
 
-/** The event's heading: T1's word. Also read on the server. */
+/** The event's title: T1's word and the amounts its head states (a deposit's
+ *  or withdrawal's USDS and sUSDS, a transfer's sUSDS). Also read on the
+ *  server. */
+export function skySavingsEventTitle(event: BaseActivityEvent): EventTitle {
+  if (!isSkySavingsEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  const c = event.context.data;
+  const kind = SKY_EVENT_LABEL[c.eventType];
+  const t = skyTransition(c);
+  const shares = { value: units(t.sharesDelta), symbol: SUSDS.symbol, address: SUSDS.address };
+  if (c.eventType === "deposit" || c.eventType === "withdrawal")
+    return makeEventTitle(event, kind, [{ value: units(t.usds), symbol: USDS.symbol, address: USDS.address }, shares]);
+  if (c.eventType === "received" || c.eventType === "sent") return makeEventTitle(event, kind, [shares]);
+  return makeEventTitle(event, kind, []);
+}
+
+/** The event's heading: the title in words. Also read on the server. */
 export function skySavingsEventHeading(event: BaseActivityEvent): string {
-  return isSkySavingsEvent(event) ? SKY_EVENT_LABEL[event.context.data.eventType] : event.actionLabel;
+  return eventTitleWords(skySavingsEventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
@@ -39,6 +57,7 @@ export function skySavingsEventPageDescription(holder: string, timestamp: number
 export const skySavingsExplorer: ExplorerAdapter<SkySavingsEventPageInput> = {
   eventPage: ({ holder, event, ...slot }) => ({
     heading: skySavingsEventHeading(event),
+    title: skySavingsEventTitle(event),
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
