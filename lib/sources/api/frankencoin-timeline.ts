@@ -230,6 +230,10 @@ export function buildFrankencoinTimeline(
       .map((r) => r.tx_hash.toLowerCase()),
   );
 
+  // A settlement in a forced sale's transaction is that sale's (lexicon,
+  // "Frankencoin: challenge sale"): "Forced sale settlement".
+  const forcedTxs = new Set(rows.filter((r) => r.event_type === "forced_sale").map((r) => r.tx_hash.toLowerCase()));
+
   // The opening transaction(s): an OwnershipTransferred in one of these is the
   // mint-time factory→owner handover — initialization, not a real transfer.
   const openedTxs = new Set(rows.filter((r) => r.event_type === "position_opened").map((r) => r.tx_hash.toLowerCase()));
@@ -442,7 +446,11 @@ export function buildFrankencoinTimeline(
       ...gasOnFirstRow(r, firstLog),
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
       actionType: kind,
-      actionLabel: initialization ? "Owner Set at Mint" : (compositeAdjustLabel ?? LABELS[kind] ?? kind),
+      actionLabel: initialization
+        ? "Owner set at creation"
+        : kind === "auction_settlement" && forcedTxs.has(r.tx_hash.toLowerCase())
+          ? "Forced sale settlement"
+          : (compositeAdjustLabel ?? LABELS[kind] ?? kind),
       flows,
       context: { protocol: "frankencoin" as const, data: ctx },
     };

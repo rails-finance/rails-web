@@ -522,7 +522,9 @@ const FRANKENCOIN_OP_LABELS: Record<string, string> = {
   challenge_averted: "Challenge Averted",
   challenge_succeeded: "Challenge Succeeded",
   forced_sale: "Forced Sale",
-  ownership_transferred: "Transferred",
+  // "Ownership": most of these are the creation handovers, not a sale or a
+  // move between holders (lexicon, "Frankencoin: challenge sale").
+  ownership_transferred: "Ownership",
 };
 
 // LlamaLend (Curve) — the Controller lifecycle. borrow/add_collateral/repay/
