@@ -216,6 +216,12 @@ words:
     Stability gain
   sheet_settled: |-
     Settled to zero
+  sheet_liquidated_coll: |-
+    Taken by the liquidation
+  sheet_liquidated_debt: |-
+    Cleared by the liquidation
+  sheet_liquidated: |-
+    Liquidated
   sheet_closed: |-
     Closed
   sheet_no_debt: |-
@@ -247,6 +253,8 @@ words:
     The CDP's pETH just before this event: what the previous event left, at this block's pETH price.
   tip_coll_event: |-
     The pETH the holder moved at this event, from the CDPManager's log, at this block's pETH price.
+  tip_coll_liquidated: |-
+    The pETH the liquidation took from the CDP, from the CDPManager's log. What it left over the debt's value, less the penalty, is the holder's to claim.
   tip_coll_reward: |-
     The reward pETH the CDP's share of the bonding curve's rewards added to its collateral at this event, from the CDPManager's log.
   tip_coll_psm: |-
@@ -265,6 +273,8 @@ words:
     The debt just before this event: the previous event's debt plus the interest charged since.
   tip_debt_event: |-
     The stablecoin the holder borrowed or repaid at this event, from the CDPManager's log.
+  tip_debt_liquidated: |-
+    The debt the liquidation cleared from the CDP, from the CDPManager's log.
   tip_debt_gain: |-
     The CDP's share of the market's revenue, credited against the debt at this event, from the CDPManager's log.
   tip_debt_psm: |-

@@ -264,16 +264,12 @@ words:
     Closed
   sheet_no_price: |-
     No price at this block
-  sheet_unread: |-
-    Not read on this page
   sheet_pts: |-
     pts
   sheet_collateral_ratio: |-
     Collateral ratio
   sheet_liquidates_at: |-
     Liquidates at
-  sheet_debt_in_front: |-
-    Debt in front
   sheet_to_minimum: |-
     LUSD to the minimum
   sheet_minimum_ratio: |-
@@ -314,7 +310,7 @@ words:
   tip_liquidates_at: |-
     The ETH price at which the Trove's collateral ratio meets the 110% minimum: the debt times the minimum ratio, divided by the collateral.
   tip_debt_in_front: |-
-    The debt of the Troves that would be redeemed against before this one, read from the redemption queue at the latest block.
+    Troves are redeemed lowest collateral ratio first. This is the debt of every Trove below yours.
   tip_to_minimum: |-
     The LUSD the debt after this event stands above the 2,000 LUSD minimum a Trove must keep.
   tip_minimum_ratio: |-

@@ -15,7 +15,8 @@
 // repaid ones. Beneath the sides, the Risk and Limits panels: label and value
 // rows, each value a level that swaps to its change since the previous event
 // (change-swap-value.tsx), the protocol's parameters as muted rows with the
-// breakdown on. Every row the family gives a `tip` ends its label with a "?"
+// breakdown on, and under them the lines a family keeps for the breakdown (a
+// swap's gross legs). Every row the family gives a `tip` ends its label with a "?"
 // that opens the tip on a click or a tap (reveal-tip.tsx), the totals and the
 // repaid row included.
 //
@@ -123,6 +124,9 @@ export interface SheetPanel {
 export interface EventSheet {
   sides: SheetSide[];
   panels: SheetPanel[];
+  /** Lines under the panels drawn with the breakdown on (a swap's gross
+   *  legs). */
+  breakdownNotes?: ReactNode;
 }
 
 /** The carry-forward layer's names, the same on every family's sheet. */
@@ -545,6 +549,11 @@ export function EventSheetView({
           </div>
         )}
       </div>
+      {on && sheet.breakdownNotes && (
+        <div className="-mx-5 pt-2" data-sheet-layer="notes">
+          {sheet.breakdownNotes}
+        </div>
+      )}
     </div>
   );
 }

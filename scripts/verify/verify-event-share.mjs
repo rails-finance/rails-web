@@ -140,7 +140,7 @@ const EXPLANATION_FROM_FIRST_PAINT = new Set([
 
 /** Families whose opened card's T2 is the event sheet (ui-jobs 330). A
  *  family's every label is listed; some of its event kinds keep the cells
- *  (MakerDAO's give and auction rows, Polaris's liquidations and transfers,
+ *  (MakerDAO's give and auction rows, Polaris's transfers,
  *  PWN's mint, burn, non-default claim and extension, Compound V2's rows that
  *  move neither side, Frankencoin's terms changes and challenges, a Liquity
  *  fork's batch-manager rate changes), so the generic pinned page is not
@@ -739,9 +739,11 @@ const SHEET_SUBJECTS = {
     {
       label: "0x7bc3…/0x6348…",
       path: "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
-      // 20 Jun 2026, a Deposit. Yearn, the Aave vaults and MetaMorpho share vault-sheet.tsx.
-      event: "0x386ee149ce06cce688af210acd99d1b222f6bd4606e7702ca170b4b5eac5e423:115",
-      second: "0x386ee149ce06cce688af210acd99d1b222f6bd4606e7702ca170b4b5eac5e423:77",
+      // 20 Jun 2026, a Withdrawal (the Deposit after it starts from nothing,
+      // so it draws no carry rows). Yearn, the Aave vaults and MetaMorpho share
+      // vault-sheet.tsx.
+      event: "0x386ee149ce06cce688af210acd99d1b222f6bd4606e7702ca170b4b5eac5e423:77",
+      second: "0x386ee149ce06cce688af210acd99d1b222f6bd4606e7702ca170b4b5eac5e423:115",
       oneSided: true,
       panels: false,
       swaps: false,

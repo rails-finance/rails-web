@@ -33,6 +33,7 @@ import {
   trovesAheadProv,
 } from "@/lib/liquity-v1/position-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
+import { V1_WORDS } from "@/lib/liquity-v1/event-templates";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
 
 /** Whether the read describes an active Trove with debt and a live ratio. */
@@ -71,7 +72,7 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
             {
               id: "debt-in-front",
               label: "Debt in front",
-              tip: "The LUSD owed by the Troves a redemption reaches before this one, lowest collateral ratio first, summed from the protocol's sorted Trove list at the latest block.",
+              tip: V1_WORDS.tip_debt_in_front,
               value: (
                 <>
                   <Prov info={debtInFrontProv()}>

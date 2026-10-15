@@ -789,47 +789,6 @@ export function useAaveV3EventBody({
   // leg): lines under the grid.
   const lines = [...stats.filter((st) => !sideOf.has(st)), ...extras];
 
-  const notes = (
-    <>
-      {lines.length > 0 && <EventRowLines rows={lines} />}
-      {state?.status === "unavailable" && (
-        <div
-          className="px-5 pb-2 text-sm text-rb-500"
-          data-position-state="unavailable"
-          data-position-code={state.code}
-        >
-          {state.lasting
-            ? "Position state isn’t available for this event."
-            : "The position at this block was not read. Reload to try again."}
-        </div>
-      )}
-      {risk?.notes && <div className="space-y-0.5 px-5 pb-2 text-xs text-rb-500">{risk.notes}</div>}
-      {forensics && <LiquidationForensics {...forensics} rowCells />}
-      {ctx.eventType === "liquidation" && unread && <LiquidationFiguresNotLoaded tokens={unread} />}
-      {fee && ctx.collateralSymbol && !unread && (
-        <div className="px-5 pb-2 text-xs text-rb-500">
-          {fmt2(ctx.liquidatedCollateralAmount)} {ctx.collateralSymbol} to the liquidator + {fmt2(fee.amount)}{" "}
-          {ctx.collateralSymbol} to the Aave treasury ={" "}
-          {fmt2(String(Math.abs(Number(ctx.liquidatedCollateralAmount)) + Math.abs(Number(fee.amount))))}{" "}
-          {ctx.collateralSymbol} removed from the position; the treasury&rsquo;s share is the liquidation&rsquo;s
-          protocol fee, a separate row in the timeline.
-        </div>
-      )}
-      {ctx.eventType === "transfer_out" && !feeOf && !unread && ctx.price && ctx.reserveSymbol && (
-        <div className="px-5 pb-2 text-xs text-rb-500">
-          The {fmt(ctx.amount)} {ctx.reserveSymbol} sent was worth{" "}
-          {formatUsdValue(Math.abs(Number(ctx.amount)) * ctx.price.usd)} at the block&rsquo;s oracle price.
-        </div>
-      )}
-      {feeOf && (
-        <div className="px-5 pb-2 text-xs text-rb-500">
-          Paid out of the liquidation in the same transaction; the account&rsquo;s figures for that transaction are on
-          the liquidation&rsquo;s card.
-        </div>
-      )}
-    </>
-  );
-
   // The sheet (ui-jobs 330), on the read lane once the read has landed. The
   // assets repaid in full: the debt assets the page's flows moved up to this
   // event that the account owes none of after it.
@@ -874,6 +833,51 @@ export function useAaveV3EventBody({
       noTotal: feeOf ? ROW_SHEET_WORDS.fee : ROW_SHEET_WORDS.unread,
     });
   }
+
+  // With a sheet, the rows behind a swap (its gross legs) stand under it with
+  // the breakdown on; the bought or sold figure stays.
+  const shownLines = sheet ? stats.filter((st) => !sideOf.has(st)) : lines;
+  if (sheet && extras.length > 0) sheet = { ...sheet, breakdownNotes: <EventRowLines rows={extras} /> };
+  const notes = (
+    <>
+      {shownLines.length > 0 && <EventRowLines rows={shownLines} />}
+      {state?.status === "unavailable" && (
+        <div
+          className="px-5 pb-2 text-sm text-rb-500"
+          data-position-state="unavailable"
+          data-position-code={state.code}
+        >
+          {state.lasting
+            ? "Position state isn’t available for this event."
+            : "The position at this block was not read. Reload to try again."}
+        </div>
+      )}
+      {risk?.notes && <div className="space-y-0.5 px-5 pb-2 text-xs text-rb-500">{risk.notes}</div>}
+      {forensics && <LiquidationForensics {...forensics} rowCells />}
+      {ctx.eventType === "liquidation" && unread && <LiquidationFiguresNotLoaded tokens={unread} />}
+      {fee && ctx.collateralSymbol && !unread && (
+        <div className="px-5 pb-2 text-xs text-rb-500">
+          {fmt2(ctx.liquidatedCollateralAmount)} {ctx.collateralSymbol} to the liquidator + {fmt2(fee.amount)}{" "}
+          {ctx.collateralSymbol} to the Aave treasury ={" "}
+          {fmt2(String(Math.abs(Number(ctx.liquidatedCollateralAmount)) + Math.abs(Number(fee.amount))))}{" "}
+          {ctx.collateralSymbol} removed from the position; the treasury&rsquo;s share is the liquidation&rsquo;s
+          protocol fee, a separate row in the timeline.
+        </div>
+      )}
+      {ctx.eventType === "transfer_out" && !feeOf && !unread && ctx.price && ctx.reserveSymbol && (
+        <div className="px-5 pb-2 text-xs text-rb-500">
+          The {fmt(ctx.amount)} {ctx.reserveSymbol} sent was worth{" "}
+          {formatUsdValue(Math.abs(Number(ctx.amount)) * ctx.price.usd)} at the block&rsquo;s oracle price.
+        </div>
+      )}
+      {feeOf && (
+        <div className="px-5 pb-2 text-xs text-rb-500">
+          Paid out of the liquidation in the same transaction; the account&rsquo;s figures for that transaction are on
+          the liquidation&rsquo;s card.
+        </div>
+      )}
+    </>
+  );
 
   return {
     cells,

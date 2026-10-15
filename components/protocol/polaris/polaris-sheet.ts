@@ -8,7 +8,8 @@
 // `debtBefore`) and this block's feed; the page hands down the previous event
 // (`prev`), whose feed prices "Last event" in dollars and the Market move
 // between the two, and whose primary rate the rate's change reads against.
-// A transfer keeps its cells.
+// A liquidation draws the sheet as Liquity V2's does: the seized pETH and the
+// cleared debt as the event's rows. A transfer keeps its cells.
 //
 // Dollars: pETH at the market's feed price in its stablecoin times the
 // stablecoin's price; a USDp is $1 in the feed (it prices pETH as the bonding
@@ -82,13 +83,13 @@ function unitPriceOf(ctx: PolarisContext): UnitPrice | null {
 }
 
 /** Polaris's sheet, or undefined for the events it cannot state (a
- *  liquidation, a transfer). */
+ *  transfer). */
 export function polarisSheet(
   ctx: PolarisContext,
   coords: PolarisCoords,
   prev?: PolarisContext,
 ): EventSheet | undefined {
-  if (ctx.eventType !== "open" && ctx.eventType !== "adjust" && ctx.eventType !== "close") return undefined;
+  if (ctx.eventType === "transfer") return undefined;
   if (ctx.newColl == null || ctx.newDebt == null) return undefined;
 
   const cfg = POLARIS_MARKET_CONFIG[ctx.market];
@@ -96,6 +97,7 @@ export function polarisSheet(
   const stableAddr = cfg.stable.address;
   const manager = { name: `Polaris ${stable} CDPManager`, address: cfg.cdpManager };
   const isClose = ctx.eventType === "close";
+  const isLiq = ctx.eventType === "liquidate";
   const fmtUnit = polarisValueFormat(ctx.market);
 
   const collAfter = num(ctx.newColl);
@@ -200,20 +202,24 @@ export function polarisSheet(
   };
 
   // The event's word on each side.
-  const collWord = isClose
-    ? W.sheet_close
-    : ctx.eventType === "open"
-      ? W.sheet_open
-      : num(ctx.collChange) >= 0
-        ? W.sheet_add
-        : W.sheet_withdraw;
-  const debtWord = isClose
-    ? W.sheet_close
-    : ctx.eventType === "open"
-      ? W.sheet_open
-      : num(ctx.debtChange) >= 0
-        ? W.sheet_borrow
-        : W.sheet_repay;
+  const collWord = isLiq
+    ? W.sheet_liquidated_coll
+    : isClose
+      ? W.sheet_close
+      : ctx.eventType === "open"
+        ? W.sheet_open
+        : num(ctx.collChange) >= 0
+          ? W.sheet_add
+          : W.sheet_withdraw;
+  const debtWord = isLiq
+    ? W.sheet_liquidated_debt
+    : isClose
+      ? W.sheet_close
+      : ctx.eventType === "open"
+        ? W.sheet_open
+        : num(ctx.debtChange) >= 0
+          ? W.sheet_borrow
+          : W.sheet_repay;
 
   /** One of the log's legs as a row. `lowers`: the log states a magnitude that
    *  comes off the side. */
@@ -245,7 +251,7 @@ export function polarisSheet(
 
   // ── Collateral ──
   const collRows = [
-    leg("collChange", "event", collWord, "coll", W.tip_coll_event),
+    leg("collChange", "event", collWord, "coll", isLiq ? W.tip_coll_liquidated : W.tip_coll_event),
     leg("bcTokenGain", "reward", W.sheet_reward, "coll", W.tip_coll_reward, { keyed: true }),
     leg("mintRedeemCollGain", "psm", W.sheet_psm, "coll", W.tip_coll_psm, { keyed: true }),
   ].filter((r): r is SheetRow => r != null);
@@ -300,7 +306,7 @@ export function polarisSheet(
 
   // ── Debt ──
   const debtRows = [
-    leg("debtChange", "event", debtWord, "debt", W.tip_debt_event),
+    leg("debtChange", "event", debtWord, "debt", isLiq ? W.tip_debt_liquidated : W.tip_debt_event),
     leg("stableGain", "stability-gain", W.sheet_stability_gain, "debt", W.tip_debt_gain, { lowers: true, keyed: true }),
     leg("mintRedeemDebtGain", "psm", W.sheet_psm, "debt", W.tip_debt_psm, { keyed: true }),
     leg("stablesMintedToEnsureZeroDebt", "settled", W.sheet_settled, "debt", W.tip_debt_settled, { keyed: true }),
@@ -435,13 +441,14 @@ export function polarisSheet(
     {
       key: "ratio",
       label: W.collateral_ratio,
-      value:
-        cr && crReceipt
+      value: isLiq
+        ? { none: W.sheet_liquidated }
+        : cr && crReceipt
           ? { text: crPct1(cr.pct), info: crReceipt.info, value: crReceipt.value }
           : { none: isClose ? W.sheet_closed : debtAfter === 0 ? W.sheet_no_debt : W.sheet_no_price },
-      tone: cr?.belowMin ? "text-red-500" : undefined,
+      tone: !isLiq && cr?.belowMin ? "text-red-500" : undefined,
       tip: W.tip_cr,
-      change: crChange,
+      change: isLiq ? null : crChange,
     },
     {
       key: "liquidates-at",
@@ -450,7 +457,7 @@ export function polarisSheet(
       value:
         liqPrice != null
           ? { text: unitText(liqPrice), info: liqProv("Liquidation price", collAfter, debtAfter) }
-          : { none: isClose ? W.sheet_closed : W.sheet_no_debt },
+          : { none: isLiq ? W.sheet_liquidated : isClose ? W.sheet_closed : W.sheet_no_debt },
       change:
         liqPrice != null && liqBefore != null
           ? {

@@ -349,16 +349,11 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
     },
   ];
 
-  // ── Limits: the redemption queue and the room above the minimum debt ──
+  // ── Limits: the room above the minimum debt. "Debt in front" is on the
+  // position card only (decision 0042 point 6). ──
   const toMin = (debt: number) => Math.max(0, debt - LIQUITY_V1_MIN_DEBT);
   const toMinAfter = toMin(s.debtAfter);
   const limits: SheetStat[] = [
-    {
-      key: "debt-in-front",
-      label: V1_WORDS.sheet_debt_in_front,
-      tip: V1_WORDS.tip_debt_in_front,
-      value: { none: V1_WORDS.sheet_unread },
-    },
     {
       key: "to-minimum",
       label: V1_WORDS.sheet_to_minimum,

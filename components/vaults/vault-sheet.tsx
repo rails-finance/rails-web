@@ -172,10 +172,11 @@ export function vaultSheet({
     });
   }
 
-  // ---- the carry layer
+  // ---- the carry layer: a row worth zero (nothing held before a first
+  // deposit, no rise across a self-transfer) is left out.
   const carry: (SheetRow & { sub?: SheetRow[] })[] = [];
   let before: SheetRow | undefined;
-  if (earlier && priceThen != null) {
+  if (earlier && priceThen != null && beforeBal !== ZERO) {
     const lastValue = valueOf(beforeBal, priceThen, sd);
     carry.push({
       key: "last",
@@ -201,8 +202,10 @@ export function vaultSheet({
         },
       ];
     }
-    if (priceNow != null) {
-      const interest = valueOf(beforeBal, priceNow - priceThen, sd);
+    const interest = priceNow != null ? valueOf(beforeBal, priceNow - priceThen, sd) : null;
+    if (interest != null && !/[1-9]/.test(assetsText(interest))) {
+      // No rise between the two blocks, at the precision drawn: no interest row.
+    } else if (interest != null) {
       carry.push({
         key: "interest",
         label: SHEET_WORDS.interest,
@@ -229,7 +232,9 @@ export function vaultSheet({
       });
     }
   }
-  if (priceNow != null) {
+  if (beforeBal === ZERO) {
+    // A first deposit: nothing before it.
+  } else if (priceNow != null) {
     before = {
       key: "before",
       label: SHEET_WORDS.before,
