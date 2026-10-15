@@ -265,8 +265,12 @@ check(
 );
 check(
   "R1b folders are drawn, and the page states fewer rows than the life has events",
-  f3Dom.folders > 0 && f3Dom.rows != null && f3Dom.rows <= f3Events.length / 1.5,
-  `${f3Dom.folders} folders drawn, ${f3Dom.rows?.toLocaleString("en-US")} rows for ${f3Events.length.toLocaleString(
+  // Derived from the rule (decision 0039): a folder holds at least five
+  // transactions, so it replaces at least five rows with one and saves at least
+  // four. With N own folders the page states at most events - 4N rows; the old
+  // 1.5x ratio was a density guess from the floor of four and the 100-row cut.
+  f3Dom.folders > 0 && f3Dom.rows != null && f3Dom.rows <= f3Events.length - 4 * f3OwnFolders.length,
+  `${f3Dom.folders} folders drawn, ${f3Dom.rows?.toLocaleString("en-US")} rows (limit ${(f3Events.length - 4 * f3OwnFolders.length).toLocaleString("en-US")}) for ${f3Events.length.toLocaleString(
     "en-US",
   )} events (${f3Dom.rows ? (f3Events.length / f3Dom.rows).toFixed(2) : "?"}×)`,
 );

@@ -102,10 +102,15 @@ const SERVED = [
   { id: "moonwell-base", path: "/base/moonwell/0x719eae70d4a83f35bf82a2740699f5db84be919d" },
 ];
 // Aave V3 on Base declares `runs`; its default page is served, so `?folders=0`
-// makes it group in the browser. The wallet must hold a stretch of five
-// transactions of transfers (rails-ops decision 0039), so a run forms and the toggle is offered: the menu offers
+// makes it group in the browser. The wallet must hold five or more consecutive
+// transactions of one transfer kind, unbroken by any other row (rails-ops
+// decision 0039), so a run forms and the toggle is offered: the menu offers
 // "Collapse like events" only where a collapse spec forms a run on the list.
-const CLIENT = { id: "client", path: "/base/aave-v3/0xbb8fb8fe5198f25d117c0e7b1b9c8260cb19c3c0?folders=0" };
+// Derivation: 0xd189…cabc's newest 2,500 rows (the route's answer, read
+// 2026-10-15) hold one stretch of 6 transfer_out transactions, 54 rows from the
+// top; 6 >= 5, so the browser draws one group. The earlier wallet 0xbb8f…c3c0
+// has no stretch of transfers longer than 1 and draws none.
+const CLIENT = { id: "client", path: "/base/aave-v3/0xd1895f2019c2152fc2b9022d57f19198c4cfcabc?folders=0" };
 
 // §13: a list with folders and no loose event, bare and filtered.
 // 0xb137…ece5 is Spark's deployer, not a borrower: all 2,776 of its events are
