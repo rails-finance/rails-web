@@ -393,7 +393,7 @@ await page6.goto(`${BASE}/sepolia/polaris/usdp/8`, { waitUntil: "domcontentloade
 await page6.waitForTimeout(6000);
 // Since ui-jobs 272 the prices sit in a menu at the wallet row's right end
 // (`[data-latest-prices]`, H7.2): open it, pressing until it reads open.
-const pricesTrigger = page6.locator("[data-latest-prices] > button[aria-haspopup]").first();
+const pricesTrigger = page6.locator("[data-latest-prices] button[aria-haspopup]").first();
 for (let i = 0; i < 6 && (await pricesTrigger.getAttribute("aria-expanded").catch(() => null)) !== "true"; i++) {
   await pricesTrigger.click({ timeout: 10000 }).catch(() => {});
   await page6.waitForTimeout(800);
