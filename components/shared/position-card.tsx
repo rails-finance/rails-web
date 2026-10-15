@@ -54,8 +54,6 @@ import {
   POSITION_CARD_MAX_HEADS,
   POSITION_CARD_MAX_STATS,
   PositionCardPanel,
-  panelTracks,
-  tracksStyle,
   type PositionPanelColumns,
 } from "@/components/shared/position-card-panel";
 import { PositionCardMeta, type PositionCardMetaProps } from "@/components/shared/position-card-meta";
@@ -166,8 +164,8 @@ interface PositionCardSlotsCommon {
   /** `null` for a live position, else the tag (detail) or the lifecycle
    *  pill's word (listing). A live listing card shows OPEN. */
   status: PositionCardStatus | null;
-  /** 1 to 4 headlines, left to right. Four go two by two below lg. A closed
-   *  card passes its peaks. */
+  /** 1 to 4 headlines, left to right, on a grid of four at lg, two below it,
+   *  one on a phone. A closed card passes its peaks. */
   heads: PositionCardHead[];
   /** Labels that carry information (270 item 6: Aave's market, Fluid's
    *  type, the testnet marker; the owner on a listing). Detail draws them at
@@ -236,14 +234,10 @@ const OUTCOME_TONE: Record<PositionCardTone, string> = {
   caution: "text-tone-caution",
 };
 
-// Four headlines go two by two until lg: four large figures do not fit a row
-// narrower than that.
-const OPEN_GRID: Record<number, string> = {
-  1: "grid grid-cols-1 gap-4",
-  2: "grid grid-cols-2 sm:grid-cols-2 gap-4",
-  3: "grid grid-cols-2 sm:grid-cols-3 gap-4",
-  4: "grid grid-cols-2 lg:grid-cols-4 gap-4",
-};
+// The headlines sit in one strict grid whatever their number (decision 0040):
+// four columns at lg, two below it, one on a phone. A card of three leaves the
+// fourth column empty, so headline figures line up across every family.
+const OPEN_GRID = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4";
 // A closed card is four columns wide (peaks, Outcome, the extra) so cards in
 // a stack line up.
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
@@ -402,18 +396,7 @@ function HeadBody({
   );
 }
 
-function OpenGrid({
-  heads,
-  detail,
-  tracks,
-}: {
-  heads: PositionCardHead[];
-  detail: boolean;
-  /** At lg, the tracks each headline spans, shared with the stats beneath
-   *  (`panelTracks`); null keeps the plain grid. */
-  tracks: number[] | null;
-}) {
-  const n = heads.length;
+function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolean }) {
   // The breakdowns: the donut button opens its side's in a popover anchored
   // to it (a bottom sheet on a phone), one side at a time; the card keeps
   // its shape.
@@ -444,11 +427,7 @@ function OpenGrid({
   const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
   return (
     <>
-      <div
-        className={`${OPEN_GRID[n] ?? OPEN_GRID[3]}${tracks ? " lg:grid-cols-(--card-tracks)" : ""}`}
-        style={tracks ? tracksStyle(tracks) : undefined}
-        data-anatomy="C10"
-      >
+      <div className={OPEN_GRID} data-anatomy="C10">
         {heads.map((h, i) => (
           <PositionCardRow
             key={h.id}
@@ -458,14 +437,6 @@ function OpenGrid({
             labelTip={h.labelTip}
             headerIcon={h.labelIcon}
             explain={detail}
-            // Three on a phone: the third spans the row, so it is not stranded
-            // beside an empty cell.
-            className={
-              [n === 3 && i === 2 && "col-span-2 sm:col-span-1", tracks && "lg:col-span-(--head-span)"]
-                .filter(Boolean)
-                .join(" ") || undefined
-            }
-            style={tracks ? ({ "--head-span": tracks[i] } as CSSProperties) : undefined}
           >
             <HeadBody head={h} toggle={toggleOf(h)} />
           </PositionCardRow>
@@ -575,7 +546,7 @@ function DetailMenu({ menu }: { menu: PositionCardMenu }) {
   );
 }
 
-// The caps (Miles, 15 Oct 2026): at most 4 headlines and 6 stats on a card.
+// The caps (decision 0040): at most 4 headlines and 6 stats on a card.
 // The slots are built at render from what the position holds (a stat shows
 // only where its figure exists), so no static count or tuple type can see the
 // number a card reaches; the shell counts what it is handed. Outside
@@ -614,7 +585,6 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   ) : null;
   const menu = detail ? slots.menu && <DetailMenu menu={slots.menu} /> : slots.menu;
   const panel = detail ? slots.panel : undefined;
-  const tracks = closed ? null : panelTracks(panel, slots.heads.length);
   const over = overCap(slots);
 
   const header = (
@@ -648,9 +618,9 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       {slots.outcome ? (
         <ClosedGrid heads={slots.heads} outcome={slots.outcome} tone={slots.status?.tone ?? "muted"} detail={detail} />
       ) : (
-        <OpenGrid heads={slots.heads} detail={detail} tracks={tracks} />
+        <OpenGrid heads={slots.heads} detail={detail} />
       )}
-      {panel && <PositionCardPanel columns={panel} tracks={tracks} />}
+      {panel && <PositionCardPanel columns={panel} />}
       {/* A listing card's recency and counts, together at its bottom right. */}
       {!detail && counters && (
         <div className="mt-2 flex items-center justify-end gap-2" data-card-foot="">
