@@ -225,7 +225,6 @@ export function useAaveV3HeadSpec({
     // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: isTransferRow,
-    custodyLabel: isTransferRow,
     deltas,
     party,
     externalActor:

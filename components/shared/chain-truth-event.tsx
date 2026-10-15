@@ -232,8 +232,9 @@ export interface ChainTruthRowSpec {
    *  spine draws no flank on a custody row, so there is nothing to hand off
    *  to (see SpineTokenRow.direction). */
   custody?: boolean;
-  /** A custody row that keeps its action label before the amounts (Aave V3's
-   *  "Transferred out"); the amounts stay bare. Unset: no label, as above. */
+  /** A custody row that keeps its action label before the amounts (Maple's
+   *  and Sky Savings' transfers); the amounts stay bare. Unset: no label, as
+   *  above. */
   custodyLabel?: boolean;
   /** A rate the position holder (or a delegate acting for them) CHOSE — never a
    *  utilization rate. Renders as the same lozenge Liquity V2 uses (individual

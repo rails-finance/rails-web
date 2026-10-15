@@ -124,10 +124,9 @@ export function sparkHeadSpec({
   return {
     label,
     critical: ctx.eventType === "liquidation",
-    // A transfer is a custody row: `Transfer out 400 ◎ to 0x…`, the verb
-    // kept before the amounts (Aave V3's custodyLabel).
+    // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
+    // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: isTransferRow,
-    custodyLabel: isTransferRow,
     deltas,
     party,
     externalActor:
