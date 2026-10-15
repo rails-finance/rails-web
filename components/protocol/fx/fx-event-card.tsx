@@ -47,6 +47,10 @@ export interface FxEventCardProps {
   /** tickRebalance rows only — how many of the position's rebalance rows share
    *  this block (the row's getPosition read then covers them together). */
   blockPeers?: number;
+  /** The position's previous event with a read position (not a transfer):
+   *  its collateral, debt and price are what the sheet's Last event, Market
+   *  move and changes read. */
+  previousEvent?: BaseActivityEvent & { context: { protocol: "fx"; data: FxContext } };
 }
 
 // The two-fact f(x) external-actor verdict now lives in lib/fx/external-actor.ts
@@ -54,7 +58,7 @@ export interface FxEventCardProps {
 // SAME predicate over the whole history for the Explanation's operator bullet,
 // so it cannot stay a file-local helper here.
 
-export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventCardProps) {
+export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEvent }: FxEventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidation";
   const isTransfer = ctx.eventType === "transfer";
@@ -178,6 +182,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
     normalizedSymbol,
     blockPeers,
     active,
+    prev: previousEvent?.context.data,
   });
 
   const slots: EventCardSlots = {

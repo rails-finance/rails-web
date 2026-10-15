@@ -106,6 +106,9 @@ export interface PwnSheetArgs {
   sides: Record<FlowSide, PwnSheetSide> | null;
   /** The event's time, unix seconds. */
   timestamp?: number;
+  /** The loan's creation, where the page hands it down: its deadline, as the
+   *  extensions left it, is the due date a repayment or a claim stands under. */
+  creation?: { ctx: PwnContext; timestamp: number };
 }
 
 const fmt = (n: number): string => formatNumber(n);
@@ -115,7 +118,7 @@ const EPS = 1e-9;
 const utcMinute = (v: string | number): string =>
   `${new Date(Number(v) * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
-export function pwnSheet({ ctx, coords, sides, timestamp }: PwnSheetArgs): EventSheet | undefined {
+export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetArgs): EventSheet | undefined {
   const kind = ctx.eventType;
   const seized = kind === "claimed" && ctx.defaulted === true;
   if (kind === "minted" || kind === "burned") return undefined;
@@ -307,14 +310,15 @@ export function pwnSheet({ ctx, coords, sides, timestamp }: PwnSheetArgs): Event
   };
 
   // ── Risk: the due date and the loan's state ──
-  const struck =
-    ctx.dueValue == null
+  const struckOf = (c: PwnContext, at: number | undefined) =>
+    c.dueValue == null
       ? null
-      : ctx.dueKind === "duration"
-        ? timestamp != null
-          ? timestamp + Number(ctx.dueValue)
+      : c.dueKind === "duration"
+        ? at != null
+          ? at + Number(c.dueValue)
           : null
-        : Number(ctx.dueValue);
+        : Number(c.dueValue);
+  const struck = struckOf(ctx, timestamp);
   const dueFig = (ts: number, info: Provenance) => ({ text: formatDate(ts), info, value: utcMinute(ts) });
   const unread = { none: WORDS.unread };
   let due: SheetStat["value"] = unread;
@@ -323,6 +327,16 @@ export function pwnSheet({ ctx, coords, sides, timestamp }: PwnSheetArgs): Event
     if (end != null) {
       const moved = struck != null && ctx.finalDeadline != null && ctx.finalDeadline !== struck;
       due = dueFig(end, moved ? extendedDeadlineProv(coords) : bookDueProv(ctx.dueKind ?? null));
+    }
+  } else if ((kind === "paid_back" || kind === "claimed") && creation) {
+    // A repayment or a claim ends the loan, so every extension came before
+    // it: the creation's final deadline is the one it stood under.
+    const c = creation.ctx;
+    const cStruck = struckOf(c, creation.timestamp);
+    const end = c.finalDeadline ?? cStruck;
+    if (end != null) {
+      const moved = cStruck != null && c.finalDeadline != null && c.finalDeadline !== cStruck;
+      due = dueFig(end, moved ? extendedDeadlineProv(coords) : bookDueProv(c.dueKind ?? null));
     }
   }
   const stateText = kind === "paid_back" ? WORDS.repaidState : seized ? WORDS.defaulted : WORDS.running;

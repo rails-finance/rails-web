@@ -252,6 +252,31 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
 
   const addressOf = (t: string) => (t.startsWith("0x") ? t : undefined);
 
+  /** The base owed at the previous event or just before this one, in tokens:
+   *  the replay's balance at that row. */
+  const baseOwedProv = (when: "previous" | "before", amount: number): Provenance => ({
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary:
+      when === "previous"
+        ? `${baseSym} owed once the account's previous event in this market had run — the base balance the position's replay of its rows holds at that row, interest to then included.`
+        : `${baseSym} owed just before this event — the base balance once the previous event had run plus the interest charged since, from the position's replay of its rows.`,
+    formula:
+      when === "previous"
+        ? "−base balance at the previous row"
+        : "−(base balance after this event − this event's move)",
+    contract: cometContract(coords),
+    via: "the position's replay of its rows (lib/compound/flows.ts)",
+    inputs: [
+      {
+        label: `${baseSym} owed`,
+        value: `${compoundAmount(amount)} ${baseSym}`,
+        kind: "chain-derived",
+        pclass: "indexed",
+      },
+    ],
+  });
+
   function sheetSide(side: FlowSide): SheetSide {
     const b = baseHolding(side);
     const hs: Holding[] = [...(side === "collateral" ? collHoldings.filter(held) : []), ...(heldBase(b) ? [b] : [])];
@@ -328,7 +353,14 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
         key: "last",
         label: SHEET_WORDS.last,
         note: single && single.pricePrev != null ? priceWords(single.pricePrev) : undefined,
-        amount: single ? { text: compoundAmount(single.last), symbol: baseSym, address: addressOf(base) } : undefined,
+        amount: single
+          ? {
+              text: compoundAmount(single.last),
+              symbol: baseSym,
+              address: addressOf(base),
+              info: baseOwedProv("previous", single.last),
+            }
+          : undefined,
         usd: { text: usdText(lastUsd), info: sideUsdProv(side, "previous", hs, coords) },
         tip: tip.last,
       });
@@ -410,7 +442,14 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
         key: "before",
         label: SHEET_WORDS.before,
         note: single && single.price != null ? priceWords(single.price) : undefined,
-        amount: single ? { text: compoundAmount(single.before), symbol: baseSym, address: addressOf(base) } : undefined,
+        amount: single
+          ? {
+              text: compoundAmount(single.before),
+              symbol: baseSym,
+              address: addressOf(base),
+              info: baseOwedProv("before", single.before),
+            }
+          : undefined,
         usd: { text: usdText(beforeUsd), info: sideUsdProv(side, "before", hs, coords) },
         tip: tip.before,
       };

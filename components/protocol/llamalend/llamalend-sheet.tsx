@@ -91,6 +91,9 @@ const TIPS = {
   debtEvent: (b: string) => `The ${b} this transaction borrowed or repaid, from the log's loan field.`,
   debtBefore: (b: string) =>
     `The ${b} owed just before this transaction, read from the Controller at the block before.`,
+  debtLast: (b: string) => `The ${b} owed once the previous transaction had run, from that row's log.`,
+  debtInterest: (b: string) =>
+    `The interest the ${b} debt accrued since the previous transaction: the debt at the block before this one less the debt that row stated.`,
   debtTotal: (b: string) => `The ${b} owed after this transaction, read from the Controller at this block.`,
   health:
     "The Controller's health for the position after this transaction, with the AMM's holdings counted; below 0 anyone may liquidate it.",
@@ -384,10 +387,51 @@ export function llamalendSheet({
     ctx.debtAfter != null
       ? afterImageProv(b, "debt", coords, ctx.raw?.debtAfter)
       : stateAtBlockProv(`${b} debt`, "Controller.user_state(user)[2]", block, coords, state.after.debtRaw);
+  // The debt carry: what the previous row stated, and the interest since.
+  const debtCarry: SheetSide["carry"] = [];
+  const lastDebt = previousStated?.debt;
+  if (lastDebt && lastDebt.amount > 0 && f.hadLoan) {
+    debtCarry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      amount: borAmt(
+        formatNumber(lastDebt.amount),
+        {
+          kind: "chain",
+          pclass: "state",
+          summary: `${b} owed at the last event — the previous row's UserState after-image on ${formatDayMonth(lastDebt.timestamp)}, the position's debt once that transaction had run.`,
+          via: "the previous row's UserState after-image",
+        },
+        formatExactDecimal(String(lastDebt.amount)),
+      ),
+      usd: usdMarket ? { text: sheetUsd(lastDebt.amount), info: faceProv(b, "The debt at the last event") } : undefined,
+      tip: TIPS.debtLast(b),
+    });
+    const interest = debtBefore - lastDebt.amount;
+    if (interest > 1e-9)
+      debtCarry.push({
+        key: "interest",
+        label: SHEET_WORDS.interest,
+        amount: borAmt(
+          formatNumber(interest),
+          {
+            kind: "chain-derived",
+            pclass: "state",
+            summary: `Interest on the ${b} debt since the ${formatDayMonth(lastDebt.timestamp)} event — Controller.user_state(user)[2] at block ${block - 1}, less the debt that row stated.`,
+            formula: "debt at block − 1 − debt at the last event",
+          },
+          formatExactDecimal(String(interest)),
+        ),
+        usd: usdMarket
+          ? { text: sheetUsd(interest), info: faceProv(b, "The interest since the last event") }
+          : undefined,
+        tip: TIPS.debtInterest(b),
+      });
+  }
   const debtSide: SheetSide = {
     side: "debt",
     icons: debtAfter > 0 || debtBefore > 0 ? [b] : [],
-    carry: [],
+    carry: debtCarry,
     before: f.hadLoan
       ? {
           key: "before",

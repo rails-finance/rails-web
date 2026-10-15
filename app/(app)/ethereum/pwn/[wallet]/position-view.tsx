@@ -386,6 +386,13 @@ export default function PwnLoanView({
   // The tx-sibling seam: each card reaches its same-tx peers so a minted / burned
   // custody card can cross-reference the economic event it accompanies.
   const siblingsByTx = groupEventsByTx(pwnEvents);
+  // Each loan's creation: the deadline its repayment or claim stands under.
+  const creationByLoan = useMemo(() => {
+    const m = new Map<string, (typeof pwnEvents)[number]>();
+    for (const e of pwnEvents)
+      if (e.context.data.eventType === "created") m.set(`${e.context.data.version}:${e.context.data.loanId}`, e);
+    return m;
+  }, [pwnEvents]);
   const tl = useTimelineEvents(pwnEvents, {
     storageKey: `pwn-${wallet}-${selectedLoanId ?? "all"}`,
     protocolKey: "pwn",
@@ -596,6 +603,7 @@ export default function PwnLoanView({
                 isPwnEvent(event) ? (
                   <PwnEventCard
                     event={event}
+                    creation={creationByLoan.get(`${event.context.data.version}:${event.context.data.loanId}`)}
                     eventNumber={meta.eventNumber}
                     isLast={meta.isLast}
                     siblings={siblingsByTx.get(event.txHash) ?? [event]}

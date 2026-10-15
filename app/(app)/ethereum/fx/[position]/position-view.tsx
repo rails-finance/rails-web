@@ -17,6 +17,7 @@ import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
+import { previousEventById } from "@/lib/shared/event-order";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
 import { FX_POOLS, parseFxPositionSlug } from "@/lib/fx/asset-catalog";
 import { fetchFxTimeline } from "@/lib/api/fetch-fx-timeline";
@@ -157,6 +158,13 @@ export default function FxPositionView({
   const fxEvents = useMemo(
     () => withHolderSpans(events.filter(isFxEvent), view?.openedBy).filter(isFxEvent),
     [events, view?.openedBy],
+  );
+  // Each card's previous event with a read position: a transfer moves nothing,
+  // and the earlier row of a shared block carries no read.
+  const previousById = useMemo(
+    () =>
+      previousEventById(fxEvents, (e) => e.context.data.eventType !== "transfer" && e.context.data.collAfter != null),
+    [fxEvents],
   );
 
   // The socialized lane by interval — rails-server's per-position boundary
@@ -610,6 +618,7 @@ export default function FxPositionView({
                       event={event}
                       eventNumber={meta.eventNumber}
                       isLast={meta.isLast}
+                      previousEvent={previousById.get(event.id)}
                       blockPeers={
                         event.context.data.eventType === "tickRebalance"
                           ? blockPeers.get(event.blockNumber)

@@ -239,7 +239,8 @@ export function AaveV3CtEventCard({
     balancesOnly: sharedBlock,
   });
   // The read lane (a market, and not a fee's row) opens its side cells into
-  // their ledgers once the read has landed; Seamless has no read.
+  // their ledgers once the read has landed; a shared block's row and a fee's
+  // row have no read.
   const readLane = !!market && !feeOf;
 
   const slots: EventCardSlots = {
@@ -282,7 +283,7 @@ export function AaveV3CtEventCard({
       : {
           none: feeOf
             ? "A liquidation fee's row states the fee; the account's ledgers are on the liquidation's card."
-            : "No position read on this lane: the cells state the event's balances.",
+            : "No position read for this row: the sheet states the row's balances.",
         },
     notes: body.notes,
     // The index carries no gas for the Aave family's rows and the position read

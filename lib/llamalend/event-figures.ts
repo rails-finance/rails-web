@@ -115,6 +115,9 @@ export function llamalendEventFigures(ctx: LlamalendContext, s: LlamalendEventSt
 export interface LlamalendPreviousStated {
   collateral: number;
   timestamp: number;
+  /** The debt the previous row stated (its after-image), where it stated
+   *  one, and that row's time. */
+  debt?: { amount: number; timestamp: number };
 }
 
 /** A gap below this share of the stated balance is the AMM's rounding. */
@@ -147,11 +150,14 @@ export function llamalendPreviousStatedMap(
     .sort((a, b) => a.e.blockNumber - b.e.blockNumber || a.i - b.i);
   const out = new Map<string, LlamalendPreviousStated | null>();
   let prev: LlamalendPreviousStated | null = null;
+  // The previous row's stated debt: a row that states none leaves none.
+  let debt: LlamalendPreviousStated["debt"];
   for (const { e } of ordered) {
-    out.set(e.id, prev);
+    out.set(e.id, prev && debt ? { ...prev, debt } : prev);
     const c = e.context.data;
     if (c.collateralAfter != null) prev = { collateral: Number(c.collateralAfter), timestamp: e.timestamp };
     else if (Number(c.collateralDelta ?? 0) !== 0) prev = null;
+    debt = c.debtAfter != null ? { amount: Number(c.debtAfter), timestamp: e.timestamp } : undefined;
   }
   return out;
 }

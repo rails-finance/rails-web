@@ -4,11 +4,11 @@
 // then Debt, each with a carry layer, the event's rows and the side's total in
 // dollars; then Risk and Limits with the protocol's parameters beneath.
 //
-// The page holds the previous event's resulting figures (`collBefore`,
-// `debtBefore`) and this block's feed but no price for the previous event, so the
-// carry layer holds "Last event" in tokens, the interest since it and "Before
-// this event"; the Market move row and the previous event's dollars need that
-// price and stand out. A liquidation and a transfer keep their cells.
+// The row holds the previous event's resulting figures (`collBefore`,
+// `debtBefore`) and this block's feed; the page hands down the previous event
+// (`prev`), whose feed prices "Last event" in dollars and the Market move
+// between the two, and whose primary rate the rate's change reads against.
+// A transfer keeps its cells.
 //
 // Dollars: pETH at the market's feed price in its stablecoin times the
 // stablecoin's price; a USDp is $1 in the feed (it prices pETH as the bonding
@@ -83,7 +83,11 @@ function unitPriceOf(ctx: PolarisContext): UnitPrice | null {
 
 /** Polaris's sheet, or undefined for the events it cannot state (a
  *  liquidation, a transfer). */
-export function polarisSheet(ctx: PolarisContext, coords: PolarisCoords): EventSheet | undefined {
+export function polarisSheet(
+  ctx: PolarisContext,
+  coords: PolarisCoords,
+  prev?: PolarisContext,
+): EventSheet | undefined {
   if (ctx.eventType !== "open" && ctx.eventType !== "adjust" && ctx.eventType !== "close") return undefined;
   if (ctx.newColl == null || ctx.newDebt == null) return undefined;
 
@@ -103,6 +107,66 @@ export function polarisSheet(ctx: PolarisContext, coords: PolarisCoords): EventS
   const pa = ctx.priceAtBlock;
   const unit = unitPriceOf(ctx);
   const pethUsd = pa && unit ? pa.pethInDebt * unit.usd : null;
+  // The previous event's prices, where the page hands it down and it read the feed.
+  const prevUnit = prev ? unitPriceOf(prev) : null;
+  const prevPethUsd = prev?.priceAtBlock && prevUnit ? prev.priceAtBlock.pethInDebt * prevUnit.usd : null;
+  const prevPethInput: ProvInput | null = prev?.priceAtBlock
+    ? {
+        label: `pETH price in ${stable} at the previous event`,
+        value: `${formatExact(prev.priceAtBlock.pethInDebt)} ${stable}`,
+        kind: "chain",
+        pclass: "oracle",
+        note: "the market's price feed, previewPrice() at the previous event's block",
+        contract: { name: `Polaris ${stable} price feed`, address: cfg.priceFeed },
+      }
+    : null;
+  /** A token amount in dollars at the previous event's prices. */
+  const prevUsdProv = (what: string, token: "coll" | "debt", amount: number): Provenance => ({
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary:
+      token === "coll"
+        ? `${what} in US dollars — the pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${prevUnit?.words}), at the previous event's block.`
+        : `${what} in US dollars — the ${stable} times its price in dollars (${prevUnit?.words}) at the previous event's block.`,
+    formula: token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
+    via: "polaris_oracle_at_block",
+    inputs: [
+      { label: token === "coll" ? "pETH" : stable, value: `${formatExact(Math.abs(amount))}`, kind: "chain" },
+      ...(token === "coll" && prevPethInput ? [prevPethInput] : []),
+      ...(prevUnit ? [{ ...prevUnit.input, label: `${stable} in USD at the previous event` }] : []),
+    ],
+  });
+  /** The change the prices made to a balance held between the two events. */
+  const marketRow = (token: "coll" | "debt", held: number, tip: string): SheetRow | null => {
+    const now = token === "coll" ? pethUsd : (unit?.usd ?? null);
+    const then = token === "coll" ? prevPethUsd : (prevUnit?.usd ?? null);
+    if (now == null || then == null || held <= 0) return null;
+    const mv = held * (now - then);
+    if (Math.abs(mv) < 0.005) return null;
+    return {
+      key: "market",
+      label: SHEET_WORDS.market,
+      usd: {
+        text: sheetUsd(mv, true),
+        info: {
+          kind: "chain-derived",
+          pclass: "oracle",
+          summary: `Market move on the ${token === "coll" ? "collateral" : "debt"} since the last event — the ${token === "coll" ? "pETH" : stable} held between the two events, valued at this event's prices less the previous event's. No token moved.`,
+          formula: "held × (price at this event − price at the previous event)",
+          via: "polaris_oracle_at_block",
+          inputs: [
+            { label: token === "coll" ? "pETH held" : `${stable} owed`, value: formatExact(held), kind: "chain" },
+            ...(token === "coll"
+              ? [...(prevPethInput ? [prevPethInput] : []), ...(pethPriceInput ? [pethPriceInput] : [])]
+              : []),
+            ...(prevUnit ? [{ ...prevUnit.input, label: `${stable} in USD at the previous event` }] : []),
+            ...(unit ? [unit.input] : []),
+          ],
+        },
+      },
+      tip,
+    };
+  };
   const pethPriceInput: ProvInput | null = pa
     ? {
         label: `pETH price in ${stable}`,
@@ -197,8 +261,14 @@ export function polarisSheet(ctx: PolarisContext, coords: PolarisCoords): EventS
         address: PETH.address,
         info: beforeProv("coll", coords, ctx.raw?.collBefore),
       },
+      usd:
+        prevPethUsd != null
+          ? { text: sheetUsd(collBefore * prevPethUsd), info: prevUsdProv(SHEET_WORDS.last, "coll", collBefore) }
+          : undefined,
       tip: W.tip_coll_last,
     });
+  const collMarket = collBefore > 0 ? marketRow("coll", collBefore, W.tip_coll_market) : null;
+  if (collMarket) collCarry.push(collMarket);
   const collSide: EventSheet["sides"][number] = {
     side: "collateral",
     icons: [PETH.symbol],
@@ -259,11 +329,13 @@ export function polarisSheet(ctx: PolarisContext, coords: PolarisCoords): EventS
         address: stableAddr,
         info: beforeProv("debt", coords, ctx.raw?.debtBefore),
       },
-      // A USDp is $1 in the feed at any block; a GOLDp's price at the previous event is not on the page.
+      // A USDp is $1 in the feed at any block; a GOLDp at the previous event's XAU/USD.
       usd:
-        ctx.market === "usdp" && unit
-          ? { text: sheetUsd(debtBefore * unit.usd), info: usdProv(SHEET_WORDS.last, "debt", debtBefore) }
-          : undefined,
+        prevUnit != null
+          ? { text: sheetUsd(debtBefore * prevUnit.usd), info: prevUsdProv(SHEET_WORDS.last, "debt", debtBefore) }
+          : ctx.market === "usdp" && unit
+            ? { text: sheetUsd(debtBefore * unit.usd), info: usdProv(SHEET_WORDS.last, "debt", debtBefore) }
+            : undefined,
       tip: W.tip_debt_last,
     });
     if (interest > 0) {
@@ -291,6 +363,8 @@ export function polarisSheet(ctx: PolarisContext, coords: PolarisCoords): EventS
         ],
       });
     }
+    const debtMarket = marketRow("debt", debtBefore, W.tip_debt_market);
+    if (debtMarket) debtCarry.push(debtMarket);
   }
   const debtSide: EventSheet["sides"][number] = {
     side: "debt",
@@ -403,6 +477,18 @@ export function polarisSheet(ctx: PolarisContext, coords: PolarisCoords): EventS
         rateText != null
           ? { text: rateText, info: rateInForceProv(coords, ctx.raw?.primaryRate), value: rateText }
           : { none: W.sheet_no_rate },
+      change:
+        ctx.primaryRate != null && prev?.primaryRate != null
+          ? {
+              text: changeText((ctx.primaryRate - prev.primaryRate) * 100, pts),
+              info: {
+                kind: "derived",
+                summary:
+                  "Primary rate change since the previous event — the rate in force at this event less the rate in force at the previous one, in percentage points.",
+                formula: "rate now − rate at the previous event",
+              },
+            }
+          : null,
     },
     {
       key: "reserve-to-debt",

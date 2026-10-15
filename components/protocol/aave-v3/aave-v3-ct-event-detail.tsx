@@ -83,7 +83,7 @@ import {
 } from "@/components/shared/liquidation-forensics";
 import { signedAmount } from "./aave-v3-ct-event-header";
 import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
-import { aaveFamilySheet } from "./aave-family-sheet";
+import { aaveFamilySheet, aaveRowSheet } from "./aave-family-sheet";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { exactLeg, exactUsd, reserveSymbol, statePricePills, type TouchedLeg } from "./aave-v3-position-state";
@@ -139,8 +139,9 @@ export interface AaveV3CtEventDetailProps {
 /** The card's T2 parts, and the read they came from. */
 export interface AaveV3EventBody {
   cells: EventCells;
-  /** T2 as a balance sheet (ui-jobs 330) on the read lane: null until the
-   *  read lands; unset on a lane with no read (Seamless, a fee's row). */
+  /** T2 as a balance sheet (ui-jobs 330): on the read lane, null until the
+   *  read lands; on a row with no read (a shared block, a fee's row), the
+   *  row's own figures. */
   sheet?: EventSheet | null;
   /** The grid's data attributes: the read's state. */
   cellsData?: Record<string, string>;
@@ -152,6 +153,12 @@ export interface AaveV3EventBody {
   state?: AaveV3PositionState;
   stateCoords: V3Coords;
 }
+
+/** A row-only sheet's words where a side's total would stand. */
+const ROW_SHEET_WORDS = {
+  unread: "Not read for this row",
+  fee: "On the liquidation's card",
+};
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 
@@ -319,11 +326,16 @@ export function useAaveV3EventBody({
 
   /** Each balance stat's side, for its cell. */
   const sideOf = new Map<ChainTruthStat, FlowSide>();
+  /** Each balance stat's axis, for the sheet of a row with no read. */
+  const axisOf = new Map<ChainTruthStat, Axis>();
   /** The axis' stat, or null where the read's side cell states the balance. */
   const statFor = (a: Axis): ChainTruthStat | null => {
     if (Number(a.change ?? "0") !== 0) moved.add(a.side);
     const s = axisStat(a);
-    if (s) sideOf.set(s, a.side === "supply" ? "collateral" : "debt");
+    if (s) {
+      sideOf.set(s, a.side === "supply" ? "collateral" : "debt");
+      axisOf.set(s, a);
+    }
     return s;
   };
   const axisStat = (a: Axis): ChainTruthStat | null => {
@@ -842,6 +854,24 @@ export function useAaveV3EventBody({
       eventTs,
       repaid,
       balancesOnly,
+    });
+  } else if (!readLane && !waiting && !unread && balanceStats.length > 0) {
+    // A row with no read (a shared block, a fee's row): the row's own figures.
+    sheet = aaveRowSheet({
+      balances: balanceStats.map((st) => {
+        const a = axisOf.get(st)!;
+        return {
+          side: sideOf.get(st)!,
+          symbol: st.symbol,
+          address: st.address ?? a.reserve,
+          change: a.change ?? "0",
+          changeProv: st.transition?.changeProv ?? a.changeProv,
+          after: a.principalAfter != null ? { value: a.principalAfter, prov: st.prov, usd: st.usd } : undefined,
+          price: a.price?.usd,
+        };
+      }),
+      label: aaveV3CtLabel(ctx, !!feeOf, coords.chainId),
+      noTotal: feeOf ? ROW_SHEET_WORDS.fee : ROW_SHEET_WORDS.unread,
     });
   }
 

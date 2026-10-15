@@ -20,6 +20,7 @@ import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
+import { previousEventById } from "@/lib/shared/event-order";
 import { fetchPolarisPositionSummary } from "@/lib/api/fetch-polaris-positions";
 import { polarisSummaryFromEvents } from "@/lib/polaris/summary-from-events";
 import { fetchPolarisTimeline } from "@/lib/api/fetch-polaris-timeline";
@@ -186,6 +187,11 @@ export default function PolarisPositionView({
   }, [chain, summary, chainSettled, events]);
 
   const polarisEvents = useMemo(() => events.filter(isPolarisEvent), [events]);
+  // Each card's previous event, a transfer passed over: it moves no figure.
+  const previousById = useMemo(
+    () => previousEventById(polarisEvents, (e) => e.context.data.eventType !== "transfer"),
+    [polarisEvents],
+  );
 
   // The CDP's summed ledger over its whole life — the closed/liquidated
   // explanation's lifetime bullet and the PSM outcome strip both read it,
@@ -438,7 +444,12 @@ export default function PolarisPositionView({
                 toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
                 renderCard={(event, meta) =>
                   isPolarisEvent(event) ? (
-                    <PolarisEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
+                    <PolarisEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isLast={meta.isLast}
+                      previousEvent={previousById.get(event.id)}
+                    />
                   ) : null
                 }
               />

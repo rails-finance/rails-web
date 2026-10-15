@@ -666,8 +666,6 @@ const SHEET_SUBJECTS = {
       // 28 Feb 2025, Withdraw and Repay.
       event: "0x8766352d623d50606f8a6929ee945523619b5e9c81a83d5dcf740f3c15a0f795:21",
       second: "0xe6dab53fd66f31cdea1bb1f7ec776bfb292e7b1adabc5063c5aba213bce9aea1:18",
-      swaps: false,
-      why: { swaps: "the card gets no previousEvent, so no Risk or Limits value carries a change" },
     },
   ],
   pwn: [

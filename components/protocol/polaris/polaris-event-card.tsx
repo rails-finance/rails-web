@@ -37,6 +37,9 @@ export interface PolarisEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "polaris"; data: PolarisContext } };
   isLast?: boolean;
   eventNumber?: number;
+  /** The CDP's previous event (not a transfer): its prices and rate are what
+   *  the sheet's Last event, Market move and changes read. */
+  previousEvent?: BaseActivityEvent & { context: { protocol: "polaris"; data: PolarisContext } };
 }
 
 const num = (s?: string): number => {
@@ -44,7 +47,7 @@ const num = (s?: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCardProps) {
+export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: PolarisEventCardProps) {
   const ctx = event.context.data;
   const coords = polarisEchoCoords(ctx, event.txHash, event.blockNumber);
   const prose = polarisEventProse({ ctx });
@@ -92,7 +95,7 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
   const head = usePolarisHeadSpec(event.actionLabel, ctx, coords);
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
-  const body = polarisEventBody(ctx, coords, useFlowFocus() != null);
+  const body = polarisEventBody(ctx, coords, useFlowFocus() != null, previousEvent?.context.data);
   const slots: EventCardSlots = {
     event: {
       id: event.id,

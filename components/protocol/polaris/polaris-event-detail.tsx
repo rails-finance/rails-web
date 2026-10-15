@@ -133,7 +133,13 @@ function crTransitionOf(
 
 /** `ledgers`: the page ties its timeline to the Lifetime flows panel, so the
  *  Collateral and Debt cells open into their ledgers. */
-export function polarisEventBody(ctx: PolarisContext, coords: PolarisCoords, ledgers: boolean): PolarisEventBody {
+export function polarisEventBody(
+  ctx: PolarisContext,
+  coords: PolarisCoords,
+  ledgers: boolean,
+  /** The CDP's previous event, where the page hands it down. */
+  prev?: PolarisContext,
+): PolarisEventBody {
   const stable = ctx.stableSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[ctx.market].stable.address;
 
@@ -334,7 +340,7 @@ export function polarisEventBody(ctx: PolarisContext, coords: PolarisCoords, led
         }
       : undefined;
 
-  const sheet = polarisSheet(ctx, coords);
+  const sheet = polarisSheet(ctx, coords, prev);
 
   // The sheet states the primary rate in its Limits panel and the open's
   // escrow stays a line beneath it; the cells carry both in the grid.

@@ -43,3 +43,19 @@ export function compareWithinBlock(a: BaseActivityEvent, b: BaseActivityEvent): 
 export function compareEventsInOrder(a: BaseActivityEvent, b: BaseActivityEvent): number {
   return a.blockNumber - b.blockNumber || a.timestamp - b.timestamp || compareWithinBlock(a, b);
 }
+
+/** Each event's previous one on the timeline, keyed by id: the latest earlier
+ *  event that `counts` keeps (default, every event). What a card reads its
+ *  carry-forward figures and its changes since the previous event from. */
+export function previousEventById<E extends BaseActivityEvent>(
+  events: readonly E[],
+  counts: (e: E) => boolean = () => true,
+): Map<string, E> {
+  const out = new Map<string, E>();
+  let last: E | undefined;
+  for (const e of [...events].sort(compareEventsInOrder)) {
+    if (last) out.set(e.id, last);
+    if (counts(e)) last = e;
+  }
+  return out;
+}

@@ -240,7 +240,9 @@ words:
     Liquidation penalty, stability pool
   # The sheet's read-more, one per row: what the figure is and where it is read.
   tip_coll_last: |-
-    The CDP's pETH after its previous event, from the CDPManager's log.
+    The CDP's pETH after its previous event, from the CDPManager's log, in dollars at that event's pETH price.
+  tip_coll_market: |-
+    The change the pETH price made to the dollar value of the CDP's pETH between its previous event and this one.
   tip_coll_before: |-
     The CDP's pETH just before this event: what the previous event left, at this block's pETH price.
   tip_coll_event: |-
@@ -252,7 +254,9 @@ words:
   tip_coll_total: |-
     The CDP's pETH after this event, from the CDPManager's log, in dollars at this block's pETH price.
   tip_debt_last: |-
-    The CDP's debt after its previous event, from the CDPManager's log.
+    The CDP's debt after its previous event, from the CDPManager's log, in dollars at the stablecoin's price then.
+  tip_debt_market: |-
+    The change the stablecoin's dollar price made to the debt's value between the previous event and this one. A USDp is $1 at every block; a GOLDp follows XAU/USD.
   tip_debt_interest: |-
     The interest charged into the debt since the previous event, from the CDPManager's log.
   tip_debt_interest_asset: |-

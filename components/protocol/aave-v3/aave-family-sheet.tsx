@@ -84,6 +84,10 @@ const TIPS = {
     `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars just before this transaction, read from the Pool at the oracle's prices at this block.`,
   asset: (sym: string) =>
     `The ${sym} owed after this transaction, read from the Pool, at the oracle's ${sym} price at this block.`,
+  rowAsset: (sym: string, side: FlowSide) =>
+    `The ${sym} ${side === "collateral" ? "supplied" : "owed"} after this transaction, as the event's row states it, at the oracle's ${sym} price at this block.`,
+  rowTotal:
+    "The side's total in dollars needs the position read at this block, which this row does not make: it states the reserve it moved.",
   repaid: "The assets this account once borrowed and owes none of after this event.",
   total: (side: FlowSide) =>
     `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars after this transaction, read from the Pool at the oracle's prices at this block.`,
@@ -545,4 +549,90 @@ export function aaveFamilySheet({
       { panel: "limits", rows: limits, breakdown: params },
     ],
   };
+}
+
+/** One balance a row with no position read states: the reserve, the row's
+ *  signed change and its receipt, and the balance after where the row carries
+ *  it. */
+export interface AaveRowBalance {
+  side: FlowSide;
+  symbol: string;
+  address?: string;
+  /** The signed change, as a decimal string. */
+  change: string;
+  changeProv: Provenance;
+  /** The balance after the event, with its receipt and its dollars. */
+  after?: { value: string; prov: Provenance; usd?: { value: number; prov: Provenance } };
+  /** The oracle's price at the block, where the row carries it. */
+  price?: number;
+}
+
+/** The sheet of a row with no position read (a block shared with another of
+ *  the owner's transactions on Base and Seamless, a liquidation's fee row):
+ *  each side the row moved states the change and, with the breakdown, the
+ *  reserve's balance after; the side's total names why it is not stated. No
+ *  Risk or Limits panel, since both need the account read. */
+export function aaveRowSheet({
+  balances,
+  label,
+  noTotal,
+}: {
+  balances: AaveRowBalance[];
+  /** The event's word ("Supply"), naming its rows. */
+  label: string;
+  /** Words in place of a side's total. */
+  noTotal: string;
+}): EventSheet {
+  const sides = (["collateral", "debt"] as const).map((side): SheetSide => {
+    const mine = balances.filter((b) => b.side === side);
+    const moved = mine.filter((b) => Number(b.change) !== 0);
+    const rows: SheetRow[] = moved.map((b) => {
+      const n = Number(b.change);
+      const mag = String(Math.abs(n));
+      return {
+        key: `event-${b.symbol}`,
+        label: moved.length > 1 ? `${label} · ${b.symbol}` : label,
+        amount: {
+          text: `${n < 0 ? "−" : ""}${fmtPositionAmount(mag)}`,
+          symbol: b.symbol,
+          address: b.address,
+          info: b.changeProv,
+          value: `${n < 0 ? "−" : "+"}${mag}`,
+        },
+        usd:
+          b.price != null
+            ? {
+                text: sheetUsd(n * b.price),
+                info: atBlockUsdProv(b.symbol, `The ${b.symbol} this event moved`, mag, b.price),
+              }
+            : undefined,
+        tip: TIPS.event(b.symbol, side),
+      };
+    });
+    const assets: SheetRow[] = mine
+      .filter((b) => b.after && Number(b.after.value) > 0)
+      .map((b) => ({
+        key: `asset-${b.symbol}`,
+        label: b.symbol,
+        amount: {
+          text: fmtPositionAmount(b.after!.value),
+          symbol: b.symbol,
+          address: b.address,
+          info: b.after!.prov,
+          value: b.after!.value,
+        },
+        usd: b.after!.usd ? { text: sheetUsd(b.after!.usd.value), info: b.after!.usd.prov } : undefined,
+        tip: TIPS.rowAsset(b.symbol, side),
+      }));
+    return {
+      side,
+      icons: mine.filter((b) => b.after && Number(b.after.value) > 0).map((b) => b.symbol),
+      carry: [],
+      rows,
+      assets,
+      total: { none: noTotal },
+      totalTip: TIPS.rowTotal,
+    };
+  });
+  return { sides, panels: [] };
 }

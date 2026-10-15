@@ -45,6 +45,8 @@ export interface PwnCellsProps {
   blockNumber?: number;
   /** The event's time (unix seconds) — the creation's, to state the term. */
   timestamp?: number;
+  /** The loan's creation, for a repayment's or a claim's due date. */
+  creation?: PwnEvent;
   /** Same-transaction events: a burn reads where the collateral went from the
    *  claim or repayment beside it. */
   siblings?: PwnEvent[];
@@ -90,7 +92,7 @@ const STATE_LABEL: Record<CollateralState, string> = {
   closed: "Collateral · none (loan closed)",
 };
 
-export function usePwnCells({ ctx, txHash, blockNumber, timestamp, siblings = [], eventId }: PwnCellsProps): {
+export function usePwnCells({ ctx, txHash, blockNumber, timestamp, siblings = [], eventId, creation }: PwnCellsProps): {
   cells: EventCellSpec[];
   notes: ReactNode;
   sheet?: EventSheet | null;
@@ -334,7 +336,13 @@ export function usePwnCells({ ctx, txHash, blockNumber, timestamp, siblings = []
   const sheet: EventSheet | null | undefined = !sheetKind
     ? undefined
     : sheetSides
-      ? pwnSheet({ ctx, coords, sides: sheetSides, timestamp })
+      ? pwnSheet({
+          ctx,
+          coords,
+          sides: sheetSides,
+          timestamp,
+          creation: creation ? { ctx: creation.context.data, timestamp: creation.timestamp } : undefined,
+        })
       : ledgerPending
         ? null
         : undefined;

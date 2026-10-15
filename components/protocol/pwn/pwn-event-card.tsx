@@ -27,9 +27,12 @@ export interface PwnEventCardProps {
   /** Same-tx sibling events — the custody cross-reference seam (defaults to just
    *  this one). */
   siblings?: PwnEvent[];
+  /** The loan's creation event: the deadline a repayment or a claim stands
+   *  under. */
+  creation?: PwnEvent;
 }
 
-export function PwnEventCard({ event, isLast, eventNumber, siblings }: PwnEventCardProps) {
+export function PwnEventCard({ event, isLast, eventNumber, siblings, creation }: PwnEventCardProps) {
   const ctx = event.context.data;
   const sibs = siblings ?? [event];
   const isSeizure = ctx.eventType === "claimed" && ctx.defaulted === true;
@@ -149,6 +152,7 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings }: PwnEventC
     timestamp: event.timestamp,
     siblings: sibs,
     eventId: event.id,
+    creation,
   });
   const flowRow = ctx.eventType === "created" || ctx.eventType === "paid_back" || isSeizure;
 

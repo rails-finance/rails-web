@@ -6,11 +6,14 @@
 //
 // Collateral is in the pool's normalized unit (stETH / WBTC) at the oracle's
 // price at the block; Debt is fxUSD counted at $1. The page has the previous
-// event's debt only as the move since it (`debtSincePrevious`), so the Debt
+// event's debt as the move since it (`debtSincePrevious`), so the Debt
 // breakdown holds "Last event", the pool's move since it and "Before this
-// event"; Collateral holds "Before this event" alone, and neither side draws a
-// "Market move" or "Interest since last event" (a position's debt accrues no
-// interest: the pool moves it through rebalances and shared bad debt).
+// event". Where the page hands down the previous event (`prev`), Collateral
+// holds "Last event" at that event's price, what the pool moved since, the
+// "Market move" between the two prices and "Before this event"; the price to
+// the tick swaps to its change since. Neither side draws "Interest since last
+// event" (a position's debt accrues no interest: the pool moves it through
+// rebalances and shared bad debt).
 //
 // Risk: the debt ratio and the price at which the position's tick reaches the
 // rebalance line. Limits: the pool's drift since the previous event, with the
@@ -30,6 +33,7 @@ import {
   type SheetSide,
   type SheetStat,
 } from "@/components/shared/event-sheet";
+import { changeText } from "@/components/shared/change-swap-value";
 import {
   chainBeforeProv,
   chainChangeProv,
@@ -61,7 +65,14 @@ const TIPS = {
   collLiquidation:
     "The collateral a keeper took from the position, the pool's balance before less the balance after, bonus included.",
   collTotal: "The collateral held after this event, in dollars at the oracle's price at this block.",
+  collLast: "The collateral the position held after its previous event, in dollars at the oracle's price then.",
+  collMoved:
+    "The collateral the pool moved on this position since the previous event, through funding and rebalances, at the oracle's price at this block.",
+  collMarket:
+    "The change the oracle's price made to the dollar value of the collateral held between the previous event and this one.",
   debtLast: "The debt at the previous event: the debt just before this event less what the pool moved since.",
+  debtLastRead:
+    "The debt after the previous event, from the pool at that event's block, counting one fxUSD as one dollar.",
   debtMoved:
     "The debt the pool moved since the previous event through rebalances, redemptions and bad debt shared across the pool.",
   debtBefore: "The debt just before this event, from the pool at the block before, counting one fxUSD as one dollar.",
@@ -98,15 +109,24 @@ const faceProv = (what: string, coords: FxCoords): Provenance => ({
 });
 
 /** A collateral amount at the oracle's price at the block. */
-const collUsdProv = (sym: string, amount: number, price: number, coords: FxCoords): Provenance => ({
+const collUsdProv = (sym: string, amount: number, price: number, coords: FxCoords, at?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${sym} in dollars: the amount times the pool oracle's price per ${sym}${coords.blockNumber != null ? ` at block ${coords.blockNumber}` : ""}.`,
+  summary: `${sym} in dollars: the amount times the pool oracle's price per ${sym}${at ? ` ${at}` : coords.blockNumber != null ? ` at block ${coords.blockNumber}` : ""}.`,
   formula: "amount × price",
   inputs: [
     { label: "amount", value: `${formatNumber(Math.abs(amount))} ${sym}`, kind: "chain" },
     { label: "price", value: sheetUsd(price), kind: "chain-derived", pclass: "oracle" },
   ],
+});
+
+/** The collateral the previous event left, as its row read it. */
+const prevCollProv = (sym: string, amount: number, coords: FxCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `Collateral at the previous event (${sym}) — getPosition's collateral at that event's block, in the pool's normalized unit.`,
+  contract: { name: "AaveFundingPool", address: coords.pool },
+  inputs: [{ label: "collateral", value: `${formatExact(amount)} ${sym}`, kind: "chain", pclass: "state" }],
 });
 
 const debtLastProv = (coords: FxCoords): Provenance => ({
@@ -128,6 +148,8 @@ export interface FxSheetArgs {
   blockPeers?: number;
   /** The card is open: the read starts. */
   active: boolean;
+  /** The position's previous event with a read position. */
+  prev?: FxContext;
 }
 
 /** The card's sheet: null while the position's read is on its way, undefined
@@ -140,6 +162,7 @@ export function useFxSheet({
   normalizedSymbol,
   blockPeers,
   active,
+  prev,
 }: FxSheetArgs): EventSheet | null | undefined {
   const { value: state, settled } = useFxEventStateRead(ctx, active ? blockNumber : undefined, txHash);
   if (ctx.eventType === "transfer") return undefined;
@@ -250,10 +273,82 @@ export function useFxSheet({
       tip: collTip,
     });
   const collAfterUsd = price != null && price > 0 ? collAfter * price : null;
+  // The carry layer from the previous event's position and price.
+  const prevColl = !opened && prev?.collAfter != null ? Number(prev.collAfter) : null;
+  const prevPrice = prev?.oraclePrice != null ? Number(prev.oraclePrice) : null;
+  const prevCoords: FxCoords = { ...coords, txHash: undefined, blockNumber: undefined };
+  const collCarry: SheetSide["carry"] = [];
+  if (prevColl != null && prevColl > DUST_COLL && prevPrice != null && prevPrice > 0) {
+    collCarry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      amount: {
+        text: formatNumber(prevColl),
+        symbol: normalizedSymbol,
+        address: collAddress,
+        info: prevCollProv(normalizedSymbol, prevColl, coords),
+        value: formatExact(prevColl),
+      },
+      usd: {
+        text: sheetUsd(prevColl * prevPrice),
+        info: collUsdProv(normalizedSymbol, prevColl, prevPrice, prevCoords, "at the previous event"),
+      },
+      tip: TIPS.collLast,
+    });
+    const movedColl = collBefore - prevColl;
+    if (Math.abs(movedColl) >= DUST_COLL && price != null && price > 0)
+      collCarry.push({
+        key: "moved",
+        label: "Moved by the pool since last event",
+        amount: {
+          text: signedNum(movedColl),
+          symbol: normalizedSymbol,
+          address: collAddress,
+          info: {
+            kind: "chain-derived",
+            pclass: "state",
+            summary: `Collateral moved by the pool (${normalizedSymbol}) — funding and rebalances since the previous event: the collateral just before this event less the collateral after the previous one.`,
+            formula: "collateral before − collateral at the previous event",
+            contract: { name: "AaveFundingPool", address: coords.pool },
+          },
+          value: formatExact(movedColl),
+        },
+        usd: { text: sheetUsd(movedColl * price), info: collUsdProv(normalizedSymbol, movedColl, price, coords) },
+        tip: TIPS.collMoved,
+      });
+    if (price != null && price > 0) {
+      const mv = prevColl * (price - prevPrice);
+      if (Math.abs(mv) >= 0.005)
+        collCarry.push({
+          key: "market",
+          label: SHEET_WORDS.market,
+          usd: {
+            text: sheetUsd(mv, true),
+            info: {
+              kind: "chain-derived",
+              pclass: "oracle",
+              summary: `Market move on the collateral since the last event — the ${normalizedSymbol} held at the previous event, valued at the oracle's price at this block less its price at the previous event. No token moved.`,
+              formula: "collateral at the previous event × (price now − price then)",
+              inputs: [
+                { label: "collateral", value: `${formatNumber(prevColl)} ${normalizedSymbol}`, kind: "chain" },
+                {
+                  label: "price at the previous event",
+                  value: sheetUsd(prevPrice),
+                  kind: "chain-derived",
+                  pclass: "oracle",
+                },
+                { label: "price at this event", value: sheetUsd(price), kind: "chain-derived", pclass: "oracle" },
+              ],
+            },
+          },
+          tip: TIPS.collMarket,
+        });
+    }
+  }
   const collSide: SheetSide = {
     side: "collateral",
     icons: [normalizedSymbol],
-    carry: [],
+    carry: collCarry,
     before:
       collBefore > 0
         ? {
@@ -330,6 +425,27 @@ export function useFxSheet({
       usd: { text: sheetUsd(since), info: faceProv("The debt the pool moved", coords) },
       tip: TIPS.debtMoved,
     });
+  } else if (!opened && prev?.debtAfter != null && Number(prev.debtAfter) > 0) {
+    const last = Number(prev.debtAfter);
+    debtCarry.push({
+      key: "last",
+      label: SHEET_WORDS.last,
+      amount: {
+        text: formatNumber(last),
+        symbol: FXUSD_META.symbol,
+        address: FXUSD_META.address,
+        info: {
+          kind: "chain",
+          pclass: "state",
+          summary: "Debt at the previous event (fxUSD) — getPosition's debt at that event's block.",
+          contract: { name: "AaveFundingPool", address: coords.pool },
+          inputs: [{ label: "debt", value: `${formatExact(last)} fxUSD`, kind: "chain", pclass: "state" }],
+        },
+        value: formatExact(last),
+      },
+      usd: { text: sheetUsd(last), info: faceProv("The debt at the previous event", coords) },
+      tip: TIPS.debtLastRead,
+    });
   }
   const debtSide: SheetSide = {
     side: "debt",
@@ -391,6 +507,11 @@ export function useFxSheet({
   const liqLine = after?.liquidateLine ?? null;
   const tickPrice =
     collAfter > 0 && debtAfter > 0 && rebLine != null && rebLine > 0 ? debtAfter / (collAfter * rebLine) : null;
+  const prevDebt = prev?.debtAfter != null ? Number(prev.debtAfter) : null;
+  const prevTick =
+    prevColl != null && prevColl > 0 && prevDebt != null && prevDebt > 0 && rebLine != null && rebLine > 0
+      ? prevDebt / (prevColl * rebLine)
+      : null;
   const risk: SheetStat[] = [
     { key: "debt-ratio", label: "Debt ratio", value: ratioValue, tip: TIPS.ratio },
     {
@@ -409,6 +530,18 @@ export function useFxSheet({
                   value: formatExact(tickPrice),
                 }
               : { none: UNREAD },
+      change:
+        tickPrice != null && prevTick != null
+          ? {
+              text: changeText(tickPrice - prevTick, (x) => sheetUsd(x)),
+              info: {
+                kind: "derived",
+                summary:
+                  "Price to the tick's change since the previous event — the price after this event less the price on the previous event's collateral and debt, both against the pool's rebalance line at this block.",
+                formula: "price now − price at the previous event",
+              },
+            }
+          : null,
       tip: TIPS.priceToTick,
     },
   ];
