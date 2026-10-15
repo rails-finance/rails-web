@@ -426,8 +426,13 @@ try {
     const l1 = /\*\*L1\*\* (.*)/.exec(copy)?.[1] ?? "";
     // Token symbols are icons on the row, not text.
     const symbols = new Set([e.values.coll_symbol, e.values.debt_symbol]);
-    const words = l1
-      .split(" · ")
+    // A batch's rate update draws no debt delta in its header (Miles, 14 Oct
+    // 2026): the debt change is the sheet's, checked below.
+    const rateUpdate = e.template.id === "liquity2.delegation.rate_update";
+    const groups = l1.split(" · ");
+    const debtGroup = rateUpdate ? (groups.find((g) => /^Debt [+−-]/.test(g)) ?? null) : null;
+    const words = groups
+      .filter((g) => g !== debtGroup)
       .flatMap((g) => g.split(" "))
       .filter((w) => !symbols.has(w));
     // The spine draws the figures beside the node and the header the words,
@@ -439,6 +444,32 @@ try {
       l1 !== "" && !missing3,
       `${missing3} not in «${rowText.slice(0, 200)}»`,
     );
+    if (debtGroup) {
+      const delta = debtGroup.split(" ")[1];
+      const header = norm(
+        (
+          (await page
+            .locator("[data-anatomy=T1]")
+            .first()
+            .innerText()
+            .catch(() => "")) || ""
+        ).replace(/\n/g, " "),
+      );
+      check(`${label}: the header draws no debt delta (${delta})`, !header.includes(delta), header.slice(0, 160));
+      const debtSide = await page
+        .$eval('[data-sheet-side="debt"]', (d) => ({
+          touched: d.getAttribute("data-sheet-touched"),
+          rows: [...d.querySelectorAll("[data-sheet-row]")].map((r) => r.getAttribute("data-sheet-row")),
+        }))
+        .catch(() => null);
+      // The debt moves by what accrued (interest, the management fee) or, on
+      // a raise, by the event's own row: either is on the Debt side.
+      check(
+        `${label}: the debt change is on the sheet (an event row, or the interest and fee rows)`,
+        debtSide != null && (debtSide.touched === "true" || debtSide.rows.some((r) => r === "interest" || r === "fee")),
+        JSON.stringify(debtSide),
+      );
+    }
     await page.close();
   }
 } finally {

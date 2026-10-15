@@ -16,13 +16,14 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
-import { HALO, armInspector, armScope } from "./lib/prov-inspector.mjs";
+import { HALO, armScope } from "./lib/prov-inspector.mjs";
 
 const TROVE =
   "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154";
 const EVENT_ID = "0x2a440f6541a008e23d3088f88bac08d0ded6884d3238cbe0c1eee4b8a3e158d4_3";
 const EVENT_PAGE = `${TROVE}/event/${EVENT_ID}`;
-const AAVE = "/ethereum/aave-v3/0xfe28854b855ab09a47adbd893a5f580cdffc5820?market=core";
+// A card with stats (figures outside the breakdown button).
+const AAVE_STATS = "/ethereum/aave-v3/0x8008316e61985599dc62d69716bab3ebe643c0a8?market=core";
 
 let checked = 0;
 let failures = 0;
@@ -256,20 +257,34 @@ for (const width of [1280, 390]) {
   await ctx.close();
 }
 
-// ── 3. Aave V3 Core: the Tools menu marks all ───────────────────────────
-// An event's "Inspect provenance" is on the event page's ⋮ alone, checked at
-// 1280 and 390 in section 2.
+// ── 3. Aave V3 Core: each section's ⋮ arms that section alone ──────────
+// The page-level tool is gone: the card's ⋮ and the panel's ⋮ each carry
+// "Inspect provenance" for their own section (scoped arming). The fixture's
+// card has stats outside the breakdown button, whose headline figures take
+// no armed click (their receipt sits in the breakdown's heading).
 {
-  const { ctx, page, errors } = await open(1280, AAVE, "[data-event-id]");
+  const { ctx, page, errors } = await open(1280, AAVE_STATS, "[data-event-id]");
   const tag = "aave-v3 @1280";
-  // The page-level tool (H7.3) marks every section.
-  await armInspector(page);
+  await page.waitForSelector("[data-position-panel] [data-panel-row]", { timeout: 60_000 }).catch(() => {});
+  await armScope(page, "position-card", { menu: "[data-card-menu]" });
   await page.waitForTimeout(500);
-  const all = await marksBySection(page);
+  const card = await marksBySection(page);
   check(
-    `${tag}: the page-level tool marks the card, the flows and the events`,
-    (all["position-card"] ?? 0) > 0 && (all.event ?? 0) > 0 && (all.flows ?? 0) > 0,
-    JSON.stringify(all),
+    `${tag}: the card's ⋮ marks the card's figures and nothing else`,
+    (card["position-card"] ?? 0) > 0 && !card.flows && !card.event,
+    JSON.stringify(card),
+  );
+  // Fresh, so the card's arming does not carry over.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector("[data-lifetime-flows-panel] [data-panel-menu]", { timeout: 120_000 }).catch(() => {});
+  await page.waitForTimeout(3000);
+  await armScope(page, "flows", { menu: "[data-lifetime-flows-panel] [data-panel-menu]" });
+  await page.waitForTimeout(500);
+  const flows = await marksBySection(page);
+  check(
+    `${tag}: the panel's ⋮ marks the flows and nothing else`,
+    (flows.flows ?? 0) > 0 && !flows["position-card"] && !flows.event,
+    JSON.stringify(flows),
   );
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
