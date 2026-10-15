@@ -585,8 +585,8 @@ export default function MakerVaultDetailView({
   // The live note: this vault's own newest rated row against the Jug's own fee
   // read at the head. Open vaults only, and only once the chain overlay has
   // answered — it is the sole source of both the live fee and the block it was
-  // read at. Unthresholded, so a vault whose fee has not moved since its last
-  // touch still says so (vault 28699's own live note is exactly 0.00 pp).
+  // read at. A fee that has not moved since the last touch draws no note
+  // (`liveNoteStated`).
   const vaultOpen = view?.status === "open";
   const liveNotes = useMemo<MarketNote[]>(() => {
     if (!market || !vaultOpen) return [];

@@ -43,6 +43,9 @@ export interface AaveV3CtEventCardProps {
   /** The transaction before this one on the timeline, whose after-state is
    *  where this event's before-state started. */
   previous?: AaveV3Neighbours["previous"];
+  /** Another of the owner's transactions shares the block: the card shows
+   *  balances only, with no health factor (`blocksSharedByTransactions`). */
+  sharedBlock?: boolean;
 }
 
 // direction "right" = token moves toward the protocol (deposit / repay),
@@ -70,7 +73,15 @@ const DIRECTION: Record<
   bad_debt_written_off: "right",
 };
 
-export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings, previous }: AaveV3CtEventCardProps) {
+export function AaveV3CtEventCard({
+  event,
+  isLast,
+  eventNumber,
+  market,
+  siblings,
+  previous,
+  sharedBlock,
+}: AaveV3CtEventCardProps) {
   const ctx = event.context.data;
   const chainId = useChainId();
   // Pointer-over or focus of the row starts the position reads the open card
@@ -225,6 +236,7 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
     // A liquidation fee's transfer states the liquidation's account: no ledger.
     eventId: feeOf ? undefined : event.id,
     eventTs: event.timestamp,
+    balancesOnly: sharedBlock,
   });
   // The read lane (a market, and not a fee's row) opens its side cells into
   // their ledgers once the read has landed; Seamless has no read.
@@ -285,7 +297,7 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           owner={event.wallet}
-          market={market}
+          market={sharedBlock ? undefined : market}
           siblings={siblings}
           previous={previous}
           timestamp={event.timestamp}

@@ -71,7 +71,7 @@ import {
   withEmodeServedRows,
   type AaveFamilyAccountSwitches,
 } from "@/lib/aave-v3/account-switches";
-import { hfLabelV3 } from "@/lib/aave-v3/position-state";
+import { blocksSharedByTransactions, hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { aaveV3CountNote, aaveV3CountSplit, aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import {
@@ -336,18 +336,9 @@ export default function AaveV3PositionDetail({
   // Each card's same-transaction rows and the transaction before it (the
   // liquidation fee's pairing, the health factor's move between events).
   const neighbours = useMemo(() => aaveV3Neighbours(timelineEvents as AaveV3Event[]), [timelineEvents]);
-  // An e-mode row is read from the chain at blocks N−1 and N, which is
-  // "immediately before" and "once it had run" only where no other of the
-  // owner's transactions shares the block.
-  const sharedBlocks = useMemo(() => {
-    const txs = new Map<number, Set<string>>();
-    for (const e of timelineEvents) {
-      const set = txs.get(e.blockNumber) ?? new Set<string>();
-      set.add((e.txHash ?? e.id).toLowerCase());
-      txs.set(e.blockNumber, set);
-    }
-    return new Set([...txs].filter(([, s]) => s.size > 1).map(([b]) => b));
-  }, [timelineEvents]);
+  // A card in a block holding another of the owner's transactions shows
+  // balances only, with no health factor; an e-mode row there is not read.
+  const sharedBlocks = useMemo(() => blocksSharedByTransactions(timelineEvents), [timelineEvents]);
 
   // The served list as ROWS. `aaveEvents` holds the grouped answer's own events
   // when one is in hand — the read above put them there — so the plan and the
@@ -916,6 +907,7 @@ export default function AaveV3PositionDetail({
                       market={market}
                       siblings={neighbours.get(event.id)?.siblings}
                       previous={neighbours.get(event.id)?.previous}
+                      sharedBlock={sharedBlocks.has(event.blockNumber)}
                     />
                   ) : null
                 }

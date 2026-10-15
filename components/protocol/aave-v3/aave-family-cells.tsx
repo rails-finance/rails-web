@@ -73,7 +73,6 @@ import {
 } from "@/lib/aave-v3/event-provenance";
 import {
   baseToUsd,
-  beforeAtBlockPrices,
   big,
   borrowableBase,
   bpsPct,
@@ -83,12 +82,14 @@ import {
   interestSincePrevious,
   legChange,
   legHeld,
+  liquidationBasis,
   rawToUsd,
   wadToNumber,
   type AaveV3AccountSide,
   type AaveV3PositionState,
   type AaveV3PositionStateReserve,
   type InterestPart,
+  type LiquidationBasis,
 } from "@/lib/aave-v3/position-state";
 import {
   CollateralFlipNote,
@@ -129,8 +130,7 @@ export function sideFacts(state: AaveV3PositionState, side: FlowSide) {
   // A supply with its switch off: the Pool's total leaves it out, the flows
   // count it, so the sum's total adds every supplied balance.
   const offSupply =
-    side === "collateral" &&
-    state.reserves.some((r) => r.collateral?.after === false && big(r.supply.after) > ZERO);
+    side === "collateral" && state.reserves.some((r) => r.collateral?.after === false && big(r.supply.after) > ZERO);
   const parts: { symbol: string; usd: number }[] = [];
   let priced = true;
   if (side === "collateral")
@@ -276,7 +276,12 @@ function SideDollars({
   const todayAfter = total("after");
   let shown: Figure | null = event;
   if (todayAfter != null) {
-    if (which === "after") shown = { text: fmtPositionUsd(todayAfter), value: todayAfter.toFixed(2), prov: todayUsdProv(what("after"), "each reserve") };
+    if (which === "after")
+      shown = {
+        text: fmtPositionUsd(todayAfter),
+        value: todayAfter.toFixed(2),
+        prov: todayUsdProv(what("after"), "each reserve"),
+      };
     else {
       const b = total("before");
       if (b == null) shown = null;
@@ -287,7 +292,10 @@ function SideDollars({
         shown = {
           text: `${d < 0 ? "−" : "+"}${fmtPositionUsd(Math.abs(d))}`,
           value: `${d < 0 ? "−" : "+"}${d.toFixed(2)}`,
-          prov: todayUsdProv(`${side === "supply" ? "Collateral" : "Debt"}\u2019s change over the event,`, "each reserve"),
+          prov: todayUsdProv(
+            `${side === "supply" ? "Collateral" : "Debt"}\u2019s change over the event,`,
+            "each reserve",
+          ),
         };
       }
     }
@@ -324,7 +332,13 @@ function sideCell(a: AccountSideArgs, side: Side): EventLedgerCellSpec {
   const afterProvOf = (r: AaveV3PositionStateReserve): Provenance => {
     const sym = reserveSymbol(r);
     const flag = side === "supply" ? r.collateral : null;
-    const prov = exactBalanceProv(sym, side, "after", coords, exactLeg(legOf(r), "after", r.decimals!, state.blockTimestamp));
+    const prov = exactBalanceProv(
+      sym,
+      side,
+      "after",
+      coords,
+      exactLeg(legOf(r), "after", r.decimals!, state.blockTimestamp),
+    );
     return flag && flag.before === flag.after ? withFlagNote(prov, sym, flag.after, coords) : prov;
   };
   const flips = rows.flatMap((r) => {
@@ -347,7 +361,15 @@ function sideCell(a: AccountSideArgs, side: Side): EventLedgerCellSpec {
     "data-receipt-total": side,
     "data-receipt-changed": changed ? "true" : "false",
   };
-  const common = { key: flowSide, label: SIDE_NAME[flowSide], side: flowSide, kind: "ledger" as const, changed, data, sub };
+  const common = {
+    key: flowSide,
+    label: SIDE_NAME[flowSide],
+    side: flowSide,
+    kind: "ledger" as const,
+    changed,
+    data,
+    sub,
+  };
 
   if (rows.length === 1) {
     const r = rows[0];
@@ -367,12 +389,21 @@ function sideCell(a: AccountSideArgs, side: Side): EventLedgerCellSpec {
           ? {
               before: {
                 text: fmtPositionAmount(before),
-                info: exactBalanceProv(sym, side, "before", coords, exactLeg(leg, "before", decimals, state.blockTimestamp)),
+                info: exactBalanceProv(
+                  sym,
+                  side,
+                  "before",
+                  coords,
+                  exactLeg(leg, "before", decimals, state.blockTimestamp),
+                ),
                 value: groupExact(before),
               },
               delta: {
                 text: `${sign}${fmtPositionAmount(moved.magnitude)}`,
-                info: exactBalanceChangeProv(sym, side, coords, { before: groupExact(before), after: groupExact(after) }),
+                info: exactBalanceChangeProv(sym, side, coords, {
+                  before: groupExact(before),
+                  after: groupExact(after),
+                }),
                 value: `${sign}${groupExact(moved.magnitude)}`,
               },
             }
@@ -398,7 +429,12 @@ function sideCell(a: AccountSideArgs, side: Side): EventLedgerCellSpec {
                 "$0"
               ),
               ...(r.priceBase != null
-                ? usdAt({ price: Number(humanOf(r.priceBase, 8)), symbol: sym, before: Number(before), after: Number(after) })
+                ? usdAt({
+                    price: Number(humanOf(r.priceBase, 8)),
+                    symbol: sym,
+                    before: Number(before),
+                    after: Number(after),
+                  })
                 : {}),
             }
           : undefined,
@@ -500,7 +536,11 @@ export function ltvCells(state: AaveV3PositionState, coords: V3Coords, beforeOve
   };
   const ratio = (which: "ltv" | "lt", a: AaveV3AccountSide, when: "before" | "after"): Figure => {
     const bps = which === "ltv" ? a.ltvBps : a.liquidationThresholdBps;
-    return { text: bpsPct(bps), value: bpsPct(bps), prov: accountRatioProv(which, when, coords, { bps, emode: inEmode }) };
+    return {
+      text: bpsPct(bps),
+      value: bpsPct(bps),
+      prov: accountRatioProv(which, when, coords, { bps, emode: inEmode }),
+    };
   };
   const hasCollateral = big(account.before.totalCollateralBase) > ZERO || big(account.after.totalCollateralBase) > ZERO;
   const before = beforeOverride ?? current(account.before, "before");
@@ -516,17 +556,31 @@ export function ltvCells(state: AaveV3PositionState, coords: V3Coords, beforeOve
       label: "LTV",
       changed: ltvMoved,
       inputs: DERIVED,
-      value: { ...(ltvMoved ? { before: fig(before) } : {}), after: fig(after), afterClass: `tabular-nums ${ltvMoved ? "text-foreground" : "text-rb-500"}` },
+      value: {
+        ...(ltvMoved ? { before: fig(before) } : {}),
+        after: fig(after),
+        afterClass: `tabular-nums ${ltvMoved ? "text-foreground" : "text-rb-500"}`,
+      },
       sub: hasCollateral
         ? [
             {
               content: (
                 <span data-ltv-limits="">
                   of{" "}
-                  {article(bpsPct(account.before.ltvBps !== account.after.ltvBps ? account.before.ltvBps : account.after.ltvBps))}{" "}
-                  <InlinePair before={ratio("ltv", account.before, "before")} after={ratio("ltv", account.after, "after")} />{" "}
+                  {article(
+                    bpsPct(
+                      account.before.ltvBps !== account.after.ltvBps ? account.before.ltvBps : account.after.ltvBps,
+                    ),
+                  )}{" "}
+                  <InlinePair
+                    before={ratio("ltv", account.before, "before")}
+                    after={ratio("ltv", account.after, "after")}
+                  />{" "}
                   maximum; liquidation at{" "}
-                  <InlinePair before={ratio("lt", account.before, "before")} after={ratio("lt", account.after, "after")} />
+                  <InlinePair
+                    before={ratio("lt", account.before, "before")}
+                    after={ratio("lt", account.after, "after")}
+                  />
                 </span>
               ),
             },
@@ -587,7 +641,8 @@ export function interestSubs(
           {
             content: (
               <span data-interest-since="" data-interest-side={side}>
-                {side === "debt" ? "Interest on the debt" : "Supply interest"} since the previous event: {list(parts, side)}
+                {side === "debt" ? "Interest on the debt" : "Supply interest"} since the previous event:{" "}
+                {list(parts, side)}
               </span>
             ),
           },
@@ -646,8 +701,16 @@ export function rowCell(s: ChainTruthStat, key: string, side?: FlowSide): EventC
   const value = {
     ...(t
       ? {
-          before: { text: tip(t.shownAsIs ? t.before : smallFigure(t.before, t.beforeExact, false), t.beforeExact), info: t.beforeProv, value: t.beforeExact },
-          delta: { text: tip(t.shownAsIs ? t.change : smallFigure(t.change, t.changeExact), t.changeExact), info: t.changeProv, value: t.changeExact },
+          before: {
+            text: tip(t.shownAsIs ? t.before : smallFigure(t.before, t.beforeExact, false), t.beforeExact),
+            info: t.beforeProv,
+            value: t.beforeExact,
+          },
+          delta: {
+            text: tip(t.shownAsIs ? t.change : smallFigure(t.change, t.changeExact), t.changeExact),
+            info: t.changeProv,
+            value: t.changeExact,
+          },
         }
       : {}),
     after: { text: tip(s.display ?? compactAmount(s.value), s.value), info: s.prov, value: s.value },
@@ -876,27 +939,21 @@ export function aaveV3RiskCells(
   liquidation: boolean,
 ): { cells: EventStatCellSpec[]; notes: ReactNode } {
   const { account, emode, sources } = state;
-  const atCall = liquidation ? beforeAtBlockPrices(state) : null;
+  const atCall = liquidation && account ? liquidationBasis(state) : null;
   const inEmode = !!emode && (emode.before !== 0 || emode.after !== 0);
-  // A liquidation's before LTV is at the prices the call ran at (block N), the
-  // figure the prose states; the note under the grid gives the end of N−1.
+  // A liquidation's before figures are at the prices inside the call; the
+  // note under the grid gives the end of N−1.
   const ltvBefore = ((): Figure | undefined => {
     if (!account || atCall?.ltv == null) return undefined;
-    const coll = baseToUsd(account.before.totalCollateralBase);
-    const debt = baseToUsd(account.before.totalDebtBase);
     const text = `${(atCall.ltv * 100).toFixed(2)}%`;
-    return { text, value: text, prov: ltvAtCallProv(coords, atCall.ltv, coll > 0 ? debt / coll : null) };
+    return { text, value: text, prov: ltvAtCallProv(coords, atCall.ltv, atCall.endLtv) };
   })();
   const hfBefore: Figure | null = account
     ? atCall?.hf != null
       ? {
           text: hfLabelV3(atCall.hf),
           value: hfLabelV3(atCall.hf),
-          prov: hfAtCallProv(
-            coords,
-            atCall.hf,
-            account.before.healthFactor == null ? null : wadToNumber(account.before.healthFactor),
-          ),
+          prov: hfAtCallProv(coords, atCall.hf, atCall.endHf),
         }
       : hfFigure(account.before, "before", coords)
     : null;
@@ -933,7 +990,9 @@ export function aaveV3RiskCells(
             changed: !!emode && emode.before !== emode.after,
             value: emode
               ? {
-                  ...(emode.before !== emode.after ? { before: fig(emodeFigure(state, emode.before, "before", coords)) } : {}),
+                  ...(emode.before !== emode.after
+                    ? { before: fig(emodeFigure(state, emode.before, "before", coords)) }
+                    : {}),
                   after: fig(emodeFigure(state, emode.after, "after", coords)),
                 }
               : { none: "Not available at this block" },
@@ -951,27 +1010,49 @@ export function aaveV3RiskCells(
           : null;
   const clamped = state.notes.some((n) => n.startsWith("negative_scaled_sum:"));
   const notes =
-    (account && liquidation && atCall?.hf != null) || missing || clamped ? (
+    atCall || missing || clamped ? (
       <>
-        {account && liquidation && atCall?.hf != null && (
-          <p data-liq-basis>
-            Before: the health factor and loan-to-value at the oracle prices the liquidation ran at (block{" "}
-            {state.block.toLocaleString("en-US")}); the other before figures are the account at the end of block{" "}
-            {(state.block - 1).toLocaleString("en-US")}
-            {account.before.healthFactor != null ? (
-              <>
-                , where the health factor was {hfLabelV3(wadToNumber(account.before.healthFactor))}
-                {hfLabelV3(wadToNumber(account.before.healthFactor)) === hfLabelV3(atCall.hf)
-                  ? " as well: the prices did not move between the two blocks"
-                  : ""}
-              </>
-            ) : null}
-            .
-          </p>
-        )}
+        {atCall && <LiquidationBasisNote basis={atCall} block={state.block} hfFormat={hfLabelV3} />}
         {missing && <p>{missing}</p>}
         {clamped && <p>A balance whose recorded changes sum below zero is shown as 0.</p>}
       </>
     ) : null;
   return { cells, notes };
+}
+
+const usd2 = (p: number): string =>
+  `$${p.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+
+/** The line under a liquidation's grid: its before figures, at the prices
+ *  inside the call, and the account at the end of block N−1 beneath (one rule
+ *  on every Aave-V3-architecture explorer, `liquidationBasis`). */
+export function LiquidationBasisNote({
+  basis,
+  block,
+  hfFormat,
+}: {
+  basis: LiquidationBasis;
+  block: number;
+  hfFormat: (hf: number | null) => string;
+}) {
+  const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
+  const pm = basis.priceMove;
+  const same =
+    hfFormat(basis.hf) === hfFormat(basis.endHf) &&
+    (basis.ltv == null || basis.endLtv == null || pct(basis.ltv) === pct(basis.endLtv));
+  return (
+    <p className="leading-relaxed" data-liq-basis="">
+      Before the liquidation: health factor {hfFormat(basis.hf)}
+      {basis.ltv != null ? `, loan-to-value ${pct(basis.ltv)}` : ""}. Valued at the prices inside the liquidation call
+      {pm ? ` (${pm.symbol} ${usd2(pm.to)})` : ""}. At the end of block {(block - 1).toLocaleString("en-US")}
+      {same ? (
+        " the figures were the same."
+      ) : (
+        <>
+          {pm ? `, with ${pm.symbol} at ${usd2(pm.from)}` : ""}: health factor {hfFormat(basis.endHf)}
+          {basis.endLtv != null ? `, loan-to-value ${pct(basis.endLtv)}` : ""}.
+        </>
+      )}
+    </p>
+  );
 }

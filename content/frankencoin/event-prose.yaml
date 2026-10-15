@@ -339,7 +339,7 @@ words:
   sale_other: |-
     The sale
   forced_settlement: |-
-    Forced Sale Settlement
+    Forced sale settlement
   time_one: |-
     time
   time_many: |-
@@ -743,11 +743,26 @@ templates:
       - repay.paid
       - repay.next
     groups:
-      happened: [repay.what, repay.what_plain, repay.what_cleared, repay.what_cleared_plain, repay.what_closed, repay.what_closed_plain]
+      happened:
+        [
+          repay.what,
+          repay.what_plain,
+          repay.what_cleared,
+          repay.what_cleared_plain,
+          repay.what_closed,
+          repay.what_closed_plain,
+        ]
       adds_up: [repay.paid]
       leaves: [repay.next]
     alternates:
-      - [repay.what, repay.what_plain, repay.what_cleared, repay.what_cleared_plain, repay.what_closed, repay.what_closed_plain]
+      - [
+          repay.what,
+          repay.what_plain,
+          repay.what_cleared,
+          repay.what_cleared_plain,
+          repay.what_closed,
+          repay.what_closed_plain,
+        ]
 
   - id: frankencoin.add_collateral
     title: |-
@@ -825,7 +840,8 @@ templates:
       - pause.ended
       - coll.understated
     groups:
-      happened: [withdraw.what, withdraw.what_plain, withdraw.what_emptied, withdraw.what_emptied_plain, coll.understated]
+      happened:
+        [withdraw.what, withdraw.what_plain, withdraw.what_emptied, withdraw.what_emptied_plain, coll.understated]
       leaves: [limit.at, limit.room, pause.ended]
     alternates:
       - [withdraw.what, withdraw.what_plain, withdraw.what_emptied, withdraw.what_emptied_plain, coll.understated]
@@ -922,7 +938,8 @@ templates:
       - mint.roll
       - coll.understated
     groups:
-      happened: [adjust.none, adjust.coll_in, adjust.repaid, adjust.coll_out, adjust.minted, price.raised, price.lowered]
+      happened:
+        [adjust.none, adjust.coll_in, adjust.repaid, adjust.coll_out, adjust.minted, price.raised, price.lowered]
       adds_up: [mint.received, repay.paid]
       leaves: [price.pause, price.no_pause, price.pause_runs, pause.ended, mint.roll, coll.understated]
     alternates:
@@ -1414,7 +1431,7 @@ templates:
 
   - id: frankencoin.handover
     title: |-
-      Owner set at mint
+      Owner set at creation
     when: |-
       ownership_transferred inside the creating transaction
     L5: creation

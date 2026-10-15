@@ -74,7 +74,7 @@ const FX_SORT_VALUES = new Set<string>(FX_SORT_OPTIONS.map((o) => o.value));
 const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
+  { value: "liquidated", label: "Ever liquidated" },
 ];
 
 // One chip per pool (the whole two-pool catalog), carrying the collateral

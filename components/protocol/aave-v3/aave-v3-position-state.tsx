@@ -210,9 +210,14 @@ export function statePricePills(
 }
 
 /** The at-call health factor's receipt: the balances before the liquidation
- *  valued at the oracle prices of its block. */
-export function hfAtCallProv(coords: V3Coords, hf: number, endOfPrevious: number | null): Provenance {
-  const brand = v3Brand(v3Protocol(coords.pool));
+ *  valued at the oracle prices of its block. `brand` names the oracle
+ *  (SparkLend passes its own). */
+export function hfAtCallProv(
+  coords: V3Coords,
+  hf: number,
+  endOfPrevious: number | null,
+  brand: string = v3Brand(v3Protocol(coords.pool)),
+): Provenance {
   return {
     kind: "chain-derived",
     pclass: "oracle",
@@ -224,8 +229,12 @@ export function hfAtCallProv(coords: V3Coords, hf: number, endOfPrevious: number
 }
 
 /** The at-call loan-to-value's receipt. */
-export function ltvAtCallProv(coords: V3Coords, ltv: number, endOfPrevious: number | null): Provenance {
-  const brand = v3Brand(v3Protocol(coords.pool));
+export function ltvAtCallProv(
+  coords: V3Coords,
+  ltv: number,
+  endOfPrevious: number | null,
+  brand: string = v3Brand(v3Protocol(coords.pool)),
+): Provenance {
   return {
     kind: "chain-derived",
     pclass: "oracle",

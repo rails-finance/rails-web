@@ -125,13 +125,13 @@ const stampPlacement = await page.evaluate(() => {
   if (!infoLink) return "no (i) link in sub-nav";
   if (!/\/info$/.test(infoLink.getAttribute("href") || "")) return "(i) href is not /info";
   const identity = document.querySelector("[data-rail-identity]");
-  // The stamp is a button since ui-jobs 59 — it shows the age and swaps to the
-  // block number on a press — so it is found by its accessible name rather
-  // than by the "block · age" text it used to read.
+  // The stamp is a button that reads "head 3 min ago", the block number in
+  // its peek, so it is found by its accessible name.
   const stamp = document.querySelector("button[aria-label^='Chain head']");
   if (!identity) return "no identity link in rail header";
   if (!stamp) return "no recency stamp in rail header";
-  const stampRow = stamp.parentElement;
+  // The stamp's peek (RevealTip) wraps the button; the row holds the wrapper.
+  const stampRow = (stamp.closest("[data-reveal-tip]") ?? stamp).parentElement;
   if (!stampRow || !stampRow.contains(nav)) return "stamp is not sharing a row with the sub-nav";
   if (stampRow.contains(identity)) return "stamp still shares a row with the identity";
   return "ok";

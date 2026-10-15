@@ -30,7 +30,12 @@
 
 import type { MakerRateLogResponse, MakerRateSet } from "@/lib/api/fetch-makerdao-rate-log";
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
-import { collapseSameDirectionRateSteps, type RateSetLog, type RateStepNote } from "@/lib/shared/market-note";
+import {
+  collapseSameDirectionRateSteps,
+  liveNoteStated,
+  type RateSetLog,
+  type RateStepNote,
+} from "@/lib/shared/market-note";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 
 /** The ilk a note is read in, as the vault page names it. */
@@ -401,11 +406,9 @@ export function makerRateStepNotesFor(
  * A LIVE rate step: this vault's own NEWEST rated row against the ilk's
  * stability fee read live at the chain head.
  *
- * Unthresholded, like every other live note: "nothing has moved" is itself the
- * fact. Vault 28699's own newest row sits at the fee its current set states, so
- * its live note is exactly 0.00 pp and MUST still render — a live note that
- * withheld itself for a flat reading would leave a reader unable to tell "the
- * fee is unchanged" from "Rails did not look".
+ * A move that rounds to 0.00 points draws no note, the rule every family
+ * shares (`liveNoteStated`): vault 28699's newest row sits at the fee its
+ * current set states, so it has no live note while the Jug reads that fee.
  *
  * `observed.to` is null — a live read is the Jug's current value, not a drip —
  * and `setsBetween` is therefore null too, matching `RateStepNote.setsBetween`'s
@@ -426,8 +429,6 @@ export function liveMakerRateStepNote(
 
   const a = rated[rated.length - 1];
   const rateA = asFraction(a.set.aprPct);
-  // The fee today equals the fee at the last event: no note (the 0.01 pp floor).
-  if (Math.abs(live.aprPct - rateA) * 100 < 0.005) return null;
   // Today's debt when the overlay has it: the fee is read now, so the yearly
   // figure is what it costs on what the vault owes now.
   const today = live.debtNow != null && live.debtNow > 0 ? live.debtNow : null;
@@ -472,5 +473,6 @@ export function liveMakerRateStepNote(
   // Folders newer than the newest ungrouped row: the vault's last events are
   // grouped, so "since the vault's last event" would name the wrong row.
   const grouped = groupedBetween(folders, a.e.blockNumber, live.block);
+  if (!liveNoteStated(note)) return null;
   return { ...note, ...(path ? { path } : {}), ...(grouped ? { grouped } : {}) };
 }

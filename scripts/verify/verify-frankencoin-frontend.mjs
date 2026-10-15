@@ -14,7 +14,7 @@
 //   E. the detail page of the known 5-slice V1 challenge position renders the
 //      forensics card grouped by (hub, challenge number) — both verdicts, the
 //      slice roster, the Hub V1 tag (the wire spells hub_version "V1" — the
-//      casing regression), the "Owner Set at Mint" initialization row, the
+//      casing regression), the "Owner set at creation" initialization row, the
 //      Auction Settlement reclassification, and the closed card's peaks;
 //   F. the denied + forced-sale position renders its denied lifecycle and
 //      Forced Sale rows.
@@ -236,7 +236,7 @@ const noDollar = (name, text) => {
   check("slice copy says who paid what in which token", /paid\s+1,?704\.\d+\s*ZCHF for 1\.4\s*WETH/.test(t));
   // Newcomer round 2 (web 26cd5a8) states the outcome as a sentence.
   check("two-axis outcome line renders", /The position is closed\.|remains open/.test(t));
-  check("Owner Set at Mint initialization row renders", /Owner Set at Mint/.test(t));
+  check("Owner set at creation initialization row renders", /Owner set at creation/.test(t));
   // The 5 slices collapse into one run row (10 events: a Challenge Succeeded
   // and its Auction Settlement echo per bid). Since ui-jobs 250 (`9301aba`)
   // the row is a group frame (lib/group-rows.mjs): its header is named "5

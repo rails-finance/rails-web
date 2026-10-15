@@ -63,6 +63,7 @@ import {
 import { sparkLives } from "@/lib/spark/lives";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
+import { blocksSharedByTransactions } from "@/lib/aave-v3/position-state";
 import { isGatewayWithdrawal, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import {
   SparkPositionCard,
@@ -326,15 +327,7 @@ export default function SparkPositionDetail({
   // The event route draws the sub-nav and the event's card in page mode with
   // the shared column; the position card and Lifetime flows stay off it.
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
-  const sharedBlocks = useMemo(() => {
-    const txs = new Map<number, Set<string>>();
-    for (const e of timelineEvents) {
-      const set = txs.get(e.blockNumber) ?? new Set<string>();
-      set.add((e.txHash ?? e.id).toLowerCase());
-      txs.set(e.blockNumber, set);
-    }
-    return new Set([...txs].filter(([, set]) => set.size > 1).map(([b]) => b));
-  }, [timelineEvents]);
+  const sharedBlocks = useMemo(() => blocksSharedByTransactions(timelineEvents), [timelineEvents]);
 
   // The served list as ROWS. `sparkEvents` holds the grouped answer's own
   // events when one is in hand — the read above put them there — so the plan
@@ -581,8 +574,6 @@ export default function SparkPositionDetail({
     [sparkEvents, reserveRates, noteOptions],
   );
 
-  // A live note whose move rounds to 0.00 points says nothing; SparkLend
-  // leaves it out (the note modal says so).
   const liveNotes = useMemo<MarketNote[]>(
     () =>
       reserveRates && chain && !chain.chainStale
@@ -591,7 +582,7 @@ export default function SparkPositionDetail({
             reserveRates,
             { blockNumber: chain.blockNumber, timestamp: head?.blockTimestamp, reserves: chain.reserves },
             noteOptions,
-          ).filter((n) => n.kind !== "rate-step" || Math.abs(n.deltaPp) >= 0.005)
+          )
         : [],
     [sparkEvents, reserveRates, chain, head, noteOptions],
   );

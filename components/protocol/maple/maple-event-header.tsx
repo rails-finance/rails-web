@@ -138,8 +138,6 @@ export function useMapleHeadSpec({
     // verb kept before the amount.
     custody: isTransfer,
     custodyLabel: isTransfer,
-    // The label says the direction; a sign read as a loss on a fill.
-    unsignedDeltas: true,
     deltas,
     note,
     externalActor:

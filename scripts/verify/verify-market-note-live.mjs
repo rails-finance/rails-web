@@ -3,8 +3,8 @@
 // event that carries it, on a Polaris CDP (usdp/8).
 // ---------------------------------------------------------------------------
 // A live note sits in a dedicated head slot above the newest row for any OPEN
-// position whose live read exists — unthresholded, because "nothing has moved"
-// is itself the fact. The switch was a toolbar pill, "Market notes · N", until
+// position whose live read exists, unless its move rounds to 0.00 points
+// (hidden on every family, rails-ops market-notes §9). The switch was a toolbar pill, "Market notes · N", until
 // rails-ops TO-DO-ui-jobs item 118 moved it into Display as "Market-note
 // markers" and made each closed note a marker on the spine; the count the pill
 // stated is `data-market-notes` on the timeline root. This script turns on

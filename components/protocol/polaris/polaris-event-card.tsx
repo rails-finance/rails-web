@@ -8,8 +8,9 @@
 // Spine grammar: a liquidation carries the critical warning spine; a transfer
 // rides the custody glyph on a dotted spine (a party changed, nothing moved);
 // every holder touch draws its token rows — pETH and the stablecoin, each
-// with the direction the log's own sign says. Value INTO the position points
-// left, value OUT points right, the convention the other CDP explorers use.
+// with the direction the log's own sign says. On the spine the wallet is
+// off-page left and the protocol is the card column, so deposit and repay point
+// right and withdraw and borrow point left, as in the other CDP explorers.
 
 import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
@@ -59,8 +60,8 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
     tokens.push({
       symbol: PETH.symbol,
       address: PETH.address,
-      // A deposit moves pETH INTO the position; a withdrawal out of it.
-      direction: dColl > 0 ? "left" : "right",
+      // A deposit moves pETH into the protocol; a withdrawal out to the wallet.
+      direction: dColl > 0 ? "right" : "left",
       value: Math.abs(dColl),
       // The header's rule: in full, three decimals, the token named.
       display: formatNumber(Math.abs(dColl)),
@@ -70,8 +71,8 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
     tokens.push({
       symbol: stable,
       address: stableAddr,
-      // A borrow sends the stablecoin OUT to the holder; a repay brings it in.
-      direction: dDebt > 0 ? "right" : "left",
+      // A borrow sends the stablecoin to the wallet; a repay returns it to the protocol.
+      direction: dDebt > 0 ? "left" : "right",
       value: Math.abs(dDebt),
       display: formatNumber(Math.abs(dDebt)),
       unit: stable,

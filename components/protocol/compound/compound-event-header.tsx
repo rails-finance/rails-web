@@ -107,9 +107,6 @@ export function useCompoundHeadSpec({
     // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: transferOut || transferIn,
-    // The verb carries the direction at every width (the SparkLend rule,
-    // TO-DO 184); an absorb keeps its signs.
-    unsignedDeltas: !critical,
     deltas,
     party,
     externalActor:

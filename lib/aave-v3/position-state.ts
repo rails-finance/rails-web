@@ -410,6 +410,63 @@ export function beforeAtBlockPrices(state: AaveV3PositionState): { hf: number | 
   return { hf: debt > 0 ? weighted / debt : null, ltv: coll > 0 ? debt / coll : null };
 }
 
+/** The blocks where the owner has more than one transaction. A card in one
+ *  shows balances only, with no health factor (rails-ops detail-page-anatomy,
+ *  "Shared row rules"): the account read at blocks N−1 and N is "immediately
+ *  before" and "once it had run" only for a transaction alone in its block,
+ *  and nothing records the prices inside the block. Every Aave-V3-architecture
+ *  view passes no market to those cards, so they ask for no read. */
+export function blocksSharedByTransactions(
+  events: readonly { blockNumber: number; txHash?: string; id: string }[],
+): Set<number> {
+  const txs = new Map<number, Set<string>>();
+  for (const e of events) {
+    const set = txs.get(e.blockNumber) ?? new Set<string>();
+    set.add((e.txHash ?? e.id).toLowerCase());
+    txs.set(e.blockNumber, set);
+  }
+  return new Set([...txs].filter(([, set]) => set.size > 1).map(([b]) => b));
+}
+
+/** A liquidation's "before" figures, one rule on every Aave-V3-architecture
+ *  explorer (rails-ops detail-page-anatomy, "Shared row rules"): the health
+ *  factor and loan-to-value at the prices inside the liquidation call
+ *  (`beforeAtBlockPrices`), with the account's figures at the end of block
+ *  N−1 beneath. `priceMove`: the collateral's price at each basis, where the
+ *  account held one collateral and the price moved. */
+export interface LiquidationBasis {
+  hf: number | null;
+  ltv: number | null;
+  endHf: number | null;
+  endLtv: number | null;
+  priceMove?: { symbol: string; from: number; to: number };
+}
+
+export function liquidationBasis(state: AaveV3PositionState): LiquidationBasis | null {
+  const at = beforeAtBlockPrices(state);
+  const b = state.account?.before;
+  if (!at || at.hf == null || !b) return null;
+  const collateralUsd = baseToUsd(b.totalCollateralBase);
+  const out: LiquidationBasis = {
+    hf: at.hf,
+    ltv: at.ltv,
+    endHf: b.healthFactor == null ? null : wadToNumber(b.healthFactor),
+    endLtv: collateralUsd > 0 ? baseToUsd(b.totalDebtBase) / collateralUsd : null,
+  };
+  const held = state.reserves.filter(
+    (r) => r.collateral?.before && r.decimals != null && Number(humanOf(r.supply.before, r.decimals)) > 0,
+  );
+  if (held.length === 1 && held[0].priceBase != null) {
+    const r = held[0];
+    const amount = Number(humanOf(r.supply.before, r.decimals as number));
+    const from = collateralUsd / amount;
+    const to = Number(r.priceBase) / 1e8;
+    if (amount > 0 && Math.abs(to / from - 1) >= 0.0005)
+      out.priceMove = { symbol: r.symbol ?? "the collateral", from, to };
+  }
+  return out;
+}
+
 /** What the account could still borrow at one end of the transaction, in
  *  base units: max LTV × total collateral − total debt, floored at zero —
  *  the Pool's availableBorrowsBase arithmetic (percentMul, half up). */

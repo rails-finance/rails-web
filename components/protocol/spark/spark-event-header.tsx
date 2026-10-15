@@ -14,12 +14,14 @@ import {
   externalActorProv,
   transferDeltaProv,
   transferCounterpartyProv,
+  gatewayCallerProv,
   type SparkCoords,
 } from "@/lib/spark/event-provenance";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { protocolIconSrc } from "@/lib/shared/protocols";
-import { isGatewayWithdrawal } from "@/lib/spark/liquidation-fee";
+import { isGatewayAct, isGatewayWithdrawal } from "@/lib/spark/liquidation-fee";
+import { SPARK_WETH_GATEWAY } from "@/lib/spark/flows-timeline";
 import { sparkRowLabel } from "@/lib/spark/event-label";
 
 export interface SparkEventHeaderProps {
@@ -100,13 +102,23 @@ export function sparkHeadSpec({
   // withdraws from the Pool and sends ETH on in the same transaction); one to
   // the Spark treasury inside a liquidation is its fee. Each row names itself so.
   const viaGateway = !feeOf && isGatewayWithdrawal(ctx);
+  // A supply, borrow or repay through the gateway names it the same way
+  // (rails-ops detail-page-anatomy, "Shared row rules").
+  const gatewayAct = !feeOf && isGatewayAct(ctx);
   // A fee and a gateway withdrawal read as acts with their verbs, the amount on
   // the spine's outgoing flank; only a plain transfer is a custody move.
   const isTransferRow = !feeOf && !viaGateway && (transferOut || ctx.eventType === "transfer_in");
   const label = sparkRowLabel(ctx, actionLabel, feeOf);
   const named = getProtocolContract(ctx.counterparty, MAINNET_CHAIN_ID);
-  const party =
-    ctx.counterparty != null
+  const party = gatewayAct
+    ? {
+        prefix: "as ETH via",
+        address: SPARK_WETH_GATEWAY,
+        name: "Spark WETH gateway",
+        prov: gatewayCallerProv(ctx.eventType, coords, SPARK_WETH_GATEWAY),
+        ens: false,
+      }
+    : ctx.counterparty != null
       ? {
           prefix: viaGateway ? "as ETH via" : transferOut ? "to" : "from",
           address: ctx.counterparty,
@@ -124,12 +136,9 @@ export function sparkHeadSpec({
   return {
     label,
     critical: ctx.eventType === "liquidation",
-    // A transfer is a custody row: `Transfer out 400 ◎ to 0x…`, the verb
-    // kept before the amounts (Aave V3's custodyLabel).
+    // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
+    // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: isTransferRow,
-    custodyLabel: isTransferRow,
-    // The verb carries the direction; a liquidation keeps its signs.
-    unsignedDeltas: ctx.eventType !== "liquidation",
     deltas,
     party,
     externalActor:

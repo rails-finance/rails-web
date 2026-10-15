@@ -199,6 +199,27 @@ export const transferCounterpartyProv = (dir: "in" | "out", coords: SparkCoords,
   };
 };
 
+/** A supply, borrow or repay sent through the Spark WETH gateway: the Pool's
+ *  msg.sender (Supply/Borrow `user`, Repay `repayer`) is the gateway, which
+ *  wraps or unwraps the ETH for the owner. */
+export const gatewayCallerProv = (eventType: string, coords: SparkCoords, gateway: string): Provenance => {
+  const named = getProtocolContract(gateway, MAINNET_CHAIN_ID);
+  const param =
+    eventType === "repay" ? "Repay event's repayer" : `${eventType === "borrow" ? "Borrow" : "Supply"} event's user`;
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `The contract that made this ${eventType} at the Pool — the ${param} param${atBlock(coords)}, the Pool's msg.sender. It is the Spark WETH gateway, which ${eventType === "borrow" ? "borrows WETH for the owner and sends it on as ETH" : "takes the owner's ETH and wraps it to WETH"}; the position is the owner's (onBehalfOf).${named ? ` Rails names the address ${named.name}: its verified contract source is \`${named.contractName}\`, ${named.role}.` : ""}`,
+    contract: SPARK,
+    via: `${SPARK_VIA} · ${eventType === "repay" ? "repayer" : "user"} param`,
+    inputs: eventInputs(
+      coords,
+      named ? [counterpartyNameInput(named, explorerUrl(MAINNET_CHAIN_ID, "address", gateway))] : [],
+    ),
+  };
+};
+
 /** Supplied balance of a reserve AFTER this event = Σ supply/withdraw/transfer/seizure deltas. */
 export const supplyAfterProv = (sym: string, coords: SparkCoords, raw?: string | null): Provenance => ({
   kind: "chain",

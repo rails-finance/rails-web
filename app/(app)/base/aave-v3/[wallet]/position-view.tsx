@@ -58,7 +58,7 @@ import {
   withEmodeServedRows,
   type AaveFamilyAccountSwitches,
 } from "@/lib/aave-v3/account-switches";
-import { hfLabelV3 } from "@/lib/aave-v3/position-state";
+import { blocksSharedByTransactions, hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { aaveV3Neighbours, aaveV3ReplayCountNote, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { aaveV3Explorer } from "@/lib/aave-v3/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
@@ -283,15 +283,7 @@ export default function AaveV3BasePositionView({
   const neighbours = useMemo(() => aaveV3Neighbours(timelineEvents as AaveV3TimelineEvent[]), [timelineEvents]);
   // A block holding two of the owner's transactions has no N−1 read that is
   // "immediately before" the second: those cards keep the row's own figures.
-  const sharedBlocks = useMemo(() => {
-    const txs = new Map<number, Set<string>>();
-    for (const e of timelineEvents) {
-      const set = txs.get(e.blockNumber) ?? new Set<string>();
-      set.add((e.txHash ?? e.id).toLowerCase());
-      txs.set(e.blockNumber, set);
-    }
-    return new Set([...txs].filter(([, s]) => s.size > 1).map(([b]) => b));
-  }, [timelineEvents]);
+  const sharedBlocks = useMemo(() => blocksSharedByTransactions(timelineEvents), [timelineEvents]);
 
   // The served list as ROWS, when the route grouped it; the plan and the
   // events it interleaves come from one answer.
