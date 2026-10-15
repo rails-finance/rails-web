@@ -370,6 +370,7 @@ export function aaveFamilySheet({
   label,
   eventTs,
   repaid,
+  balancesOnly = false,
 }: {
   state: AaveV3PositionState;
   prev: AaveV3PositionState | undefined;
@@ -379,6 +380,9 @@ export function aaveFamilySheet({
   eventTs?: number;
   /** The assets the account once owed and owes none of after the event. */
   repaid?: string[];
+  /** A block shared with another of the owner's transactions: the sides
+   *  alone, no Risk or Limits panel (`blocksSharedByTransactions`). */
+  balancesOnly?: boolean;
 }): EventSheet {
   const fresh = !!prev && prev.txHash.toLowerCase() !== state.txHash.toLowerCase();
   const prevCoords: V3Coords = { ...coords, txHash: prev?.txHash, blockNumber: prev?.block };
@@ -388,6 +392,7 @@ export function aaveFamilySheet({
 
   const acc = state.account;
   const prevAcc = fresh ? prev!.account : null;
+  if (balancesOnly) return { sides, panels: [] };
   if (!acc)
     return {
       sides,

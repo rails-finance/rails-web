@@ -32,12 +32,23 @@ import type { ReactNode } from "react";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { AaveV3SwapLegAction, AaveV3SwapPoolEvent } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
-import { chainTruthDeltaValue, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  chainTruthDeltaValue,
+  reconstructTransition,
+  type ChainTruthStat,
+} from "@/components/shared/chain-truth-event";
 import type { EventCells, EventLedgerCellSpec } from "@/components/shared/event-cells";
 import type { EventPriceChip } from "@/components/shared/event-price-row";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
-import { ACCOUNT_CELL_HEADS, aaveV3RiskCells, accountSideCells, interestSubs, priceChips, rowCell } from "./aave-family-cells";
+import {
+  ACCOUNT_CELL_HEADS,
+  aaveV3RiskCells,
+  accountSideCells,
+  interestSubs,
+  priceChips,
+  rowCell,
+} from "./aave-family-cells";
 import {
   supplyAfterProv,
   debtAfterProv,
@@ -75,13 +86,7 @@ import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
 import { aaveFamilySheet } from "./aave-family-sheet";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
-import {
-  exactLeg,
-  exactUsd,
-  reserveSymbol,
-  statePricePills,
-  type TouchedLeg,
-} from "./aave-v3-position-state";
+import { exactLeg, exactUsd, reserveSymbol, statePricePills, type TouchedLeg } from "./aave-v3-position-state";
 import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -126,6 +131,9 @@ export interface AaveV3CtEventDetailProps {
   /** The card has opened: the reads start then, so a closed card asks for
    *  nothing. */
   active?: boolean;
+  /** A block shared with another of the owner's transactions: balances only,
+   *  no health factor or limits (`blocksSharedByTransactions`). */
+  balancesOnly?: boolean;
 }
 
 /** The card's T2 parts, and the read they came from. */
@@ -203,6 +211,7 @@ export function useAaveV3EventBody({
   eventId,
   eventTs,
   active = true,
+  balancesOnly = false,
 }: AaveV3CtEventDetailProps): AaveV3EventBody {
   const focus = useFlowFocus();
   const coords: V3Coords = {
@@ -736,24 +745,34 @@ export function useAaveV3EventBody({
         </span>,
       );
   if (prevUnread)
-    addSub("supply", <>Supply interest on the collateral is left out: the position after the previous event was not read.</>);
+    addSub(
+      "supply",
+      <>Supply interest on the collateral is left out: the position after the previous event was not read.</>,
+    );
 
   // The balances the event's row states: a ledger cell on its side where no
   // read stands, a plain cell where the read lists the account without it.
   const balanceStats = stats.filter((st) => sideOf.has(st));
   const rowCells = balanceStats.map((st, i) => rowCell(st, `row-${i}`, ready ? undefined : sideOf.get(st)));
-  const risk = ready ? aaveV3RiskCells(ready, stateCoords, ctx.eventType === "liquidation") : null;
+  const risk = ready
+    ? balancesOnly
+      ? { cells: [], notes: null }
+      : aaveV3RiskCells(ready, stateCoords, ctx.eventType === "liquidation")
+    : null;
   // Before the card opens, a card with a read to make stands as the read's
   // placeholders.
   const waiting = state?.status === "loading" || (!active && !!market && !feeOf);
-  const cells: EventCells =
-    waiting
-      ? { pending: ACCOUNT_CELL_HEADS }
-      : ready && risk
-        ? [...accountSideCells({ state: ready, coords: stateCoords, touched, moved, eventTs, sub: subs }), ...risk.cells, ...rowCells]
-        : rowCells.length > 0
-          ? rowCells
-          : { none: "The event moved no balance the card can state." };
+  const cells: EventCells = waiting
+    ? { pending: ACCOUNT_CELL_HEADS }
+    : ready && risk
+      ? [
+          ...accountSideCells({ state: ready, coords: stateCoords, touched, moved, eventTs, sub: subs }),
+          ...risk.cells,
+          ...rowCells,
+        ]
+      : rowCells.length > 0
+        ? rowCells
+        : { none: "The event moved no balance the card can state." };
   // The amounts behind a swap (the bought token, the rows it merged, a netted
   // leg): lines under the grid.
   const lines = [...stats.filter((st) => !sideOf.has(st)), ...extras];
@@ -822,18 +841,18 @@ export function useAaveV3EventBody({
       label: aaveV3CtLabel(ctx, false, coords.chainId),
       eventTs,
       repaid,
+      balancesOnly,
     });
   }
 
   return {
     cells,
     sheet,
-    cellsData:
-      waiting
-        ? { "data-position-state": "loading" }
-        : ready
-          ? { "data-position-state": "ready", "data-position-complete": ready.complete ? "true" : "false" }
-          : undefined,
+    cellsData: waiting
+      ? { "data-position-state": "loading" }
+      : ready
+        ? { "data-position-state": "ready", "data-position-complete": ready.complete ? "true" : "false" }
+        : undefined,
     notes,
     prices: priceChips(pricePills),
     state: ready,
@@ -863,4 +882,3 @@ function EventRowLines({ rows }: { rows: ChainTruthStat[] }) {
     </div>
   );
 }
-
