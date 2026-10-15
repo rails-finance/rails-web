@@ -168,6 +168,39 @@ async function expandRow(page, eventId) {
   return (await row.innerText()).replace(/\s+/g, " ");
 }
 
+/** An expanded row's text outside its event sheet: the forensics block, the
+ *  notes and the price row. The sheet states the sides in dollars (decision
+ *  0042); the forensics state the market's unit. */
+async function textOutsideSheet(page, eventId) {
+  return page
+    .locator(`[data-event-id="${eventId}"]`)
+    .first()
+    .evaluate((row) => {
+      const copy = row.cloneNode(true);
+      copy.querySelectorAll("[data-sheet]").forEach((s) => s.remove());
+      document.body.appendChild(copy);
+      const t = copy.innerText;
+      copy.remove();
+      return t.replace(/\s+/g, " ");
+    });
+}
+
+/** A sheet row's figure: `col` is the amount or the USD column, or a Risk
+ *  or Limits row's value where `col` is unset. */
+async function sheetFigure(page, eventId, scope, key, col) {
+  const row = page.locator(`[data-event-id="${eventId}"] [data-sheet] ${scope} [data-sheet-row="${key}"]`).first();
+  if ((await row.count()) === 0) return "";
+  const cell = col ? row.locator(`[data-sheet-col="${col}"]`) : row.locator(":scope > span:last-child");
+  return (
+    (await cell
+      .first()
+      .innerText()
+      .catch(() => "")) || ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Open an expanded row's Explanation pane and return its text. */
 async function readExplanation(page, eventId) {
   const row = page.locator(`[data-event-id="${eventId}"]`);
@@ -178,7 +211,8 @@ async function readExplanation(page, eventId) {
   await page
     .waitForFunction((el) => /Event explanation\s*•/.test(el.innerText), await row.elementHandle(), { timeout: 15000 })
     .catch(() => {});
-  return (await row.innerText()).replace(/\s+/g, " ");
+  const pane = row.locator('[data-anatomy="T3"]').first();
+  return ((await pane.count()) ? await pane.innerText() : await row.innerText()).replace(/\s+/g, " ");
 }
 
 console.log("Polaris — liquidation forensics valued at the block, and the gas clause\n");
@@ -259,10 +293,20 @@ for (const f of FIXTURES) {
     continue;
   }
 
+  // The seizure's split stands on the sheet's Collateral side with the
+  // breakdown on (decision 0042).
+  await page
+    .locator(`[data-event-id="${f.eventKey}"] [data-sheet-switch]`)
+    .first()
+    .evaluate((el) => el.click())
+    .catch(() => {});
+  await page.waitForTimeout(400);
+  const poolLeg = await sheetFigure(page, f.eventKey, '[data-sheet-side="collateral"]', "coll-pool", "amount");
+  const seizedLabel = await sheetFigure(page, f.eventKey, '[data-sheet-side="collateral"]', "event");
   check(
     `1a. ${key} states the pool's collateral leg (${want.leg} pETH) beside the entire seized amount`,
-    rowText.includes(`Of which to the stability pool ${want.leg}`) && rowText.includes("Collateral seized"),
-    rowText.slice(0, 500),
+    poolLeg === want.leg && /Taken by the liquidation/.test(rowText),
+    `${poolLeg} · ${seizedLabel}`,
   );
   check(
     `1b. ${key} values that leg at ${want.legValue} and the cleared debt at ${want.cleared}`,
@@ -279,23 +323,36 @@ for (const f of FIXTURES) {
     rowText.includes(`pETH ${want.price}`) && (rowText.match(/oracle at block/g) ?? []).length === 1,
     `${(rowText.match(/oracle at block/g) ?? []).length} pill(s)`,
   );
-  check(`1e. ${key}'s row states no figure in dollars`, !rowText.includes("$"), rowText.slice(0, 700));
+  const outside = await textOutsideSheet(page, f.eventKey);
+  check(
+    `1e. ${key}'s row states no figure in dollars outside its sheet (the forensics are in ${f.market === "usdp" ? "USDp" : "GOLDp"})`,
+    !outside.includes("$"),
+    outside.slice(0, 700),
+  );
+
+  // The event sheet (decision 0042; a Polaris liquidation draws it as Liquity
+  // V2's does): the seized pETH and the cleared debt as the sides' event rows,
+  // and the collateral ratio the liquidation fired at in the Risk panel.
+  const num = (t) => Number(t.replace(/[^0-9.]/g, ""));
+  const seizedRow = await sheetFigure(page, f.eventKey, '[data-sheet-side="collateral"]', "event", "amount");
+  const clearedRow = await sheetFigure(page, f.eventKey, '[data-sheet-side="debt"]', "event", "amount");
+  check(
+    `2a. ${key}'s sheet states the seized ${fmtNum(toNum(f.raw.collLiquidated))} pETH and the ${want.cleared} USDp cleared as its event rows`,
+    seizedRow.startsWith("−") &&
+      Math.abs(num(seizedRow) - toNum(f.raw.collLiquidated)) < 1e-3 &&
+      clearedRow.startsWith("−") &&
+      Math.abs(num(clearedRow) - cleared) < 1e-2,
+    `${seizedRow} · ${clearedRow}`,
+  );
+  const ratio = await sheetFigure(page, f.eventKey, '[data-sheet-panel="risk"]', "ratio");
+  check(
+    `2b. ${key}'s sheet states the collateral ratio at liquidation (${want.icr}, against ${MCR_LABEL})`,
+    ratio === want.icr,
+    ratio,
+  );
 
   const explained = await readExplanation(page, f.eventKey);
   if (check(`2. ${key}'s Explanation pane opens`, explained != null)) {
-    check(
-      `2a. ${key}'s explainer states the valued sentence (${want.leg} pETH → ${want.legValue} against ${want.cleared})`,
-      explained.includes(`${want.leg} pETH came to ${want.legValue} USDp`) &&
-        explained.includes(`${want.cleared} USDp of debt cleared`) &&
-        explained.includes(`a premium of ${want.premium}`),
-      explained.slice(0, 900),
-    );
-    check(
-      `2b. ${key}'s explainer states the collateral ratio at liquidation (${want.icr}, against ${MCR_LABEL})`,
-      explained.includes(`collateral ratio at liquidation at ${want.icr}`) &&
-        explained.includes(`normal-mode minimum of ${MCR_LABEL}`),
-      explained.slice(0, 900),
-    );
     check(
       `2c. ${key}'s liquidation row carries NO gas clause (the liquidator sent that transaction)`,
       !/Gas for this transaction/.test(explained),

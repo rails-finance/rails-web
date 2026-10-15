@@ -748,6 +748,176 @@ const SHEET_WORDS_SUBJECTS = [
     params: ["Max LTV", "Liquidation threshold"],
     optional: ["eMode"],
   },
+  // The families that moved to the sheet (ui-jobs 330), one subject each, the
+  // fixtures verify-event-share.mjs holds. `carried`: the sides whose carry
+  // layer stands on this event; `closes: false`, a carry layer with no Before
+  // row (Frankencoin's).
+  {
+    name: "Spark",
+    path: "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e",
+    id: "withdraw:0x27bc2b480b5f8097cdd121baa615017d34190cf94afc4a3463ddc5a50b04af0d:4",
+    risk: ["Health factor", "Collateral can fall"],
+    limits: ["LTV", "Still borrowable"],
+    params: ["Max LTV", "Liquidation threshold"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Moonwell",
+    path: "/ethereum/moonwell/0x9781f72f15ff9d961f5b0aaf1d93b40c23905f05",
+    id: "0x1f10abf19d6af3e4f41901ac9576026d9a08de07792cec138e18112df462b183-4",
+    risk: ["Health factor", "Collateral can fall"],
+    limits: ["Borrowing limit used", "Still borrowable"],
+    params: ["USDC collateral factor"],
+    optional: [],
+    carried: 1,
+  },
+  {
+    name: "Compound V2",
+    path: "/ethereum/compound-v2/0x1a6bae20f70691ce1755a003c4560879b7798910",
+    id: "repay:6db9b0118adb0763a140babff113b07c206215d112d7b0365c6aca31f77b3105:0",
+    risk: ["Health factor", "Collateral can fall"],
+    limits: ["Borrowing limit used", "Still borrowable"],
+    params: ["ETH collateral factor"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Dolomite",
+    path: "/ethereum/dolomite/0xe6705fccaf951870ef24463c88a81f31610efba4/53264333596970428064010753932179380014364720754547549633613121572245119207273",
+    id: "deposit:7a188131629ca1733dfe5b2068842a9ee5df52eca7b522f905352f42c96bf7f6:8:self",
+    risk: ["Margin ratio", "Collateral can fall"],
+    limits: ["Borrowing limit used", "Still borrowable"],
+    params: ["Minimum margin", "weETH margin premium", "WETH margin premium"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Liquity V1",
+    path: "/ethereum/liquity-v1/0x8eb2e0cebcd191625037a042c9edf67b7f7fd74c",
+    id: "0x279c6976b089bdb2fde79c11eea756c46ef01dd8dc1ea1e05b4049cd893137d6-420",
+    risk: ["Collateral ratio", "Liquidates at"],
+    limits: ["LUSD to the minimum"],
+    params: ["Minimum ratio", "Recovery-mode ratio"],
+    optional: [],
+    carried: 0,
+  },
+  {
+    name: "Ebisu",
+    path: "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638",
+    id: "0x8496531fb5d25fc73d0d2df3695176b44d86f057871e9b89a5de224f16590a18-0",
+    risk: ["Collateral ratio", "Liquidates at"],
+    limits: ["Interest rate"],
+    params: ["Minimum ratio", "Critical ratio"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "MakerDAO",
+    path: "/ethereum/makerdao/0x226ede73e2efae6a1acf4f162b8e28caee3aaeb4",
+    id: "frob:0xb23e4a4d2a5dc6a25010c0c123f3a680e892ed16ec9e347ee1fdf39f918a7e35:498",
+    risk: ["Collateral ratio", "Liquidates at"],
+    limits: ["Still drawable", "Stability fee"],
+    params: ["Minimum ratio", "Debt ceiling", "Minimum debt"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Polaris",
+    path: "/sepolia/polaris/usdp/166",
+    id: "cdp_updated:0xc12e8b48a67cb713800b900f19091df1a8bafff6c3b7a0f3f42bac9d0c3e5999:10",
+    risk: ["Collateral ratio", "Liquidates at"],
+    limits: ["Primary rate", "Reserve-to-debt ratio"],
+    params: ["Minimum ratio", "Liquidation penalty, stability pool"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Frankencoin",
+    path: "/ethereum/frankencoin/0x6377a63b2a8caa1db4190a5419d2dc9215d74a3f",
+    id: "minting_update:807177d0a82fcc6d334f645792264052d59164a85f52f6c0d2db116a11afb93d:143",
+    risk: ["Liquidation price", "Price headroom"],
+    limits: ["Expiry", "Interest"],
+    params: ["Reserve requirement", "Challenge phase length"],
+    optional: [],
+    carried: 2,
+    closes: false,
+  },
+  {
+    name: "f(x)",
+    path: "/ethereum/fx/wsteth-249",
+    id: "0x8766352d623d50606f8a6929ee945523619b5e9c81a83d5dcf740f3c15a0f795:21",
+    risk: ["Debt ratio", "Price to tick"],
+    limits: ["Pool drift"],
+    params: ["Rebalance ratio", "Liquidation ratio"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "PWN",
+    path: "/ethereum/pwn/0x0598b250a99bd45155a6b9b04af2ee19a2e5fed0?loan=20",
+    id: "paid_back:d9505efcdac9fe2798b1870ca57e03c3cb810c2c9d6b03ea52f5ace086d4cbd8:5",
+    risk: ["Due date", "Default state"],
+    limits: ["Repay amount"],
+    params: ["Deadline as struck", "Extensions made", "Interest rate", "Extension limit"],
+    optional: [],
+    carried: 0,
+  },
+  {
+    name: "Aave V4",
+    path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
+    id: "0x93924cd94df220dd1ab3691d52e949bc413fa9fd03838d20dae69195db1d6898-6",
+    risk: ["Health factor", "Collateral can fall"],
+    limits: ["LTV", "Still borrowable"],
+    params: ["Max LTV", "Liquidation threshold"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Compound V3",
+    path: "/ethereum/compound-v3/usdc/0xd51c5283b8727206bf9be2b2db4e5673efaf519c",
+    id: "0x1b24d1761a9ca435f2b63b76ed2f6b7b119c9474b37e2fc2c60e7266b9e55fec-1",
+    risk: ["Borrowing limit used", "Collateral can fall"],
+    limits: ["Still borrowable", "Borrow rate"],
+    params: [
+      "WETH borrow collateral factor",
+      "WETH liquidate collateral factor",
+      "WBTC borrow collateral factor",
+      "WBTC liquidate collateral factor",
+    ],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Fluid",
+    path: "/ethereum/fluid/11044",
+    id: "withdraw:09dc1e0d4e197230f505de564bd5e1d7ab3ff1299462a9bf36f08d72a512ffcc:355:11044",
+    risk: ["Position ratio", "Collateral can fall"],
+    limits: ["Still borrowable", "Borrow rate"],
+    params: ["Collateral factor", "Liquidation threshold", "Liquidation penalty"],
+    optional: [],
+    carried: 2,
+  },
+  {
+    name: "Morpho",
+    path: "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+    id: "0x17675f8d57fdd518d7cc8c8f607588887495778d8f00f00883920b29f7e2ff78:3",
+    risk: ["LTV (liquidation at 86.0%)", "Collateral can fall"],
+    limits: ["Still borrowable", "Borrow rate"],
+    params: ["LLTV", "Oracle price"],
+    optional: [],
+    carried: 1,
+  },
+  {
+    name: "LlamaLend",
+    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xe32a8cf93af8661ec4708ef627b255801184ad2f",
+    id: "repay:8acd69cf7e9ec31a63b7a6f3c93f7642826a266dc60b578707d0d072a69697b4:732:self",
+    risk: ["Health", "Price to the first band"],
+    limits: ["What the AMM holds", "Borrow rate"],
+    params: ["Bands", "Band prices", "Loan discount", "Liquidation discount"],
+    optional: [],
+    carried: 2,
+  },
 ];
 const UNTOUCHED = "Not changed by this event";
 
@@ -789,7 +959,11 @@ const rowsRead = (got, want, optional) =>
   got.slice(want.length).every((r) => optional.includes(r));
 
 for (const s of SHEET_WORDS_SUBJECTS) {
-  const { ctx, page, errors } = await open(1280, `${s.path}?at=${encodeURIComponent(s.id)}`);
+  // A path may carry its subject's query (PWN's `?loan=`); `at` joins it.
+  const { ctx, page, errors } = await open(
+    1280,
+    `${s.path}${s.path.includes("?") ? "&" : "?"}at=${encodeURIComponent(s.id)}`,
+  );
   const sheet = page.locator(`[data-event-id="${s.id}"] [data-anatomy~="T2"] [data-sheet]`).first();
   const drawn = await sheet
     .waitFor({ state: "attached", timeout: 180000 })
@@ -851,12 +1025,16 @@ for (const s of SHEET_WORDS_SUBJECTS) {
     !!onLimits && rowsRead(onLimits.params, s.params, s.optional),
     JSON.stringify(onLimits?.params),
   );
+  // A carry row's label may carry its price note ("Last event · $0.9999").
   const carried = (on?.sides ?? []).filter((x) => x.carry.length > 0);
+  const wantCarried = s.carried ?? on?.sides.length ?? -1;
   check(
-    `6h. ${s.name}: each side's carry layer opens on Last event and closes on Before this event (${carried.length} sides)`,
-    carried.length === (on?.sides.length ?? -1) &&
+    `6h. ${s.name}: ${wantCarried} side(s) carry a layer that opens on Last event${s.closes === false ? "" : " and closes on Before this event"}`,
+    carried.length === wantCarried &&
       carried.every(
-        (x) => x.carry[0] === "Last event" && JSON.stringify(x.before) === JSON.stringify(["Before this event"]),
+        (x) =>
+          /^Last event\b/.test(x.carry[0]) &&
+          (s.closes === false || (x.before.length === 1 && /^Before this event\b/.test(x.before[0]))),
       ),
     JSON.stringify(on?.sides.map((x) => [x.side, x.carry, x.before])),
   );

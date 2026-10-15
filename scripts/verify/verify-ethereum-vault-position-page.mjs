@@ -1661,17 +1661,35 @@ async function openRowDetail(url, id) {
   await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
   await page.waitForSelector("[data-vault-timeline-rows] [data-event-id]", { timeout: 60_000 });
   const wrapper = page.locator(`[data-vault-timeline-rows] [data-event-id="${id}"]`);
-  await wrapper.locator('[role="button"]').first().click();
+  // The row's own control: a token chip is a `role="button"` too.
+  await wrapper
+    .locator('[data-anatomy~="T1"] [data-row-control][role="button"], [data-spine-toggle]')
+    .locator("visible=true")
+    .first()
+    .evaluate((el) => el.click());
   await page.waitForSelector("[data-row-balance-after]", { timeout: 30_000 });
-  const out = await page.evaluate(() => {
-    const el = document.querySelector("[data-row-balance-after]");
-    const value = document.querySelector("[data-figure='row-balance-after'] [data-figure-value]");
+  // The sheet's breakdown holds the balance before and after (decision 0042).
+  await wrapper
+    .locator("[data-sheet-switch]")
+    .first()
+    .evaluate((el) => el.click())
+    .catch(() => {});
+  await page.waitForTimeout(400);
+  const out = await wrapper.evaluate((w) => {
+    const el = w.querySelector("[data-row-balance-after]");
+    const fig = (key) =>
+      (w.querySelector(`[data-sheet] [data-sheet-row="${key}"] [data-sheet-col="amount"]`)?.textContent ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
     return {
       before: el?.getAttribute("data-row-balance-before") ?? null,
       after: el?.getAttribute("data-row-balance-after") ?? null,
       delta: el?.getAttribute("data-row-shares-delta") ?? null,
-      stated: (value?.textContent ?? "").replace(/\s+/g, " ").trim(),
-      arrows: value?.querySelectorAll("svg").length ?? 0,
+      // The shares held before: under "Last event" where the previous event's
+      // price was read, else "Before this event" in shares.
+      statedBefore: fig("last-shares") || fig("before"),
+      statedAfter: fig("held"),
+      statedMove: fig("shares"),
     };
   });
   await page.close();
@@ -1714,8 +1732,9 @@ check(
   `${t12.before} + ${t12.delta} = ${BigInt(t12.before ?? 0) + BigInt(t12.delta ?? 0)} vs ${t12.after}`,
 );
 // ⚠️ The two above are satisfied by data attributes alone, which a reader
-// cannot see. This is the half that says the transition is DRAWN: the value
-// cell states both figures with the house arrow glyph between them.
+// cannot see. This is the half that says the transition is DRAWN: the event
+// sheet states the shares moved, and with the breakdown on the shares held
+// before and after.
 const t12Sd = t12Event?.shareDecimals ?? 18;
 const shareTextOf = (raw, decimals) => {
   const value = Number(raw) / Math.pow(10, decimals);
@@ -1727,10 +1746,11 @@ const shareTextOf = (raw, decimals) => {
 };
 const wantBefore = shareTextOf(t12.before, t12Sd);
 const wantAfter = shareTextOf(t12.after, t12Sd);
+const wantMove = `${BigInt(t12.delta ?? 0) < 0n ? "−" : "+"}${shareTextOf((BigInt(t12.delta ?? 0) < 0n ? -BigInt(t12.delta) : BigInt(t12.delta ?? 0)).toString(), t12Sd)}`;
 check(
-  "T12c the row STATES the transition — both figures, with the arrow between",
-  t12.stated.includes(wantBefore) && t12.stated.includes(wantAfter) && t12.arrows >= 1,
-  `"${t12.stated}" (want "${wantBefore}" → "${wantAfter}", ${t12.arrows} arrow glyph(s))`,
+  "T12c the row STATES the transition — the shares held before and after, and the shares moved",
+  t12.statedBefore === wantBefore && t12.statedAfter === wantAfter && t12.statedMove === wantMove,
+  `before "${t12.statedBefore}" (want "${wantBefore}"), after "${t12.statedAfter}" (want "${wantAfter}"), moved "${t12.statedMove}" (want "${wantMove}")`,
 );
 
 // ═══ T13 — the phone ══════════════════════════════════════════════════════

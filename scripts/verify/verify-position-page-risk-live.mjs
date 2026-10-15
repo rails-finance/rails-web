@@ -9,12 +9,11 @@
 // ----------------------------------------------------------------------------
 //   1  the listing offers an open row with debt (the fixture is derived from
 //      the route, never pasted; a lane with no indebted open row is INFO);
-//   2  the position page draws the risk strip: the runway figure the lane
-//      prints from the live read — "N% from liquidation" on the Aave family,
-//      Spark and Moonwell; "<collateral> can fall N% before liquidation" on
-//      Morpho Blue (web b1f0fe5, the price-fall wording for a single
-//      collateral); "collateral value can fall N% before absorb" on Compound
-//      V3 (web 6e63b8e, where the protocol absorbs rather than liquidates);
+//   2  the position page draws the runway the lane prints from the live
+//      read, as the position card's panel row: "Liquidates at $X" where one
+//      collateral drives the line (the Aave family, Spark), "Liquidates on a
+//      drop of N%" where several do or the protocol states a fall (Moonwell,
+//      Morpho Blue, Compound V3; decision 0042 point 3);
 //   3  the strip names its line — "Health factor" on the Aave family and Spark,
 //      "Borrow capacity" on Moonwell and Morpho Blue, "Borrowing limit" on
 //      Compound V3 (web 6e63b8e);
@@ -36,7 +35,8 @@
 //   BASE=https://rails-web.vercel.app node scripts/verify/verify-position-page-risk-live.mjs
 //
 // ── PROVED IT CAN FAIL, 2026-09-10 ──────────────────────────────────────────
-//   RUNWAY set to "from liquidationx" → FAIL 2 on all seven lanes. Picking the
+//   RUNWAY set to "from liquidationx" → FAIL 2 on all seven lanes (the
+//   wording of that day; the card's runway row is "Liquidates at" since 0042). Picking the
 //   FIRST indebted row instead of the largest → FAIL 2 on aave-v3 (the dust
 //   wallet's page says "No debt"). Against production 2026-09-10 07:30 UTC:
 //   28/28, one INFO (a hydration mismatch on the 139M-debt Aave V3 wallet, not
@@ -47,9 +47,10 @@ import { openPositionCards } from "./lib/position-card.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3762";
 const PAGE = 40;
-/** The figure the runway prints from the live read, unless the lane's own
- *  wording differs (see the header, check 2). */
-const RUNWAY = "from liquidation";
+/** The runway row the position card draws from the live read, with its
+ *  figure (see the header, check 2); the label's read-more name ("…,
+ *  explain") may sit between. */
+const RUNWAY = /Liquidates (?:at|on a drop of)[^$\d]{0,60}?(?:\$[\d.,]+[KMB]?|\d+%)/;
 
 /** A row's debt in the loan asset's USD (or its own units where the lane
  *  quotes no price), from the row's own balances and prices. The largest
@@ -77,7 +78,6 @@ const LANES = [
   {
     api: "morpho-base",
     line: "of the LLTV",
-    runway: "before liquidation",
     debt: (r) => Number(r.borrowed?.amount ?? 0),
     path: (r) => `/base/morpho/${r.owner}/${r.marketId}`,
   },
@@ -155,13 +155,12 @@ for (const lane of LANES) {
   await openPositionCards(page);
   const text = (await page.evaluate(() => document.body.innerText)) ?? "";
 
-  const runway = lane.runway ?? RUNWAY;
-  // A figure, not the words alone: "before liquidation" also sits in prose.
-  const hit = new RegExp(`\\d%\\s+${runway}`).exec(text);
+  // A figure, not the words alone: "Liquidates at" also sits in read-mores.
+  const hit = RUNWAY.exec(text);
   const at = hit ? hit.index : -1;
   const window = at >= 0 ? text.slice(Math.max(0, at - 120), at + hit[0].length).replace(/\s+/g, " ") : "";
   check(
-    `2  ${lane.api}: the page draws the "% ${runway}" figure`,
+    `2  ${lane.api}: the page draws the Liquidates at / on a drop of figure`,
     at >= 0,
     navError ?? (at >= 0 ? `…${window}` : "absent"),
   );

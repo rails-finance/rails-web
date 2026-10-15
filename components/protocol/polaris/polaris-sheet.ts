@@ -24,6 +24,8 @@ import {
   beforeProv,
   rateInForceProv,
   liqPenaltyConstantProv,
+  liquidationFieldProv,
+  type PolarisLiquidationField,
   crChangeAtEventProv,
   type PolarisCoords,
   type PolarisLedgerField,
@@ -31,7 +33,12 @@ import {
 import { crPct1, polarisCrAtEvent, polarisCrReceipt, POLARIS_NORMAL_MCR_PCT } from "@/lib/polaris/cr-at-event";
 import { PETH, POLARIS_CORE, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { POLARIS_WORDS } from "@/lib/polaris/event-templates";
-import { POLARIS_LIQ_CONSTANTS, polarisValueFormat } from "./polaris-liquidation-forensics";
+import {
+  POLARIS_LIQ_CONSTANTS,
+  polarisLiquidationFigures,
+  polarisPoolLegProv,
+  polarisValueFormat,
+} from "./polaris-liquidation-forensics";
 import { formatExact, formatNumber } from "@/lib/utils/format";
 
 const W = POLARIS_WORDS;
@@ -249,6 +256,54 @@ export function polarisSheet(
     };
   };
 
+  /** A liquidation's split, with the breakdown: where the seized pETH went
+   *  (the pool, other CDPs, the liquidator, the owner's surplus, then the gas
+   *  escrow apart), and who took the debt. */
+  const liqSplit = (token: "coll" | "debt"): SheetRow[] => {
+    const field = (f: PolarisLiquidationField, key: string, label: string): SheetRow | null => {
+      const v = ctx[f];
+      if (v == null || num(v) === 0) return null;
+      return {
+        key,
+        label,
+        amount: {
+          text: formatNumber(num(v)),
+          symbol: token === "coll" ? PETH.symbol : stable,
+          address: token === "coll" ? PETH.address : stableAddr,
+          info: liquidationFieldProv(f, coords, ctx.raw?.[f]),
+        },
+        tip: W[`tip_liq_${key.replace(/-/g, "_")}` as keyof typeof W],
+      };
+    };
+    if (token === "debt")
+      return [
+        field("debtLiquidated", "debt-pool", W.sheet_liq_debt_pool),
+        field("debtRedistributed", "debt-redistributed", W.sheet_liq_debt_redistributed),
+      ].filter((r): r is SheetRow => r != null);
+    const figures = polarisLiquidationFigures(ctx);
+    const pool: SheetRow | null =
+      figures?.path === "sp"
+        ? {
+            key: "coll-pool",
+            label: W.sheet_liq_coll_pool,
+            amount: {
+              text: formatNumber(figures.leg),
+              symbol: PETH.symbol,
+              address: PETH.address,
+              info: polarisPoolLegProv(ctx, coords),
+            },
+            tip: W.tip_liq_coll_pool,
+          }
+        : null;
+    return [
+      pool,
+      field("collRedistributed", "coll-redistributed", W.sheet_liq_coll_redistributed),
+      field("collateralComp", "coll-liquidator", W.sheet_liq_coll_liquidator),
+      field("collSurplus", "coll-surplus", W.sheet_liq_coll_surplus),
+      field("flatComp", "gas-comp", W.sheet_liq_gas_comp),
+    ].filter((r): r is SheetRow => r != null);
+  };
+
   // ── Collateral ──
   const collRows = [
     leg("collChange", "event", collWord, "coll", isLiq ? W.tip_coll_liquidated : W.tip_coll_event),
@@ -295,6 +350,7 @@ export function polarisSheet(
           }
         : undefined,
     rows: collRows,
+    assets: isLiq ? liqSplit("coll") : undefined,
     total:
       collAfter === 0
         ? { text: "$0", info: ledgerFieldProv("newColl", coords, ctx.raw?.newColl) }
@@ -397,6 +453,7 @@ export function polarisSheet(
           }
         : undefined,
     rows: debtRows,
+    assets: isLiq ? liqSplit("debt") : undefined,
     total:
       debtAfter === 0
         ? { text: "$0", info: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt) }
@@ -441,13 +498,21 @@ export function polarisSheet(
     {
       key: "ratio",
       label: W.collateral_ratio,
-      value: isLiq
-        ? { none: W.sheet_liquidated }
-        : cr && crReceipt
+      // A liquidation states the ratio it fired at.
+      value:
+        cr && crReceipt
           ? { text: crPct1(cr.pct), info: crReceipt.info, value: crReceipt.value }
-          : { none: isClose ? W.sheet_closed : debtAfter === 0 ? W.sheet_no_debt : W.sheet_no_price },
-      tone: !isLiq && cr?.belowMin ? "text-red-500" : undefined,
-      tip: W.tip_cr,
+          : {
+              none: isLiq
+                ? W.sheet_liquidated
+                : isClose
+                  ? W.sheet_closed
+                  : debtAfter === 0
+                    ? W.sheet_no_debt
+                    : W.sheet_no_price,
+            },
+      tone: cr?.belowMin ? "text-red-500" : undefined,
+      tip: isLiq ? W.tip_cr_liquidated : W.tip_cr,
       change: isLiq ? null : crChange,
     },
     {

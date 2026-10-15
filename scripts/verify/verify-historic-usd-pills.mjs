@@ -3,9 +3,10 @@
 // timelines on 2026-07-16 (8d36ad5/c8b26c4/354ce38). This script does not
 // build anything new; it re-derives the expected numbers from the SAME
 // wallet's timeline API payload and checks the rendered DOM agrees, on both
-// protocols: the after-balance USD chip, the AtBlockPriceFootnote pill, the
-// toggle-off behavior, liquidation forensics (both legs + premium), and the
-// USD chip's receipt formula (no "Untraced input" caution anywhere on the card).
+// protocols: the event sheet's Collateral total, the price row's chip,
+// liquidation forensics (both legs + premium), and the total's receipt
+// formula, read on the event's page (no "Untraced input" caution anywhere on
+// the card).
 //
 // NO ROW NUMBER IS PINNED HERE. Event numbers renumber whenever a backfill
 // inserts past rows, so each case names the immutable coordinate (the block,
@@ -16,7 +17,7 @@
 // Run against a dev server:  BASE=http://localhost:3021 node scripts/verify/verify-historic-usd-pills.mjs
 
 import { chromium } from "playwright";
-import { armInspector } from "./lib/prov-inspector.mjs";
+import { armScope } from "./lib/prov-inspector.mjs";
 
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
@@ -209,31 +210,27 @@ async function expandCard(page, n) {
   }
 }
 
-// Since the event card's ledger cells (4494fc8, 46c1397) a side's total over
-// several assets sits on the closed cell; a cell that opens into a ledger
-// states one asset's dollars on the ledger's closing line (ui-jobs 289).
-const closedUsd = (side) =>
-  `[data-ledger-cell="${side}"] [data-ledger-row="closed"] span.prov-locate-box:has-text("$")`;
-const usdChipSel = closedUsd("collateral");
-
-/** The side's dollars after the transaction: the closed cell's figure where
- *  the cell states one (a side's total over several assets, or a cell with no
- *  ledger), else the opened ledger's closing line (ui-jobs 289: a cell that
- *  opens into a ledger states its dollars there). Returns the figure's text,
- *  and leaves the ledger as it found it. */
+/** The side's dollars after the transaction: the event sheet's total for
+ *  that side (decision 0042, `data-sheet-side` / `data-sheet-row="total"`). */
 async function sideUsdText(card, side) {
-  const closed = card.locator(closedUsd(side));
-  if (await closed.count()) return (await closed.last().innerText()).trim();
-  const cell = card.locator(`[data-ledger-cell="${side}"]`).first();
-  const toggle = cell.locator("[data-ledger-toggle]");
-  if (!(await toggle.count())) return "";
-  await toggle.click();
-  const usd = cell.locator('[data-ledger-row="total"] [data-ledger-usd]').last();
-  await usd.waitFor({ timeout: 10000 }).catch(() => {});
-  const text = (await usd.count()) ? (await usd.innerText()).trim() : "";
-  await toggle.click();
-  await card.page().waitForTimeout(200);
+  const total = card.locator(`[data-sheet-side="${side}"] [data-sheet-row="total"] [role="group"]`).first();
+  if (!(await total.count())) return "";
+  const text = (await total.innerText()).trim();
   return /\$/.test(text) ? text : "";
+}
+
+/** The dollars of the event's rows on a side: the sheet's rows outside its
+ *  layers, less the total and Before (the event's rows, whatever key the
+ *  builder gave them). */
+async function eventRowUsd(card, side) {
+  return card.locator(`[data-sheet-side="${side}"] [data-sheet-row]`).evaluateAll((rows) =>
+    rows
+      .filter(
+        (r) => !r.closest("[data-sheet-layer]") && !["total", "before"].includes(r.getAttribute("data-sheet-row")),
+      )
+      .map((r) => r.querySelector('[data-sheet-col="usd"]')?.textContent?.trim() ?? "")
+      .filter((t) => t.includes("$")),
+  );
 }
 
 /** An Aave V3 Ethereum card reads its balances when it opens (rails-ops
@@ -242,9 +239,9 @@ async function sideUsdText(card, side) {
 async function positionStateSettled(proto, card) {
   if (proto === "spark") {
     // Spark reads the account when the card first opens (ui-jobs 309 step 6,
-    // `onOpen`); its cells hold placeholders until the read lands.
+    // `onOpen`); its sheet stands as a skeleton until the read lands.
     await card
-      .locator('[data-ledger-cell="collateral"] [data-prov-covered]', { hasText: "$" })
+      .locator('[data-sheet] [data-sheet-row="total"]', { hasText: "$" })
       .first()
       .waitFor({ timeout: 90000 })
       .catch(() => {});
@@ -262,32 +259,39 @@ async function positionStateSettled(proto, card) {
   );
 }
 
-/** Read the receipt behind the card value matching `valueText`, via the
- *  page-level provenance inspector — the per-card receipts panel this
- *  originally drove ('Show provenance' → .prov-receipts accordion) is
- *  retired; the inspector popover is THE receipt surface now. Arms the
- *  crosshair (reading aria-pressed first — the tool is sticky, a blind
- *  toggle click turns it OFF on alternate calls), picks the card's scoped
- *  <Prov> span whose text matches the value, reads the popover, then puts
- *  the tool fully down (Escape ladder: popover, then mode) so the display
- *  toggles below never race an armed pick layer. Returns the popover's
- *  full text, or null if no pickable value matched. */
-async function openReceiptFor(page, card, valueText) {
-  // The toggle rides in the Tools menu on a position view and in the dock on
-  // a Market-type page; armInspector reads either, and is a no-op once armed
-  // (the tool is STICKY — a blind second click would put it down).
-  if (!(await armInspector(page))) return null;
-  const target = card.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
-  if ((await target.count()) === 0) return null;
-  await target.scrollIntoViewIfNeeded();
-  await target.click();
-  const pop = page.locator(".prov-inspect-pop");
-  await pop.waitFor({ state: "visible", timeout: 10000 });
-  const text = await pop.innerText();
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(200);
-  return text;
+/** Read the receipt behind a card value matching `valueText`. The inspector
+ *  arms from a card's ⋮ on the event's page (scoped arming, ui-jobs 284), so
+ *  the receipt is read there: the event's page, its card's "Inspect
+ *  provenance", the card's scoped <Prov> span whose text matches the value,
+ *  the popover's text. Returns null if no pickable value matched. */
+async function openReceiptFor(proto, wallet, card, valueText) {
+  const id = await card.getAttribute("data-event-id");
+  if (!id) return null;
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
+  try {
+    await page.goto(`${BASE}/ethereum/${proto}/${wallet}/event/${encodeURIComponent(id)}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 240000,
+    });
+    const evCard = page.locator(`[data-event-id="${id}"]`).first();
+    await evCard
+      .locator('[data-sheet] [data-sheet-row="total"]', { hasText: "$" })
+      .first()
+      .waitFor({ timeout: 120000 })
+      .catch(() => {});
+    if (!(await armScope(page, id, { menu: evCard.locator("[data-event-menu]").first() }))) return null;
+    const target = evCard.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
+    if ((await target.count()) === 0) return null;
+    await target.scrollIntoViewIfNeeded();
+    await target.click();
+    const pop = page.locator(".prov-inspect-pop");
+    await pop.waitFor({ state: "visible", timeout: 10000 });
+    return await pop.innerText();
+  } catch {
+    return null;
+  } finally {
+    await page.close();
+  }
 }
 
 // ── Runner ──────────────────────────────────────────────────────────────
@@ -347,13 +351,8 @@ async function runProtocol(proto, wallet, cases) {
       );
     }
 
-    // Receipt: formula + valued operands, no "Untraced input" anywhere. A
-    // figure that stands in the ledger is read with the ledger open.
-    const ledgerToggle = card.locator('[data-ledger-cell="collateral"] [data-ledger-toggle]').first();
-    const inLedger = (await card.locator(usdChipSel).count()) === 0 && (await ledgerToggle.count()) > 0;
-    if (inLedger) await ledgerToggle.click();
-    const panelText = text ? await openReceiptFor(page, card, text) : null;
-    if (inLedger) await ledgerToggle.click();
+    // Receipt: formula + valued operands, no "Untraced input" anywhere.
+    const panelText = text ? await openReceiptFor(proto, wallet, card, text) : null;
     check(
       `${proto}: USD chip receipt states the total collateral after, valued at the oracle's price at this block`,
       !!panelText &&
@@ -361,16 +360,6 @@ async function runProtocol(proto, wallet, cases) {
         panelText.includes("price at this block"),
     );
     check(`${proto}: card has no "Untraced input" caution`, !(await card.innerText()).includes("Untraced input"));
-
-    // The Display switches. A side's total is stated in dollars only (the
-    // assets add only there), so the Collateral cell's total stays with both
-    // switches off; the dollars after a single asset's tokens (the divider
-    // component, `data-ledger-closed-usd`) stand only in a cell with no ledger
-    // (ui-jobs 289: a ledger's USD column states them), and leave and return.
-    check(
-      `${proto}: a closed cell with a ledger states no USD after its tokens`,
-      (await card.locator("[data-ledger-cell]:has([data-ledger-toggle]) [data-ledger-closed-usd]").count()) === 0,
-    );
   }
 
   // ── Priced liquidation: both legs + forensics ───────────────────────
@@ -382,9 +371,9 @@ async function runProtocol(proto, wallet, cases) {
     await positionStateSettled(proto, card);
 
     const legs = [];
-    for (const side of ["collateral", "debt"]) if ((await sideUsdText(card, side)) !== "") legs.push(side);
+    for (const side of ["collateral", "debt"]) if ((await eventRowUsd(card, side)).length > 0) legs.push(side);
     check(
-      `${proto}: liquidation (#${num}, block ${block}) has dollars on BOTH legs' cells`,
+      `${proto}: liquidation (#${num}, block ${block}) has dollars on BOTH sides' event rows`,
       legs.length === 2,
       `${legs.join(" + ") || "none"}`,
     );
@@ -420,7 +409,7 @@ async function runProtocol(proto, wallet, cases) {
       priceRow.replace(/\s+/g, " ").trim().slice(0, 160),
     );
 
-    const panelText = await openReceiptFor(page, card, seizedUsd);
+    const panelText = await openReceiptFor(proto, wallet, card, seizedUsd);
     check(`${proto}: liquidation card has no "Untraced input" caution`, !bodyText.includes("Untraced input"));
     check(
       `${proto}: liquidation receipts include amount × price at block`,

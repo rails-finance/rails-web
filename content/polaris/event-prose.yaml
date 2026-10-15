@@ -222,6 +222,20 @@ words:
     Cleared by the liquidation
   sheet_liquidated: |-
     Liquidated
+  sheet_liq_coll_pool: |-
+    Of which to the stability pool
+  sheet_liq_coll_redistributed: |-
+    Of which redistributed to other CDPs
+  sheet_liq_coll_liquidator: |-
+    Of which to the liquidator (0.5%)
+  sheet_liq_coll_surplus: |-
+    Of which surplus for the owner to claim
+  sheet_liq_gas_comp: |-
+    Gas compensation, from the escrow sent at the open
+  sheet_liq_debt_pool: |-
+    Debt absorbed by the pool
+  sheet_liq_debt_redistributed: |-
+    Debt redistributed
   sheet_closed: |-
     Closed
   sheet_no_debt: |-
@@ -285,6 +299,22 @@ words:
     The CDP's debt after this event, from the CDPManager's log, in dollars at the stablecoin's price at this block.
   tip_cr: |-
     The collateral's value divided by the debt after this event, both in the market's stablecoin, at the market's pETH price at this block.
+  tip_cr_liquidated: |-
+    The collateral's value divided by the debt when the liquidation fired, both in the market's stablecoin, at the market's pETH price at this block: below the minimum.
+  tip_liq_coll_pool: |-
+    The seized pETH the stability pool received: the seizure less the liquidator's share and the owner's surplus, from the CDPManager's log.
+  tip_liq_coll_redistributed: |-
+    The seized pETH shared out to the market's other CDPs, from the CDPManager's log.
+  tip_liq_coll_liquidator: |-
+    The liquidator's 0.5% of the seized pETH, from the CDPManager's log.
+  tip_liq_coll_surplus: |-
+    The pETH left over the debt's value and the penalty, set aside for the owner to claim, from the CDPManager's log.
+  tip_liq_gas_comp: |-
+    The pETH escrow every CDP sends at its open, paid to the liquidator. It sits apart from the collateral, so it is not part of the seizure.
+  tip_liq_debt_pool: |-
+    The debt the stability pool absorbed, from the CDPManager's log.
+  tip_liq_debt_redistributed: |-
+    The debt shared out to the market's other CDPs, from the CDPManager's log.
   tip_liquidates_at: |-
     The pETH price, in the market's stablecoin, at which the CDP's collateral ratio meets the minimum: the debt times the minimum ratio, divided by the collateral.
   tip_primary_rate: |-

@@ -123,13 +123,21 @@ const FIXTURES = [
     kind: "Debt swap",
     axis: "debt",
     venue: PARASWAP_VENUE,
-    // D4: the open card reads the debt ending at the net $18,762 (the gross
-    // borrow alone would end at $18.8K) in the position block's Debt cell, which
-    // states it in dollars across EURC and USDC, the borrow row at its gross
-    // ("Borrowed to fund the swap"), and the leftover as its own "Returned
-    // unused" row. The balances are the exact ones read when the card opens
-    // (rails-ops TO-DO-ui-jobs §19), so the account beneath them shows too.
-    readsWhenOpen: [/Debt \$18,773 \$18,762\b/, "Borrowed to fund the swap 18,802", "Returned unused 37.528", "Health factor"],
+    // D4: the open card's Debt side (decision 0042) stands at $18,773 before
+    // the swap and ends at the net $18,762 (the gross borrow alone would end
+    // at $18.8K). With the breakdown on, the borrow row at its gross
+    // ("Borrowed to fund the swap") and the leftover as its own "Returned
+    // unused" row stand under the sheet; with it off, neither does. The
+    // balances are the exact ones read when the card opens (rails-ops
+    // TO-DO-ui-jobs §19), so the account beneath them shows too.
+    readsWhenOpen: [
+      /Before this event\b.{0,60}?\$18,773\b/,
+      /After this event\b.{0,60}?\$18,762\b/,
+      "Borrowed to fund the swap 18,802",
+      "Returned unused 37.528",
+      "Health factor",
+    ],
+    grossLegs: ["Borrowed to fund the swap", "Returned unused"],
   },
   {
     label: "aave-v3 core 0xf0838f (ParaSwap repay with collateral, leftover supplied back)",
@@ -156,14 +164,17 @@ const FIXTURES = [
     kind: "Withdraw and swap",
     venue: PARASWAP_VENUE,
     mark: "flow",
-    // The bought WETH has no position row: it reads from the adapter's Swapped log,
-    // so it keeps its grid cell. The WBTC it sold is stated by the position block's
-    // Collateral cell (§47, §213), exact, interest to the block included. The
-    // closed cell is its ledger's closing line, in dollars where the side holds
-    // more than one asset ($586 → $38, the 0.00913 → 0 WBTC being in the opened
-    // ledger), with the switch gone off with the balance noted under it. The LTV
-    // cell's borrowable line shows the account figures drew.
-    readsWhenOpen: [/Collateral\b.{0,200}?\$586 \$38\b/, "Bought 0.339", "Still borrowable"],
+    // The bought WETH has no position row: it reads from the adapter's Swapped
+    // log, as a line under the sheet. The WBTC it sold is the Collateral side's
+    // event row, exact, interest to the block included; the side stands at
+    // $586 before the swap and $38 after (decision 0042). Still borrowable
+    // shows the account figures drew.
+    readsWhenOpen: [
+      /Before this event\b.{0,60}?\$586\b/,
+      /After this event\b.{0,60}?\$38\b/,
+      "Bought 0.339",
+      "Still borrowable",
+    ],
   },
 ];
 
@@ -353,10 +364,12 @@ for (const fx of FIXTURES) {
     const opened = [];
     for (let i = 0; i < n; i++) {
       const card = candidates.nth(i);
+      // The row's own control: a token chip is a `role="button"` too.
       await card
-        .locator('[role="button"]')
+        .locator('[data-anatomy~="T1"] [data-row-control][role="button"], [data-spine-toggle]')
+        .locator("visible=true")
         .first()
-        .click()
+        .evaluate((el) => el.click())
         .catch(() => {});
       // The balances are read when the card opens: wait for that answer, not for
       // text the card draws before it.
@@ -365,7 +378,22 @@ for (const fx of FIXTURES) {
         .first()
         .waitFor({ timeout: 60000 })
         .catch(() => {});
-      opened.push(((await card.innerText().catch(() => "")) || "").replace(/\s+/g, " "));
+      const textOf = async () => ((await card.innerText().catch(() => "")) || "").replace(/\s+/g, " ");
+      // A swap's gross legs stand only with the breakdown on (decision 0042,
+      // the 15 Oct ruling): read the card off, then on.
+      if (fx.grossLegs) {
+        const off = await textOf();
+        const shown = fx.grossLegs.filter((g) => off.includes(g));
+        if (shown.length === 0) ok(`${fx.label}: with the breakdown off, no gross leg stands`);
+        else bad(`${fx.label}: with the breakdown off, ${shown.join(" and ")} stand`);
+      }
+      await card
+        .locator("[data-sheet-switch]")
+        .first()
+        .evaluate((el) => el.click())
+        .catch(() => {});
+      await page.waitForTimeout(500);
+      opened.push(await textOf());
     }
     if (opened.some((t) => fx.readsWhenOpen.every((want) => reads(t, want))))
       ok(`${fx.label}: an open "${fx.kind}" card reads ${wanted}`);

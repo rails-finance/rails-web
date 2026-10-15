@@ -1,14 +1,10 @@
 // The open Aave V3 Ethereum card reads the position state around its event's
-// transaction (rails-ops TO-DO-ui-jobs §19, §213): a Collateral cell (total
-// collateral in USD, each collateral reserve beneath, the switched-off supplies
-// under "Supplied, not collateral"), a Debt cell (total debt, each borrowed
-// reserve beneath), the health factor, an LTV cell (debt ÷ collateral of the
-// weighted max LTV, the liquidation threshold, what can still be borrowed)
-// and eMode. A balance the block
-// lists is stated there and nowhere else — the grid's cell for that reserve is
-// the statement only until the read lands (§47). A reserve row under a cent is
-// dust and sits behind a "Show dust" line per side, unless it is
-// the reserve the event touched — that row always draws (§52).
+// transaction (rails-ops TO-DO-ui-jobs §19, §213) and draws it as the event
+// sheet (decision 0042, the `data-sheet-*` hooks): each reserve the
+// transaction moved as an event row on its side, each side's total, the
+// health factor, the LTV and what can still be borrowed; with the breakdown
+// on, every reserve owed (a sub-cent one only where the transaction touched
+// it, §52), the max LTV, the liquidation threshold and eMode.
 //
 // The rendered card is checked against the SAME answer the page reads —
 // /api/aave-v3/timeline/position-state through this server — so no balance is
@@ -42,7 +38,7 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
-import { armInspector } from "./lib/prov-inspector.mjs";
+import { armScope } from "./lib/prov-inspector.mjs";
 
 const ROUTE = "/api/aave-v3/timeline/position-state";
 
@@ -68,7 +64,6 @@ const FIXTURES = [
     ],
     // §54: USDC ends the swap under a cent, touched — the position's sole
     // dust reserve, so the dust line must not draw at all (the bug it fixed).
-    checkFlagProv: true,
   },
   {
     label: "core 0x56b8 debt swap",
@@ -139,7 +134,6 @@ const FIXTURES = [
     tx: "0x01c8f13bf4c6ab034b4bf01c9508545f3d34163ca6d2e9d3aeec6497a3be71c1",
     idPrefix: "supply:",
     moved: [{ reserve: WETH, side: "supply", sign: 1 }],
-    dust: true,
   },
   {
     // Same wallet, a collateral swap that sells its UNI down to under a cent
@@ -154,7 +148,6 @@ const FIXTURES = [
       { reserve: UNI, side: "supply", sign: -1 },
       { reserve: WETH, side: "supply", sign: 1 },
     ],
-    dust: true,
   },
   {
     // rails-ops TO-DO-ui-jobs §54: repayWithATokens burns the USDT aTokens
@@ -170,8 +163,6 @@ const FIXTURES = [
     tx: "0xc4405cd15a649755199d0754d72f566d01cb3557c1d192acc6ab64da62a1769b",
     idPrefix: "repay:",
     moved: [{ reserve: USDT, side: "debt", sign: -1 }],
-    dust: true,
-    checkFlagProv: true,
   },
 ];
 
@@ -280,7 +271,9 @@ async function openCard(page, fx) {
       const id = (await h.getAttribute("data-event-id")) ?? "";
       if (fx.idPrefix && !id.startsWith(fx.idPrefix)) continue;
       if (fx.cardText && !((await h.innerText()) || "").includes(fx.cardText)) continue;
-      card = h;
+      // By its id: an nth() locator is re-read on each use, and the list
+      // reorders as the page fills.
+      card = page.locator(`[data-event-id="${id}"]`).first();
     }
     if (card) break;
     const more = page.getByRole("button", { name: /^Show \d+ more$/ });
@@ -291,14 +284,22 @@ async function openCard(page, fx) {
   return card;
 }
 
-// The header's own toggle: a token chip is a `role="button"` too, and clicking it
-// filters the timeline instead of opening the card.
-const toggleCard = (card) => card.locator('[role="button"]:not([title^="Filter by"])').first().click();
+// The row's own control (the header from 640px): a token chip or the e-mode
+// line is a `role="button"` too, and clicking one of those filters or opens a
+// popover instead of opening the card.
+const toggleCard = (card) =>
+  card
+    .locator('[data-anatomy~="T1"] [data-row-control][role="button"], [data-spine-toggle]')
+    .locator("visible=true")
+    .first()
+    .evaluate((el) => el.click());
 
-/** Open a card and wait for its detail to start answering. A click that lands
- *  before React has attached the handler is swallowed, so it is retried. */
+/** Open a card and wait for its body (T2) to mount: the sheet's skeleton
+ *  while the read is out, which carries no `data-position-state`. A click that
+ *  lands before React has attached the handler is swallowed, so it is
+ *  retried. */
 async function openDetail(card) {
-  const started = card.locator("[data-position-state]").first();
+  const started = card.locator('[data-anatomy~="T2"]').first();
   for (let attempt = 0; attempt < 8; attempt++) {
     await toggleCard(card);
     if (
@@ -322,12 +323,12 @@ async function waitForAnswer(card) {
   return "none";
 }
 
-/** The receipt behind a card value, through the page's inspector. */
-async function receiptText(page, scope, valueText) {
-  // The toggle rides in the Tools menu on a position view and in the dock on
-  // a Market-type page; armInspector reads either, and is a no-op once armed
-  // (the tool is STICKY — a blind second click would put it down).
-  if (!(await armInspector(page))) return null;
+/** The receipt behind a card value, through the inspector armed on the
+ *  card: its ⋮ carries "Inspect provenance" for the card alone (scoped
+ *  arming, ui-jobs 284), a no-op once armed. */
+async function receiptText(page, scope, valueText, card) {
+  const id = await card.getAttribute("data-event-id");
+  if (!id || !(await armScope(page, id, { menu: card.locator("[data-event-menu]").first() }))) return null;
   // A string finds the figure by its text; a locator is the figure (an
   // asset's icon, which carries its balance's receipt).
   const target =
@@ -413,185 +414,123 @@ for (const fx of FIXTURES) {
     const answer = await waitForAnswer(card);
     check(`${fx.label}: the open card shows its position state`, answer === "ready", answer);
     if (answer !== "ready") continue;
-    const block = card.locator('[data-position-state="ready"]');
+    const sheet = card.locator('[data-anatomy~="T2"] [data-sheet]').first();
     const text = (s) => s.innerText().then((t) => t.replace(/\s+/g, " ").trim());
+    check(`${fx.label}: the open card's T2 is the event sheet`, (await sheet.count()) === 1);
+    if ((await sheet.count()) === 0) continue;
+    const sideEl = (side) => sheet.locator(`[data-sheet-side="${side === "supply" ? "collateral" : "debt"}"]`);
+    /** A row's figure in one column (`amount` or `usd`), as drawn at 1440. */
+    const cell = (scope, key, col) =>
+      text(scope.locator(`[data-sheet-row="${key}"] [data-sheet-col="${col}"]`).first()).catch(() => "");
+    /** A Risk or Limits row's value. */
+    const stat = (key) =>
+      text(sheet.locator(`[data-sheet-panel] [data-sheet-row="${key}"] > span:last-child`).first()).catch(() => "");
 
-    // One statement of a balance (rails-ops TO-DO-ui-jobs §47). A reserve the
-    // block lists is stated by its row alone: the grid draws no cell for it, and
-    // a full-figure title (the grid's own, `[title="<exact> <symbol>"]`) is the
-    // sign that it did. A reserve the block leaves out keeps its grid cell,
-    // carrying the exact after-balance.
+    // The event's rows (rails-ops decision 0042): each reserve the transaction
+    // moved stands on its side as an `event-<symbol>` row, its sign the move's.
     for (const m of fx.moved) {
       const r = state.reserves.find((x) => x.reserve === m.reserve);
-      if (!r?.decimals && r?.decimals !== 0) continue;
-      const exact = humanOf(r[m.side].after, r.decimals);
-      const grouped = `${BigInt(exact.split(".")[0]).toLocaleString("en-US")}${exact.includes(".") ? `.${exact.split(".")[1]}` : ""}`;
-      const titled = await card.locator(`[title^="${grouped} "]`).count();
-      if (held(r[m.side]))
-        check(
-          `${fx.label}: ${r.symbol} ${m.side} is stated once — the row, not the grid`,
-          titled === 0,
-          `${titled} grid cell(s) reading ${grouped}`,
-        );
-      else
-        check(`${fx.label}: the grid's ${r.symbol} ${m.side} stat is the exact after-balance ${grouped}`, titled > 0);
+      if (!r?.symbol) continue;
+      const amount = await cell(sideEl(m.side), `event-${r.symbol}`, "amount");
+      check(
+        `${fx.label}: the ${m.side === "supply" ? "Collateral" : "Debt"} side has ${r.symbol}'s event row, ${m.sign > 0 ? "a gain" : "a fall"}`,
+        amount !== "" && (m.sign > 0 ? !amount.startsWith("−") : amount.startsWith("−")),
+        amount || "no row",
+      );
     }
 
-    // The closed Collateral and Debt cells (rails-ops reference/
-    // lifetime-flows-scrubber.md, "The event card's sum"): a side holding one
-    // reserve states its tokens after the event; a side holding several states
-    // its dollars and one icon per reserve it holds after the event, whose
-    // title reads its balance. A reserve under a cent is dust and draws no
-    // icon, unless the event touched it (§52). A supply whose collateral flag
-    // flipped carries "enabled/disabled as collateral here" (§54), its receipt
-    // the collateral-flag one; a steady flag rides on the balance's receipt.
-    for (const [side, rows] of [
-      ["supply", supplied],
-      ["debt", borrowed],
-    ]) {
-      const touched = new Set(fx.moved.filter((m) => m.side === side).map((m) => m.reserve));
-      const scope = block.locator(`[data-receipt-total="${side}"]`);
-      const scopeText = await text(scope);
-      if (rows.length === 1) {
-        const r = rows[0];
-        const amount = fmtAmount(humanOf(r[side].after, r.decimals));
-        check(`${fx.label}: the ${side} cell states ${r.symbol}'s ${amount}`, scopeText.includes(amount), scopeText);
-      } else {
-        const want = rows.filter(
-          (r) => big(r[side].after) > BigInt(0) && (touched.has(r.reserve) || !isDustRow(r, side)),
-        );
-        // Since `aa0ea5e` (tooltips open on click) an icon's balance is its
-        // RevealTip's label, read from the tip's screen-reader text.
-        const icons = scope.locator("[data-closed-assets] [data-reveal-tip] > .sr-only");
-        const titles = [];
-        for (let k = 0; k < (await icons.count()); k++) titles.push((await icons.nth(k).innerText()).trim());
-        check(
-          `${fx.label}: the ${side} cell draws ${want.length} asset icon(s)`,
-          titles.length === want.length,
-          titles.join(" | "),
-        );
-        for (const r of want) {
-          const amount = fmtAmount(humanOf(r[side].after, r.decimals));
-          check(
-            `${fx.label}: ${r.symbol}'s icon reads ${amount} ${r.symbol}`,
-            titles.includes(`${amount} ${r.symbol}`),
-            titles.join(" | "),
-          );
-        }
-      }
-      if (side === "supply") {
-        for (const r of rows.filter((x) => x.collateral)) {
-          const flipped = r.collateral.before !== r.collateral.after;
-          const flipEl = scope.locator("[data-collateral-flip]").filter({ hasText: rows.length > 1 ? r.symbol : "" });
-          const n = await flipEl.count();
-          if (flipped) {
-            const now = r.collateral.after ? "enabled" : "disabled";
-            const flipText = n ? await text(flipEl.first()) : "";
-            check(
-              `${fx.label}: ${r.symbol} carries "${now} as collateral here" — its flag flipped this transaction`,
-              n === 1 && flipText.endsWith(`${now} as collateral here`),
-              flipText,
-            );
-          } else if (rows.length > 1)
-            check(`${fx.label}: ${r.symbol} carries no flip text — its flag did not change`, n === 0);
-        }
-        if (fx.checkFlagProv) {
-          const flippedR = rows.find((r) => r.collateral && r.collateral.before !== r.collateral.after);
-          if (flippedR) {
-            const now = flippedR.collateral.after ? "on" : "off";
-            const receipt = await receiptText(
-              page,
-              scope,
-              `${now === "on" ? "enabled" : "disabled"} as collateral here`,
-            );
-            check(
-              `${fx.label}: ${flippedR.symbol}'s flip note opens the collateral-flag receipt`,
-              !!receipt && receipt.includes("collateral switch"),
-              receipt,
-            );
-          }
-          const steadyR =
-            rows.length === 1 ? rows.find((r) => r.collateral && r.collateral.before === r.collateral.after) : null;
-          if (steadyR) {
-            const amount = fmtAmount(humanOf(steadyR.supply.after, steadyR.decimals));
-            const receipt = await receiptText(page, scope, amount);
-            check(
-              `${fx.label}: ${steadyR.symbol}'s balance receipt also states its collateral flag`,
-              !!receipt && receipt.includes("collateral switch"),
-              receipt,
-            );
-          }
-        }
+    // The breakdown: the Debt side lists every reserve owed after the
+    // transaction (a sub-cent one only where the transaction touched it, §52),
+    // and the Limits panel its parameters.
+    await sheet
+      .locator("[data-sheet-switch]")
+      .first()
+      .evaluate((el) => el.click())
+      .catch(() => {});
+    await page
+      .waitForFunction((el) => el?.getAttribute("data-sheet-breakdown") === "on", await sheet.elementHandle(), {
+        timeout: 10000,
+      })
+      .catch(() => {});
+    check(
+      `${fx.label}: the breakdown switch turns the breakdown on`,
+      (await sheet.getAttribute("data-sheet-breakdown")) === "on",
+    );
+    {
+      const touched = new Set(fx.moved.filter((m) => m.side === "debt").map((m) => m.reserve));
+      const want = borrowed.filter(
+        (r) => big(r.debt.after) > BigInt(0) && (touched.has(r.reserve) || !isDustRow(r, "debt")),
+      );
+      const keys = await sideEl("debt")
+        .locator('[data-sheet-layer="assets"] [data-sheet-row^="asset-"]')
+        .evaluateAll((els) => els.map((e) => e.getAttribute("data-sheet-row")));
+      check(
+        `${fx.label}: the Debt side's breakdown lists ${want.length} owed reserve(s)`,
+        keys.length === want.length,
+        keys.join(" | "),
+      );
+      for (const r of want) {
+        const amount = fmtAmount(humanOf(r.debt.after, r.decimals));
+        const drawn = await cell(sideEl("debt"), `asset-${r.symbol}`, "amount");
+        check(`${fx.label}: the Debt side's ${r.symbol} row reads ${amount}`, drawn === amount, drawn);
       }
     }
 
-    // Account figures (§213): the totals head the Collateral and Debt cells;
-    // the LTV cell states the max LTV and the liquidation threshold, and what
-    // can still be borrowed.
-    const cardText = async (key) => text(block.locator(`[data-position-card="${key}"]`));
+    // Account figures (§213): each side's total, the health factor, the LTV
+    // and what can still be borrowed; the max LTV and liquidation threshold
+    // with the breakdown on.
     const a = state.account;
     if (a) {
-      // A cell holding several reserves states the Pool's total (every
-      // supplied balance where a supply's switch is off, which this skips).
-      const total = async (what) => text(block.locator(`[data-account-total="${what}"]`));
+      const usdOf = (base) => (baseToUsd(base) < 0.005 ? "$0" : fmtUsd(baseToUsd(base)));
+      const totalOf = async (side) =>
+        text(sideEl(side).locator('[data-sheet-row="total"] [role="group"]').first()).catch(() => "");
       const offSupply = supplied.some((r) => r.collateral && !r.collateral.after);
-      if (supplied.length !== 1 && !offSupply)
+      if (!offSupply)
         check(
-          `${fx.label}: the Collateral cell states total collateral ${fmtUsd(baseToUsd(a.after.totalCollateralBase))}`,
-          (await total("collateral")).endsWith(
-            big(a.after.totalCollateralBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalCollateralBase)),
-          ),
-        );
-      if (borrowed.length !== 1)
-        check(
-          `${fx.label}: the Debt cell states total debt ${fmtUsd(baseToUsd(a.after.totalDebtBase))}`,
-          (await total("debt")).endsWith(
-            big(a.after.totalDebtBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalDebtBase)),
-          ),
+          `${fx.label}: the Collateral total reads ${usdOf(a.after.totalCollateralBase)}`,
+          (await totalOf("supply")) === usdOf(a.after.totalCollateralBase),
+          await totalOf("supply"),
         );
       check(
-        `${fx.label}: no Supplied, Borrowed, Total or Max LTV cells`,
-        (await block
-          .locator(
-            '[data-position-card="supplied"], [data-position-card="borrowed"], [data-position-card="total-collateral"], [data-position-card="total-debt"], [data-position-card="liquidation-threshold"]',
-          )
-          .count()) === 0,
+        `${fx.label}: the Debt total reads ${usdOf(a.after.totalDebtBase)}`,
+        (await totalOf("debt")) === usdOf(a.after.totalDebtBase),
+        await totalOf("debt"),
       );
-      const hf = await cardText("health-factor");
+      const hf = await stat("health-factor");
       check(
         `${fx.label}: health factor reads ${hfLabel(a.after.healthFactor)}`,
-        hf.endsWith(hfLabel(a.after.healthFactor)),
+        hf === hfLabel(a.after.healthFactor),
         hf,
       );
-      if (big(a.before.totalCollateralBase) > BigInt(0) || big(a.after.totalCollateralBase) > BigInt(0)) {
-        const limits = await text(block.locator("[data-ltv-limits]"));
+      if (big(a.after.totalCollateralBase) > BigInt(0)) {
+        const maxLtv = await stat("max-ltv");
+        const lt = await stat("liquidation-threshold");
         check(
-          `${fx.label}: LTV cell reads "${bpsPct(a.after.ltvBps)} maximum; liquidation at ${bpsPct(a.after.liquidationThresholdBps)}"`,
-          limits.includes(`${bpsPct(a.after.ltvBps)} maximum; liquidation at`) &&
-            limits.endsWith(bpsPct(a.after.liquidationThresholdBps)),
-          limits,
+          `${fx.label}: Max LTV reads ${bpsPct(a.after.ltvBps)} and the liquidation threshold ${bpsPct(a.after.liquidationThresholdBps)}`,
+          maxLtv === bpsPct(a.after.ltvBps) && lt === bpsPct(a.after.liquidationThresholdBps),
+          `${maxLtv} · ${lt}`,
         );
         // availableBorrowsBase: collateral × max LTV (percentMul, half up) − debt, floored at zero.
         const roomBase =
           (big(a.after.totalCollateralBase) * BigInt(a.after.ltvBps) + BigInt(5000)) / BigInt(10000) -
           big(a.after.totalDebtBase);
         const room = roomBase > BigInt(0) ? fmtUsd(baseToUsd(roomBase.toString())) : "$0";
-        const borrowable = await text(block.locator("[data-ltv-borrowable]"));
-        check(`${fx.label}: the row reads "Still borrowable" ${room}`, borrowable === room, borrowable);
+        const borrowable = await stat("borrowable");
+        check(`${fx.label}: Still borrowable reads ${room}`, borrowable === room, borrowable);
       }
     }
-    // The eMode card draws only where a category is in use on either side.
+    // The eMode row draws only where a category is in use on either side.
     if (state.emode && (state.emode.before !== 0 || state.emode.after !== 0)) {
-      const em = await cardText("emode");
+      const em = await stat("emode");
       check(
         `${fx.label}: eMode reads ${emodeName(state, state.emode.after)}`,
-        em.endsWith(emodeName(state, state.emode.after)),
+        em === emodeName(state, state.emode.after),
         em,
       );
     } else if (state.emode) {
       check(
-        `${fx.label}: no eMode card with no category in use`,
-        (await block.locator('[data-position-card="emode"]').count()) === 0,
+        `${fx.label}: no eMode row with no category in use`,
+        (await sheet.locator('[data-sheet-row="emode"]').count()) === 0,
       );
     }
 
@@ -612,69 +551,46 @@ for (const fx of FIXTURES) {
       `${own} request(s) for this transaction, ${asks.length} in all, ${new Set(asks).size} distinct, ${retried.size} retried after a refusal that can change`,
     );
 
-    // The ledger checks read cells; a card whose T2 is the event sheet
-    // (ui-jobs 330) draws none, and verify-event-share.mjs reads the sheet.
-    const onSheet = (await card.locator("[data-sheet]").count()) > 0;
-    if (fx.deep && !onSheet) {
-      // A closed cell that opens into a ledger states no dollars after its
-      // tokens: the ledger's USD column does (ui-jobs 289). A cell with no
-      // ledger keeps them.
-      const ledgerUsdSel =
-        '[data-position-state="ready"] [data-ledger-cell]:has([data-ledger-toggle]) [data-ledger-closed-usd]';
-      check(
-        `${fx.label}: a closed cell with a ledger states no USD after its tokens`,
-        (await card.locator(ledgerUsdSel).count()) === 0,
-      );
-      // Its dollars stand in a tooltip on the figure (ui-jobs 296), opened by a
-      // click since `aa0ea5e`.
-      const usdHost = card.locator("[data-ledger-cell] [data-closed-usd-tip] [data-reveal-tip]").first();
-      if (await usdHost.count()) {
-        await usdHost.click();
-        const tip = await card
-          .locator("[data-ledger-usd-tip]")
-          .first()
-          .innerText({ timeout: 3000 })
-          .catch(() => "");
-        check(
-          `${fx.label}: clicking a closed figure shows its USD and the event's price`,
-          /\$/.test(tip) && /price/.test(tip),
-          tip,
-        );
-        await page.keyboard.press("Escape");
-      }
+    // The receipts behind the sheet's figures, on the small page. The
+    // inspector arms from a card's ⋮ on the event's page (scoped arming,
+    // ui-jobs 284), where the breakdown is always on.
+    if (fx.deep) {
+      const id = await card.getAttribute("data-event-id");
+      await page.goto(`${BASE}/ethereum/aave-v3/${fx.wallet}/event/${encodeURIComponent(id)}?market=${fx.market}`, {
+        waitUntil: "domcontentloaded",
+        timeout: 240000,
+      });
+      const evCard = page.locator(`[data-event-id="${id}"]`).first();
+      const sheet = evCard.locator("[data-sheet]").first();
+      await sheet.waitFor({ timeout: 120000 }).catch(() => {});
+      check(`${fx.label}: the event page draws the sheet`, (await sheet.count()) === 1);
+      const a = state.account;
+      const hfRow = sheet.locator('[data-sheet-panel] [data-sheet-row="health-factor"]');
       if (a) {
-        const hfReceipt = await receiptText(
-          page,
-          block.locator('[data-position-card="health-factor"]'),
-          hfLabel(a.after.healthFactor),
-        );
+        const hfReceipt = await receiptText(page, hfRow, hfLabel(a.after.healthFactor), evCard);
         check(
           `${fx.label}: the health factor's receipt states collateral × threshold ÷ debt`,
           !!hfReceipt && hfReceipt.includes("collateral × threshold ÷ debt"),
         );
       }
-      const r0 = supplied[0];
+      const r0 = borrowed.find((r) => big(r.debt.after) > BigInt(0));
       if (r0) {
-        const amount = fmtAmount(humanOf(r0.supply.after, r0.decimals));
-        const cell = block.locator('[data-receipt-total="supply"]');
+        const amount = fmtAmount(humanOf(r0.debt.after, r0.decimals));
         const balReceipt = await receiptText(
           page,
-          cell,
-          supplied.length === 1
-            ? amount
-            : cell
-                .locator("[data-closed-assets] span.prov-locate-box")
-                .filter({ has: page.locator(".sr-only", { hasText: `${amount} ` }) })
-                .first(),
+          sheet.locator(`[data-sheet-row="asset-${r0.symbol}"] [data-sheet-col="amount"]`),
+          amount,
+          evCard,
         );
         check(
-          `${fx.label}: a supplied balance's receipt states scaled × index accrued to block time`,
+          `${fx.label}: an owed balance's receipt states scaled × index accrued to block time`,
           !!balReceipt && balReceipt.includes("scaled × index accrued to block time"),
+          balReceipt?.slice(0, 120) ?? "no receipt",
         );
       }
       check(
         `${fx.label}: the card has no "Untraced input" caution`,
-        !(await card.innerText()).includes("Untraced input"),
+        !(await evCard.innerText()).includes("Untraced input"),
       );
     }
   } catch (err) {
@@ -703,7 +619,7 @@ if (!only || only.test("base")) {
     const first = page.locator("[data-event-id]").first();
     // Base reads its history by a live sweep of the chain's logs, which is slow on a cold route.
     await first.waitFor({ timeout: 300000 });
-    await first.locator('[role="button"]').first().click();
+    await openDetail(first);
     await first
       .locator('[data-position-state="ready"]')
       .waitFor({ timeout: 60000 })
