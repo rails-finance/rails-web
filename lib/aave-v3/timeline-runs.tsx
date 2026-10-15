@@ -39,10 +39,6 @@ import { AAVE_FAMILY_FOLDER_REGISTER } from "@/lib/shared/aave-family-folders";
  *  through the specs below. */
 export const AAVE_V3_FOLDER_REGISTER = AAVE_FAMILY_FOLDER_REGISTER;
 
-/** Runs shorter than this stay as individual cards. */
-const MIN_LIQUIDATION_RUN = 4;
-const MIN_TRANSFER_RUN = 4;
-
 // A keeper's liquidation sweep across a whale's reserves collects several
 // LiquidationCall rows back to back — passive/third-party events, so they
 // collapse into one expandable run row via ChainTruthTimeline's runs seam.
@@ -56,9 +52,8 @@ export const AAVE_V3_TIMELINE_RUNS: TimelineRunSpec[] = [
     match: (e) =>
       isAaveV3Event(e) &&
       (e.context.data.eventType === "liquidation" || e.context.data.eventType === "bad_debt_written_off"),
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const members = events.filter(isAaveV3Event);
         const liqs = members.filter((e) => e.context.data.eventType === "liquidation");
         const offs = members.filter((e) => e.context.data.eventType === "bad_debt_written_off");
@@ -112,9 +107,8 @@ export const AAVE_V3_TIMELINE_RUNS: TimelineRunSpec[] = [
   {
     match: (e) =>
       isAaveV3Event(e) && (e.context.data.eventType === "transfer_in" || e.context.data.eventType === "transfer_out"),
-    min: MIN_TRANSFER_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_TRANSFER_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const moves = events.filter(isAaveV3Event);
         const received = sumBySymbol(
           moves

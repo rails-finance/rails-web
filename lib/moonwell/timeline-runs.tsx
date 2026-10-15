@@ -32,21 +32,12 @@
 //      with ONE keeper doing all of it "by counterparty" degenerates into
 //      "by kind": version 2 again, in the common case.
 //
-// Resolution (the attention-budget note's 2026-09-01 revision): chronology is
-// the one promise a timeline makes, and it wins inside the run too. The run
-// renders DIRECTLY as folders of ~100 consecutive events in TRUE order
-// (`renderRunFolders` — a transaction never splits across folders: a
-// liquidation with its repay leg and seize transfers is one act). There is no
-// wrapper row above them: an "Activity ×2,000" parent was tried and dropped
-// the same day — its aggregate line was just the sum of the folders beneath
-// it, and expanding a wrapper to reveal folders was one level of ceremony
-// more than the reader needs. Each folder's header carries the chunk-scoped
-// aggregate pairs — each with its member count riding inline, muted, after
-// the pair — and its own tight date range, so the sequence of dated group
-// rows paints the churn's rhythm before anything is expanded.
-// A folder whose members are all one kind takes that kind's register (member
-// noun, tone, T1 word); a stretch of 4–100 third-party events is simply one folder — same grammar,
-// no special case.
+// Resolution: chronology is the one promise a timeline makes, and it wins
+// inside the run too. The run is one folder in TRUE order, whatever its
+// length (rails-ops decision 0039), whose header carries the aggregate pairs —
+// each with its member count riding inline, muted, after the pair — and its
+// own date range. A folder whose members are all one kind takes that kind's
+// register (member noun, tone, T1 word).
 
 import type { ReactNode } from "react";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
@@ -56,7 +47,7 @@ import { renderRunFolders, type RunFolderMeta } from "@/lib/shared/run-folders";
 import { isMoonwellEvent } from "@/lib/shared/types/event-shape";
 import type { BaseActivityEvent, MoonwellEventType } from "@/lib/shared/types/event-shape";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
-import { MIN_ACTIVITY_RUN, isThirdParty } from "@/lib/moonwell/timeline-membership";
+import { isThirdParty } from "@/lib/moonwell/timeline-membership";
 import type { Tone } from "@/lib/shared/tone";
 
 /** What one kind contributes to a header — the verb, the summed figures, and
@@ -255,8 +246,8 @@ function activityAggregates(buckets: Map<MoonwellEventType, BaseActivityEvent[]>
   ];
 }
 
-/** One folder: a chronological slice of the run, rendered as its own
- *  top-level timeline row, header scoped to its own members. A folder of ONE
+/** One folder: the run, rendered as its own top-level timeline row, header
+ *  scoped to its members. A folder of ONE
  *  kind takes that kind's register (member noun, tone, warning pill, folder
  *  mark);
  *  a mixed folder stays the quiet "Events" row wearing the shared two-way
@@ -340,10 +331,6 @@ export const MOONWELL_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFol
 export const MOONWELL_ACTIVITY_RUNS: TimelineRunSpec[] = [
   {
     match: isThirdParty,
-    min: MIN_ACTIVITY_RUN,
-    // The folders ARE the run's presentation — siblings on the timeline, no
-    // wrapper row (see the header comment); renderRunFolders holds the shared
-    // run→folders step every protocol's spec now uses.
-    render: (run, meta) => renderRunFolders(run, meta, MIN_ACTIVITY_RUN, folderCard),
+    render: (run, meta) => renderRunFolders(run, meta, folderCard),
   },
 ];

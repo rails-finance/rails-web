@@ -282,10 +282,10 @@ function SegmentSkeleton({ monthIdx, lifeDays }: { monthIdx: number; lifeDays: R
 export interface TimelineRunSpec {
   /** Events matching this predicate are candidates for one run. */
   match: (e: BaseActivityEvent) => boolean;
-  /** Consecutive matches shorter than this stay as individual cards —
-   *  collapsing two or three rows would hide meaningful events behind a
-   *  click for no density win. */
-  min: number;
+  /** Read only by an `asOneEvent` spec, in rows. A collapse spec groups at
+   *  `GROUP_MIN_TRANSACTIONS` consecutive transactions (lib/shared/
+   *  timeline-chunks.ts, rails-ops decision 0039). */
+  min?: number;
   /** Optional neighbor test for keyed runs: two consecutive matches only join
    *  the same run when this returns true (e.g. auction slices grouped by
    *  challenge number). Omit for a plain streak of any matching events. */
@@ -783,12 +783,11 @@ function ChainTruthTimelineBody({
   // admits. `matched` is the header's own answer
   // (lib/shared/timeline-folder-filter.ts).
   //
-  // Since a group never straddles a UTC month (rails-ops decision 0021,
-  // amendment 2026-09-29), a month selection admits every standing folder
-  // whole and opens none; a day, or a custom range, still opens the folders
-  // it cuts through. `useTimelineEvents` has already dropped every folder
-  // whose span misses the range, so this is a few reads, through the queued,
-  // cached provider (`lib/shared/folder-members.tsx`).
+  // A date range opens the folders it cuts through, a month as a day or a
+  // custom range: a group can straddle any of them (rails-ops decision 0039).
+  // `useTimelineEvents` has already dropped every folder whose span misses
+  // the range, so this is a few reads, through the queued, cached provider
+  // (`lib/shared/folder-members.tsx`).
   const splitByFilter = (row: { folder: ServedFolder; matched: number | null }) => row.matched !== row.folder.count;
   // The count line's numerator counts those members too, and the header can
   // say how many only on one countable axis at a time. Where it cannot, the
@@ -983,24 +982,22 @@ function ChainTruthTimelineBody({
       : 0;
   const pinnedPending = askFolderForPin && pinnedFolderId === undefined;
 
-  // Settle the displayed list into rows: stretches of ≥min consecutive
-  // matching events become one run row, cut at month boundaries (rails-ops
-  // decision 0021, amendment 2026-09-29). Runs are found on the list before
-  // the date range, so a run's floor reads its full length and a month filter
-  // shows the groups the unfiltered page shows (`settleRunRows`). Without
-  // `activeRuns` this is the identity mapping.
+  // Settle the displayed list into rows (`settleRunRows`, rails-ops decision
+  // 0039): runs are found on the list before the date range and the cut, and
+  // each group is then sliced to what the page shows. Without `activeRuns`
+  // this is the identity mapping.
   const dateRange = tl.dateRange;
   const rows = useMemo<TimelineRow[]>(() => {
     if (servedRows) return servedRows;
     if (!activeRuns || activeRuns.length === 0) {
       return events.map((event, flatIdx) => ({ kind: "event", event, flatIdx }) as const);
     }
-    const all = dateRange ? rewindEvents([...tl.visibleEvents].reverse(), cut) : events;
-    const inRange = dateRange
-      ? (e: BaseActivityEvent) => e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]
-      : () => true;
+    const all = dateRange ? [...tl.visibleEvents].reverse() : allEvents;
+    const inRange = (e: BaseActivityEvent) =>
+      (cut == null || e.timestamp <= cut) &&
+      (dateRange == null || (e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]));
     return settleRunRows(all, activeRuns, inRange);
-  }, [events, activeRuns, servedRows, dateRange, tl.visibleEvents, cut]);
+  }, [events, allEvents, activeRuns, servedRows, dateRange, tl.visibleEvents, cut]);
 
   // Market notes, attached by anchor event id — OUTSIDE the rows.
   //

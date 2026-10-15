@@ -16,18 +16,12 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
-/** Runs shorter than this stay as individual cards — the four-row floor every
- *  explorer's liquidation run uses. One liquidation is two rows (debt leg +
- *  seize leg), so this is a two-liquidation floor. */
-const MIN_LIQUIDATION_RUN = 4;
-
 export const DOLOMITE_LIQUIDATION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) =>
       isDolomiteEvent(e) && (e.context.data.eventType === "liquidation" || e.context.data.eventType === "seize_out"),
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const legs = events.filter(isDolomiteEvent);
         const debtLegs = legs.filter((e) => e.context.data.eventType === "liquidation");
         const cleared = sumBySymbol(

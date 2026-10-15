@@ -684,12 +684,11 @@ await showNoteRows(context);
 /** ── this script's OWN run grouping, 2026-09-08 ─────────────────────────────
  *  The rows ride `ChainTruthTimeline` now, and a stretch of consecutive
  *  same-kind rows is painted as ONE run row. The rule is restated here rather
- *  than imported — `MIN_VAULT_RUN` in lib/aave-vaults/timeline-runs.tsx and the
- *  `RUN_KINDS` its spec matches on — because a check that read its expectation
- *  off the thing under test could not catch a change to either. A run longer
- *  than `CHUNK_TARGET` splits into chronological folders; none of this file's
- *  fixtures has a run near that, and a fixture that grew one would show up here
- *  as a painted-vs-own mismatch rather than passing quietly.
+ *  than imported — `GROUP_MIN_TRANSACTIONS` in lib/shared/timeline-chunks.ts and
+ *  the `RUN_KINDS` lib/aave-vaults/timeline-runs.tsx matches on — because a
+ *  check that read its expectation off the thing under test could not catch a
+ *  change to either. The rule (rails-ops decision 0039): five or more
+ *  consecutive transactions of one kind are one run, whatever their length.
  *
  *  ⚠️ RESTATED IS NOT THE SAME AS RIGHT. This set held the two vault kinds and
  *  not the two custody ones until 2026-09-20, so the page grouped transfer runs
@@ -700,24 +699,7 @@ await showNoteRows(context);
  *  the cost the paragraph above accepts, and this is what it looks like when it
  *  comes due (TO-DO-ui-jobs §38). */
 const RUN_KINDS = new Set(["deposit", "withdrawal", "transfer-in", "transfer-out"]);
-const MIN_RUN = 3;
-/** A qualifying run, cut at 00:00 UTC on the 1st of each month (rails-ops
- *  decision 0021, amendment 2026-09-29). A transaction takes the month of its
- *  first row; a piece of two or more rows stays a group, one row sits loose. */
-function monthPieces(run) {
-  const pieces = [];
-  for (let k = 0; k < run.length; ) {
-    let e = k + 1;
-    while (e < run.length && run[e].txHash === run[k].txHash) e += 1;
-    const d = new Date(run[k].timestamp * 1000);
-    const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
-    const last = pieces[pieces.length - 1];
-    if (last && last.month === month) last.rows.push(...run.slice(k, e));
-    else pieces.push({ month, rows: run.slice(k, e) });
-    k = e;
-  }
-  return pieces.map((p) => p.rows);
-}
+const MIN_TRANSACTIONS = 5;
 function ownRuns(events) {
   const out = [];
   let i = 0;
@@ -729,12 +711,9 @@ function ownRuns(events) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) {
-      for (const piece of monthPieces(events.slice(i, j))) {
-        if (piece.length >= 2) out.push({ kind: "run", events: piece });
-        else out.push({ kind: "event", events: piece });
-      }
-    } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
+    const run = events.slice(i, j);
+    if (new Set(run.map((e) => e.txHash)).size >= MIN_TRANSACTIONS) out.push({ kind: "run", events: run });
+    else for (const e of run) out.push({ kind: "event", events: [e] });
     i = j;
   }
   return out;

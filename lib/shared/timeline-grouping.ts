@@ -15,12 +15,16 @@
 //     — "Implementation note 2026-09-13 — leg C: Moonwell Base groups in the
 //        web's route, after its replay".
 //
-// A PORT, NOT A NEW RULE. The pass, the chunker, rule 6, the row-cap trim and
-// the members resolution below are the server module's, line for line where
-// the two can be, because a folder must mean the same thing whichever side of
-// the wire cut it. `chunkByTransaction` is already shared with the fifteen
-// client-grouped families (`lib/shared/timeline-chunks.ts`). Three differences,
-// each forced by where this runs:
+// THE GROUP RULE (rails-ops decision 0039): five or more consecutive
+// transactions of the same act, unbroken by any other row, are one folder
+// whatever its length; the same act is one spec's `match`/`sameRun`, or one
+// repeating set (a spec's `shape`). The floor is `GROUP_MIN_TRANSACTIONS`,
+// shared with the client-grouped families (`lib/shared/timeline-chunks.ts`).
+//
+// A PORT, NOT A NEW RULE. The pass, rule 6, the row-cap trim and the members
+// resolution below are the server module's, line for line where the two can
+// be, because a folder must mean the same thing whichever side of the wire
+// cut it. Three differences, each forced by where this runs:
 //
 //   • LEGS ARRIVE RESOLVED. The route that groups also holds the market roster,
 //     so a leg names its symbol and decimals itself rather than leaving them to
@@ -44,7 +48,7 @@ import type {
   ServedFolderLeg,
   ServedTimelineRow,
 } from "@/lib/shared/timeline-folder";
-import { CHUNK_TARGET, chunkByTransaction, splitAtMonths } from "@/lib/shared/timeline-chunks";
+import { GROUP_MIN_TRANSACTIONS, transactionCount } from "@/lib/shared/timeline-chunks";
 import type { OpeningBucket } from "@/lib/shared/timeline-opening-balance";
 
 /** The four coordinates the pass needs from a family's own row shape. */
@@ -77,7 +81,6 @@ export interface GroupingLegEntry {
 export interface GroupingSpec<R> {
   kind: string;
   match: (row: R) => boolean;
-  min: number;
   sameRun?: (prev: R, next: R) => boolean;
   kindOf: (row: R) => string;
   countKinds?: readonly string[];
@@ -96,9 +99,8 @@ export interface GroupingSpec<R> {
    *  `getEventCounterpartyKeys` over each one. ABSENT serves `cells: null`. */
   cellOf?: (row: R) => { kind: string; assets: string[]; counterparties: string[] };
   /** Present on an owner run over transactions of one SHAPE — the server's
-   *  `TimelineShapeRun` (rails-ops decision 0021, amendment 2026-09-28). The
-   *  spec groups whole transactions ahead of every row spec, `min` counts
-   *  transactions, and `match`, `sameRun` and the leg accessors are not read. */
+   *  `TimelineShapeRun`. The spec groups whole transactions ahead of every row
+   *  spec, and `match`, `sameRun` and the leg accessors are not read. */
   shape?: GroupingShapeRun<R>;
 }
 
@@ -452,7 +454,7 @@ function findShapeStretches<R>(
     const t = txs[a];
     let b = a + 1;
     if (t.spec >= 0) while (b < txs.length && txs[b].spec === t.spec && txs[b].sig === t.sig) b++;
-    if (t.spec >= 0 && b - a >= specs[t.spec].min) {
+    if (t.spec >= 0 && b - a >= GROUP_MIN_TRANSACTIONS) {
       out.push({ start: t.start, end: txs[b - 1].end, spec: t.spec, kinds: t.kinds, keys: t.keys });
     }
     a = b;
@@ -463,23 +465,21 @@ function findShapeStretches<R>(
 /**
  * One forward pass over `rows` in ASCENDING chain order — the server's
  * `groupIntoRows`: a row joins the first spec that matches it, a matching row
- * opens or extends a stretch, a stretch shorter than the spec's `min` stays as
- * events, and a longer one is cut at month boundaries, each piece of two or
- * more chunked by transaction into folders. Ordinals run
- * contiguously from `ordinalBase`, the first row's place in the WHOLE history.
+ * opens or extends a stretch, and a stretch of fewer than
+ * `GROUP_MIN_TRANSACTIONS` transactions stays as events; a longer one is one
+ * folder. Ordinals run contiguously from `ordinalBase`, the first row's place
+ * in the WHOLE history.
  *
  * `keep` narrows the answer to a span without narrowing the runs: every row
  * takes part in finding and qualifying a run, and only the rows `keep` admits
- * are served — a piece left with two or more of them is still a group. So a
- * month read groups exactly as the whole history does.
+ * are served. A folder the span cuts through serves its kept members.
  */
 export function groupIntoRows<R>(
   rows: R[],
   specs: readonly GroupingSpec<R>[],
   access: GroupingAccess<R>,
-  opts: { ordinalBase: number; chunkTarget?: number; keep?: (row: R) => boolean },
+  opts: { ordinalBase: number; keep?: (row: R) => boolean },
 ): GroupedRows<R> {
-  const target = opts.chunkTarget ?? CHUNK_TARGET;
   const keep = opts.keep ?? (() => true);
   const out: ServedTimelineRow<R>[] = [];
   const folders = new Map<string, ServedFolder>();
@@ -497,40 +497,26 @@ export function groupIntoRows<R>(
 
   const specOf = (row: R): number => specs.findIndex((s) => !s.shape && s.match(row));
 
-  const emit = (chunks: R[][], at: number, spec: GroupingSpec<R>, shape?: string[]) => {
-    let offset = 0;
-    for (const chunk of chunks) {
-      const folder = folderOf(chunk, at + offset, spec, access, opts.ordinalBase, shape);
-      out.push({ kind: "folder", folder });
-      folders.set(folder.responseId, folder);
-      members.set(folder.responseId, chunk);
-      for (const row of chunk) folderByEvent.set(access.eventKey(row), folder.responseId);
-      offset += chunk.length;
+  const emitRun = (stretch: R[], at: number, spec: GroupingSpec<R>, shape?: string[]) => {
+    const first = stretch.findIndex(keep);
+    const kept = stretch.filter(keep);
+    // A slice of one member, or of one transaction of a shape, sits loose.
+    if ((shape ? transactionCount(kept, access.txHash) : kept.length) < 2) {
+      for (const row of kept) out.push({ kind: "event", event: row });
+      return;
     }
-  };
-
-  // A qualifying run is cut at each UTC month boundary (rails-ops decision
-  // 0021, amendment 2026-09-29): a piece of two or more stays a group, one
-  // left over sits loose, and a shape run counts its pieces in transactions.
-  const emitRun = (stretch: R[], at: number, spec: GroupingSpec<R>, minTail: number, shape?: string[]) => {
-    let offset = 0;
-    for (const piece of splitAtMonths(stretch, access.timestamp, access.txHash)) {
-      const first = piece.findIndex(keep);
-      const kept = piece.filter(keep);
-      const units = shape ? new Set(kept.map(access.txHash)).size : kept.length;
-      if (units >= 2) emit(chunkByTransaction(kept, access.txHash, target, minTail), at + offset + first, spec, shape);
-      else for (const row of kept) out.push({ kind: "event", event: row });
-      offset += piece.length;
-    }
+    const folder = folderOf(kept, at + first, spec, access, opts.ordinalBase, shape);
+    out.push({ kind: "folder", folder });
+    folders.set(folder.responseId, folder);
+    members.set(folder.responseId, kept);
+    for (const row of kept) folderByEvent.set(access.eventKey(row), folder.responseId);
   };
 
   let i = 0;
   while (i < rows.length) {
     const shaped = shapeAt.get(i);
     if (shaped) {
-      const spec = specs[shaped.spec];
-      const minTail = spec.min * shaped.keys;
-      emitRun(rows.slice(shaped.start, shaped.end), i, spec, minTail, shaped.kinds);
+      emitRun(rows.slice(shaped.start, shaped.end), i, specs[shaped.spec], shaped.kinds);
       i = shaped.end;
       continue;
     }
@@ -550,10 +536,10 @@ export function groupIntoRows<R>(
     )
       j++;
     const stretch = rows.slice(i, j);
-    if (stretch.length < spec.min) {
+    if (transactionCount(stretch, access.txHash) < GROUP_MIN_TRANSACTIONS) {
       for (const row of stretch) loose(row);
     } else {
-      emitRun(stretch, i, spec, spec.min);
+      emitRun(stretch, i, spec);
     }
     i = j;
   }

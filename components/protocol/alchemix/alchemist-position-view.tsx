@@ -351,8 +351,8 @@ export function AlchemistPositionView({
   // forwarding hop from a change of owner.
   const siblingsByTx = useMemo(() => groupEventsByTx(alchemistEvents), [alchemistEvents]);
   // One transaction is one card; and a redemption belongs to the line, so most
-  // of this timeline is them, and a streak of three or more collapses into one
-  // dated row.
+  // of this timeline is them, and a streak of five transactions or more collapses
+  // into one dated row.
   // The reading before each block on the timeline, for before → after on
   // every card and for what each redemption took from the collateral.
   const beforeByBlock = useMemo(() => readingsBefore(alchemistEvents), [alchemistEvents]);

@@ -12,13 +12,13 @@
 //
 // THE SPEC IS THE INDEX'S, TRANSCRIBED from rails-server
 // `api/src/services/compound-timeline-folders.ts` (COMPOUND_V3_FOLDER_SPECS),
-// which Compound V3 mainnet is served under: a liquidation run of four or more
-// absorption rows (`absorb_debt` and its `absorb_collateral` legs), and an
-// owner run of five or more of the owner's own supplies or withdrawals of one
-// asset back to back (decision 0021, 2026-09-24), the owner judged as the
-// summary's `actorsSql` judges it, or of five or more transactions of one
-// shape (the amendment of 2026-09-28: the same owner actions and transfers,
-// per asset, in each; COMPOUND_V3_SHAPE_FOLDER_SPECS). The page draws both with the family's
+// which Compound V3 mainnet is served under: a liquidation run of absorption
+// rows (`absorb_debt` and its `absorb_collateral` legs), and an owner run of
+// the owner's own supplies or withdrawals of one asset back to back, the owner
+// judged as the summary's `actorsSql` judges it, or of transactions of one
+// shape (the same owner actions and transfers, per asset, in each;
+// COMPOUND_V3_SHAPE_FOLDER_SPECS). Each groups at five transactions (rails-ops
+// decision 0039). The page draws both with the family's
 // register (`COMPOUND_FOLDER_REGISTER`). Two things are not carried over: the
 // state faces (no page reads a folder's `stateBefore`/`stateAfter`) and the
 // flows (the replay reduces the lifetime flows over every row before this pass
@@ -68,10 +68,6 @@ import {
   type LoadCometIndexParams,
 } from "@/lib/sources/api/compound-base-timeline";
 
-/** The web specs' liquidation floor (lib/compound/timeline-runs.tsx). */
-const MIN_LIQUIDATION_RUN = 4;
-/** Decision 0021, 2026-09-24: the owner's runs collapse at five. */
-const MIN_OWNER_RUN = 5;
 /** The wire kind of an owner-run folder (lib/shared/owner-run-folders.tsx,
  *  which is a client module and is not imported into a route). */
 const OWNER_RUN_KIND = "owner_run";
@@ -176,7 +172,6 @@ export function compoundBaseFolderSpecs(
         const t = dataOf(e)?.eventType;
         return t === "absorb_debt" || t === "absorb_collateral";
       },
-      min: MIN_LIQUIDATION_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       countKinds: ["absorb_debt", "absorb_collateral"],
       // The debt row states the debt the absorb cleared, not basePaidOut
@@ -201,7 +196,6 @@ export function compoundBaseFolderSpecs(
         const b = rowOf(next);
         return a != null && b != null && a.kind === b.kind && a.market.key === b.market.key && a.asset === b.asset;
       },
-      min: MIN_OWNER_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       legsOf: (e) => {
         const t = dataOf(e)?.eventType ?? "";
@@ -213,7 +207,6 @@ export function compoundBaseFolderSpecs(
     {
       kind: OWNER_RUN_KIND,
       match: () => false,
-      min: MIN_OWNER_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       actorOf,
       cellOf,

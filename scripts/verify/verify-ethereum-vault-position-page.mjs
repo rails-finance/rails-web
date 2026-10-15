@@ -348,42 +348,20 @@ const CEILING = 14000;
  *  behind the cut. `HORIZON` is still the tier boundary; it stopped being the
  *  window. Restated here for the same reason the two figures above are. */
 const DRAW_ROWS = 1000;
-/** `WINDOW_CHUNK` in components/shared/chain-truth-timeline.tsx, and the run
- *  spec's own floor in lib/aave-vaults/timeline-runs.tsx — both restated here,
- *  because a check that read them off the source could not catch a change to
- *  either. */
+/** `WINDOW_CHUNK` in components/shared/chain-truth-timeline.tsx, and the group
+ *  floor `GROUP_MIN_TRANSACTIONS` in lib/shared/timeline-chunks.ts — both
+ *  restated here, because a check that read them off the source could not
+ *  catch a change to either. */
 // Mirrors TIMELINE_PAGE_ROWS in lib/shared/timeline-opening-balance.ts — move it with it.
 const WINDOW_CHUNK = 50;
-const MIN_RUN = 3;
-/** The kinds the run spec collapses, and the rule it collapses them by. This is
- *  THIS SCRIPT's own grouping of the route's own rows — the expectation the DOM
- *  is measured against.
- *
- *  The two transfer kinds joined on 2026-09-10 (plan §7b): a plumbing position
- *  has neither a deposit nor a withdrawal, so its whole window drew as
- *  individual cards. F7's own tally is unchanged by it — 47 rows, 13 folders,
- *  because its transfers never run three deep in one direction — so T11 reads
- *  the same before and after; the kinds are added here so the two statements of
- *  the rule stay in step on the day a fixture does have such a stretch. The
- *  folder's own checks live in verify-vault-transfer-folders.mjs. */
+const MIN_TRANSACTIONS = 5;
+/** The kinds the run spec collapses, and the rule it collapses them by
+ *  (rails-ops decision 0039): five or more consecutive transactions of one
+ *  kind are one group, whatever their length. This is THIS SCRIPT's own
+ *  grouping of the route's own rows — the expectation the DOM is measured
+ *  against. The transfer folder's own checks live in
+ *  verify-vault-transfer-folders.mjs. */
 const RUN_KINDS = new Set(["deposit", "withdrawal", "transfer-in", "transfer-out"]);
-/** A qualifying run, cut at 00:00 UTC on the 1st of each month (rails-ops
- *  decision 0021, amendment 2026-09-29). A transaction takes the month of its
- *  first row; a piece of two or more rows stays a group, one row sits loose. */
-function monthPieces(run) {
-  const pieces = [];
-  for (let k = 0; k < run.length; ) {
-    let e = k + 1;
-    while (e < run.length && run[e].txHash === run[k].txHash) e += 1;
-    const d = new Date(run[k].timestamp * 1000);
-    const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
-    const last = pieces[pieces.length - 1];
-    if (last && last.month === month) last.rows.push(...run.slice(k, e));
-    else pieces.push({ month, rows: run.slice(k, e) });
-    k = e;
-  }
-  return pieces.map((p) => p.rows);
-}
 function ownRuns(events) {
   const out = [];
   let i = 0;
@@ -395,12 +373,9 @@ function ownRuns(events) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) {
-      for (const piece of monthPieces(events.slice(i, j))) {
-        if (piece.length >= 2) out.push({ kind: "run", events: piece });
-        else out.push({ kind: "event", events: piece });
-      }
-    } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
+    const run = events.slice(i, j);
+    if (new Set(run.map((e) => e.txHash)).size >= MIN_TRANSACTIONS) out.push({ kind: "run", events: run });
+    else for (const e of run) out.push({ kind: "event", events: [e] });
     i = j;
   }
   return out;

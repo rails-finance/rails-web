@@ -423,7 +423,7 @@ const FIXTURES = [
   {
     // Seeded (over 20,000 rows): the seed's rows below the cut, the newest
     // 10,000 rows after it. None of Seamless's five seeded wallets holds a
-    // run of four transfers or liquidations in its preload, so this answer is
+    // run of five transactions of transfers or liquidations in its preload, so this answer is
     // grouped with no folder (`noFolders`).
     id: "seamless-grouped",
     arm: "grouped",

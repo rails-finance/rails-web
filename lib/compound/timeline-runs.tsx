@@ -19,19 +19,13 @@ import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
-/** Runs shorter than this stay as individual cards — the four-row floor every
- *  explorer's liquidation run uses. One absorption is at least two rows
- *  (debt + one collateral leg), so this is roughly a two-absorption floor. */
-const MIN_LIQUIDATION_RUN = 4;
-
 export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) =>
       isCompoundEvent(e) &&
       (e.context.data.eventType === "absorb_debt" || e.context.data.eventType === "absorb_collateral"),
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const legs = events.filter(isCompoundEvent);
         const debtLegs = legs.filter((e) => e.context.data.eventType === "absorb_debt");
         const repaid = sumBySymbol(

@@ -18,16 +18,11 @@ import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 import { MORPHO_LIQUIDATION_REPAID_VERB } from "@/lib/morpho/position-legs";
 
-/** Runs shorter than this stay as individual cards — the four-row floor every
- *  explorer's liquidation run uses. */
-const MIN_LIQUIDATION_RUN = 4;
-
 export const MORPHO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isMorphoEvent(e) && e.context.data.eventType === "liquidation",
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const liqs = events.filter(isMorphoEvent);
         // A liquidation row moves the COLLATERAL side (assetsDelta, negative);
         // the loan-token amount it cleared rides `loanRepaid` (repaid + any bad

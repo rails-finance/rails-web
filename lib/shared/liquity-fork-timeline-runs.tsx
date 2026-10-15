@@ -18,9 +18,6 @@ import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 import { DelegateRunRatePill, delegateRunRateProv } from "@/components/protocol/liquity/delegate-adjust-run-card";
 
-/** Runs shorter than this stay as individual cards (the V2 trove threshold). */
-export const MIN_REDEMPTION_RUN = 4;
-
 /** The slice of a fork event's context the run needs — identical across the
  *  three fork contexts (EbisuContext / AsymmetryContext / BasedollarContext). */
 interface ForkRunContext {
@@ -46,9 +43,8 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
   return [
     {
       match: (e) => is(e) && e.context.data.eventType === "redeemCollateral",
-      min: MIN_REDEMPTION_RUN,
       render: (run, meta) =>
-        renderRunFolders(run, meta, MIN_REDEMPTION_RUN, (events, folder) => {
+        renderRunFolders(run, meta, (events, folder) => {
           // Collateral is after − before over the emitted absolutes; debt is
           // what each redemption cancelled (TroveOperation), which leaves out
           // the interest accrued between touches. The folder sums magnitudes. A trove page is one

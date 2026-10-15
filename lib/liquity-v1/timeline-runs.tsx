@@ -12,9 +12,6 @@ import { RedemptionRunCard } from "@/components/shared/redemption-run-card";
 import { renderRunFolders } from "@/lib/shared/run-folders";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 
-/** Runs shorter than this stay as individual cards (the V2 trove threshold). */
-const MIN_REDEMPTION_RUN = 4;
-
 // Consecutive redemption touches collapse into one expandable run row — the V2
 // trove treatment, via ChainTruthTimeline's runs seam. A heavily redeemed V1
 // Trove sitting low in the sorted list collects redemptions back to back;
@@ -23,9 +20,8 @@ const MIN_REDEMPTION_RUN = 4;
 export const LIQUITY_V1_REDEMPTION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isLiquityV1Event(e) && e.context.data.eventType === "redemption",
-    min: MIN_REDEMPTION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_REDEMPTION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         // Each member's delta is after − before over the emitted absolutes; the
         // folder carries the summed magnitudes (Cleared LUSD / Reduced ETH).
         let totalColl = 0;

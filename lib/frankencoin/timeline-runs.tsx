@@ -11,14 +11,6 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
-/** Two slices are already the same settled auction — a keyed run needs no
- *  streak to justify collapsing (contrast the plain-streak redemption floor).
- *  The floor counts ROWS: every slice's tx also writes the position's
- *  MintingUpdate down as an auction_settlement row beside it, so a two-slice
- *  auction spans at least three rows while a single-slice auction (two rows)
- *  stays flat. */
-const MIN_AUCTION_RUN = 3;
-
 // Multi-bid Dutch auctions emit MULTIPLE ChallengeSucceeded slices for one
 // challenge (event-shape.ts:1400) — group by (hub, challenge number), the
 // same key the challenge forensics card uses, so a run never merges slices
@@ -35,7 +27,6 @@ export const FRANKENCOIN_AUCTION_RUNS: TimelineRunSpec[] = [
     match: (e) =>
       isFrankencoinEvent(e) &&
       (e.context.data.eventType === "challenge_succeeded" || e.context.data.eventType === "auction_settlement"),
-    min: MIN_AUCTION_RUN,
     sameRun: (prev, next) => {
       if (!isFrankencoinEvent(prev) || !isFrankencoinEvent(next)) return false;
       if (prev.context.data.hub !== next.context.data.hub) return false;
@@ -44,7 +35,7 @@ export const FRANKENCOIN_AUCTION_RUNS: TimelineRunSpec[] = [
       return a == null || b == null || a === b;
     },
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_AUCTION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const slices = events
           .filter(isFrankencoinEvent)
           .filter((e) => e.context.data.eventType === "challenge_succeeded");

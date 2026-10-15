@@ -89,9 +89,10 @@ function assert(c, m) {
   }
 }
 
-// The page reads the grouped history, where three or more batch-manager rate
-// changes back to back sit in a closed `batch_rate` folder and redemption runs
-// in a `redemption` folder. A row inside a closed folder draws no header, so the
+// The page reads the grouped history, where a run of batch-manager rate changes
+// sits in a closed `batch_rate` folder and a run of redemptions in a
+// `redemption` folder, at the index's floor (five transactions under rails-ops
+// decision 0039, once the server carries it). A row inside a closed folder draws no header, so the
 // expectation counts the rows that stand outside a folder, from the same grouped
 // read the page makes.
 async function apiRows(path) {

@@ -21,6 +21,7 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
 import { liquityBranchObs } from "@/lib/shared/price-series";
 import { LIQUITY_RUN_KINDS } from "@/lib/liquity/timeline-run-kinds";
+import { GROUP_MIN_TRANSACTIONS, transactionCount } from "@/lib/shared/timeline-chunks";
 import {
   LIVE_EXAMPLE_COLLATERAL,
   LIVE_EXAMPLE_TROVE_ID,
@@ -131,8 +132,8 @@ function newestRows(newestFirst: BaseActivityEvent[]): BaseActivityEvent[] {
     const kind = LIQUITY_RUN_KINDS.find((k) => k.operation === op(newestFirst[i]));
     let j = i + 1;
     if (kind) while (j < newestFirst.length && op(newestFirst[j]) === kind.operation) j++;
-    // A streak shorter than its kind's minimum draws one card per event.
-    const run = kind && j - i >= kind.min;
+    // A streak of fewer transactions than the floor draws one card per event.
+    const run = kind && transactionCount(newestFirst.slice(i, j), (e) => e.txHash) >= GROUP_MIN_TRANSACTIONS;
     if (!run) j = i + 1;
     if (run && rows > 0 && j - i > RUN_EVENT_CAP) break;
     out.push(...newestFirst.slice(i, j));

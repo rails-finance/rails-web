@@ -13,9 +13,6 @@ import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
-/** Runs shorter than this stay as individual cards. */
-const MIN_QUEUE_FILL_RUN = 3;
-
 // Consecutive withdrawal-queue fills collapse into one expandable run row —
 // the FIFO queue processes a wallet's pending requests back to back once
 // liquidity lands, and a wallet parked deep in the queue can pick up a burst
@@ -24,9 +21,8 @@ const MIN_QUEUE_FILL_RUN = 3;
 export const MAPLE_QUEUE_FILL_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isMapleEvent(e) && e.context.data.eventType === "request_fill",
-    min: MIN_QUEUE_FILL_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_QUEUE_FILL_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const paidOut = sumBySymbol(
           events
             .filter(isMapleEvent)

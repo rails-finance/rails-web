@@ -57,24 +57,6 @@ import { collateralTakenRaw, type AlchemixReadingsBefore } from "@/lib/alchemix/
 import { logIndexOf, withRiders } from "@/lib/alchemix/riding-transfers";
 import { AlchemixQuietRedemptions } from "@/components/protocol/alchemix/alchemix-quiet-redemptions";
 
-/** Runs shorter than this stay as individual cards.
- *
- *  THREE, WHERE LIQUITY V2 TAKES FOUR, and the difference is what the two
- *  rows carry. A Liquity redemption card states that Trove's own collateral
- *  and debt movement, so three of them are three distinct readings and hiding
- *  them behind a click costs something. An Alchemix redemption card names no
- *  actor, draws no token flow, and says the same two sentences every time; the
- *  one figure that differs is the cleared amount, which the run header sums and
- *  the expanded members still state one by one.
- *
- *  The sample above bears the floor out: eleven streaks were three long, five
- *  of them inside a single day, which is where the later cards show a bare time
- *  under a date they have lost. Moving the floor from four to three takes the
- *  redemption rows left standing as their own cards from 51 to 18. Two stays as
- *  cards: a pair is no wall, and the second card is still beside its dated
- *  sibling. */
-const MIN_REDEMPTION_RUN = 3;
-
 const WAD = 1e18;
 
 /** The run's own date range, in the form TimelineRunCard prints above it, so
@@ -166,9 +148,8 @@ export function useAlchemixTimelineRuns(
       },
       {
         match: (e: BaseActivityEvent) => isAlchemistEvent(e) && e.context.data.eventType === "redemption",
-        min: MIN_REDEMPTION_RUN,
         render: (run, meta) =>
-          renderRunFolders(run, meta, MIN_REDEMPTION_RUN, (events, folder) => {
+          renderRunFolders(run, meta, (events, folder) => {
             // The total is summed in wei and scaled once, so it carries every
             // digit its members do. A member with no figure is counted apart
             // and never as a zero: the header states how much of the run the

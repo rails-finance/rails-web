@@ -38,7 +38,7 @@
 //       events, of which the newest 1,000 are drawn; EVERY row a plain share
 //       transfer. The page that started this thread.
 //   F4  stkwaEthUSDT.v1 `0xa484…2d31` / `0x674c…7f04` — an EOA, 9 rows, no
-//       stretch of three: the floor still holds and no folder is drawn.
+//       stretch of five: the floor still holds and no folder is drawn.
 // A fixture that has changed shape is a FAILURE, not a skip: R0 and R4a assert
 // the shapes every check below them rests on.
 //
@@ -119,19 +119,17 @@ const F4 = {
   holder: "0x674ce5965471f867f9649bbe69802b24ffed7f04",
 };
 
-/** `MIN_VAULT_RUN` in lib/aave-vaults/timeline-runs.tsx and `WINDOW_CHUNK` in
- *  components/shared/chain-truth-timeline.tsx, restated here on purpose: a check
- *  that read them off the source could not catch a change to either. */
-const MIN_RUN = 3;
+/** `GROUP_MIN_TRANSACTIONS` in lib/shared/timeline-chunks.ts and `WINDOW_CHUNK`
+ *  in components/shared/chain-truth-timeline.tsx, restated here on purpose: a
+ *  check that read them off the source could not catch a change to either. */
+const MIN_TRANSACTIONS = 5;
 // Mirrors TIMELINE_PAGE_ROWS in lib/shared/timeline-opening-balance.ts — move it with it.
 const WINDOW_CHUNK = 50;
 /** The kinds a folder may stand for, and the rule it groups them by — THIS
- *  SCRIPT's own statement of it, over the route's own rows. */
+ *  SCRIPT's own statement of it, over the route's own rows (rails-ops decision
+ *  0039): five or more consecutive transactions of one kind are one folder,
+ *  whatever their length. */
 const RUN_KINDS = new Set(["deposit", "withdrawal", "transfer-in", "transfer-out"]);
-/** `CHUNK_TARGET` in lib/shared/timeline-chunks.ts — a run longer than this
- *  splits into chronological folders, and a remnant shorter than the run floor
- *  joins the folder before it. */
-const CHUNK_TARGET = 100;
 
 function ownRuns(events) {
   const out = [];
@@ -144,40 +142,9 @@ function ownRuns(events) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) {
-      // The run's own folders. A transaction never splits across two folders;
-      // these fixtures carry at most one of a holder's own logs per
-      // transaction, so splitting on the count alone is the same answer here —
-      // and R1a, which compares the page's total against this, would go red if
-      // it ever stopped being.
-      const run = events.slice(i, j);
-      // Decision 0021, amendment 2026-09-29: the qualifying run is cut at
-      // 00:00 UTC on the 1st of each month (a transaction takes the month of
-      // its first row); a piece of two or more stays a group, one row sits loose.
-      const pieces = [];
-      for (let k = 0; k < run.length; ) {
-        let e = k + 1;
-        while (e < run.length && run[e].txHash === run[k].txHash) e++;
-        const d = new Date(run[k].timestamp * 1000);
-        const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
-        const last = pieces[pieces.length - 1];
-        if (last && last.month === month) last.rows.push(...run.slice(k, e));
-        else pieces.push({ month, rows: run.slice(k, e) });
-        k = e;
-      }
-      for (const { rows } of pieces) {
-        if (rows.length < 2) {
-          for (const r of rows) out.push({ kind: "event", events: [r] });
-          continue;
-        }
-        for (let k = 0; k < rows.length; ) {
-          const left = rows.length - k;
-          const take = left <= CHUNK_TARGET + MIN_RUN - 1 ? left : CHUNK_TARGET;
-          out.push({ kind: "run", events: rows.slice(k, k + take) });
-          k += take;
-        }
-      }
-    } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
+    const run = events.slice(i, j);
+    if (new Set(run.map((e) => e.txHash)).size >= MIN_TRANSACTIONS) out.push({ kind: "run", events: run });
+    else for (const e of run) out.push({ kind: "event", events: [e] });
     i = j;
   }
   return out;
@@ -235,7 +202,7 @@ check(
   `${f3Events.length} rows: ${JSON.stringify(f3Kinds)}`,
 );
 check(
-  "R0b and it still has stretches of three to collapse — a fixture that flattened makes R1–R3 vacuous",
+  "R0b and it still has stretches of five to collapse — a fixture that flattened makes R1–R3 vacuous",
   f3OwnFolders.length >= 10,
   `own grouping: ${f3Own.length} rows, ${f3OwnFolders.length} folders, longest ${Math.max(
     0,
@@ -452,8 +419,8 @@ for (const e of f4Events) {
   if (cur > longest) longest = cur;
 }
 check(
-  "R4a F4 is still a short life with no stretch of three — the fixture R4b rests on",
-  f4Events.length > 0 && f4Events.length < 20 && longest < MIN_RUN,
+  "R4a F4 is still a short life with no stretch of five — the fixture R4b rests on",
+  f4Events.length > 0 && f4Events.length < 20 && longest < MIN_TRANSACTIONS,
   `${f4Events.length} rows ${JSON.stringify(f4Kinds)}, longest same-kind stretch ${longest}`,
 );
 const f4Page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
@@ -468,9 +435,9 @@ const f4Dom = await f4Page.evaluate(
 );
 await f4Page.close();
 check(
-  "R4b F4's page draws no folder — the three-row floor still holds",
+  "R4b F4's page draws no folder — the five-transaction floor still holds",
   f4Dom.folders === 0 && f4Dom.painted === f4Own.length,
-  `F4's ${f4Events.length}-row life draws ${f4Dom.folders} folder(s) and ${f4Dom.painted} cards; its longest same-kind stretch is ${longest} and the floor is ${MIN_RUN}`,
+  `F4's ${f4Events.length}-row life draws ${f4Dom.folders} folder(s) and ${f4Dom.painted} cards; its longest same-kind stretch is ${longest} and the floor is ${MIN_TRANSACTIONS}`,
 );
 
 await browser.close();

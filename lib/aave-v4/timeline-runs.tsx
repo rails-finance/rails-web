@@ -18,15 +18,11 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
-/** Runs shorter than this stay as individual cards. */
-const MIN_LIQUIDATION_RUN = 4;
-
 export const AAVE_V4_TIMELINE_RUNS: TimelineRunSpec[] = [
   {
     match: (e: BaseActivityEvent) => isAaveV4Event(e) && e.context.data.eventType === "liquidation",
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const liqs = events.filter(isAaveV4Event);
         const repaid = sumBySymbol(
           liqs.map((e) => ({ symbol: e.context.data.reserveSymbol, amount: e.context.data.debtToCover })),

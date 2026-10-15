@@ -9,10 +9,6 @@
 import { isMoonwellEvent } from "@/lib/shared/types/event-shape";
 import type { BaseActivityEvent, MoonwellEventType } from "@/lib/shared/types/event-shape";
 
-/** Runs shorter than this stay as individual cards — the same density-win
- *  floor every run/cluster in the app uses. */
-export const MIN_ACTIVITY_RUN = 4;
-
 /** The membership guard for rows whose filler carried no `txFrom`: the kinds
  *  that in practice arrive third-party (a keeper's repay/liquidate legs, the
  *  seize and drain transfers). Where `txFrom` IS present, the signature fact

@@ -16,16 +16,11 @@ import { DAI_META } from "@/lib/makerdao/asset-catalog";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
-/** Runs shorter than this stay as individual cards — the four-row floor every
- *  explorer's liquidation run uses. */
-const MIN_LIQUIDATION_RUN = 4;
-
 export const MAKERDAO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isMakerDAOEvent(e) && e.context.data.eventType === "grab",
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const grabs = events.filter(isMakerDAOEvent);
         // `dink` is the collateral taken (signed, human). `dart` is NORMALISED
         // debt — DAI only once multiplied by the Vat rate at the block, which

@@ -16,9 +16,6 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
-/** Runs shorter than this stay as individual cards. */
-const MIN_LIQUIDATION_RUN = 4;
-
 // A tick sweep can touch a position several times in one bot pass —
 // consecutive liquidation/absorption rows collapse into one expandable run
 // row, via ChainTruthTimeline's runs seam. Owner actions always stand as
@@ -28,9 +25,8 @@ export const FLUID_LIQUIDATION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) =>
       isFluidEvent(e) && (e.context.data.eventType === "liquidated" || e.context.data.eventType === "absorbed"),
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const first = events[0];
         const supplySymbol = isFluidEvent(first) ? first.context.data.supplySymbol : null;
         const borrowSymbol = isFluidEvent(first) ? first.context.data.borrowSymbol : null;

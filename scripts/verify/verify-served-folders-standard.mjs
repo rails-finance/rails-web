@@ -102,8 +102,8 @@ const SERVED = [
   { id: "moonwell-base", path: "/base/moonwell/0x719eae70d4a83f35bf82a2740699f5db84be919d" },
 ];
 // Aave V3 on Base declares `runs`; its default page is served, so `?folders=0`
-// makes it group in the browser. The wallet holds a stretch of four transfers
-// (MIN_TRANSFER_RUN), so a run forms and the toggle is offered: the menu offers
+// makes it group in the browser. The wallet must hold a stretch of five
+// transactions of transfers (rails-ops decision 0039), so a run forms and the toggle is offered: the menu offers
 // "Collapse like events" only where a collapse spec forms a run on the list.
 const CLIENT = { id: "client", path: "/base/aave-v3/0xbb8fb8fe5198f25d117c0e7b1b9c8260cb19c3c0?folders=0" };
 

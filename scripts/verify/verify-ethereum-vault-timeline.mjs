@@ -49,7 +49,7 @@
 // the list at 100. Three checks compared the DOM position-for-position against
 // this script's own LOG list and had to be restated against its own ROW list —
 // the same logs, grouped by this script's own copy of the collapse rule
-// (`ownRows`, `MIN_RUN`, `WINDOW_CHUNK` above the fixtures). 2c now asserts the
+// (`ownRows`, `MIN_TRANSACTIONS`, `WINDOW_CHUNK` above the fixtures). 2c now asserts the
 // painted rows are that grouping and that the `data-vault-timeline-rows`
 // attribute is still the WHOLE life; 4e and 10b walk the row list and make
 // their per-event assertions on the rows that are single events, because a
@@ -693,7 +693,10 @@ async function ownTimeline(vault, holder, blockNumber) {
 // ── the page and the route ──────────────────────────────────────────────────
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 2000 }, extraHTTPHeaders: bypassHeaders() });
+const context = await browser.newContext({
+  viewport: { width: 1280, height: 2000 },
+  extraHTTPHeaders: bypassHeaders(),
+});
 // Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
 await showNoteRows(context);
 
@@ -856,28 +859,13 @@ const OWN = new Map();
 // list, so what is compared against the DOM is still the chain's answer.
 // Mirrors TIMELINE_PAGE_ROWS in lib/shared/timeline-opening-balance.ts — move it with it.
 const WINDOW_CHUNK = 50;
-const MIN_RUN = 3;
+// The group floor, `GROUP_MIN_TRANSACTIONS` in lib/shared/timeline-chunks.ts:
+// five or more consecutive transactions of one kind are one run, whatever
+// their length (rails-ops decision 0039).
+const MIN_TRANSACTIONS = 5;
 // The two transfer kinds collapse too (2026-09-10, the transfer folders), one
-// direction to a folder. Re-pinned 2026-09-19 from the page as served: the
-// Safe fixture's 23 consecutive sends paint as one row, 8 rows over 34 logs.
+// direction to a folder.
 const RUN_KINDS = new Set(["deposit", "withdrawal", "transfer-in", "transfer-out"]);
-/** A qualifying run, cut at 00:00 UTC on the 1st of each month (rails-ops
- *  decision 0021, amendment 2026-09-29). A transaction takes the month of its
- *  first row; a piece of two or more rows stays a group, one row sits loose. */
-function monthPieces(run) {
-  const pieces = [];
-  for (let k = 0; k < run.length; ) {
-    let e = k + 1;
-    while (e < run.length && run[e].txHash === run[k].txHash) e += 1;
-    const d = new Date(run[k].timestamp * 1000);
-    const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
-    const last = pieces[pieces.length - 1];
-    if (last && last.month === month) last.rows.push(...run.slice(k, e));
-    else pieces.push({ month, rows: run.slice(k, e) });
-    k = e;
-  }
-  return pieces.map((p) => p.rows);
-}
 /** This script's own log list, grouped the way the page draws it. */
 function ownRows(key) {
   const events = OWN.get(key).rows;
@@ -891,12 +879,9 @@ function ownRows(key) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) {
-      for (const piece of monthPieces(events.slice(i, j))) {
-        if (piece.length >= 2) out.push({ kind: "run", events: piece });
-        else out.push({ kind: "event", events: piece });
-      }
-    } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
+    const run = events.slice(i, j);
+    if (new Set(run.map((e) => e.txHash)).size >= MIN_TRANSACTIONS) out.push({ kind: "run", events: run });
+    else for (const e of run) out.push({ kind: "event", events: [e] });
     i = j;
   }
   return out;

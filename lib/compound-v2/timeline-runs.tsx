@@ -14,11 +14,6 @@ import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
-/** Runs shorter than this stay as individual cards. A keeper liquidation burst
- *  is at least 2 liquidations (~2 member rows each, once the seize legs the
- *  index merges alongside them are counted), so the row floor is doubled. */
-const MIN_LIQUIDATION_RUN = 4;
-
 // Consecutive liquidation/seize rows collapse into one expandable run — a
 // borrower caught by a keeper sweep collects several liquidations back to
 // back, each trailed by the seize legs the index names separately (seize_out
@@ -33,9 +28,8 @@ export const COMPOUND_V2_LIQUIDATION_RUNS: TimelineRunSpec[] = [
       (e.context.data.eventType === "liquidation" ||
         e.context.data.eventType === "seize_out" ||
         e.context.data.eventType === "seize_burn"),
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         // "Repaid" sums the debt each liquidation row itself covered (the index
         // merges a liquidation's own repay leg into it). "Seized" sums the
         // seize_out legs only, in the SAME cToken denomination the single seize

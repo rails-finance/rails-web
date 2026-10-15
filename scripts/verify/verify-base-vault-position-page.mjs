@@ -318,12 +318,12 @@ const LOADER_VERSION = 2;
  *  amended 2026-09-10). It is NOT `HORIZON` — a life at or under HORIZON is
  *  still built and gated whole, but only its newest DRAW_ROWS are serialised. */
 const DRAW_ROWS = 1000;
-/** `WINDOW_CHUNK` in components/shared/chain-truth-timeline.tsx and the run
- *  spec's own floor (`MIN_VAULT_RUN` in lib/aave-vaults/timeline-runs.tsx),
- *  both restated for the same reason. */
+/** `WINDOW_CHUNK` in components/shared/chain-truth-timeline.tsx and the group
+ *  floor (`GROUP_MIN_TRANSACTIONS` in lib/shared/timeline-chunks.ts, rails-ops
+ *  decision 0039), both restated for the same reason. */
 // Mirrors TIMELINE_PAGE_ROWS in lib/shared/timeline-opening-balance.ts — move it with it.
 const WINDOW_CHUNK = 50;
-const MIN_RUN = 3;
+const MIN_TRANSACTIONS = 5;
 const RUN_KINDS = new Set(["deposit", "withdrawal"]);
 /** The word target of the section's own copy charter, likewise restated. */
 const WORDS_WITH_HOLDER = 600;
@@ -548,7 +548,7 @@ async function ownLife(vault, holder, blockNumber) {
 }
 
 /** THIS SCRIPT's own grouping of the route's rows into the runs the shared
- *  timeline collapses. The rule is restated (see `MIN_RUN` above) so a change
+ *  timeline collapses. The rule is restated (see `MIN_TRANSACTIONS` above) so a change
  *  to it goes red rather than being read off the page. */
 function ownRuns(events) {
   const outRows = [];
@@ -561,8 +561,9 @@ function ownRuns(events) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) outRows.push({ kind: "run", events: events.slice(i, j) });
-    else for (let k = i; k < j; k++) outRows.push({ kind: "event", events: [events[k]] });
+    const run = events.slice(i, j);
+    if (new Set(run.map((e) => e.txHash)).size >= MIN_TRANSACTIONS) outRows.push({ kind: "run", events: run });
+    else for (const e of run) outRows.push({ kind: "event", events: [e] });
     i = j;
   }
   return outRows;
@@ -1538,7 +1539,7 @@ check(
 );
 check(
   "T9c at least one run row is painted COLLAPSED, standing for members that are not in the document",
-  f1Page.timelineRows.some((r) => r.kind === "run" && r.count >= MIN_RUN) &&
+  f1Page.timelineRows.some((r) => r.kind === "run" && r.count >= MIN_TRANSACTIONS) &&
     f1Page.paintedEvents <
       f1Page.timelineRows.length + f1Page.timelineRows.filter((r) => r.kind === "run").reduce((a, r) => a + r.count, 0),
   `${f1Page.timelineRows.filter((r) => r.kind === "run").length} run rows painted, ${f1Page.paintedEvents} event cards`,

@@ -1525,8 +1525,8 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
     return;
 
   // MOST POSITIONS HAVE NOTHING TO GROUP, so the subject cannot be "the first
-  // row of the listing". A folder needs a stretch of four or more consecutive
-  // liquidations or transfers, and an ordinary position simply does not have
+  // row of the listing". A folder needs five or more consecutive
+  // transactions of liquidations or transfers, and an ordinary position simply does not have
   // one — measured 2026-09-11 on the first Spark row, 1,403 events and zero
   // folders, which is the correct answer for that wallet and tells us nothing
   // about the feature. So walk the listing until a subject actually groups,

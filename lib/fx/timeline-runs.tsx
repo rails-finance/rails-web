@@ -133,9 +133,6 @@ function FxRebalanceRunCard({
   );
 }
 
-/** Runs shorter than this stay as individual cards. */
-const MIN_TICK_REBALANCE_RUN = 3;
-
 // Consecutive rebalances collapse into one expandable run row — the same
 // client-side de-noising as the redemption/liquidation runs elsewhere, via
 // ChainTruthTimeline's runs seam. The row names its members in words and sums
@@ -145,9 +142,8 @@ const MIN_TICK_REBALANCE_RUN = 3;
 export const FX_TICK_REBALANCE_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isFxEvent(e) && e.context.data.eventType === "tickRebalance" && !e.context.data.redemption,
-    min: MIN_TICK_REBALANCE_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_TICK_REBALANCE_RUN, (events, folder) => (
+      renderRunFolders(run, meta, (events, folder) => (
         <FxRebalanceRunCard key={folder.key} events={events} folder={folder} />
       )),
   },

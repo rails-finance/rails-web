@@ -13,7 +13,7 @@
 //
 // THE SPEC IS THE CLIENT'S, TRANSCRIBED. `lib/moonwell/timeline-runs.tsx`
 // decides membership by signature (`isThirdParty`, shared from
-// `timeline-membership.ts` so the two cannot drift) with a floor of four, and
+// `timeline-membership.ts` so the two cannot drift) at the shared floor, and
 // its folder header sums Repaid / Seized / Sent / Received. The header here is
 // the same four verbs over the same members — in base units, per market address
 // rather than per display symbol (two Base markets are both "USDC") — and the
@@ -43,7 +43,7 @@ import {
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import { externalActor } from "@/lib/shared/external-actor";
 import { getEventActionKey, getEventAssetKeys, getEventCounterpartyKeys } from "@/lib/shared/event-filter-helpers";
-import { MIN_ACTIVITY_RUN, isThirdParty } from "@/lib/moonwell/timeline-membership";
+import { isThirdParty } from "@/lib/moonwell/timeline-membership";
 import type { MoonwellMarket } from "@/lib/moonwell/asset-catalog";
 import type { MoonwellChainTimelineResponse } from "@/lib/moonwell-base/chain-timeline";
 import { replayMoonwellRows } from "@/lib/sources/chain/moonwell-events";
@@ -214,7 +214,6 @@ export function moonwellFolderSpecs(
     {
       kind: "activity",
       match: isThirdParty,
-      min: MIN_ACTIVITY_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       countKinds: COUNT_KINDS,
       legsFor: (members) => moonwellLegs(members, marketOf),

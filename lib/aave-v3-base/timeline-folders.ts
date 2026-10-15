@@ -51,8 +51,6 @@ import {
   type LoadAaveV3IndexParams,
 } from "@/lib/sources/api/aave-v3-base-timeline";
 
-const MIN_RUN = 4;
-
 const dataOf = (e: BaseActivityEvent): AaveV3Context | null => (isAaveV3Event(e) ? e.context.data : null);
 
 export const AAVE_V3_BASE_ROW_ACCESS: GroupingAccess<BaseActivityEvent> = {
@@ -147,7 +145,6 @@ export function aaveV3BaseFolderSpecs(
         const t = dataOf(e)?.eventType;
         return t === "liquidation" || t === "bad_debt_written_off";
       },
-      min: MIN_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       countKinds: ["liquidation", "bad_debt_written_off"],
       mixedKind: "mixed",
@@ -183,7 +180,6 @@ export function aaveV3BaseFolderSpecs(
         const t = dataOf(e)?.eventType;
         return t === "transfer_in" || t === "transfer_out";
       },
-      min: MIN_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       countKinds: ["transfer_in", "transfer_out"],
       mixedKind: "mixed",

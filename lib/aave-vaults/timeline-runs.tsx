@@ -89,10 +89,6 @@ import { KIND_LABEL, type VaultHolderEvent } from "@/lib/shared/vault-holder-tim
  *  the menu reads the vault's own words rather than another roster's. */
 export const AAVE_VAULT_TIMELINE_KEY = "aave-vaults";
 
-/** Runs shorter than this stay as individual cards: collapsing two rows hides a
- *  real event behind a click for no density win. */
-export const MIN_VAULT_RUN = 3;
-
 /** One vault event, as the shared timeline's coordinate record. */
 export function vaultEventToActivity(event: VaultHolderEvent, chainId: ChainId, holder: string): BaseActivityEvent {
   return {
@@ -174,9 +170,8 @@ export function aaveVaultTimelineRuns(
       // which is not what either row says. `actionType` IS the row's own kind,
       // direction included, so this one equality carries both splits.
       sameRun: (prev: BaseActivityEvent, next: BaseActivityEvent) => prev.actionType === next.actionType,
-      min: MIN_VAULT_RUN,
       render: (run, meta) =>
-        renderRunFolders(run, meta, MIN_VAULT_RUN, (events, folder) => {
+        renderRunFolders(run, meta, (events, folder) => {
           const members = events.map((e) => byId.get(e.id)).filter((e): e is VaultHolderEvent => e != null);
           const first = members[0]?.kind;
           // Every member shares one kind (`sameRun`), so the first member's own

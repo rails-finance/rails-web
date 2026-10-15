@@ -69,8 +69,8 @@
 //     1,144 liquidation rows, the longest run of consecutive liquidation rows
 //     is 1. Every liquidation is immediately preceded by its own seized-aToken
 //     `transfer_out` in the same transaction, so a keeper's sweep reads
-//     `transfer_out, liquidation, transfer_out, …` and matches neither spec's
-//     `min: 4`.
+//     `transfer_out, liquidation, transfer_out, …` and neither spec sees a
+//     run.
 //
 // The spark arm is vacuous there for a plainer reason: all 2,776 of its events
 // are transfers, so there is no flow to carry and no caller to judge.

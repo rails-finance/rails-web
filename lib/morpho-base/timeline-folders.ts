@@ -13,10 +13,10 @@
 //
 // THE SPEC IS THE INDEX'S, TRANSCRIBED from rails-server
 // `api/src/services/morpho-timeline-folders.ts` (MORPHO_FOLDER_SPECS), which
-// Morpho mainnet is served under: a liquidation run of four or more, and an
-// owner run of five or more of the owner's own rows of one borrower action
-// (add or remove collateral, borrow, repay) back to back, the opening row
-// excepted (decision 0021, 2026-09-24). Base also carries the lender side,
+// Morpho mainnet is served under: a liquidation run, and an owner run of the
+// owner's own rows of one borrower action (add or remove collateral, borrow,
+// repay) back to back, the opening row excepted; each groups at five
+// transactions (rails-ops decision 0039). Base also carries the lender side,
 // which mainnet's index does not: a supply or a withdrawal is its own row and
 // closes a run, as any other row does. The page draws both kinds with the
 // family's register (`MORPHO_FOLDER_REGISTER`). Not carried over: the state
@@ -63,10 +63,6 @@ import {
   type MorphoIndexPrepared,
 } from "@/lib/sources/api/morpho-base-timeline";
 
-/** The web spec's liquidation floor (lib/morpho/timeline-runs.tsx). */
-const MIN_LIQUIDATION_RUN = 4;
-/** Decision 0021, 2026-09-24: the owner's runs collapse at five. */
-const MIN_OWNER_RUN = 5;
 /** The wire kind of an owner-run folder (lib/shared/owner-run-folders.tsx,
  *  which is a client module and is not imported into a route). */
 const OWNER_RUN_KIND = "owner_run";
@@ -130,7 +126,6 @@ export function morphoBaseFolderSpecs(
     {
       kind: "liquidation",
       match: (e) => dataOf(e)?.eventType === "liquidation",
-      min: MIN_LIQUIDATION_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       // "Liquidators repaid" is the loan the liquidation cleared (repaid plus
       // any bad debt), "Seized" the collateral taken, in the client spec's order.
@@ -153,7 +148,6 @@ export function morphoBaseFolderSpecs(
         return d != null && has(OWNER_ACTIONS, d.eventType) && !d.isOpen && actorOf(e) === null;
       },
       sameRun: (prev, next) => dataOf(prev)?.eventType === dataOf(next)?.eventType,
-      min: MIN_OWNER_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       legsOf: (e) => {
         const d = dataOf(e);
@@ -165,13 +159,12 @@ export function morphoBaseFolderSpecs(
       actorOf,
       cellOf,
     },
-    // The owner run over transactions of one shape (decision 0021, amendment
-    // 2026-09-28; the index's MORPHO_SHAPE_FOLDER_SPECS): collateral added and
+    // The owner run over transactions of one shape (the index's
+    // MORPHO_SHAPE_FOLDER_SPECS): collateral added and
     // a borrow in each, say, netted per side.
     {
       kind: OWNER_RUN_KIND,
       match: () => false,
-      min: MIN_OWNER_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       actorOf,
       cellOf,

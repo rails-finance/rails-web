@@ -15,10 +15,6 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
-/** Runs shorter than this stay as individual cards — the four-row floor every
- *  explorer's liquidation run uses. */
-const MIN_LIQUIDATION_RUN = 4;
-
 export const LLAMALEND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
   {
     match: (e) =>
@@ -26,9 +22,8 @@ export const LLAMALEND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
       e.context.data.eventType === "liquidation" &&
       (e.context.data.role ?? "borrower") === "borrower" &&
       !e.context.data.selfLiquidation,
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const liqs = events.filter(isLlamalendEvent);
         const cleared = sumBySymbol(
           liqs.map((e) => ({

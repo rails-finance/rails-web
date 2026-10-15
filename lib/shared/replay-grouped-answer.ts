@@ -135,8 +135,7 @@ export function groupReplaySpan<R extends { events: E[] }, E>(o: {
   span: { from: number; to: number };
 }): ReplayGroupedAnswer<R, E> {
   // The whole replay is grouped and the span kept, so a run reaching past the
-  // span's edge qualifies on its full length (rails-ops decision 0021,
-  // amendment 2026-09-29).
+  // span's edge qualifies on its full length (rails-ops decision 0039).
   const grouped = groupIntoRows(o.full.events, o.specs, o.access, {
     ordinalBase: o.eventsBefore + 1,
     keep: (e) => {

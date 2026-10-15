@@ -495,28 +495,31 @@ async function runFixture(f) {
   }
 
   {
+    // The group floor, five transactions (rails-ops decision 0039).
     const bad = [];
-    let run = 0;
+    let run = new Set();
     plan.forEach((row, i) => {
       if (row.kind === "folder") {
-        run = 0;
+        run = new Set();
         return;
       }
       const e = stream[plan.slice(0, i).reduce((n, r) => n + (r.kind === "folder" ? r.folder.count : 1), 0)];
       if (!thirdParty(e)) {
-        run = 0;
+        run = new Set();
         return;
       }
-      run++;
+      run.add(e.txHash);
       const prev = plan[i - 1];
       const next = plan[i + 1];
       if (prev?.kind === "folder" || next?.kind === "folder") bad.push(`${e.id} stands beside a folder`);
-      if (run >= 4) bad.push(`${e.id} is the fourth third-party event in a row`);
+      if (run.size >= 5) bad.push(`${e.id} is in the fifth third-party transaction in a row`);
     });
     check(
       id("G7 grouping is complete"),
       bad.length === 0,
-      bad.length ? bad.slice(0, 3).join("; ") : "no third-party event left beside a folder or in a run of four",
+      bad.length
+        ? bad.slice(0, 3).join("; ")
+        : "no third-party event left beside a folder or in a run of five transactions",
     );
   }
 

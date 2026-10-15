@@ -112,8 +112,8 @@ export interface TimelineRunCardProps {
   /** Whether the members are the owner's actions. Unset: not where the run is
    *  adverse (redemptions, liquidations) or a third party's (`external`). */
   byOwner?: boolean;
-  /** A chronological slice of a longer stretch (`lib/shared/timeline-chunks.ts`):
-   *  the summary card opens with the Σ glyph before the sums. */
+  /** Drawn as a folder (`lib/shared/run-folders.tsx`): the summary card opens
+   *  with the Σ glyph before the sums. */
   folder?: boolean;
   /** The event numbers the group holds, lowest and highest, where the caller
    *  knows them (a served folder's ordinals). Unset: `GroupNumbersContext`. */

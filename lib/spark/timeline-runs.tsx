@@ -28,10 +28,6 @@ import { AAVE_FAMILY_FOLDER_REGISTER } from "@/lib/shared/aave-family-folders";
  *  fork and the index transcribes the two specs once for the same reason. */
 export const SPARK_FOLDER_REGISTER = AAVE_FAMILY_FOLDER_REGISTER;
 
-/** Runs shorter than this stay as individual cards. */
-const MIN_LIQUIDATION_RUN = 4;
-const MIN_TRANSFER_RUN = 4;
-
 // A keeper's liquidation sweep across a whale's reserves collects several
 // LiquidationCall rows back to back — passive/third-party events, so they
 // collapse into one expandable run row via ChainTruthTimeline's runs seam.
@@ -40,9 +36,8 @@ const MIN_TRANSFER_RUN = 4;
 export const SPARK_TIMELINE_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isSparkEvent(e) && e.context.data.eventType === "liquidation",
-    min: MIN_LIQUIDATION_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_LIQUIDATION_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const liqs = events.filter(isSparkEvent);
         const repaid = sumBySymbol(
           liqs.map((e) => ({ symbol: e.context.data.reserveSymbol, amount: e.context.data.debtToCover })),
@@ -81,9 +76,8 @@ export const SPARK_TIMELINE_RUNS: TimelineRunSpec[] = [
   {
     match: (e) =>
       isSparkEvent(e) && (e.context.data.eventType === "transfer_in" || e.context.data.eventType === "transfer_out"),
-    min: MIN_TRANSFER_RUN,
     render: (run, meta) =>
-      renderRunFolders(run, meta, MIN_TRANSFER_RUN, (events, folder) => {
+      renderRunFolders(run, meta, (events, folder) => {
         const moves = events.filter(isSparkEvent);
         const received = sumBySymbol(
           moves

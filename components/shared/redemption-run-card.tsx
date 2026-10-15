@@ -13,8 +13,7 @@ import { TimelineRunCard } from "@/components/shared/timeline-run-card";
  * receipt and the aria label pluralise, and the two pairs a redemption moves,
  * "Cleared" the debt and "Reduced" the collateral, drawn collateral first on
  * the spine. Every redemption run draws in the folder register
- * (TimelineRunCard's `folder`) — one folder per chronological chunk of the
- * run, sliced by the caller via `renderRunFolders`.
+ * (TimelineRunCard's `folder`), one folder per run via `renderRunFolders`.
  *
  * Shared: Liquity V2 (the origin grammar, hand-wired in the trove page) and
  * Liquity V1 / the forks (via ChainTruthTimeline's `runs` seam) render the same
