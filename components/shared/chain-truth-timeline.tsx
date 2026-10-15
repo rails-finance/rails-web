@@ -1233,7 +1233,15 @@ function ChainTruthTimelineBody({
     const topDay = segments ? newestLifeDayBefore(segments.lifeDays, cutTs) : null;
     if (segments && topDay == null) return `No events on or before ${word}.`;
     if (segments?.loading != null) return `Loading events to ${word}…`;
-    if (!segments) return `No loaded events on or before ${word}.`;
+    // A page with no month read (Liquity V2's newest 1,000 rows, Aave V4's
+    // newest window) cannot reach an older cut until decision 0039's
+    // point-in-time read (TO-DO-ui-jobs §141).
+    if (!segments) {
+      const oldest = tl.sortedEvents[0]?.timestamp;
+      return oldest != null
+        ? `Events on or before ${word} are not loaded on this page, which starts at ${shortDate(oldest)} ${shortDateYear(oldest)}.`
+        : `Events on or before ${word} are not loaded on this page.`;
+    }
     return (
       <>
         No loaded events on or before {word}.{" "}
@@ -2261,7 +2269,10 @@ function ChainTruthTimelineBody({
               LIST and the rows above it are the statement. Here there are no
               rows: a lone glyph on an otherwise blank panel would state
               nothing at all, and "no events" would state something false. */}
-            {effectiveBoundary && !tl.isFiltered ? (
+            {/* A cut older than the rows a page without a month read holds
+                says so; the boundary card would state the window's opening,
+                a day after the cut. */}
+            {effectiveBoundary && !tl.isFiltered && !(cut != null && !segments) ? (
               <div className="relative flex flex-col gap-2">
                 <SpineLine />
                 <TimelineBoundaryCard
