@@ -66,12 +66,12 @@ export function BetaStrip() {
     // information.
     <div data-anatomy="H14" className="bg-sunken md:pl-14">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2 text-sm leading-5 text-foreground md:px-6">
-        <p className="min-w-0 flex-1 leading-5">
-          <span className="font-semibold">Rails is in beta.</span>{" "}
+        <p className="flex min-w-0 flex-1 items-center justify-between gap-3 leading-5">
+          <span className="font-semibold">Rails is in beta.</span>
           <button
             type="button"
             onClick={() => setFeedbackOpen(true)}
-            className="cursor-pointer font-medium text-teal-600 hover:underline dark:text-teal-500"
+            className="shrink-0 cursor-pointer text-right font-medium text-teal-600 hover:underline dark:text-teal-500"
           >
             <MessageSquarePlus className="mr-1 inline-block h-3.5 w-3.5 align-middle" aria-hidden="true" />
             Tell us what you think.

@@ -131,7 +131,9 @@ import {
   type BinInput,
 } from "@/lib/shared/flows-series";
 import {
+  axisEndDay,
   axisSpanDays,
+  closeStop,
   combinedAt,
   combinedStops,
   eventStep,
@@ -2285,4 +2287,39 @@ test("the price view's Liquity V2 marks on a liquidated rETH Trove: blocks match
   const pts = s.level!.points;
   assert.equal(s.level!.end, "liquidation");
   assert.equal(pts[pts.length - 1][0], Math.floor(liq.ts / D));
+});
+
+test("a closed position's chart ends at the close: the axis, the live stop and the price line (ruling 14)", () => {
+  const rows = JSON.parse(readFileSync(join(__dirname, "fixtures", "liquity-flows-v2-liquidated.json"), "utf8"))
+    .events as BaseActivityEvent[];
+  const evs = liquityV2FlowEvents(rows);
+  const now = Date.UTC(2026, 9, 13) / 1000;
+  const t = liquityFlowTimeline(evs, {
+    collSymbol: "rETH",
+    debtSymbol: "BOLD",
+    live: null,
+    surplusClaimed: false,
+    now,
+    priceView: { collateralType: "rETH" },
+  })!;
+  const m = buildFlowModel(t) as FlowModel;
+  const startDay = m.start / DAY_MS;
+  const liqDay = Math.floor(evs.find((e) => e.kind === "liquidation")!.ts / D);
+  assert.equal(closeStop(m), m.lastDay);
+  assert.equal(startDay + m.lastDay, liqDay);
+  const end = axisEndDay(m, Math.floor(now / D));
+  assert.equal(end, liqDay);
+  const stops = combinedStops(m, null, 0);
+  const last = stops[stops.length - 1];
+  // One stop on the close day: the live stop, standing for it.
+  assert.ok(last.live && last.close === m.lastDay && last.event);
+  assert.ok(stops.slice(0, -1).every((x) => x.stop < m.lastDay));
+  assert.equal(stopForDay(stops, m.lastDay), stops.length - 1);
+  assert.equal(eventStep(stops, stops.length - 2, 1), stops.length - 1);
+  // The price line draws no day after the close.
+  const [s] = flowPriceSeries(t);
+  const p = pricePieces(s, startDay, end);
+  assert.equal(Math.max(...p.observed, ...p.carried), liqDay);
+  // An open position's axis runs to today.
+  assert.equal(axisEndDay(model, 30_000), closeStop(model) == null ? 30_000 : model.start / DAY_MS + model.lastDay);
 });

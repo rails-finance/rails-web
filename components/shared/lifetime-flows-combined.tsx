@@ -78,6 +78,8 @@ import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import {
+  axisEndDay,
+  closeStop,
   combinedAt,
   combinedStops,
   eventStep,
@@ -256,6 +258,10 @@ export function CombinedFlows({
   // page's model is rebuilt over more of the life (a Liquity fork's whole
   // history landing after its preload).
   const startDay = model.start / DAY_MS;
+  // A closed position's chart ends at its close: the live stop stands there
+  // (ruling 14, rails-ops reference/lifetime-price-chart.md).
+  const closed = closeStop(model) != null;
+  const closeAbs = startDay + model.lastDay;
   const [restoreDay, setRestoreDay] = useState<number | null>(null);
   const stops = useMemo(
     () => combinedStops(model, series, from, restoreDay == null ? null : restoreDay - model.start / DAY_MS),
@@ -330,7 +336,9 @@ export function CombinedFlows({
       : dayStart(model, committed.stop) + 86_399
     : Number.MAX_SAFE_INTEGER;
   const committedWord =
-    committed && !committed.live ? dayStamp(dayStart(model, committed.stop)) : dayStamp(Date.now() / 1000);
+    committed && !committed.live
+      ? dayStamp(dayStart(model, committed.stop))
+      : dayStamp(closed ? closeAbs * 86_400 : Date.now() / 1000);
   useEffect(() => {
     focus?.store.set({ cursor: { endTs: committedEnd, word: committedWord, live: !!committed?.live } });
   }, [focus?.store, committedEnd, committedWord, committed?.live]);
@@ -347,7 +355,11 @@ export function CombinedFlows({
   });
   // The frozen day, which a card's chart button hides on.
   const frozenDay =
-    frozen && committed ? Math.floor((committed.live ? Date.now() / 1000 : committedEnd) / 86_400) : null;
+    frozen && committed
+      ? committed.live && closed
+        ? closeAbs
+        : Math.floor((committed.live ? Date.now() / 1000 : committedEnd) / 86_400)
+      : null;
   useEffect(() => {
     if (focus && focus.store.get().frozenDay !== frozenDay) focus.store.set({ frozenDay });
   }, [focus, frozenDay]);
@@ -410,8 +422,8 @@ export function CombinedFlows({
   useEffect(() => {
     const to = restoreTo.current == null ? null : restoreTo.current - startDay;
     if (to == null) return;
-    const i = stops.findIndex((x) => !x.live && x.stop === to);
-    if (i < 0) return;
+    const i = stopForDay(stops, to);
+    if (i == null) return;
     restoreTo.current = null;
     setAt(i);
   }, [stops, restore]);
@@ -420,7 +432,6 @@ export function CombinedFlows({
   const { head, bars: barState } = combinedAt(model, bars, cur);
   const assets = useMemo(() => assetsAt(model, cur.stop), [model, cur.stop]);
   const hasDebt = model.buckets.some((b) => b.side === "debt");
-  const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
   const closeDay = dayStamp(dayStart(model, model.lastDay));
   const atClose = head.isLive && closed;
   const dateText = atClose
@@ -466,7 +477,8 @@ export function CombinedFlows({
   // The time axis both strips share: its lead-in holds the widest value label
   // of either view, so a day sits on one x in both.
   const [stripRef, w] = useWidth();
-  const today = series?.today ?? startDay + model.liveStop;
+  // The axis's last day: today, or a closed position's close day.
+  const today = axisEndDay(model, series?.today ?? startDay + model.liveStop);
   const span = axisSpanDays(startDay, today);
   const lineScale = useMemo(() => lineStripScale(model, series, hasDebt), [model, series, hasDebt]);
   const priceScales = useMemo(
@@ -624,7 +636,7 @@ export function CombinedFlows({
                         onPick={setAssetKey}
                         day={cursorDay}
                         gapDays={model.gapDays}
-                        isLive={cur.live}
+                        isLive={cur.live && !closed}
                       />
                       <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
                     </div>
@@ -686,7 +698,7 @@ export function CombinedFlows({
                   follow={follow}
                   applied={!!committed && !committed.live && applied === committedEnd}
                   committedWord={committedWord}
-                  live={!!committed?.live}
+                  live={!!committed?.live && !closed}
                   onApply={apply}
                 />
               </div>
@@ -1948,8 +1960,8 @@ function PipRow({
         const t = tickAt(e.clientX, TICK_REACH.touch);
         if (!t) return setPip(null);
         setPip(openTick(t));
-        const i = stops.findIndex((s) => !s.live && s.stop === t.day);
-        if (i >= 0) onPick(i);
+        const i = stopForDay(stops, t.day);
+        if (i != null) onPick(i);
       }}
     >
       {/* No cursor line here: the dots are pressed, and the line stands on

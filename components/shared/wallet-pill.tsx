@@ -15,6 +15,7 @@ import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { Facehash } from "@/components/shared/facehash";
 import { Icon } from "@/components/icons/icon";
 import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 
@@ -103,79 +104,77 @@ export function WalletPill({
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+  // A name is a convenience layer OVER the address, never a replacement: the
+  // hex stays one tap away here, on the copy button's clipboard payload, and in
+  // the receipt. The name joins it in the tip because the label may be
+  // truncated, and a clipped name with no way to read it in full would be worse
+  // than the hex it replaced.
+  const labelTip = vault
+    ? `${vault.name} — a MetaMorpho vault · ${wallet}`
+    : href && hrefOverride && hrefLabel
+      ? `${hrefLabel} · ${name ?? wallet}`
+      : name
+        ? `${name} · ${wallet}`
+        : undefined;
+  const labelEl = href ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        // A tip around the label stops the click's propagation itself.
+        if (!labelTip) e.stopPropagation();
+        startNavigationProgress(href);
+        router.push(href);
+      }}
+      aria-label={
+        vault ? `Open vault ${label}` : hrefOverride && hrefLabel ? hrefLabel : `Filter positions by wallet ${label}`
+      }
+      // Structural hook for the identity itself, so a check can find the
+      // label and ask whether it resolved without keying on the typeface
+      // — `verify-ens-pills.mjs` selected on `.font-mono` and therefore
+      // stopped counting the named pills the moment names left mono.
+      data-wallet-label={vault ? "vault" : name ? "name" : "address"}
+      // The vault's own href, restated as data so a check can read where
+      // this pill points without navigating — the click itself (via
+      // router.push above) is what a viewer actually triggers.
+      data-vault-href={vault ? vault.href : undefined}
+      className={`${labelClass} hover:text-blue-500 transition-colors cursor-pointer`}
+    >
+      {label}
+    </button>
+  ) : (
+    <span className={labelClass} data-wallet-label={name ? "name" : "address"}>
+      {label}
+    </span>
+  );
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap" data-anatomy="C7">
       <Facehash address={wallet} size={16} />
       <span className="inline-flex items-center gap-1 text-xs text-rb-500">
-        {href ? (
+        {labelTip ? (
+          <RevealTip tip={labelTip} wrap>
+            {labelEl}
+          </RevealTip>
+        ) : (
+          labelEl
+        )}
+        <RevealTip tip={copied ? "Copied!" : "Copy"}>
           <button
             type="button"
             onClick={(e) => {
+              // Stop the parent link/click handler from firing when the copy
+              // button is the actual target — this lets the pill live inside a
+              // listing-card <Link> without navigating on every copy. The RevealTip
+              // around it stops the click's propagation.
               e.preventDefault();
-              e.stopPropagation();
-              startNavigationProgress(href);
-              router.push(href);
+              copy();
             }}
-            aria-label={
-              vault
-                ? `Open vault ${label}`
-                : hrefOverride && hrefLabel
-                  ? hrefLabel
-                  : `Filter positions by wallet ${label}`
-            }
-            // A name is a convenience layer OVER the address, never a
-            // replacement: the hex stays one hover away here, on the copy
-            // button's clipboard payload, and in the receipt. The name joins it
-            // in the tooltip because the label above may be truncated, and a
-            // clipped name with no way to read it in full would be worse than
-            // the hex it replaced.
-            title={
-              vault
-                ? `${vault.name} — a MetaMorpho vault · ${wallet}`
-                : hrefOverride && hrefLabel
-                  ? `${hrefLabel} · ${name ?? wallet}`
-                  : name
-                    ? `${name} · ${wallet}`
-                    : undefined
-            }
-            // Structural hook for the identity itself, so a check can find the
-            // label and ask whether it resolved without keying on the typeface
-            // — `verify-ens-pills.mjs` selected on `.font-mono` and therefore
-            // stopped counting the named pills the moment names left mono.
-            data-wallet-label={vault ? "vault" : name ? "name" : "address"}
-            // The vault's own href, restated as data so a check can read where
-            // this pill points without navigating — the click itself (via
-            // router.push above) is what a viewer actually triggers.
-            data-vault-href={vault ? vault.href : undefined}
-            className={`${labelClass} hover:text-blue-500 transition-colors cursor-pointer`}
+            aria-label={copied ? "Copied address" : "Copy address"}
+            className="text-rb-500 hover:text-foreground cursor-pointer"
           >
-            {label}
+            <Icon name={copied ? "check" : "copy"} size={12} />
           </button>
-        ) : (
-          <span
-            className={labelClass}
-            data-wallet-label={name ? "name" : "address"}
-            title={name ? `${name} · ${wallet}` : undefined}
-          >
-            {label}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={(e) => {
-            // Stop the parent link/click handler from firing when the copy
-            // button is the actual target — this lets the pill live inside a
-            // listing-card <Link> without navigating on every copy.
-            e.preventDefault();
-            e.stopPropagation();
-            copy();
-          }}
-          aria-label={copied ? "Copied address" : "Copy address"}
-          title={copied ? "Copied!" : "Copy"}
-          className="text-rb-500 hover:text-foreground cursor-pointer"
-        >
-          <Icon name={copied ? "check" : "copy"} size={12} />
-        </button>
+        </RevealTip>
         {bookmarkProtocol && (
           <BookmarkToggle
             wallet={wallet}

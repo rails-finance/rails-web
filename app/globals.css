@@ -51,6 +51,12 @@
    them; new ports use rb-* and the semantic tokens below.
 */
 :root {
+  /* Stacking scale for the layers above the page. A modal opened from a popover
+     must sit over it, so each tier is one above what it covers. */
+  --z-modal: 9999;
+  --z-popover: 10000;
+  --z-modal-over-popover: 10001;
+  --z-progress: 10002;
   /* ── Paper tone knobs (LIGHT MODE ONLY) ────────────────────────────────────
      The warm-paper palette is ONE hue family at varying lightness: measuring
      the hand-tuned 2026-07 set (`96b6092`) in OKLCH put every token at H≈88,
@@ -1925,7 +1931,7 @@ label[for] {
   position: fixed;
   /* Over the bottom sheets (mobile-sheet.tsx, z 9999), so a receipt opened
      from inside a sheet lands on top of it. */
-  z-index: 10000;
+  z-index: var(--z-popover);
   width: 400px;
   max-width: calc(100vw - 16px);
   max-height: min(440px, calc(100vh - 16px));

@@ -14,9 +14,8 @@ const intro = (
     <p>
       Aave V3&rsquo;s Base deployment: one Pool, every reserve, one health factor per wallet — a separate market from
       the Ethereum one of the same name, with its own reserves, its own risk parameters and its own oracle. Each row of
-      the listing is one wallet&apos;s account: what it holds, what it owes, and how far it sits from liquidation —
-      every figure read from the Pool itself at the block the row names, and dollar values from the oracle the Pool
-      liquidates with. Or{" "}
+      the listing is one wallet&apos;s account: the collateral it holds and the debt it owes — every figure read from
+      the Pool itself at the block the row names, and dollar values from the oracle the Pool liquidates with. Or{" "}
       <Link href="/base/aave-v3/market" className="text-blue-500 hover:underline">
         see the reserves and the risk parameters the Pool enforces
       </Link>

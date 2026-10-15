@@ -248,7 +248,7 @@ function NavigationProgressBar() {
       // bookmarks modal (z-[9999]): the acknowledgement of a click must never
       // be the thing that is covered. It is 2px and pointer-events-none, so
       // sitting on top costs nothing.
-      className="pointer-events-none fixed inset-x-0 top-0 z-[10000] h-0.5 origin-left"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[var(--z-progress)] h-0.5 origin-left"
       style={{
         background: "var(--text-link)",
         transform: "scaleX(0)",

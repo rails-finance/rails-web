@@ -30,6 +30,7 @@ import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { formatDate } from "@/lib/date";
 import { Prov, type Provenance } from "@/components/shared/provenance";
+import { RevealTip } from "@/components/shared/reveal-tip";
 
 /** A dropdown row. `price` absent means the protocol states none for this
  *  asset: the row names what is held and `reason` says why no figure follows
@@ -142,69 +143,70 @@ export function LatestPrices({
 
   return (
     <div ref={ref} className="relative" data-latest-prices data-anatomy="H7.2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={
-          assets.length === 0
-            ? "Prices for this position"
-            : `${anyPriced ? (at ? "Prices at closing for" : "Prices for") : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}. ${tip}`
-        }
-        title={tip}
-        className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-7 gap-1 rounded-md px-1.5 text-xs sm:gap-1.5 sm:px-2`}
-      >
-        {first ? (
-          <>
-            {!bare && <span className="text-[11px] text-rb-500 sm:text-xs">{anyPriced ? "Prices" : "Assets"}</span>}
-            <TokenChipIcon symbol={first.symbol} address={first.address} size={14} filterable={false} />
-            {first.triggerLabel && <span className="font-medium text-foreground">{first.triggerLabel}</span>}
-            {/* The figure shows at every width (ui-jobs 59). It used to be
+      <RevealTip tip={tip} wrap>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label={
+            assets.length === 0
+              ? "Prices for this position"
+              : `${anyPriced ? (at ? "Prices at closing for" : "Prices for") : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}. ${tip}`
+          }
+          className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-7 gap-1 rounded-md px-1.5 text-xs sm:gap-1.5 sm:px-2`}
+        >
+          {first ? (
+            <>
+              {!bare && <span className="text-[11px] text-rb-500 sm:text-xs">{anyPriced ? "Prices" : "Assets"}</span>}
+              <TokenChipIcon symbol={first.symbol} address={first.address} size={14} filterable={false} />
+              {first.triggerLabel && <span className="font-medium text-foreground">{first.triggerLabel}</span>}
+              {/* The figure shows at every width (ui-jobs 59). It used to be
                 withheld below sm because the row carried back, the block
                 number, prices and Tools across 390px; the recency stamp beside
                 this one now shows the age alone, and the nine characters the
                 block number gave up are what this figure fits in. An asset on
                 show with no price next to it was the odd half of the row. */}
-            {/* An unpriced first asset puts its symbol where the figure would
+              {/* An unpriced first asset puts its symbol where the figure would
                 be, so the trigger still names what the position holds. */}
-            {priced(first) && first.info ? (
-              <Prov info={first.info} value={String(first.price)} symbol={first.symbol}>
-                <span className="tabular-nums font-bold text-green-400">
-                  {first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number)}
+              {priced(first) && first.info ? (
+                <Prov info={first.info} value={String(first.price)} symbol={first.symbol}>
+                  <span className="tabular-nums font-bold text-green-400">
+                    {first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number)}
+                  </span>
+                </Prov>
+              ) : (
+                <span
+                  className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
+                >
+                  {priced(first)
+                    ? first.unit
+                      ? fmtNative(first.price as number, first.unit)
+                      : fmtPrice(first.price as number)
+                    : first.symbol}
                 </span>
-              </Prov>
-            ) : (
-              <span
-                className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
-              >
-                {priced(first)
-                  ? first.unit
-                    ? fmtNative(first.price as number, first.unit)
-                    : fmtPrice(first.price as number)
-                  : first.symbol}
-              </span>
-            )}
-            {/* The count is chrome naming how many more rows the dropdown
+              )}
+              {/* The count is chrome naming how many more rows the dropdown
                 holds, not a value of its own — exempt rather than traced. */}
-            {more > 0 && (
-              <span className="tabular-nums text-rb-500" data-prov-exempt>
-                +{more}
-                {first.moreInWords ? ` more ${anyPriced ? "price" : "asset"}${more === 1 ? "" : "s"}` : ""}
-              </span>
-            )}
-          </>
-        ) : (
-          <>
-            <Coins className="h-3.5 w-3.5" aria-hidden />
-            <span className="hidden sm:inline">Prices</span>
-          </>
-        )}
-        <ChevronDown
-          className={`h-3.5 w-3.5 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
-          aria-hidden="true"
-        />
-      </button>
+              {more > 0 && (
+                <span className="tabular-nums text-rb-500" data-prov-exempt>
+                  +{more}
+                  {first.moreInWords ? ` more ${anyPriced ? "price" : "asset"}${more === 1 ? "" : "s"}` : ""}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <Coins className="h-3.5 w-3.5" aria-hidden />
+              <span className="hidden sm:inline">Prices</span>
+            </>
+          )}
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+      </RevealTip>
 
       {/* A list alone sizes to its longest price. A reason is prose and needs a
           measure to read at, so the panel widens for one and caps at the
