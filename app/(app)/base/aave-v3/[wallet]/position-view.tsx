@@ -433,7 +433,7 @@ export default function AaveV3BasePositionView({
     folderParams: { wallet },
     storageKey: `aave-v3-base-${wallet}`,
     protocolKey: "aave-v3",
-    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: false,
   });
 

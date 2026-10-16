@@ -110,7 +110,7 @@ export function useTroveFlows({
           }),
     [flowEvents, collSymbol, debtSymbol, surplusClaimed, now, open, price, liveState, daily.settled, daily.obs],
   );
-  // The panel and the timeline are tied by the day: "Show timeline to {date}",
+  // The panel and the timeline are tied by the day: "Sync to chart",
   // each day's mark, and each card's sum as of its event, read from the same
   // replay.
   const focusEvents = useMemo(

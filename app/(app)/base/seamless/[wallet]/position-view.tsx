@@ -435,7 +435,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     folderParams: { wallet },
     storageKey: `seamless-${wallet}`,
     protocolKey: "aave-v3",
-    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: false,
   });
 

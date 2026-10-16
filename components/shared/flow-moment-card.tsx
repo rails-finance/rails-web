@@ -114,7 +114,7 @@ export function FlowMomentCard({
   /** Today's UTC day. */
   today: number;
   /** The header rings for a moment after the chip's text brings it into view
-   *  or it first comes into view after "Show timeline to {date}". */
+   *  or it first comes into view after "Sync to chart". */
   flash: boolean;
 }) {
   const date = dayStamp(moment.day * DAY_S);

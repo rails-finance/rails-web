@@ -663,7 +663,7 @@ function EventCardView(props: EventCardProps) {
   // generates only the class names it finds in the source.
   const t1 = (
     // The ring: the header of a day's last event flashes after the Lifetime
-    // flows chart's "Show timeline to {date}" or the timeline chip brings it
+    // flows cursor through "Sync to chart" or the timeline chip brings it
     // into view (flow-day-mark.tsx).
     <div
       data-anatomy="T1"

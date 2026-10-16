@@ -178,12 +178,14 @@
 //
 // ── THE REWIND RUN (ui-jobs 305) ───────────────────────────────────────────
 //   On the Liquity V2 control Trove, the cut the Lifetime flows chart puts on
-//   the timeline, in both modes of "Timeline follows the chart"
-//   (`[data-flow-follow]`, the toggle beside the timeline's Display, stored as `followChart` in timeline-display-v3):
-//   R1 off: the arrow keys move the chart and cut nothing; "Show timeline to
-//      {date}" cuts at the cursor's day, writes `?to=`, and the cut stands
-//      while the cursor moves on.
-//   R2 on: no button is drawn; each step of the cursor cuts the list there,
+//   the timeline through the toolbar's sync button beside Display
+//   (`[data-flow-sync]`; locked, `[data-flow-follow="on"]`, stored as
+//   `followChart` in timeline-display-v3):
+//   R1 off: the arrow keys move the chart and cut nothing; a press ("Sync to
+//      chart") cuts at the cursor's day, writes `?to=`, and the cut stands
+//      while the cursor moves on; a second press while in sync locks it
+//      ("Follows chart"), and a press then unlocks it, the cut kept.
+//   R2 on: the button reads locked; each step of the cursor cuts the list there,
 //      the chip names the cursor's day, the newest drawn day is on or before
 //      it, the page does not scroll, and `?to=` stays out of the address bar
 //      while the cursor is free. A freeze (Enter) writes `?to=` for its day;
@@ -1603,9 +1605,9 @@ const rewindRead = (page) =>
       date: document.querySelector("[data-flow-date]")?.textContent?.trim() ?? null,
       cards: document.querySelectorAll("[data-event-id]").length,
       newest: days.length ? Math.max(...days) : null,
-      // The cursor's date is the show-timeline button while the timeline is
-      // not following; the follow toggle stands beside the timeline's Display.
-      apply: document.querySelector("button[data-flow-apply]") != null,
+      // The sync button beside the timeline's Display: "off", "synced" (the
+      // cut stands at the cursor) or "follow" (locked to the cursor).
+      sync: document.querySelector("[data-flow-sync]")?.getAttribute("data-flow-sync") ?? null,
       follow: document.querySelector("[data-flow-follow]")?.getAttribute("data-flow-follow") ?? null,
       y: Math.round(window.scrollY),
     };
@@ -1657,27 +1659,47 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
       const moved = await step("ArrowLeft");
       check(
         "R1 off: a step moves the chart and cuts nothing",
-        moved.chip == null && moved.cards === whole.cards && moved.date !== whole.date && moved.apply,
+        moved.chip == null && moved.cards === whole.cards && moved.date !== whole.date && moved.sync === "off",
         JSON.stringify(moved),
       );
-      await page.locator("[data-flow-apply]").first().click();
+      const sync = page.locator("[data-flow-sync]").first();
+      await sync.click();
       await page.waitForTimeout(500);
       const cut = await rewindRead(page);
       check(
-        "R1 off: the button cuts at the cursor's day and writes ?to=",
+        "R1 off: Sync to chart cuts at the cursor's day, writes ?to= and reads synced",
         cut.chip === moved.date &&
           cut.to != null &&
+          cut.sync === "synced" &&
           dayOfWord(cut.chip) === Date.parse(`${cut.to}T00:00:00Z`) / 86_400_000,
         JSON.stringify(cut),
       );
       const after = await step("ArrowLeft");
       check(
-        "R1 off: the cut stands while the cursor moves on",
-        after.chip === cut.chip && after.to === cut.to && after.date !== cut.date,
+        "R1 off: the cut stands while the cursor moves on, the button back to off",
+        after.chip === cut.chip && after.to === cut.to && after.date !== cut.date && after.sync === "off",
         JSON.stringify(after),
       );
+      await sync.click();
+      await page.waitForTimeout(500);
+      await sync.click();
+      await page.waitForTimeout(500);
+      const locked = await rewindRead(page);
+      check(
+        "R1 off: a second press while in sync locks the timeline to the cursor",
+        locked.follow === "on" && locked.sync === "follow" && locked.chip === after.date,
+        JSON.stringify(locked),
+      );
+      await sync.click();
+      await page.waitForTimeout(500);
+      const unlocked = await rewindRead(page);
+      check(
+        "R1 off: a press then unlocks it and keeps the cut",
+        unlocked.follow === "off" && unlocked.chip === locked.chip,
+        JSON.stringify(unlocked),
+      );
     } else {
-      check("R2 on: no show-timeline button is drawn", !whole.apply, JSON.stringify(whole));
+      check("R2 on: the sync button reads locked", whole.sync === "follow", JSON.stringify(whole));
       const seen = [];
       for (const key of ["ArrowLeft", "ArrowLeft", "ArrowLeft", "ArrowRight"]) {
         const r = await step(key);

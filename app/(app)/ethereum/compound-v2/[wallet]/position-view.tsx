@@ -276,7 +276,7 @@ export default function CompoundV2PositionView({
     folderParams: { wallet },
     storageKey: `compound-v2-${wallet}`,
     protocolKey: "compound-v2",
-    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: false,
   });
 

@@ -79,9 +79,9 @@ import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows, timelineCut } from "@/lib/shared/flow-focus";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
-import { Link2, List, X } from "lucide-react";
+import { Link2, List, Lock, X } from "lucide-react";
 import { BlockTransactionsContext, blockTransactionsOf } from "@/components/shared/chain-truth-event";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER } from "@/lib/shared/ui-grammar";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -752,7 +752,7 @@ function ChainTruthTimelineBody({
   }, []);
   const activeRuns = runs;
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
-  // "Show timeline to {date}" is pressed, the list holds every event up to that
+  // "Sync to chart" is pressed, the list holds every event up to that
   // day's close. What goes is the list's top, so the rows keep their order
   // and move up by what was cut. With "Timeline follows the chart" on, the cut
   // is the chart's cursor wherever it goes (`timelineCut`, ui-jobs 305).
@@ -1184,7 +1184,7 @@ function ChainTruthTimelineBody({
     setWindowSize(WINDOW_CHUNK);
   }, [events]);
 
-  // The cut's other half. "Show timeline to {date}" (and the chip's text) brings
+  // The cut's other half. "Sync to chart" (and the chip's text) brings
   // the list's top event (the cut day's last, or the last before it) into
   // view and flashes its header; the card stays open or closed as the
   // visitor left it. Where the page holds another month (a served,
@@ -1211,19 +1211,35 @@ function ChainTruthTimelineBody({
     if (st.follow) focusStore.set({ follow: false });
     if (st.rewind) focusStore.set({ rewind: null });
   }, [focusStore]);
-  // "Follow the chart" stands beside Display where the page's Lifetime flows
-  // chart is drawn, its cursor the one the timeline would follow.
+  // "Sync to chart" stands beside Display where the page's Lifetime flows
+  // chart is drawn, its cursor the one the timeline syncs to. A press cuts the
+  // timeline at the cursor; a second press while that cut stands locks it to
+  // the cursor ("Follows chart"); a press then unlocks, the cut kept.
   const chartDrawn = useFlowFocusState((st) => st.cursor != null);
+  const inSync = useFlowFocusState(
+    (st) => st.cursor != null && (st.cursor.live ? st.rewind == null : st.rewind?.endTs === st.cursor.endTs),
+  );
+  const [justSynced, setJustSynced] = useState(false);
+  useEffect(() => {
+    if (!inSync) setJustSynced(false);
+  }, [inSync]);
+  const synced = justSynced && inSync;
   const followToggle =
     focusStore && chartDrawn && !tl.datesAxis ? (
-      <FollowChartToggle
-        on={following}
-        onToggle={() => {
+      <SyncChartButton
+        state={following ? "follow" : synced ? "synced" : "off"}
+        onPress={() => {
           const st = focusStore.get();
-          // Turning following off keeps the cut where the cursor stands,
-          // however it got there.
-          if (st.follow) focusStore.set({ follow: false, rewind: timelineCut(st) });
-          else focusStore.set({ follow: true });
+          // Unlocking keeps the cut where the cursor stands, however it got
+          // there.
+          if (st.follow) {
+            focusStore.set({ follow: false, rewind: timelineCut(st) });
+            setJustSynced(true);
+          } else if (synced) focusStore.set({ follow: true });
+          else if (st.cursor) {
+            focusStore.set({ rewind: st.cursor.live ? null : { endTs: st.cursor.endTs, word: st.cursor.word } });
+            setJustSynced(true);
+          }
         }}
       />
     ) : null;
@@ -1271,7 +1287,7 @@ function ChainTruthTimelineBody({
    *  month is still loading scrolls once its rows land. */
   const pendingGo = useRef(0);
   /** The cut last seen, and whether its top card flashes once it first comes
-   *  into view: "Show timeline to {date}" cuts and leaves the page where it is (Miles, 1 Oct
+   *  into view: "Sync to chart" cuts and leaves the page where it is (Miles, 1 Oct
    *  2026), so the flash waits for the visitor to scroll to the card. */
   const lastRewindKey = useRef<string | null>(null);
   const watchTop = useRef(false);
@@ -1283,7 +1299,7 @@ function ChainTruthTimelineBody({
     folderId: string | null;
     runId: string | null;
     /** "scroll": into view, flashing (the chip's text); "watch": flash once
-     *  it comes into view ("Show timeline to {date}"); "none": open it only. */
+     *  it comes into view ("Sync to chart"); "none": open it only. */
     mode: "scroll" | "watch" | "none";
   } | null>(null);
   const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
@@ -1420,7 +1436,7 @@ function ChainTruthTimelineBody({
           }),
         60,
       );
-    /** "Show timeline to {date}": the header flashes once the card is half in view. */
+    /** "Sync to chart": the header flashes once the card is half in view. */
     const watch = (el: HTMLElement, id: string) => {
       const seen = new IntersectionObserver(
         (entries) => {
@@ -2059,7 +2075,6 @@ function ChainTruthTimelineBody({
           <>
             <div className="relative flex flex-col gap-2">
               <SpineLine />
-              <SpineKeyRow config={spineKey ?? DEFAULT_SPINE_KEY} />
               {/* The top is the NEWEST end, so the only omission that can stand
                 here is the TIP's — drawn when the newest events the page holds
                 are filtered out, so the row below is not the newest and the
@@ -2329,27 +2344,44 @@ function ChainTruthTimelineBody({
   );
 }
 
-/** "Follow the chart" beside Display (ui-jobs 305): the timeline cut at the
- *  Lifetime flows cursor wherever it goes, kept with Display's preferences
- *  (`followChart`). Teal and pressed while on; icon-only under 640px. */
-function FollowChartToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+/** "Sync to chart" beside Display (ui-jobs 305): a press cuts the timeline
+ *  at the Lifetime flows cursor; a second press locks it to the cursor as it
+ *  moves ("Follows chart", the chain with a padlock, kept with Display's
+ *  preferences as `followChart`); a press then unlocks it. Teal while locked,
+ *  the engaged fill while synced; icon-only under 640px. */
+function SyncChartButton({ state, onPress }: { state: "off" | "synced" | "follow"; onPress: () => void }) {
+  const on = state === "follow";
   return (
     <button
       type="button"
       aria-pressed={on}
-      aria-label="Follow the chart"
+      aria-label={on ? "Follows chart" : "Sync to chart"}
       title={
         on
-          ? "The timeline is cut at the chart's cursor as it moves"
-          : "Cut the timeline at the chart's cursor as it moves"
+          ? "The timeline follows the chart's cursor; press to stop"
+          : state === "synced"
+            ? "The timeline is cut at the chart's cursor; press again to follow it as it moves"
+            : "Cut the timeline at the chart's cursor"
       }
-      onClick={onToggle}
-      className={`${CTRL_GHOST} ${on ? CTRL_ON_ACCENT : CTRL_OFF} h-7 gap-2 rounded-md px-1.5 text-xs sm:px-2.5`}
+      onClick={onPress}
+      className={`${CTRL_GHOST} ${on ? CTRL_ON_ACCENT : state === "synced" ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF} h-7 gap-2 rounded-md px-1.5 text-xs sm:px-2.5`}
       data-flow-follow={on ? "on" : "off"}
+      data-flow-sync={state}
       data-anatomy="L1.10"
     >
-      <Link2 size={16} aria-hidden />
-      <span className="hidden sm:inline">Follow the chart</span>
+      <span className="relative inline-flex">
+        <Link2 size={16} aria-hidden />
+        {on && (
+          <Lock
+            size={8}
+            strokeWidth={3}
+            aria-hidden
+            className="absolute -bottom-0.5 -right-1 rounded-sm bg-background"
+            data-flow-sync-lock=""
+          />
+        )}
+      </span>
+      <span className="hidden sm:inline">{on ? "Follows chart" : "Sync to chart"}</span>
     </button>
   );
 }

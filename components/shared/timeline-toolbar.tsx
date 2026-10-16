@@ -363,7 +363,7 @@ export interface TimelineToolbarProps {
   displayItems: TimelineDisplayItem[];
   /** Optional left-side eyebrow (e.g. "replayed from chain"). */
   leading?: React.ReactNode;
-  /** A control beside Display, before it (the "Follow the chart" toggle). */
+  /** A control beside Display, before it (the "Sync to chart" button). */
   beforeDisplay?: React.ReactNode;
   /** A title on the count line, for a family whose count is a true but
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
@@ -962,7 +962,7 @@ export function TimelineToolbar({
             />
           )}
           {/* No Dates on a page tied to its Lifetime flows chart
-              (`tl.datesAxis`): the chart's scrubber and "Show timeline to {date}"
+              (`tl.datesAxis`): the chart's scrubber and "Sync to chart"
               navigate it by the day. */}
           {!still && tl.datesAxis && (
             <button

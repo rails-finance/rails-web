@@ -209,7 +209,7 @@ export default function PolarisPositionView({
   const tl = useTimelineEvents(polarisEvents, {
     storageKey: `polaris-${market}-${cdpId}`,
     protocolKey: "polaris",
-    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: false,
   });
 

@@ -731,7 +731,7 @@ async function runPage(f, got) {
     // H3 retired (ui-jobs 309 step 11): "the heatmap counts every event". A
     // page tied to its Lifetime flows chart draws no date-range control since
     // 1 Oct 2026 (`dates: false` in moonwell-base-view.tsx; the chart's
-    // scrubber and "Show timeline to {date}" navigate it), so no heatmap is
+    // scrubber and "Sync to chart" navigate it), so no heatmap is
     // drawn to count.
 
     // H4 — the export menu's scope note.

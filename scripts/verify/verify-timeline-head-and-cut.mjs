@@ -7,7 +7,7 @@
 //        and the timeline's agree on what they count: a liquidation's own
 //        transaction is not one of the owner's, and the count's tip names the
 //        rows beyond the transactions.
-//   232  A "Show timeline to" cut that empties the loaded list says what it
+//   232  A "Sync to chart" cut that empties the loaded list says what it
 //        hides and how to reach it, never that the wallet has no activity; and
 //        the wallet row names what the address is, from its code.
 //   170  LlamaLend's controller read says whether `approval(address,address)`

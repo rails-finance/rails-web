@@ -299,7 +299,7 @@ export default function MaplePositionView({
     folderParams: { wallet },
     storageKey: `maple-${wallet}`,
     protocolKey: "maple",
-    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: false,
   });
 

@@ -44,8 +44,8 @@ export function moveChartToDay(
 }
 
 /** The mark in the card header's time slot: the chart button, then the
- *  date. `ts` is the event's moment; `flash` is set briefly after "Show timeline to
- *  {date}" or the timeline chip brings the card into view, and the card
+ *  date. `ts` is the event's moment; `flash` is set briefly after "Sync to
+ *  chart" or the timeline chip brings the card into view, and the card
  *  header rings while it is (event-card.tsx). */
 export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean }) {
   const focus = useFlowFocus();

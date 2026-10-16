@@ -1,6 +1,6 @@
 // The Lifetime flows panel and the timeline under it, tied together by the day
 // (rails-ops TO-DO-ui-jobs 141, reference/lifetime-flows-scrubber.md, "The day
-// links the chart and the timeline"): the chart's "Show timeline to {date}" cuts the
+// links the chart and the timeline"): "Sync to chart" cuts the
 // timeline at its cursor's day close, and a day mark's button on the timeline
 // freezes the chart's cursor there. Freezing the chart cuts nothing. An event
 // card states the side's lifetime sum as of that event, from the same day rows
@@ -549,7 +549,7 @@ export interface FlowFocusState {
    *  and freezes there. The timeline is untouched. `free`: the cursor goes
    *  there unfrozen (the chip's × while the timeline follows the chart). */
   move: { ts: number; n: number; free?: boolean } | null;
-  /** The cut applied to the timeline by the chart's "Show timeline to {date}": the
+  /** The cut applied to the timeline by "Sync to chart": the
    *  list holds every event up to `endTs` (that day's close), named `word`
    *  ("2 Sep '26"). Null where nothing is cut. Freezing or moving the chart
    *  leaves it where it is; the chip's × clears it. The address bar carries
@@ -561,7 +561,7 @@ export interface FlowFocusState {
    *  cursor is frozen on, so the address bar carries a frozen cut only. */
   follow: boolean;
   /** Bumped to bring the cut's top card into view and flash its header (the
-   *  chip's text). "Show timeline to {date}" cuts without it: the page stays where it is. */
+   *  chip's text). "Sync to chart" cuts without it: the page stays where it is. */
   go: number;
   /** A cut restored from the address bar: the chart's cursor goes to its
    *  day (`endTs`, that day's close) and freezes there. */
@@ -603,7 +603,7 @@ export function createFlowFocusStore(): FlowFocusStore {
 /** The cut the timeline reads. With "Timeline follows the chart" on it is the
  *  chart's cursor (none at today), and the stored cut while the panel is not
  *  mounted or a cut from the address bar is still putting the cursor on its
- *  day; off, the cut "Show timeline to {date}" stored. */
+ *  day; off, the cut "Sync to chart" stored. */
 export function timelineCut(
   s: Pick<FlowFocusState, "cursor" | "rewind" | "follow" | "restore">,
 ): { endTs: number; word: string } | null {

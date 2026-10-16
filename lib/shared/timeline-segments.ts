@@ -114,7 +114,7 @@ export function planSegmentAsk(
   monthIdx: number,
   lifeDays: ReadonlyMap<number, number>,
   cap: number | null,
-  /** A cut inside the month ("Show timeline to {date}"): the week or day is
+  /** A cut inside the month ("Sync to chart"): the week or day is
    *  the newest on or before it, so the ask holds the cut's top. */
   until: number | null = null,
 ): { from: number; to: number } {

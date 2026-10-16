@@ -339,7 +339,7 @@ export default function FxPositionView({
     storageKey: `fx-${slug}`,
     protocolKey: "fx",
     window: historyWindow,
-    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: false,
   });
 
