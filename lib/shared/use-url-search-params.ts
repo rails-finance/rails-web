@@ -16,7 +16,7 @@
 // filter toggle. pushState doesn't emit `popstate`, so a caller MUST invoke
 // notifyUrlChanged() after it for subscribers to re-read the URL.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const URL_CHANGE_EVENT = "rails:url-change";
 
@@ -55,7 +55,17 @@ export function useUrlSearchParams(initialSearch: string): URLSearchParams {
       window.removeEventListener(URL_CHANGE_EVENT, sync);
     };
   }, []);
+  // Re-adopt only on a CHANGE after mount, never on the mount itself. On the
+  // way back from a position page the listing remounts from the router's cached
+  // render of the URL it was first opened at, so `initialSearch` is that first
+  // URL while window.location carries every facet, search and page pushed
+  // since; running this on mount after `sync()` put the first URL back and the
+  // listing came back to page 1, unfiltered, under a URL that said otherwise
+  // (Miles, 16 Oct 2026; ui-jobs 357).
+  const adopted = useRef(initialSearch);
   useEffect(() => {
+    if (adopted.current === initialSearch) return;
+    adopted.current = initialSearch;
     setSearch(initialSearch);
   }, [initialSearch]);
   return useMemo(() => new URLSearchParams(search), [search]);
