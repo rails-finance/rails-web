@@ -6,7 +6,8 @@
  * all. Sits between the filter controls and the first listing row. Editing a
  * value happens up top in <FilterSections>; a chip here only displays and
  * removes, so it renders nothing when no filters are active (keeping the
- * wallet-view resting state quiet).
+ * wallet-view resting state quiet). Given a `count`, the row also ends in the
+ * listing's result count at the far right, and is drawn even with no chip.
  */
 
 import { X } from "lucide-react";
@@ -22,9 +23,11 @@ interface FilterChipsProps<F> {
   dimensions: FilterDimension<F>[];
   filters: F;
   onChange: (next: F) => void;
+  /** The listing's result count, drawn at the far right of the row. */
+  count?: { total: number; noun: string };
 }
 
-export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsProps<F>) {
+export function FilterChips<F>({ dimensions, filters, onChange, count }: FilterChipsProps<F>) {
   const activeDims = dimensions.filter((d) => isDimensionActive(d, filters));
   // A dimension resting on a default that constrains the list names it in a
   // fixed chip (FilterDimension.defaultChip).
@@ -32,7 +35,7 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
     .filter((d) => !isDimensionActive(d, filters))
     .map((d) => ({ id: d.id, text: d.defaultChip?.(filters) ?? null, clear: d.clearDefault }))
     .filter((c): c is { id: string; text: string; clear: ((f: F) => F) | undefined } => c.text != null);
-  if (activeDims.length === 0 && defaultChips.length === 0) return null;
+  if (activeDims.length === 0 && defaultChips.length === 0 && !count) return null;
 
   const chipText = (dim: FilterDimension<F>) => {
     const vals = dim.get(filters);
@@ -92,6 +95,11 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
         <button type="button" onClick={resetAll} className={`${RESET_LINK} ml-0.5`}>
           Reset
         </button>
+      )}
+      {count && (
+        <span className="ml-auto text-xs text-rb-500 tabular-nums" data-anatomy="N1.6" data-result-count={count.total}>
+          {count.total.toLocaleString("en-US")} {count.total === 1 ? count.noun.replace(/s$/, "") : count.noun}
+        </span>
       )}
     </div>
   );

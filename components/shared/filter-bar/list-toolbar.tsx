@@ -30,6 +30,8 @@ export interface ListToolbarProps<F extends BaseListFilters> {
    *  bookmarked wallets); picking one runs `onPick` with the lowercase address.
    *  Omit to keep a plain search box. */
   bookmarks?: { protocol: BookmarkScope; onPick: (wallet: string) => void };
+  /** Result count, drawn at the far right of the chip row. */
+  count?: { total: number; noun: string };
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -39,6 +41,7 @@ export function ListToolbar<F extends BaseListFilters>({
   sortOptions,
   searchPlaceholder = "Search wallet or id",
   bookmarks,
+  count,
 }: ListToolbarProps<F>) {
   const searchRef = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
@@ -94,7 +97,7 @@ export function ListToolbar<F extends BaseListFilters>({
           onChange={(sortBy, sortOrder) => onChange({ ...filters, sortBy, sortOrder })}
         />
       </div>
-      <FilterChips dimensions={dimensions} filters={filters} onChange={onChange} />
+      <FilterChips dimensions={dimensions} filters={filters} onChange={onChange} count={count} />
     </div>
   );
 }

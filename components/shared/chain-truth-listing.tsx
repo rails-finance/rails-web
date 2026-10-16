@@ -207,6 +207,15 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
     prevViewKeyRef.current = viewKey;
   }, [viewKey]);
 
+  // The result count for the chip row: the server total, or the rows the
+  // in-memory tier holds after filtering. The last settled number stays while
+  // a fetch is in flight, so the count does not flash.
+  const liveCount = pagination ? pagination.totalCount : items.length;
+  const settledCountRef = useRef<number | null>(null);
+  if (!loading && !refreshing && !error) settledCountRef.current = liveCount;
+  const countTotal = error ? null : settledCountRef.current;
+  const count = countTotal == null ? undefined : { total: countTotal, noun: pagination?.countNoun ?? noun };
+
   return (
     <div className="py-8">
       {/* The rail header carries the whole visible heading duty: identity +
@@ -250,6 +259,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           sortOptions={filter.sortOptions}
           searchPlaceholder={filter.searchPlaceholder}
           bookmarks={filter.bookmarks}
+          count={count}
         />
       ) : (
         toolbar
