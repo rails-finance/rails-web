@@ -2075,9 +2075,10 @@ function PipRow({
           className="mt-2 h-11 sm:h-9"
           data-flow-cursor-date={date.follow ? "following" : date.byDays ? "cut" : "plain"}
         />
+        {/* Over the pips, under the asset list that opens down over it. */}
         {w > 0 && (
           <div
-            className="pointer-events-none absolute inset-y-0 z-[var(--z-dropdown)]"
+            className="pointer-events-none absolute inset-y-0 z-10"
             style={{ left, width: PAIR_W }}
             data-flow-cursor-frame=""
           >

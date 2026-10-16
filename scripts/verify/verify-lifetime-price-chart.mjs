@@ -105,7 +105,7 @@ async function checkHealth(page, tag, pg, listedAll) {
   const heading = await page.$eval("[data-price-heading]", headingText).catch(() => "");
   check(
     `${tag}: the chart opens on the health factor, its line at 1`,
-    heading.includes(`${HEALTH}`) && /Liquidates below\s*1\b/.test(heading),
+    heading.includes(`${HEALTH}`) && /Liquidates below(, explain)?\s*1\b/.test(heading),
     heading,
   );
   const u = new URL(`${BASE}${pg.path}`);

@@ -1629,6 +1629,8 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
       const k = "timeline-display-v3";
       const cur = JSON.parse(localStorage.getItem(k) || "{}");
       localStorage.setItem(k, JSON.stringify({ ...cur, followChart: ${follow} }));
+      // The charts shown: the value strip is the keyboard's slider.
+      localStorage.setItem("rails-flows-view-v1", "full");
     } catch {}
   `);
   const page = await rctx.newPage();
