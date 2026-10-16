@@ -60,6 +60,7 @@ import type { FetchPolarisPositionsParams } from "@/lib/api/fetch-polaris-positi
 import type { PolarisPositionSort } from "@/lib/sources/api/polaris-positions";
 import { normalizeMarket } from "@/lib/polaris/asset-catalog";
 import { parsePolarisSearch } from "@/lib/polaris/search";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import {
   canonicalStatuses,
   defaultStatuses,
@@ -69,6 +70,10 @@ import {
 } from "@/lib/polaris/listing-visibility";
 
 export const POLARIS_ITEMS_PER_PAGE = 20;
+
+/** The Transactions slider's top: the round number above the busiest CDP
+ *  (59 transactions, 16 Oct 2026). */
+const POLARIS_TX_TOP = 100;
 
 export interface PolarisListFilters extends BaseListFilters {
   /** "" | "usdp" | "goldp" */
@@ -213,17 +218,11 @@ export function polarisListDimensions(
       chipLabel: (v) => rangeChipLabel("Collateral", v, true),
       panelNote: priceNote,
     },
-    {
-      id: "tx",
-      label: "Transactions",
-      group: "Transactions",
-      cardinality: "range",
-      range: { min: 1, max: 1000 },
-      param: "tx",
-      options: [],
+    transactionsDimension<PolarisListFilters>({
       get: (f) => f.tx,
-      set: (f, v) => ({ ...f, tx: normalizeRange(v) }),
-    },
+      set: (f, tx) => ({ ...f, tx }),
+      top: POLARIS_TX_TOP,
+    }),
   ];
 }
 
@@ -251,7 +250,6 @@ export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: n
         ? filters.sortBy
         : "recent"
   ) as PolarisPositionSort;
-  const tx = decodeRange(filters.tx);
   const debtUsd = decodeRange(filters.debt);
   const collUsd = decodeRange(filters.coll);
   return {
@@ -264,8 +262,7 @@ export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: n
     maxDebtUsd: debtUsd.max ?? undefined,
     minCollUsd: collUsd.min ?? undefined,
     maxCollUsd: collUsd.max ?? undefined,
-    minTx: tx.min ?? undefined,
-    maxTx: tx.max ?? undefined,
+    ...transactionBounds(filters.tx),
     sortBy,
     sortOrder: filters.sortOrder,
     limit: POLARIS_ITEMS_PER_PAGE,

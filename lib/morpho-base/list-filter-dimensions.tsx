@@ -41,6 +41,7 @@
 //                It narrows the rows only; the sort gate stays on the loan
 //                token alone. Combines with the loan token as AND.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -60,6 +61,10 @@ export const MORPHO_BASE_POSITIONS_ROUTE = "/api/morpho-base/positions";
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const MORPHO_BASE_ITEMS_PER_PAGE = 20;
 
+/** The Transactions slider's top: the round number above the busiest position
+ *  (8,207 transactions, 16 Oct 2026). */
+const MORPHO_BASE_TX_TOP = 10000;
+
 export interface MorphoBaseListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). */
   status: string[];
@@ -72,6 +77,8 @@ export interface MorphoBaseListFilters extends BaseListFilters {
   loanTokens: string[];
   /** Collateral-token ERC-20 addresses (CSV on the wire, `coll`). */
   collateralTokens: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -88,6 +95,7 @@ export const MORPHO_BASE_LIST_DEFAULTS: MorphoBaseListFilters = {
   liquidations: [],
   loanTokens: [],
   collateralTokens: [],
+  tx: [],
 };
 
 /** Sort menu as a function of the live selection — Debt/Collateral rank in
@@ -243,6 +251,11 @@ export function morphoBaseListDimensions(
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<MorphoBaseListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: MORPHO_BASE_TX_TOP,
+    }),
   ];
 }
 
@@ -275,6 +288,7 @@ export function morphoBaseFiltersToFetchParams(
     hasDebt: state === "borrowing" ? true : undefined,
     noDebt: state === "collateral-only" ? true : undefined,
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...transactionBounds(filters.tx),
     // Sent as-is (recent/debt/coll) — the reconcile hook on the listing keeps
     // sortBy off debt/coll once loanTokens stops being exactly one address, and
     // the Base proxy re-checks the same gate at the wire regardless.

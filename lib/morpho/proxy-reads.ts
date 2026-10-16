@@ -46,6 +46,11 @@ export async function readMorphoPositions(
   if (sp.get("coll")) qs.set("coll", sp.get("coll")!);
   if (sp.get("user")) qs.set("user", sp.get("user")!);
   if (sp.get("status")) qs.set("status", sp.get("status")!);
+  // A transaction bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   if (sp.get("sortBy")) qs.set("sortBy", sp.get("sortBy")!);
   qs.set("sortOrder", sp.get("sortOrder") === "asc" ? "asc" : "desc");
   if (sp.get("limit") != null) qs.set("limit", sp.get("limit")!);

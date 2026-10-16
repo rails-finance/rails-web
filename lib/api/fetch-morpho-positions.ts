@@ -32,6 +32,9 @@ export interface FetchMorphoPositionsParams {
   hasDebt?: boolean;
   noDebt?: boolean;
   hasLiquidations?: boolean;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   /** The Ethereum route's in-memory sort keys, or the Base route's
    *  recent/debt/coll (baseMorpho.ts's SORT_BY) — each backend recognises only
    *  its own set and falls back to its own default otherwise. */
@@ -64,6 +67,8 @@ export async function fetchMorphoPositions(p: FetchMorphoPositionsParams): Promi
   if (p.hasDebt) qs.set("hasDebt", "true");
   if (p.noDebt) qs.set("noDebt", "true");
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));
