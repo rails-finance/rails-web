@@ -46,7 +46,7 @@ import type { Tone } from "@/lib/shared/tone";
  * (`CountChip`, ui-jobs 331), the date range in the time slot, and the list's line dotted below it for the members
  * not drawn; the row's ⋮ ("Show 48 grouped events") shows them, inside the
  * bracket frame (`group-frame.tsx`). A click on the nodes or the head opens the
- * summary card: the sums with their Σ receipts, and the date range.
+ * summary card: the members' merged sheet, or the sums with their Σ receipts.
  *
  * ── TWO WAYS THE MEMBERS ARRIVE, ONE CARD
  *
@@ -389,32 +389,23 @@ export function TimelineRunCard({
     });
   const hasSums = legAggs.length > 0 || !!lead || !!extraHeader;
 
-  /** The group's summary card: the sums and the date range. */
-  // T2: one sentence of what the group holds, from the members: the head's
-  // verbs in lower case, the sums at the head's precision, the effective
-  // price where the run cleared a dollar debt against collateral, and the
-  // position's span where the caller states it.
+  /** The group's summary card where the members draw no sheet: the sums,
+   *  under the header that names the group, counts it and dates it (Liquity
+   *  V2's redemption group, whose body is its members' sheet alone). */
+  // T2, on an adverse run only: one sentence of what the sums do not say —
+  // the effective price where the run cleared a dollar debt against
+  // collateral, and the position's span where the caller states it. An
+  // owner's run (a shape run, a cycle) has none: its sums and their counts
+  // are the whole account.
   const t2 = (() => {
-    if (legAggs.length === 0) return null;
+    if (!adverse || legAggs.length === 0) return null;
     const amt = (v: number, sym: string) => `${fmtHeaderMagnitude(v, sym)} ${sym}`;
-    let clauses: string;
+    const clauses = legAggs.map((a) => `${a.verb.toLowerCase()} ${amt(a.value, a.symbol)}`).join(" and ");
     let price = "";
-    if (adverse) {
-      clauses = legAggs.map((a) => `${a.verb.toLowerCase()} ${amt(a.value, a.symbol)}`).join(" and ");
-      const debt = legAggs.find((a) => DEBT_VERB.test(a.verb));
-      const coll = legAggs.find((a) => !DEBT_VERB.test(a.verb));
-      if (debt && coll && coll.value > 0 && USD_DEBT.test(debt.symbol))
-        price = `, an effective $${Math.round(debt.value / coll.value).toLocaleString("en-US")} per ${coll.symbol}`;
-    } else {
-      if (netTokens.length === 0) return null;
-      clauses = netTokens
-        .map((t) => {
-          const out = t.direction === "left";
-          const verb = legAggs.find((a) => a.symbol === t.symbol && OUT_VERB.test(a.verb) === out)?.verb;
-          return `${verb ? `${verb.toLowerCase()} ` : ""}a net ${amt(Number(t.value), t.symbol)}`;
-        })
-        .join(" and ");
-    }
+    const debt = legAggs.find((a) => DEBT_VERB.test(a.verb));
+    const coll = legAggs.find((a) => !DEBT_VERB.test(a.verb));
+    if (debt && coll && coll.value > 0 && USD_DEBT.test(debt.symbol))
+      price = `, an effective $${Math.round(debt.value / coll.value).toLocaleString("en-US")} per ${coll.symbol}`;
     const spans = (stateSpan ?? []).map(
       (st, i) =>
         `${i === 0 ? st.label : st.label.replace(/^the /, "")} went from ${stateAmount(st.from)} to ${stateAmount(st.to)} ${st.symbol}`,
@@ -448,16 +439,16 @@ export function TimelineRunCard({
           {t2}
         </p>
       )}
+      {/* The header above names the group (`lead`) and dates it: the strip
+          states the sums and their counts. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-3 pb-4">
         {folder && (
           <span data-prov-exempt="" className="inline-flex items-center text-rb-500">
             <Calculator size={15} strokeWidth={2} aria-label="Sums over the group" />
           </span>
         )}
-        {lead}
         {sums("", true)}
         {extraHeader}
-        <span className="ml-auto text-xs text-rb-500">{range}</span>
       </div>
     </div>
   );
