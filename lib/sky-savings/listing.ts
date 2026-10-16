@@ -92,6 +92,8 @@ export function skyListDimensions(): SerializableDimension<SkyListFilters>[] {
       options: STATUS_OPTIONS,
       get: (f) => effectiveStatuses(f),
       defaultValues: (f) => defaultStatuses(f),
+      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
+      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
       set: (f, v) => {
         const sel = canonical(v);
         const def = defaultStatuses(f);

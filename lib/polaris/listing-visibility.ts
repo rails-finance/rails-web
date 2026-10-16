@@ -68,7 +68,7 @@ export interface PolarisVisibilityInput {
 
 /** The contextual default selection: the open CDPs while the search box names no
  *  identity, every status once it does. The bare `/sepolia/polaris` view
- *  therefore opens on live CDPs with a clean URL and no chip, and a holder /
+ *  therefore opens on live CDPs with a clean URL and a "Status: Open" chip, and a holder /
  *  CDP-number search surfaces the closed and liquidated ones alongside. */
 export function defaultStatuses(f: PolarisVisibilityInput): PolarisStatusBucket[] {
   return namesIdentity(f.q) ? [...ALL_POLARIS_STATUS_BUCKETS] : ["open"];

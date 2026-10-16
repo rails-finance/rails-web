@@ -201,6 +201,8 @@ export function aaveV4ListDimensions(
     ],
     get: (f) => effectiveStatuses(f),
     defaultValues: (f) => defaultStatuses(f),
+    defaultChip: (f) => (defaultStatuses(f).length < 2 ? "Status: Open" : null),
+    clearDefault: (f) => ({ ...f, statuses: ["open", "closed"] }),
     set: (f, values) => {
       const sel = canonicalStatuses(values);
       return { ...f, statuses: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? undefined : sel };

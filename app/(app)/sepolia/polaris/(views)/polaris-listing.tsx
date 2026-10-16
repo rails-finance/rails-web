@@ -169,29 +169,6 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
       })}
       onFilters={onFilters}
       renderAbove={({ items, total, filters }) => {
-        // The resting view shows open CDPs only (listing-visibility.ts). Say
-        // so, with the whole count beside it, wherever that default is what
-        // the page is showing.
-        // Only where status is the one thing narrowing the count (a market
-        // pick is carried into the whole count below).
-        const openOnly =
-          (filters.status ?? []).length === 0 &&
-          filters.debt.length === 0 &&
-          !filters.q &&
-          effectiveStatuses(filters).length === 1 &&
-          effectiveStatuses(filters)[0] === "open";
-        const allCount = books
-          ? books
-              .filter((b) => filters.market.length === 0 || filters.market.includes(b.market))
-              .reduce((n, b) => n + b.openCount + b.closedCount + b.liquidatedCount, 0)
-          : null;
-        const restingLine =
-          openOnly && allCount != null && allCount > 0 ? (
-            <p className="text-xs text-rb-500" data-prov-exempt="">
-              Open CDPs only, the default: {total.toLocaleString("en-US")} of {allCount.toLocaleString("en-US")}. Status
-              shows the closed and liquidated ones.
-            </p>
-          ) : null;
         // The strip is a statement about a WALLET, so it mounts only where the
         // page IS that wallet's own set: the search names a holder, the status
         // selection is the relaxed default the middle path gives a holder
@@ -209,12 +186,7 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
           markets ? (
             <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE)} />
           ) : null;
-        return restingLine || strip ? (
-          <>
-            {restingLine}
-            {strip}
-          </>
-        ) : null;
+        return strip;
       }}
       initialItems={initialItems}
       initialTotal={initialTotal}
