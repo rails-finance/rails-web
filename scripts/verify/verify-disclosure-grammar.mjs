@@ -284,7 +284,7 @@ const headerLayout = (card) =>
   );
   // A press before hydration is lost: pressed until the modal shows.
   const howTo = page.locator('[data-flow-help="F16"] button').first();
-  const modalSel = '[role="dialog"][aria-label="How to read the bars and the line"]';
+  const modalSel = '[role="dialog"][aria-label="How to read the bars"]';
   for (let i = 0; i < 10 && !(await page.locator(modalSel).isVisible()); i++) {
     await howTo.click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(500);
@@ -296,7 +296,7 @@ const headerLayout = (card) =>
     .catch(() => false);
   const stillOpen = await f1.locator("[data-flows-toggle]").getAttribute("aria-expanded");
   check(
-    "2c. the bars' ? opens How to read the bars and the line and the panel stays open",
+    "2c. the bars' ? opens How to read the bars and the panel stays open",
     modal && stillOpen === "true",
     stillOpen,
   );

@@ -42,7 +42,7 @@ import {
   FlowsKeyNodeContext,
   FlowsSectionsContext,
 } from "@/components/shared/lifetime-flows-combined";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { readFlowsView, writeFlowsView } from "@/lib/shared/flows-view-store";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -92,7 +92,7 @@ function HeaderHelp({ flowsKey }: { flowsKey: FlowsKeyItems | null }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <LearnMoreButton onClick={() => setOpen(true)} ariaLabel="How to read the bars and the line" />
+      <LearnMoreButton onClick={() => setOpen(true)} ariaLabel="How to read the bars" />
       {open && (
         <LearnMoreModal
           content={BARS_HELP}
@@ -159,19 +159,20 @@ export function LifetimeFlowsPanel({
     setCompact(next);
     writeFlowsView(next ? "compact" : "full");
   };
-  const viewButton = (
+  // The charts' button beside the events heading, its words the body's:
+  // "+ Value and price chart" while hidden, "× Hide charts" while shown.
+  const viewButton = (label: ReactNode) => (
     <button
       type="button"
       onClick={toggleView}
       aria-expanded={!compact}
       aria-controls={bodyId}
-      aria-label={compact ? `Expand ${title}` : `Shrink ${title}`}
-      title={compact ? `Expand ${title}` : `Shrink ${title}`}
-      className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-sunken text-rb-500 transition-colors hover:bg-rb-300 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:hover:bg-rb-700 pointer-coarse:size-11"
+      className={`${CTRL_GHOST} ${CTRL_OFF} h-8 shrink-0 gap-1.5 rounded-lg bg-sunken px-2.5 text-xs font-medium pointer-coarse:h-11`}
       data-flows-view-toggle={compact ? "compact" : "full"}
       data-anatomy="F21"
     >
-      {compact ? <Maximize2 size={16} aria-hidden /> : <Minimize2 size={16} aria-hidden />}
+      {compact ? <Plus size={14} aria-hidden /> : <X size={14} aria-hidden />}
+      {label}
     </button>
   );
   if (scrubber == null && read === "done") return null;

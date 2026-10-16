@@ -479,7 +479,15 @@ export interface FlowModel {
   eventDays: number[];
   /** The tick strip: one entry per active day, with the timeline's names
    *  for the events that moved a bucket that day. */
-  ticks: { day: number; tick: FlowEvent["tick"]; kinds: string[] }[];
+  ticks: {
+    day: number;
+    tick: FlowEvent["tick"];
+    kinds: string[];
+    /** The sides that moved into the position (a supply, a repay) and out to
+     *  the wallet (a withdrawal, a borrow) that day; the events row draws a
+     *  bar above the line for the first and below it for the second. */
+    flow: { into: FlowSide[]; out: FlowSide[] };
+  }[];
   repricings: Repricing[];
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
@@ -982,16 +990,20 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       if (stepOnly(i)) return [];
       const prev = days[i - 1];
       const kinds: string[] = [];
+      const flow: { into: FlowSide[]; out: FlowSide[] } = { into: [], out: [] };
       for (const b of t.buckets) {
         const word = b.event ?? b.label;
         // An empty event name: a bucket that moves on most events (interest)
         // names none.
         if (!word) continue;
         const now = d.cum[b.key];
-        if (now != null && Math.abs(now - (prev?.cum[b.key] ?? 0)) > 1e-9 && !kinds.includes(word)) kinds.push(word);
+        if (now == null || Math.abs(now - (prev?.cum[b.key] ?? 0)) <= 1e-9) continue;
+        if (!kinds.includes(word)) kinds.push(word);
+        const to = (b.side === "collateral") === (b.dir === "in") ? flow.into : flow.out;
+        if (!to.includes(b.side)) to.push(b.side);
       }
       for (const r of d.rates ?? []) kinds.push(RATE_WORD[r]);
-      return [{ day: d.day - startDay, tick: d.tick, kinds }];
+      return [{ day: d.day - startDay, tick: d.tick, kinds, flow }];
     }),
     repricings,
     live: t.live,

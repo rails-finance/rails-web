@@ -11,9 +11,10 @@
 //   - at three stops the readout's block (`data-price-block`, the value its
 //     <Prov> carries as `source.block`) is the block of the answer's point on
 //     the readout's day, and the price figure is inside a <Prov>;
-//   - the price chart's how-to-read names the series' source;
+//   - the events-and-charts how-to-read (the events heading's "?", F7.1)
+//     names the selected series;
 //   - one pip row under the charts;
-//   - the heading's list names each held asset with a series.
+//   - the price tip's list names each held asset with a series.
 // Pages: Aave V3 Core 0xfb93…2a71 and 0xfb45…750a (liquidated), whose answer
 // is /api/aave-v3/flows, and whose chart opens on the health view (step 4,
 // `checkHealth`); three Liquity V2 Troves, whose answer is
@@ -48,40 +49,43 @@ const PAGES = [
     id: "aave-v3 0xfb93",
     path: "/ethereum/aave-v3/0xfb9395e0b216823c9a60d5dfcb8c6ef458232a71?market=core",
     answer: "/api/aave-v3/flows",
-    source: /AaveOracle/,
     health: true,
   },
   {
     id: "aave-v3 0xfb45 (liquidated)",
     path: "/ethereum/aave-v3/0xfb45f0e612424104753f2e2fc9507b3d082e750a?market=core",
     answer: "/api/aave-v3/flows",
-    source: /AaveOracle/,
     health: true,
   },
   {
     id: "liquity-v2 WETH Trove",
     path: "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
     answer: "/api/liquity-v2/prices/daily",
-    source: /PriceFeed/,
     trove: "live",
   },
   {
     id: "liquity-v2 WETH Trove (redeemed)",
     path: "/ethereum/liquity-v2/trove/WETH/22412517865912344610666591322850826630726594253808037974356128721405243892759",
     answer: "/api/liquity-v2/prices/daily",
-    source: /PriceFeed/,
     trove: "redeemed",
   },
   {
     id: "liquity-v2 rETH Trove (liquidated)",
     path: "/ethereum/liquity-v2/trove/rETH/19392756892012588507808147823032851071198051944268422940534038614966657095964",
     answer: "/api/liquity-v2/prices/daily",
-    source: /PriceFeed/,
     trove: "liquidated",
   },
 ];
 
 const DAY = 86_400;
+
+/** The price tip's words for a reader: its text (the level's mark carries
+ *  "Liquidates at" / "Liquidates below" for a screen reader) and the picker's
+ *  name, the series being drawn as a mark alone. */
+function headingText(h) {
+  const picker = h.querySelector("[data-price-picker]")?.getAttribute("aria-label") ?? "";
+  return `${picker} ${h.textContent ?? ""}`;
+}
 const HEALTH = "Health factor";
 
 /** The Aave family's health factor as its cards print it (hfLabelV3). */
@@ -97,7 +101,8 @@ function hfLabel(hf) {
  *  card states "Liquidates at", that asset's level today is the card's. */
 async function checkHealth(page, tag, pg, listedAll) {
   check(`${tag}: the picker lists the health factor first`, listedAll[0] === HEALTH, listedAll.join(","));
-  const heading = await page.$eval("[data-price-heading]", (h) => h.textContent ?? "").catch(() => "");
+  // The tip names its series by its mark: the picker's accessible name.
+  const heading = await page.$eval("[data-price-heading]", headingText).catch(() => "");
   check(
     `${tag}: the chart opens on the health factor, its line at 1`,
     heading.includes(`${HEALTH}`) && /Liquidates below\s*1\b/.test(heading),
@@ -505,9 +510,12 @@ for (const pg of PAGES) {
     // The health view lands once its position-state reads have.
     if (pg.health)
       await page
-        .waitForFunction((h) => document.querySelector("[data-price-heading]")?.textContent?.includes(h), HEALTH, {
-          timeout: 120000,
-        })
+        .waitForFunction(
+          (h) =>
+            document.querySelector("[data-price-heading] [data-price-picker]")?.getAttribute("aria-label")?.includes(h),
+          HEALTH,
+          { timeout: 120000 },
+        )
         .catch(() => {});
     if ((await picker.count()) > 0) {
       await picker.click();
@@ -530,8 +538,8 @@ for (const pg of PAGES) {
       `listed ${listed.join(",")}; answer ${want.join(",")}`,
     );
 
-    // Each listed asset: the drawn days against the answer, and the price
-    // chart's how-to-read naming the source.
+    // Each listed asset: the drawn days against the answer, and the charts'
+    // how-to-read naming the series.
     for (const sym of listed) {
       await pick(sym);
       await page.waitForTimeout(250);
@@ -551,14 +559,14 @@ for (const pg of PAGES) {
         drawn.observed.length > 0 && extra.length === 0 && wrong.length === 0,
         `${drawn.observed.length} observed, ${drawn.carried.length} carried; extra ${extra.slice(0, 3)}; carried but answered ${wrong.slice(0, 3)}`,
       );
-      await page.locator('[data-flow-help="F19.7"] button').click();
+      await page.locator('[data-flow-help="F7.1"] button').click();
       const help = await page
-        .locator('[role="dialog"][aria-label="How to read the price chart"]')
+        .locator('[role="dialog"][aria-label="How to read the events and charts"]')
         .textContent({ timeout: 5000 })
         .catch(() => "");
       await page.keyboard.press("Escape");
       await page.waitForTimeout(150);
-      check(`${tag} ${sym}: the price chart's how-to-read names the source`, pg.source.test(help ?? ""), help ?? "");
+      check(`${tag} ${sym}: the charts' how-to-read names the series`, help?.includes(`The ${sym} price`), help ?? "");
     }
     // Back to the first asset for the stops.
     await pick(listed[0]);

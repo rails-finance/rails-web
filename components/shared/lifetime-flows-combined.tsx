@@ -32,14 +32,15 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { Activity, ChevronDown, ChevronLeft, ChevronRight, Link2, ListEnd, SkipBack, SkipForward } from "lucide-react";
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Link2, SkipBack, SkipForward } from "lucide-react";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { RevealTip } from "@/components/shared/reveal-tip";
+import { Icon } from "@/components/icons/icon";
 import {
   lifetimeFlowsBarsContent,
-  lifetimeFlowsEventsContent,
-  lifetimeFlowsHealthContent,
-  lifetimeFlowsPriceContent,
+  lifetimeFlowsStackContent,
+  type FlowEventsHelp,
 } from "@/lib/shared/learn-more-content";
 import { FlowBarsHeadsContext, Headline, Rescaled, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
@@ -74,6 +75,7 @@ import {
   type FlowModel,
   type FlowTick,
   tickRank,
+  type FlowSide,
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
@@ -104,6 +106,17 @@ export const FLOW_TICK: Record<FlowTick, string> = {
   "rate-owner": "var(--color-green-400)",
 };
 
+/** The events tip and the date under the row share one width, so the two
+ *  read as one unit; event names are kept short enough to fit it. */
+const PAIR_W = 232;
+/** The day's events under the row, hidden while Miles tries the row without
+ *  them (16 Oct 2026). */
+const SHOW_EVENTS_TIP = false;
+/** The cursor's boxes (the price tip, the date, the events) take the
+ *  dropdowns' surface, the .overlay-panel colours without its shadow. */
+const CURSOR_SKIN =
+  "border-[var(--color-rb-200)] bg-[var(--surface-overlay)] dark:border-[var(--color-rb-800)] dark:bg-[var(--color-rb-900)]";
+
 /** The triangle pip's size: large enough to read as a triangle. */
 const PIP_TRIANGLE = 7;
 
@@ -125,11 +138,42 @@ function visiblePips<T extends { day: number; tick: FlowTick }>(ticks: T[], x: (
   return kept.sort((a, b) => tickRank(a.tick) - tickRank(b.tick));
 }
 
+/** A day's movement bar on the events row: above the line for what moved into
+ *  the position, below it for what went out to the wallet, in the side's hue
+ *  (both hues side by side where both sides moved that way). */
+function FlowBar({ sides, up, left, opacity }: { sides: FlowSide[]; up: boolean; left: number; opacity: number }) {
+  const hue = (s: FlowSide) => FLOW_TICK[s];
+  return (
+    <i
+      className={`pointer-events-none absolute h-[9px] w-1 -translate-x-1/2 rounded-full ${up ? "bottom-1/2 mb-px" : "top-1/2 mt-px"}`}
+      style={{
+        left,
+        opacity,
+        background:
+          sides.length > 1 ? `linear-gradient(to right, ${hue(sides[0])} 50%, ${hue(sides[1])} 50%)` : hue(sides[0]),
+      }}
+      data-flow-pip={sides.length > 1 ? "both" : sides[0]}
+      data-flow-dir={up ? "into" : "out"}
+    />
+  );
+}
+
 /** One pip on the line strip, centred on `left`: a filled warning triangle
  *  (the spine's path) for a liquidation, a redemption or another caution
- *  event; a ring in the debt hue for the owner's rate change; a dot for
- *  everything else, in its tick's hue. */
-export function FlowPip({ tick, left, opacity }: { tick: FlowTick; left: number; opacity: number }) {
+ *  event; a ring in the debt hue for the owner's rate change; a delegate's
+ *  rate change a dot; a movement a bar per direction (`FlowBar`), where the
+ *  day carries its flow, else a dot in its tick's hue. */
+export function FlowPip({
+  tick,
+  left,
+  opacity,
+  flow,
+}: {
+  tick: FlowTick;
+  left: number;
+  opacity: number;
+  flow?: { into: FlowSide[]; out: FlowSide[] };
+}) {
   if (tick === "liquidation" || tick === "redemption" || tick === "caution")
     return (
       <svg
@@ -144,6 +188,13 @@ export function FlowPip({ tick, left, opacity }: { tick: FlowTick; left: number;
       </svg>
     );
   const ring = tick === "rate-owner";
+  if (!ring && tick !== "rate-delegate" && flow && (flow.into.length || flow.out.length))
+    return (
+      <>
+        {flow.into.length > 0 && <FlowBar sides={flow.into} up left={left} opacity={opacity} />}
+        {flow.out.length > 0 && <FlowBar sides={flow.out} up={false} left={left} opacity={opacity} />}
+      </>
+    );
   return (
     <i
       className={`pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${ring ? "size-[6px] border-[1.5px]" : "size-[5px]"}`}
@@ -170,7 +221,7 @@ const BARS_HELP = lifetimeFlowsBarsContent();
  *  events by the family's names for them (its buckets' events), and the
  *  marks the family draws (the warning tones its buckets carry, the marks it
  *  names, the ticks the position has). */
-function eventsHelp(model: FlowModel, hasDebt: boolean): LearnMoreContent {
+function eventsHelp(model: FlowModel, hasDebt: boolean): FlowEventsHelp {
   const has = new Set(model.ticks.map((t) => t.tick));
   const wordsOf = (side: "collateral" | "debt") => [
     ...new Set(
@@ -187,7 +238,7 @@ function eventsHelp(model: FlowModel, hasDebt: boolean): LearnMoreContent {
   // A kind the family draws as a triangle is not a dot.
   const triangles = new Set([toned("liquidation"), toned("redemption")].filter(Boolean));
   const caution = named.caution ?? (has.has("caution") ? "a change the owner did not make" : undefined);
-  return lifetimeFlowsEventsContent({
+  return {
     sides: [
       { hue: "Blue", label: model.labels.collateral, events: wordsOf("collateral") },
       ...(hasDebt ? [{ hue: "Green" as const, label: model.labels.debt, events: wordsOf("debt") }] : []),
@@ -198,7 +249,7 @@ function eventsHelp(model: FlowModel, hasDebt: boolean): LearnMoreContent {
     caution,
     delegateRate: has.has("rate-delegate") || named["rate-delegate"] != null,
     ownerRate: has.has("rate-owner") || named["rate-owner"] != null,
-  });
+  };
 }
 
 /** This position's Key, under the bars' how-to-read: provided by the panel,
@@ -212,7 +263,11 @@ export const FlowsSectionsContext = createContext<((on: boolean) => void) | null
  *  headlines and bars, the events and the steps, with the two charts
  *  hidden; the toggle that opens them stands centred under the bars in
  *  both states. */
-export const FlowsCompactContext = createContext<{ compact: boolean; toggle: ReactNode }>({
+export const FlowsCompactContext = createContext<{
+  compact: boolean;
+  /** The charts' button, given its words. */
+  toggle: ((label: ReactNode) => ReactNode) | null;
+}>({
   compact: false,
   toggle: null,
 });
@@ -293,7 +348,7 @@ export function CombinedFlows({
 
   // On a page that ties the panel to its timeline, the day is the unit the
   // two share. A click on the strip freezes the cursor on a day; the chart and
-  // the bars show it and the list is untouched. "Show timeline to {date}" cuts the
+  // the bars show it and the list is untouched. "Sync to chart" cuts the
   // list at the cursor's day close and brings that day's last card into
   // view; the cut stays where it is while the chart moves, until the button is
   // pressed again or the timeline chip's × clears it. A card's "View on
@@ -372,18 +427,6 @@ export function CombinedFlows({
     if (focus && focus.store.get().frozenDay !== frozenDay) focus.store.set({ frozenDay });
   }, [focus, frozenDay]);
   useEffect(() => () => focus?.store.set({ cursor: null, frozenDay: null }), [focus?.store]);
-  // "Show timeline to {date}": the cut at the cursor's day close. At today it
-  // clears a standing cut, as the chip's × does; with no cut there is nothing
-  // to apply, nor where that cut already stands.
-  const applied = useFlowFocusState((s) => s.rewind?.endTs ?? null);
-  const canApply = byDays && !!committed && (committed.live ? applied != null : applied !== committedEnd);
-  // The page stays where it is (Miles, 1 Oct 2026): the cut's top card
-  // flashes once the visitor scrolls it into view.
-  const apply = () => {
-    if (!focus || !canApply) return;
-    if (committed?.live) focus.store.set({ rewind: null });
-    else focus.store.set({ rewind: { endTs: committedEnd, word: committedWord } });
-  };
   // "Timeline follows the chart" (ui-jobs 305): the timeline reads the
   // cursor itself (`timelineCut`), and the stored cut, which the address bar
   // carries, is the day the cursor is frozen on, kept level here; a cut from
@@ -464,7 +507,7 @@ export function CombinedFlows({
   // Outside the window the bars hold the window's first day, greyed.
   const barStop = cur.barStop ?? 0;
   const barAssets = useMemo(() => assetsAt(bars, barStop), [bars, barStop]);
-  const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-8 pointer-coarse:size-11`;
+  const btn = `${CTRL_GHOST} ${CTRL_OFF} size-9 shrink-0 rounded-md sm:size-7 pointer-coarse:size-9`;
   const tickHere = cur.event && !cur.live ? model.ticks.find((t) => t.day === cur.stop) : undefined;
   // What an open segment panel reads: the date in words and the cursor's
   // steps, so the panel restates its figures as the cursor moves.
@@ -509,6 +552,44 @@ export function CombinedFlows({
 
   const valueText = tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine;
   const cursorWord = atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop));
+  const dateProps: CursorDateProps = {
+    word: cursorWord,
+    byDays,
+    follow,
+  };
+  // The steps, on the date over the events row: the opening, the previous
+  // and next day with events, today.
+  const steps = (
+    <span className="flex items-center" data-flow-controls="" data-anatomy="F5">
+      <button
+        type="button"
+        className={btn}
+        aria-label={`Jump to opening, ${dayStamp(dayStart(model, 0))}`}
+        onClick={() => go(0)}
+        data-flow-jump="start"
+      >
+        <SkipBack size={14} aria-hidden />
+      </button>
+      <button type="button" className={btn} aria-label="Previous event" onClick={stepBack}>
+        <ChevronLeft size={16} aria-hidden />
+      </button>
+      <button type="button" className={btn} aria-label="Next event" onClick={stepOn}>
+        <ChevronRight size={16} aria-hidden />
+      </button>
+      <button
+        type="button"
+        className={btn}
+        aria-label={closed ? `Jump to close, ${closeDay}` : "Jump to today"}
+        onClick={() => {
+          go(last);
+          setFrozen(false);
+        }}
+        data-flow-jump="end"
+      >
+        <SkipForward size={14} aria-hidden />
+      </button>
+    </span>
+  );
   const sliderProps = {
     geo,
     w,
@@ -518,7 +599,6 @@ export function CombinedFlows({
     cx,
     ready,
     valueText,
-    cursorWord,
     onPick: go,
     freeze: byDays ? { frozen, onTap: tapStop } : null,
     startDay,
@@ -540,24 +620,18 @@ export function CombinedFlows({
     collateral: (
       <div className="mb-1.5 flex items-center justify-between gap-3" data-flow-headline-row="collateral">
         {bareHeadline("collateral")}
-        <SectionHelp content={BARS_HELP} name="the bars and the line" anatomy="F16" extra={flowsKey} />
+        <SectionHelp content={BARS_HELP} name="the bars" anatomy="F16" extra={flowsKey} />
       </div>
     ),
     ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
   };
-  const eventsContent = useMemo(() => eventsHelp(model, hasDebt), [model, hasDebt]);
-  const priceHelp = priced?.health
-    ? lifetimeFlowsHealthContent({ source: priced.source, assets: prices.length > 1 })
-    : priced
-      ? lifetimeFlowsPriceContent({
-          symbol: priced.asset.symbol,
-          unit: priced.unitLabel,
-          source: `${priced.asset.symbol} in ${priced.unitLabel}: ${priced.source}`,
-          perEvent: priced.grain === "event",
-          level: priced.level?.formula ?? null,
-          marks: (priced.events?.length ?? 0) > 0,
-        })
-      : null;
+  const marks = useMemo(() => eventsHelp(model, hasDebt), [model, hasDebt]);
+  const priceBrief = priced
+    ? { health: !!priced.health, symbol: priced.asset.symbol, level: priced.level != null }
+    : null;
+  const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
+  const stackHelp = lifetimeFlowsStackContent({ events: marks, charts: { value: true, price: priceBrief } });
+  const priceOnlyHelp = lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
 
   const barsBlock = (
     <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
@@ -609,17 +683,32 @@ export function CombinedFlows({
           data-flow-frozen={frozen ? "" : undefined}
         >
           {!priceOnly && <Steady>{barsBlock}</Steady>}
-          {/* The view's toggle, centred under the bars, in both states: the
-              charts open beneath it, the events and steps keep their place. */}
-          {viewToggle && !priceOnly && (
-            <div className="mt-3 flex justify-center" data-flows-view-row="">
-              {viewToggle}
+          {/* The section's heading, its "?" and the charts' button: "Events"
+              and "+ Value and price chart" while the charts are hidden,
+              "Events with value and prices" and "× Hide charts" while shown. */}
+          {!priceOnly && (
+            <div className="mt-6 flex items-start justify-between gap-3" data-flows-view-row="">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <h3 className="text-sm font-semibold text-rb-500" data-flow-events-label="">
+                  Events{!compact && (priced ? " with value and prices" : " with value")}
+                </h3>
+                {viewToggle?.(compact ? (priced ? "Value and price chart" : "Value chart") : "Hide charts")}
+              </div>
+              {/* One "?" for what is on screen: the events, or the charts and
+                  the events. */}
+              <span className="flex min-h-8 items-center pointer-coarse:min-h-11">
+                <SectionHelp
+                  content={compact ? eventsOnlyHelp : stackHelp}
+                  name={compact ? "the events" : "the events and charts"}
+                  anatomy="F7.1"
+                />
+              </span>
             </div>
           )}
 
           <div>
             <div {...KEEP_PANEL}>
-              <div ref={stripRef} className={priceOnly ? undefined : viewToggle ? "mt-2" : "mt-8"}>
+              <div ref={stripRef} className={priceOnly ? undefined : "mt-3"}>
                 {/* The value line, then the price chart, then the events: one
                   time axis and one cursor, which either chart moves. The
                   charts stay mounted while collapsed, so they draw at once
@@ -642,19 +731,25 @@ export function CombinedFlows({
                     />
                   </StripSlider>
                 </div>
-                {priced && priceHelp && (
-                  <div className={priceOnly ? undefined : compact ? "hidden" : "mt-10"} data-flow-price-section="">
-                    <div className="mb-2 flex items-center justify-between gap-3" data-anatomy="F19.1">
-                      <PriceHeading
-                        series={prices}
-                        selected={priced}
-                        onPick={setAssetKey}
-                        day={cursorDay}
-                        gapDays={model.gapDays}
-                        isLive={cur.live && !closed}
-                      />
-                      <SectionHelp content={priceHelp} name="the price chart" anatomy="F19.7" />
-                    </div>
+                {priced && (
+                  <div className={priceOnly ? undefined : compact ? "hidden" : undefined} data-flow-price-section="">
+                    {/* The value chart's cursor line runs on down to the tip. */}
+                    {!priceOnly && <Stem x={cx} w={w} />}
+                    <PriceHeading
+                      help={
+                        priceOnly ? (
+                          <SectionHelp content={priceOnlyHelp} name="the price chart" anatomy="F19.7" />
+                        ) : null
+                      }
+                      series={prices}
+                      selected={priced}
+                      onPick={setAssetKey}
+                      day={cursorDay}
+                      gapDays={model.gapDays}
+                      isLive={cur.live && !closed}
+                      x={cx}
+                      w={w}
+                    />
                     <div className="relative">
                       <StripSlider
                         {...sliderProps}
@@ -678,18 +773,10 @@ export function CombinedFlows({
                     </div>
                   </div>
                 )}
-                {/* The events: a labelled row of pips on the time axis. */}
-                <div className={priceOnly ? "hidden" : compact ? "mt-2" : "mt-6"} data-flow-events-section="">
-                  <div className="flex items-center justify-between gap-3">
-                    <span
-                      className={`${SECTION_HEADING} text-rb-500`}
-                      style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
-                      data-flow-events-label=""
-                    >
-                      Events
-                    </span>
-                    <SectionHelp content={eventsContent} name="the events" anatomy="F7.1" />
-                  </div>
+                {/* The events: a row of pips on the time axis, the price
+                    chart's cursor line running on down to the date over it. */}
+                <div className={priceOnly ? "hidden" : compact ? "mt-2" : undefined} data-flow-events-section="">
+                  {!compact && <Stem x={cx} w={w} />}
                   <PipRow
                     model={model}
                     geo={geo}
@@ -699,62 +786,18 @@ export function CombinedFlows({
                     at={Math.min(at, last)}
                     cx={cx}
                     dim={dim}
-                    ready={ready}
                     onPick={go}
+                    date={dateProps}
+                    steps={steps}
                   />
                 </div>
-                {/* The cursor's date under the cursor line; pressed, it shows the
-                  timeline's two buttons beside it. */}
-                <CursorDate
-                  x={cx}
-                  w={w}
-                  word={cursorWord}
-                  byDays={byDays}
-                  follow={follow}
-                  applied={!!committed && !committed.live && applied === committedEnd}
-                  committedWord={committedWord}
-                  live={!!committed?.live && !closed}
-                  onApply={apply}
-                />
-              </div>
-            </div>
-
-            {/* The steps, grouped at the right end: the opening, the previous
-              and next day with events, today. */}
-            <div
-              className={priceOnly ? "hidden" : "mt-1 flex items-center justify-end"}
-              data-flow-controls=""
-              data-anatomy="F5"
-              {...KEEP_PANEL}
-            >
-              <div className="-mr-1.5 flex items-center gap-x-1">
-                <button
-                  type="button"
-                  className={btn}
-                  aria-label={`Jump to opening, ${dayStamp(dayStart(model, 0))}`}
-                  onClick={() => go(0)}
-                  data-flow-jump="start"
-                >
-                  <SkipBack size={16} aria-hidden />
-                </button>
-                <button type="button" className={btn} aria-label="Previous event" onClick={stepBack}>
-                  <ChevronLeft size={18} aria-hidden />
-                </button>
-                <button type="button" className={btn} aria-label="Next event" onClick={stepOn}>
-                  <ChevronRight size={18} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  aria-label={closed ? `Jump to close, ${closeDay}` : "Jump to today"}
-                  onClick={() => {
-                    go(last);
-                    setFrozen(false);
-                  }}
-                  data-flow-jump="end"
-                >
-                  <SkipForward size={16} aria-hidden />
-                </button>
+                {/* With the events row hidden, the cursor's date stands alone. */}
+                {priceOnly && (
+                  <>
+                    <Stem x={cx} w={w} />
+                    <CursorDate x={cx} w={w} {...dateProps} />
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -796,9 +839,6 @@ function Steady({ children }: { children: ReactNode }) {
 }
 
 type Point = { to: number; collateral: number | null; debt: number | null };
-
-/** How near, in px, a pointer must be to an event tick to open it. */
-const TICK_REACH = { mouse: 6, touch: 14 };
 
 /** The flows line's points and value axes, fixed per position: the line's
  *  points and every day's figures, so the cursor's dots stay inside the strip
@@ -879,7 +919,6 @@ function StripSlider({
   ready,
   ariaLabel,
   valueText,
-  cursorWord,
   onPick,
   freeze,
   view,
@@ -898,8 +937,6 @@ function StripSlider({
   ready: boolean;
   ariaLabel: string;
   valueText: string;
-  /** The cursor's day, over it while a press drags. */
-  cursorWord: string;
   onPick: (i: number) => void;
   /** On a page that ties the panel to its timeline: a click or a tap (a press
    *  that does not drag) freezes the cursor. */
@@ -1026,21 +1063,6 @@ function StripSlider({
     >
       {children}
       {tip && w > 0 && ready && tip(over || focused || tapped || grabbing || armed)}
-      {grabbing && w > 0 && ready && (
-        <span
-          aria-hidden
-          data-prov-hidden=""
-          data-flow-drag-date=""
-          className="pointer-events-none absolute bottom-full z-[var(--z-dropdown)] mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
-          style={{
-            left: Math.max(36, Math.min(w - 36, cx)),
-            background: "var(--rb-tooltip-bg)",
-            borderColor: "var(--rb-tooltip-border)",
-          }}
-        >
-          {cursorWord}
-        </span>
-      )}
     </div>
   );
 }
@@ -1540,8 +1562,9 @@ function PriceStrip({
   );
 }
 
-/** The price chart's heading, "Daily [WBTC ▾] USD price", at the plot's
- *  left: the asset a list where the position holds several with a series. */
+/** The price chart's figures in a tip standing over the cursor, always
+ *  shown: the asset (a list where the position holds several with a series)
+ *  and its price, the liquidation level on the line beneath. */
 function PriceHeading({
   series,
   selected,
@@ -1549,51 +1572,70 @@ function PriceHeading({
   day,
   gapDays,
   isLive,
+  x,
+  w,
+  help,
 }: {
+  /** The price chart's "?", at the tip's right. */
+  help: ReactNode;
   series: FlowPriceSeries[];
   selected: FlowPriceSeries;
   onPick: (key: string) => void;
-  /** The cursor's day: the heading's figures follow it. */
+  /** The cursor's day: the figures follow it. */
   day: number;
   gapDays: number;
   isLive: boolean;
+  /** The cursor's x, which the tip's caret points at. */
+  x: number;
+  w: number;
 }) {
   const asset =
     series.length > 1 ? (
       <AssetPicker series={series} selected={selected} onPick={onPick} />
     ) : (
-      <span className="inline-flex items-center gap-1 text-foreground" data-price-asset={selected.asset.symbol}>
+      <span className="inline-flex items-center text-foreground" data-price-asset={selected.asset.symbol}>
         <AssetIcon s={selected} />
-        {selected.asset.symbol}
+        <span className="sr-only">{selected.asset.symbol}</span>
       </span>
     );
+  const left = Math.max(0, Math.min(w - PAIR_W, x - PAIR_W / 2));
+  const caret = Math.max(8, Math.min(PAIR_W - 8, x - left));
   return (
-    <div
-      className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 ${SECTION_HEADING} text-rb-500`}
-      style={{ paddingLeft: Math.max(0, STRIP_PAD) }}
-      data-price-heading=""
-    >
-      {asset}
-      <PriceFigures s={selected} day={day} gapDays={gapDays} isLive={isLive} />
+    <div className="relative mb-2.5" data-anatomy="F19.1">
+      <div
+        className={`relative rounded-lg border px-2 py-1.5 ${CURSOR_SKIN} ${SECTION_HEADING} text-rb-500`}
+        style={{ marginLeft: Math.max(0, left), width: PAIR_W }}
+        data-price-heading=""
+      >
+        <span className="absolute right-1.5 top-1.5">{help}</span>
+        <PriceFigures s={selected} day={day} gapDays={gapDays} isLive={isLive} asset={asset} />
+        <i
+          aria-hidden
+          className={`absolute top-full size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r ${CURSOR_SKIN}`}
+          style={{ left: caret }}
+        />
+      </div>
     </div>
   );
 }
 
-/** The heading's figures at the cursor's day: the price, and the
- *  liquidation level where the series has one, each with its receipt. At
- *  today the price takes the live green (color-grammar §5a; green-600 on the
- *  light surface, where green-400 reads pale) and the level red; in history
- *  the price is plain and the level muted. */
+/** The tip's figures at the cursor's day: the asset and its price, and the
+ *  liquidation level beneath where the series has one, each with its
+ *  receipt. At today the price takes the live green (color-grammar §5a;
+ *  green-600 on the light surface, where green-400 reads pale) and the level
+ *  red; in history the price is plain and the level muted. */
 function PriceFigures({
   s,
   day,
   gapDays,
   isLive,
+  asset,
 }: {
   s: FlowPriceSeries;
   day: number;
   gapDays: number;
   isLive: boolean;
+  asset: ReactNode;
 }) {
   const r = priceReadout(s, day, gapDays);
   const dayWord = isLive ? "today" : dayStamp(day * 86_400);
@@ -1615,11 +1657,12 @@ function PriceFigures({
       }
     : null;
   return (
-    <span
-      className="inline-flex flex-wrap items-baseline gap-x-1.5 tabular-nums"
+    <div
+      className="grid grid-cols-[auto_1fr] items-center gap-x-1.5 gap-y-1 text-sm tabular-nums"
       aria-live="polite"
       data-anatomy="F19.2"
     >
+      <span className="inline-flex justify-center">{asset}</span>
       {r ? (
         <span
           className={`font-semibold ${isLive ? "text-green-600 dark:text-green-400" : "text-foreground"}`}
@@ -1641,23 +1684,54 @@ function PriceFigures({
         </span>
       )}
       {lv && levelProv && (
-        <span
-          className="whitespace-nowrap"
-          data-liq-readout=""
-          data-liq-day={lv[0]}
-          data-liq-block={lv[2] ?? ""}
-          data-liq-value={lv[1]}
-          data-anatomy="F19.3"
-        >
-          · {s.health ? "Liquidates below" : "Liquidates at"}{" "}
-          <span className={`font-semibold ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}>
-            <Prov info={levelProv} value={String(lv[1])}>
-              {s.health ? "1" : formatPrice(lv[1], s.unitLabel)}
-            </Prov>
+        <>
+          <span className="inline-flex justify-center">
+            <LevelMark health={!!s.health} isLive={isLive} />
           </span>
-        </span>
+          <span
+            className="whitespace-nowrap"
+            data-liq-readout=""
+            data-liq-day={lv[0]}
+            data-liq-block={lv[2] ?? ""}
+            data-liq-value={lv[1]}
+            data-anatomy="F19.3"
+          >
+            <span className={`font-semibold ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}>
+              <Prov info={levelProv} value={String(lv[1])}>
+                {s.health ? "1" : formatPrice(lv[1], s.unitLabel)}
+              </Prov>
+            </span>
+          </span>
+        </>
       )}
-    </span>
+    </div>
+  );
+}
+
+/** The level's mark in the heading: the warning triangle, red at today and
+ *  muted in history, naming the level on a press. */
+function LevelMark({ health, isLive }: { health: boolean; isLive: boolean }) {
+  const words = health ? "Liquidates below" : "Liquidates at";
+  return (
+    <RevealTip
+      tip={
+        <span className="block w-56 max-w-[calc(100vw-48px)] whitespace-normal leading-snug">
+          {health ? "Liquidates below this health factor." : "Liquidates at this price."}
+        </span>
+      }
+      label={`${words}, explain`}
+      focusable
+      className="focus-ring rounded-sm"
+    >
+      <span
+        className={`inline-flex border-b border-dotted border-current/40 pb-px align-[-1px] ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
+        data-heading-tip=""
+        data-liq-mark=""
+      >
+        <Icon name="triangle" size={12} />
+        <span className="sr-only">{words}</span>
+      </span>
+    </RevealTip>
   );
 }
 
@@ -1754,11 +1828,11 @@ function AssetPicker({
             setOpen(true);
           }
         }}
-        className={`inline-flex min-h-11 cursor-pointer items-center gap-1 rounded bg-[var(--surface-sunken)] py-0.5 pl-1.5 pr-1 ${SECTION_HEADING} text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 sm:min-h-0`}
+        // Small in the tip; the before: layer keeps a finger-sized target.
+        className={`relative inline-flex cursor-pointer items-center gap-0.5 rounded bg-[var(--surface-sunken)] py-0.5 pl-1 pr-0.5 ${SECTION_HEADING} text-foreground before:absolute before:-inset-2.5 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
         data-price-picker=""
       >
         <AssetIcon s={selected} />
-        {selected.asset.symbol}
         <ChevronDown size={12} aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -1817,75 +1891,25 @@ function SectionHelp({
   );
 }
 
-/** The cursor's date under the events, at the cursor's x, in one of three
- *  states. While the timeline follows the chart: the date in the text colour
- *  after the teal chain, nothing to press. On a page tied to its timeline
- *  otherwise: the date is the button that cuts the timeline at that day's
- *  close (the list icon before it), pressed while the cut stands at the
- *  cursor's day. With no timeline: the date alone. */
-function CursorDate({
-  x,
-  w,
-  word,
-  byDays,
-  follow,
-  applied,
-  committedWord,
-  live,
-  onApply,
-}: {
-  x: number;
-  w: number;
-  word: string;
-  byDays: boolean;
-  follow: boolean;
-  /** The timeline is cut at the cursor's day. */
-  applied: boolean;
-  committedWord: string;
-  live: boolean;
-  onApply: () => void;
-}) {
-  const ref = useRef<HTMLSpanElement & HTMLButtonElement>(null);
-  const [left, setLeft] = useState<number | null>(null);
-  // The date centred on the cursor, kept inside the row.
-  useLayoutEffect(() => {
-    const dw = ref.current?.offsetWidth ?? 0;
-    setLeft(Math.max(0, Math.min(w - dw, x - dw / 2)));
-  });
-  const place = { left: left ?? 0, visibility: left == null ? ("hidden" as const) : undefined };
-  const text =
-    "absolute top-0 inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap px-1.5 text-xs font-semibold tabular-nums sm:min-h-8";
+/** The cursor's date where the events row is hidden (a price-only panel); the
+ *  events row's frame draws it otherwise. While the timeline follows the
+ *  chart, the date after the teal chain; otherwise the date alone. */
+function CursorDate({ x, w, ...date }: CursorDateProps & { x: number; w: number }) {
+  const left = Math.max(0, Math.min(w - PAIR_W, x - PAIR_W / 2));
   return (
-    <div className="relative mt-1 h-11 sm:h-8" data-flow-cursor-date={follow ? "following" : byDays ? "cut" : "plain"}>
-      {byDays && !follow ? (
-        <button
-          ref={ref}
-          type="button"
-          className={`${CTRL_GHOST} ${applied ? CTRL_ON_ACCENT : CTRL_OFF} ${text} rounded-md`}
-          style={place}
-          aria-pressed={applied}
-          aria-label={live ? "Show the timeline to today" : `Show the timeline to ${committedWord}`}
-          title={
-            applied
-              ? `The timeline is cut at ${committedWord}`
-              : live
-                ? "Show the timeline up to today"
-                : `Show the timeline up to the end of ${committedWord}`
-          }
-          onClick={() => !applied && onApply()}
-          data-flow-apply=""
-          data-flow-cursor-word=""
-          data-anatomy="F6"
-        >
-          <ListEnd size={14} aria-hidden />
-          {word}
-        </button>
-      ) : (
-        <span ref={ref} className={`${text} text-foreground`} style={place} data-flow-cursor-word="">
-          {follow && <Link2 size={14} aria-hidden className="text-teal-600 dark:text-teal-400" />}
-          {word}
+    <div
+      className="relative mt-2 h-11 sm:h-9"
+      data-flow-cursor-date={date.follow ? "following" : date.byDays ? "cut" : "plain"}
+    >
+      <div
+        className={`absolute top-0 flex min-h-11 items-center justify-between gap-1.5 rounded-lg border py-0.5 pl-2 pr-0.5 text-xs font-semibold tabular-nums text-foreground sm:min-h-9 ${CURSOR_SKIN}`}
+        style={{ left, width: PAIR_W }}
+      >
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap" data-flow-cursor-word="">
+          {date.follow && <Link2 size={14} aria-hidden className="text-teal-600 dark:text-teal-400" />}
+          {date.word}
         </span>
-      )}
+      </div>
     </div>
   );
 }
@@ -1921,10 +1945,27 @@ function readoutProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord:
   };
 }
 
-/** The event pips under the strip, on the shared time axis, the cursor
- *  running through them: one row for both views. The nearest pip within
- *  reach of the pointer names its day's events; a tap or a click also moves
- *  the cursor to that day. */
+/** The cursor line carried on from the chart above down to the box under it,
+ *  so the charts and the row read as one stack. */
+function Stem({ x, w }: { x: number; w: number }) {
+  return (
+    <div aria-hidden className="relative h-6" data-flow-stem="">
+      {w > 0 && <span className="absolute inset-y-0 w-px bg-foreground" style={{ left: x - 0.5 }} />}
+    </div>
+  );
+}
+
+interface CursorDateProps {
+  word: string;
+  byDays: boolean;
+  follow: boolean;
+}
+
+/** The events row with its cursor: the elapsed stretch on a lighter ground,
+ *  and under the row the date tip at the settled day, carrying the steps.
+ *  The row scrubs as the charts do: a press moves the cursor to the nearest
+ *  stop and a drag carries it. The day's events under the date are behind
+ *  SHOW_EVENTS_TIP. */
 function PipRow({
   model,
   geo,
@@ -1934,8 +1975,9 @@ function PipRow({
   at,
   cx,
   dim,
-  ready,
   onPick,
+  date,
+  steps,
 }: {
   model: FlowModel;
   geo: StripGeometry;
@@ -1945,99 +1987,148 @@ function PipRow({
   at: number;
   cx: number;
   dim: boolean;
-  ready: boolean;
   onPick: (i: number) => void;
+  date: CursorDateProps;
+  /** The step buttons, on the date's right. */
+  steps: ReactNode;
 }) {
   const startDay = model.start / DAY_MS;
   const xClose = (day: number) => geo.xClose(Math.min(day, today));
+  const wrapRef = useRef<HTMLDivElement>(null);
   const pipRef = useRef<HTMLDivElement>(null);
-  const [pip, setPip] = useState<{ x: number; text: string; day: number } | null>(null);
-  const tickText = (t: FlowModel["ticks"][number]) =>
-    `${dayStamp(dayStart(model, t.day))}${t.kinds.length ? `: ${t.kinds.join(", ")}` : ""}`;
-  const tickAt = (clientX: number, reach: number) => {
+  const dragging = useRef(false);
+  /** The stop nearest the pointer, on the charts' time axis. */
+  const stopAt = (clientX: number) => {
     const el = pipRef.current;
-    if (!el) return null;
+    if (!el || stops.length === 0) return null;
     const px = clientX - el.getBoundingClientRect().left;
-    let best: FlowModel["ticks"][number] | null = null;
+    let best = 0;
     let bestD = Infinity;
-    for (const t of model.ticks) {
-      const d = Math.abs(xClose(startDay + t.day) - px);
+    stops.forEach((st, i) => {
+      const d = Math.abs(xClose(st.live ? today : startDay + st.stop) - px);
       if (d < bestD) {
         bestD = d;
-        best = t;
+        best = i;
       }
-    }
-    return best && bestD <= reach ? best : null;
+    });
+    return best;
   };
-  const openTick = (t: FlowModel["ticks"][number]) => ({
-    x: Math.max(80, Math.min(w - 80, xClose(startDay + t.day))),
-    text: tickText(t),
-    day: t.day,
-  });
-  // A tapped tick's tip closes once the cursor moves off its day.
-  // It sets state only where a tip is open: a no-op update queued on every
-  // step rendered at default priority and committed nothing, so React never
-  // cleared its nested-update count, and about 160 quick arrow presses hit
-  // its limit (rails-ops TO-DO-ui-jobs 227).
+  const pickAt = (clientX: number) => {
+    const i = stopAt(clientX);
+    if (i != null) onPick(i);
+  };
   const atDay = stops[at]?.stop;
-  const pipNow = useRef(pip);
-  pipNow.current = pip;
-  useEffect(() => {
-    if (pipNow.current && pipNow.current.day !== atDay) setPip(null);
-  }, [atDay]);
-  useEffect(() => {
-    if (!pip) return;
-    const away = (e: globalThis.PointerEvent) => {
-      if (!pipRef.current?.contains(e.target as Node)) setPip(null);
-    };
-    document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
-  }, [pip]);
+  const settledTick = model.ticks.find((k) => k.day === atDay);
+
+  const left = Math.max(0, Math.min(w - PAIR_W, cx - PAIR_W / 2));
+  const caret = Math.max(8, Math.min(PAIR_W - 8, cx - left));
+  const kinds = settledTick?.kinds ?? [];
+  const box = `rounded-lg border text-xs tabular-nums ${CURSOR_SKIN}`;
+
   return (
-    <div
-      ref={pipRef}
-      // A pill on the sunken ground, padded only vertically so each pip keeps
-      // its x on the charts' axis; the whole pill takes the press.
-      className="relative h-11 cursor-pointer rounded-full bg-sunken py-3 sm:h-[38px]"
-      data-flow-pips=""
-      data-anatomy="F4.1"
-      onPointerMove={(e) => {
-        if (e.pointerType !== "mouse") return;
-        const t = tickAt(e.clientX, TICK_REACH.mouse);
-        setPip(t ? openTick(t) : null);
-      }}
-      onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
-      onClick={(e) => {
-        const t = tickAt(e.clientX, TICK_REACH.touch);
-        if (!t) return setPip(null);
-        setPip(openTick(t));
-        const i = stopForDay(stops, t.day);
-        if (i != null) onPick(i);
-      }}
-    >
-      {/* No cursor line here: the dots are pressed, and the line stands on
-          the charts above. */}
-      <div aria-hidden>
-        {w > 0 &&
-          visiblePips(model.ticks, (d) => xClose(startDay + d)).map((t) => (
-            <FlowPip
-              key={t.day}
-              tick={t.tick}
-              left={xClose(startDay + t.day)}
-              opacity={dim && xClose(startDay + t.day) > cx + 0.5 ? 0.35 : 1}
-            />
-          ))}
-      </div>
-      {pip && (
-        <span
-          role="tooltip"
-          data-prov-hidden=""
-          data-flow-pip-tip=""
-          className="pointer-events-none absolute bottom-full z-[var(--z-dropdown)] mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
-          style={{ left: pip.x, background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
+    <div ref={wrapRef} data-flow-pair="">
+      <div className="relative">
+        <div
+          ref={pipRef}
+          // A pill on the sunken ground, padded only vertically so each pip
+          // keeps its x on the charts' axis; the whole pill takes the press.
+          className="relative h-11 cursor-crosshair touch-none select-none rounded-md bg-sunken py-3 sm:h-[38px]"
+          data-flow-pips=""
+          data-anatomy="F4.1"
+          onPointerDown={(e) => {
+            if (e.pointerType === "mouse" && e.button !== 0) return;
+            dragging.current = true;
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+            pickAt(e.clientX);
+          }}
+          onPointerMove={(e) => dragging.current && pickAt(e.clientX)}
+          onPointerUp={() => (dragging.current = false)}
+          onPointerCancel={() => (dragging.current = false)}
+          onLostPointerCapture={() => (dragging.current = false)}
         >
-          {pip.text}
-        </span>
+          {/* No cursor line here: the dots are pressed, and the line stands on
+            the charts above. The stretch up to the cursor takes a lighter
+            ground, so the row shows where the scrubber stands. */}
+          {dim && w > 0 && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-0 rounded-l-md bg-rb-300 dark:bg-rb-700"
+              style={{ width: Math.max(0, Math.min(w, cx)) }}
+              data-flow-pips-elapsed=""
+            />
+          )}
+          <div aria-hidden>
+            {w > 0 &&
+              visiblePips(model.ticks, (d) => xClose(startDay + d)).map((t) => (
+                <FlowPip
+                  key={t.day}
+                  tick={t.tick}
+                  flow={t.flow}
+                  left={xClose(startDay + t.day)}
+                  opacity={dim && xClose(startDay + t.day) > cx + 0.5 ? 0.35 : 1}
+                />
+              ))}
+          </div>
+        </div>
+        {/* The date's place in the layout, under the row; the frame draws it. */}
+        <div
+          className="mt-2 h-11 sm:h-9"
+          data-flow-cursor-date={date.follow ? "following" : date.byDays ? "cut" : "plain"}
+        />
+        {w > 0 && (
+          <div
+            className="pointer-events-none absolute inset-y-0 z-[var(--z-dropdown)]"
+            style={{ left, width: PAIR_W }}
+            data-flow-cursor-frame=""
+          >
+            <div
+              className={`pointer-events-auto absolute bottom-0 left-0 flex min-h-11 w-full items-center justify-between gap-1.5 py-0.5 pl-2 pr-0.5 font-semibold text-foreground sm:min-h-9 ${box}`}
+            >
+              <i
+                aria-hidden
+                className={`absolute bottom-full size-2 -translate-x-1/2 translate-y-1 rotate-45 border-l border-t ${CURSOR_SKIN}`}
+                style={{ left: caret }}
+              />
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap" data-flow-cursor-word="">
+                {date.follow && <Link2 size={14} aria-hidden className="text-teal-600 dark:text-teal-400" />}
+                {date.word}
+              </span>
+              {steps}
+            </div>
+          </div>
+        )}
+      </div>
+      {/* The day's events under the row, in the layout so the steps below
+          make room; held at its tallest so they keep still while it moves. */}
+      {SHOW_EVENTS_TIP && w > 0 && (
+        <Steady>
+          <div className="pt-1.5">
+            <div
+              data-prov-hidden=""
+              data-flow-pip-tip=""
+              className={`relative px-2 py-1 font-medium text-foreground ${box}`}
+              style={{ marginLeft: left, width: PAIR_W }}
+            >
+              {/* Each event on its own line; the day stands over the row. */}
+              {kinds.length ? (
+                <ul className="list-disc pl-4">
+                  {kinds.map((k) => (
+                    <li key={k}>{k}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="block text-rb-500" data-flow-pip-none="">
+                  No events
+                </span>
+              )}
+              <i
+                aria-hidden
+                className={`absolute bottom-full size-2 -translate-x-1/2 translate-y-1 rotate-45 border-l border-t ${CURSOR_SKIN}`}
+                style={{ left: caret }}
+              />
+            </div>
+          </div>
+        </Steady>
       )}
     </div>
   );

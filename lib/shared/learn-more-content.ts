@@ -8,96 +8,15 @@ import { indefiniteArticle } from "@/lib/utils/format";
 
 // ── Lifetime flows: how to read the charts ───────────────────────────────────
 
-/** The Lifetime flows panel's how-to-read, one per section, each behind its
- *  section's "?": the bars and the value line, the price chart, the events
- *  row. One text on every explorer (ui-jobs §264); the price chart's names
- *  its series' source. */
+/** The Lifetime flows panel's how-to-read, brief: the bars behind their own
+ *  "?", and the events row with whatever charts stand over it behind the
+ *  "?" on the events heading, so the modal reads only what is on screen.
+ *  One text on every explorer (ui-jobs §264). */
 export function lifetimeFlowsBarsContent(): LearnMoreContent {
   return {
-    title: "How to read the bars and the line",
+    title: "How to read the bars",
     intro:
-      "A bar for what the position holds and one for what it owes, and a line of both over its life, moved by one cursor with the price chart and the events.",
-    detailsHeading: "The parts:",
-    details: [
-      {
-        bold: "The bars",
-        text: "Blue is the collateral, green the debt. The solid part is what is held or owed on the cursor's day, the figure above it. The hatched parts are what left: withdrawn, repaid, redeemed, liquidated. On an earlier day, a dashed outline marks where the bar ends today. Click or tap a part for its name, value and share of the bar. A very busy position draws each bar at the scale of what is held.",
-      },
-      {
-        bold: "The line",
-        text: "Collateral and debt at the close of each day, week or month since the position opened. The line is in USD, each point valued at that close's price; where the two sides share no price it is in their tokens, as the (i) says. A dotted stretch rests on an old or missing price.",
-      },
-      {
-        bold: "The cursor",
-        text: "Press either chart and drag to move it; it stops at each close, on each day with events and at today. The figures and the bars follow it. A click or tap holds it on a day and dims the charts after it. The start date jumps to the opening, the arrows step through the days with events, and Today returns to today.",
-      },
-      {
-        bold: "The cursor's date",
-        text: "Under the events, the day the cursor is on. Press it for two buttons: one shows the transaction list up to that day's close, the other keeps the list cut at the cursor wherever it moves. The × on the chip above the list removes the cut.",
-      },
-    ],
-  };
-}
-
-export function lifetimeFlowsPriceContent(opts: {
-  symbol: string;
-  unit: string;
-  source: string;
-  perEvent: boolean;
-  level?: string | null;
-  /** The chart marks the position's events at their prices (Liquity V2). */
-  marks?: boolean;
-}): LearnMoreContent {
-  const { symbol, unit, source, perEvent, level, marks = true } = opts;
-  return {
-    title: "How to read the price chart",
-    intro: `The ${symbol} price in ${unit} over the position's life, on the same days as the line above. The list over the chart picks the asset.`,
-    detailsHeading: "The parts:",
-    details: [
-      {
-        bold: "The source",
-        text: `${source}. ${perEvent ? "One point per event." : "One point per day."}${marks ? " Each event is marked at its own price, and a redemption also at its redemption price." : ""} A dotted stretch carries the last price over days with none recorded.`,
-      },
-      ...(level
-        ? [
-            {
-              bold: "Liquidates at",
-              text: `The red line: the price at which the position can be liquidated, ${level}. The figure at the cursor stands under the price.`,
-            },
-          ]
-        : []),
-      {
-        bold: "The figure at the cursor",
-        text: "The price on the cursor's day. With the inspector on, it opens its receipt.",
-      },
-    ],
-  };
-}
-
-/** The price chart's how-to-read on its health view (ruling 7). */
-export function lifetimeFlowsHealthContent(opts: { source: string; assets: boolean }): LearnMoreContent {
-  return {
-    title: "How to read the price chart",
-    intro: `The position's health factor over its life, on the same days as the line above.${opts.assets ? " The list over the chart picks it or one asset's price." : ""}`,
-    detailsHeading: "The parts:",
-    details: [
-      {
-        bold: "The source",
-        text: `Σ collateral × price × liquidation threshold ÷ Σ debt × price: ${opts.source}. One point per day. A dotted stretch takes its thresholds from a later event's read.`,
-      },
-      {
-        bold: "Liquidates below",
-        text: "The red line at 1: below it a liquidator can repay part of the debt and take collateral at a bonus.",
-      },
-      {
-        bold: "An asset's price",
-        text: "Picked from the list, the asset's price and, in red, the price at which the health factor would reach 1 if that asset alone moved, every other balance and price held at the day's. A level more than ten times above or below the price is not drawn.",
-      },
-      {
-        bold: "The figure at the cursor",
-        text: "The health factor on the cursor's day; today's is the card's. With the inspector on, it opens its receipt.",
-      },
-    ],
+      "Blue is the collateral, green the debt. The solid part is what is held or owed on the cursor's day; the hatched parts are what left. Tap a part for its name, value and share.",
   };
 }
 
@@ -116,28 +35,78 @@ export interface FlowEventsHelp {
   ownerRate?: boolean;
 }
 
+/** The price chart under the value line: an asset's price, or the health
+ *  factor, and whether it draws a liquidation line. */
+export interface FlowPriceHelp {
+  health: boolean;
+  symbol: string;
+  level: boolean;
+}
+
 const listWords = (xs: string[]) =>
   xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
-export function lifetimeFlowsEventsContent(h: FlowEventsHelp): LearnMoreContent {
+/** What is on screen under the events heading: the events row alone, or the
+ *  value line and the price chart over it (`charts`), or the price chart
+ *  alone (`events` null). */
+export function lifetimeFlowsStackContent(opts: {
+  events: FlowEventsHelp | null;
+  charts: { value: boolean; price: FlowPriceHelp | null } | null;
+}): LearnMoreContent {
+  const { events, charts } = opts;
   const details: { bold: string; text: string }[] = [];
-  for (const s of h.sides)
-    if (s.events.length > 0) details.push({ bold: `${s.hue} dot`, text: `${s.label}: ${listWords(s.events)}.` });
-  if (h.both) details.push({ bold: "Half blue, half green", text: "a day that moved both sides." });
-  if (h.liquidation) details.push({ bold: "Red triangle", text: `${h.liquidation}.` });
-  if (h.redemption) details.push({ bold: "Orange triangle", text: `${h.redemption}.` });
-  if (h.caution)
-    details.push({ bold: h.redemption ? "Orange triangle, also" : "Orange triangle", text: `${h.caution}.` });
-  if (h.delegateRate) details.push({ bold: "Pink dot", text: "the delegate set the interest rate." });
-  if (h.ownerRate) details.push({ bold: "Ring", text: "the owner changed the interest rate." });
+  if (charts?.value) details.push({ bold: "The value line", text: "collateral and debt in USD at each day's close." });
+  const price = charts?.price;
+  if (price)
+    details.push(
+      price.health
+        ? {
+            bold: "The health factor",
+            text: "on the same days; the red line at 1 is where it liquidates. The list in the tip picks it or an asset's price.",
+          }
+        : {
+            bold: `The ${price.symbol} price`,
+            text: `on the same days${price.level ? "; the red line is where the position liquidates" : ""}.`,
+          },
+    );
+  if (events) {
+    const hues = events.sides
+      .filter((s) => s.events.length > 0)
+      .map((s) => `${s.hue.toLowerCase()} for ${s.label.toLowerCase()} (${listWords(s.events)})`);
+    // A family's mark name ("Liquidation") reads as a noun in the sentence.
+    const named = (w: string) => (/^an? /.test(w) ? w : `${indefiniteArticle(w).toLowerCase()} ${w.toLowerCase()}`);
+    const marks = [
+      events.liquidation && `a red triangle is ${named(events.liquidation)}`,
+      events.redemption && `an orange triangle is ${named(events.redemption)}`,
+      events.caution && `an orange triangle${events.redemption ? ", also," : " is"} ${events.caution}`,
+      events.delegateRate && "a pink dot is the delegate setting the interest rate",
+      events.ownerRate && "a ring is the owner changing it",
+    ].filter((m): m is string => !!m);
+    const sentence = (t: string) => `${t[0].toUpperCase()}${t.slice(1)}.`;
+    details.push({
+      bold: "The events",
+      text: [
+        `a mark per day with events: ${listWords(hues)}${events.both ? "; half and half where both moved" : ""}.`,
+        "Above the middle, into the position; below, out of it.",
+        ...(marks.length ? [sentence(listWords(marks))] : []),
+      ].join(" "),
+    });
+  }
   details.push({
-    bold: "On the list",
-    text: "Hover or tap a mark for its day's events; a click moves the cursor there. Each day's last event in the list carries a chart button that moves the cursor to that day and holds it there.",
+    bold: "The cursor",
+    text: `press and drag ${charts ? "a chart or the events" : "the events"} to move it; the date${events ? " under the events" : ""} shows its day, its arrows step between days with events.`,
   });
   return {
-    title: "How to read the events",
-    intro: "Each mark is a day with events, on the charts' time axis, in the colour of what moved.",
-    detailsHeading: "The marks:",
+    title:
+      charts && events
+        ? "How to read the events and charts"
+        : events
+          ? "How to read the events"
+          : "How to read the price chart",
+    intro: charts
+      ? `The ${events ? "charts and the events" : "chart"} share one time axis, oldest at the left, and one cursor.`
+      : "The position's life, oldest at the left.",
+    detailsHeading: "The parts:",
     details,
   };
 }
