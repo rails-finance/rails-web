@@ -376,7 +376,8 @@ function HeadBody({
           ) : head.assets ? (
             <span className="flex items-center gap-1.5">
               {head.value}
-              {head.assets}
+              {/* shrink-0: a long figure must never squeeze the icon away. */}
+              <span className="inline-flex shrink-0 items-center">{head.assets}</span>
             </span>
           ) : (
             head.value

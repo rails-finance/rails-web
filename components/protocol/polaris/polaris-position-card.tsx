@@ -50,7 +50,14 @@ import { StatValue } from "@/components/shared/stat-value";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { formatExact, formatNumber, formatUnitsExact, formatUsdValue, withRealMinus } from "@/lib/utils/format";
+import {
+  formatCompact,
+  formatExact,
+  formatNumber,
+  formatUnitsExact,
+  formatUsdValue,
+  withRealMinus,
+} from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, peakProv } from "@/lib/polaris/event-provenance";
@@ -204,22 +211,26 @@ export function CardSumAmount({ value }: { value: number }) {
   return <>{cardFigure(value)}</>;
 }
 
-/** A card headline in full — the row's and the grid's rule, three decimals.
- *  The exact decimal rides the tip and the inspector's `data-prov-exact`, as
- *  AssetAmount's does. The token stands beside it as an icon (`assets`). */
+/** A card figure at three decimals. `compact` is a headline's form (anatomy
+ *  C10): from a thousand up it reads in the listing's compact form ("770.33K"),
+ *  as AssetAmount's does. The exact decimal rides the tip and the inspector's
+ *  `data-prov-exact`. The token stands beside it as an icon (`assets`). */
 function CardFigure({
   value,
   symbol,
   exact,
   signed = false,
+  compact = false,
 }: {
   value: number;
   symbol: string;
   exact?: string;
   signed?: boolean;
+  compact?: boolean;
 }) {
   const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
-  const shown = signed ? withRealMinus(cardFigure(value)) : cardFigure(value);
+  const face = compact && Math.abs(value) >= 1_000 ? formatCompact(value) : cardFigure(value);
+  const shown = signed ? withRealMinus(face) : face;
   return (
     <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
       <span data-prov-exact={full} data-prov-symbol={symbol}>
@@ -441,7 +452,7 @@ export function polarisCardSlots({
           v.peakColl > 0 ? (
             <Prov info={peakProv("coll", v.market, v.peaksCountLiquidation)}>
               <span className="text-rb-500">
-                <CardFigure value={v.peakColl} symbol={PETH.symbol} />
+                <CardFigure value={v.peakColl} symbol={PETH.symbol} compact />
               </span>
             </Prov>
           ) : null,
@@ -455,7 +466,7 @@ export function polarisCardSlots({
           v.peakDebt > 0 ? (
             <Prov info={peakProv("debt", v.market, v.peaksCountLiquidation)}>
               <span className="text-rb-500">
-                <CardFigure value={v.peakDebt} symbol={stable} />
+                <CardFigure value={v.peakDebt} symbol={stable} compact />
               </span>
             </Prov>
           ) : null,
@@ -494,6 +505,7 @@ export function polarisCardSlots({
               <CardFigure
                 value={v.coll}
                 symbol={PETH.symbol}
+                compact
                 exact={v.collRaw != null ? formatUnitsExact(v.collRaw, 18) : undefined}
               />
             </Prov>
@@ -527,6 +539,7 @@ export function polarisCardSlots({
               <CardFigure
                 value={v.debt}
                 symbol={stable}
+                compact
                 exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : undefined}
               />
             </Prov>
