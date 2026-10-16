@@ -11,6 +11,8 @@
 //     only a CLOSED position — the two-axis status model.
 //   • History — Liquidated before (the orthogonal flag): open SURVIVORS
 //     match too.
+//   • Transactions — a range over tx_count, every distinct transaction on the
+//     position (liquidations included), sent as minTx / maxTx.
 //   • User search (the `q` box → the `user` param — "this user's positions",
 //     plural on purpose: the grain is the pair and a user can hold several
 //     isolated markets) + recency sort.
@@ -22,6 +24,7 @@
 // facet either: it is a chain overlay figure (no event carries it), so the
 // backend cannot filter on it — the cards state it instead.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -39,12 +42,18 @@ import {
  *  multicall of 20 user_state reads. */
 export const LLAMALEND_ITEMS_PER_PAGE = 20;
 
+/** The Transactions slider's top: the round number above the busiest position
+ *  (932 transactions, 16 Oct 2026). */
+const LLAMALEND_TX_TOP = 1000;
+
 export interface LlamalendListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). */
   status: string[];
   /** "" | "liquidated" — positions hard-liquidated at least once (the
    *  orthogonal flag; open survivors included). */
   liquidations: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -58,6 +67,7 @@ export const LLAMALEND_LIST_DEFAULTS: LlamalendListFilters = {
   sortOrder: "desc",
   status: [],
   liquidations: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -105,6 +115,11 @@ export function llamalendListDimensions(): SerializableDimension<LlamalendListFi
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<LlamalendListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: LLAMALEND_TX_TOP,
+    }),
   ];
 }
 
@@ -120,6 +135,7 @@ export function llamalendFiltersToFetchParams(
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as LlamalendPositionSort,
     sortOrder: filters.sortOrder,
     limit: LLAMALEND_ITEMS_PER_PAGE,

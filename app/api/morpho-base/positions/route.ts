@@ -52,6 +52,11 @@ export async function GET(request: NextRequest) {
     if (sp.get("hasDebt")) qs.set("hasDebt", sp.get("hasDebt")!);
     if (sp.get("noDebt")) qs.set("noDebt", sp.get("noDebt")!);
     if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
+    // A transaction bound is forwarded only as a whole number.
+    for (const k of ["minTx", "maxTx"]) {
+      const v = sp.get(k);
+      if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+    }
     // The shared fetch client says `loan` / `coll` (the Ethereum route's
     // words, lib/api/fetch-morpho-positions.ts); the Base route says
     // `loanTokens` / `collateralTokens`. Both spellings land on the same CSV

@@ -27,6 +27,9 @@ export interface FetchLlamalendPositionsParams {
   /** Ever hard-liquidated — the orthogonal flag, NOT the lifecycle status:
    *  open survivors match too. */
   hasLiquidations?: boolean;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   sortBy?: LlamalendPositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -49,6 +52,8 @@ export async function fetchLlamalendPositions(p: FetchLlamalendPositionsParams):
   if (p.controller) qs.set("controller", p.controller);
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

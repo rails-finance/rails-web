@@ -24,6 +24,8 @@
 //     ids: USDC alone is the loan token of ~503 markets, and a market-id CSV for
 //     it would be a 33 KB query string. A symbol can name more than one
 //     contract, so every address under it is sent.
+//   • Transactions      → `minTx` / `maxTx`, inclusive bounds on the position's
+//     distinct transactions (lib/shared/transactions-dimension.ts).
 //   • A wallet address in the search box → `user`; a 64-hex id → `market`.
 //
 // Degrading while the roster is absent: the roster route and the `market` CSV /
@@ -41,6 +43,7 @@ import type { MorphoPositionSort } from "@/lib/sources/api/morpho-positions";
 import type { FetchMorphoPositionsParams } from "@/lib/api/fetch-morpho-positions";
 import type { MorphoMarketRosterEntry, MorphoMarketRosterResponse } from "@/lib/api/fetch-morpho-market-roster";
 import { shortMarketId } from "@/lib/morpho/asset-catalog";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import {
   canonicalStatuses,
   defaultStatuses,
@@ -61,6 +64,10 @@ export const MORPHO_ITEMS_PER_PAGE = 20;
  *  off (morphoSearchTruncation). */
 export const MORPHO_MARKET_CSV_CAP = 150;
 
+/** The Transactions slider's top: the round number above the busiest position
+ *  (3,076 transactions, 16 Oct 2026). */
+const MORPHO_TX_TOP = 5000;
+
 export interface MorphoListFilters extends BaseListFilters {
   status: string[];
   /** 0x-prefixed market ids, as a position row carries them. */
@@ -69,6 +76,8 @@ export interface MorphoListFilters extends BaseListFilters {
   loanAssets: string[];
   /** Collateral token symbols; mapped the same way. */
   collateralAssets: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -84,6 +93,7 @@ export const MORPHO_LIST_DEFAULTS: MorphoListFilters = {
   markets: [],
   loanAssets: [],
   collateralAssets: [],
+  tx: [],
 };
 
 // Only the orderings rails-server actually applies. The retired in-memory tier
@@ -209,6 +219,11 @@ export function morphoListDimensions(
       set: (f, v) => ({ ...f, collateralAssets: v }),
       available: (f) => offered || f.collateralAssets.length > 0,
     },
+    transactionsDimension<MorphoListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: MORPHO_TX_TOP,
+    }),
   ];
 }
 
@@ -335,6 +350,7 @@ export function morphoFiltersToFetchParams(
     user: target.wallet,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as MorphoPositionSort,
     sortOrder: filters.sortOrder,
     limit: MORPHO_ITEMS_PER_PAGE,

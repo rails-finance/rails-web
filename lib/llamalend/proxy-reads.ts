@@ -53,6 +53,11 @@ export async function readLlamalendPositions(
   if (sp.get("controller")) qs.set("controller", sp.get("controller")!);
   if (sp.get("status")) qs.set("status", sp.get("status")!);
   if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
+  // A transaction bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   // Allowlist, like sortOrder: an unrecognised value is dropped rather than
   // forwarded verbatim, so rails-server's own default (recent) decides it —
   // same "unrecognised ⇒ default, no error" stance the route takes throughout.
