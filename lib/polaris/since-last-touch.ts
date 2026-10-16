@@ -37,6 +37,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
 import { flowsReconcile } from "@/lib/shared/chain-truth-economics";
 import { formatCompact } from "@/lib/utils/format";
+import { polarisPendingAtFeed } from "@/lib/polaris/economics";
 
 /** The overlay fields this needs — a structural subset of PolarisChainResponse
  *  so the markdown export and the verifier can pass a plain object. */
@@ -164,11 +165,12 @@ export function polarisSinceLastTouch(
   // The card's equity: an entire debt at or below zero owes nothing.
   const equityNow = chain.entireColl * priceNow - Math.max(0, chain.entireDebt);
   const feed = collAtTouch * (priceNow - priceAtTouch);
+  const pending = polarisPendingAtFeed(chain, priceNow);
   const legs = {
-    interest: -chain.accruedInterest,
-    stabilityGain: chain.accruedStables,
-    reward: chain.bcTokenGain * priceNow,
-    psm: chain.mintRedeemCollChange * priceNow - chain.mintRedeemDebtChange,
+    interest: pending.interest,
+    stabilityGain: pending.stabilityGain,
+    reward: pending.reward,
+    psm: pending.psm,
     settle: Math.min(0, chain.entireDebt),
   };
   const protocol = legs.interest + legs.stabilityGain + legs.reward + legs.psm + legs.settle;

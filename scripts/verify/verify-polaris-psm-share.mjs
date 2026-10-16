@@ -5,9 +5,15 @@
 // next CDPUpdated as `_mintRedeemCollGain` / `_mintRedeemDebtGain`.
 // This script proves:
 //
-//   1. the three pinned fixture touches on usdp CDP 8 show one "Net PSM
-//      share" label and both signed magnitudes on the row HEADER (not the
-//      expanded detail), and the holder's own verb still renders;
+//   1. the three pinned fixture touches on usdp CDP 8, and usdp CDP 9's net
+//      redemption at block 11,637,899 (event 21), show one "PSM share" label
+//      and ONE signed figure on the row HEADER (not the expanded detail): the
+//      route's two legs netted at the route's own price at block,
+//      mintRedeemCollGain × pethInDebt − mintRedeemDebtGain, in the debt
+//      unit; neither raw leg stands on the face; and the holder's own verb
+//      still renders. A row the route has not priced shows the two legs,
+//      each signed. 1x proves the comparison rejects a figure 1% off, so a
+//      green 1 is not a match on any number;
 //   2. the four zero-share rows on the same CDP show no such label;
 //   3. the page-wide label count equals the timeline route's own independent
 //      count of touches with a non-zero share (one label per touch: the share
@@ -28,6 +34,9 @@
 // re-derived from this code either.
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
+// Fail-first, 16 Oct 2026 (ui-jobs 357): with the header's net stubbed to
+// 1.01 × itself, checks 1 went red on every fixture row.
+//
 // Run:  BASE=http://localhost:3412 node scripts/verify/verify-polaris-psm-share.mjs
 
 import { chromium } from "playwright";
@@ -93,7 +102,9 @@ async function open(context, url) {
   return page;
 }
 
-const PSM_LABEL_RE = /^Net PSM share$/;
+const PSM_LABEL = "PSM share";
+const PSM_LABEL_RE = /^PSM share$/;
+const signedFig = (v) => `${v < 0 ? "−" : "+"}${fmtFullLike(v)}`;
 
 async function rowText(page, eventKey) {
   const row = page.locator(`[data-event-id="${cssEscape(eventKey)}"]`);
@@ -137,42 +148,68 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 1400
 
 const page8 = await open(context, polarisUrl("usdp", "8"));
 
-// ── 1. the three pinned fixture touches — header labels + magnitudes ──────
+// ── 1. the fixture touches — one label, one net figure at block price ─────
 
 const FIXTURES = [
-  { block: 11603483, holderVerb: "Borrow" },
-  { block: 11562362, holderVerb: "Borrow" },
-  { block: 11610231, holderVerb: "Deposit" },
+  { cdp: "8", block: 11603483, holderVerb: "Borrow" },
+  { cdp: "8", block: 11562362, holderVerb: "Borrow" },
+  { cdp: "8", block: 11610231, holderVerb: "Deposit" },
+  // The net redemption that read "−20.772 pETH 108,803.567 USDp" on the face
+  // while its sheet read −108,803.567 (ui-jobs 357 point 1).
+  { cdp: "9", block: 11637899, holderVerb: "Deposit" },
 ];
 
+/** What the face must state for one row, from the route alone. */
+function expectedFace(e) {
+  const price = e.context?.data?.priceAtBlock?.pethInDebt;
+  if (price == null) return { net: null, legs: [signedFig(mrColl(e)), signedFig(mrDebt(e))] };
+  const net = mrColl(e) * price - mrDebt(e);
+  return { net, text: signedFig(net), legs: [fmtFullLike(mrColl(e)), fmtFullLike(mrDebt(e))] };
+}
+
+check(
+  "1x. the comparison rejects a net 1% off (a stubbed figure goes red)",
+  signedFig(626000) !== signedFig(626000 * 1.01) && !"PSM share +625,603.378".includes(signedFig(625603.378 * 1.01)),
+);
+
+const j9 = await api("/api/polaris/timeline?market=usdp&id=9");
+const routeByCdp = { 8: eventsByBlock8, 9: new Map(j9.events.map((e) => [e.blockNumber, e])) };
+const pages = { 8: page8, 9: await open(context, polarisUrl("usdp", "9")) };
+
 for (const f of FIXTURES) {
-  const e = eventsByBlock8.get(f.block);
-  check(`1. usdp/8 block ${f.block} is on the route`, e != null);
+  const e = routeByCdp[f.cdp].get(f.block);
+  check(`1. usdp/${f.cdp} block ${f.block} is on the route`, e != null);
   if (e == null) continue;
-  const collLabel = "Net PSM share";
-  const debtLabel = "Net PSM share";
-  const sign = (v) => (v < 0 ? "−" : "+");
-  const collMag = `${sign(mrColl(e))}${fmtFullLike(mrColl(e))}`;
-  const debtMag = `${sign(mrDebt(e))}${fmtFullLike(mrDebt(e))}`;
-  const text = await rowText(page8, e.id);
-  check(`1. usdp/8 block ${f.block} row found on the page (event_key ${e.id})`, text != null);
+  const want = expectedFace(e);
+  const text = await rowText(pages[f.cdp], e.id);
+  check(`1. usdp/${f.cdp} block ${f.block} row found on the page (event_key ${e.id})`, text != null);
   if (text == null) continue;
+  if (want.net != null) {
+    check(
+      `1. usdp/${f.cdp} block ${f.block} header shows "${PSM_LABEL} ${want.text} USDp" (legs ${mrColl(e)} pETH, ${mrDebt(e)} USDp at ${e.context.data.priceAtBlock.pethInDebt})`,
+      // textContent runs the label, figure and ticker together.
+      text.replace(/\s/g, "").includes(`${PSM_LABEL}${want.text}USDp`.replace(/\s/g, "")),
+      text.slice(0, 200),
+    );
+    check(
+      `1. usdp/${f.cdp} block ${f.block} header states neither raw leg (${want.legs.join(", ")})`,
+      !want.legs.some((l) => text.includes(l)),
+      text.slice(0, 200),
+    );
+  } else {
+    check(
+      `1. usdp/${f.cdp} block ${f.block} has no price at block, so the header shows both legs signed (${want.legs.join(", ")})`,
+      text.includes(PSM_LABEL) && want.legs.every((l) => text.includes(l)),
+      text.slice(0, 200),
+    );
+  }
   check(
-    `1. block ${f.block} header shows "${collLabel}" + ${collMag}`,
-    text.includes(collLabel) && text.includes(collMag),
-    text.slice(0, 200),
-  );
-  check(
-    `1. block ${f.block} header shows "${debtLabel}" + ${debtMag}`,
-    text.includes(debtLabel) && text.includes(debtMag),
-    text.slice(0, 200),
-  );
-  check(
-    `1. block ${f.block} header still shows the holder's own verb "${f.holderVerb}"`,
+    `1. usdp/${f.cdp} block ${f.block} header still shows the holder's own verb "${f.holderVerb}"`,
     text.includes(f.holderVerb),
     text.slice(0, 200),
   );
 }
+await pages[9].close();
 
 // ── 2. the four zero-share rows show none of the four labels ──────────────
 
@@ -188,7 +225,7 @@ for (const block of ZERO_BLOCKS) {
   );
   const text = await rowText(page8, e.id);
   check(`2. usdp/8 block ${block} row found on the page`, text != null);
-  const hasAnyLabel = text != null && text.includes("Net PSM share");
+  const hasAnyLabel = text != null && text.includes(PSM_LABEL);
   check(`2. usdp/8 block ${block} header shows NO PSM label`, !hasAnyLabel, text?.slice(0, 200) ?? "");
 }
 
@@ -197,7 +234,7 @@ for (const block of ZERO_BLOCKS) {
 const wantLegs8 = nonZeroTouchCount(j8.events);
 const domLabelCount8 = await page8.getByText(PSM_LABEL_RE).count();
 check(
-  `3. usdp/8: ${wantLegs8} "Net PSM share" labels on the page (41 touches, pinned) match the DOM count`,
+  `3. usdp/8: ${wantLegs8} "${PSM_LABEL}" labels on the page (41 touches, pinned) match the DOM count`,
   domLabelCount8 === wantLegs8,
   `DOM ${domLabelCount8}, route ${wantLegs8}`,
 );

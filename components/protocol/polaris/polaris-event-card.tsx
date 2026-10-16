@@ -21,6 +21,7 @@ import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { polarisEventProse } from "@/lib/polaris/event-prose";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
+import { formatPeth } from "@/lib/polaris/figure-format";
 import { usePolarisHeadSpec } from "./polaris-event-header";
 import { polarisEventBody } from "./polaris-event-detail";
 import {
@@ -66,8 +67,8 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
       // A deposit moves pETH into the protocol; a withdrawal out to the wallet.
       direction: dColl > 0 ? "right" : "left",
       value: Math.abs(dColl),
-      // The header's rule: in full, three decimals; the icon names the token.
-      display: formatNumber(Math.abs(dColl)),
+      // The header's rule: in full, pETH to four decimals; the icon names the token.
+      display: formatPeth(Math.abs(dColl)),
     });
   if (isTouch && dDebt !== 0)
     tokens.push({

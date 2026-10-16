@@ -13,10 +13,11 @@
 // An open / adjust / close touch may ALSO carry a settled PSM share (the
 // market's mint/redemption activity moves every CDP pro rata, and the effect
 // lands on the CDP's own next touch as `_mintRedeemCollGain` /
-// `_mintRedeemDebtGain`): those legs render AFTER the holder's own deltas,
-// neutral rb-500 (a market fact, not a holder choice — no caution tone, no
-// pill), with `noSpineCounterpart` since the spine draws the holder's own
-// flows only. A liquidation states the pool's seizure with caution labels,
+// `_mintRedeemDebtGain`): it renders AFTER the holder's own deltas as one
+// signed "PSM share" in the debt unit at the row's price at block (two signed
+// legs where the row has no price), neutral rb-500 (a market fact, not a
+// holder choice — no caution tone, no pill), with `noSpineCounterpart` since
+// the spine draws the holder's own flows only. A liquidation states the pool's seizure with caution labels,
 // then the surplus set aside for the owner as a neutral "Claimable" leg when
 // there is one (lib/polaris/liquidation-legs.ts holds the three-leg rule),
 // and names the liquidator as a neutral party; a transfer names the recipient
@@ -25,11 +26,20 @@
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
-import { ledgerFieldProv, liquidatorProv, transferProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
+import {
+  ledgerFieldProv,
+  liquidatorProv,
+  psmShareNetProv,
+  transferProv,
+  type PolarisCoords,
+} from "@/lib/polaris/event-provenance";
 import { polarisLiquidationDeltas } from "@/lib/polaris/liquidation-legs";
 import { CR_CHIP_TITLE, crChipText, polarisCrAtEvent, polarisCrReceipt } from "@/lib/polaris/cr-at-event";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
-import { formatNumber } from "@/lib/utils/format";
+import { formatExact, formatNumber, withRealMinus } from "@/lib/utils/format";
+import { polarisPsmShareValue } from "@/lib/polaris/economics";
+import { formatPeth } from "@/lib/polaris/figure-format";
+import { PSM_SHARE_LABEL } from "@/lib/polaris/row-kinds";
 
 const num = (s?: string): number => {
   const n = Number(s ?? "0");
@@ -69,35 +79,55 @@ export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coo
   // label on a touch the holder did nothing but receive a PSM share on.
   let holderDeltaCount = 0;
 
-  // Pushes the settled PSM legs, when non-zero, after the holder's own
-  // deltas — same log, same touch, the market's pro-rata share of its own
-  // mints/redemptions. Not an axis verb (no holder chose it) and no spine
-  // counterpart (the spine draws the holder's own flows only), so the
-  // header keeps the figure at ≥sm.
-  // The share is the NET of every mint and redemption since the CDP's
-  // previous touch, so its two sides can carry opposite signs: one name for
-  // the pair, on the first leg, and each side signed by what it did.
+  // Pushes the settled PSM share, when non-zero, after the holder's own
+  // deltas — the market's pro-rata share of its own mints and redemptions
+  // since the CDP's previous touch. Not an axis verb (no holder chose it) and
+  // no spine counterpart (the spine draws the holder's own flows only), so the
+  // header keeps the figure at ≥sm. With the row's price at block it is one
+  // signed figure in the debt unit (lib/polaris/economics.ts), its receipt
+  // carrying both legs and the price; without one, the two legs, each signed.
   const pushPsmLegs = (): void => {
-    let named = false;
-    const signed = (v: number): string => `${v < 0 ? "−" : "+"}${formatNumber(Math.abs(v))}`;
-    if (mrColl !== 0) {
+    if (mrColl === 0 && mrDebt === 0) return;
+    const price = ctx.priceAtBlock?.pethInDebt;
+    if (price != null && price > 0) {
+      const net = polarisPsmShareValue(mrColl, mrDebt, price);
+      deltas.push({
+        value: net,
+        symbol: stable,
+        address: stableAddr,
+        label: PSM_SHARE_LABEL,
+        signed: true,
+        exact: withRealMinus(`${net < 0 ? "" : "+"}${formatExact(net)}`),
+        prov: psmShareNetProv(coords, {
+          coll: mrColl,
+          debt: mrDebt,
+          price,
+          collRaw: ctx.raw?.mintRedeemCollGain,
+          debtRaw: ctx.raw?.mintRedeemDebtGain,
+          priceRaw: ctx.priceAtBlock?.raw,
+        }),
+        noSpineCounterpart: true,
+      });
+      return;
+    }
+    // One name for the pair, on the first leg; each side signed by what it did.
+    if (mrColl !== 0)
       deltas.push({
         value: mrColl,
         symbol: PETH.symbol,
         address: PETH.address,
-        label: "Net PSM share",
-        display: signed(mrColl),
+        label: PSM_SHARE_LABEL,
+        signed: true,
         prov: ledgerFieldProv("mintRedeemCollGain", coords, ctx.raw?.mintRedeemCollGain),
         noSpineCounterpart: true,
       });
-      named = true;
-    }
     if (mrDebt !== 0)
       deltas.push({
         value: mrDebt,
         symbol: stable,
         address: stableAddr,
-        ...(named ? {} : { label: "Net PSM share", display: signed(mrDebt) }),
+        ...(mrColl !== 0 ? {} : { label: PSM_SHARE_LABEL }),
+        signed: true,
         prov: ledgerFieldProv("mintRedeemDebtGain", coords, ctx.raw?.mintRedeemDebtGain),
         noSpineCounterpart: true,
       });
@@ -159,14 +189,14 @@ export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coo
       break;
   }
 
-  // One rounding rule for a figure wherever it appears — the row, the spine,
-  // the opened grid and the card all state it in full to three decimals —
-  // and each amount names its token in words beside the glyph. A verb's
+  // One rounding rule for a figure wherever it appears — the row, the spine
+  // and the card state it in full, pETH to four decimals and the stablecoin
+  // to three — and each amount names its token in words beside the glyph. A verb's
   // amount carries no ticker: at ≥sm its figure and glyph hand off to the
   // spine, and the ticker would stand alone after the verb.
   const shown: ChainTruthDelta[] = deltas.map((d) => ({
     ...d,
-    display: d.display ?? formatNumber(Math.abs(d.value)),
+    display: d.display ?? (d.symbol === PETH.symbol ? formatPeth : formatNumber)(Math.abs(d.value)),
     ...(d.axisVerb ? {} : { suffix: d.symbol }),
   }));
 

@@ -362,6 +362,7 @@ export default function PolarisPositionView({
               <>
                 <PolarisPositionCard
                   v={view}
+                  lifetime={lifetime}
                   viewHref={tl.viewHref}
                   exports={exports ?? undefined}
                   explanationDefaultOpen={explanationOpen}

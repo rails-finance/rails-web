@@ -59,6 +59,51 @@ const num = (s?: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/** A PSM share's two legs as one figure in the debt unit: the pETH it added
+ *  (or took) at the given pETH price, less the debt it added (or cleared).
+ *  The row face, the lifetime sums, the card's stats and the markdown all
+ *  value a share with this. */
+export const polarisPsmShareValue = (collLeg: number, debtLeg: number, pethInDebt: number): number =>
+  collLeg * pethInDebt - debtLeg;
+
+/** The lifetime net PSM legs valued at one price (the latest feed): the
+ *  figure the card's "PSM outcome at the feed" and the markdown state. Null
+ *  on a CDP no PSM share ever reached. */
+export function polarisPsmOutcomeAtFeed(
+  lifetime: PolarisLifetime,
+  pethInDebt: number,
+): { netColl: number; netDebt: number; value: number } | null {
+  if (lifetime.collFromPsm + lifetime.collToPsm + lifetime.debtFromPsm + lifetime.debtToPsm === 0) return null;
+  const netColl = lifetime.collFromPsm - lifetime.collToPsm;
+  const netDebt = lifetime.debtFromPsm - lifetime.debtToPsm;
+  return { netColl, netDebt, value: polarisPsmShareValue(netColl, netDebt, pethInDebt) };
+}
+
+/** The live read's pending legs, the subset of PolarisChainResponse they need. */
+export interface PolarisPendingRead {
+  accruedInterest: number;
+  accruedStables: number;
+  bcTokenGain: number;
+  mintRedeemCollChange: number;
+  mintRedeemDebtChange: number;
+}
+
+/** The four legs that settle at the CDP's next touch, each in the debt unit at
+ *  the feed, signed by their effect on equity: interest a cost, the stability
+ *  gain a credit, the PSM share at the feed, the reward pETH at the feed.
+ *  `total` is the card's "Pending to settle"; the "Since its last touch"
+ *  window's protocol term is the same legs. */
+export function polarisPendingAtFeed(
+  c: PolarisPendingRead,
+  pethInDebt: number,
+): { interest: number; stabilityGain: number; psm: number; reward: number; total: number } {
+  const interest = -c.accruedInterest;
+  const stabilityGain = c.accruedStables;
+  const psm = polarisPsmShareValue(c.mintRedeemCollChange, c.mintRedeemDebtChange, pethInDebt);
+  const reward = c.bcTokenGain * pethInDebt;
+  return { interest, stabilityGain, psm, reward, total: interest + stabilityGain + psm + reward };
+}
+
 /** Sum the ledger's legs over the CDP's rows. Exported for the markdown
  *  export, which states the same figures in words. */
 export function polarisLifetime(events: BaseActivityEvent[]): PolarisLifetime {
@@ -117,7 +162,7 @@ export function polarisLifetime(events: BaseActivityEvent[]): PolarisLifetime {
       if (price == null) {
         f.psmRowsUnpriced++;
       } else {
-        const effect = mrColl * price - mrDebt;
+        const effect = polarisPsmShareValue(mrColl, mrDebt, price);
         f.psmEffectAtSettle += effect;
         const isRedemption = mrColl !== 0 ? mrColl < 0 : mrDebt < 0;
         if (isRedemption) f.psmRedemptionEffectAtSettle += effect;
