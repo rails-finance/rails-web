@@ -79,7 +79,7 @@ const qty = (v: number): string => {
   const a = Math.abs(v);
   if (a >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
   if (a >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `${(v / 1e3).toFixed(1)}k`;
+  if (a >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
   if (a > 0 && a < 0.001) return formatTinyNonZero(v);
   return v.toLocaleString("en-US", { maximumFractionDigits: a < 1 ? 4 : 2 });
 };
@@ -394,7 +394,7 @@ function MarketCard({ m, block, chainId }: { m: CompoundV3MarketRow; block: numb
               of base units, which is what its receipt says. It is stated in
               that asset and not run through the market's oracle: on a market
               whose base is not its numeraire the two are different numbers,
-              and cAEROv3 is that market (539.9k AERO is not $539.9k). */}
+              and cAEROv3 is that market (539.9K AERO is not $539.9K). */}
           <span>
             <span className={`${k} ${TIPPED}`}>Reserves</span>{" "}
             <Prov info={cvReservesProv("line", coords)}>

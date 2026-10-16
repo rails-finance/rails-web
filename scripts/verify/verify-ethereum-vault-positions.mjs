@@ -1153,7 +1153,7 @@ check(
 // census's oracle read at the census block — so the copy rule is no longer "no
 // dollar sign" but "no dollar figure that is not that stat": every `$` on the
 // page is accounted for by an open, priced card, and none is anywhere else.
-const dollarFigures = (body.match(/\$\s?\d[\d,.]*[kMB]?/g) ?? []).length;
+const dollarFigures = (body.match(/\$\s?\d[\d,.]*[KMB]?/g) ?? []).length;
 const pricedOpenCards = dom.cards.filter((c) => c.status === "live" && c.valueUsdE8).length;
 check(
   "L9b the only dollar figures on the listing are the open cards' Value · USD stats",

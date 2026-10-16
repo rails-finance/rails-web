@@ -328,5 +328,5 @@ test("token figures: compact, whole and spoken", () => {
   assert.equal(formatFlowUsd(315, unit), "0.0315 WETH");
   assert.equal(wholeUsd(123_456, unit), "12.3456 WETH");
   assert.equal(wholeUsd(-90_118, { symbol: "USDC", scale: 0 }), "90,118 USDC");
-  assert.equal(formatFlowUsd(82_029, { symbol: "USDC", scale: 0 }), "82k USDC");
+  assert.equal(formatFlowUsd(82_029, { symbol: "USDC", scale: 0 }), "82K USDC");
 });

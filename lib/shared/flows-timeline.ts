@@ -1373,8 +1373,8 @@ export function nextEventDay(m: FlowModel, stop: number): number {
 /** Unix seconds of the start of day `stop`. */
 export const dayStart = (m: FlowModel, stop: number): number => (m.start + stop * DAY_MS) / 1000;
 
-/** "$123k" · "$5.5k" · "$363" · "$1.2M" · "$1.89B" · "−$5k": whole dollars
- *  under $1k, one decimal under $10k, whole thousands under $1M, one decimal
+/** "$123K" · "$5.5K" · "$363" · "$1.2M" · "$1.89B" · "−$5K": whole dollars
+ *  under $1K, one decimal under $10K, whole thousands under $1M, one decimal
  *  of millions under $1B, then billions to two decimals with a trailing zero
  *  dropped ("$1.0B", "$1.5B", "$1.89B"). */
 export function formatFlowUsd(v: number, unit?: FlowUnit): string {
@@ -1384,8 +1384,8 @@ export function formatFlowUsd(v: number, unit?: FlowUnit): string {
   let body: string;
   if (a >= 999_950_000) body = `$${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")}B`;
   else if (a >= 1_000_000) body = `$${(a / 1_000_000).toFixed(1)}M`;
-  else if (a >= 9_999.5) body = `$${Math.round(a / 1_000)}k`;
-  else if (a >= 999.5) body = `$${(a / 1_000).toFixed(1)}k`;
+  else if (a >= 9_999.5) body = `$${Math.round(a / 1_000)}K`;
+  else if (a >= 999.5) body = `$${(a / 1_000).toFixed(1)}K`;
   else body = `$${Math.round(a)}`;
   return sign + body;
 }
@@ -1421,7 +1421,7 @@ export const sideAxis = (m: Pick<FlowModel, "axis" | "sideAxes">, side: FlowSide
 /** Grains to the token. */
 export const unitAmount = (v: number, unit: FlowUnit): number => v / 10 ** unit.scale;
 
-/** "12.3k USDC" · "4.21 WETH" · "0.0315 WBTC": the token at about three
+/** "12.3K USDC" · "4.21 WETH" · "0.0315 WBTC": the token at about three
  *  significant digits, thousands and millions shortened as the dollars are. */
 export function formatFlowToken(v: number, unit: FlowUnit, symbol = true): string {
   const x = unitAmount(v, unit);
@@ -1430,8 +1430,8 @@ export function formatFlowToken(v: number, unit: FlowUnit, symbol = true): strin
   let body: string;
   if (a >= 999_950_000) body = `${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")}B`;
   else if (a >= 1_000_000) body = `${(a / 1_000_000).toFixed(1)}M`;
-  else if (a >= 9_999.5) body = `${Math.round(a / 1_000)}k`;
-  else if (a >= 999.5) body = `${(a / 1_000).toFixed(1)}k`;
+  else if (a >= 9_999.5) body = `${Math.round(a / 1_000)}K`;
+  else if (a >= 999.5) body = `${(a / 1_000).toFixed(1)}K`;
   else if (a >= 99.95) body = `${Math.round(a)}`;
   else if (a >= 9.995) body = a.toFixed(1);
   else if (a >= 0.9995) body = a.toFixed(2);

@@ -219,12 +219,12 @@ test("9 Nov 2025 reads as Miles's screenshot of the prototype", () => {
   const s = stateAt(model, stop);
   assert.equal(formatDate(dayStart(model, stop)), "9 Nov 2025");
   assert.equal(s.count, 25);
-  assert.equal(formatFlowUsd(s.collateral.now), "$123k");
-  assert.equal(formatFlowUsd(s.collateral.total), "$206k");
-  assert.equal(formatFlowUsd(s.collateral.out), "$83k");
-  assert.equal(formatFlowUsd(s.debt.now), "$48k");
-  assert.equal(formatFlowUsd(s.debt.total), "$60k");
-  assert.equal(formatFlowUsd(s.debt.out), "$12k");
+  assert.equal(formatFlowUsd(s.collateral.now), "$123K");
+  assert.equal(formatFlowUsd(s.collateral.total), "$206K");
+  assert.equal(formatFlowUsd(s.collateral.out), "$83K");
+  assert.equal(formatFlowUsd(s.debt.now), "$48K");
+  assert.equal(formatFlowUsd(s.debt.total), "$60K");
+  assert.equal(formatFlowUsd(s.debt.out), "$12K");
 });
 
 test("solid plus hatched is the in figure, and the sources fill the bar, at every stop", () => {
@@ -302,11 +302,11 @@ test("the axis's labels at phone width: the ends always, never two neighbours, t
 
 test("the number format", () => {
   assert.equal(formatFlowUsd(363.4), "$363");
-  assert.equal(formatFlowUsd(5_473), "$5.5k");
-  assert.equal(formatFlowUsd(123_024), "$123k");
-  assert.equal(formatFlowUsd(-5_000), "−$5.0k");
+  assert.equal(formatFlowUsd(5_473), "$5.5K");
+  assert.equal(formatFlowUsd(123_024), "$123K");
+  assert.equal(formatFlowUsd(-5_000), "−$5.0K");
   assert.equal(formatFlowUsd(1_234_567), "$1.2M");
-  assert.equal(formatFlowUsd(9_999.7), "$10k");
+  assert.equal(formatFlowUsd(9_999.7), "$10K");
   assert.equal(formatFlowUsd(1_000_000_000), "$1.0B");
   assert.equal(formatFlowUsd(1_887_545_149), "$1.89B");
   assert.equal(formatFlowUsd(1_500_000_000), "$1.5B");

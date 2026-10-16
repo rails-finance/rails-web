@@ -880,7 +880,7 @@ export function lineStripScale(model: FlowModel, series: FlowBinSeries | null, h
   // A token axis (Morpho) labels its values without the symbol.
   // Compact on the axis: "$4M", "$250k".
   const axisLabel = (t: number) =>
-    model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t).replace(/\.0(?=[kMB])/, "");
+    model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t).replace(/\.0(?=[KMB])/, "");
   // Labels at least 24px apart: every k-th of the axis's ticks. A label that
   // reads as the one under it ("$0" thrice on a position worth cents) is left
   // out.

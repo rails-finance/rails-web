@@ -1515,7 +1515,7 @@ const banned = [
 // oracle read at the census block — so "no dollar sign" became "no dollar
 // figure other than that stat": the count of `$` figures on the page equals one
 // for an open, priced card and zero otherwise.
-const dollarFigures = (f5Page.text.match(/\$\s?\d[\d,.]*[kMB]?/g) ?? []).length;
+const dollarFigures = (f5Page.text.match(/\$\s?\d[\d,.]*[KMB]?/g) ?? []).length;
 const expectedDollars = f5Page.cardStatus === "live" && f5Page.cardValueUsdE8 ? 1 : 0;
 check(
   "T7h0 the only dollar figure on the position page is the card's Value · USD stat",

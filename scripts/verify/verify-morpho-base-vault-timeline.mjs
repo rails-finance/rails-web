@@ -1639,7 +1639,7 @@ check(
 // dollar figure" but "no dollar figure other than that stat": an open, priced
 // card accounts for exactly one, and a closed or unpriced one for none. The
 // timeline itself still carries none, which is what B6 below breaks.
-const USD_FIGURE_RE = /\$\s?\d[\d,.]*[kMB]?/g;
+const USD_FIGURE_RE = /\$\s?\d[\d,.]*[KMB]?/g;
 const USD_SUFFIX_RE = /\b\d[\d,]*(?:\.\d+)?\s?USD\b/;
 // A rate of return is a FIGURE wearing a period, so the test is the figure and
 // the period together — "Apr" is a month in this section's own en-GB dates, and

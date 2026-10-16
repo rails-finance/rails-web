@@ -11,7 +11,7 @@ export function amount(value: number): string {
   const a = Math.abs(value);
   if (a >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
   if (a >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `${(value / 1e3).toFixed(1)}k`;
+  if (a >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
   if (a < 0.001) return formatTinyNonZero(value);
   return value.toLocaleString("en-US", { maximumFractionDigits: a < 1 ? 4 : 2 });
 }

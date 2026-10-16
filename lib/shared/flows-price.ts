@@ -199,11 +199,11 @@ export function formatPrice(v: number, unitLabel: string): string {
 const sig3 = (x: number) => x.toLocaleString("en-US", { maximumSignificantDigits: 3, useGrouping: false });
 
 /** The price axis's labels, in the heading's unit with no sign: thousands
- *  and up compact ("2.45k", "1.2M"), below at the fewest places that keep
+ *  and up compact ("2.45K", "1.2M"), below at the fewest places that keep
  *  every label distinct ("1.5", "1", "0.95"), trailing zeros dropped. */
 export function priceAxisLabels(ticks: number[]): string[] {
   const compact = (a: number) =>
-    a >= 1e9 ? `${sig3(a / 1e9)}B` : a >= 1e6 ? `${sig3(a / 1e6)}M` : a >= 1e4 ? `${sig3(a / 1e3)}k` : null;
+    a >= 1e9 ? `${sig3(a / 1e9)}B` : a >= 1e6 ? `${sig3(a / 1e6)}M` : a >= 1e4 ? `${sig3(a / 1e3)}K` : null;
   const at = (d: number) =>
     ticks.map((v) => {
       const c = compact(Math.abs(v));

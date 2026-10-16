@@ -75,7 +75,7 @@ page.on("request", (req) => {
 // ── A + B — every view names its block and renders its figures ───────────────
 /** Formatted figures — a thousands-separated integer, a decimal, or a compact
  *  suffix. A view that read nothing renders its error copy and almost none. */
-const FIGURE = /\d{1,3}(?:,\d{3})+|\d+\.\d+%?|\d+(?:\.\d+)?[MBk]\b/g;
+const FIGURE = /\d{1,3}(?:,\d{3})+|\d+\.\d+%?|\d+(?:\.\d+)?[KMB]\b/g;
 
 for (const view of VIEWS) {
   await page.goto(`${base}${view.path}`, { waitUntil: "networkidle" });
