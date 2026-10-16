@@ -9,7 +9,7 @@ import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
 import { EventPageAside, EventPageContext } from "@/components/shared/event-page-aside";
 import { EVENT_PAGE_WORDS } from "@/lib/shared/event-page-words";
-import { SheetCollectContext, type CollectedCard } from "@/components/shared/group-sheet";
+import { SheetCollectContext, type CollectedCard, type GroupLane } from "@/components/shared/group-sheet";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
@@ -126,6 +126,10 @@ interface EventCardSlotsCommon {
    *  the family draws a sheet whose figures are still on their way, and
    *  `cells` stands (its placeholders) until they land. */
   sheet?: EventSheet | null;
+  /** The balances the event's row states, handed to a group's sheet
+   *  (`group-sheet.tsx`, `mergeLaneSheet`) where `sheet` waits on a read the
+   *  card makes at open. */
+  groupLanes?: GroupLane[];
   /** Data attributes on the grid: the state of the read its figures come
    *  from ("data-position-state": "ready"). */
   cellsData?: Record<string, string>;
@@ -363,7 +367,7 @@ function CollectedEventCard({
   slots: EventCardSlots;
   collect: (card: CollectedCard) => () => void;
 }) {
-  const { event, sheet, price } = slots;
+  const { event, sheet, price, groupLanes } = slots;
   useEffect(() => {
     if (!event) return;
     return collect({
@@ -373,8 +377,9 @@ function CollectedEventCard({
       number: event.number,
       sheet,
       price,
+      lanes: groupLanes,
     });
-  }, [collect, event, sheet, price]);
+  }, [collect, event, sheet, price, groupLanes]);
   return null;
 }
 

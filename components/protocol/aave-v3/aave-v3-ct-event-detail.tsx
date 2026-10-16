@@ -83,7 +83,8 @@ import {
 } from "@/components/shared/liquidation-forensics";
 import { signedAmount } from "./aave-v3-ct-event-header";
 import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
-import { aaveFamilySheet, aaveRowSheet } from "./aave-family-sheet";
+import { aaveFamilySheet, aaveGroupLanes, aaveRowSheet } from "./aave-family-sheet";
+import type { GroupLane } from "@/components/shared/group-sheet";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { exactLeg, exactUsd, reserveSymbol, statePricePills, type TouchedLeg } from "./aave-v3-position-state";
@@ -143,6 +144,9 @@ export interface AaveV3EventBody {
    *  read lands; on a row with no read (a shared block, a fee's row), the
    *  row's own figures. */
   sheet?: EventSheet | null;
+  /** The balances the row states, for its group's sheet; none on a swap,
+   *  whose received leg carries no balance before. */
+  groupLanes?: GroupLane[];
   /** The grid's data attributes: the read's state. */
   cellsData?: Record<string, string>;
   /** Lines under the grid: a liquidation's figures, a fee's, a missing read. */
@@ -328,8 +332,11 @@ export function useAaveV3EventBody({
   const sideOf = new Map<ChainTruthStat, FlowSide>();
   /** Each balance stat's axis, for the sheet of a row with no read. */
   const axisOf = new Map<ChainTruthStat, Axis>();
+  /** Every balance the row states, for its group's sheet. */
+  const axes: Axis[] = [];
   /** The axis' stat, or null where the read's side cell states the balance. */
   const statFor = (a: Axis): ChainTruthStat | null => {
+    axes.push(a);
     if (Number(a.change ?? "0") !== 0) moved.add(a.side);
     const s = axisStat(a);
     if (s) {
@@ -834,6 +841,50 @@ export function useAaveV3EventBody({
     });
   }
 
+  // The row's balances for its group's sheet: each lane's before and after as
+  // the row states them. A fee's row states its change alone: its balances
+  // are the liquidation's.
+  const groupLanes =
+    ctx.eventType === "swap" || unread || axes.some((a) => a.change == null)
+      ? undefined
+      : aaveGroupLanes(
+          axes.map((a) => ({
+            side: a.side,
+            symbol: a.symbol,
+            address: a.reserve,
+            change: a.change!,
+            changeProv: a.changeProv,
+            before: feeOf ? undefined : a.side === "supply" ? ctx.supplyBefore : ctx.debtBefore,
+            after: feeOf ? undefined : a.principalAfter,
+            chain: !!a.chain,
+            beforeProv: a.chain
+              ? rowChainBalanceProv(a.symbol, a.side, "before", coords, {
+                  raw: a.chain.rawBefore,
+                  index: a.chain.index,
+                })
+              : a.side === "supply"
+                ? supplyBeforeProv(a.symbol, coords)
+                : debtBeforeProv(a.symbol, coords),
+            afterProv: a.chain
+              ? rowChainBalanceProv(a.symbol, a.side, "after", coords, {
+                  raw: a.principalRawAfter,
+                  scaled: a.chain.scaled,
+                  index: a.chain.index,
+                })
+              : a.side === "supply"
+                ? supplyAfterProv(a.symbol, coords, a.principalRawAfter)
+                : debtAfterProv(a.symbol, coords, a.principalRawAfter),
+            price: a.price?.usd,
+            priceField:
+              ctx.eventType === "liquidation"
+                ? a.side === "supply"
+                  ? "collateral_price_usd"
+                  : "debt_price_usd"
+                : "price_usd",
+          })),
+          aaveV3CtLabel(ctx, !!feeOf, coords.chainId),
+        );
+
   // With a sheet, the rows behind a swap (its gross legs) stand under it with
   // the breakdown on; the bought or sold figure stays.
   const shownLines = sheet ? stats.filter((st) => !sideOf.has(st)) : lines;
@@ -882,6 +933,7 @@ export function useAaveV3EventBody({
   return {
     cells,
     sheet,
+    groupLanes,
     cellsData: waiting
       ? { "data-position-state": "loading" }
       : ready

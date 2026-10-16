@@ -14,6 +14,7 @@ import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { useMorphoHeadSpec } from "./morpho-event-header";
 import { useMorphoCells, useMorphoOpened } from "./morpho-cells";
+import { morphoGroupLanes } from "./morpho-sheet";
 import { MorphoLedgerProvider } from "./morpho-ledger";
 import { MorphoEventExplainer, morphoLearnMoreContent } from "./morpho-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -115,6 +116,7 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
     caption: event.actionLabel,
     actor: { by: extBy ?? undefined },
     cells,
+    groupLanes: morphoGroupLanes(ctx, coords, event.flows, event.actionLabel),
     // The Collateral (or Supplied) and Debt cells open into their ledgers
     // where the page ties its timeline to the Lifetime flows panel.
     ledgers: {

@@ -58,6 +58,7 @@ import {
 } from "@/lib/morpho/use-market-at-block";
 import { MORPHO_WORDS, PROSE } from "@/lib/morpho/event-templates";
 import { soleFlowAddress } from "@/lib/shared/format-event";
+import type { GroupLane } from "@/components/shared/group-sheet";
 
 const { fillText } = PROSE;
 
@@ -614,4 +615,47 @@ function suppliedSide(ctx: MorphoContext, coords: MorphoCoords, label: string, a
         : { none: MORPHO_WORDS.sheet_not_loaded },
     totalTip: fillText(MORPHO_WORDS.tip_supplied_total, { symbol: sym }),
   };
+}
+
+/** What a borrower's card hands its group's sheet (`GroupLane`): the
+ *  collateral and the debt its row states, before and after, with their
+ *  receipts. None on a lender's row, or where the row does not carry the
+ *  debt before and after. */
+export function morphoGroupLanes(
+  ctx: MorphoContext,
+  coords: MorphoCoords,
+  flows: AssetFlow[] | undefined,
+  label: string,
+): GroupLane[] | undefined {
+  if (ctx.eventType === "supply" || ctx.eventType === "withdraw") return undefined;
+  if (ctx.collateralAfter == null || ctx.debtBefore == null || ctx.debtAfter == null) return undefined;
+  const collSym = ctx.collateralSymbol;
+  const loanSym = ctx.loanSymbol;
+  const collChange = ctx.side === "collateral" ? ctx.assetsDelta : "0";
+  const debtMoved = ctx.eventType === "borrow" || ctx.eventType === "repay" || ctx.eventType === "liquidation";
+  const debtChange = debtMoved ? (ctx.debtChange ?? subDecimal(ctx.debtAfter, ctx.debtBefore)) : "0";
+  return [
+    {
+      side: "collateral",
+      symbol: collSym,
+      address: soleFlowAddress(flows, collSym),
+      label,
+      change: collChange,
+      changeProv: assetsDeltaProv(collSym, "collateral", coords, ctx.eventType),
+      before: { value: subDecimal(ctx.collateralAfter, collChange), prov: collateralBeforeProv(collSym, coords) },
+      after: { value: ctx.collateralAfter, prov: collateralAfterProv(collSym, coords) },
+      fmt: fmtMorphoAmount,
+    },
+    {
+      side: "debt",
+      symbol: loanSym,
+      address: soleFlowAddress(flows, loanSym),
+      label,
+      change: debtChange,
+      changeProv: debtChangeProv(loanSym, coords),
+      before: { value: ctx.debtBefore, prov: debtBeforeProv(loanSym, coords) },
+      after: { value: ctx.debtAfter, prov: debtAfterProv(loanSym, coords) },
+      fmt: fmtMorphoAmount,
+    },
+  ];
 }

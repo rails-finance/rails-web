@@ -172,6 +172,8 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
     actor: { by: extBy ?? undefined, byOwner: isTransfer && kind === "transfer_in" ? false : undefined },
     cells: body.cells,
     sheet: body.sheet,
+    // A fee's row states its change alone: its balances are the liquidation's.
+    groupLanes: feeOf ? body.groupLanes?.map((l) => ({ ...l, before: undefined, after: undefined })) : body.groupLanes,
     cellsData: body.cellsData,
     ledgers: stateMarket
       ? {

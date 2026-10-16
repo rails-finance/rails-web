@@ -266,6 +266,7 @@ export function AaveV3CtEventCard({
     },
     cells: body.cells,
     sheet: body.sheet,
+    groupLanes: body.groupLanes,
     cellsData: body.cellsData,
     ledgers: readLane
       ? {

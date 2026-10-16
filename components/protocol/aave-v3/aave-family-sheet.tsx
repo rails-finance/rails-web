@@ -26,6 +26,7 @@ import {
 import { changeText } from "@/components/shared/change-swap-value";
 import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import type { GroupLane } from "@/components/shared/group-sheet";
 import {
   accountRatioProv,
   borrowableProv,
@@ -635,4 +636,58 @@ export function aaveRowSheet({
     };
   });
   return { sides, panels: [] };
+}
+
+/** One balance an Aave-family row states, for its group's sheet: the reserve
+ *  on a lane, the row's signed change, and the balances around the row with
+ *  the family's receipts. */
+export interface AaveRowLane {
+  side: "supply" | "debt";
+  symbol: string;
+  address?: string;
+  change: string;
+  changeProv: Provenance;
+  before?: string;
+  after?: string;
+  /** The row's balances are the chain's (`balanceBasis: "chain"`). */
+  chain: boolean;
+  beforeProv: Provenance;
+  afterProv: Provenance;
+  price?: number;
+  /** The row field the price is read from ("price_usd"). */
+  priceField: string;
+}
+
+/** A receipt, naming the row field its figure is read from. */
+const fromRowField = (p: Provenance, field: string, value: string): Provenance => ({
+  ...p,
+  via: `${p.via ? `${p.via} · ` : ""}row field ${field} = ${value}`,
+});
+
+/** What an Aave-family card hands its group's sheet (`GroupLane`): each
+ *  balance its row states, before and after, with the receipt of the row
+ *  field it reads (`chain_supply_before`, `debt_after`, `price_usd`). */
+export function aaveGroupLanes(lanes: AaveRowLane[], label: string): GroupLane[] {
+  return lanes.map((l) => {
+    const field = (when: "before" | "after") => `${l.chain ? "chain_" : ""}${l.side}_${when}`;
+    const price = l.price;
+    return {
+      side: l.side === "supply" ? "collateral" : "debt",
+      symbol: l.symbol,
+      address: l.address,
+      label,
+      change: l.change,
+      changeProv: l.changeProv,
+      before:
+        l.before != null ? { value: l.before, prov: fromRowField(l.beforeProv, field("before"), l.before) } : undefined,
+      after: l.after != null ? { value: l.after, prov: fromRowField(l.afterProv, field("after"), l.after) } : undefined,
+      price,
+      usdProv:
+        price != null
+          ? (what: string, amount: string) =>
+              fromRowField(atBlockUsdProv(l.symbol, what, amount, price), l.priceField, `$${price}`)
+          : undefined,
+      fmt: fmtPositionAmount,
+    };
+  });
 }

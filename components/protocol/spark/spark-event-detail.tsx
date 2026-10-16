@@ -59,7 +59,7 @@ import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
 import { sparkRiskCells } from "./spark-account-state";
 import { TRANSFER_LABEL } from "@/lib/spark/event-label";
-import { aaveFamilySheet } from "@/components/protocol/aave-v3/aave-family-sheet";
+import { aaveFamilySheet, aaveGroupLanes, type AaveRowLane } from "@/components/protocol/aave-v3/aave-family-sheet";
 import { reserveSymbol } from "@/components/protocol/aave-v3/aave-v3-position-state";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import type { EventSheet } from "@/components/shared/event-sheet";
@@ -407,20 +407,34 @@ export function useSparkEventBody({
         </span>,
       );
   if (ready && previous && read.prevUnread)
-    addSub("supply", <>Supply interest on the collateral is left out: the position after the previous event was not read.</>);
+    addSub(
+      "supply",
+      <>Supply interest on the collateral is left out: the position after the previous event was not read.</>,
+    );
 
-  const risk = read.status === "ready" && read.state && ready ? sparkRiskCells({ state: read.state, raw: ready, coords: v3Coords, isLiquidation: ctx.eventType === "liquidation" }) : null;
+  const risk =
+    read.status === "ready" && read.state && ready
+      ? sparkRiskCells({
+          state: read.state,
+          raw: ready,
+          coords: v3Coords,
+          isLiquidation: ctx.eventType === "liquidation",
+        })
+      : null;
   const rowCells = stats.map((st, i) =>
     rowCell(st, `row-${i}`, ready ? undefined : sideOf.get(st) === "debt" ? "debt" : "collateral"),
   );
-  const cells: EventCells =
-    waiting
-      ? { pending: ACCOUNT_CELL_HEADS }
-      : ready && risk
-        ? [...accountSideCells({ state: ready, coords: v3Coords, touched, moved, eventTs, sub: subs }), ...risk.cells, ...rowCells]
-        : rowCells.length > 0
-          ? rowCells
-          : { none: "The event moved no balance the card can state." };
+  const cells: EventCells = waiting
+    ? { pending: ACCOUNT_CELL_HEADS }
+    : ready && risk
+      ? [
+          ...accountSideCells({ state: ready, coords: v3Coords, touched, moved, eventTs, sub: subs }),
+          ...risk.cells,
+          ...rowCells,
+        ]
+      : rowCells.length > 0
+        ? rowCells
+        : { none: "The event moved no balance the card can state." };
 
   const notes = (
     <>
@@ -452,6 +466,12 @@ export function useSparkEventBody({
   // Aave family's builder over the same position reads. The assets repaid in
   // full: the debt assets the page's flows moved up to this event that the
   // account owes none of after it.
+  const isTransferRow = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
+  const word = isGatewayWithdrawal(ctx)
+    ? "Withdraw"
+    : isTransferRow
+      ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL]
+      : (label ?? ctx.eventType);
   let sheet: EventSheet | null | undefined = market ? null : undefined;
   if (market && ready && risk) {
     let repaid: string[] | undefined;
@@ -464,28 +484,97 @@ export function useSparkEventBody({
         for (const l of e.legs) if (l.symbol && !l.accrual && debtLines.has(l.bucket)) once.add(l.symbol);
       repaid = [...once].filter((s) => !owes.has(s));
     }
-    const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
-    const word = isGatewayWithdrawal(ctx)
-      ? "Withdraw"
-      : isTransfer
-        ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL]
-        : (label ?? ctx.eventType);
     sheet = aaveFamilySheet({ state: ready, prev: read.prevRaw, coords: v3Coords, label: word, eventTs, repaid });
   }
+
+  // The row's balances for its group's sheet: each lane's before and after
+  // as the row states them.
+  const lane = (
+    side: "supply" | "debt",
+    symbol: string,
+    address: string | undefined,
+    change: string | undefined,
+    changeProv: Provenance,
+    price: { usd: number } | undefined,
+    priceField: string,
+  ): AaveRowLane | null =>
+    change == null
+      ? null
+      : {
+          side,
+          symbol,
+          address,
+          change,
+          changeProv,
+          before: side === "supply" ? ctx.supplyBefore : ctx.debtBefore,
+          after: side === "supply" ? ctx.supplyAfter : ctx.debtAfter,
+          chain,
+          beforeProv: beforeProv(symbol, side),
+          afterProv: afterProv(symbol, side),
+          price: price?.usd,
+          priceField,
+        };
+  const lanes =
+    ctx.eventType === "liquidation"
+      ? [
+          lane(
+            "supply",
+            ctx.collateralSymbol ?? "—",
+            ctx.collateralAsset,
+            ctx.assetsDelta,
+            seizedCollateralProv(
+              ctx.collateralSymbol ?? "—",
+              coords,
+              ctx.raw?.liquidatedCollateralAmount,
+              ctx.origin?.liquidatedCollateralAmount,
+            ),
+            ctx.collateralPrice,
+            "collateral_price_usd",
+          ),
+          lane(
+            "debt",
+            ctx.reserveSymbol,
+            reserveAddress,
+            ctx.debtDelta,
+            debtRepaidProv(ctx.reserveSymbol, coords, ctx.raw?.debtToCover, ctx.origin?.debtToCover),
+            ctx.debtPrice,
+            "debt_price_usd",
+          ),
+        ]
+      : [
+          lane(
+            ctx.side === "supply" ? "supply" : "debt",
+            ctx.reserveSymbol,
+            reserveAddress,
+            ctx.assetsDelta,
+            isTransferRow
+              ? transferDeltaProv(ctx.reserveSymbol, ctx.eventType === "transfer_in" ? "in" : "out", coords)
+              : assetsDeltaProv(
+                  ctx.reserveSymbol,
+                  ctx.side === "supply" ? "supply" : "debt",
+                  coords,
+                  ctx.raw?.amount,
+                  ctx.origin?.amount,
+                ),
+            ctx.price,
+            "price_usd",
+          ),
+        ];
+  const groupLanes = lanes.every((l) => l != null) ? aaveGroupLanes(lanes as AaveRowLane[], word) : undefined;
 
   return {
     cells,
     sheet,
-    cellsData:
-      waiting
-        ? { "data-spark-account-state": "loading", "data-position-state": "loading" }
-        : ready && risk
-          ? {
-              "data-spark-account-state": "ready",
-              "data-position-state": "ready",
-              "data-position-complete": ready.complete ? "true" : "false",
-            }
-          : undefined,
+    groupLanes,
+    cellsData: waiting
+      ? { "data-spark-account-state": "loading", "data-position-state": "loading" }
+      : ready && risk
+        ? {
+            "data-spark-account-state": "ready",
+            "data-position-state": "ready",
+            "data-position-complete": ready.complete ? "true" : "false",
+          }
+        : undefined,
     notes,
     prices: priceChips(pricePills),
     state: ready,
