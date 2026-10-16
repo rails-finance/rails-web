@@ -191,13 +191,12 @@ export const COUNT_BADGE =
  * The detail page's box padding and the inset of the bare text around the
  * boxes (rails-ops standards/detail-page-anatomy.md, "The wallet row"). The
  * position card, the Lifetime flows panel and the timeline's fill well pad
- * their content by CARD_PAD_X; the wallet row and the timeline's heading
- * start CARD_INSET_START in, so the avatar, "Opened" and the boxes' content
- * share one left line while the boxes keep their edge on the page edge. The
- * two change together.
+ * their content by CARD_PAD_X; the wallet row (H13) and the timeline's
+ * heading (L1.1) start CARD_INSET_START in, a short step off the page edge
+ * (Miles, 16 Oct 2026), while the boxes keep their edge on the page edge.
  */
 export const CARD_PAD_X = "px-5";
-export const CARD_INSET_START = "pl-5";
+export const CARD_INSET_START = "pl-2";
 
 /** The position card's frame: the raised rounded box, with the listing row's
  *  blue hover border (the row <Link> declares the group). */

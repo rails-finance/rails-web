@@ -609,8 +609,9 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         </span>
         {detail && slots.identity}
       </div>
-      {/* The card's ⋮ at the top right of the header, whatever wraps beside it. */}
-      {menu && <span className="-my-1 flex shrink-0 items-center">{menu}</span>}
+      {/* The card's ⋮ at the top right of the header, whatever wraps beside it,
+          centred on the heading's first line. */}
+      {menu && <span className="-mb-1 -mt-1.5 flex shrink-0 items-center">{menu}</span>}
     </div>
   );
 

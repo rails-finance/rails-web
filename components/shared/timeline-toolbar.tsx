@@ -852,7 +852,7 @@ export function TimelineToolbar({
   return (
     <div ref={stripRef} className="relative space-y-3" data-anatomy="L1" {...ctrlWaking(hydrated)}>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        {/* Inset to the cards' content line (CARD_INSET_START), on a line of
+        {/* Inset CARD_INSET_START from the page edge, on a line of
             its own; the controls stay on the page edge. */}
         <div className={`min-w-0 basis-full ${CARD_INSET_START}`} data-anatomy="L1.1">
           {leading}
@@ -876,7 +876,7 @@ export function TimelineToolbar({
             data-timeline-unit={countState.unit}
             data-timeline-shown={countState.shown}
             data-anatomy="L1.2"
-            className="inline-flex items-center gap-2 basis-full sm:basis-auto whitespace-nowrap"
+            className={`inline-flex items-center gap-2 basis-full sm:basis-auto whitespace-nowrap ${CARD_INSET_START} sm:pl-0`}
           >
             {countTooltip ? (
               <RevealTip tip={countTooltip} className="text-xs text-rb-500 tabular-nums">

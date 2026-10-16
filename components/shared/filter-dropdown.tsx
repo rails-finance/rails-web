@@ -109,7 +109,7 @@ interface FilterDropdownProps {
   align?: "left" | "right";
   /** Override the default list-filter icon shown in minimal/multi mode. */
   triggerIcon?: React.ReactNode;
-  /** Minimal mode: print `label` beside the icon, and give the trigger a
+  /** Minimal mode: print `label` beside the icon from sm up, and give the trigger a
    *  hover tooltip. For a control whose icon alone does not say what it does. */
   showLabel?: boolean;
   /** Hover tooltip on the trigger. */
@@ -260,7 +260,7 @@ export function FilterDropdown({
             {(minimal || multi) && (triggerIcon ?? <ListFilterIcon size={12} />)}
             {/* A single pick at rest shows its glyph where it has one. */}
             {!minimal && !multi && isAll && triggerIcon}
-            {minimal && showLabel && <span>{label}</span>}
+            {minimal && showLabel && <span className="hidden sm:inline">{label}</span>}
             {!minimal &&
               !isAll &&
               !multi &&

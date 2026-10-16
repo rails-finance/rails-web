@@ -147,7 +147,7 @@ export function PositionWalletRow({
     // takes the line under them, flush right (ui-jobs 272). From sm up the
     // strip sits before Tools on the address line, and wraps right-aligned
     // when the row is too narrow for both. DOM order is address, strip,
-    // Tools. The wallet starts on the card content's line (CARD_INSET_START);
+    // Tools. The wallet starts CARD_INSET_START in;
     // Tools stays at the page edge.
     <div
       className={`flex min-h-7 flex-wrap items-start gap-x-2 gap-y-1.5 ${CARD_INSET_START}`}
