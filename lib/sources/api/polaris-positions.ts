@@ -19,7 +19,28 @@ import type { PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_MARKET_CONFIG, normalizeMarket } from "@/lib/polaris/asset-catalog";
 
 export type PolarisPositionStatus = "open" | "closed" | "liquidated";
-export type PolarisPositionSort = "recent" | "debt" | "coll" | "ratio";
+export type PolarisPositionSort = "recent" | "debt" | "coll" | "ratio" | "debtUsd" | "collUsd";
+
+/** The oracle-at-block row a market's USD figures are valued at: the latest
+ *  indexed polaris_oracle_at_block row with every leg the market needs. */
+export interface PolarisUsdPrice {
+  market: PolarisMarket;
+  block: number;
+  timestamp: number | null;
+  /** The filler's source tag (`polaris-pricefeed-preview`). */
+  source: string;
+  /** USD per whole debt token (USDp, GOLDp) and per whole pETH. */
+  debtUnitUsd: number;
+  collUnitUsd: number;
+}
+
+/** The listing's USD valuation, as the index states it: one price row per
+ *  priced market, and the markets with none (their CDPs carrying a balance
+ *  drop out of a USD range). */
+export interface PolarisUsdValuation {
+  prices: PolarisUsdPrice[];
+  unpricedMarkets: PolarisMarket[];
+}
 
 export interface PolarisPositionSummary {
   market: PolarisMarket;
@@ -200,6 +221,39 @@ export function buildPolarisPositionRows(raw: RawPolarisPositionRow[]): PolarisP
     });
   }
   return out;
+}
+
+export interface RawPolarisUsdValuation {
+  prices?: Array<{
+    market: string;
+    block_number: string | number;
+    block_timestamp: string | number | null;
+    price_source: string;
+    debt_unit_usd: string;
+    coll_unit_usd: string;
+  }>;
+  unpriced_markets?: string[];
+}
+
+export function buildPolarisUsdValuation(raw: RawPolarisUsdValuation | undefined): PolarisUsdValuation | undefined {
+  if (!raw) return undefined;
+  const prices: PolarisUsdPrice[] = [];
+  for (const r of raw.prices ?? []) {
+    const market = normalizeMarket(r.market);
+    if (!market) continue;
+    prices.push({
+      market,
+      block: intOf(r.block_number),
+      timestamp: r.block_timestamp == null ? null : intOf(r.block_timestamp),
+      source: r.price_source,
+      debtUnitUsd: Number(r.debt_unit_usd),
+      collUnitUsd: Number(r.coll_unit_usd),
+    });
+  }
+  const unpricedMarkets = (raw.unpriced_markets ?? [])
+    .map((m) => normalizeMarket(m))
+    .filter((m): m is PolarisMarket => m != null);
+  return { prices, unpricedMarkets };
 }
 
 export function buildPolarisMarketBooks(raw: RawPolarisMarketRow[] | undefined): PolarisMarketBook[] {

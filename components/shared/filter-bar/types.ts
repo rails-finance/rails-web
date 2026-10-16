@@ -68,6 +68,9 @@ export interface FilterDimension<F> {
   labelAction?: ReactNode;
   /** Hide from the + Filter menu when false (e.g. Borrowing while Supply-only). */
   available?: (f: F) => boolean;
+  /** One short line at the foot of the dimension's group panel (the price
+   *  source a USD range is valued at). A group draws the first one it holds. */
+  panelNote?: ReactNode;
 }
 
 /** Active iff the current selection differs from the dimension's default. */
@@ -98,6 +101,15 @@ export function joinOptionLabels(values: string[], options: FilterOptionDef[], m
 export interface RangeSpec {
   min: number;
   max: number;
+  /** Values are US dollars: the ends, the chip and the inputs read `$1.5K`. */
+  usd?: boolean;
+}
+
+/** A range value for display: `1,500`, or `$1.5K` on a USD range. */
+export function formatRangeValue(v: number, usd?: boolean): string {
+  if (!usd) return v.toLocaleString("en-US");
+  if (v < 1000) return `$${v.toLocaleString("en-US")}`;
+  return `$${Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)}`;
 }
 
 /** A range selection; null is no bound on that side. */
@@ -131,11 +143,13 @@ export function normalizeRange(values: string[]): string[] {
 }
 
 /** Chip text for a range: `Transactions: 10–500`, `Transactions: ≥ 10`,
- *  `Transactions: ≤ 500`. */
-export function rangeChipLabel(label: string, values: string[]): string {
+ *  `Transactions: ≤ 500`; `Debt: $1K–$50K` on a USD range. A maximum of 0
+ *  alone reads as the one value it allows. */
+export function rangeChipLabel(label: string, values: string[], usd?: boolean): string {
   const { min, max } = decodeRange(values);
-  const n = (v: number) => v.toLocaleString("en-US");
+  const n = (v: number) => formatRangeValue(v, usd);
   if (min != null && max != null) return min === max ? `${label}: ${n(min)}` : `${label}: ${n(min)}–${n(max)}`;
+  if (max === 0) return `${label}: ${n(0)}`;
   if (min != null) return `${label}: ≥ ${n(min)}`;
   if (max != null) return `${label}: ≤ ${n(max)}`;
   return label;

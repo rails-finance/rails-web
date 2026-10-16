@@ -12,6 +12,7 @@ import type {
   PolarisPositionStatus,
   PolarisPositionSort,
   PolarisMarketBook,
+  PolarisUsdValuation,
 } from "@/lib/sources/api/polaris-positions";
 import type { PolarisMarket } from "@/lib/polaris/asset-catalog";
 
@@ -29,6 +30,14 @@ export interface FetchPolarisPositionsParams {
   /** Inclusive bounds on the CDP's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
+  /** Inclusive USD bounds on the CDP's last debt and collateral, valued at
+   *  the market's latest indexed oracle price; either alone. */
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
+  /** Ask for the USD valuation block (`usd`) with no USD bound or sort. */
+  withUsd?: boolean;
   sortBy?: PolarisPositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -45,6 +54,8 @@ export interface PolarisPositionsResult {
   pagination: { total: number; limit: number; offset: number };
   /** The replayed book per market, as the index states it beside the page. */
   markets: PolarisMarketBook[];
+  /** Present when a USD bound, a USD sort or `withUsd` was asked for. */
+  usd?: PolarisUsdValuation;
 }
 
 export async function fetchPolarisPositions(p: FetchPolarisPositionsParams): Promise<PolarisPositionsResult> {
@@ -56,6 +67,10 @@ export async function fetchPolarisPositions(p: FetchPolarisPositionsParams): Pro
   if (p.hasDebt != null) qs.set("hasDebt", p.hasDebt ? "1" : "0");
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
+  for (const k of ["minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
+  if (p.withUsd) qs.set("withUsd", "1");
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));
@@ -68,11 +83,13 @@ export async function fetchPolarisPositions(p: FetchPolarisPositionsParams): Pro
     data?: PolarisPositionSummary[];
     pagination?: PolarisPositionsResult["pagination"];
     markets?: PolarisMarketBook[];
+    usd?: PolarisUsdValuation;
   };
   return {
     data: json.data ?? [],
     pagination: json.pagination ?? { total: json.data?.length ?? 0, limit: p.limit ?? 50, offset: p.offset ?? 0 },
     markets: json.markets ?? [],
+    ...(json.usd ? { usd: json.usd } : {}),
   };
 }
 

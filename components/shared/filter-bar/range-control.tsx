@@ -8,7 +8,8 @@
  * 25, 30, 40 … 1,000), so equal travel is roughly an equal ratio: a log scale
  * whose every stop is a round number. A handle resting at its end means no
  * bound on that side, so the control opens unset and hides nothing. The inputs
- * take any whole number, past the slider's top too.
+ * take any whole number, past the slider's top too, with a k / M / B suffix
+ * if wanted ("50k"). A USD range (`range.usd`) writes its figures as dollars.
  *
  * Each handle is a native range input (arrow keys, Page Up / Down, Home / End),
  * the two laid over one track. A slider change is written after a short pause,
@@ -25,6 +26,7 @@ import {
   type RangeSpec,
   decodeRange,
   encodeRange,
+  formatRangeValue,
 } from "@/components/shared/filter-bar/types";
 
 const COMMIT_DELAY_MS = 350;
@@ -58,15 +60,22 @@ function indexAtOrBelow(stops: number[], v: number): number {
   return 0;
 }
 
-const fmt = (v: number) => v.toLocaleString("en-US");
-const textOf = (v: number | null) => (v == null ? "" : String(v));
+/** An input's text for a bound: exact, so leaving the field unedited never
+ *  moves the bound. */
+const textOf = (v: number | null, usd?: boolean) =>
+  v == null ? "" : usd ? `$${v.toLocaleString("en-US")}` : String(v);
 
-/** A typed bound: blank is no bound, a whole number is the bound, anything
- *  else is refused (undefined). */
+const SUFFIX: Record<string, number> = { k: 1e3, m: 1e6, b: 1e9 };
+
+/** A typed bound: blank is no bound; a whole number, or a number with a k / M
+ *  / B suffix ("1.5k"), is the bound; anything else is refused (undefined). A
+ *  leading "$" and thousands commas are ignored. */
 function parseBound(text: string): number | null | undefined {
-  const t = text.replace(/[,\s]/g, "");
+  const t = text.replace(/[,\s$]/g, "");
   if (t === "") return null;
-  return /^\d+$/.test(t) ? Number(t) : undefined;
+  if (/^\d+$/.test(t)) return Number(t);
+  const m = /^(\d+(?:\.\d+)?)([kmb])$/i.exec(t);
+  return m ? Math.round(Number(m[1]) * SUFFIX[m[2].toLowerCase()]) : undefined;
 }
 
 const THUMB =
@@ -88,19 +97,21 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
   const stops = useMemo(() => rangeStops(spec), [spec.min, spec.max]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = stops.length - 1;
   const noun = dim.label.toLowerCase();
+  const usd = spec.usd;
+  const fmt = (v: number) => formatRangeValue(v, usd);
 
   const committedKey = dim.get(filters).join(",");
   const [draft, setDraft] = useState<RangeBounds>(() => decodeRange(dim.get(filters)));
-  const [minText, setMinText] = useState(textOf(draft.min));
-  const [maxText, setMaxText] = useState(textOf(draft.max));
+  const [minText, setMinText] = useState(textOf(draft.min, usd));
+  const [maxText, setMaxText] = useState(textOf(draft.max, usd));
 
   // A change from outside (a chip removed, Reset, the back button) replaces
   // the draft.
   useEffect(() => {
     const b = decodeRange(committedKey ? committedKey.split(",") : []);
     setDraft(b);
-    setMinText(textOf(b.min));
-    setMaxText(textOf(b.max));
+    setMinText(textOf(b.min, usd));
+    setMaxText(textOf(b.max, usd));
   }, [committedKey]);
 
   // The write reads the newest filters, so a delayed commit never restores a
@@ -132,24 +143,24 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
         ? { ...draft, min: Math.min(idx, maxIdx) <= 0 ? null : stops[Math.min(idx, maxIdx)] }
         : { ...draft, max: Math.max(idx, minIdx) >= last ? null : stops[Math.max(idx, minIdx)] };
     setDraft(b);
-    setMinText(textOf(b.min));
-    setMaxText(textOf(b.max));
+    setMinText(textOf(b.min, usd));
+    setMaxText(textOf(b.max, usd));
     commitLater(b);
   };
 
   const type = (side: "min" | "max") => {
     const parsed = parseBound(side === "min" ? minText : maxText);
     if (parsed === undefined) {
-      setMinText(textOf(draft.min));
-      setMaxText(textOf(draft.max));
+      setMinText(textOf(draft.min, usd));
+      setMaxText(textOf(draft.max, usd));
       return;
     }
     let b: RangeBounds = side === "min" ? { ...draft, min: parsed } : { ...draft, max: parsed };
     if (b.min != null && b.max != null && b.min > b.max)
       b = side === "min" ? { ...b, max: b.min } : { ...b, min: b.max };
     setDraft(b);
-    setMinText(textOf(b.min));
-    setMaxText(textOf(b.max));
+    setMinText(textOf(b.min, usd));
+    setMaxText(textOf(b.max, usd));
     commit(b);
   };
 
@@ -204,7 +215,7 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
       <div className="mt-2 flex items-center gap-2">
         <input
           type="text"
-          inputMode="numeric"
+          inputMode={usd ? "text" : "numeric"}
           value={minText}
           placeholder="Min"
           aria-label={`Minimum ${noun}`}
@@ -220,7 +231,7 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
         </span>
         <input
           type="text"
-          inputMode="numeric"
+          inputMode={usd ? "text" : "numeric"}
           value={maxText}
           placeholder="Max"
           aria-label={`Maximum ${noun}`}

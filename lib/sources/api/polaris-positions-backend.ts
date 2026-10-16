@@ -27,9 +27,11 @@ import type { FetchPolarisPositionsParams, PolarisPositionsResult } from "@/lib/
 import {
   buildPolarisMarketBooks,
   buildPolarisPositionRows,
+  buildPolarisUsdValuation,
   type PolarisPositionStatus,
   type RawPolarisMarketRow,
   type RawPolarisPositionRow,
+  type RawPolarisUsdValuation,
 } from "@/lib/sources/api/polaris-positions";
 
 interface PositionsRawResponse {
@@ -38,7 +40,11 @@ interface PositionsRawResponse {
   limit: number;
   offset: number;
   markets?: RawPolarisMarketRow[];
+  usd?: RawPolarisUsdValuation;
 }
+
+/** The sorts forwarded by name (`recent` is the backend's default). */
+const SORTS = new Set<string>(["debt", "coll", "ratio", "debtUsd", "collUsd"]);
 
 export type PolarisPositionsRead =
   | { ok: true; result: PolarisPositionsResult; upstream: Response }
@@ -58,6 +64,11 @@ export function parsePolarisPositionsQuery(sp: URLSearchParams): FetchPolarisPos
     const v = sp.get(key);
     return v != null && /^\d+$/.test(v) ? Number(v) : undefined;
   };
+  // A USD bound is forwarded only as a non-negative decimal.
+  const usdBound = (key: string) => {
+    const v = sp.get(key);
+    return v != null && /^\d{1,16}(\.\d{1,18})?$/.test(v) ? Number(v) : undefined;
+  };
   const status = (sp.get("status") ?? "")
     .split(",")
     .map((s) => s.trim())
@@ -73,7 +84,12 @@ export function parsePolarisPositionsQuery(sp: URLSearchParams): FetchPolarisPos
     hasDebt: hasDebt === "1" ? true : hasDebt === "0" ? false : undefined,
     minTx: txBound("minTx"),
     maxTx: txBound("maxTx"),
-    sortBy: sortBy === "debt" || sortBy === "coll" || sortBy === "ratio" ? sortBy : undefined,
+    minDebtUsd: usdBound("minDebtUsd"),
+    maxDebtUsd: usdBound("maxDebtUsd"),
+    minCollUsd: usdBound("minCollUsd"),
+    maxCollUsd: usdBound("maxCollUsd"),
+    withUsd: sp.get("withUsd") === "1" || undefined,
+    sortBy: SORTS.has(sortBy ?? "") ? (sortBy as FetchPolarisPositionsParams["sortBy"]) : undefined,
     sortOrder: sp.get("sortOrder") === "asc" ? "asc" : "desc",
     limit: sp.get("limit") != null && Number.isFinite(limit) ? limit : undefined,
     offset: sp.get("offset") != null && Number.isFinite(offset) ? offset : undefined,
@@ -105,8 +121,12 @@ export async function readPolarisPositionsFromBackend(
   if (p.hasDebt != null) qs.set("hasDebt", p.hasDebt ? "1" : "0");
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
+  for (const k of ["minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
+  if (p.withUsd) qs.set("withUsd", "1");
   // `recent` is the backend's own default and is never sent by name.
-  if (p.sortBy === "debt" || p.sortBy === "coll" || p.sortBy === "ratio") qs.set("sortBy", p.sortBy);
+  if (p.sortBy && SORTS.has(p.sortBy)) qs.set("sortBy", p.sortBy);
   qs.set("sortOrder", p.sortOrder === "asc" ? "asc" : "desc");
   if (p.limit != null) qs.set("limit", String(p.limit));
   if (p.offset != null) qs.set("offset", String(p.offset));
@@ -124,6 +144,7 @@ export async function readPolarisPositionsFromBackend(
       data: buildPolarisPositionRows(raw.rows),
       pagination: { total: raw.total, limit: raw.limit, offset: raw.offset },
       markets: buildPolarisMarketBooks(raw.markets),
+      ...(raw.usd ? { usd: buildPolarisUsdValuation(raw.usd) } : {}),
     },
   };
 }

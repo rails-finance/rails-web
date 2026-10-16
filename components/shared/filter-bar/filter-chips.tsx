@@ -38,7 +38,7 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
     const vals = dim.get(filters);
     if (dim.chipLabel) return dim.chipLabel(vals, dim.options);
     return dim.cardinality === "range"
-      ? rangeChipLabel(dim.label, vals)
+      ? rangeChipLabel(dim.label, vals, dim.range?.usd)
       : defaultChipLabel(dim.label, vals, dim.options);
   };
 

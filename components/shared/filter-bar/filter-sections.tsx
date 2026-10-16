@@ -21,14 +21,15 @@
  * shorter dimension renders exactly as before.
  *
  * A "range" dimension renders a RangeControl (./range-control) in place of the
- * option rows: a two-handle slider and Min / Max inputs.
+ * option rows: a two-handle slider and Min / Max inputs. A group's first
+ * `panelNote` closes the panel in one muted line.
  *
  * Like the rest of the filter grammar this holds no filter state — it reads and
  * writes the rail's URL-backed param object through the dimension registry
  * (see ./types).
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import {
   CTRL_GHOST,
@@ -85,9 +86,22 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
   // its full list.
   const [queries, setQueries] = useState<Record<string, string>>({});
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setQueries({});
+  }, [openGroup]);
+
+  // A panel opens under its button, left-aligned; where that would run past
+  // the viewport's right edge (a group far along the row on a phone), it moves
+  // left until it fits, never past the left edge.
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    el.style.transform = "";
+    const r = el.getBoundingClientRect();
+    const over = r.right - (window.innerWidth - 8);
+    if (over > 0) el.style.transform = `translateX(-${Math.max(0, Math.min(over, r.left - 8))}px)`;
   }, [openGroup]);
 
   useEffect(() => {
@@ -160,6 +174,7 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
 
             {open && (
               <div
+                ref={panelRef}
                 className="absolute top-full left-0 mt-2 z-[var(--z-dropdown)] min-w-[220px] max-h-[420px] overflow-y-auto overlay-panel"
                 role={hasRange ? "group" : "menu"}
                 aria-label={group.name}
@@ -232,6 +247,14 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
                     </div>
                   );
                 })}
+                {(() => {
+                  const note = group.dims.find((d) => d.panelNote != null)?.panelNote;
+                  return note != null ? (
+                    <p className="px-4 pt-1 pb-3 text-[11px] text-rb-500" data-prov-exempt="">
+                      {note}
+                    </p>
+                  ) : null;
+                })()}
               </div>
             )}
           </div>
