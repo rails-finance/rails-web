@@ -60,7 +60,7 @@ import {
   type StripGeometry,
 } from "@/lib/shared/flows-price";
 import type { PriceAt } from "@/lib/shared/price-series";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT, SECTION_HEADING } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
@@ -106,12 +106,13 @@ export const FLOW_TICK: Record<FlowTick, string> = {
   "rate-owner": "var(--color-green-400)",
 };
 
-/** The events tip and the date under the row share one width, so the two
+/** The price tip and the date under the row share one width, so the two
  *  read as one unit; event names are kept short enough to fit it. */
 const PAIR_W = 232;
-/** The day's events under the row, hidden while Miles tries the row without
- *  them (16 Oct 2026). */
-const SHOW_EVENTS_TIP = false;
+/** The date tip's event list, opened by its chevron: one height whatever the
+ *  day holds (about four lines, scrolling past that), so the tip keeps still
+ *  while the cursor moves. */
+const EVENTS_H = 64;
 /** The cursor's boxes (the price tip, the date, the events) take the
  *  dropdowns' surface, the .overlay-panel colours without its shadow. */
 const CURSOR_SKIN =
@@ -1360,14 +1361,12 @@ export function priceStripScale(s: FlowPriceSeries, startDay: number, today: num
   const pieces = pricePieces(s, startDay, today);
   const inView = (day: number) => day >= startDay && day <= today;
   const level = (s.level?.points ?? []).filter((p) => inView(p[0]));
-  const events = (s.events ?? []).filter((e) => inView(e.day));
   const values = [
     ...[...pieces.solid, ...pieces.dotted, ...pieces.flat, ...pieces.riser].flat().map((v) => v[1]),
     ...level.map((p) => p[1]),
-    ...events.flatMap((e) => (e.redemptionPrice != null ? [e.price, e.redemptionPrice] : [e.price])),
   ];
   const axis = priceAxis(values);
-  return { pieces, level, events, axis, labels: priceAxisLabels(axis.ticks) };
+  return { pieces, level, axis, labels: priceAxisLabels(axis.ticks) };
 }
 type PriceScale = ReturnType<typeof priceStripScale>;
 
@@ -1400,7 +1399,7 @@ function PriceStrip({
   windowFrom: number | null;
   startDay: number;
 }) {
-  const { pieces, axis, level, events } = scale;
+  const { pieces, axis, level } = scale;
   const xClose = (day: number) => geo.xClose(Math.min(day, today));
   const y = (v: number) => STRIP_H - 4 - ((v - axis.min) / (axis.max - axis.min || 1)) * (STRIP_H - 8);
   const path = (vs: [number, number][]) => vs.map(([d, v], j) => `${j ? "L" : "M"}${xClose(d)},${y(v)}`).join("");
@@ -1420,7 +1419,6 @@ function PriceStrip({
         j === 0 ? `M${xClose(d)},${y(v)}` : `L${xClose(d)},${y(run[j - 1][1])}L${xClose(d)},${y(v)}`,
       )
       .join("");
-  const redeemed = events.filter((e) => e.redemptionPrice != null);
   const hue = LINE_HUE[s.side];
   const shade = windowFrom != null && windowFrom > startDay ? geo.xDay(windowFrom) : null;
   if (!(w > 0)) return null;
@@ -1512,44 +1510,6 @@ function PriceStrip({
             />
           ))}
         </g>
-        {/* Each row's price on its day; a redemption's redemption price over it. */}
-        <g data-price-events={events.length} data-anatomy="F19.5">
-          {events.map((e, i) => (
-            <circle
-              key={`e${i}`}
-              cx={xClose(e.day)}
-              cy={y(e.price)}
-              r={2.25}
-              className={e.tone === "liquidation" ? undefined : "fill-background"}
-              fill={e.tone === "liquidation" ? LIQ_HUE : undefined}
-              stroke={e.tone === "liquidation" ? LIQ_HUE : hue}
-              strokeWidth={1.25}
-              data-price-event={e.tone}
-              data-price-event-day={e.day}
-              data-price-event-block={e.block ?? ""}
-              data-price-event-price={e.price}
-            />
-          ))}
-        </g>
-        <g data-redemption-marks={redeemed.length} data-anatomy="F19.6">
-          {redeemed.map((e, i) => {
-            const ex = xClose(e.day);
-            const ey = y(e.redemptionPrice!);
-            return (
-              <path
-                key={`r${i}`}
-                d={`M${ex},${ey - 3}L${ex + 3},${ey}L${ex},${ey + 3}L${ex - 3},${ey}Z`}
-                fill={FLOW_TICK.redemption}
-                className="stroke-background"
-                strokeWidth={0.75}
-                data-redemption-mark=""
-                data-redemption-day={e.day}
-                data-redemption-block={e.block ?? ""}
-                data-redemption-price={e.redemptionPrice}
-              />
-            );
-          })}
-        </g>
         {dim && <AfterCursor x={cx} w={w} />}
         <CursorLine x={cx} />
         {cursorLevel != null && <CursorDot x={cx} y={y(cursorLevel)} hue={LIQ_HUE} />}
@@ -1564,7 +1524,8 @@ function PriceStrip({
 
 /** The price chart's figures in a tip standing over the cursor, always
  *  shown: the asset (a list where the position holds several with a series)
- *  and its price, the liquidation level on the line beneath. */
+ *  and its price; where the series has a liquidation level, the triangle at
+ *  the line's right end shows it on the line beneath. */
 function PriceHeading({
   series,
   selected,
@@ -1600,6 +1561,8 @@ function PriceHeading({
     );
   const left = Math.max(0, Math.min(w - PAIR_W, x - PAIR_W / 2));
   const caret = Math.max(8, Math.min(PAIR_W - 8, x - left));
+  const [showLevel, setShowLevel] = useState(false);
+  const levelWord = selected.health ? "liquidation level" : "liquidation price";
   return (
     <div className="relative mb-2.5" data-anatomy="F19.1">
       <div
@@ -1607,8 +1570,24 @@ function PriceHeading({
         style={{ marginLeft: Math.max(0, left), width: PAIR_W }}
         data-price-heading=""
       >
-        <span className="absolute right-1.5 top-1.5">{help}</span>
-        <PriceFigures s={selected} day={day} gapDays={gapDays} isLive={isLive} asset={asset} />
+        <span className="absolute right-0.5 top-0.5 flex items-center gap-0.5">
+          {selected.level && (
+            <button
+              type="button"
+              aria-pressed={showLevel}
+              aria-label={`${showLevel ? "Hide" : "Show"} ${levelWord}`}
+              title={`${showLevel ? "Hide" : "Show"} ${levelWord}`}
+              onClick={() => setShowLevel((v) => !v)}
+              className={`${CTRL_GHOST} ${showLevel ? CTRL_ON : CTRL_OFF} relative size-7 rounded-md before:absolute before:-inset-1.5 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
+              data-flow-level-toggle={showLevel ? "on" : "off"}
+              data-anatomy="F19.8"
+            >
+              <Icon name="triangle" size={12} />
+            </button>
+          )}
+          {help}
+        </span>
+        <PriceFigures s={selected} day={day} gapDays={gapDays} isLive={isLive} asset={asset} showLevel={showLevel} />
         <i
           aria-hidden
           className={`absolute top-full size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r ${CURSOR_SKIN}`}
@@ -1620,7 +1599,7 @@ function PriceHeading({
 }
 
 /** The tip's figures at the cursor's day: the asset and its price, and the
- *  liquidation level beneath where the series has one, each with its
+ *  liquidation level beneath where the series has one and it is shown, each with its
  *  receipt. At today the price takes the live green (color-grammar §5a;
  *  green-600 on the light surface, where green-400 reads pale) and the level
  *  red; in history the price is plain and the level muted. */
@@ -1630,12 +1609,15 @@ function PriceFigures({
   gapDays,
   isLive,
   asset,
+  showLevel,
 }: {
   s: FlowPriceSeries;
   day: number;
   gapDays: number;
   isLive: boolean;
   asset: ReactNode;
+  /** The level's line, shown by the tip's triangle. */
+  showLevel: boolean;
 }) {
   const r = priceReadout(s, day, gapDays);
   const dayWord = isLive ? "today" : dayStamp(day * 86_400);
@@ -1683,7 +1665,7 @@ function PriceFigures({
           {s.health ? "No health factor" : "No price recorded"}
         </span>
       )}
-      {lv && levelProv && (
+      {showLevel && lv && levelProv && (
         <>
           <span className="inline-flex justify-center">
             <LevelMark health={!!s.health} isLive={isLive} />
@@ -1964,8 +1946,8 @@ interface CursorDateProps {
 /** The events row with its cursor: the elapsed stretch on a lighter ground,
  *  and under the row the date tip at the settled day, carrying the steps.
  *  The row scrubs as the charts do: a press moves the cursor to the nearest
- *  stop and a drag carries it. The day's events under the date are behind
- *  SHOW_EVENTS_TIP. */
+ *  stop and a drag carries it. The date's chevron opens the day's events
+ *  inside the tip, and they stay open while the cursor moves. */
 function PipRow({
   model,
   geo,
@@ -2019,6 +2001,8 @@ function PipRow({
   };
   const atDay = stops[at]?.stop;
   const settledTick = model.ticks.find((k) => k.day === atDay);
+  const [open, setOpen] = useState(false);
+  const listId = useId();
 
   const left = Math.max(0, Math.min(w - PAIR_W, cx - PAIR_W / 2));
   const caret = Math.max(8, Math.min(PAIR_W - 8, cx - left));
@@ -2075,6 +2059,7 @@ function PipRow({
           className="mt-2 h-11 sm:h-9"
           data-flow-cursor-date={date.follow ? "following" : date.byDays ? "cut" : "plain"}
         />
+        {open && <div style={{ height: EVENTS_H + 1 }} />}
         {/* Over the pips, under the asset list that opens down over it. */}
         {w > 0 && (
           <div
@@ -2082,55 +2067,66 @@ function PipRow({
             style={{ left, width: PAIR_W }}
             data-flow-cursor-frame=""
           >
-            <div
-              className={`pointer-events-auto absolute bottom-0 left-0 flex min-h-11 w-full items-center justify-between gap-1.5 py-0.5 pl-2 pr-0.5 font-semibold text-foreground sm:min-h-9 ${box}`}
-            >
+            <div className={`pointer-events-auto absolute bottom-0 left-0 w-full font-semibold text-foreground ${box}`}>
               <i
                 aria-hidden
                 className={`absolute bottom-full size-2 -translate-x-1/2 translate-y-1 rotate-45 border-l border-t ${CURSOR_SKIN}`}
                 style={{ left: caret }}
               />
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap" data-flow-cursor-word="">
-                {date.follow && <Link2 size={14} aria-hidden className="text-teal-600 dark:text-teal-400" />}
-                {date.word}
-              </span>
-              {steps}
+              <div className="flex min-h-[42px] items-center justify-between gap-0.5 p-0.5 sm:min-h-[34px]">
+                {/* The date and its chevron, one control: it opens the day's
+                    events under the date. */}
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={open ? listId : undefined}
+                  aria-label={`Events on ${date.word}`}
+                  onClick={() => setOpen((v) => !v)}
+                  className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} min-h-9 shrink-0 gap-0.5 whitespace-nowrap rounded-md py-0.5 pl-1 pr-0.5 font-semibold sm:min-h-7 pointer-coarse:min-h-9`}
+                  data-flow-events-toggle={open ? "open" : "closed"}
+                  data-anatomy="F5.1"
+                >
+                  <span className="inline-flex items-center gap-1.5 text-foreground" data-flow-cursor-word="">
+                    {/* On a phone the row has no room for the link; the
+                        timeline's sync button shows the follow. */}
+                    {date.follow && (
+                      <Link2 size={14} aria-hidden className="hidden text-teal-600 sm:block dark:text-teal-400" />
+                    )}
+                    {date.word}
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    aria-hidden
+                    className={`text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {steps}
+              </div>
+              {open && (
+                <div
+                  id={listId}
+                  data-prov-hidden=""
+                  data-flow-pip-tip=""
+                  className="overflow-y-auto overscroll-contain border-t border-[var(--color-rb-200)] px-2 py-1 font-medium leading-4 dark:border-[var(--color-rb-800)]"
+                  style={{ height: EVENTS_H }}
+                >
+                  {kinds.length ? (
+                    <ul className="list-disc pl-4">
+                      {kinds.map((k) => (
+                        <li key={k}>{k}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="block text-rb-500" data-flow-pip-none="">
+                      No events
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
-      {/* The day's events under the row, in the layout so the steps below
-          make room; held at its tallest so they keep still while it moves. */}
-      {SHOW_EVENTS_TIP && w > 0 && (
-        <Steady>
-          <div className="pt-1.5">
-            <div
-              data-prov-hidden=""
-              data-flow-pip-tip=""
-              className={`relative px-2 py-1 font-medium text-foreground ${box}`}
-              style={{ marginLeft: left, width: PAIR_W }}
-            >
-              {/* Each event on its own line; the day stands over the row. */}
-              {kinds.length ? (
-                <ul className="list-disc pl-4">
-                  {kinds.map((k) => (
-                    <li key={k}>{k}</li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="block text-rb-500" data-flow-pip-none="">
-                  No events
-                </span>
-              )}
-              <i
-                aria-hidden
-                className={`absolute bottom-full size-2 -translate-x-1/2 translate-y-1 rotate-45 border-l border-t ${CURSOR_SKIN}`}
-                style={{ left: caret }}
-              />
-            </div>
-          </div>
-        </Steady>
-      )}
     </div>
   );
 }

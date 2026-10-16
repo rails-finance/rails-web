@@ -16,9 +16,9 @@
 //   market-notes.md §1): each observation held flat to the next, a dashed
 //   riser there. The grammar follows `series.grain`. Days before
 //   `series.sparseBefore` are the rows alone (decision 3's sparse rule):
-//   every segment dotted, each row marked.
-// - A family's rows (`series.events`) are marks on their days at their own
-//   price; a redemption row adds an orange mark at its redemption price. The
+//   every segment dotted.
+// - A family's rows (`series.events`) are not marked on the line: the events
+//   row under the charts carries them. The
 //   liquidation level (`series.level`) is a second line on the same axis, one
 //   point per day, held between days and stepped on the day it moves; it has
 //   no point after the day it ends.

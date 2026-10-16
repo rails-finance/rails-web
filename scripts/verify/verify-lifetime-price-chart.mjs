@@ -14,7 +14,13 @@
 //   - the events-and-charts how-to-read (the events heading's "?", F7.1)
 //     names the selected series;
 //   - one pip row under the charts;
-//   - the price tip's list names each held asset with a series.
+//   - the price tip's list names each held asset with a series;
+//   - the price tip's level line is hidden until its triangle toggle
+//     (`data-flow-level-toggle`, F19.8) is pressed, and the chart's level line
+//     is drawn either way;
+//   - the date tip's chevron (`data-flow-events-toggle`, F5.1) opens the day's
+//     events in a fixed-height list that stays open, at one height, as the
+//     steps move the cursor.
 // Pages: Aave V3 Core 0xfb93…2a71 and 0xfb45…750a (liquidated), whose answer
 // is /api/aave-v3/flows, and whose chart opens on the health view (step 4,
 // `checkHealth`); three Liquity V2 Troves, whose answer is
@@ -23,10 +29,8 @@
 // WETH 2241…2759 (open, redeemed several hundred times) and rETH 1939…5964
 // (redeemed, then liquidated on 5 Jun 2026).
 // On each Trove (step 3), against the Trove's rows (/api/trove/…/timeline):
-//   - every event mark is a row's price at the row's block, on its day, and
-//     every priced row has its mark;
-//   - every redemption mark sits on a redemption row's day at its redemption
-//     price, one per such row;
+//   - the price line carries no event or redemption marks (the events row
+//     does);
 //   - the liquidation level draws no day the Trove's life lacks: each day has
 //     a row holding collateral and debt by its end, none after a liquidation;
 //   - at the three stops, the level's <Prov> block is the block of the last
@@ -172,6 +176,74 @@ async function checkHealth(page, tag, pg, listedAll) {
   }
 }
 
+/** The price tip's level line: hidden until the triangle toggle is pressed,
+ *  the chart's level line drawn either way. Leaves the level shown, for the
+ *  readout checks that follow. */
+async function checkLevelToggle(page, tag) {
+  const toggle = page.locator("[data-flow-level-toggle]");
+  if (!check(`${tag}: the price tip has the level toggle`, (await toggle.count()) === 1)) return;
+  const state = () =>
+    page.evaluate(() => ({
+      pressed: document.querySelector("[data-flow-level-toggle]")?.getAttribute("aria-pressed"),
+      readout: !!document.querySelector("[data-liq-readout]"),
+      lines: document.querySelectorAll("[data-liq-level]").length,
+    }));
+  const off = await state();
+  await toggle.click();
+  await page.waitForTimeout(150);
+  const on = await state();
+  check(
+    `${tag}: the level line is hidden until the toggle shows it; the chart's level line stays`,
+    off.pressed === "false" &&
+      !off.readout &&
+      on.pressed === "true" &&
+      on.readout &&
+      off.lines > 0 &&
+      on.lines === off.lines,
+    `off ${JSON.stringify(off)}, on ${JSON.stringify(on)}`,
+  );
+}
+
+/** The date tip's chevron: opens the day's events in a list of one height,
+ *  which stays open while the steps move the cursor. */
+async function checkEventsToggle(page, tag) {
+  const toggle = page.locator("[data-flow-events-toggle]");
+  if (!check(`${tag}: the date tip has the events chevron`, (await toggle.count()) === 1)) return;
+  const state = () =>
+    page.evaluate(() => {
+      const list = document.querySelector("[data-flow-pip-tip]");
+      return {
+        expanded: document.querySelector("[data-flow-events-toggle]")?.getAttribute("aria-expanded"),
+        h: list ? Math.round(list.getBoundingClientRect().height) : null,
+        items: list ? list.querySelectorAll("li").length : null,
+        none: !!list?.querySelector("[data-flow-pip-none]"),
+      };
+    });
+  const closed = await state();
+  await toggle.click();
+  await page.waitForTimeout(150);
+  const seen = [await state()];
+  await page.locator("[data-flow-jump=start]").click();
+  for (let i = 0; i < 4; i++) {
+    await page.locator('[aria-label="Next event"]').click();
+    await page.waitForTimeout(100);
+    seen.push(await state());
+  }
+  const heights = new Set(seen.map((s) => s.h));
+  check(
+    `${tag}: the chevron opens the day's events at one height, open while stepping`,
+    closed.expanded === "false" &&
+      closed.h == null &&
+      seen.every((s) => s.expanded === "true" && s.h > 0 && (s.items > 0 || s.none)) &&
+      heights.size === 1 &&
+      seen.some((s) => s.items > 0),
+    seen.map((s) => `${s.items ?? "-"}${s.none ? " none" : ""} @${s.h}px`).join(", "),
+  );
+  await page.locator("[data-flow-jump=end]").click();
+  await toggle.click();
+  await page.waitForTimeout(100);
+}
+
 /** The Trove's rows, every page of them, as the page reads them. */
 async function troveRows(path) {
   const [, , , , ct, id] = path.split("/");
@@ -271,50 +343,10 @@ function answerSeries(kind, body, collSymbol) {
   return out;
 }
 
-/** The marks and the level's days against the Trove's rows. */
+/** No marks on the price line, and the level's days against the Trove's rows. */
 async function checkTroveMarks(page, tag, pg, rows) {
-  const marks = await page.$$eval("[data-price-event]", (cs) =>
-    cs.map((c) => ({
-      tone: c.dataset.priceEvent,
-      day: Number(c.dataset.priceEventDay),
-      block: c.dataset.priceEventBlock === "" ? null : Number(c.dataset.priceEventBlock),
-      price: Number(c.dataset.priceEventPrice),
-    })),
-  );
-  const priced = rows.filter((r) => r.price != null);
-  const pool = new Map();
-  for (const r of priced) pool.set(r.block, [...(pool.get(r.block) ?? []), r]);
-  const bad = [];
-  for (const m of marks) {
-    const at = pool.get(m.block) ?? [];
-    const i = at.findIndex((r) => Math.floor(r.ts / DAY) === m.day && near(r.price, m.price));
-    if (i < 0) bad.push(`${m.block}@${m.day}`);
-    else at.splice(i, 1);
-  }
-  const left = [...pool.values()].flat();
-  check(
-    `${tag}: every event mark is a row's price at its block and day, every priced row marked`,
-    marks.length > 0 && bad.length === 0 && left.length === 0,
-    `${marks.length} marks, ${priced.length} priced rows; unmatched ${bad.slice(0, 3)}; unmarked ${left.slice(0, 3).map((r) => r.block)}`,
-  );
-  const reds = await page.$$eval("[data-redemption-mark]", (ps) =>
-    ps.map((p) => ({
-      day: Number(p.dataset.redemptionDay),
-      block: Number(p.dataset.redemptionBlock),
-      price: Number(p.dataset.redemptionPrice),
-    })),
-  );
-  const redRows = rows.filter((r) => r.redemption && r.redemptionPrice != null && r.price != null);
-  const redBad = reds.filter(
-    (m) =>
-      !redRows.some((r) => r.block === m.block && Math.floor(r.ts / DAY) === m.day && near(r.redemptionPrice, m.price)),
-  );
-  if (pg.trove !== "live" || redRows.length > 0)
-    check(
-      `${tag}: each redemption mark sits on its row's day at the row's redemption price, one per row`,
-      redRows.length > 0 && reds.length === redRows.length && redBad.length === 0,
-      `${reds.length} marks, ${redRows.length} redemption rows; off ${redBad.slice(0, 3).map((m) => `${m.block}@${m.day}`)}`,
-    );
+  const marks = await page.$$eval("[data-price-event], [data-redemption-mark]", (cs) => cs.length);
+  check(`${tag}: the price line carries no event or redemption marks`, marks === 0, `${marks} marks`);
   const levelDays = await page.$$eval("[data-liq-level]", (ps) =>
     ps.flatMap((p) => (p.dataset.liqDays ?? "").split(",").filter(Boolean).map(Number)),
   );
@@ -517,6 +549,9 @@ for (const pg of PAGES) {
           { timeout: 120000 },
         )
         .catch(() => {});
+    // The tip's toggles, once the series the chart opens on has landed.
+    await checkLevelToggle(page, tag);
+    await checkEventsToggle(page, tag);
     if ((await picker.count()) > 0) {
       await picker.click();
       await page.waitForSelector('[role="listbox"] [data-price-asset]', { timeout: 5000 }).catch(() => {});
