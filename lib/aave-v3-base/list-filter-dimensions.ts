@@ -17,8 +17,12 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 
 export const AAVE_V3_BASE_POSITIONS_ROUTE = "/api/aave-v3-base/positions";
 
+/** The Transactions slider's top on Base: the round number above the busiest
+ *  listed account (1,784,177 transactions, 16 Oct 2026). */
+const AAVE_V3_BASE_TX_TOP = 2000000;
+
 export function aaveV3BaseListDimensions() {
-  return aaveV3ListDimensions().filter((d) => d.id !== "market");
+  return aaveV3ListDimensions(AAVE_V3_BASE_TX_TOP).filter((d) => d.id !== "market");
 }
 
 export const AAVE_V3_BASE_LIST_DEFAULTS: AaveV3ListFilters = { ...AAVE_V3_LIST_DEFAULTS, market: [] };

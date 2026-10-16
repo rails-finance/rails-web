@@ -162,6 +162,9 @@ export interface FetchAaveV4SpokePositionsParams {
    *  directory, all statuses on a wallet-scoped view). */
   status?: AaveV4SpokePositionStatus[];
   activeWithin?: number;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   /** Multi-asset filter on the supply side. Position must hold at least one
    *  of these symbols with a non-zero supply balance. "???" matches reserves
    *  whose symbol couldn't be resolved (unknown ERC20s). Empty/undefined =
@@ -198,6 +201,8 @@ export function buildAaveV4SpokePositionsQuery(p: FetchAaveV4SpokePositionsParam
   if (p.minTotalUsd != null) qs.set("minTotalUsd", String(p.minTotalUsd));
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.activeWithin != null) qs.set("activeWithin", String(p.activeWithin));
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.supplyAssets && p.supplyAssets.length > 0) qs.set("supplyAssets", p.supplyAssets.join(","));
   if (p.borrowAssets && p.borrowAssets.length > 0) qs.set("borrowAssets", p.borrowAssets.join(","));
   if (p.sortBy) qs.set("sortBy", p.sortBy);

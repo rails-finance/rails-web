@@ -11,6 +11,8 @@
 //   • Market  — Core / Prime / EtherFi (the three V3 Pools).
 //   • Position — Borrowing (hasDebt) / Supply only (noDebt).
 //   • History — Liquidated before (hasLiquidations).
+//   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive), the
+//     distinct transactions on the position (lib/shared/transactions-dimension.ts).
 // The Status facet arrived with mv_aave_v3_wallets (mig 076), the (wallet,market)-grain
 // lifecycle MV — the old listing base (mv_aave_v3_positions) was OPEN-ONLY, so there
 // was nothing closed / liquidated to filter. The directory rests on the open accounts
@@ -23,6 +25,7 @@
 // Per-asset Supplying/Borrowing facets are honored server-side (the proxy maps symbols
 // → addresses off AAVE_V3_CATALOG) and can graduate later.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -34,6 +37,10 @@ import {
   isAllStatuses,
   sameStatusSet,
 } from "@/lib/aave-v3/listing-visibility";
+
+/** The Transactions slider's top on Ethereum: the round number above the
+ *  busiest listed position (76,778 transactions, 16 Oct 2026). */
+const AAVE_V3_TX_TOP = 100000;
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const AAVE_V3_ITEMS_PER_PAGE = 20;
@@ -47,6 +54,8 @@ export interface AaveV3ListFilters extends BaseListFilters {
   state: string[];
   /** "" | "liquidated" — positions liquidated at least once. */
   liquidations: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -62,6 +71,7 @@ export const AAVE_V3_LIST_DEFAULTS: AaveV3ListFilters = {
   market: [],
   state: [],
   liquidations: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -91,7 +101,8 @@ const STATE_OPTIONS: FilterOptionDef[] = [
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
-export function aaveV3ListDimensions(): SerializableDimension<AaveV3ListFilters>[] {
+/** `txTop` is the Transactions slider's top; the Base lane passes its own. */
+export function aaveV3ListDimensions(txTop: number = AAVE_V3_TX_TOP): SerializableDimension<AaveV3ListFilters>[] {
   return [
     {
       id: "status",
@@ -140,6 +151,11 @@ export function aaveV3ListDimensions(): SerializableDimension<AaveV3ListFilters>
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<AaveV3ListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: txTop,
+    }),
   ];
 }
 
@@ -156,6 +172,7 @@ export function aaveV3FiltersToFetchParams(filters: AaveV3ListFilters, page: num
     // "supply-only" / absent — a false-valued hasDebt/noDebt is unrepresentable.
     debt: state === "borrowing" || state === "supply-only" ? state : undefined,
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as AaveV3PositionSort,
     sortOrder: filters.sortOrder,
     limit: AAVE_V3_ITEMS_PER_PAGE,

@@ -131,6 +131,9 @@ export interface FetchAaveV3PositionsParams {
   /** Borrowing / Supply-only facet — see {@link AaveV3DebtFacet}. */
   debt?: AaveV3DebtFacet;
   hasLiquidations?: boolean;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   /** Lifecycle Status facet — any subset of open/closed/liquidated (mv_aave_v3_wallets).
    *  Omit = all statuses. */
   status?: ("open" | "closed" | "liquidated")[];
@@ -161,6 +164,8 @@ export async function fetchAaveV3Positions(p: FetchAaveV3PositionsParams): Promi
   if (p.debt === "supply-only") qs.set("noDebt", "true");
   if (p.hasLiquidations === true) qs.set("hasLiquidations", "true");
   if (p.hasLiquidations === false) qs.set("hasLiquidations", "false");
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.excludeClosed) qs.set("excludeClosed", "true");
   if (p.market) qs.set("market", p.market);

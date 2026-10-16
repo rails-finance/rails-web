@@ -21,8 +21,12 @@ export const AAVE_V4_BASE_UNIVERSE: AaveV4AssetUniverseEntry[] = [
   { symbol: "USDC", asSupply: true, asDebt: true },
 ];
 
+/** The Transactions slider's top on Base: the round number above the busiest
+ *  account (1,096 transactions, 16 Oct 2026). */
+const AAVE_V4_BASE_TX_TOP = 2000;
+
 export function aaveV4BaseListDimensions() {
-  return aaveV4ListDimensions(AAVE_V4_LIST_DEFAULTS, AAVE_V4_BASE_UNIVERSE).filter(
+  return aaveV4ListDimensions(AAVE_V4_LIST_DEFAULTS, AAVE_V4_BASE_UNIVERSE, AAVE_V4_BASE_TX_TOP).filter(
     (d) => d.id !== "hubs" && d.id !== "spokes",
   );
 }

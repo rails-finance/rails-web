@@ -17,6 +17,7 @@
 // rides the driver's `q`; `aaveV4FiltersToFetchParams` parses it back out.
 
 import Link from "next/link";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { joinOptionLabels } from "@/components/shared/filter-bar/types";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -46,6 +47,10 @@ import {
   type FetchAaveV4SpokePositionsParams,
 } from "@/lib/api/fetch-aave-v4-spoke-positions";
 
+/** The Transactions slider's top on Ethereum: the round number above the
+ *  busiest position (861 transactions, 16 Oct 2026). */
+const AAVE_V4_TX_TOP = 1000;
+
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const AAVE_V4_ITEMS_PER_PAGE = 20;
 
@@ -63,6 +68,8 @@ export interface AaveV4ListFilters extends BaseListFilters {
   liquidations: AaveV4Liquidations;
   statuses?: AaveV4StatusBucket[];
   show?: AaveV4Show;
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx?: string[];
 }
 
 // Resting view = every market, all sides, and the positions still open — the last of those a
@@ -180,6 +187,7 @@ function assetSideOptions(universe: AaveV4AssetUniverseEntry[]): {
 export function aaveV4ListDimensions(
   filters: AaveV4ListFilters,
   universe: AaveV4AssetUniverseEntry[] | undefined,
+  txTop: number = AAVE_V4_TX_TOP,
 ): SerializableDimension<AaveV4ListFilters>[] {
   const spokeOptions = spokeOptionsForHubs(filters.hubs);
   const { supplyOptions, borrowOptions } = assetSideOptions(universe ?? []);
@@ -329,7 +337,14 @@ export function aaveV4ListDimensions(
     chipLabel: bareLabel,
   };
 
-  return [status, state, liquidated, hubs, spokes, supplying, borrowing, dust];
+  // Transactions — a range over the stored tx_count (minTx / maxTx, inclusive).
+  const transactions = transactionsDimension<AaveV4ListFilters>({
+    get: (f) => f.tx ?? [],
+    set: (f, tx) => ({ ...f, tx: tx.length > 0 ? tx : undefined }),
+    top: txTop,
+  });
+
+  return [status, state, liquidated, hubs, spokes, supplying, borrowing, transactions, dust];
 }
 
 /** Map the decoded selection + page onto the spoke-positions fetch params — the
@@ -355,6 +370,7 @@ export function aaveV4FiltersToFetchParams(filters: AaveV4ListFilters, page: num
     // 3,931; the three buckets answer 7,507 — so omitting it made Closed a chip that
     // changed the URL and not the list.
     status: bucketsToWireStatuses(effectiveStatuses(filters)),
+    ...transactionBounds(filters.tx ?? []),
     sortBy: filters.sortBy as AaveV4SpokePositionSort,
     sortOrder: filters.sortOrder,
     limit: AAVE_V4_ITEMS_PER_PAGE,

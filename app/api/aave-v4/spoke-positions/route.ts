@@ -35,6 +35,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // A transaction bound is forwarded only as a whole number.
+    for (const k of ["minTx", "maxTx"]) {
+      const v = params.get(k);
+      if (v != null && !/^\d+$/.test(v)) params.delete(k);
+    }
+
     const search = params.toString();
     const url = `${RAILS_API_URL}/api/aave-v4/spoke-positions${search ? `?${search}` : ""}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));

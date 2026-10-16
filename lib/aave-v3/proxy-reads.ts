@@ -90,6 +90,11 @@ export async function readAaveV3Positions(
   if (sp.get("noDebt") === "true") qs.set("noDebt", "true");
   if (sp.get("hasLiquidations") === "true") qs.set("hasLiquidations", "true");
   if (sp.get("hasLiquidations") === "false") qs.set("hasLiquidations", "false");
+  // A transaction bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   if (sp.get("market")) qs.set("market", sp.get("market")!);
   // Lifecycle Status facet — rails-server filters mv_aave_v3_wallet_markets.status
   // (mig 105; whole-lifecycle). Absent = the whole lifecycle (a cleared chip).

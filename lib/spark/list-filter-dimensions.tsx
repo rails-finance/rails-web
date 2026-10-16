@@ -15,6 +15,9 @@
 //     resting on a CONTEXTUAL default (lib/spark/listing-visibility.ts).
 //   • Position — Borrowing (hasDebt) / Supply only (noDebt), from on-chain balances.
 //   • History  — Liquidated before (hasLiquidations, = ever liquidated).
+//   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive), the
+//     distinct transactions on the wallet, liquidations included
+//     (lib/shared/transactions-dimension.ts).
 //   • Wallet search (exact address → the `wallet` param) and Recent activity /
 //     Debt / Collateral sort (mig 183's debt_usd/collateral_usd on
 //     mv_spark_wallets — a ranking aid, never displayed; the card's HF/USD
@@ -23,6 +26,7 @@
 //     universe (the full Pool.getReservesList set); chips carry symbols, the
 //     proxy maps them to addresses, the backend matches within the position.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -36,6 +40,10 @@ import {
   isAllStatuses,
   sameStatusSet,
 } from "@/lib/spark/listing-visibility";
+
+/** The Transactions slider's top: the round number above the busiest listed
+ *  wallet (27,023 transactions, 16 Oct 2026). */
+const SPARK_TX_TOP = 30000;
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const SPARK_ITEMS_PER_PAGE = 20;
@@ -53,6 +61,8 @@ export interface SparkListFilters extends BaseListFilters {
   supplying: string[];
   /** Reserve symbols the position must be BORROWING (multi, OR). */
   borrowing: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion",
@@ -69,6 +79,7 @@ export const SPARK_LIST_DEFAULTS: SparkListFilters = {
   liquidations: [],
   supplying: [],
   borrowing: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -155,6 +166,11 @@ export function sparkListDimensions(): SerializableDimension<SparkListFilters>[]
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<SparkListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: SPARK_TX_TOP,
+    }),
   ];
 }
 
@@ -172,6 +188,7 @@ export function sparkFiltersToFetchParams(filters: SparkListFilters, page: numbe
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
     supplyAssets: filters.supplying.length > 0 ? filters.supplying : undefined,
     borrowAssets: filters.borrowing.length > 0 ? filters.borrowing : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as SparkPositionSort,
     sortOrder: filters.sortOrder,
     limit: SPARK_ITEMS_PER_PAGE,

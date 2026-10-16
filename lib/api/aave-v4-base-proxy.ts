@@ -9,7 +9,13 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 export async function proxyAaveV4Base(request: NextRequest, backendPath: string): Promise<NextResponse> {
   const base = process.env.RAILS_API_URL;
   if (!base) return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
-  const search = request.nextUrl.searchParams.toString();
+  const params = new URLSearchParams(request.nextUrl.searchParams);
+  // A transaction bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx"]) {
+    const v = params.get(k);
+    if (v != null && !/^\d+$/.test(v)) params.delete(k);
+  }
+  const search = params.toString();
   try {
     const res = await fetch(
       `${base}${backendPath}${search ? `?${search}` : ""}`,

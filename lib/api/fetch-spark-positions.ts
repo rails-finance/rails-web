@@ -16,6 +16,9 @@ export interface FetchSparkPositionsParams {
   hasDebt?: boolean;
   noDebt?: boolean;
   hasLiquidations?: boolean;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   /** supply-side reserve symbols/addresses — restrict to positions supplying them. */
   supplyAssets?: string[];
   borrowAssets?: string[];
@@ -43,6 +46,8 @@ export async function fetchSparkPositions(p: FetchSparkPositionsParams): Promise
   if (p.hasDebt) qs.set("hasDebt", "true");
   if (p.noDebt) qs.set("noDebt", "true");
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.supplyAssets && p.supplyAssets.length > 0) qs.set("supplyAssets", p.supplyAssets.join(","));
   if (p.borrowAssets && p.borrowAssets.length > 0) qs.set("borrowAssets", p.borrowAssets.join(","));
   if (p.sortBy) qs.set("sortBy", p.sortBy);

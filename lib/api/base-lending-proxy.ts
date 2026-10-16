@@ -60,6 +60,11 @@ export async function proxyBaseLendingPositions(request: NextRequest, t: BaseLen
     if (sp.get("noDebt") === "true") qs.set("noDebt", "true");
     if (sp.get("hasLiquidations") === "true") qs.set("hasLiquidations", "true");
     if (sp.get("hasLiquidations") === "false") qs.set("hasLiquidations", "false");
+    // A transaction bound is forwarded only as a whole number.
+    for (const k of ["minTx", "maxTx"]) {
+      const v = sp.get(k);
+      if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+    }
     if (sp.get("status")) qs.set("status", sp.get("status")!);
     // Asset facets arrive as ADDRESSES on this lane (no curated Base catalog to
     // map symbols through); pass them straight down.
