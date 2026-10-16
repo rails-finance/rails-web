@@ -18,7 +18,13 @@
 // token transfers in each (a Maple deposit and its share transfer). The
 // index sends the shape (`ServedFolder.shape`, the member kinds of one
 // transaction) and legs netted per asset; the header names the shape before
-// the sums, "12 × deposit + share transfer".
+// the sums, "Deposit + share transfer".
+//
+// Since 2026-10-16 (rails-ops decision 0039) an owner run is also a cycle: a
+// sequence of transactions repeated whole (a withdraw transaction then a
+// repay transaction, five times). The index sends `shape` as the kinds of one
+// cycle and `cycles` as its repeats, and the label leads with the repeats:
+// "5 × Withdraw + repay".
 
 import type { FolderRegisterEntry, ServedFolder } from "@/lib/shared/timeline-folder";
 
@@ -35,7 +41,9 @@ export function ownerRunEntry(folder: ServedFolder, nounOf: (action: string) => 
     return {
       memberNoun: "event",
       tone: "neutral",
-      shapeLabel: ownerShapeLabel(folder.shape, nounOf),
+      shapeLabel: folder.cycles
+        ? `${folder.cycles.toLocaleString("en-US")} × ${ownerShapeLabel(folder.shape, nounOf)}`
+        : ownerShapeLabel(folder.shape, nounOf),
     };
   }
   return {

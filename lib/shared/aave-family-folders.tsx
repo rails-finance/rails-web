@@ -16,7 +16,9 @@
 // declare, so a folder drawn from the wire and a folder grouped in the browser
 // are the same card.
 //
-// THREE KINDS ARRIVE. `liquidation` and `transfer` are the two specs; `mixed`
+// FOUR KINDS ARRIVE. `owner_run` is the owner's shape run or cycle
+// (`lib/shared/owner-run-folders.tsx`), named by the card's own verbs.
+// `liquidation` and `transfer` are the other two specs; `mixed`
 // is what rule 6 emits when two or more members are unlike the rest and the
 // stretch is not homogeneous enough to summarise under one kind. A
 // `liquidation` folder may hold `bad_debt_written_off` members beside its
@@ -28,6 +30,7 @@
 // (the pill was retired at every width, 2026-09-02).
 
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
+import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
 const LIQUIDATION: FolderRegisterEntry = {
   memberNoun: "liquidation",
@@ -59,7 +62,16 @@ const MIXED_WITH_LIQUIDATION: FolderRegisterEntry = {
   spineIcon: "warning",
 };
 
+/** One member of an owner shape or cycle, by its action: the card's verb. */
+const OWNER_RUN_NOUN: Record<string, string> = {
+  supply: "supply",
+  withdraw: "withdraw",
+  borrow: "borrow",
+  repay: "repay",
+};
+
 export const AAVE_FAMILY_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry => {
+  if (folder.kind === OWNER_RUN_KIND) return ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event");
   if (folder.kind === "liquidation") return LIQUIDATION;
   if (folder.kind === "transfer") return TRANSFER;
   return folder.counts.some((c) => c.key === "liquidation" && c.count > 0) ? MIXED_WITH_LIQUIDATION : MIXED;

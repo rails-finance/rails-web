@@ -17,8 +17,9 @@
 //
 // THE GROUP RULE (rails-ops decision 0039): five or more consecutive
 // transactions of the same act, unbroken by any other row, are one folder
-// whatever its length; the same act is one spec's `match`/`sameRun`, or one
-// repeating set (a spec's `shape`). The floor is `GROUP_MIN_TRANSACTIONS`,
+// whatever its length; the same act is one spec's `match`/`sameRun`, one
+// repeating set (a spec's `shape`), or a cycle of two to four transaction
+// shapes repeated whole (`findCycles`). The floor is `GROUP_MIN_TRANSACTIONS`,
 // shared with the client-grouped families (`lib/shared/timeline-chunks.ts`).
 //
 // A PORT, NOT A NEW RULE. The pass, rule 6, the row-cap trim and the members
@@ -350,6 +351,7 @@ function folderOf<R>(
   access: GroupingAccess<R>,
   ordinalBase: number,
   shape?: string[],
+  cycles?: number,
 ): ServedFolder {
   const txs = new Set<string>();
   const kindCount = new Map<string, number>();
@@ -397,19 +399,27 @@ function folderOf<R>(
     byDay: countByDay(members, access.timestamp),
     cells: spec.cellOf ? countCells(members, spec.cellOf, access.timestamp) : null,
     ...(shape ? { shape } : {}),
+    ...(cycles ? { cycles } : {}),
   };
 }
 
-/** A shape run's rows `[start, end)`, its spec and its member kinds. */
+/** A shape run's or a cycle's rows `[start, end)`, its spec, and the member
+ *  kinds of one transaction (a shape run) or of one cycle (a cycle, with
+ *  `cycles` its repeats). */
 interface ShapeStretch {
   start: number;
   end: number;
   spec: number;
   kinds: string[];
-  keys: number;
+  cycles?: number;
 }
 
-/** Every shape run in `rows` — the server's `findShapeStretches`. */
+/** The longest cycle, in transactions — the server's `CYCLE_MAX_TRANSACTIONS`. */
+export const CYCLE_MAX_TRANSACTIONS = 4;
+
+/** Every shape run and cycle in `rows` — the server's `findShapeStretches`. A
+ *  shape run is `GROUP_MIN_TRANSACTIONS` or more transactions of one shape of
+ *  two or more keys; a cycle is `findCycles`'s, found after them. */
 function findShapeStretches<R>(
   rows: R[],
   specs: readonly GroupingSpec<R>[],
@@ -443,7 +453,7 @@ function findShapeStretches<R>(
           kinds.push(s.kindOf(rows[k]));
         }
       }
-      if (ok && anchored && keys.length >= 2) {
+      if (ok && anchored) {
         hit = { start: i, end: j, spec: si, sig: keys.join("\u0000"), kinds, keys: keys.length };
         break;
       }
@@ -452,15 +462,86 @@ function findShapeStretches<R>(
     i = j;
   }
   const out: ShapeStretch[] = [];
+  const taken = new Array<boolean>(txs.length).fill(false);
   let a = 0;
   while (a < txs.length) {
     const t = txs[a];
     let b = a + 1;
     if (t.spec >= 0) while (b < txs.length && txs[b].spec === t.spec && txs[b].sig === t.sig) b++;
-    if (t.spec >= 0 && b - a >= GROUP_MIN_TRANSACTIONS) {
-      out.push({ start: t.start, end: txs[b - 1].end, spec: t.spec, kinds: t.kinds, keys: t.keys });
+    if (t.spec >= 0 && t.keys >= 2 && b - a >= GROUP_MIN_TRANSACTIONS) {
+      out.push({ start: t.start, end: txs[b - 1].end, spec: t.spec, kinds: t.kinds });
+      for (let k = a; k < b; k++) taken[k] = true;
     }
     a = b;
+  }
+  for (const c of findCycles(txs, taken)) {
+    out.push({
+      start: txs[c.at].start,
+      end: txs[c.at + c.length - 1].end,
+      spec: txs[c.at].spec,
+      kinds: txs.slice(c.at, c.at + c.period).flatMap((t) => t.kinds),
+      cycles: c.length / c.period,
+    });
+  }
+  return out.sort((x, y) => x.start - y.start);
+}
+
+/**
+ * The cycles among `txs` (rails-ops decision 0039) — the server's
+ * `findCycles`, line for line. A cycle is a sequence of two to
+ * `CYCLE_MAX_TRANSACTIONS` transaction shapes, not all alike, repeated whole
+ * at least twice over `GROUP_MIN_TRANSACTIONS` or more transactions; it ends
+ * on its last whole cycle, so a partial cycle after it is left to the row
+ * specs. A transaction outside every shape spec, or `taken` by a shape run,
+ * breaks one. `at` is the first transaction, `period` the transactions in one
+ * cycle, `length` the transactions grouped.
+ */
+export function findCycles(
+  txs: readonly { spec: number; sig: string }[],
+  taken: readonly boolean[],
+): { at: number; period: number; length: number }[] {
+  const out: { at: number; period: number; length: number }[] = [];
+  const open = (k: number) => k < txs.length && txs[k].spec >= 0 && !taken[k];
+  const same = (x: number, y: number) => txs[x].spec === txs[y].spec && txs[x].sig === txs[y].sig;
+  let a = 0;
+  while (a < txs.length) {
+    if (!open(a)) {
+      a += 1;
+      continue;
+    }
+    // A run of one shape is the shape run's ground, or a row spec's.
+    let alike = 1;
+    while (open(a + alike) && same(a + alike, a)) alike++;
+    if (alike >= GROUP_MIN_TRANSACTIONS) {
+      a += alike;
+      continue;
+    }
+    let found: { period: number; length: number } | null = null;
+    for (let p = 2; p <= CYCLE_MAX_TRANSACTIONS && !found; p++) {
+      let ok = true;
+      for (let k = a; k < a + p && ok; k++) ok = open(k) && txs[k].spec === txs[a].spec;
+      if (!ok) break;
+      // The smallest period: a window that repeats a shorter one is that
+      // shorter cycle, tried already.
+      let shorter = false;
+      for (let q = 1; q < p && !shorter; q++) {
+        if (p % q !== 0) continue;
+        let rep = true;
+        for (let k = a + q; k < a + p && rep; k++) rep = same(k, k - q);
+        shorter = rep;
+      }
+      if (shorter) continue;
+      let len = p;
+      while (open(a + len) && same(a + len, a + len - p)) len++;
+      const whole = len - (len % p);
+      if (whole / p >= 2 && whole >= GROUP_MIN_TRANSACTIONS) found = { period: p, length: whole };
+    }
+    if (found) {
+      out.push({ at: a, ...found });
+      a += found.length;
+    } else {
+      a += 1;
+    }
   }
   return out;
 }
@@ -500,7 +581,7 @@ export function groupIntoRows<R>(
 
   const specOf = (row: R): number => specs.findIndex((s) => !s.shape && s.match(row));
 
-  const emitRun = (stretch: R[], at: number, spec: GroupingSpec<R>, shape?: string[]) => {
+  const emitRun = (stretch: R[], at: number, spec: GroupingSpec<R>, shape?: string[], cycles?: number) => {
     const first = stretch.findIndex(keep);
     const kept = stretch.filter(keep);
     // A slice of one member, or of one transaction of a shape, sits loose.
@@ -508,7 +589,12 @@ export function groupIntoRows<R>(
       for (const row of kept) out.push({ kind: "event", event: row });
       return;
     }
-    const folder = folderOf(kept, at + first, spec, access, opts.ordinalBase, shape);
+    // A slice of a cycle counts the whole cycles it keeps, and names none when
+    // it cuts one: its header then reads as the shape alone.
+    const period = cycles ? transactionCount(stretch, access.txHash) / cycles : 0;
+    const keptTxs = cycles ? transactionCount(kept, access.txHash) : 0;
+    const keptCycles = cycles && first === 0 && keptTxs % period === 0 ? keptTxs / period : undefined;
+    const folder = folderOf(kept, at + first, spec, access, opts.ordinalBase, shape, keptCycles);
     out.push({ kind: "folder", folder });
     folders.set(folder.responseId, folder);
     members.set(folder.responseId, kept);
@@ -519,7 +605,7 @@ export function groupIntoRows<R>(
   while (i < rows.length) {
     const shaped = shapeAt.get(i);
     if (shaped) {
-      emitRun(rows.slice(shaped.start, shaped.end), i, specs[shaped.spec], shaped.kinds);
+      emitRun(rows.slice(shaped.start, shaped.end), i, specs[shaped.spec], shaped.kinds, shaped.cycles);
       i = shaped.end;
       continue;
     }
