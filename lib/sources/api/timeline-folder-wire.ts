@@ -81,6 +81,8 @@ export interface UpstreamFolder {
   /** On an owner run of one transaction shape, the member kinds of one
    *  transaction in order. Absent on every other folder. */
   shape?: string[];
+  /** On a cycle, how many times it repeats; `shape` is then one cycle. */
+  cycles?: number;
 }
 
 /** One cell exactly as rails-server sends it — assets as token addresses, and
@@ -267,5 +269,6 @@ export function toServedFolder(folder: UpstreamFolder, resolve: FolderAssetResol
     byDay: folder.byDay,
     cells: folder.cells ? resolveCells(folder.cells, resolve) : null,
     ...(folder.shape ? { shape: folder.shape } : {}),
+    ...(folder.cycles ? { cycles: folder.cycles } : {}),
   };
 }

@@ -2,21 +2,34 @@
 // ----------------------------------------------------------------------------
 // rails-ops decision 0039: five or more consecutive transactions of the same
 // act, unbroken by any other row, are one group whatever its length; a
-// repeating set (the shape run) counts the same way. No month cut, no size
-// cut. This file runs the rule against the two web paths:
+// repeating set (the shape run) and a cycle of transactions repeated whole
+// count the same way. No month cut, no size cut. This file runs the rule
+// against the two web paths:
 //
 //   • lib/shared/timeline-grouping.ts `groupIntoRows` — the route pass for
 //     Morpho Base, Compound V3 Base, Moonwell Base and Aave V3 Base;
 //   • lib/shared/timeline-chunks.ts `settleRunRows` — the client-grouped
 //     families' run rows.
 //
-// OFFLINE. Pure functions, synthetic rows.
+// and the cycle against a fixture of a real page: Aave V3 Core
+// `0x2dad3ac73c4c8305019e117c71a573913c373b11`, whose Withdraw wstETH / Repay
+// USDC unwind of 2–6 Jun 2026 (rows 414–431, Miles's 422–431 among them) is
+// one group, "9 × Withdraw + repay" (fixtures/aave-v3-cycle-unwind.json, read
+// from victoria 2026-10-16). The index groups that page with the same keying
+// (rails-server `aave-family-timeline-folders.ts`); here the Base route's
+// transcription runs it, and the family's register names it.
+//
+// OFFLINE. Pure functions, synthetic rows and one fixture.
 //
 //   npx tsx --test scripts/verify/verify-group-rule.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { groupIntoRows, type GroupingAccess, type GroupingSpec } from "@/lib/shared/timeline-grouping";
 import { GROUP_MIN_TRANSACTIONS, settleRunRows, type RunGroupingSpec } from "@/lib/shared/timeline-chunks";
+import { readFileSync } from "node:fs";
+import { aaveV3BaseFolderSpecs, AAVE_V3_BASE_ROW_ACCESS } from "@/lib/aave-v3-base/timeline-folders";
+import { AAVE_FAMILY_FOLDER_REGISTER } from "@/lib/shared/aave-family-folders";
+import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 
 const SEP_1 = Date.UTC(2026, 8, 1) / 1000;
 
@@ -236,5 +249,137 @@ test("flatIdx numbers loose rows and runs contiguously", () => {
       ["run", 1],
       ["event", 7],
     ],
+  );
+});
+
+// ── cycles: a sequence of transactions repeated whole ───────────────────────
+
+/** An owner act per transaction: a withdraw or a repay, keyed by kind. */
+const CYCLE: GroupingSpec<Row> = {
+  kind: "owner_run",
+  match: () => false,
+  kindOf: (r) => r.kind,
+  shape: {
+    keyOf: (r) => (["withdraw", "repay", "supply", "borrow"].includes(r.kind) ? r.kind : null),
+    anchor: () => true,
+    netLegOf: (r) => [
+      {
+        axis: r.kind === "withdraw" || r.kind === "supply" ? "supply" : "debt",
+        asset: "0xaaa",
+        assetKeyKind: "tokenAddress",
+        amount: BigInt(r.kind === "withdraw" || r.kind === "repay" ? -Number(r.amount) : Number(r.amount)),
+        up: "Up",
+        down: "Down",
+        symbol: "AAA",
+        decimals: 0,
+      },
+    ],
+  },
+};
+
+/** `n` cycles of the given kinds, one transaction each. */
+function cycles(n: number, kinds = ["withdraw", "repay"]): Row[] {
+  const out: Row[] = [];
+  for (let c = 0; c < n; c++) for (const k of kinds) out.push(mk(k, SEP_1 + 60 * seq));
+  return out;
+}
+const cycleShape = (rows: Row[]) =>
+  served(rows, [CYCLE]).rows.map((r) =>
+    r.kind === "folder" ? `${r.folder.cycles ?? 1}x${r.folder.txCount}:${(r.folder.shape ?? []).join("+")}` : "·",
+  );
+
+test("a withdraw then a repay, five times, one per transaction, is one cycle", () => {
+  assert.deepEqual(cycleShape(cycles(5)), ["5x10:withdraw+repay"]);
+});
+
+test("a cycle's floor counts transactions, and only whole cycles group", () => {
+  assert.deepEqual(cycleShape(cycles(2)), Array(4).fill("·"), "two cycles are four transactions");
+  assert.deepEqual(cycleShape(cycles(3)), ["3x6:withdraw+repay"]);
+  assert.deepEqual(
+    cycleShape([...cycles(5), mk("withdraw", SEP_1 + 99_999)]),
+    ["5x10:withdraw+repay", "·"],
+    "a partial cycle draws as a plain row after the group",
+  );
+});
+
+test("an unrelated row breaks a cycle", () => {
+  assert.deepEqual(cycleShape([...cycles(3), mk("transfer_out", SEP_1), ...cycles(2)]), [
+    "3x6:withdraw+repay",
+    ...Array(5).fill("·"),
+  ]);
+});
+
+test("a cycle may span three transactions, and one act repeated is no cycle", () => {
+  assert.deepEqual(cycleShape(cycles(2, ["withdraw", "repay", "supply"])), ["2x6:withdraw+repay+supply"]);
+  assert.deepEqual(cycleShape(cycles(6, ["withdraw"])), Array(6).fill("·"));
+});
+
+test("a slice of a cycle names its whole cycles, and none when it cuts one", () => {
+  const rows = cycles(5);
+  const at = (from: number) =>
+    groupIntoRows(rows, [CYCLE], ACCESS, { ordinalBase: 1, keep: (r) => rows.indexOf(r) < from }).rows.map((r) =>
+      r.kind === "folder" ? [r.folder.count, r.folder.cycles ?? null] : "·",
+    );
+  assert.deepEqual(at(6), [[6, 3]], "the first six rows are three whole cycles");
+  assert.deepEqual(at(5), [[5, null]], "five rows cut the third cycle");
+});
+
+// ── the fixture: Aave V3 Core 0x2dad…3b11, the unwind of 2–6 Jun 2026 ──────
+
+interface Fixture {
+  wallet: string;
+  rows: [string, string, number, number, string, string | null, string | null, 0 | 1][];
+}
+
+const TOKENS: Record<string, { symbol: string; decimals: number }> = {
+  "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0": { symbol: "wstETH", decimals: 18 },
+  "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": { symbol: "USDC", decimals: 6 },
+  "0x6b175474e89094c44da98b954eedac495271d0f": { symbol: "DAI", decimals: 18 },
+};
+
+test('Aave V3 Core 0x2dad…3b11: rows 422–431 draw in one group, "9 × Withdraw + repay"', () => {
+  const fx = JSON.parse(
+    readFileSync(new URL("./fixtures/aave-v3-cycle-unwind.json", import.meta.url), "utf8"),
+  ) as Fixture;
+  const reserveOf = new Map<string, string>();
+  const events = fx.rows.map(([key, tx, block, ts, action, reserve, amount, ownerSigned]) => {
+    if (reserve) reserveOf.set(key, reserve);
+    return {
+      id: key,
+      txHash: tx,
+      blockNumber: block,
+      timestamp: ts,
+      wallet: fx.wallet,
+      context: {
+        protocol: "aave-v3",
+        data: { eventType: action, txFrom: ownerSigned ? fx.wallet : "0xother", raw: { amount: amount ?? undefined } },
+      },
+    } as unknown as BaseActivityEvent;
+  });
+  const specs = aaveV3BaseFolderSpecs(
+    (e) => {
+      const reserve = reserveOf.get(e.id);
+      return reserve ? { reserve } : undefined;
+    },
+    (address) => (address ? TOKENS[address] : undefined),
+  );
+  const g = groupIntoRows(events, specs, AAVE_V3_BASE_ROW_ACCESS, { ordinalBase: 1 });
+  const holding = g.rows.filter(
+    (r) => r.kind === "folder" && r.folder.ordinalFirst <= 431 && r.folder.ordinalLast >= 422,
+  );
+  assert.equal(holding.length, 1, "one row holds 422–431");
+  const f = holding[0].kind === "folder" ? holding[0].folder : null;
+  assert.ok(f, "that row is a group");
+  assert.deepEqual([f.ordinalFirst, f.ordinalLast, f.txCount, f.cycles], [414, 431, 18, 9], "the whole unwind");
+  assert.equal(AAVE_FAMILY_FOLDER_REGISTER(f).shapeLabel, "9 × Withdraw + repay");
+  assert.equal(new Date(f.firstAt * 1000).toISOString().slice(0, 10), "2026-06-02");
+  assert.equal(new Date(f.lastAt * 1000).toISOString().slice(0, 10), "2026-06-06");
+  assert.deepEqual(
+    f.legs.map((l) => [l.verb, l.symbol, l.amount]),
+    [
+      ["Withdrawn", "wstETH", "44000000000000000000"],
+      ["Repaid", "USDC", "86691081876"],
+    ],
+    "the net effect: 44 wstETH withdrawn, 86,691.08 USDC repaid",
   );
 });

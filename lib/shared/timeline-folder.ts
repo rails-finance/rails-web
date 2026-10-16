@@ -187,6 +187,11 @@ export interface ServedFolder {
    *  asset. Absent on every other folder. */
   shape?: string[];
 
+  /** On a cycle (rails-ops decision 0039): how many times the cycle repeats.
+   *  `shape` then holds the member kinds of one cycle, transaction by
+   *  transaction. Absent on every other folder. */
+  cycles?: number;
+
   /** On a Liquity fork `batch_rate` folder: the rate before the first member
    *  and after the last, and the lowest and highest the run passed through,
    *  in percent as the members' `interestRate` (rails-ops decision 0039, rule
@@ -345,8 +350,8 @@ export interface FolderRegisterEntry {
   /** Whether the members are the owner's actions (TimelineRunCard). */
   byOwner?: boolean;
   muted?: boolean;
-  /** A shape run's summary, drawn before its sums: "12 × deposit + share
-   *  transfer". */
+  /** A shape run's summary, drawn before its sums: "Deposit + share
+   *  transfer", or a cycle's "5 × Withdraw + repay". */
   shapeLabel?: string;
   /** While an opened folder's members are read, say so in words ("Reading 12
    *  deposits…") above the skeleton. Unset draws the skeleton alone. */

@@ -16,7 +16,9 @@
 // `bad_debt_written_off` row rides with it; Base reads no DeficitCreated, so
 // none arises here) and aToken transfer (a swap card is never a member) — the
 // same legs keyed by the same reserve addresses, the same state faces and
-// the same actor verdict. The page draws them with the family's register
+// the same actor verdict — and the owner's shape run or cycle (decision 0039),
+// keyed and netted as the index's `owner_run`. The page draws them with the
+// family's register
 // (`AAVE_V3_FOLDER_REGISTER`), as the mainnet page draws the index's.
 //
 // The index rows carry the reserve addresses and the events carry symbols, so
@@ -29,6 +31,7 @@ import {
   baseUnitMagnitude,
   type GroupingAccess,
   type GroupingLegEntry,
+  type GroupingNetLegEntry,
   type GroupingSpec,
 } from "@/lib/shared/timeline-grouping";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
@@ -51,6 +54,10 @@ import {
   type LoadAaveV3IndexParams,
 } from "@/lib/sources/api/aave-v3-base-timeline";
 
+/** The owner-run wire kind (`lib/shared/owner-run-folders.tsx` is a client
+ *  module, so a server route spells it out). */
+const OWNER_RUN_KIND = "owner_run";
+
 const dataOf = (e: BaseActivityEvent): AaveV3Context | null => (isAaveV3Event(e) ? e.context.data : null);
 
 export const AAVE_V3_BASE_ROW_ACCESS: GroupingAccess<BaseActivityEvent> = {
@@ -68,7 +75,7 @@ interface RowAssets {
   collateralAsset?: string;
 }
 
-/** The two specs, in the order the index declares them. `assetsOf` resolves
+/** The three specs, in the order the index declares them. `assetsOf` resolves
  *  an event to its row's addresses; `metaOf` names an address. */
 export function aaveV3BaseFolderSpecs(
   assetsOf: (e: BaseActivityEvent) => RowAssets | undefined,
@@ -202,8 +209,56 @@ export function aaveV3BaseFolderSpecs(
       stateOf,
       cellOf,
     },
+    {
+      // The owner's shape run or cycle — the index's `ownerShapeSpec` on this
+      // family: supply, withdraw, borrow and repay the owner signed, keyed by
+      // action and reserve, netted per reserve on the supply and debt axes.
+      kind: OWNER_RUN_KIND,
+      match: () => false,
+      kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
+      shape: {
+        keyOf: (e) => {
+          const d = dataOf(e);
+          const a = assetsOf(e);
+          if (!d || !a || !OWNER_AXIS[d.eventType]) return null;
+          return d.txFrom && d.txFrom.toLowerCase() === e.wallet.toLowerCase() ? `${d.eventType}:${a.reserve}` : null;
+        },
+        anchor: () => true,
+        netLegOf: (e): GroupingNetLegEntry[] => {
+          const d = dataOf(e);
+          const a = assetsOf(e);
+          const axis = d ? OWNER_AXIS[d.eventType] : undefined;
+          if (!d || !a || !axis) return [];
+          const magnitude = baseUnitMagnitude(d.raw?.amount);
+          const m = metaOf(a.reserve);
+          return [
+            {
+              axis: axis.axis,
+              asset: a.reserve,
+              assetKeyKind: "tokenAddress",
+              amount: magnitude == null ? null : axis.sign === 1 ? magnitude : -magnitude,
+              up: axis.up,
+              down: axis.down,
+              symbol: m && !m.unresolved ? m.symbol : null,
+              decimals: m && !m.unresolved ? m.decimals : null,
+            },
+          ];
+        },
+      },
+      actorOf,
+      stateOf,
+      cellOf,
+    },
   ];
 }
+
+/** Each owner act's axis and direction, as the index nets it. */
+const OWNER_AXIS: Record<string, { axis: string; sign: 1 | -1; up: string; down: string } | undefined> = {
+  supply: { axis: "supply", sign: 1, up: "Supplied", down: "Withdrawn" },
+  withdraw: { axis: "supply", sign: -1, up: "Supplied", down: "Withdrawn" },
+  borrow: { axis: "debt", sign: 1, up: "Borrowed", down: "Repaid" },
+  repay: { axis: "debt", sign: -1, up: "Borrowed", down: "Repaid" },
+};
 
 // ── The replay the answers slice ────────────────────────────────────────────
 
