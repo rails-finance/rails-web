@@ -166,8 +166,7 @@ const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const pctShort = (f: number): string => `${Number((f * 100).toFixed(1))}%`;
 
 /** What the Debt label says on a CDP that owes nothing. */
-const COLLATERAL_ONLY_TIP =
-  "The CDP owes nothing at this block. Polaris allows a CDP with no debt; the PSM's shares can still add debt to it at a later touch.";
+const COLLATERAL_ONLY_TIP = "Owes nothing at this block. A Polaris CDP can hold collateral with no debt.";
 
 /** A pETH price in the market's own stablecoin, at a readable grain: three
  *  decimals under 1, two under 100, whole numbers above (USDp's feed runs in
@@ -192,11 +191,6 @@ const LISTING_ICR_TIP =
  *  sentence needs its own width and normal prose settings, declared on the
  *  child so they win over the bubble's own. */
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
-
-/** Why the highest collateral can exceed every deposit: pETH reaches a CDP
- *  without the holder depositing it. */
-const PEAK_COLL_ABOVE_DEPOSITS =
-  "It can be more than the holder deposited: the difference is the market's net PSM share and reward pETH, which add collateral at a touch without a deposit.";
 
 /** Three decimals, trailing zeros kept ("2,035.800"), so the card's figures
  *  read at one grain; a magnitude too small for three decimals keeps
@@ -436,16 +430,12 @@ export function polarisCardSlots({
   let outcome: PositionCardOutcome | undefined;
 
   if (ended) {
+    // One sentence each (Miles, 16 Oct 2026); why a peak can exceed the
+    // deposits, and what a liquidation writes in, is the receipt's to say.
     const peakTip = (what: "coll" | "debt") =>
-      what === "coll"
-        ? `${
-            v.peaksCountLiquidation
-              ? "The most pETH the CDP held at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in."
-              : "The most pETH the CDP held after any of its touches (a touch is any transaction on it)."
-          } ${PEAK_COLL_ABOVE_DEPOSITS}`
-        : v.peaksCountLiquidation
-          ? `The most ${stable} the CDP owed at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in.`
-          : `The most ${stable} the CDP owed after any of its touches (a touch is any transaction on it).`;
+      `The most ${what === "coll" ? `pETH the CDP held` : `${stable} the CDP owed`} after any transaction on it${
+        v.peaksCountLiquidation ? ", its liquidation included" : ""
+      }.`;
     heads = [
       {
         id: "peak-collateral",

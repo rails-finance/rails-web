@@ -459,7 +459,6 @@ export default function MaplePositionView({
         price: rate,
         unit: rate ? p.assetSymbol : undefined,
         label: `Exit rate: what one ${p.symbol} pays out on withdrawal, in ${p.assetSymbol}`,
-        tip: `Exit rate: what one ${p.symbol} pays out on withdrawal now, in ${p.assetSymbol}.`,
         info: rate && state ? poolExitRateProv(p.assetSymbol, p.symbol, state.blockNumber) : undefined,
         moreInWords: true,
       });

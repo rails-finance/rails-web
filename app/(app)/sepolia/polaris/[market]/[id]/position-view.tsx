@@ -61,12 +61,6 @@ import { polarisExplorer } from "@/lib/polaris/explorer";
 
 /** What the ETH/USD row is, and why it is in the menu. */
 const ETH_USD_LABEL = "ETH/USD — the protocol's medianiser";
-const ETH_USD_TIP =
-  "ETH in USD from the protocol's ETH/USD medianiser, the median of its testnet oracles. pETH's USD price is its bonding-curve price in ETH times this.";
-
-/** What the trigger's pETH-in-ETH figure is, and why it is above one. */
-const PETH_CURVE_TIP =
-  "pETH's price in ETH on the protocol's bonding curve. ETH paid into the curve mints pETH at a price that rises as ETH enters it, so one pETH costs more than one ETH.";
 
 /** The card's "Highest recorded" peaks, with the liquidation's own state
  *  counted: the index takes its peaks over each touch's resulting figures, and
@@ -267,7 +261,6 @@ export default function PolarisPositionView({
         label: `${PETH.symbol} — bonding curve, native`,
         // "2.84 ETH" alone read as a gas price: the trigger names the token.
         triggerLabel: PETH.symbol,
-        tip: PETH_CURVE_TIP,
         info: liveCurvePriceProv(),
       },
       { symbol: PETH.symbol, address: PETH.address, price: chain.price.pethUsd },
@@ -277,7 +270,6 @@ export default function PolarisPositionView({
         symbol: "ETH",
         price: chain.price.ethUsd,
         label: ETH_USD_LABEL,
-        tip: ETH_USD_TIP,
         info: liveMedianiserProv("eth"),
       });
     const stableUsd = market === "usdp" ? 1 : chain.price.xauUsd;
@@ -302,13 +294,12 @@ export default function PolarisPositionView({
           unit: "ETH",
           label: `${PETH.symbol} — bonding curve, native`,
           triggerLabel: PETH.symbol,
-          tip: PETH_CURVE_TIP,
           info: curvePriceAtBlockProv(row.blockNumber),
         },
       ];
       if (p.ethUsd != null && p.ethUsd > 0) {
         out.push({ symbol: PETH.symbol, address: PETH.address, price: p.curve * p.ethUsd });
-        out.push({ symbol: "ETH", price: p.ethUsd, label: ETH_USD_LABEL, tip: ETH_USD_TIP });
+        out.push({ symbol: "ETH", price: p.ethUsd, label: ETH_USD_LABEL });
       }
       const stableUsd = market === "usdp" ? 1 : p.xauUsd;
       if (stableUsd != null) out.push({ symbol: stable, address: cfg.stable.address, price: stableUsd });

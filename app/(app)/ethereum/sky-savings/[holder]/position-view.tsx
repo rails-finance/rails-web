@@ -153,7 +153,6 @@ export default function SkySavingsPositionView({
       price: asOf.chi ? rayNumber(asOf.chi) : undefined,
       unit: USDS.symbol,
       label: "One sUSDS in USDS, the share price at the page's block",
-      tip: `The sUSDS share price: what one sUSDS redeems for in USDS at block ${asOf.block.toLocaleString("en-US")}.`,
       info: asOf.chi ? chiProv(asOf) : undefined,
     },
     ...(usdc != null
