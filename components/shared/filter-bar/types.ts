@@ -32,10 +32,16 @@ export interface FilterDimension<F> {
   /** Human label: shown in the + Filter menu and (by default) the chip prefix. */
   label: string;
   /** "single" → radio (one value; picking applies + closes; re-picking clears).
-   *  "multi" → checkboxes (OR within; toggles, popover stays open). */
-  cardinality: "single" | "multi";
+   *  "multi" → checkboxes (OR within; toggles, popover stays open).
+   *  "range" → a numeric range: a two-handle slider plus Min / Max inputs
+   *  (./range-control). Its selection is one `encodeRange` string, or [] when
+   *  neither bound is set. Needs `range`; `options` is []. */
+  cardinality: "single" | "multi" | "range";
   /** Selectable values. For async universes (assets) pass the resolved list in. */
   options: FilterOptionDef[];
+  /** The slider's span, for a "range" dimension. A handle at either end means
+   *  no bound on that side; the inputs take values past `max`. */
+  range?: RangeSpec;
   /** Current selection as a list of option keys ([] = inactive). */
   get: (f: F) => string[];
   /** Apply a new selection, returning the updated filter object. */
@@ -62,6 +68,9 @@ export interface FilterDimension<F> {
   labelAction?: ReactNode;
   /** Hide from the + Filter menu when false (e.g. Borrowing while Supply-only). */
   available?: (f: F) => boolean;
+  /** One short line at the foot of the dimension's group panel (the price
+   *  source a USD range is valued at). A group draws the first one it holds. */
+  panelNote?: ReactNode;
 }
 
 /** Active iff the current selection differs from the dimension's default. */
@@ -85,4 +94,63 @@ export function joinOptionLabels(values: string[], options: FilterOptionDef[], m
   const shown = labels.slice(0, max).join(", ");
   const extra = labels.length > max ? ` +${labels.length - max}` : "";
   return `${shown}${extra}`;
+}
+
+/** The span a "range" dimension's slider covers. The slider steps through the
+ *  1-2-2.5-3-4-5 series between the two ends, so it reads on a log scale. */
+export interface RangeSpec {
+  min: number;
+  max: number;
+  /** Values are US dollars: the ends, the chip and the inputs read `$1.5K`. */
+  usd?: boolean;
+}
+
+/** A range value for display: `1,500`, or `$1.5K` on a USD range. */
+export function formatRangeValue(v: number, usd?: boolean): string {
+  if (!usd) return v.toLocaleString("en-US");
+  if (v < 1000) return `$${v.toLocaleString("en-US")}`;
+  return `$${Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)}`;
+}
+
+/** A range selection; null is no bound on that side. */
+export interface RangeBounds {
+  min: number | null;
+  max: number | null;
+}
+
+/** One range as its selection value: `10-500`, `10-` or `-500`; [] when both
+ *  sides are open. A single string, so the URL codec carries it as any other
+ *  value (`?tx=10-500`). */
+export function encodeRange(b: RangeBounds): string[] {
+  if (b.min == null && b.max == null) return [];
+  return [`${b.min ?? ""}-${b.max ?? ""}`];
+}
+
+/** The inverse of encodeRange. A side that is not a non-negative integer reads
+ *  as open, and a pair given high-low is put in order. */
+export function decodeRange(values: string[]): RangeBounds {
+  const m = /^(\d*)-(\d*)$/.exec(values[0] ?? "");
+  if (!m) return { min: null, max: null };
+  const min = m[1] ? Number(m[1]) : null;
+  const max = m[2] ? Number(m[2]) : null;
+  if (min != null && max != null && min > max) return { min: max, max: min };
+  return { min, max };
+}
+
+/** Canonical form of a range selection: decoded, ordered, re-encoded. */
+export function normalizeRange(values: string[]): string[] {
+  return encodeRange(decodeRange(values));
+}
+
+/** Chip text for a range: `Transactions: 10–500`, `Transactions: ≥ 10`,
+ *  `Transactions: ≤ 500`; `Debt: $1K–$50K` on a USD range. A maximum of 0
+ *  alone reads as the one value it allows. */
+export function rangeChipLabel(label: string, values: string[], usd?: boolean): string {
+  const { min, max } = decodeRange(values);
+  const n = (v: number) => formatRangeValue(v, usd);
+  if (min != null && max != null) return min === max ? `${label}: ${n(min)}` : `${label}: ${n(min)}–${n(max)}`;
+  if (max === 0) return `${label}: ${n(0)}`;
+  if (min != null) return `${label}: ≥ ${n(min)}`;
+  if (max != null) return `${label}: ≤ ${n(max)}`;
+  return label;
 }

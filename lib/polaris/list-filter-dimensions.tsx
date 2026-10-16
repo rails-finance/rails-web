@@ -9,16 +9,25 @@
 //   • Market  — USDp / GOLDp (single). Every CDP lives in exactly one.
 //   • Status  — open / closed / liquidated, the API's whole lifecycle
 //     vocabulary, resting on a CONTEXTUAL default (listing-visibility.ts).
-//   • Debt    — "Borrowing" (the last state carries debt) or "Collateral
-//     only" (pETH deposited, nothing minted — 213 of 5,428 open CDPs on
-//     2026-09-10). A CDP with no debt has no ratio and sorts last in both
-//     directions of every sort, so the second option is the only way to see
-//     that set. Single-select: one chip, no negation.
+//   • Size    — two USD ranges, Debt and Collateral, over the CDP's last
+//     state, valued on the server at the market's latest indexed oracle price
+//     (polaris_oracle_at_block: 1 USDp at the ETH/USD medianiser over the usdp
+//     feed's ETH price, 1 GOLDp at the XAU/USD medianiser, pETH at the
+//     market's previewPrice()). Sent as minDebtUsd / maxDebtUsd / minCollUsd /
+//     maxCollUsd; the panel names the price block. Debt with a maximum of $0
+//     is the collateral-only set (pETH deposited, nothing minted), which no
+//     sort surfaces because a CDP with no debt has no ratio. The Debt range
+//     keeps the old Debt facet's `?debt=` param, so `?debt=collateral-only`
+//     reads as $0 and `?debt=borrowing` as at least $1. A market with no
+//     price row drops its CDPs with a balance from a USD range.
 //   • (There is no "Liquidated before" facet. On Polaris a liquidation clears
 //     the whole CDP and burns the NFT, and the id is never reused, so "ever
 //     liquidated" is the Status bucket "Liquidated" — the two-axis shape
 //     belongs to the lenders where a position survives a partial liquidation.
 //     Retired 2026-09-10; it had been a server no-op since it shipped.)
+//   • Transactions — a range over tx_count, the distinct transactions on the
+//     CDP's timeline, sent as minTx / maxTx. Unset by default; "10–500" sets
+//     aside the one-transaction CDPs and the busiest accounts.
 //   • Identity search (the `q` box) + recency sort.
 //
 // The free-text search is the driver's `q`; it carries the tri-modal identity
@@ -27,16 +36,24 @@
 // That same parse decides the resting status default (listing-visibility.ts),
 // which is why it lives in its own module rather than here.
 //
-// Debt, collateral and ratio sorts are offered only once a market is chosen:
-// the two markets' debts are different tokens, and a mixed page sorted by
-// "debt" would rank USDp against GOLDp as if they were one number. The ratio
+// Debt, collateral and ratio sorts in token units are offered only once a
+// market is chosen: the two markets' debts are different tokens, and a mixed
+// page sorted by "debt" would rank USDp against GOLDp as if they were one
+// number. With no market chosen the size sorts are Debt (USD) and Collateral
+// (USD), the server's valued figures, which rank both markets alike. The ratio
 // sort is the index's own coll ÷ debt — within one market the collateral
 // ratio is that quotient times one price, so the ORDER needs no price (the
 // figure each card shows is valued from the market board; see
 // polaris-position-card.tsx). Ascending surfaces the CDPs nearest the floor,
 // which is what a reviewer's first look asked for (2026-09-10).
 
-import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
+import type { ReactNode } from "react";
+import {
+  decodeRange,
+  normalizeRange,
+  rangeChipLabel,
+  type FilterOptionDef,
+} from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FetchPolarisPositionsParams } from "@/lib/api/fetch-polaris-positions";
@@ -59,8 +76,14 @@ export interface PolarisListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). RAW intent: empty is "no
    *  opinion" and resolves to the contextual default (listing-visibility.ts). */
   status: string[];
-  /** "" | "borrowing" | "collateral-only" */
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`. */
   debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
+  /** Transaction-count range, one encodeRange value (`10-500`, `10-`, `-500`)
+   *  or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no
@@ -76,9 +99,15 @@ export const POLARIS_LIST_DEFAULTS: PolarisListFilters = {
   market: [],
   status: [],
   debt: [],
+  coll: [],
+  tx: [],
 };
 
-const RECENT_ONLY: SortOption[] = [{ value: "recent", label: RECENT_ACTIVITY_LABEL }];
+const RECENT_ONLY: SortOption[] = [
+  { value: "recent", label: RECENT_ACTIVITY_LABEL },
+  { value: "debtUsd", label: "Debt (USD)" },
+  { value: "collUsd", label: "Collateral (USD)" },
+];
 const WITH_MARKET: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
@@ -86,7 +115,8 @@ const WITH_MARKET: SortOption[] = [
   { value: "ratio", label: "Ratio" },
 ];
 
-/** Debt / Collateral / Ratio sorts appear once a market is chosen (see the header). */
+/** Debt / Collateral / Ratio sorts appear once a market is chosen; without
+ *  one the size sorts are in USD (see the header). */
 export function polarisSortOptions(f: PolarisListFilters): SortOption[] {
   return normalizeMarket(f.market[0]) ? WITH_MARKET : RECENT_ONLY;
 }
@@ -104,10 +134,16 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "liquidated", label: "Liquidated" },
 ];
 
-const DEBT_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "collateral-only", label: "Collateral only" },
-];
+/** The Size sliders' span: $0 to $1M, with typed bounds past the top. */
+const USD_RANGE = { min: 0, max: 1_000_000, usd: true };
+
+/** The old Debt facet's values, still in shared links: collateral only is no
+ *  debt, borrowing is at least a dollar. */
+function debtRangeFromUrl(values: string[]): string[] {
+  if (values.includes("collateral-only")) return ["-0"];
+  if (values.includes("borrowing")) return ["1-"];
+  return normalizeRange(values);
+}
 
 /**
  * Market options can be injected with token glyphs for the client toolbar;
@@ -117,6 +153,7 @@ const DEBT_OPTIONS: FilterOptionDef[] = [
  */
 export function polarisListDimensions(
   marketOptions: FilterOptionDef[] = MARKET_OPTIONS,
+  priceNote?: ReactNode,
 ): SerializableDimension<PolarisListFilters>[] {
   return [
     {
@@ -153,13 +190,39 @@ export function polarisListDimensions(
     },
     {
       id: "debt",
-      label: "Debt",
-      group: "Debt",
-      cardinality: "single",
+      label: "Debt (USD)",
+      group: "Size",
+      cardinality: "range",
+      range: USD_RANGE,
       param: "debt",
-      options: DEBT_OPTIONS,
+      options: [],
       get: (f) => f.debt,
-      set: (f, v) => ({ ...f, debt: v }),
+      set: (f, v) => ({ ...f, debt: debtRangeFromUrl(v) }),
+      chipLabel: (v) => rangeChipLabel("Debt", v, true),
+    },
+    {
+      id: "coll",
+      label: "Collateral (USD)",
+      group: "Size",
+      cardinality: "range",
+      range: USD_RANGE,
+      param: "coll",
+      options: [],
+      get: (f) => f.coll,
+      set: (f, v) => ({ ...f, coll: normalizeRange(v) }),
+      chipLabel: (v) => rangeChipLabel("Collateral", v, true),
+      panelNote: priceNote,
+    },
+    {
+      id: "tx",
+      label: "Transactions",
+      group: "Transactions",
+      cardinality: "range",
+      range: { min: 1, max: 1000 },
+      param: "tx",
+      options: [],
+      get: (f) => f.tx,
+      set: (f, v) => ({ ...f, tx: normalizeRange(v) }),
     },
   ];
 }
@@ -184,15 +247,25 @@ export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: n
       ? market
         ? filters.sortBy
         : "recent"
-      : "recent"
+      : filters.sortBy === "debtUsd" || filters.sortBy === "collUsd"
+        ? filters.sortBy
+        : "recent"
   ) as PolarisPositionSort;
+  const tx = decodeRange(filters.tx);
+  const debtUsd = decodeRange(filters.debt);
+  const collUsd = decodeRange(filters.coll);
   return {
     market: market ?? undefined,
     cdpId,
     wallet: ownerAddress,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: filters.debt.includes("borrowing") ? true : filters.debt.includes("collateral-only") ? false : undefined,
+    minDebtUsd: debtUsd.min ?? undefined,
+    maxDebtUsd: debtUsd.max ?? undefined,
+    minCollUsd: collUsd.min ?? undefined,
+    maxCollUsd: collUsd.max ?? undefined,
+    minTx: tx.min ?? undefined,
+    maxTx: tx.max ?? undefined,
     sortBy,
     sortOrder: filters.sortOrder,
     limit: POLARIS_ITEMS_PER_PAGE,

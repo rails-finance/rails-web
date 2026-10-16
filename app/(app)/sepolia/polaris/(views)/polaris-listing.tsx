@@ -40,8 +40,9 @@ import { HolderStrip } from "@/components/shared/holder-strip";
 import { fetchPolarisListingPage } from "@/lib/polaris/listing-fetch";
 import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
 import { namesHolder, parsePolarisSearch } from "@/lib/polaris/search";
-import { effectiveStatuses, isAllStatuses } from "@/lib/polaris/listing-visibility";
-import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
+import { isAllStatuses } from "@/lib/polaris/listing-visibility";
+import type { PolarisUsdValuation } from "@/lib/sources/api/polaris-positions";
+import { polarisUsdSourceNote } from "@/lib/polaris/usd-source-note";
 import {
   polarisListDimensions,
   polarisSortOptions,
@@ -81,18 +82,18 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
     };
   }, []);
 
-  // Every status's count per market, for the line that says the resting view
-  // is the open CDPs only. One read on mount; the envelope carries the counts
-  // whatever the page asks for.
-  const [books, setBooks] = useState<PolarisMarketBook[] | null>(null);
+  // The oracle-at-block row each market's USD figures are valued at, for the
+  // Size panel's source line. One read on mount; the server values every
+  // USD-filtered page at the same latest indexed row.
+  const [usd, setUsd] = useState<PolarisUsdValuation | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/polaris/positions?status=open&limit=1");
+        const res = await fetch("/api/polaris/positions?withUsd=1&limit=1");
         if (!res.ok) return;
-        const json = (await res.json()) as { markets?: PolarisMarketBook[] };
-        if (!cancelled && json.markets?.length) setBooks(json.markets);
+        const json = (await res.json()) as { usd?: PolarisUsdValuation };
+        if (!cancelled && json.usd) setUsd(json.usd);
       } catch {
         /* the line is an aid — the listing still lists */
       }
@@ -151,7 +152,7 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
   );
 
   return (
-    <ChainTruthListingPage<PolarisPositionSummary, PolarisListFilters>
+    <ChainTruthListingPage<PolarisPositionSummary, PolarisListFilters, PolarisUsdValuation | null>
       title="Polaris CDPs"
       noun="CDPs"
       basePath={POLARIS_BASE_PATH}
@@ -162,8 +163,11 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
       renderCard={(p) => <PolarisPositionCard v={viewFromSummary(p, markets, !marketsSettled)} surface="listing" />}
       hrefFor={(p) => polarisPositionHref(p.market, p.cdpId)}
       keyFor={(p) => `${p.market}:${p.cdpId}`}
-      strategy={serverStrategy<PolarisPositionSummary, PolarisListFilters>({
-        dimensions: polarisListDimensions(marketOptions),
+      strategy={serverStrategy<PolarisPositionSummary, PolarisListFilters, PolarisUsdValuation | null>({
+        // The valuation is external state, so the Size panel's source line
+        // re-renders when the read lands.
+        dimensions: (_f, u) => polarisListDimensions(marketOptions, polarisUsdSourceNote(u)),
+        useExternalState: () => usd,
         itemsPerPage: POLARIS_ITEMS_PER_PAGE,
         fetchPage: (filters, page) => fetchPolarisListingPage(filters, page),
       })}
@@ -183,6 +187,8 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
           isAllStatuses(filters) &&
           filters.market.length === 0 &&
           filters.debt.length === 0 &&
+          filters.coll.length === 0 &&
+          filters.tx.length === 0 &&
           markets ? (
             <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE)} />
           ) : null;
