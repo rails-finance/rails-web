@@ -7,7 +7,7 @@
 // it, §52), the max LTV, the liquidation threshold and eMode.
 //
 // The rendered card is checked against the SAME answer the page reads —
-// /api/aave-v3/timeline/position-state through this server — so no balance is
+// /api/aave-v3/position-state through this server — so no balance is
 // pinned here. Each fixture pins the chain facts that make it the case it is, and
 // the answer is checked for those facts before the card is.
 //
@@ -40,7 +40,7 @@ import { chromium } from "playwright";
 import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 import { armScope } from "./lib/prov-inspector.mjs";
 
-const ROUTE = "/api/aave-v3/timeline/position-state";
+const ROUTE = "/api/aave-v3/position-state";
 
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
 const USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";

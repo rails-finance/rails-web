@@ -52,7 +52,7 @@ const routeFor = (market: string): string =>
         ? "/api/chain/spark/position-state"
         : market.startsWith("chain:")
           ? "/api/chain/aave-v3/position-state"
-          : "/api/aave-v3/timeline/position-state";
+          : "/api/aave-v3/position-state";
 
 const READ_TIMEOUT_MS = 25_000;
 const RETRY_AFTER_MS = 2_000;

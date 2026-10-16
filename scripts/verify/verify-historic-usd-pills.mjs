@@ -439,7 +439,7 @@ const aaveTotal = await collateralAfterUsd(
   AAVE_V3_WALLET,
   "core",
   findEvent(aaveEvents, AAVE_SUPPLY),
-  "/api/aave-v3/timeline/position-state",
+  "/api/aave-v3/position-state",
 );
 check(`aave-v3: the position state prices the collateral at block ${AAVE_SUPPLY.block}`, aaveTotal != null);
 const sparkTotal = await collateralAfterUsd(

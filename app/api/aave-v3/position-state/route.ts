@@ -15,6 +15,12 @@ import type { AaveV3PositionState } from "@/lib/aave-v3/position-state";
 //
 // Cacheability is the server's call — long only when the answer is complete —
 // so the upstream header is forwarded and no fallback is invented here.
+//
+// The path stays out of `/timeline`: the Vercel Firewall denies the 61st
+// request a minute per IP to any path containing `/timeline` (rails-ops
+// playbooks/deployment.md, "Vercel Firewall rules"), and the price chart's
+// health view asks ~40 of these on one page load, which spent the budget
+// that a folder open on the same page then met as a 403.
 // Node runtime.
 
 export const runtime = "nodejs";
