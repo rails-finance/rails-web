@@ -183,6 +183,7 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
           isAllStatuses(filters) &&
           filters.market.length === 0 &&
           filters.debt.length === 0 &&
+          filters.tx.length === 0 &&
           markets ? (
             <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE)} />
           ) : null;

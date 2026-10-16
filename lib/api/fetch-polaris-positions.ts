@@ -26,6 +26,9 @@ export interface FetchPolarisPositionsParams {
   /** true → the last state carries debt; false → collateral only (pETH
    *  deposited, nothing minted); undefined → both. */
   hasDebt?: boolean;
+  /** Inclusive bounds on the CDP's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   sortBy?: PolarisPositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -51,6 +54,8 @@ export async function fetchPolarisPositions(p: FetchPolarisPositionsParams): Pro
   if (p.wallet) qs.set("wallet", p.wallet);
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.hasDebt != null) qs.set("hasDebt", p.hasDebt ? "1" : "0");
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

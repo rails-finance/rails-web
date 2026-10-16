@@ -100,6 +100,7 @@ export function polarisSummaryFromEvents(
     lastTs: last.timestamp,
     lastTxHash: last.txHash,
     eventCount,
+    txCount: new Set(rows.map((r) => r.txHash)).size,
     transferCount,
     liqCount,
     lastPrimaryRate,

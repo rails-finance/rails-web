@@ -51,6 +51,9 @@ export interface PolarisPositionSummary {
   lastTxHash: string | null;
   /** CDPUpdated rows. */
   eventCount: number;
+  /** Distinct transactions on the CDP's timeline (its CDPUpdated and custody
+   *  rows). Absent from an index that predates the column. */
+  txCount?: number;
   transferCount: number;
   liqCount: number;
   /** The market's primary rate at the CDP's last touch, as a fraction. */
@@ -104,6 +107,7 @@ export interface RawPolarisPositionRow {
   transfer_count: number | string;
   liq_count: number | string;
   last_primary_rate: string | null;
+  tx_count?: number | string;
 }
 
 export interface RawPolarisMarketRow {
@@ -191,6 +195,7 @@ export function buildPolarisPositionRows(raw: RawPolarisPositionRow[]): PolarisP
       eventCount: intOf(r.event_count),
       transferCount: intOf(r.transfer_count),
       liqCount: intOf(r.liq_count),
+      ...(r.tx_count != null ? { txCount: intOf(r.tx_count) } : {}),
       lastPrimaryRate: r.last_primary_rate != null ? scale18(r.last_primary_rate) : null,
     });
   }

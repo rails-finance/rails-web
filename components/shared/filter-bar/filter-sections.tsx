@@ -20,6 +20,9 @@
  * multi-dimension group, under the header divider when the group holds one. A
  * shorter dimension renders exactly as before.
  *
+ * A "range" dimension renders a RangeControl (./range-control) in place of the
+ * option rows: a two-handle slider and Min / Max inputs.
+ *
  * Like the rest of the filter grammar this holds no filter state — it reads and
  * writes the rail's URL-backed param object through the dimension registry
  * (see ./types).
@@ -43,6 +46,7 @@ import {
   OptionSearchInput,
   OptionSearchNote,
 } from "@/components/shared/filter-bar/option-search";
+import { RangeControl } from "@/components/shared/filter-bar/range-control";
 
 interface FilterSectionsProps<F> {
   dimensions: FilterDimension<F>[];
@@ -135,6 +139,9 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
         // Exactly one input takes focus when a panel opens: the first dimension
         // in the group long enough to render one.
         const firstSearchableId = group.dims.find((d) => isOptionSearchable(d.options.length))?.id;
+        // A panel holding a slider and text inputs is a group of controls,
+        // not a menu of items.
+        const hasRange = group.dims.some((d) => d.cardinality === "range");
         return (
           <div key={group.name} className="relative">
             <button
@@ -154,7 +161,8 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
             {open && (
               <div
                 className="absolute top-full left-0 mt-2 z-[var(--z-dropdown)] min-w-[220px] max-h-[420px] overflow-y-auto overlay-panel"
-                role="menu"
+                role={hasRange ? "group" : "menu"}
+                aria-label={group.name}
               >
                 {/* Canonical dropdown header: title + Reset, then a divider. */}
                 <div className="flex items-center justify-between px-4 py-3">
@@ -168,6 +176,19 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
                 <div className="my-1 mx-3 border-t border-rb-300 dark:border-rb-700" />
 
                 {group.dims.map((dim) => {
+                  if (dim.cardinality === "range") {
+                    return (
+                      <div key={dim.id} className="flex flex-col">
+                        {multiDim && (
+                          <div className="flex items-center justify-between px-4 pt-2 pb-1">
+                            <span className={OVERLAY_SUBHEADING}>{dim.label}</span>
+                            {dim.labelAction}
+                          </div>
+                        )}
+                        <RangeControl dim={dim} filters={filters} onChange={onChange} />
+                      </div>
+                    );
+                  }
                   const selected = new Set(dim.get(filters));
                   const searchable = isOptionSearchable(dim.options.length);
                   const query = queries[dim.id] ?? "";

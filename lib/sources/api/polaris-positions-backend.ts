@@ -53,6 +53,11 @@ export function parsePolarisPositionsQuery(sp: URLSearchParams): FetchPolarisPos
   const hasDebt = sp.get("hasDebt");
   const limit = Number(sp.get("limit"));
   const offset = Number(sp.get("offset"));
+  // A transaction bound is forwarded only as a whole number.
+  const txBound = (key: string) => {
+    const v = sp.get(key);
+    return v != null && /^\d+$/.test(v) ? Number(v) : undefined;
+  };
   const status = (sp.get("status") ?? "")
     .split(",")
     .map((s) => s.trim())
@@ -66,6 +71,8 @@ export function parsePolarisPositionsQuery(sp: URLSearchParams): FetchPolarisPos
     // (No `liquidated` param: on Polaris "ever liquidated" is the status
     // bucket — the NFT is burned and the id never reused.)
     hasDebt: hasDebt === "1" ? true : hasDebt === "0" ? false : undefined,
+    minTx: txBound("minTx"),
+    maxTx: txBound("maxTx"),
     sortBy: sortBy === "debt" || sortBy === "coll" || sortBy === "ratio" ? sortBy : undefined,
     sortOrder: sp.get("sortOrder") === "asc" ? "asc" : "desc",
     limit: sp.get("limit") != null && Number.isFinite(limit) ? limit : undefined,
@@ -96,6 +103,8 @@ export async function readPolarisPositionsFromBackend(
   if (p.wallet) qs.set("wallet", p.wallet);
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.hasDebt != null) qs.set("hasDebt", p.hasDebt ? "1" : "0");
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   // `recent` is the backend's own default and is never sent by name.
   if (p.sortBy === "debt" || p.sortBy === "coll" || p.sortBy === "ratio") qs.set("sortBy", p.sortBy);
   qs.set("sortOrder", p.sortOrder === "asc" ? "asc" : "desc");

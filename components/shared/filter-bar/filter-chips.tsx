@@ -11,7 +11,12 @@
 
 import { X } from "lucide-react";
 import { RESET_LINK } from "@/lib/shared/ui-grammar";
-import { type FilterDimension, isDimensionActive, defaultChipLabel } from "@/components/shared/filter-bar/types";
+import {
+  type FilterDimension,
+  isDimensionActive,
+  defaultChipLabel,
+  rangeChipLabel,
+} from "@/components/shared/filter-bar/types";
 
 interface FilterChipsProps<F> {
   dimensions: FilterDimension<F>[];
@@ -31,7 +36,10 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
 
   const chipText = (dim: FilterDimension<F>) => {
     const vals = dim.get(filters);
-    return dim.chipLabel ? dim.chipLabel(vals, dim.options) : defaultChipLabel(dim.label, vals, dim.options);
+    if (dim.chipLabel) return dim.chipLabel(vals, dim.options);
+    return dim.cardinality === "range"
+      ? rangeChipLabel(dim.label, vals)
+      : defaultChipLabel(dim.label, vals, dim.options);
   };
 
   const removeDim = (dim: FilterDimension<F>) => onChange(dim.set(filters, dim.defaultValues?.(filters) ?? []));

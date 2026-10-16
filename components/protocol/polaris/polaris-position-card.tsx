@@ -784,7 +784,9 @@ export function viewFromSummary(
     peakColl: s.peakColl,
     peakDebt: s.peakDebt,
     lastActivityAt: s.lastTs,
-    eventCount: s.eventCount,
+    // The foot strip counts transactions; an index without tx_count gives the
+    // CDPUpdated rows.
+    eventCount: s.txCount ?? s.eventCount,
     liqCount: s.liqCount,
     transferCount: s.transferCount,
     basis: "index",
@@ -845,7 +847,7 @@ export function mergeChainAndSummary(chain: PolarisPositionView, summary: Polari
     peakColl: summary.peakColl,
     peakDebt: summary.peakDebt,
     lastActivityAt: summary.lastTs || chain.lastActivityAt,
-    eventCount: summary.eventCount,
+    eventCount: summary.txCount ?? summary.eventCount,
     liqCount: summary.liqCount,
     transferCount: summary.transferCount,
   };

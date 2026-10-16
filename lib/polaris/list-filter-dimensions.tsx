@@ -19,6 +19,9 @@
 //     liquidated" is the Status bucket "Liquidated" — the two-axis shape
 //     belongs to the lenders where a position survives a partial liquidation.
 //     Retired 2026-09-10; it had been a server no-op since it shipped.)
+//   • Transactions — a range over tx_count, the distinct transactions on the
+//     CDP's timeline, sent as minTx / maxTx. Unset by default; "10–500" sets
+//     aside the one-transaction CDPs and the busiest accounts.
 //   • Identity search (the `q` box) + recency sort.
 //
 // The free-text search is the driver's `q`; it carries the tri-modal identity
@@ -36,7 +39,7 @@
 // polaris-position-card.tsx). Ascending surfaces the CDPs nearest the floor,
 // which is what a reviewer's first look asked for (2026-09-10).
 
-import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
+import { decodeRange, normalizeRange, type FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FetchPolarisPositionsParams } from "@/lib/api/fetch-polaris-positions";
@@ -61,6 +64,9 @@ export interface PolarisListFilters extends BaseListFilters {
   status: string[];
   /** "" | "borrowing" | "collateral-only" */
   debt: string[];
+  /** Transaction-count range, one encodeRange value (`10-500`, `10-`, `-500`)
+   *  or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no
@@ -76,6 +82,7 @@ export const POLARIS_LIST_DEFAULTS: PolarisListFilters = {
   market: [],
   status: [],
   debt: [],
+  tx: [],
 };
 
 const RECENT_ONLY: SortOption[] = [{ value: "recent", label: RECENT_ACTIVITY_LABEL }];
@@ -161,6 +168,17 @@ export function polarisListDimensions(
       get: (f) => f.debt,
       set: (f, v) => ({ ...f, debt: v }),
     },
+    {
+      id: "tx",
+      label: "Transactions",
+      group: "Transactions",
+      cardinality: "range",
+      range: { min: 1, max: 1000 },
+      param: "tx",
+      options: [],
+      get: (f) => f.tx,
+      set: (f, v) => ({ ...f, tx: normalizeRange(v) }),
+    },
   ];
 }
 
@@ -186,6 +204,7 @@ export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: n
         : "recent"
       : "recent"
   ) as PolarisPositionSort;
+  const tx = decodeRange(filters.tx);
   return {
     market: market ?? undefined,
     cdpId,
@@ -193,6 +212,8 @@ export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: n
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
     hasDebt: filters.debt.includes("borrowing") ? true : filters.debt.includes("collateral-only") ? false : undefined,
+    minTx: tx.min ?? undefined,
+    maxTx: tx.max ?? undefined,
     sortBy,
     sortOrder: filters.sortOrder,
     limit: POLARIS_ITEMS_PER_PAGE,
