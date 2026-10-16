@@ -2014,9 +2014,9 @@ function PipRow({
       <div className="relative">
         <div
           ref={pipRef}
-          // A pill on the sunken ground, padded only vertically so each pip
+          // A pill on a white ground (rb-900 in dark), padded only vertically so each pip
           // keeps its x on the charts' axis; the whole pill takes the press.
-          className="relative h-11 cursor-crosshair touch-none select-none rounded-md bg-sunken py-3 sm:h-[38px]"
+          className="relative h-11 cursor-crosshair touch-none select-none rounded-md bg-white py-3 sm:h-[38px] dark:bg-rb-900"
           data-flow-pips=""
           data-anatomy="F4.1"
           onPointerDown={(e) => {
@@ -2031,12 +2031,12 @@ function PipRow({
           onLostPointerCapture={() => (dragging.current = false)}
         >
           {/* No cursor line here: the dots are pressed, and the line stands on
-            the charts above. The stretch up to the cursor takes a lighter
+            the charts above. The stretch up to the cursor takes a second
             ground, so the row shows where the scrubber stands. */}
           {dim && w > 0 && (
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 rounded-l-md bg-rb-300 dark:bg-rb-700"
+              className="pointer-events-none absolute inset-y-0 left-0 rounded-l-md bg-rb-100 dark:bg-rb-800"
               style={{ width: Math.max(0, Math.min(w, cx)) }}
               data-flow-pips-elapsed=""
             />
