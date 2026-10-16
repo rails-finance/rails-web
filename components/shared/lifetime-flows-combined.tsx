@@ -690,7 +690,12 @@ export function CombinedFlows({
           {!priceOnly && (
             <div className="mt-6 flex items-start justify-between gap-3" data-flows-view-row="">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h3 className="text-sm font-semibold text-rb-500" data-flow-events-label="">
+                {/* As tall as the "?" beside it, so the two share a centre
+                    when the charts' button wraps under the heading. */}
+                <h3
+                  className="flex min-h-8 items-center text-sm font-semibold text-rb-500 pointer-coarse:min-h-11"
+                  data-flow-events-label=""
+                >
                   Events{!compact && (priced ? " with value and prices" : " with value")}
                 </h3>
                 {viewToggle?.(compact ? (priced ? "Value and price chart" : "Value chart") : "Hide charts")}
