@@ -235,9 +235,9 @@ const OUTCOME_TONE: Record<PositionCardTone, string> = {
 };
 
 // The headlines sit in one strict grid whatever their number (decision 0040):
-// four columns at lg, two below it, one on a phone. A card of three leaves the
-// fourth column empty, so headline figures line up across every family.
-const OPEN_GRID = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4";
+// four columns at lg, two below it down to a phone. A card of three leaves the
+// fourth cell empty, so headline figures line up across every family.
+const OPEN_GRID = "grid grid-cols-2 lg:grid-cols-4 gap-4";
 // A closed card is four columns wide (peaks, Outcome, the extra) so cards in
 // a stack line up.
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
