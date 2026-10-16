@@ -16,7 +16,7 @@ import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 // A group on the timeline (rails-ops TO-DO-ui-jobs 250 points 3 and 4, 240,
 // 331 point 4): a closed group is a row on the spine, its legs summed as
 // nodes, and its ⋮ offering "Show 48 grouped events", the one way to open it.
-// Open, the members draw as rows and each member's ⋮ offers "Hide", the one
+// Open, the members draw as rows and each member's ⋮ offers "Group 48 events", the one
 // way to close it. A bracket frame marks the group closed and open and
 // carries the range: the newest member's number at its top end, the oldest at
 // its tail. The tone sits on the nodes, the T1 word and the dotted segment.
@@ -112,13 +112,15 @@ export function groupRangeText(range: [number, number] | null): string | null {
   return lo === hi ? `#${lo}` : `#${lo}–${hi}`;
 }
 
-/** The menu rows that open and close a group: the closed row's ⋮ shows it,
- *  every member's ⋮ hides it, one handler behind both. */
+/** The menu rows that open and close a group: the closed row's ⋮ shows it
+ *  ("Show 16 grouped events"), every member's ⋮ groups it again ("Group 16
+ *  events"), one handler behind both. */
 export function groupMenuWords(count: number, range: string | null) {
-  const n = `${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`;
+  const c = count.toLocaleString("en-US");
+  const noun = count === 1 ? "event" : "events";
   return {
-    show: { title: `Show ${n}`, subtitle: range ? `Expand the group, ${range}` : "Expand the group" },
-    hide: { title: `Hide ${n}`, subtitle: range ? `Collapse the group, ${range}` : "Collapse the group" },
+    show: { title: `Show ${c} grouped ${noun}`, subtitle: range ? `Expand the group, ${range}` : "Expand the group" },
+    hide: { title: `Group ${c} ${noun}`, subtitle: range ? `Back to one row, ${range}` : "Back to one row" },
   };
 }
 
@@ -126,7 +128,7 @@ export function groupMenuWords(count: number, range: string | null) {
  *  muted border colour (`border-rb-300`, `dark:border-rb-500`). Closed it
  *  holds the group's row and its ⋮ offering "Show"; open, the members alone,
  *  the first on the row the summed nodes held, every member's ⋮ offering
- *  "Hide". A `group-open` event on the frame opens it (the timeline's rewind).
+ *  "Group 48 events". A `group-open` event on the frame opens it (the timeline's rewind).
  *
  *  Closed, the ends carry the range (ui-jobs 331 point 4): the highest
  *  number centred on the bracket's top edge, the lowest on its bottom edge,

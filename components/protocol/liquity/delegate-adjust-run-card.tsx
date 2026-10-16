@@ -269,7 +269,7 @@ export function DelegateAdjustRunCard({
   const numberRange = useContext(GroupNumbersContext);
   const rangeText = groupRangeText(numberRange);
   // The group opens from its row's ⋮ ("Show 48 grouped events") and closes
-  // from a member's ("Hide …"); the range rides the items' sub-line.
+  // from a member's ("Group 48 events"); the range rides the items' sub-line.
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && toggle() };
   const hide = { ...words2.hide, hide: () => open && toggle() };

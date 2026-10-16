@@ -2,7 +2,7 @@
 
 // The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308), at the T1 row's
 // right end (ui-jobs 295), the same on every family: Open event page, inside
-// a group Hide or Show {n} grouped events, and on a timeline Hide the row's
+// a group Show {n} grouped events or Group {n} events, and on a timeline Hide the row's
 // type of event, the Types of event filter's untick. On the event page it holds
 // the event's Inspect provenance (`provScope`). The explorer link is the row's
 // hash under Display's Transaction hashes (ui-jobs 294); copy link is on the
@@ -58,7 +58,7 @@ export function eventMarkdownHref(shareHref: string): string {
 }
 
 /** An open group around a member row: its collapse, for the member's ⋮
- *  ("Hide 48 grouped events"). The same handler as the group's pill. */
+ *  ("Group 48 events"). The same handler as the group's pill. */
 export const GroupHideContext = createContext<{ title: string; subtitle: string; hide: () => void } | null>(null);
 
 /** A timeline row's type, for its ⋮ ("Hide “Redeemed” events"): the same

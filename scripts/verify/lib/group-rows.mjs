@@ -10,7 +10,7 @@
 // 1,798 sUSDS"), and a click on that header opens the summary card. The
 // members open only from the row's ⋮, "Show 72 grouped events"
 // (`data-menu-item="show-group"`); open, the frame holds the members alone and
-// each member's ⋮ offers "Hide".
+// each member's ⋮ offers "Group 72 events".
 //
 //   import { GROUP_FRAME, GROUP_HEADER, groupCount, openGroup } from "./lib/group-rows.mjs";
 
