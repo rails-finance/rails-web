@@ -132,6 +132,7 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
       // The bare directory rests on the loans still in escrow; the chip says so.
       // A search naming a loan or a party rests on every status, which needs no chip.
       defaultChip: (f) => (defaultStatuses(f).length < ALL_PWN_STATUS_BUCKETS.length ? "Status: in escrow" : null),
+      clearDefault: (f) => ({ ...f, status: [...ALL_PWN_STATUS_BUCKETS] }),
       matches: (row, v) => v.includes(pwnStatusBucket(row)),
     },
     {

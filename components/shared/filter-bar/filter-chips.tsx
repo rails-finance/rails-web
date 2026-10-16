@@ -25,8 +25,8 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
   // fixed chip (FilterDimension.defaultChip).
   const defaultChips = dimensions
     .filter((d) => !isDimensionActive(d, filters))
-    .map((d) => ({ id: d.id, text: d.defaultChip?.(filters) ?? null }))
-    .filter((c): c is { id: string; text: string } => c.text != null);
+    .map((d) => ({ id: d.id, text: d.defaultChip?.(filters) ?? null, clear: d.clearDefault }))
+    .filter((c): c is { id: string; text: string; clear: ((f: F) => F) | undefined } => c.text != null);
   if (activeDims.length === 0 && defaultChips.length === 0) return null;
 
   const chipText = (dim: FilterDimension<F>) => {
@@ -48,10 +48,20 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
         <span
           key={c.id}
           data-default-chip={c.id}
-          className="inline-flex items-center rounded-full bg-rb-100 dark:bg-rb-800 px-2.5 py-1 text-xs text-foreground"
+          className="inline-flex items-center rounded-full bg-rb-100 dark:bg-rb-800 text-xs text-foreground"
           title="The list's default view"
         >
-          {c.text}
+          <span className={c.clear ? "pl-2.5 pr-1.5 py-1" : "px-2.5 py-1"}>{c.text}</span>
+          {c.clear && (
+            <button
+              type="button"
+              onClick={() => onChange(c.clear!(filters))}
+              className="pr-1.5 pl-0.5 py-1 rounded-r-full text-rb-500 hover:text-foreground hover:bg-rb-200/60 dark:hover:bg-rb-700/60 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label={`Remove ${c.text}`}
+            >
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          )}
         </span>
       ))}
       {activeDims.map((dim) => (

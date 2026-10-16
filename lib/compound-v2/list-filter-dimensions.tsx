@@ -101,6 +101,8 @@ export function compoundV2ListDimensions(): SerializableDimension<CompoundV2List
       options: STATUS_OPTIONS,
       get: (f) => effectiveStatuses(f),
       defaultValues: (f) => defaultStatuses(f),
+      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
+      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
       set: (f, v) => {
         const sel = canonicalStatuses(v);
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };

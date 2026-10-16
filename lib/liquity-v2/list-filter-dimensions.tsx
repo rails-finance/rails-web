@@ -24,6 +24,7 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import type { StatusBucket } from "@/lib/liquity-v2/listing-visibility";
 import {
+  ALL_STATUS_BUCKETS,
   canonicalStatuses,
   defaultStatuses,
   effectiveStatuses,
@@ -112,6 +113,8 @@ export function liquityV2ListDimensions(
     ],
     get: (f) => effectiveStatuses(f),
     defaultValues: (f) => defaultStatuses(f),
+    defaultChip: (f) => (defaultStatuses(f).length < ALL_STATUS_BUCKETS.length ? "Status: Open" : null),
+    clearDefault: (f) => ({ ...f, statuses: [...ALL_STATUS_BUCKETS] }),
     set: (f, values) => {
       const sel = canonicalStatuses(values);
       const def = defaultStatuses(f);

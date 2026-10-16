@@ -45,10 +45,13 @@ export interface FilterDimension<F> {
    *  view, so it never shows a chip). Defaults to [] (empty). */
   defaultValues?: (f: F) => string[];
   /** Chip text for the default selection, where the default is a
-   *  constraint worth naming ("Status: in escrow"). Drawn as a fixed chip, with
-   *  no remove control and no Reset, while the dimension is inactive. Null or
-   *  unset draws nothing. */
+   *  constraint worth naming ("Status: in escrow"). Drawn while the dimension is
+   *  inactive; fixed unless `clearDefault` is set. Null or unset draws nothing. */
   defaultChip?: (f: F) => string | null;
+  /** Gives the default chip a remove control: returns the filters with the
+   *  dimension widened to an explicit selection of every option. Reset then
+   *  returns to the resting default. */
+  clearDefault?: (f: F) => F;
   /** Chip text for an active selection. Default: `${label}: a, b (+N)`. */
   chipLabel?: (values: string[], options: FilterOptionDef[]) => string;
   /** Optional grouping header in the + Filter menu (insertion order preserved). */

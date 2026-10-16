@@ -66,8 +66,8 @@ export interface PolarisListFilters extends BaseListFilters {
 // No status is written into the page defaults: an empty `status` is "no
 // opinion", and listing-visibility.ts resolves it per context — the open CDPs on
 // the bare directory, every status once the search names a holder or a CDP
-// number. Because the default is contextual rather than a selection it draws no
-// chip and no Reset link, and a cleared selection always resolves back to
+// number. The default is contextual rather than a selection: it shows as the
+// removable "Status: Open" chip (defaultChip / clearDefault), and a cleared selection always resolves back to
 // whatever the current context rests on.
 export const POLARIS_LIST_DEFAULTS: PolarisListFilters = {
   q: "",
@@ -143,6 +143,8 @@ export function polarisListDimensions(
       options: STATUS_OPTIONS,
       get: (f) => effectiveStatuses(f),
       defaultValues: (f) => defaultStatuses(f),
+      defaultChip: (f) => (defaultStatuses(f).length < STATUS_OPTIONS.length ? "Status: Open" : null),
+      clearDefault: (f) => ({ ...f, status: STATUS_OPTIONS.map((o) => o.value) }),
       set: (f, v) => {
         const sel = canonicalStatuses(v);
         const def = defaultStatuses(f);
