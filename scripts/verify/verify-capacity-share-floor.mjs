@@ -2,16 +2,16 @@
 // The borrow-capacity readout past its own ceiling — a stated multiple, not
 // a fourteen-digit percentage.
 // ----------------------------------------------------------------------------
-// The risk strip on the Compound-family position cards (Moonwell, Compound
-// V2, Comet, Morpho) states where the debt stands against the liquidation
-// line: "Borrow capacity: 61.2% of the liquidation line". When the collateral
+// The Moonwell position card's stat "Debt against the liquidation line"
+// (C18, `data-panel-row="liquidation-line"`) states where the debt stands
+// against the liquidation line: "61.2%". When the collateral
 // left is dust against the debt — the 2026-08-27 MAMO exploiter holds $9.3M of
 // debt against a capacity line worth under a cent — that share printed as
 // "19070621780048.1% of the liquidation line" (and the Explanation sentence
 // "The debt stands at 19070621780048.1% of the liquidation line"). Since
 // 2026-09-03 `capacityShare` (lib/shared/capacity-share.ts) stops the
-// percentage at 1,000× and states the floor instead: "over 1,000× the
-// liquidation line". The receipt behind the figure is the same division.
+// percentage at 1,000× and states the floor instead: "over 1,000×". The
+// receipt behind the figure is the same division.
 //
 // Fixture: the exploiter wallet (the ratio is ~1.9e11 today and only grows
 // as interest accrues on a debt nothing backs) is a permanent chain fact —
@@ -29,12 +29,12 @@
 // Checks:
 //   0. Precondition — EXPLOITER's debt ÷ capacity is above the ceiling; the
 //      queried CONTROL's sits between 0 and the ceiling.
-//   1. EXPLOITER page — the opened card reads "over 1,000× the liquidation
-//      line" under Health factor.
+//   1. EXPLOITER page — the card's "Debt against the liquidation line" stat
+//      reads "over 1,000×".
 //   2. EXPLOITER page — no seven-digit-plus percentage anywhere in the
 //      document (the Explanation stays mounted while hidden, so this
 //      covers its sentence too).
-//   3. CONTROL page — the opened card still reads "N.N% of the liquidation line".
+//   3. CONTROL page — the same stat still reads "N.N%".
 //
 // Proved it can fail 2026-09-03: against the deployed site before the fix
 // (BASE=https://rails-web-onboarding.vercel.app), checks 1 and 2 FAIL while
@@ -52,10 +52,12 @@ const STRIP_TIMEOUT_MS = 240000;
 const CEILING = 1000;
 
 const EXPLOITER = "0x719eae70d4a83f35bf82a2740699f5db84be919d";
-// The line under the card's Health factor in its opened layer (ui-jobs 209;
-// the heading-row strip read "Borrow capacity: …" until 2 Oct 2026).
-const FLOOR_TEXT = "over 1,000× the liquidation line";
-const SHARE_RE = /\d+\.\d% of the liquidation line/;
+// The value of the card's "Debt against the liquidation line" stat (C18). It
+// read as a line under Health factor in the headlines (C10) until the stats
+// grid took it; the heading-row strip read "Borrow capacity: …" until 2 Oct 2026.
+const STAT = '[data-anatomy="C18"] [data-panel-row="liquidation-line"] dd';
+const FLOOR_TEXT = "over 1,000×";
+const SHARE_RE = /^\d+\.\d%$/;
 const GIANT_PCT_RE = /\d{7,}\.\d%/;
 
 let failures = 0;
@@ -127,13 +129,10 @@ async function stripText(wallet) {
   await page.goto(`${BASE}/base/moonwell/${wallet}`, NAV);
   let strip = "";
   try {
-    // The card draws the line once opened; the stats grid holds it.
+    // The card draws the stat once opened; the stats grid holds it.
     await page.locator('[data-anatomy^="P1"]').first().waitFor({ timeout: STRIP_TIMEOUT_MS });
     await openPositionCards(page);
-    const el = page
-      .locator('[data-anatomy="C10"]')
-      .getByText(/the liquidation line/)
-      .first();
+    const el = page.locator(STAT).first();
     await el.waitFor({ timeout: STRIP_TIMEOUT_MS });
     strip = (await el.textContent()) ?? "";
   } catch {
