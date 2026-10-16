@@ -1,13 +1,13 @@
 "use client";
 
 // Recency stamp — decision 0006's freshness signal on the live/current surfaces.
-// "▣ head 2 min ago": how long ago the latest block of the ROUTE'S OWN CHAIN was
+// "▣ 2 min ago": how long ago the latest block of the ROUTE'S OWN CHAIN was
 // minted, so staleness is legible and the user can judge whether a reload is
 // worth it (the reload IS the refresh — no button). The age ticks client-side
 // off the block timestamp; the head only re-pulls on focus / reload.
 // Fail-soft: renders nothing when the chain head is unavailable.
 //
-// The stamp reads "head 3 min ago" on every explorer: the age in place, the
+// The stamp reads "3 min ago" on every explorer: the age in place, the
 // block number in its peek (a RevealTip, opened by a press; rails-ops
 // detail-page-anatomy, "Shared row rules"). The copy-for-LLM exports carry the
 // block number from the page's own data (lib/<proto>/position-to-markdown.ts).
@@ -67,7 +67,7 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
         className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
       >
         <Box size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
-        <span aria-hidden>head {age} ago</span>
+        <span aria-hidden>{age} ago</span>
       </button>
     </RevealTip>
   );
