@@ -20,7 +20,7 @@ import {
 } from "@/components/protocol/polaris/polaris-liquidation-forensics";
 import { crPct2, polarisCrAtEvent } from "@/lib/polaris/cr-at-event";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
-import { polarisLifetime } from "@/lib/polaris/economics";
+import { polarisLifetime, polarisPendingAtFeed, polarisPsmShareValue } from "@/lib/polaris/economics";
 import { polarisPsmOutcomeSentence } from "@/lib/polaris/economics-explanation";
 import { polarisSinceLastTouch, polarisSinceLastTouchSentence } from "@/lib/polaris/since-last-touch";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
@@ -58,6 +58,8 @@ export interface PolarisPositionMarkdownArgs {
 }
 
 const pct = (f: number): string => `${num(f * 100, 2)}%`;
+/** A signed native amount, the real minus and an explicit plus. */
+const sAmt = (n: number): string => `${n < 0 ? "−" : "+"}${amt(Math.abs(n))}`;
 /** Two places always — a derived premium reads as a measurement, and never
  *  collapses into the round constant it is being checked against. */
 const pct2 = (f: number): string => `${(f * 100).toFixed(2)}%`;
@@ -122,7 +124,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push(`## Live chain state (Sepolia block ${live.blockNumber})`);
     lines.push("");
     lines.push(
-      `- **Interest rate in force:** ${pct(live.interestRate)} per year (primary ${pct(live.primaryRate)} + secondary ${pct(live.secondaryRate)})`,
+      `- **Interest rate in force:** ${pct(live.interestRate)} per year (${pct(live.primaryRate)} primary + ${pct(live.secondaryRate)} safety)`,
     );
     // The same projection the card's Costs figure states, on the same base —
     // the RECORDED debt, which is what the contract accrues on. Naming the
@@ -144,8 +146,16 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     if (live.bcTokenGain > 0) lines.push(`- **Reward pETH pending:** ${amt(live.bcTokenGain)} pETH`);
     if (live.mintRedeemCollChange !== 0 || live.mintRedeemDebtChange !== 0)
       lines.push(
-        `- **Net PSM share pending:** ${amt(live.mintRedeemCollChange)} pETH / ${amt(live.mintRedeemDebtChange)} ${stable}`,
+        `- **PSM share pending:** ${sAmt(live.mintRedeemCollChange)} pETH / ${sAmt(live.mintRedeemDebtChange)} ${stable}`,
       );
+    if (live.price) {
+      // The card's "Pending to settle": the four legs above netted at the feed.
+      const p = polarisPendingAtFeed(live, live.price.pethInDebt);
+      if ([p.interest, p.stabilityGain, p.psm, p.reward].some((x) => x !== 0))
+        lines.push(
+          `- **Pending to settle:** ${sAmt(p.total)} ${stable} at the feed (interest ${sAmt(p.interest)}, stability gain ${sAmt(p.stabilityGain)}, PSM share ${sAmt(p.psm)}, reward pETH ${sAmt(p.reward)}, each in ${stable})`,
+        );
+    }
     if (live.price) {
       lines.push(
         `- **pETH price (protocol feed):** ${amt(live.price.pethInDebt)} ${stable} — bonding curve ${num(live.price.curve, 4)} ETH per pETH × ETH/USD ${usd(live.price.ethUsd)}${live.price.xauUsd != null ? ` ÷ XAU/USD ${usd(live.price.xauUsd)}` : ""}`,
@@ -177,7 +187,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push(`- **Deposited / withdrawn:** ${amt(lifetime.deposited)} / ${amt(lifetime.withdrawn)} pETH`);
     lines.push(`- **Borrowed / repaid:** ${amt(lifetime.borrowed)} / ${amt(lifetime.repaid)} ${stable}`);
     lines.push(`- **Interest charged:** ${amt(lifetime.interestCharged)} ${stable}`);
-    lines.push(`- **Stability gains credited:** ${amt(lifetime.stableGains)} ${stable}`);
+    lines.push(`- **Stability gains since open:** ${amt(lifetime.stableGains)} ${stable}`);
     lines.push(`- **Reward pETH added:** ${amt(lifetime.rewardPeth)} pETH`);
     lines.push(
       `- **Net PSM shares:** +${amt(lifetime.collFromPsm)} / −${amt(lifetime.collToPsm)} pETH; +${amt(lifetime.debtFromPsm)} / −${amt(lifetime.debtToPsm)} ${stable}`,
@@ -191,6 +201,8 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
         `- **Liquidated:** ${amt(lifetime.collLiquidated)} pETH taken, ${amt(lifetime.debtLiquidated)} ${stable} cleared`,
       );
     const psmOutcome = polarisPsmOutcomeSentence(lifetime, stable, live?.price?.pethInDebt);
+    // Its "at the latest block's feed price" figure is the card's stat of
+    // the same name.
     if (psmOutcome) lines.push(`- **PSM outcome at the feed:** ${psmOutcome}`);
     lines.push("");
     lines.push(
@@ -314,10 +326,10 @@ function timelineTable(
     return out;
   }
   out.push(
-    `| # | Date | Action | Collateral after (pETH) | Debt after (${stable}) | Interest charged | PSM share (pETH / ${stable}) | pETH price at block (${stable}) | Collateral ratio at block | Transaction |`,
+    `| # | Date | Action | Collateral after (pETH) | Debt after (${stable}) | Interest charged | PSM share (pETH / ${stable}) | PSM share at block price (${stable}) | pETH price at block (${stable}) | Collateral ratio at block | Transaction |`,
   );
   out.push(
-    "|---|------|--------|-------------------------|------------------------|------------------|-------------------------------|----------------------------------|---------------------------|-------------|",
+    "|---|------|--------|-------------------------|------------------------|------------------|-------------------------------|------------------------------------|----------------------------------|---------------------------|-------------|",
   );
   events.forEach((e, i) => {
     if (!isPolarisEvent(e)) return;
@@ -330,9 +342,12 @@ function timelineTable(
     // none.
     const mrColl = d.mintRedeemCollGain != null ? parseFloat(d.mintRedeemCollGain) : 0;
     const mrDebt = d.mintRedeemDebtGain != null ? parseFloat(d.mintRedeemDebtGain) : 0;
-    const psm =
-      mrColl !== 0 || mrDebt !== 0
-        ? `${mrColl >= 0 ? "+" : "−"}${amt(Math.abs(mrColl))} / ${mrDebt >= 0 ? "+" : "−"}${amt(Math.abs(mrDebt))}`
+    const psm = mrColl !== 0 || mrDebt !== 0 ? `${sAmt(mrColl)} / ${sAmt(mrDebt)}` : "—";
+    // The row face's one figure: the two legs netted at the row's price at
+    // block, "—" with no share or no price.
+    const psmNet =
+      (mrColl !== 0 || mrDebt !== 0) && d.priceAtBlock != null
+        ? sAmt(polarisPsmShareValue(mrColl, mrDebt, d.priceAtBlock.pethInDebt))
         : "—";
     // The oracle-at-block lane's feed price at this touch's own block — the
     // feed at the END of the block (§1 of the build plan), "—" unfilled.
@@ -345,12 +360,12 @@ function timelineTable(
     const ratioAtBlock = cr ? crPct2(cr.pct) : "—";
     const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
     out.push(
-      `| ${i + 1} | ${fmtUtc(e.timestamp)} | ${e.actionLabel} | ${coll} | ${debt} | ${interest} | ${psm} | ${priceAtBlock} | ${ratioAtBlock} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
+      `| ${i + 1} | ${fmtUtc(e.timestamp)} | ${e.actionLabel} | ${coll} | ${debt} | ${interest} | ${psm} | ${psmNet} | ${priceAtBlock} | ${ratioAtBlock} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
     );
   });
   out.push("");
   out.push(
-    "_Collateral after / Debt after are the CDP's resulting figures on each touch, as the cdpManager emitted them. A transfer row moves custody only. A liquidation row's debt and collateral went to the stability pool or were redistributed. pETH price at block is the market's own price feed at the END of that block, from the oracle-at-block lane — not necessarily the price the row's own transaction saw. Collateral ratio at block is the resulting collateral at that price over the resulting debt; on a liquidation row it is the ratio at the moment the liquidation fired, the entire seized collateral over the debt cleared; a row without a price, or without debt after it, carries none._",
+    "_Collateral after / Debt after are the CDP's resulting figures on each touch, as the cdpManager emitted them. A transfer row moves custody only. A liquidation row's debt and collateral went to the stability pool or were redistributed. pETH price at block is the market's own price feed at the END of that block, from the oracle-at-block lane — not necessarily the price the row's own transaction saw. PSM share at block price is the pETH leg at that price less the debt leg, the one figure the row's face states. Collateral ratio at block is the resulting collateral at that price over the resulting debt; on a liquidation row it is the ratio at the moment the liquidation fired, the entire seized collateral over the debt cleared; a row without a price, or without debt after it, carries none._",
   );
   out.push("");
   return out;

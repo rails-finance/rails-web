@@ -17,6 +17,7 @@
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "./asset-catalog";
+import { formatExact } from "@/lib/utils/format";
 
 const LANE_VIA = "GET /api/chain/polaris/position";
 const BOARD_VIA = "GET /api/chain/polaris/markets";
@@ -113,6 +114,54 @@ export function livePendingProv(leg: PolarisPendingLeg, market: PolarisMarket): 
     summary: PENDING[leg].summary(stableOf(market)),
     contract: manager(market),
     via: `${LANE_VIA} · ${PENDING[leg].method} @ head`,
+  };
+}
+
+/** The four pending legs netted at the feed in the debt unit — the card's
+ *  "Pending to settle" (lib/polaris/economics.ts `polarisPendingAtFeed`). Each
+ *  leg is its own getter, listed in native units with the feed price. */
+export function livePendingToSettleProv(
+  market: PolarisMarket,
+  legs: {
+    accruedInterest: number;
+    accruedStables: number;
+    bcTokenGain: number;
+    mintRedeemCollChange: number;
+    mintRedeemDebtChange: number;
+  },
+  pethInDebt: number,
+): Provenance {
+  const stable = stableOf(market);
+  const leg = (label: string, value: number, note: string) => ({
+    label,
+    value: formatExact(value),
+    kind: "chain" as const,
+    pclass: "state" as const,
+    note,
+  });
+  return {
+    kind: "chain-derived",
+    pclass: "oracle",
+    verify: recompute("the five pending getters and previewPrice()"),
+    summary: `What settles into the CDP at its next touch, as one figure in ${stable} at the latest block: the pending stability gain less the pending interest, plus the pending PSM share (its pETH at the feed less its debt) and the pending reward pETH at the feed. Each leg is the cdpManager's own getter; the netting is computed in the browser.`,
+    contract: manager(market),
+    via: `${LANE_VIA} · pending getters × previewPrice() @ head`,
+    formula:
+      "accruedStables − accruedInterest + (mintRedeemCollChange × pethInDebt − mintRedeemDebtChange) + bcTokenGain × pethInDebt",
+    inputs: [
+      leg(`interest (${stable})`, legs.accruedInterest, "getCDPAccruedInterest(id), a cost"),
+      leg(`stability gain (${stable})`, legs.accruedStables, "getCDPAccruedStables(id), a credit"),
+      leg("PSM share, pETH", legs.mintRedeemCollChange, "getCDPMintRedeemCollChange(id)"),
+      leg(`PSM share, ${stable}`, legs.mintRedeemDebtChange, "getCDPMintRedeemDebtChange(id)"),
+      leg("reward pETH", legs.bcTokenGain, "getCDPBcTokenGain(id)"),
+      {
+        label: "feed price",
+        value: formatExact(pethInDebt),
+        kind: "chain",
+        pclass: "oracle",
+        note: `pETH in ${stable}, previewPrice() at the latest block`,
+      },
+    ],
   };
 }
 

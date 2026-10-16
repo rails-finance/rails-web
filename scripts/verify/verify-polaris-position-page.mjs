@@ -18,6 +18,17 @@
 //       CDP is not; and a FAILED index read is not (that is the whole point
 //       of the rule — an outage must not 404 every CDP on the explorer).
 //   (g) The Learn-more modal says the CDP is an NFT.
+//   (h) The card's stats from the live read and the summed touches (ui-jobs
+//       357): "Pending to settle" is the four pending legs netted at the feed
+//       (accruedStables − accruedInterest + mintRedeemCollChange × price −
+//       mintRedeemDebtChange + bcTokenGain × price); "PSM outcome at the
+//       feed" is the route's summed PSM legs at the live feed; "Stability
+//       gains since open" is the route's summed stableGain; the Interest rate
+//       headline's sub line names primaryRate and secondaryRate; and Copy for
+//       LLM states the same pending figure. Each is recomputed here from the
+//       verifier's own reads. h0 proves the comparison rejects a figure 1% off.
+//       Fail-first, 16 Oct 2026: with "Pending to settle" stubbed to 1.01 ×
+//       itself, h1 went red on both CDPs.
 //
 // THE COST FIGURE IS RE-MEASURED AT RUN TIME, never pinned: this market's
 // rate is algorithmic and moves every few blocks (measured 2026-09-10, usdp
@@ -227,13 +238,12 @@ for (const [market, id] of [
   const onRecorded = live.recordedDebt * live.interestRate;
   const onEntire = live.entireDebt * live.interestRate;
   const page = await open(context, polarisUrl(market, id));
-  const stripText = (await card(page).innerText()).replace(/\s+/g, " ");
-  const m = /Costs:\s*~([\d,.]+)\s*(\w+)\s*\/\s*year/.exec(stripText);
-  check(
-    `c1. ${market}/${id} — the card's risk strip states a Costs figure per year`,
-    m != null,
-    stripText.slice(0, 200),
-  );
+  // The card's "Costs per year" stat: "~1,234.567" beside the stable's icon.
+  const stat = card(page).locator('[data-panel-row="annual-cost"]').first();
+  const stripText = (await stat.innerText().catch(() => "")).replace(/\s+/g, " ");
+  const m0 = /~([\d,.]+)/.exec(stripText);
+  const m = m0 ? [m0[0], m0[1], STABLE[market]] : null;
+  check(`c1. ${market}/${id} — the card states a "Costs per year" stat`, m != null, stripText.slice(0, 200));
   if (m) {
     const shown = parseFig(m[1]);
     check(
@@ -248,7 +258,7 @@ for (const [market, id] of [
         !near(shown, onEntire, 0.02),
         `page ${m[1]}`,
       );
-    check(`c4. ${market}/${id} — the unit is the market's own stable, never "$"`, m[2] === STABLE[market], m[2]);
+    check(`c4. ${market}/${id} — the stat states no "$"`, !stripText.includes("$"), stripText);
   }
   // The explanation says the same figure in words, on the same base.
   const explBtn = card(page).locator('button[aria-label*="explanation" i]').first();
@@ -431,6 +441,100 @@ for (const [path, want, what] of [
     "g. the '?' modal says the CDP is an ERC-721 whose holder holds the position",
     /The CDP is an NFT/.test(modal) && /ERC-721/.test(modal) && /never reused/.test(modal),
     modal.slice(modal.indexOf("The CDP is an NFT"), modal.indexOf("The CDP is an NFT") + 200),
+  );
+  await page.close();
+}
+
+// ── (h) the stats the live read and the summed touches feed ────────────────
+/** A signed figure off the page: "+386,745.350", "−0.229". */
+const parseSigned = (t) => {
+  const m = /([+−-])?\s*([\d,]+(?:\.\d+)?)/.exec(t ?? "");
+  return m ? Number(m[2].replace(/,/g, "")) * (m[1] === "−" || m[1] === "-" ? -1 : 1) : NaN;
+};
+/** Within 0.5%: the page and this script read the head a block or two apart.
+ *  Compared on the figure's exact decimal (its `data-prov-exact`), since the
+ *  face's three decimals hide a 1% error on a small CDP. */
+const close = (got, want) => Number.isFinite(got) && Math.abs(got - want) <= Math.max(Math.abs(want) * 0.005, 1e-6);
+check("h0. the comparison rejects a figure 1% off", !close(386745.35 * 1.01, 386745.35) && close(386745.35, 386745.35));
+for (const [market, id] of [
+  ["usdp", "9"],
+  ["goldp", "1763"],
+]) {
+  const page = await open(context, polarisUrl(market, id));
+  await card(page)
+    .locator('[data-panel-row="pending-to-settle"]')
+    .first()
+    .waitFor({ timeout: 60000 })
+    .catch(() => {});
+  const live = await api(`/api/chain/polaris/position?market=${market}&id=${id}`);
+  const tl = await api(`/api/polaris/timeline?market=${market}&id=${id}`);
+  const p = live.price.pethInDebt;
+  const pending =
+    live.accruedStables -
+    live.accruedInterest +
+    live.mintRedeemCollChange * p -
+    live.mintRedeemDebtChange +
+    live.bcTokenGain * p;
+  const rows = tl.events.map((e) => e.context?.data ?? {});
+  const sum = (f) => rows.reduce((a, d) => a + Number(d[f] ?? 0), 0);
+  const psmAtFeed = sum("mintRedeemCollGain") * p - sum("mintRedeemDebtGain");
+  const gains = sum("stableGain");
+  const fig = async (row) => {
+    const el = card(page).locator(`[data-panel-row="${row}"] [data-figure="${row}"]`).first();
+    const face = (await el.innerText().catch(() => "")).replace(/\s+/g, " ").trim();
+    const exact = await el
+      .locator("[data-prov-exact]")
+      .first()
+      .getAttribute("data-prov-exact")
+      .catch(() => null);
+    return { face, value: parseSigned(exact ?? face) };
+  };
+
+  const pendingText = await fig("pending-to-settle");
+  check(
+    `h1. ${market}/${id} — "Pending to settle" is the four pending legs at the feed (${pending.toFixed(3)} ${STABLE[market]})`,
+    close(pendingText.value, pending) && /^[+−]/.test(pendingText.face),
+    `page ${pendingText.face}`,
+  );
+  const psmText = await fig("psm-outcome");
+  check(
+    `h2. ${market}/${id} — "PSM outcome at the feed" is the route's summed PSM legs at the live feed (${psmAtFeed.toFixed(3)})`,
+    close(psmText.value, psmAtFeed) && /^[+−]/.test(psmText.face),
+    `page ${psmText.face}`,
+  );
+  const gainsText = await fig("stability-gains");
+  check(
+    `h3. ${market}/${id} — "Stability gains since open" is the route's summed stableGain (${gains.toFixed(3)})`,
+    Math.abs(gainsText.value - gains) < 0.0006,
+    `page ${gainsText.face}`,
+  );
+  const partsText = (
+    await card(page)
+      .locator('[data-figure="rate-parts"]')
+      .first()
+      .innerText()
+      .catch(() => "")
+  ).replace(/\s+/g, " ");
+  const parts = /([\d.]+)% primary \+ ([\d.]+)% safety/.exec(partsText);
+  check(
+    `h4. ${market}/${id} — the rate's sub line names its primary and safety parts (${(live.primaryRate * 100).toFixed(2)}% + ${(live.secondaryRate * 100).toFixed(2)}%)`,
+    parts != null &&
+      Math.abs(Number(parts[1]) - live.primaryRate * 100) < 0.011 &&
+      Math.abs(Number(parts[2]) - live.secondaryRate * 100) < 0.011,
+    partsText || "absent",
+  );
+  await page
+    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
+    .first()
+    .click();
+  await page.getByRole("menuitem", { name: /Copy Position/i }).click();
+  await page.waitForTimeout(500);
+  const md = await page.evaluate(() => navigator.clipboard.readText());
+  const mdPending = /- \*\*Pending to settle:\*\* ([+−][\d,.]+) (\w+) at the feed/.exec(md);
+  check(
+    `h5. ${market}/${id} — Copy for LLM states the same "Pending to settle"`,
+    mdPending != null && close(parseSigned(mdPending[1]), pending) && mdPending[2] === STABLE[market],
+    mdPending?.[0] ?? "line absent",
   );
   await page.close();
 }

@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact, formatExact } from "@/lib/utils/format";
-import type { PolarisLifetime } from "./economics";
+import { polarisPsmOutcomeAtFeed, type PolarisLifetime } from "./economics";
 import { AmountText } from "@/components/shared/amount-text";
 
 const DUST = 1e-9;
@@ -30,9 +30,7 @@ export function polarisPsmOutcomeSentence(
   pethInDebt?: number,
 ): string | null {
   if (!hasPsmOutcome(lifetime)) return null;
-  const netCollLeg = lifetime.collFromPsm - lifetime.collToPsm;
-  const netDebtLeg = lifetime.debtFromPsm - lifetime.debtToPsm;
-  const todayEffect = pethInDebt != null ? netCollLeg * pethInDebt - netDebtLeg : null;
+  const todayEffect = pethInDebt != null ? (polarisPsmOutcomeAtFeed(lifetime, pethInDebt)?.value ?? null) : null;
 
   let s =
     `The net PSM shares, valued at the feed at each settling block, changed the CDP's equity by ` +
@@ -53,9 +51,7 @@ export function polarisPsmOutcomeSentence(
  *  and an open CDP's own position is not scored here. */
 export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pethInDebt?: number): ReactNode {
   if (!hasPsmOutcome(lifetime)) return undefined;
-  const netCollLeg = lifetime.collFromPsm - lifetime.collToPsm;
-  const netDebtLeg = lifetime.debtFromPsm - lifetime.debtToPsm;
-  const todayEffect = pethInDebt != null ? netCollLeg * pethInDebt - netDebtLeg : null;
+  const todayEffect = pethInDebt != null ? (polarisPsmOutcomeAtFeed(lifetime, pethInDebt)?.value ?? null) : null;
 
   const signed = (n: number) => (
     <span className="whitespace-nowrap font-medium tabular-nums">
@@ -95,35 +91,7 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
     ],
   };
 
-  const todayProv: Provenance | null =
-    todayEffect != null && pethInDebt != null
-      ? {
-          kind: "chain-derived",
-          summary: `The same PSM legs at the latest block's feed price — the net pETH the PSM's shares moved over the CDP's life, priced at the pETH/${stable} feed, minus the net debt they moved.`,
-          formula: "(collFromPsm − collToPsm) × pethInDebt − (debtFromPsm − debtToPsm)",
-          inputs: [
-            {
-              label: "net pETH from PSM",
-              value: formatExact(netCollLeg),
-              kind: "derived",
-              note: "collFromPsm − collToPsm",
-            },
-            {
-              label: "net debt from PSM",
-              value: formatExact(netDebtLeg),
-              kind: "derived",
-              note: "debtFromPsm − debtToPsm",
-            },
-            {
-              label: "latest block's feed price",
-              value: formatExact(pethInDebt),
-              kind: "chain-derived",
-              pclass: "oracle",
-              note: "the market's own price feed at head",
-            },
-          ],
-        }
-      : null;
+  const todayProv = pethInDebt != null ? polarisPsmOutcomeAtFeedProv(lifetime, stable, pethInDebt) : null;
 
   return (
     // A bullet of the Lifetime flows Explanation's Totals.
@@ -150,4 +118,46 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
       </span>
     </li>
   );
+}
+
+/** The receipt for the lifetime PSM legs at the latest feed: the figure the
+ *  card's "PSM outcome at the feed" stat, this panel's bullet and the markdown
+ *  state. Null on a CDP no PSM share reached. */
+export function polarisPsmOutcomeAtFeedProv(
+  lifetime: PolarisLifetime,
+  stable: string,
+  pethInDebt: number,
+): Provenance | null {
+  const at = polarisPsmOutcomeAtFeed(lifetime, pethInDebt);
+  if (!at) return null;
+  return {
+    kind: "chain-derived",
+    summary: `The same PSM legs at the latest block's feed price — the net pETH the PSM's shares moved over the CDP's life, priced at the pETH/${stable} feed, minus the net debt they moved.`,
+    formula: "(collFromPsm − collToPsm) × pethInDebt − (debtFromPsm − debtToPsm)",
+    inputs: [
+      { label: "pETH from PSM mints", value: formatExact(lifetime.collFromPsm), kind: "derived", note: "collFromPsm" },
+      { label: "pETH to PSM redemptions", value: formatExact(lifetime.collToPsm), kind: "derived", note: "collToPsm" },
+      {
+        label: `${stable} from PSM mints`,
+        value: formatExact(lifetime.debtFromPsm),
+        kind: "derived",
+        note: "debtFromPsm",
+      },
+      {
+        label: `${stable} cleared by PSM redemptions`,
+        value: formatExact(lifetime.debtToPsm),
+        kind: "derived",
+        note: "debtToPsm",
+      },
+      { label: "net pETH from PSM", value: formatExact(at.netColl), kind: "derived", note: "collFromPsm − collToPsm" },
+      { label: "net debt from PSM", value: formatExact(at.netDebt), kind: "derived", note: "debtFromPsm − debtToPsm" },
+      {
+        label: "latest block's feed price",
+        value: formatExact(pethInDebt),
+        kind: "chain-derived",
+        pclass: "oracle",
+        note: `pETH in ${stable}, the market's own price feed at head`,
+      },
+    ],
+  };
 }

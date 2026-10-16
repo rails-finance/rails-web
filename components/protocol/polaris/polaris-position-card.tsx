@@ -60,7 +60,14 @@ import {
 } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
-import { latestStateProv, peakProv } from "@/lib/polaris/event-provenance";
+import { latestStateProv, lifetimeLegProv, peakProv } from "@/lib/polaris/event-provenance";
+import {
+  polarisPendingAtFeed,
+  polarisPsmOutcomeAtFeed,
+  type PolarisLifetime,
+  type PolarisPendingRead,
+} from "@/lib/polaris/economics";
+import { polarisPsmOutcomeAtFeedProv } from "@/lib/polaris/economics-explanation";
 import {
   listingIcrProv,
   liveEntireProv,
@@ -69,7 +76,7 @@ import {
   liveMcrProv,
   liveModeProv,
   liveOwnerProv,
-  livePendingProv,
+  livePendingToSettleProv,
   liveRateProv,
   liveRecordedDebtProv,
   liveUsdValueProv,
@@ -129,14 +136,14 @@ export interface PolarisPositionView {
    *  slot holds a pulse rather than a dash. Never true once it has settled,
    *  answered or not. */
   pricePending: boolean;
-  /** Chain lane only — the pending legs since the last touch. */
-  pendingInterest: number | null;
-  pendingStables: number | null;
-  pendingReward: number | null;
-  /** Chain lane only — the net PSM share pending on the debt, signed. */
-  pendingPsmDebt: number | null;
-  /** Chain lane only — the rate in force, fraction. */
+  /** Chain lane only — the legs pending since the last touch, native units. */
+  pending: PolarisPendingRead | null;
+  /** Chain lane only — the feed's pETH price in the debt unit at this block. */
+  pethInDebt: number | null;
+  /** The rate in force, fraction; its two parts on the chain lane only. */
   interestRate: number | null;
+  primaryRate: number | null;
+  secondaryRate: number | null;
   /** Terminal-card headlines (lifetime maxima). */
   peakColl: number;
   peakDebt: number;
@@ -162,6 +169,7 @@ const debtProv = (v: PolarisPositionView): Provenance =>
   v.basis === "chain" ? liveEntireProv("debt", v.market) : latestStateProv("debt", v.market);
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
+const pct2 = (f: number): string => `${(f * 100).toFixed(2)}%`;
 /** A floor at the grain it is set in: "115%", "112.5%". */
 const pctShort = (f: number): string => `${Number((f * 100).toFixed(1))}%`;
 
@@ -193,12 +201,12 @@ const LISTING_ICR_TIP =
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
 
 /** Three decimals, trailing zeros kept ("2,035.800"), so the card's figures
- *  read at one grain; a magnitude too small for three decimals keeps
- *  formatNumber's non-zero rule. */
-const cardFigure = (value: number): string =>
-  value !== 0 && Math.abs(value) < 0.0005
+ *  read at one grain; pETH takes four (lib/polaris/figure-format.ts). A
+ *  magnitude too small for the grain keeps formatNumber's non-zero rule. */
+const cardFigure = (value: number, decimals = 3): string =>
+  value !== 0 && Math.abs(value) < 0.5 * 10 ** -decimals
     ? formatNumber(value)
-    : value.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    : value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 /** A figure in the card's cost and debt-sum lines, at the card's grain:
  *  three decimals with trailing zeros kept ("24.040"), so the sum reads at the
@@ -209,26 +217,32 @@ export function CardSumAmount({ value }: { value: number }) {
   return <>{cardFigure(value)}</>;
 }
 
-/** A card figure at three decimals. `compact` is a headline's form (anatomy
- *  C10): from a thousand up it reads in the listing's compact form ("770.33K"),
- *  as AssetAmount's does. The exact decimal rides the tip and the inspector's
- *  `data-prov-exact`. The token stands beside it as an icon (`assets`). */
+/** A card figure at three decimals (pETH at four). `compact` is a headline's
+ *  form (anatomy C10): from a thousand up it reads in the listing's compact
+ *  form ("770.33K"), as AssetAmount's does. The exact decimal rides the tip
+ *  and the inspector's `data-prov-exact`. The token stands beside it as an
+ *  icon (`assets`). `signed` keeps a negative's minus; `plus` also marks a
+ *  positive, for a stat whose sign is its direction. */
 function CardFigure({
   value,
   symbol,
   exact,
   signed = false,
+  plus = false,
   compact = false,
 }: {
   value: number;
   symbol: string;
   exact?: string;
   signed?: boolean;
+  plus?: boolean;
   compact?: boolean;
 }) {
-  const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
-  const face = compact && Math.abs(value) >= 1_000 ? formatCompact(value) : cardFigure(value);
-  const shown = signed ? withRealMinus(face) : face;
+  const lead = plus && value >= 0 ? "+" : "";
+  const full = lead + (signed || plus ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value)));
+  const face =
+    compact && Math.abs(value) >= 1_000 ? formatCompact(value) : cardFigure(value, symbol === PETH.symbol ? 4 : 3);
+  const shown = lead + (signed || plus ? withRealMinus(face) : face);
   return (
     <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
       <span data-prov-exact={full} data-prov-symbol={symbol}>
@@ -379,6 +393,9 @@ export interface PolarisPositionCardProps {
   /** The ⋮'s export shapes (`polarisExports`). Absent: the ⋮ holds the CDP's
    *  rows and the provenance row alone. */
   exports?: PositionCardExports;
+  /** The CDP's summed ledger (lib/polaris/economics.ts), for the stats that
+   *  sum its touches. Absent on the listing. */
+  lifetime?: PolarisLifetime | null;
 }
 
 /** The Polaris slots for the shared position card: the headlines, the panel,
@@ -391,6 +408,7 @@ export function polarisCardSlots({
   onExplanationToggle,
   viewHref,
   exports,
+  lifetime,
 }: PolarisPositionCardProps): PositionCardSlots {
   const detail = surface === "detail";
   const cfg = POLARIS_MARKET_CONFIG[v.market];
@@ -608,6 +626,20 @@ export function polarisCardSlots({
             </Prov>
           ) : null,
         pending: v.interestRate == null && v.pricePending,
+        // Its two parts, where the live read states them: the market's set
+        // rate and the Protocol Safety Rate.
+        sub:
+          v.primaryRate != null && v.secondaryRate != null ? (
+            <span data-figure="rate-parts">
+              <Prov info={liveRateProv("primary", v.market)} value={pct2(v.primaryRate)}>
+                <span>{pct2(v.primaryRate)} primary</span>
+              </Prov>
+              {" + "}
+              <Prov info={liveRateProv("secondary", v.market)} value={pct2(v.secondaryRate)}>
+                <span>{pct2(v.secondaryRate)} safety</span>
+              </Prov>
+            </span>
+          ) : undefined,
       });
   }
 
@@ -696,22 +728,59 @@ export function polarisCardSlots({
       ),
     });
   }
-  if (v.pendingReward != null && v.pendingReward > 0) {
-    right.push({
-      id: "pending-reward",
-      label: "Reward pending",
-      tip: "pETH the CDP has earned from the protocol's fees and not yet settled; it joins the collateral at the next touch.",
+  // The legs that settle at the next touch, netted at the feed.
+  const feed = v.basis === "chain" ? v.pethInDebt : null;
+  if (v.pending && feed != null) {
+    const p = polarisPendingAtFeed(v.pending, feed);
+    if ([p.interest, p.stabilityGain, p.psm, p.reward].some((x) => x !== 0))
+      right.push({
+        id: "pending-to-settle",
+        label: "Pending to settle",
+        tip: `Interest, the stability gain, the PSM share and reward pETH accrued since the last touch, netted at the feed in ${stable}; the next touch writes them in.`,
+        value: (
+          <TokenFigure symbol={stable} address={stableAddress}>
+            <Prov info={livePendingToSettleProv(v.market, v.pending, feed)}>
+              <span data-figure="pending-to-settle">
+                <CardFigure value={p.total} symbol={stable} plus />
+              </span>
+            </Prov>
+          </TokenFigure>
+        ),
+      });
+  }
+  // The PSM shares the CDP has settled over its life, at the latest feed.
+  const psmAtFeed = lifetime && feed != null ? polarisPsmOutcomeAtFeed(lifetime, feed) : null;
+  const psmAtFeedProv = lifetime && feed != null ? polarisPsmOutcomeAtFeedProv(lifetime, stable, feed) : null;
+  if (psmAtFeed && psmAtFeedProv)
+    left.push({
+      id: "psm-outcome",
+      label: "PSM outcome at the feed",
+      tip: `Every PSM share the CDP has settled, its pETH at the latest feed less the debt it moved, in ${stable}.`,
       value: (
-        <TokenFigure symbol={PETH.symbol} address={PETH.address}>
-          <Prov info={livePendingProv("bcTokenGain", v.market)}>
-            <span>
-              <AmountText value={v.pendingReward} />
+        <TokenFigure symbol={stable} address={stableAddress}>
+          <Prov info={psmAtFeedProv}>
+            <span data-figure="psm-outcome">
+              <CardFigure value={psmAtFeed.value} symbol={stable} plus />
             </span>
           </Prov>
         </TokenFigure>
       ),
     });
-  }
+  if (lifetime && lifetime.stableGains > 0)
+    right.push({
+      id: "stability-gains",
+      label: "Stability gains since open",
+      tip: `${stable} the Protocol Safety Rate has credited against the debt, summed over every touch since the open.`,
+      value: (
+        <TokenFigure symbol={stable} address={stableAddress}>
+          <Prov info={lifetimeLegProv("stability gains", stable, v.market)}>
+            <span data-figure="stability-gains">
+              <CardSumAmount value={lifetime.stableGains} />
+            </span>
+          </Prov>
+        </TokenFigure>
+      ),
+    });
 
   return { ...detailCommon, outcome: undefined, panel: [left, right] };
 }
@@ -766,11 +835,11 @@ export function viewFromSummary(
     mcr: mcrInForce,
     defensiveMode: board?.defensiveMode ?? false,
     pricePending: pending,
-    pendingInterest: null,
-    pendingStables: null,
-    pendingReward: null,
-    pendingPsmDebt: null,
+    pending: null,
+    pethInDebt: null,
     interestRate: board?.interestRate ?? null,
+    primaryRate: null,
+    secondaryRate: null,
     peakColl: s.peakColl,
     peakDebt: s.peakDebt,
     lastActivityAt: s.lastTs,
@@ -808,11 +877,11 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     mcr: c.defensiveMode ? c.defensiveMcr : c.mcr,
     defensiveMode: c.defensiveMode,
     pricePending: false,
-    pendingInterest: c.accruedInterest,
-    pendingStables: c.accruedStables,
-    pendingReward: c.bcTokenGain,
-    pendingPsmDebt: c.mintRedeemDebtChange,
+    pending: c,
+    pethInDebt: c.price?.pethInDebt ?? null,
     interestRate: c.interestRate,
+    primaryRate: c.primaryRate,
+    secondaryRate: c.secondaryRate,
     peakColl: 0,
     peakDebt: 0,
     lastActivityAt: c.lastTouchTime > 0 ? c.lastTouchTime : null,

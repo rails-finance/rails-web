@@ -1,10 +1,14 @@
 // What a Polaris adjust row did, in the words its row shows. One CDPUpdated
 // adjust can deposit or withdraw, borrow or repay, and carry the market's net
 // PSM share, all in one touch; the row names each leg ("Deposit", "Borrow",
-// "Net PSM share"), so the Types filter keys an adjust by the same words
+// "PSM share"), so the Types filter keys an adjust by the same words
 // rather than by "Adjust", which no row reads.
 
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
+
+/** The row's name for the settled PSM share, on its face and in the Types
+ *  filter. */
+export const PSM_SHARE_LABEL = "PSM share";
 
 const num = (s?: string): number => {
   const n = Number(s ?? "0");
@@ -22,12 +26,12 @@ export function polarisAdjustKinds(
   const dDebt = num(ctx.debtChange);
   if (dColl !== 0) kinds.push(dColl > 0 ? "Deposit" : "Withdraw");
   if (dDebt !== 0) kinds.push(dDebt > 0 ? "Borrow" : "Repay");
-  if (num(ctx.mintRedeemCollGain) !== 0 || num(ctx.mintRedeemDebtGain) !== 0) kinds.push("Net PSM share");
+  if (num(ctx.mintRedeemCollGain) !== 0 || num(ctx.mintRedeemDebtGain) !== 0) kinds.push(PSM_SHARE_LABEL);
   return kinds;
 }
 
 /** The Types filter's key for a Polaris row: an adjust's leg names joined
- *  ("Deposit, Borrow, Net PSM share"), which is also its label; every other
+ *  ("Deposit, Borrow, PSM share"), which is also its label; every other
  *  row keeps its event type. */
 export function polarisFilterKey(ctx: PolarisContext): string {
   if (ctx.eventType !== "adjust") return ctx.eventType;

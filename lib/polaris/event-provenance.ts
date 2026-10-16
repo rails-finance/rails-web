@@ -23,6 +23,7 @@ import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/prov
 import { explorerUrl } from "@/lib/shared/chains";
 import { POLARIS_CHAIN_ID, POLARIS_CORE, POLARIS_MARKET_CONFIG, type PolarisMarket } from "./asset-catalog";
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
+import { formatExact } from "@/lib/utils/format";
 
 // Custody, not origin — the via line's leading segment only.
 const POLARIS_VIA = "captured cdpManager + cdpNft events (polaris_*)";
@@ -140,6 +141,48 @@ export const ledgerFieldProv = (field: PolarisLedgerField, coords: PolarisCoords
   via: `${POLARIS_VIA} · CDPUpdated · ${fieldSeg(LOG_FIELD[field], raw)}`,
   inputs: eventInputs(coords),
 });
+
+/** The settled PSM share as one figure in the debt unit: the log's two legs
+ *  netted at the feed this row's block closed with (the oracle-at-block
+ *  lane). Both legs and the price are its inputs. */
+export const psmShareNetProv = (
+  coords: PolarisCoords,
+  vals: { coll: number; debt: number; price: number; collRaw?: string; debtRaw?: string; priceRaw?: string },
+): Provenance => {
+  const stable = stableOf(coords.market);
+  return {
+    kind: "chain-derived",
+    pclass: "oracle",
+    verify: txVerify(coords),
+    summary: `The PSM share this touch settled, as one figure in ${stable}${atBlock(coords)}: the pETH it ${vals.coll < 0 ? "took" : "added"} (\`_mintRedeemCollGain\`) at the feed's \`previewPrice()\` for this block, less the debt it ${vals.debt < 0 ? "cleared" : "added"} (\`_mintRedeemDebtGain\`). The share is the net of every PSM mint and redemption since the CDP's previous touch; at the price the PSM used it is close to even, so the figure is what the price moved in between. The two legs stand on the event's sheet.`,
+    contract: managerContract(coords),
+    via: `${POLARIS_VIA} · CDPUpdated · ${fieldSeg(LOG_FIELD.mintRedeemCollGain, vals.collRaw)} × polaris_oracle_at_block · ${fieldSeg("previewPrice()", vals.priceRaw)} − ${fieldSeg(LOG_FIELD.mintRedeemDebtGain, vals.debtRaw)}`,
+    formula: "_mintRedeemCollGain × previewPrice() at block − _mintRedeemDebtGain",
+    inputs: eventInputs(coords, [
+      {
+        label: "pETH leg",
+        value: formatExact(vals.coll),
+        kind: "chain",
+        pclass: "emitted",
+        note: "CDPUpdated._mintRedeemCollGain",
+      },
+      {
+        label: `${stable} leg`,
+        value: formatExact(vals.debt),
+        kind: "chain",
+        pclass: "emitted",
+        note: "CDPUpdated._mintRedeemDebtGain",
+      },
+      {
+        label: "price at block",
+        value: formatExact(vals.price),
+        kind: "chain",
+        pclass: "oracle",
+        note: `pETH in ${stable} — previewPrice() at this block`,
+      },
+    ]),
+  };
+};
 
 // ── the reduction (indexed) ──────────────────────────────────────────────────
 
