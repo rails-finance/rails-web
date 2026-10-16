@@ -73,6 +73,7 @@ import {
   liveRateProv,
   liveRecordedDebtProv,
   liveUsdValueProv,
+  liveDebtUsdProv,
   polarisAnnualCostProv,
 } from "@/lib/polaris/live-provenance";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
@@ -106,6 +107,9 @@ export interface PolarisPositionView {
   /** Collateral valued by the protocol's own feed — the position read on the
    *  chain lane, the market board's own legs on the index lane. */
   collUsd: number | null;
+  /** The debt in USD: USDp at one dollar, GOLDp at the XAU/USD leg of the
+   *  same read. */
+  debtUsd: number | null;
   /** Chain lane only — entireColl × the feed's pETH-in-debt-unit price, minus
    *  the debt owed. A valuation at the block, not a profit — may be negative.
    *  An entire debt at or below zero owes nothing (the next touch settles it
@@ -556,6 +560,14 @@ export function polarisCardSlots({
                 v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : formatExact(v.debt),
               )
             : undefined,
+        usd:
+          v.debtUsd != null && v.debtUsd > 0 ? (
+            <Prov info={liveDebtUsdProv(v.market, index)} value={formatUsdValue(v.debtUsd)}>
+              <span className="font-bold text-green-400">{formatUsdValue(v.debtUsd)}</span>
+            </Prov>
+          ) : v.pricePending && v.debt > 0 ? (
+            <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+          ) : null,
       },
       {
         id: "collateral-ratio",
@@ -719,6 +731,13 @@ export function PolarisPositionCard(props: PolarisPositionCardProps) {
   return <PositionCard slots={polarisCardSlots(props)} />;
 }
 
+/** A debt in USD: USDp is a dollar by construction, GOLDp a troy ounce at the
+ *  XAU/USD leg of the market's price read. */
+function debtInUsd(market: PolarisMarket, debt: number, xauUsd: number | null): number | null {
+  if (market === "usdp") return debt;
+  return xauUsd != null && xauUsd > 0 ? debt * xauUsd : null;
+}
+
 /** Build a card view from the listing summary row (the index).
  *
  *  `markets` is the listing's ONE market-board read for the whole page (the
@@ -750,6 +769,7 @@ export function viewFromSummary(
     debt: s.debt,
     debtRaw: s.debtRaw,
     collUsd: board && s.coll > 0 ? s.coll * board.price.pethUsd : null,
+    debtUsd: board && s.debt > 0 ? debtInUsd(s.market, s.debt, board.price.xauUsd) : null,
     equity: null,
     recordedDebt: null,
     icr: priced && board ? (s.coll * board.price.pethInDebt) / s.debt : null,
@@ -789,6 +809,7 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     debt: c.entireDebt,
     debtRaw: c.entireDebtRaw,
     collUsd: c.price ? c.entireColl * c.price.pethUsd : null,
+    debtUsd: c.price && c.entireDebt > 0 ? debtInUsd(c.market, c.entireDebt, c.price.xauUsd) : null,
     equity: c.price ? c.entireColl * c.price.pethInDebt - Math.max(0, c.entireDebt) : null,
     recordedDebt: c.recordedDebt,
     icr: c.icr,

@@ -423,6 +423,41 @@ export function liveUsdValueProv(what: string, board = false): Provenance {
   };
 }
 
+/** A CDP's debt in USD — USDp at one dollar, GOLDp at the XAU/USD medianiser. */
+export function liveDebtUsdProv(market: PolarisMarket, board = false): Provenance {
+  const stable = stableOf(market);
+  const gold = market === "goldp";
+  return {
+    kind: gold ? "chain-derived" : "derived",
+    pclass: "oracle",
+    verify: {
+      kind: "recompute",
+      text: gold
+        ? "Re-run the XAU/USD medianiser's previewExternalPrice() at the stamped block; multiply the GOLDp debt by it."
+        : "Take the USDp debt at one dollar a token.",
+    },
+    summary: gold
+      ? `Debt in USD — the ${stable} amount × the XAU/USD medianiser, read at the latest block. One ${stable} is a troy ounce of gold, the unit the market's own feed prices in. Sepolia testnet figures throughout: a test dollar, not a real one.`
+      : `Debt in USD — the ${stable} amount at one dollar a token. The market's feed prices pETH in USDp as the bonding curve × the ETH/USD medianiser, so one USDp is one dollar by construction. Sepolia testnet figures throughout: a test dollar, not a real one.`,
+    ...(gold ? { contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser } } : {}),
+    via: `${board ? BOARD_VIA : LANE_VIA} · amount × ${gold ? "XAU/USD @ head" : "1"}`,
+    formula: gold ? "amount × XAU/USD" : "amount × 1",
+    inputs: [
+      { label: "amount", kind: "chain", pclass: "state", note: `the ${stable} debt valued` },
+      ...(gold
+        ? [
+            {
+              label: "XAU/USD",
+              kind: "chain" as const,
+              pclass: "oracle" as const,
+              note: "the XAU/USD medianiser's previewExternalPrice()",
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
 // ── the listing's derived figures ────────────────────────────────────────────
 // The listing states an APPROXIMATE ratio: one read of the market board per
 // page load (never one per row) priced against each row's last emitted
