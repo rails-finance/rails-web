@@ -2058,11 +2058,11 @@ function PipRow({
                 />
               ))}
           </div>
-          {/* Locked to the timeline: an inner glow in the sync link's teal. */}
+          {/* Locked to the timeline: a 1px border in the sync link's teal. */}
           {date.follow && (
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-md shadow-[inset_0_0_8px_var(--color-teal-600)] dark:shadow-[inset_0_0_8px_var(--color-teal-400)]"
+              className="pointer-events-none absolute inset-0 rounded-md border border-teal-600 dark:border-teal-400"
               data-flow-pips-follow=""
             />
           )}
