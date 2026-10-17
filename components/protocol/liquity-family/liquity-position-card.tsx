@@ -33,7 +33,7 @@
 
 import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
-import { AlertTriangle, Users } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import {
   PositionCard,
   type PositionCardExports,
@@ -626,31 +626,17 @@ export function useLiquityCardSlots({
           ? { word: "Zombie", tone: "muted" }
           : null;
 
-  // The listing names the owner as text and, on a live Trove, flags a
-  // delegate; the Trove page states both in its Explanation and under
-  // Interest rate.
+  // The listing names the owner; the delegate shows under Interest rate.
   const identity = detail ? undefined : (
-    <>
-      <TroveIdentityRow
-        protocol={protocol}
-        troveId={v.id}
-        owner={v.owner}
-        lastOwner={v.lastOwner}
-        ownerEns={ownerEns}
-        shortId={ops.shortId}
-        inert
-      />
-      {v.isBatched && v.status === "open" && (
-        // Delegate marker: the name is in the Explanation; pink marks an outside party.
-        <RevealTip
-          tip={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
-          label={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
-          className="text-pink-500/90"
-        >
-          <Users className="w-3.5 h-3.5" aria-hidden="true" />
-        </RevealTip>
-      )}
-    </>
+    <TroveIdentityRow
+      protocol={protocol}
+      troveId={v.id}
+      owner={v.owner}
+      lastOwner={v.lastOwner}
+      ownerEns={ownerEns}
+      shortId={ops.shortId}
+      inert
+    />
   );
 
   const counters = {
@@ -844,7 +830,7 @@ export function useLiquityCardSlots({
       ...common,
       surface: "listing",
       menu: null,
-      tag: <ListingTag market={v.collateralType} id={ops.shortId(v.id)} />,
+      tag: <ListingTag id={ops.shortId(v.id)} />,
     };
 
   const menu: PositionCardMenu | null =
