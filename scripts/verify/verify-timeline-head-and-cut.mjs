@@ -99,7 +99,7 @@ const kindOf = async (path) => {
 const ethx = await kindOf(SUPER_ETH);
 check(
   "232: Super ETH reads as a contract with its own name",
-  ethx.kind === "contract" && ethx.text === "Contract: Super ETH (ETHx)",
+  ethx.kind === "contract" && ethx.text === "Super ETH (ETHx)",
   JSON.stringify(ethx),
 );
 const owner = await kindOf(LIQUIDATED);

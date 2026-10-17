@@ -11,6 +11,7 @@
 // view that never resolves; the wallet joins it when the page knows it (an
 // id-keyed page learns its owner from the position read).
 
+import { FileCode2, KeyRound, UsersRound, type LucideIcon } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { useEffect, useState, type ReactNode } from "react";
@@ -22,25 +23,31 @@ import { protocolForSession } from "@/lib/shared/protocols";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
 import type { ChainId } from "@/lib/shared/chains";
 
-/** The row's words for what the address is (ui-jobs 232), and the read
- *  behind them for the tip. A plain wallet (`account`) has no label. */
-function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): { label: string; tip: string } {
-  const at = `eth_getCode at block ${k.block.toLocaleString("en-US")}`;
+/** The row's glyph and words for what the address is (ui-jobs 232), with a
+ *  newcomer's one-line tip. A plain wallet (`account`) has none; a contract
+ *  carries its name when it answers one. */
+function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
+  Icon: LucideIcon;
+  label: string | null;
+  tip: string;
+} {
   switch (k.kind) {
     case "delegated":
       return {
-        label: "Smart account (EIP-7702)",
-        tip: `The code is an EIP-7702 delegation to ${k.delegate} (${at}): a key controls the account and it runs the delegate's code.`,
+        Icon: KeyRound,
+        label: "Smart account",
+        tip: "A wallet someone holds a key to, set up to run extra code when it acts.",
       };
     case "safe":
-      return { label: "Smart account (Safe)", tip: `A Safe ${k.version} (${at}): its owners sign together.` };
+      return { Icon: UsersRound, label: "Safe", tip: "A shared wallet: several owners sign together before it acts." };
     case "contract": {
       const named = k.name && k.symbol ? `${k.name} (${k.symbol})` : (k.name ?? k.symbol);
       return {
-        label: named ? `Contract: ${named}` : "Contract",
+        Icon: FileCode2,
+        label: named ?? null,
         tip: named
-          ? `A contract (${at}); its name() and symbol() answer ${named}.`
-          : `A contract (${at}); it answers no name().`,
+          ? `A smart contract named ${named}: a program on Ethereum, not a wallet someone holds a key to.`
+          : "A smart contract: a program on Ethereum, not a wallet someone holds a key to.",
       };
     }
   }
@@ -64,12 +71,13 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
     // Gives way before the address does (shrink-[100]).
     <RevealTip
       tip={<span className="block w-72 whitespace-normal">{w.tip}</span>}
-      label={`${w.label}. ${w.tip}`}
+      label={w.label ? `${w.label}. ${w.tip}` : w.tip}
       focusable
       className="min-w-0 shrink-[100] focus-ring rounded-sm"
     >
-      <span className="truncate" data-address-kind={kind.kind}>
-        {w.label}
+      <span className="flex min-w-0 items-center gap-1" data-address-kind={kind.kind}>
+        <w.Icon className="size-3.5 shrink-0" aria-hidden />
+        {w.label && <span className="truncate">{w.label}</span>}
       </span>
     </RevealTip>
   );

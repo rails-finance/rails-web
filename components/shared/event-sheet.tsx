@@ -190,7 +190,7 @@ const GRID = "grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_au
 const SUB = "col-span-full grid grid-cols-subgrid";
 const USD_RULE = "border-l border-rb-300 pl-4 dark:border-rb-600";
 /** The breakdown's tint. */
-const TINT = "bg-blue-500/[0.06] dark:bg-blue-400/[0.07]";
+const TINT = "bg-raised";
 
 type Tone = "event" | "plain" | "muted" | "sub";
 const TONE: Record<Tone, string> = {
@@ -531,7 +531,7 @@ export function EventSheetView({
               e.stopPropagation();
               setShown((v) => !v);
             }}
-            className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-sunken text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 max-sm:min-h-9 max-sm:min-w-9"
+            className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-md text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 max-sm:min-h-9 max-sm:min-w-9"
           >
             <ListChevronsIcon open={shown} className="h-4 w-4" />
           </button>
@@ -542,7 +542,7 @@ export function EventSheetView({
           <SidePanel key={s.side} s={s} breakdown={on} col={col} />
         ))}
         {sheet.panels.length > 0 && (
-          <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {sheet.panels.map((p) => (
               <StatPanel key={p.panel} p={p} breakdown={on} />
             ))}

@@ -2,7 +2,7 @@
 
 // A level that swaps to its change (rails-ops TO-DO-ui-jobs 330): the value is
 // a dotted-underlined button; a click shows its change since the previous
-// event in its place ("▼ 3.24 pts", in blue), a second click shows the level
+// event in its place ("▼ 3.24 pts"), a second click shows the level
 // again. With no change to show it is the level alone, with no control. Both
 // faces keep their receipts. The event card's Risk and Limits panels draw it;
 // 321's spine reads it later.
@@ -64,7 +64,7 @@ export function ChangeSwapValue({
       }}
       onKeyDown={(e) => e.stopPropagation()}
       className={`cursor-pointer rounded-sm border-b border-dotted border-rb-400 tabular-nums leading-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-rb-500 ${
-        swapped ? "text-blue-600 dark:text-blue-300" : className
+        className
       }`}
     >
       <Face f={swapped ? change : level} />
