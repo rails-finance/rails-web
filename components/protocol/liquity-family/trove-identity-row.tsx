@@ -59,8 +59,8 @@ export function TroveIdentityRow({
    *  above the card names the owner (ui-jobs 228). */
   showOwner?: boolean;
   /** The listing card: the owner's wallet pill with its copy and bookmark,
-   *  as every family's listing draws it (Miles, 17 Oct 2026), or the Trove ID
-   *  as text where there is no owner; no Trove ID copy or NFT link. */
+   *  as every family's listing draws it (Miles, 17 Oct 2026); no Trove ID copy
+   *  or NFT link, the ID being the card's right-end tag. */
   inert?: boolean;
 }) {
   const [copiedTrove, setCopiedTrove] = useState(false);
@@ -73,26 +73,17 @@ export function TroveIdentityRow({
   if (!troveLabel && !nftUrl && !ownerAddress) return null;
 
   if (inert) {
+    // The Trove ID sits at the card's right end (the listing `tag`).
+    if (!ownerAddress) return null;
     return (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500">
-        {ownerAddress ? (
-          <>
-            {isLastOwner && <span className="text-rb-400">last owner</span>}
-            <WalletPill
-              wallet={ownerAddress}
-              ensName={ownerEns ?? null}
-              filterProtocol={protocol}
-              bookmarkProtocol={showBookmark ? protocol : undefined}
-            />
-          </>
-        ) : (
-          troveLabel && (
-            <>
-              <Icon name="trove-id" size={12} />
-              <span className="font-mono">{troveLabel}</span>
-            </>
-          )
-        )}
+        {isLastOwner && <span className="text-rb-400">last owner</span>}
+        <WalletPill
+          wallet={ownerAddress}
+          ensName={ownerEns ?? null}
+          filterProtocol={protocol}
+          bookmarkProtocol={showBookmark ? protocol : undefined}
+        />
       </span>
     );
   }

@@ -121,6 +121,7 @@ import {
   DEBT_ADDRESS as BASEDOLLAR_DEBT_ADDRESS,
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
+import { ListingTag } from "@/components/shared/listing-tag";
 import { TroveMenuRows } from "./trove-menu-rows";
 import {
   CLAIMABLE_BY_OWNER,
@@ -837,7 +838,14 @@ export function useLiquityCardSlots({
   }
 
   const common = { status, heads, identity, notice: deprecationBanner || undefined, counters, outcome };
-  if (!detail) return { ...common, surface: "listing", menu: null };
+  // The listing's right end: the branch and the Trove ID.
+  if (!detail)
+    return {
+      ...common,
+      surface: "listing",
+      menu: null,
+      tag: <ListingTag market={v.collateralType} id={ops.shortId(v.id)} />,
+    };
 
   const menu: PositionCardMenu | null =
     exports === undefined
