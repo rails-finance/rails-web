@@ -217,8 +217,9 @@ interface PositionCardDetailClosed extends PositionCardDetailCommon {
 /** A row of a listing. */
 export interface PositionCardListingSlots extends PositionCardSlotsCommon {
   surface: "listing";
-  /** The family's listing ⋮ (Liquity V2's `TroveListingMenu`), or `null`. It
-   *  must stop a press from reaching the row's <Link>. */
+  /** A listing ⋮, or `null`. Every family passes `null`: the listing card is
+   *  one link and its position's actions live in the page's ⋮ (Miles,
+   *  17 Oct 2026). A menu here must stop a press from reaching the <Link>. */
   menu: ReactNode | null;
   /** Present on a closed position. */
   outcome?: PositionCardOutcome;

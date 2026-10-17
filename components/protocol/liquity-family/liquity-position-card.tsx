@@ -504,8 +504,6 @@ export interface LiquityPositionCardProps {
   /** The ⋮'s export shapes. `null`: the ⋮ holds the Trove's rows and the
    *  provenance row alone. Absent: no ⋮ (the home hero's inert embed). */
   exports?: PositionCardExports | null;
-  /** The listing row's ⋮ (Liquity V2's `TroveListingMenu`). */
-  listingMenu?: ReactNode;
   /** A line at the foot (V2's snapshot and loading status). */
   foot?: ReactNode;
 }
@@ -526,7 +524,6 @@ export function useLiquityCardSlots({
   surplus,
   panel,
   exports,
-  listingMenu,
   foot,
 }: LiquityPositionCardProps): PositionCardSlots {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
@@ -840,7 +837,7 @@ export function useLiquityCardSlots({
   }
 
   const common = { status, heads, identity, notice: deprecationBanner || undefined, counters, outcome };
-  if (!detail) return { ...common, surface: "listing", menu: listingMenu ?? null };
+  if (!detail) return { ...common, surface: "listing", menu: null };
 
   const menu: PositionCardMenu | null =
     exports === undefined

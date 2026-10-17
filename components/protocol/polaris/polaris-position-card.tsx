@@ -33,7 +33,6 @@
 import { TokenFigure } from "@/components/shared/token-figure";
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy, Image as ImageIcon, Link2 } from "lucide-react";
-import { Icon } from "@/components/icons/icon";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import {
@@ -266,54 +265,16 @@ function assetIcon(symbol: string, address: string, figure: string): ReactNode {
   );
 }
 
-/** The CDP-grain identity on a listing row: market chip · CDP id, then the two
- *  things a reader wants to do with the id — take it away, and look at the NFT
- *  it names.
- *
- *  Both are <button>s, never <a>s: this row renders inside the driver's row
- *  <Link>, and a nested anchor is invalid HTML. So the NFT link is a button +
- *  window.open, and both handlers preventDefault/stopPropagation so a click
- *  copies or opens instead of navigating to the CDP's page. */
+/** The CDP-grain identity on a listing row: market chip · CDP id. Its copy
+ *  and NFT actions live in the CDP page's ⋮; the listing card is one link. */
 function CdpIdentity({ v }: { v: PolarisPositionView }) {
   const cfg = POLARIS_MARKET_CONFIG[v.market];
-  const [copied, setCopied] = useState(false);
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-rb-500 tabular-nums">
       <TokenChipIcon symbol={cfg.stable.symbol} address={cfg.stable.address} size={14} filterable={false} />
       {cfg.stable.symbol}
       <span className="text-rb-400">·</span>
       CDP #{v.cdpId}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          // The bare number, not "CDP #8" — what a reader pastes into a search
-          // box, a URL or the contract's own getCDP(id).
-          navigator.clipboard.writeText(v.cdpId);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-        aria-label={copied ? "Copied" : "Copy CDP number"}
-        title={copied ? "Copied!" : "Copy"}
-        className="text-rb-500 hover:text-foreground cursor-pointer"
-      >
-        <Icon name={copied ? "check" : "copy"} size={12} />
-      </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.open(polarisCdpNftUrl(v.market, v.cdpId), "_blank", "noopener,noreferrer");
-        }}
-        aria-label="View the CDP NFT on Etherscan"
-        title="View the CDP NFT on Etherscan"
-        className="inline-flex items-center gap-1 text-rb-500 hover:text-foreground transition-colors cursor-pointer"
-      >
-        <ImageIcon size={12} />
-        <Link2 size={12} className="-rotate-45" />
-      </button>
     </span>
   );
 }

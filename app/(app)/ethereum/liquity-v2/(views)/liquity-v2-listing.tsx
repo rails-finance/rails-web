@@ -19,7 +19,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
-import { TroveListingMenu } from "@/components/trove/TroveListingMenu";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -128,13 +127,7 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
       sortOptions={LIQUITY_V2_SORT_OPTIONS}
       searchPlaceholder={troveWords("listing_search")}
       renderCard={(t) => (
-        <LiquityPositionCard
-          protocol="liquity-v2"
-          surface="listing"
-          v={viewFromTroveSummary(t, prices)}
-          compact
-          listingMenu={<TroveListingMenu trove={t} prices={prices ?? undefined} />}
-        />
+        <LiquityPositionCard protocol="liquity-v2" surface="listing" v={viewFromTroveSummary(t, prices)} compact />
       )}
       hrefFor={(t) => `/ethereum/liquity-v2/trove/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
