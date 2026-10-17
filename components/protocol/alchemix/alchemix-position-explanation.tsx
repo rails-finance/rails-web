@@ -27,10 +27,10 @@ const compact = (n: number) => formatCompact(n).display;
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatNumber(Math.abs(n))}`;
 
 /** A 1e18-scaled ratio as the position card draws it: one decimal below
- *  1,000%, whole numbers above it, and "over 10,000%" past that. */
+ *  1,000%, whole numbers above it, and ">10k%" past that. */
 export function ratioPct(raw: string): string {
   const pct = Number(raw) / 1e16;
-  if (pct >= 10000) return "over 10,000%";
+  if (pct >= 10000) return ">10k%";
   return pct < 1000
     ? `${pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
     : `${Math.round(pct).toLocaleString("en-US")}%`;

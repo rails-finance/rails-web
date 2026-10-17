@@ -5,8 +5,6 @@ import { useState } from "react";
 import { Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { Facehash } from "@/components/shared/facehash";
-import { useEnsName } from "@/lib/ens/use-ens-names";
 import type { LiquityFamilyId } from "./types";
 
 /**
@@ -60,9 +58,9 @@ export function TroveIdentityRow({
   /** The owner's pill. The detail card passes false: the page's wallet row
    *  above the card names the owner (ui-jobs 228). */
   showOwner?: boolean;
-  /** The listing card under the header set (ui-jobs 246): the owner, or the
-   *  Trove ID where there is none, as text with its facehash and no
-   *  controls; the whole card is the link. */
+  /** The listing card: the owner's wallet pill with its copy and bookmark,
+   *  as every family's listing draws it (Miles, 17 Oct 2026), or the Trove ID
+   *  as text where there is no owner; no Trove ID copy or NFT link. */
   inert?: boolean;
 }) {
   const [copiedTrove, setCopiedTrove] = useState(false);
@@ -72,22 +70,20 @@ export function TroveIdentityRow({
   const ownerAddress = showOwner ? (owner ?? lastOwner ?? null) : null;
   const isLastOwner = !owner && !!lastOwner;
 
-  const resolved = useEnsName(inert && ownerAddress && !ownerEns ? ownerAddress : null);
   if (!troveLabel && !nftUrl && !ownerAddress) return null;
 
   if (inert) {
-    const name = ownerEns ?? resolved;
     return (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500">
         {ownerAddress ? (
           <>
             {isLastOwner && <span className="text-rb-400">last owner</span>}
-            <Facehash address={ownerAddress} size={16} />
-            <RevealTip tip={name ? `${name} · ${ownerAddress}` : ownerAddress} className="min-w-0">
-              <span className={name ? "max-w-[15ch] truncate" : "font-mono"}>
-                {name ?? `${ownerAddress.slice(0, 6)}…${ownerAddress.slice(-4)}`}
-              </span>
-            </RevealTip>
+            <WalletPill
+              wallet={ownerAddress}
+              ensName={ownerEns ?? null}
+              filterProtocol={protocol}
+              bookmarkProtocol={showBookmark ? protocol : undefined}
+            />
           </>
         ) : (
           troveLabel && (

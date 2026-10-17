@@ -135,14 +135,14 @@ export interface AlchemixStateAtBlockProps {
  *  so a small move still shows between before and after. */
 function gridRatio(raw: string): string {
   const pct = Number(raw) / 1e16;
-  if (pct >= 10000) return "over 10,000%";
+  if (pct >= 10000) return ">10k%";
   return `${pct.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 /** A 1e18-scaled ratio as the position card draws it. */
 function ratioPct(raw: string): string {
   const pct = Number(raw) / 1e16;
-  if (pct >= 10000) return "over 10,000%";
+  if (pct >= 10000) return ">10k%";
   return pct < 1000
     ? `${pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
     : `${Math.round(pct).toLocaleString("en-US")}%`;
