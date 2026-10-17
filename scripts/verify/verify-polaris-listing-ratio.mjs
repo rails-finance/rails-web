@@ -90,14 +90,8 @@ async function readCards(page) {
       // so a text regex silently swallows a digit.
       const href = card.closest("a")?.getAttribute("href") ?? "";
       const idm = /\/sepolia\/polaris\/(usdp|goldp)\/(\d+)(?:[?#]|$)/.exec(href);
-      // The ratio column: the label div, then its parent holds value + footnote.
-      let col = null;
-      for (const el of card.querySelectorAll("div")) {
-        if (el.children.length === 0 && el.textContent?.trim() === "Collateral ratio") {
-          col = el.parentElement;
-          break;
-        }
-      }
+      // The ratio column, by its head hook: its first child is the label.
+      const col = card.querySelector('[data-card-head="collateral-ratio"]');
       const valueEl = col?.querySelector('[data-figure="collateral-ratio"]') ?? null;
       const valueText = (valueEl?.textContent ?? "").replace(/\s+/g, " ").trim();
       const dash = col ? /—/.test(col.textContent ?? "") && valueEl == null : false;
@@ -107,7 +101,7 @@ async function readCards(page) {
         const parts = [];
         for (const kid of col.children) {
           const t = (kid.textContent ?? "").replace(/\s+/g, " ").trim();
-          if (t === "Collateral ratio" || (valueEl && kid.contains(valueEl))) continue;
+          if (kid === col.firstElementChild || (valueEl && kid.contains(valueEl))) continue;
           if (t) parts.push(t);
         }
         footnote = parts.join(" ");
@@ -186,12 +180,12 @@ for (const c of cards) {
   if (row.debt > 0 && row.coll > 0) {
     const want = expectedIcrPct(row, m);
     const got = parseNum((c.valueText.match(/([\d,]+\.\d+)%/) ?? [])[1]);
-    // Above 10,000% the card states "over 10,000%" (lib/polaris/ratio-format.ts,
+    // Above 10,000% the card states ">10k%" (lib/polaris/ratio-format.ts,
     // POLARIS_RATIO_CEILING_PCT).
     const capped = want > 10_000;
     if (
       !c.valueText.includes("≈") ||
-      (capped ? !c.valueText.includes("over 10,000%") : !Number.isFinite(got) || Math.abs(got - want) > 0.05)
+      (capped ? !c.valueText.includes(">10k%") : !Number.isFinite(got) || Math.abs(got - want) > 0.05)
     ) {
       ratioBad.push(`${row.market}/${row.cdpId}: shown "${c.valueText}" vs expected ≈ ${want.toFixed(1)}%`);
     }
@@ -206,7 +200,8 @@ for (const c of cards) {
     }
   } else {
     zeroDebtSeen++;
-    if (c.valueText.includes("≈") || !c.dash) {
+    // A listing row with no recorded debt drops the ratio column.
+    if (c.valueText !== "" || c.footnote !== "") {
       dashBad.push(`${row.market}/${row.cdpId} (debt ${row.debt}): "${c.valueText}" dash=${c.dash}`);
     }
   }
@@ -227,7 +222,7 @@ check(
   footnoteBad.join(" ; "),
 );
 check(
-  "1e. a zero-debt card shows the dash and no ≈",
+  "1e. a zero-debt card has no ratio column",
   dashBad.length === 0,
   dashBad.length
     ? dashBad.join(" ; ")
@@ -256,14 +251,9 @@ check(
 );
 
 // ── 2. the tooltip ─────────────────────────────────────────────────────────
-const TIP_FRAGMENT = "Interest since the last touch and any PSM share are not in it";
-// The press goes to the figure: the stat column is full-width and its centre
-// lands beside the inline value, where RevealTip never fires. Tips open on a
-// click since `aa0ea5e`.
-await page1
-  .getByText(/≈\s*[\d,]+\.\d+%/)
-  .first()
-  .click();
+// Listing cards silence their tips; the estimated ratio's label keeps its own.
+const TIP_FRAGMENT = "Estimated, without interest";
+await page1.getByText("Estimated collateral ratio", { exact: true }).first().click();
 await page1.waitForTimeout(400);
 const tipText = await page1
   .locator('[role="tooltip"]')
@@ -271,7 +261,7 @@ const tipText = await page1
   .innerText()
   .catch(() => "");
 check(
-  "2. clicking a ratio reveals the tooltip sentence",
+  "2. clicking the ratio label reveals its tip",
   tipText.replace(/\s+/g, " ").includes(TIP_FRAGMENT),
   tipText.slice(0, 160),
 );
@@ -517,8 +507,8 @@ await page7.close();
   const page9 = await openListing(context, `${BASE}/sepolia/polaris?debt=collateral-only`);
   const cards9 = await readCards(page9);
   check(
-    "9c. the Collateral-only view renders only dash cards — no ≈, no liquidation price",
-    cards9.length > 0 && cards9.every((c) => c.dash && !c.valueText.includes("≈") && !/Liquidates if/.test(c.footnote)),
+    "9c. the Collateral-only view's cards carry no ratio column",
+    cards9.length > 0 && cards9.every((c) => c.valueText === "" && c.footnote === ""),
     `${cards9.length} cards; first "${cards9[0]?.valueText}" footnote "${cards9[0]?.footnote}"`,
   );
   const chrome9 = await page9.evaluate(() => {

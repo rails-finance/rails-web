@@ -2,7 +2,7 @@
 // (i), the rows' chip and metric, the market notes' Polaris cells and the
 // export all format through here.
 //
-// Two rules. Above POLARIS_RATIO_CEILING_PCT a ratio says "over 10,000%": a
+// Two rules. Above POLARIS_RATIO_CEILING_PCT a ratio says ">10k%": a
 // CDP whose debt is a few units against a large collateral has a ratio in the
 // millions, and the digits past the ceiling carry nothing a reader can use
 // while they swing with every block. Below it the figure carries the site's
@@ -21,7 +21,7 @@ const fixed = (n: number, d: number): string =>
  *  against, and the grain widens (up to two decimals) until the two differ. */
 export function formatPolarisRatioPct(pct: number, decimals = 1, minPct?: number): string {
   if (!Number.isFinite(pct)) return "—";
-  if (pct > POLARIS_RATIO_CEILING_PCT) return `over ${fixed(POLARIS_RATIO_CEILING_PCT, 0)}%`;
+  if (pct > POLARIS_RATIO_CEILING_PCT) return `>${POLARIS_RATIO_CEILING_PCT / 1000}k%`;
   let d = decimals;
   if (minPct != null && pct !== minPct) {
     while (d < 2 && fixed(pct, d) === fixed(minPct, d)) d++;

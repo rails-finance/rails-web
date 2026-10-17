@@ -94,11 +94,11 @@ const crAtFirePct = (d) => {
   return ((seized * price) / cleared) * 100;
 };
 // lib/polaris/ratio-format.ts: one decimal, the site's separators, a second
-// decimal where one would put the ratio on the 115% minimum, "over 10,000%"
+// decimal where one would put the ratio on the 115% minimum, ">10k%"
 // above the ceiling. The chip states the metric's figure.
 const fx = (v, d) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const pct1 = (pct) => {
-  if (pct > 10000) return "over 10,000%";
+  if (pct > 10000) return ">10k%";
   let d = 1;
   while (d < 2 && pct !== 115 && fx(pct, d) === fx(115, d)) d++;
   return `${fx(pct, d)}%`;

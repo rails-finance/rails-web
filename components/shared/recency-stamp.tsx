@@ -7,17 +7,15 @@
 // off the block timestamp; the head only re-pulls on focus / reload.
 // Fail-soft: renders nothing when the chain head is unavailable.
 //
-// The stamp reads "3 min ago" on every explorer: the age in place, the
-// block number in its peek (a RevealTip, opened by a press; rails-ops
-// detail-page-anatomy, "Shared row rules"). The copy-for-LLM exports carry the
-// block number from the page's own data (lib/<proto>/position-to-markdown.ts).
+// Two readings, switched by a press on the stamp: the age ("3 min ago", behind
+// the block-and-clock icon) or the block number ("11,932,361", behind the
+// cube). The choice holds across pages for this browser. The copy-for-LLM exports carry the block
+// number from the page's own data (lib/<proto>/position-to-markdown.ts).
 
 import { useEffect, useState } from "react";
 import { Box } from "lucide-react";
-import { RevealTip } from "@/components/shared/reveal-tip";
+import { BlockClockIcon } from "@/components/icons/block-clock-icon";
 import { useChainHead } from "@/hooks/useChainHead";
-import { useChainId } from "@/lib/shared/chain-context";
-import { chainMeta } from "@/lib/shared/chains";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 
 // Compact age for the 11px stamp: "< 1 min" / "5 min" / "3 hr" / "2 d".
@@ -34,41 +32,58 @@ function formatCompactAge(elapsedMs: number): string {
   return `${Math.floor(hr / 24)} d`;
 }
 
+type Reading = "age" | "block";
+const READING_KEY = "rails.recency-reading";
+
+function storedReading(): Reading {
+  try {
+    return localStorage.getItem(READING_KEY) === "block" ? "block" : "age";
+  } catch {
+    return "age";
+  }
+}
+
 /** `compact` drops the cube below sm, for the detail pages' top row, which
  *  carries back, this stamp, the labelled prices trigger and Tools across
  *  390px. */
 export function RecencyStamp({ className, compact = false }: { className?: string; compact?: boolean }) {
   const head = useChainHead();
-  const chain = chainMeta(useChainId());
   // Re-render every 30s so the age stays current without re-fetching.
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 30_000);
     return () => clearInterval(id);
   }, []);
+  // "age" on the server render; the stored choice lands after mount.
+  const [reading, setReading] = useState<Reading>("age");
+  useEffect(() => setReading(storedReading()), []);
+  const toggle = () => {
+    const next = reading === "age" ? "block" : "age";
+    setReading(next);
+    try {
+      localStorage.setItem(READING_KEY, next);
+    } catch {}
+  };
 
   if (!head) return null;
   const age = formatCompactAge(Date.now() - head.blockTimestamp * 1000);
   const block = head.blockNumber.toLocaleString("en-US");
 
+  const showAge = reading === "age";
+  const Icon = showAge ? BlockClockIcon : Box;
+
   return (
-    <RevealTip
-      align="end"
-      wrap
-      tip={`Block ${block}, the latest ${chain.name} block this page reads. Reload to advance it.`}
+    <button
+      type="button"
+      data-anatomy="H6"
+      onClick={toggle}
+      aria-label={`Chain head minted ${age} ago, block ${block}. Press to show the ${showAge ? "block number" : "age"}.`}
+      // The control grammar: the stamp reads as pressable. Same height and
+      // radius as the price trigger beside it, one type size down.
+      className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
     >
-      <button
-        type="button"
-        data-anatomy="H6"
-        aria-label={`Chain head minted ${age} ago, block ${block}.`}
-        // The control grammar: the stamp reads as pressable, so its peek is
-        // found. Same height and radius as the price trigger beside it, one
-        // type size down.
-        className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
-      >
-        <Box size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
-        <span aria-hidden>{age} ago</span>
-      </button>
-    </RevealTip>
+      <Icon size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
+      <span aria-hidden>{showAge ? `${age} ago` : block}</span>
+    </button>
   );
 }

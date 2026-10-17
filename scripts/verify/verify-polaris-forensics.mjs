@@ -127,10 +127,10 @@ const fmtPremium = (f) => `${f >= 0 ? "+" : "−"}${(Math.abs(f) * 100).toFixed(
 /** The explainer's own percentage: two places, no sign. */
 const fmtPct = (f) => `${(f * 100).toFixed(2)}%`;
 // The page's ratio rule (lib/polaris/ratio-format.ts): one decimal, a second
-// where one would read as the 115% minimum, separators, "over 10,000%".
+// where one would read as the 115% minimum, separators, ">10k%".
 const fmtRatio = (f) => {
   const pct = f * 100;
-  if (pct > 10000) return "over 10,000%";
+  if (pct > 10000) return ">10k%";
   const fx = (v, d) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
   let d = 1;
   while (d < 2 && pct !== 115 && fx(pct, d) === fx(115, d)) d++;

@@ -188,18 +188,6 @@ export const formatPethPrice = (p: number): string => {
   return p.toLocaleString("en-US", { maximumFractionDigits: 0 });
 };
 
-/** What the ≈ on the listing's ratio means, in one sentence. Rides the shared
- *  RevealTip (hover on desktop, first tap on touch) beside the <Prov>
- *  receipt — the tooltip says what the figure IS, the receipt where it came
- *  from. */
-const LISTING_ICR_TIP =
-  "An estimate: the CDP's last stated collateral and debt, valued at the market's price feed as of the latest read. Interest since the last touch and any PSM share are not in it. The CDP's page states the contract's own ratio.";
-
-/** RevealTip's bubble is sized for a number (nowrap, tabular figures); a
- *  sentence needs its own width and normal prose settings, declared on the
- *  child so they win over the bubble's own. */
-const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
-
 /** Three decimals, trailing zeros kept ("2,035.800"), so the card's figures
  *  read at one grain; pETH takes four (lib/polaris/figure-format.ts). A
  *  magnitude too small for the grain keeps formatNumber's non-zero rule. */
@@ -579,20 +567,21 @@ export function polarisCardSlots({
       },
       {
         id: "collateral-ratio",
-        label: ratioLabel("cdp"),
+        // The index lane's ratio is an approximation (its receipt says where
+        // the two legs come from), and the heading says so.
+        label: index ? `Estimated ${ratioLabel("cdp").toLowerCase()}` : ratioLabel("cdp"),
+        ...(index && {
+          labelTip: "Estimated, without interest. View position to see latest ratio.",
+          labelTipOnListing: true,
+        }),
         value:
           v.icr != null ? (
             <span data-figure="collateral-ratio">
               {index ? (
-                // The index lane's ratio is an approximation and wears the ≈:
-                // the receipt says where the two legs come from, the tooltip
-                // what the figure is and is not.
                 <Prov info={listingIcrProv(v.market)} value={`≈ ${pct(v.icr)}`}>
-                  <RevealTip tip={<span className={TIP_PROSE}>{LISTING_ICR_TIP}</span>}>
-                    <span className={belowMin ? "text-red-500" : undefined}>
-                      {"≈"}&nbsp;{formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
-                    </span>
-                  </RevealTip>
+                  <span className={belowMin ? "text-red-500" : undefined}>
+                    {"≈"}&nbsp;{formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
+                  </span>
                 </Prov>
               ) : (
                 <Prov info={liveIcrProv(v.market)} value={pct(v.icr)}>
@@ -612,6 +601,8 @@ export function polarisCardSlots({
           ) : undefined,
       },
     ];
+    // A listing row whose recorded debt is none has no ratio to estimate.
+    if (index && v.debt <= 0) heads.pop();
     // The rate the market charges, on a CDP whose debt accrues it.
     const owesRecorded = index ? v.debt > 0 : (v.recordedDebt ?? 0) > 0;
     if (owesRecorded)

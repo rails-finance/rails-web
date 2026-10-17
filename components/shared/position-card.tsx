@@ -88,6 +88,10 @@ export interface PositionCardHead {
   label: string;
   /** What the label means, on hover or tap (a dotted underline). */
   labelTip?: string;
+  /** Keep `labelTip` on a listing card, where tips are otherwise quiet: a
+   *  headline whose label needs its meaning in the row (Polaris's estimated
+   *  ratio). */
+  labelTipOnListing?: boolean;
   /** An icon after the label. The closed card's peaks carry their asset here
    *  (Liquity V2's closed face); an open headline puts it in `assets`. */
   labelIcon?: ReactNode;
@@ -281,7 +285,14 @@ function PositionCardRow({
   return (
     <div className={className} style={style} data-card-row={index} data-card-head={head}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
-        {explain ? <HeadingTip text={label} tip={labelTip ?? help} /> : <TipLabel text={label} tip={labelTip} />}
+        {explain ? (
+          <HeadingTip text={label} tip={labelTip ?? help} />
+        ) : (
+          // A listing passes a labelTip only where the head keeps it.
+          <QuietTipsContext.Provider value={false}>
+            <TipLabel text={label} tip={labelTip} />
+          </QuietTipsContext.Provider>
+        )}
         {headerIcon}
         {help && !explain && <RowHelp tip={help} name={label} />}
       </div>
@@ -436,7 +447,7 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
             index={i}
             head={h.id}
             label={h.label}
-            labelTip={h.labelTip}
+            labelTip={detail || h.labelTipOnListing ? h.labelTip : undefined}
             headerIcon={h.labelIcon}
             explain={detail}
           >
@@ -506,7 +517,7 @@ function ClosedGrid({
           index={i}
           head={h.id}
           label={h.label}
-          labelTip={h.labelTip}
+          labelTip={detail || h.labelTipOnListing ? h.labelTip : undefined}
           headerIcon={h.labelIcon}
           explain={detail}
         >
@@ -618,11 +629,20 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const body = (
     <div {...(closed ? { "data-anatomy": "C11" } : {})}>
       {header}
-      {slots.outcome ? (
-        <ClosedGrid heads={slots.heads} outcome={slots.outcome} tone={slots.status?.tone ?? "muted"} detail={detail} />
-      ) : (
-        <OpenGrid heads={slots.heads} detail={detail} />
-      )}
+      {/* A listing card is one link: its figures and labels open no tips
+          (the position page keeps them). */}
+      <QuietTipsContext.Provider value={!detail}>
+        {slots.outcome ? (
+          <ClosedGrid
+            heads={slots.heads}
+            outcome={slots.outcome}
+            tone={slots.status?.tone ?? "muted"}
+            detail={detail}
+          />
+        ) : (
+          <OpenGrid heads={slots.heads} detail={detail} />
+        )}
+      </QuietTipsContext.Provider>
       {panel && <PositionCardPanel columns={panel} />}
       {/* A listing card's recency and counts, together at its bottom right. */}
       {!detail && counters && (

@@ -10,7 +10,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 export function TipLabel({ text, tip }: { text: string; tip?: string }) {
   if (!tip) return <>{text}</>;
   return (
-    <RevealTip tip={tip} label={`${text}: ${tip}`} focusable className="focus-ring rounded-sm">
+    <RevealTip tip={tip} label={`${text}: ${tip}`} focusable wrap className="focus-ring rounded-sm">
       <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">{text}</span>
     </RevealTip>
   );
