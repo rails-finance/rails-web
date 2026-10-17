@@ -357,8 +357,11 @@ export interface FolderRegisterEntry {
    *  deposits…") above the skeleton. Unset draws the skeleton alone. */
   readingLine?: boolean;
   /** Drawn before the sums in place of a shape label: a family's own figure
-   *  the header states (a delegate run's rate pill). */
+   *  the header states. */
   lead?: ReactNode;
+  /** A muted line at the left of the opened card's sheet controls (a
+   *  delegate run's rate move). */
+  sheetLead?: ReactNode;
 }
 
 /** One family's whole folder register: served kind → how it draws. */

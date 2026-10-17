@@ -124,6 +124,8 @@ export interface TimelineRunCardProps {
   stateSpan?: { label: string; from: number; to: number; symbol: string }[];
   /** Header content drawn before the aggregate pairs: a shape run's summary. */
   lead?: ReactNode;
+  /** A muted line at the left of the opened card's sheet controls. */
+  sheetLead?: ReactNode;
   /** Extra header content, rendered after the aggregate pairs. */
   extraHeader?: ReactNode;
   /** Chronological bounds of the run (either display order). */
@@ -197,6 +199,7 @@ export function TimelineRunCard({
   byOwner,
   folder,
   lead,
+  sheetLead,
   extraHeader,
   firstTimestamp,
   lastTimestamp,
@@ -387,7 +390,7 @@ export function TimelineRunCard({
         )
       );
     });
-  const hasSums = legAggs.length > 0 || !!lead || !!extraHeader;
+  const hasSums = legAggs.length > 0 || !!lead || !!sheetLead || !!extraHeader;
 
   /** The group's summary card where the members draw no sheet: the sums,
    *  under the header that names the group, counts it and dates it (Liquity
@@ -540,7 +543,7 @@ export function TimelineRunCard({
             head: { row: head },
             caption: "",
             cells: { none: "A run's figures are its members' sums, stated in the summary." },
-            sheet: merged?.sheet,
+            sheet: merged ? (sheetLead ? { ...merged.sheet, lead: sheetLead } : merged.sheet) : undefined,
             price: merged?.price,
             ledgers: { none: "A run's ledgers are its members'." },
             notes: hasSums ? summary : undefined,

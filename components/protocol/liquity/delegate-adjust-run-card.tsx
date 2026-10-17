@@ -41,12 +41,13 @@ import { DelegateRatePillShell } from "@/components/shared/rate-pill";
  * last change in the pink delegate pill, its arrow the way the members moved
  * the rate (`moves`).
  *
- * The header's rate pill states the net effect (rails-ops decision 0039, rule
- * 6): the rate before the first member → the rate after the last, and the
- * range the run moved through where it went outside them; a nil net change
- * reads "unchanged at" the rate, with the range where the rate moved
- * (`DelegateRunRatePill`, which the served fork `batch_rate` folder draws
- * too).
+ * The run states its net effect (rails-ops decision 0039, rule 6): the rate
+ * before the first member → the rate after the last, and the range the run
+ * moved through where it went outside them; a nil net change reads
+ * "unchanged at" the rate, with the range where the rate moved
+ * (`DelegateRunRatePill`). Here it is a muted line in the opened card, beside
+ * the breakdown switch (Miles 17 Oct 2026); the served fork `batch_rate`
+ * folder still draws it as the header's pink pill.
  */
 
 /** The rates a delegate run's header states (%), each optional. */
@@ -123,12 +124,16 @@ export function DelegateRunRatePill({
   rates,
   prov,
   echoLast,
+  plain,
 }: {
   rates: DelegateRunRates;
   prov: (which: DelegateRunRateWhich) => Provenance;
   /** The last rate's receipt is registered by another figure (the spine's
    *  flank), so the pill echoes it. */
   echoLast?: boolean;
+  /** The same words as a muted line, without the pill (the V2 run's opened
+   *  card, Miles 17 Oct 2026). */
+  plain?: boolean;
 }) {
   const r = rateReading(rates);
   if (!r) return null;
@@ -137,24 +142,36 @@ export function DelegateRunRatePill({
       {pct(v)}
     </Prov>
   );
+  const body = (
+    <>
+      {r.unchanged ? (
+        <span>{troveNodes("run_rate_unchanged", { rate: fig("last", r.to) })}</span>
+      ) : (
+        <>
+          <span>{fig("first", r.from)}</span>
+          <span aria-hidden="true">→</span>
+          <span>{fig("last", r.to)}</span>
+        </>
+      )}
+      {r.showRange && (
+        <span className={plain ? "-ml-1.5" : "-ml-1.5 font-normal"}>
+          {troveNodes("run_rate_range", { low: fig("low", r.low), high: fig("high", r.high) })}
+        </span>
+      )}
+    </>
+  );
+  if (plain)
+    return (
+      <span
+        className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 text-sm text-rb-500"
+        data-group-rate={r.unchanged ? "unchanged" : "moved"}
+      >
+        {body}
+      </span>
+    );
   return (
     <span className="leading-[0]" data-group-rate={r.unchanged ? "unchanged" : "moved"}>
-      <DelegateRatePillShell>
-        {r.unchanged ? (
-          <span>{troveNodes("run_rate_unchanged", { rate: fig("last", r.to) })}</span>
-        ) : (
-          <>
-            <span>{fig("first", r.from)}</span>
-            <span aria-hidden="true">→</span>
-            <span>{fig("last", r.to)}</span>
-          </>
-        )}
-        {r.showRange && (
-          <span className="font-normal -ml-1.5">
-            {troveNodes("run_rate_range", { low: fig("low", r.low), high: fig("high", r.high) })}
-          </span>
-        )}
-      </DelegateRatePillShell>
+      <DelegateRatePillShell>{body}</DelegateRatePillShell>
     </span>
   );
 }
@@ -260,7 +277,6 @@ export function DelegateAdjustRunCard({
         {troveWords("run_adjusted")}
         <CountChip count={count} />
       </span>
-      <DelegateRunRatePill rates={rates} prov={rateProv} echoLast />
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-rb-500">{range}</span>
       </span>
@@ -311,7 +327,11 @@ export function DelegateAdjustRunCard({
             head: { row: <div className="pl-5 pt-4 pb-3">{words}</div> },
             caption: "",
             cells: { none: troveWords("run_cells_none") },
-            sheet: merged?.sheet,
+            // The rate move opens with the card, as a muted line beside the
+            // breakdown switch.
+            sheet: merged
+              ? { ...merged.sheet, lead: <DelegateRunRatePill rates={rates} prov={rateProv} echoLast plain /> }
+              : undefined,
             price: merged?.price,
             ledgers: { none: troveWords("run_ledgers_none") },
             notes: (

@@ -692,6 +692,7 @@ function ServedFolderRow({
           </span>
         ) : undefined)
       }
+      sheetLead={entry.sheetLead}
       extraHeader={extras.length > 0 ? <>{extras}</> : undefined}
       firstTimestamp={folder.firstAt}
       lastTimestamp={folder.lastAt}

@@ -17,6 +17,7 @@ import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 import { DelegateRunRatePill, delegateRunRateProv } from "@/components/protocol/liquity/delegate-adjust-run-card";
+import { troveWords } from "@/lib/liquity/event-templates";
 
 /** The slice of a fork event's context the run needs — identical across the
  *  three fork contexts (EbisuContext / AsymmetryContext / BasedollarContext). */
@@ -120,19 +121,22 @@ const BATCH_RATE_FOLDER: FolderRegisterEntry = {
   byOwner: false,
 };
 
-/** A `batch_rate` folder's header states its rate as the V2 delegate run's
- *  does, from the index's `rate` (rails-ops decision 0039, rule 6); a folder
- *  served without one draws the register alone. */
+/** A `batch_rate` folder states its rate as the V2 delegate run's does, from
+ *  the index's `rate` (rails-ops decision 0039, rule 6): "Adjusted" in the
+ *  header, the rate move as a muted line in the opened card. A folder served
+ *  without one draws the register alone. */
 function batchRateEntry(folder: ServedFolder): FolderRegisterEntry {
   const r = folder.rate;
   if (r?.first == null || r.last == null) return BATCH_RATE_FOLDER;
   const span: [number, number] = [folder.firstAt, folder.lastAt];
   return {
     ...BATCH_RATE_FOLDER,
-    lead: (
+    kindWord: troveWords("run_adjusted"),
+    sheetLead: (
       <DelegateRunRatePill
         rates={{ fromRate: r.first, toRate: r.last, lowRate: r.low ?? undefined, highRate: r.high ?? undefined }}
         prov={(which) => delegateRunRateProv(which, span, folder.count)}
+        plain
       />
     ),
   };

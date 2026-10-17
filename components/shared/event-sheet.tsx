@@ -127,6 +127,9 @@ export interface EventSheet {
   /** Lines under the panels drawn with the breakdown on (a swap's gross
    *  legs). */
   breakdownNotes?: ReactNode;
+  /** A muted line at the left of the controls row (a delegate run's rate
+   *  move). */
+  lead?: ReactNode;
 }
 
 /** The carry-forward layer's names, the same on every family's sheet. */
@@ -497,9 +500,14 @@ export function EventSheetView({
   return (
     <div className="px-5 py-2" data-sheet="" data-sheet-breakdown={on ? "on" : "off"} {...data}>
       <div
-        className={`mb-2 flex items-center justify-end gap-3 ${breakdown ? "sm:hidden" : ""}`}
+        className={`mb-2 flex items-center justify-end gap-3 ${breakdown && !sheet.lead ? "sm:hidden" : ""}`}
         data-sheet-controls=""
       >
+        {sheet.lead && (
+          <div className="mr-auto min-w-0" data-sheet-lead="">
+            {sheet.lead}
+          </div>
+        )}
         <div
           role="group"
           aria-label={WORDS.column}
