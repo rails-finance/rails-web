@@ -2041,7 +2041,8 @@ function PipRow({
           {dim && w > 0 && (
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 rounded-l-md bg-rb-100 dark:bg-rb-800"
+              // Following the chart, it takes the "Follows chart" button's ground.
+              className={`pointer-events-none absolute inset-y-0 left-0 rounded-l-md ${date.follow ? "bg-teal-500/15" : "bg-rb-100 dark:bg-rb-800"}`}
               style={{ width: Math.max(0, Math.min(w, cx)) }}
               data-flow-pips-elapsed=""
             />
