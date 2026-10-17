@@ -2059,14 +2059,12 @@ function PipRow({
                 />
               ))}
           </div>
-          {/* Locked to the timeline: a 1px border in the sync link's teal. */}
-          {date.follow && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-md border border-teal-600 dark:border-teal-400"
-              data-flow-pips-follow=""
-            />
-          )}
+          {/* A 1px border on the pill's ground; locked to the timeline, the sync link's teal. */}
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute inset-0 rounded-md border ${date.follow ? "border-teal-600 dark:border-teal-400" : "border-white dark:border-rb-900"}`}
+            {...(date.follow && { "data-flow-pips-follow": "" })}
+          />
         </div>
         {/* The date's place in the layout, under the row; the frame draws it. */}
         <div
