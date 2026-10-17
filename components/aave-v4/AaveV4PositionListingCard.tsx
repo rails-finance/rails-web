@@ -20,6 +20,7 @@
 // health factor below 1 says so under the figure, since the listing's pill is
 // the lifecycle one.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { Icon } from "@/components/icons/icon";
@@ -185,16 +186,17 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     );
   })();
 
-  // The wallet and the spoke with its hubs, after the lifecycle pill.
+  // The wallet and its hubs after the lifecycle pill; the spoke (the market) at
+  // the right end.
   const identity = (
     <>
       <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol={session} bookmarkProtocol={session} />
-      <span className="flex items-center gap-1.5 leading-none text-foreground">
-        <span className="text-xs font-semibold">{row.spokeName}</span>
-        <span className="text-xs font-bold uppercase tracking-wide">{hubChipLabel(hubTier, debtHubs)}</span>
+      <span className="text-xs font-bold uppercase tracking-wide leading-none text-rb-500">
+        {hubChipLabel(hubTier, debtHubs)}
       </span>
     </>
   );
+  const tag = <ListingTag market={row.spokeName} />;
   // Time-ago, the owner transaction count (distinct non-liquidation
   // transactions), then the red liquidation triangle.
   const counters = {
@@ -234,6 +236,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
       status,
       heads,
       identity,
+      tag,
       counters,
       menu: null,
       outcome: {
@@ -297,6 +300,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     status: null,
     heads,
     identity,
+    tag,
     counters,
     menu: null,
   };

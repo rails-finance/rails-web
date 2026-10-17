@@ -18,6 +18,7 @@
 // leaf — a DefiLlama price, a projection — would push it out; cf. Compound's
 // parked USD.)
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { type ReactNode, useState } from "react";
 import { Check, Copy, Link2 } from "lucide-react";
 import {
@@ -270,22 +271,25 @@ export function makerVaultCardSlots({
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}
-      <span>
-        {v.ilk}
-        <span className="ml-2 font-normal tabular-nums text-rb-400">
-          {v.cdpId == null ? (
-            <RevealTip tip={URN_TIP} label={`${vaultIdentityLabel(v)}: ${URN_TIP}`} focusable>
-              <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
-                {vaultIdentityLabel(v)}
-              </span>
-            </RevealTip>
-          ) : (
-            vaultIdentityLabel(v)
-          )}
-        </span>
-      </span>
       <VaultKindChips v={v} urn={false} />
     </span>
+  );
+  // The listing's right end: the ilk and the vault's number.
+  const tag = detail ? undefined : (
+    <ListingTag
+      market={v.ilk}
+      id={
+        v.cdpId == null ? (
+          <RevealTip tip={URN_TIP} label={`${vaultIdentityLabel(v)}: ${URN_TIP}`} focusable>
+            <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
+              {v.urn.slice(0, 6)}…{v.urn.slice(-4)}
+            </span>
+          </RevealTip>
+        ) : (
+          v.cdpId
+        )
+      }
+    />
   );
 
   const common = { status, identity, counters };
@@ -340,7 +344,7 @@ export function makerVaultCardSlots({
       dates: v.lastActivityAt != null ? [{ at: v.lastActivityAt }] : undefined,
       tip: endTip,
     };
-    if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null };
+    if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null, tag };
     return { ...common, ...detailCommon, heads, outcome };
   }
 
@@ -411,7 +415,7 @@ export function makerVaultCardSlots({
     },
   ];
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag };
   return { ...common, ...detailCommon, heads, outcome: undefined, panel: makerdaoPanelColumns(v) };
 }
 

@@ -31,6 +31,7 @@
 // names only a CLOSED position; an OPEN survivor stays an OPEN card with the
 // counters' count.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import {
   PositionCard,
   type PositionCardExports,
@@ -125,8 +126,31 @@ const MARKET_KIND: Partial<Record<LlamalendFactoryKind, string>> = { crvusd: "mi
 /** The position + market identity: whose position, in which isolated market.
  *  The detail page draws the owner on the wallet row above the card
  *  (ui-jobs 228). */
-function PositionIdentity({ v, wallet = true }: { v: LlamalendPositionView; wallet?: boolean }) {
+function PositionIdentity({
+  v,
+  wallet = true,
+  listing = false,
+}: {
+  v: LlamalendPositionView;
+  wallet?: boolean;
+  /** A listing row: the market's pair goes to the card's right-end `tag`, and
+   *  the market kind stays beside the wallet. */
+  listing?: boolean;
+}) {
   const kind = v.factory ? MARKET_KIND[v.factory] : undefined;
+  if (listing) {
+    const kinds = [kind, v.version === "v2" ? "V2 market" : null].filter(Boolean);
+    return (
+      <span className="flex items-center gap-2">
+        <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmarkProtocol="llamalend" />
+        {kinds.length > 0 && (
+          <span className="text-xs text-rb-500" data-llamalend-market-kind="">
+            {kinds.join(" · ")}
+          </span>
+        )}
+      </span>
+    );
+  }
   return (
     <span className="flex items-center gap-2">
       {wallet && <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmarkProtocol="llamalend" />}
@@ -227,7 +251,8 @@ export function useLlamalendCardSlots({
     liquidationCount: v.liquidationCount,
     ...(detail ? { order: "age-last" as const } : {}),
   };
-  const common = { status, identity: <PositionIdentity v={v} wallet={!detail} />, counters };
+  const common = { status, identity: <PositionIdentity v={v} wallet={!detail} listing={!detail} />, counters };
+  const tag = <ListingTag market={v.marketLabel} />;
 
   // Closed / liquidated: the last emitted absolutes are back at zero, so the
   // card states the outcome (no USD: the oracle prices the PRESENT, not
@@ -330,7 +355,7 @@ export function useLlamalendCardSlots({
     }
   }
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
 
   const detailCommon = {
     ...common,

@@ -25,6 +25,7 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import {
   PositionCard,
   type PositionCardExports,
@@ -227,9 +228,13 @@ export function DolomiteAccountLabel({ text, accountNumber }: { text: string; ac
  *  explains itself on hover or tap (the listing card sits inside a link), and
  *  the owner is on the page's wallet row above the card (ui-jobs 228). */
 function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean }) {
+  // The listing keeps the wallet alone on the left; the account's name is the
+  // card's right-end `tag`.
+  if (!tip) {
+    return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />;
+  }
   return (
     <span className="flex items-center gap-2">
-      {!tip && <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />}
       <span className="text-xs text-rb-500">
         {tip ? <DolomiteAccountLabel text={v.accountLabel} accountNumber={v.accountNumber} /> : v.accountLabel}
       </span>
@@ -297,6 +302,10 @@ export function useDolomiteCardSlots({
     ...(detail ? { order: "age-last" as const } : {}),
   };
   const common = { status, identity: <AccountIdentity v={v} tip={detail} />, counters };
+  const borrowId = /^Borrow Position #(.+)$/.exec(v.accountLabel)?.[1];
+  // The WLFI frontend's shared account reads by its frontend alone.
+  const tagMarket = /\(WLFI frontend account\)/.test(v.accountLabel) ? "WLFI" : v.accountLabel;
+  const tag = borrowId ? <ListingTag id={borrowId} /> : <ListingTag market={tagMarket} />;
 
   // Closed / liquidated: every par is back at zero, so the heads are what each
   // market lane held at its height, the highest recorded par. The LIQUIDATED
@@ -394,7 +403,7 @@ export function useDolomiteCardSlots({
     }
   }
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
 
   const detailCommon = {
     ...common,

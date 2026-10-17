@@ -30,6 +30,7 @@
 // overlay — the cdpManager's own entire figures at head, the primary truth on
 // the detail page).
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy, Image as ImageIcon, Link2 } from "lucide-react";
@@ -265,18 +266,11 @@ function assetIcon(symbol: string, address: string, figure: string): ReactNode {
   );
 }
 
-/** The CDP-grain identity on a listing row: market chip · CDP id. Its copy
+/** The CDP-grain identity on a listing row: the market and the CDP id. Its copy
  *  and NFT actions live in the CDP page's ⋮; the listing card is one link. */
 function CdpIdentity({ v }: { v: PolarisPositionView }) {
   const cfg = POLARIS_MARKET_CONFIG[v.market];
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-rb-500 tabular-nums">
-      <TokenChipIcon symbol={cfg.stable.symbol} address={cfg.stable.address} size={14} filterable={false} />
-      {cfg.stable.symbol}
-      <span className="text-rb-400">·</span>
-      CDP #{v.cdpId}
-    </span>
-  );
+  return <ListingTag market={cfg.stable.symbol} id={v.cdpId} />;
 }
 
 /** The CDP's rows at the head of the card's ⋮: its number with a copy, its
@@ -386,10 +380,7 @@ export function polarisCardSlots({
   const identity = detail ? (
     <span className="text-xs text-rb-500">{stable} market</span>
   ) : (
-    <span className="flex items-center gap-2">
-      {v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmarkProtocol="polaris" />}
-      <CdpIdentity v={v} />
-    </span>
+    v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmarkProtocol="polaris" />
   );
 
   const ended = v.status === "closed" || v.status === "liquidated";
@@ -609,7 +600,8 @@ export function polarisCardSlots({
     ) : undefined;
 
   const common = { status, heads, identity, notice, counters };
-  if (!detail) return { ...common, notice: undefined, surface: "listing", menu: null, outcome };
+  if (!detail)
+    return { ...common, notice: undefined, surface: "listing", menu: null, tag: <CdpIdentity v={v} />, outcome };
 
   const menu: PositionCardMenu = { leading: () => <CdpMenuRows v={v} />, exports: exports ?? null };
   const detailCommon = {

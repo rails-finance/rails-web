@@ -18,6 +18,7 @@
 // its loan token, so no headline carries a USD line, and the collateral's
 // value at the oracle is a panel row in the loan token.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
 import { Check, Hash, Link2 } from "lucide-react";
 import {
@@ -223,12 +224,22 @@ export function morphoCardIdentity({
           vault={listingOwner.vault ?? null}
         />
       )}
-      <span>
-        {market}
-        {lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(lltv * 100).toFixed(1)}%</span>}
-      </span>
+      {listingOwner ? (
+        // The listing's market goes to the card's right-end `tag`.
+        lltv > 0 && <span className="text-rb-400">LLTV {(lltv * 100).toFixed(1)}%</span>
+      ) : (
+        <span>
+          {market}
+          {lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(lltv * 100).toFixed(1)}%</span>}
+        </span>
+      )}
     </span>
   );
+}
+
+/** The listing's right-end `tag`: the market (the collateral / loan pair). */
+export function morphoCardTag(market: ReactNode): ReactNode {
+  return <ListingTag market={market} />;
 }
 
 /** A Morpho position's page, for the ⋮'s link row. */
@@ -314,8 +325,9 @@ export function useMorphoCardSlots({
     morphoPositionModal({ ...o, base: session === "morpho-base", pt: isPendlePt(v.collateralSymbol) });
 
   const status: PositionCardStatus | null = v.status === "open" ? null : STATUS[v.status];
+  const marketPair = <MorphoMarketPair label={v.marketLabel} marketId={v.marketId} loanToken={v.loanToken} />;
   const identity = morphoCardIdentity({
-    market: <MorphoMarketPair label={v.marketLabel} marketId={v.marketId} loanToken={v.loanToken} />,
+    market: marketPair,
     lltv: v.lltv,
     listingOwner: detail ? undefined : { wallet: v.owner, session, vault: v.vaultOwner },
   });
@@ -601,7 +613,7 @@ export function useMorphoCardSlots({
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome };
-  if (!detail) return { ...common, surface: "listing", menu: null };
+  if (!detail) return { ...common, surface: "listing", menu: null, tag: morphoCardTag(marketPair) };
 
   const menu: PositionCardMenu = {
     leading: () => (

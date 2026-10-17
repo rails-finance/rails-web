@@ -25,6 +25,7 @@
 // the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay,
 // the position's slots at head, the primary truth on the detail page).
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Hash, Link2 } from "lucide-react";
@@ -137,13 +138,8 @@ const liqPriceProv = (v: FrankencoinPositionView): Provenance =>
     ? liveLiqPriceProv(v.collateralSymbol, v.collateralDecimals, v.position)
     : latestAbsoluteProv("price", v.collateralSymbol, v.collateralDecimals);
 
-/** The position-grain identity: the contract address + which hub + lineage,
- *  each explained on hover or tap. */
-function PositionIdentity({ v, cloneParent }: { v: FrankencoinPositionView; cloneParent?: string | null }) {
-  const hubTip =
-    v.hub === "v1"
-      ? "Minting Hub V1 (2023), the first of Frankencoin's two hubs. It opened this position and runs its challenges."
-      : "Minting Hub V2 (2024), the current hub. It opened this position and runs its challenges and, after expiry, the sale of its collateral.";
+/** The position's contract address, which is its identity. */
+function PositionAddress({ v }: { v: FrankencoinPositionView }) {
   return (
     <span className="text-xs text-rb-500 tabular-nums">
       <RevealTip
@@ -154,7 +150,35 @@ function PositionIdentity({ v, cloneParent }: { v: FrankencoinPositionView; clon
       >
         {shortAddress(v.position)}
       </RevealTip>
-      <span className="mx-1 text-rb-400">·</span>
+    </span>
+  );
+}
+
+/** The position-grain identity: the contract address + which hub + lineage,
+ *  each explained on hover or tap. */
+function PositionIdentity({
+  v,
+  cloneParent,
+  listing = false,
+}: {
+  v: FrankencoinPositionView;
+  cloneParent?: string | null;
+  /** A listing row: the address goes to the card's right-end `tag`, so only
+   *  the hub and lineage are drawn here. */
+  listing?: boolean;
+}) {
+  const hubTip =
+    v.hub === "v1"
+      ? "Minting Hub V1 (2023), the first of Frankencoin's two hubs. It opened this position and runs its challenges."
+      : "Minting Hub V2 (2024), the current hub. It opened this position and runs its challenges and, after expiry, the sale of its collateral.";
+  return (
+    <span className="text-xs text-rb-500 tabular-nums">
+      {!listing && (
+        <>
+          <PositionAddress v={v} />
+          <span className="mx-1 text-rb-400">·</span>
+        </>
+      )}
       <RevealTip tip={hubTip} label={hubTip} focusable className="focus-ring rounded-sm">
         {v.hub === "v1" ? "Hub V1" : "Hub V2"}
       </RevealTip>
@@ -321,9 +345,10 @@ export function useFrankencoinCardSlots({
       {v.owner && (
         <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmarkProtocol="frankencoin" />
       )}
-      <PositionIdentity v={v} cloneParent={cloneParent} />
+      <PositionIdentity v={v} cloneParent={cloneParent} listing />
     </span>
   );
+  const tag = detail ? undefined : <ListingTag id={<PositionAddress v={v} />} />;
 
   const counters: PositionCardCounters = {
     lastActivityAt: v.lastActivityAt,
@@ -459,7 +484,7 @@ export function useFrankencoinCardSlots({
   }
 
   const common = { status, heads, identity, notice, counters, outcome };
-  if (!detail) return { ...common, surface: "listing", menu: null };
+  if (!detail) return { ...common, surface: "listing", menu: null, tag };
 
   const menu: PositionCardMenu = {
     leading: () => <FrankencoinMenuRows position={v.position} />,

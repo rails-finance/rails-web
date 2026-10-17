@@ -25,6 +25,7 @@ import {
   MorphoMenuRows,
   MorphoPositionCard,
   morphoCardIdentity,
+  morphoCardTag,
 } from "@/components/protocol/morpho/morpho-position-card";
 import { PositionCard, type PositionCardExports, type PositionCardSlots } from "@/components/shared/position-card";
 import { morphoBasePositionHref } from "@/lib/morpho-base/routes";
@@ -442,7 +443,15 @@ export function MorphoLenderOpenCard({
             [],
           ],
         }
-      : { surface: "listing", status: null, heads, identity, counters: null, menu: null };
+      : {
+          surface: "listing",
+          status: null,
+          heads,
+          identity,
+          tag: morphoCardTag(marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0)),
+          counters: null,
+          menu: null,
+        };
   return <PositionCard slots={slots} />;
 }
 
@@ -496,6 +505,6 @@ export function LenderClosedCard({
           exports: exports ?? null,
         },
       }
-    : { ...common, surface: "listing", menu: null };
+    : { ...common, surface: "listing", menu: null, tag: morphoCardTag(pos.marketLabel) };
   return <PositionCard slots={slots} />;
 }

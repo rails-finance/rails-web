@@ -30,6 +30,7 @@
 // what a linked V2 position BECAME, so showing the two debts as one row would
 // double count one obligation (rails-ops reference/alchemix-v2-frozen-record.md).
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import type { ReactNode } from "react";
 import {
   PositionCard,
@@ -51,7 +52,7 @@ import type {
   AlchemixUsdValue,
 } from "@/types/api/alchemix";
 import { formatCompact } from "@/lib/shared/format-event";
-import { alchemixPositionName } from "@/lib/alchemix/naming";
+import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import { BlockRef } from "@/components/shared/block-ref";
 import { isStableDenominated } from "@/lib/aave-v4/asset-class";
 import { DEPEG_BAND } from "@/lib/shared/usd-display";
@@ -214,6 +215,38 @@ export function AlchemixIdentity({
   );
 }
 
+/** A listing's left side: the holder, then the chain. The position's name is
+ *  the card's right-end `tag` (AlchemixTag). */
+export function AlchemixListingIdentity({
+  chain,
+  wallet,
+  session,
+  prefix,
+}: {
+  chain: string;
+  wallet?: string | null;
+  session?: SessionProtocol;
+  /** A word before the wallet ("claimed by"). */
+  prefix?: string;
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+      {wallet && session ? (
+        <span className="inline-flex items-center gap-1.5 text-rb-500">
+          {prefix}
+          <WalletPill wallet={wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+        </span>
+      ) : null}
+      <span className="text-rb-500">{chain}</span>
+    </span>
+  );
+}
+
+/** A listing's right end: the synthetic and the position's id ("alETH", 265). */
+export function AlchemixTag({ market, id }: { market: string; id: string }) {
+  return <ListingTag market={market} id={id} />;
+}
+
 /** " · block 26,186,057": a listing figure's stamp. */
 function stamp(block: number | null | undefined): ReactNode {
   return block != null ? (
@@ -245,13 +278,9 @@ export function alchemixListingSlots(p: AlchemixPositionSummary, session: Sessio
   return {
     surface: "listing",
     status: alchemixStatus(p.status),
+    tag: <AlchemixTag market={alchemixMarketWord(sym)} id={p.tokenId} />,
     identity: (
-      <AlchemixIdentity
-        name={alchemixPositionName(sym, p.tokenId)}
-        chain={p.chainName ?? `chain ${p.chainId}`}
-        wallet={p.owner}
-        session={session}
-      />
+      <AlchemixListingIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.owner} session={session} />
     ),
     heads: [
       depositedHead(collSettled, "shares", undefined, collStamp),

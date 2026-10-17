@@ -21,6 +21,7 @@
 //           block the balance was read at.
 //   closed  the highest recorded supply and debt, and the Outcome.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
 import {
@@ -263,15 +264,29 @@ function CompoundIdentity({
   v,
   session,
   wallet = true,
+  listing = false,
 }: {
   v: CompoundPositionView;
   session: SessionProtocol;
   /** False on the detail page, whose wallet row above the card names the
    *  owner (ui-jobs 228). */
   wallet?: boolean;
+  listing?: boolean;
 }) {
   const entry = protocolForSession(session);
   const hasListing = entry != null && !EXPLORERS_WITHOUT_LISTING.has(entry.id);
+  const market = <span className="text-xs font-semibold text-rb-500">{v.marketLabel}</span>;
+  // The listing keeps the wallet on the left and the market in the card's `tag`.
+  if (listing) {
+    return (
+      <WalletPill
+        wallet={v.account}
+        ensName={null}
+        filterProtocol={hasListing ? session : undefined}
+        bookmarkProtocol={session}
+      />
+    );
+  }
   return (
     <span className="flex items-center gap-2">
       {wallet && (
@@ -282,7 +297,7 @@ function CompoundIdentity({
           bookmarkProtocol={session}
         />
       )}
-      <span className="text-xs font-semibold text-rb-500">{v.marketLabel}</span>
+      {market}
     </span>
   );
 }
@@ -378,7 +393,8 @@ export function useCompoundCardSlots({
         : v.status === "unread"
           ? { word: "Not loaded", tone: "muted" }
           : null;
-  const identity = <CompoundIdentity v={v} session={session} wallet={!detail} />;
+  const identity = <CompoundIdentity v={v} session={session} wallet={!detail} listing={!detail} />;
+  const tag = <ListingTag market={v.marketLabel} />;
   const counters: PositionCardMetaProps = {
     lastActivityAt: v.lastActivityAt,
     eventCount: v.txCount,
@@ -635,7 +651,7 @@ export function useCompoundCardSlots({
       ? h
       : { ...h, labelTip: h.id === "debt" ? HEAD_TIP.debt : HEAD_TIP.collateral };
   const common = { status, heads: detail ? heads.map(tipped) : heads, identity, counters, outcome };
-  if (!detail) return { ...common, surface: "listing", menu: null };
+  if (!detail) return { ...common, surface: "listing", menu: null, tag };
 
   const menu: PositionCardMenu = {
     leading: pagePath ? () => <CompoundMenuRows pagePath={pagePath} /> : undefined,

@@ -18,6 +18,7 @@
 // (the "token" is a Fluid DEX pool) — they render as shares; no USD is
 // asserted at this depth.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import type { ReactNode } from "react";
 import {
   PositionCard,
@@ -232,7 +233,8 @@ export function fluidCardSlots({
       </span>
     </span>
   );
-  // The listing names the owner; the position page's wallet row does.
+  // The listing names the owner and the vault kind on the left and the pair
+  // and NFT at the right end; the position page's wallet row names the owner.
   const identity = detail ? (
     typeLabel
   ) : (
@@ -242,9 +244,10 @@ export function fluidCardSlots({
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}
-      {typeLabel}
+      <span className="text-xs font-normal tabular-nums text-rb-400">{v.vaultKindLabel}</span>
     </span>
   );
+  const tag = detail ? undefined : <ListingTag market={pairText} id={v.nftId} />;
   const counters = {
     lastActivityAt: v.lastActivityAt,
     eventCount: v.txCount,
@@ -298,7 +301,7 @@ export function fluidCardSlots({
           <div className="text-xs text-rb-500 mt-0.5">each peak at its own date</div>
         ) : undefined,
     };
-    if (!detail) return { ...common, surface: "listing", menu: null, heads, outcome };
+    if (!detail) return { ...common, surface: "listing", menu: null, tag, heads, outcome };
     return {
       ...common,
       surface: "detail",
@@ -353,7 +356,7 @@ export function fluidCardSlots({
     heads.push({ id: "position-ratio", label: "Position ratio", value: null, pending: true });
   }
 
-  if (!detail) return { ...common, surface: "listing", menu: null, heads };
+  if (!detail) return { ...common, surface: "listing", menu: null, tag, heads };
 
   const left = [sigmaRow(v, "supply", chain), sigmaRow(v, "borrow", chain)].filter(
     (r): r is PositionPanelRow => r != null,

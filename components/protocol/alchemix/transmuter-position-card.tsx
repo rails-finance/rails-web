@@ -38,13 +38,17 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import type { TransmuterMaturityEstimate } from "@/lib/alchemix/transmuter-provenance";
-import { alchemixPositionName } from "@/lib/alchemix/naming";
+import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { BlockRef } from "@/components/shared/block-ref";
-import { AlchemixIdentity, alchemixChip } from "@/components/protocol/alchemix/alchemix-position-card";
+import {
+  AlchemixListingIdentity,
+  AlchemixTag,
+  alchemixChip,
+} from "@/components/protocol/alchemix/alchemix-position-card";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -286,9 +290,9 @@ export function transmuterListingSlots(
   return {
     surface: "listing",
     status: transmuterStatus(p),
+    tag: <AlchemixTag market={alchemixMarketWord(p.syntheticSymbol, "transmuter")} id={p.nftId} />,
     identity: (
-      <AlchemixIdentity
-        name={alchemixPositionName(p.syntheticSymbol, p.nftId, "transmuter")}
+      <AlchemixListingIdentity
         chain={p.chainName ?? `chain ${p.chainId}`}
         wallet={holder}
         session={session}

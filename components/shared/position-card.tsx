@@ -221,6 +221,9 @@ export interface PositionCardListingSlots extends PositionCardSlotsCommon {
    *  one link and its position's actions live in the page's ⋮ (Miles,
    *  17 Oct 2026). A menu here must stop a press from reaching the <Link>. */
   menu: ReactNode | null;
+  /** The position's market and ID, at the right end of the heading row (where
+   *  a detail card draws its identity); `identity` keeps the holder on the left. */
+  tag?: ReactNode;
   /** Present on a closed position. */
   outcome?: PositionCardOutcome;
 }
@@ -619,7 +622,14 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             </>
           )}
         </span>
-        {detail && slots.identity}
+        {detail
+          ? slots.identity
+          : slots.tag && (
+              // Quiet like the figures: the listing card is one link.
+              <QuietTipsContext.Provider value={true}>
+                <span className="ml-auto flex items-center">{slots.tag}</span>
+              </QuietTipsContext.Provider>
+            )}
       </div>
       {/* The card's ⋮ at the top right of the header, whatever wraps beside it,
           centred on the heading's first line. */}

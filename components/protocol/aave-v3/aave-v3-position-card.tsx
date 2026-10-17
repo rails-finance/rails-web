@@ -20,6 +20,7 @@
 // find a position, and risk is read live on the position page — whose Pool
 // getUserAccountData read is the only HF this card ever shows.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
 import { Link2 } from "lucide-react";
 import {
@@ -322,17 +323,16 @@ export function useAaveV3CardSlots({
       {marketLabel}
     </span>
   ) : null;
-  // The listing names the wallet (its controls are buttons, which can sit
-  // inside the row's <Link>) and the market; the position page names the wallet in its
-  // top row (ui-jobs 228) and keeps the market at the heading's right end.
+  // The listing names the wallet on the left (its controls are buttons, which
+  // can sit inside the row's <Link>) and the market at the right end; the
+  // position page names the wallet in its top row (ui-jobs 228) and keeps the
+  // market at the heading's right end.
   const identity = detail ? (
     (marketBadge ?? undefined)
   ) : (
-    <span className="flex items-center gap-2">
-      <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmarkProtocol={dep.session} />
-      {marketBadge}
-    </span>
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmarkProtocol={dep.session} />
   );
+  const tag = detail || !marketLabel ? undefined : <ListingTag market={marketLabel} />;
 
   const counters = {
     lastActivityAt: v.lastActivityAt,
@@ -392,7 +392,7 @@ export function useAaveV3CardSlots({
         dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
       },
     };
-    if (!detail) return { ...common, surface: "listing", menu: null };
+    if (!detail) return { ...common, surface: "listing", menu: null, tag };
     return { ...common, surface: "detail", explainer, learnMore, menu: menuSlot };
   }
 
@@ -526,7 +526,7 @@ export function useAaveV3CardSlots({
   ) : undefined;
 
   const common = { status, heads, identity, counters, notice };
-  if (!detail) return { ...common, surface: "listing", menu: null };
+  if (!detail) return { ...common, surface: "listing", menu: null, tag };
 
   // ── Each side's reserve rows, and the panel: the supplied side's values
   //    on the left, the borrowed side's and the risk on the right.

@@ -23,6 +23,7 @@
 // hidden: wsteth-285 shows implied 25,178 fxUSD against settled 0. They are
 // panel rows on an open card and on a closed one.
 
+import { ListingTag } from "@/components/shared/listing-tag";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -649,18 +650,20 @@ export function useFxCardSlots({
 
   // The detail page draws the owner on the wallet row above the card
   // (ui-jobs 228); the listing card keeps it.
-  const identity = (
-    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-      {detail ? null : v.owner ? (
-        <WalletPill wallet={v.owner} ensName={null} filterProtocol="fx" bookmarkProtocol="fx" />
-      ) : (
-        <span className="font-normal tabular-nums text-rb-400">{short(v.owner)}</span>
-      )}
-      <span>
-        {poolMeta.tokenSymbol} pool
-        <span className="ml-2 font-normal tabular-nums text-rb-400">Position #{v.positionId}</span>
-      </span>
+  const poolLabel = (
+    <span>
+      {poolMeta.tokenSymbol} pool
+      <span className="ml-2 font-normal tabular-nums text-rb-400">Position #{v.positionId}</span>
     </span>
+  );
+  const tag = detail ? undefined : <ListingTag market={poolMeta.tokenSymbol} id={v.positionId} />;
+  // The listing keeps the owner on the left and the pool and position at the right end.
+  const identity = detail ? (
+    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">{poolLabel}</span>
+  ) : v.owner ? (
+    <WalletPill wallet={v.owner} ensName={null} filterProtocol="fx" bookmarkProtocol="fx" />
+  ) : (
+    <span className="text-xs font-normal tabular-nums text-rb-400">{short(v.owner)}</span>
   );
 
   const counters = {
@@ -745,7 +748,7 @@ export function useFxCardSlots({
     ];
   }
 
-  if (!detail) return { ...common, heads, surface: "listing", menu: null, outcome };
+  if (!detail) return { ...common, heads, surface: "listing", menu: null, tag, outcome };
 
   const detailCommon = {
     ...common,

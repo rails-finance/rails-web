@@ -26,12 +26,16 @@ import {
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatUnitsExact } from "@/lib/utils/format";
-import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
+import { alchemixPositionName, alchemixV2AccountLabel } from "@/lib/alchemix/naming";
 import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { AlchemixIdentity, alchemixChip } from "@/components/protocol/alchemix/alchemix-position-card";
+import {
+  AlchemixListingIdentity,
+  AlchemixTag,
+  alchemixChip,
+} from "@/components/protocol/alchemix/alchemix-position-card";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
 const SYNTHETIC_DECIMALS = 18;
@@ -175,13 +179,9 @@ export function v2ListingSlots(p: AlchemixV2PositionSummary, session: SessionPro
   return {
     surface: "listing",
     status: V2_STATUS,
+    tag: <AlchemixTag market={p.syntheticSymbol} id={alchemixV2AccountLabel(p.account)} />,
     identity: (
-      <AlchemixIdentity
-        name={alchemixV2PositionName(p.syntheticSymbol, p.account)}
-        chain={p.chainName ?? `chain ${p.chainId}`}
-        wallet={p.account}
-        session={session}
-      />
+      <AlchemixListingIdentity chain={p.chainName ?? `chain ${p.chainId}`} wallet={p.account} session={session} />
     ),
     heads: [v2DebtHead(p), v2CollateralHead(p)],
     outcome: v2Outcome(p),
