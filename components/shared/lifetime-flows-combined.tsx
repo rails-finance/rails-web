@@ -2058,6 +2058,14 @@ function PipRow({
                 />
               ))}
           </div>
+          {/* Locked to the timeline: an inner glow in the sync link's teal. */}
+          {date.follow && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-md shadow-[inset_0_0_8px_var(--color-teal-600)] dark:shadow-[inset_0_0_8px_var(--color-teal-400)]"
+              data-flow-pips-follow=""
+            />
+          )}
         </div>
         {/* The date's place in the layout, under the row; the frame draws it. */}
         <div

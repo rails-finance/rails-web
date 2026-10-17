@@ -79,12 +79,8 @@ function subscribeHeadForm(onChange: () => void): () => void {
 }
 const dateFormOnServer = () => false;
 
-/** A value the reader flips between two forms, under a dashed line. */
-function Flips({ children }: { children: React.ReactNode }) {
-  return <span className="underline decoration-rb-400 decoration-dashed underline-offset-[3px]">{children}</span>;
-}
-
-/** The heading's one statement, a button that flips between its two forms. */
+/** The heading's one statement, a button that flips between its two forms,
+ *  the whole line under the dotted line a tip label wears. */
 function HeadToggle({ tenure, date, dur }: { tenure: boolean; date: React.ReactNode; dur: React.ReactNode }) {
   return (
     <button
@@ -95,7 +91,9 @@ function HeadToggle({ tenure, date, dur }: { tenure: boolean; date: React.ReactN
       onClick={() => writeHeadTenure(!tenure)}
       className="cursor-pointer rounded-sm focus-ring"
     >
-      {tenure ? dur : date}
+      <span className="underline decoration-current/40 decoration-dotted decoration-1 underline-offset-[3px]">
+        {tenure ? dur : date}
+      </span>
     </button>
   );
 }
@@ -224,16 +222,8 @@ export function TimelineActivityHeader({
       >
         <HeadToggle
           tenure={tenure}
-          date={
-            <>
-              Open again since <Flips>{formatDateShortYear(reopenedAt)}</Flips>
-            </>
-          }
-          dur={
-            <>
-              Open again for <Flips>{dur(reopenedAt, null)}</Flips>
-            </>
-          }
+          date={<>Open again since {formatDateShortYear(reopenedAt)}</>}
+          dur={<>Open again for {dur(reopenedAt, null)}</>}
         />
         <span className={HEAD_META}>· first opened {formatDateShortYear(first)}</span>
       </div>
@@ -255,12 +245,12 @@ export function TimelineActivityHeader({
           tenure={tenure}
           date={
             <>
-              {closed ? "Opened" : `${lead} since`} <Flips>{formatDateShortYear(first)}</Flips>
+              {closed ? "Opened" : `${lead} since`} {formatDateShortYear(first)}
             </>
           }
           dur={
             <>
-              {closed ? "Open" : lead} for <Flips>{closed ? dur(first, last) : dur(first, null)}</Flips>
+              {closed ? "Open" : lead} for {closed ? dur(first, last) : dur(first, null)}
             </>
           }
         />
