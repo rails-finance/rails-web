@@ -40,6 +40,7 @@ import {
   polarisValueFormat,
 } from "./polaris-liquidation-forensics";
 import { formatExact, formatNumber } from "@/lib/utils/format";
+import { formatPeth } from "@/lib/polaris/figure-format";
 
 const W = POLARIS_WORDS;
 
@@ -48,7 +49,10 @@ const num = (s?: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 const signed = (n: number, text: string) => (n < 0 ? `−${text}` : text);
-const amountText = (n: number) => signed(n, formatNumber(Math.abs(n)));
+/** pETH at the grain the row head and card use (four decimals); the
+ *  stablecoin at the house grain. */
+const fmtAmount = (token: "coll" | "debt") => (token === "coll" ? formatPeth : formatNumber);
+const amountText = (n: number, token: "coll" | "debt") => signed(n, fmtAmount(token)(Math.abs(n)));
 
 /** The stablecoin's price in dollars at the event's block, with the receipt
  *  input that states where it comes from. */
@@ -245,11 +249,11 @@ export function polarisSheet(
       key,
       label,
       amount: {
-        text: amountText(n),
+        text: amountText(n, token),
         symbol: token === "coll" ? PETH.symbol : stable,
         address: token === "coll" ? PETH.address : stableAddr,
         info: ledgerFieldProv(field, coords, ctx.raw?.[field]),
-        value: opts.keyed ? formatNumber(Math.abs(num(v))) : undefined,
+        value: opts.keyed ? fmtAmount(token)(Math.abs(num(v))) : undefined,
       },
       usd: usdOf(label, token, n),
       tip,
@@ -267,7 +271,7 @@ export function polarisSheet(
         key,
         label,
         amount: {
-          text: formatNumber(num(v)),
+          text: fmtAmount(token)(num(v)),
           symbol: token === "coll" ? PETH.symbol : stable,
           address: token === "coll" ? PETH.address : stableAddr,
           info: liquidationFieldProv(f, coords, ctx.raw?.[f]),
@@ -287,7 +291,7 @@ export function polarisSheet(
             key: "coll-pool",
             label: W.sheet_liq_coll_pool,
             amount: {
-              text: formatNumber(figures.leg),
+              text: formatPeth(figures.leg),
               symbol: PETH.symbol,
               address: PETH.address,
               info: polarisPoolLegProv(ctx, coords),
@@ -317,7 +321,7 @@ export function polarisSheet(
       key: "last",
       label: SHEET_WORDS.last,
       amount: {
-        text: formatNumber(collBefore),
+        text: formatPeth(collBefore),
         symbol: PETH.symbol,
         address: PETH.address,
         info: beforeProv("coll", coords, ctx.raw?.collBefore),
@@ -340,7 +344,7 @@ export function polarisSheet(
             key: "before",
             label: SHEET_WORDS.before,
             amount: {
-              text: formatNumber(collBefore),
+              text: formatPeth(collBefore),
               symbol: PETH.symbol,
               address: PETH.address,
               info: beforeProv("coll", coords, ctx.raw?.collBefore),
