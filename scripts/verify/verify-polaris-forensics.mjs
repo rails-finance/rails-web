@@ -118,6 +118,8 @@ const toNum = (raw) => {
 };
 /** formatNumber's plain-decimal path: Intl defaults (0–3 fraction digits). */
 const fmtNum = (n) => n.toLocaleString("en-US", { style: "decimal" });
+/** pETH as the sheet draws it (formatPeth, ui-jobs 358): four decimals. */
+const fmtPeth = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 /** The market's own unit — USDp to 2dp. */
 const fmtValue = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** The premium pill: sign + two places, U+2212 for a negative. */
@@ -277,7 +279,7 @@ for (const f of FIXTURES) {
   const icr = (toNum(f.raw.collLiquidated) * price) / cleared;
 
   const want = {
-    leg: fmtNum(leg),
+    leg: fmtPeth(leg),
     legValue: fmtValue(legValue),
     cleared: fmtValue(cleared),
     premium: fmtPremium(premium),

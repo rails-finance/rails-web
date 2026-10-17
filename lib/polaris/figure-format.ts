@@ -1,4 +1,4 @@
-// pETH at four decimals on the Polaris row head, spine flank and card
+// pETH at four decimals on the Polaris row head, spine flank, T2 sheet and card
 // headline: a pETH is worth thousands of USDp, so the house three decimals
 // leave several USDp of collateral unstated. A magnitude too small for four
 // decimals keeps formatNumber's non-zero rule.
