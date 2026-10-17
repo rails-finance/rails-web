@@ -13,7 +13,10 @@
 //      unit; neither raw leg stands on the face; and the holder's own verb
 //      still renders. A row the route has not priced shows the two legs,
 //      each signed. 1x proves the comparison rejects a figure 1% off, so a
-//      green 1 is not a match on any number;
+//      green 1 is not a match on any number. 1u stubs the page's timeline
+//      payload so CDP 9's block 11,637,899 row arrives without `priceAtBlock`
+//      (every indexed row carries one, so no live fixture reaches the
+//      fallback) and reads the two signed legs off the row face;
 //   2. the four zero-share rows on the same CDP show no such label;
 //   3. the page-wide label count equals the timeline route's own independent
 //      count of touches with a non-zero share (one label per touch: the share
@@ -36,6 +39,8 @@
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Fail-first, 16 Oct 2026 (ui-jobs 357): with the header's net stubbed to
 // 1.01 × itself, checks 1 went red on every fixture row.
+// Fail-first, 17 Oct 2026 (ui-jobs 360): with the fallback pushing only the debt leg, the
+// 1u label check and the 1u both-legs check went red (the rest stayed green).
 //
 // Run:  BASE=http://localhost:3412 node scripts/verify/verify-polaris-psm-share.mjs
 
@@ -159,10 +164,13 @@ const FIXTURES = [
   { cdp: "9", block: 11637899, holderVerb: "Deposit" },
 ];
 
+// The pETH leg reads to four decimals (lib/polaris/figure-format.ts), the debt to three.
+const signedPeth = (v) => `${v < 0 ? "−" : "+"}${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 4 })}`;
+
 /** What the face must state for one row, from the route alone. */
 function expectedFace(e) {
   const price = e.context?.data?.priceAtBlock?.pethInDebt;
-  if (price == null) return { net: null, legs: [signedFig(mrColl(e)), signedFig(mrDebt(e))] };
+  if (price == null) return { net: null, legs: [signedPeth(mrColl(e)), signedFig(mrDebt(e))] };
   const net = mrColl(e) * price - mrDebt(e);
   return { net, text: signedFig(net), legs: [fmtFullLike(mrColl(e)), fmtFullLike(mrDebt(e))] };
 }
@@ -210,6 +218,73 @@ for (const f of FIXTURES) {
   );
 }
 await pages[9].close();
+
+// ── 1u. the unpriced fallback — a stubbed page payload, two signed legs ──
+
+{
+  const f = FIXTURES[3];
+  const priced = routeByCdp[9].get(f.block);
+  const pricedNetText = expectedFace(priced).text; // what the priced face carries
+  // The expectation comes from the route event with its price removed.
+  const stripped = structuredClone(priced);
+  delete stripped.context.data.priceAtBlock;
+  const want = expectedFace(stripped);
+  check(
+    "1u. the stubbed event expects the fallback face (no net, two signed legs)",
+    want.net == null && want.legs.length === 2 && want.legs.every((l) => /^[−+]/.test(l)),
+    want.legs.join(", "),
+  );
+
+  const stubCtx = await browser.newContext({ viewport: { width: 1440, height: 1400 } });
+  // The page's events are seeded by the server (position-page-data.ts), so
+  // the browser makes no timeline fetch on a first load: the stub rewrites
+  // the document's embedded payload instead. The event's object runs from its
+  // `id` to the next event's; inside it the price object is removed.
+  let stubbed = 0;
+  const stubPage = await stubCtx.newPage();
+  await stubPage.route(/\/sepolia\/polaris\/usdp\/9(\?.*)?$/, async (route) => {
+    const res = await route.fetch();
+    let html = await res.text();
+    const start = html.indexOf(`{\\"id\\":\\"${priced.id}\\"`);
+    if (start >= 0) {
+      const next = html.indexOf('{\\"id\\":\\"cdp_updated', start + 10);
+      const end = next < 0 ? html.length : next;
+      const seg = html.slice(start, end);
+      const cut = seg.replace(/\\"priceAtBlock\\":\{[^{}]*\},?/g, () => {
+        stubbed++;
+        return "";
+      });
+      html = html.slice(0, start) + cut + html.slice(end);
+    }
+    await route.fulfill({ response: res, body: html });
+  });
+  await stubPage.goto(polarisUrl("usdp", "9"), { waitUntil: "domcontentloaded", timeout: 180000 });
+  await stubPage
+    .getByText(/^(?:Showing )?[\d,]+(?: of [\d,]+)? (?:events?|listed)/)
+    .first()
+    .waitFor({ state: "visible", timeout: 120000 })
+    .catch(() => {});
+  await stubPage.waitForTimeout(1200);
+
+  check("1u. the page's embedded timeline was stubbed (price removed from the row)", stubbed > 0, `stubbed ${stubbed}`);
+  const text = await rowText(stubPage, priced.id);
+  check(`1u. usdp/9 block ${f.block} row found on the stubbed page`, text != null);
+  if (text != null) {
+    const flat = text.replace(/\s/g, "");
+    check(`1u. the unpriced row's face carries the "${PSM_LABEL}" label`, text.includes(PSM_LABEL), text.slice(0, 200));
+    check(
+      `1u. the unpriced row's face carries both legs, each signed (${want.legs.join(", ")})`,
+      want.legs.every((l) => flat.includes(l.replace(/\s/g, ""))),
+      text.slice(0, 200),
+    );
+    check(
+      `1u. the unpriced row's face does not carry the priced net ("${PSM_LABEL} ${pricedNetText} USDp")`,
+      !flat.includes(`${PSM_LABEL}${pricedNetText}USDp`.replace(/\s/g, "")),
+      text.slice(0, 200),
+    );
+  }
+  await stubCtx.close();
+}
 
 // ── 2. the four zero-share rows show none of the four labels ──────────────
 
