@@ -8,7 +8,8 @@ import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/components/shared/spine-column";
 import { Facehash } from "@/components/shared/facehash";
 import { useLiquityHeadSpec } from "./liquity-head";
-import { liquityL1Label } from "@/lib/liquity/event-prose";
+import { liquityT1Caption, liquityT1Words } from "@/lib/liquity/event-prose";
+import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { LiquityRedeemerNote, useLiquityCells } from "./liquity-cells";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
@@ -330,7 +331,13 @@ export function LiquityEventCard({
     previousEvent,
   });
 
-  const head = useLiquityHeadSpec(ctx, coords);
+  // The timeline's head is words (ui-jobs 367); the event page's card keeps
+  // the head its title states.
+  const head = useLiquityHeadSpec(ctx, coords, page ? "title" : "row", wallet);
+  const claim = useSurplusClaimFor(ctx.operation === "liquidate" ? event.txHash : undefined);
+  const caption = liquityT1Caption(liquityT1Words(ctx, { wallet, surplusClaimed: claim }));
+  const received =
+    ctx.operation === "transferTrove" && ctx.transfer?.toAddress?.toLowerCase() === event.wallet?.toLowerCase();
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -342,19 +349,14 @@ export function LiquityEventCard({
     },
     spine,
     head,
-    caption: isRateChange && rateSpan ? `Rate ${rateSpan[1].toFixed(2)}%` : liquityL1Label(ctx),
+    caption,
     // A third party's act names who acted: the redeemer. The batch manager
-    // moving a delegated Trove's rate goes unnamed ("Rate 3.60%"), the join
-    // having named it; the spine still runs dotted.
+    // moving a delegated Trove's rate goes unnamed ("Adjusted rate"), the
+    // join having named it; the spine still runs dotted. A transfer states
+    // its counterparty in the caption's words; one received runs dotted.
     actor: {
       by: isRedemption ? ctx.redeemer : undefined,
-      byOwner: ctx.operation === "setBatchManagerAnnualInterestRate" ? false : undefined,
-      custody:
-        ctx.operation === "transferTrove" && ctx.transfer
-          ? ctx.transfer.toAddress?.toLowerCase() === event.wallet?.toLowerCase()
-            ? { dir: "from", address: ctx.transfer.fromAddress }
-            : { dir: "to", address: ctx.transfer.toAddress }
-          : undefined,
+      byOwner: ctx.operation === "setBatchManagerAnnualInterestRate" || received ? false : undefined,
     },
     cells,
     sheet,

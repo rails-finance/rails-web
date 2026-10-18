@@ -268,6 +268,13 @@ export interface ChainTruthRowSpec {
    *  "Close" pill the same way. Ignored when `labelOnSpine`/`critical` own the
    *  label. */
   status?: "open" | "close" | "party" | "marker";
+  /** The plain label in the delegate's party pink (a batch manager's rate
+   *  change on Liquity V2). */
+  labelTone?: "delegate";
+  /** Present-tense clauses after the label, each after a middle dot, for a
+   *  state the spine cannot show ("Opened trove · Rate to Summerstone";
+   *  rails-ops TO-DO-ui-jobs 367). With no label, the first clause leads. */
+  clauses?: ReactNode[];
   /** A trailing ratio chip ("134% CR") — the position's collateral ratio at
    *  this event, for an explorer whose rows carry the figures and an at-block
    *  price to state one (Polaris). Rendered once, just before the `evt-meta`
@@ -747,7 +754,11 @@ export function ChainTruthRow({
       {spec.label}
     </span>
   ) : spec.label && (!spec.custody || spec.custodyLabel) ? (
-    <span className={`max-w-full shrink-0 ${sz.txt} text-rb-500`}>{spec.label}</span>
+    <span
+      className={`max-w-full shrink-0 ${sz.txt} ${spec.labelTone === "delegate" ? "text-pink-600 dark:text-pink-400" : "text-rb-500"}`}
+    >
+      {spec.label}
+    </span>
   ) : // A combined adjust omits the row label — the per-axis delta labels carry
   // the verbs (V2's grammar) — and a custody row drops it: the spine's plane
   // and the chip's to/from are the verb. Render nothing so no empty span
@@ -892,6 +903,18 @@ export function ChainTruthRow({
       {labelNode}
       {spec.ratePill?.lead && rateNode}
       {spec.ratePill?.lead && managerNode}
+      {spec.clauses?.map((c, i) => (
+        <Fragment key={`clause-${i}`}>
+          {(i > 0 || labelNode) && (
+            <span className={`${sz.txt} text-rb-500`} aria-hidden="true">
+              &middot;
+            </span>
+          )}
+          <span className={`inline-flex items-center gap-1 ${sz.txt} text-rb-500`} data-head-clause="">
+            {c}
+          </span>
+        </Fragment>
+      ))}
       {deltaNodes}
 
       {spec.asset && (
@@ -1003,7 +1026,7 @@ export function ChainTruthRow({
  *  ENS reverse record does (batched through the same hook the pink chip uses),
  *  degrading to the hex until one resolves. Its own component so the hook
  *  runs unconditionally. */
-function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }) {
+export function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }) {
   const ens = useEnsName(party.ens ? party.address : null);
   const shown = party.name ?? ens ?? `${party.address.slice(0, 6)}…${party.address.slice(-4)}`;
   return (

@@ -203,6 +203,134 @@ export function liquityL1Label(ctx: LiquityContext): string {
   }
 }
 
+// ── T1: the timeline head ────────────────────────────────────────────────────
+
+/** A clause after the head's kind (rails-ops TO-DO-ui-jobs 367): words, the
+ *  delegate named after `lead`, a liquidation's surplus, or a transfer's
+ *  counterparty after `lead`. */
+export type LiquityT1Clause =
+  | { text: string; zombie?: boolean }
+  | { lead: string; delegate: string }
+  | { surplus: number; symbol: string; word: string; claimedAt?: number | null }
+  | { lead: string; address: string; dir: "to" | "from" };
+
+export interface LiquityT1Words {
+  /** The past-participle kind; empty where the clause carries the act (a
+   *  join reads "Rate to Summerstone"). */
+  kind: string;
+  clauses: LiquityT1Clause[];
+}
+
+/** An adjust's legs as participles, in the order they run: what goes into the
+ *  Trove before what comes out, the collateral first where both go one way
+ *  (rails-ops reference/shared-event-card-spec.md, "Spine order"). */
+function adjustLegs(ctx: LiquityContext): string | null {
+  const op = ctx.troveOperation;
+  if (!op) return null;
+  const collOp = op.collChangeFromOperation;
+  const debtOp = op.debtChangeFromOperation;
+  const hasColl = Math.abs(collOp) >= TROVE_DELTA_EPSILON;
+  const hasDebt = Math.abs(debtOp) >= TROVE_DELTA_EPSILON;
+  if (!hasColl && !hasDebt) return null;
+  const c = collOp > 0 ? L1_WORDS.t1_added_coll : L1_WORDS.t1_withdrew_coll;
+  const d = debtOp > 0 ? L1_WORDS.t1_borrowed : L1_WORDS.t1_repaid;
+  if (!hasDebt) return c;
+  if (!hasColl) return d;
+  // A repayment goes in and a withdrawal comes out: the repayment first.
+  return debtOp < 0 && collOp < 0 ? `${d} ${L1_WORDS.t1_sep} ${c}` : `${c} ${L1_WORDS.t1_sep} ${d}`;
+}
+
+/** The timeline head's words. `wallet`: the account the timeline reads, for a
+ *  transfer's direction. `surplusClaimed`: the liquidation's surplus has since
+ *  been claimed. */
+export function liquityT1Words(
+  ctx: LiquityContext,
+  opts: { wallet?: string; surplusClaimed?: { timestamp?: number | null } | null } = {},
+): LiquityT1Words {
+  const delegate = (): LiquityT1Clause[] =>
+    ctx.batchManager ? [{ lead: L1_WORDS.t1_rate_to, delegate: getBatchManagerName(ctx.batchManager) }] : [];
+  switch (ctx.operation) {
+    case "openTrove":
+      return { kind: L1_WORDS.t1_opened, clauses: [] };
+    case "openTroveAndJoinBatch":
+      return { kind: L1_WORDS.t1_opened, clauses: delegate() };
+    case "closeTrove":
+      return { kind: L1_WORDS.t1_closed, clauses: [] };
+    case "adjustTrove":
+      if (ctx.noChangeRun)
+        return { kind: fillText(L1_WORDS.no_change_run, { run_count: ctx.noChangeRun.count }), clauses: [] };
+      if (ctx.troveOperation && !adjustLegs(ctx)) return { kind: L1_WORDS.no_change, clauses: [] };
+      return { kind: adjustLegs(ctx) ?? L1_WORDS.t1_adjusted, clauses: [] };
+    case "adjustZombieTrove":
+    case "adjustUnredeemableZombieTrove":
+      return { kind: adjustLegs(ctx) ?? L1_WORDS.t1_adjusted, clauses: [] };
+    case "adjustTroveInterestRate":
+    case "setBatchManagerAnnualInterestRate":
+      return { kind: L1_WORDS.t1_adjusted_rate, clauses: [] };
+    case "setInterestBatchManager": {
+      const c = delegate();
+      return c.length ? { kind: "", clauses: c } : { kind: L1_WORDS.t1_adjusted_rate, clauses: [] };
+    }
+    case "removeFromBatch":
+      return { kind: L1_WORDS.t1_ended_delegation, clauses: [] };
+    case "applyPendingDebt":
+      return { kind: L1_WORDS.t1_interest_applied, clauses: [] };
+    case "liquidate": {
+      const liq = ctx.liquidation;
+      if (!liq || !(liq.collSurplus > 0)) return { kind: L1_WORDS.liquidated, clauses: [] };
+      const claimed = opts.surplusClaimed;
+      return {
+        kind: L1_WORDS.liquidated,
+        clauses: [
+          {
+            surplus: liq.collSurplus,
+            symbol: ctx.collateralType,
+            word: claimed ? L1_WORDS.t1_surplus_claimed : L1_WORDS.claimable,
+            claimedAt: claimed ? (claimed.timestamp ?? null) : undefined,
+          },
+        ],
+      };
+    }
+    case "redeemCollateral":
+      return {
+        kind: L1_WORDS.redeemed,
+        clauses: ctx.isZombieTrove
+          ? [{ text: L1_WORDS.t1_coll_reduced }, { text: L1_WORDS.t1_debt_below_min, zombie: true }]
+          : [{ text: L1_WORDS.t1_coll_debt_reduced }],
+      };
+    case "transferTrove": {
+      const t = ctx.transfer;
+      if (!t) return { kind: L1_WORDS.t1_transferred, clauses: [] };
+      const received = !!opts.wallet && t.toAddress?.toLowerCase() === opts.wallet.toLowerCase();
+      return {
+        kind: L1_WORDS.t1_transferred,
+        clauses: [
+          received
+            ? { lead: L1_WORDS.t1_from, address: t.fromAddress, dir: "from" }
+            : { lead: L1_WORDS.t1_to, address: t.toAddress, dir: "to" },
+        ],
+      };
+    }
+    default:
+      return { kind: liquityL1Label(ctx), clauses: [] };
+  }
+}
+
+/** The head's words as one line, for the phone caption and the row's
+ *  accessible name: "Opened trove · Rate to Summerstone". */
+export function liquityT1Caption(words: LiquityT1Words): string {
+  const parts = words.clauses.map((c) =>
+    "text" in c
+      ? c.text
+      : "delegate" in c
+        ? `${c.lead} ${c.delegate}`
+        : "surplus" in c
+          ? `${c.surplus.toFixed(4)} ${c.symbol} ${c.word}`
+          : `${c.lead} ${c.address.slice(0, 6)}…${c.address.slice(-4)}`,
+  );
+  return [words.kind, ...parts].filter(Boolean).join(` ${L1_WORDS.t1_sep} `);
+}
+
 // ── The generator ────────────────────────────────────────────────────────────
 
 function pick(ctx: LiquityContext): { id: string; variant: string } {

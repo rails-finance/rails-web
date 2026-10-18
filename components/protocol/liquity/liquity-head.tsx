@@ -1,16 +1,24 @@
 "use client";
 
 // Liquity V2's T1 head as a spec for the shared row (`ChainTruthRow`,
-// components/shared/chain-truth-event.tsx; ui-jobs 309 step 2): the word or
-// the status pill, the amounts the event moved, the rate pills and the batch
-// manager, a redistribution's arrival, a liquidation's surplus, the gas
-// compensation escrow on the open and the close, the zombie flag and the
-// same-block "n of m". The words are the generator's
-// (`liquityL1Label`, content/liquity-v2/event-prose.yaml).
+// components/shared/chain-truth-event.tsx; ui-jobs 309 step 2).
+//
+// The timeline's head (mode "row", ui-jobs 367) is words: the past-participle
+// kind, in its status pill where it has one, then the clauses for what the
+// spine cannot show (`liquityT1Words`). The spine carries the figures; the
+// head keeps a pending debt's figure, whose spine draws no flank, a
+// redistribution's arrival and the same-block "n of m".
+//
+// The event page's title (mode "title") states the word or the status pill,
+// the amounts the event moved, the rate pills and the batch manager, a
+// redistribution's arrival, a liquidation's surplus, the gas compensation
+// escrow on the open and the close, the zombie flag and the same-block
+// "n of m". The words are the generator's (`liquityL1Label`,
+// content/liquity-v2/event-prose.yaml).
 
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
-import { liquityL1Label } from "@/lib/liquity/event-prose";
+import { liquityL1Label, liquityT1Words, type LiquityT1Clause } from "@/lib/liquity/event-prose";
 import { L1_WORDS } from "@/lib/liquity/event-templates";
 import { zombieTitle } from "@/lib/liquity/trove-page-words";
 import {
@@ -21,11 +29,18 @@ import {
   redistArrivalProv,
   liquityGasEscrowProv,
   LIQUITY_V2_GAS_ESCROW,
+  transferPartyProv,
+  liquidationSurplusProv,
   type EventCoords,
 } from "@/lib/liquity/event-provenance";
+import { formatDate } from "@/lib/date";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { Prov } from "@/components/shared/provenance";
+import { formatExact } from "@/lib/utils/format";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import {
   ChainTruthRow,
+  PartyChip,
   useSameTransaction,
   type ChainTruthDelta,
   type ChainTruthRowSpec,
@@ -61,9 +76,65 @@ function statusOf(operation: string): ChainTruthRowSpec["status"] {
   }
 }
 
-/** The head of one Liquity V2 event. `claimed`: the liquidation's surplus
- *  has since been claimed (the head read). */
+/** One clause of the timeline head, drawn. */
+function clauseNode(c: LiquityT1Clause, ctx: LiquityContext, coords: EventCoords) {
+  if ("text" in c)
+    return c.zombie ? <span title={zombieTitle(ctx.stateAfter?.debt === 0)}>{c.text}</span> : <span>{c.text}</span>;
+  if ("delegate" in c)
+    return (
+      <span>
+        {c.lead} <span className="font-bold text-pink-500">{c.delegate}</span>
+      </span>
+    );
+  if ("surplus" in c)
+    // The one figure the head states: the collateral the holder can claim.
+    return (
+      <>
+        <Prov info={liquidationSurplusProv(ctx, coords)} value={formatExact(c.surplus)} symbol={c.symbol}>
+          <span className="font-bold text-foreground">{c.surplus.toFixed(4)}</span>
+        </Prov>
+        <TokenChipIcon symbol={c.symbol} size={16} />
+        <span className={c.claimedAt === undefined ? "text-green-700 dark:text-green-400" : undefined}>
+          {c.word}
+          {c.claimedAt != null && <> {formatDate(c.claimedAt)}</>}
+        </span>
+      </>
+    );
+  return (
+    <PartyChip party={{ prefix: c.lead, address: c.address, prov: transferPartyProv(c.dir, coords), ens: true }} />
+  );
+}
+
+/** The head of one Liquity V2 event: the timeline's ("row") or the event
+ *  page's title. `claimed`: the liquidation's surplus has since been claimed
+ *  (the head read). `wallet`: the account the timeline reads. */
 export function liquityHeadSpec(
+  ctx: LiquityContext,
+  coords: EventCoords,
+  claimed?: { timestamp?: number | null } | null,
+  mode: "row" | "title" = "title",
+  wallet?: string,
+): ChainTruthRowSpec {
+  const spec = titleSpec(ctx, coords, claimed);
+  if (mode === "title") return spec;
+  const op = ctx.operation;
+  const words = liquityT1Words(ctx, { wallet, surplusClaimed: claimed });
+  return {
+    label: words.kind,
+    status: spec.status,
+    critical: spec.critical,
+    labelOnSpine: spec.labelOnSpine,
+    labelTone: op === "setBatchManagerAnnualInterestRate" ? "delegate" : undefined,
+    clauses: words.clauses.map((c) => clauseNode(c, ctx, coords)),
+    // A pending debt's spine draws no flank: its figure stays in the head.
+    deltas: op === "applyPendingDebt" ? spec.deltas : [],
+    redistribution: spec.redistribution,
+    sameBlock: spec.sameBlock,
+  };
+}
+
+/** The event page's title spec. */
+function titleSpec(
   ctx: LiquityContext,
   coords: EventCoords,
   claimed?: { timestamp?: number | null } | null,
@@ -224,14 +295,19 @@ export function liquityHeadSpec(
 }
 
 /** The spec, with the surplus claim the page has read. */
-export function useLiquityHeadSpec(ctx: LiquityContext, coords: EventCoords): ChainTruthRowSpec {
+export function useLiquityHeadSpec(
+  ctx: LiquityContext,
+  coords: EventCoords,
+  mode: "row" | "title" = "title",
+  wallet?: string,
+): ChainTruthRowSpec {
   const claim = useSurplusClaimFor(ctx.operation === "liquidate" ? coords.txHash : undefined);
   const sameTransaction = useSameTransaction(
     coords.blockNumber,
     coords.txHash,
     ctx.blockGrouping?.isGrouped ? ctx.blockGrouping.sameBlockCount : 0,
   );
-  const spec = liquityHeadSpec(ctx, coords, claim);
+  const spec = liquityHeadSpec(ctx, coords, claim, mode, wallet);
   return sameTransaction && spec.sameBlock ? { ...spec, sameBlock: { ...spec.sameBlock, sameTransaction } } : spec;
 }
 

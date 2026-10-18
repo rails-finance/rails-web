@@ -463,3 +463,35 @@ export const LIQUITY_V2_GAS_ESCROW: LiquityGasEscrow = {
 /** The escrow's receipt at an event: the constant, and the transaction whose
  *  WETH Transfer to or from the GasPool carries it. */
 export const liquityGasEscrowProv = gasEscrowReceipt(LIQUITY_V2_GAS_ESCROW, MAINNET_CHAIN_ID);
+
+/** A Trove transfer's counterparty: the `to` (or `from`) of the TroveNFT's
+ *  Transfer log, the timeline head's "Transferred · to 0x…". */
+export function transferPartyProv(dir: "to" | "from", coords?: EventCoords): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: changeVerify(coords),
+    summary:
+      dir === "to"
+        ? "The account the Trove passed to — the receiver the TroveNFT's Transfer log names. Ownership of the Trove is the NFT; no collateral or BOLD moved."
+        : "The account the Trove came from — the sender the TroveNFT's Transfer log names. Ownership of the Trove is the NFT; no collateral or BOLD moved.",
+    contract: { name: "TroveNFT" },
+    via: `${streamVia()} · Transfer.${dir}`,
+    inputs: eventInputs(coords),
+  };
+}
+
+/** A liquidation's collateral surplus: what the liquidation left over the
+ *  debt and the penalty, held for the owner to claim (the timeline head's
+ *  "Liquidated · 0.42 ETH claimable"). */
+export function liquidationSurplusProv(ctx: LiquityContext, coords?: EventCoords): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: changeVerify(coords),
+    summary: `Claimable collateral — the ${ctx.collateralType} the liquidation left over after covering the Trove's debt and penalty. The branch's CollSurplusPool holds it until the owner claims it.`,
+    contract: { name: "TroveManager", address: TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()] },
+    via: `${streamVia()} · Liquidation · collSurplus`,
+    inputs: eventInputs(coords),
+  };
+}

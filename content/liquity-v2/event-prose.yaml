@@ -456,6 +456,47 @@ L1_words:
     gas compensation escrow sent
   spine_escrow_returned: |-
     gas compensation escrow returned
+  # The timeline head (rails-ops TO-DO-ui-jobs 367): the kind as a past
+  # participle, then at most one present-tense clause for what the spine
+  # cannot show, each after the middle dot. The spine carries the figures.
+  t1_sep: |-
+    ·
+  t1_opened: |-
+    Opened trove
+  t1_closed: |-
+    Closed trove
+  t1_adjusted: |-
+    Adjusted trove
+  t1_added_coll: |-
+    Added collateral
+  t1_withdrew_coll: |-
+    Withdrew collateral
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_adjusted_rate: |-
+    Adjusted rate
+  t1_rate_to: |-
+    Rate to
+  t1_ended_delegation: |-
+    Ended delegation
+  t1_interest_applied: |-
+    Interest applied
+  t1_coll_debt_reduced: |-
+    Collateral and debt reduced
+  t1_coll_reduced: |-
+    Collateral reduced
+  t1_debt_below_min: |-
+    Debt below the minimum
+  t1_transferred: |-
+    Transferred
+  t1_to: |-
+    to
+  t1_from: |-
+    from
+  t1_surplus_claimed: |-
+    claimed
 
 # ── L2: the opened card's labels and sub-lines ──
 L2_words:
