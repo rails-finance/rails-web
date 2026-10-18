@@ -31,7 +31,8 @@
 // (`SheetSide.totalAmount`), and the carry layer draws "Before this event" only
 // where it adds something to "Last event": decision 0042, points 9 and 10.
 
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -552,10 +553,15 @@ export function SheetSkeleton({ sides = 2, panels = 2 }: { sides?: number; panel
   );
 }
 
+/** Where a sheet draws its breakdown switch when a tab strip stands over it
+ *  (rails-ops decision 0044): the strip's end slot, or null until it mounts.
+ *  Unset (no strip), the switch stands on the sheet's controls line. */
+export const SheetSwitchSlotContext = createContext<HTMLElement | null | undefined>(undefined);
+
 /** The sheet, drawn from the `sheet` slot. `breakdown`: the breakdown stands
  *  with no switch (an event's page); else the card's switch, off at first,
- *  shows it. `data` marks the sheet (the state of the read its figures come
- *  from). */
+ *  shows it, drawn in `SheetSwitchSlotContext`'s slot where one is provided.
+ *  `data` marks the sheet (the state of the read its figures come from). */
 export function EventSheetView({
   sheet,
   breakdown,
@@ -567,11 +573,31 @@ export function EventSheetView({
 }) {
   const [col, setCol] = useState<Col>("usd");
   const [shown, setShown] = useState(false);
+  const slot = useContext(SheetSwitchSlotContext);
   const on = breakdown || shown;
+  const switchButton = !breakdown && (
+    <button
+      type="button"
+      aria-label={shown ? WORDS.hide : WORDS.show}
+      title={shown ? WORDS.hide : WORDS.show}
+      data-sheet-switch=""
+      onClick={(e) => {
+        e.stopPropagation();
+        setShown((v) => !v);
+      }}
+      className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-md text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 max-sm:min-h-9 max-sm:min-w-9"
+    >
+      <ListChevronsIcon open={shown} className="h-4 w-4" />
+    </button>
+  );
+  // A strip over the sheet holds the switch; the controls line keeps the lead
+  // and the phone's column toggle.
+  const switchOut = slot !== undefined;
   return (
     <div className="px-5 py-2" data-sheet="" data-sheet-breakdown={on ? "on" : "off"} {...data}>
+      {switchOut && slot && switchButton && createPortal(switchButton, slot)}
       <div
-        className={`mb-2 flex items-center justify-end gap-3 ${breakdown && !sheet.lead ? "sm:hidden" : ""}`}
+        className={`mb-2 flex items-center justify-end gap-3 ${(breakdown || switchOut) && !sheet.lead ? "sm:hidden" : ""}`}
         data-sheet-controls=""
       >
         {sheet.lead && (
@@ -600,21 +626,7 @@ export function EventSheetView({
             </button>
           ))}
         </div>
-        {!breakdown && (
-          <button
-            type="button"
-            aria-label={shown ? WORDS.hide : WORDS.show}
-            title={shown ? WORDS.hide : WORDS.show}
-            data-sheet-switch=""
-            onClick={(e) => {
-              e.stopPropagation();
-              setShown((v) => !v);
-            }}
-            className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-md text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 max-sm:min-h-9 max-sm:min-w-9"
-          >
-            <ListChevronsIcon open={shown} className="h-4 w-4" />
-          </button>
-        )}
+        {!switchOut && switchButton}
       </div>
       <div className="flex flex-col gap-2.5">
         {sheet.sides.map((s) => (

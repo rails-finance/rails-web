@@ -33,7 +33,12 @@ import { useRowTarget } from "@/components/shared/row-target";
 import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
-import { EventSheetView, SheetSkeleton, type EventSheet } from "@/components/shared/event-sheet";
+import {
+  EventSheetView,
+  SheetSkeleton,
+  SheetSwitchSlotContext,
+  type EventSheet,
+} from "@/components/shared/event-sheet";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -498,6 +503,9 @@ function EventCardView(props: EventCardProps) {
   useEffect(() => {
     setOpenTab(figuresFirst ? "figures" : "explanation");
   }, [figuresFirst]);
+  // The Figures tab's breakdown switch stands at the strip's right end
+  // (rails-ops decision 0044): the sheet draws it into this slot.
+  const [switchSlot, setSwitchSlot] = useState<HTMLElement | null>(null);
 
   // Restore persisted open state after mount (SSR-safe — no hydration mismatch:
   // first render is always closed, matching the server, then this opens it).
@@ -794,11 +802,18 @@ function EventCardView(props: EventCardProps) {
           tabs={CARD_TABS}
           openTab={openTab}
           onOpenTabChange={(key) => setOpenTab(key as CardTab)}
+          // Empty under Explanation; it holds the phone's switch height on
+          // both tabs, so the labels stay put across a tab change.
+          end={<div ref={setSwitchSlot} className="flex items-center max-sm:min-h-9" />}
         />
       )}
       {tabbed ? (
         <div id={`${domId}-panel`} role="tabpanel" aria-labelledby={`${domId}-tab-${openTab}`}>
-          {openTab === "figures" ? figuresNode : explanationRegion}
+          {openTab === "figures" ? (
+            <SheetSwitchSlotContext.Provider value={switchSlot}>{figuresNode}</SheetSwitchSlotContext.Provider>
+          ) : (
+            explanationRegion
+          )}
         </div>
       ) : (
         <>
