@@ -30,7 +30,7 @@ import {
   type SpineColumnProps,
 } from "@/components/shared/spine-column";
 import { useRowTarget } from "@/components/shared/row-target";
-import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { ChainTruthRow, HeadSurplusChip, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
 import {
@@ -40,6 +40,7 @@ import {
   type EventSheet,
 } from "@/components/shared/event-sheet";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
+import { ExplainerLeadOnTitleContext } from "@/lib/shared/explainer-prose";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
@@ -553,8 +554,17 @@ function EventCardView(props: EventCardProps) {
   // An event naming a token whose decimals did not load (the timeline provides
   // them): the explainer and its teaser give way to one line saying so.
   const unread = useUnreadTokens();
-  const explainerTeaser = unread ? undefined : explainerTeaserProp;
+  const teaser = unread ? undefined : explainerTeaserProp;
   const explainer = unread && explainerProp != null ? <ExplanationNotLoaded tokens={unread} /> : explainerProp;
+  // The event page's title is the Explanation's first sentence, the teaser
+  // (rails-ops decision 0045, "Ruled since"); the pane then opens on the
+  // second. A grouped explanation's first bullet is that sentence: the pane
+  // leaves it out (`ExplainerLeadOnTitleContext`). A card with no teaser
+  // keeps the title the route draws.
+  const leadGrouped = !!props.slots.explainer.grouped;
+  const pageSentence = pageMode && !unread ? props.slots.explainer.first : undefined;
+  const explainerTeaser = pageSentence ? undefined : teaser;
+  const head = props.slots.event ? props.slots.head : undefined;
 
   const hasDetail = hasPanel;
   const hasExplainer = explainer != null;
@@ -588,7 +598,11 @@ function EventCardView(props: EventCardProps) {
   // explanation start on the head's text (its `pl-5`).
   const explanationRegion = hasExplainer ? (
     <div className="pb-1 pl-5 pr-4" data-anatomy="T3" data-prov-exempt="">
-      <div className="pb-3 pt-4 text-sm">{explanationNode}</div>
+      <div className="pb-3 pt-4 text-sm">
+        <ExplainerLeadOnTitleContext.Provider value={!!pageSentence && leadGrouped}>
+          {explanationNode}
+        </ExplainerLeadOnTitleContext.Provider>
+      </div>
       {footerNode}
     </div>
   ) : null;
@@ -861,7 +875,11 @@ function EventCardView(props: EventCardProps) {
               // stacked above the card below sm, where the row drops its side
               // padding so the paragraph and the card share one width.
               <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
-                <EventPageAside page={page} />
+                <EventPageAside
+                  page={page}
+                  sentence={pageSentence}
+                  beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
+                />
               </div>
             ) : (
               <div className="spine-cell" data-anatomy="L3">

@@ -6,14 +6,14 @@
 // The timeline's head (mode "row", ui-jobs 367) is words: the past-participle
 // kind, in its status pill where it has one, then the clauses for what the
 // spine cannot show (`liquityT1Words`). The spine carries the figures; the
-// head keeps a pending debt's figure, whose spine draws no flank, a
-// redistribution's arrival and the same-block "n of m".
+// head keeps a redistribution's arrival and the same-block "n of m".
 //
-// The event page's title (mode "title") states the word or the status pill,
-// the amounts the event moved, the rate pills and the batch manager, a
-// redistribution's arrival, a liquidation's surplus, the gas compensation
-// escrow on the open and the close, the zombie flag and the same-block
-// "n of m". The words are the generator's (`liquityL1Label`,
+// The event page's title (mode "title"), drawn where the explanation has no
+// first sentence for the shell to make the title (decision 0045), states the
+// word or the status pill, the amounts the event moved, the rate pills and the
+// batch manager, a redistribution's arrival, a liquidation's surplus, the gas
+// compensation escrow on the open and the close, the zombie flag and the
+// same-block "n of m". The words are the generator's (`liquityL1Label`,
 // content/liquity-v2/event-prose.yaml).
 
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
@@ -126,8 +126,7 @@ export function liquityHeadSpec(
     labelOnSpine: spec.labelOnSpine,
     labelTone: op === "setBatchManagerAnnualInterestRate" ? "delegate" : undefined,
     clauses: words.clauses.map((c) => clauseNode(c, ctx, coords)),
-    // A pending debt's spine draws no flank: its figure stays in the head.
-    deltas: op === "applyPendingDebt" ? spec.deltas : [],
+    deltas: [],
     redistribution: spec.redistribution,
     sameBlock: spec.sameBlock,
   };
@@ -238,14 +237,9 @@ function titleSpec(
     ];
   }
 
-  // The amounts the other operations moved: the debt, then the collateral. A
-  // pending-debt row's spine draws no flank, so its figure stays.
+  // The amounts the other operations moved: the debt, then the collateral.
   if (!OWN_AMOUNTS.has(op) && !label.includes(" + ")) {
-    const stays = op === "applyPendingDebt";
-    spec.deltas = [
-      ...(hasDebt ? [debt({ noSpineCounterpart: stays })] : []),
-      ...(hasColl ? [coll({ noSpineCounterpart: stays })] : []),
-    ];
+    spec.deltas = [...(hasDebt ? [debt({})] : []), ...(hasColl ? [coll({})] : [])];
   }
 
   // The gas compensation escrow, the owner's WETH held apart from the
