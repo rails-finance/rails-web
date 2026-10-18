@@ -481,6 +481,9 @@ export interface CardTabStripProps {
   onOpenTabChange: (key: string) => void;
   /** id prefix tying each tab to its panel (`${idBase}-panel`). */
   idBase: string;
+  /** Drawn at the strip's right end, centred on the tab labels (the Figures
+   *  tab's breakdown switch, rails-ops decision 0044). */
+  end?: React.ReactNode;
   className?: string;
 }
 
@@ -491,7 +494,7 @@ export interface CardTabStripProps {
  * with one always open. Each button carries `data-card-tab="<key>"`; the host
  * draws the panel under `${idBase}-panel` with `data-card-tab-open`.
  */
-export function CardTabStrip({ tabs, openTab, onOpenTabChange, idBase, className }: CardTabStripProps) {
+export function CardTabStrip({ tabs, openTab, onOpenTabChange, idBase, end, className }: CardTabStripProps) {
   const refs = useRef(new Map<string, HTMLButtonElement>());
   const move = (from: number, step: number) => {
     const next = tabs[(from + step + tabs.length) % tabs.length];
@@ -537,6 +540,7 @@ export function CardTabStrip({ tabs, openTab, onOpenTabChange, idBase, className
           </button>
         );
       })}
+      {end != null && <div className="ml-auto flex items-center">{end}</div>}
     </div>
   );
 }
