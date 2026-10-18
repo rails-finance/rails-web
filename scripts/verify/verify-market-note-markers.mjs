@@ -3,8 +3,9 @@
 // ----------------------------------------------------------------------------
 // On desktop a closed note is a marker on the spine (`[data-note-marker]`, a
 // button) that sits where its open row's node will stand, so it neither moves
-// nor misses a second click as the note opens and closes; between two rows it
-// takes the open row's header height above its node. A click or Enter/Space opens the note's row
+// nor misses a second click as the note opens and closes; its slot takes the
+// open row's height, so the rows either side stand as far apart with the note
+// as a marker as with it open (Miles, 18 Oct 2026). A click or Enter/Space opens the note's row
 // and panel in place and moves focus to its header, and the open row's filled
 // diamond closes it and returns focus to the marker. Display carries
 // "Market notes" and "Open all market notes"; the toolbar's "Market
@@ -78,19 +79,18 @@ console.log(`Market notes — against ${BASE}\n`);
     '1c. the toolbar carries no "Market notes · N" pill',
     (await page.getByRole("button", { name: /^Market notes ·/i }).count()) === 0,
   );
-  // A single marker takes the height the open row's header takes above its
-  // node: the list's 8px and 32px (Miles, 30 Sep 2026).
-  const gap = await page.evaluate(() => {
-    const g = document.querySelector('[data-note-gap=""]');
-    const prev = g?.previousElementSibling?.getBoundingClientRect();
-    const next = g?.nextElementSibling?.getBoundingClientRect();
-    return g && prev && next ? Math.round(next.top - prev.bottom) : null;
-  });
-  check(
-    "1d. a single marker takes the open row's header height (the rows either side 40px apart)",
-    gap === 40,
-    `${gap}px`,
-  );
+  // A single marker takes its open row's height: the list's 8px and the 72px
+  // row (its 8px `pt-2`, the 4px card padding either side of the 56px header
+  // panel; Miles, 18 Oct 2026). 7d holds it against the open row itself.
+  const gapOf = (p) =>
+    p.evaluate(() => {
+      const g = document.querySelector('[data-note-gap=""]');
+      const prev = g?.previousElementSibling?.getBoundingClientRect();
+      const next = g?.nextElementSibling?.getBoundingClientRect();
+      return g && prev && next ? Math.round(next.top - prev.bottom) : null;
+    });
+  const gap = await gapOf(page);
+  check("1d. a single marker takes its open row's height (the rows either side 80px apart)", gap === 80, `${gap}px`);
 
   const first = closedMarkers(page).first();
   const id = await first.getAttribute("data-note-marker");
@@ -160,6 +160,12 @@ console.log(`Market notes — against ${BASE}\n`);
     "7. Open all shows every note as its header row, no panel open",
     rowsOpenAll === total && panelsOpenAll === 0,
     `${rowsOpenAll} rows, ${panelsOpenAll} panels`,
+  );
+  const gapOpen = await gapOf(page);
+  check(
+    "7d. the rows either side of a note stand as far apart with it open as with it a marker",
+    gapOpen === gap,
+    `${gap}px as a marker, ${gapOpen}px open`,
   );
   check(
     "7b. under Open all the diamonds are inert",
