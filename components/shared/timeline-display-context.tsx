@@ -5,7 +5,6 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 export type TimelineDisplayKey =
   | "showTickerLabels"
   | "showInterestRates"
-  | "showCollateralRatio"
   | "showMarketNotes"
   | "openAllMarketNotes"
   | "showTxHashes"
@@ -18,9 +17,6 @@ export interface TimelineDisplayState {
   /** When true, event-card headers show the per-event interest-rate badge
    * (Aave supply/borrow APR). Off by default — surfaced on demand. */
   showInterestRates: boolean;
-  /** When true, Polaris event-card headers show the trailing collateral-ratio
-   * chip. Off by default — surfaced on demand. */
-  showCollateralRatio: boolean;
   /** "Market notes" in Display. When true, receipted market notes
    * (facts about the market observed between two of the account's own events)
    * stand on the spine between the events they bracket, each as a marker that
@@ -46,7 +42,6 @@ export interface TimelineDisplayState {
 const DEFAULTS = {
   showTickerLabels: false,
   showInterestRates: false,
-  showCollateralRatio: false,
   showMarketNotes: true,
   openAllMarketNotes: false,
   showTxHashes: false,
@@ -69,8 +64,9 @@ const Ctx = createContext<TimelineDisplayState>({
  *  `showChangeBars`, `showBalanceBars`, `showEventNumbers`, `showTimestamps`,
  *  `showUsdStable`, `showUsdOther`, `mobileSpine` (the phone's Timeline |
  *  List choice: the spine view is the only phone view),
- *  `showFullBreakdown` (the sheet's breakdown is each card's, ui-jobs 330)
- *  and `flowsView` (the Lifetime flows panel draws both strips). */
+ *  `showFullBreakdown` (the sheet's breakdown is each card's, ui-jobs 330),
+ *  `flowsView` (the Lifetime flows panel draws both strips) and
+ *  `showCollateralRatio` (Polaris's row ratio chip, ui-jobs 368). */
 function migrate(
   parsed: Partial<typeof DEFAULTS> & {
     showUsdValues?: boolean;
@@ -85,6 +81,7 @@ function migrate(
     collapseRuns?: boolean;
     showFullBreakdown?: boolean;
     flowsView?: unknown;
+    showCollateralRatio?: boolean;
   },
 ): Partial<typeof DEFAULTS> {
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -101,6 +98,7 @@ function migrate(
     collapseRuns,
     showFullBreakdown,
     flowsView,
+    showCollateralRatio,
     ...rest
   } = parsed;
   /* eslint-enable @typescript-eslint/no-unused-vars */

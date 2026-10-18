@@ -160,21 +160,21 @@ export const psmShareNetProv = (
     formula: "_mintRedeemCollGain × previewPrice() at block − _mintRedeemDebtGain",
     inputs: eventInputs(coords, [
       {
-        label: "pETH leg",
+        label: "pETH leg (_mintRedeemCollGain)",
         value: formatExact(vals.coll),
         kind: "chain",
         pclass: "emitted",
         note: "CDPUpdated._mintRedeemCollGain",
       },
       {
-        label: `${stable} leg`,
+        label: `${stable} leg (_mintRedeemDebtGain)`,
         value: formatExact(vals.debt),
         kind: "chain",
         pclass: "emitted",
         note: "CDPUpdated._mintRedeemDebtGain",
       },
       {
-        label: "price at block",
+        label: "price at block (previewPrice)",
         value: formatExact(vals.price),
         kind: "chain",
         pclass: "oracle",

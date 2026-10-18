@@ -61,8 +61,8 @@ const num = (s?: string): number => {
 
 /** A PSM share's two legs as one figure in the debt unit: the pETH it added
  *  (or took) at the given pETH price, less the debt it added (or cleared).
- *  The row face, the lifetime sums, the card's stats and the markdown all
- *  value a share with this. */
+ *  The event's explanation, the lifetime sums, the card's stats and the
+ *  markdown all value a share with this. */
 export const polarisPsmShareValue = (collLeg: number, debtLeg: number, pethInDebt: number): number =>
   collLeg * pethInDebt - debtLeg;
 

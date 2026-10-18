@@ -8,11 +8,13 @@
 // echoes that receipt.
 
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
+import { polarisPsmShareValue } from "@/lib/polaris/economics";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
 import { formatNumber } from "@/lib/utils/format";
-import { ledgerFieldProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
+import { formatPeth } from "@/lib/polaris/figure-format";
+import { ledgerFieldProv, psmShareNetProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
 import {
   polarisEventProse,
   polarisExplanationRuns,
@@ -38,8 +40,9 @@ export function polarisEchoCoords(ctx: PolarisContext, txHash?: string, blockNum
 }
 
 /** The receipt each echoed figure registers against: the header's per-axis
- *  amounts (a bare magnitude on a labelled axis, signed on a close) and the
- *  detail grid's settled-to-zero row. */
+ *  amounts (a bare magnitude on a labelled axis, signed on a close), the
+ *  detail grid's settled-to-zero row, the sheet's two PSM share legs, and the
+ *  PSM share's net at the block's price, which only the explanation states. */
 export function polarisEchoFor(key: PolarisEchoKey, ctx: PolarisContext, coords: PolarisCoords): ProseEcho | null {
   const labeled = ctx.eventType !== "close";
   switch (key) {
@@ -60,6 +63,36 @@ export function polarisEchoFor(key: PolarisEchoKey, ctx: PolarisContext, coords:
         info: ledgerFieldProv("stablesMintedToEnsureZeroDebt", coords, ctx.raw?.stablesMintedToEnsureZeroDebt),
         value: formatNumber(Math.abs(num(ctx.stablesMintedToEnsureZeroDebt))),
       };
+    case "psm_coll":
+      return {
+        info: ledgerFieldProv("mintRedeemCollGain", coords, ctx.raw?.mintRedeemCollGain),
+        value: formatPeth(Math.abs(num(ctx.mintRedeemCollGain))),
+        symbol: "pETH",
+      };
+    case "psm_debt":
+      return {
+        info: ledgerFieldProv("mintRedeemDebtGain", coords, ctx.raw?.mintRedeemDebtGain),
+        value: formatNumber(Math.abs(num(ctx.mintRedeemDebtGain))),
+        symbol: ctx.stableSymbol,
+      };
+    case "psm_net": {
+      const price = ctx.priceAtBlock?.pethInDebt;
+      if (price == null || price <= 0) return null;
+      const coll = num(ctx.mintRedeemCollGain);
+      const debt = num(ctx.mintRedeemDebtGain);
+      return {
+        info: psmShareNetProv(coords, {
+          coll,
+          debt,
+          price,
+          collRaw: ctx.raw?.mintRedeemCollGain,
+          debtRaw: ctx.raw?.mintRedeemDebtGain,
+          priceRaw: ctx.priceAtBlock?.raw,
+        }),
+        value: formatNumber(Math.abs(polarisPsmShareValue(coll, debt, price))),
+        symbol: ctx.stableSymbol,
+      };
+    }
   }
 }
 

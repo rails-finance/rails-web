@@ -127,6 +127,12 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
     return `${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%`;
   },
   token: (v) => formatNumber(Math.abs(num(v))),
+  token_signed: (v) => `${num(v) < 0 ? "−" : "+"}${formatNumber(Math.abs(num(v)))}`,
+  units4_signed: (v) => {
+    const n = Math.abs(num(v));
+    const t = n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+    return `${num(v) < 0 ? "−" : "+"}${n !== 0 && parseFloat(t.replace(/,/g, "")) === 0 ? formatNumber(n) : t}`;
+  },
   token_leg: (v) => {
     const n = Math.abs(num(v));
     return n < 1 ? fmtTokenPos(n) : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

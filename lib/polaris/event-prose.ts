@@ -17,9 +17,10 @@ import {
   polarisLiquidationFigures,
 } from "@/components/protocol/polaris/polaris-liquidation-forensics";
 import { polarisModal, POLARIS_WORDS, PROSE, type PolarisL5Key } from "@/lib/polaris/event-templates";
+import { polarisPsmShareValue } from "@/lib/polaris/economics";
 
 /** The receipt a figure echoes on the card. */
-export type PolarisEchoKey = "coll" | "debt" | "zero";
+export type PolarisEchoKey = "coll" | "debt" | "zero" | "psm_coll" | "psm_debt" | "psm_net";
 
 export type PolarisEventProse = EventProseCore<PolarisL5Key, PolarisEchoKey>;
 
@@ -104,8 +105,23 @@ export function polarisEventProse(input: PolarisProseInput): PolarisEventProse {
         : `${names.slice(0, -1).join(", ")} ${POLARIS_WORDS.and} ${names[names.length - 1]}`;
     sp.say("legs.written");
   };
+  // The settled PSM share: with the block's price, its two legs netted in the
+  // stablecoin (lib/polaris/economics.ts), the side it favours in words;
+  // without one, the two legs, each signed.
   const sayPsm = () => {
-    if (Math.abs(num(ctx.mintRedeemCollGain)) > EPS || Math.abs(num(ctx.mintRedeemDebtGain)) > EPS) sp.say("psm.share");
+    const mrColl = num(ctx.mintRedeemCollGain);
+    const mrDebt = num(ctx.mintRedeemDebtGain);
+    if (Math.abs(mrColl) <= EPS && Math.abs(mrDebt) <= EPS) return;
+    const price = ctx.priceAtBlock?.pethInDebt;
+    if (price != null && price > 0) {
+      const net = polarisPsmShareValue(mrColl, mrDebt, price);
+      v.psm_net = Math.abs(net);
+      sp.say(net < 0 ? "psm.share_neg" : "psm.share_pos", { psm_net: "psm_net" });
+      return;
+    }
+    v.psm_coll = mrColl;
+    v.psm_debt = mrDebt;
+    sp.say("psm.share_unpriced", { psm_coll: "psm_coll", psm_debt: "psm_debt" });
   };
   const saySettled = () => {
     if (num(ctx.stablesMintedToEnsureZeroDebt) > EPS) {

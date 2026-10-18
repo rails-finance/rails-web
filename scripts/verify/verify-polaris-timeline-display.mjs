@@ -3,26 +3,27 @@
 // Scaffold of verify-polaris-equity.mjs. Checks (rails-ops
 // TO-DO-polaris-v2-parity §1.4 and §1.5):
 //
-//   (a) usdp/8's display menu offers the two labels and no
-//       "Collapse like events" (no run card: measured, 0 no-change touches).
-//   (c) Collateral Ratio on: usdp/8 row #1's chip and its last row's chip
-//       read the restated `${pct1(cr)} CR`, neither red; usdp/175's
-//       liquidation row's chip is the at-fire ratio and is red (asserted on
-//       the marker, not the text: 114.78 rounds to 115); its open row is not
-//       red. Flag off: no chip anywhere.
-//   (d) usdp/8's last row expanded: the "Collateral ratio" stat reads the
-//       restated 1-dp figure; its transition's before equals the restated
-//       before ratio and its change equals after − before in points. Row #1
-//       (the open) has no transition.
+//   (a) usdp/8's display menu offers Transaction hashes and the market-note
+//       items, no "Collateral Ratio" (Miles, 18 Oct 2026: the ratio is the
+//       sheet's, never a row chip) and no "Collapse like events" (no run
+//       card: measured, 0 no-change touches).
+//   (c) No row carries a ratio chip: none on usdp/8, none on usdp/175's
+//       liquidation or open row; the liquidation's metric and forensics
+//       the sheet's ratio states the at-fire ratio, red.
+//   (d) usdp/8's last row expanded: the sheet's Risk panel "Collateral
+//       ratio" reads the restated 1-dp figure and its change (the swap) reads
+//       after − before in points at two decimals. Row #1 (the open) has no
+//       change to swap to.
 //   (e) The dash: with the document rewritten so no row carries
-//       `priceAtBlock`, no row shows a chip and the expanded metric reads
-//       "—"; the rest of the card renders.
+//       `priceAtBlock`, the sheet's ratio states no percentage; the rest of
+//       the card renders.
 //   (f) "Copy Position" markdown: the timeline table's header carries
 //       "Collateral ratio at block" and the last row carries the 2-dp
 //       figure; the price-less document gives "—".
-//   (g) Persistence: Collateral Ratio on, reload, chips still drawn and
-//       localStorage `timeline-display-v3` has showCollateralRatio: true.
-//       The defaults are restored at the end.
+//   (g) A stored preference from before the switch left: localStorage
+//       `timeline-display-v3` planted with showCollateralRatio: true, reload,
+//       the menu still opens without the item and no chip is drawn. The
+//       planted key is removed at the end.
 //
 // EVERY EXPECTED FIGURE IS RESTATED from the route's own rows at run time
 // (`crPct = newColl × pethInDebt ÷ newDebt × 100`, the before on the lag
@@ -95,7 +96,7 @@ const crAtFirePct = (d) => {
 };
 // lib/polaris/ratio-format.ts: one decimal, the site's separators, a second
 // decimal where one would put the ratio on the 115% minimum, ">10k%"
-// above the ceiling. The chip states the metric's figure.
+// above the ceiling.
 const fx = (v, d) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const pct1 = (pct) => {
   if (pct > 10000) return ">10k%";
@@ -103,10 +104,9 @@ const pct1 = (pct) => {
   while (d < 2 && pct !== 115 && fx(pct, d) === fx(115, d)) d++;
   return `${fx(pct, d)}%`;
 };
-const chipText = (pct) => `${pct1(pct)} CR`;
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
 // "Timeline values" left Display with its off state (326, `5b5c19b`).
-const MENU_LABELS = ["Collateral Ratio", "Transaction hashes"];
+const MENU_LABELS = ["Transaction hashes"];
 
 // ── the routes, read at run time ────────────────────────────────────────────
 const byTime = (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp;
@@ -174,9 +174,9 @@ function menuTrigger(page) {
 async function readDisplayMenu(page) {
   const { countSpan, trigger } = menuTrigger(page);
   await countSpan.waitFor({ state: "visible", timeout: 30000 });
-  // The dropdown title-cases its labels ("Collateral ratio"), so every
-  // comparison in this file is case-insensitive.
-  const anyItem = page.getByRole("button", { name: /^Collateral ratio$/i });
+  // The dropdown title-cases its labels, so every comparison in this file is
+  // case-insensitive.
+  const anyItem = page.getByRole("button", { name: /^Transaction hashes$/i });
   let opened = false;
   for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
     await trigger.click();
@@ -195,31 +195,6 @@ async function readDisplayMenu(page) {
   return items;
 }
 
-/** Toggle the named display item to the wanted state (idempotent). */
-async function setDisplayFlag(page, label, wantOn) {
-  const { countSpan, trigger } = menuTrigger(page);
-  await countSpan.waitFor({ state: "visible", timeout: 30000 });
-  const item = page.getByRole("button", { name: new RegExp(`^${label.replace(/[()]/g, "\\$&")}$`, "i") });
-  let opened = false;
-  for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
-    await trigger.click();
-    opened = await item
-      .waitFor({ state: "visible", timeout: 2500 })
-      .then(() => true)
-      .catch(() => false);
-    if (!opened) await page.waitForTimeout(700);
-  }
-  if (!opened) throw new Error(`Display menu never offered "${label}" on ${page.url()}`);
-  const isOn = await item
-    .locator("span")
-    .first()
-    .evaluate((el) => el.className.includes("bg-rb-500"))
-    .catch(() => false);
-  if (isOn !== wantOn) await item.click();
-  await countSpan.click();
-  await page.waitForTimeout(200);
-}
-
 const rowOf = (page, eventId) => page.locator(`[data-event-id="${eventId}"]`).first();
 
 /** Expand one event row (its header button). Idempotent: a card's open state
@@ -228,43 +203,38 @@ const rowOf = (page, eventId) => page.locator(`[data-event-id="${eventId}"]`).fi
 async function expandRow(page, eventId) {
   const row = rowOf(page, eventId);
   await row.scrollIntoViewIfNeeded();
-  // Open already when its detail grid is drawn (every non-transfer row's grid
-  // carries the "Collateral ratio" stat, a figure or a dash).
-  const isOpen = (await row.locator("div", { hasText: /^Collateral ratio$/ }).count()) > 0;
-  if (!isOpen) await row.getByRole("button").first().click();
+  // Open already when its sheet is drawn.
+  if ((await row.locator("[data-sheet]").count()) === 0) {
+    await row.locator('[data-anatomy="T1"] [role="button"]').first().click();
+    await row
+      .locator("[data-sheet]")
+      .first()
+      .waitFor({ timeout: 15000 })
+      .catch(() => {});
+  }
   await page.waitForTimeout(300);
   return row;
 }
 
-/** The chip on a row: its text and its marker, or null. */
-async function readChip(page, eventId) {
-  const chip = rowOf(page, eventId).locator("[data-ratio-chip]").first();
-  if ((await chip.count()) === 0) return null;
-  return {
-    text: (await chip.innerText()).replace(/\s+/g, " ").trim(),
-    marker: await chip.getAttribute("data-ratio-chip"),
-    red: ((await chip.getAttribute("class")) ?? "").includes("text-red-500"),
-  };
-}
-
-/** The "Collateral ratio" stat inside an expanded row: its value, and the
- *  transition's before and change (the DeltaToggle shows the before first;
- *  a click shows the change). */
+/** The sheet's Risk panel "Collateral ratio" inside an expanded row: its
+ *  value, its colour, and the change its swap shows (null when the value
+ *  has no swap). */
 async function readRatioStat(page, eventId) {
-  const row = rowOf(page, eventId);
-  const label = row.locator("div", { hasText: /^Collateral ratio$/ }).last();
-  if ((await label.count()) === 0) return null;
-  const stat = label.locator("xpath=..");
+  const stat = rowOf(page, eventId).locator('[data-sheet] [data-sheet-row="ratio"]').first();
+  if ((await stat.count()) === 0) return null;
+  const cell = stat.locator("[data-swap-value]").first();
+  const read = async () => ((await cell.innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim();
   const text = (await stat.innerText()).replace(/\s+/g, " ").trim();
-  const toggle = stat.getByRole("button", { name: /Show total change/i });
+  const value = await read();
+  const red = ((await cell.getAttribute("class").catch(() => "")) ?? "").includes("text-red-500");
   let change = null;
-  if ((await toggle.count()) > 0) {
-    await toggle.click();
+  if ((await cell.evaluate((el) => el.tagName).catch(() => "")) === "BUTTON") {
+    await cell.click();
     await page.waitForTimeout(150);
-    change = (await stat.innerText()).replace(/\s+/g, " ").trim();
-    await stat.getByRole("button", { name: /Show before and after/i }).click();
+    change = await read();
+    await cell.click();
   }
-  return { text, change };
+  return { text, value, red, change };
 }
 
 async function copyMarkdown(page) {
@@ -317,70 +287,38 @@ try {
   // rule (rails-ops TO-DO-ui-jobs item 118).
   const NOTE_LABELS = ["market notes", "open all market notes"];
   check(
-    "a. usdp/8's display menu offers the two labels, then the two market-note items, and no collapse item",
+    "a. usdp/8's display menu offers Transaction hashes, then the two market-note items, no Collateral Ratio and no collapse item",
     menu.length === MENU_LABELS.length + NOTE_LABELS.length &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
       NOTE_LABELS.every((l, i) => menu[MENU_LABELS.length + i] === l) &&
-      !menu.includes("collapse like events"),
+      !menu.includes("collapse like events") &&
+      !menu.includes("collateral ratio"),
     JSON.stringify(menu),
   );
 
   await showAll(page8);
   const dLast = last8.context.data;
 
-  // ── (c) the chips ─────────────────────────────────────────────────────────
-  check(
-    "c0. Collateral Ratio off: no chip anywhere on usdp/8",
-    (await page8.locator("[data-ratio-chip]").count()) === 0,
-  );
-  await setDisplayFlag(page8, "Collateral Ratio", true);
-  await showAll(page8);
+  // ── (c) no chip ───────────────────────────────────────────────────────────
   const cr1 = crPct(first8.context.data);
   const crLast = crPct(dLast);
-  const chip1 = await readChip(page8, first8.id);
-  const chipLast = await readChip(page8, last8.id);
-  check(
-    `c1. usdp/8 row #1's chip reads "${chipText(cr1)}" and is not red`,
-    chip1 != null && chip1.text === chipText(cr1) && !chip1.red && chip1.marker === "ok",
-    JSON.stringify(chip1),
-  );
-  check(
-    `c2. usdp/8's last row's chip reads "${chipText(crLast)}" and is not red`,
-    chipLast != null && chipLast.text === chipText(crLast) && !chipLast.red && chipLast.marker === "ok",
-    JSON.stringify(chipLast),
-  );
+  check("c1. no row on usdp/8 carries a ratio chip", (await page8.locator("[data-ratio-chip]").count()) === 0);
 
   const page175 = await open(context, polarisUrl("usdp", "175"));
   const fire = crAtFirePct(liq175.context.data);
-  const chipLiq = await readChip(page175, liq175.id);
-  const chipOpen175 = await readChip(page175, open175.id);
-  const crOpen175 = crPct(open175.context.data);
   check(
-    `c3. usdp/175's liquidation row's chip is the at-fire ratio "${chipText(fire)}" and is red (${fire.toFixed(2)} < 115)`,
-    chipLiq != null && chipLiq.text === chipText(fire) && chipLiq.red && chipLiq.marker === "below-min" && fire < 115,
-    JSON.stringify(chipLiq),
+    "c3. usdp/175's liquidation row and open row carry no ratio chip",
+    (await rowOf(page175, liq175.id).locator("[data-ratio-chip]").count()) === 0 &&
+      (await rowOf(page175, open175.id).locator("[data-ratio-chip]").count()) === 0,
   );
-  check(
-    `c4. usdp/175's open row's chip reads "${chipText(crOpen175)}" and is not red`,
-    chipOpen175 != null && chipOpen175.text === chipText(crOpen175) && !chipOpen175.red,
-    JSON.stringify(chipOpen175),
-  );
-  // The forensics explainer states the same at-fire figure at the metric's
-  // grain (one decimal, two where one would read as the minimum).
+  // The sheet states the at-fire figure at the metric's grain (one decimal,
+  // two where one would read as the minimum), red below it.
   await expandRow(page175, liq175.id);
-  const liqRow = rowOf(page175, liq175.id);
-  const explBtn = liqRow.getByRole("button", { name: /explanation/i }).first();
-  if ((await explBtn.count()) > 0 && (await explBtn.getAttribute("aria-expanded")) !== "true") await explBtn.click();
-  await page175.waitForTimeout(300);
-  const liqText = (await liqRow.innerText()).replace(/\s+/g, " ");
   const liqStat = await readRatioStat(page175, liq175.id);
   check(
-    `c5. the liquidation row's metric and the forensics clause both state ${pct1(fire)} at fire`,
-    liqStat != null &&
-      liqStat.text.includes(pct1(fire)) &&
-      liqText.includes(`ratio at liquidation at ${pct1(fire)}`) &&
-      liqStat.change == null,
-    JSON.stringify({ liqStat, inClause: liqText.includes(`ratio at liquidation at ${pct1(fire)}`) }),
+    `c5. the liquidation row's sheet states ${pct1(fire)} at fire, red, with no change`,
+    liqStat != null && liqStat.value === pct1(fire) && liqStat.red && liqStat.change == null,
+    JSON.stringify(liqStat),
   );
   await page175.close();
 
@@ -389,21 +327,17 @@ try {
   const statLast = await readRatioStat(page8, last8.id);
   const beforeLast = crBeforePct(dLast);
   const changeLast = crLast - beforeLast;
-  const changeStr = `${changeLast >= 0 ? "+" : "−"}${Math.abs(changeLast).toFixed(1)} pts`;
+  const changeStr = `${changeLast > 0 ? "▲" : "▼"} ${Math.abs(changeLast).toFixed(2)} pts`;
   check(
-    `d1. usdp/8's last row's "Collateral ratio" stat reads ${pct1(crLast)}, before ${pct1(beforeLast)}, change ${changeStr}`,
-    statLast != null &&
-      statLast.text.includes(pct1(crLast)) &&
-      statLast.text.includes(pct1(beforeLast)) &&
-      statLast.change != null &&
-      statLast.change.includes(changeStr),
+    `d1. usdp/8's last row's sheet "Collateral ratio" reads ${pct1(crLast)}, its change ${changeStr}`,
+    statLast != null && statLast.value === pct1(crLast) && statLast.change === changeStr,
     JSON.stringify(statLast),
   );
   await expandRow(page8, first8.id);
   const statFirst = await readRatioStat(page8, first8.id);
   check(
     `d2. usdp/8 row #1 (the open) reads ${pct1(cr1)} with no transition`,
-    statFirst != null && statFirst.text.includes(pct1(cr1)) && statFirst.change == null && !/pts/.test(statFirst.text),
+    statFirst != null && statFirst.value === pct1(cr1) && statFirst.change == null,
     JSON.stringify(statFirst),
   );
 
@@ -424,7 +358,14 @@ try {
     JSON.stringify({ tableHeader, lastMdRow: lastMdRow.slice(0, 300) }),
   );
 
-  // ── (g) persistence ───────────────────────────────────────────────────────
+  // ── (g) a stored preference from before ───────────────────────────────────
+  await page8.evaluate(() => {
+    let prev = {};
+    try {
+      prev = JSON.parse(localStorage.getItem("timeline-display-v3") ?? "{}") ?? {};
+    } catch {}
+    localStorage.setItem("timeline-display-v3", JSON.stringify({ ...prev, showCollateralRatio: true }));
+  });
   await page8.reload({ waitUntil: "domcontentloaded" });
   await page8
     .getByText(/^(?:Showing )?[\d,]+(?: of [\d,]+)? (?:events?|listed)/)
@@ -432,17 +373,11 @@ try {
     .waitFor({ state: "visible", timeout: 120000 })
     .catch(() => {});
   await page8.waitForTimeout(800);
-  const stored = await page8.evaluate(() => {
-    try {
-      return JSON.parse(localStorage.getItem("timeline-display-v3") ?? "null");
-    } catch {
-      return null;
-    }
-  });
+  const menuAfter = (await readDisplayMenu(page8)).map((s) => s.toLowerCase());
   check(
-    "g. Collateral Ratio survives a reload: chips drawn and timeline-display-v3 has showCollateralRatio: true",
-    stored?.showCollateralRatio === true && (await page8.locator("[data-ratio-chip]").count()) > 0,
-    JSON.stringify({ stored, chips: await page8.locator("[data-ratio-chip]").count() }),
+    "g. a stored showCollateralRatio: true draws no chip and the menu still opens without the item",
+    (await page8.locator("[data-ratio-chip]").count()) === 0 && !menuAfter.includes("collateral ratio"),
+    JSON.stringify({ menuAfter, chips: await page8.locator("[data-ratio-chip]").count() }),
   );
 
   // ── (e) the dash ──────────────────────────────────────────────────────────
@@ -453,18 +388,13 @@ try {
     priceLessLeftovers === 0,
     `${priceLessLeftovers} leftovers`,
   );
-  const chipsNoPrice = await pageNoPrice.locator("[data-ratio-chip]").count();
   await expandRow(pageNoPrice, last8.id);
   const statNoPrice = await readRatioStat(pageNoPrice, last8.id);
   const rowText = (await rowOf(pageNoPrice, last8.id).innerText()).replace(/\s+/g, " ");
   check(
-    "e1. without a price: no chip on any row, the expanded metric reads a dash, and the row's Collateral and Debt stats still render",
-    chipsNoPrice === 0 &&
-      statNoPrice != null &&
-      /Collateral ratio —/.test(statNoPrice.text) &&
-      /Collateral/.test(rowText) &&
-      /Debt/.test(rowText),
-    JSON.stringify({ chipsNoPrice, statNoPrice }),
+    "e1. without a price: the sheet's ratio states no percentage, and the row's Collateral and Debt still render",
+    statNoPrice != null && !/\d%/.test(statNoPrice.text) && /Collateral/.test(rowText) && /Debt/.test(rowText),
+    JSON.stringify({ statNoPrice }),
   );
   const mdNoPrice = await copyMarkdown(pageNoPrice);
   const lastMdRowNoPrice = mdRowFor(mdNoPrice, last8);
@@ -475,18 +405,22 @@ try {
   );
   await pageNoPrice.close();
 
-  // ── restore the shared defaults ───────────────────────────────────────────
-  await setDisplayFlag(page8, "Collateral Ratio", false);
+  // ── remove the planted key ────────────────────────────────────────────────
   const restored = await page8.evaluate(() => {
     try {
+      const prev = JSON.parse(localStorage.getItem("timeline-display-v3") ?? "null");
+      if (prev) {
+        delete prev.showCollateralRatio;
+        localStorage.setItem("timeline-display-v3", JSON.stringify(prev));
+      }
       return JSON.parse(localStorage.getItem("timeline-display-v3") ?? "null");
     } catch {
       return null;
     }
   });
   check(
-    "z. the run leaves the display flags at their defaults",
-    restored?.showCollateralRatio === false,
+    "z. the run leaves no showCollateralRatio in the stored flags",
+    !("showCollateralRatio" in (restored ?? {})),
     JSON.stringify(restored),
   );
   await page8.close();

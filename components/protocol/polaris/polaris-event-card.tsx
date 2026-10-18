@@ -24,7 +24,7 @@ import { polarisEventProse } from "@/lib/polaris/event-prose";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { formatPeth } from "@/lib/polaris/figure-format";
-import { usePolarisHeadSpec } from "./polaris-event-header";
+import { polarisHeadSpec } from "./polaris-event-header";
 import { polarisEventBody } from "./polaris-event-detail";
 import {
   PolarisEventExplainer,
@@ -136,7 +136,7 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     () => ({ ctx, coords: polarisEchoCoords(ctx, event.txHash, event.blockNumber) }),
     [ctx, event.txHash, event.blockNumber],
   );
-  const head = usePolarisHeadSpec(event.actionLabel, ctx, coords);
+  const head = polarisHeadSpec(event.actionLabel, ctx, coords);
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
   const body = polarisEventBody(ctx, coords, useFlowFocus() != null, previousEvent?.context.data);

@@ -1,6 +1,6 @@
 // Polaris collateral ratio at the event, computed once for every surface.
 // ----------------------------------------------------------------------------
-// The header chip, the detail metric and the markdown export all read THIS
+// The sheet's Risk panel, the detail metric and the markdown export all read THIS
 // function, so no surface can state a different figure for the same row.
 //
 // A touch (open / adjust / close) states `_newColl × previewPrice() ÷ _newDebt`
@@ -12,10 +12,10 @@
 // A liquidation row has `_newDebt = 0`, so the formula has no answer there.
 // The row states the ratio AT FIRE the forensics already compute, the ENTIRE
 // seized collateral over the debt cleared (polarisLiquidationFigures), so
-// the chip, the metric and the forensics line agree to the digit.
+// the sheet, the metric and the forensics line agree to the digit.
 //
 // A row without a price, or a close (no resulting debt), carries no ratio:
-// the caller draws a dash (the metric) or nothing (the chip).
+// the caller draws a dash (the metric) or nothing.
 
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
@@ -91,15 +91,8 @@ export const crPct1 = (pct: number): string => formatPolarisRatioPct(pct, 1, POL
  *  every ratio it states (the same key the explainer's ratio at fire
  *  registers, so the three surfaces of a liquidation share one receipt). */
 export const crPct2 = (pct: number): string => `${pct.toFixed(2)}%`;
-/** The header chip: the metric's figure, so the row states one ratio. */
-export const crChipText = (pct: number): string => `${crPct1(pct)} CR`;
-
-/** What the chip's "CR" stands for, on hover. */
-export const CR_CHIP_TITLE =
-  "Collateral ratio (CR): the collateral's value at this block's price divided by the debt. Under 115% anyone may liquidate the CDP.";
-
 /** The receipt behind the ratio and the value key it registers under, built
- *  once so the header chip (an echo) and the detail metric (the primary) name
+ *  once so the sheet and the detail metric name
  *  the same identity. A liquidation row's receipt is the forensics' own
  *  `liqIcrAtFireProv`, with the values the explainer clause passes. */
 export function polarisCrReceipt(

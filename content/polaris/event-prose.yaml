@@ -32,6 +32,10 @@ roundings:
     up to four places (0.0375)
   number: |-
     three places, grouped, signed (6,500.123)
+  token_signed: |-
+    three places, grouped, with its sign (+6,500.123, −6,098.142)
+  units4_signed: |-
+    up to four places, with its sign (+0.0375, −1.6499)
   pct_whole: |-
     whole percent of a fraction (0.32 → 32%), unsigned
   ratio_frac: |-
@@ -174,6 +178,18 @@ placeholders:
     rounding: token
     means: |-
       the stablecoin the CDP's PSM shares removed from its debt over its life
+  psm_coll:
+    rounding: units4_signed
+    means: |-
+      the pETH the PSM share settled at this touch, signed as it moved the collateral
+  psm_debt:
+    rounding: token_signed
+    means: |-
+      the stablecoin the PSM share settled at this touch, signed as it moved the debt
+  psm_net:
+    rounding: token
+    means: |-
+      the PSM share's two legs netted in the stablecoin at this block's pETH price, unsigned
 
 # ── The event explanation's group headings, in the order the pane shows them ──
 group_words:
@@ -211,7 +227,7 @@ words:
   sheet_reward: |-
     Reward pETH
   sheet_psm: |-
-    Net PSM share
+    PSM share
   sheet_stability_gain: |-
     Stability gain
   sheet_settled: |-
@@ -453,11 +469,21 @@ shared_sentences:
       interest, stability gains or reward pETH were written in at this touch
     text: |-
       The touch also wrote in the {legs} built up since the previous one.
-  psm.share:
+  psm.share_pos:
     when: |-
-      a net PSM share was written in at this touch
+      a PSM share was written in at this touch, priced at its block, its net in the holder's favour
     text: |-
-      Traders' PSM mints and redemptions since the previous touch gave this CDP a net share.
+      PSM mints and redemptions since the previous touch netted {psm_net} {stable} in the holder's favour at this block's pETH price.
+  psm.share_neg:
+    when: |-
+      a PSM share was written in at this touch, priced at its block, its net against the holder
+    text: |-
+      PSM mints and redemptions since the previous touch netted {psm_net} {stable} against the holder at this block's pETH price.
+  psm.share_unpriced:
+    when: |-
+      a PSM share was written in at this touch and its block has no price
+    text: |-
+      PSM mints and redemptions since the previous touch moved {psm_coll} pETH and {psm_debt} {stable} through this CDP.
   zero.settled:
     when: |-
       the protocol added debt so it settled at zero
@@ -571,7 +597,9 @@ templates:
       - adj.repay
       - adj.none
       - legs.written
-      - psm.share
+      - psm.share_pos
+      - psm.share_neg
+      - psm.share_unpriced
       - zero.settled
     groups:
       happened:
@@ -582,7 +610,9 @@ templates:
         - adj.none
       adds_up:
         - legs.written
-        - psm.share
+        - psm.share_pos
+        - psm.share_neg
+        - psm.share_unpriced
         - zero.settled
     alternates:
       - [adj.deposit, adj.withdraw]
@@ -635,7 +665,9 @@ templates:
       - close.withdraw
       - close.bare
       - legs.written
-      - psm.share
+      - psm.share_pos
+      - psm.share_neg
+      - psm.share_unpriced
       - zero.settled
       - close.ended
     groups:
@@ -646,7 +678,9 @@ templates:
         - close.bare
       adds_up:
         - legs.written
-        - psm.share
+        - psm.share_pos
+        - psm.share_neg
+        - psm.share_unpriced
         - zero.settled
       leaves:
         - close.ended

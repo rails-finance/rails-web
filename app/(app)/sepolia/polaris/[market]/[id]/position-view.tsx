@@ -50,7 +50,7 @@ import { usePolarisFlows } from "@/hooks/usePolarisFlows";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
-import { TimelineActivityHeader, POLARIS_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { ExportMenu } from "@/components/shared/export-menu";
 import { polarisExports } from "@/components/protocol/polaris/polaris-export-menu";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -432,7 +432,7 @@ export default function PolarisPositionView({
                     closed: view.status !== "open",
                   })
                 }
-                displayItems={POLARIS_DISPLAY_ITEMS}
+                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                 toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
                 renderCard={(event, meta) =>
                   isPolarisEvent(event) ? (

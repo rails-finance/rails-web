@@ -40,6 +40,8 @@ export type Rounding =
   | "morpho_amount"
   | "fall_pct"
   | "token"
+  | "token_signed"
+  | "units4_signed"
   | "token_leg"
   | "token_pos"
   | "compound_amount"
