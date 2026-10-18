@@ -15,7 +15,7 @@
 // sheet is read from those (`mergeLaneSheet`). A group whose members draw no
 // sheet and hand up no balances, or sheets of different shapes,
 // or figures the sheet's own formats do not state (`parseSheetNumber`), has
-// none, and its card keeps the sentence and the sums.
+// none, and its card keeps the sums.
 
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Provenance } from "@/components/shared/provenance";

@@ -5,13 +5,15 @@ import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
+import { Fragment, createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Calculator } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
 import { GroupSheetCollector } from "@/components/shared/group-sheet";
-import type { EventSheet } from "@/components/shared/event-sheet";
+import type { EventSheet, SheetFigure } from "@/components/shared/event-sheet";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import type { FlowSide } from "@/lib/shared/flows-timeline";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { CountChip } from "@/components/shared/count-chip";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
@@ -46,7 +48,8 @@ import type { Tone } from "@/lib/shared/tone";
  * (`CountChip`, ui-jobs 331), the date range in the time slot, and the list's line dotted below it for the members
  * not drawn; the row's ⋮ ("Show 48 grouped events") shows them, inside the
  * bracket frame (`group-frame.tsx`). A click on the nodes or the head opens the
- * summary card: the members' merged sheet, or the sums with their Σ receipts.
+ * summary card: Explanation, the run in bullets, and Figures, the members' merged
+ * sheet or the sums with their Σ receipts.
  *
  * ── TWO WAYS THE MEMBERS ARRIVE, ONE CARD
  *
@@ -393,37 +396,162 @@ export function TimelineRunCard({
     });
   const hasSums = legAggs.length > 0 || !!lead || !!sheetLead || !!extraHeader;
 
-  /** The group's summary card where the members draw no sheet: the sums,
-   *  under the header that names the group, counts it and dates it (Liquity
-   *  V2's redemption group, whose body is its members' sheet alone). */
-  // T2, on an adverse run only: one sentence of what the sums do not say —
-  // the effective price where the run cleared a dollar debt against
-  // collateral, and the position's span where the caller states it. An
-  // owner's run (a shape run, a cycle) has none: its sums and their counts
-  // are the whole account.
-  const t2 = (() => {
-    if (!adverse || legAggs.length === 0) return null;
-    const amt = (v: number, sym: string) => `${fmtHeaderMagnitude(v, sym)} ${sym}`;
-    const clauses = legAggs.map((a) => `${a.verb.toLowerCase()} ${amt(a.value, a.symbol)}`).join(" and ");
-    let price = "";
-    const debt = legAggs.find((a) => DEBT_VERB.test(a.verb));
-    const coll = legAggs.find((a) => !DEBT_VERB.test(a.verb));
-    if (debt && coll && coll.value > 0 && USD_DEBT.test(debt.symbol))
-      price = `, an effective $${Math.round(debt.value / coll.value).toLocaleString("en-US")} per ${coll.symbol}`;
-    const spans = (stateSpan ?? []).map(
-      (st, i) =>
-        `${i === 0 ? st.label : st.label.replace(/^the /, "")} went from ${stateAmount(st.from)} to ${stateAmount(st.to)} ${st.symbol}`,
-    );
-    const spanText = spans.length ? `; ${spans.join(", ").replace(/, (\S+) went from/g, ", $1 from")}` : "";
-    return `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural} ${spanWords(fromTs, toTs)} ${clauses}${price}${spanText}.`;
-  })();
-
   // The members the sheet reads: a client-grouped run's cards, or a served
   // folder's once read (the summary's open asks for them).
   const sheetMembers = onOpen ? members : children;
   const collector = sheetMembers != null && (
     <GroupSheetCollector members={sheetMembers} count={count} label={kindWord} onSheet={onSheet} />
   );
+
+  // ── T3: the group's Explanation (rails-ops TO-DO-ui-jobs 372, decision
+  // 0044). One generator for every family and run kind, as bullets, each
+  // dropped where its data is missing: what happened (who, how many of what,
+  // when, the sums verb by verb), the effective price where an adverse run
+  // cleared a dollar debt against collateral, each side's before and after,
+  // and where the members are. At most two figures to a bullet beyond the
+  // count and the dates, and five bullets.
+  const W = GROUP_EXPLANATION_WORDS;
+  const saidLegs = legAggs.filter((a) => !unreadOf(undefined, a.symbol));
+  const bold = (n: ReactNode) => <strong className="font-semibold text-foreground">{n}</strong>;
+  // A leg whose verb is the one before it drops the verb: "borrowed 400 GHO
+  // and 575 USDC".
+  const sumClause = (a: RunAggregate, verb: boolean) => (
+    <>
+      {verb && `${pastTense(a.verb)} `}
+      <Prov echo value={fullNum(a.value)} symbol={a.symbol} info={runProv(a.provWhat)}>
+        {bold(<ExactTip text={fmtHeaderMagnitude(a.value, a.symbol)} exact={formatExact(a.value)} symbol={a.symbol} />)}
+      </Prov>{" "}
+      {a.symbol}
+    </>
+  );
+  const joinAnd = (legs: RunAggregate[]) =>
+    legs.map((a, i) => (
+      <Fragment key={`${a.verb}_${a.symbol}`}>
+        {i > 0 && ` ${W.and} `}
+        {sumClause(a, i === 0 || legs[i - 1].verb !== a.verb)}
+      </Fragment>
+    ));
+  const pairs: RunAggregate[][] = [];
+  for (let i = 0; i < saidLegs.length; i += 2) pairs.push(saidLegs.slice(i, i + 2));
+  const bullets: ReactNode[] = [];
+  const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
+  const span = spanWords(fromTs, toTs);
+  // Who: the holder on an owner's run, a third party where the caller says
+  // the members are another party's acts (`byOwner` false on an external
+  // run: Maple's queue fills); a run of transfers, of the owner's losses or
+  // of mixed events names its events alone.
+  const who =
+    actedByOwner && spineIcon !== "custody"
+      ? W.holder
+      : spineIcon === "external" && byOwner === false
+        ? W.thirdParty
+        : null;
+  const shownPairs = pairs.slice(0, MAX_LEG_BULLETS);
+  const unsaid = saidLegs.length - shownPairs.flat().length;
+  bullets.push(
+    who ? (
+      <>
+        {who} {countText} {span}
+        {pairs[0] && (
+          <>
+            {" "}
+            {W.inAll} {joinAnd(pairs[0])}
+          </>
+        )}
+        .
+      </>
+    ) : (
+      <>
+        {countText} {span}
+        {pairs[0] && <> {joinAnd(pairs[0])}</>}.
+      </>
+    ),
+  );
+  for (const pair of shownPairs.slice(1))
+    bullets.push(
+      <>
+        {W.also} {joinAnd(pair)}.
+      </>,
+    );
+  if (unsaid > 0) bullets.push(W.moreSums(unsaid));
+  const debtLeg = adverse ? saidLegs.find((a) => DEBT_VERB.test(a.verb)) : undefined;
+  const collLeg = adverse ? saidLegs.find((a) => !DEBT_VERB.test(a.verb)) : undefined;
+  if (debtLeg && collLeg && collLeg.value > 0 && USD_DEBT.test(debtLeg.symbol)) {
+    const price = debtLeg.value / collLeg.value;
+    bullets.push(
+      <>
+        {W.price}{" "}
+        <Prov value={String(price)} info={priceProv(debtLeg, collLeg, count, memberPlural, fullNum)}>
+          {bold(`$${Math.round(price).toLocaleString("en-US")}`)}
+        </Prov>{" "}
+        {W.per} {collLeg.symbol}.
+      </>,
+    );
+  }
+  const sideOf = (label: string): FlowSide => (/debt/i.test(label) ? "debt" : "collateral");
+  const covered = new Set<string>();
+  for (const st of stateSpan ?? []) {
+    covered.add(sideOf(st.label));
+    bullets.push(
+      <>
+        {capitalFirst(/^the /i.test(st.label) ? st.label : `the ${st.label}`)} {W.wentFrom} {bold(stateAmount(st.from))}{" "}
+        {W.to} {bold(stateAmount(st.to))} {st.symbol}.
+      </>,
+    );
+  }
+  // A side the merged sheet states before and after, where `stateSpan` does not.
+  const sheetFig = (f: SheetFigure, symbol?: string) =>
+    f.info ? (
+      <Prov echo info={f.info} value={f.value} symbol={symbol}>
+        {bold(f.text)}
+      </Prov>
+    ) : (
+      bold(f.text)
+    );
+  // A side the group left where it found it says nothing.
+  const same = (x: SheetFigure, y: SheetFigure) =>
+    x.value != null && y.value != null
+      ? Number(x.value) === Number(y.value)
+      : typeof x.text === "string" && x.text === y.text;
+  for (const s of merged?.sheet.sides ?? []) {
+    const key = s.id ?? s.side;
+    if (covered.has(key)) continue;
+    covered.add(key);
+    const name = s.name ? `The ${s.name.toLowerCase()}` : W.side[s.side];
+    const b = s.before?.amount;
+    const a = s.totalAmount;
+    const symbol = b?.symbol ?? a?.symbol;
+    if (b && a && symbol) {
+      if (!same(b, a))
+        bullets.push(
+          <>
+            {name} {W.wentFrom} {sheetFig(b, symbol)} {W.to} {sheetFig(a, symbol)} {symbol}.
+          </>,
+        );
+    } else if (s.before?.usd && "text" in s.total && !same(s.before.usd, s.total))
+      bullets.push(
+        <>
+          {name} {W.wentFrom} {sheetFig(s.before.usd)} {W.to} {sheetFig(s.total)}.
+        </>,
+      );
+  }
+  if (saidLegs.length > 0 && bullets.length < MAX_BULLETS) bullets.push(W.note);
+  const [firstBullet, ...restBullets] = bullets.slice(0, MAX_BULLETS);
+  const explainer = {
+    first: <span data-group-sentence="">{firstBullet}</span>,
+    // The collector and the folder's read sit here too, so the members are
+    // read and the sheet's sides reach the bullets while Explanation is open.
+    body: (
+      <>
+        {hasSums && collector}
+        {hasSums && onOpen && !members && <AskMembers onOpen={onOpen} askedRef={askedRef} />}
+        <ProseExplainer items={restBullets} />
+      </>
+    ),
+  };
+  /** The Figures tab: the members' merged sheet, its skeleton while they are
+   *  collected, or the sums where the members draw no sheet (Liquity V2's
+   *  redemption group draws its members' sheet alone). */
   const summary = merged ? (
     <div data-group-summary="" data-group-sheet="">
       {collector}
@@ -438,11 +566,6 @@ export function TimelineRunCard({
     <div data-group-summary="">
       {collector}
       {onOpen && !members && <AskMembers onOpen={onOpen} askedRef={askedRef} />}
-      {t2 && (
-        <p className="px-5 pt-3 text-sm leading-relaxed text-rb-500" data-anatomy="T2" data-group-sentence="">
-          {t2}
-        </p>
-      )}
       {/* The header above names the group (`lead`) and dates it: the strip
           states the sums and their counts. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-3 pb-4">
@@ -526,7 +649,6 @@ export function TimelineRunCard({
   const spokenSums = legAggs
     .filter((agg) => !unreadOf(undefined, agg.symbol))
     .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
-  const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
 
   return (
     <GroupFrame
@@ -548,7 +670,7 @@ export function TimelineRunCard({
             price: merged?.price,
             ledgers: { none: "A run's ledgers are its members'." },
             notes: hasSums ? summary : undefined,
-            explainer: { body: null },
+            explainer,
             learnMore: null,
           }}
           phoneCaption={
@@ -577,6 +699,61 @@ function AskMembers({ onOpen, askedRef }: { onOpen: () => void; askedRef: React.
     onOpen();
   }, [onOpen, askedRef]);
   return null;
+}
+
+/** The group Explanation's words (rails-ops TO-DO-ui-jobs 372), the same on
+ *  every family's. */
+const GROUP_EXPLANATION_WORDS = {
+  holder: "The holder made",
+  thirdParty: "A third party made",
+  inAll: "and in all",
+  and: "and",
+  also: "They also",
+  price: "The debt cleared at an effective",
+  per: "per",
+  wentFrom: "went from",
+  to: "to",
+  side: { collateral: "The collateral", debt: "The debt" } as Record<FlowSide, string>,
+  note: "Open the group for each event and its receipt.",
+  moreSums: (n: number) => `The Figures tab has the other ${n.toLocaleString("en-US")} sums.`,
+  /** A header verb that is a participle, in the past tense a sentence takes. */
+  pastTense: { withdrawn: "withdrew", "written off": "wrote off", "debt cleared": "cleared" } as Record<string, string>,
+};
+
+/** The explanation's bullets at most (rails-ops standards/prose-limits-and-zones.md, Z2). */
+const MAX_BULLETS = 5;
+/** The bullets the sums take at most, two to a bullet; the rest are counted. */
+const MAX_LEG_BULLETS = 2;
+
+function pastTense(verb: string): string {
+  const v = verb.toLowerCase();
+  return GROUP_EXPLANATION_WORDS.pastTense[v] ?? v;
+}
+
+function capitalFirst(s: string): string {
+  return `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
+}
+
+/** The receipt of an adverse group's effective price: the debt it cleared
+ *  over the collateral it took, both summed over the members. */
+function priceProv(
+  debt: RunAggregate,
+  coll: RunAggregate,
+  count: number,
+  plural: string,
+  fullNum: (n: number) => string,
+): Provenance {
+  const d = debt.provWhat.toLowerCase();
+  const c = coll.provWhat.toLowerCase();
+  return {
+    kind: "chain-derived",
+    summary: `Effective price across this group — the ${d} divided by the ${c}, each summed over the ${count} ${plural}.`,
+    formula: `Σ ${d} ÷ Σ ${c}`,
+    inputs: [
+      { label: d, value: `${fullNum(debt.value)} ${debt.symbol}`, kind: "chain" },
+      { label: c, value: `${fullNum(coll.value)} ${coll.symbol}`, kind: "chain" },
+    ],
+  };
 }
 
 /** A state figure as the card's grid states it: whole units from a thousand,

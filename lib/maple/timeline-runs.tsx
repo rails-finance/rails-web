@@ -34,6 +34,7 @@ export const MAPLE_QUEUE_FILL_RUNS: TimelineRunSpec[] = [
             count={events.length}
             memberNoun="queue fill"
             spineIcon="external"
+            byOwner={false}
             aggregates={Array.from(paidOut, ([symbol, value]) => ({
               verb: "Paid out",
               value,
@@ -63,6 +64,7 @@ export const MAPLE_QUEUE_FILL_RUNS: TimelineRunSpec[] = [
 const QUEUE_FILL_FOLDER: FolderRegisterEntry = {
   memberNoun: "queue fill",
   spineIcon: "external",
+  byOwner: false,
   readingLine: true,
 };
 
