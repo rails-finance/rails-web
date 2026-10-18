@@ -20,7 +20,8 @@ import { eventGas } from "@/components/shared/event-price-row";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 
-import { polarisEventProse } from "@/lib/polaris/event-prose";
+import { polarisEventProse, polarisT1Caption, polarisT1Words } from "@/lib/polaris/event-prose";
+import { polarisLiquidationDeltas } from "@/lib/polaris/liquidation-legs";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { formatPeth } from "@/lib/polaris/figure-format";
@@ -121,9 +122,15 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     .sort((a, b) => FAMILY_ORDER.indexOf(a.kind) - FAMILY_ORDER.indexOf(b.kind))
     .map((l) => l.row);
 
+  // A liquidation's seizure on the spine: the pETH taken below the debt the
+  // pool cleared. The surplus stays with the owner and the head states it.
+  const warningLegs = polarisLiquidationDeltas(ctx, coords)
+    .filter((d) => !d.noSpineCounterpart)
+    .map((d) => ({ label: d.label, value: Math.abs(d.value), symbol: d.symbol, address: d.address }));
+
   const spine: SpineColumnProps =
     ctx.eventType === "liquidate"
-      ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+      ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
       : ctx.eventType === "transfer"
         ? { icon: "custody", isLast: !!isLast }
         : tokens.length === 0
@@ -136,7 +143,7 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     () => ({ ctx, coords: polarisEchoCoords(ctx, event.txHash, event.blockNumber) }),
     [ctx, event.txHash, event.blockNumber],
   );
-  const head = polarisHeadSpec(event.actionLabel, ctx, coords);
+  const head = polarisHeadSpec(ctx, coords);
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
   const body = polarisEventBody(ctx, coords, useFlowFocus() != null, previousEvent?.context.data);
@@ -151,9 +158,11 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     },
     spine,
     head,
-    caption: event.actionLabel,
-    // A transfer: the holder it reached only received it (ui-jobs 304).
-    actor: ctx.eventType === "transfer" ? { byOwner: false } : undefined,
+    // The phone caption and the row's accessible name follow the head's words.
+    caption: polarisT1Caption(polarisT1Words(ctx)),
+    // A transfer: the holder it reached only received it (ui-jobs 304). A
+    // liquidation: the liquidator acted.
+    actor: ctx.eventType === "transfer" || ctx.eventType === "liquidate" ? { byOwner: false } : undefined,
     cells: body.cells,
     sheet: body.sheet,
     ledgers: {

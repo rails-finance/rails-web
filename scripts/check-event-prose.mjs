@@ -85,6 +85,9 @@ const FAMILIES = {
       "components/protocol/liquity/liquity-cells.tsx",
       "components/protocol/liquity/liquity-event-card.tsx",
       "lib/liquity/explorer.ts",
+      // The forks' timeline head reads the t1 words (rails-ops decision 0045).
+      "lib/shared/liquity-fork-head-words.ts",
+      "components/protocol/liquity-fork/liquity-fork-event-card.tsx",
     ],
     /** The listing, the Trove and event pages, the run card and the position
      *  card's explanation print trove_words. */
@@ -114,6 +117,7 @@ const FAMILIES = {
       "lib/liquity/event-page.ts",
       "lib/liquity/event-page-markdown.ts",
       "components/protocol/liquity/event-prose-render.tsx",
+      "lib/shared/liquity-fork-head-words.ts",
     ],
   },
   "liquity-v1": {
@@ -265,6 +269,9 @@ const FAMILIES = {
       "components/protocol/polaris/polaris-event-explainer.tsx",
       "components/protocol/polaris/polaris-position-explanation.tsx",
       "components/protocol/polaris/polaris-sheet.ts",
+      "components/protocol/polaris/polaris-event-header.tsx",
+      "components/protocol/polaris/polaris-event-card.tsx",
+      "components/protocol/polaris/polaris-event-detail.tsx",
     ],
     nodes: {
       section: "position_words",
@@ -278,6 +285,7 @@ const FAMILIES = {
       "lib/polaris/position-nodes.tsx",
       "components/protocol/polaris/polaris-event-explainer.tsx",
       "components/protocol/polaris/polaris-event-card.tsx",
+      "components/protocol/polaris/polaris-event-header.tsx",
     ],
   },
   "aave-v3": {

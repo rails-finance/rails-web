@@ -1,29 +1,15 @@
 "use client";
 
-// Shared Liquity-V2-fork event head (chain-state tier) — the card's `head` slot
-// (ui-jobs 309), drawn by the shared ChainTruthRow, for the three forks (Ebisu,
-// Asymmetry, Basedollar). A Trove event
-// moves two axes at once (branch collateral + the fork's stablecoin debt), so
-// the row carries two signed deltas; each is after − before over two emitted
-// absolutes (chain-derived), traced via <Prov>. The two forks differ only in
-// what names the deployment — the debt symbol and the provenance builders — so
-// those arrive as `builders`, the same shape the fork explainer already uses.
+// Shared Liquity-V2-fork event head — the card's `head` slot (ui-jobs 309),
+// drawn by the shared ChainTruthRow, for the three forks (Ebisu, Asymmetry,
+// Basedollar).
 //
-// Where the rate IS the event's point (open / rate change / batch join-or-leave)
-// the header also carries a rate pill: the rate the owner (or a delegate acting
-// for them) chose, echoing the detail grid's rate receipt. A rate on every
-// adjust would turn the header into a ticker, so it is scoped to those events.
-//
-// A batched Trove's rate pill is paired with a party-pink DELEGATE chip naming
-// the interest-batch manager — scoped to the SAME events, because the chip's
-// claim is "this delegate determines the rate on this row", which is only the
-// point where the rate is. On a plain adjustTrove the owner moved collateral and
-// the manager is a standing fact about the Trove, not about the event; on a
-// redemption a third party acted and the manager did nothing at all. Against the
-// real timelines that scope is what keeps the header a header: of the 3,628 rows
-// carrying a manager across both forks, 3,387 are redemptions and 159 are owner
-// adjusts — chipping them all would bury the 82 rows where a delegate was
-// actually handed control.
+// The timeline's head is words (rails-ops decision 0045, TO-DO-ui-jobs 367):
+// the past-participle kind, in its status pill where it has one, then the
+// clauses for what the spine cannot show (`liquityForkT1Words`). The spine
+// carries the figures: the legs, the escrow and the rate. The head keeps a
+// redistribution's arrival, which moves no token, a pending debt's figure,
+// whose spine draws no flank, and a liquidation's claimable surplus.
 
 import type {
   AssetFlow,
@@ -34,20 +20,14 @@ import type {
 } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
-import type { Provenance } from "@/components/shared/provenance";
-import type { LiquityForkCoords, DeltaOps } from "@/lib/shared/liquity-fork-provenance";
-import {
-  FORK_RATE_PILL_EVENTS,
-  COLL_VERB,
-  DEBT_VERB,
-  FORK_DEBT_DUST_FLOAT,
-  forkDebtMove,
-  forkDebtMoveOps,
-  forkCollMove,
-  forkRedistArrival,
-} from "@/lib/shared/liquity-fork-ops";
-import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
-import { FORK_ESCROW_WORDS, type LiquityForkEscrow } from "./liquity-fork-escrow";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import type { LiquityForkCoords, DeltaOps, LiquityForkLiquidationLeg } from "@/lib/shared/liquity-fork-provenance";
+import { FORK_DEBT_DUST_FLOAT, forkDebtMove, forkDebtMoveOps, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
+import { liquityForkT1Words, type LiquityForkT1Clause } from "@/lib/shared/liquity-fork-head-words";
+import { zombieTitle } from "@/lib/liquity/trove-page-words";
+import { formatDate } from "@/lib/date";
+import { formatExact } from "@/lib/utils/format";
 
 /** The fork contexts are structural twins; any of them drives the head. */
 export type LiquityForkEventContext = EbisuContext | AsymmetryContext | BasedollarContext;
@@ -71,38 +51,79 @@ export interface LiquityForkHeaderBuilders {
     coords: LiquityForkCoords,
     vals: { fee?: string; batchFee: string; shares?: string; totalShares: string },
   ) => Provenance;
+  /** A Liquidation log's leg; the head reads the surplus. */
+  liquidationLegProv?: (
+    coords: LiquityForkCoords,
+    vals: { leg: LiquityForkLiquidationLeg; amount: string },
+  ) => Provenance;
 }
 
 export interface LiquityForkHeadArgs {
-  actionLabel: string;
-  /** Zero-delta adjust — the sub-epsilon dust chip would contradict the
-   *  "No change" label, so the row renders label-only. */
+  /** Zero-delta adjust: the head reads "No change". */
   noChange?: boolean;
   ctx: LiquityForkEventContext;
   txHash?: string;
   blockNumber?: number;
   builders: LiquityForkHeaderBuilders;
-  /** The event's own movements, read for the two contracts this row names. A
-   *  fork adds branches over time and each branch is a different collateral, so
-   *  the set of symbols reaching this header is open-ended and the house table
-   *  is the wrong authority on it; the Trove's flows record the ERC-20s that
-   *  actually moved, which is what the icon chip has to have. */
+  /** The event's own movements, read for the contracts the head's figures
+   *  name: a fork adds branches over time, so the house table is the wrong
+   *  authority on a collateral's address. */
   flows?: AssetFlow[];
-  /** The fork's gas compensation escrow, a leg on the open and the close. */
-  escrow?: LiquityForkEscrow;
+  /** The liquidation's surplus has since been claimed (the page's head read). */
+  surplusClaimed?: { timestamp?: number | null } | null;
 }
 
-/** The row's spec: the per-axis verbs, the redemption's legs, the rate pill
- *  and the delegate chip where the rate is the event's point. */
+/** One clause of the head, drawn. */
+function clauseNode(
+  c: LiquityForkT1Clause,
+  ctx: LiquityForkEventContext,
+  coords: LiquityForkCoords,
+  builders: LiquityForkHeaderBuilders,
+) {
+  if ("text" in c) return c.zombie ? <span title={zombieTitle(!!c.cleared)}>{c.text}</span> : <span>{c.text}</span>;
+  if ("delegate" in c)
+    return (
+      <span>
+        {c.lead}{" "}
+        <Prov info={builders.batchManagerProv(coords, c.address)} value={c.address}>
+          <span className="font-bold text-pink-500">{c.delegate}</span>
+        </Prov>
+      </span>
+    );
+  // The one figure the head states: the collateral the holder can claim.
+  const amount = ctx.liquidation?.collSurplus ?? String(c.surplus);
+  const figure = <span className="font-bold text-foreground">{c.surplus.toFixed(4)}</span>;
+  return (
+    <>
+      {builders.liquidationLegProv ? (
+        <Prov
+          info={builders.liquidationLegProv(coords, { leg: "surplus", amount })}
+          value={formatExact(c.surplus)}
+          symbol={c.symbol}
+        >
+          {figure}
+        </Prov>
+      ) : (
+        figure
+      )}
+      <TokenChipIcon symbol={c.symbol} size={16} />
+      <span className={c.claimedAt === undefined ? "text-green-700 dark:text-green-400" : undefined}>
+        {c.word}
+        {c.claimedAt != null && <> {formatDate(c.claimedAt)}</>}
+      </span>
+    </>
+  );
+}
+
+/** The timeline head's spec. */
 export function liquityForkHeadSpec({
-  actionLabel,
   noChange,
   ctx,
   txHash,
   blockNumber,
   builders,
   flows,
-  escrow,
+  surplusClaimed,
 }: LiquityForkHeadArgs): ChainTruthRowSpec {
   const coords: LiquityForkCoords = {
     txHash,
@@ -110,113 +131,26 @@ export function liquityForkHeadSpec({
     collateralType: ctx.collateralSymbol,
     isBatched: ctx.isBatched,
   };
+  const words = liquityForkT1Words(ctx, { noChange, minDebt: builders.minDebt, surplusClaimed });
+  const et = ctx.eventType;
   const deltas: ChainTruthDelta[] = [];
 
-  // A redemption borrows the V2 grammar, debt first: debt "Cleared", collateral
-  // "Reduced", both in the caution orange, magnitudes only; the action name
-  // rides the spine.
-  const isRedemption = ctx.eventType === "redeemCollateral";
-
-  // Opens + owner adjusts get V2's per-axis grammar: each axis carries its own
-  // imperative verb (from the SAME sign classification as the CSV label), so the
-  // open shows a green pill + labeled axes and a combined adjust drops the merged
-  // "Add + Borrow" verb. Verbs are the fork vocabulary's own (Add/Withdraw,
-  // Borrow/Repay) — not standardized to Supply/Borrow.
-  const isOpen = ctx.eventType === "openTrove" || ctx.eventType === "openTroveAndJoinBatch";
-  // A batch manager's change (server mig 342): the Liquity V2 delegate row —
-  // "Adjusted 3.20% → 3.60%" and the manager — with the fee it charged this
-  // Trove, where it charged one.
-  const isBatchChange = ctx.eventType === "setBatchManagerAnnualInterestRate";
-  const batchFee = ctx.batchRate?.troveFee != null ? Number(ctx.batchRate.troveFee) : 0;
-  if (ctx.batchRate && batchFee >= FORK_DEBT_DUST_FLOAT && builders.batchFeeShareProv)
-    deltas.push({
-      value: batchFee,
-      symbol: builders.debtSymbol,
-      address: soleFlowAddress(flows, builders.debtSymbol),
-      prov: builders.batchFeeShareProv(coords, {
-        fee: ctx.batchRate.troveFee,
-        batchFee: ctx.batchRate.batchFee,
-        shares: ctx.batchRate.troveShares,
-        totalShares: ctx.batchRate.totalShares,
-      }),
-      label: "Fee",
-      tone: "caution",
-      // A batch row moves no token, so the spine draws no row for the fee.
-      noSpineCounterpart: true,
-    });
-  const isAdjust = ctx.eventType === "adjustTrove";
-  const perAxis = isOpen || isAdjust;
-
-  // The collateral the act moved. A liquidated neighbour's redistribution
-  // landing on the same touch is its own figure below: no token left the
-  // wallet for it, so it is not an "Add".
-  const coll = forkCollMove(ctx);
-  if (coll !== 0 && !noChange)
-    deltas.push({
-      value: coll,
-      symbol: ctx.collateralSymbol,
-      address: soleFlowAddress(flows, ctx.collateralSymbol),
-      // Operand values ride into the receipt: the emitted after, and the
-      // previous event's value it was diffed against (after − delta).
-      prov: builders.collDeltaProv(
-        coords,
-        {
-          after: ctx.collAfter,
-          before: ctx.collAfter != null ? Number(ctx.collAfter) - coll : null,
-        },
-        ctx.origin?.coll,
-      ),
-      ...(isRedemption
-        ? { label: "Reduced", tone: "caution" as const }
-        : perAxis
-          ? { label: coll > 0 ? COLL_VERB.add : COLL_VERB.withdraw, axisVerb: true }
-          : {}),
-    });
-
-  // The debt axis states what the act moved (TroveOperation's own figure), so
-  // interest accrued since the last touch never reads as a borrow, a repayment
-  // or a redemption. The accrued interest is its own figure on the detail grid.
-  const debt = forkDebtMove(ctx).value;
-  if (Math.abs(debt) >= FORK_DEBT_DUST_FLOAT && !noChange)
-    deltas.push({
-      value: debt,
-      symbol: builders.debtSymbol,
-      address: soleFlowAddress(flows, builders.debtSymbol),
-      prov: builders.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
-      ...(isRedemption
-        ? { label: "Cleared", tone: "caution" as const }
-        : perAxis
-          ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
-          : {}),
-    });
-
-  // The gas compensation escrow, the owner's WETH held apart from the
-  // collateral: sent to the GasPool at the open, returned at the close. The
-  // Trove's logs do not carry it; the amount is the fork's constant.
-  if (escrow && !noChange && (isOpen || ctx.eventType === "closeTrove")) {
-    const e = escrow.constant;
-    deltas.push({
-      value: isOpen ? e.amount : -e.amount,
-      symbol: e.symbol,
-      address: e.address,
-      label: FORK_ESCROW_WORDS.leg,
-      axisVerb: true,
-      exact: String(e.amount),
-      prov: escrow.prov(isOpen ? "sent" : "returned", coords),
-    });
-  }
-
-  // A redemption names the debt first.
-  if (isRedemption) {
-    const iColl = deltas.findIndex((d) => d.label === "Reduced");
-    const iDebt = deltas.findIndex((d) => d.label === "Cleared");
-    if (iColl >= 0 && iDebt > iColl) deltas.splice(iColl, 0, ...deltas.splice(iDebt, 1));
+  // A pending debt's spine draws no flank: its figure stays in the head.
+  if (et === "applyPendingDebt") {
+    const debt = forkDebtMove(ctx).value;
+    if (Math.abs(debt) >= FORK_DEBT_DUST_FLOAT)
+      deltas.push({
+        value: debt,
+        symbol: builders.debtSymbol,
+        address: soleFlowAddress(flows, builders.debtSymbol),
+        prov: builders.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
+        noSpineCounterpart: true,
+      });
   }
 
   // A redistribution from a liquidated Trove on this branch, applied on this
-  // touch: its own part of the row, in the caution tone, so a repayment that
-  // arrived with inherited debt never reads as a larger repayment or a borrow.
-  // No token moved for it, so the spine draws no row and the figure stays here.
+  // touch, in the caution tone. No token moved for it, so the spine draws no
+  // row and the figure stays in the head.
   const redist = forkRedistArrival(ctx);
   if (redist && builders.redistProv) {
     if (redist.debt >= FORK_DEBT_DUST_FLOAT)
@@ -241,62 +175,21 @@ export function liquityForkHeadSpec({
       });
   }
 
-  // Rate pill — only where the rate IS the event's point (open, rate change,
-  // batch join/leave). A batched trove's rate is the delegate's, so it takes the
-  // pink `delegate` treatment; the pill echoes the detail grid's rate receipt.
-  const rate = ctx.interestRate != null ? Number(ctx.interestRate) : null;
-  const ratePill =
-    rate != null && Number.isFinite(rate) && FORK_RATE_PILL_EVENTS.has(ctx.eventType)
-      ? {
-          pct: rate,
-          tone: ctx.isBatched ? ("delegate" as const) : undefined,
-          prov: builders.rateAtEventProv(coords),
-          ...(isBatchChange && ctx.rateBefore != null && Number.isFinite(Number(ctx.rateBefore))
-            ? { fromPct: Number(ctx.rateBefore) }
-            : {}),
-        }
-      : undefined;
-
-  // Delegate chip — the batch manager behind that rate, on the same rows. The
-  // address arrives lowercase from the MV. `getForkBatchManagerName` resolves
-  // the managers with a verifiable public identity (see lib/shared/fork-batch-managers.ts
-  // for the evidence bar); the rest return undefined and the chip keeps its
-  // truncated address, which the shared party seam already degrades to. In
-  // practice the surviving rows are the two batch-JOIN events — a batched
-  // Trove's rate changes on its BATCH, so adjustTroveInterestRate and
-  // removeFromBatch are never batched and carry no manager.
-  const party =
-    ctx.batchManager != null && FORK_RATE_PILL_EVENTS.has(ctx.eventType)
-      ? {
-          prefix: "delegate",
-          address: ctx.batchManager,
-          name: getForkBatchManagerName(ctx.batchManager),
-          tone: "party" as const,
-          prov: builders.batchManagerProv(coords, ctx.batchManager),
-        }
-      : undefined;
-
-  // The redemption that took the debt under the branch minimum: from this
-  // row on the Trove is a zombie, out of the rate queue.
-  const debtAfterN = Number(ctx.debtAfter);
-  const becameZombie =
-    isRedemption &&
-    builders.minDebt != null &&
-    Number.isFinite(debtAfterN) &&
-    debtAfterN - debt >= builders.minDebt &&
-    debtAfterN < builders.minDebt;
-
+  const isOpen = et === "openTrove" || et === "openTroveAndJoinBatch";
   return {
-    ...(becameZombie ? { note: "Now a zombie: out of the rate queue" } : {}),
-    // Open → the short pill word + green status; a combined/single owner
-    // adjust drops the row verb (the per-axis delta labels carry it) but
-    // keeps its label when nothing moved (a "No change" row has no deltas).
-    label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : isBatchChange ? "Adjusted" : actionLabel,
-    status: isOpen ? "open" : undefined,
-    critical: ctx.eventType === "liquidate",
-    labelOnSpine: isRedemption,
+    label: words.kind,
+    status: isOpen ? "open" : et === "closeTrove" ? "close" : et === "applyPendingDebt" ? "party" : undefined,
+    critical: et === "liquidate",
+    labelOnSpine: et === "redeemCollateral",
+    // A batch manager's change, or a batched Trove's rate moved by its
+    // delegate: the word in the delegate's pink, no name.
+    labelTone:
+      et === "setBatchManagerAnnualInterestRate" ||
+      et === "lowerBatchManagerAnnualFee" ||
+      (et === "adjustTroveInterestRate" && ctx.isBatched)
+        ? "delegate"
+        : undefined,
+    clauses: words.clauses.map((c) => clauseNode(c, ctx, coords, builders)),
     deltas,
-    ratePill,
-    party,
   };
 }

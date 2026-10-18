@@ -497,6 +497,11 @@ L1_words:
     from
   t1_surplus_claimed: |-
     claimed
+  # The Liquity V2 forks (Ebisu, Asymmetry, Basedollar) read these t1 words
+  # too (lib/shared/liquity-fork-head-words.ts); this one is theirs alone, a
+  # batch manager's cut to its annual fee.
+  t1_lowered_fee: |-
+    Lowered management fee
 
 # ── L2: the opened card's labels and sub-lines ──
 L2_words:

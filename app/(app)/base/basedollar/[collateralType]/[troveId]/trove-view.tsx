@@ -37,6 +37,7 @@ import { isCollSurplusClaimEvent, isBasedollarEvent } from "@/lib/shared/types/e
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
 import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
+import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { BASEDOLLAR_FORK } from "@/components/protocol/basedollar/basedollar-event-card";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
 import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
@@ -536,61 +537,66 @@ export default function BasedollarTroveDetail({
                   />
                 );
               })()}
-            <ChainTruthTimeline
-              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              csvExportCeiling={INDEX_ROW_CEILING}
-              closed={view ? view.status !== "open" : undefined}
-              // Matches `BasedollarEventCard`'s own
-              // `persistKey={`basedollar:${event.id}`}` — lets pinned mode (the
-              // per-event share route) force a landed card's detail panel open
-              // on its first mount.
-              persistKeyPrefix="basedollar"
-              eventPage={(slot) =>
-                liquityForkExplorer.eventPage({
-                  ...slot,
-                  deployment: "basedollar",
-                  collateralType,
-                  troveId,
-                  owner: view?.owner ?? null,
-                  lastOwner: view?.lastOwner ?? null,
-                  ownerEns: view?.ownerEns ?? null,
-                })
-              }
-              tl={tl}
-              runs={FORK_RUNS}
-              folderRegister={LIQUITY_FORK_FOLDER_REGISTER}
-              readFolderMembers={readFolderMembers}
-              segments={segments}
-              // Tenure eyebrow (the V2 trove's "Opened … · tenure · ago"), read off
-              // the captured event stream — a closed or liquidated life measures
-              // its tenure to the last event instead of now.
-              toolbarLeading={
-                view ? (
-                  <TimelineActivityHeader
-                    events={activityStamps}
-                    closed={view.status !== "open"}
-                    // When the Trove actually opened, not when the window does —
-                    // otherwise a long life reads as days old because its oldest
-                    // loaded card is.
-                    firstAt={opening?.firstTimestamp}
-                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  />
-                ) : undefined
-              }
-              renderCard={(event, meta) =>
-                isCollSurplusClaimEvent(event) ? (
-                  <CollSurplusClaimCard
-                    event={event}
-                    isLast={meta.isLast}
-                    eventNumber={meta.eventNumber}
-                    persistPrefix="basedollar"
-                    fork={BASEDOLLAR_FORK}
-                  />
-                ) : isBasedollarEvent(event) ? (
-                  <BasedollarEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
-                ) : null
-              }
-            />
+            {/* The liquidation card's head reads whether its surplus was claimed. */}
+            <CollSurplusCtx.Provider
+              value={surplus && lastLiq ? { creditTx: lastLiq.txHash, claimed: surplus.claimed } : null}
+            >
+              <ChainTruthTimeline
+                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                csvExportCeiling={INDEX_ROW_CEILING}
+                closed={view ? view.status !== "open" : undefined}
+                // Matches `BasedollarEventCard`'s own
+                // `persistKey={`basedollar:${event.id}`}` — lets pinned mode (the
+                // per-event share route) force a landed card's detail panel open
+                // on its first mount.
+                persistKeyPrefix="basedollar"
+                eventPage={(slot) =>
+                  liquityForkExplorer.eventPage({
+                    ...slot,
+                    deployment: "basedollar",
+                    collateralType,
+                    troveId,
+                    owner: view?.owner ?? null,
+                    lastOwner: view?.lastOwner ?? null,
+                    ownerEns: view?.ownerEns ?? null,
+                  })
+                }
+                tl={tl}
+                runs={FORK_RUNS}
+                folderRegister={LIQUITY_FORK_FOLDER_REGISTER}
+                readFolderMembers={readFolderMembers}
+                segments={segments}
+                // Tenure eyebrow (the V2 trove's "Opened … · tenure · ago"), read off
+                // the captured event stream — a closed or liquidated life measures
+                // its tenure to the last event instead of now.
+                toolbarLeading={
+                  view ? (
+                    <TimelineActivityHeader
+                      events={activityStamps}
+                      closed={view.status !== "open"}
+                      // When the Trove actually opened, not when the window does —
+                      // otherwise a long life reads as days old because its oldest
+                      // loaded card is.
+                      firstAt={opening?.firstTimestamp}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    />
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isCollSurplusClaimEvent(event) ? (
+                    <CollSurplusClaimCard
+                      event={event}
+                      isLast={meta.isLast}
+                      eventNumber={meta.eventNumber}
+                      persistPrefix="basedollar"
+                      fork={BASEDOLLAR_FORK}
+                    />
+                  ) : isBasedollarEvent(event) ? (
+                    <BasedollarEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
+                  ) : null
+                }
+              />
+            </CollSurplusCtx.Provider>
             <ProvInspectorLayer />
           </>
         )}

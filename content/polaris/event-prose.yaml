@@ -204,6 +204,37 @@ group_words:
 words:
   and: |-
     and
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind as
+  # a past participle, then at most one present-tense clause for what the
+  # spine cannot show, each after the middle dot. The spine carries the
+  # figures. A touch that moved neither collateral nor debt is the docs' touch.
+  t1_sep: |-
+    ·
+  t1_opened: |-
+    Opened CDP
+  t1_closed: |-
+    Closed CDP
+  t1_added_coll: |-
+    Added collateral
+  t1_withdrew_coll: |-
+    Withdrew collateral
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_touched: |-
+    Touched CDP
+  t1_liquidated: |-
+    Liquidated
+  t1_claimable: |-
+    claimable
+  t1_transferred: |-
+    Transferred
+  t1_to: |-
+    to
+  # The liquidation's notes: who liquidated the CDP.
+  liquidated_by: |-
+    Liquidated by
   leg_interest: |-
     interest
   leg_gain: |-
@@ -323,11 +354,9 @@ words:
     The liquidator's 0.5% of the seized pETH, from the CDPManager's log.
   tip_liq_coll_surplus: |-
     The pETH left over the debt's value and the penalty, set aside for the owner to claim, from the CDPManager's log.
-  # The gas-compensation escrow: its own leg, held apart from the collateral
-  # (rails-ops TO-DO-ui-jobs 363), and its own panel on every event from the
-  # open to the close or the liquidation (TO-DO-ui-jobs 366).
-  escrow_leg: |-
-    Gas escrow
+  # The gas-compensation escrow: its own spine row, held apart from the
+  # collateral (rails-ops TO-DO-ui-jobs 363), and its own panel on every event
+  # from the open to the close or the liquidation (TO-DO-ui-jobs 366).
   sheet_escrow: |-
     Gas compensation escrow
   sheet_escrow_sent: |-

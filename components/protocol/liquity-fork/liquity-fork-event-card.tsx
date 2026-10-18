@@ -24,7 +24,7 @@ import { eventGas, type EventCardPrice } from "@/components/shared/event-price-r
 import { chainTruthCells, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
-import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/components/shared/spine-column";
 import { LiquidationForensics } from "@/components/shared/liquidation-forensics";
 import { Prov } from "@/components/shared/provenance";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -46,6 +46,10 @@ import { liquityForkStateFigures, liquityForkStateStats, type LiquityForkStatePr
 import { buildForkLiquidationForensics, forkLiquidationStats, forkRedemptionStats } from "./liquity-fork-forensics";
 import { liquityForkSheet, type LiquityForkSheetBranch } from "./liquity-fork-sheet";
 import { FORK_ESCROW_WORDS, type LiquityForkEscrow } from "./liquity-fork-escrow";
+import { liquityForkT1Words } from "@/lib/shared/liquity-fork-head-words";
+import { liquityT1Caption } from "@/lib/liquity/event-prose";
+import { L1_WORDS } from "@/lib/liquity/event-templates";
+import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 
 /** A fork's provenance vocabulary: every builder the card's parts read. */
 export type LiquityForkCardProvs = LiquityForkExplainerProvs &
@@ -68,8 +72,8 @@ export interface LiquityForkDeployment {
    *  the balance sheet's Risk and Limits panels read. */
   branch?: (collateralSymbol: string) => LiquityForkSheetBranch | undefined;
   /** The gas compensation escrow, where the fork's constant is established
-   *  (lib/<fork>/event-provenance.ts): a header leg and a spine row on the
-   *  open and the close, a sheet panel on every event. */
+   *  (lib/<fork>/event-provenance.ts): a spine row on the open and the
+   *  close, a sheet panel on every event. */
   escrow?: LiquityForkEscrow;
 }
 
@@ -172,11 +176,84 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
       direction: debtDelta > 0 ? "left" : "right",
       value: Math.abs(debtDelta),
     });
+  // A redemption's or a liquidation's legs, drawn as nodes on the spine: the
+  // collateral that left the Trove below the debt it cleared, on the same
+  // receipts the sheet traces.
+  const warningLegs: SpineWarningLeg[] | undefined = isWarning
+    ? [
+        ...(collDelta !== 0
+          ? [
+              {
+                label: isRedemption ? L1_WORDS.reduced : L1_WORDS.liquidated,
+                value: Math.abs(collDelta),
+                symbol: ctx.collateralSymbol,
+                address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+              },
+            ]
+          : []),
+        ...(debtMoved
+          ? [
+              {
+                label: L1_WORDS.cleared,
+                value: Math.abs(debtDelta),
+                symbol: debtSymbol,
+                address: soleFlowAddress(event.flows, debtSymbol),
+              },
+            ]
+          : []),
+      ]
+    : undefined;
+
+  // The rate on the spine's flank where the rate is the event's point: an
+  // opening's below its legs, a rate change's and a delegate's join or leave
+  // beside the glyph, in the delegate's pink where a batch manager sets it.
+  // It echoes the Interest rate cell's receipt.
+  const et = ctx.eventType;
+  const rate = ctx.interestRate != null ? Number(ctx.interestRate) : NaN;
+  const rateBefore = ctx.rateBefore != null ? Number(ctx.rateBefore) : NaN;
+  const isRateChange =
+    et === "adjustTroveInterestRate" ||
+    et === "setBatchManagerAnnualInterestRate" ||
+    et === "lowerBatchManagerAnnualFee";
+  const isDelegate = et === "setInterestBatchManager" || et === "removeFromBatch";
+  const rateSpan: [number, number] | undefined = !Number.isFinite(rate)
+    ? undefined
+    : isOpenEvent
+      ? [0, rate]
+      : isRateChange || isDelegate
+        ? [Number.isFinite(rateBefore) ? rateBefore : rate, rate]
+        : undefined;
+  const rateFlank = rateSpan
+    ? {
+        rateSpan,
+        rateTone: ctx.isBatched ? ("delegate" as const) : undefined,
+        rateProv: {
+          info: provs.rateAtEventProv(coords, ctx.origin?.annualInterestRate),
+          value: `${rate}%`,
+          echo: true,
+        },
+      }
+    : {};
   const spine: SpineColumnProps = isWarning
-    ? { icon: "warning", warningTone: isLiq ? "critical" : "caution", isLast: !!isLast }
+    ? { icon: "warning", warningTone: isLiq ? "critical" : "caution", warningLegs, isLast: !!isLast }
     : isNoChange
       ? { icon: "no-change", isLast: !!isLast }
-      : { tokens: tokens.length > 0 ? tokens : undefined, isLast: !!isLast };
+      : isDelegate
+        ? {
+            icon: "delegate",
+            iconDirection: et === "setInterestBatchManager" ? "up" : "down",
+            ...rateFlank,
+            isLast: !!isLast,
+          }
+        : isRateChange
+          ? {
+              icon: "rate-change",
+              iconDirection:
+                rateSpan && rateSpan[1] !== rateSpan[0] ? (rateSpan[1] > rateSpan[0] ? "up" : "down") : undefined,
+              ...rateFlank,
+              isLast: !!isLast,
+            }
+          : { tokens: tokens.length > 0 ? tokens : undefined, ...(isOpenEvent ? rateFlank : {}), isLast: !!isLast };
 
   // ── T2 ──
   const stats = liquityForkStateStats(ctx, coords, debtSymbol, provs);
@@ -219,16 +296,20 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
         : [],
   };
 
+  const surplusClaimed = useSurplusClaimFor(isLiq ? event.txHash : undefined);
   const head = liquityForkHeadSpec({
-    actionLabel: event.actionLabel,
     noChange: isNoChange,
     ctx,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
     builders: { ...provs, debtSymbol, minDebt: fork.minDebt },
     flows: event.flows,
-    escrow: fork.escrow,
+    surplusClaimed,
   });
+  // The phone caption and the row's accessible name follow the head's words.
+  const caption = liquityT1Caption(
+    liquityForkT1Words(ctx, { noChange: isNoChange, minDebt: fork.minDebt, surplusClaimed }),
+  );
 
   const sheet = liquityForkSheet({
     ctx,
@@ -253,7 +334,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption,
     // A batch manager moved the rate, or the protocol applied pending debt:
     // not the owner's act.
     actor:

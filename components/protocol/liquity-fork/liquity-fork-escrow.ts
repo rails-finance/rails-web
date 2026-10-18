@@ -1,6 +1,6 @@
 // The Liquity V2 forks' gas compensation escrow (rails-ops TO-DO-ui-jobs 363,
-// 366): what a deployment hands the card, and the words its header leg, spine
-// row and sheet panel read. The panel is built by the family's
+// 366): what a deployment hands the card, and the words its spine row and
+// sheet panel read. The panel is built by the family's
 // components/protocol/liquity-family/gas-escrow.ts.
 
 import type { Provenance } from "@/components/shared/provenance";
@@ -15,7 +15,6 @@ export interface LiquityForkEscrow {
 }
 
 export const FORK_ESCROW_WORDS = {
-  leg: "Gas escrow",
   spineSent: "gas compensation escrow sent",
   spineReturned: "gas compensation escrow returned",
 };

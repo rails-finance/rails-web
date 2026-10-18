@@ -18,6 +18,7 @@ import {
 } from "@/components/protocol/polaris/polaris-liquidation-forensics";
 import { polarisModal, POLARIS_WORDS, PROSE, type PolarisL5Key } from "@/lib/polaris/event-templates";
 import { polarisPsmShareValue } from "@/lib/polaris/economics";
+import { PETH } from "@/lib/polaris/asset-catalog";
 
 /** The receipt a figure echoes on the card. */
 export type PolarisEchoKey = "coll" | "debt" | "zero" | "psm_coll" | "psm_debt" | "psm_net";
@@ -200,3 +201,61 @@ export function polarisEventProse(input: PolarisProseInput): PolarisEventProse {
 
 /** L4 as the explanation prints it: one flat run, or one run per group. */
 export const polarisExplanationRuns = PROSE.explanationRuns;
+
+// ── T1: the timeline head ────────────────────────────────────────────────────
+
+/** A clause after the head's kind (rails-ops decision 0045): a liquidation's
+ *  surplus, or a transfer's recipient after `lead`. */
+export type PolarisT1Clause = { surplus: number; symbol: string; word: string } | { lead: string; address: string };
+
+export interface PolarisT1Words {
+  kind: string;
+  clauses: PolarisT1Clause[];
+}
+
+/** The timeline head's words: the past-participle kind, and the legs as words
+ *  where the kind alone says nothing, in the order they run (what goes into
+ *  the CDP before what comes out, the collateral first where both go one way;
+ *  rails-ops reference/shared-event-card-spec.md, "Spine order"). */
+export function polarisT1Words(ctx: PolarisContext): PolarisT1Words {
+  const W = POLARIS_WORDS;
+  switch (ctx.eventType) {
+    case "open":
+      return { kind: W.t1_opened, clauses: [] };
+    case "close":
+      return { kind: W.t1_closed, clauses: [] };
+    case "adjust": {
+      const coll = num(ctx.collChange);
+      const debt = num(ctx.debtChange);
+      const c = coll > 0 ? W.t1_added_coll : W.t1_withdrew_coll;
+      const d = debt > 0 ? W.t1_borrowed : W.t1_repaid;
+      if (coll === 0 && debt === 0) return { kind: W.t1_touched, clauses: [] };
+      if (debt === 0) return { kind: c, clauses: [] };
+      if (coll === 0) return { kind: d, clauses: [] };
+      // A repayment goes in and a withdrawal comes out: the repayment first.
+      return { kind: debt < 0 && coll < 0 ? `${d} ${W.t1_sep} ${c}` : `${c} ${W.t1_sep} ${d}`, clauses: [] };
+    }
+    case "liquidate": {
+      const surplus = num(ctx.collSurplus);
+      return {
+        kind: W.t1_liquidated,
+        clauses: surplus > 0 ? [{ surplus, symbol: PETH.symbol, word: W.t1_claimable }] : [],
+      };
+    }
+    case "transfer":
+      return { kind: W.t1_transferred, clauses: ctx.toAddr ? [{ lead: W.t1_to, address: ctx.toAddr }] : [] };
+    default:
+      return { kind: W.t1_touched, clauses: [] };
+  }
+}
+
+/** The head's words as one line, for the phone caption and the row's
+ *  accessible name. */
+export function polarisT1Caption(words: PolarisT1Words): string {
+  const parts = words.clauses.map((c) =>
+    "surplus" in c
+      ? `${c.surplus.toFixed(4)} ${c.symbol} ${c.word}`
+      : `${c.lead} ${c.address.slice(0, 6)}…${c.address.slice(-4)}`,
+  );
+  return [words.kind, ...parts].join(` ${POLARIS_WORDS.t1_sep} `);
+}

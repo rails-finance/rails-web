@@ -38,6 +38,7 @@ import {
   liquidationFieldProv,
   rateInForceProv,
   transferProv,
+  liquidatorProv,
   atBlockPriceProv,
   gasCompEscrowProv,
   gasCompReturnProv,
@@ -54,6 +55,7 @@ import { formatNumber, formatExact } from "@/lib/utils/format";
 import { TipLabel } from "@/components/shared/tip-label";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { polarisSheet } from "./polaris-sheet";
+import { POLARIS_WORDS } from "@/lib/polaris/event-templates";
 
 /** The primary rate, glossed where a row first states it. */
 const PRIMARY_RATE_TIP =
@@ -349,9 +351,20 @@ export function polarisEventBody(
 
   // The sheet states the primary rate in its Limits panel and the escrow in
   // a panel of its own; the cells carry both in the grid.
+  // Who liquidated the CDP, the Liquidation log's indexed `_liquidator`.
+  const liquidator =
+    ctx.eventType === "liquidate" && ctx.liquidator ? (
+      <div className="px-5 py-1 text-xs text-rb-500" data-liquidator="">
+        {POLARIS_WORDS.liquidated_by}{" "}
+        <Prov info={liquidatorProv(coords)} value={ctx.liquidator}>
+          <LinkedAddress address={ctx.liquidator} />
+        </Prov>
+      </div>
+    ) : null;
   const notes =
-    forensics || (!sheet && ctx.primaryRate != null) ? (
+    forensics || liquidator || (!sheet && ctx.primaryRate != null) ? (
       <>
+        {liquidator}
         {forensics && <LiquidationForensics {...forensics} />}
         {!sheet && ctx.primaryRate != null && (
           // px-5 mirrors the grid's inset so the line sits on the cells' left
