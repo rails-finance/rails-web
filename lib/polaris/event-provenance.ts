@@ -419,6 +419,25 @@ export const gasCompReturnProv = (coords: PolarisCoords): Provenance => ({
   ]),
 });
 
+/** The escrow held at an event between the open and the close — the same fixed
+ *  amount, held by the cdpManager since the open. Neither this event's log
+ *  nor its transfers carry it; the open's coordinates are not on the row, so
+ *  the receipt names this event's. */
+export const gasCompHeldProv = (coords: PolarisCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: "Read getCDP(id).gasCompDeposit on the cdpManager while the CDP is open — it returns 0.0375 pETH.",
+  },
+  summary: `Gas compensation escrow held by the cdpManager${atBlock(coords)} — the fixed amount the CDP sent beside its collateral at its open and has held apart from it since: returned on close, paid to the liquidator on a liquidation. No event between the open and the close moves it. The amount is the protocol constant fixedGasComp, 0.0375 pETH. It enters neither the collateral nor the collateral ratio.`,
+  contract: managerContract(coords),
+  via: "the protocol constant fixedGasComp (0.0375 pETH) · held since the open",
+  inputs: eventInputs(coords, [
+    { label: "gas compensation", value: "0.0375 pETH", kind: "chain", pclass: "state", note: "fixedGasComp" },
+  ]),
+});
+
 /** The CDP's collateral ratio at the moment it fired — the WHOLE seized
  *  collateral valued at the same price over the whole debt cleared. A
  *  different fact from the premium, which is measured on one leg. */

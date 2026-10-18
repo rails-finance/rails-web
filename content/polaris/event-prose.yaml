@@ -230,8 +230,6 @@ words:
     Of which to the liquidator (0.5%)
   sheet_liq_coll_surplus: |-
     Of which surplus for the owner to claim
-  sheet_liq_gas_comp: |-
-    Gas compensation, from the escrow sent at the open
   sheet_liq_debt_pool: |-
     Debt absorbed by the pool
   sheet_liq_debt_redistributed: |-
@@ -309,10 +307,9 @@ words:
     The liquidator's 0.5% of the seized pETH, from the CDPManager's log.
   tip_liq_coll_surplus: |-
     The pETH left over the debt's value and the penalty, set aside for the owner to claim, from the CDPManager's log.
-  tip_liq_gas_comp: |-
-    The pETH escrow every CDP sends at its open, paid to the liquidator. It sits apart from the collateral, so it is not part of the seizure.
-  # The gas-compensation escrow on the open and the close: its own leg, held
-  # apart from the collateral (rails-ops TO-DO-ui-jobs 363).
+  # The gas-compensation escrow: its own leg, held apart from the collateral
+  # (rails-ops TO-DO-ui-jobs 363), and its own panel on every event from the
+  # open to the close or the liquidation (TO-DO-ui-jobs 366).
   escrow_leg: |-
     Gas escrow
   sheet_escrow: |-
@@ -327,6 +324,16 @@ words:
     The escrow the holder sent in the open's one pETH transfer, beside the collateral. It counts toward neither the collateral nor the collateral ratio.
   tip_escrow_returned: |-
     The escrow the close sent back to the holder, in the same pETH transfer as the collateral.
+  sheet_escrow_paid: |-
+    Paid to the liquidator
+  tip_escrow_paid: |-
+    The escrow paid to the liquidator, from the LiquidationGasComp log. It sits apart from the collateral, so it is not part of the seizure.
+  tip_escrow_last: |-
+    The escrow the CDP held after its previous event, the protocol's fixed amount since the open, in dollars at that event's pETH price.
+  tip_escrow_market: |-
+    The change the pETH price made to the dollar value of the escrow between the CDP's previous event and this one.
+  tip_escrow_before: |-
+    The escrow just before this event, at this block's pETH price.
   tip_escrow_total: |-
     The escrow the CDP holds after this event in pETH, and in dollars at this block's pETH price.
   spine_escrow_sent: |-
