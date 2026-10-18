@@ -289,10 +289,11 @@ export function TimelineRunCard({
   // ── The summed legs, as the spine's nodes ─────────────────────────────
   // A run of redemptions or liquidations draws its legs as set A's warning
   // nodes: every leg left the position, so each points out ("12.41 →",
-  // "37K →"), collateral first, in the run's tone. Any other run nets each
-  // token's legs: a leg whose verb moves the token into the position counts
-  // plus, one that moves it to the wallet minus, and the node's arrow points
-  // the way the net goes. A run whose members moved no asset draws no node.
+  // "37K →"), the collateral below the debt, in the run's tone. Any other run
+  // nets each token's legs: a leg whose verb moves the token into the position
+  // counts plus, one that moves it to the wallet minus, and the node's arrow
+  // points the way the net goes. A run whose members moved no asset draws no
+  // node.
   const adverse = spineIcon === "warning" && tone !== "neutral";
   const legAggs = (aggregates ?? []).filter((agg) => agg.value > 0);
   const warningLegs = adverse
@@ -602,23 +603,29 @@ function spanWords(a: number, b: number): string {
   return `between ${d1} ${y1} and ${d2} ${y2}`;
 }
 
-/** A verb that names the debt side of a leg: drawn last, after the
- *  collateral, as set A's warning nodes are. */
+/** A verb that names the debt side of a leg: drawn above the collateral, as
+ *  set A's warning nodes are. */
 const DEBT_VERB = /^(cleared|repaid|repay|debt)/i;
 /** A verb that moves the token to the wallet; every other one into the
  *  position. */
 const OUT_VERB = /^(withdr|borrow|received|paid out|claimed|redeemed|sent)/i;
 
-/** Net each token's legs: into the position plus, to the wallet minus. */
+/** A verb on the debt side of an owner's leg. */
+const DEBT_SIDE_VERB = /^(borrow|repa|cleared|debt)/i;
+
+/** Net each token's legs: into the position plus, to the wallet minus. The
+ *  collateral comes first, so the spine draws it below the debt. */
 function netLegs(aggs: RunAggregate[]): SpineTokenRow[] {
-  const net = new Map<string, { value: number; iconSymbol?: string }>();
+  const net = new Map<string, { value: number; iconSymbol?: string; debt: boolean }>();
   for (const agg of aggs) {
-    const cur = net.get(agg.symbol) ?? { value: 0, iconSymbol: agg.iconSymbol };
+    const cur = net.get(agg.symbol) ?? { value: 0, iconSymbol: agg.iconSymbol, debt: false };
     cur.value += OUT_VERB.test(agg.verb) ? -agg.value : agg.value;
+    cur.debt ||= DEBT_SIDE_VERB.test(agg.verb);
     net.set(agg.symbol, cur);
   }
   return [...net.entries()]
     .filter(([, v]) => v.value !== 0)
+    .sort(([, a], [, b]) => Number(a.debt) - Number(b.debt))
     .map(([symbol, v]) => ({
       symbol,
       iconSymbol: v.iconSymbol,

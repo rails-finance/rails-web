@@ -64,6 +64,22 @@ export const WARNING_TONE_TEXT: Record<Tone, string> = {
   critical: "text-tone-critical",
 };
 
+// ── Vertical order ──────────────────────────────────────────────────────────
+
+/** THE SPINE'S VERTICAL ORDER: rows read bottom to top in the order the acts
+ *  happen, what goes into the position below what comes out, and legs going
+ *  the same way in the card's order from the bottom up, so collateral sits
+ *  below debt (rails-ops reference/shared-event-card-spec.md §1, "Spine
+ *  order"). Returns the rows top to bottom. */
+const IN_FIRST = (r: SpineTokenRow) => (r.direction === "right" ? 0 : r.direction === "left" ? 2 : 1);
+function bottomUp(rows: readonly SpineTokenRow[]): SpineTokenRow[] {
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => IN_FIRST(a.row) - IN_FIRST(b.row) || a.i - b.i)
+    .reverse()
+    .map((x) => x.row);
+}
+
 // ── Token row descriptor ────────────────────────────────────────────────────
 
 export interface SpineTokenRow {
@@ -145,7 +161,8 @@ export interface SpineColumnProps {
   /** icon="swap" only — tints the glyph in the Lifetime flows tower's hues.
    *  Unset draws the mixed, two-tone glyph. */
   swapAxis?: SpineSwapAxis;
-  /** Token rows: 1 for single-asset events, 2 for dual-asset (collateral+debt, swap) */
+  /** Token rows: 1 for single-asset events, 2 for dual-asset (collateral+debt,
+   *  swap), collateral first. Drawn by `bottomUp`. */
   tokens?: SpineTokenRow[];
   /** Semantic icon override — replaces token icons entirely */
   icon?: SpineIcon;
@@ -166,10 +183,11 @@ export interface SpineColumnProps {
   warningTone?: Tone;
   /** Optional hover/tap tip on a warning node: what the kind means. */
   warningTip?: ReactNode;
-  /** icon="warning" only: the legs, top to bottom (the collateral, then the
-   *  debt), each drawn as a node pointing out of the position. Unset, the
-   *  legs the card's header publishes (`usePublishSpineLegs`) are drawn; with
-   *  neither, the triangle stands in. */
+  /** icon="warning" only: the legs, collateral first, then the debt, drawn
+   *  bottom to top (the collateral below, the debt above), each a node
+   *  pointing out of the position. Unset, the legs the card's header
+   *  publishes (`usePublishSpineLegs`) are drawn; with neither, the triangle
+   *  stands in. */
   warningLegs?: SpineWarningLeg[];
   /** icon="rate-change" or "delegate": the rate before and after (%). The
    *  right flank, where a row's leg numbers stand, states the rate after
@@ -787,7 +805,8 @@ const RING_GAP = 2;
 /** A warning event's legs, one node each: the token, "→", and the magnitude
  *  in the event's tone. Both point out of the position — the collateral left
  *  it and the debt was cleared — so a redemption reads as a withdraw plus a
- *  repay.
+ *  repay. Drawn bottom to top in the order given (`bottomUp`'s rule): the
+ *  collateral below, the debt above, a locked leg on top.
  *
  *  A taken leg wears a ring in the tone's ink at the node size, the token
  *  drawn smaller inside it with a gap of page ground, so the node's footprint
@@ -798,7 +817,7 @@ function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; 
   const unreadOf = useUnreadTokenOf();
   return (
     <div className="flex flex-col gap-y-1 items-center" data-spine-legs={legs.length}>
-      {legs.map((leg, i) => {
+      {[...legs].reverse().map((leg, i) => {
         // A token whose decimals did not load keeps its node and states no figure.
         const txt =
           isFinite(leg.value) && leg.value !== 0 && !unreadOf(leg.address, leg.symbol)
@@ -1118,7 +1137,7 @@ export function SpineColumn({
   // it takes the same paddingBottom compensation — without it the badge clips
   // into the row below.
   const hasBadge = rows.some((r) => r.badge) || (externalParty && rows.length > 0);
-  const tokenRows = rows.map((row, i) => {
+  const tokenRows = bottomUp(rows).map((row, i) => {
     const chip = (
       <TokenChipIcon
         symbol={row.symbol}
