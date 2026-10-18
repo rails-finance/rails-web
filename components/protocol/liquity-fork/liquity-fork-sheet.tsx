@@ -14,6 +14,9 @@
 // branch's minimum and critical ratios as the parameters. The debt ahead in
 // the redemption queue is a live read and is not on the sheet, as on Liquity V2.
 //
+// The gas compensation escrow stands between Collateral and Debt where the
+// fork's constant is established (LiquityForkEscrow).
+//
 // A batch manager's rate and fee rows carry no balance of the
 // Trove: they return no sheet and the shell draws their cells.
 
@@ -50,6 +53,9 @@ import {
   type LiquityForkStateProvs,
 } from "./liquity-fork-state-stats";
 import type { LiquityForkEventContext, LiquityForkHeaderBuilders } from "./liquity-fork-event-header";
+import { forkEscrowWords, type LiquityForkEscrow } from "./liquity-fork-escrow";
+import { gasEscrowMove } from "@/lib/shared/liquity-gas-escrow";
+import { gasEscrowSide } from "@/components/protocol/liquity-family/gas-escrow";
 
 /** What the sheet reads of a fork's branch: the collateral token, the
  *  governance ratios and the contract that holds them. */
@@ -74,6 +80,8 @@ export interface LiquityForkSheetArgs {
   branch?: LiquityForkSheetBranch;
   actionLabel: string;
   flows?: AssetFlow[];
+  /** The fork's gas compensation escrow, where its constant is established. */
+  escrow?: LiquityForkEscrow;
 }
 
 const WORDS = {
@@ -171,6 +179,7 @@ export function liquityForkSheet({
   branch,
   actionLabel,
   flows,
+  escrow,
 }: LiquityForkSheetArgs): EventSheet | undefined {
   if (isForkBatchRow(ctx)) return undefined;
 
@@ -436,6 +445,29 @@ export function liquityForkSheet({
     totalTip: TIP.debtTotal,
   };
 
+  // ── The gas compensation escrow ──
+  // A panel of its own between Collateral and Debt on every event from the
+  // open to the close or the liquidation, outside the Collateral total and the
+  // ratio (rails-ops TO-DO-ui-jobs 363, 366). Priced on a WETH branch alone:
+  // the fork timeline carries the branch's collateral price, and no price for
+  // the previous event.
+  const escrowMove = gasEscrowMove({
+    open: ctx.eventType === "openTrove" || ctx.eventType === "openTroveAndJoinBatch",
+    close: isClose,
+    liquidation: ctx.eventType === "liquidate",
+  });
+  const escrowSide: SheetSide | null = escrow
+    ? gasEscrowSide({
+        escrow: escrow.constant,
+        move: escrowMove,
+        words: forkEscrowWords(escrow.constant),
+        prices: { now: collSym === escrow.constant.symbol ? (price ?? null) : null, prev: null },
+        info: escrow.prov(escrowMove, coords),
+        held: escrow.prov("held", coords),
+        fmt: forkCollAmount,
+      })
+    : null;
+
   // ── Risk ──
   const open = !isClose && debtAfter > 0 && collAfter > 0;
   const noneFor = (): { none: string } => ({ none: isClose ? WORDS.closed : WORDS.notApplicable });
@@ -561,7 +593,7 @@ export function liquityForkSheet({
       : [];
 
   return {
-    sides: [collSide, debtSide],
+    sides: escrowSide ? [collSide, escrowSide, debtSide] : [collSide, debtSide],
     panels: [
       { panel: "risk", rows: [crRow, liqRow] },
       { panel: "limits", rows: limits, breakdown: params },

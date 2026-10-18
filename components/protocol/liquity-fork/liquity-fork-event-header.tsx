@@ -47,6 +47,7 @@ import {
   forkRedistArrival,
 } from "@/lib/shared/liquity-fork-ops";
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
+import { FORK_ESCROW_WORDS, type LiquityForkEscrow } from "./liquity-fork-escrow";
 
 /** The fork contexts are structural twins; any of them drives the head. */
 export type LiquityForkEventContext = EbisuContext | AsymmetryContext | BasedollarContext;
@@ -87,6 +88,8 @@ export interface LiquityForkHeadArgs {
    *  is the wrong authority on it; the Trove's flows record the ERC-20s that
    *  actually moved, which is what the icon chip has to have. */
   flows?: AssetFlow[];
+  /** The fork's gas compensation escrow, a leg on the open and the close. */
+  escrow?: LiquityForkEscrow;
 }
 
 /** The row's spec: the per-axis verbs, the redemption's legs, the rate pill
@@ -99,6 +102,7 @@ export function liquityForkHeadSpec({
   blockNumber,
   builders,
   flows,
+  escrow,
 }: LiquityForkHeadArgs): ChainTruthRowSpec {
   const coords: LiquityForkCoords = {
     txHash,
@@ -185,6 +189,22 @@ export function liquityForkHeadSpec({
           ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
           : {}),
     });
+
+  // The gas compensation escrow, the owner's WETH held apart from the
+  // collateral: sent to the GasPool at the open, returned at the close. The
+  // Trove's logs do not carry it; the amount is the fork's constant.
+  if (escrow && !noChange && (isOpen || ctx.eventType === "closeTrove")) {
+    const e = escrow.constant;
+    deltas.push({
+      value: isOpen ? e.amount : -e.amount,
+      symbol: e.symbol,
+      address: e.address,
+      label: FORK_ESCROW_WORDS.leg,
+      axisVerb: true,
+      exact: String(e.amount),
+      prov: escrow.prov(isOpen ? "sent" : "returned", coords),
+    });
+  }
 
   // A redemption names the debt first.
   if (isRedemption) {

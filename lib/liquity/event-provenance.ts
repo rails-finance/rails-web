@@ -15,6 +15,7 @@ import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { formatExact } from "@/lib/utils/format";
 import { exactDebtAfter, exactDebtBefore } from "@/lib/liquity/utils/interest-calculator";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { gasEscrowReceipt, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
 
 const INDEX_VIA = "rails-server index of decoded Liquity V2 logs";
 
@@ -441,3 +442,24 @@ export function debtChangeProv(ctx: LiquityContext, coords?: EventCoords): Chang
     },
   };
 }
+
+// ── The gas compensation escrow ──────────────────────────────────────────────
+
+/** ETH_GAS_COMPENSATION: the WETH every Trove sends to its branch's GasPool at
+ *  its open, on every branch, returned at the close and paid to the liquidator
+ *  at a liquidation (Liquity V2's Constants.sol; docs.liquity.org, "a
+ *  liquidation reserve of 0.0375 ETH regardless of the chosen collateral").
+ *  An open's WETH Transfer of 0.0375 to the GasPool is in its transaction's
+ *  logs (0x46fb24cd…, log 0x32, read 18 Oct 2026). */
+export const LIQUITY_V2_GAS_ESCROW: LiquityGasEscrow = {
+  protocol: "Liquity V2",
+  amount: 0.0375,
+  symbol: "WETH",
+  address: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+  source: "Constants.sol ETH_GAS_COMPENSATION",
+  label: "0.0375 WETH",
+};
+
+/** The escrow's receipt at an event: the constant, and the transaction whose
+ *  WETH Transfer to or from the GasPool carries it. */
+export const liquityGasEscrowProv = gasEscrowReceipt(LIQUITY_V2_GAS_ESCROW, MAINNET_CHAIN_ID);

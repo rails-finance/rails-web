@@ -729,6 +729,7 @@ const SHEET_WORDS_SUBJECTS = [
     limits: ["Interest Rate"],
     params: ["Minimum ratio", "Critical ratio"],
     optional: ["Delegate's fee"],
+    headings: ["Collateral", "Gas compensation escrow", "Debt"],
   },
   {
     name: "Aave V3 0x9ff6…0de5 Borrow",
@@ -800,6 +801,7 @@ const SHEET_WORDS_SUBJECTS = [
     limits: ["LUSD to the minimum"],
     params: ["Minimum ratio", "Recovery-mode ratio"],
     optional: [],
+    headings: ["Collateral", "Debt", "Liquidation reserve, in the debt"],
     carried: 0,
   },
   {
@@ -810,6 +812,8 @@ const SHEET_WORDS_SUBJECTS = [
     limits: ["Interest rate"],
     params: ["Minimum ratio", "Critical ratio"],
     optional: [],
+    headings: ["Collateral", "Gas compensation escrow", "Debt"],
+    // The escrow states its amount alone on the WBTC branch: no WETH price.
     carried: 2,
   },
   {
@@ -830,7 +834,8 @@ const SHEET_WORDS_SUBJECTS = [
     limits: ["Primary rate", "Reserve-to-debt ratio"],
     params: ["Minimum ratio", "Liquidation penalty, stability pool"],
     optional: [],
-    carried: 2,
+    headings: ["Collateral", "Gas compensation escrow", "Debt"],
+    carried: 3,
   },
   {
     name: "Frankencoin",
@@ -979,9 +984,12 @@ for (const s of SHEET_WORDS_SUBJECTS) {
     off?.switch?.label === "Show breakdown" && off.switch.title === "Show breakdown",
     JSON.stringify(off?.switch),
   );
+  // `headings`: a family that draws an amount held beside the two sides as a
+  // panel of its own (the gas compensation escrow, Liquity V1's reserve).
+  const headings = s.headings ?? ["Collateral", "Debt"];
   check(
-    `6b. ${s.name}: the sides read Collateral and Debt, the panels Risk and Limits`,
-    JSON.stringify(off?.sides.map((x) => x.heading)) === JSON.stringify(["Collateral", "Debt"]) &&
+    `6b. ${s.name}: the sides read ${headings.join(", ")}, the panels Risk and Limits`,
+    JSON.stringify(off?.sides.map((x) => x.heading)) === JSON.stringify(headings) &&
       JSON.stringify(off?.panels.map((x) => x.heading)) === JSON.stringify(["Risk", "Limits"]),
     JSON.stringify({ sides: off?.sides.map((x) => x.heading), panels: off?.panels.map((x) => x.heading) }),
   );

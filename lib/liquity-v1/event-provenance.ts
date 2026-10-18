@@ -401,19 +401,43 @@ export const lusdReceivedProv = (coords: LiquityV1Coords, amount: string): Prove
   inputs: [{ label: "minted", value: amount, kind: "chain", pclass: "emitted" }, ...eventInputs(coords)],
 });
 
-/** The 200 LUSD reserve minted to, or burned from, the GasPool. */
-export const reserveProv = (coords: LiquityV1Coords, how: "minted" | "burned"): Provenance => ({
-  kind: "chain",
-  pclass: "emitted",
-  verify: txVerify(coords),
-  summary:
-    how === "minted"
-      ? "Liquidation reserve — 200 LUSD minted to the GasPool when the Trove opened, from the LUSD token's Transfer log. It counts in the debt and pays whoever liquidates the Trove; on a close or a full redemption it is burned."
-      : "Liquidation reserve burned — the 200 LUSD the GasPool held for this Trove, burned when it closed, from the LUSD token's Transfer log. It cancels the last 200 LUSD of the debt, so the owner repaid the debt less 200.",
-  contract: LUSD_TOKEN,
-  via: `${RECEIPT_VIA} · Transfer(${how === "minted" ? "0x0 → GasPool" : "GasPool → 0x0"}) · ÷10^18`,
-  inputs: eventInputs(coords),
-});
+/** The 200 LUSD reserve (LUSD_GAS_COMPENSATION): minted to the GasPool at the
+ *  open, held there while the Trove is open, burned at a close or a full
+ *  redemption, paid to the liquidator at a liquidation. */
+export const reserveProv = (
+  coords: LiquityV1Coords,
+  how: "minted" | "burned" | "redeemed" | "paid" | "held",
+): Provenance =>
+  how === "held"
+    ? {
+        kind: "chain-derived",
+        pclass: "state",
+        verify: {
+          kind: "recompute",
+          text: "Every open mints 200 LUSD to the GasPool and every close burns it: read the open's or the close's LUSD Transfer logs.",
+        },
+        summary: `Liquidation reserve held by the GasPool${atBlock(coords)} — the 200 LUSD (LUSD_GAS_COMPENSATION) minted into the Trove's debt at its open and held by the GasPool since. It counts in the debt and the collateral ratio; no event between the open and the close moves it.`,
+        contract: { name: "Liquity V1 GasPool", address: LIQUITY_V1_ADDRESSES.GAS_POOL },
+        via: "the protocol constant LUSD_GAS_COMPENSATION (200 LUSD) · held since the open",
+        inputs: eventInputs({ blockNumber: coords.blockNumber }),
+      }
+    : {
+        kind: "chain",
+        pclass: "emitted",
+        verify: txVerify(coords),
+        summary: {
+          minted:
+            "Liquidation reserve — 200 LUSD minted to the GasPool when the Trove opened, from the LUSD token's Transfer log. It counts in the debt and pays whoever liquidates the Trove; on a close or a full redemption it is burned.",
+          burned:
+            "Liquidation reserve burned — the 200 LUSD the GasPool held for this Trove, burned when it closed, from the LUSD token's Transfer log. It cancels the last 200 LUSD of the debt, so the owner repaid the debt less 200.",
+          redeemed:
+            "Liquidation reserve burned — the 200 LUSD the GasPool held for this Trove, burned when a redemption cleared the rest of its debt, from the LUSD token's Transfer log. It cancels the last 200 LUSD of the debt (TroveManager._redeemCloseTrove).",
+          paid: "Liquidation reserve paid to the liquidator — the 200 LUSD the GasPool held for this Trove, sent to the address that called the liquidation, from the LUSD token's Transfer log. The debt the liquidation cleared includes it.",
+        }[how],
+        contract: LUSD_TOKEN,
+        via: `${RECEIPT_VIA} · Transfer(${how === "minted" ? "0x0 → GasPool" : how === "paid" ? "GasPool → liquidator" : "GasPool → 0x0"}) · ÷10^18`,
+        inputs: eventInputs(coords),
+      };
 
 /** LUSD the owner burned on a close. */
 export const ownerRepaidProv = (coords: LiquityV1Coords, amount: string): Provenance => ({

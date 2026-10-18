@@ -5,7 +5,9 @@
 // opened card's cells already state. A Trove has ETH collateral and LUSD debt
 // and no interest, so there is no "Interest since last event" and, with no
 // price at the previous event, no "Last event" or "Market move": the breakdown
-// holds "Before this event" alone. The receipt read starts when the card opens
+// holds "Before this event" alone. Beside Debt, the 200 LUSD liquidation
+// reserve the GasPool holds, part of the debt, as a panel of its own on every
+// event from the open to the end. The receipt read starts when the card opens
 // (`active`); the sheet is null until the price it needs has landed.
 
 import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
@@ -301,6 +303,83 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
     totalTip: V1_WORDS.tip_debt_total,
   };
 
+  // ── The liquidation reserve: a panel beside Debt on every event from the
+  // open to the close, the liquidation or the full redemption (rails-ops
+  // TO-DO-ui-jobs 366). It is part of the debt, held by the GasPool, so the
+  // Debt total includes its amount; the panel states where it sits. ──
+  const fullRedemption = isRedemption && (split?.full ?? s.debtAfter <= EPS);
+  const reserveHow = isOpen
+    ? ("minted" as const)
+    : isClose
+      ? ("burned" as const)
+      : isLiq
+        ? ("paid" as const)
+        : fullRedemption
+          ? ("redeemed" as const)
+          : ("held" as const);
+  const reserveEnds = reserveHow === "burned" || reserveHow === "paid" || reserveHow === "redeemed";
+  const reserveFig = (n: number, how: Parameters<typeof reserveProv>[1]) => ({
+    text: n < 0 ? `−${fmtLusd(-n)}` : fmtLusd(n),
+    symbol: DEBT_SYMBOL,
+    address: LUSD,
+    info: reserveProv(coords, how),
+    value: String(Math.abs(n)),
+  });
+  const reserveMove = isOpen ? LIQUITY_V1_RESERVE : reserveEnds ? -LIQUITY_V1_RESERVE : 0;
+  const reserveLabel =
+    reserveHow === "minted"
+      ? V1_WORDS.sheet_reserve_minted
+      : reserveHow === "paid"
+        ? V1_WORDS.sheet_reserve_paid
+        : V1_WORDS.sheet_reserve_burned;
+  const reserveRows: SheetRow[] =
+    reserveMove === 0
+      ? []
+      : [
+          {
+            key: `reserve-${reserveHow}`,
+            label: reserveLabel,
+            amount: reserveFig(reserveMove, reserveHow),
+            usd: { text: sheetUsd(reserveMove), info: sheetFaceUsdProv(reserveLabel, fmtLusd(LIQUITY_V1_RESERVE)) },
+            tip:
+              reserveHow === "minted"
+                ? V1_WORDS.tip_reserve_minted
+                : reserveHow === "paid"
+                  ? V1_WORDS.tip_reserve_paid
+                  : V1_WORDS.tip_reserve_burned,
+          },
+        ];
+  const reserveAfter = reserveEnds ? 0 : LIQUITY_V1_RESERVE;
+  const reserveSide: SheetSide = {
+    side: "debt",
+    id: "reserve",
+    name: V1_WORDS.sheet_reserve_panel,
+    tip: V1_WORDS.tip_reserve_panel,
+    icons: [DEBT_SYMBOL],
+    carry: [],
+    before: reserveEnds
+      ? {
+          key: "before",
+          label: SHEET_WORDS.before,
+          amount: reserveFig(LIQUITY_V1_RESERVE, "held"),
+          usd: {
+            text: sheetUsd(LIQUITY_V1_RESERVE),
+            info: sheetFaceUsdProv(SHEET_WORDS.before, fmtLusd(LIQUITY_V1_RESERVE)),
+          },
+          tip: V1_WORDS.tip_reserve_before,
+        }
+      : undefined,
+    rows: reserveRows,
+    total: reserveEnds
+      ? { text: "$0", info: reserveProv(coords, reserveHow) }
+      : { text: sheetUsd(LIQUITY_V1_RESERVE), info: faceUsdProv(DEBT_SYMBOL, fmtLusd(LIQUITY_V1_RESERVE), "after") },
+    totalAmount: {
+      ...reserveFig(reserveAfter, reserveEnds ? reserveHow : isOpen ? "minted" : "held"),
+      value: String(reserveAfter),
+    },
+    totalTip: V1_WORDS.tip_reserve_total,
+  };
+
   // ── Risk: the ratio and the price that liquidates the Trove ──
   const crBefore = isOpen ? null : ratioOf(s.collBefore, s.debtBefore, price);
   const crAfter = ends ? null : ratioOf(s.collAfter, s.debtAfter, price);
@@ -403,7 +482,7 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
   ];
 
   return {
-    sides: [collSide, debtSide],
+    sides: [collSide, debtSide, reserveSide],
     panels: [
       { panel: "risk", rows: risk },
       { panel: "limits", rows: limits, breakdown: params },

@@ -42,6 +42,7 @@ const DEPLOYMENT: LiquityForkDeployment = {
   debtSymbol: DEBT_SYMBOL,
   minDebt: MIN_DEBT,
   provs,
+  escrow: { constant: provs.ASYMMETRY_GAS_ESCROW, prov: provs.gasEscrowProv },
   gas: true,
   branch: branchOf,
 };

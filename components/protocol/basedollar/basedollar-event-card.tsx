@@ -39,6 +39,7 @@ const DEPLOYMENT: LiquityForkDeployment = {
   debtSymbol: DEBT_SYMBOL,
   minDebt: MIN_DEBT,
   provs,
+  escrow: { constant: provs.BASEDOLLAR_GAS_ESCROW, prov: provs.gasEscrowProv },
   // No gas: on Base the index's gas is the L2 execution fee alone, which
   // leaves out the L1 data fee, and no whole figure is read yet.
   gas: false,
