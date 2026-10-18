@@ -424,13 +424,13 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
             />
           </span>
           <span
-            className="self-center py-2 text-right text-base font-semibold tabular-nums text-foreground max-sm:hidden"
+            className="self-center py-2 text-right text-sm font-semibold tabular-nums text-foreground max-sm:hidden"
             data-sheet-col="amount"
           >
             {totalAmount && <AmountCell r={totalAmount} />}
           </span>
           <span
-            className={`whitespace-nowrap py-2 text-right text-base font-semibold tabular-nums text-foreground ${USD_RULE} max-sm:border-l-0 max-sm:pl-0 ${phoneAmount ? "max-sm:hidden" : ""}`}
+            className={`whitespace-nowrap py-2 text-right text-sm font-semibold tabular-nums text-foreground ${USD_RULE} max-sm:border-l-0 max-sm:pl-0 ${phoneAmount ? "max-sm:hidden" : ""}`}
             role="group"
             aria-label={`${name} total`}
           >
@@ -442,7 +442,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
           </span>
           {phoneAmount && totalAmount && (
             <span
-              className="self-center whitespace-nowrap py-2 text-right text-base font-semibold tabular-nums text-foreground sm:hidden"
+              className="self-center whitespace-nowrap py-2 text-right text-sm font-semibold tabular-nums text-foreground sm:hidden"
               data-sheet-col="phone"
             >
               <AmountCell r={totalAmount} />
