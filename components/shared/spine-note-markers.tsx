@@ -7,7 +7,8 @@
 // between: a hollow diamond on the line with a direction arrow beside it, in
 // the spine's neutral ink (a rate rise is bad for a borrower and good for a
 // supplier, so no green or red). Several notes in one gap (a Types of event
-// filter hid the events between them) stack in date order, one target apart.
+// filter hid the events between them) stack in date order: one target apart
+// on a phone, one open row apart from 640px.
 // A marker stays when a filter hides the events either side of it: it
 // describes the market, not the account.
 //
@@ -19,12 +20,15 @@
 // with the event cards (`note:<id>`), so opening a note closes an open card
 // and the reverse.
 //
-// DESKTOP. The marker sits on the join between two rows, in the bare line
-// their padding leaves, and takes no row height; its target is 28 × 64px so it
-// clears the event glyphs above and below. A click opens the note's row and
-// panel in place; the row's node is the diamond, filled, and a click on it
-// puts the note back to a marker. Notes open independently of each other and
-// of the event cards. Display's "Open all market notes" shows every note as
+// DESKTOP. A closed marker's slot takes the height of the note's open header
+// row, and the marker sits where that row's node stands, so the spine keeps
+// its rhythm whether notes are shown as markers or rows, and the diamond does
+// not move as the note opens and closes (Miles, 18 Oct 2026, superseding the
+// 30 Sep sizing; rails-ops architecture/market-notes.md §10). Its target is
+// 28 × 64px. A click opens the note's row and panel in place; the row's node
+// is the diamond, filled, and a click on it puts the note back to a marker.
+// The phone keeps its short gap above. Notes open independently of each other
+// and of the event cards. Display's "Open all market notes" shows every note as
 // its header row, and the diamonds do nothing until it is turned off.
 //
 // The marker is a sibling of the rows and the segments' buttons, never inside
@@ -118,23 +122,34 @@ function Direction({ note }: { note: GapItem }) {
 /** The desktop marker's target: 28px tall, so it clears the glyphs above and
  *  below it, and 64px wide. */
 const LIST_TARGET = 28;
-/** How far the last closed desktop marker's centre sits above the slot's
- *  bottom, so above the next row's node: a slot follows its gap's rows with
- *  the list's 8px gap cancelled, and the next node's halo starts 24px below
- *  the slot's end (the gap, the next row's padding and its column's 16px top
- *  padding, less the 4px halo). */
-const LIST_FIRST_CENTRE = 12;
 /** The open row's node: 32px below its column's top. */
 const LIST_NODE_Y = 32;
-/** A closed desktop marker sits where the node of its open row will stand, so
- *  a marker opens and closes under the pointer (Miles, 30 Sep 2026): a
- *  closed slot takes the height the open row's header takes above its node.
- *  Where the first marker's centre sits below its slot's top: between two
- *  rows the open row starts 8px down (its `pt-2`), then the row's padding; in
- *  the head slot, at the slot's top. Markers after the first step by the same
- *  distance, less the 12px a closed run leaves below its last marker. */
-const listFirstCentre = (cardPad: number, head: boolean) => (head ? 0 : 8) + cardPad + LIST_NODE_Y;
-const listStep = (cardPad: number) => 8 + cardPad + LIST_NODE_Y - LIST_FIRST_CENTRE;
+/** The open row's header panel (note-row-shell.tsx): its 16px top padding
+ *  (`pt-4`), the 28px line of marks (24px marks in 2px chips) and its 12px
+ *  bottom padding (`pb-3`). */
+const NOTE_HEADER = 16 + 28 + 12;
+/** The live group's card at rest (`LiveNoteGroupRow`, market-note-row.tsx):
+ *  its title line (16px top padding, a 16px `text-xs` line, 4px below), one
+ *  40px line per note (`py-1.5` around the 28px marks) and its 6px bottom
+ *  padding (`pb-1.5`). */
+const GROUP_TITLE = 16 + 16 + 4;
+const GROUP_LINE = 12 + 28;
+const GROUP_FOOT = 6;
+/** From 640px a closed marker's slot is its open row at rest, and the marker
+ *  stands on that row's node (Miles, 18 Oct 2026). Between two rows the open
+ *  row starts 8px down (its `pt-2`), then the row's padding either side of the
+ *  header panel: 72px at the timeline's 4px card padding. In the head slot
+ *  the row starts at the slot's top: 64px. Exported for the head slot's
+ *  reservation while the live notes load. */
+export const noteRowHeight = (cardPad: number, head: boolean) => (head ? 0 : 8) + 2 * cardPad + NOTE_HEADER;
+/** The slot one item takes from 640px: a note's row, or the live group's card
+ *  with its lines. */
+const itemHeight = (item: GapItem, cardPad: number, head: boolean) =>
+  isLiveNoteGroup(item)
+    ? (head ? 0 : 8) + 2 * cardPad + GROUP_TITLE + GROUP_LINE * item.notes.length + GROUP_FOOT
+    : noteRowHeight(cardPad, head);
+/** The open row's node centre below its top, the `pt-2` included. */
+const noteNodeY = (cardPad: number, head: boolean) => (head ? 0 : 8) + cardPad + LIST_NODE_Y;
 
 /** A marker's box, per width: `--mk-top-p`/`--mk-top-d` set its top on a
  *  phone and from 640px. Centred on the spine: the row's middle on a phone,
@@ -234,7 +249,7 @@ export function NoteGap({
           <PulsingDot side={tip} />
         </div>
       )}
-      {groups.map((g, gi) =>
+      {groups.map((g) =>
         g.open ? (
           <OpenNote
             key={g.note.id}
@@ -246,13 +261,7 @@ export function NoteGap({
             onClose={() => toggle(g.note, false)}
           />
         ) : (
-          <MarkerSlot
-            key={g.notes[0].id}
-            notes={g.notes}
-            head={!!head}
-            last={gi === groups.length - 1}
-            onOpen={(note) => toggle(note, true)}
-          />
+          <MarkerSlot key={g.notes[0].id} notes={g.notes} head={!!head} onOpen={(note) => toggle(note, true)} />
         ),
       )}
     </div>
@@ -262,21 +271,10 @@ export function NoteGap({
 /** A run of closed markers in one gap, sized per width. On a phone the gap
  *  grows by `GROWTH` for the first marker and a full target for each further
  *  one, the stack centred on the bare line between the caption above and the
- *  next node. From 640px it takes one target of height per marker after the
- *  first; in the head slot one per marker, but the last run there stops
- *  short so its last marker sits as far above the next node as a marker
- *  between two rows does. */
-function MarkerSlot({
-  notes,
-  head,
-  last,
-  onOpen,
-}: {
-  notes: GapItem[];
-  head: boolean;
-  last: boolean;
-  onOpen: (note: GapItem) => void;
-}) {
+ *  next node. From 640px each marker takes its open row's height (the live
+ *  group's, its card's) and stands on that row's node, in the head slot as
+ *  between two rows. */
+function MarkerSlot({ notes, head, onOpen }: { notes: GapItem[]; head: boolean; onOpen: (note: GapItem) => void }) {
   const { cardPad } = useTimelineScale();
   const n = notes.length;
   const heightP = head ? TARGET * n : GROWTH + TARGET * (n - 1);
@@ -284,14 +282,13 @@ function MarkerSlot({
   const regionHeight = heightP + CAPTION_PAD + 2 * cardPad + 8 + 16 + 4;
   const centreP = (i: number) =>
     head ? TARGET * i + TARGET / 2 : regionTop + regionHeight / 2 + (i - (n - 1) / 2) * TARGET;
-  const first = listFirstCentre(cardPad, head);
-  const step = listStep(cardPad);
-  const heightD = head && !last ? step * n : first + step * (n - 1) - LIST_FIRST_CENTRE;
-  const centreD = (i: number) => first + i * step;
+  const tops = notes.map((_, i) => notes.slice(0, i).reduce((y, note) => y + itemHeight(note, cardPad, head), 0));
+  const heightD = tops[n - 1] + itemHeight(notes[n - 1], cardPad, head);
+  const centreD = (i: number) => tops[i] + noteNodeY(cardPad, head);
   return (
     <div
       className="relative h-[var(--slot-h-p)] sm:h-[var(--slot-h-d)]"
-      style={{ "--slot-h-p": `${heightP}px`, "--slot-h-d": `${Math.max(0, heightD)}px` } as CSSProperties}
+      style={{ "--slot-h-p": `${heightP}px`, "--slot-h-d": `${heightD}px` } as CSSProperties}
     >
       {notes.map((note, i) => (
         <button
@@ -339,9 +336,8 @@ function OpenNote({
 }) {
   const { tip } = markerText(note);
   const { cardPad } = useTimelineScale();
-  // From 640px the control lies over the row's node: the row's top padding
-  // (`pt-2` between rows), the row's padding, then the node's centre.
-  const nodeTop = (head ? 0 : 8) + cardPad + LIST_NODE_Y - LIST_TARGET / 2;
+  // From 640px the control lies over the row's node.
+  const nodeTop = noteNodeY(cardPad, head) - LIST_TARGET / 2;
   const inert = openAll && !panel;
   return (
     <div data-note-open={note.id} className={`relative max-sm:pb-2 ${head ? "" : "sm:pt-2"}`}>

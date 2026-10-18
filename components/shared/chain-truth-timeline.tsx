@@ -86,7 +86,7 @@ import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { SingleWalletProvider } from "@/components/shared/activity-timeline";
+import { SingleWalletProvider, useTimelineScale } from "@/components/shared/activity-timeline";
 import { TimelineDisplayProvider, useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { TimelineBoundaryCard, TimelineBoundaryRow } from "@/components/shared/timeline-boundary-card";
 import { SpineTipContext, type SpineTip } from "@/components/shared/spine-column";
@@ -104,7 +104,7 @@ import {
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { usePublishLifeCount, type LifeCount } from "@/lib/shared/life-count-store";
-import { NoteGap, type GapItem } from "@/components/shared/spine-note-markers";
+import { NoteGap, noteRowHeight, type GapItem } from "@/components/shared/spine-note-markers";
 import { SpineLine } from "@/components/shared/spine-line";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { anchorMarketNotes, liveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
@@ -1629,6 +1629,7 @@ function ChainTruthTimelineBody({
   }, [moment, tl.sortedEvents]);
   const bottomTerminusTaken = boundaryAtBottom || viewBoundaryAtBottom;
   const liveSkeletonAtTop = showMarketNotes && !!liveNotesPending && cut == null;
+  const { cardPad } = useTimelineScale();
 
   // Auto-grow as the bottom sentinel nears the viewport. The observer re-arms on
   // each window change (the sentinel stays mounted while `hasMore`); a 600px
@@ -2092,10 +2093,10 @@ function ChainTruthTimelineBody({
               {liveWindowAtTop && liveWindow && (
                 <SpineTipContext.Provider value={tipSide}>{liveWindow()}</SpineTipContext.Provider>
               )}
-              {/* From 640px the markers reserve one target for the live notes
-                while they load; a phone reserves nothing. */}
+              {/* From 640px the head slot reserves one marker's height for the
+                live notes while they load; a phone reserves nothing. */}
               {liveSkeletonAtTop && !liveSlotAtTop && (
-                <div aria-hidden className="hidden sm:block" style={{ height: 28 }} />
+                <div aria-hidden className="hidden sm:block" style={{ height: noteRowHeight(cardPad, true) }} />
               )}
               {liveSlotAtTop && (
                 <NoteGap
