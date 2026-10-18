@@ -28,6 +28,7 @@ import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { FolderMembersReader } from "@/lib/shared/folder-members";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
@@ -333,9 +334,19 @@ export default function AaveV3PositionDetail({
     [switches, wallet],
   );
   const timelineEvents = useMemo(() => withEmodeRows(aaveEvents, emodeRows), [aaveEvents, emodeRows]);
+  // Folder members the page has read, by folder (the reader opens a folder, or
+  // a shared link lands inside one).
+  const [memberEvents, setMemberEvents] = useState<Record<string, BaseActivityEvent[]>>({});
   // Each card's same-transaction rows and the transaction before it (the
-  // liquidation fee's pairing, the health factor's move between events).
-  const neighbours = useMemo(() => aaveV3Neighbours(timelineEvents as AaveV3Event[]), [timelineEvents]);
+  // liquidation fee's pairing, the health factor's move between events, the
+  // sheet's carry layer), over the listed rows and the folder members read.
+  const neighbours = useMemo(() => {
+    const seen = new Set(timelineEvents.map((e) => e.id));
+    const members = Object.values(memberEvents)
+      .flat()
+      .filter((e) => isAaveV3Event(e) && !seen.has(e.id));
+    return aaveV3Neighbours([...timelineEvents, ...members] as AaveV3Event[]);
+  }, [timelineEvents, memberEvents]);
   // A card in a block holding another of the owner's transactions shows
   // balances only, with no health factor; an e-mode row there is not read.
   const sharedBlocks = useMemo(() => blocksSharedByTransactions(timelineEvents), [timelineEvents]);
@@ -503,6 +514,14 @@ export default function AaveV3PositionDetail({
     // Navigated by the Lifetime flows chart's Apply: no Dates.
     dates: false,
   });
+  const readMembers = useCallback<FolderMembersReader>(
+    async (ask) => {
+      const res = await readFolderMembers(ask);
+      setMemberEvents((m) => ({ ...m, [res.folder.responseId]: res.events }));
+      return res;
+    },
+    [readFolderMembers],
+  );
   /** The preload's own total, for the export: `tl.totalCount` counts the
    *  segment once one is loaded. */
   const preloadTotal = lifetimeFiguresKnown(historyWindow)
@@ -862,7 +881,7 @@ export default function AaveV3PositionDetail({
                 // `?folders=1` block above.
                 runs={AAVE_V3_TIMELINE_RUNS}
                 folderRegister={AAVE_V3_FOLDER_REGISTER}
-                readFolderMembers={readFolderMembers}
+                readFolderMembers={readMembers}
                 // The month picker above the rows, on a served page.
                 segments={segments}
                 // The USD-values toggle joins the chain-state items: the detail

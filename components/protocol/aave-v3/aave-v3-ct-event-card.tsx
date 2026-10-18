@@ -10,16 +10,20 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type V3Coords } from "@/lib/aave-v3/event-provenance";
-import { isAaveV3LossRow, useAaveV3HeadSpec } from "./aave-v3-ct-event-header";
+import { aaveV3T1Caption, isAaveV3LossRow, useAaveV3HeadSpec } from "./aave-v3-ct-event-header";
+import { V3_HEAD_WORDS } from "@/lib/aave-v3/event-templates";
+import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
 import { useAaveV3EventBody } from "./aave-v3-ct-event-detail";
 import { AaveFamilyLedgers } from "./aave-family-cells";
 import { AaveV3EventExplainer, aaveV3LearnMoreContent } from "./aave-v3-event-explainer";
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useState } from "react";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { useChainId } from "@/lib/shared/chain-context";
@@ -51,8 +55,8 @@ export interface AaveV3CtEventCardProps {
 // direction "right" = token moves toward the protocol (deposit / repay),
 // "left" = toward the wallet (withdraw / borrow). A transfer is neither — the
 // aToken changed hands, nothing entered or left the Pool — so it has no entry
-// here: the row draws the reserve with the custody badge and no flank, and
-// the header carries the amount and the counterparty.
+// here: the row draws the reserve with the custody badge, its amount on the
+// flank the position's balance moved by.
 // A swap is neither too: both legs stayed in the position, so its node wears the
 // swap glyph with no flank (rails-ops TO-DO-ui-jobs §15, D1). A withdraw and swap
 // is the exception: its value left the position, so it draws the withdrawn
@@ -68,7 +72,7 @@ const DIRECTION: Record<
   liquidation: "left",
   // A write-off is a debt decrease from the borrower's side, the same axis
   // movement as a repay without the repayment. Stated for the axis it moves
-  // on; the row itself wears the warning glyph and no flank, like a
+  // on; the row itself wears the warning glyph with its leg beside it, like a
   // liquidation, so this entry is never drawn today.
   bad_debt_written_off: "right",
 };
@@ -128,18 +132,20 @@ export function AaveV3CtEventCard({
   const isTransfer = kind === "transfer_in" || kind === "transfer_out";
 
   // The icon chip resolves a mark from an ADDRESS, and given only a symbol it
-  // has to find one in the hand-kept house table. Aave V3's reserves are a
-  // curated roster the table already names, so this is belt-and-braces here
-  // rather than a repair — but the reserve's contract is sitting in the event's
-  // own flows, and taking it from there costs nothing and stops the chip
-  // depending on a list someone has to maintain. soleFlowAddress answers only
-  // when exactly one flow claims the symbol, so a transaction that touched two
-  // reserves sharing a symbol resolves to nothing rather than to the wrong one.
+  // has to find one in the hand-kept house table. The reserve's contract is in
+  // the event's flows: soleFlowAddress answers only when exactly one flow
+  // claims the symbol, so a transaction that touched two reserves sharing a
+  // symbol resolves to nothing.
   //
   // A transfer is a custody move: the reserve's icon wears the paper-plane
-  // badge and neither flank is drawn — the two flanks are "out to the wallet"
-  // and "into the protocol", and a transfer to another account is neither. The
-  // header states the amount and the to/from counterparty.
+  // badge, its amount on the flank the position's balance moved by, out to the
+  // left or in to the right; the head's clause names the counterparty. A
+  // withdrawal through the WETH gateway and a liquidation's fee to the
+  // treasury leave the position like a withdrawal, on the outgoing flank.
+  const outFlow =
+    !!feeOf ||
+    (kind === "transfer_out" && getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID)?.kind === "gateway");
+  const reserveAddress = soleFlowAddress(event.flows, ctx.reserveSymbol);
   const tokens =
     isLoss || (isSwap && !isFlowSwap) || mag === 0
       ? undefined
@@ -147,28 +153,56 @@ export function AaveV3CtEventCard({
         ? [
             {
               symbol: ctx.reserveSymbol ?? "?",
-              address: soleFlowAddress(event.flows, ctx.reserveSymbol),
+              address: reserveAddress,
               direction: isSupplySwap ? ("right" as const) : ("left" as const),
               value: mag,
               badge: "swap" as const,
             },
           ]
-        : isTransfer
-          ? [
-              {
-                symbol: ctx.reserveSymbol ?? "?",
-                address: soleFlowAddress(event.flows, ctx.reserveSymbol),
-                badge: "send" as const,
-              },
-            ]
-          : [
-              {
-                symbol: ctx.reserveSymbol ?? "?",
-                address: soleFlowAddress(event.flows, ctx.reserveSymbol),
-                direction: DIRECTION[kind as keyof typeof DIRECTION],
-                value: mag,
-              },
-            ];
+        : outFlow
+          ? [{ symbol: ctx.reserveSymbol ?? "?", address: reserveAddress, direction: "left" as const, value: mag }]
+          : isTransfer
+            ? [
+                {
+                  symbol: ctx.reserveSymbol ?? "?",
+                  address: reserveAddress,
+                  badge: "send" as const,
+                  direction: kind === "transfer_out" ? ("left" as const) : ("right" as const),
+                  value: mag,
+                  verb: kind === "transfer_out" ? V3_HEAD_WORDS.legSent : V3_HEAD_WORDS.legReceived,
+                },
+              ]
+            : [
+                {
+                  symbol: ctx.reserveSymbol ?? "?",
+                  address: reserveAddress,
+                  direction: DIRECTION[kind as keyof typeof DIRECTION],
+                  value: mag,
+                },
+              ];
+
+  // A liquidation's legs, the collateral seized below the debt repaid, and a
+  // write-off's debt: the warning node's flank carries them.
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (kind === "liquidation") {
+      const legs: SpineWarningLeg[] = [];
+      const coll = Math.abs(Number(ctx.liquidatedCollateralAmount ?? "0")) || 0;
+      if (coll !== 0 && ctx.collateralSymbol)
+        legs.push({
+          label: V3_HEAD_WORDS.legSeized,
+          value: coll,
+          symbol: ctx.collateralSymbol,
+          address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+        });
+      const debt = Math.abs(Number(ctx.debtToCover ?? "0")) || 0;
+      if (debt !== 0 && ctx.reserveSymbol)
+        legs.push({ label: V3_HEAD_WORDS.legRepaid, value: debt, symbol: ctx.reserveSymbol, address: reserveAddress });
+      return legs;
+    }
+    if (kind === "bad_debt_written_off" && mag !== 0 && ctx.reserveSymbol)
+      return [{ label: V3_HEAD_WORDS.legWrittenOff, value: mag, symbol: ctx.reserveSymbol, address: reserveAddress }];
+    return undefined;
+  })();
 
   // A swap that stayed in the position stacks its legs beside the node, given
   // then received. The glyph takes the axis the legs share.
@@ -206,12 +240,16 @@ export function AaveV3CtEventCard({
       : undefined;
 
   const spine: SpineColumnProps = isLoss
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : isSwap && !isFlowSwap
       ? { icon: "swap", swapLegs, swapAxis, isLast: !!isLast }
       : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useAaveV3HeadSpec({
+    mode: page ? "title" : "row",
     ctx,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -254,13 +292,14 @@ export function AaveV3CtEventCard({
     },
     spine,
     head,
-    caption: aaveV3CtLabel(ctx, !!feeOf, chainId),
+    caption: page ? aaveV3CtLabel(ctx, !!feeOf, chainId) : aaveV3T1Caption(ctx, !!feeOf, chainId),
+    // A transfer states its counterparty in the caption's words; one received
+    // runs dotted, the sender having acted (ui-jobs 304).
     actor: {
       by: extBy ?? undefined,
-      // A transfer received: the sender acted (ui-jobs 304).
       byOwner: kind === "transfer_in" ? false : undefined,
       custody:
-        ctx.counterparty && isTransfer
+        page && ctx.counterparty && isTransfer
           ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
           : undefined,
     },

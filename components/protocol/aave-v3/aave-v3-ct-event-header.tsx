@@ -1,14 +1,24 @@
 "use client";
 
 // Aave V3 event head (T1): the card's `head` slot, drawn by the shared
-// ChainTruthRow. Maps the signed amount(s) this event moved into the shared row
-// spec, each traced via <Prov>; a swap states its two legs sold → bought and
-// names its venue as the party.
+// ChainTruthRow (Ethereum, Base, Seamless).
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`aaveFamilyT1Kind`, lib/aave-v3/head-words.ts), a
+// transfer's counterparty as its clause, and the chips for what the spine
+// cannot show: a swap's venue, the WETH gateway, the treasury, the "by" party.
+// The spine carries the figures.
+//
+// The event page's card (mode "title") maps the signed amount(s) this event
+// moved into the shared row spec, each traced via <Prov>; a swap states its two
+// legs sold → bought and names its venue as the party.
 
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { AssetFlow } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { aaveFamilyT1Caption, aaveFamilyT1Kind } from "@/lib/aave-v3/head-words";
+import { V3_HEAD_WORDS } from "@/lib/aave-v3/event-templates";
 import {
   assetsDeltaProv,
   seizedCollateralProv,
@@ -69,6 +79,34 @@ export interface AaveV3CtEventHeaderProps {
   /** Set when this transfer is a liquidation's protocol fee to the Aave
    *  treasury (lib/aave-v3/liquidation-fee.ts): the row names itself so. */
   feeOf?: AaveV3Context;
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
+}
+
+/** An aToken transfer to a WETH gateway: a withdrawal paid out as ETH
+ *  (aaveV3CtLabel). */
+function viaGatewayOf(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | undefined | null): boolean {
+  const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
+  return !isFee && ctx.eventType === "transfer_out" && named?.kind === "gateway";
+}
+
+/** The timeline head's words as one line: the phone caption and the row's
+ *  accessible name. */
+export function aaveV3T1Caption(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | undefined | null): string {
+  const gateway = viaGatewayOf(ctx, isFee, chainId);
+  const kind = aaveFamilyT1Kind(
+    { eventType: ctx.eventType, fee: isFee, gateway, swapKind: ctx.swap?.kind },
+    V3_HEAD_WORDS,
+  );
+  const transfer = !isFee && !gateway && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
+  if (!transfer || !ctx.counterparty) return kind;
+  const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
+  return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
+    lead: ctx.eventType === "transfer_out" ? V3_HEAD_WORDS.to : V3_HEAD_WORDS.from,
+    address: ctx.counterparty,
+    name: named?.name,
+  });
 }
 
 /** The row's head spec. */
@@ -80,6 +118,7 @@ export function useAaveV3HeadSpec({
   wallet,
   flows,
   feeOf,
+  mode = "title",
 }: AaveV3CtEventHeaderProps): ChainTruthRowSpec {
   const coords: V3Coords = {
     txHash,
@@ -91,7 +130,7 @@ export function useAaveV3HeadSpec({
   const deltas: ChainTruthDelta[] = [];
   const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId);
   const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
-  const viaGateway = !feeOf && ctx.eventType === "transfer_out" && named?.kind === "gateway";
+  const viaGateway = viaGatewayOf(ctx, !!feeOf, coords.chainId);
   // A liquidation's fee reads as an act with its verb, not as a custody move.
   const isTransferRow = !feeOf && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
 
@@ -208,7 +247,7 @@ export function useAaveV3HeadSpec({
         ? {
             prefix: viaGateway ? "via" : transferOut ? "to" : "from",
             address: ctx.counterparty,
-            name: feeOf ? "Aave treasury" : named?.name,
+            name: feeOf ? V3_HEAD_WORDS.treasury : named?.name,
             icon: feeOf
               ? protocolIconSrc("aave-v3")
               : named?.protocolIcon
@@ -219,6 +258,36 @@ export function useAaveV3HeadSpec({
           }
         : undefined;
 
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.poolCaller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
+            coords,
+          ),
+        }
+      : undefined;
+
+  if (mode === "row") {
+    const W = V3_HEAD_WORDS;
+    // A withdrawal through the WETH gateway is paid out as ETH; a transfer's
+    // counterparty is the clause after "Transferred". The chip prefixes are
+    // literals, which check:parties maps to their roles.
+    const rowParty = party && viaGateway ? { ...party, prefix: "as ETH via" } : party;
+    return {
+      label: aaveFamilyT1Kind(
+        { eventType: ctx.eventType, fee: !!feeOf, gateway: viaGateway, swapKind: ctx.swap?.kind },
+        W,
+      ),
+      critical: isAaveV3LossRow(ctx),
+      deltas: [],
+      clauses: isTransferRow && rowParty ? [<PartyChip key="party" party={rowParty} />] : undefined,
+      party: isTransferRow ? undefined : rowParty,
+      externalActor,
+    };
+  }
+
   return {
     label,
     critical: isAaveV3LossRow(ctx),
@@ -227,15 +296,6 @@ export function useAaveV3HeadSpec({
     custody: isTransferRow,
     deltas,
     party,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.poolCaller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
-              coords,
-            ),
-          }
-        : undefined,
+    externalActor,
   };
 }

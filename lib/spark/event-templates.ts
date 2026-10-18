@@ -6,6 +6,7 @@
 // string the prose writer cannot see (`pnpm check:prose` fails on one).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { AaveFamilyHeadTable } from "@/lib/aave-v3/head-words";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
 import type { ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { SparkEchoKey } from "@/lib/spark/event-prose";
@@ -40,6 +41,38 @@ export const PROSE = eventProseEngine<SparkL5Key, SparkEchoKey>(FILE, { doc: FIL
 
 /** Words the generator and the renderers put into a sentence. */
 export const SPARK_WORDS = FILE.words;
+
+/** The timeline head's words (lib/aave-v3/head-words.ts). */
+export const SPARK_HEAD_WORDS: AaveFamilyHeadTable = {
+  sep: SPARK_WORDS.t1_sep,
+  supplied: SPARK_WORDS.t1_supplied,
+  withdrew: SPARK_WORDS.t1_withdrew,
+  borrowed: SPARK_WORDS.t1_borrowed,
+  repaid: SPARK_WORDS.t1_repaid,
+  liquidated: SPARK_WORDS.t1_liquidated,
+  writtenOff: SPARK_WORDS.t1_written_off,
+  feePaid: SPARK_WORDS.t1_fee_paid,
+  transferred: SPARK_WORDS.t1_transferred,
+  to: SPARK_WORDS.t1_to,
+  from: SPARK_WORDS.t1_from,
+  swap: {
+    collateral_swap: SPARK_WORDS.t1_collateral_swap,
+    debt_swap: SPARK_WORDS.t1_debt_swap,
+    repay_with_collateral: SPARK_WORDS.t1_repay_with_collateral,
+    withdraw_and_swap: SPARK_WORDS.t1_withdraw_and_swap,
+    supply_from_swap: SPARK_WORDS.t1_supply_from_swap,
+  },
+  emode: SPARK_WORDS.t1_emode,
+  emodeOff: SPARK_WORDS.t1_emode_off,
+  emodeCategory: SPARK_WORDS.t1_emode_category,
+  legSeized: SPARK_WORDS.t1_leg_seized,
+  legRepaid: SPARK_WORDS.t1_leg_repaid,
+  legWrittenOff: SPARK_WORDS.t1_leg_written_off,
+  legSent: SPARK_WORDS.t1_leg_sent,
+  legReceived: SPARK_WORDS.t1_leg_received,
+  treasury: SPARK_WORDS.t1_treasury,
+  gatewayName: SPARK_WORDS.t1_gateway_name,
+};
 
 /** The event page's side column: the paragraph, the facts' labels and the
  *  metadata description. */
