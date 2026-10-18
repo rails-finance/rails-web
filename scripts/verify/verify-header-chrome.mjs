@@ -152,7 +152,7 @@ const title = await page.evaluate(() => {
   const cs = getComputedStyle(span);
   // The bar's own trigger is still in the tree below `md`, hidden by a
   // breakpoint class, so take the one that is actually drawn.
-  const trigger = [...document.querySelectorAll('button[aria-label="Switch blockchain"]')].find(
+  const trigger = [...document.querySelectorAll('button[aria-label$="switch blockchain"]')].find(
     (b) => b.getBoundingClientRect().width > 0,
   );
   const lb = link.getBoundingClientRect();
@@ -221,7 +221,7 @@ if (!trovePath) {
   check(false, "found a trove link on the Liquity V2 listing to open a position view with");
 } else {
   await page.goto(BASE + trovePath, { waitUntil: "networkidle" });
-  const posTrigger = await page.locator('button[aria-label="Switch blockchain"]:visible').count();
+  const posTrigger = await page.locator('button[aria-label$="switch blockchain"]:visible').count();
   check(posTrigger === 1, `a position view carries the chain chooser (${posTrigger})`);
   const posBar = await page.locator("header").first().isVisible();
   check(posBar === false, `a position view draws no top bar at 1280 (${posBar})`);
@@ -237,7 +237,7 @@ if (!trovePath) {
 // ui-jobs 68 it sits on the protocol title row from `md` up and in the bar
 // below `md`, and this block should hold either one to the same behaviour.
 async function switcherCoverage(target, slug) {
-  await target.locator('button[aria-label="Switch blockchain"]:visible').click();
+  await target.locator('button[aria-label$="switch blockchain"]:visible').click();
   await target.waitForSelector(`a[href="/coverage/${slug}"]`, { timeout: 5000 }).catch(() => {});
   return target.locator(`a[href="/coverage/${slug}"]`).count();
 }
@@ -251,7 +251,7 @@ check(switcherCov >= 1, `chain switcher reaches /coverage/ethereum on an Ethereu
 // there is no work-in-progress strip.
 console.log("[chrome on /base/moonwell — Base is launched]");
 await page.goto(BASE + "/base/moonwell", { waitUntil: "networkidle" });
-const baseChainTrigger = await page.locator('button[aria-label="Switch blockchain"]:visible').count();
+const baseChainTrigger = await page.locator('button[aria-label$="switch blockchain"]:visible').count();
 check(baseChainTrigger === 1, `a Base rail names the chain trigger once (${baseChainTrigger})`);
 const switcherCovBase = await switcherCoverage(page, "base");
 check(switcherCovBase >= 1, `chain switcher reaches /coverage/base on a Base rail (${switcherCovBase})`);
@@ -283,11 +283,11 @@ console.log("[mobile @390]");
 const mob = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
-const mSwitcher = await mob.locator('header button[aria-label="Switch blockchain"]').count();
+const mSwitcher = await mob.locator('header button[aria-label$="switch blockchain"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 check(mSwitcher === 1, `mobile header keeps the chain switcher trigger (${mSwitcher})`);
 // Below `md` the brand rail does not render and the bar carries the lot: mark,
-// wordmark, bookmark, theme toggle, chain trigger (rails-ops TO-DO-ui-jobs
+// bookmark, theme toggle, chain trigger (rails-ops TO-DO-ui-jobs
 // 67, 68). The chooser is drawn ONCE — the title row's copy is `md` and up.
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
@@ -295,10 +295,14 @@ const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]:visi
 check(mBookmarks === 1, `mobile header keeps the bookmark (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
 check(mToggle === 1, `mobile header keeps the theme toggle (${mToggle})`);
-const mSwitcherAll = await mob.locator('button[aria-label="Switch blockchain"]:visible').count();
+const mSwitcherAll = await mob.locator('button[aria-label$="switch blockchain"]:visible').count();
 check(mSwitcherAll === 1, `mobile draws one chain trigger, not two (${mSwitcherAll})`);
+// The app header carries the mark alone and the chain glyph without its name
+// (Miles 18 Oct 2026).
+const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').count();
+check(mHome === 1, `mobile header carries the Rails mark as the home link (${mHome})`);
 const mWordmark = await mob.locator("header").first().innerText();
-check(/Rails/.test(mWordmark), `mobile header keeps the Rails wordmark (${mWordmark.replace(/\s+/g, " ")})`);
+check(!/Rails|Ethereum/i.test(mWordmark), `mobile header shows neither word (${mWordmark.replace(/\s+/g, " ")})`);
 // FRANKENCOIN is the roster's longest name: at 390 the title must stay on one
 // line, and at 1440 it must not crowd the chooser it now shares a row with.
 for (const [w, h] of [
@@ -309,7 +313,7 @@ for (const [w, h] of [
   await p.goto(BASE + "/ethereum/frankencoin", { waitUntil: "networkidle" });
   const t = await p.evaluate(() => {
     const link = document.querySelector("[data-rail-identity]");
-    const trigger = [...document.querySelectorAll('button[aria-label="Switch blockchain"]')].find(
+    const trigger = [...document.querySelectorAll('button[aria-label$="switch blockchain"]')].find(
       (b) => b.getBoundingClientRect().width > 0,
     );
     const lb = link.getBoundingClientRect();

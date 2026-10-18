@@ -20,16 +20,18 @@ function isSiteRoute(pathname: string | null) {
   return SITE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
-/** The Rails wordmark on the left of the bar — on every marketing width, and
- *  on the app surfaces only below `md`, where BrandRail does not render.
+/** The Rails wordmark on the left of the bar on every marketing width; on the
+ *  app surfaces, below `md` where BrandRail does not render, the mark alone
+ *  (Miles 18 Oct 2026), as the rail draws it.
  *  Rails is the platform; the active
  *  rail's identity lives on the page itself (`ProtocolIdentity` above the
  *  detail back row, the mark in the listing h1), not in the chrome. No
  *  "Explorer" sublabel — there isn't a single explorer, there are mono-rails. */
-function RailsLogo() {
+function RailsLogo({ markOnly }: { markOnly?: boolean }) {
   return (
     <Link
       href="/"
+      aria-label={markOnly ? "Rails home" : undefined}
       className="group flex items-center gap-1.5 text-foreground hover:text-blue-500 transition-colors shrink-0"
     >
       <svg width={30} height={30} viewBox="0 0 200 200" fill="none" aria-hidden="true">
@@ -48,7 +50,7 @@ function RailsLogo() {
           d="M 148.892 142.388 L 180.766 142.388 L 155.359 93.185 L 123.486 93.185 L 148.892 142.388 Z"
         />
       </svg>
-      <span className="text-base tracking-wide font-semibold">Rails</span>
+      {!markOnly && <span className="text-base tracking-wide font-semibold">Rails</span>}
     </Link>
   );
 }
@@ -131,7 +133,7 @@ export function HeaderBar() {
             there below `md`, where there is no rail to hold them). Marketing
             carries the beta strip alone. */}
         <div className="flex items-center">
-          <RailsLogo />
+          <RailsLogo markOnly={!isMarketing} />
           {!isMarketing && <BetaPill />}
         </div>
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used

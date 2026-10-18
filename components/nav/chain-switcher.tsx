@@ -30,6 +30,7 @@ import { CHAINS, MAINNET_CHAIN_ID, type ChainId, type ChainMeta } from "@/lib/sh
 import { protocolsForChain, protocolForPathname, type ProtocolEntry } from "@/lib/shared/protocols";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
+import { MobileSheet } from "@/components/shared/mobile-sheet";
 
 // Row state grammar, same as the nav menu's:
 //   rest    → text-foreground; hover → blue-500 ("this goes somewhere")
@@ -110,9 +111,10 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Close on Escape, and on a click/tap outside the switcher root.
+  // Close on Escape, and on a click/tap outside the switcher root. The phone
+  // sheet is portalled outside the root and closes itself.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isMobile) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsOpen(false);
     };
@@ -125,7 +127,7 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   const toggle = () =>
     setIsOpen((v) => {
@@ -144,7 +146,7 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
       {showChainTrigger ? (
         <button
           onClick={toggle}
-          aria-label="Switch blockchain"
+          aria-label={`${activeChain.name}, switch blockchain`}
           aria-haspopup="menu"
           aria-expanded={isOpen}
           className="group flex cursor-pointer items-center gap-1.5 rounded-lg p-2.5 text-foreground transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -152,8 +154,11 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
           <ChainGlyph chainId={activeChain.id} className="h-4 w-4" />
           {/* The rail identity's small-caps register — the chain name is the
               same kind of ambient label, one register family across the top
-              of the page. */}
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{activeChain.name}</span>
+              of the page. Below `md` (the header bar) the glyph stands alone
+              (Miles 18 Oct 2026). */}
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] max-md:hidden">
+            {activeChain.name}
+          </span>
           <span className="text-rb-500 transition-colors group-hover:text-blue-500">
             <Chevron open={isOpen} />
           </span>
@@ -225,72 +230,53 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
         </div>
       )}
 
-      {/* Mobile sheet — the chains as stacked sections, each heading carrying
-          the glyph, name and count; the same rows underneath. */}
+      {/* Phone sheet — a tab per chain over that chain's explorers, opening
+          on the reader's chain (Miles 18 Oct 2026). */}
       {isMobile && isOpen && (
-        <div
-          className="fixed inset-0 z-[var(--z-dropdown)] bg-black/50 backdrop-blur-sm"
-          onClick={toggle}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
-              e.preventDefault();
-              toggle();
-            }
-          }}
-          aria-label="Close explorer switcher"
-        >
-          <div
-            className="fixed right-0 top-0 h-full w-80 max-w-[85vw] overflow-y-auto bg-white shadow-2xl dark:bg-rb-900"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-rb-200 p-6 dark:border-rb-700">
-              <span className="text-lg font-semibold tracking-wide text-foreground">Explorers</span>
-              <button
-                onClick={toggle}
-                className="cursor-pointer rounded-lg p-3 transition-colors duration-150 hover:bg-rb-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:bg-rb-700"
-                aria-label="Close explorer switcher"
-              >
-                <div className="relative flex h-5 w-6 flex-col justify-center">
-                  <span className="absolute h-0.5 w-full rotate-45 bg-rb-700 dark:bg-rb-300" />
-                  <span className="absolute h-0.5 w-full -rotate-45 bg-rb-700 dark:bg-rb-300" />
-                </div>
-              </button>
-            </div>
-            <nav className="p-6">
+        <MobileSheet
+          label="Explorers"
+          onClose={close}
+          header={
+            <div
+              role="tablist"
+              aria-label="Blockchain"
+              className="mb-3 flex shrink-0 rounded-md bg-sunken p-0.5 text-xs font-semibold"
+              data-switcher-tabs=""
+            >
               {chains.map((chain) => {
-                const entries = protocolsForChain(chain.id);
+                const selected = chain.id === selectedChain.id;
                 return (
-                  <div key={chain.id} className="mb-5 last:mb-0">
-                    <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-rb-500">
-                      <ChainGlyph chainId={chain.id} className="h-4 w-4" />
-                      <span>{chain.name}</span>
-                      <span className="tabular-nums">· {entries.length}</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {entries.map((entry) => (
-                        <ExplorerRow
-                          key={entry.id}
-                          entry={entry}
-                          isActive={activeEntry?.id === entry.id}
-                          onNavigate={close}
-                        />
-                      ))}
-                    </div>
-                    <Link
-                      href={`/coverage/${chain.slug}`}
-                      onClick={close}
-                      className="mt-1.5 inline-block px-2 text-xs text-rb-500 transition-colors hover:text-blue-500"
-                    >
-                      See detailed {chain.name} coverage →
-                    </Link>
-                  </div>
+                  <button
+                    key={chain.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setSelectedId(chain.id)}
+                    className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded px-2 ${
+                      selected ? "bg-background text-foreground" : "text-rb-500"
+                    }`}
+                  >
+                    <ChainGlyph chainId={chain.id} className="h-4 w-4" />
+                    {chain.name}
+                  </button>
                 );
               })}
-            </nav>
-          </div>
-        </div>
+            </div>
+          }
+        >
+          <nav role="tabpanel" aria-label={selectedChain.name} className="space-y-0.5">
+            {selectedEntries.map((entry) => (
+              <ExplorerRow key={entry.id} entry={entry} isActive={activeEntry?.id === entry.id} onNavigate={close} />
+            ))}
+            <Link
+              href={`/coverage/${selectedChain.slug}`}
+              onClick={close}
+              className="mt-1.5 inline-block px-2 pt-1 text-xs text-rb-500 transition-colors hover:text-blue-500"
+            >
+              See detailed {selectedChain.name} coverage →
+            </Link>
+          </nav>
+        </MobileSheet>
       )}
     </div>
   );
