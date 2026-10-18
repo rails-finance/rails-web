@@ -631,7 +631,8 @@ function EventCardView(props: EventCardProps) {
     phoneCaption ??
     (captionCtx ? (
       <>
-        {kind} &middot; {capDate ? `${capDate} ` : ""}
+        {kind} &middot; {capDate && <span className="text-foreground">{capDate}</span>}
+        {capDate ? " " : ""}
         {formatTimestamp(captionCtx.ts)}
       </>
     ) : null);

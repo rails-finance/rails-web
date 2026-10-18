@@ -477,7 +477,7 @@ export function TimelineRunCard({
       {sums(hideVal, false)}
       {extraHeader}
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
-        <span className="text-xs text-rb-500">{range}</span>
+        <span className="text-xs text-foreground">{range}</span>
       </span>
     </div>
   );
@@ -553,7 +553,7 @@ export function TimelineRunCard({
           phoneCaption={
             <>
               {kindWord}
-              {countMark} &middot; {range}
+              {countMark} &middot; <span className="text-foreground">{range}</span>
             </>
           }
           spokenCaption={`${kindWord}, ${spokenRange}`}

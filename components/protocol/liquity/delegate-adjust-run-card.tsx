@@ -278,7 +278,7 @@ export function DelegateAdjustRunCard({
         <CountChip count={count} />
       </span>
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
-        <span className="text-xs text-rb-500">{range}</span>
+        <span className="text-xs text-foreground">{range}</span>
       </span>
     </div>
   );
@@ -354,7 +354,8 @@ export function DelegateAdjustRunCard({
           phoneCaption={
             <>
               {troveWords("run_adjusted")}
-              <CountChip count={count} /> {troveWords("run_phone_caption", { range })}
+              <CountChip count={count} />{" "}
+              {troveNodes("run_phone_caption", { range: <span className="text-foreground">{range}</span> })}
             </>
           }
           spokenCaption={troveWords("run_spoken", { range: spokenRange })}
