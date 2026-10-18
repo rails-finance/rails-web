@@ -17,7 +17,15 @@ import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 import { CountChip } from "@/components/shared/count-chip";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
-import { RunLandingContext } from "@/components/shared/timeline-run-card";
+import {
+  groupExplainer,
+  MAX_BULLETS,
+  RunLandingContext,
+  sheetFig,
+  sheetSideBullets,
+  spanWords,
+} from "@/components/shared/timeline-run-card";
+import { LinkedAddress } from "@/components/shared/linked-address";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
 import { troveWords } from "@/lib/liquity/event-templates";
@@ -311,6 +319,81 @@ export function DelegateAdjustRunCard({
     count: count.toLocaleString("en-US"),
   });
 
+  // ── T3: the run's Explanation (rails-ops TO-DO-ui-jobs 372), in the shared
+  // group shape (`groupExplainer`): who adjusted the rate how often and when,
+  // the rate's path, the debt's before and after, what the run added to it,
+  // the range where the rate left its ends (dropped first for room), and
+  // where the members are.
+  const manager = useMemo(() => {
+    const all = new Set(events.map((e) => (isLiquityEvent(e) ? e.context.data.batchManager : undefined)));
+    return all.size === 1 ? [...all][0] : undefined;
+  }, [events]);
+  const rateFig = (which: DelegateRunRateWhich, v: number) => (
+    <Prov echo info={rateProv(which)} value={pct(v)}>
+      <strong className="font-semibold text-foreground">{pct(v)}</strong>
+    </Prov>
+  );
+  const span = spanWords(fromTs, toTs);
+  const countWord = count.toLocaleString("en-US");
+  const bullets: ReactNode[] = [
+    manager
+      ? troveNodes("run_explain_happened", {
+          manager: <LinkedAddress address={manager} label={managerName} />,
+          count: countWord,
+          span,
+        })
+      : troveNodes("run_explain_happened_unnamed", { count: countWord, span }),
+  ];
+  const reading = rateReading(rates);
+  if (reading)
+    bullets.push(
+      reading.unchanged
+        ? troveNodes("run_explain_rate_unchanged", { rate: rateFig("last", reading.to) })
+        : troveNodes("run_explain_rate", { from: rateFig("first", reading.from), to: rateFig("last", reading.to) }),
+    );
+  bullets.push(...sheetSideBullets(merged?.sheet, new Set(["collateral", "escrow"])));
+  const debtRows = merged?.sheet.sides.find((s) => s.side === "debt" && !s.id)?.rows ?? [];
+  // What the run added to the debt, as the sheet sums it, with the upfront
+  // fees in the same bullet where there are any; a zero sum says nothing.
+  const amountOf = (key: string) => {
+    const a = debtRows.find((r) => r.key === key)?.amount;
+    return a && Number(String(a.text).replace(/[^0-9.]/g, "")) > 0 ? a : undefined;
+  };
+  const interestAmt = amountOf("group-interest");
+  const upfrontAmt = amountOf("group-upfront");
+  if (interestAmt && upfrontAmt) {
+    bullets.push(
+      troveNodes("run_explain_interest_upfront", {
+        amount: sheetFig(interestAmt, interestAmt.symbol),
+        upfront: sheetFig(upfrontAmt, upfrontAmt.symbol),
+        symbol: interestAmt.symbol ?? "",
+      }),
+    );
+  } else if (interestAmt)
+    bullets.push(
+      troveNodes("run_explain_interest", {
+        amount: sheetFig(interestAmt, interestAmt.symbol),
+        symbol: interestAmt.symbol ?? "",
+      }),
+    );
+  // The range takes a bullet only where the closing note still fits.
+  if (reading?.showRange && bullets.length + 2 <= MAX_BULLETS)
+    bullets.push(
+      troveNodes("run_explain_range", { low: rateFig("low", reading.low), high: rateFig("high", reading.high) }),
+    );
+  const collector = (
+    <GroupSheetCollector
+      members={children}
+      count={count}
+      label={troveWords("run_adjusted")}
+      merge={merge}
+      onSheet={onSheet}
+    />
+  );
+  // The collector mounts under whichever tab is open, so the sheet's figures
+  // reach the bullets on the default tab.
+  const explainer = groupExplainer(bullets, true, collector);
+
   return (
     <GroupFrame
       open={open}
@@ -336,17 +419,11 @@ export function DelegateAdjustRunCard({
             ledgers: { none: troveWords("run_ledgers_none") },
             notes: (
               <div data-group-summary="" data-group-sheet={merged ? "" : undefined}>
-                <GroupSheetCollector
-                  members={children}
-                  count={count}
-                  label={troveWords("run_adjusted")}
-                  merge={merge}
-                  onSheet={onSheet}
-                />
+                {collector}
                 {merged === undefined && <SheetSkeleton />}
               </div>
             ),
-            explainer: { body: null },
+            explainer,
             learnMore: null,
           }}
           // On a phone the caption carries the word, the count's chip and the

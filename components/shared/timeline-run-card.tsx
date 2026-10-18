@@ -499,56 +499,17 @@ export function TimelineRunCard({
       </>,
     );
   }
-  // A side the merged sheet states before and after, where `stateSpan` does not.
-  const sheetFig = (f: SheetFigure, symbol?: string) =>
-    f.info ? (
-      <Prov echo info={f.info} value={f.value} symbol={symbol}>
-        {bold(f.text)}
-      </Prov>
-    ) : (
-      bold(f.text)
-    );
-  // A side the group left where it found it says nothing.
-  const same = (x: SheetFigure, y: SheetFigure) =>
-    x.value != null && y.value != null
-      ? Number(x.value) === Number(y.value)
-      : typeof x.text === "string" && x.text === y.text;
-  for (const s of merged?.sheet.sides ?? []) {
-    const key = s.id ?? s.side;
-    if (covered.has(key)) continue;
-    covered.add(key);
-    const name = s.name ? `The ${s.name.toLowerCase()}` : W.side[s.side];
-    const b = s.before?.amount;
-    const a = s.totalAmount;
-    const symbol = b?.symbol ?? a?.symbol;
-    if (b && a && symbol) {
-      if (!same(b, a))
-        bullets.push(
-          <>
-            {name} {W.wentFrom} {sheetFig(b, symbol)} {W.to} {sheetFig(a, symbol)} {symbol}.
-          </>,
-        );
-    } else if (s.before?.usd && "text" in s.total && !same(s.before.usd, s.total))
-      bullets.push(
-        <>
-          {name} {W.wentFrom} {sheetFig(s.before.usd)} {W.to} {sheetFig(s.total)}.
-        </>,
-      );
-  }
-  if (saidLegs.length > 0 && bullets.length < MAX_BULLETS) bullets.push(W.note);
-  const [firstBullet, ...restBullets] = bullets.slice(0, MAX_BULLETS);
-  const explainer = {
-    first: <span data-group-sentence="">{firstBullet}</span>,
-    // The collector and the folder's read sit here too, so the members are
-    // read and the sheet's sides reach the bullets while Explanation is open.
-    body: (
-      <>
-        {hasSums && collector}
-        {hasSums && onOpen && !members && <AskMembers onOpen={onOpen} askedRef={askedRef} />}
-        <ProseExplainer items={restBullets} />
-      </>
-    ),
-  };
+  bullets.push(...sheetSideBullets(merged?.sheet, covered));
+  // The collector and the folder's read sit in the Explanation too, so the
+  // members are read and the sheet's sides reach the bullets while it is open.
+  const explainer = groupExplainer(
+    bullets,
+    saidLegs.length > 0,
+    <>
+      {hasSums && collector}
+      {hasSums && onOpen && !members && <AskMembers onOpen={onOpen} askedRef={askedRef} />}
+    </>,
+  );
   /** The Figures tab: the members' merged sheet, its skeleton while they are
    *  collected, or the sums where the members draw no sheet (Liquity V2's
    *  redemption group draws its members' sheet alone). */
@@ -703,7 +664,7 @@ function AskMembers({ onOpen, askedRef }: { onOpen: () => void; askedRef: React.
 
 /** The group Explanation's words (rails-ops TO-DO-ui-jobs 372), the same on
  *  every family's. */
-const GROUP_EXPLANATION_WORDS = {
+export const GROUP_EXPLANATION_WORDS = {
   holder: "The holder made",
   thirdParty: "A third party made",
   inAll: "and in all",
@@ -720,8 +681,74 @@ const GROUP_EXPLANATION_WORDS = {
   pastTense: { withdrawn: "withdrew", "written off": "wrote off", "debt cleared": "cleared" } as Record<string, string>,
 };
 
+const boldFig = (n: ReactNode) => <strong className="font-semibold text-foreground">{n}</strong>;
+
+/** A sheet figure in an explanation bullet: bold, echoing the sheet's receipt. */
+export function sheetFig(f: SheetFigure, symbol?: string): ReactNode {
+  return f.info ? (
+    <Prov echo info={f.info} value={f.value} symbol={symbol}>
+      {boldFig(f.text)}
+    </Prov>
+  ) : (
+    boldFig(f.text)
+  );
+}
+
+/** "The debt went from X to Y BOLD." for each side of a group's merged sheet
+ *  that states its before and after and is not in `covered` (side ids); a
+ *  side the group left where it found it says nothing. */
+export function sheetSideBullets(sheet: EventSheet | undefined, covered: Set<string>): ReactNode[] {
+  const W = GROUP_EXPLANATION_WORDS;
+  const same = (x: SheetFigure, y: SheetFigure) =>
+    x.value != null && y.value != null
+      ? Number(x.value) === Number(y.value)
+      : typeof x.text === "string" && x.text === y.text;
+  const out: ReactNode[] = [];
+  for (const s of sheet?.sides ?? []) {
+    const key = s.id ?? s.side;
+    if (covered.has(key)) continue;
+    covered.add(key);
+    const name = s.name ? `The ${s.name.toLowerCase()}` : W.side[s.side];
+    const b = s.before?.amount;
+    const a = s.totalAmount;
+    const symbol = b?.symbol ?? a?.symbol;
+    if (b && a && symbol) {
+      if (!same(b, a))
+        out.push(
+          <>
+            {name} {W.wentFrom} {sheetFig(b, symbol)} {W.to} {sheetFig(a, symbol)} {symbol}.
+          </>,
+        );
+    } else if (s.before?.usd && "text" in s.total && !same(s.before.usd, s.total))
+      out.push(
+        <>
+          {name} {W.wentFrom} {sheetFig(s.before.usd)} {W.to} {sheetFig(s.total)}.
+        </>,
+      );
+  }
+  return out;
+}
+
+/** A group's Explanation in the shell's slot: the first bullet as the teaser
+ *  (`data-group-sentence`), the rest under it, at most five, with the note on
+ *  where the members are when `note` and there is room. `extra` mounts in the
+ *  body and draws nothing (the sheet's collector). */
+export function groupExplainer(bullets: ReactNode[], note: boolean, extra?: ReactNode) {
+  const all = note && bullets.length < MAX_BULLETS ? [...bullets, GROUP_EXPLANATION_WORDS.note] : bullets;
+  const [first, ...rest] = all.slice(0, MAX_BULLETS);
+  return {
+    first: <span data-group-sentence="">{first}</span>,
+    body: (
+      <>
+        {extra}
+        <ProseExplainer items={rest} />
+      </>
+    ),
+  };
+}
+
 /** The explanation's bullets at most (rails-ops standards/prose-limits-and-zones.md, Z2). */
-const MAX_BULLETS = 5;
+export const MAX_BULLETS = 5;
 /** The bullets the sums take at most, two to a bullet; the rest are counted. */
 const MAX_LEG_BULLETS = 2;
 
@@ -767,7 +794,7 @@ const USD_DEBT = /USD|BOLD|LUSD|DAI|GHO|FRAX/i;
 
 /** "between 1 and 12 Oct '25", "on 1 Sep '25", "between 28 Sep '25 and
  *  2 Oct '25". */
-function spanWords(a: number, b: number): string {
+export function spanWords(a: number, b: number): string {
   const [lo, hi] = a <= b ? [a, b] : [b, a];
   const d1 = shortDate(lo);
   const d2 = shortDate(hi);
