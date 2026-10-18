@@ -1,8 +1,9 @@
 "use client";
 
 // The event page's side column (rails-ops TO-DO-ui-jobs 236), in the spine's
-// place beside the card, the same on every family: the page's h1 (the
-// family's header in its title form, ui-jobs 286), the actions row (the
+// place beside the card, the same on every family: the page's h1 (the card's
+// teaser where it has one, else the family's header in its title form,
+// ui-jobs 286), the actions row (the
 // timeline, the explorer, the Markdown, Copy link, Copy transaction hash, Copy
 // for LLM; ui-jobs 291 and 294), the paragraph
 // with the timeline link, the facts table (the family's rows, then the
@@ -218,12 +219,40 @@ function EventActions({ c }: { c: EventPageContract }) {
   );
 }
 
-export function EventPageAside({ page }: { page: EventPageShell }) {
+/** The page's h1 where the card has a teaser: the Explanation's first
+ *  sentence (rails-ops decision 0045, "Ruled since"), under the Explanation's
+ *  receipt rule (`data-prov-exempt`, as on T3), and under it a chip the
+ *  sentence leaves out (a liquidation's claimable surplus). */
+function EventPageSentence({ sentence, beside }: { sentence: ReactNode; beside?: ReactNode }) {
+  return (
+    <h1
+      className="text-xl font-normal leading-snug text-foreground max-sm:text-lg"
+      data-event-page-title=""
+      data-event-page-sentence=""
+      data-prov-exempt=""
+    >
+      {sentence}
+      {beside && <span className="mt-2 flex">{beside}</span>}
+    </h1>
+  );
+}
+
+/** The column. `sentence`: the card's teaser, which stands as the h1 in place
+ *  of the route's title; `beside` follows it. */
+export function EventPageAside({
+  page,
+  sentence,
+  beside,
+}: {
+  page: EventPageShell;
+  sentence?: ReactNode;
+  beside?: ReactNode;
+}) {
   const c = page.contract;
   return (
     <div className="space-y-4 pb-4 pt-3 text-sm sm:pb-0 sm:pr-6" data-event-page-side="">
       <div className="space-y-2 pb-2">
-        {page.title}
+        {sentence ? <EventPageSentence sentence={sentence} beside={beside} /> : page.title}
         <EventActions c={c} />
       </div>
       <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">

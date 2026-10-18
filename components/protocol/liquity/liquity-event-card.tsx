@@ -154,13 +154,26 @@ export function LiquityEventCard({
   // A redemption's or a liquidation's legs, drawn as two nodes on the spine:
   // the collateral that left the Trove below the debt it cleared. The same
   // change receipts the header's figures trace.
+  // A pending debt applied draws one leg: the debt the event added, on the
+  // BOLD node in the caution tone, its figure on the flank.
   const warningLegs = (() => {
-    if (!isRedemption && !isLiquidation) return undefined;
+    const isPendingDebt = ctx.operation === "applyPendingDebt";
+    if (!isRedemption && !isLiquidation && !isPendingDebt) return undefined;
     const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
     const collCp = collChangeProv(ctx, coords);
     const debtCp = debtChangeProv(ctx, coords);
     const debtSym = ctx.assetType ?? "BOLD";
     const legs: SpineWarningLeg[] = [];
+    if (isPendingDebt) {
+      if (debtCp && Math.abs(debtCp.change) >= 0.01)
+        legs.push({
+          label: L1_WORDS.spine_debt_added,
+          value: Math.abs(debtCp.change),
+          symbol: debtSym,
+          address: soleFlowAddress(event.flows, debtSym),
+        });
+      return legs;
+    }
     if (collCp && Math.abs(collCp.change) >= 0.01)
       legs.push({
         label: isRedemption ? L1_WORDS.reduced : L1_WORDS.liquidated,

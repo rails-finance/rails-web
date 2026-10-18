@@ -91,13 +91,14 @@ export function eventPageDescription(o: {
   return `${text} ${PAGE_WORDS.timeline_link}`;
 }
 
-/** The event's heading in words, for the browser title: the prose's L1 line
- *  ("Repay · 100K BOLD") with its groups joined by spaces. Null where the
- *  history lacks the event. */
+/** The event's heading in words, for the browser title. It follows the
+ *  page's h1 (rails-ops decision 0045, "Ruled since"): the Explanation's first
+ *  sentence, else the prose's L1 line ("Repay · 100K BOLD") with its groups
+ *  joined by spaces. Null where the history lacks the event. */
 export function eventHeadingWords(place: EventPagePlace, currentPrice?: number): string | null {
   const { event, previous } = place;
   if (!event) return null;
-  const { L1 } = liquityEventProse({
+  const { L1, L4 } = liquityEventProse({
     ctx: event.context.data,
     event,
     previousEvent: previous,
@@ -107,5 +108,5 @@ export function eventHeadingWords(place: EventPagePlace, currentPrice?: number):
     collDecimals: null,
     debtDecimals: null,
   });
-  return L1.split(" · ").join(" ");
+  return L4[0]?.text ?? L1.split(" · ").join(" ");
 }

@@ -456,6 +456,9 @@ L1_words:
     gas compensation escrow sent
   spine_escrow_returned: |-
     gas compensation escrow returned
+  # A pending debt applied: its one spine leg, spoken.
+  spine_debt_added: |-
+    added to the debt
   # The timeline head (rails-ops TO-DO-ui-jobs 367): the kind as a past
   # participle, then at most one present-tense clause for what the spine
   # cannot show, each after the middle dot. The spine carries the figures.

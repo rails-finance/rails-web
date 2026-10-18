@@ -942,24 +942,7 @@ export function ChainTruthRow({
         </span>
       )}
 
-      {surplus &&
-        (surplus.claimed ? (
-          <span
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-rb-500/15 text-rb-500"
-            title="Claimable at the liquidation; the owner has since claimed it"
-          >
-            <span>{surplus.amount.toFixed(4)}</span>
-            <TokenChipIcon symbol={surplus.symbol} size={16} />
-            {surplus.word}
-            {surplus.claimed.timestamp != null && <> {formatDate(surplus.claimed.timestamp)}</>}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
-            <span>{surplus.amount.toFixed(4)}</span>
-            <TokenChipIcon symbol={surplus.symbol} size={16} />
-            {surplus.word}
-          </span>
-        ))}
+      {surplus && <HeadSurplusChip surplus={surplus} />}
 
       {!spec.ratePill?.lead && rateNode}
       {!spec.ratePill?.lead && managerNode}
@@ -1016,6 +999,28 @@ export function ChainTruthRow({
       {cluster}
       {meta}
     </div>
+  );
+}
+
+/** A liquidation's claimable surplus as the head's chip; muted, with the
+ *  date, once claimed. The event page's title draws it beside the sentence. */
+export function HeadSurplusChip({ surplus }: { surplus: NonNullable<ChainTruthRowSpec["surplus"]> }) {
+  return surplus.claimed ? (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-rb-500/15 text-rb-500"
+      title="Claimable at the liquidation; the owner has since claimed it"
+    >
+      <span>{surplus.amount.toFixed(4)}</span>
+      <TokenChipIcon symbol={surplus.symbol} size={16} />
+      {surplus.word}
+      {surplus.claimed.timestamp != null && <> {formatDate(surplus.claimed.timestamp)}</>}
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
+      <span>{surplus.amount.toFixed(4)}</span>
+      <TokenChipIcon symbol={surplus.symbol} size={16} />
+      {surplus.word}
+    </span>
   );
 }
 
