@@ -150,7 +150,7 @@ export function LiquityEventCard({
   const isRedemption = ctx.operation === "redeemCollateral";
   const isLiquidation = ctx.operation === "liquidate";
   // A redemption's or a liquidation's legs, drawn as two nodes on the spine:
-  // the collateral that left the Trove, then the debt it cleared. The same
+  // the collateral that left the Trove below the debt it cleared. The same
   // change receipts the header's figures trace.
   const warningLegs = (() => {
     if (!isRedemption && !isLiquidation) return undefined;

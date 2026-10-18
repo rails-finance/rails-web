@@ -138,7 +138,7 @@ export interface ChainTruthDelta {
    *  set it to paper over a missing row that ought to exist — draw the row. */
   noSpineCounterpart?: boolean;
   /** The debt side of a redemption's or a liquidation's legs, where its
-   *  label does not say so: the spine draws the debt after the collateral,
+   *  label does not say so: the spine draws the debt above the collateral,
    *  whatever order the head states (ui-jobs 250 point 8). */
   debtSide?: boolean;
   /** Still the owner's, held for them to claim (Liquity V1's collateral
@@ -597,7 +597,8 @@ export function chainTruthCaption(spec: ChainTruthRowSpec): string | undefined {
 /** A leg on the debt side: flagged, or labelled so ("Cleared", "Debt …",
  *  "Repaid"). */
 const isDebtLeg = (d: ChainTruthDelta) => !!d.debtSide || /^(cleared|debt|repaid|covered)/i.test(d.label ?? "");
-/** The spine's order: the collateral that left, the debt, then what is held. */
+/** The legs' order, drawn bottom to top: the collateral that left, the debt,
+ *  then what is held. */
 const legRank = (d: ChainTruthDelta) => (d.locked ? 2 : isDebtLeg(d) ? 1 : 0);
 
 export function ChainTruthRow({
@@ -634,7 +635,7 @@ export function ChainTruthRow({
   const hideClass = variant === "row" ? spineHide : "";
   const sz = variant === "title" ? TITLE_SIZES : ROW_SIZES;
   // A redemption or a liquidation: its deltas are the warning spine's legs,
-  // collateral first and the debt after, whatever order the head states. A
+  // the collateral below and the debt above, whatever order the head states. A
   // muted figure (a pool's total) is not the position's and stays in the
   // head.
   const adverse = !!spec.critical || !!spec.labelOnSpine;
