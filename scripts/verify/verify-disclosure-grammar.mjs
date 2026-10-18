@@ -11,7 +11,7 @@
 // Debt and Collateral ratio rows each on a chevron (the first two open
 // by default, the ratio closed, remembered per row, the card-wide key of 209
 // dropped on read); the Lifetime flows header's chevron after its heading and
-// its ⋮ at the right end; the Repay #148 card's chevron after "Repay", the
+// its ⋮ at the right end; the Repaid #148 card's chevron after "Repaid", the
 // number pill last on the line and no ⋮; the opened card's Explanation |
 // Figures strip (ui-jobs 370), T2's breakdown switch at its row's right end on
 // the Figures tab. Aave V3: the event ⋮ in the header before the pill,
@@ -324,13 +324,13 @@ const headerLayout = (card) =>
     .locator('[data-anatomy="T1"]')
     .evaluate((t1) => {
       const chev = t1.querySelector("[data-evt-head-chev]");
-      const word = [...t1.querySelectorAll("span")].find((s) => s.textContent === "Repay");
+      const word = [...t1.querySelectorAll("span")].find((s) => s.textContent === "Repaid");
       if (!chev || !word) return null;
       return Math.round(chev.getBoundingClientRect().left - word.getBoundingClientRect().right);
     })
     .catch(() => null);
   check(
-    "2e. #148: the chevron follows the word Repay",
+    "2e. #148: the chevron follows the word Repaid",
     headGap != null && headGap >= 0 && headGap <= 8,
     `${headGap}px`,
   );
@@ -563,7 +563,8 @@ async function waitHeads(page) {
   await page.waitForTimeout(3000);
 }
 
-// 5a. Liquity V2 at 1280, Timeline values on.
+// 5a. Liquity V2 at 1280. Values is retired (0045): the head reads words, a
+// past participle and at most one clause, with the chevron after the last.
 {
   const { ctx, page, errors } = await open(1280, TROVE);
   await waitHeads(page);
@@ -571,61 +572,47 @@ async function waitHeads(page) {
   const { card } = cardWith(page, 148);
   const repay = await headItems(card.locator('[data-anatomy="T1"]')).catch(() => null);
   check(
-    "5a. 1280, values on: Repay #148 holds no icon and its chevron is last",
-    !!repay && !repay.items.includes("IMG") && repay.last && repay.items[0] === "Repay",
+    "5a. 1280: Repaid #148 holds the word and the chevron, no icon",
+    !!repay &&
+      !repay.items.includes("IMG") &&
+      repay.last &&
+      repay.items[0] === "Repaid" &&
+      repay.items.filter((t) => t !== "CHEV").length === 1,
     JSON.stringify(repay?.items),
   );
   const heads = await allHeads(page);
-  const redemption = heads.find((h) => h.items[0] === "Cleared");
+  const redemption = heads.find((h) => h.items[0] === "Redeemed");
   check(
-    "5b. 1280, values on: a redemption card reads Cleared … Reduced … then the chevron",
+    "5b. 1280: a redemption card reads Redeemed \u00b7 Collateral and debt reduced, then the chevron",
     !!redemption &&
       redemption.last &&
-      redemption.items.indexOf("Reduced") > 0 &&
-      redemption.items.indexOf("CHEV") > redemption.items.indexOf("Reduced"),
+      redemption.items
+        .join(" ")
+        .replace(/ \u00b7 /g, " ")
+        .includes("Redeemed Collateral and debt reduced") &&
+      redemption.items.indexOf("CHEV") === redemption.items.length - 1,
     JSON.stringify(redemption?.items),
   );
   const first = cardWith(page, 1);
   await first.card.scrollIntoViewIfNeeded().catch(() => {});
   const open1 = await headItems(first.card.locator('[data-anatomy="T1"]')).catch(() => null);
   check(
-    "5c. 1280, values on: the open card's chevron follows the rate pill",
+    '5c. 1280: the open card\'s chevron follows "Opened trove" (or its delegate clause)',
     !!open1 &&
-      open1.items[0] === "Open" &&
+      open1.items[0] === "Opened trove" &&
       open1.last &&
       !open1.items.includes("IMG") &&
-      /%$/.test(open1.items[open1.items.length - 2] ?? ""),
+      !open1.items.some((t) => /%$/.test(t)),
     JSON.stringify(open1?.items),
   );
   const strays = heads.filter((h) => !h.last);
-  check("5d. 1280, values on: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));
+  check("5d. 1280: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));
   check("5e. no page error", errors.length === 0, errors.join("; "));
   await ctx.close();
 }
 
-// 5b. Liquity V2 at 1280, Timeline values off: the icon follows its amount.
-{
-  const { ctx, page, errors } = await open(1280, TROVE, { valuesOff: true });
-  await waitHeads(page);
-  await openFolder(page);
-  const { card } = cardWith(page, 148);
-  const repay = await headItems(card.locator('[data-anatomy="T1"]')).catch(() => null);
-  const at = (a, x) => a.indexOf(x);
-  check(
-    "5f. 1280, values off: Repay #148 reads Repay, the amount, the icon, the chevron",
-    !!repay &&
-      repay.last &&
-      repay.items[0] === "Repay" &&
-      at(repay.items, "IMG") === 2 &&
-      at(repay.items, "CHEV") === 3,
-    JSON.stringify(repay?.items),
-  );
-  const heads = await allHeads(page);
-  const strays = heads.filter((h) => !h.last);
-  check("5g. 1280, values off: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));
-  check("5h. no page error", errors.length === 0, errors.join("; "));
-  await ctx.close();
-}
+// 5f and 5g retired (0045): they were the Values-off pass of 5a and 5d, and
+// Values no longer exists, so 5a and 5d cover the one head.
 
 // 5c. Liquity V2 at 390: amounts and icons show, the chevron last.
 {
