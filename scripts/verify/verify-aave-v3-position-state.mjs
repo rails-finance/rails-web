@@ -39,6 +39,7 @@
 import { chromium } from "playwright";
 import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 import { armScope } from "./lib/prov-inspector.mjs";
+import { waitOnFigures } from "./lib/card-tabs.mjs";
 
 const ROUTE = "/api/aave-v3/position-state";
 
@@ -313,11 +314,9 @@ async function openDetail(card) {
 }
 
 async function waitForAnswer(card) {
-  await card
-    .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
-    .first()
-    .waitFor({ timeout: 90000 })
-    .catch(() => {});
+  // The answer and the sheet stand under the opened card's Figures tab
+  // (rails-ops TO-DO-ui-jobs 370).
+  await waitOnFigures(card, '[data-position-state="ready"], [data-position-state="unavailable"]', 90000);
   if (await card.locator('[data-position-state="ready"]').count()) return "ready";
   if (await card.locator('[data-position-state="unavailable"]').count()) return "unavailable";
   return "none";
@@ -441,8 +440,9 @@ for (const fx of FIXTURES) {
 
     // The breakdown: the Debt side lists every reserve owed after the
     // transaction (a sub-cent one only where the transaction touched it, §52),
-    // and the Limits panel its parameters.
-    await sheet
+    // and the Limits panel its parameters. The switch stands on the card's tab
+    // strip while Figures is open (decision 0044), so it is found on the card.
+    await card
       .locator("[data-sheet-switch]")
       .first()
       .evaluate((el) => el.click())
@@ -620,10 +620,8 @@ if (!only || only.test("base")) {
     // Base reads its history by a live sweep of the chain's logs, which is slow on a cold route.
     await first.waitFor({ timeout: 300000 });
     await openDetail(first);
-    await first
-      .locator('[data-position-state="ready"]')
-      .waitFor({ timeout: 60000 })
-      .catch(() => {});
+    // The block stands under the Figures tab (rails-ops TO-DO-ui-jobs 370).
+    await waitOnFigures(first, '[data-position-state="ready"]', 60000);
     check(
       "base: an open Aave V3 Base card makes no request to the Ethereum index's position-state route",
       asks.length === 0,

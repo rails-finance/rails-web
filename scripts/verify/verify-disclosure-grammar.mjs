@@ -380,20 +380,22 @@ const headerLayout = (card) =>
   );
   // 2g (ui-jobs 330): the opened card's T2 is the event sheet, which draws no
   // ledger cell, so the Collateral and Debt rows' chevrons are gone with it;
-  // its one disclosure is the breakdown switch, at the right end of the row
-  // above the panels, on the Figures tab.
+  // its one disclosure is the breakdown switch, on the Figures tab at the
+  // right end of the tab strip (decision 0044), measured to the strip's
+  // content edge.
   await waitOnFigures(card, "[data-sheet-switch]", 60000);
   const switchPlace = await card
-    .locator("[data-sheet-controls]")
+    .locator('[role="tablist"]')
     .first()
     .evaluate((row) => {
       const b = row.querySelector("[data-sheet-switch]");
       if (!b) return null;
-      return { rightGap: Math.round(row.getBoundingClientRect().right - b.getBoundingClientRect().right) };
+      const edge = row.getBoundingClientRect().right - parseFloat(getComputedStyle(row).paddingRight);
+      return { rightGap: Math.round(edge - b.getBoundingClientRect().right) };
     })
     .catch(() => null);
   check(
-    "2g. #148: the sheet's breakdown switch stands at the right end of its row",
+    "2g. #148: the sheet's breakdown switch stands at the right end of the tab strip",
     !!switchPlace && switchPlace.rightGap >= 0 && switchPlace.rightGap <= 2,
     JSON.stringify(switchPlace),
   );
@@ -967,7 +969,9 @@ const sheetWords = (sheet) =>
       return c.textContent.replace(/\s+/g, " ").trim();
     };
     const label = (r) => seen(r.firstElementChild);
-    const sw = s.querySelector("[data-sheet-switch]");
+    // The switch stands on the card's tab strip (decision 0044), in the sheet
+    // where the card draws no strip.
+    const sw = (s.closest("[data-event-id]") ?? s).querySelector("[data-sheet-switch]");
     return {
       switch: sw ? { label: sw.getAttribute("aria-label"), title: sw.getAttribute("title") } : null,
       sides: [...s.querySelectorAll("[data-sheet-side]")].map((e) => ({
@@ -1045,8 +1049,9 @@ for (const s of SHEET_WORDS_SUBJECTS) {
     !!limits && rowsRead(limits.rows, s.limits, s.optional),
     JSON.stringify(limits?.rows),
   );
-  await sheet
+  await row
     .locator("[data-sheet-switch]")
+    .first()
     .evaluate((el) => el.click())
     .catch(() => {});
   await page

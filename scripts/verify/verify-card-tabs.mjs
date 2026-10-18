@@ -21,7 +21,11 @@
 //      (within 1px);
 //   f. Learn more sits inside the Explanation region, and no part of the sheet
 //      (`[data-sheet]`) is in the DOM while Explanation is open; on Figures the
-//      sheet is drawn and the explanation is not.
+//      sheet is drawn and the explanation is not;
+//   g. on Figures the breakdown switch stands on the strip (decision 0044),
+//      its vertical centre within 1px of the tab labels' at 1280, none inside
+//      the sheet; on Explanation the card holds no switch;
+//   h. at 390 the strip holds the switch on Figures too.
 //
 // Run:  BASE=http://localhost:3011 node scripts/verify/verify-card-tabs.mjs
 
@@ -122,6 +126,9 @@ const readStrip = (row, learnMore, sheet) =>
         learnMoreInT3: t3 ? t3.querySelectorAll(learnMore).length : 0,
         learnMore: r.querySelectorAll(learnMore).length,
         sheet: r.querySelectorAll(sheet).length,
+        switches: r.querySelectorAll("[data-sheet-switch]").length,
+        switchInStrip: list ? list.querySelectorAll("[data-sheet-switch]").length : 0,
+        switchInSheet: r.querySelectorAll(`${sheet} [data-sheet-switch]`).length,
       };
     },
     [learnMore, sheet],
@@ -189,6 +196,11 @@ for (const s of SUBJECTS) {
     !!st && st.sheet === 0,
     `${st?.sheet} found`,
   );
+  check(
+    `g. ${s.name}: on Explanation, the card holds no breakdown switch`,
+    !!st && st.switches === 0,
+    `${st?.switches} found`,
+  );
 
   const moved = await showCardTab(row, "figures");
   await row
@@ -201,6 +213,38 @@ for (const s of SUBJECTS) {
     `f. ${s.name}: on Figures, the sheet is drawn and the explanation is not`,
     moved === "tabbed" && stripOk(fig, "figures") && fig.sheet > 0 && !fig.t3,
     JSON.stringify(fig && { moved, open: fig.open, sheet: fig.sheet, t3: fig.t3 }),
+  );
+  await row
+    .locator('[role="tablist"] [data-sheet-switch]')
+    .first()
+    .waitFor({ state: "attached", timeout: 30000 })
+    .catch(() => {});
+  const placed = await readStrip(row, LEARN_MORE, SHEET).catch(() => null);
+  const centres = await row
+    .evaluate((r) => {
+      const mid = (rect) => rect.top + rect.height / 2;
+      const sw = r.querySelector('[role="tablist"] [data-sheet-switch]');
+      const labels = [...r.querySelectorAll("[data-card-tab]")].map((b) => {
+        const range = document.createRange();
+        range.selectNodeContents(b);
+        return mid(range.getBoundingClientRect());
+      });
+      if (!sw || labels.length === 0) return null;
+      return { switch: mid(sw.getBoundingClientRect()), labels };
+    })
+    .catch(() => null);
+  const off = centres ? Math.max(...centres.labels.map((l) => Math.abs(l - centres.switch))) : null;
+  check(
+    `g. ${s.name} @1280: on Figures the one switch stands on the strip, none in the sheet`,
+    !!placed && placed.switchInStrip === 1 && placed.switchInSheet === 0 && placed.switches === 1,
+    JSON.stringify(placed && { strip: placed.switchInStrip, sheet: placed.switchInSheet, all: placed.switches }),
+  );
+  check(
+    `g. ${s.name} @1280: the switch's vertical centre is within 1px of the tab labels'`,
+    off != null && off <= 1,
+    centres
+      ? `switch ${centres.switch.toFixed(1)}, labels ${centres.labels.map((l) => l.toFixed(1)).join(", ")}`
+      : "not measured",
   );
   check(`${s.name} @1280: no page error`, errors.length === 0, errors.join("; "));
   await ctx.close();
@@ -228,6 +272,18 @@ for (const s of SUBJECTS) {
     `a. ${s.name} @390: a tap opens the card on the strip, open on Explanation`,
     stripOk(st, "explanation"),
     JSON.stringify(st && { tabs: st.tabs.map((t) => t.key), open: st.open }),
+  );
+  await showCardTab(row, "figures");
+  await row
+    .locator('[role="tablist"] [data-sheet-switch]')
+    .first()
+    .waitFor({ state: "attached", timeout: 30000 })
+    .catch(() => {});
+  const fig = await readStrip(row, LEARN_MORE, SHEET).catch(() => null);
+  check(
+    `h. ${s.name} @390: on Figures the strip holds the switch, none in the sheet`,
+    !!fig && fig.open === "figures" && fig.switchInStrip === 1 && fig.switchInSheet === 0,
+    JSON.stringify(fig && { open: fig.open, strip: fig.switchInStrip, sheet: fig.switchInSheet }),
   );
   check(`${s.name} @390: no page error`, errors.length === 0, errors.join("; "));
   await ctx.close();

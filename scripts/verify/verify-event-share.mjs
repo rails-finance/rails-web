@@ -769,6 +769,13 @@ const SHEET_SUBJECTS = {
 
 const cardSel = (id) => `[data-event-id="${id}"]`;
 const sheetSel = (id) => `${cardSel(id)} [data-anatomy~="T2"] [data-sheet]`;
+/** The card's breakdown switch: on its tab strip while Figures is open
+ *  (decision 0044), on the sheet's controls row where the card has no strip. */
+const switchSel = (id) => `${cardSel(id)} [data-sheet-switch]`;
+/** One switch, in its place: on the strip and none in the sheet on a tabbed
+ *  card, in the sheet on an untabbed one. */
+const switchPlaced = (at) =>
+  !!at && (at.tabbed ? at.stripSwitches === 1 && at.switches === 0 : at.switches === 1 && at.allSwitches === 1);
 /** A press by the element's click(): a Playwright click times out on an
  *  element a layer hides, and the sheet's controls sit in the card's body. */
 const press = (page, sel) =>
@@ -791,6 +798,10 @@ const readSheet = (page, id) =>
         breakdown: s.getAttribute("data-sheet-breakdown"),
         controls: s.querySelectorAll("[data-sheet-controls]").length,
         switches: s.querySelectorAll("[data-sheet-switch]").length,
+        tabbed: !!s.closest("[data-card-tab-open]"),
+        stripSwitches: (s.closest("[data-event-id]") ?? s).querySelectorAll('[role="tablist"] [data-sheet-switch]')
+          .length,
+        allSwitches: (s.closest("[data-event-id]") ?? s).querySelectorAll("[data-sheet-switch]").length,
         layers: [...s.querySelectorAll("[data-sheet-layer]")].map((e) => e.getAttribute("data-sheet-layer")),
         sides: [...s.querySelectorAll("[data-sheet-side]")].map((e) => {
           const rows = rowsOf(e);
@@ -931,9 +942,15 @@ async function verifySheetSubject(name, s) {
     check(`${tag} @1280: the breakdown is off on open`, at?.breakdown === "off", at?.breakdown);
     check(`${tag} @1280: no data-sheet-layer is drawn off`, at?.layers.length === 0, JSON.stringify(at?.layers));
     check(
-      `${tag} @1280: the controls row holds one data-sheet-switch`,
-      at?.controls === 1 && at?.switches === 1,
-      `${at?.controls} row, ${at?.switches} switch`,
+      `${tag} @1280: one data-sheet-switch, on the tab strip (a tabbed card) or the controls row`,
+      at?.controls === 1 && switchPlaced(at),
+      JSON.stringify({
+        controls: at?.controls,
+        tabbed: at?.tabbed,
+        strip: at?.stripSwitches,
+        inSheet: at?.switches,
+        all: at?.allSwitches,
+      }),
     );
     const sides = at?.sides ?? [];
     if (s.oneSided)
@@ -1000,7 +1017,7 @@ async function verifySheetSubject(name, s) {
     if (secondOpen) check(`${tag} @1280: the second card's breakdown is off on open`, secondAt?.breakdown === "off");
 
     // The switch: on, the layers drawn, the second card unchanged; off again.
-    await press(page, `${sheetSel(s.event)} [data-sheet-switch]`);
+    await press(page, switchSel(s.event));
     const on = await waitBreakdown(page, s.event, "on");
     const atOn = await readSheet(page, s.event);
     check(`${tag} @1280: a press on the switch turns the breakdown on`, on, atOn?.breakdown);
@@ -1032,7 +1049,7 @@ async function verifySheetSubject(name, s) {
       figs.length > 0 && bare.length === 0,
       JSON.stringify(bare.slice(0, 4)),
     );
-    await press(page, `${sheetSel(s.event)} [data-sheet-switch]`);
+    await press(page, switchSel(s.event));
     const off = await waitBreakdown(page, s.event, "off");
     const atOff = await readSheet(page, s.event);
     check(
@@ -1119,9 +1136,14 @@ async function verifySheetSubject(name, s) {
       if (!flag("usd")) skip("the asset | USD toggle changes what the phone column shows", s.why.usd);
       else if (
         check(
-          `${tag} @390: the controls row holds the asset | USD group and the switch`,
-          before.pressed.length === 2 && idle >= 0 && at?.switches === 1,
-          JSON.stringify({ group: before.pressed, switches: at?.switches }),
+          `${tag} @390: the controls row holds the asset | USD group, the switch its place (strip or row)`,
+          before.pressed.length === 2 && idle >= 0 && switchPlaced(at),
+          JSON.stringify({
+            group: before.pressed,
+            tabbed: at?.tabbed,
+            strip: at?.stripSwitches,
+            inSheet: at?.switches,
+          }),
         )
       ) {
         await press(page, `${sheetSel(s.event)} [data-sheet-column] button:nth-child(${idle + 1})`);
@@ -1135,7 +1157,7 @@ async function verifySheetSubject(name, s) {
       }
       const width = () => page.evaluate(() => document.documentElement.scrollWidth);
       const offWidth = await width();
-      await press(page, `${sheetSel(s.event)} [data-sheet-switch]`);
+      await press(page, switchSel(s.event));
       await waitBreakdown(page, s.event, "on");
       await page.waitForTimeout(300);
       const onWidth = await width();
@@ -1155,8 +1177,8 @@ async function verifySheetSubject(name, s) {
       const at = await readSheet(page, s.event);
       check(
         `${tag} event page: the breakdown is on, its layers drawn, no data-sheet-switch`,
-        at?.breakdown === "on" && layersWanted.every((l) => at.layers.includes(l)) && at.switches === 0,
-        JSON.stringify({ breakdown: at?.breakdown, layers: at?.layers, switches: at?.switches }),
+        at?.breakdown === "on" && layersWanted.every((l) => at.layers.includes(l)) && at.allSwitches === 0,
+        JSON.stringify({ breakdown: at?.breakdown, layers: at?.layers, switches: at?.allSwitches }),
       );
     }
     check(`${tag} event page: no page error`, errors.length === 0, errors.join("; "));

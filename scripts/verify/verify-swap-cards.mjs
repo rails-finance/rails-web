@@ -50,6 +50,7 @@ import { chromium } from "playwright";
 import { PRESS_SHOW_MORE } from "../lib/timeline-draw.mjs";
 
 import { BASE, bypassHeaders } from "./lib/host.mjs";
+import { waitOnFigures } from "./lib/card-tabs.mjs";
 const COW_ICON = "/icons/protocols/cow.png";
 const COW_VENUE = { text: "via CoW Protocol", icon: COW_ICON };
 const PARASWAP_VENUE = { text: "via ParaSwap", icon: "/icons/protocols/paraswap.png" };
@@ -373,12 +374,9 @@ for (const fx of FIXTURES) {
         .evaluate((el) => el.click())
         .catch(() => {});
       // The balances are read when the card opens: wait for that answer, not for
-      // text the card draws before it.
-      await card
-        .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
-        .first()
-        .waitFor({ timeout: 60000 })
-        .catch(() => {});
+      // text the card draws before it. They stand under the Figures tab
+      // (rails-ops TO-DO-ui-jobs 370), the switch on its strip.
+      await waitOnFigures(card, '[data-position-state="ready"], [data-position-state="unavailable"]', 60000);
       const textOf = async () => ((await card.innerText().catch(() => "")) || "").replace(/\s+/g, " ");
       // A swap's gross legs stand only with the breakdown on (decision 0042,
       // the 15 Oct ruling): read the card off, then on.
