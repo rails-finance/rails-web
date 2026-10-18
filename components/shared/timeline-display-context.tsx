@@ -8,7 +8,8 @@ export type TimelineDisplayKey =
   | "showMarketNotes"
   | "openAllMarketNotes"
   | "showTxHashes"
-  | "followChart";
+  | "followChart"
+  | "figuresFirst";
 
 export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside
@@ -35,6 +36,11 @@ export interface TimelineDisplayState {
    *  Off by default. Set through the page's flow-focus store, which the
    *  timeline and the chart share (`useFollowPreference`). */
   followChart: boolean;
+  /** "Figures first" in Display (ui-jobs 370): an opened timeline card opens on
+   *  its Figures tab in place of its Explanation. Off by default. Clicking
+   *  either tab on any card sets it, so every opened card follows the last
+   *  choice. The event page stands both open and ignores it. */
+  figuresFirst: boolean;
   toggle: (key: TimelineDisplayKey) => void;
   set: (key: TimelineDisplayKey, value: boolean) => void;
 }
@@ -46,6 +52,7 @@ const DEFAULTS = {
   openAllMarketNotes: false,
   showTxHashes: false,
   followChart: false,
+  figuresFirst: false,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences

@@ -13,7 +13,8 @@ import { SheetCollectContext, type CollectedCard, type GroupLane } from "@/compo
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
-import { InfoDisclosure, InfoTabsDisclosure, type InfoDisclosureTab } from "@/components/shared/info-disclosure";
+import { CardTabStrip } from "@/components/shared/info-disclosure";
+import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
@@ -330,6 +331,12 @@ function drawnOf(slots: EventCardSlots, pageMode: boolean, breakdown: boolean): 
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
 
+type CardTab = "explanation" | "figures";
+const CARD_TABS: { key: CardTab; label: string }[] = [
+  { key: "explanation", label: "Explanation" },
+  { key: "figures", label: "Figures" },
+];
+
 /** Whether the owner the sender test judges against is a key-controlled
  *  account, read from its code (one cached request per address) only where
  *  the sender alone decides: no caller, and another address sent the
@@ -483,9 +490,9 @@ function EventCardView(props: EventCardProps) {
   // its share path; a card outside a timeline falls back to the card's key.
   const scopeId = eventIdFromShareHref(shareHref) ?? cardId;
   const lit = useProvScopeLit(scopeId);
-  // Which info section is expanded — the section heading is the button,
-  // bridging into the pane below.
-  const [openInfoTab, setOpenInfoTab] = useState<string | null>(null);
+  // The opened timeline card's tab (ui-jobs 370): the Display preference, set
+  // by a click on either tab of any card.
+  const { figuresFirst, set: setDisplay } = useTimelineDisplay();
 
   // Restore persisted open state after mount (SSR-safe — no hydration mismatch:
   // first render is always closed, matching the server, then this opens it).
@@ -545,33 +552,39 @@ function EventCardView(props: EventCardProps) {
   // The phone segment's control: every timeline row with a body to open.
   const phoneToggles = inTimeline && hasDetail;
 
-  /* ── Info sections — the headings are the buttons ────────────────── */
-  // The story (Explanation, (i) disc): the heading-button expands the shared
-  // pane beneath. Per-value evidence lives with the page-level inspector now
-  // — a card with no explainer still gets the plain (i) for its footer
-  // metadata.
-  const infoTabs: InfoDisclosureTab[] = [
-    ...(hasExplainer
-      ? [
-          {
-            key: "explanation",
-            label: "explanation",
-            content: (
-              <>
-                {explainerTeaser && (
-                  <div className="mb-2 flex items-baseline gap-2 text-rb-500">
-                    <span className="shrink-0">•</span>
-                    <div className="min-w-0 flex-1 leading-relaxed">{explainerTeaser}</div>
-                  </div>
-                )}
-                {explainer}
-              </>
-            ),
-          },
-        ]
-      : []),
-  ];
+  /* ── Explanation and Figures (rails-ops TO-DO-ui-jobs 370) ─────────── */
+  // The explanation reads before the figures. A timeline card with both shows
+  // one at a time under the Explanation | Figures tabs; the event page stands
+  // the explanation open above the figures. A card with one of the two shows
+  // it alone.
+  const explanationNode = hasExplainer ? (
+    <>
+      {explainerTeaser && (
+        <div className="mb-2 flex items-baseline gap-2 text-rb-500">
+          <span className="shrink-0">•</span>
+          <div className="min-w-0 flex-1 leading-relaxed">{explainerTeaser}</div>
+        </div>
+      )}
+      {explainer}
+    </>
+  ) : null;
   const footerNode = txHash ? <EventCardFooter learnMore={learnMore} /> : undefined;
+  const hasFigures = hasPanel || hasPriceRow(price);
+  const tabbed = !pageMode && hasExplainer && hasFigures;
+  const openTab: CardTab = figuresFirst ? "figures" : "explanation";
+  // The explanation, with the Learn more "?" at its end.
+  const explanationRegion = hasExplainer ? (
+    <div className="px-4 pb-1" data-anatomy="T3" data-prov-exempt="">
+      <div className="pb-3 pt-4 text-sm">{explanationNode}</div>
+      {footerNode}
+    </div>
+  ) : null;
+  const figuresNode = hasFigures ? (
+    <>
+      {detail}
+      {hasPriceRow(price) && <EventPriceRow price={price} />}
+    </>
+  ) : null;
 
   // The header's chevron slot (ui-jobs 295), after the action word.
   const headChevron =
@@ -765,47 +778,31 @@ function EventCardView(props: EventCardProps) {
       data-spine-card={inTimeline ? cardId : undefined}
       className={`flow-root rounded-b-xl bg-raised${inTimeline ? " max-sm:rounded-t-xl" : ""}`}
       data-anatomy="T2"
+      data-card-tab-open={tabbed ? openTab : undefined}
     >
       {inTimeline && band && <div className="sm:hidden">{band}</div>}
 
-      {detail}
-      {hasPriceRow(price) && <EventPriceRow price={price} />}
-
-      {/* ── Info sections: the (i) Explanation button
-               at the bottom-left opens the pane beneath, drawn with no
-               panel, with the footer metadata pinned below. A card
-               without an explainer keeps the plain (i) for its footer. ── */}
-      {(hasExplainer || txHash) && (
-        <div className="px-4 pb-3 pt-1">
-          {/* The event page: the explanation stands open with no panel and
-              no heading, in the foreground as the timeline's row is while
-              open (ui-jobs 289). */}
-          {pageMode && infoTabs.length > 0 ? (
-            <div data-anatomy="T3" data-prov-exempt="">
-              {infoTabs.map((t) => (
-                <div key={t.key} className="pb-3 pt-2 text-sm">
-                  {t.content}
-                </div>
-              ))}
-              {footerNode}
-            </div>
-          ) : infoTabs.length > 0 ? (
-            <InfoTabsDisclosure
-              bare
-              anatomy="T3"
-              rowToggle
-              tabs={infoTabs}
-              openTab={openInfoTab}
-              onOpenTabChange={setOpenInfoTab}
-              footer={footerNode}
-            />
-          ) : (
-            <InfoDisclosure bare footer={footerNode} defaultOpen={pageMode}>
-              {null}
-            </InfoDisclosure>
-          )}
-        </div>
+      {tabbed && (
+        <CardTabStrip
+          className="px-4 pt-3"
+          idBase={domId}
+          tabs={CARD_TABS}
+          openTab={openTab}
+          onOpenTabChange={(key) => setDisplay("figuresFirst", key === "figures")}
+        />
       )}
+      {tabbed ? (
+        <div id={`${domId}-panel`} role="tabpanel" aria-labelledby={`${domId}-tab-${openTab}`}>
+          {openTab === "figures" ? figuresNode : explanationRegion}
+        </div>
+      ) : (
+        <>
+          {explanationRegion}
+          {figuresNode}
+        </>
+      )}
+      {/* A card with figures and no explanation keeps the footer under them. */}
+      {!hasExplainer && footerNode}
     </div>
   );
 

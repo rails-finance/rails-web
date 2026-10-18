@@ -286,12 +286,16 @@ export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
  *  (event-number-pill.tsx, ui-jobs 294), so every preset carries it. */
 export const TX_HASH_ITEM: TimelineDisplayItem = { key: "showTxHashes", label: "Transaction hashes" };
 
+/** "Figures first": every family's opened card has the Explanation | Figures
+ *  tabs (event-card.tsx, ui-jobs 370), so every preset carries it. */
+export const FIGURES_FIRST_ITEM: TimelineDisplayItem = { key: "figuresFirst", label: "Figures first" };
+
 /** Display flags the chain-state timeline exposes: the ones with a render path
  *  on every family's cards (Morpho, MakerDAO, Aave V3 + Spark, the Liquity
  *  forks, Liquity V1, Polaris). USD, timestamps and the spine's values always show, so
- *  Transaction hashes is the item. ChainTruthTimeline appends Collapse-runs
+ *  Figures first and Transaction hashes are the items. ChainTruthTimeline appends Collapse-runs
  *  whenever the page passes `runs`. */
-export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [TX_HASH_ITEM];
+export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [FIGURES_FIRST_ITEM, TX_HASH_ITEM];
 
 /** The shared display "eye" menu — one FilterDropdown over a chosen subset of
  *  the timeline-display flags. Replaces the per-protocol TimelineDisplayToggle

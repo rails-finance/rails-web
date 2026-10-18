@@ -465,3 +465,78 @@ export function InfoTabsDisclosure({
     </div>
   );
 }
+
+/* ── Always-open tab strip — the opened event card's Explanation | Figures ── */
+
+export interface CardTabStripTab {
+  key: string;
+  /** The visible word on the heading-button ("Explanation"). */
+  label: string;
+}
+
+export interface CardTabStripProps {
+  tabs: CardTabStripTab[];
+  /** Key of the open tab; one tab is always open. */
+  openTab: string;
+  onOpenTabChange: (key: string) => void;
+  /** id prefix tying each tab to its panel (`${idBase}-panel`). */
+  idBase: string;
+  className?: string;
+}
+
+/**
+ * The opened timeline card's two views (rails-ops TO-DO-ui-jobs 370): the
+ * headings are the buttons, in the bare register and tones of
+ * `InfoTabsDisclosure` (muted at rest, foreground on hover and while open),
+ * with one always open. Each button carries `data-card-tab="<key>"`; the host
+ * draws the panel under `${idBase}-panel` with `data-card-tab-open`.
+ */
+export function CardTabStrip({ tabs, openTab, onOpenTabChange, idBase, className }: CardTabStripProps) {
+  const refs = useRef(new Map<string, HTMLButtonElement>());
+  const move = (from: number, step: number) => {
+    const next = tabs[(from + step + tabs.length) % tabs.length];
+    onOpenTabChange(next.key);
+    refs.current.get(next.key)?.focus();
+  };
+  return (
+    <div role="tablist" className={`flex items-center gap-4${className ? ` ${className}` : ""}`}>
+      {tabs.map((t, i) => {
+        const active = t.key === openTab;
+        return (
+          <button
+            key={t.key}
+            ref={(el) => {
+              if (el) refs.current.set(t.key, el);
+              else refs.current.delete(t.key);
+            }}
+            type="button"
+            role="tab"
+            id={`${idBase}-tab-${t.key}`}
+            aria-selected={active}
+            aria-controls={`${idBase}-panel`}
+            tabIndex={active ? 0 : -1}
+            data-card-tab={t.key}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenTabChange(t.key);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                e.preventDefault();
+                e.stopPropagation();
+                move(i, e.key === "ArrowRight" ? 1 : -1);
+              }
+            }}
+            className={`relative cursor-pointer rounded-md py-1 text-sm transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] ${
+              active
+                ? "font-medium text-foreground after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-foreground"
+                : "text-rb-500 hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
