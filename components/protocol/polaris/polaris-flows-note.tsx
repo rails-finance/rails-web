@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { PolarisFlowFacts } from "@/lib/polaris/flows";
 import { POLARIS_APP_LINK, POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
+import { POLARIS_LIQ_CONSTANTS } from "./polaris-liquidation-forensics";
 
 export interface PolarisFlowsNoteProps {
   facts: PolarisFlowFacts | null;
@@ -36,6 +37,11 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
         {stable} the protocol mints where the shares took the debt below zero.
         {facts && facts.psmRows > 0 && ` ${n(facts.psmRows, "One event", "events")} wrote PSM shares in.`}
         {facts && facts.settledRows > 0 && ` ${n(facts.settledRows, "One event", "events")} settled the debt to zero.`}
+      </p>
+      <p>
+        The gas compensation escrow, a fixed {POLARIS_LIQ_CONSTANTS.gasComp.label} every open sends with the collateral,
+        is held apart from the collateral and has no line here: each card&apos;s Collateral ledger states it under its
+        rows, sent at the open and returned at the close or paid to the liquidator.
       </p>
       {facts?.liquidated && (
         <p>
@@ -85,6 +91,10 @@ export function polarisFlowsContent(stable: string): LearnMoreContent {
       {
         bold: "PSM shares",
         text: "when the market's PSM mints or redeems, every CDP takes a pro-rata share of the collateral and debt that moved. An event writes in the net of every mint and redemption since the last one, so its two sides can move in opposite directions; each side is split by its sign.",
+      },
+      {
+        bold: "Gas compensation escrow",
+        text: `a fixed ${POLARIS_LIQ_CONSTANTS.gasComp.label} sent with the collateral at the open and held apart from it, so it is on no line. It returns at the close, or goes to the liquidator.`,
       },
       {
         bold: "Settled to zero",

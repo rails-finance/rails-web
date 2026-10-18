@@ -40,6 +40,7 @@ import {
   transferProv,
   atBlockPriceProv,
   gasCompEscrowProv,
+  gasCompReturnProv,
   crAtEventProv,
   crBeforeAtEventProv,
   crChangeAtEventProv,
@@ -308,19 +309,23 @@ export function polarisEventBody(
   leg("mintRedeemDebtGain", "Net PSM share · debt", stable, stableAddr);
   leg("stablesMintedToEnsureZeroDebt", "Settled to zero · debt", stable, stableAddr);
 
-  // The open's escrow: the holder sends the collateral and, beside it, the
-  // fixed gas compensation the CDP holds for a liquidator — returned on
-  // close, paid out on a liquidation. The log does not carry it; the amount is
-  // the protocol's constant (POLARIS_LIQ_CONSTANTS.gasComp).
-  if (ctx.eventType === "open")
+  // The gas compensation escrow, a leg of its own held apart from the
+  // collateral: sent with it at the open, returned with it at the close (a
+  // liquidation states it above, from the escrow). The log does not carry it;
+  // the amount is the protocol's constant (POLARIS_LIQ_CONSTANTS.gasComp).
+  if (ctx.eventType === "open" || ctx.eventType === "close") {
+    const close = ctx.eventType === "close";
     stats.push({
-      label: "Gas compensation escrow, sent with the collateral",
+      label: close
+        ? "Gas compensation escrow, returned to the holder"
+        : "Gas compensation escrow, sent with the collateral",
       value: String(POLARIS_LIQ_CONSTANTS.gasComp.amount),
-      display: `+${POLARIS_LIQ_CONSTANTS.gasComp.amount}`,
+      display: `${close ? "−" : "+"}${POLARIS_LIQ_CONSTANTS.gasComp.amount}`,
       symbol: PETH.symbol,
       address: PETH.address,
-      prov: gasCompEscrowProv(coords),
+      prov: close ? gasCompReturnProv(coords) : gasCompEscrowProv(coords),
     });
+  }
 
   const forensics =
     ctx.eventType === "liquidate" ? buildPolarisLiquidationForensics(ctx, coords, ctx.market) : undefined;
@@ -342,23 +347,12 @@ export function polarisEventBody(
 
   const sheet = polarisSheet(ctx, coords, prev);
 
-  // The sheet states the primary rate in its Limits panel and the open's
-  // escrow stays a line beneath it; the cells carry both in the grid.
-  const escrowLine =
-    sheet && ctx.eventType === "open" ? (
-      <div className="px-5 py-1 text-xs text-rb-500 tabular-nums">
-        <Prov info={gasCompEscrowProv(coords)} value={String(POLARIS_LIQ_CONSTANTS.gasComp.amount)}>
-          <span>+{POLARIS_LIQ_CONSTANTS.gasComp.amount}</span>
-        </Prov>{" "}
-        {PETH.symbol} gas compensation escrow, sent with the collateral
-      </div>
-    ) : undefined;
-
+  // The sheet states the primary rate in its Limits panel and the escrow in
+  // a panel of its own; the cells carry both in the grid.
   const notes =
-    forensics || escrowLine || (!sheet && ctx.primaryRate != null) ? (
+    forensics || (!sheet && ctx.primaryRate != null) ? (
       <>
         {forensics && <LiquidationForensics {...forensics} />}
-        {escrowLine}
         {!sheet && ctx.primaryRate != null && (
           // px-5 mirrors the grid's inset so the line sits on the cells' left
           // edge. The figure only: the "set by the market, not the holder"

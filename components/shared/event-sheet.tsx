@@ -69,6 +69,12 @@ export interface SheetSide {
    *  position has neither (Maple's "Pool claim"). `data-sheet-side` keeps the
    *  `side` value. */
   name?: string;
+  /** The panel's key and `data-sheet-side`, where it is not `side`: a panel
+   *  beside a side that holds an amount apart from it (Polaris's gas
+   *  compensation escrow, beside its Collateral). */
+  id?: string;
+  /** The heading's read-more, where `name` replaces the side's. */
+  tip?: string;
   /** The icons of the assets the side holds, after its name. */
   icons: string[];
   /** The carry-forward layer above the event's rows, drawn with the
@@ -293,7 +299,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
   return (
     <section
       className="min-w-0 rounded-xl bg-background px-4 pb-2 pt-3 text-sm"
-      data-sheet-side={s.side}
+      data-sheet-side={s.id ?? s.side}
       data-sheet-touched={touched ? "true" : "false"}
       aria-label={name}
     >
@@ -301,7 +307,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
         <h3 className="text-sm font-semibold text-rb-500">
           <HeadingTip
             text={name}
-            tip={s.name ? undefined : s.side === "collateral" ? WORDS.tipCollateral : WORDS.tipDebt}
+            tip={s.name ? s.tip : s.side === "collateral" ? WORDS.tipCollateral : WORDS.tipDebt}
           />
         </h3>
         {s.icons.length > 0 && <InlineAssetCluster symbols={s.icons} size={16} overlap={5} max={4} />}
@@ -547,7 +553,7 @@ export function EventSheetView({
       </div>
       <div className="flex flex-col gap-2.5">
         {sheet.sides.map((s) => (
-          <SidePanel key={s.side} s={s} breakdown={on} col={col} />
+          <SidePanel key={s.id ?? s.side} s={s} breakdown={on} col={col} />
         ))}
         {sheet.panels.length > 0 && (
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">

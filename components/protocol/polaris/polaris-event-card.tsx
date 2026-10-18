@@ -8,10 +8,12 @@
 // Spine grammar: a liquidation carries the critical warning spine; a transfer
 // rides the custody glyph on a dotted spine (a party changed, nothing moved);
 // every holder touch draws its token rows — pETH and the stablecoin, each
-// with the direction the log's own sign says. On the spine the wallet is
+// with the direction the log's own sign says, and on the open and the close
+// the gas compensation escrow's pETH row after them. On the spine the wallet is
 // off-page left and the protocol is the card column, so deposit and repay point
 // right and withdraw and borrow point left, as in the other CDP explorers.
 
+import { useMemo } from "react";
 import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { eventGas } from "@/components/shared/event-price-row";
@@ -33,6 +35,8 @@ import {
 } from "./polaris-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { PolarisLedgerProvider } from "./polaris-ledger";
+import { POLARIS_LIQ_CONSTANTS } from "./polaris-liquidation-forensics";
+import { POLARIS_WORDS } from "@/lib/polaris/event-templates";
 
 export interface PolarisEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "polaris"; data: PolarisContext } };
@@ -59,26 +63,63 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
   const dDebt = num(ctx.debtChange);
   const isTouch = ctx.eventType === "open" || ctx.eventType === "adjust" || ctx.eventType === "close";
 
-  const tokens: SpineTokenRow[] = [];
+  // Each leg keyed by what it is; "right" moves into the protocol.
+  type Leg = { kind: "coll" | "debt" | "escrow"; row: SpineTokenRow };
+  const legs: Leg[] = [];
   if (isTouch && dColl !== 0)
-    tokens.push({
-      symbol: PETH.symbol,
-      address: PETH.address,
-      // A deposit moves pETH into the protocol; a withdrawal out to the wallet.
-      direction: dColl > 0 ? "right" : "left",
-      value: Math.abs(dColl),
-      // The header's rule: in full, pETH to four decimals; the icon names the token.
-      display: formatPeth(Math.abs(dColl)),
+    legs.push({
+      kind: "coll",
+      row: {
+        symbol: PETH.symbol,
+        address: PETH.address,
+        // A deposit moves pETH into the protocol; a withdrawal out to the wallet.
+        direction: dColl > 0 ? "right" : "left",
+        value: Math.abs(dColl),
+        // The header's rule: in full, pETH to four decimals; the icon names the token.
+        display: formatPeth(Math.abs(dColl)),
+      },
     });
   if (isTouch && dDebt !== 0)
-    tokens.push({
-      symbol: stable,
-      address: stableAddr,
-      // A borrow sends the stablecoin to the wallet; a repay returns it to the protocol.
-      direction: dDebt > 0 ? "left" : "right",
-      value: Math.abs(dDebt),
-      display: formatNumber(Math.abs(dDebt)),
+    legs.push({
+      kind: "debt",
+      row: {
+        symbol: stable,
+        address: stableAddr,
+        // A borrow sends the stablecoin to the wallet; a repay returns it to the protocol.
+        direction: dDebt > 0 ? "left" : "right",
+        value: Math.abs(dDebt),
+        display: formatNumber(Math.abs(dDebt)),
+      },
     });
+
+  // The gas compensation escrow, the holder's own pETH beside the
+  // collateral: into the protocol at the open, back to the wallet at the
+  // close. The amount is the protocol's constant; the log does not carry it.
+  if (ctx.eventType === "open" || ctx.eventType === "close") {
+    const amount = POLARIS_LIQ_CONSTANTS.gasComp.amount;
+    legs.push({
+      kind: "escrow",
+      row: {
+        symbol: PETH.symbol,
+        address: PETH.address,
+        direction: ctx.eventType === "open" ? "right" : "left",
+        value: amount,
+        display: formatPeth(amount),
+        verb: ctx.eventType === "open" ? POLARIS_WORDS.spine_escrow_sent : POLARIS_WORDS.spine_escrow_returned,
+      },
+    });
+  }
+
+  // The spine's row order (rails-ops reference/shared-event-card-spec.md,
+  // Miles 18 Oct 2026): read bottom to top in the order the acts happen,
+  // what leaves the position above what enters it; on one direction the
+  // debt above the collateral. Drawn top to bottom: open → debt out,
+  // collateral in, escrow in; close → escrow out, collateral out, debt in.
+  const OUT_ORDER = ["escrow", "debt", "coll"] as const;
+  const IN_ORDER = ["debt", "coll", "escrow"] as const;
+  const rank = (l: Leg) =>
+    l.row.direction === "left" ? OUT_ORDER.indexOf(l.kind) : OUT_ORDER.length + IN_ORDER.indexOf(l.kind);
+  const tokens: SpineTokenRow[] = [...legs].sort((a, b) => rank(a) - rank(b)).map((l) => l.row);
 
   const spine: SpineColumnProps =
     ctx.eventType === "liquidate"
@@ -91,6 +132,10 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
             { icon: "no-change", isLast: !!isLast }
           : { tokens, isLast: !!isLast };
 
+  const escrowAt = useMemo(
+    () => ({ ctx, coords: polarisEchoCoords(ctx, event.txHash, event.blockNumber) }),
+    [ctx, event.txHash, event.blockNumber],
+  );
   const head = usePolarisHeadSpec(event.actionLabel, ctx, coords);
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
@@ -113,7 +158,12 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     sheet: body.sheet,
     ledgers: {
       provider: (children) => (
-        <PolarisLedgerProvider eventId={event.id} eventTs={event.timestamp} flowRow={ctx.eventType !== "transfer"}>
+        <PolarisLedgerProvider
+          eventId={event.id}
+          eventTs={event.timestamp}
+          flowRow={ctx.eventType !== "transfer"}
+          escrow={escrowAt}
+        >
           {children}
         </PolarisLedgerProvider>
       ),

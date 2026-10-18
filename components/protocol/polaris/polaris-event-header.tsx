@@ -9,7 +9,8 @@
 // holder (or a delegate) CHOSE. The rate in force at the touch is a fact on
 // the row, stated in the detail body instead.
 //
-// Deltas are the log's own `_collChange` / `_debtChange` — the holder's legs.
+// Deltas are the log's own `_collChange` / `_debtChange` — the holder's legs —
+// and, on the open and the close, the gas compensation escrow beside them.
 // An open / adjust / close touch may ALSO carry a settled PSM share (the
 // market's mint/redemption activity moves every CDP pro rata, and the effect
 // lands on the CDP's own next touch as `_mintRedeemCollGain` /
@@ -27,6 +28,8 @@ import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import {
+  gasCompEscrowProv,
+  gasCompReturnProv,
   ledgerFieldProv,
   liquidatorProv,
   psmShareNetProv,
@@ -40,6 +43,8 @@ import { formatExact, formatNumber, withRealMinus } from "@/lib/utils/format";
 import { polarisPsmShareValue } from "@/lib/polaris/economics";
 import { formatPeth } from "@/lib/polaris/figure-format";
 import { PSM_SHARE_LABEL } from "@/lib/polaris/row-kinds";
+import { POLARIS_WORDS } from "@/lib/polaris/event-templates";
+import { POLARIS_LIQ_CONSTANTS } from "./polaris-liquidation-forensics";
 
 const num = (s?: string): number => {
   const n = Number(s ?? "0");
@@ -133,6 +138,26 @@ export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coo
       });
   };
 
+  // The gas compensation escrow, the holder's own pETH held apart from the
+  // collateral: sent with it at the open, returned with it at the close. The
+  // log does not carry it; the amount is the protocol's constant. It is the
+  // holder's flow, so the spine draws it (polaris-event-card.tsx) and the
+  // figure hands off there at ≥sm, the word staying. A liquidation states it
+  // as the liquidator's gas compensation in the card instead.
+  const pushEscrow = (): void => {
+    const close = ctx.eventType === "close";
+    const amount = POLARIS_LIQ_CONSTANTS.gasComp.amount;
+    deltas.push({
+      value: close ? -amount : amount,
+      symbol: PETH.symbol,
+      address: PETH.address,
+      label: POLARIS_WORDS.escrow_leg,
+      axisVerb: true,
+      exact: String(amount),
+      prov: close ? gasCompReturnProv(coords) : gasCompEscrowProv(coords),
+    });
+  };
+
   switch (ctx.eventType) {
     case "open":
     case "adjust":
@@ -158,6 +183,7 @@ export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coo
         });
         holderDeltaCount++;
       }
+      if (isOpen) pushEscrow();
       pushPsmLegs();
       break;
     case "close":
@@ -180,6 +206,7 @@ export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coo
         });
         holderDeltaCount++;
       }
+      pushEscrow();
       pushPsmLegs();
       break;
     case "liquidate":

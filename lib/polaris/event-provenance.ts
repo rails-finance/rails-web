@@ -389,15 +389,34 @@ export const liqPremiumProv = (
 };
 
 /** The open's gas-compensation escrow — the protocol's fixed amount, sent by
- *  the holder beside the collateral. Not on the CDPUpdated log. */
+ *  the holder beside the collateral. Not on the CDPUpdated log. The amount is
+ *  POLARIS_LIQ_CONSTANTS.gasComp (polaris-liquidation-forensics.ts). */
 export const gasCompEscrowProv = (coords: PolarisCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   verify: txVerify(coords),
   summary:
-    "Gas compensation held in escrow since the open — the fixed amount every Polaris CDP holds apart from its collateral, sent by the holder in the same transaction: returned on close, paid to the liquidator on a liquidation. The CDPUpdated log carries only the collateral; the open transaction's pETH transfer to the cdpManager carries both (collateral + 0.0375 pETH), and getCDP(id).gasCompDeposit reads 0.0375 on an open CDP.",
+    "Gas compensation escrow sent at the open — the fixed amount every Polaris CDP holds apart from its collateral, sent by the holder in the same transaction: returned on close, paid to the liquidator on a liquidation. It enters neither the collateral nor the collateral ratio. The amount is the protocol constant fixedGasComp, 0.0375 pETH. The CDPUpdated log carries only the collateral; the open transaction's one pETH transfer to the cdpManager carries both (collateral + 0.0375 pETH), and getCDP(id).gasCompDeposit reads 0.0375 on an open CDP.",
   contract: managerContract(coords),
-  via: "the protocol's fixedGasComp constant · the open transaction's pETH transfer",
+  via: "the protocol constant fixedGasComp (0.0375 pETH) · the open transaction's pETH transfer to the cdpManager",
+  inputs: eventInputs(coords, [
+    { label: "gas compensation", value: "0.0375 pETH", kind: "chain", pclass: "state", note: "fixedGasComp" },
+  ]),
+});
+
+/** The close's return of the escrow — the same fixed amount, sent back to the
+ *  holder with the collateral. Not on the CDPUpdated log either. */
+export const gasCompReturnProv = (coords: PolarisCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: txVerify(coords),
+  summary:
+    "Gas compensation escrow returned at the close — the fixed amount the CDP held apart from its collateral since its open, sent back to the holder. The amount is the protocol constant fixedGasComp, 0.0375 pETH. The CDPUpdated log carries only the collateral; the close transaction's pETH transfer from the cdpManager to the holder carries both (collateral + 0.0375 pETH). A liquidated CDP's escrow goes to the liquidator instead, as the LiquidationGasComp log's _flatComp.",
+  contract: managerContract(coords),
+  via: "the protocol constant fixedGasComp (0.0375 pETH) · the close transaction's pETH transfer to the holder",
+  inputs: eventInputs(coords, [
+    { label: "gas compensation", value: "0.0375 pETH", kind: "chain", pclass: "state", note: "fixedGasComp" },
+  ]),
 });
 
 /** The CDP's collateral ratio at the moment it fired — the WHOLE seized

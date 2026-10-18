@@ -9,7 +9,9 @@
 // (`prev`), whose feed prices "Last event" in dollars and the Market move
 // between the two, and whose primary rate the rate's change reads against.
 // A liquidation draws the sheet as Liquity V2's does: the seized pETH and the
-// cleared debt as the event's rows. A transfer keeps its cells.
+// cleared debt as the event's rows. A transfer keeps its cells. The open and
+// the close draw the gas compensation escrow as a panel of its own between
+// the two sides (rails-ops TO-DO-ui-jobs 363).
 //
 // Dollars: pETH at the market's feed price in its stablecoin times the
 // stablecoin's price; a USDp is $1 in the feed (it prices pETH as the bonding
@@ -25,6 +27,8 @@ import {
   rateInForceProv,
   liqPenaltyConstantProv,
   liquidationFieldProv,
+  gasCompEscrowProv,
+  gasCompReturnProv,
   type PolarisLiquidationField,
   crChangeAtEventProv,
   type PolarisCoords,
@@ -364,6 +368,52 @@ export function polarisSheet(
     totalTip: W.tip_coll_total,
   };
 
+  // ── The gas compensation escrow ──
+  // Its own panel beside the Collateral on the open and the close, outside
+  // the Collateral total and the ratio: the constant every open sends with
+  // the collateral and every close returns (a liquidation states it in its
+  // split). The CDPUpdated log does not carry it.
+  const escrowAmount = POLARIS_LIQ_CONSTANTS.gasComp.amount;
+  const escrowSide: EventSheet["sides"][number] | null =
+    ctx.eventType === "open" || isClose
+      ? {
+          side: "collateral",
+          id: "escrow",
+          name: W.sheet_escrow,
+          tip: W.tip_escrow,
+          icons: [PETH.symbol],
+          carry: [],
+          rows: [
+            {
+              key: isClose ? "escrow-returned" : "escrow-sent",
+              label: isClose ? W.sheet_escrow_returned : W.sheet_escrow_sent,
+              amount: {
+                text: amountText(isClose ? -escrowAmount : escrowAmount, "coll"),
+                symbol: PETH.symbol,
+                address: PETH.address,
+                info: isClose ? gasCompReturnProv(coords) : gasCompEscrowProv(coords),
+                value: String(escrowAmount),
+              },
+              usd: usdOf(
+                isClose ? W.sheet_escrow_returned : W.sheet_escrow_sent,
+                "coll",
+                isClose ? -escrowAmount : escrowAmount,
+              ),
+              tip: isClose ? W.tip_escrow_returned : W.tip_escrow_sent,
+            },
+          ],
+          total: isClose
+            ? { text: "$0", info: gasCompReturnProv(coords) }
+            : pethUsd != null
+              ? {
+                  text: sheetUsd(escrowAmount * pethUsd),
+                  info: usdProv("The gas compensation escrow after this event", "coll", escrowAmount),
+                }
+              : { none: W.sheet_no_price },
+          totalTip: W.tip_escrow_total,
+        }
+      : null;
+
   // ── Debt ──
   const debtRows = [
     leg("debtChange", "event", debtWord, "debt", isLiq ? W.tip_debt_liquidated : W.tip_debt_event),
@@ -606,7 +656,7 @@ export function polarisSheet(
   ];
 
   return {
-    sides: [collSide, debtSide],
+    sides: escrowSide ? [collSide, escrowSide, debtSide] : [collSide, debtSide],
     panels: [
       { panel: "risk", rows: risk },
       { panel: "limits", rows: limits, breakdown: params },

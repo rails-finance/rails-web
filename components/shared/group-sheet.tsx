@@ -213,8 +213,13 @@ export function mergeGroupSheet(cards: CollectedCard[], label: string): EventShe
   const first = sheets[0]!;
   const last = sheets[sheets.length - 1]!;
   const sides: SheetSide[] = [];
+  // Panels match by `id ?? side`; a panel some member draws and the first
+  // does not would be dropped, so the group does not read as one.
+  const keyOf = (x: SheetSide) => x.id ?? x.side;
+  const firstKeys = new Set(first.sides.map(keyOf));
+  if (sheets.some((sh) => sh!.sides.some((x) => !firstKeys.has(keyOf(x))))) return null;
   for (const s of first.sides) {
-    const memberSides = sheets.map((sh) => sh!.sides.find((x) => x.side === s.side));
+    const memberSides = sheets.map((sh) => sh!.sides.find((x) => keyOf(x) === keyOf(s)));
     const lastSide = memberSides[memberSides.length - 1];
     if (memberSides.some((x) => !x) || !lastSide) return null;
     const legs = memberSides.flatMap((x, i) =>

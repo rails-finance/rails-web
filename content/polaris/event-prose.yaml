@@ -311,6 +311,38 @@ words:
     The pETH left over the debt's value and the penalty, set aside for the owner to claim, from the CDPManager's log.
   tip_liq_gas_comp: |-
     The pETH escrow every CDP sends at its open, paid to the liquidator. It sits apart from the collateral, so it is not part of the seizure.
+  # The gas-compensation escrow on the open and the close: its own leg, held
+  # apart from the collateral (rails-ops TO-DO-ui-jobs 363).
+  escrow_leg: |-
+    Gas escrow
+  sheet_escrow: |-
+    Gas compensation escrow
+  sheet_escrow_sent: |-
+    Sent with the collateral
+  sheet_escrow_returned: |-
+    Returned to the holder
+  tip_escrow: |-
+    A fixed pETH amount every CDP sends at its open and holds apart from its collateral. It returns on close and goes to the liquidator on a liquidation.
+  tip_escrow_sent: |-
+    The escrow the holder sent in the open's one pETH transfer, beside the collateral. It counts toward neither the collateral nor the collateral ratio.
+  tip_escrow_returned: |-
+    The escrow the close sent back to the holder, in the same pETH transfer as the collateral.
+  tip_escrow_total: |-
+    The escrow the CDP holds after this event, in dollars at this block's pETH price.
+  spine_escrow_sent: |-
+    gas compensation escrow sent
+  spine_escrow_returned: |-
+    gas compensation escrow returned
+  ledger_escrow: |-
+    Gas compensation escrow, held apart from the collateral
+  ledger_escrow_sent: |-
+    Sent at the open
+  ledger_escrow_returned: |-
+    Returned at the close
+  ledger_escrow_paid: |-
+    Paid to the liquidator
+  ledger_escrow_held: |-
+    Held
   tip_liq_debt_pool: |-
     The debt the stability pool absorbed, from the CDPManager's log.
   tip_liq_debt_redistributed: |-
@@ -472,7 +504,7 @@ templates:
         when: |-
           with_debt, no_debt
         text: |-
-          The {escrow} pETH escrow, held as gas compensation, comes back when the CDP closes.
+          The {escrow} pETH gas compensation escrow is held apart from the collateral and comes back when the CDP closes.
     order:
       - open.what_debt
       - open.what_no_debt
