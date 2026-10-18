@@ -22,6 +22,7 @@ import {
   eventGasProv,
   eventPriceProv,
   rateAfterProv,
+  LIQUITY_V2_GAS_ESCROW,
 } from "@/lib/liquity/event-provenance";
 import { eventPriceTitle } from "@/lib/liquity/trove-page-words";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
@@ -176,7 +177,8 @@ export function LiquityEventCard({
     return legs;
   })();
 
-  // An owner's move: the collateral and BOLD it moved, as token rows.
+  // An owner's move: the collateral and BOLD it moved, as token rows, and on
+  // the open and the close the gas compensation escrow.
   const tokenRows = (): SpineTokenRow[] => {
     const debtOp = ctx.troveOperation?.debtChangeFromOperation ?? 0;
     const collOp = ctx.troveOperation?.collChangeFromOperation ?? 0;
@@ -210,7 +212,25 @@ export function LiquityEventCard({
     // the contracts outright, and preferring the stated fact to the looked-up
     // one is the same reason the rest of these cards read from flows. The
     // helper answers only where a symbol appears on one flow alone.
+    // The gas compensation escrow: the owner's WETH into the GasPool at the
+    // open, back to the wallet at the close. Handed first, in the family's
+    // order escrow, collateral, debt, so the spine's sort draws it beneath
+    // the collateral (rails-ops reference/shared-event-card-spec.md, "Spine
+    // order").
+    const escrowDir = isOpen ? ("right" as const) : ctx.operation === "closeTrove" ? ("left" as const) : null;
     return [
+      ...(escrowDir
+        ? [
+            {
+              symbol: LIQUITY_V2_GAS_ESCROW.symbol,
+              address: LIQUITY_V2_GAS_ESCROW.address,
+              direction: escrowDir,
+              verb: escrowDir === "right" ? L1_WORDS.spine_escrow_sent : L1_WORDS.spine_escrow_returned,
+              value: LIQUITY_V2_GAS_ESCROW.amount,
+              display: String(LIQUITY_V2_GAS_ESCROW.amount),
+            },
+          ]
+        : []),
       ...(showColl
         ? [
             {

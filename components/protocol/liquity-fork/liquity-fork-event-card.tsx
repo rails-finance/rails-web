@@ -45,6 +45,7 @@ import { LiquityForkEventExplainer, liquityForkLearnMoreContent } from "./liquit
 import { liquityForkStateFigures, liquityForkStateStats, type LiquityForkStateProvs } from "./liquity-fork-state-stats";
 import { buildForkLiquidationForensics, forkLiquidationStats, forkRedemptionStats } from "./liquity-fork-forensics";
 import { liquityForkSheet, type LiquityForkSheetBranch } from "./liquity-fork-sheet";
+import { FORK_ESCROW_WORDS, type LiquityForkEscrow } from "./liquity-fork-escrow";
 
 /** A fork's provenance vocabulary: every builder the card's parts read. */
 export type LiquityForkCardProvs = LiquityForkExplainerProvs &
@@ -66,6 +67,10 @@ export interface LiquityForkDeployment {
   /** The branch of a collateral symbol: its token and governance ratios, which
    *  the balance sheet's Risk and Limits panels read. */
   branch?: (collateralSymbol: string) => LiquityForkSheetBranch | undefined;
+  /** The gas compensation escrow, where the fork's constant is established
+   *  (lib/<fork>/event-provenance.ts): a header leg and a spine row on the
+   *  open and the close, a sheet panel on every event. */
+  escrow?: LiquityForkEscrow;
 }
 
 export interface LiquityForkEventCardProps {
@@ -140,6 +145,19 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
   // would otherwise draw as a letter. Two flows sharing one symbol resolve to
   // nothing, which keeps the letter.
   const tokens: SpineTokenRow[] = [];
+  // The gas compensation escrow, handed first in the family's order escrow,
+  // collateral, debt, so the spine's sort draws it beneath the collateral
+  // (rails-ops reference/shared-event-card-spec.md, "Spine order").
+  const isOpenEvent = ctx.eventType === "openTrove" || ctx.eventType === "openTroveAndJoinBatch";
+  if (fork.escrow && (isOpenEvent || ctx.eventType === "closeTrove"))
+    tokens.push({
+      symbol: fork.escrow.constant.symbol,
+      address: fork.escrow.constant.address,
+      direction: isOpenEvent ? "right" : "left",
+      verb: isOpenEvent ? FORK_ESCROW_WORDS.spineSent : FORK_ESCROW_WORDS.spineReturned,
+      value: fork.escrow.constant.amount,
+      display: String(fork.escrow.constant.amount),
+    });
   if (!isWarning && collDelta !== 0)
     tokens.push({
       symbol: ctx.collateralSymbol,
@@ -209,6 +227,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     blockNumber: event.blockNumber,
     builders: { ...provs, debtSymbol, minDebt: fork.minDebt },
     flows: event.flows,
+    escrow: fork.escrow,
   });
 
   const sheet = liquityForkSheet({
@@ -219,6 +238,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     branch: fork.branch?.(ctx.collateralSymbol),
     actionLabel: event.actionLabel,
     flows: event.flows,
+    escrow: fork.escrow,
   });
 
   const teaser = liquityForkExplainerTeaser(ctx, coords, fork.words, provs);

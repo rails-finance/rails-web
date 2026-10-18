@@ -303,6 +303,29 @@ words:
     A one-off borrowing fee this draw added to the Trove's debt, from BorrowerOperations' log.
   tip_debt_reserve: |-
     The 200 LUSD liquidation reserve: added to the debt when a Trove opens, burned when it closes or is fully redeemed.
+  # The liquidation reserve's panel beside Debt, on every event from the open
+  # to the close, the liquidation or the full redemption (rails-ops
+  # TO-DO-ui-jobs 366): part of the debt, held by the GasPool.
+  sheet_reserve_panel: |-
+    Liquidation reserve, in the debt
+  sheet_reserve_minted: |-
+    Minted to the GasPool
+  sheet_reserve_burned: |-
+    Burned from the GasPool
+  sheet_reserve_paid: |-
+    Paid to the liquidator
+  tip_reserve_panel: |-
+    The 200 LUSD of the Trove's debt the GasPool holds to pay whoever liquidates it. It is minted into the debt at the open, burned at a close or a full redemption, and paid to the liquidator at a liquidation. The Debt total includes it, and so does the collateral ratio.
+  tip_reserve_minted: |-
+    The 200 LUSD the open minted to the GasPool as the reserve, from the LUSD token's Transfer log. The Debt side counts it among the open's rows.
+  tip_reserve_burned: |-
+    The reserve the GasPool burned, from the LUSD token's Transfer log. It cancels the last 200 LUSD of the debt.
+  tip_reserve_paid: |-
+    The reserve the GasPool paid to the liquidator, from the LUSD token's Transfer log. The debt the liquidation cleared includes it.
+  tip_reserve_before: |-
+    The reserve the GasPool held just before this event, at $1 per LUSD.
+  tip_reserve_total: |-
+    The reserve the GasPool holds for the Trove after this event, part of the debt above, at $1 per LUSD.
   tip_debt_total: |-
     The Trove's debt after this event, from the TroveManager's log, at $1 per LUSD.
   tip_cr: |-

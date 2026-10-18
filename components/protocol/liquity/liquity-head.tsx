@@ -3,8 +3,9 @@
 // Liquity V2's T1 head as a spec for the shared row (`ChainTruthRow`,
 // components/shared/chain-truth-event.tsx; ui-jobs 309 step 2): the word or
 // the status pill, the amounts the event moved, the rate pills and the batch
-// manager, a redistribution's arrival, a liquidation's surplus, the zombie
-// flag and the same-block "n of m". The words are the generator's
+// manager, a redistribution's arrival, a liquidation's surplus, the gas
+// compensation escrow on the open and the close, the zombie flag and the
+// same-block "n of m". The words are the generator's
 // (`liquityL1Label`, content/liquity-v2/event-prose.yaml).
 
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
@@ -18,6 +19,8 @@ import {
   rateAfterProv,
   liquityRedistOnAdjust,
   redistArrivalProv,
+  liquityGasEscrowProv,
+  LIQUITY_V2_GAS_ESCROW,
   type EventCoords,
 } from "@/lib/liquity/event-provenance";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
@@ -172,6 +175,25 @@ export function liquityHeadSpec(
       ...(hasDebt ? [debt({ noSpineCounterpart: stays })] : []),
       ...(hasColl ? [coll({ noSpineCounterpart: stays })] : []),
     ];
+  }
+
+  // The gas compensation escrow, the owner's WETH held apart from the
+  // collateral: sent to the GasPool at the open, returned at the close. The
+  // logs of the Trove do not carry it; the amount is the protocol's constant.
+  // The spine draws it (liquity-event-card.tsx); a liquidation states its
+  // payment to the liquidator in the sheet.
+  if (op === "openTrove" || op === "openTroveAndJoinBatch" || op === "closeTrove") {
+    const close = op === "closeTrove";
+    const e = LIQUITY_V2_GAS_ESCROW;
+    spec.deltas.push({
+      value: close ? -e.amount : e.amount,
+      symbol: e.symbol,
+      address: e.address,
+      label: L1_WORDS.escrow_leg,
+      axisVerb: true,
+      exact: String(e.amount),
+      prov: liquityGasEscrowProv(close ? "returned" : "sent", coords),
+    });
   }
 
   // A liquidated neighbour's redistribution this adjust applied, in the
