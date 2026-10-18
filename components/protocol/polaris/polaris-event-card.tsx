@@ -114,8 +114,8 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
   // Miles 18 Oct 2026): read bottom to top in the order the acts happen,
   // what leaves the position above what enters it; on one direction the
   // debt above the collateral. Drawn top to bottom: open → debt out,
-  // collateral in, escrow in; close → escrow out, collateral out, debt in.
-  const OUT_ORDER = ["escrow", "debt", "coll"] as const;
+  // collateral in, escrow in; close → collateral out, escrow out, debt in.
+  const OUT_ORDER = ["debt", "coll", "escrow"] as const;
   const IN_ORDER = ["debt", "coll", "escrow"] as const;
   const rank = (l: Leg) =>
     l.row.direction === "left" ? OUT_ORDER.indexOf(l.kind) : OUT_ORDER.length + IN_ORDER.indexOf(l.kind);
