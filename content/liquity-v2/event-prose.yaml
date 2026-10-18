@@ -843,6 +843,21 @@ trove_words:
     , in USD at $1.00 face
   run_sheet_rate_change: |-
     Interest rate change across the run, in percentage points — the rate after the last adjustment less the rate before the first.
+  # The run's Explanation (rails-ops TO-DO-ui-jobs 372): the shared group bullets' shape, in the run's words.
+  run_explain_happened: |-
+    The delegate {manager} adjusted the rate {count} times {span}.
+  run_explain_happened_unnamed: |-
+    The delegate adjusted the rate {count} times {span}.
+  run_explain_rate: |-
+    The rate went from {from} to {to}.
+  run_explain_rate_unchanged: |-
+    The rate ended where it began, at {rate}.
+  run_explain_range: |-
+    On the way it moved between {low} and {high}.
+  run_explain_interest: |-
+    Interest and management fee added {amount} {symbol} to the debt.
+  run_explain_interest_upfront: |-
+    Interest and management fee added {amount} {symbol} to the debt, and upfront fees {upfront} {symbol}.
   # ── The position card's explanation: the lead and bullets under the stats ──
   # A {name} is a figure or a linked value the hook draws in its receipt; the rest is the sentence.
   # The bullets sit under the four headings below (rails-ops standards/prose-limits-and-zones.md
