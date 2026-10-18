@@ -13,9 +13,10 @@
 // off-page left and the protocol is the card column, so deposit and repay point
 // right and withdraw and borrow point left, as in the other CDP explorers.
 
-import { useMemo } from "react";
+import { useContext, useMemo } from "react";
 import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { EventPageContext } from "@/components/shared/event-page-aside";
 import { eventGas } from "@/components/shared/event-price-row";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
@@ -143,7 +144,9 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     () => ({ ctx, coords: polarisEchoCoords(ctx, event.txHash, event.blockNumber) }),
     [ctx, event.txHash, event.blockNumber],
   );
-  const head = polarisHeadSpec(ctx, coords);
+  // The event page draws the claimable surplus beside its title.
+  const onPage = useContext(EventPageContext) != null;
+  const head = polarisHeadSpec(ctx, coords, onPage ? "title" : "row");
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
   const body = polarisEventBody(ctx, coords, useFlowFocus() != null, previousEvent?.context.data);

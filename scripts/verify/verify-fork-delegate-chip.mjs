@@ -1,23 +1,26 @@
-// Verify the Liquity-fork DELEGATE chip — the party-pink "delegate 0x12…34"
-// beside the deltas, naming the interest-batch manager the owner handed rate
-// control to (backend mig 152/153 → batch_manager on the events MVs).
+// Verify the Liquity-fork DELEGATE clause — the head's "Rate to Bolder"
+// (rails-ops decision 0045), the name in party pink, naming the interest-batch
+// manager the owner handed rate control to (backend mig 152/153 →
+// batch_manager on the events MVs).
 //
 // What it asserts, per specimen:
-//   · the chip renders, in the party-pink COMPUTED colour, in BOTH themes
+//   · the clause renders, its name in the party-pink COMPUTED colour, in BOTH
+//     themes
 //   · it reads the manager's registry name (lib/shared/fork-batch-managers.ts)
 //     where one is evidenced, and the truncated 0x1234…abcd where none is
 //   · its address matches the manager the API row carries
-//   · it is SCOPED: present on the batch-JOIN rows (openTroveAndJoinBatch /
-//     setInterestBatchManager) and the manager's rate-change rows that stand
-//     outside a folder, absent on plain adjustTrove rows of the SAME
-//     batched trove, and absent on the liquidation row (is_batched=false there)
-//   · it carries a provenance receipt (the chip is <Prov>-wrapped, not an orphan)
+//   · it is SCOPED: present on the hand-over rows (openTroveAndJoinBatch /
+//     setInterestBatchManager) that stand outside a folder; absent on the
+//     manager's rate changes ("Adjusted rate" in the delegate's pink, no name),
+//     on plain adjustTrove rows of the SAME batched trove, and on the
+//     liquidation row (is_batched=false there)
+//   · it carries a provenance receipt (the name is <Prov>-wrapped, not an orphan)
 //
-// Plus a NARROW-WIDTH pass (§2): the chip is the widest thing ever added to a
-// header row that already carries a label, two deltas and a rate pill, so the
-// risk is horizontal overflow, clipping, or a collision. That pass measures
-// geometry — page scrollWidth, the chip's box against its row's, and pairwise
-// overlap between the row's children — rather than mere presence.
+// Plus a NARROW-WIDTH pass (§2): the clause is the widest thing on a head that
+// already carries the kind, so the risk is horizontal overflow, clipping, or a
+// collision. That pass measures geometry — page scrollWidth, the clause's box
+// against its row's, and pairwise overlap between the row's children — rather
+// than mere presence.
 //
 // Run: BASE=http://localhost:3007 node scripts/verify/verify-fork-delegate-chip.mjs
 // Against the deployed preview (dev.rails.finance), the bypass header rides
@@ -28,7 +31,6 @@
 import { chromium } from "playwright";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -67,18 +69,13 @@ const SPECIMENS = [
   },
 ];
 
-// The events whose header carries the chip — the same set the rate pill uses.
-const CHIP_EVENTS = new Set([
-  "openTrove",
-  "openTroveAndJoinBatch",
-  "adjustTroveInterestRate",
-  "setInterestBatchManager",
-  "removeFromBatch",
-  // A batch manager's rate change carries the chip since web 555b2b2 (server
-  // mig 342): "Adjusted 3.20% → 3.60% Bolder".
-  "setBatchManagerAnnualInterestRate",
-  "lowerBatchManagerAnnualFee",
-]);
+// The events whose head names the delegate: the hand-over itself ("Opened
+// trove · Rate to Bolder", "Rate to Bolder"). A manager's later rate change
+// reads "Adjusted rate" in the delegate's pink with no name, and a removal
+// "Ended delegation" (lib/shared/liquity-fork-head-words.ts).
+const CHIP_EVENTS = new Set(["openTroveAndJoinBatch", "setInterestBatchManager"]);
+/** The clause's lead, `t1_rate_to` under `L1_words` in content/liquity-v2/event-prose.yaml. */
+const RATE_TO = "Rate to";
 
 let failures = 0;
 function assert(c, m) {
@@ -126,30 +123,31 @@ const NAMES = {
 // What a chip for `m` must read: its resolved name, else the truncated address.
 const label = (m) => NAMES[m.toLowerCase()] ?? trunc(m);
 
-// Every rendered chip: the "delegate" prefix span's sibling address span, with
-// its COMPUTED colour — presence alone would not prove the party-pink tone.
+// Every rendered clause: a head clause led by "Rate to", its name with the
+// name's COMPUTED colour — presence alone would not prove the party-pink tone.
 async function chips(page) {
-  return page.evaluate(() => {
+  return page.evaluate((lead) => {
     const out = [];
-    for (const el of Array.from(document.querySelectorAll("span"))) {
-      if ((el.textContent || "").trim() !== "delegate") continue;
-      const addr = el.nextElementSibling;
-      if (!addr) continue;
-      const cs = getComputedStyle(addr);
-      const r = addr.getBoundingClientRect();
+    for (const clause of Array.from(document.querySelectorAll("[data-head-clause]"))) {
+      const text = (clause.textContent || "").replace(/\s+/g, " ").trim();
+      if (!text.startsWith(`${lead} `)) continue;
+      // The name is <Prov>-wrapped when it sits in a `prov-locate-box` — the
+      // class Prov puts on a scoped value, which is what registers it into the
+      // card's receipt registry (the inspector then reaches it, asserted
+      // separately below).
+      const box = clause.querySelector(".prov-locate-box");
+      const name = box?.firstElementChild ?? clause.lastElementChild ?? clause;
+      const cs = getComputedStyle(name);
+      const r = name.getBoundingClientRect();
       out.push({
-        text: (addr.textContent || "").trim(),
+        text: text.slice(lead.length + 1),
         color: cs.color,
         visible: r.width > 0 && r.height > 0,
-        // The chip is <Prov>-wrapped when its box carries `prov-locate-box` —
-        // the class Prov puts on a scoped value, which is what registers it
-        // into the card's receipt registry (the inspector then reaches it,
-        // asserted separately below).
-        hasReceipt: !!el.parentElement?.classList.contains("prov-locate-box"),
+        hasReceipt: box != null,
       });
     }
     return out;
-  });
+  }, RATE_TO);
 }
 
 // oklch(L C H) or rgb(r g b) → is this the party pink, not a neutral?
@@ -256,35 +254,11 @@ for (const spec of SPECIMENS) {
           `[${scheme}] every chip is a scoped <Prov> value (registers into the card's receipt registry)`,
         );
 
-        // The registry claim, proven end-to-end: arm the page-level provenance
-        // inspector (the per-card receipts panel is retired — the inspector
-        // popover is THE receipt surface now), pick the chip, and read the
-        // batch-manager receipt back off the popover.
-        assert(await armInspector(page), `[${scheme}] page mounts the provenance inspector`);
-        const chip = page.locator("span.prov-locate-box").filter({ hasText: "delegate" }).first();
-        await chip.scrollIntoViewIfNeeded();
-        await chip.click();
-        await page.waitForTimeout(500);
-        const pop = page.locator(".prov-inspect-pop");
-        const popText = (await pop.count()) > 0 ? await pop.innerText() : "";
-        // What the popover renders is not the vocabulary summary verbatim: the
-        // head takes its name clause ("Batch manager at this event") and the
-        // embedded receipt renders the REST, capitalised — so a check that
-        // pastes a mid-sentence phrase out of the vocabulary misses on the
-        // first letter. Read the two surfaces as the popover builds them, and
-        // prove the pin is THIS chip's receipt by its manager operand rather
-        // than by prose alone.
-        assert(
-          popText.includes("Batch manager at this event") &&
-            popText.includes("handed control of the Trove's interest rate to") &&
-            managers.some((m) => popText.toLowerCase().includes(m.toLowerCase())),
-          `[${scheme}] picking the chip pins its batch-manager receipt in the inspector popover (chip is not an orphan)`,
-        );
-        // Escape ladder: first press closes the popover, second disarms — the
-        // tool must be down before the runtime-error scan and screenshot below.
-        await page.keyboard.press("Escape");
-        await page.keyboard.press("Escape");
-        await page.waitForTimeout(200);
+        // Retired (ui-jobs 367): picking the name in the armed inspector.
+        // The page-level inspector arms the position's own sections; a
+        // timeline card's receipts are read on its event page (ui-jobs 308),
+        // and the event page draws no head, so no surface offers the name to
+        // pick. The receipt wrapper above is what this pass can still prove.
       }
 
       // Scope: the manager-carrying rows outside the rate set must NOT chip —
@@ -321,8 +295,8 @@ for (const spec of SPECIMENS) {
 // ─────────────────────────────────────────────────────────────────────────────
 // §2 — NARROW WIDTHS
 //
-// The header row already carried a label, two signed deltas and a rate pill;
-// the delegate chip makes it the widest that row has ever been. The widths are
+// The head carries the kind and the delegate clause, the widest it gets
+// (decision 0045 moved the deltas and the rate pill to the spine). The widths are
 // chosen around the 640px (sm) hand-off that `lib/shared/header-values.ts`
 // governs: with the default-on "Timeline values" preference, header amounts
 // hide at ≥sm so the SpineColumn can carry them. So the CROWDED case is just
@@ -340,9 +314,8 @@ const NARROW = [
   { w: 640, label: "640px (sm — deltas hand off to the spine)" },
 ];
 
-// The chip-bearing specimens: an openTroveAndJoinBatch row (label + BOTH deltas
-// + rate pill + chip = the widest header this grammar can produce) and an
-// Asymmetry setInterestBatchManager row.
+// The clause-bearing specimens: an openTroveAndJoinBatch row (the kind and the
+// clause, the widest head this grammar can produce) on Ebisu and Asymmetry.
 const NARROW_SPECIMENS = [
   { name: "ebisu WBTC — openTroveAndJoinBatch (widest header)", path: SPECIMENS[0].path },
   { name: "asymmetry ysyBOLD — openTroveAndJoinBatch", path: SPECIMENS[3].path },
@@ -351,19 +324,19 @@ const NARROW_SPECIMENS = [
 // Measure the chip's header row: page overflow, the chip's box against its
 // row's, clipping, and whether any two children of the row overlap.
 async function geometry(page) {
-  return page.evaluate(() => {
+  return page.evaluate((lead) => {
     const de = document.documentElement;
     // The chip in the most crowded header row: a batch manager's rate-change
     // row is newer and carries fewer children than the join row this pass is
     // about, so the first chip on the page is not the one to measure.
-    const chip = [...document.querySelectorAll("span")]
-      .filter((e) => (e.textContent || "").trim() === "delegate" && e.closest("div.flex.flex-wrap"))
+    const chip = [...document.querySelectorAll("[data-head-clause]")]
+      .filter((e) => (e.textContent || "").trim().startsWith(lead) && e.closest("div.flex.flex-wrap"))
       .reduce((best, e) => {
         const n = e.closest("div.flex.flex-wrap").children.length;
         return best && best.n >= n ? best : { e, n };
       }, null)?.e;
     if (!chip) return { found: false, pageScroll: de.scrollWidth, pageClient: de.clientWidth };
-    const box = chip.parentElement; // the Prov locate-box wrapping prefix + address
+    const box = chip; // the clause: the lead and the name's Prov box
     const row = chip.closest("div.flex.flex-wrap");
     const bb = box.getBoundingClientRect();
     const rb = row.getBoundingClientRect();
@@ -400,7 +373,19 @@ async function geometry(page) {
       row: { x: rb.x, right: rb.right, width: rb.width, height: rb.height },
       // A flex row that cannot wrap would squeeze or overflow instead.
       flexWrap: getComputedStyle(row).flexWrap,
-      clipped: box.scrollWidth > box.clientWidth + 1,
+      // The name is cut off where an ancestor up to the row clips its
+      // overflow and the name runs past that ancestor's box.
+      clipped: (() => {
+        const name = box.querySelector(".prov-locate-box") ?? box;
+        const nb = name.getBoundingClientRect();
+        for (let el = name.parentElement; el && el !== row.parentElement; el = el.parentElement) {
+          const o = getComputedStyle(el);
+          if (o.overflowX === "visible" && o.textOverflow !== "ellipsis") continue;
+          const eb = el.getBoundingClientRect();
+          if (nb.right > eb.right + 0.5 || nb.x < eb.x - 0.5) return true;
+        }
+        return false;
+      })(),
       collisions,
       // Are the deltas still inline in the header at this width? (the sm
       // hand-off). Two live delta shapes: a signed value child ("+16.84",
@@ -412,7 +397,7 @@ async function geometry(page) {
       deltasInline: kids.some((k) => k.visible && /(^|\n)[+−-]?\d[\d,.]*[KMB]?(\n|$)/.test(k.text)),
       rowText: row.innerText.replace(/\n/g, " · ").slice(0, 110),
     };
-  });
+  }, RATE_TO);
 }
 
 console.log("\n════ §2 — narrow widths: overflow, clipping, collisions ════");
@@ -434,7 +419,7 @@ for (const spec of NARROW_SPECIMENS) {
         }
         const g = await geometry(page);
         if (!g.found) {
-          assert(false, `[${label} ${scheme}] chip present at this width`);
+          assert(false, `[${label} ${scheme}] clause present at this width`);
           continue;
         }
         if (scheme === "light") {
@@ -453,7 +438,7 @@ for (const spec of NARROW_SPECIMENS) {
             g.chip.right,
           )} within row ${Math.round(g.row.x)}–${Math.round(g.row.right)})`,
         );
-        assert(!g.clipped, `[${label} ${scheme}] chip text is not clipped (address stays legible)`);
+        assert(!g.clipped, `[${label} ${scheme}] the name is not clipped (stays legible)`);
         assert(
           g.collisions.length === 0,
           `[${label} ${scheme}] no two header items overlap${g.collisions.length ? ` — ${g.collisions.join(", ")}` : ""}`,

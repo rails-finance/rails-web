@@ -26,7 +26,15 @@
 //     does not exist (it would open the paragraph) is dropped — a continuation
 //     attaches to the previous clause or dies with it.
 
-import { Fragment, cloneElement, createContext, isValidElement, useContext, type ReactNode } from "react";
+import {
+  Fragment,
+  cloneElement,
+  createContext,
+  createElement,
+  isValidElement,
+  useContext,
+  type ReactNode,
+} from "react";
 import { EXPLAIN_GROUP_RULE, ExplainHeading } from "@/components/shared/explain-groups";
 
 /** The one emphasis helper for explainer copy — the charter §3 highlight rule's
@@ -125,6 +133,44 @@ export function splitLead(clauses: ClauseInput[]): { lead: ReactNode | null; res
   let end = 1;
   while (end < live.length && isCont(live[end])) end++;
   return { lead: composeParagraph(live.slice(0, end)), rest: live.slice(end) };
+}
+
+/** A sentence's end: its stop, followed by a space and the next sentence's
+ *  capital (a figure's decimal point is followed by a digit). */
+const SENTENCE_END = /[.!?](?=\s+[A-Z“‘"(])/;
+
+/** The node split after its first sentence: `head` the first sentence,
+ *  `tail` the rest, or null where the node is one sentence. It reads the text
+ *  the node carries (strings, fragments, elements' children); a component's
+ *  own render is opaque to it, so a teaser drawn by a component stays whole. */
+export function splitFirstSentence(node: ReactNode): { head: ReactNode; tail: ReactNode | null } {
+  return cutSentence(node) ?? { head: node, tail: null };
+}
+
+function cutSentence(node: ReactNode): { head: ReactNode; tail: ReactNode } | null {
+  if (typeof node === "string") {
+    const m = SENTENCE_END.exec(node);
+    if (!m) return null;
+    return { head: node.slice(0, m.index + 1), tail: node.slice(m.index + 1).trimStart() };
+  }
+  if (Array.isArray(node)) {
+    for (let i = 0; i < node.length; i++) {
+      const cut = cutSentence(node[i] as ReactNode);
+      if (cut)
+        return {
+          // Spread as arguments, so the pieces need no keys.
+          head: createElement(Fragment, null, ...node.slice(0, i), cut.head),
+          tail: createElement(Fragment, null, cut.tail, ...node.slice(i + 1)),
+        };
+    }
+    return null;
+  }
+  if (isValidElement<{ children?: ReactNode }>(node) && node.props.children != null) {
+    const cut = cutSentence(node.props.children);
+    if (!cut) return null;
+    return { head: cloneElement(node, undefined, cut.head), tail: cloneElement(node, undefined, cut.tail) };
+  }
+  return null;
 }
 
 /** Compose the clauses as BULLET items: each surviving sentence clause plus its

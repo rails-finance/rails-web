@@ -576,11 +576,13 @@ export function TimelineRunCard({
       This position has moved since the page was opened; reload for the current history.
     </p>
   ) : null;
+  // The frame draws its members as a list (`WindowedMembers`), so each line
+  // that stands in their place carries a key.
   let body: ReactNode = children;
   if (onOpen) {
     if (error) {
       body = (
-        <p className="px-5 text-[11px] leading-relaxed text-rb-500">
+        <p key="error" className="px-5 text-[11px] leading-relaxed text-rb-500">
           <span className="text-foreground">These events could not be loaded.</span> {error} The figures above are
           unchanged.
         </p>
@@ -592,14 +594,14 @@ export function TimelineRunCard({
       // no spinner: a spinner implies a fast answer is coming, and a first
       // open on a cold position pays for the whole grouping pass.
       body = readingLine ? (
-        <div className="relative" aria-busy="true">
+        <div key="reading" className="relative" aria-busy="true">
           <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
           <p className="absolute inset-x-0 top-5 px-5 text-center text-xs text-rb-500" role="status">
             Reading {count.toLocaleString("en-US")} {count === 1 ? memberNoun : memberPlural}&hellip;
           </p>
         </div>
       ) : (
-        <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
+        <SkeletonBlock key="reading" height={MEMBERS_SKELETON_HEIGHT} />
       );
     }
   }

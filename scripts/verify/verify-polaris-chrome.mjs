@@ -16,12 +16,13 @@
 //   3. Listing: the Market facet's two options each carry the stable's glyph
 //      (<img alt="USDp"> / <img alt="GOLDp">); picking one still writes
 //      ?market=usdp (the codec is untouched).
-//   4. usdp/175 and usdp/166: the liquidation card's header carries a
-//      "Claimable" leg restating the timeline API's collSurplus in the
-//      header's compact form, after Seized and Cleared; usdp/8's rows carry
-//      none. The zero-surplus branch is proven on the model: a node child
-//      feeds polarisLiquidationDeltas a row with collSurplus "0" and gets two
-//      legs, and one with "0.5" gets the third, neutral, off the spine.
+//   4. usdp/175 and usdp/166: the liquidation's head reads "Liquidated" and
+//      one clause, "0.0211 claimable", restating the timeline API's
+//      collSurplus at four places (rails-ops decision 0045); the seizure's
+//      figures stay off the head; usdp/8's heads carry no claimable clause.
+//      The zero-surplus branch is proven on the model: a node child feeds
+//      polarisLiquidationDeltas a row with collSurplus "0" and gets two legs,
+//      and one with "0.5" gets the third, neutral, off the spine.
 //   5. Every Polaris learn-more modal — the markets page's two inline "?",
 //      the CDP card's, the Lifetime flows panel's, a liquidation row's — lists ≥ 2 links on
 //      docs.polaris.finance, each answering 200 to a fetch from this script,
@@ -31,8 +32,7 @@
 //      Liquity V2's, the one cross-explorer check that proves the sweep.
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
-// page: the compact figure is parseFloat(x.toFixed(4)) for a sub-1 magnitude
-// (the header's own rule for the spine's form), and collSurplus comes from
+// page: the head's figure is x.toFixed(4), and collSurplus comes from
 // /api/polaris/timeline fetched by this script. The two liquidations are
 // immutable rows; the board block is read at run time.
 //
@@ -72,18 +72,9 @@ async function api(path_, tries = 4) {
   throw last ?? new Error(`failed ${path_}`);
 }
 
-/** The header's compact form for a sub-1 magnitude, restated. */
-// Polaris states every row figure in full, three decimals (the house
-// formatNumber: en-US, at most 3 fraction digits; a non-zero amount that would
-// round to 0 reads to 3 significant digits) — restated, not imported.
-function fmtFullLike(n) {
-  const a = Math.abs(Number(n));
-  if (!a || !isFinite(a)) return "";
-  const s = a.toLocaleString("en-US", { maximumFractionDigits: 3 });
-  if (parseFloat(s.replace(/,/g, "")) === 0)
-    return a < 1e-6 ? "<0.000001" : a.toLocaleString("en-US", { maximumSignificantDigits: 3 });
-  return s;
-}
+/** The head's claimable surplus: four places, as the Liquity heads state it
+ *  (components/protocol/polaris/polaris-event-header.tsx), restated. */
+const surplusFig = (n) => Number(n).toFixed(4);
 const DOCS_HOST = "docs.polaris.finance";
 const APP_URL = "https://testnet.polaris.finance";
 
@@ -175,9 +166,29 @@ async function openPosition(url) {
   await page.close();
 }
 
-// ── 4. the Claimable leg ───────────────────────────────────────────────────
-async function liquidationCard(page) {
-  return page.locator('[data-skel-section="detail-event"]', { hasText: "Seized" }).first();
+// ── 4. the claimable clause on the liquidation's head ──────────────────────
+/** The liquidation's row: the one whose head reads "Liquidated". */
+function liquidationCard(page) {
+  return page
+    .locator('[data-skel-section="detail-event"]', {
+      has: page.locator('[data-anatomy~="T1"]', { hasText: /^\s*Liquidated/ }),
+    })
+    .first();
+}
+
+/** The liquidation row's head: its kind, its clauses and its whole text. */
+async function liquidationHead(page) {
+  const row = liquidationCard(page);
+  if ((await row.count()) === 0) return null;
+  return row
+    .locator('[data-anatomy~="T1"]')
+    .first()
+    .evaluate((el) => ({
+      text: (el.textContent ?? "").replace(/\s+/g, " ").trim(),
+      clauses: [...el.querySelectorAll("[data-head-clause]")].map((c) =>
+        (c.textContent ?? "").replace(/\s+/g, " ").trim(),
+      ),
+    }));
 }
 
 for (const id of ["175", "166"]) {
@@ -190,38 +201,36 @@ for (const id of ["175", "166"]) {
     `collSurplus ${surplus}`,
   );
   const page = await openPosition(`${BASE}/sepolia/polaris/usdp/${id}`);
-  const card = await liquidationCard(page);
-  const header = await card.evaluate((el) => {
-    const spans = [...el.querySelectorAll("span")];
-    const claim = spans.find((s) => s.textContent === "Claimable");
-    // The figure follows the word since the shared head row (ui-jobs 309 step 2).
-    const figure = claim?.nextElementSibling?.textContent ?? "";
-    const text = (el.textContent ?? "").replace(/\s+/g, " ");
-    return { figure, text, order: [text.indexOf("Seized"), text.indexOf("Cleared"), text.indexOf("Claimable")] };
-  });
-  const want = fmtFullLike(surplus);
+  const head = await liquidationHead(page);
+  const want = `${surplusFig(surplus)} claimable`;
   check(
-    `4b. usdp/${id}: the liquidation header states "Claimable ${want} pETH"`,
-    header.figure === want,
-    `figure "${header.figure}" vs restated ${want}`,
+    `4b. usdp/${id}: the liquidation head reads "Liquidated · ${want}"`,
+    // The figure, the pETH mark and the word sit in one flex box with no text
+    // between them: compared without spaces.
+    head != null &&
+      head.text.startsWith("Liquidated") &&
+      head.clauses.length === 1 &&
+      head.clauses[0].replace(/\s+/g, "") === want.replace(/\s+/g, ""),
+    JSON.stringify(head),
   );
   check(
-    `4c. usdp/${id}: the leg rides after Seized and Cleared`,
-    header.order[0] >= 0 && header.order[0] < header.order[1] && header.order[1] < header.order[2],
-    `positions ${header.order.join(", ")}`,
+    `4c. usdp/${id}: the head states no seizure figure (Seized and Cleared ride the spine)`,
+    head != null && !/Seized|Cleared/.test(head.text),
+    head?.text ?? "no head",
   );
   await page.close();
 }
 {
   const page = await openPosition(`${BASE}/sepolia/polaris/usdp/8`);
-  const claimables = await page
-    .locator('[data-skel-section="detail-event"]')
-    .evaluateAll((els) => els.filter((el) => /Claimable/.test(el.textContent ?? "")).length);
-  const rows = await page.locator('[data-skel-section="detail-event"]').count();
+  const heads = page.locator('[data-skel-section="detail-event"] [data-anatomy~="T1"]');
+  const rows = await heads.count();
+  const claimables = await heads.evaluateAll(
+    (els) => els.filter((el) => /claimable/i.test(el.textContent ?? "")).length,
+  );
   check(
-    "4d. usdp/8's rows carry no Claimable leg",
+    "4d. usdp/8's heads carry no claimable clause",
     rows > 0 && claimables === 0,
-    `${rows} rows, ${claimables} with Claimable`,
+    `${rows} heads, ${claimables} with claimable`,
   );
   await page.close();
 }
@@ -392,7 +401,7 @@ async function checkModal(name, { title, links }) {
   await checkModal("the CDP card", await readModalLinks(page));
   await openModalIn(page.locator('[data-skel-section="detail-economics"]').first(), page);
   await checkModal("the Lifetime flows panel", await readModalLinks(page));
-  const card = await liquidationCard(page);
+  const card = liquidationCard(page);
   // The card's header is the toggle (role="button"); its footer, with the "?",
   // draws once the detail is open.
   await card

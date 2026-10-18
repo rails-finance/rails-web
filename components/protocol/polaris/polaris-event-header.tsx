@@ -40,14 +40,26 @@ function clauseNode(c: PolarisT1Clause, ctx: PolarisContext, coords: PolarisCoor
   return <PartyChip party={{ prefix: c.lead, address: c.address, prov: transferProv(coords), ens: true }} />;
 }
 
-/** The timeline head's spec. */
-export function polarisHeadSpec(ctx: PolarisContext, coords: PolarisCoords): ChainTruthRowSpec {
+/** The head's spec: the timeline's ("row") or the event page's ("title"),
+ *  where the claimable surplus leaves the clauses for the chip the page draws
+ *  beside its title, as Liquity V2's does. */
+export function polarisHeadSpec(
+  ctx: PolarisContext,
+  coords: PolarisCoords,
+  mode: "row" | "title" = "row",
+): ChainTruthRowSpec {
   const words = polarisT1Words(ctx);
+  const surplus = mode === "title" ? words.clauses.find((c) => "surplus" in c) : undefined;
+  const clauses = surplus ? words.clauses.filter((c) => c !== surplus) : words.clauses;
   return {
     label: words.kind,
     status: ctx.eventType === "open" ? "open" : ctx.eventType === "close" ? "close" : undefined,
     critical: ctx.eventType === "liquidate",
-    clauses: words.clauses.map((c) => clauseNode(c, ctx, coords)),
+    clauses: clauses.map((c) => clauseNode(c, ctx, coords)),
     deltas: [],
+    surplus:
+      surplus && "surplus" in surplus
+        ? { amount: surplus.surplus, symbol: surplus.symbol, word: surplus.word }
+        : undefined,
   };
 }

@@ -131,7 +131,7 @@ await run("fork delegate pill", async (page) => {
 
 // ── 2. Individual rate pill + paired detail stat (receipt identity) ──
 await run("ebisu individual pill + detail", async (page) => {
-  console.log("\n[ebisu individual rate pill — unbatched Increase interest rate]");
+  console.log("\n[ebisu individual rate pill — unbatched Adjusted rate]");
   const ok = await load(page, SPECIMENS.ebisuIndividual.url);
   assert(ok, "page rendered cards");
   const ps = await pills(page);
@@ -140,12 +140,17 @@ await run("ebisu individual pill + detail", async (page) => {
   const m = indiv.color.match(/\d+/g).map(Number);
   assert(!(m[0] > 150 && m[1] < 90), `individual pill NOT pink (neutral ${indiv.color})`);
   assert(indiv.visible, "individual pill visible at 1280px");
-  // Expand the "Increase interest rate" card → its detail grid carries the paired
-  // "Interest rate" stat with the same 2-dp value (the receipt identity).
-  // The card's hidden label span carries the words too since 309 (`7bfc37d`);
-  // the press goes to the visible header.
-  const header = page.locator("text=/Increase interest rate/i").locator("visible=true").first();
-  assert((await header.count()) > 0, 'header reads "Increase interest rate"');
+  // Expand the "Adjusted rate" card (the head's participle, rails-ops decision
+  // 0045) → its detail grid carries the paired "Interest rate" stat with the
+  // same 2-dp value (the receipt identity). The card's hidden label span
+  // carries the words too since 309 (`7bfc37d`); the press goes to the visible
+  // head.
+  const header = page
+    .locator('[data-anatomy~="T1"]')
+    .getByText(/^Adjusted rate$/)
+    .locator("visible=true")
+    .first();
+  assert((await header.count()) > 0, 'head reads "Adjusted rate"');
   await header.click();
   await page.waitForTimeout(600);
   const rateStat = await page

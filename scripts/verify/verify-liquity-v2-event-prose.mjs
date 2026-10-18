@@ -15,10 +15,10 @@
 //       equal the copy's); and the dollar figures on a line that says
 //       "today", which the page reads at today's price and the export at its
 //       pinned one.
-//   P2  L4 ON THE PAGE — every L4 sentence of the block is a bullet of the
-//       opened card's Explanation, in order; a grouped L4's headings
-//       ("**L4 · What happened**") are the pane's group headings, in order
-//       (ui-jobs 282).
+//   P2  L4 ON THE PAGE — the first L4 sentence is the page's title (P4) and
+//       every other L4 sentence is a bullet of the card's Explanation, in
+//       order; a grouped L4's headings ("**L4 · What happened**") are the
+//       pane's group headings, in order (ui-jobs 282).
 //   P3  L2 AGAINST CHAIN TRUTH — the copy states the chain-truth figures
 //       (ui-jobs 330), so each L2 figure is checked against its source. The
 //       token after-figures of the Collateral and Debt lines, a "CLOSED", the
@@ -28,8 +28,12 @@
 //       event's price), at the precision the copy prints them. The figures the
 //       sheet draws (the sides' dollar totals, the ratio and the rate after,
 //       the price) are on the opened card, in order, as before.
-//   P4  L1 ON THE PAGE — the L1 line's words and figures are on the event's
-//       row (the header and the spine; on the event page, the header).
+//   P4  THE TITLE — the page's h1 (`data-event-page-sentence`) is the
+//       Explanation's first sentence, L4's first bullet, word for word, and
+//       the card's pane leaves it out (rails-ops decision 0045, "Ruled
+//       since"); a liquidation's claimable surplus in L1 stands beside it as
+//       the chip. The event page draws no head row, so L1's words are not on
+//       it.
 //
 // Samples: the brief's #17 (redemption) and #18 (withdraw) on trove
 // 102247…0154, each other fixture's last event, and the first event printed
@@ -377,9 +381,11 @@ try {
     const t2 = await card.innerText();
     const l4 = l4Runs(copy);
     const bullets = l4.flatMap((r) => r.bullets);
-    const missing = inOrder(norm(t2), bullets.map(norm));
+    // The first sentence is the page's title (P4); the pane opens on the second.
+    const [lead, ...paneBullets] = bullets;
+    const missing = inOrder(norm(t2), paneBullets.map(norm));
     check(
-      `${label}: L4 is the card's Explanation (${bullets.length} bullets)`,
+      `${label}: L4 after its first sentence is the card's Explanation (${paneBullets.length} bullets)`,
       bullets.length > 0 && !missing,
       missing ?? "",
     );
@@ -387,11 +393,14 @@ try {
     const paneHeadings = await card
       .locator('[data-anatomy="T3"] [data-explain-group] > h4')
       .evaluateAll((els) => els.map((el) => el.textContent.trim()));
-    // Each heading's bullets sit in its section.
+    // Each heading's bullets sit in its section; the first run's first bullet
+    // is the title.
     const underRight = await card.locator('[data-anatomy="T3"] [data-explain-group]').evaluateAll(
       (els, runs) =>
         runs.every((r, i) => els[i] && r.bullets.every((b) => els[i].textContent.replace(/\s+/g, " ").includes(b))),
-      l4.filter((r) => r.heading).map((r) => ({ heading: r.heading, bullets: r.bullets.map(norm) })),
+      l4
+        .filter((r) => r.heading)
+        .map((r, i) => ({ heading: r.heading, bullets: (i === 0 ? r.bullets.slice(1) : r.bullets).map(norm) })),
     );
     check(
       `${label}: L4's group headings are the pane's (${headings.length ? headings.join(" / ") : "flat"})`,
@@ -422,31 +431,39 @@ try {
         : "the event is not in the timeline API",
     );
 
-    // P4: the row (spine and header; the event page's header states the
-    // spine's values), with the timeline values on.
-    const row = page.locator('[data-skel-section="detail-event"]').first();
-    const rowText = norm((await row.innerText()).replace(/\n/g, " "));
+    // P4: the title is the Explanation's first sentence.
     const l1 = /\*\*L1\*\* (.*)/.exec(copy)?.[1] ?? "";
-    // Token symbols are icons on the row, not text.
-    const symbols = new Set([e.values.coll_symbol, e.values.debt_symbol]);
+    const titles = await page.locator("h1[data-event-page-sentence]").allInnerTexts();
+    const pageTitle = norm((titles[0] ?? "").replace(/\n/g, " "));
+    const sentence = norm(lead ?? "");
+    // After the sentence, only a liquidation's surplus chip ("0.1069 claimable").
+    const surplus = /([\d.]+) \S+ claimable/.exec(l1)?.[1] ?? null;
+    const rest = pageTitle.startsWith(sentence) ? pageTitle.slice(sentence.length).trim() : null;
+    check(
+      `${label}: the page's title is the Explanation's first sentence${surplus ? `, ${surplus} claimable beside it` : ""}`,
+      titles.length === 1 &&
+        sentence !== "" &&
+        rest != null &&
+        (surplus ? rest.startsWith(surplus) && /claim/.test(rest) : rest === ""),
+      `title «${pageTitle.slice(0, 220)}», sentence «${sentence.slice(0, 120)}»`,
+    );
+    const pane = norm(
+      await card
+        .locator('[data-anatomy="T3"]')
+        .first()
+        .innerText()
+        .catch(() => ""),
+    );
+    check(
+      `${label}: the card's pane leaves the title's sentence out`,
+      sentence !== "" && !pane.includes(sentence),
+      pane.slice(0, 160),
+    );
     // A batch's rate update draws no debt delta in its header (Miles, 14 Oct
     // 2026): the debt change is the sheet's, checked below.
     const rateUpdate = e.template.id === "liquity2.delegation.rate_update";
     const groups = l1.split(" · ");
     const debtGroup = rateUpdate ? (groups.find((g) => /^Debt [+−-]/.test(g)) ?? null) : null;
-    const words = groups
-      .filter((g) => g !== debtGroup)
-      .flatMap((g) => g.split(" "))
-      .filter((w) => !symbols.has(w));
-    // The spine draws the figures beside the node and the header the words,
-    // so they are matched separately, regardless of case (the spine's
-    // pill is upper-cased by its style).
-    const missing3 = words.find((w) => !rowText.toLowerCase().includes(w.toLowerCase())) ?? null;
-    check(
-      `${label}: L1 "${l1}" is on the row`,
-      l1 !== "" && !missing3,
-      `${missing3} not in «${rowText.slice(0, 200)}»`,
-    );
     if (debtGroup) {
       const delta = debtGroup.split(" ")[1];
       const header = norm(

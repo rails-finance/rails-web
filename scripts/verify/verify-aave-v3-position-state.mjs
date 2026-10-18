@@ -57,7 +57,7 @@ const FIXTURES = [
     market: "core",
     block: 25963602,
     tx: "0xc2596fc8ac8593338c4bffea88b2db2826f25a1609c5851dce12c0d5f86f078d",
-    cardText: "Collateral swap",
+    headText: "Swapped collateral",
     // aUSDC given, aWETH received: both supplied balances moved.
     moved: [
       { reserve: USDC, side: "supply", sign: -1 },
@@ -72,7 +72,7 @@ const FIXTURES = [
     market: "core",
     block: 25925584,
     tx: "0xaf0a493a61933ba1c6db6cbd02ad848eda4a9aa6b08e7a418f37f592755d21c3",
-    cardText: "Debt swap",
+    headText: "Swapped debt",
     moved: [
       { reserve: USDC, side: "debt", sign: -1 },
       { reserve: WETH, side: "debt", sign: 1 },
@@ -84,7 +84,7 @@ const FIXTURES = [
     market: "core",
     block: 25925977,
     tx: "0xa3ac83ba56f6ce4846f8eaab4bd36494c462851d2d4f2a9ee81a86ea7f2f7a6d",
-    cardText: "Repay with collateral",
+    headText: "Repaid with collateral",
     moved: [
       { reserve: WBTC, side: "supply", sign: -1 },
       { reserve: USDT, side: "debt", sign: -1 },
@@ -144,7 +144,7 @@ const FIXTURES = [
     market: "core",
     block: 25983408,
     tx: "0xa8590e9c7325641a59840a897d3d57f5681b46ce353efa373136edf3a693cf81",
-    cardText: "Collateral swap",
+    headText: "Swapped collateral",
     moved: [
       { reserve: UNI, side: "supply", sign: -1 },
       { reserve: WETH, side: "supply", sign: 1 },
@@ -271,7 +271,19 @@ async function openCard(page, fx) {
       const h = hits.nth(j);
       const id = (await h.getAttribute("data-event-id")) ?? "";
       if (fx.idPrefix && !id.startsWith(fx.idPrefix)) continue;
-      if (fx.cardText && !((await h.innerText()) || "").includes(fx.cardText)) continue;
+      // The swap kinds read as participles on the head (rails-ops decision
+      // 0045, "Ruled since"): a head that regresses to the old noun finds no card.
+      if (
+        fx.headText &&
+        !(
+          (await h
+            .locator('[data-anatomy="T1"]')
+            .first()
+            .innerText()
+            .catch(() => "")) || ""
+        ).includes(fx.headText)
+      )
+        continue;
       // By its id: an nth() locator is re-read on each use, and the list
       // reorders as the page fills.
       card = page.locator(`[data-event-id="${id}"]`).first();

@@ -1093,9 +1093,14 @@ function eventSlots(
           <>
             {manager}, the Trove&rsquo;s batch manager, changed the batch&rsquo;s annual interest rate
             {f.rateBefore != null ? <> from {forkRateText(f.rateBefore)}</> : null}
-            {rateNow ? <> to {rateNow}</> : null}. The owner did not act: every Trove in the batch pays the rate its
-            manager sets.
+            {rateNow ? <> to {rateNow}</> : null}.
           </>
+        );
+      // Its own clause, so the teaser and the event page's title are the one
+      // sentence above.
+      const ownerIdle =
+        ctx.eventType === "lowerBatchManagerAnnualFee" && br ? null : (
+          <>The owner did not act: every Trove in the batch pays the rate its manager sets.</>
         );
       const troveFee = br?.troveFee != null ? Number(br.troveFee) : 0;
       const changed: ClauseInput[] = [
@@ -1137,7 +1142,7 @@ function eventSlots(
             )
           : null,
       ];
-      return { happened: [clause(happened)], changed, meansNow };
+      return { happened: [clause(happened), ownerIdle && clause(ownerIdle)], changed, meansNow };
     }
 
     default:

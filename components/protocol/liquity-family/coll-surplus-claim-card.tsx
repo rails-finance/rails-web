@@ -1,12 +1,12 @@
 "use client";
 
-// The "Claim collateral" row on a Liquity-family Trove's timeline: the owner's
+// The "Claimed collateral" row on a Liquity-family Trove's timeline: the owner's
 // claimCollateral() that paid this Trove's surplus out of the CollSurplusPool
 // (lib/shared/liquity-coll-surplus-claim.ts builds the event). One card for
 // Liquity V2, its forks and Liquity V1, on the shared chain-truth row grammar.
 //
-//   T1  "Claim collateral" and the amount, which rides the spine toward the
-//       wallet at ≥sm.
+//   T1  "Claimed collateral" (rails-ops decision 0045); the amount rides the
+//       spine toward the wallet.
 //   T2  this Trove's claimable collateral going to zero, and what the claim
 //       paid in all (the pool pays the owner's whole balance, so one claim can
 //       cover several Troves), as cells; the collateral's price in the price
@@ -28,7 +28,7 @@ import { formatNum } from "@/lib/shared/format-event";
 import type { BaseActivityEvent, CollSurplusClaimContext } from "@/lib/shared/types/event-shape";
 import type { LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
 import { liquityCollSurplusClaimContent } from "@/lib/shared/learn-more-content";
-import { liquityV1ClaimLinks } from "@/lib/liquity-v1/event-templates";
+import { V1_WORDS, liquityV1ClaimLinks } from "@/lib/liquity-v1/event-templates";
 import { claimOthers } from "@/lib/shared/liquity-coll-surplus-claim";
 import {
   claimAmountProv,
@@ -201,11 +201,8 @@ export function CollSurplusClaimCard({
       number: eventNumber,
     },
     spine: { tokens: [{ symbol: d.symbol, direction: "left", value: d.amount, verb: "claimed" }], isLast: !!isLast },
-    head: {
-      label: "",
-      deltas: [{ value: d.amount, symbol: d.symbol, prov: amountProv, label: event.actionLabel, axisVerb: true }],
-    },
-    caption: event.actionLabel,
+    head: { label: V1_WORDS.claim_head, deltas: [] },
+    caption: V1_WORDS.claim_head,
     cells,
     ledgers: { none: "the claim pays out of the surplus pool, outside the Trove's flows" },
     // The collateral's price at the claim's block, from the branch's feed

@@ -250,6 +250,11 @@ words:
     redemption
   redemption_many: |-
     redemptions
+  # The head and phone caption of the surplus claim row every Liquity family
+  # draws (rails-ops decision 0045: a past participle; the amount rides the
+  # spine).
+  claim_head: |-
+    Claimed collateral
   # T2's balance sheet (ui-jobs 330): the rows an event names, the Risk and
   # Limits labels and the states a figure can be in.
   sheet_reduced: |-

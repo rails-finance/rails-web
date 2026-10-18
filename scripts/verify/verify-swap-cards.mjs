@@ -1,6 +1,7 @@
 // A position swap an Aave V3 position made through CoW Protocol or ParaSwap draws
-// ONE card: the kind's label ("Collateral swap", "Debt swap", "Repay with
-// collateral", "Withdraw and swap"), a swap mark on the spine, and "via CoW
+// ONE card: the kind's participle on the head ("Swapped collateral", "Swapped
+// debt", "Repaid with collateral", "Withdrew and swapped", "Supplied from a
+// swap"), a swap mark on the spine, and "via CoW
 // Protocol" or "via ParaSwap" with the venue's mark. The mark sits on the node where both legs stayed in the position,
 // and on the flow (a badge on the withdrawn reserve) for a withdraw and swap. The two legs it
 // merges never draw their own "to/from CoW Protocol" rows, and on the adapter
@@ -56,7 +57,9 @@ const COW_VENUE = { text: "via CoW Protocol", icon: COW_ICON };
 const PARASWAP_VENUE = { text: "via ParaSwap", icon: "/icons/protocols/paraswap.png" };
 const VENUES = [COW_VENUE, PARASWAP_VENUE];
 const SWAP_NODE = '[role="img"][aria-label="Swap"]';
-const KIND_LABEL = /Collateral swap|Debt swap|Repay with collateral|Withdraw and swap|Supply from a swap/;
+// The head's participle (rails-ops decision 0045, "Ruled since"), read off the
+// card's T1 alone: the old nouns ("Collateral swap") on the head are a failure.
+const KIND_LABEL = /Swapped collateral|Swapped debt|Repaid with collateral|Withdrew and swapped|Supplied from a swap/;
 
 const FIXTURES = [
   {
@@ -64,21 +67,21 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0x81dbec9d661cdbe17650a6cbb9098ccf3eabad5a?market=core",
     tx: "0x8a01f2c1",
     minCards: 1,
-    kind: "Collateral swap",
+    kind: "Swapped collateral",
   },
   {
     label: "aave-v3 core 0xfe28 (two permit swaps)",
     path: "/ethereum/aave-v3/0xfe28854b855ab09a47adbd893a5f580cdffc5820?market=core",
     tx: "0xc2596fc8",
     minCards: 2,
-    kind: "Collateral swap",
+    kind: "Swapped collateral",
   },
   {
     label: "aave-v3 core 0x682ef9 (adapter route)",
     path: "/ethereum/aave-v3/0x682ef980b9732fc7606d2632339fe2d8fedf1a88?market=core",
     tx: "0x9be7bbcd",
     minCards: 1,
-    kind: "Collateral swap",
+    kind: "Swapped collateral",
     // The per-order proxy that owned the Trade: never named on the page.
     neverNamed: "0xd46c",
   },
@@ -87,7 +90,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0x56b8a8dfae36edd33df91606fe4ece49e4d76ac1?market=core",
     tx: "0xaf0a493a",
     minCards: 1,
-    kind: "Debt swap",
+    kind: "Swapped debt",
     axis: "debt",
     neverNamed: "0x4545",
   },
@@ -96,7 +99,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0xfa356e93d17a5d80dc1d64e3d181009e594295fc?market=core",
     tx: "0xa3ac83ba",
     minCards: 1,
-    kind: "Repay with collateral",
+    kind: "Repaid with collateral",
     axis: "mixed",
     neverNamed: "0x51c1",
   },
@@ -105,7 +108,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0xbc8c609e7df8658dc9c494434058e6389fef3dc4?market=core",
     tx: "0x061ae6a7",
     minCards: 1,
-    kind: "Withdraw and swap",
+    kind: "Withdrew and swapped",
     mark: "flow",
   },
   {
@@ -113,7 +116,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0x650e0262d165bcfcbd6fb78cedf083089bcbee14?market=core",
     tx: "0xff98b829",
     minCards: 1,
-    kind: "Supply from a swap",
+    kind: "Supplied from a swap",
     mark: "flow",
   },
   {
@@ -121,7 +124,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0xb466d8e3e4873b43730950911fc1a7a19603ff3e?market=core",
     tx: "0x087968de",
     minCards: 1,
-    kind: "Debt swap",
+    kind: "Swapped debt",
     axis: "debt",
     venue: PARASWAP_VENUE,
     // D4: the open card's Debt side (decision 0042) stands at $18,773 before
@@ -145,7 +148,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0xf0838f0fb5daaf808cf1ebad6c09460e1701d1d7?market=core",
     tx: "0x6e28d6e4",
     minCards: 1,
-    kind: "Repay with collateral",
+    kind: "Repaid with collateral",
     axis: "mixed",
     venue: PARASWAP_VENUE,
   },
@@ -154,7 +157,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0xe72b71f97a4ceb0077e468054b788163e72abcc8?market=core",
     tx: "0xa1eee65b",
     minCards: 1,
-    kind: "Collateral swap",
+    kind: "Swapped collateral",
     venue: PARASWAP_VENUE,
   },
   {
@@ -162,7 +165,7 @@ const FIXTURES = [
     path: "/ethereum/aave-v3/0xf6b75b0475d09e4a92e4316185c383d74a9d9589?market=core",
     tx: "0x803c61bc",
     minCards: 1,
-    kind: "Withdraw and swap",
+    kind: "Withdrew and swapped",
     venue: PARASWAP_VENUE,
     mark: "flow",
     // The bought WETH has no position row: it reads from the adapter's Swapped
@@ -263,7 +266,9 @@ for (const fx of FIXTURES) {
           if (!el || el.querySelectorAll(swapNode).length !== 1) return null;
           return {
             chips: chipsIn(el),
-            label: ((el.textContent || "").match(new RegExp(kindLabel)) || [])[0] ?? null,
+            label:
+              ((el.querySelector('[data-anatomy~="T1"]')?.textContent || "").match(new RegExp(kindLabel)) || [])[0] ??
+              null,
             mark: node.getAttribute("data-swap-mark"),
             // rails-ops TO-DO-ui-jobs §19: the node glyph's axis hues, the legs stacked beside it, and
             // no disc behind it.

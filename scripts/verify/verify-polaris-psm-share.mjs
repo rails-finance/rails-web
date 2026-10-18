@@ -10,8 +10,8 @@
 //   1. the three pinned fixture touches on usdp CDP 8, usdp CDP 9's net
 //      redemption at block 11,637,899 (event 21) and usdp CDP 22's PSM-only
 //      touch at block 11,670,597: the row HEAD carries no "PSM share" label,
-//      no net and neither leg, and the holder's own verb (or the row's
-//      label) still renders; the opened card's sheet carries two "PSM share"
+//      no net and neither leg, and it opens on the holder's own act as a
+//      past participle ("Borrowed", "Added collateral", "Touched CDP"); the opened card's sheet carries two "PSM share"
 //      rows with the route's two legs, each signed; the explanation states
 //      the legs netted at the route's own price at block,
 //      mintRedeemCollGain × pethInDebt − mintRedeemDebtGain, in the debt unit,
@@ -152,15 +152,17 @@ const page8 = await open(context, polarisUrl("usdp", "8"));
 
 // ── 1. the fixture touches — no PSM figure on the head; sheet and explanation
 
+// The head opens on the holder's own act as a past participle (rails-ops
+// decision 0045; `t1_*` in content/polaris/event-prose.yaml), restated.
 const FIXTURES = [
-  { cdp: "8", block: 11603483, holderVerb: "Borrow" },
-  { cdp: "8", block: 11562362, holderVerb: "Borrow" },
-  { cdp: "8", block: 11610231, holderVerb: "Deposit" },
+  { cdp: "8", block: 11603483, holderVerb: "Borrowed" },
+  { cdp: "8", block: 11562362, holderVerb: "Borrowed" },
+  { cdp: "8", block: 11610231, holderVerb: "Added collateral" },
   // The net redemption that read "−20.772 pETH 108,803.567 USDp" on the face
   // while its sheet read −108,803.567 (ui-jobs 357 point 1).
-  { cdp: "9", block: 11637899, holderVerb: "Deposit" },
-  // A touch whose only content was a PSM share: the head keeps its label.
-  { cdp: "22", block: 11670597, holderVerb: "Adjust" },
+  { cdp: "9", block: 11637899, holderVerb: "Added collateral" },
+  // A touch whose only content was a PSM share: the head reads the docs' touch.
+  { cdp: "22", block: 11670597, holderVerb: "Touched CDP" },
 ];
 
 // The pETH leg reads to four decimals (lib/polaris/figure-format.ts), the debt to three.
@@ -270,8 +272,8 @@ for (const f of FIXTURES) {
     `${card.head.slice(0, 200)}${bad.length ? ` (found ${bad.join(", ")})` : ""}`,
   );
   check(
-    `1. usdp/${f.cdp} block ${f.block} head still shows "${f.holderVerb}"`,
-    card.head.includes(f.holderVerb),
+    `1. usdp/${f.cdp} block ${f.block} head opens on "${f.holderVerb}"`,
+    card.head.trim().startsWith(f.holderVerb),
     card.head.slice(0, 200),
   );
   const wantAmounts = [sheetSigned(mrColl(e), pethFig(mrColl(e))), sheetSigned(mrDebt(e), fmtFullLike(mrDebt(e)))];

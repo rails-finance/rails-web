@@ -40,7 +40,7 @@ import {
   type EventSheet,
 } from "@/components/shared/event-sheet";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
-import { ExplainerLeadOnTitleContext } from "@/lib/shared/explainer-prose";
+import { ExplainerLeadOnTitleContext, splitFirstSentence } from "@/lib/shared/explainer-prose";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
@@ -561,9 +561,13 @@ function EventCardView(props: EventCardProps) {
   // second. A grouped explanation's first bullet is that sentence: the pane
   // leaves it out (`ExplainerLeadOnTitleContext`). A card with no teaser
   // keeps the title the route draws.
+  // The title is the teaser's first sentence; a second sentence opens the
+  // pane, in the teaser's place.
   const leadGrouped = !!props.slots.explainer.grouped;
-  const pageSentence = pageMode && !unread ? props.slots.explainer.first : undefined;
-  const explainerTeaser = pageSentence ? undefined : teaser;
+  const pageLead = pageMode && !unread && props.slots.explainer.first != null ? props.slots.explainer.first : undefined;
+  const pageSplit = pageLead != null ? splitFirstSentence(pageLead) : null;
+  const pageSentence = pageSplit?.head;
+  const explainerTeaser = pageSplit ? (pageSplit.tail ?? undefined) : teaser;
   const head = props.slots.event ? props.slots.head : undefined;
 
   const hasDetail = hasPanel;
