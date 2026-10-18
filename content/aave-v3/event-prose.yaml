@@ -286,6 +286,60 @@ words:
     {n} more reserves
   more_reserve: |-
     one more reserve
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle, then at most one clause for what the spine cannot
+  # show, each after the middle dot. Read through the loader's head table by
+  # lib/aave-v3/head-words.ts. The spine carries the figures.
+  t1_sep: |-
+    ·
+  t1_supplied: |-
+    Supplied
+  t1_withdrew: |-
+    Withdrew
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_liquidated: |-
+    Liquidated
+  t1_written_off: |-
+    Debt written off
+  t1_fee_paid: |-
+    Liquidation fee paid
+  t1_transferred: |-
+    Transferred
+  t1_to: |-
+    to
+  t1_from: |-
+    from
+  t1_collateral_swap: |-
+    Swapped collateral
+  t1_debt_swap: |-
+    Swapped debt
+  t1_repay_with_collateral: |-
+    Repaid with collateral
+  t1_withdraw_and_swap: |-
+    Withdrew and swapped
+  t1_supply_from_swap: |-
+    Supplied from a swap
+  t1_emode: |-
+    E-mode
+  t1_emode_off: |-
+    E-mode off
+  t1_emode_category: |-
+    category
+  t1_leg_seized: |-
+    seized
+  t1_leg_repaid: |-
+    repaid
+  t1_leg_written_off: |-
+    written off
+  t1_leg_sent: |-
+    transferred out
+  t1_leg_received: |-
+    transferred in
+  t1_treasury: |-
+    Aave treasury
 
 # The event page (ui-jobs 236, 307): the side column's paragraph, the facts'
 # labels and the metadata description. {market} is the Pool's name (Core, Prime,

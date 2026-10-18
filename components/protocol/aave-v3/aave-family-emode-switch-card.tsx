@@ -2,10 +2,12 @@
 
 // An Aave V3-family account's e-mode change as a timeline row of its own: the
 // Pool's UserEModeSet log, which the page reads beside its timeline
-// (lib/aave-v3/account-switches.ts; SparkLend, Seamless). The header names the
-// new category and its limits at the switch's block; the cells state the
-// category before → after and the health factor either side, read at blocks
-// N−1 and N like every other row (ui-jobs 309).
+// (lib/aave-v3/account-switches.ts; SparkLend, Seamless). The timeline's head
+// reads "E-mode · <category>" or "E-mode off" (decision 0045,
+// lib/aave-v3/head-words.ts); the event page's card names the new category and
+// its limits at the switch's block. The cells state the category before →
+// after and the health factor either side, read at blocks N−1 and N like every
+// other row (ui-jobs 309).
 
 import type { BaseActivityEvent, EmodeSwitchFields, SparkContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
@@ -21,6 +23,11 @@ import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import type { V3PoolIdentity } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { sparkEventState } from "@/lib/spark/event-state";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { aaveFamilyEmodeWords } from "@/lib/aave-v3/head-words";
+import { V3_HEAD_WORDS } from "@/lib/aave-v3/event-templates";
+import { SPARK_HEAD_WORDS } from "@/lib/spark/event-templates";
+import { useContext } from "react";
 
 type Switch = EmodeSwitchFields;
 
@@ -154,6 +161,10 @@ export function AaveFamilyEmodeSwitchCard({
         }
       : null;
   const protocol = pool.protocol === "Seamless" ? "seamless" : /spark/i.test(pool.name) ? "spark" : "aave";
+  // The timeline's head is words; the event page's card keeps its headline.
+  const page = useContext(EventPageContext) != null;
+  const words = aaveFamilyEmodeWords(s.toId, s.toLabel, protocol === "spark" ? SPARK_HEAD_WORDS : V3_HEAD_WORDS);
+  const sep = (protocol === "spark" ? SPARK_HEAD_WORDS : V3_HEAD_WORDS).sep;
 
   const slots: EventCardSlots = {
     event: {
@@ -165,16 +176,28 @@ export function AaveFamilyEmodeSwitchCard({
       number: eventNumber,
     },
     spine: { icon: "rate-change", iconDirection: entering ? "up" : "down", isLast: !!isLast },
-    head: {
-      label: "E-mode",
-      deltas: [],
-      note: (
-        <span data-emode-switch="">
-          <Prov info={switchProv(s, coords, pool)}>{headline(s)}</Prov>
-        </span>
-      ),
-    },
-    caption: "E-mode",
+    head: page
+      ? {
+          label: "E-mode",
+          deltas: [],
+          note: (
+            <span data-emode-switch="">
+              <Prov info={switchProv(s, coords, pool)}>{headline(s)}</Prov>
+            </span>
+          ),
+        }
+      : {
+          label: words.kind,
+          deltas: [],
+          clauses: words.category
+            ? [
+                <span key="category" data-emode-switch="">
+                  <Prov info={switchProv(s, coords, pool)}>{words.category}</Prov>
+                </span>,
+              ]
+            : undefined,
+        },
+    caption: page ? "E-mode" : words.category ? `${words.kind} ${sep} ${words.category}` : words.kind,
     cells: hfCell ? [emodeCell, hfCell] : [emodeCell],
     ledgers: { none: "an e-mode switch moves no reserve" },
     notes:

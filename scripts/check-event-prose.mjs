@@ -234,6 +234,7 @@ const FAMILIES = {
       "components/protocol/spark/spark-event-explainer.tsx",
       "components/protocol/spark/spark-position-explanation.tsx",
       "lib/spark/explorer.ts",
+      "components/protocol/spark/spark-event-header.tsx",
     ],
     nodes: {
       section: "position_words",
@@ -247,6 +248,7 @@ const FAMILIES = {
       "lib/spark/position-nodes.tsx",
       "components/protocol/spark/spark-event-explainer.tsx",
       "components/protocol/spark/spark-event-card.tsx",
+      "lib/aave-v3/head-words.ts",
     ],
   },
   polaris: {
@@ -315,6 +317,7 @@ const FAMILIES = {
       "lib/aave-v3/event-state.ts",
       "lib/aave-v3/position-nodes.tsx",
       "components/protocol/aave-v3/aave-v3-event-explainer.tsx",
+      "lib/aave-v3/head-words.ts",
     ],
   },
   makerdao: {

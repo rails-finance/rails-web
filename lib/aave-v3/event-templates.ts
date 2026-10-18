@@ -7,6 +7,7 @@
 // prose writer cannot see (`pnpm check:prose` fails on one).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { AaveFamilyHeadTable } from "@/lib/aave-v3/head-words";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
 import type { ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { AaveV3EchoKey } from "@/lib/aave-v3/event-prose";
@@ -47,6 +48,37 @@ export const PROSE = eventProseEngine<AaveV3L5Key, AaveV3EchoKey>(FILE, { doc: F
 
 /** Words the generator and the position explanation put into a sentence. */
 export const V3_WORDS = FILE.words;
+
+/** The timeline head's words (lib/aave-v3/head-words.ts). */
+export const V3_HEAD_WORDS: AaveFamilyHeadTable = {
+  sep: V3_WORDS.t1_sep,
+  supplied: V3_WORDS.t1_supplied,
+  withdrew: V3_WORDS.t1_withdrew,
+  borrowed: V3_WORDS.t1_borrowed,
+  repaid: V3_WORDS.t1_repaid,
+  liquidated: V3_WORDS.t1_liquidated,
+  writtenOff: V3_WORDS.t1_written_off,
+  feePaid: V3_WORDS.t1_fee_paid,
+  transferred: V3_WORDS.t1_transferred,
+  to: V3_WORDS.t1_to,
+  from: V3_WORDS.t1_from,
+  swap: {
+    collateral_swap: V3_WORDS.t1_collateral_swap,
+    debt_swap: V3_WORDS.t1_debt_swap,
+    repay_with_collateral: V3_WORDS.t1_repay_with_collateral,
+    withdraw_and_swap: V3_WORDS.t1_withdraw_and_swap,
+    supply_from_swap: V3_WORDS.t1_supply_from_swap,
+  },
+  emode: V3_WORDS.t1_emode,
+  emodeOff: V3_WORDS.t1_emode_off,
+  emodeCategory: V3_WORDS.t1_emode_category,
+  legSeized: V3_WORDS.t1_leg_seized,
+  legRepaid: V3_WORDS.t1_leg_repaid,
+  legWrittenOff: V3_WORDS.t1_leg_written_off,
+  legSent: V3_WORDS.t1_leg_sent,
+  legReceived: V3_WORDS.t1_leg_received,
+  treasury: V3_WORDS.t1_treasury,
+};
 
 /** The event page's side column: the paragraph, the facts' labels and the
  *  metadata description. */

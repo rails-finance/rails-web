@@ -1,12 +1,22 @@
 "use client";
 
 // SparkLend event head (T1): the card's `head` slot, drawn by the shared
-// ChainTruthRow. Maps the signed amount(s) this event moved into the shared row
-// spec, each traced via <Prov>.
+// ChainTruthRow.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`aaveFamilyT1Kind`, lib/aave-v3/head-words.ts), a
+// transfer's counterparty as its clause, and the chips for what the spine
+// cannot show: the WETH gateway, the treasury, the "by" party. The spine
+// carries the figures.
+//
+// The event page's card (mode "title") maps the signed amount(s) this event
+// moved into the shared row spec, each traced via <Prov>.
 
 import type { AssetFlow, SparkContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { aaveFamilyT1Caption, aaveFamilyT1Kind } from "@/lib/aave-v3/head-words";
+import { SPARK_HEAD_WORDS, SPARK_WORDS } from "@/lib/spark/event-templates";
 import {
   assetsDeltaProv,
   seizedCollateralProv,
@@ -43,6 +53,23 @@ export interface SparkEventHeaderProps {
   /** Set on a fee transfer: the liquidation it belongs to, among the
    *  transaction's rows (lib/spark/liquidation-fee.ts). */
   feeOf?: SparkContext;
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
+}
+
+/** The timeline head's words as one line: the phone caption and the row's
+ *  accessible name. */
+export function sparkT1Caption(ctx: SparkContext, feeOf?: SparkContext): string {
+  const gateway = !feeOf && isGatewayWithdrawal(ctx);
+  const kind = aaveFamilyT1Kind({ eventType: ctx.eventType, fee: !!feeOf, gateway }, SPARK_HEAD_WORDS);
+  const transfer = !feeOf && !gateway && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
+  if (!transfer || !ctx.counterparty) return kind;
+  return aaveFamilyT1Caption(kind, SPARK_HEAD_WORDS, {
+    lead: ctx.eventType === "transfer_out" ? SPARK_HEAD_WORDS.to : SPARK_HEAD_WORDS.from,
+    address: ctx.counterparty,
+    name: getProtocolContract(ctx.counterparty, MAINNET_CHAIN_ID)?.name,
+  });
 }
 
 /** The row's head spec. */
@@ -55,6 +82,7 @@ export function sparkHeadSpec({
   wallet,
   flows,
   feeOf,
+  mode = "title",
 }: SparkEventHeaderProps): ChainTruthRowSpec {
   const coords: SparkCoords = { txHash, blockNumber };
   const deltas: ChainTruthDelta[] = [];
@@ -68,7 +96,7 @@ export function sparkHeadSpec({
         address: soleFlowAddress(flows, ctx.collateralSymbol),
         prov: seizedCollateralProv(ctx.collateralSymbol, coords),
         // The pair reads as collateral taken and debt repaid.
-        label: "Collateral",
+        label: SPARK_WORDS.t1_title_collateral,
       });
     const debt = Number(ctx.debtDelta ?? "0") || 0;
     if (debt !== 0)
@@ -77,7 +105,7 @@ export function sparkHeadSpec({
         symbol: ctx.reserveSymbol,
         address: soleFlowAddress(flows, ctx.reserveSymbol),
         prov: debtRepaidProv(ctx.reserveSymbol, coords),
-        label: "Debt",
+        label: SPARK_WORDS.t1_title_debt,
       });
   } else {
     const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
@@ -114,7 +142,7 @@ export function sparkHeadSpec({
     ? {
         prefix: "as ETH via",
         address: SPARK_WETH_GATEWAY,
-        name: "Spark WETH gateway",
+        name: SPARK_HEAD_WORDS.gatewayName,
         prov: gatewayCallerProv(ctx.eventType, coords, SPARK_WETH_GATEWAY),
         ens: false,
       }
@@ -122,7 +150,9 @@ export function sparkHeadSpec({
       ? {
           prefix: viaGateway ? "as ETH via" : transferOut ? "to" : "from",
           address: ctx.counterparty,
-          name: feeOf ? "Spark treasury" : (named?.name ?? (viaGateway ? "Spark WETH gateway" : undefined)),
+          name: feeOf
+            ? SPARK_HEAD_WORDS.treasury
+            : (named?.name ?? (viaGateway ? SPARK_HEAD_WORDS.gatewayName : undefined)),
           icon: feeOf
             ? protocolIconSrc("spark")
             : named?.protocolIcon
@@ -133,6 +163,28 @@ export function sparkHeadSpec({
         }
       : undefined;
 
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.poolCaller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
+            coords,
+          ),
+        }
+      : undefined;
+
+  if (mode === "row")
+    return {
+      label: aaveFamilyT1Kind({ eventType: ctx.eventType, fee: !!feeOf, gateway: viaGateway }, SPARK_HEAD_WORDS),
+      critical: ctx.eventType === "liquidation",
+      deltas: [],
+      // A transfer's counterparty is the clause after "Transferred".
+      clauses: isTransferRow && party ? [<PartyChip key="party" party={party} />] : undefined,
+      party: isTransferRow ? undefined : party,
+      externalActor,
+    };
+
   return {
     label,
     critical: ctx.eventType === "liquidation",
@@ -141,15 +193,6 @@ export function sparkHeadSpec({
     custody: isTransferRow,
     deltas,
     party,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.poolCaller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
-              coords,
-            ),
-          }
-        : undefined,
+    externalActor,
   };
 }

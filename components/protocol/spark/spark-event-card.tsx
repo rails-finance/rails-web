@@ -9,16 +9,17 @@
 import type { BaseActivityEvent, SparkContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type SparkCoords } from "@/lib/spark/event-provenance";
-import { SPARK_WORDS } from "@/lib/spark/event-templates";
-import { sparkHeadSpec } from "./spark-event-header";
+import { SPARK_HEAD_WORDS, SPARK_WORDS } from "@/lib/spark/event-templates";
+import { sparkHeadSpec, sparkT1Caption } from "./spark-event-header";
 import { useSparkEventBody } from "./spark-event-detail";
 import { SparkEventExplainer, sparkLearnMoreContent } from "./spark-event-explainer";
 import { AaveFamilyLedgers } from "@/components/protocol/aave-v3/aave-family-cells";
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useState } from "react";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import type { AaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
@@ -41,8 +42,8 @@ export interface SparkEventCardProps {
 // direction "right" = token moves toward the protocol (deposit / repay),
 // "left" = toward the wallet (withdraw / borrow). A transfer is neither — the
 // spToken changed hands, nothing entered or left the Pool — so it has no entry
-// here: the row draws the reserve with the custody badge and no flank, and
-// the header carries the amount and the counterparty.
+// here: the row draws the reserve with the custody badge, its amount on the
+// flank the position's balance moved by.
 const DIRECTION: Record<
   Exclude<SparkContext["eventType"], "transfer_in" | "transfer_out" | "emode">,
   "right" | "left"
@@ -100,10 +101,9 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
   // with the reserve list. One flow per symbol or nothing — a shared symbol
   // resolved by picking a flow would be the original mistake, one level down.
   //
-  // A transfer is a custody move: the token's icon wears the paper-plane badge
-  // and neither flank is drawn — the two flanks are "out to the wallet" and
-  // "into the protocol", and a transfer to another account is neither. The
-  // header states the amount and the to/from counterparty.
+  // A transfer is a custody move: the token's icon wears the paper-plane
+  // badge, its amount on the flank the position's balance moved by, out to the
+  // left or in to the right; the head's clause names the counterparty.
   const tokens =
     isLiq || mag === 0
       ? undefined
@@ -113,6 +113,11 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
               symbol: ctx.reserveSymbol,
               address: soleFlowAddress(event.flows, ctx.reserveSymbol),
               badge: "send" as const,
+              direction: kind === "transfer_out" ? ("left" as const) : ("right" as const),
+              value: mag,
+              unit: ctx.reserveSymbol,
+              fullValue: true,
+              verb: kind === "transfer_out" ? SPARK_HEAD_WORDS.legSent : SPARK_HEAD_WORDS.legReceived,
             },
           ]
         : [
@@ -126,8 +131,27 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
             },
           ];
 
+  // A liquidation's legs, the collateral seized below the debt repaid: the
+  // warning node's flank carries them.
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!isLiq) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    const coll = Math.abs(Number(ctx.assetsDelta)) || 0;
+    if (coll !== 0 && ctx.collateralSymbol)
+      legs.push({
+        label: SPARK_HEAD_WORDS.legSeized,
+        value: coll,
+        symbol: ctx.collateralSymbol,
+        address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+      });
+    const debt = Math.abs(Number(ctx.debtDelta ?? "0")) || 0;
+    if (debt !== 0)
+      legs.push({ label: SPARK_HEAD_WORDS.legRepaid, value: debt, symbol: ctx.reserveSymbol, address: reserveAddress });
+    return legs;
+  })();
+
   const spine: SpineColumnProps = isLiq
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   // The reads start when the card first opens.
@@ -147,6 +171,9 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
     label: event.actionLabel,
   });
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -158,6 +185,7 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
     },
     spine,
     head: sparkHeadSpec({
+      mode: page ? "title" : "row",
       actionLabel: event.actionLabel,
       ctx,
       txHash: event.txHash,
@@ -167,7 +195,7 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
       flows: event.flows,
       feeOf,
     }),
-    caption: event.actionLabel,
+    caption: page ? event.actionLabel : sparkT1Caption(ctx, feeOf),
     // A transfer received: the sender acted (ui-jobs 304).
     actor: { by: extBy ?? undefined, byOwner: isTransfer && kind === "transfer_in" ? false : undefined },
     cells: body.cells,
