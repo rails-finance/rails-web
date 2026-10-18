@@ -110,16 +110,16 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     });
   }
 
-  // The spine's row order (rails-ops reference/shared-event-card-spec.md,
-  // Miles 18 Oct 2026): read bottom to top in the order the acts happen,
-  // what leaves the position above what enters it; on one direction the
-  // debt above the collateral. Drawn top to bottom: open → debt out,
-  // collateral in, escrow in; close → collateral out, escrow out, debt in.
-  const OUT_ORDER = ["debt", "coll", "escrow"] as const;
-  const IN_ORDER = ["debt", "coll", "escrow"] as const;
-  const rank = (l: Leg) =>
-    l.row.direction === "left" ? OUT_ORDER.indexOf(l.kind) : OUT_ORDER.length + IN_ORDER.indexOf(l.kind);
-  const tokens: SpineTokenRow[] = [...legs].sort((a, b) => rank(a) - rank(b)).map((l) => l.row);
+  // The spine orders the rows itself (rails-ops reference/shared-event-card-spec.md,
+  // "Spine order"): what enters the position below what leaves it, and among
+  // rows going one way the card's first row lowest. The card hands them in the
+  // family's order, escrow, collateral, debt, so the escrow sits beneath the
+  // collateral and the collateral beneath the debt. Drawn top to bottom: open →
+  // debt out, collateral in, escrow in; close → collateral out, escrow out, debt in.
+  const FAMILY_ORDER = ["escrow", "coll", "debt"] as const;
+  const tokens: SpineTokenRow[] = [...legs]
+    .sort((a, b) => FAMILY_ORDER.indexOf(a.kind) - FAMILY_ORDER.indexOf(b.kind))
+    .map((l) => l.row);
 
   const spine: SpineColumnProps =
     ctx.eventType === "liquidate"
