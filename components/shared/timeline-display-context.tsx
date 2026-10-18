@@ -36,10 +36,10 @@ export interface TimelineDisplayState {
    *  Off by default. Set through the page's flow-focus store, which the
    *  timeline and the chart share (`useFollowPreference`). */
   followChart: boolean;
-  /** "Figures first" in Display (ui-jobs 370): an opened timeline card opens on
-   *  its Figures tab in place of its Explanation. Off by default. Clicking
-   *  either tab on any card sets it, so every opened card follows the last
-   *  choice. The event page stands both open and ignores it. */
+  /** "Figures first" in Display (ui-jobs 370): the default tab an opened
+   *  timeline card opens on, Figures in place of Explanation. Off by default.
+   *  A tab clicked on a card changes that card alone; changing this resets
+   *  every opened card to it. The event page stands both open and ignores it. */
   figuresFirst: boolean;
   toggle: (key: TimelineDisplayKey) => void;
   set: (key: TimelineDisplayKey, value: boolean) => void;

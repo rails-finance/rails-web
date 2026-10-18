@@ -490,9 +490,14 @@ function EventCardView(props: EventCardProps) {
   // its share path; a card outside a timeline falls back to the card's key.
   const scopeId = eventIdFromShareHref(shareHref) ?? cardId;
   const lit = useProvScopeLit(scopeId);
-  // The opened timeline card's tab (ui-jobs 370): the Display preference, set
-  // by a click on either tab of any card.
-  const { figuresFirst, set: setDisplay } = useTimelineDisplay();
+  // The opened timeline card's tab (ui-jobs 370): each card keeps its own,
+  // opening on the Display preference's default and reset to it when the
+  // preference changes.
+  const { figuresFirst } = useTimelineDisplay();
+  const [openTab, setOpenTab] = useState<CardTab>(figuresFirst ? "figures" : "explanation");
+  useEffect(() => {
+    setOpenTab(figuresFirst ? "figures" : "explanation");
+  }, [figuresFirst]);
 
   // Restore persisted open state after mount (SSR-safe — no hydration mismatch:
   // first render is always closed, matching the server, then this opens it).
@@ -571,10 +576,10 @@ function EventCardView(props: EventCardProps) {
   const footerNode = txHash ? <EventCardFooter learnMore={learnMore} /> : undefined;
   const hasFigures = hasPanel || hasPriceRow(price);
   const tabbed = !pageMode && hasExplainer && hasFigures;
-  const openTab: CardTab = figuresFirst ? "figures" : "explanation";
-  // The explanation, with the Learn more "?" at its end.
+  // The explanation, with the Learn more "?" at its end. The strip and the
+  // explanation start on the head's text (its `pl-5`).
   const explanationRegion = hasExplainer ? (
-    <div className="px-4 pb-1" data-anatomy="T3" data-prov-exempt="">
+    <div className="pb-1 pl-5 pr-4" data-anatomy="T3" data-prov-exempt="">
       <div className="pb-3 pt-4 text-sm">{explanationNode}</div>
       {footerNode}
     </div>
@@ -784,11 +789,11 @@ function EventCardView(props: EventCardProps) {
 
       {tabbed && (
         <CardTabStrip
-          className="px-4 pt-3"
+          className="pl-5 pr-4 pt-3"
           idBase={domId}
           tabs={CARD_TABS}
           openTab={openTab}
-          onOpenTabChange={(key) => setDisplay("figuresFirst", key === "figures")}
+          onOpenTabChange={(key) => setOpenTab(key as CardTab)}
         />
       )}
       {tabbed ? (
