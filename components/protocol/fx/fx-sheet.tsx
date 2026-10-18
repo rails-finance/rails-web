@@ -43,6 +43,7 @@ import {
   poolLineProv,
   rowChangeProv,
   rowStateProv,
+  chainAfterProv,
   snapOraclePriceProv,
   type FxCoords,
 } from "@/lib/fx/event-provenance";
@@ -64,7 +65,7 @@ const TIPS = {
     "The collateral given up to a redeemer from the position's tick, the pool's balance before less the balance after.",
   collLiquidation:
     "The collateral a keeper took from the position, the pool's balance before less the balance after, bonus included.",
-  collTotal: "The collateral held after this event, in dollars at the oracle's price at this block.",
+  collTotal: "The collateral held after this event, and its dollars at the oracle's price at this block.",
   collLast: "The collateral the position held after its previous event, in dollars at the oracle's price then.",
   collMoved:
     "The collateral the pool moved on this position since the previous event, through funding and rebalances, at the oracle's price at this block.",
@@ -375,6 +376,15 @@ export function useFxSheet({
       collAfterUsd != null
         ? { text: collAfter > 0 ? sheetUsd(collAfterUsd) : "$0", info: priceProv }
         : { none: UNREAD },
+    totalAmount: {
+      text: formatNumber(collAfter),
+      symbol: normalizedSymbol,
+      address: collAddress,
+      info: read
+        ? rowStateProv("coll", "after", normalizedSymbol, coords)
+        : chainAfterProv("coll", normalizedSymbol, coords),
+      value: formatExact(collAfter),
+    },
     totalTip: TIPS.collTotal,
   };
 
@@ -473,6 +483,15 @@ export function useFxSheet({
     total: {
       text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
       info: faceProv("The debt after this event", coords),
+    },
+    totalAmount: {
+      text: formatNumber(debtAfter),
+      symbol: FXUSD_META.symbol,
+      address: FXUSD_META.address,
+      info: read
+        ? rowStateProv("debt", "after", normalizedSymbol, coords)
+        : chainAfterProv("debt", normalizedSymbol, coords),
+      value: formatExact(debtAfter),
     },
     totalTip: TIPS.debtTotal,
   };

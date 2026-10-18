@@ -328,7 +328,7 @@ words:
   tip_escrow_returned: |-
     The escrow the close sent back to the holder, in the same pETH transfer as the collateral.
   tip_escrow_total: |-
-    The escrow the CDP holds after this event, in dollars at this block's pETH price.
+    The escrow the CDP holds after this event in pETH, and in dollars at this block's pETH price.
   spine_escrow_sent: |-
     gas compensation escrow sent
   spine_escrow_returned: |-

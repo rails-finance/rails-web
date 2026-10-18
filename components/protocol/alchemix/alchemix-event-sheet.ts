@@ -22,6 +22,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import {
+  SHEET_NO_USD,
   SHEET_WORDS,
   sheetUsd,
   type EventSheet,
@@ -92,7 +93,7 @@ const TIPS = {
   set_aside:
     "The part of the debt earmarked for the line's redemptions, read from the Alchemist at this block; a redemption pays it down.",
   coll_total: (under: string, usd: boolean) =>
-    `The vault shares held after this event, valued in ${under} at the share price read at this block${usd ? `, then at ${under}'s price now` : ""}.`,
+    `The vault shares held after this event, and their worth in ${under} at the share price read at this block${usd ? `, then at ${under}'s price now` : ""}.`,
   debt_total: (sym: string, face: boolean) =>
     `The debt after this event, read from the Alchemist at this block${face ? `, at the ${sym}'s $1 face` : ""}.`,
   ltv: (under: string) =>
@@ -519,7 +520,9 @@ export function alchemixSheet({
   // ── Totals ──
   const collTotal: SheetSide["total"] =
     collAfter === ZERO
-      ? { text: face ? "$0" : `0 ${mytSymbol}`, info: reading("Collateral", mytSymbol, state.collateralRaw) }
+      ? face
+        ? { text: "$0", info: reading("Collateral", mytSymbol, state.collateralRaw) }
+        : SHEET_NO_USD
       : sp == null
         ? { none: WORDS.no_price }
         : usdNow != null && unit
@@ -537,15 +540,14 @@ export function alchemixSheet({
                 coords,
               ),
             };
-  const debtTotal: SheetSide["total"] =
-    debtAfter === ZERO
-      ? { text: face ? "$0" : `0 ${sym}`, info: reading("Debt", sym, state.debtRaw) }
-      : face
-        ? {
-            text: sheetUsd(units(debtAfter)),
-            info: faceProv("Debt after this event", sym, formatUnitsExact(state.debtRaw, DECIMALS)),
-          }
-        : { text: `${fmtPositionAmount(units(debtAfter))} ${sym}`, info: reading("Debt", sym, state.debtRaw) };
+  const debtTotal: SheetSide["total"] = !face
+    ? SHEET_NO_USD
+    : debtAfter === ZERO
+      ? { text: "$0", info: reading("Debt", sym, state.debtRaw) }
+      : {
+          text: sheetUsd(units(debtAfter)),
+          info: faceProv("Debt after this event", sym, formatUnitsExact(state.debtRaw, DECIMALS)),
+        };
 
   // Set-aside: part of the debt, stated at this block alone (decisions/0032).
   const setAside: SheetRow[] =
@@ -575,6 +577,12 @@ export function alchemixSheet({
       before: collCarry.length > 0 ? collBefore : undefined,
       rows: collRows,
       total: collTotal,
+      totalAmount: {
+        text: fmtPositionAmount(units(collAfter)),
+        symbol: mytSymbol,
+        info: reading("Collateral", mytSymbol, state.collateralRaw),
+        value: formatUnitsExact(state.collateralRaw, DECIMALS),
+      },
       totalTip: TIPS.coll_total(under, usdNow != null),
     },
     {
@@ -585,6 +593,13 @@ export function alchemixSheet({
       rows: debtRows,
       assets: setAside,
       total: debtTotal,
+      totalAmount: {
+        text: fmtPositionAmount(units(debtAfter)),
+        symbol: sym,
+        address: syntheticAddress,
+        info: reading("Debt", sym, state.debtRaw),
+        value: formatUnitsExact(state.debtRaw, DECIMALS),
+      },
       totalTip: TIPS.debt_total(sym, face),
     },
   ];

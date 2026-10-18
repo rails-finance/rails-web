@@ -26,6 +26,10 @@
 // one value column is drawn, the asset figure or the USD, picked by the
 // asset | USD switch at the other end of that row; a row with no figure in the picked
 // column draws the other.
+//
+// A side holding one asset after the event states its amount on the total line
+// (`SheetSide.totalAmount`), and the carry layer draws "Before this event" only
+// where it adds something to "Last event": decision 0042, points 9 and 10.
 
 import { useState, type ReactNode } from "react";
 import { HeadingTip } from "@/components/shared/tip-label";
@@ -90,8 +94,13 @@ export interface SheetSide {
   /** With the breakdown on, the assets the side once held and holds none of. */
   repaid?: string[];
   /** The side's total after the event, in dollars; `none` names why there is
-   *  none. */
+   *  none (`SHEET_NO_USD` where the family states no dollar). */
   total: SheetFigure | { none: string };
+  /** The total's asset figure, drawn in the asset column of the total line
+   *  with the breakdown on or off, where the side holds one asset after the
+   *  event (a closed side: its 0). Unset where it holds several (the
+   *  breakdown's `assets` state them) or the page does not carry the amount. */
+  totalAmount?: SheetRow["amount"];
   /** The total line's words where the side has no rows; unset, "Not changed
    *  by this event" (a moment's card: "No events this day"). */
   untouched?: string;
@@ -146,6 +155,10 @@ export const SHEET_WORDS = {
   before: "Before this event",
 };
 
+/** The total line's USD cell on a family whose page carries no dollar
+ *  (Morpho, Fluid): its total states the amount in the asset column. */
+export const SHEET_NO_USD = { none: "" };
+
 /** Dollars as the sheet prints them: cents under $10, whole dollars above;
  *  `signed` puts "+" on a gain (a loss always reads "−"). */
 export function sheetUsd(v: number, signed = false): string {
@@ -197,7 +210,10 @@ const nameOf = (label: ReactNode, key: string) => (typeof label === "string" ? l
  *  label and one value column. */
 const GRID = "grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4";
 const SUB = "col-span-full grid grid-cols-subgrid";
-const USD_RULE = "border-l border-rb-300 pl-4 dark:border-rb-600";
+/** The USD column's rule; a side with no dollar figure (`SHEET_NO_USD`) draws
+ *  none. */
+const USD_RULE =
+  "border-l border-rb-300 pl-4 dark:border-rb-600 group-data-[sheet-usd=none]/side:border-l-0 group-data-[sheet-usd=none]/side:pl-0";
 /** The breakdown's tint. */
 const TINT = "bg-raised";
 
@@ -291,11 +307,44 @@ function Row({
   );
 }
 
+/** The same figure on two rows: the exact values where both carry one, else
+ *  the text. */
+const sameFigure = (a?: SheetFigure, b?: SheetFigure) =>
+  a != null &&
+  b != null &&
+  (a.value != null && b.value != null ? a.value === b.value : typeof a.text === "string" && a.text === b.text);
+
+/** "Before this event" as drawn (decision 0042, point 10): none where the
+ *  carry holds "Last event" alone; its dollars alone where its amount repeats
+ *  "Last event"'s. */
+function beforeShown(s: SheetSide): SheetRow | undefined {
+  if (!s.before) return undefined;
+  const last = s.carry.find((r) => r.key === "last");
+  if (last && s.carry.length === 1 && !last.sub?.length) return undefined;
+  return last && sameFigure(last.amount, s.before.amount) && s.before.usd
+    ? { ...s.before, amount: undefined }
+    : s.before;
+}
+
 function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; col: Col }) {
   const touched = s.rows.length > 0;
-  const carry = breakdown && (s.carry.length > 0 || s.before);
+  const before = beforeShown(s);
+  const carry = breakdown && (s.carry.length > 0 || before);
   const listed = breakdown && ((s.assets?.length ?? 0) > 0 || (s.repaid?.length ?? 0) > 0);
   const name = s.name ?? (s.side === "collateral" ? WORDS.collateral : WORDS.debt);
+  const totalAmount: SheetRow | undefined = s.totalAmount && { key: "total", label: "", amount: s.totalAmount };
+  const noUsd =
+    "none" in s.total &&
+    !s.total.none &&
+    [
+      ...s.carry,
+      ...s.carry.flatMap((r) => r.sub ?? []),
+      ...(s.before ? [s.before] : []),
+      ...s.rows,
+      ...(s.assets ?? []),
+    ].every((r) => !r.usd);
+  // Under 640px the total line follows the column switch as the rows do.
+  const phoneAmount = totalAmount != null && (col === "tokens" || "none" in s.total);
   return (
     <section
       className="min-w-0 rounded-xl bg-background px-4 pb-2 pt-3 text-sm"
@@ -312,10 +361,13 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
         </h3>
         {s.icons.length > 0 && <InlineAssetCluster symbols={s.icons} size={16} overlap={5} max={4} />}
       </div>
-      <div className={GRID}>
+      <div className={`${GRID} group/side`} data-sheet-usd={noUsd ? "none" : undefined}>
         {carry && (
           <>
-            <div className={`${SUB} ${TINT} -mx-2 rounded-t-md px-2`} data-sheet-layer="carry">
+            <div
+              className={`${SUB} ${TINT} -mx-2 ${before ? "rounded-t-md" : "rounded-md"} px-2`}
+              data-sheet-layer="carry"
+            >
               {s.carry.map((r) => (
                 <div key={r.key} className="contents">
                   <Row r={r} tone={r.key === "last" ? "muted" : "plain"} col={col} />
@@ -325,11 +377,11 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
                 </div>
               ))}
             </div>
-            {s.before && (
+            {before && (
               <div
                 className={`${SUB} ${TINT} -mx-2 rounded-b-md border-t border-dashed border-rb-300 px-2 dark:border-rb-600`}
               >
-                <Row r={s.before} tone="muted" col={col} pad="py-2" />
+                <Row r={before} tone="muted" col={col} pad="py-2" />
               </div>
             )}
           </>
@@ -371,9 +423,14 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
               name={WORDS.total(name)}
             />
           </span>
-          <span className="py-2 max-sm:hidden" />
           <span
-            className={`whitespace-nowrap py-2 text-right text-base font-semibold tabular-nums text-foreground ${USD_RULE} max-sm:border-l-0 max-sm:pl-0`}
+            className="self-center py-2 text-right text-base font-semibold tabular-nums text-foreground max-sm:hidden"
+            data-sheet-col="amount"
+          >
+            {totalAmount && <AmountCell r={totalAmount} />}
+          </span>
+          <span
+            className={`whitespace-nowrap py-2 text-right text-base font-semibold tabular-nums text-foreground ${USD_RULE} max-sm:border-l-0 max-sm:pl-0 ${phoneAmount ? "max-sm:hidden" : ""}`}
             role="group"
             aria-label={`${name} total`}
           >
@@ -383,6 +440,14 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
               <Fig f={s.total} />
             )}
           </span>
+          {phoneAmount && totalAmount && (
+            <span
+              className="self-center whitespace-nowrap py-2 text-right text-base font-semibold tabular-nums text-foreground sm:hidden"
+              data-sheet-col="phone"
+            >
+              <AmountCell r={totalAmount} />
+            </span>
+          )}
         </div>
       </div>
     </section>

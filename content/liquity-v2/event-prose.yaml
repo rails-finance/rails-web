@@ -536,7 +536,7 @@ L2_words:
   tip_coll_redistribution: |-
     The {coll_symbol} that liquidated Troves passed to this one, applied at this event, from the TroveManager's log.
   tip_coll_total: |-
-    The Trove's collateral after this event in dollars: its {coll_symbol} from the TroveManager's log times Liquity's {coll_symbol} price at this block.
+    The Trove's {coll_symbol} after this event, from the TroveManager's log, and its dollars at Liquity's {coll_symbol} price at this block.
   tip_debt_last: |-
     The Trove's debt after its previous event, from the TroveManager's log, at $1 per {debt_symbol}.
   tip_debt_interest: |-

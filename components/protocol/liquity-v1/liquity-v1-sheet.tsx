@@ -195,6 +195,11 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
               info: collUsdAtBlockProv(coords, { coll: ctx.collAfter, priceUsd: price, side: "after" }),
             }
           : { none: V1_WORDS.sheet_no_price },
+    totalAmount: {
+      text: fmtEth(s.collAfter <= EPS ? 0 : s.collAfter),
+      symbol: COLLATERAL_SYMBOL,
+      info: collAfterProv(coords),
+    },
     totalTip: V1_WORDS.tip_coll_total,
   };
 
@@ -286,6 +291,12 @@ export function useLiquityV1Sheet({ ctx, txHash, blockNumber, wallet, active }: 
     total: {
       text: s.debtAfter > EPS ? sheetUsd(s.debtAfter) : "$0",
       info: s.debtAfter > EPS ? faceUsdProv(DEBT_SYMBOL, fmtLusd(s.debtAfter), "after") : debtAfterProv(coords),
+    },
+    totalAmount: {
+      text: fmtLusd(s.debtAfter > EPS ? s.debtAfter : 0),
+      symbol: DEBT_SYMBOL,
+      address: LUSD,
+      info: debtAfterProv(coords),
     },
     totalTip: V1_WORDS.tip_debt_total,
   };

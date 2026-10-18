@@ -5,7 +5,7 @@
 // (lib/morpho/use-market-at-block.ts).
 //
 // One collateral and one loan token per market, and no dollar on the page:
-// each row and total states its token. Collateral: the event's row, the
+// each row and total states its token in the asset column. Collateral: the event's row, the
 // collateral before it, the total after. Debt: the debt at the previous event,
 // the interest since, the debt before, the event's row, the total after (the
 // Base sweep carries principal alone: the before and the total). Risk: the LTV
@@ -19,6 +19,7 @@
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import {
+  SHEET_NO_USD as NO_USD,
   SHEET_WORDS,
   type EventSheet,
   type SheetRow,
@@ -235,14 +236,17 @@ export function morphoSheet({ ctx, coords, flows, label, read, move }: MorphoShe
           }
         : undefined,
     rows: collRows,
-    total:
+    total: ctx.collateralAfter != null ? NO_USD : { none: MORPHO_WORDS.sheet_not_loaded },
+    totalAmount:
       ctx.collateralAfter != null
         ? {
-            text: `${fmtMorphoAmount(ctx.collateralAfter)} ${collSym}`,
+            text: fmtMorphoAmount(ctx.collateralAfter),
+            symbol: collSym,
+            address: collAddr,
             info: collateralAfterProv(collSym, coords),
             value: ctx.collateralAfter,
           }
-        : { none: MORPHO_WORDS.sheet_not_loaded },
+        : undefined,
     totalTip: fillText(MORPHO_WORDS.tip_coll_total, { symbol: collSym }),
   };
 
@@ -472,7 +476,8 @@ function owedSide(
           }
         : undefined,
     rows,
-    total: { text: `${fmtMorphoAmount(after)} ${sym}`, info: debtAfterProv(sym, coords), value: after },
+    total: NO_USD,
+    totalAmount: amount(fmtMorphoAmount(after), debtAfterProv(sym, coords), after),
     totalTip: fillText(MORPHO_WORDS.tip_debt_total, { symbol: sym }),
   };
 }
@@ -524,10 +529,17 @@ function borrowedSide(
           },
         ]
       : [],
-    total:
+    total: after != null ? NO_USD : { none: MORPHO_WORDS.sheet_not_loaded },
+    totalAmount:
       after != null
-        ? { text: `${fmtMorphoAmount(after)} ${sym}`, info: borrowedAfterProv(sym, coords), value: after }
-        : { none: MORPHO_WORDS.sheet_not_loaded },
+        ? {
+            text: fmtMorphoAmount(after),
+            symbol: sym,
+            address: addr,
+            info: borrowedAfterProv(sym, coords),
+            value: after,
+          }
+        : undefined,
     totalTip: fillText(MORPHO_WORDS.tip_borrowed_total, { symbol: sym }),
   };
 }
@@ -580,7 +592,8 @@ function suppliedSide(ctx: MorphoContext, coords: MorphoCoords, label: string, a
           tip: MORPHO_WORDS.tip_supply_event,
         },
       ],
-      total: { text: `${fmtMorphoAmount(after)} ${sym}`, info: supplyAfterProv(sym, coords), value: after },
+      total: NO_USD,
+      totalAmount: amount(fmtMorphoAmount(after), supplyAfterProv(sym, coords), after),
       totalTip: fillText(MORPHO_WORDS.tip_supply_total, { symbol: sym }),
     };
   }
@@ -609,10 +622,8 @@ function suppliedSide(ctx: MorphoContext, coords: MorphoCoords, label: string, a
         tip: fillText(MORPHO_WORDS.tip_supplied_event, { symbol: sym }),
       },
     ],
-    total:
-      after != null
-        ? { text: `${fmtMorphoAmount(after)} ${sym}`, info: suppliedAfterProv(sym, coords), value: after }
-        : { none: MORPHO_WORDS.sheet_not_loaded },
+    total: after != null ? NO_USD : { none: MORPHO_WORDS.sheet_not_loaded },
+    totalAmount: after != null ? amount(fmtMorphoAmount(after), suppliedAfterProv(sym, coords), after) : undefined,
     totalTip: fillText(MORPHO_WORDS.tip_supplied_total, { symbol: sym }),
   };
 }

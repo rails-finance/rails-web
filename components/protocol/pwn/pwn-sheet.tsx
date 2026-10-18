@@ -16,6 +16,7 @@
 
 import type { PwnContext } from "@/lib/shared/types/event-shape";
 import {
+  SHEET_NO_USD,
   SHEET_WORDS,
   type EventSheet,
   type SheetRow,
@@ -190,7 +191,9 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
         }
       : undefined;
   const collTotal = {
-    text: coll.after > EPS ? `${nftText ?? fmt(coll.after)} ${cs}` : `0 ${cs}`,
+    text: coll.after > EPS ? (nftText ?? fmt(coll.after)) : "0",
+    symbol: cs,
+    address: ctx.collateralAsset,
     info: flowCellProv("collateral", cs, coords),
     value: String(coll.after),
   };
@@ -292,7 +295,8 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
     carry: [],
     before: collBefore,
     rows: collRows,
-    total: collTotal,
+    total: SHEET_NO_USD,
+    totalAmount: collTotal,
     totalTip: TIPS.collateralTotal,
   };
   const debtSide: SheetSide = {
@@ -301,11 +305,8 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
     carry: debtCarry,
     before: debtBeforeRow,
     rows: debtRows,
-    total: {
-      text: `${fmt(debt.after)} ${ds}`,
-      info: flowCellProv("debt", ds, coords),
-      value: String(debt.after),
-    },
+    total: SHEET_NO_USD,
+    totalAmount: debtFig(fmt(debt.after), flowCellProv("debt", ds, coords), String(debt.after)),
     totalTip: TIPS.debtTotal,
   };
 

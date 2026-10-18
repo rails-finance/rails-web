@@ -23,7 +23,7 @@ import { fmtPositionAmount } from "@/components/shared/position-row";
 import { usdShown } from "@/lib/shared/usd-display";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { dayStamp, type LedgerProvs } from "@/components/shared/event-ledger";
-import type { EventSheet, SheetSide } from "@/components/shared/event-sheet";
+import { SHEET_NO_USD, type EventSheet, type SheetSide } from "@/components/shared/event-sheet";
 import { signedTokens, signedUsd, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import { fmtTokens, tokenDecimals } from "@/lib/shared/flow-focus";
 import { apportionSigned, wholeUsd } from "@/lib/shared/flows-sum";
@@ -525,11 +525,13 @@ export function FlowMomentCard({
           ? { text: wholeUsd(faceUsd, unitOf(model, side)), info: totalProv }
           : usd != null && (multi || shownFor(built[0].a))
             ? { text: wholeUsd(usd, unitOf(model, side)), info: totalProv }
-            : {
-                none: built
-                  .map(({ a, ledger: l }) => `${l.tokens?.after ?? fmtPositionAmount(a.tokens)} ${a.symbol}`)
-                  .join(", "),
-              };
+            : !multi
+              ? SHEET_NO_USD
+              : {
+                  none: built
+                    .map(({ a, ledger: l }) => `${l.tokens?.after ?? fmtPositionAmount(a.tokens)} ${a.symbol}`)
+                    .join(", "),
+                };
     return {
       side,
       name: model.labels[side],
@@ -537,6 +539,15 @@ export function FlowMomentCard({
       carry,
       rows: [],
       total,
+      // One asset on the side: the total states its amount (decision 0042, point 9).
+      totalAmount:
+        built.length === 1
+          ? {
+              text: built[0].ledger.tokens?.after ?? fmtPositionAmount(built[0].a.tokens),
+              symbol: built[0].a.symbol,
+              info: built[0].provs.totalTokens,
+            }
+          : undefined,
       untouched: "No events this day",
       totalTip:
         "The side's total at the day's close: what its last events left, with the interest since, at that day's closing prices.",

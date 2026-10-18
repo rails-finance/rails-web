@@ -346,6 +346,10 @@ function sheetSide(
         }))
       : undefined;
 
+  // One market held after the transaction, or none after it emptied the one it
+  // moved: the total states its amount (decision 0042, point 9).
+  const sole = after.length === 1 ? after[0] : after.length === 0 && moved.length === 1 ? moved[0] : undefined;
+
   return {
     side,
     icons: after.map((b) => b.symbol),
@@ -355,6 +359,12 @@ function sheetSide(
     ...(side === "debt" ? { assets, repaid, repaidTip: MOONWELL_WORDS.tip_debt_repaid } : {}),
     total:
       held != null ? { text: usdText(held), info: heldProv(side, "after") } : { none: MOONWELL_WORDS.sheet_no_price },
+    totalAmount: sole && {
+      text: fmtPositionAmount(sole.amount > DUST ? sole.amount : 0),
+      symbol: sole.symbol,
+      address: addr(sole.symbol),
+      info: balanceProv(side, sole.symbol),
+    },
     totalTip: TIPS[side].total,
   };
 }

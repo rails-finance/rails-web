@@ -10,7 +10,7 @@
 // claim after. No Risk or Limits panel: the family has none.
 
 import type { MapleContext } from "@/lib/shared/types/event-shape";
-import { SHEET_WORDS, type EventSheet, type SheetRow } from "@/components/shared/event-sheet";
+import { SHEET_NO_USD, SHEET_WORDS, type EventSheet, type SheetRow } from "@/components/shared/event-sheet";
 import type { ChainTruthTransition } from "@/components/shared/chain-truth-event";
 import type { Provenance } from "@/components/shared/provenance";
 import { formatNumber } from "@/lib/utils/format";
@@ -80,12 +80,13 @@ export function mapleSheet({ ctx, coords, claim, addresses = {} }: MapleSheetArg
   const raw = ctx.raw;
   const kind = ctx.eventType;
   const num = (v?: string): number => Number(v ?? "0") || 0;
-  const figure = (
-    text: string,
-    symbol: string,
-    info: Provenance,
-    value?: string,
-  ): NonNullable<SheetRow["amount"]> => ({ text, symbol, address: addresses[symbol], info, value });
+  const figure = (text: string, symbol: string, info: Provenance, value?: string): NonNullable<SheetRow["amount"]> => ({
+    text,
+    symbol,
+    address: addresses[symbol],
+    info,
+    value,
+  });
 
   const rows: SheetRow[] = [];
   const assets = num(ctx.assetsDelta);
@@ -200,13 +201,15 @@ export function mapleSheet({ ctx, coords, claim, addresses = {} }: MapleSheetArg
               }
             : undefined,
         rows,
-        total: haveClaim
-          ? {
-              text: `${fmt(num(ctx.valueAfter))} ${asset}`,
-              info: claimAfterProv(asset, pool, ctx.rateSource, coords, raw?.valueAfter),
-              value: ctx.valueAfter,
-            }
-          : { none: WORDS.unread },
+        total: haveClaim ? SHEET_NO_USD : { none: WORDS.unread },
+        totalAmount: haveClaim
+          ? figure(
+              fmt(num(ctx.valueAfter)),
+              asset,
+              claimAfterProv(asset, pool, ctx.rateSource, coords, raw?.valueAfter),
+              ctx.valueAfter,
+            )
+          : undefined,
         totalTip: TIPS.total,
       },
     ],

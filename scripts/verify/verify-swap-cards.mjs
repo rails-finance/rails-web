@@ -167,10 +167,11 @@ const FIXTURES = [
     // The bought WETH has no position row: it reads from the adapter's Swapped
     // log, as a line under the sheet. The WBTC it sold is the Collateral side's
     // event row, exact, interest to the block included; the side stands at
-    // $586 before the swap and $38 after (decision 0042). Still borrowable
-    // shows the account figures drew.
+    // $586 at the last event, with no interest or market move since, so no
+    // "Before this event" (decision 0042, point 10), and $38 after. Still
+    // borrowable shows the account figures drew.
     readsWhenOpen: [
-      /Before this event\b.{0,60}?\$586\b/,
+      /Last event\b.{0,60}?\$586\b/,
       /After this event\b.{0,60}?\$38\b/,
       "Bought 0.339",
       "Still borrowable",

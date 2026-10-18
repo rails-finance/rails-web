@@ -288,7 +288,7 @@ words:
   tip_coll_surplus: |-
     The ETH a full redemption left over after paying the redeemer, held in the CollSurplusPool for the owner to claim.
   tip_coll_total: |-
-    The Trove's collateral after this event in dollars: its ETH from the TroveManager's log times Liquity's ETH price at this block.
+    The Trove's ETH after this event, from the TroveManager's log, and its dollars at Liquity's ETH price at this block.
   tip_debt_before: |-
     The Trove's debt just before this event, from the previous TroveUpdated log, at $1 per LUSD.
   tip_debt_event: |-

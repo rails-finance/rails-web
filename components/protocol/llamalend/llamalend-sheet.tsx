@@ -19,6 +19,7 @@ import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { changeText } from "@/components/shared/change-swap-value";
 import {
+  SHEET_NO_USD,
   SHEET_WORDS,
   sheetUsd,
   type EventSheet,
@@ -87,7 +88,7 @@ const TIPS = {
   collBefore: (c: string) =>
     `The ${c} collateral just before this transaction, read from the Controller at the block before, valued at the AMM's oracle price at this block.`,
   collTotal: (c: string, b: string) =>
-    `The collateral after this transaction, the ${c} in the bands and any ${b} the AMM holds from selling it, valued at the AMM's oracle price at this block.`,
+    `The collateral after this transaction, the ${c} in the bands and any ${b} the AMM holds from selling it, valued at the AMM's oracle price at this block. With no ${b} held, the ${c} amount stands beside the value.`,
   debtEvent: (b: string) => `The ${b} this transaction borrowed or repaid, from the log's loan field.`,
   debtBefore: (b: string) =>
     `The ${b} owed just before this transaction, read from the Controller at the block before.`,
@@ -357,6 +358,23 @@ export function llamalendSheet({
               text: `${fmtPrice(collValue)} ${b}`,
               info: inBorrowedProv("The collateral after this transaction", b, afterParts),
             },
+    // One asset where the AMM holds none of the borrowed token (decision 0042, point 9).
+    totalAmount:
+      convAfter > 0
+        ? undefined
+        : collAmt(
+            fmtColl(collAfter),
+            ctx.collateralAfter != null
+              ? afterImageProv(c, "collateral", coords, ctx.raw?.collateralAfter)
+              : stateAtBlockProv(
+                  `${c} collateral`,
+                  "Controller.user_state(user)[0]",
+                  block,
+                  coords,
+                  state.after.collateralRaw,
+                ),
+            formatExactDecimal(String(collAfter)),
+          ),
     totalTip: TIPS.collTotal(c, b),
   };
 
@@ -444,9 +462,8 @@ export function llamalendSheet({
         }
       : undefined,
     rows: debtRows,
-    total: usdMarket
-      ? { text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0", info: debtAfterProv }
-      : { text: `${formatNumber(debtAfter)} ${b}`, info: debtAfterProv },
+    total: usdMarket ? { text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0", info: debtAfterProv } : SHEET_NO_USD,
+    totalAmount: borAmt(formatNumber(debtAfter), debtAfterProv, formatExactDecimal(String(debtAfter))),
     totalTip: TIPS.debtTotal(b),
   };
 

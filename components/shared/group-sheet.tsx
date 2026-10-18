@@ -20,7 +20,7 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Provenance } from "@/components/shared/provenance";
 import type { EventSheet, SheetRow, SheetSide } from "@/components/shared/event-sheet";
-import { sheetUsd } from "@/components/shared/event-sheet";
+import { SHEET_NO_USD, sheetUsd } from "@/components/shared/event-sheet";
 import type { EventCardPrice, EventPriceChip } from "@/components/shared/event-price-row";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
@@ -254,6 +254,10 @@ export function mergeGroupSheet(cards: CollectedCard[], label: string): EventShe
       assets: legs,
       repaid: undefined,
       total: lastSide.total,
+      // The last member's amount, where every member's side holds that one asset.
+      totalAmount: memberSides.every((x) => x!.totalAmount?.symbol === lastSide.totalAmount?.symbol)
+        ? lastSide.totalAmount
+        : undefined,
       totalTip: lastSide.totalTip,
       after: WORDS.after,
     });
@@ -303,7 +307,7 @@ const LANE_TIPS = {
   asset: (sym: string, side: FlowSide) =>
     `The ${sym} ${sideWord(side)} after the last of these events to move it, as its row states it.`,
   total: (side: FlowSide) =>
-    `The ${side === "collateral" ? "collateral" : "debt"} these events moved, in dollars after the last of them: each asset's balance at the price its last row carries.`,
+    `The ${side === "collateral" ? "collateral" : "debt"} these events moved, in dollars after the last of them: each asset's balance at the price its last row carries. Where they moved one asset, its amount stands beside the dollars.`,
 };
 
 function laneInterestProv(sym: string, before: number, after: number, moved: number, n: number): Provenance {
@@ -491,12 +495,10 @@ function laneSide(side: FlowSide, accs: LaneAcc[], label: string): SheetSide {
     : totalUsd != null
       ? { text: sheetUsd(totalUsd), info: laneTotalProv(side, totals) }
       : !multi && one.lastWithAfter?.after && one.lastWithAfter.price == null
-        ? {
-            text: `${one.fmt(Number(one.lastWithAfter.after.value))} ${one.symbol}`,
-            info: one.lastWithAfter.after.prov,
-            value: one.lastWithAfter.after.value,
-          }
+        ? SHEET_NO_USD
         : { none: WORDS.unpriced };
+  // One asset on the side: the total states its amount.
+  const soleAfter = !multi && !unread ? one.lastWithAfter?.after : undefined;
   const before: SheetRow | undefined = multi
     ? befores.length === accs.length
       ? {
@@ -520,6 +522,7 @@ function laneSide(side: FlowSide, accs: LaneAcc[], label: string): SheetSide {
     // Each member's move in the members' order, then what the side holds.
     assets: [...legs.sort((x, y) => x.at - y.at).map(({ at: _at, ...r }) => r), ...holdings],
     total,
+    totalAmount: soleAfter && amountOf(one, Number(soleAfter.value), soleAfter.prov, soleAfter.value),
     untouched: WORDS.untouched,
     after: WORDS.after,
     totalTip: LANE_TIPS.total(side),

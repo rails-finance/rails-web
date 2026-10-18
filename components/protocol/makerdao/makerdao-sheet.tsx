@@ -215,6 +215,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
             info: collUsdProv(collSym, "Collateral after this event", inkAfter, price, coords),
           }
         : { none: "No price read at this block" },
+    totalAmount: { text: collAmount(inkAfter), symbol: collSym, info: inkAfterProv(collSym, coords) },
     totalTip: TIP.collTotal,
   };
 
@@ -276,6 +277,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
       text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
       info: debtAfterProv(debtSym, coords),
     },
+    totalAmount: { text: fmtDai(debtAfter), symbol: debtSym, info: debtAfterProv(debtSym, coords) },
     totalTip: TIP.debtTotal,
   };
 

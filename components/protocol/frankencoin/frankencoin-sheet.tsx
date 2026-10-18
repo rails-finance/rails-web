@@ -11,6 +11,7 @@
 
 import type { FrankencoinContext } from "@/lib/shared/types/event-shape";
 import {
+  SHEET_NO_USD,
   SHEET_WORDS,
   type EventSheet,
   type SheetRow,
@@ -145,8 +146,11 @@ export function frankencoinSheet({
     carry: collBeforeRow && !readBefore ? [collBeforeRow] : [],
     before: collBeforeRow && readBefore ? collBeforeRow : undefined,
     rows: collRows,
-    total: {
-      text: `${fmtFcColl(collAfter)} ${sym}`,
+    total: SHEET_NO_USD,
+    totalAmount: {
+      text: fmtFcColl(collAfter),
+      symbol: sym,
+      address: collAddress,
       info: collateralAfterProv(sym, coords, ctx.raw?.collateral),
     },
     totalTip: FRANKENCOIN_WORDS.tip_coll_total,
@@ -191,8 +195,11 @@ export function frankencoinSheet({
           ]
         : [],
     rows: debtRows,
-    total: {
-      text: `${fmtZchf(debtAfter)} ZCHF`,
+    total: SHEET_NO_USD,
+    totalAmount: {
+      text: fmtZchf(debtAfter),
+      symbol: "ZCHF",
+      address: zchfAddress,
       info: mintedAfterProv(coords, ctx.raw?.minted),
     },
     totalTip: FRANKENCOIN_WORDS.tip_debt_total,

@@ -74,7 +74,7 @@ const TIPS = {
     `The ${sym} owed after this transaction, its par below zero times the market's borrow index, at Dolomite's latest ${sym} oracle price by this event.`,
   repaid: "The assets this account once borrowed and owes none of after this event.",
   total: (side: FlowSide) =>
-    `The ${sideWords(side).name}'s total in dollars after this transaction: each ${side === "collateral" ? "balance above zero" : "balance below zero"}, ${sideWords(side).bal}, at Dolomite's latest oracle price by this event.`,
+    `The ${sideWords(side).name}'s total in dollars after this transaction: each ${side === "collateral" ? "balance above zero" : "balance below zero"}, ${sideWords(side).bal}, at Dolomite's latest oracle price by this event. Where the side holds one market, its amount stands beside the dollars.`,
   margin:
     "The account's supply over its debt after this event, each adjusted by its market's margin premium, as the core's getAdjustedAccountValues states them; at the minimum margin the account can be liquidated.",
   fall: "How far the collateral's total value can fall, the debt's value held, before the margin ratio reaches the minimum margin: one less the minimum over the margin ratio.",
@@ -363,6 +363,10 @@ function sheetSide(
         }))
       : undefined;
 
+  // One market held after the transaction, or none after it emptied the one it
+  // moved: the total states its amount (decision 0042, point 9).
+  const sole = after.length === 1 ? after[0] : after.length === 0 && moved.length === 1 ? moved[0] : undefined;
+
   return {
     side,
     icons: after.map((b) => b.symbol),
@@ -371,6 +375,12 @@ function sheetSide(
     rows,
     ...(side === "debt" ? { assets, repaid, repaidTip: TIPS.repaid } : {}),
     total: held != null ? { text: usdText(held), info: heldProv(side, "after") } : { none: WORDS.no_price },
+    totalAmount: sole && {
+      text: fmtPositionAmount(sole.amount > DUST ? sole.amount : 0),
+      symbol: sole.symbol,
+      address: addr(sole.symbol),
+      info: balanceProv(side, sole.symbol),
+    },
     totalTip: TIPS.total(side),
   };
 }

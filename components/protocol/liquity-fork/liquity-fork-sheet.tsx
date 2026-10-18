@@ -106,7 +106,7 @@ function tips(coll: string, debt: string, noun: string) {
     collBefore: `The Trove's ${coll} just before this event, at the branch's ${coll} price at this block.`,
     collEvent: `The ${coll} this event moved, from the TroveManager's log, at the branch's ${coll} price at this block.`,
     collRedist: `The ${coll} that liquidated Troves passed to this one, applied at this event, from the TroveManager's log.`,
-    collTotal: `The Trove's collateral after this event in dollars: its ${coll} from the TroveManager's log times the branch's ${coll} price at this block.`,
+    collTotal: `The Trove's ${coll} after this event, from the TroveManager's log, and its dollars at the branch's ${coll} price at this block.`,
     collTotalUnpriced: `The Trove's ${coll} after this event, from the TroveManager's log. The page carries no ${coll} price for this block, so there is no dollar figure.`,
     debtLast: `The Trove's debt after its previous event, from the TroveManager's log, at $1 per ${debt}.`,
     debtInterest: `The ${noun} the debt accrued between the previous event and this one, at $1 per ${debt}.`,
@@ -301,6 +301,12 @@ export function liquityForkSheet({
               info: provs.collUsdProv(coords, { coll: ctx.collAfter, priceUsd: price, which: "after" }),
             }
           : { none: WORDS.unread },
+    totalAmount: {
+      text: forkCollAmount(collAfter),
+      symbol: collSym,
+      address: collAddr,
+      info: provs.collAfterProv(coords, ctx.origin?.coll),
+    },
     totalTip: collAfter > 0 && price == null ? TIP.collTotalUnpriced : TIP.collTotal,
   };
 
@@ -420,6 +426,12 @@ export function liquityForkSheet({
     total: {
       text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
       info: faceUsdProv(debtSym, forkAmount(debtAfter), "after"),
+    },
+    totalAmount: {
+      text: forkAmount(debtAfter),
+      symbol: debtSym,
+      address: debtAddr,
+      info: provs.debtAfterProv(coords, ctx.origin?.debt),
     },
     totalTip: TIP.debtTotal,
   };

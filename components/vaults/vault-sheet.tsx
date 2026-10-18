@@ -17,7 +17,7 @@
 // of the vault). A row with no previous event in the list, or a price that was
 // not read, leaves out the rows that need it.
 
-import { SHEET_WORDS, type EventSheet, type SheetFigure, type SheetRow } from "@/components/shared/event-sheet";
+import { SHEET_NO_USD, SHEET_WORDS, type EventSheet, type SheetRow } from "@/components/shared/event-sheet";
 import type { Provenance } from "@/components/shared/provenance";
 import { assetText, shareText } from "@/lib/shared/vault-amount-text";
 import { sharePriceText } from "@/components/vaults/aave-vault-format";
@@ -286,17 +286,19 @@ export function vaultSheet({
     ...extraRows,
   ];
 
-  const total: SheetFigure | { none: string } =
+  // The total states its amount in the asset column: the claim in the vault's
+  // asset, or the shares where the price was not read.
+  const totalAmount: SheetRow["amount"] =
     priceNow != null
-      ? {
-          text: `${assetsText(valueOf(after, priceNow, sd))} ${assetSymbol}`,
-          info: derived(
+      ? asset(
+          assetsText(valueOf(after, priceNow, sd)),
+          derived(
             "The shares held after this event, valued in the vault's asset at the share price of this event's block.",
             "shares held after × share price now ÷ 10^share decimals",
             [heldInput("Shares held", after), priceInput(event, "Share price now")],
           ),
-        }
-      : { text: `${sharesText(after)} ${shareUnit}`, info: prov.balanceAfter(coords), value: event.balanceAfter };
+        )
+      : shares(sharesText(after), prov.balanceAfter(coords), event.balanceAfter);
 
   return {
     sides: [
@@ -308,7 +310,8 @@ export function vaultSheet({
         before,
         rows,
         assets,
-        total,
+        total: SHEET_NO_USD,
+        totalAmount,
         totalTip: priceNow != null ? TIPS.total : TIPS.totalShares,
       },
     ],

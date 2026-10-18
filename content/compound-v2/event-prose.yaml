@@ -214,7 +214,7 @@ words:
   tip_coll_event: |-
     The {market_symbol} this transaction moved on the supplied side, its supply after less before, at Compound's latest {market_symbol} oracle price by this event.
   tip_coll_total: |-
-    The collateral's total in dollars after this transaction: each market's supply, its cTokens times the exchange rate, at Compound's latest oracle price by this event.
+    The collateral's total in dollars after this transaction: each market's supply, its cTokens times the exchange rate, at Compound's latest oracle price by this event. Where the side holds one market, its amount stands beside the dollars.
   tip_debt_last: |-
     The debt's total in dollars once the previous transaction on this timeline had run, from the market rows the page replays.
   tip_debt_interest: |-
@@ -232,7 +232,7 @@ words:
   tip_debt_repaid: |-
     The assets this account once borrowed and owes none of after this event.
   tip_debt_total: |-
-    The debt's total in dollars after this transaction: each market's accountBorrows at Compound's latest oracle price by this event.
+    The debt's total in dollars after this transaction: each market's accountBorrows at Compound's latest oracle price by this event. Where the side holds one market, its amount stands beside the dollars.
   tip_health: |-
     The Comptroller's health factor after this event: each entered market's collateral times its collateral factor, over the debt; at 1 or below the account can be liquidated.
   tip_fall: |-

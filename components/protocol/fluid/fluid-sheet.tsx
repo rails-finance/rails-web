@@ -26,6 +26,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { FluidContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import {
+  SHEET_NO_USD,
   SHEET_WORDS,
   type EventSheet,
   type SheetRow,
@@ -379,8 +380,11 @@ function sheetSide(args: {
     carry,
     before: beforeRow,
     rows,
-    total: {
-      text: `${fig(after)} ${sym}`,
+    total: SHEET_NO_USD,
+    totalAmount: {
+      text: fig(after),
+      symbol: sym,
+      address,
       info: liq
         ? liqSettledProv(side, "after", sym, coords)
         : side === "collateral"

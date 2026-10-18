@@ -52,7 +52,7 @@ const TIPS = {
   sent: "The sUSDS that left in this transfer, from the Transfer log; the dollar column is its worth in USDS.",
   held: "The sUSDS this address holds after the event, replayed from every log that names it; the dollar column is its worth in USDS.",
   total:
-    "The USDS the sUSDS held after this event is worth: the sUSDS held times the share price of this block, counted at $1 per USDS.",
+    "The USDS the sUSDS held after this event is worth, the sUSDS held times the share price of this block, and its dollars at $1 per USDS.",
 };
 
 /** USDS counted at one dollar: the receipt behind every dollar figure. */
@@ -239,6 +239,13 @@ export function skySavingsSheet({ c, coords, previous, sinceRaw }: SkySheetArgs)
         total: {
           ...dollars(t.valueAfter, WORDS.total),
           info: dollarProv("The worth of the sUSDS held after this event", exact(t.valueAfter)),
+        },
+        totalAmount: {
+          text: formatCompact(units(t.valueAfter)),
+          symbol: USDS.symbol,
+          address: USDS.address,
+          info: worthProv("after"),
+          value: exact(t.valueAfter),
         },
         totalTip: TIPS.total,
       },

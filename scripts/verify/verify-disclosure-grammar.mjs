@@ -1028,13 +1028,18 @@ for (const s of SHEET_WORDS_SUBJECTS) {
   // A carry row's label may carry its price note ("Last event · $0.9999").
   const carried = (on?.sides ?? []).filter((x) => x.carry.length > 0);
   const wantCarried = s.carried ?? on?.sides.length ?? -1;
+  // "Before this event" stands only where a row follows Last event in the
+  // layer (decision 0042, point 10).
   check(
-    `6h. ${s.name}: ${wantCarried} side(s) carry a layer that opens on Last event${s.closes === false ? "" : " and closes on Before this event"}`,
+    `6h. ${s.name}: ${wantCarried} side(s) carry a layer that opens on Last event${s.closes === false ? "" : " and closes on Before this event where a movement row follows it"}`,
     carried.length === wantCarried &&
       carried.every(
         (x) =>
           /^Last event\b/.test(x.carry[0]) &&
-          (s.closes === false || (x.before.length === 1 && /^Before this event\b/.test(x.before[0]))),
+          (s.closes === false ||
+            (x.carry.length === 1
+              ? x.before.length === 0
+              : x.before.length === 1 && /^Before this event\b/.test(x.before[0]))),
       ),
     JSON.stringify(on?.sides.map((x) => [x.side, x.carry, x.before])),
   );

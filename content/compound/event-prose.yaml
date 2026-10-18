@@ -268,7 +268,7 @@ words:
   tip_coll_event: |-
     The {symbol} this event moved on this side, as its log states it, at the Comet's oracle price at this event.
   tip_coll_total: |-
-    This side's total in dollars after this event: each asset posted and any lent {symbol}, at the Comet's oracle prices at this event.
+    This side's total in dollars after this event: each asset posted and any lent {symbol}, at the Comet's oracle prices at this event. Where the side holds one asset, its amount stands beside the dollars.
   tip_debt_last: |-
     The {symbol} owed once the previous event had run, at the Comet's oracle price then.
   tip_debt_interest: |-

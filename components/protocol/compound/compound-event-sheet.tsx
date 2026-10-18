@@ -455,6 +455,12 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
       };
     }
 
+    // One asset held after the event, or none after it emptied the one the side
+    // held: the total states its amount (decision 0042, point 9).
+    const heldAfter = hs.filter((h) => h.after > (h.base ? dust : DUST));
+    const sole = baseUnread ? undefined : heldAfter.length === 1 ? heldAfter[0] : hs.length === 1 ? hs[0] : undefined;
+    const soleAmount = sole && (sole.after > (sole.base ? dust : DUST) ? sole.after : 0);
+
     // The debt assets the account once owed and owes none of after the event.
     const repaid =
       side === "debt" && b.after <= dust && rp.replayed.slice(0, i + 1).some((x) => x.base < -dust)
@@ -474,6 +480,22 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
         : priced("after")
           ? { text: usdText(usdAt("after")), info: sideUsdProv(side, "after", hs, coords) }
           : { none: COMPOUND_WORDS.sheet_no_price },
+      totalAmount:
+        sole && soleAmount != null
+          ? {
+              text: compoundAmount(soleAmount),
+              symbol: sole.symbol,
+              address: addressOf(sole.token),
+              info: {
+                kind: "chain-derived",
+                pclass: "indexed",
+                summary: `${sole.symbol} ${side === "debt" ? "owed" : sole.base ? "lent" : "posted"} once this event had run — the balance the position's replay of its rows holds at this row.`,
+                formula: side === "debt" ? "−base balance at this row" : "balance at this row",
+                contract: cometContract(coords),
+                via: "the position's replay of its rows (lib/compound/flows.ts)",
+              },
+            }
+          : undefined,
       totalTip: tip.total,
     };
   }

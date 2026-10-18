@@ -286,7 +286,7 @@ words:
   tip_coll_event: |-
     The {coll_symbol} this event moved, from the Vat's log, at Maker's {coll_symbol} price at this block.
   tip_coll_total: |-
-    The vault's collateral after this event in dollars: its {coll_symbol} from the Vat's log times Maker's {coll_symbol} price at this block.
+    The vault's {coll_symbol} after this event, from the Vat's log, and its dollars at Maker's {coll_symbol} price at this block.
   tip_debt_last: |-
     The vault's debt after its previous event, from the Vat's log, at $1 per {debt_symbol}.
   tip_debt_interest: |-

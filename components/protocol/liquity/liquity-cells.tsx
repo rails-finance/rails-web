@@ -857,6 +857,7 @@ export function useLiquityCells({
         : undefined,
     rows: collRows,
     total: { text: afterCollInUsd > 0 ? sheetUsd(afterCollInUsd) : "$0", info: usdAfterProv ?? collAfterProv },
+    totalAmount: { text: formatColl(collAfter), symbol: collSym, info: collAfterProv },
     totalTip: TIP.collTotal,
   };
 
@@ -965,6 +966,7 @@ export function useLiquityCells({
       text: debtAfter > 0 ? sheetUsd(debtAfter) : "$0",
       info: faceUsdProv(debtSym, toLocaleStringHelper(debtAfter), "after"),
     },
+    totalAmount: { text: toLocaleStringHelper(debtAfter), symbol: debtSym, info: debtAfterProv },
     totalTip: TIP.debtTotal,
   };
 

@@ -2,7 +2,7 @@
 // `sheet` slot filled for an open, an adjust and a close. Liquity V2's sheet
 // (components/protocol/liquity/liquity-cells.tsx) is the template: Collateral
 // then Debt, each with a carry layer, the event's rows and the side's total in
-// dollars; then Risk and Limits with the protocol's parameters beneath.
+// pETH or the stablecoin and dollars; then Risk and Limits with the protocol's parameters beneath.
 //
 // The row holds the previous event's resulting figures (`collBefore`,
 // `debtBefore`) and this block's feed; the page hands down the previous event
@@ -365,6 +365,12 @@ export function polarisSheet(
         : pethUsd != null
           ? { text: sheetUsd(collAfter * pethUsd), info: usdProv("The collateral after this event", "coll", collAfter) }
           : { none: W.sheet_no_price },
+    totalAmount: {
+      text: formatPeth(collAfter),
+      symbol: PETH.symbol,
+      address: PETH.address,
+      info: ledgerFieldProv("newColl", coords, ctx.raw?.newColl),
+    },
     totalTip: W.tip_coll_total,
   };
 
@@ -410,6 +416,12 @@ export function polarisSheet(
                   info: usdProv("The gas compensation escrow after this event", "coll", escrowAmount),
                 }
               : { none: W.sheet_no_price },
+          totalAmount: {
+            text: formatPeth(isClose ? 0 : escrowAmount),
+            symbol: PETH.symbol,
+            address: PETH.address,
+            info: isClose ? gasCompReturnProv(coords) : gasCompEscrowProv(coords),
+          },
           totalTip: W.tip_escrow_total,
         }
       : null;
@@ -514,6 +526,12 @@ export function polarisSheet(
         : unit
           ? { text: sheetUsd(debtAfter * unit.usd), info: usdProv("The debt after this event", "debt", debtAfter) }
           : { none: W.sheet_no_price },
+    totalAmount: {
+      text: formatNumber(debtAfter),
+      symbol: stable,
+      address: stableAddr,
+      info: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt),
+    },
     totalTip: W.tip_debt_total,
   };
 

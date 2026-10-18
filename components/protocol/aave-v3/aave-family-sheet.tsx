@@ -91,7 +91,7 @@ const TIPS = {
     "The side's total in dollars needs the position read at this block, which this row does not make: it states the reserve it moved.",
   repaid: "The assets this account once borrowed and owes none of after this event.",
   total: (side: FlowSide) =>
-    `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars after this transaction, read from the Pool at the oracle's prices at this block.`,
+    `The ${side === "collateral" ? "collateral" : "debt"}'s total in dollars after this transaction, read from the Pool at the oracle's prices at this block; where the side holds one reserve, its amount beside the dollars.`,
   health:
     "The Pool's health factor for the account after this transaction: the collateral times the weighted liquidation threshold, divided by the debt; at or below 1 the position can be liquidated.",
   fall: "How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.",
@@ -353,7 +353,13 @@ function sheetSide(
             };
           })
       : undefined;
-  const icons = owed.filter((r) => moved.includes(r) || !isDustRow(r, leg)).map(reserveSymbol);
+  const shown = owed.filter((r) => moved.includes(r) || !isDustRow(r, leg));
+  const icons = shown.map(reserveSymbol);
+  // One reserve held after the transaction (dust under a cent aside), or none
+  // after it emptied the one it moved: the total states its amount (decision
+  // 0042, point 9).
+  const sole = shown.length === 1 ? shown[0] : owed.length === 0 && moved.length === 1 ? moved[0] : undefined;
+  const soleAfter = sole && humanOf(legOf(sole, leg).after, sole.decimals!);
 
   return {
     side,
@@ -363,6 +369,22 @@ function sheetSide(
     rows,
     ...(side === "debt" ? { assets, repaid, repaidTip: TIPS.repaid } : {}),
     total: usd ? { text: usd.after.text, info: usd.after.prov, value: usd.after.value } : { none: WORDS.unread },
+    totalAmount:
+      sole && soleAfter != null
+        ? {
+            text: fmtPositionAmount(soleAfter),
+            symbol: reserveSymbol(sole),
+            address: sole.reserve,
+            info: exactBalanceProv(
+              reserveSymbol(sole),
+              leg,
+              "after",
+              coords,
+              exactLeg(legOf(sole, leg), "after", sole.decimals!, state.blockTimestamp),
+            ),
+            value: groupExact(soleAfter),
+          }
+        : undefined,
     totalTip: TIPS.total(side),
   };
 }

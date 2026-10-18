@@ -73,7 +73,7 @@ const TIPS = {
     `The ${sym} ${side === "collateral" ? "supplied" : "owed"} after this event, from the spoke's snapshot, at the ${sym} price at this block.`,
   repaid: "The assets this position once borrowed on this spoke and owes none of after this event.",
   total: (side: FlowSide) =>
-    `The ${side}'s total in dollars after this event: every asset's balance on the spoke at its price at this block.`,
+    `The ${side}'s total in dollars after this event: every asset's balance on the spoke at its price at this block. Where the side holds one asset, its amount stands beside the dollars.`,
   health:
     "The spoke's health factor for the position at the end of this event's block, from getUserAccountData: the collateral weighted by its collateral factors, divided by the debt; at or below 1 the position can be liquidated.",
   fall: "How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.",
@@ -394,43 +394,48 @@ function sheetSide({
       };
   }
 
+  /** A balance after the event, with its receipt. */
+  const amountAfter = (h: Holding): SheetRow["amount"] => {
+    const sym = aaveV4DisplaySymbol(h.symbol);
+    const isMoved = moved?.symbol === h.symbol;
+    const detail = { ...coord, asset: sym };
+    return {
+      text: fmtV4Amount(h.amount),
+      symbol: h.symbol,
+      address: isMoved ? address : undefined,
+      info:
+        isMoved && chain
+          ? chainBalanceProv(
+              "Balance after this event",
+              detail,
+              leg,
+              leg === "supply"
+                ? {
+                    value: ctx.raw?.supplyAfter,
+                    shares: ctx.raw?.supplySharesAfter,
+                    a: ctx.raw?.hubAddedAssets,
+                    b: ctx.raw?.hubAddedShares,
+                  }
+                : { value: ctx.raw?.debtAfter, shares: ctx.raw?.drawnSharesAfter, a: ctx.raw?.hubDrawnIndex },
+              leg === "debt" ? premiumAt(hf, "after") : undefined,
+            )
+          : snapshotProv(
+              "Balance after this event",
+              { ...detail, raw: isMoved ? ctx.raw?.[leg === "supply" ? "supplyAfter" : "debtAfter"] : undefined },
+              leg,
+            ),
+      value: h.amount,
+    };
+  };
   // With the breakdown, every asset the side holds after the event.
   const assets: SheetRow[] = after.map((h) => {
     const sym = aaveV4DisplaySymbol(h.symbol);
     const p = priceOf(ctx, h);
-    const isMoved = moved?.symbol === h.symbol;
-    const detail = { ...coord, asset: sym };
     return {
       key: `asset-${sym}`,
       label: sym,
       note: priceNote(p),
-      amount: {
-        text: fmtV4Amount(h.amount),
-        symbol: h.symbol,
-        address: isMoved ? address : undefined,
-        info:
-          isMoved && chain
-            ? chainBalanceProv(
-                "Balance after this event",
-                detail,
-                leg,
-                leg === "supply"
-                  ? {
-                      value: ctx.raw?.supplyAfter,
-                      shares: ctx.raw?.supplySharesAfter,
-                      a: ctx.raw?.hubAddedAssets,
-                      b: ctx.raw?.hubAddedShares,
-                    }
-                  : { value: ctx.raw?.debtAfter, shares: ctx.raw?.drawnSharesAfter, a: ctx.raw?.hubDrawnIndex },
-                leg === "debt" ? premiumAt(hf, "after") : undefined,
-              )
-            : snapshotProv(
-                "Balance after this event",
-                { ...detail, raw: isMoved ? ctx.raw?.[leg === "supply" ? "supplyAfter" : "debtAfter"] : undefined },
-                leg,
-              ),
-        value: h.amount,
-      },
+      amount: amountAfter(h),
       usd: p
         ? {
             text: sheetUsd(Number(h.amount) * p.usd),
@@ -442,6 +447,17 @@ function sheetSide({
   });
 
   const total = sumOf(ctx, after);
+  // Where the spoke's snapshot shows one asset held after the event, or none
+  // after it emptied the one it moved, the total states its amount (decision
+  // 0042, point 9). Without a snapshot the side's other assets are unknown.
+  const snapped = (leg === "supply" ? ctx.allSupplies : ctx.allDebts) != null;
+  const sole: Holding | undefined = !snapped
+    ? undefined
+    : after.length === 1
+      ? after[0]
+      : after.length === 0 && moved && Number(moved.before) > 0
+        ? { symbol: moved.symbol, amount: "0" }
+        : undefined;
   return {
     usd: total.missing.length === 0 ? total.usd : null,
     side: {
@@ -462,6 +478,7 @@ function sheetSide({
               ),
             }
           : { none: WORDS.no_price(total.missing) },
+      totalAmount: sole && amountAfter(sole),
       totalTip: TIPS.total(side),
     },
   };
