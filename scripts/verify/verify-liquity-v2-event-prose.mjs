@@ -318,10 +318,13 @@ try {
       .waitFor({ state: "attached", timeout: 60_000 })
       .catch(() => {});
     await page.waitForTimeout(500);
-    // The event page's T3 stands open with no button; a card with a closed
-    // (i) button is opened here.
-    const t3 = page.locator('[data-anatomy="T2"] button[data-anatomy="T3"]').first();
-    if ((await t3.count()) > 0 && (await t3.getAttribute("aria-expanded")) !== "true") await t3.click();
+    // The event page stands the explanation (T3) open above the sheet, with no
+    // tab strip (ui-jobs 370); P2 reads it.
+    await card
+      .locator('[data-anatomy="T3"]')
+      .first()
+      .waitFor({ state: "attached", timeout: 30_000 })
+      .catch(() => {});
     // Copy for LLM is the last button of the actions row under the side
     // column's title (ui-jobs 291).
     const copyBtn = page.locator('[data-event-page-actions] [data-menu-item="copy-for-llm"]').first();
@@ -399,7 +402,7 @@ try {
     // P3
     const l2 = section(copy, "L2").slice(1);
     const P3 = l2Checks(l2, await chainEvent(f.branch, f.troveId, e.id));
-    // The panels above the Explanation, whose prose repeats figures.
+    // The sheet and its panels without the explanation, whose prose repeats figures.
     const panels = await card.evaluate((el) => {
       const c = el.cloneNode(true);
       c.querySelectorAll('[data-anatomy="T3"]').forEach((n) => n.remove());

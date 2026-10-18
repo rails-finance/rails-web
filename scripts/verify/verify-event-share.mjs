@@ -84,6 +84,7 @@
 import { chromium } from "playwright";
 import { CLOSED_GROUP, GROUP_FRAME, openGroup } from "./lib/group-rows.mjs";
 import { openPositionCards } from "./lib/position-card.mjs";
+import { showCardTab, waitOnFigures } from "./lib/card-tabs.mjs";
 import {
   exhaustPaging,
   waitForCountSettled,
@@ -347,6 +348,8 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
       .first()
       .waitFor({ state: "attached", timeout: 20000 })
       .catch(() => {});
+    // The cells stand under the Figures tab (ui-jobs 370).
+    await showCardTab(page, "figures");
     const t2 = await page.locator('[data-anatomy~="T2"]').count();
     const sheets = await page.locator("[data-sheet]").count();
     check(`${label} @${width}: a cells family's card draws no event sheet`, sheets === 0, `${sheets} sheet, ${t2} T2`);
@@ -850,14 +853,18 @@ const sheetFigures = (page, id) =>
     })
     .catch(() => []);
 
-/** Wait for the card's sheet; the Aave sheet stands once the block read lands. */
-const waitSheet = (page, id, timeout = 120000) =>
-  page
-    .locator(sheetSel(id))
-    .first()
-    .waitFor({ state: "attached", timeout })
-    .then(() => true)
-    .catch(() => false);
+/** Wait for the card's sheet; the Aave sheet stands once the block read lands.
+ *  On the timeline the sheet stands under the opened card's Figures tab
+ *  (ui-jobs 370), so the tab is pressed; the event page draws no strip. Under
+ *  640px a `?at=` landing leaves the card closed, so it is opened by its
+ *  control when no T2 has drawn. */
+async function waitSheet(page, id, timeout = 120000) {
+  const card = page.locator(cardSel(id)).first();
+  const t2 = card.locator('[data-anatomy~="T2"]').first();
+  await t2.waitFor({ state: "attached", timeout: Math.min(timeout, 20000) }).catch(() => {});
+  if (!(await t2.count())) await openCardById(page, id);
+  return waitOnFigures(card, '[data-anatomy~="T2"] [data-sheet]', timeout);
+}
 
 /** Open a card on the timeline by its row control (the header from 640px, the
  *  spine's segment under it), pressed until it reads open. */
@@ -1959,8 +1966,14 @@ async function verifyLiquityMarkdown(subject) {
         factHash.title === factHash.text,
       JSON.stringify(factHash),
     );
+    // The event page stands the explanation (T3) open above the sheet.
+    const pageT3 = await page.locator('[data-anatomy="T3"]').count();
     const pageT3Hash = await page.locator('[data-anatomy="T3"] [data-tx-hash]').count();
-    check(`${name} event page: the Explanation row carries no hash`, pageT3Hash === 0, `${pageT3Hash} found`);
+    check(
+      `${name} event page: the explanation stands open and carries no hash`,
+      pageT3 > 0 && pageT3Hash === 0,
+      `${pageT3} T3, ${pageT3Hash} hash found`,
+    );
     const copied = await page
       .click(COPY_LLM, { timeout: 10000 })
       .then(() => page.waitForSelector(`${COPY_LLM}[data-copied]`, { timeout: 20000 }))
@@ -1996,8 +2009,15 @@ async function verifyLiquityMarkdown(subject) {
       if (!wasOn) await item.click();
       await trigger.click().catch(() => {});
       await page.waitForTimeout(300);
+      // The opened card's Explanation tab (ui-jobs 370), its default.
+      await showCardTab(card, "explanation");
+      const t3 = await card.locator('[data-anatomy="T3"]').count();
       const t3Hash = await page.locator('[data-anatomy="T3"] [data-tx-hash]').count();
-      check(`${name} timeline: no Explanation row carries a hash`, t3Hash === 0, `${t3Hash} found`);
+      check(
+        `${name} timeline: the opened card's Explanation tab carries no hash`,
+        t3 > 0 && t3Hash === 0,
+        `${t3} T3 on the card, ${t3Hash} hash found`,
+      );
     }
     await ctx.close();
   }

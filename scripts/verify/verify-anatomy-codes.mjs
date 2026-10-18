@@ -12,7 +12,9 @@
 //
 // For each position, at 1280 and at 390: load the page, read every
 // `data-anatomy` code on it (closed), open the first event card of the
-// timeline, its first ledger cell and its Explanation, and read again. T4 is
+// timeline, its first ledger cell on the Figures tab and then its Explanation
+// tab (rails-ops TO-DO-ui-jobs 370: T3 is the opened card's Explanation tab, on
+// the card's face; a card with no strip stands both), and read again. T4 is
 // reached by the selector `scripts/anatomy-shots.mjs` names for it (a family
 // passes its "?" into the footer). A shared code counts for the family when
 // the first card carries it at that width; T7 counts on any card of the page
@@ -29,6 +31,7 @@
 
 import { chromium } from "playwright";
 import { bypassHeaders } from "./lib/host.mjs";
+import { showCardTab } from "./lib/card-tabs.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",").map((s) => s.trim())) : null;
@@ -213,8 +216,8 @@ async function firstCardId(page) {
 }
 
 /** Open the first card from its control at this width (the header from
- *  640px, the spine's segment below it), then its first ledger cell and its
- *  Explanation. A press before hydration is lost, so each is pressed until
+ *  640px, the spine's segment below it), then its first ledger cell on the
+ *  Figures tab and its Explanation tab. A press before hydration is lost, so each is pressed until
  *  it reads open. Returns the codes read with the ledger open and with the
  *  Explanation open, merged; null when the card never opened. */
 async function openCard(page, id, expectLedger, sheetFamily) {
@@ -248,6 +251,9 @@ async function openCard(page, id, expectLedger, sheetFamily) {
     .catch(() => {});
   // The cells settle after the family's reads (Spark and Aave read on open).
   await page.waitForTimeout(4000);
+  // The sheet and the cells stand under the Figures tab; Explanation is the
+  // default, and a card with no strip draws both.
+  const figuresTab = await showCardTab(card, "figures");
   // A sheet family's T2 stands as cells placeholders until its read lands.
   if (sheetFamily)
     await card
@@ -270,20 +276,16 @@ async function openCard(page, id, expectLedger, sheetFamily) {
       .waitFor({ timeout: 15_000 })
       .catch(() => {});
   }
-  // Read once with the ledger open, before the Explanation's press.
+  // Read once with the ledger open, before the Explanation tab's press.
   const withLedger = await readCodes(page, id);
-  const t3 = card.locator("[data-t3-toggle]").locator("visible=true").first();
-  for (let i = 0; i < 4 && (await t3.count()); i++) {
-    if ((await t3.getAttribute("aria-expanded").catch(() => null)) === "true") break;
-    await t3.click({ timeout: 5000 }).catch(() => {});
-    await page.waitForTimeout(600);
-  }
+  const explanationTab = await showCardTab(card, "explanation");
   await page.waitForTimeout(1000);
   const withExplanation = await readCodes(page, id);
   return {
     page: [...new Set([...withLedger.page, ...withExplanation.page])],
     card: [...new Set([...withLedger.card, ...withExplanation.card])],
     sheet,
+    tabs: figuresTab === "stuck" || explanationTab === "stuck" ? "stuck" : explanationTab,
   };
 }
 
@@ -362,6 +364,12 @@ for (const f of FAMILIES) {
   for (const w of WIDTHS) {
     byWidth[w] = await walk(path, w, !NA[f.key]?.["T2.1"], SHEET_FAMILIES.has(f.key));
     if (byWidth[w].error) check(`${f.key} @${w}: the walk read the page`, false, byWidth[w].error);
+    else
+      check(
+        `${f.key} @${w}: the opened card's Explanation | Figures tabs answer a press (${byWidth[w].opened.tabs})`,
+        byWidth[w].opened.tabs !== "stuck",
+        byWidth[w].opened.tabs === "stuck" ? "the strip never showed the pressed tab" : "",
+      );
   }
   const na = { ...(NA[f.key] ?? {}) };
   // The first card's T2 drew the sheet at a width: no cell, so no ledger.

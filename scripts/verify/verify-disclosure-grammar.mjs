@@ -12,8 +12,9 @@
 // by default, the ratio closed, remembered per row, the card-wide key of 209
 // dropped on read); the Lifetime flows header's chevron after its heading and
 // its ⋮ at the right end; the Repay #148 card's chevron after "Repay", the
-// number pill last on the line and no ⋮; T2's breakdown switch at its row's
-// right end and T3's row with the chevron after the words. Aave V3: the event ⋮ in the header before the pill,
+// number pill last on the line and no ⋮; the opened card's Explanation |
+// Figures strip (ui-jobs 370), T2's breakdown switch at its row's right end on
+// the Figures tab. Aave V3: the event ⋮ in the header before the pill,
 // a press on it opening the menu (rows unchanged) and leaving the card closed,
 // and T6 holding the "?" alone.
 //
@@ -30,13 +31,15 @@
 // one, the breakdown's carry-forward names, and the Risk and Limits rows the
 // family's sheet builder names (components/protocol/liquity/liquity-cells.tsx
 // and content/liquity-v2/event-prose.yaml; components/protocol/aave-v3/
-// aave-family-sheet.tsx).
+// aave-family-sheet.tsx). The sheet stands under the opened card's Figures
+// tab; the tabs' own checks are verify-card-tabs.mjs.
 //
 // Run:  BASE=http://localhost:3109 node scripts/verify/verify-disclosure-grammar.mjs
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 import { CLOSED_GROUP, openGroup } from "./lib/group-rows.mjs";
+import { showCardTab, waitOnFigures } from "./lib/card-tabs.mjs";
 
 const TROVE =
   "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154";
@@ -344,15 +347,42 @@ const headerLayout = (card) =>
     `${restOp} → ${hoverOp}`,
   );
   await head.click({ position: { x: 200, y: 20 } });
-  // 2g (ui-jobs 330): the opened card's T2 is the event sheet, which draws no
-  // ledger cell, so the Collateral and Debt rows' chevrons are gone with it;
-  // its one disclosure is the breakdown switch, at the right end of the row
-  // above the panels.
+  // 2h (ui-jobs 370, replacing T3's row with the chevron after its words): the
+  // opened card's explanation and figures are the strip's two tabs, and it
+  // opens on Explanation.
   await card
-    .locator("[data-sheet-switch]")
+    .locator('[data-anatomy~="T2"]')
     .first()
     .waitFor({ state: "attached", timeout: 60000 })
     .catch(() => {});
+  await card
+    .locator("[data-card-tab]")
+    .first()
+    .waitFor({ state: "attached", timeout: 30000 })
+    .catch(() => {});
+  const strip = await card
+    .evaluate((c) => ({
+      tabs: [...c.querySelectorAll('[role="tablist"] [data-card-tab]')].map((b) => [
+        b.getAttribute("data-card-tab"),
+        b.textContent.trim(),
+      ]),
+      open: c.querySelector("[data-card-tab-open]")?.getAttribute("data-card-tab-open") ?? null,
+    }))
+    .catch(() => null);
+  check(
+    "2h. #148: the opened card draws the Explanation | Figures strip, open on Explanation",
+    JSON.stringify(strip?.tabs) ===
+      JSON.stringify([
+        ["explanation", "Explanation"],
+        ["figures", "Figures"],
+      ]) && strip.open === "explanation",
+    JSON.stringify(strip),
+  );
+  // 2g (ui-jobs 330): the opened card's T2 is the event sheet, which draws no
+  // ledger cell, so the Collateral and Debt rows' chevrons are gone with it;
+  // its one disclosure is the breakdown switch, at the right end of the row
+  // above the panels, on the Figures tab.
+  await waitOnFigures(card, "[data-sheet-switch]", 60000);
   const switchPlace = await card
     .locator("[data-sheet-controls]")
     .first()
@@ -366,14 +396,6 @@ const headerLayout = (card) =>
     "2g. #148: the sheet's breakdown switch stands at the right end of its row",
     !!switchPlace && switchPlace.rightGap >= 0 && switchPlace.rightGap <= 2,
     JSON.stringify(switchPlace),
-  );
-  const t3 = card.locator("[data-t3-toggle]").first();
-  const t3Gap = await chevGap(t3, "[data-t3-heading]");
-  const t3Name = await t3.getAttribute("aria-label").catch(() => null);
-  check(
-    "2h. #148: the explanation's chevron follows Event explanation, its name Show event explanation",
-    t3Gap != null && t3Gap >= 0 && t3Gap <= 8 && t3Name === "Show event explanation",
-    `${t3Gap}px, ${t3Name}`,
   );
   // 2i retired (ui-jobs 309 step 11): "no event ⋮ on the opened card". Since
   // ui-jobs 250 the event page is reached from the row's ⋮ ("View event page")
@@ -454,10 +476,17 @@ const headerLayout = (card) =>
     .locator('[data-anatomy="T1"] > div')
     .first()
     .click({ position: { x: 100, y: 20 } });
+  // T6 ends the explanation, on the opened card's Explanation tab (ui-jobs 370).
   await card
-    .locator("[data-t3-toggle]")
+    .locator('[data-anatomy~="T2"]')
     .first()
-    .click({ timeout: 30000 })
+    .waitFor({ state: "attached", timeout: 30000 })
+    .catch(() => {});
+  await showCardTab(card, "explanation");
+  await card
+    .locator('[data-anatomy="T6"]')
+    .first()
+    .waitFor({ state: "attached", timeout: 30000 })
     .catch(() => {});
   const t6 = await card
     .locator('[data-anatomy="T6"]')
@@ -969,11 +998,15 @@ for (const s of SHEET_WORDS_SUBJECTS) {
     1280,
     `${s.path}${s.path.includes("?") ? "&" : "?"}at=${encodeURIComponent(s.id)}`,
   );
-  const sheet = page.locator(`[data-event-id="${s.id}"] [data-anatomy~="T2"] [data-sheet]`).first();
-  const drawn = await sheet
-    .waitFor({ state: "attached", timeout: 180000 })
-    .then(() => true)
-    .catch(() => false);
+  // The sheet stands under the opened card's Figures tab (ui-jobs 370).
+  const row = page.locator(`[data-event-id="${s.id}"]`).first();
+  const sheet = row.locator('[data-anatomy~="T2"] [data-sheet]').first();
+  await row
+    .locator('[data-anatomy~="T2"]')
+    .first()
+    .waitFor({ state: "attached", timeout: 120000 })
+    .catch(() => {});
+  const drawn = await waitOnFigures(row, '[data-anatomy~="T2"] [data-sheet]', 120000);
   if (!check(`6. ${s.name}: the opened card draws the sheet`, drawn)) {
     await ctx.close();
     continue;

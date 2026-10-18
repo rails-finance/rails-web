@@ -44,6 +44,7 @@
 // Run:  BASE=http://localhost:3412 node scripts/verify/verify-polaris-psm-share.mjs
 
 import { chromium } from "playwright";
+import { showCardTab, waitOnFigures } from "./lib/card-tabs.mjs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -188,8 +189,9 @@ function forbiddenOnHead(e) {
   return out;
 }
 
-/** Open one row's card through `?at=`, its breakdown on and its explanation
- *  open; returns the head's, the sheet's PSM rows' and the explanation's text. */
+/** Open one row's card through `?at=`, its Figures tab with the breakdown on,
+ *  then its Explanation tab (ui-jobs 370); returns the head's, the sheet's PSM
+ *  rows' and the explanation's text. */
 async function readCard(page, e) {
   const row = page.locator(`[data-event-id="${cssEscape(e.id)}"]`).first();
   if ((await row.count()) === 0) return null;
@@ -201,6 +203,7 @@ async function readCard(page, e) {
       .innerText()
       .catch(() => "")) ?? ""
   ).replace(/\s+/g, " ");
+  await waitOnFigures(row, "[data-sheet]", 60000);
   const sw = row.locator("[data-sheet-switch]").first();
   if ((await sw.count()) > 0) await sw.evaluate((el) => el.click());
   await page.waitForTimeout(400);
@@ -216,8 +219,12 @@ async function readCard(page, e) {
     ).trim();
     psmRows.push({ label, amount });
   }
-  const tog = row.locator("[data-t3-toggle]").first();
-  if ((await tog.count()) > 0 && (await tog.getAttribute("aria-expanded")) !== "true") await tog.click();
+  await showCardTab(row, "explanation");
+  await row
+    .locator('[data-anatomy="T3"]')
+    .first()
+    .waitFor({ state: "attached", timeout: 15000 })
+    .catch(() => {});
   await page.waitForTimeout(600);
   const prose = (
     (await row

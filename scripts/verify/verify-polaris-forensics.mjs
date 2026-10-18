@@ -35,6 +35,7 @@
 // Run:  BASE=http://localhost:3414 node scripts/verify/verify-polaris-forensics.mjs
 
 import { chromium } from "playwright";
+import { showCardTab, waitOnFigures } from "./lib/card-tabs.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -153,8 +154,9 @@ async function open(context, url) {
   return page;
 }
 
-/** Expand one event row by its `event_key` and return its whole text,
- *  whitespace-collapsed. */
+/** Expand one event row by its `event_key`, show its Figures tab (ui-jobs
+ *  370: the sheet, the notes and the price row stand there, Explanation is the
+ *  default) and return its whole text, whitespace-collapsed. */
 async function expandRow(page, eventId) {
   const row = page.locator(`[data-event-id="${eventId}"]`);
   if ((await row.count()) === 0) return null;
@@ -166,6 +168,7 @@ async function expandRow(page, eventId) {
     await head.click();
     await page.waitForTimeout(500);
   }
+  await waitOnFigures(row, "[data-sheet], [data-price-row]", 60000);
   await page.waitForTimeout(300);
   return (await row.innerText()).replace(/\s+/g, " ");
 }
@@ -203,18 +206,15 @@ async function sheetFigure(page, eventId, scope, key, col) {
     .trim();
 }
 
-/** Open an expanded row's Explanation pane and return its text. */
+/** Show an expanded row's Explanation tab (ui-jobs 370) and return its text;
+ *  null when the card draws no explanation. */
 async function readExplanation(page, eventId) {
   const row = page.locator(`[data-event-id="${eventId}"]`);
-  const btn = row.getByRole("button", { name: /explanation/i }).first();
-  if ((await btn.count()) === 0) return null;
-  if ((await btn.getAttribute("aria-expanded")) !== "true") await btn.click();
-  // The pane mounts its bullets after the toggle; wait for them before reading.
-  await page
-    .waitForFunction((el) => /Event explanation\s*•/.test(el.innerText), await row.elementHandle(), { timeout: 15000 })
-    .catch(() => {});
+  if ((await showCardTab(row, "explanation")) === "stuck") return null;
   const pane = row.locator('[data-anatomy="T3"]').first();
-  return ((await pane.count()) ? await pane.innerText() : await row.innerText()).replace(/\s+/g, " ");
+  await pane.waitFor({ state: "attached", timeout: 15000 }).catch(() => {});
+  if ((await pane.count()) === 0) return null;
+  return (await pane.innerText()).replace(/\s+/g, " ");
 }
 
 console.log("Polaris — liquidation forensics valued at the block, and the gas clause\n");
@@ -354,7 +354,7 @@ for (const f of FIXTURES) {
   );
 
   const explained = await readExplanation(page, f.eventKey);
-  if (check(`2. ${key}'s Explanation pane opens`, explained != null)) {
+  if (check(`2. ${key}'s Explanation tab shows the explanation`, explained != null)) {
     check(
       `2c. ${key}'s liquidation row carries NO gas clause (the liquidator sent that transaction)`,
       !/Gas for this transaction/.test(explained),
