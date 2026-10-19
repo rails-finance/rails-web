@@ -8,7 +8,11 @@
 
 import { Prov } from "@/components/shared/provenance";
 import type { PositionPanelRow } from "@/components/shared/position-card";
-import { dolomiteRequirementProv, dolomiteCollateralizationProv } from "@/lib/dolomite/live-provenance";
+import {
+  dolomiteRequirementProv,
+  dolomiteCollateralizationProv,
+  dolomiteDropProv,
+} from "@/lib/dolomite/live-provenance";
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
 
 const pct2 = (f: number) => `${(f * 100).toFixed(2)}%`;
@@ -42,7 +46,7 @@ export function dolomiteRiskRows(chain: DolomiteChainResponse): PositionPanelRow
           {
             id: "liquidates-on-drop",
             label: "Liquidates on a drop of",
-            value: <>{dropPct}%</>,
+            value: <Prov info={dolomiteDropProv()}>{dropPct}%</Prov>,
             tip: "How far the collateral's value can fall, with the debt unchanged, before the margin ratio reaches the account's line. It is 1 minus the line divided by the margin ratio.",
           },
         ]

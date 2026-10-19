@@ -40,7 +40,7 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   positionCurrentProv,
@@ -55,7 +55,6 @@ import type { DolomiteCardCaptions } from "@/lib/dolomite/economics";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { dolomitePositionContent } from "@/lib/dolomite/position-content";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { formatUsd } from "@/lib/shared/format-event";
 import type {
   DolomitePositionSummary,
   DolomiteBalanceAmount,
@@ -72,7 +71,7 @@ import {
   dolomiteHasRisk,
   dolomiteRiskRows,
 } from "@/components/protocol/dolomite/dolomite-risk-slot";
-import { formatCompact } from "@/lib/shared/format-compact";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 
 export interface DolomitePositionView {
   owner: string;
@@ -198,11 +197,12 @@ function PeakLines({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
   );
 }
 
-/** The oracle-USD figure that leads a side, with its exact dollars on hover. */
+/** The oracle-USD figure that leads a side of several markets, in compact
+ *  dollars with the cents on hover. */
 function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   return (
-    <RevealTip tip={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
-      <Prov info={info}>{formatUsd(usd)}</Prov>
+    <RevealTip tip={formatUsdValue(usd)}>
+      <Prov info={info}>{formatCompactUsd(usd)}</Prov>
     </RevealTip>
   );
 }
@@ -376,9 +376,9 @@ export function useDolomiteCardSlots({
         assets: undefined,
         usd:
           usd != null ? (
-            <span className="font-bold text-green-400">
-              <UsdFigure usd={usd} info={dolomiteUsdProv(side === "supply" ? "Collateral" : "Borrowed")} />
-            </span>
+            <Prov info={dolomiteUsdProv(side === "supply" ? "Collateral" : "Borrowed")}>
+              <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+            </Prov>
           ) : null,
       };
     };
@@ -499,7 +499,9 @@ function marketBreakdown(
         ),
         usdText:
           usd != null ? (
-            <UsdFigure usd={usd} info={dolomiteUsdProv(`${r.symbol} ${side === "supply" ? "supplied" : "borrowed"}`)} />
+            <Prov info={dolomiteUsdProv(`${r.symbol} ${side === "supply" ? "supplied" : "borrowed"}`)}>
+              {formatUsdValue(usd)}
+            </Prov>
           ) : undefined,
       };
     }),

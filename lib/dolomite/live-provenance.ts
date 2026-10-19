@@ -66,3 +66,25 @@ export function dolomiteCollateralizationProv(): Provenance {
     ],
   };
 }
+
+/** The fall to the line: 1 − line ÷ collateralisation, over the two core
+ *  reads above. */
+export function dolomiteDropProv(): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: {
+      kind: "recompute",
+      text: "Re-run DolomiteMargin.getAdjustedAccountValues and getMarginRatioForAccount, divide the line by supply ÷ borrow and take it from 1.",
+    },
+    summary:
+      "The fall to the liquidation line — how far the collateral's value can drop, with the debt unchanged, before this account reaches its line: 1 − line ÷ collateralisation, rounded to a whole percent. Both inputs are the core's own reads at the same block; the subtraction and division are client arithmetic.",
+    contract: MARGIN,
+    via: `${LANE_VIA} · 1 − (1 + getMarginRatioForAccount) ÷ (adjusted supply ÷ adjusted borrow)`,
+    formula: "1 − line ÷ collateralisation",
+    inputs: [
+      { label: "collateralisation", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
+      { label: "liquidation line", kind: "chain", pclass: "state", note: "getMarginRatioForAccount @ head" },
+    ],
+  };
+}
