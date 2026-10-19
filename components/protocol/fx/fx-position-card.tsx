@@ -74,7 +74,8 @@ import { formatDate } from "@/lib/date";
 import { FX_POOLS, fxPositionSlug } from "@/lib/fx/asset-catalog";
 import { fxPositionContent } from "@/lib/fx/position-content";
 import { formatExact, formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
@@ -349,7 +350,7 @@ function ratioRows(
       value: (
         <>
           <Prov info={px ? oracleLegAtProv("anchor", sym, px.block) : anchorPriceProv(sym, v.settled.block)}>
-            {formatCompactUsd(anchor)}
+            {formatLiquidationPrice(anchor)}
           </Prov>{" "}
           per {sym}
           {v.settled.block != null ? (
@@ -370,7 +371,7 @@ function ratioRows(
       value: (
         <>
           <Prov info={minRatioProv(px.block)}>{(minRatio * 100).toFixed(1)}%</Prov> at{" "}
-          <Prov info={oracleLegAtProv("min", sym, px.block)}>{formatCompactUsd(px.min)}</Prov>
+          <Prov info={oracleLegAtProv("min", sym, px.block)}>{formatLiquidationPrice(px.min)}</Prov>
         </>
       ),
       tip: "The debt ratio judged at the oracle's min price, the price the pool's lines are judged at. It sits at or above the ratio at the anchor price.",
@@ -455,8 +456,8 @@ function ratioRows(
             label: "Rebalances at",
             value: (
               <>
-                <Prov info={minTriggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatCompactUsd(rb)}</Prov> min
-                price ({fall(rb, px.min)})
+                <Prov info={minTriggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatLiquidationPrice(rb)}</Prov>{" "}
+                min price ({fall(rb, px.min)})
               </>
             ),
             tip: reachTip("rebalance"),
@@ -466,8 +467,8 @@ function ratioRows(
             label: "Liquidates at",
             value: (
               <>
-                <Prov info={minTriggerPriceProv(pctLine(terms.liquidateRatio), sym)}>{formatCompactUsd(lq)}</Prov> min
-                price ({fall(lq, px.min)})
+                <Prov info={minTriggerPriceProv(pctLine(terms.liquidateRatio), sym)}>{formatLiquidationPrice(lq)}</Prov>{" "}
+                min price ({fall(lq, px.min)})
               </>
             ),
             tip: reachTip("liquidation"),
@@ -488,8 +489,8 @@ function ratioRows(
         label: "Rebalances at",
         value: (
           <>
-            <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatCompactUsd(at)}</Prov> anchor price
-            ({fall(at, anchor)})
+            <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatLiquidationPrice(at)}</Prov> anchor
+            price ({fall(at, anchor)})
           </>
         ),
         tip: reachTip("rebalance"),
