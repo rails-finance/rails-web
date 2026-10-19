@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
 import { loadFrankencoinPositionTail } from "@/lib/frankencoin/position-page-data";
-import { frankencoinEventHeading, frankencoinEventPageDescription } from "@/lib/frankencoin/explorer";
+import { frankencoinEventPageDescription, frankencoinEventPageTitle } from "@/lib/frankencoin/explorer";
 import FrankencoinPositionPage from "../../page";
 
 interface Props {
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "frankencoin",
     subject: position ?? raw,
     canonicalPath: `/ethereum/frankencoin/${position ?? raw}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: frankencoinEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: frankencoinEventPageTitle(event), timestamp: event.timestamp } : null,
     description:
       event && position && tail?.position
         ? frankencoinEventPageDescription(tail.position.collateralSymbol, position, event.timestamp)

@@ -3,10 +3,13 @@
 // One Sky Savings event on the timeline: a Deposit, Withdrawal, Received, Sent
 // or Transfer to self, from the sealed sUSDS ledger. The disclosure ladder
 // (rails-ops standards/detail-page-anatomy.md):
-//   T1 — the header: the verb and the amounts, each unit named in words (USDS
-//        and sUSDS on a deposit or withdrawal; sUSDS and its USDS worth on a
-//        transfer, with the other address), who deposited when it was another
-//        address, and the referral code a deposit carried.
+//   T1 — the header. On the timeline (rails-ops decision 0045) the
+//        past-participle kind, the other address as its clause (a transfer's
+//        counterparty, who deposited when it was another address, the
+//        recipient a withdrawal named) and the referral code a deposit
+//        carried; the spine carries the amounts, a transfer's on the flank its
+//        balance moved by. The event page's card keeps the verb and the
+//        amounts, each unit named in words.
 //   T2 — the opened card, a balance sheet (sky-savings-sheet.tsx); the cells below
 //        stand for a kind the sheet cannot state: sUSDS held and its worth before → after as cells,
 //        the interest earned to date and since the previous event under the
@@ -27,6 +30,7 @@ import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import {
   compactAmount,
+  PartyChip,
   type ChainTruthDelta,
   type ChainTruthRowSpec,
   type ChainTruthStat,
@@ -65,7 +69,9 @@ import {
   type SkyEventCoords,
 } from "@/lib/sky-savings/provenance";
 import { skySavingsSheet } from "@/components/protocol/sky-savings/sky-savings-sheet";
-import { SKY_EVENT_LABEL } from "@/lib/sky-savings/event-label";
+import { SKY_EVENT_LABEL, SKY_T1, skyT1Caption, skyT1Party } from "@/lib/sky-savings/event-label";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
 import { skyEventContent } from "@/lib/sky-savings/learn-more";
 import { skyEventBullets, skyInterestSince, type SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -168,7 +174,15 @@ export function SkySavingsEventCard({
       suffix: USDS.symbol,
       noSpineCounterpart: true,
     });
-    tokens.push({ symbol: SUSDS.symbol, address: SUSDS.address, badge: "send" });
+    // The paper plane, its sUSDS on the flank the balance moved by.
+    tokens.push({
+      symbol: SUSDS.symbol,
+      address: SUSDS.address,
+      badge: "send",
+      direction: kind === "sent" ? "left" : "right",
+      value: Math.abs(sharesMoved),
+      verb: kind === "sent" ? SKY_T1.legSent : SKY_T1.legReceived,
+    });
   }
 
   const holder = c.holder.toLowerCase();
@@ -182,19 +196,31 @@ export function SkySavingsEventCard({
           ? { prefix: "to", address: other, prov: eventCounterpartyProv(coords, kind) }
           : undefined;
   const referralProv = c.referral != null ? eventReferralProv(coords, c.referral) : null;
-  const spec: ChainTruthRowSpec = {
-    label: SKY_EVENT_LABEL[kind],
-    custody: isTransfer,
-    custodyLabel: isTransfer,
-    deltas,
-    party,
-    // The referral code rides the header's trailing chip, as an echo of the
-    // code's receipt in the opened card.
-    ratioChip:
-      referralProv && c.referral != null
-        ? { text: `Referral ${c.referral}`, value: String(c.referral), prov: referralProv }
-        : undefined,
-  };
+  // The referral code rides the header's trailing chip, as an echo of the
+  // code's receipt in the opened card.
+  const ratioChip =
+    referralProv && c.referral != null
+      ? { text: `Referral ${c.referral}`, value: String(c.referral), prov: referralProv }
+      : undefined;
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
+  const t1Party = skyT1Party(c);
+  const spec: ChainTruthRowSpec = page
+    ? {
+        label: SKY_EVENT_LABEL[kind],
+        custody: isTransfer,
+        custodyLabel: isTransfer,
+        deltas,
+        party,
+        ratioChip,
+      }
+    : {
+        label: SKY_T1.kind[kind],
+        deltas: [],
+        clauses: t1Party && party ? [<PartyChip key="party" party={{ ...party, prefix: t1Party.lead }} />] : undefined,
+        ratioChip,
+      };
 
   // ── T2 ────────────────────────────────────────────────────────────────────
   const sharesChanged = t.sharesDelta !== BigInt(0);
@@ -339,7 +365,7 @@ export function SkySavingsEventCard({
     },
     spine,
     head: spec,
-    caption: SKY_EVENT_LABEL[kind],
+    caption: page ? SKY_EVENT_LABEL[kind] : skyT1Caption(c),
     // A transfer received: the sender acted (ui-jobs 304).
     actor: kind === "received" ? { byOwner: false } : undefined,
     cells,

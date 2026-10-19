@@ -1,13 +1,22 @@
 "use client";
 
 // MakerDAO event header (chain-state tier) — adapter onto the shared ChainTruthRow
-// grammar. Maps the frob/grab deltas (signed dink collateral, and the debt
-// dart × rate at the block) into the shared row spec; each value traces via <Prov>. No collateral
-// ratio, no APR — those are layers, absent from the baseline.
+// grammar.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`makerT1Kind`, lib/makerdao/head-words.ts), a give's
+// new owner as its clause, the pink "by" chip where a third party acted. The
+// spine carries the figures; a fork's debt, which moves with the collateral
+// and has no spine row, is in the Figures sheet and the Explanation.
+//
+// The event page's card (mode "title") maps the frob/grab deltas (signed dink
+// collateral, and the debt dart × rate at the block) into the shared row
+// spec; each value traces via <Prov>.
 
 import type { AssetFlow, MakerDAOContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { makerT1Kind } from "@/lib/makerdao/head-words";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import {
   dinkProv,
@@ -44,6 +53,9 @@ export interface MakerDAOEventHeaderProps {
   /** A give row: the owner before and after, and its transaction's read. */
   ownership?: MakerOwnershipStep;
   txContext?: MakerTxContext;
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
 }
 
 /** T1's head row spec (the card's `head` slot). */
@@ -59,6 +71,7 @@ export function useMakerHeadSpec({
   flows,
   ownership,
   txContext,
+  mode = "title",
 }: MakerDAOEventHeaderProps): ChainTruthRowSpec {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const dink = Number(ctx.dink) || 0;
@@ -113,6 +126,33 @@ export function useMakerHeadSpec({
   const toChip = ownership ? ownerChipText(ownership.after, txContext) : null;
   const fromChip = ownership ? ownerChipText(ownership.before, txContext) : null;
 
+  const party: ChainTruthRowSpec["party"] = giveTo
+    ? {
+        prefix: "to",
+        address: toChip?.address || giveTo,
+        ...(toChip?.name ? { name: toChip.name } : {}),
+        prov: ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords),
+      }
+    : undefined;
+  const externalActor =
+    externalBy && ownerForReceipt && ctx.txFrom && ctx.txTo
+      ? {
+          address: externalBy,
+          prov: externalActorProv({ owner: ownerForReceipt, txFrom: ctx.txFrom, txTo: ctx.txTo }, coords),
+        }
+      : undefined;
+
+  if (mode === "row")
+    return {
+      label: makerT1Kind(ctx),
+      status: isOpen ? "open" : undefined,
+      critical: ctx.eventType === "grab" || ctx.eventType.startsWith("lse-"),
+      deltas: [],
+      // A give's new owner is the clause after "Transferred".
+      clauses: party ? [<PartyChip key="party" party={party} />] : undefined,
+      externalActor,
+    };
+
   return {
     label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
     status: isOpen ? "open" : undefined,
@@ -122,20 +162,7 @@ export function useMakerHeadSpec({
       fromChip && fromChip.address
         ? { prefix: "from", address: fromChip.address, name: fromChip.name, prov: ownerBeforeProv(coords) }
         : undefined,
-    party: giveTo
-      ? {
-          prefix: "to",
-          address: toChip?.address || giveTo,
-          ...(toChip?.name ? { name: toChip.name } : {}),
-          prov: ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords),
-        }
-      : undefined,
-    externalActor:
-      externalBy && ownerForReceipt && ctx.txFrom && ctx.txTo
-        ? {
-            address: externalBy,
-            prov: externalActorProv({ owner: ownerForReceipt, txFrom: ctx.txFrom, txTo: ctx.txTo }, coords),
-          }
-        : undefined,
+    party,
+    externalActor,
   };
 }

@@ -1,15 +1,21 @@
 "use client";
 
-// Maple event header — adapter onto the shared ChainTruthRow grammar. Maps
-// the signed amount(s) this event moved into the shared row spec; traces via
-// <Prov>. Value-bearing events (deposit / withdraw / fill) lead with the
-// asset amount; queue and transfer events lead with the share amount. A
-// genuinely external action (someone else moved the position) gets the pink
-// external-actor chip.
+// Maple event header — adapter onto the shared ChainTruthRow grammar.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`mapleT1Kind`, lib/maple/event-label.ts), a
+// transfer's counterparty as its clause, and the pink "by" chip where someone
+// else moved the position. The spine carries the figures; a fill's wait since
+// its request is a note in the Figures sheet.
+//
+// The event page's card (mode "title") maps the signed amount(s) this event
+// moved into the shared row spec, each traced via <Prov>. Value-bearing events
+// (deposit / withdraw / fill) lead with the asset amount; queue and transfer
+// events lead with the share amount.
 
 import type { AssetFlow, MapleContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   flankedLegProv,
   sharesLegProv,
@@ -20,7 +26,14 @@ import {
 import { getKnownInfrastructure } from "@/lib/shared/known-infrastructure";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatWait } from "@/lib/maple/row-times";
-import { TRANSFER_LABEL } from "@/lib/maple/event-label";
+import {
+  isRouterDeposit,
+  isSyrupRouter,
+  mapleT1Kind,
+  mapleT1PartyName,
+  MAPLE_T1,
+  TRANSFER_LABEL,
+} from "@/lib/maple/event-label";
 import { formatNumber } from "@/lib/utils/format";
 
 export interface MapleEventHeaderProps {
@@ -44,11 +57,10 @@ export interface MapleEventHeaderProps {
   flows?: AssetFlow[];
   /** Queue fills: unix seconds of the request this fill paid, where loaded. */
   requestAt?: number;
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
 }
-
-/** A Maple SyrupRouter: shares it sends are the receiving wallet's own deposit. */
-const isSyrupRouter = (address: string | null | undefined): boolean =>
-  getKnownInfrastructure(address, MAINNET_CHAIN_ID)?.contractName === "SyrupRouter";
 
 /** T1's head row spec (the card's `head` slot). */
 export function useMapleHeadSpec({
@@ -62,6 +74,7 @@ export function useMapleHeadSpec({
   wallet,
   flows,
   requestAt,
+  mode = "title",
 }: MapleEventHeaderProps): ChainTruthRowSpec {
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const deltas: ChainTruthDelta[] = [];
@@ -132,6 +145,36 @@ export function useMapleHeadSpec({
           }
         : undefined;
 
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.caller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+            coords,
+          ),
+          tip: isTransfer
+            ? "“by” is the address that sent the transaction; “from” is the wallet the shares came from."
+            : undefined,
+        }
+      : undefined;
+
+  if (mode === "row") {
+    // A transfer's counterparty is the clause; shares from the SyrupRouter
+    // read as the wallet's deposit made through it.
+    const clause = party && {
+      ...party,
+      prefix: isRouterDeposit(ctx) ? MAPLE_T1.through : party.prefix,
+      name: mapleT1PartyName(party.address),
+    };
+    return {
+      label: mapleT1Kind(ctx),
+      deltas: [],
+      clauses: clause ? [<PartyChip key="party" party={clause} />] : undefined,
+      externalActor,
+    };
+  }
+
   return {
     label: isTransfer ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL] : actionLabel,
     // A transfer is a custody row: `Shares received 400 ◎ from 0x…`, the
@@ -140,19 +183,7 @@ export function useMapleHeadSpec({
     custodyLabel: isTransfer,
     deltas,
     note,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.caller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-              coords,
-            ),
-            tip: isTransfer
-              ? "“by” is the address that sent the transaction; “from” is the wallet the shares came from."
-              : undefined,
-          }
-        : undefined,
+    externalActor,
     party,
   };
 }

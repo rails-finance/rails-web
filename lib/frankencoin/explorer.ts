@@ -7,6 +7,7 @@ import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isFrankencoinEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle, type EventTitleAmount } from "@/lib/shared/event-title";
+import { frankencoinEventProse, frankencoinExplanationRuns } from "@/lib/frankencoin/event-prose";
 
 const WORDS = {
   paragraph: "This page is one transaction from this position's history.",
@@ -106,6 +107,20 @@ export function frankencoinEventTitle(event: BaseActivityEvent): EventTitle {
 /** The event's heading: the title in words. Also read on the server. */
 export function frankencoinEventHeading(event: BaseActivityEvent): string {
   return eventTitleWords(frankencoinEventTitle(event));
+}
+
+/** The browser title's event words: the Explanation's first sentence, which
+ *  the page's h1 states (rails-ops decision 0045, "Ruled since"), read from
+ *  the row alone; else the heading. Also read on the server. */
+export function frankencoinEventPageTitle(event: BaseActivityEvent): string {
+  if (!isFrankencoinEvent(event)) return frankencoinEventHeading(event);
+  const prose = frankencoinEventProse({
+    ctx: event.context.data,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+  });
+  return frankencoinExplanationRuns(prose)[0]?.sentences[0]?.text ?? frankencoinEventHeading(event);
 }
 
 /** The page's metadata description, also read on the server. */

@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 import { decodeEventId, eventMetadata } from "@/lib/shared/page-metadata";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { skyPositionHref } from "@/lib/sky-savings/constants";
-import { skySavingsEventHeading, skySavingsEventPageDescription } from "@/lib/sky-savings/explorer";
+import { skySavingsEventPageDescription, skySavingsEventPageTitle } from "@/lib/sky-savings/explorer";
 import { loadSkyPosition } from "@/lib/sky-savings/position-page-data";
 import SkySavingsPositionPage from "../../page";
 
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "sky-savings",
     subject: address ? shortAddress(h) : h,
     canonicalPath: `${skyPositionHref(h)}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: skySavingsEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: skySavingsEventPageTitle(event), timestamp: event.timestamp } : null,
     description: event ? skySavingsEventPageDescription(h, event.timestamp) : undefined,
     image: "explorer",
   });

@@ -9,14 +9,17 @@ import type { BaseActivityEvent, MorphoContext } from "@/lib/shared/types/event-
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { gasPrice } from "@/components/shared/event-price-row";
 import { useMorphoNeighbours } from "@/lib/morpho/timeline-neighbours";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { MORPHO_LEG_WORDS, morphoT1Kind } from "@/lib/morpho/head-words";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { useMorphoHeadSpec } from "./morpho-event-header";
 import { useMorphoCells, useMorphoOpened } from "./morpho-cells";
 import { morphoGroupLanes } from "./morpho-sheet";
 import { MorphoLedgerProvider } from "./morpho-ledger";
-import { MorphoEventExplainer, morphoLearnMoreContent } from "./morpho-event-explainer";
+import { MorphoEventExplainer, MorphoExplainerLead, morphoLearnMoreContent } from "./morpho-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { type MorphoCoords } from "@/lib/morpho/event-provenance";
 
@@ -68,8 +71,32 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
   // permissionless, and an unnamed symbol reaches neither icon CDN and draws
   // its initial letter. The event's flows record the transfer; soleFlowAddress
   // reads it under the single-match rule.
+  // A liquidation's legs, the collateral seized below the debt it cleared
+  // (the Liquidate log's repaid assets plus any bad debt): the warning node's
+  // flank carries them.
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!isLiq) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    if (mag !== 0)
+      legs.push({
+        label: MORPHO_LEG_WORDS.seized,
+        value: mag,
+        symbol: sym,
+        address: soleFlowAddress(event.flows, sym),
+      });
+    const cleared = Number(ctx.loanRepaid);
+    if (Number.isFinite(cleared) && cleared > 0)
+      legs.push({
+        label: MORPHO_LEG_WORDS.cleared,
+        value: cleared,
+        symbol: ctx.loanSymbol,
+        address: soleFlowAddress(event.flows, ctx.loanSymbol),
+      });
+    return legs;
+  })();
+
   const spine: SpineColumnProps = isLiq
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : {
         tokens:
           mag === 0
@@ -86,7 +113,11 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
         isLast: !!isLast,
       };
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useMorphoHeadSpec({
+    mode: page ? "title" : "row",
     actionLabel: event.actionLabel,
     ctx,
     txHash: event.txHash,
@@ -113,7 +144,7 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption: page ? event.actionLabel : morphoT1Kind(ctx.eventType),
     actor: { by: extBy ?? undefined },
     cells,
     groupLanes: morphoGroupLanes(ctx, coords, event.flows, event.actionLabel),
@@ -128,8 +159,21 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
     },
     price,
     useOpened: () => useMorphoOpened(ctx, coords, event.flows, cells, price, event.actionLabel),
+    // The event page's title is the Explanation's first sentence (rails-ops
+    // decision 0045, "Ruled since"); the pane there opens on the second.
     explainer: {
-      body: <MorphoEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />,
+      body: (
+        <MorphoEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          eventId={event.id}
+          leadOnTitle={page}
+        />
+      ),
+      first: page ? (
+        <MorphoExplainerLead ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />
+      ) : undefined,
     },
     learnMore: <LearnMore inline content={morphoLearnMoreContent(ctx)} />,
   };

@@ -96,6 +96,7 @@ for (const [label, path] of ROUTES.filter(([label]) => label.includes(ROUTE_FILT
           // must read as the people glyph (delegate), never the generic
           // zero-delta equals sign — the party changing IS the event.
           const label = (card.innerText || "").trim().slice(0, 40).replace(/\s+/g, " ");
+          // The timeline head reads "Transferred · to 0x…" since ui-jobs 367.
           if (/Ownership Transferred|Owner set at creation|Transferred( ·)? to/i.test(label)) {
             const svg = well.querySelector("svg");
             const isPeople = !!svg && /circle cx="9"|M16 21v-2/.test(svg.innerHTML);
