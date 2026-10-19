@@ -36,7 +36,7 @@ export const AAVE_V3_ARBITRUM_PAGE: AaveV3PoolPageDeployment = {
   sourceLabel: "the Aave V3 Pool on Arbitrum",
   card: AAVE_V3_ARBITRUM_LIVE_CARD_DEPLOYMENT,
   key: "aave-v3-arbitrum",
-  flows: { family: "aave-v3-arbitrum", chainId: AAVE_V3_ARBITRUM_CHAIN_ID, routeless: true },
+  flows: { family: "aave-v3-arbitrum", chainId: AAVE_V3_ARBITRUM_CHAIN_ID, routeless: true, noDailyStore: true },
   writeOff: { firstBlock: AAVE_V3_ARBITRUM_FIRST_WRITE_OFF_BLOCK, chain: "Arbitrum" },
   captureSourceOf: (coverage) => (coverage?.source === "tenderly" ? "tenderly" : "etherscan"),
   wholeOf: aaveV3ArbitrumWholeLife,

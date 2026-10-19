@@ -48,6 +48,9 @@ export interface AaveV3BaseFlowsInput {
   /** No server replay serves this lane (Aave V3 Arbitrum): a history the page
    *  cannot hold whole is a failed read. */
   routeless?: boolean;
+  /** The daily price store holds no series for this lane (Aave V3 Arbitrum):
+   *  skip the read, and each reserve carries its last event's price. */
+  noDailyStore?: boolean;
   wallet: string;
   /** The page's history is elided (`coverage.omitted`): the server's replay
    *  answers without a flat read first. */
@@ -167,6 +170,10 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
   const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
   useEffect(() => {
     if (!want) return;
+    if (p.noDailyStore) {
+      setDaily({ key: want.key, prices: null });
+      return;
+    }
     const ac = new AbortController();
     fetchDailyPrices(
       chain,
@@ -187,7 +194,7 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     return () => ac.abort();
     // `want.key` stands for the reserves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [want?.key, want?.from, family, chain]);
+  }, [want?.key, want?.from, family, chain, p.noDailyStore]);
   const dailySettled = want != null && daily?.key === want.key;
 
   // Set on mount, so the server's render and the first client render agree.

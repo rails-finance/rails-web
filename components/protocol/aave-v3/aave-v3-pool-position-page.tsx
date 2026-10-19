@@ -151,7 +151,7 @@ export interface AaveV3PoolPageDeployment {
   card: AaveV3CardDeployment;
   /** Prefix for settle marks, storage keys and file names. */
   key: string;
-  flows: Pick<AaveV3BaseFlowsInput, "family" | "routeless" | "chainId">;
+  flows: Pick<AaveV3BaseFlowsInput, "family" | "routeless" | "chainId" | "noDailyStore">;
   /** The block of the Pool's first DeficitCreated, and the chain the note names. */
   writeOff: { firstBlock: number; chain: string };
   /** Which store answered, for the cards' custody lines and the footer. */
