@@ -1110,7 +1110,7 @@ templates:
         when: |-
           the trove has debt before and after
         text: |-
-          The trove is safer: {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+          {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
     order:
       - add.what
       - add.liq_distance
@@ -1150,7 +1150,7 @@ templates:
         when: |-
           the trove has debt before and after
         text: |-
-          The trove is less safe: {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+          {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
     order:
       - withdraw.what
       - withdraw.liq_distance
@@ -1195,7 +1195,7 @@ templates:
         when: |-
           the trove has debt before and after
         text: |-
-          The trove is less safe: {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+          {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
     order:
       - borrow.what
       - borrow.what_fee
@@ -1238,7 +1238,7 @@ templates:
         when: |-
           the trove has debt before and after
         text: |-
-          The trove is safer: {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+          {coll_symbol} would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
     order:
       - repay.what
       - repay.liq_distance
@@ -2109,7 +2109,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidations Work
+      How liquidations work
     intro: |-
       A trove can be liquidated once its collateral ratio falls below {min_cr} for {coll_type}, a maximum LTV of {max_ltv}. Anyone can trigger the liquidation.
     detailsHeading: |-
@@ -2147,7 +2147,7 @@ L5:
 
   open:
     title: |-
-      How Borrowing Works
+      How borrowing works
     intro: |-
       Liquity V2 lets a borrower deposit collateral into a Trove and borrow BOLD against it. The interest rate set at opening decides redemption risk: a higher rate costs more and sits later in the redemption queue.
     detailsHeading: |-
@@ -2185,7 +2185,7 @@ L5:
 
   close:
     title: |-
-      How Closing a Trove Works
+      How closing a trove works
     intro: |-
       Closing a trove repays its entire debt and returns the collateral, ending the position.
     # A close with no debt left (a redemption cleared it): intro_zero_debt and
@@ -2222,7 +2222,7 @@ L5:
 
   interest_rate:
     title: |-
-      How Interest Rates Work
+      How interest rates work
     intro: |-
       Each trove carries an annual interest rate that is added to its debt over time. The borrower can change the rate at any time, or delegate it to a batch manager that sets one rate for many troves.
     intro_delegated: |-
@@ -2257,7 +2257,7 @@ L5:
 
   delegation:
     title: |-
-      How Interest Delegation Works
+      How interest delegation works
     intro: |-
       A trove can hand its interest rate to a batch manager. The manager sets one rate for a group of troves and charges a management fee.
     detailsHeading: |-
@@ -2285,7 +2285,7 @@ L5:
 
   transfer:
     title: |-
-      How Trove Transfers Work
+      How trove transfers work
     intro: |-
       A trove is an ERC-721 NFT, so its ownership can be transferred to another wallet like any other token.
     detailsHeading: |-
@@ -2313,7 +2313,7 @@ L5:
 
   fallback:
     title: |-
-      How Liquity V2 Troves Work
+      How Liquity V2 troves work
     intro: |-
       Liquity V2 lets a borrower take out BOLD against collateral in a trove — a self-custodied position represented by an NFT.
     detailsHeading: |-

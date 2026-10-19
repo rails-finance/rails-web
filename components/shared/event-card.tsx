@@ -596,10 +596,12 @@ function EventCardView(props: EventCardProps) {
       {explainer}
     </>
   ) : null;
-  const footerNode = txHash ? <EventCardFooter learnMore={learnMore} /> : undefined;
+  // The event page carries Learn more under its h1 (`EventPageAside`); T6
+  // draws on the timeline card only.
+  const footerNode = txHash && !pageMode ? <EventCardFooter learnMore={learnMore} /> : undefined;
   const hasFigures = hasPanel || hasPriceRow(price);
   const tabbed = !pageMode && hasExplainer && hasFigures;
-  // The explanation, with the Learn more "?" at its end. The strip and the
+  // The explanation, with the Learn more "?" at its end on a timeline card. The strip and the
   // explanation start on the head's text (its `pl-5`).
   const explanationRegion = hasExplainer ? (
     <div className="pb-1 pl-5 pr-4" data-anatomy="T3" data-prov-exempt="">
@@ -884,6 +886,7 @@ function EventCardView(props: EventCardProps) {
                   page={page}
                   sentence={pageSentence}
                   beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
+                  learnMore={learnMore}
                 />
               </div>
             ) : (

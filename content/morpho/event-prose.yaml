@@ -392,12 +392,12 @@ shared_sentences:
     when: |-
       the event raised the price fall the position can take
     text: |-
-      The position is safer: {coll_symbol} would now need to fall {fall_after} to reach liquidation, against {fall_before} before.
+      {coll_symbol} would now need to fall {fall_after} to reach liquidation, against {fall_before} before.
   liq.less_safe:
     when: |-
       the event lowered the price fall the position can take
     text: |-
-      The position is less safe: {coll_symbol} would now need to fall {fall_after} to reach liquidation, against {fall_before} before.
+      {coll_symbol} would now need to fall {fall_after} to reach liquidation, against {fall_before} before.
   liq.after:
     when: |-
       the position has debt after the event, and none before or no change in its distance to liquidation

@@ -480,12 +480,12 @@ shared_sentences:
     when: |-
       the event raised the health factor, and the state read landed
     text: |-
-      The account is safer: collateral value could now fall {fall_after} against the debt before liquidation, up from {fall_before}.
+      Collateral value could now fall {fall_after} against the debt before liquidation, up from {fall_before}.
   hf.less_safe:
     when: |-
       the event lowered the health factor, and the state read landed
     text: |-
-      The account is less safe: collateral value could now fall {fall_after} against the debt before liquidation, down from {fall_before}.
+      Collateral value could now fall {fall_after} against the debt before liquidation, down from {fall_before}.
   hf.first:
     when: |-
       the account had no debt before and has some now

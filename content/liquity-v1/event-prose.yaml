@@ -476,12 +476,12 @@ shared_sentences:
     when: |-
       the event raised the room above 110%
     text: |-
-      The Trove is safer: ETH would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+      ETH would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
   liq.less_safe:
     when: |-
       the event lowered the room above 110%
     text: |-
-      The Trove is less safe: ETH would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+      ETH would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
 
 # ── Templates: one per kind of event ──
 #   id          the template's id

@@ -27,7 +27,7 @@
 //      driving the browser at the proxy routes the server's own read back
 //      through it. The `patched > 0` assertion below was already here and is
 //      what caught the rot — keep it.
-//   §3 Liquity V2 "How Borrowing Works" modal (real data, on a BATCHED trove —
+//   §3 Liquity V2 "How borrowing works" modal (real data, on a BATCHED trove —
 //      that modal also serves openTroveAndJoinBatch): its Interest-rate line
 //      must name the delegation route, not assert the borrower alone sets it.
 //   §4 the fork never-empty-floor modal's copy, asserted at module level: it
@@ -198,7 +198,7 @@ console.log("§2 fork explainer — BATCHED rate adjust (timeline response rewri
 }
 
 // ── §3 Liquity V2 borrowing modal on a BATCHED trove (real data) ────────────
-console.log("§3 Liquity V2 'How Borrowing Works' modal — on a batched trove");
+console.log("§3 Liquity V2 'How borrowing works' modal — on a batched trove");
 {
   const page = await browser.newPage();
   await page.goto(BASE + V2_BATCHED, { waitUntil: "networkidle", timeout: 120000 });
@@ -234,7 +234,7 @@ console.log("§3 Liquity V2 'How Borrowing Works' modal — on a batched trove")
     const d = document.querySelector(sel);
     return d ? d.innerText : "";
   }, MODAL_SEL);
-  assert(/How Borrowing Works/i.test(modal), "the borrowing modal is the one open");
+  assert(/How borrowing works/i.test(modal), "the borrowing modal is the one open");
   assert(
     /the borrower sets the rate,? or delegates it to a batch manager/.test(modal),
     "the modal names the delegation route",

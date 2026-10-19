@@ -5,9 +5,10 @@ export interface EventCardFooterProps {
   learnMore?: React.ReactNode;
 }
 
-/** T6, the foot of the open explanation: the "?" at the bottom right, as C4
- *  sits at the foot of C3 (rails-ops TO-DO-ui-jobs 281). The event menu
- *  stands at the header's right end (ui-jobs 295). */
+/** T6, the foot of the open explanation on a timeline card: the "?" at the
+ *  bottom right, as C4 sits at the foot of C3 (rails-ops TO-DO-ui-jobs 281).
+ *  The event page draws no T6; its Learn more is a link under the h1 (ui-jobs
+ *  380). The event menu stands at the header's right end (ui-jobs 295). */
 export function EventCardFooter({ learnMore }: EventCardFooterProps) {
   if (learnMore == null) return null;
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useState, useCallback, useContext, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 // ── Content types ────────────────────────────────────────────────────────────
@@ -265,6 +265,11 @@ export function LearnMoreModal({
 
 // ── Convenience wrapper: ? button + modal together ───────────────────────────
 
+/** True where a `LearnMore` draws as a text link reading the modal's title in
+ *  place of the "?" (the event page's side column, ui-jobs 380); `label` is
+ *  not drawn there. */
+export const LearnMoreAsLinkContext = createContext(false);
+
 // `inline` drops the bottom-right panel placement (justify-end + mt-3) so the
 // "?" trigger can sit centered next to a heading instead of anchored to the
 // corner of an explainer panel.
@@ -291,6 +296,24 @@ export function LearnMore({
 }) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
+  const asLink = useContext(LearnMoreAsLinkContext);
+
+  if (asLink) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="cursor-pointer text-left text-sm text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 rounded-sm dark:text-blue-400"
+          data-anatomy={anatomy ?? "T4"}
+          data-event-page-learn-more=""
+        >
+          {content.title}
+        </button>
+        {open && <LearnMoreModal content={content} onClose={close} anatomy={anatomy ?? "T4"} extra={extra} />}
+      </>
+    );
+  }
 
   return (
     <>

@@ -16,6 +16,11 @@
 //
 // Every failure names the file, the string id, the zone, the rule and the count.
 //
+// Banned terms (ui-jobs 380): the plain-zone strings of a strings file (Z1, Z2)
+// use no word of BANNED_TERMS; Z4 is exempt. A hit already in a family's file
+// when the rule landed is held in BANNED_LISTED for that family's sweep job:
+// listed, not failed.
+//
 // What it reads
 //   Z2 event sentences, shared sentences, payout legs: content/*/event-prose.yaml
 //       `templates`, `shared_sentences`. The pane's worst case is computed from
@@ -321,6 +326,45 @@ export function checkReveal(where, zone, paragraphs) {
   }
 }
 
+// ── Plain-zone strings: banned terms ─────────────────────────────────────────
+
+/** Words a plain-zone string (Z1–Z3) does not use (ui-jobs 380); Z4 is exempt.
+ *  Whole word or phrase, any case; placeholders are not read. */
+const BANNED_TERMS = [
+  ["value word", ["safe", "safer", "risky", "riskier", "healthy", "dangerous", "good", "bad", "cheap", "expensive", "protect", "opportunity"]],
+  ["directive", ["should", "recommend"]],
+  ["intensifier", ["noticeably", "significantly", "dangerously"]],
+  ["motive phrase", ["in order to", "to keep", "keeping"]],
+  ["address", ["you", "your"]],
+];
+const BANNED_RE = BANNED_TERMS.flatMap(([kind, terms]) =>
+  terms.map((term) => ({ kind, term, re: new RegExp(`(?<![\\p{L}\\p{N}_'’])${term.replace(/ /g, "\\s+")}(?![\\p{L}\\p{N}_'’])`, "iu") })),
+);
+/** Strings-file hits held for the family's sweep job: listed, not failed.
+ *  "file id term" per entry; a stale entry fails. */
+const BANNED_LISTED = new Set([
+  "content/compound-v2/event-prose.yaml position_words.lead_borrowing healthy",
+  "content/compound-v2/event-prose.yaml position_words.lead_debt_free safe",
+  "content/frankencoin/event-prose.yaml position_words.denied good",
+  "content/frankencoin/event-prose.yaml position_words.disabled good",
+  "content/frankencoin/event-prose.yaml frankencoin.denied/denied.next good",
+]);
+const bannedSeen = new Set();
+const bannedListed = [];
+
+export function checkBanned(where, text, zone) {
+  const t = text.replace(PH_RE, " ");
+  for (const { kind, term, re } of BANNED_RE) {
+    if (!re.test(t)) continue;
+    const key = `${where.file} ${where.id} ${term}`;
+    const row = { file: where.file, id: where.id, zone, line: where.src?.lineOf(where.path), rule: `banned ${kind} "${term}"`, count: 1, limit: 0 };
+    if (BANNED_LISTED.has(key)) {
+      bannedSeen.add(key);
+      bannedListed.push(row);
+    } else fail(row);
+  }
+}
+
 // ── Z2: templates, shared sentences, the pane's worst case ───────────────────
 
 /** Sentences that cannot be said together: the pane holds the longest of each family. */
@@ -558,7 +602,9 @@ function checkStringsFile({ family, rel }) {
   // Z2: shared sentences, then each template's own sentences and payout legs.
   for (const [id, s] of Object.entries(d.shared_sentences ?? {})) {
     out.sentences++;
-    checkBullet({ src, file: rel, id: `shared_sentences.${id}`, zone: "Z2", path: ["shared_sentences", id, "text"] }, s.text, "Z2", { isFig: figNameZ2 });
+    const w = { src, file: rel, id: `shared_sentences.${id}`, zone: "Z2", path: ["shared_sentences", id, "text"] };
+    checkBullet(w, s.text, "Z2", { isFig: figNameZ2 });
+    checkBanned(w, s.text, "Z2");
   }
   const headingWords = Object.fromEntries(
     Object.entries(d.group_words ?? {}).map(([k, v]) => [k, v.trim().split(/\s+/).length]),
@@ -566,7 +612,9 @@ function checkStringsFile({ family, rel }) {
   for (const [i, t] of (d.templates ?? []).entries()) {
     for (const [id, s] of Object.entries(t.sentences ?? {})) {
       out.sentences++;
-      checkBullet({ src, file: rel, id: `${t.id}/${id}`, zone: "Z2", path: ["templates", i, "sentences", id, "text"] }, s.text, "Z2", { isFig: figNameZ2 });
+      const w = { src, file: rel, id: `${t.id}/${id}`, zone: "Z2", path: ["templates", i, "sentences", id, "text"] };
+      checkBullet(w, s.text, "Z2", { isFig: figNameZ2 });
+      checkBanned(w, s.text, "Z2");
     }
     const wc = worstCase(t, d.shared_sentences ?? {}, headingWords);
     out.pane.push({ id: t.id, ...wc });
@@ -583,7 +631,9 @@ function checkStringsFile({ family, rel }) {
       continue;
     }
     out.z1++;
-    checkBullet({ src, file: rel, id: `${sec}.${id}`, zone: "Z1", path: [sec, id] }, text, "Z1", { lead: text.trim().endsWith(":"), isFig: figNameZ1 });
+    const w = { src, file: rel, id: `${sec}.${id}`, zone: "Z1", path: [sec, id] };
+    checkBullet(w, text, "Z1", { lead: text.trim().endsWith(":"), isFig: figNameZ1 });
+    checkBanned(w, text, "Z1");
   }
   for (const k of Object.keys((sec && d[sec]) ?? {}))
     if (/^(group|heading)_/.test(k) && !Z1_HEADINGS.includes(d[sec][k]))
@@ -802,6 +852,8 @@ function selfTest() {
   run("reveals in Z2", () => checkReveal(where, "Z2", ["One."]), "reveals per pane");
   run("heading set", () => checkHeadingSet("self-test", { happened: "What happens", adds_up: "How it adds up", leaves: "Where it leaves the position" }, []), "heading is");
   run("heading order", () => checkHeadingSet("self-test", Object.fromEntries(Z2_HEADINGS), [{ id: "t", groups: { leaves: [], happened: [] } }]), "groups out of heading order");
+  run("banned term", () => checkBanned(where, "The trove is safer now.", "Z2"), "banned value word");
+  run("banned phrase", () => checkBanned(where, "It repaid in order to free collateral.", "Z1"), "banned motive phrase");
   const cap = (n) => "Word " + words(n - 1);
   const modal = { intro: cap(30) + ". " + cap(30) + ". " + cap(3) + ".", extraParagraphs: [words(60) + "{coll_x}", "B.", "C."], details: [{ bold: "A", text: words(30) + ". Two." }], links: [] };
   for (const [rule, name] of [
@@ -859,6 +911,8 @@ for (const f of contentFiles()) {
   z1Count += out.z1;
   termListing(f.family, f.rel, d);
 }
+for (const key of BANNED_LISTED)
+  if (!bannedSeen.has(key)) fail({ file: key.split(" ")[0], id: key.split(" ").slice(1, -1).join(" "), zone: "-", rule: `BANNED_LISTED entry matches no string ("${key.split(" ").pop()}")`, count: 0, limit: 0 });
 const others = otherFamilies();
 const links = linkChecks(parsed);
 for (const n of links.notDocs) warn({ ...n, rule: "not documentation" });
@@ -872,6 +926,7 @@ const fmt = (f) =>
 if (!SUMMARY) {
   for (const f of failures) console.log(`FAIL  ${loc(f)} :: ${fmt(f)}`);
   for (const f of others.found) console.log(`LIST  ${loc(f)} :: ${fmt(f)}\n        "${f.text.slice(0, 160)}"`);
+  for (const f of bannedListed) console.log(`LIST  ${loc(f)} :: ${fmt(f)}`);
   for (const w of warnings) console.log(`WARN  ${w.file} :: ${w.id} :: ${w.family ?? ""} :: not documentation :: ${w.url}`);
 }
 
@@ -893,6 +948,7 @@ console.log("  worst strings (count over limit):");
 for (const f of worst) console.log(`    ${f.count}/${f.limit}  ${f.zone}  ${f.rule}  ${f.id}`);
 console.log(`  other families, extracted sentences over the limit (listed only): ${others.found.length}`);
 for (const [fam, n] of tally(others.found, (f) => f.file.split("/").slice(0, -1).join("/"))) console.log(`    ${String(n).padStart(3)}  ${fam}`);
+console.log(`  banned terms held for the family's sweep job (listed only): ${bannedListed.length}`);
 console.log(`  not documentation (listed only): ${warnings.length}`);
 for (const [fam, n] of tally(warnings, (w) => `${w.family ?? "-"} ${w.host}`)) console.log(`    ${String(n).padStart(3)}  ${fam}`);
 console.log(`  term check, first half (listed for review only): ${listings.length}`);
