@@ -4,7 +4,7 @@ import { loadCompoundBaseTail } from "@/lib/compound-base/position-page-data";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import type { CometChainTimelineResult } from "@/lib/sources/chain/compound-v3-events";
-import { compoundEventHeading, compoundEventPageDescription } from "@/lib/compound/explorer";
+import { compoundEventPageDescription, compoundEventTabWords } from "@/lib/compound/explorer";
 import CompoundBaseWalletPage from "../../page";
 
 interface Props {
@@ -37,7 +37,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "compound-base",
     subject: shortSubject(wallet),
     canonicalPath: `/base/compound-v3/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: compoundEventHeading(event, "base"), timestamp: event.timestamp } : null,
+    event: event
+      ? { actionLabel: compoundEventTabWords(event, "base", rehydrated?.events ?? []), timestamp: event.timestamp }
+      : null,
     description: event ? compoundEventPageDescription(event, wallet, "base") : undefined,
   });
 }

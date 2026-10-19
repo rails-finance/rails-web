@@ -57,25 +57,53 @@ export function compoundBaseBefore(ctx: CompoundContext, decimals?: number): str
   return decimals != null && isBaseDust(before, decimals) ? "0" : before;
 }
 
-/** The row's label by what the base balance did — Comet has no borrow or
- *  repay call, so a Withdraw past zero is the borrow and a Supply into debt
- *  is the repayment. A row that crosses zero names both. Collateral and
- *  transfer rows keep the label they came with. */
-export function compoundRowLabel(ctx: CompoundContext, fallback: string, baseDecimals?: number): string {
-  if (ctx.eventType !== "supply" && ctx.eventType !== "withdraw") return fallback;
-  // A call for nothing moves nothing: named so, since it still sits in a run.
-  if (/^-?0(\.0*)?$/.test(ctx.assetsDelta))
-    return ctx.eventType === "supply" ? "Supply (zero amount)" : "Withdraw (zero amount)";
-  if (ctx.baseAfter == null) return fallback;
+/** What a base row did, by the base balance — Comet has no borrow or repay
+ *  call, so a Withdraw past zero is the borrow and a Supply into debt is the
+ *  repayment. A row that crosses zero names both; a call for nothing moved
+ *  nothing. Null off a base supply or withdraw, or where the row's balance is
+ *  not read. */
+export type CompoundBaseAct =
+  | "supply"
+  | "repay"
+  | "repay_lend"
+  | "withdraw"
+  | "borrow"
+  | "withdraw_borrow"
+  | "supply_zero"
+  | "withdraw_zero";
+
+export function compoundBaseAct(ctx: CompoundContext, baseDecimals?: number): CompoundBaseAct | null {
+  if (ctx.eventType !== "supply" && ctx.eventType !== "withdraw") return null;
+  if (/^-?0(\.0*)?$/.test(ctx.assetsDelta)) return ctx.eventType === "supply" ? "supply_zero" : "withdraw_zero";
+  if (ctx.baseAfter == null) return null;
   const before = compoundBaseBefore(ctx, baseDecimals);
-  if (before == null) return fallback;
+  if (before == null) return null;
   const after = baseDecimals != null && isBaseDust(ctx.baseAfter, baseDecimals) ? "0" : ctx.baseAfter;
   if (ctx.eventType === "supply") {
-    if (!isNeg(before)) return "Supply";
-    return isPos(after) ? "Repay and lend" : "Repay";
+    if (!isNeg(before)) return "supply";
+    return isPos(after) ? "repay_lend" : "repay";
   }
-  if (!isPos(before)) return "Borrow";
-  return isNeg(after) ? "Withdraw and borrow" : "Withdraw";
+  if (!isPos(before)) return "borrow";
+  return isNeg(after) ? "withdraw_borrow" : "withdraw";
+}
+
+const BASE_ACT_LABEL: Record<CompoundBaseAct, string> = {
+  supply: "Supply",
+  repay: "Repay",
+  repay_lend: "Repay and lend",
+  withdraw: "Withdraw",
+  borrow: "Borrow",
+  withdraw_borrow: "Withdraw and borrow",
+  // A call for nothing moves nothing: named so, since it still sits in a run.
+  supply_zero: "Supply (zero amount)",
+  withdraw_zero: "Withdraw (zero amount)",
+};
+
+/** The row's label by what the base balance did (`compoundBaseAct`).
+ *  Collateral and transfer rows keep the label they came with. */
+export function compoundRowLabel(ctx: CompoundContext, fallback: string, baseDecimals?: number): string {
+  const act = compoundBaseAct(ctx, baseDecimals);
+  return act ? BASE_ACT_LABEL[act] : fallback;
 }
 
 /** One precision for a row's moved amount wherever it is printed — the row's
