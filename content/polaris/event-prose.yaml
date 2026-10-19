@@ -493,9 +493,9 @@ position_words:
   life_interest: |-
     {interest} {stable} of interest was charged on the debt.
   life_psm_in: |-
-    Its PSM shares added {psm_coll_in} pETH to the collateral and {psm_debt_in} {stable} to the debt.
+    Its PSM shares, from the market's peg defence, added {psm_coll_in} pETH to the collateral and {psm_debt_in} {stable} to the debt.
   life_psm_out: |-
-    Its PSM shares removed {psm_coll_out} pETH from the collateral and {psm_debt_out} {stable} from the debt.
+    Its PSM shares, from the market's peg defence, removed {psm_coll_out} pETH from the collateral and {psm_debt_out} {stable} from the debt.
   life_liq: |-
     The liquidation seized {seized} pETH and cleared {cleared} {stable} of debt.
 
@@ -510,17 +510,17 @@ shared_sentences:
     when: |-
       a PSM share was written in at this touch, priced at its block, its net in the holder's favour
     text: |-
-      PSM mints and redemptions since the previous touch netted {psm_net} {stable} in the holder's favour at this block's pETH price.
+      PSM trades, the market's peg defence, netted {psm_net} {stable} for the holder since the previous touch at this block's price.
   psm.share_neg:
     when: |-
       a PSM share was written in at this touch, priced at its block, its net against the holder
     text: |-
-      PSM mints and redemptions since the previous touch netted {psm_net} {stable} against the holder at this block's pETH price.
+      PSM trades, the market's peg defence, netted {psm_net} {stable} against the holder since the previous touch at this block's price.
   psm.share_unpriced:
     when: |-
       a PSM share was written in at this touch and its block has no price
     text: |-
-      PSM mints and redemptions since the previous touch moved {psm_coll} pETH and {psm_debt} {stable} through this CDP.
+      PSM trades, the market's peg defence, moved {psm_coll} pETH and {psm_debt} {stable} through this CDP since the previous touch.
   zero.settled:
     when: |-
       the protocol added debt so it settled at zero
@@ -954,7 +954,7 @@ L5:
       - bold: |-
           The PSM
         text: |-
-          the peg module, Adaptive Peg Defense in the docs: buys and redemptions at peg change every open CDP's collateral and debt pro rata.
+          the market's peg defence: a buy above the target upsizes the market, so every open CDP takes the new collateral, debt and fee pro rata.
       - bold: |-
           Settled to zero
         text: |-
