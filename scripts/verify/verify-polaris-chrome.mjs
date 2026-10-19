@@ -26,8 +26,8 @@
 //   5. Every Polaris learn-more modal — the markets page's two inline "?",
 //      the CDP card's, the Lifetime flows panel's, a liquidation row's — lists ≥ 2 links on
 //      docs.polaris.finance, each answering 200 to a fetch from this script,
-//      and the last link is the testnet app.
-//   6. /sepolia/polaris/info carries the ENS sentence.
+//      and none is the testnet app.
+//   6. /sepolia/polaris/info says ENS names resolve on Ethereum mainnet.
 //   7. The bare listing's sort menu reads "Recent activity", and so does
 //      Liquity V2's, the one cross-explorer check that proves the sweep.
 //
@@ -88,7 +88,7 @@ console.log(`BASE ${BASE}\n`);
     fetch(`${BASE}/sepolia/polaris/markets`).then((r) => r.text()),
   ]);
   check('1a. the markets page carries data-skel-section="page-table"', html.includes('data-skel-section="page-table"'));
-  const stampIdx = html.indexOf("chain snapshot");
+  const stampIdx = html.search(/chain snapshot/i);
   const stamp = stampIdx >= 0 ? html.slice(stampIdx, stampIdx + 400) : "";
   const stampBlock = Number((/etherscan\.io\/block\/(\d+)/.exec(stamp) ?? [])[1]);
   const gap = Math.abs(stampBlock - Number(board.blockNumber));
@@ -417,10 +417,7 @@ async function checkModal(name, { title, links }) {
 // ── 6. the ENS sentence ────────────────────────────────────────────────────
 {
   const html = await fetch(`${BASE}/sepolia/polaris/info`).then((r) => r.text());
-  check(
-    "6. the info page says an ENS name resolves on Ethereum mainnet",
-    html.includes("resolves on Ethereum mainnet"),
-  );
+  check("6. the info page says ENS names resolve on Ethereum mainnet", html.includes("resolve on Ethereum mainnet"));
 }
 
 // ── 7. the sort label ──────────────────────────────────────────────────────
