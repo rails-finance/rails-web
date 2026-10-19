@@ -2,7 +2,8 @@
 // already makes and the shared card renderer — no second read.
 //
 //   • `polarisShareCardModel` — ONE CDP, from `loadPolarisPositionTail`'s
-//     indexed summary (the same tail the position page itself awaits).
+//     indexed summary (the same tail the position page awaits) and, while the
+//     CDP is open, the page's live window over its chain read at head.
 //   • `polarisHolderCardModel` — a WALLET, from the holder strip's own adapter
 //     (the same one the wallet view mounts above its cards).
 
@@ -14,6 +15,7 @@ import { holderCardModel } from "@/lib/share/holder-card";
 import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
 import { positionNounPlural } from "@/lib/shared/protocols";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { polarisSinceLabel, signedFigure, type PolarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
 
 const STATUS_WORD: Record<PolarisPositionStatus, string> = {
   open: "Open",
@@ -25,14 +27,34 @@ const STATUS_WORD: Record<PolarisPositionStatus, string> = {
  *  makes. Given it, an open CDP with debt carries the listing's own
  *  approximate ratio (row figures × the market's feed ÷ row debt), marked ≈
  *  for the same reason it is marked on the card. A stale or absent board
- *  simply leaves the stat out; the image still renders. */
+ *  simply leaves the stat out; the image still renders.
+ *
+ *  `liveWindow` is the page's live window (`polarisSinceLastTouch` over the CDP's
+ *  own chain read at the head block and its timeline, the inputs the page's
+ *  row is built from). Where it renders, the card states what the row states:
+ *  the whole change in equity at the feed since the last touch (or the open)
+ *  and its two terms, the feed and the protocol's legs summed, in the row's
+ *  words and figures and in the row's order, in place of the summary stats:
+ *  three figures fill the row (a GOLDp card's wider figures wrap the change in
+ *  equity onto a second row), and a second three would run off the canvas.
+ *  The stamp is the head block's time, the time the figures are valued at.
+ *  Where it is null (a closed CDP, a stale read, the index behind the chain)
+ *  the card carries the indexed summary as before. */
 export function polarisShareCardModel(
   position: PolarisPositionSummary | null,
   markets?: PolarisMarketsChainResponse | null,
+  liveWindow?: PolarisSinceLastTouch | null,
 ): PositionCardModel | null {
   if (!position) return null;
   const stats: PositionCardModel["stats"] = [];
-  if (position.status === "open") {
+  if (position.status === "open" && liveWindow) {
+    const stable = position.stableSymbol;
+    stats.push(
+      { label: `${polarisSinceLabel(liveWindow)}, the feed`, value: signedFigure(liveWindow.feed, stable) },
+      { label: "The protocol\u2019s legs", value: signedFigure(liveWindow.protocol, stable) },
+      { label: "Change in equity at the feed", value: signedFigure(liveWindow.total, stable) },
+    );
+  } else if (position.status === "open") {
     if (position.coll > 0) stats.push({ label: CARD_VOCAB.collateral, value: `${formatCompact(position.coll)} pETH` });
     if (position.debt > 0)
       stats.push({ label: CARD_VOCAB.debt, value: `${formatCompact(position.debt)} ${position.stableSymbol}` });
@@ -54,7 +76,7 @@ export function polarisShareCardModel(
     market: position.stableSymbol,
     status: STATUS_WORD[position.status],
     stats,
-    asOf: new Date(),
+    asOf: position.status === "open" && liveWindow ? new Date(liveWindow.to.timestamp * 1000) : new Date(),
   };
 }
 

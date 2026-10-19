@@ -1,12 +1,17 @@
 // This CDP's live share card — a second consumer of `loadPolarisPositionTail`,
 // the exact same server read the page itself awaits (see `page.tsx` beside
-// this file), plus the market board the listing reads for its ratio. Both are
-// server-side loaders called directly: no HTTP hop out of this route.
+// this file), plus the market board the listing reads for its ratio, plus the
+// CDP's chain read at head (`loadPolarisPositionFromChain`, the loader behind
+// the page's /api/chain/polaris/position), from which the card states the
+// page's live window. All are server-side loaders called directly: no HTTP hop
+// out of this route.
 
 import { normalizeCdpId, normalizeMarket } from "@/lib/polaris/asset-catalog";
 import { loadPolarisPositionTail } from "@/lib/polaris/position-page-data";
 import { polarisShareCardModel } from "@/lib/polaris/share-card";
-import { loadPolarisMarketsFromChain } from "@/lib/sources/chain/polaris-position";
+import { loadPolarisMarketsFromChain, loadPolarisPositionFromChain } from "@/lib/sources/chain/polaris-position";
+import { polarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
+import { isPolarisEvent } from "@/lib/shared/types/event-shape";
 import { positionImage } from "@/lib/share/position-image";
 
 export const runtime = "nodejs";
@@ -31,11 +36,16 @@ export default async function Image({ params }: Props) {
       // render, the same read the listing makes, so the card can carry the
       // ratio. It is allowed to fail: a null board drops the ratio stat and
       // the image still renders.
-      const [tail, markets] = await Promise.all([
+      // The chain read is allowed to fail too: without it there is no live
+      // window, and the card carries the indexed summary.
+      const [tail, markets, chain] = await Promise.all([
         loadPolarisPositionTail(market, id),
         loadPolarisMarketsFromChain().catch(() => null),
+        loadPolarisPositionFromChain(market, id).catch(() => null),
       ]);
-      return polarisShareCardModel(tail.position, markets);
+      const events = (tail.events ?? []).filter(isPolarisEvent);
+      const liveWindow = chain && events.length > 0 ? polarisSinceLastTouch(chain, events) : null;
+      return polarisShareCardModel(tail.position, markets, liveWindow);
     },
   });
 }

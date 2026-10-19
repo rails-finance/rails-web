@@ -12,7 +12,10 @@
 //   4. The ?q=<owner of usdp/8> view: the usdp/8 card's ratio matches.
 //   5. The OG image route returns 200 + image/png; the share-card MODEL is
 //      asserted directly in a node child (a PNG cannot be read for text) with
-//      a stubbed overlay — present, stale, and absent.
+//      a stubbed overlay — present, stale, and absent — and with a stubbed live
+//      window: an open CDP's card states the window's three figures in the
+//      row's words and order, stamped at the head block's time; a closed CDP's
+//      card is unchanged by one.
 //   6. /sepolia/polaris/usdp/8's price strip lists pETH and USDp.
 //   7. Fail-first: with /api/chain/polaris/markets aborted, every ratio slot
 //      is a dash — no ≈, no liquidation price, no rate line.
@@ -339,10 +342,18 @@ const { polarisShareCardModel } = await import(ROOT + "lib/polaris/share-card.ts
 const row = { market: "usdp", stableSymbol: "USDp", cdpId: "8", status: "open", coll: 100, debt: 200000, peakColl: 100, peakDebt: 200000 };
 const live = { blockNumber: 1, chainStale: false, markets: [{ market: "usdp", price: { pethInDebt: 6000 } }] };
 const stale = { blockNumber: 1, chainStale: true, markets: [] };
+const win = (sinceOpen) => ({ sinceOpen, feed: 1200, protocol: -300, total: 900, to: { timestamp: 1760000000 } });
+const closed = { ...row, status: "closed" };
+const opened = polarisShareCardModel(row, live, win(true));
 console.log("RESULT " + JSON.stringify({
   withBoard: polarisShareCardModel(row, live).stats,
   stale: polarisShareCardModel(row, stale).stats,
   absent: polarisShareCardModel(row).stats,
+  windowOpen: opened.stats,
+  windowAsOf: opened.asOf.getTime(),
+  windowTouch: polarisShareCardModel(row, live, win(false)).stats,
+  closedPlain: polarisShareCardModel(closed, live).stats,
+  closedWindow: polarisShareCardModel(closed, live, win(true)).stats,
 }));
 `;
 const probe = spawnSync(
@@ -374,6 +385,32 @@ if (!probeLine) {
       got.stale.length === 2 &&
       got.absent.length === 2,
     JSON.stringify({ stale: got.stale, absent: got.absent }),
+  );
+  // The live window's card: the row's words (components/protocol/polaris/
+  // polaris-since-last-touch.tsx — "The feed:", "The protocol's legs",
+  // "Change in equity at the feed", and "Since its open" / "Since its last
+  // touch"), in the row's order, the signs written out, and no percentage.
+  const labels = (stats) => stats.map((s) => s.label);
+  const wantLabels = (since) => [`${since}, the feed`, "The protocol\u2019s legs", "Change in equity at the feed"];
+  check(
+    "5d. with a live window an open CDP's card states the feed, the protocol's legs and the change, in the row's words",
+    JSON.stringify(labels(got.windowOpen)) === JSON.stringify(wantLabels("Since its open")) &&
+      JSON.stringify(labels(got.windowTouch)) === JSON.stringify(wantLabels("Since its last touch")) &&
+      /^\+.* USDp$/.test(got.windowOpen[0].value) &&
+      /^\u2212.* USDp$/.test(got.windowOpen[1].value) &&
+      /^\+.* USDp$/.test(got.windowOpen[2].value) &&
+      got.windowOpen.every((s) => !s.value.includes("%")),
+    JSON.stringify({ open: got.windowOpen, touch: got.windowTouch }),
+  );
+  check(
+    "5e. the window's card is stamped at the head block's time",
+    got.windowAsOf === 1760000000 * 1000,
+    String(got.windowAsOf),
+  );
+  check(
+    "5f. a closed CDP's card is unchanged by a window",
+    JSON.stringify(got.closedWindow) === JSON.stringify(got.closedPlain),
+    JSON.stringify({ plain: got.closedPlain, window: got.closedWindow }),
   );
 }
 
