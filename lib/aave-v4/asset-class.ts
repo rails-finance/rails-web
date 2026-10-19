@@ -64,6 +64,11 @@ const STABLE_DENOMINATED = new Set<string>([
   "scrvUSD",
   "sfrxUSD",
   "ysyBOLD",
+  // Aave V3 on Arbitrum's: the bridged USDC as its catalog names it, Tether's
+  // USD₮0, and STASIS EURS.
+  "USDC.e",
+  "USD₮0",
+  "EURS",
 ]);
 
 const STABLE_LOWER = new Set([...STABLE_DENOMINATED].map((s) => s.toLowerCase()));

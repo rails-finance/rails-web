@@ -42,7 +42,12 @@ const BASE_CHAIN_ID = 8453;
 
 export interface AaveV3BaseFlowsInput {
   /** The daily store's family, and the flows route's lane. */
-  family: "aave-v3-base" | "seamless";
+  family: "aave-v3-base" | "seamless" | "aave-v3-arbitrum";
+  /** The chain the daily store is asked about; Base where unset. */
+  chainId?: number;
+  /** No server replay serves this lane (Aave V3 Arbitrum): a history the page
+   *  cannot hold whole is a failed read. */
+  routeless?: boolean;
   wallet: string;
   /** The page's history is elided (`coverage.omitted`): the server's replay
    *  answers without a flat read first. */
@@ -103,7 +108,8 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     read: FlowsRead;
   }>({ events: null, route: null, read: "reading" });
   const needRead = p.wholeEvents == null && !p.pending;
-  const { fetchAll, family, wallet, elided } = p;
+  const { fetchAll, family, wallet, elided, routeless } = p;
+  const chain = p.chainId ?? BASE_CHAIN_ID;
   useEffect(() => {
     if (!needRead) return;
     let cancelled = false;
@@ -113,7 +119,9 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     };
     // The server's replay of every row.
     const viaRoute = () =>
-      fetchAaveBaseFlows(family, wallet).then((a) => {
+      routeless || family === "aave-v3-arbitrum" ? failed("no server replay on this lane") : viaFlowsRoute(family);
+    const viaFlowsRoute = (lane: "aave-v3-base" | "seamless") =>
+      fetchAaveBaseFlows(lane, wallet).then((a) => {
         if (cancelled) return;
         if (isAaveBaseSummaryAnswer(a)) setFetched({ events: null, route: a, read: "done" });
         else failed(`the flows route refused (${a.refused})`);
@@ -131,7 +139,7 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     return () => {
       cancelled = true;
     };
-  }, [needRead, fetchAll, family, wallet, elided]);
+  }, [needRead, fetchAll, family, wallet, elided, routeless]);
 
   const source = p.pending ? null : (p.wholeEvents ?? fetched.events);
   const route = p.pending || p.wholeEvents ? null : fetched.route;
@@ -161,7 +169,7 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     if (!want) return;
     const ac = new AbortController();
     fetchDailyPrices(
-      BASE_CHAIN_ID,
+      chain,
       want.reserves.map((r) => `${family}:${r}`),
       { from: want.from, signal: ac.signal },
     )
@@ -179,7 +187,7 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     return () => ac.abort();
     // `want.key` stands for the reserves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [want?.key, want?.from, family]);
+  }, [want?.key, want?.from, family, chain]);
   const dailySettled = want != null && daily?.key === want.key;
 
   // Set on mount, so the server's render and the first client render agree.

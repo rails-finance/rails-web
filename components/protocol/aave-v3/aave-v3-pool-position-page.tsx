@@ -1,0 +1,845 @@
+"use client";
+
+// One wallet's position on a single-Pool Aave V3 deployment read live from the
+// chain — Aave V3 on Base and on Arbitrum — state, economics and whole history.
+// The deployment (`AaveV3PoolPageDeployment`) names the Pool, its routes and its
+// words; the page is the same for both. The notes below were written for Base;
+// on Arbitrum the history is one read of rails-server's store, nothing is swept,
+// and the whole-life gate also waits for a second witness to confirm the rows
+// (lib/aave-v3-arbitrum/page-deployment.ts).
+//
+// The same three surfaces the Ethereum explorer carries, through the same
+// components: the shared position card (mode pill, wallet, collateral, debt,
+// health factor, the risk strip, the explanation drawer), the Lifetime flows
+// panel and the timeline. On L1 the panel and the timeline are built over a
+// rails-server index; on Base both are built over the history route, which
+// serves the index's rows where it vouches for the whole life and sweeps the
+// Pool's own logs (lib/sources/chain/aave-v3-events) otherwise; the panel
+// replays it on the page (lib/aave-v3-base/flows.ts). The cards, the flow legs
+// and the run-collapse are the
+// Ethereum ones, imported rather than reimplemented — only the receipts
+// differ, because the custody of the numbers genuinely differs and a receipt
+// has to say so (lib/aave-v3/card-deployment: the live-Pool deployment).
+//
+// Three reads, deliberately independent, in the order they can answer:
+//
+//   1. THE POOL. Fast (one multicall burst) and enough for the position card,
+//      so the card paints while the rest is still moving. The server does this
+//      one and hands it down as `initialPosition`
+//      (lib/aave-v3-base/position-page-data); the effect below is the fallback
+//      for when it could not answer.
+//   2. THE HISTORY. It feeds the timeline, the Lifetime flows panel, and —
+//      when it covers every block — the card's own history: the peaks a closed
+//      account shows and its activity meta. A failure here leaves the card
+//      standing. Where it comes from decides where it is read: the index
+//      answers in well under a second and the SERVER takes it
+//      (`initialTimeline`), while a sweep of the Pool's own logs runs 3-30s and
+//      stays here. The effect below is the branch for everything the server did
+//      not seed.
+//   3. THE ORACLE, once the other two name the reserves worth pricing. The
+//      panel values what is held today at this price, so it is asked for every
+//      reserve the position ever touched, not just the live ones.
+//
+// The sweep's completeness is a property of the request, not of the explorer,
+// so it is stated under the last event rather than on a coverage page — see
+// <TimelineCoverageFooter>.
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+
+import { AaveV3PositionCard } from "@/components/protocol/aave-v3/aave-v3-position-card";
+import {
+  AaveV3ClosedPositionExplanation,
+  AaveV3PositionExplanation,
+} from "@/components/protocol/aave-v3/aave-v3-position-explanation";
+import { aaveV3Exports } from "@/components/protocol/aave-v3/aave-v3-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
+import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
+import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
+import {
+  emodeSwitchEvents,
+  fetchAccountSwitches,
+  switchesInWindow,
+  withEmodeRows,
+  withEmodeServedRows,
+  type AaveFamilyAccountSwitches,
+} from "@/lib/aave-v3/account-switches";
+import { blocksSharedByTransactions, hfLabelV3 } from "@/lib/aave-v3/position-state";
+import { aaveV3Neighbours, aaveV3ReplayCountNote, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
+import { aaveV3Explorer } from "@/lib/aave-v3/explorer";
+import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { AaveV3BaseFlowsNote, aaveV3BaseFlowsContent } from "@/components/protocol/aave-v3/aave-v3-base-flows-note";
+import { useAaveV3BaseFlows } from "@/hooks/useAaveV3BaseFlows";
+import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
+import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
+import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
+import { formatNumber } from "@/lib/utils/format";
+import { aaveV3BaseWriteOffLeftovers, type WriteOffLeftover } from "@/lib/aave-v3-base/write-off-gap";
+import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
+import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { CaptureSourceProvider, type CaptureSource } from "@/lib/shared/capture-source";
+import { summariseExternalActors } from "@/lib/shared/external-actor";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { eventsBelowLife, replaySegmentReads, type ReplayGroupedFields } from "@/lib/api/fetch-replay-segment";
+import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
+import { WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
+import { interleaveRowPlan, servedFoldersEnabled, type GroupedTimelineFields } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
+import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
+import { computeAaveV3CardCaptions, unpricedAaveV3FlowAddresses } from "@/lib/aave-v3/chain-truth-tower";
+import type { AaveV3CardDeployment } from "@/lib/aave-v3/card-deployment";
+import type { AaveV3Deployment as AaveV3ExplorerDeployment } from "@/lib/aave-v3/explorer";
+import type { SessionProtocol } from "@/lib/shared/sessions";
+import type { ChainId } from "@/lib/shared/chains";
+import type { AaveV3BaseFlowsInput } from "@/hooks/useAaveV3BaseFlows";
+import { v3ViewFromChain, type V3SweptHistory } from "@/lib/aave-v3/chain-position-view";
+import { V3PoolProvider, type V3PoolIdentity } from "@/lib/aave-v3/pool-context";
+import { fetchAaveV3Position, type AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
+import {
+  ChainTimelineUnavailable,
+  fetchChainTimeline,
+  type ChainTimelineCoverage,
+  type ChainTimelineResponse,
+} from "@/lib/api/fetch-chain-timeline";
+import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
+import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { isAaveV3Event } from "@/lib/shared/types/event-shape";
+import { SweepInFlight } from "@/components/shared/sweep-in-flight";
+
+/** The history as the route answers it: flat, or — asked `?group=1`, the
+ *  page default where the deployment serves folders — as ROWS, where `events`
+ *  holds only the ungrouped events and `rowPlan` puts the folders back between
+ *  them (lib/aave-v3-base/timeline-folders.ts). A history the index cannot
+ *  vouch for is answered flat either way, and reads as flat here. */
+type BaseTimeline = ChainTimelineResponse & ReplayGroupedFields;
+
+/** What differs between the deployments this page serves: the Pool, its
+ *  routes, its keys and its words. */
+export interface AaveV3PoolPageDeployment {
+  /** The rail, bookmarks and session scope. */
+  session: SessionProtocol;
+  chainId: ChainId;
+  /** What every receipt on the page names as the contract behind its value —
+   *  this Pool, on this chain — and the route the live read came through. */
+  pool: V3PoolIdentity;
+  routes: {
+    timeline: string;
+    /** The folder route behind a grouped answer; null where the history is
+     *  served flat only. */
+    folder: string | null;
+    prices: string;
+    accountSwitches: string;
+  };
+  /** The market key the view and the cards carry ("base", "arbitrum"); the
+   *  cards' position-state read routes on it (hooks/useAaveV3PositionState). */
+  marketKey: string;
+  /** The event page adapter's deployment (lib/aave-v3/explorer.ts). */
+  explorerDeployment: AaveV3ExplorerDeployment;
+  /** The chain's name as the exports and the event pages print it. */
+  marketName: string;
+  /** The Pool, named for the coverage footer's "swept X from its first block". */
+  sourceLabel: string;
+  /** The position card's receipts. */
+  card: AaveV3CardDeployment;
+  /** Prefix for settle marks, storage keys and file names. */
+  key: string;
+  flows: Pick<AaveV3BaseFlowsInput, "family" | "routeless" | "chainId">;
+  /** The block of the Pool's first DeficitCreated, and the chain the note names. */
+  writeOff: { firstBlock: number; chain: string };
+  /** Which store answered, for the cards' custody lines and the footer. */
+  captureSourceOf: (coverage: ChainTimelineCoverage | undefined) => CaptureSource;
+  /** The history is a whole life: the gate on the peaks, all-time interest,
+   *  the lifetime flows and the "never touched" claim. */
+  wholeOf: (coverage: ChainTimelineCoverage) => boolean;
+  /** Draw the lifetime flows panel only over a whole history. */
+  flowsNeedWhole?: boolean;
+  words: {
+    /** While the history is read. */
+    reading: string;
+    untouchedTitle: string;
+    untouchedBody: string;
+    emptyWhole: string;
+    emptyNotWhole: string;
+    unavailable: string;
+    failed: string;
+    /** The Pool holds nothing and the history answered empty without being
+     *  whole; absent where that state draws the closed card. */
+    emptyNotWholeState?: { title: string; body: string };
+  };
+}
+
+async function fetchBasePrices(route: string, assets: string[]): Promise<Record<string, number>> {
+  if (assets.length === 0) return {};
+  const res = await fetch(`${route}?assets=${assets.join(",")}`, { cache: "no-store" });
+  if (!res.ok) return {};
+  const data = (await res.json()) as { prices?: Record<string, number> };
+  return data.prices ?? {};
+}
+
+export interface AaveV3PoolPositionViewProps {
+  /** Already lower-cased and address-shaped — the server route rejected
+   *  anything else with a 404 before this component existed. */
+  wallet: string;
+  /** The Pool's own read of this account, done on the server. `null` means the
+   *  server could not answer (or answered with a stale stub), and the effect
+   *  below reads it from the browser exactly as this page always did. */
+  initialPosition: AaveV3PositionChainResponse | null;
+  /** The history in the route's own wire shape, present when the server read
+   *  it — on Base when the index vouched for the whole life, or for one of the
+   *  handful of addresses too heavy to send whole, the horizon it states
+   *  instead, which the coverage carries and `sweptClean` below reads. `null`
+   *  means the client reads the route. */
+  initialTimeline: unknown | null;
+}
+
+export function AaveV3PoolPositionView({
+  deployment: d,
+  wallet,
+  initialPosition,
+  initialTimeline,
+}: AaveV3PoolPositionViewProps & { deployment: AaveV3PoolPageDeployment }) {
+  // The Pool read is the whole of this page's server half — the sweep is not,
+  // and its own effect runs on every visit regardless.
+  const seeded = initialPosition != null;
+
+  const [data, setData] = useState<AaveV3PositionChainResponse | null>(initialPosition);
+  const [loading, setLoading] = useState(!seeded);
+  const [error, setError] = useState<string | null>(null);
+
+  // Rehydrated through the same function the fetch client runs on a response
+  // body, so a seeded timeline and a fetched one are the same object.
+  const timelineSeeded = initialTimeline != null;
+  const [timeline, setTimeline] = useState<BaseTimeline | null>(() =>
+    initialTimeline != null ? (rehydrateChainTimelineWire(initialTimeline) as BaseTimeline) : null,
+  );
+  // The event route renders this same view, flat: pinned mode finds its card
+  // among the served events, and a folder's members arrive only when opened.
+  const routeParams = useParams<{ eventId?: string | string[] }>();
+  const pinnedRoute = routeParams?.eventId != null;
+  const [timelineState, setTimelineState] = useState<"loading" | "ready" | "unavailable" | "failed">(
+    timelineSeeded ? "ready" : "loading",
+  );
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  // The card holds its USD headlines' space until the oracle has answered.
+  const [pricesSettled, setPricesSettled] = useState(false);
+
+  // ── 1. The Pool ───────────────────────────────────────────────────────────
+  // Only when the server could not answer. A seeded view has the card's
+  // figures in its first paint and never asks again.
+  useEffect(() => {
+    if (seeded || !wallet) return;
+    let cancelled = false;
+    setLoading(true);
+    fetchAaveV3Position({ wallet, route: d.pool.positionRoute })
+      .then((d) => {
+        if (cancelled) return;
+        setData(d);
+        setError(d.chainStale ? "The read failed — reload to retry." : null);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load the position");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wallet, seeded]);
+
+  // ── 2. The sweep ──────────────────────────────────────────────────────────
+  // Off the critical path: it is the slow read, and the position card is
+  // already on screen. "Could not sweep" and "swept, found nothing" are kept
+  // apart — one is our failure and the other is the wallet's history.
+  useEffect(() => {
+    if (timelineSeeded || !wallet) return;
+    let cancelled = false;
+    setTimelineState("loading");
+    fetchChainTimeline<BaseTimeline>({
+      wallet,
+      route: d.routes.timeline,
+      mark: `${d.key}-timeline`,
+      // `?folders=0` is the way back to the flat list, the test every grouped
+      // page shares.
+      params: d.routes.folder && servedFoldersEnabled() && !pinnedRoute ? { group: "1" } : undefined,
+    })
+      .then((d) => {
+        if (cancelled) return;
+        setTimeline(d);
+        setTimelineState("ready");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wallet, timelineSeeded, pinnedRoute, d]);
+
+  const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
+  const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
+  // The account's e-mode changes, from the Pool's logs: each is a timeline row
+  // of its own, placed among the rows and counted by nothing else.
+  const [switches, setSwitches] = useState<AaveFamilyAccountSwitches | null>(null);
+  useEffect(() => {
+    const ac = new AbortController();
+    setSwitches(null);
+    fetchAccountSwitches(d.routes.accountSwitches, wallet, ac.signal)
+      .then(setSwitches)
+      .catch(() => {
+        // The timeline reads as it did without them.
+      });
+    return () => ac.abort();
+  }, [wallet, d]);
+  const emodeRows = useMemo(() => {
+    if (!switches) return [];
+    // A trimmed history takes the changes from its oldest loaded row on.
+    let floor: number | null = null;
+    if ((timeline?.coverage.omitted?.count ?? 0) > 0) {
+      const blocks = [
+        ...aaveEvents.map((e) => e.blockNumber),
+        ...(timeline?.rowPlan ?? []).flatMap((r) => (r.kind === "folder" ? [r.folder.firstBlock] : [])),
+      ];
+      if (blocks.length > 0) floor = Math.min(...blocks);
+    }
+    return emodeSwitchEvents(wallet, switchesInWindow(switches.emode, floor), "aave-v3", d.chainId).filter(
+      isAaveV3Event,
+    );
+  }, [switches, timeline, aaveEvents, wallet, d]);
+  // Every change of the life, for a month read to draw those in its span.
+  const allEmodeRows = useMemo(
+    () => (switches ? emodeSwitchEvents(wallet, switches.emode, "aave-v3", d.chainId).filter(isAaveV3Event) : []),
+    [switches, wallet, d],
+  );
+  const timelineEvents = useMemo(() => withEmodeRows(aaveEvents, emodeRows), [aaveEvents, emodeRows]);
+  // Each card's same-transaction rows and the transaction before it: the open
+  // card reads the account at blocks N−1 and N (the Base lane's position
+  // state), and the explanation chains from the previous transaction's read.
+  const neighbours = useMemo(() => aaveV3Neighbours(timelineEvents as AaveV3TimelineEvent[]), [timelineEvents]);
+  // A block holding two of the owner's transactions has no N−1 read that is
+  // "immediately before" the second: those cards keep the row's own figures.
+  const sharedBlocks = useMemo(() => blocksSharedByTransactions(timelineEvents), [timelineEvents]);
+
+  // The served list as ROWS, when the route grouped it; the plan and the
+  // events it interleaves come from one answer.
+  const servedRows = useMemo(
+    () =>
+      timeline?.grouped && timeline.rowPlan
+        ? withEmodeServedRows(interleaveRowPlan(timeline.rowPlan, aaveEvents), emodeRows)
+        : undefined,
+    [timeline, aaveEvents, emodeRows],
+  );
+  /** The folders, whole and unfiltered. Every whole-history claim below that
+   *  is reduced over `aaveEvents` adds them, or states nothing it cannot. The
+   *  card's counts and the peaks need nothing: the route replayed
+   *  every row before it grouped, and those figures ride the replay. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  const groupedTail = useMemo<GroupedTimelineFields | null>(
+    () =>
+      timeline?.grouped && timeline.rowPlan && timeline.eventsServed != null
+        ? {
+            grouped: true,
+            rowPlan: timeline.rowPlan,
+            eventsServed: timeline.eventsServed,
+            boundBy: timeline.boundBy ?? null,
+          }
+        : null,
+    [timeline],
+  );
+  /** The stamps the activity header measures tenure and freshness from: the
+   *  events on the page and each folder's first and last member. */
+  const headerStamps = useMemo(
+    () =>
+      servedFolders && servedFolders.length > 0
+        ? [...aaveEvents, ...servedFolders.flatMap((f) => [{ timestamp: f.firstAt }, { timestamp: f.lastAt }])]
+        : aaveEvents,
+    [aaveEvents, servedFolders],
+  );
+
+  // The card's captions read THESE, not the events above. The list is capped
+  // for a long history; these sums are not, so "all time" and "incl. interest"
+  // stay true.
+  const lifetime = timeline?.lifetime;
+
+  // "The sweep read every block of this Pool's life." Both conditions are
+  // needed: no holes inside the span, AND the span reaching the Pool's own
+  // first block. A horizon leaves the events contiguous but the history
+  // starting later than the protocol, which is enough to disqualify a lifetime
+  // total from the words "all time" — and a peak from "highest recorded".
+  // Which store the events reached the page through — the coverage says.
+  // The route serves the index when it can vouch for the whole life and
+  // sweeps the chain otherwise, and the receipts' custody line and the
+  // footer must name the one that actually answered.
+  const captureSource = d.captureSourceOf(timeline?.coverage);
+  const sweptClean = timelineState === "ready" && timeline != null && d.wholeOf(timeline.coverage);
+
+  // The sweep as the card view consumes it: only a WHOLE sweep fills the peaks
+  // and the activity meta (lib/aave-v3/chain-position-view).
+  const history = useMemo<V3SweptHistory | null>(
+    () => (timeline ? { timeline, whole: sweptClean } : null),
+    [timeline, sweptClean],
+  );
+
+  // ── 3. The oracle ─────────────────────────────────────────────────────────
+  // Every reserve the position holds now, plus every reserve its history ever
+  // moved. One shot per wallet: an asset the oracle will not price stays
+  // unpriced rather than driving a retry loop.
+  const pricedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data || data.chainStale) return;
+    const view = v3ViewFromChain(data, d.marketKey, undefined, events);
+    const wanted = new Set<string>(view.supplies.concat(view.borrows).map((r) => r.address.toLowerCase()));
+    for (const a of unpricedAaveV3FlowAddresses(view, events, timeline?.lifetime)) wanted.add(a);
+    if (wanted.size === 0) {
+      setPricesSettled(true);
+      return;
+    }
+    // One read per set of reserves: the history arriving can name more, and
+    // an answer that lands after it is still this wallet's, so it is kept.
+    const key = `${wallet}:${[...wanted].sort().join(",")}`;
+    if (pricedRef.current === key) return;
+    pricedRef.current = key;
+    fetchBasePrices(d.routes.prices, [...wanted])
+      .then((p) => {
+        if (pricedRef.current?.startsWith(`${wallet}:`) && Object.keys(p).length > 0)
+          setPrices((prev) => ({ ...prev, ...p }));
+      })
+      .catch(() => {
+        // A reserve without a price today keeps its last recorded one.
+      })
+      .finally(() => setPricesSettled(true));
+  }, [data, events, timeline, wallet, d]);
+
+  // Why the timeline's event count and the card's transaction count differ,
+  // stated where the page holds every row the count was taken over.
+  const countWhole = sweptClean && (timeline?.coverage.omitted?.count ?? 0) === 0;
+  const countNote = useMemo(() => {
+    if (!data || data.chainStale || !countWhole || (servedFolders?.length ?? 0) > 0) return null;
+    return aaveV3ReplayCountNote(aaveEvents as AaveV3TimelineEvent[], timeline?.txCount ?? 0);
+  }, [data, countWhole, timeline, servedFolders, aaveEvents]);
+  const view = useMemo(() => {
+    if (!data || data.chainStale) return null;
+    const v = v3ViewFromChain(data, d.marketKey, prices, events, history);
+    // The card's count counts transactions; its tip gives the events too.
+    return countWhole && timeline && (servedFolders?.length ?? 0) === 0
+      ? { ...v, eventTotal: timeline.totalEvents, countNote: countNote?.parts.join(", ") || undefined }
+      : v;
+  }, [data, prices, events, history, countWhole, timeline, servedFolders, countNote, d]);
+
+  // Debt the Pool wrote off that this history does not show (DeficitCreated
+  // is not among the logs Base reads). Stated only where it left a remainder.
+  // The closing debt is read off the last debt-lane row; a liquidation folder
+  // holds rows the page has not opened, so beside one the note is withheld
+  // rather than read off an earlier row.
+  const writeOffLeftovers = useMemo(
+    () =>
+      servedFolders?.some((f) => f.kind !== "transfer")
+        ? []
+        : aaveV3BaseWriteOffLeftovers(events, data, d.writeOff.firstBlock),
+    [events, data, servedFolders, d],
+  );
+
+  // The month read (hooks/useTimelineSegment.ts): a month the preload does
+  // not hold is sliced from the route's replay (`&from=&to=`), whose running
+  // figures are the whole replay's. Months below a seed's cut have no day
+  // counts, so the grid draws them and refuses the click; the boundary card
+  // states them.
+  const segmentReads = useMemo(() => replaySegmentReads(d.routes.timeline, wallet), [wallet, d]);
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: timelineEvents,
+    extraRows: allEmodeRows,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening: null,
+    lifeBelow: timeline?.belowByDay,
+    eventsBelowLife: eventsBelowLife(timeline?.coverage.omitted?.count, timeline?.belowByDay),
+    // The rows before the trim, so numbering runs over the whole history and
+    // the count line states the real total (rails-ops decision 0019).
+    olderCount: timeline?.coverage.omitted?.count ?? 0,
+    historyWindow: WHOLE_HISTORY,
+    isEvent: isAaveV3Event,
+    readGrouped: segmentReads.readGrouped,
+    readFlat: segmentReads.readFlat,
+    folderPath: d.routes.folder ?? d.routes.timeline,
+    folderParams: { wallet },
+    storageKey: `${d.key}-${wallet}`,
+    protocolKey: "aave-v3",
+    // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
+    dates: false,
+  });
+
+  // The CSV on a grouped page: the rows in the order the route served them,
+  // each folder opened for its members. `missing` is what no answer lists —
+  // a seeded wallet's rows before its seed, or rows below the row cap — and a
+  // download short by any of them does not happen.
+  const fetchAllHistory = useCallback(async (): Promise<WholeHistoryFetch> => {
+    const all: BaseActivityEvent[] = [];
+    for (const row of servedRows ?? []) {
+      if (row.kind === "event") {
+        all.push(row.event);
+        continue;
+      }
+      const opened = await fetchTimelineFolderMembers({
+        path: d.routes.folder ?? d.routes.timeline,
+        params: { wallet },
+        folder: row.folder.responseId,
+      });
+      all.push(...opened.events);
+    }
+    return { events: all, missing: timeline?.coverage.omitted?.count ?? 0 };
+  }, [servedRows, wallet, timeline, d]);
+
+  // Who executed this position's events — the SAME externalActor() verdict each
+  // event card renders on its spine, reduced over the whole history so the
+  // Explanation can state it once.
+  const externalActivity = useMemo(
+    () =>
+      withFolderActors(
+        summariseExternalActors(
+          aaveEvents.map((e) => ({
+            txFrom: e.context.data.txFrom,
+            poolCaller: e.context.data.poolCaller,
+            wallet: e.wallet,
+          })),
+        ),
+        servedFolders,
+      ),
+    [aaveEvents, servedFolders],
+  );
+
+  // Stat captions (accrued interest, borrow rate). The rate rides the Pool
+  // read; the interest split attributes against the sweep's WHOLE-life sums —
+  // and only when the sweep read every block, because an attribution against
+  // a partial history would call missed principal "interest".
+  const captions = useMemo(
+    () =>
+      view && data
+        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents)
+        : null,
+    [view, data, sweptClean, lifetime, aaveEvents],
+  );
+
+  // An address that has never touched the Pool answers successfully with zeros,
+  // which is a true answer and a different one from a failed read. Say which.
+  //
+  // The `sweptClean` clause is the load-bearing one. A sweep that could not
+  // read the chain ALSO comes back with no events, and without this the page
+  // rendered "this wallet has never touched Aave V3 on Base" over blocks nobody
+  // had looked at. Silence is only evidence of absence when someone listened.
+  const untouched =
+    data != null &&
+    !data.chainStale &&
+    data.totalCollateralUsd === 0 &&
+    data.totalDebtUsd === 0 &&
+    data.reserves.length === 0 &&
+    sweptClean &&
+    // On a grouped answer the list covers `eventsServed`, folder members
+    // included; `events` holds only the ungrouped ones.
+    (timeline?.grouped ? (timeline.eventsServed ?? 0) : events.length) === 0 &&
+    // A seeded heavy wallet can draw no rows at all — its whole life sits
+    // before the seed's cut and travelled as state. That is not "never
+    // touched": the boundary card states the count (rails-ops decision 0019).
+    (timeline?.coverage.omitted?.count ?? 0) === 0;
+
+  // The Pool says this account holds nothing. That alone does not say which of
+  // two accounts it is — one that closed, or one that was never opened — and
+  // only the history separates them. Until it answers, the card must not pick:
+  // given no balances and no events it reads the account as CLOSED and narrates
+  // a life it cannot see, dating "its record closed on" from the Unix epoch.
+  // That was a flash while the sweep ran and the client held the page; rendered
+  // on the server it would be the account's permanent machine-readable record.
+  const nothingOnChain = view != null && view.status !== "open";
+  const historyPending = nothingOnChain && timelineState === "loading";
+  // The Pool holds nothing and the history answered with no rows, but not as a
+  // whole life (Arbitrum's unconfirmed store): neither "never touched" nor a
+  // closed account can be said yet.
+  const emptyNotWhole =
+    nothingOnChain &&
+    timelineState === "ready" &&
+    !sweptClean &&
+    (timeline?.grouped ? (timeline.eventsServed ?? 0) : events.length) === 0 &&
+    (timeline?.coverage.omitted?.count ?? 0) === 0;
+  const historyUnread = nothingOnChain && (timelineState === "failed" || timelineState === "unavailable");
+
+  // The Lifetime flows panel replays the account's whole history
+  // (lib/aave-v3-base/flows.ts): the page's rows where they are all of it,
+  // else the flat history read once. Where the page's history is elided (a
+  // heavy wallet's seed and tail, rows past the draw cut) or the flat read
+  // comes back short, the server's replay of every row answers; where that
+  // fails too, the read failed.
+  const wholeRows = sweptClean && (servedFolders?.length ?? 0) === 0 && (timeline?.coverage.omitted?.count ?? 0) === 0;
+  const fetchFlatHistory = useCallback(async () => {
+    const flat = await fetchChainTimeline<BaseTimeline>({ wallet, route: d.routes.timeline, mark: `${d.key}-flows` });
+    const whole = d.wholeOf(flat.coverage);
+    return {
+      events: flat.events.filter(isAaveV3Event),
+      missing: whole ? (flat.coverage.omitted?.count ?? 0) : Math.max(1, flat.coverage.omitted?.count ?? 0),
+    };
+  }, [wallet, d]);
+  const flows = useAaveV3BaseFlows({
+    ...d.flows,
+    wallet,
+    elided: (timeline?.coverage.omitted?.count ?? 0) > 0,
+    brand: "Aave",
+    writeOffFrom: d.writeOff.firstBlock,
+    pending: timelineState === "loading",
+    wholeEvents: wholeRows ? aaveEvents : null,
+    fetchAll: timelineState === "ready" ? fetchFlatHistory : null,
+    chain: data,
+    prices,
+  });
+
+  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+    if (!view) return [];
+    const seen = new Set<string>();
+    const out: PriceStripAsset[] = [];
+    for (const r of [...view.supplies, ...view.borrows]) {
+      const a = r.address.toLowerCase();
+      if (seen.has(a)) continue;
+      seen.add(a);
+      const p = prices[a];
+      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
+    }
+    return out;
+  }, [view, prices]);
+
+  // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
+  const exports = view
+    ? aaveV3Exports({
+        wallet,
+        marketName: d.marketName,
+        source: captureSource,
+        view,
+        chain: data,
+        captions,
+        events: aaveEvents,
+        history: markdownHistoryScope(undefined, aaveEvents, servedFolders),
+        scopeNote: exportScopeNote(undefined, aaveEvents, "this wallet's whole history", servedFolders),
+        fetchAllEvents: servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined,
+        csvFilename: `${d.key}-${wallet.slice(0, 10)}-activity.csv`,
+      })
+    : null;
+
+  return (
+    // Every event card's custody line names the live sweep rather than an index
+    // that does not exist behind this page.
+    <CaptureSourceProvider value={captureSource}>
+      <V3PoolProvider pool={d.pool}>
+        <FlowFocusContext.Provider value={flows.focus}>
+          <div className="py-8 space-y-6">
+            <DetailTopRow
+              session={d.session}
+              wallet={wallet}
+              owner={{ wallet }}
+              assets={stripAssets}
+              closed={view != null && view.status !== "open"}
+              // The exports ride the card's ⋮; the event route, which draws no
+              // card, keeps them in the wallet row's Tools.
+              tools={pinnedRoute}
+            >
+              {pinnedRoute && exports && <ExportMenu {...exports} />}
+            </DetailTopRow>
+
+            {loading ? (
+              <DetailBodySkeleton />
+            ) : error ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">Couldn&apos;t read this position.</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            ) : historyPending ? (
+              <SweepInFlight>{d.words.reading}</SweepInFlight>
+            ) : historyUnread ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">Nothing is supplied or borrowed on this Pool.</p>
+                <p className="text-sm">
+                  Whether this account ever held a position is a question only its history answers, and that read
+                  failed. Reload to try again.
+                </p>
+              </div>
+            ) : untouched ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">{d.words.untouchedTitle}</p>
+                <p className="text-sm">{d.words.untouchedBody}</p>
+              </div>
+            ) : emptyNotWhole && d.words.emptyNotWholeState ? (
+              <div className="py-12 text-center text-rb-500" data-history-empty-not-whole="">
+                <p className="mb-1">{d.words.emptyNotWholeState.title}</p>
+                <p className="text-sm">{d.words.emptyNotWholeState.body}</p>
+              </div>
+            ) : (
+              <>
+                {!pinnedRoute && view && data && (
+                  <AaveV3PositionCard
+                    v={view}
+                    receipts
+                    viewHref={tl.viewHref}
+                    deployment={d.card}
+                    pricesPending={!pricesSettled}
+                    captions={captions ?? undefined}
+                    // The Pool read's room to borrow and eMode go in the panel,
+                    // inside the card's receipts scope.
+                    chain={data}
+                    exports={exports}
+                    // The Explanation is layman prose about the face figures,
+                    // plus the two facts about THIS Pool that change how they
+                    // read — eMode and a supply that backs nothing — which the
+                    // face deliberately does not carry.
+                    explanation={
+                      view.status !== "open" ? (
+                        <AaveV3ClosedPositionExplanation v={view} events={aaveEvents} folders={servedFolders} />
+                      ) : (
+                        <AaveV3PositionExplanation
+                          chain={data}
+                          captions={captions}
+                          view={view}
+                          externalActivity={externalActivity}
+                        />
+                      )
+                    }
+                  />
+                )}
+
+                {/* Lifetime flows: the bars and the line over the account's
+              replay (lib/aave-v3-base/flows.ts), in place of the tower
+              (TO-DO-ui-jobs 206). */}
+                {!pinnedRoute && view && (!d.flowsNeedWhole || sweptClean) && (
+                  <LifetimeFlowsPanel
+                    scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                    read={timelineState === "failed" || timelineState === "unavailable" ? "failed" : flows.read}
+                    explanation={
+                      <div className="space-y-2 text-sm text-rb-500">
+                        <AaveV3BaseFlowsNote facts={flows.facts} brand="Aave" pool={d.sourceLabel} />
+                      </div>
+                    }
+                    learnMore={aaveV3BaseFlowsContent("Aave")}
+                  />
+                )}
+
+                {timelineState === "ready" && timeline ? (
+                  <>
+                    {!pinnedRoute && <TimelineFillWell fill={timeline.coverage.fill} />}
+                    <ChainTruthTimeline
+                      // Matches `AaveV3CtEventCard`'s own
+                      // `persistKey={`aave-v3:${event.id}`}` — lets pinned mode
+                      // (the per-event share route) force a landed card's detail
+                      // panel open on its first mount.
+                      persistKeyPrefix="aave-v3"
+                      eventPage={(slot) =>
+                        aaveV3Explorer.eventPage({
+                          ...slot,
+                          market: d.marketName,
+                          wallet,
+                          deployment: d.explorerDeployment,
+                          siblings: neighbours.get(slot.event.id)?.siblings,
+                        })
+                      }
+                      closed={view?.status !== "open"}
+                      tl={tl}
+                      // Both grouping paths: the specs group a flat answer in the
+                      // browser, the register draws the folders the route served.
+                      runs={AAVE_V3_TIMELINE_RUNS}
+                      folderRegister={AAVE_V3_FOLDER_REGISTER}
+                      readFolderMembers={readFolderMembers}
+                      segments={segments}
+                      displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                      toolbarLeading={
+                        <TimelineActivityHeader
+                          events={headerStamps}
+                          closed={view?.status !== "open"}
+                          firstAt={timeline.coverage.firstEventAt}
+                        />
+                      }
+                      // Only claim absence when the sweep actually read the blocks;
+                      // otherwise the footer beneath states what was missed.
+                      emptyLabel={sweptClean ? d.words.emptyWhole : d.words.emptyNotWhole}
+                      footer={
+                        <>
+                          <TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={d.sourceLabel} />
+                          <WriteOffGapNote leftovers={writeOffLeftovers} chain={d.writeOff.chain} />
+                        </>
+                      }
+                      // On a grouped answer the list covers `eventsServed`; a month
+                      // read holds no card, the grid holding the other months.
+                      boundary={
+                        tl.historyWindow.state === "span"
+                          ? null
+                          : boundaryFromChainCoverage(
+                              timeline.coverage,
+                              servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
+                            )
+                      }
+                      renderCard={(event, meta) =>
+                        isAaveV3Event(event) && event.context.data.emodeSwitch ? (
+                          <AaveFamilyEmodeSwitchCard
+                            event={event}
+                            sw={event.context.data.emodeSwitch}
+                            pool={d.pool}
+                            persistPrefix="aave-v3"
+                            hfFormat={hfLabelV3}
+                            eventNumber={meta.eventNumber}
+                            isLast={meta.isLast}
+                            market={sharedBlocks.has(event.blockNumber) ? undefined : d.marketKey}
+                          />
+                        ) : isAaveV3Event(event) ? (
+                          <AaveV3CtEventCard
+                            event={event}
+                            eventNumber={meta.eventNumber}
+                            isLast={meta.isLast}
+                            market={sharedBlocks.has(event.blockNumber) ? undefined : d.marketKey}
+                            siblings={neighbours.get(event.id)?.siblings}
+                            previous={neighbours.get(event.id)?.previous}
+                          />
+                        ) : null
+                      }
+                    />
+                  </>
+                ) : timelineState === "loading" ? (
+                  <SweepInFlight>{d.words.reading}</SweepInFlight>
+                ) : (
+                  <p className="py-6 text-center text-sm text-rb-500">
+                    {timelineState === "unavailable" ? d.words.unavailable : d.words.failed}
+                  </p>
+                )}
+              </>
+            )}
+
+            <ProvInspectorLayer />
+          </div>
+        </FlowFocusContext.Provider>
+      </V3PoolProvider>
+    </CaptureSourceProvider>
+  );
+}
+
+/** Under the last event, in the coverage footer's register: the write-off
+ *  gap, where this wallet's history shows it (lib/aave-v3-base/write-off-gap). */
+function WriteOffGapNote({ leftovers, chain }: { leftovers: WriteOffLeftover[]; chain: string }) {
+  if (leftovers.length === 0) return null;
+  // The formatter the event card's "debt after" figure uses, so the note
+  // matches the row above it (dust keeps its magnitude: 0.0004, not 0).
+  const amounts = leftovers.map((l) => `${formatNumber(Number(l.amount))} ${l.symbol}`);
+  const it = amounts.length === 1 ? "it" : "them";
+  const listed =
+    amounts.length === 1 ? amounts[0] : `${amounts.slice(0, -1).join(", ")} and ${amounts[amounts.length - 1]}`;
+  return (
+    <p className="mt-2 pt-3 text-[11px] leading-relaxed text-rb-500">
+      <span className="text-foreground">This history ends with {listed} of debt that no longer exists on chain.</span> A
+      liquidation left no collateral to cover {it}, so Aave wrote {it} off (a <code>DeficitCreated</code> event), and
+      Rails does not show write-offs on {chain} yet.
+    </p>
+  );
+}

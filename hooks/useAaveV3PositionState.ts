@@ -38,21 +38,24 @@ const inFlight = new Map<string, Promise<Settled>>();
 const LASTING_REFUSALS = new Set([400, 404]);
 const LOADING: AaveV3PositionStateResult = { status: "loading" };
 
-/** The Ethereum markets read the index's answer; Base, Seamless and SparkLend
- *  read the chain at the block (app/api/chain/{aave-v3-base,seamless,spark}/
+/** The Ethereum markets read the index's answer; Base, Arbitrum, Seamless and
+ *  SparkLend read the chain at the block (app/api/chain/{aave-v3-base,
+ *  aave-v3-arbitrum,seamless,spark}/
  *  position-state), same wire shape. "chain:<market>" reads an Ethereum
  *  market from the chain (app/api/chain/aave-v3/position-state), for a row
  *  the index holds no event for (an e-mode change). */
 const routeFor = (market: string): string =>
   market === "base"
     ? "/api/chain/aave-v3-base/position-state"
-    : market === "seamless"
-      ? "/api/chain/seamless/position-state"
-      : market === "spark"
-        ? "/api/chain/spark/position-state"
-        : market.startsWith("chain:")
-          ? "/api/chain/aave-v3/position-state"
-          : "/api/aave-v3/position-state";
+    : market === "arbitrum"
+      ? "/api/chain/aave-v3-arbitrum/position-state"
+      : market === "seamless"
+        ? "/api/chain/seamless/position-state"
+        : market === "spark"
+          ? "/api/chain/spark/position-state"
+          : market.startsWith("chain:")
+            ? "/api/chain/aave-v3/position-state"
+            : "/api/aave-v3/position-state";
 
 const READ_TIMEOUT_MS = 25_000;
 const RETRY_AFTER_MS = 2_000;

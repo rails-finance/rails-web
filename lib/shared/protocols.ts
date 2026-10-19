@@ -65,13 +65,15 @@ type ProtocolSpec = {
   /** One-line summary shown on the directory cards. */
   desc: string;
   /** Does this explorer's own route list POSITIONS? Every explorer but the
-   *  vault-native ones does, and the rail's first tab is that listing, named by
-   *  the protocol's own noun. A protocol whose whole product is vaults has no
-   *  position listing to draw — a share in a vault is not a position in the
-   *  roster's sense (rails-ops decision 0027 call 2) — so its rail drops that
-   *  tab and its own route opens on the first sub-page. Omitted means it has
-   *  one; `false` is the only other value, because "has a listing" needs no
-   *  declaring. */
+   *  vault-native ones and the position-first ones does, and the rail's first
+   *  tab is that listing, named by the protocol's own noun. A protocol whose
+   *  whole product is vaults has no position listing to draw — a share in a
+   *  vault is not a position in the roster's sense (rails-ops decision 0027
+   *  call 2) — so its rail drops that tab and its own route opens on the first
+   *  sub-page. A position-first explorer (no sub-pages) keeps its own route as
+   *  the protocol page: a wallet input over the market overview. Omitted means
+   *  it has one; `false` is the only other value, because "has a listing"
+   *  needs no declaring. */
   positionListing?: false;
   /** NOT LAUNCHED: this explorer serves at its URL and nothing on the site
    *  points at it. Every route under it renders exactly as it always did, with
@@ -109,9 +111,13 @@ type ProtocolSpec = {
    *  header's sub-nav shows ("Markets", not "Markets overview"). The surfaces
    *  that read it: the rail header's tabs (`RailHeader`, which the sub-page's
    *  own `SubPageHeader` draws), the route loading boundary, and the sitemap —
-   *  so moving a sub-page is one edit here rather than a hunt through them. */
-  subPages: [SubPageSpec, ...SubPageSpec[]];
+   *  so moving a sub-page is one edit here rather than a hunt through them.
+   *  Empty only on a position-first explorer, whose overview sits on its own
+   *  route under the wallet input. */
+  subPages: SubPageSpecs;
 };
+
+type SubPageSpecs = [SubPageSpec, ...SubPageSpec[]] | [];
 
 type SubPageSpec = {
   segment: string;
@@ -148,7 +154,7 @@ export type ProtocolEntry = Omit<ProtocolSpec, "subPages"> & {
    *  hand-written: see `explorerHref`. */
   href: string;
   /** The spec's sub-pages, each carrying its derived route. */
-  subPages: [SubPageEntry, ...SubPageEntry[]];
+  subPages: [SubPageEntry, ...SubPageEntry[]] | [];
   /** This explorer's info page (`href` + "/info") — the intro prose and the
    *  /coverage door. Derived like a sub-page's `href`. */
   infoHref: string;
@@ -184,6 +190,22 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Base deployment — a separate Pool with its own reserves and risk parameters, every wallet's account read whole from the contracts, no modeled state",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+  },
+  {
+    // Aave V3 on Arbitrum One, position-first (rails-ops
+    // TO-DO-arbitrum-scoping.md): no listing, so the explorer's own route is
+    // the protocol page — a wallet input over the market overview — and it has
+    // no sub-pages.
+    id: "aave-v3-arbitrum",
+    session: "aave-v3-arbitrum",
+    label: "Aave V3",
+    chainId: 42161,
+    slug: "aave-v3",
+    protocolKey: "aave-v3",
+    tags: ["Lend", "Borrow"],
+    desc: "Aave V3's Arbitrum deployment — a separate Pool with its own reserves and risk parameters, any wallet's account read whole from the contracts, no modeled state",
+    positionListing: false,
+    subPages: [],
   },
   {
     id: "aave-v4",
@@ -588,7 +610,8 @@ export const PROTOCOLS: ProtocolEntry[] = SPECS.map((spec) => {
   const href = explorerHref(spec.chainId, spec.slug);
   const sub = (s: SubPageSpec): SubPageEntry => ({ ...s, href: `${href}/${s.segment}` });
   const [first, ...rest] = spec.subPages;
-  return { ...spec, href, subPages: [sub(first), ...rest.map(sub)], infoHref: `${href}/info` };
+  const subPages: ProtocolEntry["subPages"] = first ? [sub(first), ...rest.map(sub)] : [];
+  return { ...spec, href, subPages, infoHref: `${href}/info` };
 });
 
 /** The roster a LISTING surface shows — the nav switcher, the home tile strip,
@@ -703,6 +726,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "aave-v4-base": "Position",
   "aave-v3": "Position",
   "aave-v3-base": "Position",
+  "aave-v3-arbitrum": "Position",
   // A holder's reading of one vault. It names no headline position — the vault
   // layer is in NOT_POSITION_EXPLORERS — and the rail never prints it either,
   // because that explorer draws no position tab; the entry exists because this
@@ -773,8 +797,9 @@ export function protocolsForChain(chainId: ChainId): ProtocolEntry[] {
 export function protocolIconSrc(id: string): string {
   // A Base deployment shares its protocol's mark: the roster id carries the
   // chain ("aave-v3-base") but the brand does not, and no `<id>-base.png`
-  // exists — without the strip, every Base entry rendered a broken image.
-  return `/icons/protocols/${id.replace(/-base$/, "")}.png`;
+  // exists — without the strip, every Base entry rendered a broken image. An
+  // Arbitrum deployment ("aave-v3-arbitrum") is the same case.
+  return `/icons/protocols/${id.replace(/-(base|arbitrum)$/, "")}.png`;
 }
 
 /** Resolve a bookmarks/session-store key (`SessionProtocol`) to its explorer
@@ -844,7 +869,7 @@ export function listingHrefForWallet(session: SessionProtocol, wallet: string, t
   if (takenOnSub) {
     listing = `${takenOnSub.href}/positions`;
   } else if (entry.positionListing === false) {
-    if (!entry.subPages[0].holderListing) return null;
+    if (!entry.subPages[0]?.holderListing) return null;
     listing = `${entry.subPages[0].href}/positions`;
   }
   return `${listing}?q=${encodeURIComponent(wallet.toLowerCase())}`;

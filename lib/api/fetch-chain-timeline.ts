@@ -17,6 +17,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { settleFetchMark } from "@/lib/perf/settle-marks";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { TimelineCutSummary } from "@/lib/shared/timeline-boundary";
+import type { CaptureSource } from "@/lib/shared/capture-source";
 
 /** An inclusive block range the sweep could not read. */
 export interface CoverageGap {
@@ -76,12 +77,28 @@ export interface ChainTimelineCoverage {
    *  include them. Absent when none. */
   undated?: number;
   /** Where the rows came from: a live sweep of the chain's logs (the default
-   *  when absent), or the rails-server index read through the API. */
-  source?: "sweep" | "index";
+   *  when absent), the rails-server index read through the API, or the
+   *  Arbitrum store's Etherscan or Tenderly body. */
+  source?: CaptureSource;
+  /** Whether a second chain witness has confirmed the rows, on a store that
+   *  says so (Arbitrum). Absent everywhere else. */
+  confirmation?: TimelineConfirmation;
   /** The lane's oracle-at-block walk, when one prices this family's rows
    *  (rails-server api/src/services/price-walk-fill.ts). Absent on a sweep,
    *  on a lane with no walk, and from a server before the field. */
   fill?: TimelineFillState;
+}
+
+/** The Arbitrum store's verdict on a wallet's history (rails-ops
+ *  TO-DO-arbitrum-scoping.md §7 item 1): "unconfirmed" until its validator has
+ *  re-read the wallet from a chain witness, "confirmed" through a block once it
+ *  agrees, "disputed" where a log only Etherscan returned was dropped. */
+export interface TimelineConfirmation {
+  status: "unconfirmed" | "confirmed" | "disputed";
+  confirmedThroughBlock: number | null;
+  /** Logs Etherscan returned that no chain witness did; left off the list. */
+  droppedCount: number;
+  dropped: { txHash: string; logIndex: number; blockNumber: number }[];
 }
 
 /** A running oracle-at-block walk as a timeline answer states it: the lane's

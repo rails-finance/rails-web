@@ -14,6 +14,7 @@ import { buildAaveMarketView } from "@/lib/shared/aave-market-view";
 import { AaveMarketViews, AaveMarketLoadingSkeleton } from "@/components/shared/aave-market-views";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { LearnMore } from "@/components/shared/learn-more-modal";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { BlockRef } from "@/components/shared/block-ref";
 
@@ -21,8 +22,8 @@ export interface AaveMarketPageProps {
   /** This deployment's chain proxy for the market ("/api/chain/spark/market"). */
   apiRoute: string;
   /** Protocol id — selects the market-surface provenance vocabulary
-   *  ("aave-v3" / "aave-v3-base" / "seamless" / "spark"). */
-  protocol: "aave-v3" | "aave-v3-base" | "seamless" | "spark";
+   *  ("aave-v3" / "aave-v3-base" / "aave-v3-arbitrum" / "seamless" / "spark"). */
+  protocol: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "seamless" | "spark";
   /** Which chain the market is on. Drives the block link's explorer; defaults
    *  to Ethereum, so the two existing pages render the Etherscan URL they
    *  rendered before. Getting this wrong is invisible on the page and wrong in
@@ -39,6 +40,10 @@ export interface AaveMarketPageProps {
   learnMore: LearnMoreContent;
   /** Listing URL filtered to one asset/side, where the listing supports it. */
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
+  /** "section": the overview sits under another page's header (a
+   *  position-first explorer's protocol page), so it draws a section heading
+   *  in place of the rail header and the h1. */
+  header?: "page" | "section";
 }
 
 export function AaveMarketPage(props: AaveMarketPageProps) {
@@ -85,34 +90,49 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
   const protocol = protocolForHref(props.listingHref);
   if (!protocol) throw new Error(`aave-market-page: no roster entry for ${props.listingHref}`);
 
+  const body =
+    loading && !data ? (
+      <AaveMarketLoadingSkeleton />
+    ) : error || !view ? (
+      <div className="py-12 text-center text-rb-500">
+        <p className="mb-1">Couldn&apos;t read the market from chain.</p>
+        <p className="text-sm">{error ?? "The RPC read failed — reload to retry."}</p>
+      </div>
+    ) : (
+      <div data-skel-section="page-table">
+        <AaveMarketViews view={view} listingHref={props.listingHref} assetHref={props.assetHref} />
+      </div>
+    );
+
+  const stamp =
+    data && !data.chainStale && data.blockNumber > 0 ? (
+      <p className="mt-2 text-[11px] text-rb-500">
+        Chain snapshot · <BlockRef block={data.blockNumber} chainId={props.chainId ?? MAINNET_CHAIN_ID} />
+      </p>
+    ) : undefined;
+
+  if (props.header === "section")
+    return (
+      <section aria-labelledby="market-overview-heading">
+        <header className="mb-6" data-skel-section="page-header">
+          <div className="flex items-center gap-2">
+            <h2 id="market-overview-heading" className="text-lg font-semibold text-foreground">
+              Market overview
+            </h2>
+            <LearnMore content={props.learnMore} inline />
+          </div>
+          {stamp}
+        </header>
+        {body}
+      </section>
+    );
+
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader
-          protocol={protocol}
-          title="Market overview"
-          learnMore={props.learnMore}
-          stamp={
-            data && !data.chainStale && data.blockNumber > 0 ? (
-              <p className="mt-2 text-[11px] text-rb-500">
-                Chain snapshot · <BlockRef block={data.blockNumber} chainId={props.chainId ?? MAINNET_CHAIN_ID} />
-              </p>
-            ) : undefined
-          }
-        />
+        <SubPageHeader protocol={protocol} title="Market overview" learnMore={props.learnMore} stamp={stamp} />
 
-        {loading && !data ? (
-          <AaveMarketLoadingSkeleton />
-        ) : error || !view ? (
-          <div className="py-12 text-center text-rb-500">
-            <p className="mb-1">Couldn&apos;t read the market from chain.</p>
-            <p className="text-sm">{error ?? "The RPC read failed — reload to retry."}</p>
-          </div>
-        ) : (
-          <div data-skel-section="page-table">
-            <AaveMarketViews view={view} listingHref={props.listingHref} assetHref={props.assetHref} />
-          </div>
-        )}
+        {body}
       </div>
     </div>
   );

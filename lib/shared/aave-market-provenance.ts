@@ -99,7 +99,7 @@ export interface CapUsedInput {
 }
 
 interface AaveMarketConfig {
-  protocol: "aave-v3" | "aave-v3-base" | "seamless" | "spark";
+  protocol: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "seamless" | "spark";
   poolName: string;
   oracleName: string;
   /** The chain-proxy lane the surface reads through. */
@@ -436,6 +436,12 @@ const FACTORIES: Record<string, (coords: AaveMarketCoords) => AaveMarketVocab> =
     poolName: "Aave V3 Base Pool",
     oracleName: "Aave V3 Base IAaveOracle",
     lane: "GET /api/chain/aave-v3-base/market",
+  }),
+  "aave-v3-arbitrum": makeVocab({
+    protocol: "aave-v3-arbitrum",
+    poolName: "Aave V3 Arbitrum Pool",
+    oracleName: "Aave V3 Arbitrum IAaveOracle",
+    lane: "GET /api/chain/aave-v3-arbitrum/market",
   }),
   seamless: makeVocab({
     protocol: "seamless",

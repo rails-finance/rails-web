@@ -255,6 +255,7 @@ function AaveV3MenuRows({ pagePath }: { pagePath: string }) {
 /** The position page of each deployment, for the ⋮'s link. */
 function pagePathOf(session: string, v: AaveV3PositionView): string {
   if (session === "aave-v3-base") return `/base/aave-v3/${v.wallet}`;
+  if (session === "aave-v3-arbitrum") return `/arbitrum/aave-v3/${v.wallet}`;
   if (session === "seamless") return `/base/seamless/${v.wallet}`;
   return `/ethereum/aave-v3/${v.wallet}?market=${v.market}`;
 }
@@ -352,7 +353,9 @@ export function useAaveV3CardSlots({
   // on Ethereum, Aave V3 on Base, and Seamless; only the deployment named by
   // the card's session changes the prose.
   const positionDeployment: AaveV3Deployment =
-    dep.session === "aave-v3-base" || dep.session === "seamless" ? dep.session : "aave-v3";
+    dep.session === "aave-v3-base" || dep.session === "aave-v3-arbitrum" || dep.session === "seamless"
+      ? dep.session
+      : "aave-v3";
   const learnMore = aaveV3PositionModal(v.status, positionDeployment, v.borrows.length > 0);
   const menuSlot = {
     leading: () => <AaveV3MenuRows pagePath={pagePathOf(dep.session, v)} />,
