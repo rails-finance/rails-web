@@ -4,9 +4,13 @@
 
 import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
-import { formatDateLong } from "@/lib/date";
+import { formatDate, formatDateLong } from "@/lib/date";
 import { isPwnEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { eventTitleWords, kindTitle, type EventTitle } from "@/lib/shared/event-title";
+import { pwnT1Caption, pwnT1Words } from "@/lib/pwn/head-words";
+import { pwnExplainerTeaser } from "@/lib/pwn/explainer-clauses";
+import { firstSentenceText } from "@/lib/pwn/sentence-text";
+import type { PwnCoords } from "@/lib/pwn/event-provenance";
 
 const WORDS = {
   paragraph: "This page is one transaction from this loan's history.",
@@ -33,30 +37,33 @@ export interface PwnEventPageInput extends EventPageSlot {
   borrower: string | null;
 }
 
-/** The event's title: T1's word and the amount its head states (the credit
- *  advanced, repaid or claimed, or the collateral a default seized). Also read
- *  on the server. */
+/** The event's title where the card has no teaser: T1's words (rails-ops
+ *  decision 0045). Also read on the server. */
 export function pwnEventTitle(event: BaseActivityEvent): EventTitle {
-  if (!isPwnEvent(event)) return makeEventTitle(event, event.actionLabel, []);
+  if (!isPwnEvent(event)) return kindTitle(event.actionLabel);
   const ctx = event.context.data;
-  const credit = (value: number) => ({ value, symbol: ctx.creditSymbol ?? "" });
-  // The repaid amount the log states. An accruing loan's is summed on the page
-  // (`ctx.accrued`), which the server does not have, so that row's title stays the word.
-  const repaid = ctx.loanRepayAmount != null ? Number(ctx.loanRepayAmount) || 0 : 0;
-  if (ctx.eventType === "created")
-    return makeEventTitle(event, event.actionLabel, [credit(Number(ctx.creditAmount ?? "0") || 0)]);
-  if (ctx.eventType === "paid_back") return makeEventTitle(event, event.actionLabel, [credit(repaid)]);
-  if (ctx.eventType === "claimed" && ctx.defaulted === true)
-    return makeEventTitle(event, event.actionLabel, [
-      { value: Number(ctx.collateralAmount ?? "1") || 1, symbol: ctx.collateralSymbol ?? "" },
-    ]);
-  if (ctx.eventType === "claimed") return makeEventTitle(event, event.actionLabel, [credit(repaid)]);
-  return makeEventTitle(event, event.actionLabel, []);
+  const to =
+    ctx.eventType === "extended" && ctx.extendedDefaultTimestamp != null
+      ? formatDate(Number(ctx.extendedDefaultTimestamp))
+      : null;
+  return kindTitle(pwnT1Caption(pwnT1Words(ctx), to));
 }
 
-/** The event's heading: the title in words. Also read on the server. */
-export function pwnEventHeading(event: BaseActivityEvent): string {
-  return eventTitleWords(pwnEventTitle(event));
+/** The event's heading, the browser title's last words: the Explanation's
+ *  first sentence, as the page's h1 states it, else T1's words. `siblings`:
+ *  the events of its transaction, which the teaser reads (a mint's or a burn's
+ *  economic event). Also read on the server. */
+export function pwnEventHeading(event: BaseActivityEvent, siblings?: BaseActivityEvent[]): string {
+  if (!isPwnEvent(event)) return event.actionLabel;
+  const ctx = event.context.data;
+  const coords: PwnCoords = {
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    loanId: ctx.loanId,
+    version: ctx.version,
+  };
+  const sibs = (siblings ?? [event]).filter(isPwnEvent);
+  return firstSentenceText(pwnExplainerTeaser(ctx, coords, sibs, event)) ?? eventTitleWords(pwnEventTitle(event));
 }
 
 /** The page's metadata description, also read on the server. */
