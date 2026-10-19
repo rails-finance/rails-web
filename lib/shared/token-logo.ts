@@ -20,11 +20,15 @@ import { getAddress } from "viem";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 /** Trust Wallet's directory name per chain — absent where it has none. */
-const TRUST_WALLET_CHAIN: Partial<Record<ChainId, string>> = { 1: "ethereum", 8453: "base" };
+const TRUST_WALLET_CHAIN: Partial<Record<ChainId, string>> = {
+  1: "ethereum",
+  8453: "base",
+  42161: "arbitrum",
+};
 
 /** Chains DeFiLlama's icon service serves. Keyed by chain id in the path, so
  *  the set is what matters, not a name. */
-const DEFILLAMA_CHAINS: ReadonlySet<ChainId> = new Set<ChainId>([1, 8453]);
+const DEFILLAMA_CHAINS: ReadonlySet<ChainId> = new Set<ChainId>([1, 8453, 42161]);
 
 export function getTokenLogoUrl(address: string, chainId: ChainId = MAINNET_CHAIN_ID): string | null {
   // viem throws if the address isn't 20 bytes / 0x-hex; for our use the input
