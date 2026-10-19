@@ -4,8 +4,9 @@
 //
 //   POST /api/aave-v3-arbitrum/visits    the position page's chain read
 //   GET  /api/aave-v3-arbitrum/timeline  a wallet's history, Base's row shape
+//   GET  /api/aave-v3-arbitrum/positions the recorded wallets, newest visit first
 //
-// As landed on rails-server main (9cd6ebd). Collateral on/off events are stored
+// As landed on rails-server main (9cd6ebd; /positions 8a81dea). Collateral on/off events are stored
 // there and not returned as rows; the arb1 witness covers Pool rows only, so
 // `arb1ThroughBlock` says nothing about the aToken transfers.
 //
@@ -155,5 +156,103 @@ export function readTimelineAnswer(raw: unknown): AaveV3ArbitrumTimelineResponse
       fromDeployment: c.fromDeployment === true,
       gaps,
     },
+  };
+}
+
+// ── GET /positions?limit=&offset= ───────────────────────────────────────────
+
+/** A visited wallet's history state; the server sends null before a visit
+ *  has queued one. */
+export interface AaveV3ArbitrumPositionHistory {
+  status: "unconfirmed" | "confirmed" | "disputed";
+  bodySource: "etherscan" | "tenderly" | null;
+  confirmedThroughBlock: number | null;
+  validatedAt: string | null;
+  droppedCount: number;
+  error: string | null;
+}
+
+/** One recorded wallet: the stored Pool read (figures as the server's decimal
+ *  strings, read here as numbers) and its visit counts. */
+export interface AaveV3ArbitrumPositionRow {
+  wallet: string;
+  blockNumber: number | null;
+  /** Null when the wallet had no debt at the read. */
+  healthFactor: number | null;
+  avgLiquidationThreshold: number | null;
+  ltv: number | null;
+  totalCollateralUsd: number | null;
+  totalDebtUsd: number | null;
+  supplyCount: number;
+  borrowCount: number;
+  chainOpen: boolean | null;
+  chainHasDebt: boolean | null;
+  chainStale: boolean;
+  refreshedAt: string | null;
+  firstVisitedAt: string | null;
+  lastVisitedAt: string | null;
+  visitCount: number;
+  history: AaveV3ArbitrumPositionHistory | null;
+}
+
+export interface AaveV3ArbitrumPositionsResponse {
+  rows: AaveV3ArbitrumPositionRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
+
+/** The answer checked against the contract; null when it does not hold one.
+ *  A row without a wallet address is dropped; numeric fields are read as
+ *  numbers whether the server sends numbers or decimal strings. */
+export function readPositionsAnswer(raw: unknown): AaveV3ArbitrumPositionsResponse | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (!Array.isArray(r.rows)) return null;
+  const rows = (r.rows as Record<string, unknown>[]).flatMap((p): AaveV3ArbitrumPositionRow[] => {
+    if (!p || typeof p !== "object" || typeof p.wallet !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(p.wallet)) return [];
+    const h = p.history as Record<string, unknown> | null | undefined;
+    const status = h?.status;
+    const history: AaveV3ArbitrumPositionHistory | null =
+      h && (status === "unconfirmed" || status === "confirmed" || status === "disputed")
+        ? {
+            status,
+            bodySource: h.bodySource === "etherscan" || h.bodySource === "tenderly" ? h.bodySource : null,
+            confirmedThroughBlock: block(h.confirmedThroughBlock),
+            validatedAt: str(h.validatedAt),
+            droppedCount: block(h.droppedCount) ?? 0,
+            error: str(h.error),
+          }
+        : null;
+    return [
+      {
+        wallet: p.wallet.toLowerCase(),
+        blockNumber: block(p.blockNumber),
+        healthFactor: block(p.healthFactor),
+        avgLiquidationThreshold: block(p.avgLiquidationThreshold),
+        ltv: block(p.ltv),
+        totalCollateralUsd: block(p.totalCollateralUsd),
+        totalDebtUsd: block(p.totalDebtUsd),
+        supplyCount: block(p.supplyCount) ?? 0,
+        borrowCount: block(p.borrowCount) ?? 0,
+        chainOpen: bool(p.chainOpen),
+        chainHasDebt: bool(p.chainHasDebt),
+        chainStale: p.chainStale === true,
+        refreshedAt: str(p.refreshedAt),
+        firstVisitedAt: str(p.firstVisitedAt),
+        lastVisitedAt: str(p.lastVisitedAt),
+        visitCount: block(p.visitCount) ?? 0,
+        history,
+      },
+    ];
+  });
+  return {
+    rows,
+    total: block(r.total) ?? rows.length,
+    limit: block(r.limit) ?? rows.length,
+    offset: block(r.offset) ?? 0,
   };
 }
