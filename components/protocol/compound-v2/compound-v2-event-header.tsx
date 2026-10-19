@@ -7,10 +7,19 @@
 // seizure legs carry NEUTRAL party chips whose prefixes say what happened
 // ("seized by" / "seized from") — the collateral was TAKEN, and the copy never
 // reads as a send the borrower made.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`cTokenT1Kind`, lib/compound-v2/head-words.ts), a
+// transfer's counterparty as its clause, and the chips for what the spine
+// cannot show (the liquidator, the seizure's other party, the "by" party).
+// The spine carries the figures. The event page's card (mode "title") keeps
+// the signed amounts.
 
 import type { AssetFlow, CompoundV2Context } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { cTokenT1Caption, cTokenT1Kind } from "@/lib/compound-v2/head-words";
+import { COMPOUND_V2_HEAD_WORDS } from "@/lib/compound-v2/event-templates";
 import {
   movedDeltaProv,
   transferAmountProv,
@@ -40,6 +49,22 @@ export interface CompoundV2EventHeaderProps {
    *  transaction, so both appear in the flows and matching by symbol is what
    *  keeps the right one. */
   flows?: AssetFlow[];
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
+}
+
+const isTransferKind = (t: CompoundV2Context["eventType"]) => t === "transfer_in" || t === "transfer_out";
+
+/** The timeline head's words as one line: the phone caption and the row's
+ *  accessible name. */
+export function compoundV2T1Caption(ctx: CompoundV2Context, actionLabel: string): string {
+  const kind = cTokenT1Kind(ctx.eventType, COMPOUND_V2_HEAD_WORDS, actionLabel);
+  if (!isTransferKind(ctx.eventType) || !ctx.counterparty) return kind;
+  return cTokenT1Caption(kind, COMPOUND_V2_HEAD_WORDS, {
+    lead: ctx.eventType === "transfer_out" ? COMPOUND_V2_HEAD_WORDS.to : COMPOUND_V2_HEAD_WORDS.from,
+    address: ctx.counterparty,
+  });
 }
 
 export function compoundV2HeadSpec({
@@ -50,6 +75,7 @@ export function compoundV2HeadSpec({
   externalBy,
   wallet,
   flows,
+  mode = "title",
 }: CompoundV2EventHeaderProps): ChainTruthRowSpec {
   const market = COMPOUND_V2_MARKET_BY_KEY[ctx.market];
   const cSym = market?.cSymbol ?? `c${ctx.marketSymbol}`;
@@ -157,23 +183,47 @@ export function compoundV2HeadSpec({
                 }
               : undefined;
 
+  const critical = ctx.eventType === "liquidation" || ctx.eventType === "seize_out" || ctx.eventType === "seize_burn";
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.caller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+            coords,
+          ),
+        }
+      : undefined;
+
+  if (mode === "row") {
+    const transfer = isTransferKind(ctx.eventType);
+    return {
+      label: cTokenT1Kind(ctx.eventType, COMPOUND_V2_HEAD_WORDS, actionLabel),
+      critical,
+      deltas: [],
+      // A transfer's counterparty is the clause after "Transferred".
+      clauses: transfer && party ? [<PartyChip key="party" party={party} />] : undefined,
+      // The kind names the seizure, so its party chip reads "by" or "from".
+      party: transfer
+        ? undefined
+        : party && (ctx.eventType === "seize_out" || ctx.eventType === "seize_in")
+          ? {
+              ...party,
+              prefix: ctx.eventType === "seize_out" ? COMPOUND_V2_HEAD_WORDS.by : COMPOUND_V2_HEAD_WORDS.from,
+            }
+          : party,
+      externalActor,
+    };
+  }
+
   return {
     label: actionLabel,
-    critical: ctx.eventType === "liquidation" || ctx.eventType === "seize_out" || ctx.eventType === "seize_burn",
+    critical,
     // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out",
     deltas,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.caller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-              coords,
-            ),
-          }
-        : undefined,
+    externalActor,
     party,
   };
 }

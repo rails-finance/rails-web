@@ -243,6 +243,44 @@ words:
     What the account could still borrow in dollars after this event: the borrowing limit less the debt, as the Comptroller's getAccountLiquidity states it.
   tip_collateral_factor: |-
     The share of the {market_symbol} supplied that counts toward the borrowing limit, set by governance in the Comptroller's markets() for the market.
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle, then at most one clause for what the spine cannot
+  # show, after the middle dot. Read through COMPOUND_V2_HEAD_WORDS
+  # (lib/compound-v2/event-templates.ts). The spine carries the figures.
+  t1_sep: |-
+    ·
+  t1_supplied: |-
+    Supplied
+  t1_withdrew: |-
+    Withdrew
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_liquidated: |-
+    Liquidated
+  t1_transferred: |-
+    Transferred
+  t1_to: |-
+    to
+  t1_from: |-
+    from
+  t1_by: |-
+    by
+  t1_seized_out: |-
+    Collateral seized
+  t1_seized_in: |-
+    Received seized collateral
+  t1_seize_burn: |-
+    Protocol share burned
+  t1_leg_sent: |-
+    transferred out
+  t1_leg_received: |-
+    transferred in
+  t1_leg_seized: |-
+    seized
+  t1_leg_repaid: |-
+    repaid
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more
