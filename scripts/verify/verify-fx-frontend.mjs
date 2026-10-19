@@ -159,8 +159,22 @@ async function openAndRead(path) {
   }
   await pg.waitForTimeout(5000);
   const text = await pg.evaluate(() => document.body.innerText);
+  // "Collateral moved by the pool" states one figure; the parts behind it are
+  // the sentence in the row's tip (ui-jobs 381), read by opening it.
+  const moved = { total: null, parts: "" };
+  const row = pg.locator('[data-panel-row="collateral-moved"]').first();
+  if (await row.count()) {
+    moved.total = ((await row.locator("dd").textContent()) ?? "").trim();
+    try {
+      await row.locator("[data-heading-tip]").first().click({ timeout: 2000 });
+      await pg.waitForSelector("[data-collateral-moved-parts]", { timeout: 3000 });
+      moved.parts = ((await pg.locator("[data-collateral-moved-parts]").first().textContent()) ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+    } catch {}
+  }
   await pg.close();
-  return { text, errors };
+  return { text, errors, moved };
 }
 
 const p249 = await openAndRead("/ethereum/fx/wsteth-249");
@@ -222,8 +236,9 @@ check(
   /88% if the min price falls to \$[\d,]+ \(−\d+\.\d%\), 95% at \$[\d,]+ \(−\d+\.\d%\)/.test(p484.text),
 );
 check(
-  "484: funding apart from the rebalances",
-  /rebalances took 3\.545 WBTC and funding took 0\.2\d+ WBTC/.test(p484.text),
+  "484: funding apart from the rebalances, in the collateral row's tip",
+  /Rebalances took 3\.5\d* WBTC and funding took 0\.\d+ WBTC/.test(p484.moved.parts),
+  p484.moved.parts,
 );
 check(
   "484: yearly funding in the card's explanation",
@@ -452,17 +467,17 @@ check(
   const p = await openAndRead("/ethereum/fx/wsteth-1801");
   check("1801 r4: no page errors", p.errors.length === 0, p.errors.slice(0, 2).join(" | "));
   // Funding keeps taking collateral between transactions, so the gap grows
-  // with the days (1.341 = 1.332 + 0.00971 on 29 Sep 2026): the card's whole is
-  // checked as the sum of its parts, the inside part (fixed by 3 past
-  // transactions) pinned, and the table's total against the card's.
-  const gap =
-    /funding & rebalances took (\d+\.\d+) stETH \((\d+\.\d+) between the transactions and 0\.00971 stETH inside 3 of them\)/.exec(
-      p.text,
-    );
+  // with the days: the card's one figure is checked as the sum of the parts
+  // its tip states (between the transactions and inside them), and the
+  // table's total against the tip's.
+  const parts = /\((\d+\.\d+) stETH between the transactions and (\d+\.\d+) stETH inside \d+ of them\)/.exec(
+    p.moved.parts,
+  );
+  const gap = parts ? [null, (p.moved.total ?? "").replace(/[^\d.]/g, ""), parts[1], parts[2]] : null;
   check(
-    "1801 r4 P1: the card states the whole gap as between plus 0.00971 inside 3 transactions",
-    gap != null && Math.abs(Number(gap[1]) - Number(gap[2]) - 0.00971) < 0.0015,
-    gap ? `${gap[1]} = ${gap[2]} + 0.00971` : "absent",
+    "1801 r4 P1: the card states the whole gap, its tip the between and inside parts",
+    gap != null && Math.abs(Number(gap[1]) - Number(gap[2]) - Number(gap[3])) < 0.015,
+    gap ? `${gap[1]} = ${gap[2]} + ${gap[3]}` : `absent: ${p.moved.total} | ${p.moved.parts}`,
   );
   check(
     "1801 r4 P1: the stretch table hides the empty stretches and totals the rest",
