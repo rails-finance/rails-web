@@ -63,6 +63,7 @@ import { pwnPositionContent } from "@/lib/pwn/position-content";
 import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
 import type { PwnBundleAsset } from "@/lib/api/fetch-pwn-bundle";
 import { PwnMenuRows } from "./pwn-menu-rows";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export interface PwnPositionView {
   loanId: string;
@@ -352,6 +353,16 @@ function CostFigure({ v, cost }: { v: PwnPositionView; cost: PwnLoanCost }) {
   );
 }
 
+/** A rate in words ("8% for 30 days, 97% a year") with its figures marked,
+ *  so the words read muted in the panel (ui-jobs 381). */
+function RateText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\d[\d.,]*%?)/).map((part, i) => (i % 2 === 1 ? <PanelFigure key={i}>{part}</PanelFigure> : part))}
+    </>
+  );
+}
+
 /** The interest and its rate as panel rows, where the card is open. */
 function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
   const sym = v.credit?.symbol ?? "";
@@ -378,7 +389,7 @@ function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
         id: "rate",
         label: "Rate",
         tip: "The fixed interest as a rate over the term the parties struck, worked out from the principal and the repay total.",
-        value: interestRateText(cost.rate),
+        value: <RateText text={interestRateText(cost.rate)} />,
       });
     return rows;
   }
@@ -397,11 +408,11 @@ function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
               prov={positionAccruedProv(v.credit.symbol, v.version, a, cost.basis === "paid" ? "paid" : "at-deadline")}
             />
           ) : (
-            `${formatCompact(cost.interest)} ${sym}`
+            <>
+              <PanelFigure>{formatCompact(cost.interest)}</PanelFigure> {sym}
+            </>
           )}
-          <span className="text-rb-500">
-            {cost.basis === "paid" ? " to the repayment" : " counted to the deadline"}
-          </span>
+          {cost.basis === "paid" ? " to the repayment" : " counted to the deadline"}
         </>
       ),
     },
@@ -409,7 +420,7 @@ function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
       id: "rate",
       label: "Accrues",
       tip: "The yearly rate in the loan's terms, read from the PWN contract at creation.",
-      value: aprText(a.apr),
+      value: <RateText text={aprText(a.apr)} />,
     },
   ];
 }

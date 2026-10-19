@@ -50,6 +50,7 @@ import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position"
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { FluidMenuRows } from "./fluid-menu-rows";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export interface FluidPositionView {
   nftId: string;
@@ -400,7 +401,7 @@ export function fluidCardSlots({
             <Prov
               info={vaultConfigProv("Collateral factor (borrow gate)", "collateralFactor", riskLive.vault, pairText)}
             >
-              {pct(riskLive.collateralFactor)}
+              <PanelFigure>{pct(riskLive.collateralFactor)}</PanelFigure>
             </Prov>{" "}
             limit
           </>

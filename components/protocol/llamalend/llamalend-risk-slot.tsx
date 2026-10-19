@@ -38,6 +38,7 @@ import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { AmountText } from "@/components/shared/amount-text";
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 /** Health under this (5%) and above 0 carries the near-0 line. */
 const HEALTH_NEAR_ZERO = 0.05;
@@ -117,7 +118,7 @@ export function llamalendRiskRows(
             "—"
           )}
         </Prov>
-        {chain.inSoftLiq && <span className="text-rb-500">from sold {chain.collateralSymbol}</span>}
+        {chain.inSoftLiq && <span>from sold {chain.collateralSymbol}</span>}
         {/* The misleading-figure caution (copy charter §2's one exception): the
             converted figure cannot be trusted as it stands. Plain words, no
             machinery; the receipt on the figure names the two reads. The `null`
@@ -186,7 +187,9 @@ export function llamalendRiskRows(
       ) : inBand ? (
         <span className="font-semibold text-tone-caution">Converting now</span>
       ) : (
-        <>{Math.round(((price - pUp) / price) * 100)}% from soft-liquidation</>
+        <>
+          <PanelFigure>{Math.round(((price - pUp) / price) * 100)}%</PanelFigure> from soft-liquidation
+        </>
       ),
       tip: "Where the oracle price stands against this position's bands: above them (the fall left before conversion begins), inside them (the AMM is converting collateral) or below them (all of it converted).",
     });
@@ -196,13 +199,15 @@ export function llamalendRiskRows(
       value: (
         <>
           <Prov info={llamalendBandCountProv(chain.controller)}>
-            {chain.bands} band{chain.bands === 1 ? "" : "s"}
+            <PanelFigure>{chain.bands}</PanelFigure> band{chain.bands === 1 ? "" : "s"}
           </Prov>
           :{" "}
           <Prov info={llamalendBandEdgeProv("pUp", chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm)}>
-            <span title={chain.pUpRaw != null ? `${formatUnitsExact(chain.pUpRaw, 18)} (exact, 1e18)` : undefined}>
-              {p(pUp)}
-            </span>
+            <PanelFigure>
+              <span title={chain.pUpRaw != null ? `${formatUnitsExact(chain.pUpRaw, 18)} (exact, 1e18)` : undefined}>
+                {p(pUp)}
+              </span>
+            </PanelFigure>
           </Prov>{" "}
           →{" "}
           <TokenFigure symbol={chain.borrowedSymbol}>

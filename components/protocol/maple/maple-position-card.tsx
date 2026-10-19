@@ -50,6 +50,7 @@ import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { MapleMenuRows } from "./maple-menu-rows";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export interface MaplePositionView {
   wallet: string;
@@ -225,7 +226,11 @@ function interestRows(captions?: MapleCardCaptions): PositionPanelRow[] {
       {
         id: "interest-earned",
         label: "Interest earned",
-        value: "All withdrawn, total in Lifetime flows",
+        value: (
+          <>
+            <PanelFigure>All withdrawn</PanelFigure>, total in Lifetime flows
+          </>
+        ),
         tip: "The claim holds none of the interest the position earned; the total is in the Lifetime flows panel.",
       },
     ];
@@ -267,12 +272,15 @@ function interestRows(captions?: MapleCardCaptions): PositionPanelRow[] {
 }
 
 /** How many withdrawal requests the wallet made, and what became of them. */
-function requestValue(requestCount: number, cancelledRequests?: number): string {
+function requestValue(requestCount: number, cancelledRequests?: number): ReactNode {
   const n = requestCount;
   const c = cancelledRequests ?? 0;
   if (c <= 0 || c > n) return String(n);
-  if (c === n) return n === 1 ? "1, cancelled" : `${n}, all cancelled`;
-  return `${n}, ${c} cancelled`;
+  return (
+    <>
+      <PanelFigure>{n}</PanelFigure>, {c === n ? (n === 1 ? "cancelled" : "all cancelled") : `${c} cancelled`}
+    </>
+  );
 }
 
 export interface MaplePositionCardProps {
@@ -399,7 +407,7 @@ export function mapleCardSlots({
             <>
               {" "}
               <Prov info={poolExitRateProv(p.assetSymbol, p.symbol, v.poolState[p.pool].blockNumber)}>
-                <span className="text-rb-500">@ {v.poolState[p.pool].exitRate.toFixed(4)}</span>
+                @ <PanelFigure>{v.poolState[p.pool].exitRate.toFixed(4)}</PanelFigure>
               </Prov>
             </>
           )}

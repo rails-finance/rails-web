@@ -23,6 +23,7 @@ import { capacityShare } from "@/lib/shared/capacity-share";
 import { capacityProv, contractVerdictProv } from "@/lib/compound/position-provenance";
 import type { CompoundCoords } from "@/lib/compound/event-provenance";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const LIMIT_TIP =
   "The debt as a share of the borrowing limit, which each collateral's borrow factor sets. The account is absorbed at a higher line, set by the liquidate factors.";
@@ -103,7 +104,7 @@ export function compoundRiskSlots(
       value: (
         <>
           <Prov info={capacityProv("Debt share of the liquidation line", "debt value ÷ liquidation capacity", coords)}>
-            {line.text}
+            <PanelFigure>{line.text}</PanelFigure>
           </Prov>{" "}
           <Prov info={contractVerdictProv("Liquidation line", "isLiquidatable", coords)}>
             {line.beyond ? "past it" : "reached"}

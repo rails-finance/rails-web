@@ -14,6 +14,7 @@ import {
   dolomiteDropProv,
 } from "@/lib/dolomite/live-provenance";
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const pct2 = (f: number) => `${(f * 100).toFixed(2)}%`;
 
@@ -56,7 +57,7 @@ export function dolomiteRiskRows(chain: DolomiteChainResponse): PositionPanelRow
       label: "Liquidation line",
       value: (
         <Prov info={dolomiteRequirementProv()}>
-          {pct2(req)}
+          <PanelFigure>{pct2(req)}</PanelFigure>
           {chain.override.active ? " (account override)" : ""}
         </Prov>
       ),

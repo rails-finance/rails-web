@@ -64,6 +64,7 @@ import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/li
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
 import { AmountText } from "@/components/shared/amount-text";
 import { formatDate, formatDayMonth } from "@/lib/date";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -516,10 +517,13 @@ export function useFrankencoinCardSlots({
         <>
           <Prov info={liqPriceProv(v)} value={String(v.liqPrice)}>
             <span>
-              <AmountText value={v.liqPrice} format="compact" /> ZCHF/{sym}
+              <PanelFigure>
+                <AmountText value={v.liqPrice} format="compact" />
+              </PanelFigure>{" "}
+              ZCHF/{sym}
             </span>
           </Prov>{" "}
-          <span className="text-rb-500">(owner-declared)</span>
+          (owner-declared)
         </>
       ),
       tip: `The liquidation price the owner declared, in ZCHF per ${sym}, from ${lane}. A challenge auction tests it.`,
@@ -538,7 +542,14 @@ export function useFrankencoinCardSlots({
     left.push({
       id: "challenges",
       label: "Challenges",
-      value: challengeTally === 0 ? "Never challenged" : `${challengeTally}, none running`,
+      value:
+        challengeTally === 0 ? (
+          "Never challenged"
+        ) : (
+          <>
+            <PanelFigure>{challengeTally}</PanelFigure>, none running
+          </>
+        ),
       tip: "How many times anyone has challenged the position's declared price, from its indexed history.",
     });
   }
@@ -546,7 +557,11 @@ export function useFrankencoinCardSlots({
     left.push({
       id: "challenge-phases",
       label: "Challenge phases",
-      value: `${phaseText(live.challengePeriod)} each`,
+      value: (
+        <>
+          <PanelFigure>{phaseText(live.challengePeriod)}</PanelFigure> each
+        </>
+      ),
       tip: "The length of each of a challenge's two phases, from the position's challengePeriod() at the latest block.",
     });
   }
@@ -557,7 +572,7 @@ export function useFrankencoinCardSlots({
       value: (
         <>
           <Prov info={liveInterestProv(v.hub, v.position)}>
-            <span>{ppmToPct(v.annualInterestPPM).toFixed(2)}%</span>
+            <PanelFigure>{ppmToPct(v.annualInterestPPM).toFixed(2)}%</PanelFigure>
           </Prov>{" "}
           a year, charged at each mint
         </>
@@ -581,7 +596,11 @@ export function useFrankencoinCardSlots({
     right.push({
       id: "expiry",
       label: "Expires",
-      value: `${formatDate(v.expiration)}, ${daysLeft(v.expiration)}`,
+      value: (
+        <>
+          <PanelFigure>{formatDate(v.expiration)}</PanelFigure>, {daysLeft(v.expiration)}
+        </>
+      ),
       tip: "When the position expires, from its expiration() at the latest block. It is fixed for the life of the position.",
     });
   }
@@ -590,7 +609,13 @@ export function useFrankencoinCardSlots({
     right.push({
       id: "cooldown",
       label: "Minting cooldown",
-      value: cooling ? `until ${formatDayMonth(live.cooldownUntil as number)}` : "None",
+      value: cooling ? (
+        <>
+          until <PanelFigure>{formatDayMonth(live.cooldownUntil as number)}</PanelFigure>
+        </>
+      ) : (
+        "None"
+      ),
       tip: "Minting and withdrawals pause for a cooldown after the owner raises the declared price, read from the position at the latest block.",
     });
   }

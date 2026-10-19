@@ -143,6 +143,7 @@ import type {
 } from "@/types/api/alchemix";
 import { BlockRef } from "@/components/shared/block-ref";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -635,7 +636,7 @@ export function AlchemistPositionView({
                   value={String(Number(dlb.debtRaw) / 1e18)}
                   symbol={sym}
                 >
-                  {formatCompactTitled(Number(dlb.debtRaw) / 1e18).display}
+                  <PanelFigure>{formatCompactTitled(Number(dlb.debtRaw) / 1e18).display}</PanelFigure>
                 </Prov>{" "}
                 {sym}
               </span>
@@ -661,9 +662,10 @@ export function AlchemistPositionView({
                         value={String(redemptionTotals.cleared)}
                         symbol={sym}
                       >
-                        {formatCompactTitled(redemptionTotals.cleared).display}
+                        <PanelFigure>{formatCompactTitled(redemptionTotals.cleared).display}</PanelFigure>
                       </Prov>{" "}
-                      {sym} by {redemptionTotals.count} {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
+                      {sym} by <PanelFigure>{redemptionTotals.count}</PanelFigure>{" "}
+                      {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
                     </span>
                   ),
                   tip: "What the redemptions on this timeline cleared from this position, summed. It accounts for the gap between the debt read now and the debt from events alone.",
@@ -795,11 +797,13 @@ export function AlchemistPositionView({
           label: "Set aside for repayment",
           value: live.earmarked ? (
             <span className="tabular-nums">
-              {alchemixAmountFigure(
-                live.earmarked,
-                sym,
-                liveFigureProv("Set aside for repayment", sym, live.earmarked.raw, live.asOfBlock, coords),
-              )}{" "}
+              <PanelFigure>
+                {alchemixAmountFigure(
+                  live.earmarked,
+                  sym,
+                  liveFigureProv("Set aside for repayment", sym, live.earmarked.raw, live.asOfBlock, coords),
+                )}
+              </PanelFigure>{" "}
               {sym}
             </span>
           ) : (
@@ -827,7 +831,8 @@ export function AlchemistPositionView({
                     symbol={u.symbol ?? undefined}
                   >
                     <span className="tabular-nums">
-                      1 {mytSymbol} = {formatSharePrice(sharePrice, u.decimals)} {u.symbol ?? "underlying"}
+                      <PanelFigure>1</PanelFigure> {mytSymbol} ={" "}
+                      <PanelFigure>{formatSharePrice(sharePrice, u.decimals)}</PanelFigure> {u.symbol ?? "underlying"}
                     </span>
                   </Prov>
                 ),
