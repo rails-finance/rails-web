@@ -84,15 +84,13 @@ export default async function AaveV3ArbitrumPositionsPage() {
           <RailHeader session="aave-v3-arbitrum" venue="subPage" />
         </div>
         <h1 className="mb-2 text-lg font-semibold text-foreground">Positions read</h1>
-        <p className="text-sm text-rb-500">
-          The wallets whose position page has been opened on this deployment, newest first.
-        </p>
+        <p className="text-sm text-rb-500">The wallets whose position page has been opened, newest first.</p>
       </header>
 
       {!answer ? (
         <p className="text-sm text-rb-500">The store did not answer; the list could not be read.</p>
       ) : answer.rows.length === 0 ? (
-        <p className="text-sm text-rb-500">No position has been read on this deployment yet.</p>
+        <p className="text-sm text-rb-500">No position has been read yet.</p>
       ) : (
         <>
           <div className="overflow-x-auto">
