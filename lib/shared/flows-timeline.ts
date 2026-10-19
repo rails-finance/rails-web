@@ -621,8 +621,12 @@ export function axisFor(peak: number): { max: number; ticks: number[] } {
   const step = niceStepBelow(peak / 3);
   const grain = step / 5;
   const max = Math.ceil((peak * 1.02) / grain) * grain;
+  // The margin and the rounding are a millionth of the step, so a peak of any
+  // size gives distinct ticks and a bounded loop (a vault holder's 1 wei of
+  // shares, ui-jobs 379).
+  const decimals = Math.min(100, Math.max(0, Math.ceil(-Math.log10(step)) + 6));
   const ticks: number[] = [];
-  for (let v = 0; v <= max + 1e-9; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+  for (let i = 0; i * step <= max + step * 1e-6; i++) ticks.push(Number((i * step).toFixed(decimals)));
   return { max, ticks };
 }
 

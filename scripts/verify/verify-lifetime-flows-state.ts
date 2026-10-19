@@ -280,6 +280,18 @@ test("the stale WBTC price is marked where it steps", () => {
 test("the axis rule", () => {
   assert.deepEqual(model.axis, { max: 320_000, ticks: [0, 100_000, 200_000, 300_000] });
   assert.deepEqual(axisFor(122_043), { max: 125_000, ticks: [0, 25_000, 50_000, 75_000, 100_000, 125_000] });
+  assert.deepEqual(axisFor(0.95).ticks, [0, 0.25, 0.5, 0.75, 1]);
+  // A peak of any size: distinct ticks from a bounded loop (ui-jobs 379, a
+  // vault holder keeping 1 wei of shares; a peak under 1e-6 ran the loop
+  // about 1e8 times, or repeated "0.000001").
+  for (const peak of [1e-18, 3.7e-12, 2.5e-9, 8e-7, 1e-6, 4.2e-3, 7, 1e12, 3e21]) {
+    const { max, ticks } = axisFor(peak);
+    assert.ok(ticks.length >= 2 && ticks.length <= 12, `${peak}: ${ticks.length} ticks`);
+    assert.equal(new Set(ticks).size, ticks.length, `${peak}: distinct ticks`);
+    const top = ticks[ticks.length - 1];
+    const step = ticks[1] - ticks[0];
+    assert.ok(top <= max * (1 + 1e-9) && top + step > max * (1 - 1e-9), `${peak}: the last tick under the top`);
+  }
 });
 
 test("the axis's labels at phone width: the ends always, never two neighbours, the last two steps clear", () => {
