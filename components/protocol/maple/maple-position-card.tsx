@@ -25,9 +25,11 @@ import {
   type PositionCardStatus,
   type PositionPanelRow,
 } from "@/components/shared/position-card";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { AssetAmount } from "@/components/shared/asset-amount";
+import { TokenFigure } from "@/components/shared/token-figure";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatExact, formatUnitsExact, formatNumber } from "@/lib/utils/format";
+import { formatExact, formatUnitsExact } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
 import { Prov } from "@/components/shared/provenance";
 import {
   positionCurrentValueProv,
@@ -46,7 +48,7 @@ import { maplePositionContent } from "@/lib/maple/position-content";
 import type { MaplePositionSummary, MaplePoolAmount, MaplePeakAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
-import { RevealTip } from "@/components/shared/reveal-tip";
+import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { MapleMenuRows } from "./maple-menu-rows";
 
 export interface MaplePositionView {
@@ -76,27 +78,44 @@ const claimAmount = (p: MaplePoolAmount): number => p.currentValue ?? p.deposite
 const claimProv = (p: MaplePoolAmount) =>
   p.currentValue != null ? positionCurrentValueProv(p.assetSymbol, p.symbol) : positionPrincipalProv(p.assetSymbol);
 
+/** A pool key's share token (the ERC-4626 pool), the address its icon keys on. */
+const shareAddress = (key: string): string | undefined => MAPLE_POOLS.find((m) => m.key === key)?.pool;
+
 const heldIn = (p: MaplePoolAmount): boolean => p.shares + p.escrowedShares > 0;
 
-/** A card figure in full to three decimals with its token named, the rows'
- *  rule (Polaris's CardAmount). The unit and glyph wrap as one piece, so a
- *  nine-figure claim does not push the card past a phone's width. */
-function CardAmount({ value, symbol, exact }: { value: number; symbol: string; exact?: string }) {
-  const full = exact ?? formatExact(value);
+/** A headline figure: compact, with its token's icon in place of the ticker
+ *  (the exact amount in the asset panel and the receipt). */
+function CardAmount({
+  value,
+  symbol,
+  exact,
+  address,
+}: {
+  value: number;
+  symbol: string;
+  exact?: string;
+  address?: string;
+}) {
+  return <AssetAmount value={value} symbol={symbol} exact={exact} address={address} />;
+}
+
+/** A panel figure: compact, with its token's 16 px icon in place of the
+ *  ticker; `children` is the traced figure. */
+function PanelAmount({
+  symbol,
+  address,
+  exact,
+  children,
+}: {
+  symbol: string;
+  address?: string;
+  exact: string;
+  children: ReactNode;
+}) {
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-2">
-      <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
-        <span data-prov-exact={full} data-prov-symbol={symbol}>
-          {formatNumber(value)}
-        </span>
-      </RevealTip>
-      <span data-prov-hidden="" className="inline-flex items-center gap-2">
-        <span className="text-[0.55em] font-medium text-rb-500">{symbol}</span>
-        <span className="inline-flex items-center justify-center rounded-full bg-raised p-0.5">
-          <TokenChipIcon symbol={symbol} size={28} filterable={false} />
-        </span>
-      </span>
-    </span>
+    <TokenFigure symbol={symbol} address={address} figure={`${exact} ${symbol}`}>
+      {children}
+    </TokenFigure>
   );
 }
 
@@ -114,6 +133,7 @@ function ClaimLines({ v }: { v: MaplePositionView }) {
             <CardAmount
               value={claimAmount(p)}
               symbol={p.assetSymbol}
+              address={p.assetAddress}
               exact={p.currentValue != null ? undefined : String(p.depositedPrincipal)}
             />
           </Prov>
@@ -138,6 +158,7 @@ function QueueLines({ v }: { v: MaplePositionView }) {
               <CardAmount
                 value={value ?? p.escrowedShares}
                 symbol={value != null ? p.assetSymbol : p.symbol}
+                address={value != null ? p.assetAddress : shareAddress(p.pool)}
                 exact={value != null ? undefined : formatUnitsExact(p.escrowedSharesRaw, 6)}
               />
             </Prov>
@@ -161,7 +182,12 @@ function PeakLines({ lines }: { lines: MaplePeakAmount[] }) {
       {held.map((p) => (
         <div key={p.pool}>
           <Prov info={peakSharesProv(p.symbol)}>
-            <CardAmount value={p.peakShares} symbol={p.symbol} exact={String(p.peakShares)} />
+            <CardAmount
+              value={p.peakShares}
+              symbol={p.symbol}
+              exact={String(p.peakShares)}
+              address={shareAddress(p.pool)}
+            />
           </Prov>
         </div>
       ))}
@@ -179,7 +205,7 @@ function PeakDepositedLines({ lines }: { lines: MaplePeakAmount[] }) {
         <div key={p.pool}>
           <Prov info={peakDepositedProv(p.assetSymbol)}>
             <span>
-              peak deposited <AmountText value={p.peakDeposited} format="number" /> {p.assetSymbol}
+              peak deposited <AmountText value={p.peakDeposited} format="compact" /> {p.assetSymbol}
             </span>
           </Prov>
         </div>
@@ -212,10 +238,11 @@ function interestRows(captions?: MapleCardCaptions): PositionPanelRow[] {
       value: (
         <Prov info={interestEarnedProv(it.symbol)}>
           <span>
-            <AmountText value={it.amount} format="number" /> {it.symbol}
+            <AmountText value={it.amount} format="compact" />
           </span>
         </Prov>
       ),
+      asset: { symbol: it.symbol, figure: `${formatExact(it.amount)} ${it.symbol}` },
       tip: "What the claim holds beyond the principal the wallet put in, replayed from the wallet's events and the exit rate at head.",
     },
     // A pool the wallet has left: its interest is not in the claim.
@@ -224,11 +251,13 @@ function interestRows(captions?: MapleCardCaptions): PositionPanelRow[] {
       label: `Interest earned, ${e.symbol} pool`,
       value: (
         <>
-          <Prov info={interestEarnedLifetimeProv(e.symbol)}>
-            <span>
-              <AmountText value={e.amount} format="number" /> {e.symbol}
-            </span>
-          </Prov>
+          <PanelAmount symbol={e.symbol} exact={formatExact(e.amount)}>
+            <Prov info={interestEarnedLifetimeProv(e.symbol)}>
+              <span>
+                <AmountText value={e.amount} format="compact" />
+              </span>
+            </Prov>
+          </PanelAmount>
           , all withdrawn
         </>
       ),
@@ -359,11 +388,13 @@ export function mapleCardSlots({
       label: `${p.symbol} held`,
       value: (
         <span className="tabular-nums">
-          <Prov info={positionSharesProv(p.symbol)}>
-            <ExactSpan exact={formatUnitsExact(p.sharesRaw, 6)} symbol={p.symbol}>
-              {formatNumber(p.shares)} {p.symbol}
-            </ExactSpan>
-          </Prov>
+          <PanelAmount symbol={p.symbol} address={shareAddress(p.pool)} exact={formatUnitsExact(p.sharesRaw, 6)}>
+            <Prov info={positionSharesProv(p.symbol)}>
+              <ExactSpan exact={formatUnitsExact(p.sharesRaw, 6)} symbol={p.symbol}>
+                {formatCompact(p.shares)}
+              </ExactSpan>
+            </Prov>
+          </PanelAmount>
           {p.currentValue != null && v.poolState?.[p.pool] != null && (
             <>
               {" "}
@@ -395,10 +426,15 @@ export function mapleCardSlots({
         value: (
           <Prov info={positionEscrowProv(p.symbol)}>
             <ExactSpan exact={formatUnitsExact(p.escrowedSharesRaw, 6)} symbol={p.symbol}>
-              {formatNumber(p.escrowedShares)} {p.symbol}
+              {formatCompact(p.escrowedShares)}
             </ExactSpan>
           </Prov>
         ),
+        asset: {
+          symbol: p.symbol,
+          address: shareAddress(p.pool),
+          figure: `${formatUnitsExact(p.escrowedSharesRaw, 6)} ${p.symbol}`,
+        },
         tip: `${p.symbol} the wallet has escrowed in the withdrawal queue, read from the queue contract. They earn interest until the request fills, at the pool's exit rate.`,
       })),
   ];
