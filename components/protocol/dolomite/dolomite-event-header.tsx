@@ -6,10 +6,17 @@
 // liquidation legs carry NEUTRAL party chips whose prefixes say what happened
 // ("liquidated by" / "seized by" / "seized from") — the balance was TAKEN,
 // and the copy never reads as an act the borrower performed.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words
+// (`dolomiteT1Kind`, lib/dolomite/head-words.ts): the past-participle kind, a
+// transfer's counterparty as its clause, and the liquidation legs' party
+// chips after the kind. The spine carries the figures. The event page's card
+// (mode "title") keeps the signed amount.
 
 import type { AssetFlow, DolomiteContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { DOLOMITE_HEAD_WORDS, dolomiteT1Kind } from "@/lib/dolomite/head-words";
 import {
   movedDeltaProv,
   liquidationDebtProv,
@@ -35,7 +42,17 @@ export interface DolomiteEventHeaderProps {
    *  ERC-20. The leg's flow states it, which beats looking it up in a table
    *  that has to be edited every time Dolomite lists a market. */
   flows?: AssetFlow[];
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
 }
+
+/** A liquidation leg's chip prefix after the kind, which names the act. */
+const ROW_PREFIX: Partial<Record<DolomiteContext["eventType"], string>> = {
+  seize_out: DOLOMITE_HEAD_WORDS.by,
+  seize_in: DOLOMITE_HEAD_WORDS.from,
+  liquidation_payout: DOLOMITE_HEAD_WORDS.for,
+};
 
 export function dolomiteHeadSpec({
   actionLabel,
@@ -45,6 +62,7 @@ export function dolomiteHeadSpec({
   externalBy,
   wallet,
   flows,
+  mode = "title",
 }: DolomiteEventHeaderProps): ChainTruthRowSpec {
   const coords: DolomiteCoords = {
     txHash,
@@ -100,20 +118,37 @@ export function dolomiteHeadSpec({
                 }
               : undefined;
 
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.caller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+            coords,
+          ),
+        }
+      : undefined;
+  const critical = ctx.eventType === "liquidation" || ctx.eventType === "seize_out";
+
+  if (mode === "row") {
+    const transfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
+    const prefix = ROW_PREFIX[ctx.eventType];
+    return {
+      label: dolomiteT1Kind(ctx, actionLabel),
+      critical,
+      deltas: [],
+      // A transfer's counterparty is the clause after the kind.
+      clauses: transfer && party ? [<PartyChip key="party" party={party} />] : undefined,
+      party: transfer ? undefined : party && prefix ? { ...party, prefix } : party,
+      externalActor,
+    };
+  }
+
   return {
     label: actionLabel,
-    critical: ctx.eventType === "liquidation" || ctx.eventType === "seize_out",
+    critical,
     deltas,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.caller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-              coords,
-            ),
-          }
-        : undefined,
+    externalActor,
     party,
   };
 }

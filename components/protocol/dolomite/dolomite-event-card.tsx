@@ -16,7 +16,7 @@
 // own acts and flow normally.
 
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 
 import { externalActor } from "@/lib/shared/external-actor";
@@ -24,6 +24,10 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type DolomiteCoords } from "@/lib/dolomite/event-provenance";
 import { dolomiteExplainerTeaser, type DolomiteEvent } from "@/lib/dolomite/explainer-clauses";
 import { dolomiteHeadSpec } from "./dolomite-event-header";
+import { DOLOMITE_HEAD_WORDS, dolomiteT1Caption } from "@/lib/dolomite/head-words";
+import { otherAccountName } from "@/lib/dolomite/asset-catalog";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
 import { useDolomiteCells } from "./dolomite-event-detail";
 import { useDolomiteSheet } from "./dolomite-event-sheet";
 import { DolomiteEventExplainer, dolomiteLearnMoreContent } from "./dolomite-event-explainer";
@@ -81,8 +85,22 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
           },
         ];
 
+  // The warning node's flank carries the leg's amount: the debt a
+  // liquidation repaid, or the collateral it seized.
+  const warningLegs: SpineWarningLeg[] | undefined =
+    isBorrowerLoss && mag !== 0
+      ? [
+          {
+            label: ctx.eventType === "seize_out" ? DOLOMITE_HEAD_WORDS.legSeized : DOLOMITE_HEAD_WORDS.legRepaid,
+            value: mag,
+            symbol: ctx.marketSymbol,
+            address: ctx.marketToken ?? soleFlowAddress(event.flows, ctx.marketSymbol),
+          },
+        ]
+      : undefined;
+
   const spine: SpineColumnProps = isBorrowerLoss
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   const { cells, ledgers, notes, prices } = useDolomiteCells({
@@ -96,6 +114,17 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
   });
   const sheet = useDolomiteSheet({ event, siblings: sibs, coords });
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
+  const ownAccount =
+    ctx.counterparty != null &&
+    event.wallet != null &&
+    ctx.counterparty === event.wallet.toLowerCase() &&
+    ctx.counterpartyAccountNumber != null
+      ? otherAccountName(ctx.counterpartyAccountNumber)
+      : undefined;
+
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -107,6 +136,7 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
     },
     spine,
     head: dolomiteHeadSpec({
+      mode: page ? "title" : "row",
       actionLabel: event.actionLabel,
       ctx,
       txHash: event.txHash,
@@ -115,7 +145,7 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
       wallet: event.wallet,
       flows: event.flows,
     }),
-    caption: event.actionLabel,
+    caption: page ? event.actionLabel : dolomiteT1Caption(ctx, event.actionLabel, ownAccount),
     // A transfer received from another account: the sender acted. One from
     // the owner's other Dolomite account, and any other kind, follows the
     // transaction-sender test (ui-jobs 304).
