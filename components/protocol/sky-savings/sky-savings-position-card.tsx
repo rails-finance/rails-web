@@ -19,6 +19,7 @@ import { Prov } from "@/components/shared/provenance";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { withRealMinus } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
 import { skyPositionContent } from "@/lib/sky-savings/learn-more";
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
 import { exact, pctString, rayExact, rayNumber, skyYearlyEarnings, units, yearlyText } from "@/lib/sky-savings/math";
@@ -176,18 +177,16 @@ export function skySavingsCardSlots({
           value:
             shares > 0 ? (
               <Prov info={sharesHeldProv(p.holder, asOf.block, p.shares.raw)}>
-                <AssetAmount
-                  value={shares}
-                  symbol={SUSDS.symbol}
-                  address={SUSDS.address}
-                  exact={exact(p.shares.raw)}
-                  unit
-                  iconSize={16}
-                />
+                <span data-prov-exact={exact(p.shares.raw)} data-prov-symbol={SUSDS.symbol}>
+                  {formatCompact(shares)}
+                </span>
               </Prov>
             ) : (
               "—"
             ),
+          ...(shares > 0 && {
+            asset: { symbol: SUSDS.symbol, address: SUSDS.address, figure: `${exact(p.shares.raw)} ${SUSDS.symbol}` },
+          }),
         },
       ],
       asOf.chi

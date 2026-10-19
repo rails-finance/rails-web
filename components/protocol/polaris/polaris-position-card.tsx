@@ -50,7 +50,7 @@ import { StatValue } from "@/components/shared/stat-value";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { formatExact, formatNumber, formatUnitsExact, formatUsdValue, withRealMinus } from "@/lib/utils/format";
+import { formatExact, formatUnitsExact, formatUsdValue, withRealMinus } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, lifetimeLegProv, peakProv } from "@/lib/polaris/event-provenance";
@@ -86,7 +86,6 @@ import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 // Type-only — lib/sources/chain/* is server-only, and an `import type` is
 // erased before the client bundle is built (the markets view does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
-import { AmountText } from "@/components/shared/amount-text";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 import { formatCompact } from "@/lib/shared/format-compact";
 
@@ -182,48 +181,34 @@ export const formatPethPrice = (p: number): string => {
   return p.toLocaleString("en-US", { maximumFractionDigits: 0 });
 };
 
-/** Three decimals, trailing zeros kept ("2,035.800"), so the card's figures
- *  read at one grain; pETH takes four (lib/polaris/figure-format.ts). A
- *  magnitude too small for the grain keeps formatNumber's non-zero rule. */
-const cardFigure = (value: number, decimals = 3): string =>
-  value !== 0 && Math.abs(value) < 0.5 * 10 ** -decimals
-    ? formatNumber(value)
-    : value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-
-/** A figure in the card's cost and debt-sum lines, at the card's grain:
- *  three decimals with trailing zeros kept ("24.040"), so the sum reads at the
- *  same grain as the Debt figure above it. A magnitude too small for three
- *  decimals keeps AmountText's floor and tooltip. */
+/** A figure in the card's cost and debt-sum lines, in the compact form
+ *  (lib/shared/format-compact.ts), as the Debt figure above it reads; the
+ *  exact decimal rides `data-prov-exact` for the receipt. */
 export function CardSumAmount({ value }: { value: number }) {
-  if (value !== 0 && Math.abs(value) < 0.0005) return <AmountText value={value} />;
-  return <>{cardFigure(value)}</>;
+  return <span data-prov-exact={formatExact(value)}>{formatCompact(value)}</span>;
 }
 
-/** A card figure at three decimals (pETH at four). `compact` is a headline's
- *  form (anatomy C10): from a thousand up it reads in the listing's compact
- *  form ("770.33K"), as AssetAmount's does. The exact decimal rides the tip
- *  and the inspector's `data-prov-exact`. The token stands beside it as an
- *  icon (`assets`). `signed` keeps a negative's minus; `plus` also marks a
- *  positive, for a stat whose sign is its direction. */
+/** A card figure in the compact form (lib/shared/format-compact.ts, anatomy
+ *  C10): 2 dp below a thousand, 1 dp with K, M or B from it. The exact decimal
+ *  rides the tip and the inspector's `data-prov-exact`. The token stands beside
+ *  it as an icon (`assets`). `signed` keeps a negative's minus; `plus` also
+ *  marks a positive, for a stat whose sign is its direction. */
 function CardFigure({
   value,
   symbol,
   exact,
   signed = false,
   plus = false,
-  compact = false,
 }: {
   value: number;
   symbol: string;
   exact?: string;
   signed?: boolean;
   plus?: boolean;
-  compact?: boolean;
 }) {
   const lead = plus && value >= 0 ? "+" : "";
   const full = lead + (signed || plus ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value)));
-  const face =
-    compact && Math.abs(value) >= 1_000 ? formatCompact(value) : cardFigure(value, symbol === PETH.symbol ? 4 : 3);
+  const face = formatCompact(value);
   const shown = lead + (signed || plus ? withRealMinus(face) : face);
   return (
     <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
@@ -398,7 +383,7 @@ export function polarisCardSlots({
           v.peakColl > 0 ? (
             <Prov info={peakProv("coll", v.market, v.peaksCountLiquidation)}>
               <span className="text-rb-500">
-                <CardFigure value={v.peakColl} symbol={PETH.symbol} compact />
+                <CardFigure value={v.peakColl} symbol={PETH.symbol} />
               </span>
             </Prov>
           ) : null,
@@ -412,7 +397,7 @@ export function polarisCardSlots({
           v.peakDebt > 0 ? (
             <Prov info={peakProv("debt", v.market, v.peaksCountLiquidation)}>
               <span className="text-rb-500">
-                <CardFigure value={v.peakDebt} symbol={stable} compact />
+                <CardFigure value={v.peakDebt} symbol={stable} />
               </span>
             </Prov>
           ) : null,
@@ -451,7 +436,6 @@ export function polarisCardSlots({
               <CardFigure
                 value={v.coll}
                 symbol={PETH.symbol}
-                compact
                 exact={v.collRaw != null ? formatUnitsExact(v.collRaw, 18) : undefined}
               />
             </Prov>
@@ -485,7 +469,6 @@ export function polarisCardSlots({
               <CardFigure
                 value={v.debt}
                 symbol={stable}
-                compact
                 exact={v.debtRaw != null ? formatUnitsExact(v.debtRaw, 18) : undefined}
               />
             </Prov>

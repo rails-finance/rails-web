@@ -453,7 +453,7 @@ const parseSigned = (t) => {
 };
 /** Within 0.5%: the page and this script read the head a block or two apart.
  *  Compared on the figure's exact decimal (its `data-prov-exact`), since the
- *  face's three decimals hide a 1% error on a small CDP. */
+ *  face's compact form hides a 1% error on a small CDP. */
 const close = (got, want) => Number.isFinite(got) && Math.abs(got - want) <= Math.max(Math.abs(want) * 0.005, 1e-6);
 check("h0. the comparison rejects a figure 1% off", !close(386745.35 * 1.01, 386745.35) && close(386745.35, 386745.35));
 for (const [market, id] of [

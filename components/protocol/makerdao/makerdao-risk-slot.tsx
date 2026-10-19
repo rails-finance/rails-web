@@ -11,10 +11,8 @@
 // Liquity family).
 
 import { Prov } from "@/components/shared/provenance";
-import { AmountText } from "@/components/shared/amount-text";
 import { pct } from "@/components/shared/ratio-bar";
 import type { PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
-import { usdPrice } from "@/lib/makerdao/price-format";
 import {
   matProv,
   borrowHeadroomProv,
@@ -22,8 +20,9 @@ import {
   stabilityFeeAprProv,
 } from "@/lib/makerdao/event-provenance";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
-import { formatNumber } from "@/lib/utils/format";
-import { formatUsd } from "@/lib/shared/format-event";
+import { formatExact, formatNumber } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import type { MakerVaultView } from "./makerdao-vault-card";
 
 /** A minimum ratio at its own grain: 175%, 145%, 172.5%. */
@@ -69,7 +68,7 @@ export function makerdaoPanelColumns(v: MakerVaultView): PositionPanelColumns {
             `${formatNumber(v.ink)} ${v.collateralSymbol}`,
           )}
         >
-          {usdPrice(v.liquidationPriceUsd, formatUsd)}
+          {formatLiquidationPrice(v.liquidationPriceUsd)}
         </Prov>
       ),
       tip: `The ${v.collateralSymbol} price at which the vault crosses the Vat's safety line: its debt times the minimum ratio, divided by its collateral. Below it the vault can be liquidated.`,
@@ -90,11 +89,8 @@ export function makerdaoPanelColumns(v: MakerVaultView): PositionPanelColumns {
     right.push({
       id: "room-to-borrow",
       label: "Room to borrow",
-      value: (
-        <Prov info={borrowHeadroomProv(pct(v.matRatio))}>
-          <AmountText value={headroom} format="compact" /> {dsym}
-        </Prov>
-      ),
+      value: <Prov info={borrowHeadroomProv(pct(v.matRatio))}>{formatCompact(headroom)}</Prov>,
+      asset: { symbol: dsym, figure: `${formatExact(headroom)} ${dsym}` },
       tip: `The ${dsym} the vault could still draw before its collateral ratio falls to the ${pctWhole(v.matRatio)} minimum: the collateral's value divided by the minimum, less the debt.`,
     });
   }

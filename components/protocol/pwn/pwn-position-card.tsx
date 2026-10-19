@@ -42,7 +42,9 @@ import {
   positionAccruedProv,
   extendedDeadlineProv,
 } from "@/lib/pwn/event-provenance";
-import { formatNumber } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { TokenFigure } from "@/components/shared/token-figure";
 import {
   aprText,
   interestRateText,
@@ -112,14 +114,24 @@ export interface PwnPositionView {
   txParts?: string[];
 }
 
-/** A fungible amount in `asset`, or "Not loaded" where its decimals did not
- *  load (the amount has no known scale). Stated in full to three decimals, the
- *  rows' rounding, so the card and the rows print one figure ("3,239.365"). */
-function FungibleAmount({ asset, value }: { asset: PwnAsset; value: number }) {
+/** A fungible amount in `asset` in the compact form ("2.5K"), or "Not
+ *  loaded" where its decimals did not load (the amount has no known scale).
+ *  `iconSize` 16 in a panel row. */
+function FungibleAmount({ asset, value, iconSize }: { asset: PwnAsset; value: number; iconSize?: number }) {
   return asset.decimalsUnread ? (
     <TokenAmountNotLoaded address={asset.address} label={asset.symbol} />
   ) : (
-    <AssetAmount value={value} symbol={asset.symbol} display={formatNumber(value)} />
+    <AssetAmount value={value} symbol={asset.symbol} address={asset.address} iconSize={iconSize} />
+  );
+}
+
+/** A panel figure in the loan's credit token: compact, its 16 px icon in
+ *  place of the ticker, traced to `prov`. */
+function CreditFigure({ asset, value, prov }: { asset: PwnAsset; value: number; prov: Provenance }) {
+  return (
+    <TokenFigure symbol={asset.symbol} address={asset.address} figure={`${formatExact(value)} ${asset.symbol}`}>
+      <Prov info={prov}>{formatCompact(value)}</Prov>
+    </TokenFigure>
   );
 }
 
@@ -129,7 +141,7 @@ function FungibleAmount({ asset, value }: { asset: PwnAsset; value: number }) {
  *  styled like a token symbol (the panel's Collateral kind row says what kind
  *  of thing it is). Inline: the headline or the panel row around it sets the
  *  type. Wrapped in its provenance when one is supplied. */
-function AssetValue({ asset, prov }: { asset: PwnAsset; prov?: Provenance }) {
+function AssetValue({ asset, prov, iconSize }: { asset: PwnAsset; prov?: Provenance; iconSize?: number }) {
   const isNft = asset.category === "ERC721" || asset.category === "ERC1155";
   const inner =
     isNft && asset.tokenId != null ? (
@@ -148,7 +160,7 @@ function AssetValue({ asset, prov }: { asset: PwnAsset; prov?: Provenance }) {
         </RevealTip>
       )
     ) : (
-      <FungibleAmount asset={asset} value={asset.amount} />
+      <FungibleAmount asset={asset} value={asset.amount} iconSize={iconSize} />
     );
   return prov ? <Prov info={prov}>{inner}</Prov> : inner;
 }
@@ -169,7 +181,7 @@ function bundleRows(assets: PwnBundleAsset[], bundleId: string, atBlock?: number
   const rows: PositionPanelRow[] = [];
   for (const list of byContract.values()) {
     const first = list[0];
-    const make = (key: string, value: string): PositionPanelRow => ({
+    const make = (key: string, value: string, asset?: PositionPanelRow["asset"]): PositionPanelRow => ({
       id: `bundle-${first.address}-${key}`,
       label: `${first.symbol} in the bundle`,
       tip,
@@ -178,9 +190,18 @@ function bundleRows(assets: PwnBundleAsset[], bundleId: string, atBlock?: number
           <RevealTip tip={first.address}>{value}</RevealTip>
         </Prov>
       ),
+      asset,
     });
     if (first.category === "ERC20") {
-      list.forEach((a, i) => rows.push(make(String(i), a.amount.toLocaleString("en-US"))));
+      list.forEach((a, i) =>
+        rows.push(
+          make(String(i), formatCompact(a.amount), {
+            symbol: a.symbol,
+            address: a.address,
+            figure: `${formatExact(a.amount)} ${a.symbol}`,
+          }),
+        ),
+      );
     } else if (list.length === 1 && first.amount <= 1) {
       rows.push(make("0", first.tokenId != null ? `#${shortTokenId(first.tokenId)}` : "1"));
     } else {
@@ -226,7 +247,7 @@ function bundleSummary(assets: PwnBundleAsset[]): string {
   for (const list of byContract.values()) {
     const first = list[0];
     if (first.category === "ERC20") {
-      for (const a of list) parts.push(`${a.amount.toLocaleString("en-US")} ${a.symbol}`);
+      for (const a of list) parts.push(`${formatCompact(a.amount)} ${a.symbol}`);
     } else if (list.length === 1 && first.amount <= 1) {
       parts.push(`${first.symbol}${first.tokenId != null ? ` #${shortTokenId(first.tokenId)}` : ""}`);
     } else {
@@ -240,9 +261,11 @@ function bundleSummary(assets: PwnBundleAsset[]): string {
 /** The activity counters: transactions where the count is known, with the
  *  events beside them in the tip, since one transaction can carry two of the
  *  loan's events. */
-function loanCounters(v: PwnPositionView): PositionCardMetaProps {
+function loanCounters(v: PwnPositionView, detail: boolean): PositionCardMetaProps {
   const txs = v.txCount ?? null;
   return {
+    // The foot strip reads transactions, then the age, as every family's does.
+    ...(detail ? { order: "age-last" as const } : {}),
     lastActivityAt: v.lastActivityAt,
     eventCount: txs ?? v.eventCount,
     eventCountNoun: txs != null ? "transaction" : "event",
@@ -297,7 +320,7 @@ function costFootnote(v: PwnPositionView, cost: PwnLoanCost): ReactNode {
     const ext = v.extensionCount ?? 0;
     return (
       <StatFootnote>
-        principal + {formatNumber(cost.interest)} {sym} fixed interest
+        principal + {formatCompact(cost.interest)} {sym} fixed interest
         {cost.rate ? <> · {interestRateText(cost.rate)}</> : null}
         {ext > 0 ? <> · unchanged by the {ext === 1 ? "extension" : `${ext} extensions`}</> : null}
       </StatFootnote>
@@ -306,7 +329,7 @@ function costFootnote(v: PwnPositionView, cost: PwnLoanCost): ReactNode {
   const a = cost.accrual!;
   return (
     <StatFootnote>
-      principal + {formatNumber(cost.interest)} {sym} interest · accrues {aprText(a.apr)}
+      principal + {formatCompact(cost.interest)} {sym} interest · accrues {aprText(a.apr)}
       {cost.basis === "paid" ? <> · to the repayment</> : <> · counted to the deadline</>}
     </StatFootnote>
   );
@@ -338,7 +361,16 @@ function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
         id: "interest",
         label: "Fixed interest",
         tip: "The interest struck in the loan's terms, the repay total less the principal, read from the PWN contract at creation. Extensions do not change it.",
-        value: cost.interest > 0 ? `${formatNumber(cost.interest)} ${sym}` : "none",
+        value:
+          cost.interest > 0 && v.credit ? (
+            <CreditFigure
+              asset={v.credit}
+              value={cost.interest}
+              prov={positionInterestProv(v.credit.symbol, v.version)}
+            />
+          ) : (
+            "none"
+          ),
       },
     ];
     if (cost.rate)
@@ -358,7 +390,15 @@ function costRows(v: PwnPositionView, cost: PwnLoanCost): PositionPanelRow[] {
       tip: "The principal times the loan's yearly rate for each whole minute, counted to the deadline while the loan is unpaid and to the repayment once it is paid. The contract refuses a repayment after the deadline, so the sum stops there.",
       value: (
         <>
-          {formatNumber(cost.interest)} {sym}
+          {v.credit ? (
+            <CreditFigure
+              asset={v.credit}
+              value={cost.interest}
+              prov={positionAccruedProv(v.credit.symbol, v.version, a, cost.basis === "paid" ? "paid" : "at-deadline")}
+            />
+          ) : (
+            `${formatCompact(cost.interest)} ${sym}`
+          )}
           <span className="text-rb-500">
             {cost.basis === "paid" ? " to the repayment" : " counted to the deadline"}
           </span>
@@ -518,7 +558,7 @@ export function pwnCardSlots({
     <AssetValue asset={v.collateral} prov={positionCollateralProv(v.collateral.symbol, v.version)} />
   ) : null;
 
-  const common = { identity, counters: loanCounters(v) };
+  const common = { identity, counters: loanCounters(v, detail) };
   const menu = {
     leading: () => (
       <PwnMenuRows
@@ -640,7 +680,9 @@ export function pwnCardSlots({
       id: "collateral",
       label: CARD_VOCAB.collateral,
       tip: "What the borrower locked for this loan, from the loan's terms as created. The protocol holds it until the loan ends.",
-      value: collateralFigure,
+      value: (
+        <AssetValue asset={v.collateral} prov={positionCollateralProv(v.collateral.symbol, v.version)} iconSize={16} />
+      ),
     });
     const c = v.collateral;
     if (v.bundleContents && v.bundleContents.length > 0 && c.tokenId != null) {

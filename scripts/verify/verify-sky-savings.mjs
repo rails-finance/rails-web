@@ -269,7 +269,12 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     else check(`${name} page: no held-days pill without a gap`, !m, m?.[0]);
   }
   const words = await page.evaluate(() => {
-    const bal = document.querySelector('[data-prov-symbol="sUSDS"]')?.parentElement?.innerText ?? "";
+    // The balance names its token by the icon's label (the panel draws no ticker text).
+    const row = document.querySelector('[data-panel-row="balance"]');
+    const bal = [
+      row?.innerText ?? "",
+      ...[...(row?.querySelectorAll("[aria-label]") ?? [])].map((e) => e.getAttribute("aria-label")),
+    ].join(" ");
     const live = document.querySelector("p[aria-live=polite]")?.innerText ?? "";
     return { bal, live };
   });
