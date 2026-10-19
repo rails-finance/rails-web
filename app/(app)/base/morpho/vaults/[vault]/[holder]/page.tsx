@@ -338,6 +338,12 @@ function vaultContextStrip(data: MorphoBaseVaultResponse) {
           text: `${assetText(holder.maxWithdraw, vault.asset.decimals)} ${vault.asset.symbol}`,
           prov: vaultHolderMaxWithdrawProv(coords),
           figure: "holder-max-withdraw" as const,
+          amount: {
+            ...holder.maxWithdraw,
+            decimals: vault.asset.decimals,
+            symbol: vault.asset.symbol,
+            address: vault.asset.address,
+          },
         }
       : { unread: true as const, figure: "holder-max-withdraw" as const },
     // ERC-4626 offers both, and which one a holder uses decides which side is

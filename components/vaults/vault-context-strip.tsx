@@ -24,12 +24,21 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import type { PositionPanelRow } from "@/components/shared/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { formatUnitsExact } from "@/lib/utils/format";
 
 /** The redeemable reading, or the statement that it was not read. `figure` is
  *  the `data-figure` name the cluster wears, and it names the CALL: Ethereum's
  *  `maxRedeem`, Base's `maxWithdraw`. */
 export type VaultRedeemable =
-  | { text: string; prov: Provenance; figure: "holder-max-redeem" | "holder-max-withdraw" }
+  | {
+      text: string;
+      prov: Provenance;
+      figure: "holder-max-redeem" | "holder-max-withdraw";
+      /** The reading as a token amount: the card's panel states it compact
+       *  with the token's icon; the standalone strip keeps `text`. */
+      amount?: { value: number; raw: string; decimals: number; symbol: string; address?: string };
+    }
   | { unread: true; figure: "holder-max-redeem" | "holder-max-withdraw" };
 
 export interface VaultContextStripProps {
@@ -94,6 +103,7 @@ export function VaultContextStripStandalone({ absence, ...strip }: VaultContextS
 /** The same figures as rows of the position card's panel. */
 export function vaultContextRows({ redeemable, exit, cooldown }: VaultContextStripProps): PositionPanelRow[] {
   const shares = redeemable.figure === "holder-max-redeem";
+  const amount = "unread" in redeemable ? undefined : redeemable.amount;
   return [
     {
       id: "redeemable",
@@ -103,10 +113,17 @@ export function vaultContextRows({ redeemable, exit, cooldown }: VaultContextStr
           {"unread" in redeemable ? (
             <NotLoaded inline className="" />
           ) : (
-            <Prov info={redeemable.prov}>{redeemable.text}</Prov>
+            <Prov info={redeemable.prov}>{amount ? formatCompact(amount.value) : redeemable.text}</Prov>
           )}
         </span>
       ),
+      asset: amount
+        ? {
+            symbol: amount.symbol,
+            address: amount.address,
+            figure: `${formatUnitsExact(amount.raw, amount.decimals)} ${amount.symbol}`,
+          }
+        : undefined,
       tip: shares
         ? "The vault's maxRedeem() for this address at the page's block, in shares: what the contract says can be redeemed then."
         : "The vault's maxWithdraw() for this address at the page's block, in the asset: what the markets in its withdraw queue could pay then.",

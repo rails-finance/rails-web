@@ -10,13 +10,13 @@
 // THREE LANES, KEPT APART. Shares, claim, share of the vault and what is
 // redeemable are read LIVE at the page's block; transfers, first seen, last
 // activity and what the address is come from the daily census at the census
-// block; Value · USD is the census's figure at its priced block (mig 206),
+// block; the USD line is the census's figure at its priced block (mig 206),
 // through the vault's convertToAssets and the chain's Aave V3 oracle. Each
 // figure carries its receipt, and the panel names both blocks.
 //
-// THE SLOTS. Heads: Value · USD and Share of the vault. The panel (detail
-// only): Shares and Claim on the left; the page's reads (Redeemable now, Exit,
-// Cooldown) and the two blocks on the right. A closed card has one head,
+// THE SLOTS. Heads: Balance (the shares, with the census's USD beneath) and
+// Share of the vault. The panel (detail only): Claim on the left; the page's
+// reads (Redeemable now, Exit, Cooldown) and the two blocks on the right. A closed card has one head,
 // Closed by, and the Outcome column. Identity: the share symbol with the venue
 // mark, then the attested name or the shape word; the listing adds the wallet
 // pill, which the position page carries in its wallet row. Notice: the
@@ -49,11 +49,11 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { BlockRef } from "@/components/shared/block-ref";
-import { assetText, pctText, shareText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
+import { pctText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
 import { VaultVenueMark } from "@/components/vaults/vault-venue-mark";
 import { vaultContextRows, type VaultContextStripProps } from "@/components/vaults/vault-context-strip";
-import { formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { explorerUrl, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { baseVaultHref, ethereumVaultHref } from "@/lib/vaults/routes";
@@ -84,6 +84,7 @@ import {
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { AssetAmount } from "@/components/shared/asset-amount";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -109,12 +110,6 @@ export const FAMILY_BOOKMARK_SCOPE: Record<VaultPositionFamily, BookmarkScope> =
 const chainOf = (row: VaultPositionRow): ChainId => (row.chainId === BASE_CHAIN_ID ? BASE_CHAIN_ID : MAINNET_CHAIN_ID);
 const vaultHref = (row: VaultPositionRow, holder?: string) =>
   chainOf(row) === BASE_CHAIN_ID ? baseVaultHref(row.vault, holder) : ethereumVaultHref(row.vault, holder);
-
-/** A figure's headline form, the same on the listing and the position page
- *  (decision 2026-09-09): the magnitude above a thousand ("60.9M"), the
- *  section's print rule below it, and the full figure in the tip and the
- *  receipt. */
-const headline = (exact: string, value: number) => (Math.abs(value) >= 1000 ? formatCompact(value) : exact);
 
 /** The words a card prints where nothing was read. */
 const Unread = ({ what }: { what: string }) => <span className="text-base font-normal text-rb-500">{what}</span>;
@@ -249,21 +244,38 @@ export function vaultCardSlots({
   );
 
   // ── heads ────────────────────────────────────────────────────────────────
+  // Balance: the shares with the share token's icon, the census's oracle USD
+  // beneath in cents (the one-asset head, rails-ops ui-jobs 377). Where the
+  // live read did not answer, the census's balance stands in and the sub says so.
   const usd = vaultPositionUsd(row);
   const priced = row.value.usdE8 != null && usd != null;
   const pricedBlock = row.value.pricedBlock ?? row.census.block;
-  const valueHead: PositionCardHead = {
-    id: "value-usd",
-    label: "Value · USD",
-    labelTip:
-      "What the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.",
-    value: priced ? (
+  const censusShares = Number(row.census.balance) / 10 ** shareDecimals;
+  const balanceHead: PositionCardHead = {
+    id: "balance",
+    label: "Balance",
+    labelTip: row.live
+      ? `The ${shareSymbol} this address holds: the vault's balanceOf() for it, read at the page's block. Beneath it, what the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.`
+      : `The ${shareSymbol} this address held at the census block: the live read did not answer, so the census's balance stands in. Beneath it, what the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.`,
+    value: (
+      <Figure name={figureName("holder-shares")}>
+        <Prov info={row.live ? aaveVaultHolderSharesProv(coords) : aaveVaultCensusBalanceProv(coords)}>
+          <AssetAmount
+            value={row.live ? row.live.shares.value : censusShares}
+            symbol={shareSymbol}
+            address={row.vault}
+            exact={formatUnitsExact(row.live ? row.live.shares.raw : row.census.balance, shareDecimals)}
+          />
+        </Prov>
+      </Figure>
+    ),
+    usd: priced ? (
       <Figure
         name={figureName("holder-value-usd")}
         tip={`${usdText(row.value.usdE8!)} at census block ${n(pricedBlock)}, via the chain's Aave V3 oracle`}
       >
         <Prov info={aaveVaultValueUsdProv(coords, row.value, shareDecimals)}>
-          {usd >= 1000 ? `$${formatCompact(usd)}` : usdText(row.value.usdE8!)}
+          <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
         </Prov>
       </Figure>
     ) : (
@@ -273,11 +285,14 @@ export function vaultCardSlots({
         </Prov>
       </Figure>
     ),
-    sub: priced
-      ? `Aave V3 oracle at census block ${n(pricedBlock)}`
-      : row.value.pricedBlock == null
-        ? "the census has not priced this vault yet"
-        : `the oracle declined ${row.value.assetSymbol ?? "the asset"}`,
+    sub: [
+      ...(row.live || !receipts ? [] : [`shares from the census at block ${n(row.census.block)}`]),
+      priced
+        ? `Aave V3 oracle at census block ${n(pricedBlock)}`
+        : row.value.pricedBlock == null
+          ? "the census has not priced this vault yet"
+          : `the oracle declined ${row.value.assetSymbol ?? "the asset"}`,
+    ].join(" · "),
   };
   const fractionHead: PositionCardHead = {
     id: "share-of-vault",
@@ -314,7 +329,7 @@ export function vaultCardSlots({
 
   const common = {
     status: status.live ? null : { word: "Closed", tone: "muted" as const },
-    heads: status.live ? [valueHead, fractionHead] : [closedHead],
+    heads: status.live ? [balanceHead, fractionHead] : [closedHead],
     identity,
     notice: status.divergent ? (
       <p className="mb-3 max-w-3xl text-xs leading-relaxed text-rb-500" data-card-divergence>
@@ -369,66 +384,30 @@ export function vaultCardSlots({
   if (!status.live) return { ...detail, outcome: { word: "Closed" } };
 
   // ── the panel ────────────────────────────────────────────────────────────
-  const censusShares = { raw: row.census.balance, value: Number(row.census.balance) / 10 ** shareDecimals };
-  const shares = row.live ? (
-    <Figure
-      name={figureName("holder-shares")}
-      tip={`${formatUnitsExact(row.live.shares.raw, shareDecimals)} ${shareSymbol}`}
-    >
-      <Prov info={aaveVaultHolderSharesProv(coords)}>
-        {headline(shareText(row.live.shares, shareDecimals), row.live.shares.value)}
-      </Prov>
-    </Figure>
-  ) : (
-    <Figure
-      name={figureName("holder-shares")}
-      tip={`${formatUnitsExact(row.census.balance, shareDecimals)} ${shareSymbol}`}
-    >
-      <Prov info={aaveVaultCensusBalanceProv(coords)}>
-        {headline(shareText(censusShares, shareDecimals), censusShares.value)}
-      </Prov>
-    </Figure>
-  );
   const claim =
     row.live?.claim && row.asset ? (
       <Figure
         name={figureName("holder-claim")}
         tip={`${formatUnitsExact(row.live.claim.raw, row.asset.decimals)} ${row.asset.symbol}`}
       >
-        <Prov info={aaveVaultHolderClaimProv(coords)}>
-          {headline(assetText(row.live.claim, row.asset.decimals), row.live.claim.value)}
-        </Prov>
+        <Prov info={aaveVaultHolderClaimProv(coords)}>{formatCompact(row.live.claim.value)}</Prov>
       </Figure>
     ) : (
       <NotLoaded className="text-rb-500" />
     );
   const left: PositionPanelRow[] = [
     {
-      id: "shares",
-      label: "Shares",
-      value: (
-        <>
-          {shares} {shareSymbol}
-          {!row.live && (
-            <span className="text-rb-500">
-              {" "}
-              · the census&rsquo;s reading at <BlockRef block={row.census.block} />
-            </span>
-          )}
-        </>
-      ),
-      tip: row.live
-        ? `The ${shareSymbol} this address holds: the vault's balanceOf() for it, read at the page's block.`
-        : `The ${shareSymbol} this address held at the census block: the live read did not answer, so the census's balance stands in.`,
-    },
-    {
       id: "claim",
       label: "Claim",
-      value: (
-        <>
-          {claim} {row.live?.claim && row.asset ? assetSymbol : null}
-        </>
-      ),
+      value: claim,
+      asset:
+        row.live?.claim && row.asset
+          ? {
+              symbol: row.asset.symbol,
+              address: row.asset.address,
+              figure: `${formatUnitsExact(row.live.claim.raw, row.asset.decimals)} ${row.asset.symbol}`,
+            }
+          : undefined,
       tip: `What those shares convert to in ${assetSymbol}: the vault's convertToAssets() of this balance at the same block.`,
     },
   ];

@@ -334,6 +334,12 @@ function vaultContextStrip(data: AaveEthereumVaultResponse) {
           text: `${shareText(holder.maxRedeem, sd)} ${vault.symbol ?? "shares"}`,
           prov: aaveVaultMaxRedeemProv(coords, vault.family),
           figure: "holder-max-redeem" as const,
+          amount: {
+            ...holder.maxRedeem,
+            decimals: sd,
+            symbol: vault.symbol ?? "shares",
+            address: vault.address,
+          },
         }
       : { unread: true as const, figure: "holder-max-redeem" as const },
     exit: vault.family === "umbrella-stake" ? "cooldown(), then redeem()" : "redeem()",
