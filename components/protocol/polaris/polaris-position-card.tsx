@@ -79,6 +79,16 @@ import {
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { POLARIS_WORDS, polarisPositionModal } from "@/lib/polaris/event-templates";
 import { polarisCdpNftUrl, polarisPositionHref } from "@/lib/polaris/routes";
+import {
+  polarisClaimPaidWholeBalance,
+  polarisSurplusClaimProv,
+  polarisSurplusCreditProv,
+  polarisSurplusState,
+  polarisSurplusUnreadProv,
+} from "@/lib/polaris/surplus-claim";
+import { LinkedTx } from "@/components/shared/linked-tx";
+import { dateTimeText } from "@/lib/frankencoin/figures";
+import type { PolarisSurplusContext } from "@/lib/shared/types/event-shape";
 import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
 import type { PolarisPositionSummary, PolarisPositionStatus } from "@/lib/sources/api/polaris-positions";
@@ -147,6 +157,9 @@ export interface PolarisPositionView {
    *  (the liquidation row's `_collSurplus`); the detail page reads it from
    *  the rows. */
   surplus?: number;
+  /** What became of that surplus (the timeline's `surplus`, riding the
+   *  liquidation row), with the liquidation's coordinates for the receipts. */
+  surplusInfo?: { ctx?: PolarisSurplusContext; txHash: string; blockNumber: number };
   lastActivityAt: number | null;
   eventCount: number;
   liqCount: number;
@@ -222,10 +235,11 @@ function CardFigure({
 /** A figure with the token named in words and by its glyph, for a cell that
  *  has no icon slot of its own (Surplus to claim). The word and the glyph wrap
  *  under the figure where the column is too narrow for all three. */
-function CardAmount(props: { value: number; symbol: string; address: string; exact?: string }) {
+function CardAmount(props: { value: number; symbol: string; address: string; exact?: string; prov?: Provenance }) {
+  const figure = <CardFigure value={props.value} symbol={props.symbol} exact={props.exact} />;
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2">
-      <CardFigure value={props.value} symbol={props.symbol} exact={props.exact} />
+      {props.prov ? <Prov info={props.prov}>{figure}</Prov> : figure}
       <span data-prov-hidden="" className="inline-flex items-center gap-2">
         <span className="text-[0.55em] font-medium text-rb-500">{props.symbol}</span>
         <span className="inline-flex items-center justify-center rounded-full bg-raised p-0.5">
@@ -234,6 +248,58 @@ function CardAmount(props: { value: number; symbol: string; address: string; exa
       </span>
     </span>
   );
+}
+
+/** The card's surplus line on a liquidated CDP: the credit, and what became of
+ *  it (claimed and when, unclaimed, or not yet read). */
+function surplusExtra(v: PolarisPositionView): { label: string; value: ReactNode } {
+  const info = v.surplusInfo;
+  const sur = info?.ctx;
+  const state = polarisSurplusState(sur);
+  const coords = { market: v.market, cdpId: v.cdpId, txHash: info?.txHash, blockNumber: info?.blockNumber };
+  const amount = sur ? Number(sur.credit) : (v.surplus ?? 0);
+  const label = state === "claimed" ? "Surplus claimed" : state === "unclaimed" ? "Surplus to claim" : "Surplus";
+  let note: ReactNode;
+  if (state === "claimed" && sur?.claim) {
+    const claimProv = polarisSurplusClaimProv(coords, sur);
+    const when = <span>{dateTimeText(sur.claim.timestamp)}</span>;
+    note = (
+      <>
+        <div className="text-xs mt-0.5 text-rb-500">
+          Claimed {claimProv ? <Prov info={claimProv}>{when}</Prov> : when}, in <LinkedTx txHash={sur.claim.txHash} />
+        </div>
+        {polarisClaimPaidWholeBalance(sur) ? (
+          <div className="text-xs mt-0.5 text-rb-500">The claim paid the owner&apos;s whole balance.</div>
+        ) : null}
+      </>
+    );
+  } else if (state === "unclaimed") {
+    note = <div className="text-xs mt-0.5 text-rb-500">Unclaimed, claimable by the owner.</div>;
+  } else {
+    note = (
+      <div className="text-xs mt-0.5 text-rb-500">
+        <Prov info={polarisSurplusUnreadProv(coords, sur)}>
+          <span>The claim state has not been read yet.</span>
+        </Prov>
+      </div>
+    );
+  }
+  return {
+    label,
+    value: (
+      <>
+        <StatValue>
+          <CardAmount
+            value={amount}
+            symbol={PETH.symbol}
+            address={PETH.address}
+            prov={sur ? polarisSurplusCreditProv(coords, sur) : undefined}
+          />
+        </StatValue>
+        {note}
+      </>
+    ),
+  };
 }
 
 /** A headline's token icon; it opens the asset's popover with the exact figure. */
@@ -406,22 +472,7 @@ export function polarisCardSlots({
     outcome = {
       word: v.status === "liquidated" ? "Liquidated" : "Closed",
       dates: v.lastActivityAt ? [{ at: v.lastActivityAt }] : undefined,
-      extra:
-        v.status === "liquidated" && v.surplus != null && v.surplus > 0
-          ? {
-              label: "Surplus to claim",
-              value: (
-                <>
-                  <StatValue>
-                    <CardAmount value={v.surplus} symbol={PETH.symbol} address={PETH.address} />
-                  </StatValue>
-                  <div className="text-xs mt-0.5 text-rb-500">
-                    set aside at the liquidation for the owner to claim; this page does not show claims
-                  </div>
-                </>
-              ),
-            }
-          : undefined,
+      extra: v.status === "liquidated" && v.surplus != null && v.surplus > 0 ? surplusExtra(v) : undefined,
     };
   } else {
     const mcrInForce = v.mcr;

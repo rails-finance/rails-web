@@ -71,6 +71,7 @@ function withLiquidationPeaks(v: PolarisView, events: BaseActivityEvent[]): Pola
   let coll = v.peakColl;
   let debt = v.peakDebt;
   let surplus = 0;
+  let surplusInfo: PolarisView["surplusInfo"];
   let found = false;
   for (const e of events) {
     if (!isPolarisEvent(e) || e.context.data.eventType !== "liquidate") continue;
@@ -78,8 +79,9 @@ function withLiquidationPeaks(v: PolarisView, events: BaseActivityEvent[]): Pola
     coll = Math.max(coll, Number(e.context.data.collLiquidated ?? 0) || 0);
     debt = Math.max(debt, Number(e.context.data.debtLiquidated ?? 0) || 0);
     surplus += Number(e.context.data.collSurplus ?? 0) || 0;
+    surplusInfo = { ctx: e.context.data.surplus, txHash: e.txHash, blockNumber: e.blockNumber };
   }
-  return found ? { ...v, peakColl: coll, peakDebt: debt, peaksCountLiquidation: true, surplus } : v;
+  return found ? { ...v, peakColl: coll, peakDebt: debt, peaksCountLiquidation: true, surplus, surplusInfo } : v;
 }
 
 interface PolarisPositionViewProps {

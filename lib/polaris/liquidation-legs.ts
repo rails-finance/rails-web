@@ -13,13 +13,16 @@
 //                (it is the owner's), no caution (the seizure carries that),
 //                and no spine counterpart (the spine draws the seizure). Drawn
 //                only when the surplus is above zero — a liquidation that left
-//                nothing over draws two legs, not a "0 Claimable".
+//                nothing over draws two legs, not a "0 Claimable". The label
+//                follows what became of it: "Claimed" once the owner has
+//                claimed, "Surplus" while the pool's claims are unread.
 // Each leg carries the Liquidation log's own field as its receipt.
 
 import type { ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import { liquidationFieldProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
+import { polarisSurplusLabel } from "@/lib/polaris/surplus-claim";
 
 const num = (s?: string): number => {
   const n = Number(s ?? "0");
@@ -56,7 +59,7 @@ export function polarisLiquidationDeltas(ctx: PolarisContext, coords: PolarisCoo
       value: surplus,
       symbol: PETH.symbol,
       address: PETH.address,
-      label: "Claimable",
+      label: polarisSurplusLabel(ctx.surplus),
       prov: liquidationFieldProv("collSurplus", coords, ctx.raw?.collSurplus),
       noSpineCounterpart: true,
     });
