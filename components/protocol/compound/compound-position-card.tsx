@@ -47,7 +47,6 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { useDustLines } from "@/components/shared/dust-reserves";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { formatUnitsExact, formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
-import { formatUsd } from "@/lib/shared/format-event";
 import {
   compoundUsdProvOnchain,
   peakBaseProv,
@@ -68,7 +67,7 @@ import type {
   CompoundBaseAmount,
   CompoundCurrentBase,
 } from "@/lib/sources/api/compound-positions";
-import { formatCompact } from "@/lib/shared/format-compact";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 
 /** Highest-recorded amounts over a position's life (closed/liquidated cards). */
 interface CompoundPeak {
@@ -248,12 +247,12 @@ function TracedAmount({
   );
 }
 
-/** One oracle-USD figure (the V4 spoke-card grammar: one dollar total leads a
- *  side whatever its leg count). */
+/** A multi-asset side's oracle-USD total in compact dollars, the cents in
+ *  the tip (rails-ops ui-jobs 377). */
 function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   return (
     <RevealTip tip={formatUsdValue(usd)}>
-      <Prov info={info}>{formatUsd(usd)}</Prov>
+      <Prov info={info}>{formatCompactUsd(usd)}</Prov>
     </RevealTip>
   );
 }
@@ -589,7 +588,7 @@ export function useCompoundCardSlots({
       sub: borrowing ? borrowBasis : undefined,
     };
     // The risk headline and its rows from the live read: a borrower only.
-    const risk = borrowing && live !== undefined ? compoundRiskSlots(live) : null;
+    const risk = borrowing && live !== undefined ? compoundRiskSlots(live, v.base.address) : null;
     heads = [supplyHead, debtHead, ...(risk ? [risk.head] : [])];
 
     // The supply lines, the donut's breakdown (asset-donut.tsx) where the side

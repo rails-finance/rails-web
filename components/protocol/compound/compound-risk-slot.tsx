@@ -17,6 +17,7 @@
 
 import { Prov } from "@/components/shared/provenance";
 import { AmountText } from "@/components/shared/amount-text";
+import { TokenFigure } from "@/components/shared/token-figure";
 import type { PositionCardHead, PositionPanelRow } from "@/components/shared/position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
 import { capacityProv, contractVerdictProv } from "@/lib/compound/position-provenance";
@@ -37,8 +38,12 @@ const toBase = (chain: CompoundMarketChainResponse, v: number) => (chain.basePri
 
 /** A borrower's risk figures: the "Borrowing limit used" headline and the
  *  panel rows on the debt side. `chain` null: the read is still out, so the
- *  headline waits and the rows are absent. */
-export function compoundRiskSlots(chain: CompoundMarketChainResponse | null): {
+ *  headline waits and the rows are absent. `baseAddress` puts the base's icon
+ *  after its figures. */
+export function compoundRiskSlots(
+  chain: CompoundMarketChainResponse | null,
+  baseAddress?: string,
+): {
   head: PositionCardHead;
   rows: PositionPanelRow[];
 } {
@@ -65,9 +70,10 @@ export function compoundRiskSlots(chain: CompoundMarketChainResponse | null): {
             coords,
           )}
         >
-          <AmountText value={headroom} /> {chain.baseSymbol}
+          <AmountText value={headroom} format="compact" />
         </Prov>
       ),
+      asset: { symbol: chain.baseSymbol, address: baseAddress, figure: `${headroom} ${chain.baseSymbol}` },
     },
     {
       id: "absorbed-at",
@@ -75,9 +81,17 @@ export function compoundRiskSlots(chain: CompoundMarketChainResponse | null): {
       tip: "The debt at which the protocol can absorb the account: each collateral's value at the Comet's price times its liquidate factor, in base tokens.",
       value: (
         <>
-          <Prov info={capacityProv("Liquidation line", "Σ collateral × price × liquidate factor ÷ base price", coords)}>
-            <AmountText value={toBase(chain, chain.liquidationCapacity)} format="compact" /> {chain.baseSymbol}
-          </Prov>{" "}
+          <TokenFigure
+            symbol={chain.baseSymbol}
+            address={baseAddress}
+            figure={`${toBase(chain, chain.liquidationCapacity)} ${chain.baseSymbol}`}
+          >
+            <Prov
+              info={capacityProv("Liquidation line", "Σ collateral × price × liquidate factor ÷ base price", coords)}
+            >
+              <AmountText value={toBase(chain, chain.liquidationCapacity)} format="compact" />
+            </Prov>
+          </TokenFigure>{" "}
           of debt
         </>
       ),
