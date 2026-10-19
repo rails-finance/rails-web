@@ -16,7 +16,8 @@ import { useMemo } from "react";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { LlamalendLedgerProvider } from "./llamalend-ledger";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { LLAMALEND_HEAD_WORDS, llamalendT1Caption, llamalendT1Words } from "@/lib/llamalend/head-words";
 
 import { type LlamalendCoords } from "@/lib/llamalend/event-provenance";
 import { llamalendExplainerTeaser } from "@/lib/llamalend/explainer-clauses";
@@ -99,19 +100,49 @@ export function LlamalendEventCard({
       value: Math.abs(debt),
     });
 
+  // A third party's liquidation: the warning node's flank carries the legs,
+  // the collateral taken below the converted borrowed token and the debt
+  // cleared.
+  const convTaken = Number(ctx.convertedTaken ?? "0") || 0;
+  const warningLegs: SpineWarningLeg[] = [];
+  if (isBorrowerLoss) {
+    if (coll !== 0)
+      warningLegs.push({
+        label: LLAMALEND_HEAD_WORDS.legTaken,
+        value: Math.abs(coll),
+        symbol: ctx.collateralSymbol,
+        address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+      });
+    if (convTaken > 0)
+      warningLegs.push({
+        label: LLAMALEND_HEAD_WORDS.legConverted,
+        value: convTaken,
+        symbol: ctx.borrowedSymbol,
+        address: soleFlowAddress(event.flows, ctx.borrowedSymbol),
+      });
+    if (debt !== 0)
+      warningLegs.push({
+        label: LLAMALEND_HEAD_WORDS.legCleared,
+        value: Math.abs(debt),
+        symbol: ctx.borrowedSymbol,
+        address: soleFlowAddress(event.flows, ctx.borrowedSymbol),
+      });
+  }
+
   const spine: SpineColumnProps = isBorrowerLoss
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? {
+        icon: "warning",
+        warningTone: "critical",
+        warningLegs: warningLegs.length > 0 ? warningLegs : undefined,
+        isLast: !!isLast,
+      }
     : { tokens: tokens.length > 0 ? tokens : undefined, isLast: !!isLast };
 
   const head = useLlamalendHeadSpec({
-    actionLabel: event.actionLabel,
     ctx,
-    timestamp: event.timestamp,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
-    eventNumber,
     wallet: event.wallet,
-    flows: event.flows,
     loanMark,
   });
   // The owner's gas: a liquidator's taking, and a row where the page's wallet
@@ -137,7 +168,7 @@ export function LlamalendEventCard({
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption: llamalendT1Caption(llamalendT1Words(ctx, loanMark)),
     cells: { pending: LLAMALEND_HEADS },
     // The Collateral and Debt cells open into their ledgers where the page
     // ties its timeline to the Lifetime flows panel; the Collateral ledger

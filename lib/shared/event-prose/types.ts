@@ -33,6 +33,7 @@ export type Rounding =
   | "span"
   | "manager"
   | "address"
+  | "tx_hash"
   | "text"
   | "units4"
   | "units2"
@@ -69,6 +70,8 @@ export interface ProseSeg<E extends string = string> {
   pair?: { cr: string; ltv: string };
   /** An address the page links to the explorer. */
   address?: string;
+  /** A transaction hash the page links to the explorer. */
+  tx?: string;
   tone?: "manager" | "address";
 }
 

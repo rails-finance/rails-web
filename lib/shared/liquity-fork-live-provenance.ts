@@ -178,6 +178,9 @@ export interface LiquityForkLiveVocab {
   branchAggregateProv: (what: string, getter: string, branchSymbol: string) => Provenance;
   branchTcrProv: (branchSymbol: string) => Provenance;
   branchPriceProv: (branchSymbol: string, stale: boolean) => Provenance;
+  /** The same PriceFeed read as served with the Trove's summary
+   *  (/api/<fork>/troves), before the live position read lands. */
+  trovesPriceProv: (branchSymbol: string, stale: boolean) => Provenance;
   branchConstantProv: (what: string, name: string, branchSymbol: string) => Provenance;
   branchListSizeProv: (branchSymbol: string) => Provenance;
   /** `idsCapped` = the ids enumeration hit its bound — the census is a floor. */
@@ -226,6 +229,25 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
     kind: "recompute",
     text: `Re-run the ${target}.${method} eth_call against any node`,
   });
+
+  // A branch PriceFeed read served by `lane`: the roster's, or the troves
+  // route's beside a Trove's summary.
+  const branchPrice = (sym: string, stale: boolean, lane: string): Provenance => {
+    const g = gradedPrice(sym, true);
+    return {
+      kind: "chain",
+      pclass: pricePclass(sym),
+      verify: recompute("PriceFeed", stale ? "lastGoodPrice" : "fetchPrice"),
+      summary:
+        (stale
+          ? `${sym} price in USD — the branch PriceFeed's lastGoodPrice: the last value a user operation fetched (the live fetchPrice simulation failed on this read). It lags between operations on a quiet branch; treat it as the protocol's most recent price, not this block's.`
+          : `${sym} price in USD — the branch's own PriceFeed, fetchPrice SIMULATED via eth_call at the latest block (the call is state-mutating on-chain, read-only under eth_call). This is the same price the branch liquidates and redeems with.`) +
+        (g?.sentence ?? ""),
+      contract: pfContract(sym),
+      via: `${lane} · PriceFeed.${stale ? "lastGoodPrice" : "fetchPrice (simulated)"} @ head`,
+      ...(g && { formula: g.formula, inputs: g.inputs }),
+    };
+  };
 
   return {
     troveStateProv: (what, field, sym, scaling) => ({
@@ -411,22 +433,8 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
         { label: "branch debt", kind: "chain", pclass: "state", note: "getEntireBranchDebt @ head" },
       ],
     }),
-    branchPriceProv: (sym, stale) => {
-      const g = gradedPrice(sym, true);
-      return {
-        kind: "chain",
-        pclass: pricePclass(sym),
-        verify: recompute("PriceFeed", stale ? "lastGoodPrice" : "fetchPrice"),
-        summary:
-          (stale
-            ? `${sym} price in USD — the branch PriceFeed's lastGoodPrice: the last value a user operation fetched (the live fetchPrice simulation failed on this read). It lags between operations on a quiet branch; treat it as the protocol's most recent price, not this block's.`
-            : `${sym} price in USD — the branch's own PriceFeed, fetchPrice SIMULATED via eth_call at the latest block (the call is state-mutating on-chain, read-only under eth_call). This is the same price the branch liquidates and redeems with.`) +
-          (g?.sentence ?? ""),
-        contract: pfContract(sym),
-        via: `${ROSTER_VIA} · PriceFeed.${stale ? "lastGoodPrice" : "fetchPrice (simulated)"} @ head`,
-        ...(g && { formula: g.formula, inputs: g.inputs }),
-      };
-    },
+    branchPriceProv: (sym, stale) => branchPrice(sym, stale, ROSTER_VIA),
+    trovesPriceProv: (sym, stale) => branchPrice(sym, stale, `GET /api/${cfg.protocolId}/troves`),
     branchConstantProv: (what, name, sym) => ({
       kind: "chain",
       pclass: "state",

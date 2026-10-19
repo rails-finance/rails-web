@@ -515,12 +515,16 @@ await page7.close();
     const text = (document.body.innerText ?? "").replace(/\s+/g, " ");
     const facetButtons = [...document.querySelectorAll("button")].map((b) => (b.textContent ?? "").trim());
     return {
-      chip: /Collateral only/.test(text),
+      chip: /Debt: \$0(?!\.?\d)/.test(text),
       history: facetButtons.some((t) => /^History\b/.test(t)) || /Liquidated before/.test(text),
       hasDebtLabel: /\bHas debt\b/.test(text),
     };
   });
-  check("9d. the view draws its Collateral only chip", chrome9.chip, JSON.stringify(chrome9));
+  check(
+    '9d. the view draws its "Debt: $0" chip (the Size panel\'s range chip, ui-jobs 354)',
+    chrome9.chip,
+    JSON.stringify(chrome9),
+  );
   check(
     '9e. no History facet and no "Liquidated before" anywhere on the listing; the old "Has debt" label is gone',
     !chrome9.history && !chrome9.hasDebtLabel,

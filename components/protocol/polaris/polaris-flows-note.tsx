@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { PolarisFlowFacts } from "@/lib/polaris/flows";
-import { POLARIS_APP_LINK, POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
+import { POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
 import { POLARIS_LIQ_CONSTANTS } from "./polaris-liquidation-forensics";
 
 export interface PolarisFlowsNoteProps {
@@ -101,11 +101,6 @@ export function polarisFlowsContent(stable: string): LearnMoreContent {
         text: "when a net PSM share clears more debt than the CDP owes, the protocol adds the difference back so the debt lands on zero.",
       },
     ],
-    links: [
-      POLARIS_DOC_LINKS.interestRates,
-      POLARIS_DOC_LINKS.pegDefence,
-      POLARIS_DOC_LINKS.liquidations,
-      POLARIS_APP_LINK,
-    ],
+    links: [POLARIS_DOC_LINKS.interestRates, POLARIS_DOC_LINKS.pegDefence, POLARIS_DOC_LINKS.liquidations],
   };
 }

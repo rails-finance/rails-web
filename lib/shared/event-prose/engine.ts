@@ -122,6 +122,7 @@ export function eventProseEngine<K extends string, E extends string = string>(
       if (emph[name]) seg.emph = emph[name];
       if (rounding === "ratio_pair")
         seg.pair = { cr: ROUNDING.ratio(v, name, env), ltv: `${(10000 / num(v)).toFixed(2)}%` };
+      if (rounding === "tx_hash") seg.tx = String(v);
       if (rounding === "manager" || rounding === "address") {
         seg.address = String(v);
         seg.tone = rounding;

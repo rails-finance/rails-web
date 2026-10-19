@@ -17,8 +17,9 @@
 //      (<img alt="USDp"> / <img alt="GOLDp">); picking one still writes
 //      ?market=usdp (the codec is untouched).
 //   4. usdp/175 and usdp/166: the liquidation's head reads "Liquidated" and
-//      one clause, "0.0211 claimable", restating the timeline API's
-//      collSurplus at four places (rails-ops decision 0045); the seizure's
+//      one clause, "0.0211 claimable" (or "0.3231 claimed" once the owner has
+//      claimed), restating the timeline API's collSurplus at four places
+//      (rails-ops decision 0045); the seizure's
 //      figures stay off the head; usdp/8's heads carry no claimable clause.
 //      The zero-surplus branch is proven on the model: a node child feeds
 //      polarisLiquidationDeltas a row with collSurplus "0" and gets two legs,
@@ -26,8 +27,8 @@
 //   5. Every Polaris learn-more modal — the markets page's two inline "?",
 //      the CDP card's, the Lifetime flows panel's, a liquidation row's — lists ≥ 2 links on
 //      docs.polaris.finance, each answering 200 to a fetch from this script,
-//      and the last link is the testnet app.
-//   6. /sepolia/polaris/info carries the ENS sentence.
+//      and none is the testnet app.
+//   6. /sepolia/polaris/info says ENS names resolve on Ethereum mainnet.
 //   7. The bare listing's sort menu reads "Recent activity", and so does
 //      Liquity V2's, the one cross-explorer check that proves the sweep.
 //
@@ -88,7 +89,7 @@ console.log(`BASE ${BASE}\n`);
     fetch(`${BASE}/sepolia/polaris/markets`).then((r) => r.text()),
   ]);
   check('1a. the markets page carries data-skel-section="page-table"', html.includes('data-skel-section="page-table"'));
-  const stampIdx = html.indexOf("chain snapshot");
+  const stampIdx = html.search(/chain snapshot/i);
   const stamp = stampIdx >= 0 ? html.slice(stampIdx, stampIdx + 400) : "";
   const stampBlock = Number((/etherscan\.io\/block\/(\d+)/.exec(stamp) ?? [])[1]);
   const gap = Math.abs(stampBlock - Number(board.blockNumber));
@@ -202,7 +203,10 @@ for (const id of ["175", "166"]) {
   );
   const page = await openPosition(`${BASE}/sepolia/polaris/usdp/${id}`);
   const head = await liquidationHead(page);
-  const want = `${surplusFig(surplus)} claimable`;
+  // The head's word follows what the timeline's `surplus` says became of it.
+  const sur = liq?.context?.data?.surplus;
+  const word = sur?.claim ? "claimed" : sur?.read ? "claimable" : "surplus";
+  const want = `${surplusFig(surplus)} ${word}`;
   check(
     `4b. usdp/${id}: the liquidation head reads "Liquidated · ${want}"`,
     // The figure, the pETH mark and the word sit in one flex box with no text
@@ -265,7 +269,9 @@ const coords = { txHash: "0xab", blockNumber: 1, market: "usdp", cdpId: "175" };
 const strip = (d) => d.map(({ prov, ...r }) => r);
 console.log("RESULT " + JSON.stringify({
   zero: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0" }, coords)),
-  some: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5" }, coords)),
+  some: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5", surplus: { read: true, claim: null } }, coords)),
+  claimed: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5", surplus: { read: true, claim: { block: 1 } } }, coords)),
+  unread: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5" }, coords)),
 }));
 `;
   const probe = spawnSync(
@@ -417,10 +423,7 @@ async function checkModal(name, { title, links }) {
 // ── 6. the ENS sentence ────────────────────────────────────────────────────
 {
   const html = await fetch(`${BASE}/sepolia/polaris/info`).then((r) => r.text());
-  check(
-    "6. the info page says an ENS name resolves on Ethereum mainnet",
-    html.includes("resolves on Ethereum mainnet"),
-  );
+  check("6. the info page says ENS names resolve on Ethereum mainnet", html.includes("resolve on Ethereum mainnet"));
 }
 
 // ── 7. the sort label ──────────────────────────────────────────────────────

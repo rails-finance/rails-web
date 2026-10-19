@@ -8,6 +8,7 @@
 import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { LinkedAddress } from "@/components/shared/linked-address";
+import { LinkedTx } from "@/components/shared/linked-tx";
 import type { ProseSentence } from "@/lib/shared/event-prose/types";
 
 /** The receipt a figure echoes: its provenance, the value key it registers
@@ -33,6 +34,7 @@ export function ProseSentenceText<E extends string>({
     <>
       {s.segs.map((seg, i) => {
         if (seg.address) return <LinkedAddress key={i} address={seg.address} />;
+        if (seg.tx) return <LinkedTx key={i} txHash={seg.tx} />;
         if (!seg.emph) return <span key={i}>{seg.text}</span>;
         if (seg.emph === "bold") return <Bold key={i}>{seg.text}</Bold>;
         const prov = echo(seg.emph);

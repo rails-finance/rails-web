@@ -17,12 +17,13 @@
 // forensics stand under the grid as notes.
 
 import type { ReactNode } from "react";
-import { forkDebtMove, FORK_DEBT_DUST_FLOAT, forkCollMove } from "@/lib/shared/liquity-fork-ops";
+import { forkDebtMove, FORK_DEBT_DUST_FLOAT, forkCollMove, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { eventGas, type EventCardPrice } from "@/components/shared/event-price-row";
 import { chainTruthCells, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { InLedgerFigures } from "@/components/shared/event-ledger-context";
+import { CutTeaser, splitFirstSentence } from "@/lib/shared/explainer-prose";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/components/shared/spine-column";
 import { LiquidationForensics } from "@/components/shared/liquidation-forensics";
@@ -129,9 +130,9 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
   const isNoChange = event.actionType === "adjustTrove_noChange";
 
   // The collateral the act moved; a redistribution landing on the same touch
-  // is a figure of the head and moves no token, so the spine leaves it out.
+  // moves no token, so the act's rows leave it out (the sheet states it).
   const collDelta = forkCollMove(ctx);
-  // The debt the act moved (TroveOperation), the figure the head states.
+  // The debt the act moved (TroveOperation).
   const debtDelta = forkDebtMove(ctx).value;
   const debtMoved = Math.abs(debtDelta) >= FORK_DEBT_DUST_FLOAT;
 
@@ -234,26 +235,54 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
         },
       }
     : {};
+  // Interest applied: the debt the event added, on the debt node in the
+  // caution tone, as Liquity V2 draws it, and below it any collateral a
+  // liquidated neighbour's redistribution brought on the same touch. The
+  // sheet's Debt and Redistribution rows carry the receipts.
+  const isPendingDebt = et === "applyPendingDebt";
+  const pendingLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!isPendingDebt) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    const redist = forkRedistArrival(ctx);
+    if (redist && redist.coll > 0)
+      legs.push({
+        label: L1_WORDS.from_liquidation,
+        value: redist.coll,
+        symbol: ctx.collateralSymbol,
+        address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+      });
+    const added = Number(ctx.debtDelta) || 0;
+    if (added >= FORK_DEBT_DUST_FLOAT)
+      legs.push({
+        label: L1_WORDS.spine_debt_added,
+        value: added,
+        symbol: debtSymbol,
+        address: soleFlowAddress(event.flows, debtSymbol),
+      });
+    return legs;
+  })();
   const spine: SpineColumnProps = isWarning
     ? { icon: "warning", warningTone: isLiq ? "critical" : "caution", warningLegs, isLast: !!isLast }
-    : isNoChange
-      ? { icon: "no-change", isLast: !!isLast }
-      : isDelegate
-        ? {
-            icon: "delegate",
-            iconDirection: et === "setInterestBatchManager" ? "up" : "down",
-            ...rateFlank,
-            isLast: !!isLast,
-          }
-        : isRateChange
+    : isPendingDebt
+      ? { icon: "warning", warningTone: "caution", warningLegs: pendingLegs, isLast: !!isLast }
+      : isNoChange
+        ? { icon: "no-change", isLast: !!isLast }
+        : isDelegate
           ? {
-              icon: "rate-change",
-              iconDirection:
-                rateSpan && rateSpan[1] !== rateSpan[0] ? (rateSpan[1] > rateSpan[0] ? "up" : "down") : undefined,
+              icon: "delegate",
+              iconDirection: et === "setInterestBatchManager" ? "up" : "down",
               ...rateFlank,
               isLast: !!isLast,
             }
-          : { tokens: tokens.length > 0 ? tokens : undefined, ...(isOpenEvent ? rateFlank : {}), isLast: !!isLast };
+          : isRateChange
+            ? {
+                icon: "rate-change",
+                iconDirection:
+                  rateSpan && rateSpan[1] !== rateSpan[0] ? (rateSpan[1] > rateSpan[0] ? "up" : "down") : undefined,
+                ...rateFlank,
+                isLast: !!isLast,
+              }
+            : { tokens: tokens.length > 0 ? tokens : undefined, ...(isOpenEvent ? rateFlank : {}), isLast: !!isLast };
 
   // ── T2 ──
   const stats = liquityForkStateStats(ctx, coords, debtSymbol, provs);
@@ -303,7 +332,6 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     txHash: event.txHash,
     blockNumber: event.blockNumber,
     builders: { ...provs, debtSymbol, minDebt: fork.minDebt },
-    flows: event.flows,
     surplusClaimed,
   });
   // The phone caption and the row's accessible name follow the head's words.
@@ -322,7 +350,8 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     escrow: fork.escrow,
   });
 
-  const teaser = liquityForkExplainerTeaser(ctx, coords, fork.words, provs);
+  const buildTeaser = () => liquityForkExplainerTeaser(ctx, coords, fork.words, provs);
+  const teaser = buildTeaser();
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -367,7 +396,18 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
         />
       ),
       first: teaser ? (
-        <InLedgerFigures build={() => liquityForkExplainerTeaser(ctx, coords, fork.words, provs)} />
+        // The event page's title is the teaser's first sentence and the pane
+        // opens on the rest (decision 0045, "Ruled since"); the cut is stated
+        // here, where the text is known, for the component that draws it.
+        <CutTeaser
+          whole={<InLedgerFigures build={buildTeaser} />}
+          head={<InLedgerFigures build={() => splitFirstSentence(buildTeaser()).head} />}
+          tail={
+            splitFirstSentence(teaser).tail != null ? (
+              <InLedgerFigures build={() => splitFirstSentence(buildTeaser()).tail} />
+            ) : null
+          }
+        />
       ) : undefined,
     },
     learnMore: <LearnMore inline content={liquityForkLearnMoreContent(ctx, fork.words)} />,

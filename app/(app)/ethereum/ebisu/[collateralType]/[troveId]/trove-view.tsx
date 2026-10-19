@@ -89,7 +89,10 @@ import { DEBT_SYMBOL, EBISU_DOCS } from "@/lib/ebisu/asset-catalog";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { ExportMenu } from "@/components/shared/export-menu";
 import { liquityForkExports } from "@/components/protocol/liquity-fork/liquity-fork-export-menu";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import { atBlockPriceProv } from "@/lib/ebisu/event-provenance";
+import { resolveBranch as resolveForkBranch } from "@/lib/ebisu/asset-catalog";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 // Redemption touches collapse into one expandable run row — the V2 trove
@@ -381,12 +384,26 @@ export default function EbisuTroveDetail({
   // listing route's PriceFeed resolution carried on the view — plus the
   // fork's stable at its $1 redemption face (no separate price source, as
   // with BOLD). An unpriced branch leaves the strip on its tool slot alone.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  // The price carries the branch PriceFeed's receipt: the live position
+  // read's, else the troves route's the summary came with.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view) return [];
-    const collateralPrice = chain?.priceUsd ?? view.priceUsd ?? null;
+    const live = chain?.priceUsd != null && chain.priceUsd > 0 ? chain : null;
+    const collateralPrice = live?.priceUsd ?? view.priceUsd ?? null;
     return [
       ...(collateralPrice != null && collateralPrice > 0
-        ? [{ symbol: view.collateralType, price: collateralPrice }]
+        ? [
+            {
+              symbol: view.collateralType,
+              price: collateralPrice,
+              info: live
+                ? forkLiveVocab(live.protocol).forkPriceProv(live.symbol, live.priceStale)
+                : forkLiveVocab("ebisu").trovesPriceProv(
+                    resolveForkBranch(view.collateralType)?.symbol ?? view.collateralType,
+                    view.priceStale === true,
+                  ),
+            },
+          ]
         : []),
       { symbol: DEBT_SYMBOL, price: 1 },
     ];
@@ -398,9 +415,10 @@ export default function EbisuTroveDetail({
     if (!view || view.status === "open") return undefined;
     return closingPricesAt(ebisuEvents, (row) => {
       const usd = row.context.data.priceAtBlock?.usd;
+      const coords = { txHash: row.txHash, blockNumber: row.blockNumber, collateralType: view.collateralType };
       return usd != null && usd > 0
         ? [
-            { symbol: view.collateralType, price: usd },
+            { symbol: view.collateralType, price: usd, info: atBlockPriceProv(coords, usd) },
             { symbol: DEBT_SYMBOL, price: 1 },
           ]
         : undefined;

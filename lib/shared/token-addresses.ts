@@ -6,7 +6,7 @@
 // Addresses are lowercased; consumers checksum at lookup time when needed
 // (Trust Wallet CDN URLs require EIP-55 case).
 
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { BASE_TOKEN_ADDRESSES } from "@/lib/shared/token-addresses.base";
 import { SEPOLIA_TOKEN_ADDRESSES } from "@/lib/shared/token-addresses.sepolia";
 
@@ -125,17 +125,21 @@ export const TOKEN_ADDRESSES: Record<string, string> = {
   ZCHF: "0xb58e61c3098d85632df34eecfb899a1ed80921cb",
 };
 
+/** One table per chain, keyed by `ChainId` so a new chain cannot compile
+ *  without saying which table it reads. Arbitrum has none yet: an empty table
+ *  answers null, where reading Ethereum's would name the wrong contract. */
+const TABLES: Record<ChainId, Record<string, string>> = {
+  1: TOKEN_ADDRESSES,
+  8453: BASE_TOKEN_ADDRESSES,
+  42161: {},
+  11155111: SEPOLIA_TOKEN_ADDRESSES,
+};
+
 /** The address a symbol names on `chainId` — Ethereum's hand-kept table, the
  *  generated Base one (token-addresses.base.ts), or Sepolia's three-row one.
  *  No cross-chain fallback: a caller that wants Ethereum's brand mark for a
  *  Base symbol asks for chain 1 explicitly, so the CDN path it builds matches
  *  the address. */
 export function getTokenAddress(symbol: string, chainId: ChainId = MAINNET_CHAIN_ID): string | null {
-  const table =
-    chainId === BASE_CHAIN_ID
-      ? BASE_TOKEN_ADDRESSES
-      : chainId === SEPOLIA_CHAIN_ID
-        ? SEPOLIA_TOKEN_ADDRESSES
-        : TOKEN_ADDRESSES;
-  return table[symbol] ?? null;
+  return (TABLES[chainId] ?? TOKEN_ADDRESSES)[symbol] ?? null;
 }

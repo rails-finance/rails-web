@@ -86,6 +86,8 @@ function aaveV4HubRedirects(): Redirect[] {
 const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/aave-v3", "/ethereum/aave-v3"],
   ["/aave-v3-base", "/base/aave-v3"],
+  // Aave V3 on Arbitrum never had a pre-0016 path; the row is for check:routes.
+  ["/aave-v3-arbitrum", "/arbitrum/aave-v3"],
   ["/aave-v4", "/ethereum/aave-v4"],
   // Aave V4 on Base never had a pre-0016 path; the row is for check:routes.
   ["/aave-v4-base", "/base/aave-v4"],

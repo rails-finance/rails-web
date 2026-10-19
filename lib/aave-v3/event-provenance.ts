@@ -22,6 +22,7 @@
 // would count it twice. The card's balances come from a different lane (the
 // scaled-delta reduction, decisions 0008/0011) and say so.
 
+import type { CaptureSource } from "@/lib/shared/capture-source";
 import type { V3PoolIdentity } from "./pool-context";
 import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/components/shared/provenance";
 import type {
@@ -53,8 +54,21 @@ const poolOf = (coords?: V3Coords): { name: string; address: string } => coords?
 // not exist is exactly the kind of claim a provenance receipt must never make.
 const V3_INDEX_VIA = "rails-server index of decoded Aave V3 logs";
 const V3_SWEEP_VIA = "live chunked eth_getLogs sweep of the Pool's own logs";
+// Arbitrum's per-wallet store on rails-server: the body of the history from
+// Etherscan's log index, or from Tenderly's archive of the chain (rails-ops
+// TO-DO-arbitrum-scoping.md §7 item 1). The footer states whether a second
+// witness has confirmed it.
+const V3_ETHERSCAN_VIA = "rails-server store of the Pool's logs, body from Etherscan's log index";
+const V3_TENDERLY_VIA = "rails-server store of the Pool's logs, body from Tenderly's archive";
 
-const captureVia = (coords?: V3Coords): string => (coords?.source === "sweep" ? V3_SWEEP_VIA : V3_INDEX_VIA);
+const captureVia = (coords?: V3Coords): string =>
+  coords?.source === "sweep"
+    ? V3_SWEEP_VIA
+    : coords?.source === "etherscan"
+      ? V3_ETHERSCAN_VIA
+      : coords?.source === "tenderly"
+        ? V3_TENDERLY_VIA
+        : V3_INDEX_VIA;
 
 export interface V3Coords {
   txHash?: string;
@@ -78,7 +92,7 @@ export interface V3Coords {
    *  (default), or through a live chain sweep (Base, which has no index). Only
    *  the receipt's custody line differs — the value is the same log either
    *  way. */
-  source?: "index" | "sweep";
+  source?: CaptureSource;
   /** Set on the position-state receipts of the Base lane, whose account is
    *  read from the chain at the end of blocks N−1 and N. */
   stateRead?: "chain-at-block";

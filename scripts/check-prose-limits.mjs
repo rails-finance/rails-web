@@ -147,7 +147,7 @@ const z1Ids = (family, d) => {
 /** Modal placeholders that are branch or mode constants (modal grammar 1). Any other placeholder is an instance figure. */
 const MODAL_CONSTANT_PLACEHOLDERS = new Set(["min_cr", "max_ltv", "coll_type", "delegate", "delegate_name"]);
 /** Roundings whose placeholder is a name or a link. */
-const NAME_ROUNDINGS = new Set(["text", "manager", "address"]);
+const NAME_ROUNDINGS = new Set(["text", "manager", "address", "tx_hash"]);
 
 const UNITS = new Set([
   "ETH", "WETH", "wstETH", "rETH", "BOLD", "USD", "USDC", "USDT", "DAI", "ZCHF", "LUSD",

@@ -6,13 +6,16 @@
 // debt); a liquidation / redemption shows the warning spine instead. T2 waits
 // on the receipt read, which starts when the card opens (`useOpened`).
 
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useState } from "react";
 import type { BaseActivityEvent, LiquityV1Context } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 
 import { useLiquityV1Sheet } from "./liquity-v1-sheet";
-import { liquityV1HeadSpec } from "./liquity-v1-event-header";
+import { liquityV1HeadSpec, liquityV1Legs } from "./liquity-v1-event-header";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { liquityV1T1Caption, liquityV1T1Words } from "@/lib/liquity-v1/head-words";
+import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { LIQUITY_V1_CELL_HEADS, useLiquityV1Opened } from "./liquity-v1-event-detail";
 import { LiquityV1EventExplainer, liquityV1LearnMoreContent } from "./liquity-v1-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -54,7 +57,14 @@ export function LiquityV1EventCard({
   // A close burns the debt less the 200 LUSD reserve from the owner; the
   // GasPool burns the reserve. The spine draws what left the owner's wallet.
   const isClose = ctx.eventType === "closeTrove";
-  const debtSpineValue = isClose ? Math.max(0, Math.abs(debtDelta) - LIQUITY_V1_RESERVE) : Math.abs(debtDelta);
+  // An open or a draw states what the owner received: the debt added less
+  // the borrowing fee and, on an open, the reserve (the sheet's rows).
+  const received = debtDelta > 0 && ctx.lusdReceived != null ? Number(ctx.lusdReceived) : null;
+  const debtSpineValue = isClose
+    ? Math.max(0, Math.abs(debtDelta) - LIQUITY_V1_RESERVE)
+    : received != null && Number.isFinite(received)
+      ? received
+      : Math.abs(debtDelta);
 
   const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
 
@@ -90,8 +100,15 @@ export function LiquityV1EventCard({
         ] as (SpineTokenRow | null)[]
       ).filter((t): t is SpineTokenRow => t !== null);
 
+  // A redemption's or a liquidation's legs: the collateral below the debt
+  // it cleared, and a full redemption's surplus locked after them.
   const spine: SpineColumnProps = isWarning
-    ? { icon: "warning", warningTone: isLiq ? "critical" : "caution", isLast: !!isLast }
+    ? {
+        icon: "warning",
+        warningTone: isLiq ? "critical" : "caution",
+        warningLegs: liquityV1Legs(ctx, coords),
+        isLast: !!isLast,
+      }
     : { tokens: tokens && tokens.length > 0 ? tokens : undefined, isLast: !!isLast };
 
   const opened = {
@@ -112,6 +129,19 @@ export function LiquityV1EventCard({
     wallet: event.wallet,
     active,
   });
+  // The timeline's head is words (decision 0045); the event page's title is
+  // the Explanation's first sentence, the pane opening on the second. A full
+  // redemption's head states its surplus, claimable or claimed: the page's
+  // CollSurplusPool read says which.
+  const page = useContext(EventPageContext) != null;
+  const surplusClaimed = useSurplusClaimFor(event.txHash);
+  const explainerProps = {
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    ownerOutcome: isLiq ? ownerOutcome : null,
+  };
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -122,8 +152,8 @@ export function LiquityV1EventCard({
       number: eventNumber,
     },
     spine,
-    head: liquityV1HeadSpec(event.actionLabel, ctx, coords),
-    caption: event.actionLabel,
+    head: liquityV1HeadSpec(event.actionLabel, ctx, coords, page ? "title" : "row", { surplusClaimed }),
+    caption: page ? event.actionLabel : liquityV1T1Caption(liquityV1T1Words(ctx, { surplusClaimed })),
     // Collateral, Debt and Collateral ratio; V1 has no interest rate. The
     // figures, the price row and the notes are built once the card opens.
     cells: { pending: LIQUITY_V1_CELL_HEADS },
@@ -141,17 +171,12 @@ export function LiquityV1EventCard({
     },
     // The pane draws every bullet: whether it groups them waits on the
     // receipt read, which starts only when the card opens.
-    explainer: {
-      body: (
-        <LiquityV1EventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          ownerOutcome={isLiq ? ownerOutcome : null}
-        />
-      ),
-    },
+    explainer: page
+      ? {
+          body: <LiquityV1EventExplainer {...explainerProps} part="rest" />,
+          first: <LiquityV1EventExplainer {...explainerProps} part="lead" />,
+        }
+      : { body: <LiquityV1EventExplainer {...explainerProps} /> },
     learnMore: <LearnMore inline content={liquityV1LearnMoreContent(ctx)} />,
   };
   return <EventCard slots={slots} avatar={null} />;

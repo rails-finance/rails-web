@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
-import { buildPolarisTimeline, type PolarisTimelineRow } from "@/lib/sources/api/polaris-timeline";
+import {
+  buildPolarisTimeline,
+  type PolarisSurplusWire,
+  type PolarisTimelineRow,
+} from "@/lib/sources/api/polaris-timeline";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { POLARIS_CHAIN_ID, normalizeCdpId, normalizeMarket } from "@/lib/polaris/asset-catalog";
 
@@ -24,6 +28,8 @@ interface TimelineRowsResponse {
   cdp_id: string;
   totalEvents: number;
   rows: PolarisTimelineRow[];
+  /** Each liquidation's surplus and the owner's first claim on it. */
+  surplus?: PolarisSurplusWire | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -49,7 +55,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
     }
     const json = (await response.json()) as TimelineRowsResponse;
-    const data = buildPolarisTimeline(json.rows ?? [], market, id, json.totalEvents);
+    const data = buildPolarisTimeline(json.rows ?? [], market, id, json.totalEvents, json.surplus);
     return NextResponse.json(toTimelineWire(data, POLARIS_CHAIN_ID), {
       headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),
     });

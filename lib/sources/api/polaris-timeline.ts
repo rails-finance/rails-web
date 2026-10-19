@@ -29,7 +29,13 @@
 //
 // SERVER-ONLY — imported from the /api/polaris/* route handlers.
 
-import type { BaseActivityEvent, AssetFlow, PolarisContext, PolarisEventType } from "@/lib/shared/types/event-shape";
+import type {
+  BaseActivityEvent,
+  AssetFlow,
+  PolarisContext,
+  PolarisEventType,
+  PolarisSurplusContext,
+} from "@/lib/shared/types/event-shape";
 import { explorerUrl } from "@/lib/shared/chains";
 import { PETH, POLARIS_CHAIN_ID, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 
@@ -40,6 +46,35 @@ export interface PolarisTimelineResult {
   /** The CDP's whole history as the backend counts it. */
   totalEvents: number;
 }
+
+/** One liquidation's surplus as `/api/polaris/timeline` carries it in the
+ *  top-level `surplus.liquidations`: the owner, the credit, and the owner's
+ *  first claim after it (the claim fields are null when none is captured). */
+export interface PolarisSurplusWireEntry {
+  liquidation_block: string | number;
+  liquidation_log_index: number;
+  liquidation_tx_hash: string;
+  liquidation_timestamp: string | number;
+  owner: string;
+  coll_surplus: string;
+  credit_block: string | number;
+  credit_log_index: number;
+  credit_amount: string;
+  claim_block: string | number | null;
+  claim_log_index: number | null;
+  claim_timestamp: string | number | null;
+  claim_tx_hash: string | null;
+  claim_tx_from: string | null;
+  claim_amount: string | null;
+}
+
+/** The timeline's top-level `surplus`: the pool's scan position and its entries. */
+export interface PolarisSurplusWire {
+  scanned_to_block: string | number;
+  liquidations: PolarisSurplusWireEntry[];
+}
+
+const hex = (h: string): string => (h.startsWith("0x") ? h.toLowerCase() : `0x${h.toLowerCase()}`);
 
 /** One row as the rails /api/polaris/timeline route projects it (§3 of the
  *  build plan). Numerics are decimal strings in raw 1e18 units. */
@@ -137,6 +172,33 @@ const numOrNull = (raw: string | null): number | null => {
 const rawVal = (raw: string | null): string | undefined =>
   raw == null || raw === "" ? undefined : String(raw).split(".")[0];
 
+/** The surplus entry of the liquidation in transaction `tx`, as the context
+ *  carries it; undefined when the timeline had none for it. */
+function surplusContextFor(wire: PolarisSurplusWire | null | undefined, tx: string): PolarisSurplusContext | undefined {
+  const e = wire?.liquidations?.find((l) => hex(l.liquidation_tx_hash) === hex(tx));
+  if (!wire || !e) return undefined;
+  const scannedToBlock = Number(wire.scanned_to_block);
+  const claimed = e.claim_tx_hash != null && e.claim_block != null && e.claim_timestamp != null;
+  return {
+    owner: e.owner.toLowerCase(),
+    credit: human(e.credit_amount) ?? "0",
+    creditRaw: rawVal(e.credit_amount) ?? "0",
+    creditBlock: Number(e.credit_block),
+    scannedToBlock,
+    read: Number.isFinite(scannedToBlock) && scannedToBlock >= Number(e.liquidation_block),
+    claim: claimed
+      ? {
+          block: Number(e.claim_block),
+          timestamp: Number(e.claim_timestamp),
+          txHash: hex(e.claim_tx_hash as string),
+          from: (e.claim_tx_from ?? e.owner).toLowerCase(),
+          amount: human(e.claim_amount) ?? "0",
+          amountRaw: rawVal(e.claim_amount) ?? "0",
+        }
+      : null,
+  };
+}
+
 const OPERATION_TYPE: Record<number, PolarisEventType> = { 0: "open", 1: "adjust", 2: "close", 3: "liquidate" };
 
 /** Per-axis verbs for an adjust — the classifier's label is "Adjust", and the
@@ -170,6 +232,7 @@ export function buildPolarisTimeline(
   market: PolarisMarket,
   cdpId: string,
   totalEvents?: number,
+  surplus?: PolarisSurplusWire | null,
 ): PolarisTimelineResult {
   const cfg = POLARIS_MARKET_CONFIG[market];
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
@@ -222,6 +285,7 @@ export function buildPolarisTimeline(
           }
         : undefined;
 
+    const surplusCtx = kind === "liquidate" ? surplusContextFor(surplus, tx) : undefined;
     const ctx: PolarisContext = {
       eventType: kind,
       market,
@@ -257,6 +321,7 @@ export function buildPolarisTimeline(
             collSurplus: human(r.coll_surplus),
             flatComp: human(r.flat_comp),
             collateralComp: human(r.collateral_comp),
+            ...(surplusCtx ? { surplus: surplusCtx } : {}),
             // Pool-absorbed when nothing was redistributed (scoping doc §1.4).
             ...(debtRedistributed != null ? { spAbsorbed: debtRedistributed === ZERO } : {}),
           }

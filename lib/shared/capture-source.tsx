@@ -20,7 +20,11 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-export type CaptureSource = "index" | "sweep";
+/** "index": the rails-server index. "sweep": a live sweep of the chain's logs.
+ *  "etherscan" and "tenderly": rails-server's per-wallet store on Arbitrum,
+ *  whose history body came from Etherscan's log index or from Tenderly's
+ *  archive (rails-ops TO-DO-arbitrum-scoping.md §7 item 1). */
+export type CaptureSource = "index" | "sweep" | "etherscan" | "tenderly";
 
 const CaptureSourceContext = createContext<CaptureSource>("index");
 

@@ -13,5 +13,5 @@ import { redirect } from "next/navigation";
 import { protocolForHref } from "@/lib/shared/protocols";
 
 export default function YearnInfoRedirect() {
-  redirect(`${protocolForHref("/ethereum/yearn")!.subPages[0].href}/info`);
+  redirect(`${protocolForHref("/ethereum/yearn")!.subPages[0]!.href}/info`);
 }

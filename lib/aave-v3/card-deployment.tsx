@@ -203,9 +203,13 @@ export function makeLivePoolCardDeployment(id: {
   oracleAddress: string;
   /** e.g. "/api/chain/aave-v3-base/position". */
   positionRoute: string;
+  /** The server env var the route reads the chain through, named on the via
+   *  line where the deployment states it (Arbitrum). */
+  rpcEnv?: string;
 }): AaveV3CardDeployment {
   const pool = { name: id.poolName, address: id.poolAddress };
   const oracle = { name: id.oracleName, address: id.oracleAddress };
+  const route = id.rpcEnv ? `${id.positionRoute} · ${id.rpcEnv}` : id.positionRoute;
   return {
     session: id.session,
     marketLabel: () => "",
@@ -237,7 +241,7 @@ export function makeLivePoolCardDeployment(id: {
       verify: RECOMPUTE,
       summary: `Supplied ${symbol} the position holds${at(block)} — the balance the reserve's aToken reports for this wallet at that block, read for this page. The aToken's balance climbs with the reserve's liquidity index, so every unit of interest earned up to that block is inside this figure.`,
       contract: pool,
-      via: `GET ${id.positionRoute} · aToken balanceOf${at(block)}`,
+      via: `GET ${route} · aToken balanceOf${at(block)}`,
     }),
     debt: (symbol, block) => ({
       kind: "chain",
@@ -245,7 +249,7 @@ export function makeLivePoolCardDeployment(id: {
       verify: RECOMPUTE,
       summary: `Borrowed ${symbol} the position owes${at(block)} — the balance the reserve's variableDebtToken reports for this wallet at that block, read for this page. The debt token's balance climbs with the reserve's borrow index, so every unit of interest charged up to that block is inside this figure.`,
       contract: pool,
-      via: `GET ${id.positionRoute} · variableDebtToken balanceOf${at(block)}`,
+      via: `GET ${route} · variableDebtToken balanceOf${at(block)}`,
     }),
     healthFactor: (_market, block) => ({
       kind: "chain",
@@ -253,7 +257,7 @@ export function makeLivePoolCardDeployment(id: {
       verify: RECOMPUTE,
       summary: `Health factor — the figure the Pool gives for this wallet when it is asked for the account's state${at(block)}. It is the Pool's account arithmetic over its oracle's prices at that block. The Pool writes a health factor with 18 decimal places, so 10^18 stands for a factor of 1.`,
       contract: pool,
-      via: `GET ${id.positionRoute} · Pool.getUserAccountData · healthFactor ÷10^18`,
+      via: `GET ${route} · Pool.getUserAccountData · healthFactor ÷10^18`,
     }),
     usd: (what) => ({
       kind: "chain-derived",

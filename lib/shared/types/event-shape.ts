@@ -2386,6 +2386,32 @@ export interface PolarisContextRaw {
   priceAtBlock?: string;
 }
 
+/** A liquidation's collateral surplus and the owner's claim on it, from the
+ *  timeline's `surplus` field (`/api/polaris/timeline`, one entry per
+ *  liquidation that left a surplus). The market's CollSurplusPool keeps one
+ *  balance per owner, so a claim pays the owner's whole balance: `claim.amount`
+ *  can exceed `credit` when other credits sat in the pool. */
+export interface PolarisSurplusContext {
+  owner: string;
+  /** The SurplusAccounted credit, human decimal string, and its integer. */
+  credit: string;
+  creditRaw: string;
+  creditBlock: number;
+  /** The pool's scanned_to_block. */
+  scannedToBlock: number;
+  /** True once the pool has been read past the liquidation's block. */
+  read: boolean;
+  /** The owner's first claim after the credit; null when none is captured. */
+  claim: {
+    block: number;
+    timestamp: number;
+    txHash: string;
+    from: string;
+    amount: string;
+    amountRaw: string;
+  } | null;
+}
+
 export interface PolarisContext {
   eventType: PolarisEventType;
   market: "usdp" | "goldp";
@@ -2428,6 +2454,8 @@ export interface PolarisContext {
   collateralComp?: string;
   /** Liquidity-pool absorption (`_debtRedistributed == 0`) vs redistribution. */
   spAbsorbed?: boolean;
+  /** The surplus credit and the owner's claim, where the timeline carried it. */
+  surplus?: PolarisSurplusContext;
   // ── transfer rows ──
   fromAddr?: string;
   toAddr?: string;

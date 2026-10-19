@@ -24,6 +24,7 @@ import { isCollSurplusClaimEvent, isLiquityV1Event } from "@/lib/shared/types/ev
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
 import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
+import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { fetchLiquityV1Positions } from "@/lib/api/fetch-liquity-v1-positions";
 import { fetchLiquityV1Timeline } from "@/lib/api/fetch-liquity-v1-timeline";
 import { fetchLiquityV1Position, type LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
@@ -612,51 +613,56 @@ export default function LiquityV1TroveView({
                 outcome={liquityV1RedemptionOutcome(redemptions, priceNow)}
               />
             )}
-            <ChainTruthTimeline
-              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              csvExportCeiling={INDEX_ROW_CEILING}
-              // Matches `LiquityV1EventCard`'s own `persistKey={`liquity-v1:${event.id}`}`
-              // — lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="liquity-v1"
-              eventPage={(slot) => liquityV1Explorer.eventPage({ ...slot, wallet })}
-              closed={view ? view.status !== "open" : undefined}
-              tl={tl}
-              runs={LIQUITY_V1_REDEMPTION_RUNS}
-              // Tenure-first header (the V4 spoke treatment) for the shown Trove
-              // life: opened / active-since, tenure, freshness.
-              toolbarLeading={
-                view ? (
-                  <TimelineActivityHeader
-                    events={v1Events}
-                    closed={view.status !== "open"}
-                    // When the position actually opened, not when the window does.
-                    firstAt={opening?.firstTimestamp}
-                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  />
-                ) : undefined
-              }
-              renderCard={(event, meta) =>
-                isCollSurplusClaimEvent(event) ? (
-                  <CollSurplusClaimCard
-                    event={event}
-                    isLast={meta.isLast}
-                    eventNumber={meta.eventNumber}
-                    persistPrefix="liquity-v1"
-                  />
-                ) : isLiquityV1Event(event) ? (
-                  <LiquityV1EventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isLast={meta.isLast}
-                    // Today's PriceFeed price — a redemption's net outcome at
-                    // today's value. Read on any life: it prices the ETH now.
-                    currentPrice={priceNow}
-                    ownerOutcome={ownerOutcome}
-                  />
-                ) : null
-              }
-            />
+            {/* A full redemption's head reads whether its surplus was claimed. */}
+            <CollSurplusCtx.Provider
+              value={surplus && closingTx ? { creditTx: closingTx, claimed: surplus.claimed } : null}
+            >
+              <ChainTruthTimeline
+                displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                csvExportCeiling={INDEX_ROW_CEILING}
+                // Matches `LiquityV1EventCard`'s own `persistKey={`liquity-v1:${event.id}`}`
+                // — lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="liquity-v1"
+                eventPage={(slot) => liquityV1Explorer.eventPage({ ...slot, wallet })}
+                closed={view ? view.status !== "open" : undefined}
+                tl={tl}
+                runs={LIQUITY_V1_REDEMPTION_RUNS}
+                // Tenure-first header (the V4 spoke treatment) for the shown Trove
+                // life: opened / active-since, tenure, freshness.
+                toolbarLeading={
+                  view ? (
+                    <TimelineActivityHeader
+                      events={v1Events}
+                      closed={view.status !== "open"}
+                      // When the position actually opened, not when the window does.
+                      firstAt={opening?.firstTimestamp}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    />
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isCollSurplusClaimEvent(event) ? (
+                    <CollSurplusClaimCard
+                      event={event}
+                      isLast={meta.isLast}
+                      eventNumber={meta.eventNumber}
+                      persistPrefix="liquity-v1"
+                    />
+                  ) : isLiquityV1Event(event) ? (
+                    <LiquityV1EventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isLast={meta.isLast}
+                      // Today's PriceFeed price — a redemption's net outcome at
+                      // today's value. Read on any life: it prices the ETH now.
+                      currentPrice={priceNow}
+                      ownerOutcome={ownerOutcome}
+                    />
+                  ) : null
+                }
+              />
+            </CollSurplusCtx.Provider>
             <ProvInspectorLayer />
           </>
         )}

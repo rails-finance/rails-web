@@ -111,6 +111,7 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
     return typeof n === "string" && n ? `${n} (${short(String(v))})` : short(String(v));
   },
   address: (v) => short(String(v)),
+  tx_hash: (v) => `${String(v).slice(0, 8)}…${String(v).slice(-4)}`,
   text: (v) => String(v ?? ""),
   units4: (v, _n, env) =>
     ledgerFigure(

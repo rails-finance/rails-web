@@ -15,5 +15,5 @@ import { redirect } from "next/navigation";
 import { protocolForHref } from "@/lib/shared/protocols";
 
 export default function AaveVaultsExplorerRoot() {
-  redirect(protocolForHref("/ethereum/aave")!.subPages[0].href);
+  redirect(protocolForHref("/ethereum/aave")!.subPages[0]!.href);
 }

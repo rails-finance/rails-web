@@ -9,6 +9,7 @@
 //
 // Values replay the captured morpho_* events.
 
+import type { CaptureSource } from "@/lib/shared/capture-source";
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { MORPHO_ADDRESSES } from "./asset-catalog";
@@ -54,7 +55,7 @@ export interface MorphoCoords {
   chainId?: ChainId;
   /** How the decoded logs reached the page — the custody line. "index" when
    *  absent (the default every indexed page relies on). */
-  source?: "index" | "sweep";
+  source?: CaptureSource;
 }
 
 const atBlock = (coords?: MorphoCoords): string =>

@@ -8,7 +8,8 @@
 // wherever a surface offers the two chains.
 
 import Link from "next/link";
-import { CHAINS, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, CHAINS, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_MARK_PATH } from "@/components/shared/explorer-mark";
 import { launchedChains } from "@/lib/shared/protocols";
 import { CTRL_GHOST, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -23,8 +24,8 @@ export const segmentClass = (active: boolean) =>
     active ? "bg-rb-100 text-foreground dark:bg-rb-800" : "text-rb-500 hover:text-foreground"
   }`;
 
-/** The chain as a small mark for any toggle/switcher segment. Both chains
- *  paint in currentColor (theme-aware) — a brand-blue square here would be
+/** The chain as a small mark for any toggle/switcher segment. Every chain
+ *  paints in currentColor (theme-aware) — a brand-blue square here would be
  *  the loudest thing in a monochrome control. Base's square is inset to 75%
  *  of the box: drawn edge-to-edge it reads heavier than the Ethereum diamond
  *  at the same footprint. Decorative here: every use sits beside the chain's
@@ -34,6 +35,15 @@ export function ChainGlyph({ chainId, className = "" }: { chainId: ChainId; clas
     return (
       <svg viewBox="0 0 122 122" fill="currentColor" className={`shrink-0 ${className}`} aria-hidden="true">
         <rect x="15.25" y="15.25" width="91.5" height="91.5" rx="7.25" />
+      </svg>
+    );
+  }
+  if (chainId === ARBITRUM_CHAIN_ID) {
+    // Full box, no inset: the hexagon is an outline mark, so at the diamond's
+    // height it carries less ink than Base's inset square.
+    return (
+      <svg viewBox="0 0 1080 1218.5" fill="currentColor" className={`shrink-0 ${className}`} aria-hidden="true">
+        <path d={ARBITRUM_MARK_PATH} />
       </svg>
     );
   }

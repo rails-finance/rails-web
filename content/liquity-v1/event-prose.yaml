@@ -250,6 +250,41 @@ words:
     redemption
   redemption_many: |-
     redemptions
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle, then at most one present-tense clause after the
+  # middle dot. The spine's flank, the Figures sheet and the Explanation carry
+  # the figures.
+  t1_sep: |-
+    ·
+  t1_opened: |-
+    Opened trove
+  t1_closed: |-
+    Closed trove
+  t1_adjusted: |-
+    Adjusted trove
+  t1_added_coll: |-
+    Added collateral
+  t1_withdrew_coll: |-
+    Withdrew collateral
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_redeemed: |-
+    Redeemed
+  t1_liquidated: |-
+    Liquidated
+  t1_coll_debt_reduced: |-
+    Collateral and debt reduced
+  t1_trove_closed: |-
+    Trove closed
+  # A full redemption's surplus is the one figure the head states (decision
+  # 0045, ruled 19 Oct 2026): "Redeemed · 2.9200 ETH claimable", or "claimed"
+  # with the claim's date once the owner has taken it.
+  t1_claimable: |-
+    claimable
+  t1_surplus_claimed: |-
+    claimed
   # The head and phone caption of the surplus claim row every Liquity family
   # draws (rails-ops decision 0045: a past participle; the amount rides the
   # spine).

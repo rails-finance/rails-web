@@ -42,7 +42,8 @@
 // SERVER-ONLY.
 
 import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
-import type { TimelineFillState } from "@/lib/api/fetch-chain-timeline";
+import type { TimelineConfirmation, TimelineFillState } from "@/lib/api/fetch-chain-timeline";
+import type { CaptureSource } from "@/lib/shared/capture-source";
 import { decodeEventLog, encodeEventTopics, parseAbi } from "viem";
 import { chainBatchClient, chainLogsClient } from "./rpc";
 import { resolveBlockTimestamps, resolveTxSenders } from "./sweep-metadata";
@@ -164,7 +165,10 @@ export interface ChainTimelineCoverage {
   /** Where the rows came from: a live sweep of the chain's logs, or the
    *  rails-server index (the Base box's capture, read through the API). The
    *  footer's sentence and the receipts' custody line both turn on it. */
-  source?: "sweep" | "index";
+  source?: CaptureSource;
+  /** The Arbitrum store's confirmation state (lib/api/fetch-chain-timeline.ts
+   *  `TimelineConfirmation`). Absent on every other lane. */
+  confirmation?: TimelineConfirmation;
   /** The lane's oracle-at-block walk, index answers only (lib/api/fetch-chain-
    *  timeline.ts `TimelineFillState`). */
   fill?: TimelineFillState;

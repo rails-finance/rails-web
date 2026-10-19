@@ -1,10 +1,19 @@
 "use client";
 
 // Liquity V1 event head (chain-state tier) — the card's `head` slot (ui-jobs
-// 309), drawn by the shared ChainTruthRow. A Trove event moves BOTH axes at once (ETH collateral + LUSD debt), so the
-// row can carry two signed deltas. Each delta is after − before over two emitted
-// absolutes (chain-derived); traced via <Prov>. No USD, no collateral ratio — layers.
+// 309), drawn by the shared ChainTruthRow.
+//
+// The timeline's head (mode "row") is words (rails-ops decision 0045,
+// TO-DO-ui-jobs 367): the past-participle kind and at most one clause
+// (`liquityV1T1Words`). The figures are the spine's: the card draws the
+// owner's legs as token rows and a redemption's or a liquidation's as warning
+// legs (`liquityV1Legs`).
+//
+// The title mode, drawn on the event page where the Explanation has no first
+// sentence, keeps the amounts: each side's signed change, after − before over
+// two emitted absolutes (chain-derived), traced via <Prov>.
 
+import { Fragment } from "react";
 import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
 import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
@@ -23,13 +32,16 @@ import {
   redemptionSplit,
 } from "@/lib/liquity-v1/event-figures";
 import { COLL_VERB, DEBT_VERB } from "@/lib/shared/liquity-fork-ops";
+import type { SpineWarningLeg } from "@/components/shared/spine-column";
+import { liquityV1T1Words, type LiquityV1T1Clause, type LiquityV1T1Options } from "@/lib/liquity-v1/head-words";
+import { Prov } from "@/components/shared/provenance";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { formatDate } from "@/lib/date";
+import { formatExact } from "@/lib/utils/format";
 
-/** The row's spec: each side's signed change, a redemption's legs debt first. */
-export function liquityV1HeadSpec(
-  actionLabel: string,
-  ctx: LiquityV1Context,
-  coords: LiquityV1Coords,
-): ChainTruthRowSpec {
+/** Each side's signed change with its receipt, a redemption's legs debt
+ *  first: the title's amounts, and the spine's warning legs. */
+function liquityV1Deltas(ctx: LiquityV1Context, coords: LiquityV1Coords): ChainTruthDelta[] {
   const deltas: ChainTruthDelta[] = [];
 
   // A redemption borrows the V2 grammar, debt first: debt "Cleared", collateral
@@ -132,11 +144,72 @@ export function liquityV1HeadSpec(
 
   // A redemption names the debt first.
   if (isRedemption) deltas.sort((a, b) => Number(b.symbol === DEBT_SYMBOL) - Number(a.symbol === DEBT_SYMBOL));
+  return deltas;
+}
 
+/** A redemption's or a liquidation's legs on the warning spine: the
+ *  collateral below the debt, then a full redemption's surplus, locked. */
+export function liquityV1Legs(ctx: LiquityV1Context, coords: LiquityV1Coords): SpineWarningLeg[] {
+  const rank = (d: ChainTruthDelta) => (d.locked ? 2 : d.symbol === DEBT_SYMBOL ? 1 : 0);
+  return liquityV1Deltas(ctx, coords)
+    .sort((a, b) => rank(a) - rank(b))
+    .map((d) => ({ label: d.label, locked: d.locked, value: Math.abs(d.value), symbol: d.symbol, address: d.address }));
+}
+
+/** One clause of the head, drawn: words, or the full redemption's surplus
+ *  with its receipt, the word green while it is still the owner's to claim
+ *  (the forks' liquidation clause, `liquity-fork-event-header.tsx`). */
+function clauseNode(c: LiquityV1T1Clause, ctx: LiquityV1Context, coords: LiquityV1Coords) {
+  if ("text" in c) return <span key={c.text}>{c.text}</span>;
+  const split = redemptionSplit(ctx);
+  const legVals = split
+    ? { debt: String(split.lusdRedeemed), priceUsd: split.price, coll: ctx.collBefore }
+    : { debt: "0", priceUsd: 0, coll: ctx.collBefore };
+  // A fragment: the figure, the icon and the word sit as the clause's own
+  // flex items, on one line.
+  return (
+    <Fragment key="surplus">
+      <Prov info={redemptionLegProv(coords, "surplus", legVals)} value={formatExact(c.surplus)} symbol={c.symbol}>
+        <span className="font-bold text-foreground">{c.surplus.toFixed(4)}</span>
+      </Prov>
+      <TokenChipIcon symbol={c.symbol} size={16} />
+      <span className={c.claimedAt === undefined ? "text-green-700 dark:text-green-400" : undefined}>
+        {c.word}
+        {c.claimedAt != null && <> {formatDate(c.claimedAt)}</>}
+      </span>
+    </Fragment>
+  );
+}
+
+/** The head's spec: words in the timeline ("row"), the amounts on the event
+ *  page's title ("title"). */
+export function liquityV1HeadSpec(
+  actionLabel: string,
+  ctx: LiquityV1Context,
+  coords: LiquityV1Coords,
+  mode: "row" | "title" = "row",
+  opts: LiquityV1T1Options = {},
+): ChainTruthRowSpec {
+  const isOpen = ctx.eventType === "openTrove";
+  const isRedemption = ctx.eventType === "redemption";
+  const critical = ctx.eventType === "liquidation";
+  if (mode === "row") {
+    const words = liquityV1T1Words(ctx, opts);
+    return {
+      label: words.kind,
+      status: isOpen ? "open" : ctx.eventType === "closeTrove" ? "close" : undefined,
+      critical,
+      labelOnSpine: isRedemption,
+      clauses: words.clauses.map((c) => clauseNode(c, ctx, coords)),
+      deltas: [],
+    };
+  }
+  const deltas = liquityV1Deltas(ctx, coords);
+  const isAdjust = ctx.eventType === "adjustTrove";
   return {
     label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
     status: isOpen ? "open" : undefined,
-    critical: ctx.eventType === "liquidation",
+    critical,
     labelOnSpine: isRedemption,
     deltas,
   };

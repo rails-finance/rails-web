@@ -43,7 +43,6 @@ import type { ReactNode } from "react";
 import type { LlamalendContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import {
   clause,
   cont,
@@ -59,7 +58,7 @@ import {
   liquidationProv,
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
-import { formatNumber } from "@/lib/utils/format";
+import { formatExact, formatNumber } from "@/lib/utils/format";
 import {
   fmtColl,
   fmtHealth,
@@ -70,6 +69,12 @@ import {
 } from "@/lib/llamalend/event-figures";
 import { formatDate } from "@/lib/date";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+
+/** A delta's receipt value, as the shared row keys it (chainTruthDeltaValue in
+ *  chain-truth-event.tsx, a client module): the event page's server-side title
+ *  reads this file's first sentence (lib/llamalend/explorer.ts). */
+const deltaValue = (value: number, labeled: boolean): string =>
+  `${labeled ? "" : value < 0 ? "−" : "+"}${formatExact(Math.abs(value))}`;
 
 /** A balance below this is arithmetic dust, not a real leg. Mirrors economics.ts. */
 const DUST = 1e-12;
@@ -178,7 +183,7 @@ export function llamalendEventSlots(
     <Fig
       echo
       info={collateralDeltaProv(collSym, ctx.eventType, coords, ctx.raw?.collateralDelta)}
-      value={chainTruthDeltaValue(Number(ctx.collateralDelta ?? 0), true)}
+      value={deltaValue(Number(ctx.collateralDelta ?? 0), true)}
       symbol={collSym}
     >
       {fmtAbs(ctx.collateralDelta)} {collSym}
@@ -188,7 +193,7 @@ export function llamalendEventSlots(
     <Fig
       echo
       info={debtDeltaProv(debtSym, ctx.eventType, coords, ctx.raw?.debtDelta)}
-      value={chainTruthDeltaValue(Number(ctx.debtDelta ?? 0), true)}
+      value={deltaValue(Number(ctx.debtDelta ?? 0), true)}
       symbol={debtSym}
     >
       {fmtAbs(ctx.debtDelta)} {debtSym}
@@ -349,7 +354,7 @@ function liquidationSlots(
     <Fig
       echo
       info={liquidationProv("debt", debtSym, role, coords, ctx.raw?.debtDelta)}
-      value={chainTruthDeltaValue(Number(ctx.debtDelta ?? 0), false)}
+      value={deltaValue(Number(ctx.debtDelta ?? 0), false)}
       symbol={debtSym}
     >
       {fmtAbs(ctx.debtDelta)} {debtSym}
@@ -359,7 +364,7 @@ function liquidationSlots(
     <Fig
       echo
       info={liquidationProv("collateral", collSym, role, coords, ctx.raw?.collateralDelta)}
-      value={chainTruthDeltaValue(Number(ctx.collateralDelta ?? 0), false)}
+      value={deltaValue(Number(ctx.collateralDelta ?? 0), false)}
       symbol={collSym}
     >
       {fmtAbs(ctx.collateralDelta)} {collSym}
