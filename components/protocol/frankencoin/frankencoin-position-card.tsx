@@ -516,7 +516,7 @@ export function useFrankencoinCardSlots({
         <>
           <Prov info={liqPriceProv(v)} value={String(v.liqPrice)}>
             <span>
-              <AmountText value={v.liqPrice} /> ZCHF/{sym}
+              <AmountText value={v.liqPrice} format="compact" /> ZCHF/{sym}
             </span>
           </Prov>{" "}
           <span className="text-rb-500">(owner-declared)</span>
@@ -528,11 +528,8 @@ export function useFrankencoinCardSlots({
       left.push({
         id: "headroom",
         label: "Headroom",
-        value: (
-          <>
-            <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} /> ZCHF
-          </>
-        ),
+        value: <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} format="compact" />,
+        asset: { symbol: "ZCHF" },
         tip: "The ZCHF more debt the collateral backs at the declared liquidation price: the collateral at that price, less the debt.",
       });
     }
