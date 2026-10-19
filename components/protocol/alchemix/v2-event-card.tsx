@@ -10,8 +10,8 @@
 // if it were one: wherever it stands it says "shares".
 //
 // SPINE GRAMMAR, as on the V3 card: the holder's own moves draw token rows on a
-// solid spine with the amount beside them at ≥sm and the header carrying the
-// verbs (detail-page-anatomy §4). V2's `Liquidate` is one of those holder
+// solid spine with the amount beside them, the head in words (rails-ops
+// decision 0045). V2's `Liquidate` is one of those holder
 // moves, not an adverse one: it is the account holder repaying their own debt
 // by selling their own collateral shares, with no third party and no seizure
 // (rails-ops reference/alchemix-v2-frozen-record.md). It draws the dead-end
@@ -25,28 +25,26 @@ import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { gasPrice } from "@/components/shared/event-price-row";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
-import {
-  type ChainTruthDelta,
-  type ChainTruthRowSpec,
-  type ChainTruthStat,
-  chainTruthCaption,
-} from "@/components/shared/chain-truth-event";
+import type { ChainTruthRowSpec, ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import type { GasCost } from "@/lib/shared/types/event-shape";
-import type { AlchemixV2Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { AlchemixV2Context } from "@/lib/shared/types/event-shape";
 import type { ChainId } from "@/lib/shared/chains";
 import { v2EmittedProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { ALCHEMIX_V2 } from "@/lib/alchemix/learn-more";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
-
-export type AlchemixV2Event = BaseActivityEvent & { context: { protocol: "alchemix-v2"; data: AlchemixV2Context } };
-
-/** alUSD and alETH, the two V2 synthetics: 18 decimals each, read from the
- *  tokens. The same two V3 mints. */
-const SYNTHETIC_DECIMALS = 18;
+import {
+  credit,
+  movedAmount,
+  v2Sentence,
+  SYNTHETIC_DECIMALS,
+  type AlchemixV2Event,
+  type Amount,
+} from "@/lib/alchemix/v2-lines";
+import { ALCHEMIX_HEAD_WORDS, alchemixV2Kind } from "@/lib/alchemix/head-words";
 
 const VERB: Record<AlchemixV2Context["eventType"], string> = {
   deposit: "Deposit",
@@ -61,16 +59,6 @@ const VERB: Record<AlchemixV2Context["eventType"], string> = {
   liquidate: "Repay from collateral",
 };
 
-interface Amount {
-  field: string;
-  raw: string;
-  decimals: number;
-  symbol: string;
-  address?: string;
-  value: number;
-  shares: boolean;
-}
-
 function coordsOf(e: AlchemixV2Event): AlchemixV2Coords {
   const d = e.context.data;
   return {
@@ -81,53 +69,6 @@ function coordsOf(e: AlchemixV2Event): AlchemixV2Coords {
     txHash: e.txHash,
     blockNumber: e.blockNumber,
   };
-}
-
-function amount(raw: string | null | undefined, decimals: number | null | undefined): number | null {
-  if (raw == null || decimals == null) return null;
-  const n = Number(raw.split(".")[0]);
-  return Number.isFinite(n) ? n / 10 ** decimals : null;
-}
-
-/** The one amount the log moved, in the unit the log states it in. */
-function movedAmount(d: AlchemixV2Context): Amount | null {
-  const r = d.raw;
-  const yieldSym = d.yieldToken?.symbol ?? "yield token";
-  const underSym = d.underlyingToken?.symbol ?? "underlying";
-  const pick = (
-    field: string,
-    decimals: number | null | undefined,
-    symbol: string,
-    shares: boolean,
-    address?: string,
-  ) => {
-    const raw = r[field];
-    const value = amount(raw, decimals);
-    return raw != null && value != null && decimals != null
-      ? { field, raw, decimals, symbol, address, value, shares }
-      : null;
-  };
-  switch (d.eventType) {
-    case "deposit":
-      return pick("amount", d.yieldToken?.decimals, yieldSym, false, d.yieldToken?.address);
-    case "withdraw":
-    case "liquidate":
-      return pick("shares", d.yieldToken?.decimals, yieldSym, true, d.yieldToken?.address);
-    case "mint":
-    case "burn":
-      return pick("amount", SYNTHETIC_DECIMALS, d.syntheticSymbol, false);
-    case "repay":
-      return pick("amount", d.underlyingToken?.decimals, underSym, false, d.underlyingToken?.address);
-    default:
-      return null;
-  }
-}
-
-/** The debt a Repay or Liquidate cancelled, where the log carries it. */
-function credit(d: AlchemixV2Context): { raw: string; value: number } | null {
-  const raw = d.raw.credit;
-  const value = amount(raw, SYNTHETIC_DECIMALS);
-  return raw != null && value != null ? { raw, value } : null;
 }
 
 function spine(d: AlchemixV2Context, a: Amount | null): SpineTokenRow[] {
@@ -145,37 +86,14 @@ function spine(d: AlchemixV2Context, a: Amount | null): SpineTokenRow[] {
   ];
 }
 
-function rowSpec(e: AlchemixV2Event, a: Amount | null, showVersion: boolean): ChainTruthRowSpec {
-  const d = e.context.data;
-  const coords = coordsOf(e);
-  const deltas: ChainTruthDelta[] = [];
-  if (a) {
-    deltas.push({
-      value: a.value,
-      symbol: a.symbol,
-      address: a.address,
-      suffix: a.shares ? " shares" : undefined,
-      label: VERB[d.eventType],
-      // The number hands off to the spine at ≥sm — except a liquidate's
-      // dead-end icon carries no flank value of its own, so its amount stays
-      // in the header at every width.
-      axisVerb: true,
-      noSpineCounterpart: d.eventType === "liquidate" ? true : undefined,
-      prov: v2EmittedProv(a.field, a.symbol, a.raw, a.decimals, coords),
-    });
-  }
-  const c = credit(d);
-  if (c && (d.eventType === "repay" || d.eventType === "liquidate")) {
-    deltas.push({
-      value: c.value,
-      symbol: d.syntheticSymbol,
-      label: "Cleared",
-      prov: v2EmittedProv("credit", d.syntheticSymbol, c.raw, SYNTHETIC_DECIMALS, coords),
-    });
-  }
+/** The row's head (decision 0045): the kind in words, "V2" beside it where
+ *  the timeline carries both versions. The amount is on the spine's flank, a
+ *  repayment from collateral's and the debt cleared in the cells. */
+function rowSpec(e: AlchemixV2Event, showVersion: boolean): ChainTruthRowSpec {
   return {
-    label: showVersion ? "V2" : "",
-    deltas,
+    label: alchemixV2Kind(e.context.data),
+    deltas: [],
+    note: showVersion ? <span data-alchemix-version="">{ALCHEMIX_HEAD_WORDS.v2}</span> : undefined,
   };
 }
 
@@ -215,39 +133,7 @@ function ownerGas(e: AlchemixV2Event): GasCost | undefined {
   return d.chainId === 1 && e.wallet?.toLowerCase() === d.account.toLowerCase() ? e.gas : undefined;
 }
 
-function explainer(e: AlchemixV2Event, a: Amount | null): string | null {
-  const d = e.context.data;
-  const amt = a ? `${formatUnitsExact(a.raw, a.decimals)} ${a.symbol}` : null;
-  const c = credit(d);
-  const cleared = c ? `${formatUnitsExact(c.raw, SYNTHETIC_DECIMALS)} ${d.syntheticSymbol}` : null;
-  switch (d.eventType) {
-    case "deposit":
-      return amt ? `${amt} went into the V2 Alchemist as collateral.` : null;
-    case "withdraw":
-      return amt ? `${amt} shares of collateral came out of the V2 Alchemist.` : null;
-    case "mint":
-      return amt ? `The account minted ${amt} against its collateral.` : null;
-    case "burn":
-      return amt ? `${amt} was burned to pay down the account's debt.` : null;
-    case "repay":
-      return amt
-        ? cleared
-          ? `${amt} repaid ${cleared} of debt.`
-          : `${amt} was repaid. The log from before 11 May 2022 does not state how much debt that cleared.`
-        : null;
-    case "liquidate":
-      // Alchemix V2's Liquidate is the account holder's own action: it sells
-      // their collateral shares to repay their own debt, with no third party
-      // (rails-ops reference/alchemix-v2-frozen-record.md).
-      return amt
-        ? cleared
-          ? `The holder repaid ${cleared} of debt by selling ${amt} shares of their own collateral.`
-          : `The holder sold ${amt} shares of their own collateral to repay debt. The log from before 11 May 2022 does not state how much debt that cleared.`
-        : null;
-    default:
-      return null;
-  }
-}
+export type { AlchemixV2Event };
 
 export function AlchemixV2EventCard({
   event,
@@ -270,8 +156,8 @@ export function AlchemixV2EventCard({
     // self-liquidation `close` mark.
     d.eventType === "liquidate" ? { icon: "dead-end", isLast: !!isLast } : { tokens: spine(d, a), isLast: !!isLast };
   const stats = detailStats(event, a);
-  const line = explainer(event, a);
-  const spec = rowSpec(event, a, showVersion);
+  const line = v2Sentence(event, a);
+  const spec = rowSpec(event, showVersion);
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -283,7 +169,7 @@ export function AlchemixV2EventCard({
     },
     spine: spineProps,
     head: spec,
-    caption: chainTruthCaption(spec) ?? "",
+    caption: spec.label,
     // The log's figures are the event's cells: V2 took no reading.
     cells:
       stats.length > 0

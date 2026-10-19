@@ -43,7 +43,6 @@ import type { ReactNode } from "react";
 import type { FxContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import {
   collDeltaProv,
@@ -88,6 +87,12 @@ export interface FxRowRead {
 }
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
+
+/** A delta's receipt value, as the shared row keys it (chainTruthDeltaValue in
+ *  chain-truth-event.tsx, a client module): the event page's server-side title
+ *  reads this file's first sentence (lib/fx/explorer.ts). */
+const deltaValue = (value: number, labeled: boolean): string =>
+  `${labeled ? "" : value < 0 ? "−" : "+"}${formatExact(Math.abs(value))}`;
 
 // ── figure rendering ─────────────────────────────────────────────────────────
 // A Fig bolds a figure (semibold + foreground) ONLY when it is mirrored on the
@@ -204,12 +209,12 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
 
   // ── header-mirrored delta figures (echo the header's moved-amount receipt) ──
   const collFig = () => (
-    <Fig info={collDeltaProv(sym, coords)} value={chainTruthDeltaValue(coll, labeled)} symbol={sym}>
+    <Fig info={collDeltaProv(sym, coords)} value={deltaValue(coll, labeled)} symbol={sym}>
       {fmtAmt(ctx.collDelta)} {sym}
     </Fig>
   );
   const debtFig = () => (
-    <Fig info={debtDeltaProv(coords)} value={chainTruthDeltaValue(debt, labeled)} symbol="fxUSD">
+    <Fig info={debtDeltaProv(coords)} value={deltaValue(debt, labeled)} symbol="fxUSD">
       {fmtAmt(ctx.debtDelta)} fxUSD
     </Fig>
   );
