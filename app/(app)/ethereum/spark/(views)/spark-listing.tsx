@@ -35,7 +35,15 @@ export function SparkListing({ initialItems, initialTotal, initialKey, initialSe
       defaults={SPARK_LIST_DEFAULTS}
       sortOptions={SPARK_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      renderCard={(p) => <SparkPositionCard v={viewFromSummary(p)} surface="listing" />}
+      renderCard={(p) => (
+        // The row's Collateral leaves out the supplies that back no borrowing,
+        // as the position page's card does.
+        <SparkPositionCard
+          v={viewFromSummary(p)}
+          surface="listing"
+          notCollateral={p.notCollateral ? new Set(p.notCollateral) : null}
+        />
+      )}
       hrefFor={(p) => `/ethereum/spark/${p.wallet}`}
       keyFor={(p) => p.wallet}
       strategy={serverStrategy<SparkPositionSummary, SparkListFilters>({
