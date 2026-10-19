@@ -33,6 +33,7 @@ import {
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { usdPrice } from "@/lib/makerdao/price-format";
 import { AssetAmount } from "@/components/shared/asset-amount";
+import { FadeNumber } from "@/components/ui/FadeNumber";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -409,7 +410,7 @@ export function makerVaultCardSlots({
               v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
             )}
           >
-            {ratio.toFixed(0)}%
+            <FadeNumber value={ratio} decimals={1} />%
           </Prov>
         ) : null,
     },
