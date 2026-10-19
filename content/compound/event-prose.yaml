@@ -1239,7 +1239,8 @@ L5:
         doc: LIQUIDATION
 
   # ── The position card's "?" (an open position, by what it does now; a
-  # closed one; an absorbed one). On Base the text_base forms apply. ──
+  # closed one; an absorbed one). On Base the text_base forms apply; on Arbitrum
+  # the text_arbitrum forms, then the text_base ones. ──
   position_borrowing:
     title: |-
       About This Position
@@ -1270,6 +1271,8 @@ L5:
           each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
         text_base: |-
           Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+        text_arbitrum: |-
+          Compound V3 on Arbitrum runs separate markets from Ethereum's and Base's; a position on one says nothing about the others.
     links:
       - label: |-
           Collateral and borrowing
@@ -1311,6 +1314,8 @@ L5:
           each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
         text_base: |-
           Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+        text_arbitrum: |-
+          Compound V3 on Arbitrum runs separate markets from Ethereum's and Base's; a position on one says nothing about the others.
     links:
       - label: |-
           Collateral and borrowing
@@ -1350,6 +1355,8 @@ L5:
           each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
         text_base: |-
           Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+        text_arbitrum: |-
+          Compound V3 on Arbitrum runs separate markets from Ethereum's and Base's; a position on one says nothing about the others.
     links:
       - label: |-
           Collateral and borrowing
@@ -1390,6 +1397,8 @@ L5:
           each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
         text_base: |-
           Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+        text_arbitrum: |-
+          Compound V3 on Arbitrum runs separate markets from Ethereum's and Base's; a position on one says nothing about the others.
     links:
       - label: |-
           Absorb

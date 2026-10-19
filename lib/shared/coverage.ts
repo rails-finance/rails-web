@@ -1000,6 +1000,22 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     views: true,
     verification: true,
   }),
+  // Compound V3 on Arbitrum (2026-10-19), position-first (rails-ops
+  // TO-DO-arbitrum-scoping.md item 12). The wallet page is the Base page
+  // through the deployment seam: the four Comets read live at one block
+  // (`dashboard`), each Comet's own feeds for USD (`oracleUsd`), the market
+  // overview on the protocol page (`views`), the shared cards and explainers
+  // over the history rails-server serves per wallet (`explainers`,
+  // `forensics`), and the Markdown/CSV export (`llm`). Not yet: no offline
+  // verifier runs against these Comets.
+  "compound-v3-arbitrum": explorerDepth({
+    dashboard: true,
+    oracleUsd: true,
+    explainers: true,
+    forensics: true,
+    views: true,
+    llm: true,
+  }),
   // Compound V2 (2026-07-15): the protocol view landed first — /compound-v2/markets
   // reads every listed market at head and states what is parked in it, with USD
   // from the Comptroller's own oracle. The position explorer is IN FLIGHT (its
@@ -1397,6 +1413,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "aave-v3-arbitrum",
   // Morpho Blue on Arbitrum ships position-first on the same terms (item 13).
   "morpho-arbitrum",
+  // Compound V3 on Arbitrum ships position-first on the same terms (item 12).
+  "compound-v3-arbitrum",
   // The history below is why each earlier member left.
   // aave-v3-base left 2026-08-26: the listing lane by config over the Seamless
   // shape (same aToken/debt-token grain, the live Pool for status) — its history
@@ -1537,6 +1555,8 @@ export const VIEW_NOTES: Record<string, string> = {
     "The two markets side by side — each one's collateral and debt, the algorithmic rate in force, its mode and reserve ratio, the stability pool's depth, and the price legs the protocol values pETH with, beside the CDP counts the index holds.",
   morpho:
     "Every Blue market grouped by the token it measures in, each carrying the single immutable loan-to-value that is its whole risk surface.",
+  "compound-v3-arbitrum":
+    "The four Comets on Arbitrum under the wallet input, read at one block: each one's base asset, collateral roster, rate curve and reserve line.",
   "compound-base":
     "The five Comets on Base, each with its own base asset, collateral roster, rate curve and reserve line — and one of them reading above 100% utilised, which is what a growing reserve line looks like.",
   "morpho-base":

@@ -7,7 +7,7 @@
 // reads bracket it (app/api/chain/compound/rates).
 
 import { useEffect, useState } from "react";
-import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { compoundDeploymentOfChain } from "@/lib/compound/deployments";
 import { createReadStore } from "./read-store";
 
 interface Rate {
@@ -63,7 +63,7 @@ export function CompoundRateNote({
   useEffect(() => {
     if (!(prevBlock > 0) || !(readBlock >= prevBlock)) return;
     const ac = new AbortController();
-    const deployment = chainId === BASE_CHAIN_ID ? "base" : "ethereum";
+    const deployment = compoundDeploymentOfChain(chainId);
     fetch(`/api/chain/compound/rates?deployment=${deployment}&market=${marketKey}&blocks=${prevBlock},${readBlock}`, {
       signal: ac.signal,
     })

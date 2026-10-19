@@ -42,6 +42,9 @@ function largestMarket(positions: CompoundMarketChainResponse[]): CompoundMarket
 export function compoundBaseShareCardModel(
   head: CompoundWalletChainResponse | null,
   wallet: string,
+  /** The explorer the card names; Compound V3 on Arbitrum draws the same
+   *  card from its own Comet read. */
+  session: "compound-base" | "compound-v3-arbitrum" = "compound-base",
 ): PositionCardModel | null {
   // No market this wallet holds anything in — `positionImage` degrades to
   // the static roster card rather than rendering an empty one.
@@ -109,7 +112,7 @@ export function compoundBaseShareCardModel(
   }
 
   return {
-    session: "compound-base",
+    session,
     subject: shortSubject(wallet),
     market: market.baseSymbol,
     // The Comet read only says whether the wallet holds anything NOW — there

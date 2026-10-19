@@ -18,7 +18,8 @@ import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
 import { externalActor } from "@/lib/shared/external-actor";
-import { BASE_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import type { ChainId } from "@/lib/shared/chains";
+import { compoundDeploymentOfChain } from "@/lib/compound/deployments";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { formatExactDecimal, formatNumber, formatUsdValue } from "@/lib/utils/format";
@@ -146,7 +147,7 @@ function useSmartAccount(enabled: boolean, txHash: string | undefined, account: 
   useEffect(() => {
     if (!enabled || !txHash) return;
     const ac = new AbortController();
-    const deployment = chainId === BASE_CHAIN_ID ? "base" : "ethereum";
+    const deployment = compoundDeploymentOfChain(chainId);
     fetch(`/api/chain/compound/tx-sender?deployment=${deployment}&tx=${txHash}&account=${account}`, {
       signal: ac.signal,
     })

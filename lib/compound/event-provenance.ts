@@ -29,8 +29,20 @@ import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains
 // what a value means on chain, never which store delivered it.
 const COMET_INDEX_VIA = "captured Comet events (compound_v3_*)";
 const COMET_SWEEP_VIA = "live chunked eth_getLogs sweep of the Comet's own logs";
+// Arbitrum's per-wallet store on rails-server: the body of the history from
+// Etherscan's log index, or from Tenderly's archive of the chain (rails-ops
+// TO-DO-arbitrum-scoping.md item 12). The footer states whether a second
+// witness has confirmed it.
+const COMET_ETHERSCAN_VIA = "rails-server store of the Comets' logs, body from Etherscan's log index";
+const COMET_TENDERLY_VIA = "rails-server store of the Comets' logs, body from Tenderly's archive";
 const captureVia = (coords?: CompoundCoords): string =>
-  coords?.source === "sweep" ? COMET_SWEEP_VIA : COMET_INDEX_VIA;
+  coords?.source === "sweep"
+    ? COMET_SWEEP_VIA
+    : coords?.source === "etherscan"
+      ? COMET_ETHERSCAN_VIA
+      : coords?.source === "tenderly"
+        ? COMET_TENDERLY_VIA
+        : COMET_INDEX_VIA;
 
 export interface CompoundCoords {
   txHash?: string;
@@ -38,8 +50,9 @@ export interface CompoundCoords {
   /** The chain the event lives on — decides which explorer the tx-logs link
    *  opens. Ethereum when absent, which is what every pre-Base receipt meant. */
   chainId?: ChainId;
-  /** How the decoded log reached the page: the rails-server index (default), or
-   *  a live sweep of the Comet's logs run for this request (the Base lane). */
+  /** How the decoded log reached the page: the rails-server index (default),
+   *  a live sweep of the Comet's logs run for this request (the Base lane), or
+   *  the Arbitrum lane's per-wallet store ("etherscan" | "tenderly"). */
   source?: CaptureSource;
   /** The Comet proxy address for this market — the contract every value cites. */
   comet?: string;

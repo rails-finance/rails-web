@@ -7,11 +7,13 @@
 // Addresses from compound-finance/comet `deployments/<network>/<market>/roots.json`
 // ("bulker"): one per chain, shared by its markets.
 
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { COMPOUND_ARBITRUM_BULKER } from "@/lib/compound-arbitrum/asset-catalog";
 
 const BULKERS: Record<number, string> = {
   [MAINNET_CHAIN_ID]: "0xa397a8c2086c554b531c02e29f3291c9704b00c7",
   [BASE_CHAIN_ID]: "0x78d0677032a35c63d142a48a2037048871212a8c",
+  [ARBITRUM_CHAIN_ID]: COMPOUND_ARBITRUM_BULKER,
 };
 
 /** True where `address` is the Compound Bulker of `chainId` (Ethereum when

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeEventLog, parseAbi } from "viem";
 import { chainClient } from "@/lib/sources/chain/rpc";
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { COMPOUND_DEPLOYMENT_CHAIN, compoundDeploymentParam } from "@/lib/compound/deployments";
 
 // Who sent a Comet row's transaction, for the rows where the owner neither
 // signed it nor funded it. A smart-account wallet (ERC-4337) never signs a
@@ -10,7 +10,7 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 // emits UserOperationEvent with the account as `sender`, which is what this
 // reads from the receipt.
 //
-// `?deployment=ethereum|base&tx=<hash>&account=<address>` answers
+// `?deployment=ethereum|base|arbitrum&tx=<hash>&account=<address>` answers
 // `{ from, to, userOpSender }`: `userOpSender` is the account when one of the
 // transaction's user operations was the account's own, else null.
 
@@ -25,7 +25,7 @@ const USER_OP_EVENT = parseAbi([
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const chainId = q.get("deployment") === "base" ? BASE_CHAIN_ID : MAINNET_CHAIN_ID;
+  const chainId = COMPOUND_DEPLOYMENT_CHAIN[compoundDeploymentParam(q.get("deployment"))];
   const tx = (q.get("tx") ?? "").toLowerCase();
   const account = (q.get("account") ?? "").toLowerCase();
   if (!HASH.test(tx) || !ADDRESS.test(account)) {

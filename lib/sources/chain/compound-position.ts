@@ -105,6 +105,7 @@ async function loadCompoundPositions(
   wallet: `0x${string}`,
   markets: CometMarket[],
   deployment: CometDeployment,
+  pinnedBlock?: number,
 ): Promise<{ blockNumber: number; positions: CompoundMarketChainResponse[] }> {
   const client = chainClient(deployment.chainId);
   // Heterogeneous multicalls: type the entries as the generic viem contract
@@ -118,7 +119,7 @@ async function loadCompoundPositions(
   // response names, and then the receipt's "re-run this call at block N" does
   // not reproduce the figure it is a receipt for. One extra round trip buys a
   // block that is a fact about the answer rather than a label on it.
-  const blockNumber = Number(await client.getBlockNumber());
+  const blockNumber = pinnedBlock ?? Number(await client.getBlockNumber());
   const atBlock = { blockNumber: BigInt(blockNumber) };
 
   // Phase 1 — every market's account slots, verdicts, asset count, base feed
@@ -254,6 +255,182 @@ async function loadCompoundPositions(
   return { blockNumber, positions };
 }
 
+// ── A roster the deployment states (Arbitrum) ───────────────────────────────
+// Where every market carries its base feed and collateral roster
+// (CometMarket.collateral), each Comet is read in ONE multicall at the pinned
+// block: the account's base and verdicts, the market's base feed, minimum and
+// utilization, and per stated asset its `getAssetInfo`, the account's balance
+// and the price on the stated feed. `getAssetInfo` and `baseTokenPriceFeed`
+// in the same call check the statement; a Comet whose roster or feeds have
+// moved since it was written is read the generic way instead, at the same
+// block. The two rates, which take the utilization as an argument, follow in
+// one multicall across the Comets. The deployment's first dollar-quoted
+// Comet's price for the ETH-quoted Comet's base token is WETH in dollars, the
+// leg the ETH-quoted Comet's dollar figures convert at (`ethUsd`).
+
+/** Slots before the per-asset triples in a stated-roster multicall. */
+const STATED_HEAD = 9;
+
+const statedRoster = (deployment: CometDeployment): boolean =>
+  deployment.markets.every((m) => m.collateral != null && m.baseFeed != null);
+
+/** A Comet's multicall, asked once more when the gateway refuses it. */
+async function retryOnce<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch {
+    return read();
+  }
+}
+
+async function loadStatedRosterPositions(
+  wallet: `0x${string}`,
+  deployment: CometDeployment,
+  pinnedBlock?: number,
+): Promise<{ blockNumber: number; positions: CompoundMarketChainResponse[]; ethUsd: number | null }> {
+  const client = chainClient(deployment.chainId);
+  const at = (comet: string, functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
+    ({ address: comet as `0x${string}`, abi: COMET_ABI, functionName, args }) as ContractFunctionParameters;
+  const blockNumber = pinnedBlock ?? Number(await client.getBlockNumber());
+  const atBlock = { blockNumber: BigInt(blockNumber) };
+
+  const reads = await Promise.all(
+    deployment.markets.map((m) =>
+      retryOnce(
+        async () =>
+          (await client.multicall({
+            allowFailure: false,
+            ...atBlock,
+            contracts: [
+              at(m.comet, "balanceOf", [wallet]),
+              at(m.comet, "borrowBalanceOf", [wallet]),
+              at(m.comet, "isBorrowCollateralized", [wallet]),
+              at(m.comet, "isLiquidatable", [wallet]),
+              at(m.comet, "numAssets"),
+              at(m.comet, "baseTokenPriceFeed"),
+              at(m.comet, "baseBorrowMin"),
+              at(m.comet, "getUtilization"),
+              at(m.comet, "getPrice", [m.baseFeed]),
+              ...(m.collateral ?? []).flatMap((a, i) => [
+                at(m.comet, "getAssetInfo", [i]),
+                at(m.comet, "collateralBalanceOf", [wallet, a.asset]),
+                at(m.comet, "getPrice", [a.priceFeed]),
+              ]),
+            ],
+          })) as unknown[],
+      ),
+    ),
+  );
+
+  // The statement checked against the contract's answers in the same call.
+  const drifted = deployment.markets.filter((m, i) => {
+    const r = reads[i];
+    const roster = m.collateral ?? [];
+    if (Number(r[4] as number) !== roster.length) return true;
+    if ((r[5] as string).toLowerCase() !== m.baseFeed?.toLowerCase()) return true;
+    return roster.some((a, k) => {
+      const info = r[STATED_HEAD + k * 3] as AssetInfo;
+      return info.asset.toLowerCase() !== a.asset || info.priceFeed.toLowerCase() !== a.priceFeed;
+    });
+  });
+  if (drifted.length > 0) {
+    console.warn(
+      `Compound V3 stated roster differs from the contract on ${drifted.map((m) => m.key).join(", ")}: reading those Comets' rosters from the chain`,
+    );
+  }
+  const generic =
+    drifted.length > 0 ? await loadCompoundPositions(wallet, drifted, deployment, blockNumber) : { positions: [] };
+
+  const utilization = reads.map((r) => r[7] as bigint);
+  const rates = (await retryOnce(() =>
+    client.multicall({
+      allowFailure: false,
+      ...atBlock,
+      contracts: deployment.markets.flatMap((m, i) => [
+        at(m.comet, "getSupplyRate", [utilization[i]]),
+        at(m.comet, "getBorrowRate", [utilization[i]]),
+      ]),
+    }),
+  )) as unknown[];
+
+  const positions = deployment.markets.map((m, i): CompoundMarketChainResponse => {
+    const fallback = generic.positions.find((p) => p.market === m.key);
+    if (fallback) return fallback;
+    const r = reads[i];
+    const supply = r[0] as bigint;
+    const borrow = r[1] as bigint;
+    const basePrice = Number(r[8] as bigint) / PRICE;
+    let borrowCapacity = 0;
+    let liquidationCapacity = 0;
+    const collateral: CompoundChainCollateral[] = [];
+    (m.collateral ?? []).forEach((a, k) => {
+      const info = r[STATED_HEAD + k * 3] as AssetInfo;
+      const balance = r[STATED_HEAD + k * 3 + 1] as bigint;
+      if (balance <= ZERO) return;
+      const price = Number(r[STATED_HEAD + k * 3 + 2] as bigint) / PRICE;
+      const units = Number(balance) / Number(info.scale);
+      const bcf = Number(info.borrowCollateralFactor) / FACTOR;
+      const lcf = Number(info.liquidateCollateralFactor) / FACTOR;
+      borrowCapacity += units * price * bcf;
+      liquidationCapacity += units * price * lcf;
+      collateral.push({
+        address: a.asset,
+        symbol: a.symbol,
+        decimals: a.decimals,
+        balanceRaw: balance.toString(),
+        price,
+        borrowCollateralFactor: bcf,
+        liquidateCollateralFactor: lcf,
+        liquidationFactor: Number(info.liquidationFactor) / FACTOR,
+      });
+    });
+    collateral.sort((x, y) => {
+      const xv = (Number(x.balanceRaw) / 10 ** x.decimals) * x.price;
+      const yv = (Number(y.balanceRaw) / 10 ** y.decimals) * y.price;
+      return yv - xv;
+    });
+    const debtValue = (Number(borrow) / 10 ** m.baseDecimals) * basePrice;
+    return {
+      wallet: wallet.toLowerCase(),
+      market: m.key,
+      comet: m.comet,
+      blockNumber,
+      baseSymbol: m.baseSymbol,
+      baseDecimals: m.baseDecimals,
+      quoteUnit: m.quoteUnit,
+      supplyBalanceRaw: supply.toString(),
+      borrowBalanceRaw: borrow.toString(),
+      basePrice,
+      collateral,
+      borrowCapacity,
+      liquidationCapacity,
+      debtValue,
+      healthFactor: borrow > ZERO && debtValue > 0 ? liquidationCapacity / debtValue : null,
+      isBorrowCollateralized: r[2] as boolean,
+      isLiquidatable: r[3] as boolean,
+      utilization: Number(utilization[i]) / FACTOR,
+      supplyApr: (Number(rates[i * 2] as bigint) * SECONDS_PER_YEAR) / FACTOR,
+      borrowApr: (Number(rates[i * 2 + 1] as bigint) * SECONDS_PER_YEAR) / FACTOR,
+      baseBorrowMin: Number(r[6] as bigint) / 10 ** m.baseDecimals,
+      chainStale: false,
+    };
+  });
+
+  // WETH in dollars: the first dollar-quoted Comet's price on its stated feed
+  // for the ETH-quoted Comet's base token, read in that Comet's multicall.
+  let ethUsd: number | null = null;
+  const eth = deployment.markets.find((m) => m.quoteUnit === "ETH");
+  const usdIdx = deployment.markets.findIndex((m) => m.quoteUnit === "USD");
+  if (eth && usdIdx >= 0 && !drifted.includes(deployment.markets[usdIdx])) {
+    const k = (deployment.markets[usdIdx].collateral ?? []).findIndex((a) => a.asset === eth.baseToken.toLowerCase());
+    if (k >= 0) {
+      const p = Number(reads[usdIdx][STATED_HEAD + k * 3 + 2] as bigint) / PRICE;
+      ethUsd = p > 0 ? p : null;
+    }
+  }
+  return { blockNumber, positions, ethUsd };
+}
+
 /**
  * One account's live position in ONE market.
  *
@@ -291,11 +468,19 @@ export async function loadCompoundPositionFromChain(
 export async function loadCompoundWalletFromChain(
   walletRaw: string,
   deployment: CometDeployment,
+  opts: {
+    /** Read at this block instead of the head (taken first, as always). */
+    blockNumber?: number;
+  } = {},
 ): Promise<CompoundWalletChainResponse> {
   const wallet = getAddress(walletRaw);
   const marketsScanned = deployment.markets.length;
   try {
-    const { blockNumber, positions } = await loadCompoundPositions(wallet, deployment.markets, deployment);
+    const stated = statedRoster(deployment)
+      ? await loadStatedRosterPositions(wallet, deployment, opts.blockNumber)
+      : null;
+    const { blockNumber, positions } =
+      stated ?? (await loadCompoundPositions(wallet, deployment.markets, deployment, opts.blockNumber));
     // "Holds something" is any of the three ways a Comet account can be
     // non-empty: lent base, borrowed base, or collateral parked against it.
     // The third stands alone — collateral with no debt is a real position, and
@@ -310,6 +495,7 @@ export async function loadCompoundWalletFromChain(
       positionsFound: held.length,
       positions: held,
       chainStale: false,
+      ...(stated?.ethUsd != null ? { ethUsd: stated.ethUsd } : {}),
     };
   } catch (error) {
     console.error("Compound V3 wallet sweep failed:", error);

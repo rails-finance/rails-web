@@ -66,79 +66,99 @@ const FLOW_STORY: Record<CompoundLifetimeFlow, string> = {
 /** The swept-lane receipts. One constant rather than a factory: the market's
  *  identity already rides on every call's coords (`comet`, `marketLabel`), so
  *  nothing about a Comet deployment is left for a factory to bind. */
-export const COMPOUND_SWEPT_VOCABULARY: CompoundTowerVocabulary = {
-  positionBase: (sym, side, coords): Provenance => ({
-    kind: "chain-derived",
-    pclass: "emitted",
-    summary: `Base ${side === "lend" ? "lent" : "borrowed"} (${sym}) — the account's net base PRINCIPAL, replayed from every Supply, Withdraw, AbsorbDebt and account-to-account Transfer the Comet has emitted for it since the market's first block, in log order. ${side === "lend" ? "Positive base: it earns the supply rate." : "Negative base: it pays the borrow rate."} Principal only — interest accrues with no log to replay, so the live balance above sits apart from this by exactly the interest.`,
-    contract: cometContract(coords),
-    via: `${SWEEP_VIA} · Σ ±amount across Supply/Withdraw/AbsorbDebt/Transfer logs`,
-  }),
+/** The receipts over a history replayed from the Comets' logs. `via` names
+ *  where the logs came from; `whole` and `wholeAnd` the condition the
+ *  lifetime figures wait for. */
+function cometLogVocabulary(lane: { via: string; whole: string; wholeAnd: string }): CompoundTowerVocabulary {
+  const SWEEP_VIA = lane.via;
+  return {
+    positionBase: (sym, side, coords): Provenance => ({
+      kind: "chain-derived",
+      pclass: "emitted",
+      summary: `Base ${side === "lend" ? "lent" : "borrowed"} (${sym}) — the account's net base PRINCIPAL, replayed from every Supply, Withdraw, AbsorbDebt and account-to-account Transfer the Comet has emitted for it since the market's first block, in log order. ${side === "lend" ? "Positive base: it earns the supply rate." : "Negative base: it pays the borrow rate."} Principal only — interest accrues with no log to replay, so the live balance above sits apart from this by exactly the interest.`,
+      contract: cometContract(coords),
+      via: `${SWEEP_VIA} · Σ ±amount across Supply/Withdraw/AbsorbDebt/Transfer logs`,
+    }),
 
-  currentBase: (sym, side, coords, block): Provenance => ({
-    kind: "chain",
-    pclass: "state",
-    verify: stateVerify(side === "lend" ? "balanceOf" : "borrowBalanceOf", block),
-    summary: `Current ${sym} base with accrued interest — the ${side === "lend" ? "lent balance the account has earned to (supply rate applied)" : "debt the account owes (borrow rate applied)"}, read straight from the Comet with \`${side === "lend" ? "balanceOf" : "borrowBalanceOf"}\`${block != null ? ` pinned to block ${block.toLocaleString("en-US")}` : ""}. The Comet applies its own index in the call, so this is the true current amount; the principal replayed from the events sits apart from it by exactly the interest.`,
-    contract: cometContract(coords),
-    via: `Comet · ${side === "lend" ? "balanceOf" : "borrowBalanceOf"} at the pinned block`,
-    inputs:
-      block != null
-        ? [{ label: "block", value: String(block), kind: "chain", pclass: "state", note: "chain read block" }]
-        : [],
-  }),
+    currentBase: (sym, side, coords, block): Provenance => ({
+      kind: "chain",
+      pclass: "state",
+      verify: stateVerify(side === "lend" ? "balanceOf" : "borrowBalanceOf", block),
+      summary: `Current ${sym} base with accrued interest — the ${side === "lend" ? "lent balance the account has earned to (supply rate applied)" : "debt the account owes (borrow rate applied)"}, read straight from the Comet with \`${side === "lend" ? "balanceOf" : "borrowBalanceOf"}\`${block != null ? ` pinned to block ${block.toLocaleString("en-US")}` : ""}. The Comet applies its own index in the call, so this is the true current amount; the principal replayed from the events sits apart from it by exactly the interest.`,
+      contract: cometContract(coords),
+      via: `Comet · ${side === "lend" ? "balanceOf" : "borrowBalanceOf"} at the pinned block`,
+      inputs:
+        block != null
+          ? [{ label: "block", value: String(block), kind: "chain", pclass: "state", note: "chain read block" }]
+          : [],
+    }),
 
-  positionCollateral: (sym, coords): Provenance => ({
-    kind: "chain",
-    pclass: "state",
-    verify: stateVerify("collateralBalanceOf", coords.blockNumber),
-    summary: `The ${sym} collateral the account holds — read straight from the Comet with \`collateralBalanceOf\`${coords.blockNumber != null ? ` pinned to block ${coords.blockNumber.toLocaleString("en-US")}` : ""}. Collateral does not accrue in Comet, so this is also exactly what a replay of the account's own collateral supplies, withdrawals, transfers and absorptions arrives at — the timeline's running balance is checked against it.`,
-    contract: cometContract(coords),
-    via: "Comet · collateralBalanceOf at the pinned block",
-  }),
+    positionCollateral: (sym, coords): Provenance => ({
+      kind: "chain",
+      pclass: "state",
+      verify: stateVerify("collateralBalanceOf", coords.blockNumber),
+      summary: `The ${sym} collateral the account holds — read straight from the Comet with \`collateralBalanceOf\`${coords.blockNumber != null ? ` pinned to block ${coords.blockNumber.toLocaleString("en-US")}` : ""}. Collateral does not accrue in Comet, so this is also exactly what a replay of the account's own collateral supplies, withdrawals, transfers and absorptions arrives at — the timeline's running balance is checked against it.`,
+      contract: cometContract(coords),
+      via: "Comet · collateralBalanceOf at the pinned block",
+    }),
 
-  lifetimeFlow: (flow, sym, coords): Provenance => ({
-    kind: "chain-derived",
-    pclass: "emitted",
-    summary: `Lifetime ${flow} (${sym}) — ${FLOW_STORY[flow]}, summed over every event the Comet has emitted for this account since the market's first block. Base flows split at the running balance's zero crossings — Comet's own semantics (a supply repays debt first; a withdraw past the balance is a borrow). Shown only when the sweep read every block of the market's life, and when the replayed collateral matches the Comet's own \`collateralBalanceOf\`.`,
-    contract: cometContract(coords),
-    via: `${SWEEP_VIA} · Σ amount across the account's own logs · split at zero crossings`,
-  }),
+    lifetimeFlow: (flow, sym, coords): Provenance => ({
+      kind: "chain-derived",
+      pclass: "emitted",
+      summary: `Lifetime ${flow} (${sym}) — ${FLOW_STORY[flow]}, summed over every event the Comet has emitted for this account since the market's first block. Base flows split at the running balance's zero crossings — Comet's own semantics (a supply repays debt first; a withdraw past the balance is a borrow). Shown only when ${lane.whole}, and when the replayed collateral matches the Comet's own \`collateralBalanceOf\`.`,
+      contract: cometContract(coords),
+      via: `${SWEEP_VIA} · Σ amount across the account's own logs · split at zero crossings`,
+    }),
 
-  accruedBase: (sym, side, coords): Provenance => ({
-    kind: "chain-derived",
-    pclass: "state",
-    summary: `Interest ${side === "borrow" ? "accrued on the borrow" : "earned on the supply"} (${sym}) — the Comet's own \`${side === "borrow" ? "borrowBalanceOf" : "balanceOf"}\` (which already includes interest) minus the principal replayed from every base move the Comet has emitted for this account since the market's first block. Comet accrues by index with no log of its own, so the difference between what the contract says and what the events moved IS the interest. Shown only when the sweep read every block and the subtraction lands inside its own plausibility bounds.`,
-    contract: cometContract(coords),
-    via: `Comet ${side === "borrow" ? "borrowBalanceOf" : "balanceOf"} − (${SWEEP_VIA} · Σ replayed base amounts)`,
-    formula: "current − net principal",
-    inputs: [
-      {
-        label: "current",
-        kind: "chain",
-        pclass: "state",
-        note: "Comet balanceOf / borrowBalanceOf at the pinned block",
-      },
-      { label: "net principal", kind: "chain-derived", pclass: "emitted", note: "Σ over the swept logs" },
-    ],
-  }),
+    accruedBase: (sym, side, coords): Provenance => ({
+      kind: "chain-derived",
+      pclass: "state",
+      summary: `Interest ${side === "borrow" ? "accrued on the borrow" : "earned on the supply"} (${sym}) — the Comet's own \`${side === "borrow" ? "borrowBalanceOf" : "balanceOf"}\` (which already includes interest) minus the principal replayed from every base move the Comet has emitted for this account since the market's first block. Comet accrues by index with no log of its own, so the difference between what the contract says and what the events moved IS the interest. Shown only when ${lane.wholeAnd} and the subtraction lands inside its own plausibility bounds.`,
+      contract: cometContract(coords),
+      via: `Comet ${side === "borrow" ? "borrowBalanceOf" : "balanceOf"} − (${SWEEP_VIA} · Σ replayed base amounts)`,
+      formula: "current − net principal",
+      inputs: [
+        {
+          label: "current",
+          kind: "chain",
+          pclass: "state",
+          note: "Comet balanceOf / borrowBalanceOf at the pinned block",
+        },
+        { label: "net principal", kind: "chain-derived", pclass: "emitted", note: "Σ over the swept logs" },
+      ],
+    }),
 
-  debtPrincipal: (sym, coords): Provenance => ({
-    kind: "chain-derived",
-    pclass: "emitted",
-    summary: `Borrowed ${sym} PRINCIPAL — the net of every draw, repayment and liquidation absorption the account's own Comet events moved, over every event the Comet has emitted for it since the market's first block. Principal only — the interest accrued since each draw is the separate accrued segment above it (principal + interest = the Comet's own borrowBalanceOf).`,
-    contract: cometContract(coords),
-    via: `${SWEEP_VIA} · Σ (borrowed − repaid − absorbed) · first block → head`,
-  }),
-  lendPrincipal: (sym, coords): Provenance => ({
-    kind: "chain-derived",
-    pclass: "emitted",
-    summary: `Lent ${sym} PRINCIPAL — the net of every supply and withdrawal the account's own Comet events moved, over every event the Comet has emitted for it since the market's first block. The interest earned on it is the separate segment above it (principal + interest = the Comet's own balanceOf).`,
-    contract: cometContract(coords),
-    via: `${SWEEP_VIA} · Σ (deposited − withdrawn) · first block → head`,
-  }),
-  baseAtLastEvent: false,
-};
+    debtPrincipal: (sym, coords): Provenance => ({
+      kind: "chain-derived",
+      pclass: "emitted",
+      summary: `Borrowed ${sym} PRINCIPAL — the net of every draw, repayment and liquidation absorption the account's own Comet events moved, over every event the Comet has emitted for it since the market's first block. Principal only — the interest accrued since each draw is the separate accrued segment above it (principal + interest = the Comet's own borrowBalanceOf).`,
+      contract: cometContract(coords),
+      via: `${SWEEP_VIA} · Σ (borrowed − repaid − absorbed) · first block → head`,
+    }),
+    lendPrincipal: (sym, coords): Provenance => ({
+      kind: "chain-derived",
+      pclass: "emitted",
+      summary: `Lent ${sym} PRINCIPAL — the net of every supply and withdrawal the account's own Comet events moved, over every event the Comet has emitted for it since the market's first block. The interest earned on it is the separate segment above it (principal + interest = the Comet's own balanceOf).`,
+      contract: cometContract(coords),
+      via: `${SWEEP_VIA} · Σ (deposited − withdrawn) · first block → head`,
+    }),
+    baseAtLastEvent: false,
+  };
+}
+
+export const COMPOUND_SWEPT_VOCABULARY: CompoundTowerVocabulary = cometLogVocabulary({
+  via: SWEEP_VIA,
+  whole: "the sweep read every block of the market's life",
+  wholeAnd: "the sweep read every block",
+});
+
+/** The Arbitrum lane: the logs from rails-server's per-wallet store, the
+ *  lifetime figures waiting for its confirmation against the chain. */
+export const COMPOUND_ARBITRUM_VOCABULARY: CompoundTowerVocabulary = cometLogVocabulary({
+  via: "rails-server store of the Comets' logs (Etherscan's log index, checked against the chain)",
+  whole: "the store's history is confirmed against the chain from the first Comet's creation block",
+  wholeAnd: "the store's history is confirmed against the chain",
+});
 
 /** The Base index lane once its rows carry the chain's state (rails-server
  *  /api/compound-base/timeline `blockState`; rails-ops decision 0033): the

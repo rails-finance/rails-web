@@ -56,6 +56,9 @@ export type SessionProtocol =
   | "spark"
   | "compound"
   | "compound-base"
+  // Compound V3 on Arbitrum, at `/arbitrum/compound-v3`: its own four Comets,
+  // so its own scope.
+  | "compound-v3-arbitrum"
   | "compound-v2"
   | "dolomite"
   | "pwn"

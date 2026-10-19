@@ -1,5 +1,5 @@
 // Compound V3's explorer adapter (rails-ops TO-DO-ui-jobs 307): the contracts
-// the shared units read, for the Ethereum and Base deployments. For now the
+// the shared units read, for the Ethereum, Base and Arbitrum deployments. For now the
 // event page's (ui-jobs 236): the market's base asset and the account, then
 // the shared rows.
 
@@ -8,19 +8,23 @@ import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isCompoundEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { COMPOUND_DEPLOYMENT, marketOf, type CometMarket } from "@/lib/compound/asset-catalog";
-import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
+import { COMPOUND_DEPLOYMENT_CHAIN, cometDeploymentOf, type CompoundDeploymentKey } from "@/lib/compound/deployments";
 import { compoundAbsorbSplit, compoundRowLabel } from "@/lib/compound/row-facts";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { externalActor } from "@/lib/shared/external-actor";
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { isCompoundBulker } from "@/lib/compound/bulkers";
 import { compoundEventProse, type CompoundEvent } from "@/lib/compound/event-prose";
 
-export type CompoundDeployment = "ethereum" | "base";
+export type CompoundDeployment = CompoundDeploymentKey;
+
+const CHAIN_WORDS: Record<CompoundDeployment, string> = { ethereum: "", base: " on Base", arbitrum: " on Arbitrum" };
+
+/** The session whose listing an event page's account links to. */
+const SESSION = { ethereum: "compound", base: "compound-base", arbitrum: "compound-v3-arbitrum" } as const;
 
 const WORDS = {
   paragraph: (base: string, deployment: CompoundDeployment) =>
-    `This page is one transaction from this account's history in the Compound V3 ${base} market${deployment === "base" ? " on Base" : ""}.`,
+    `This page is one transaction from this account's history in the Compound V3 ${base} market${CHAIN_WORDS[deployment]}.`,
   timeline_link: "See the whole history in the timeline.",
   timeline_hint: "Open this event in the account's timeline",
   market: "Market",
@@ -39,8 +43,8 @@ export interface CompoundEventPageInput extends EventPageSlot {
 
 /** The Comet an event belongs to, in the deployment's roster. */
 function cometOf(key: string, deployment: CompoundDeployment): CometMarket {
-  if (deployment === "base") {
-    const m = COMPOUND_BASE_DEPLOYMENT.markets.find((c) => c.key === key);
+  if (deployment !== "ethereum") {
+    const m = cometDeploymentOf(deployment).markets.find((c) => c.key === key);
     if (m) return m;
   }
   return COMPOUND_DEPLOYMENT.markets.find((c) => c.key === key) ?? marketOf(key);
@@ -81,7 +85,7 @@ export function compoundEventTabWords(
   const self = event as CompoundEvent;
   const siblings = events.filter((e): e is CompoundEvent => e.txHash === event.txHash && isCompoundEvent(e));
   // The card's external test (compoundExternal), with no smart-account read.
-  const chainId = deployment === "base" ? BASE_CHAIN_ID : MAINNET_CHAIN_ID;
+  const chainId = COMPOUND_DEPLOYMENT_CHAIN[deployment];
   const actor =
     ctx.eventType === "supply" || ctx.eventType === "supply_collateral"
       ? externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.funder }, event.wallet)
@@ -126,7 +130,7 @@ export const compoundExplorer: ExplorerAdapter<CompoundEventPageInput> = {
           value: wallet,
           mono: true,
           copy: WORDS.copy_account,
-          href: listingHrefForWallet(deployment === "base" ? "compound-base" : "compound", wallet) ?? undefined,
+          href: listingHrefForWallet(SESSION[deployment], wallet) ?? undefined,
         },
       ],
       ...slot,

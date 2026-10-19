@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cometPricesAtBlock } from "@/lib/sources/chain/compound-prices";
-import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
-import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
+import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deployments";
 
 // A Comet's oracle prices at one block, in dollars: the base's and each listed
 // asset's `getPrice` on the feed the Comet named at that block (an archive
@@ -10,7 +9,7 @@ import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 // (lib/compound/flows.ts). A past block's answer never changes, so it is
 // cached hard.
 //
-// `?deployment=ethereum|base&market=<key>&block=<n>&assets=a,b,…`
+// `?deployment=ethereum|base|arbitrum&market=<key>&block=<n>&assets=a,b,…`
 // Answers `{ block, prices: { [token]: usd } }`, the base under its token
 // address; an asset the Comet did not list at that block is absent.
 
@@ -21,7 +20,7 @@ const MAX_ASSETS = 24;
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const deployment = q.get("deployment") === "base" ? COMPOUND_BASE_DEPLOYMENT : COMPOUND_DEPLOYMENT;
+  const deployment = cometDeploymentOf(compoundDeploymentParam(q.get("deployment")));
   const market = deployment.markets.find((m) => m.key === (q.get("market") ?? "").toLowerCase());
   const block = Number(q.get("block"));
   const assets = [

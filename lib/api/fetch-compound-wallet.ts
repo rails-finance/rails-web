@@ -1,5 +1,5 @@
 // ============================================================================
-// FETCH COMPOUND V3 WALLET (chain sweep, Base)
+// FETCH COMPOUND V3 WALLET (chain read, Base and Arbitrum)
 // ============================================================================
 //
 // Every Compound V3 position one wallet holds across a deployment, found by
@@ -34,14 +34,21 @@ export interface CompoundWalletChainResponse {
    *  an empty wallet look identical on the page, so a failed read empties the
    *  whole answer rather than quietly dropping a market. */
   chainStale: boolean;
+  /** WETH in dollars at `blockNumber`, where the deployment states its
+   *  rosters (Arbitrum): the first dollar-quoted Comet's `getPrice` on its
+   *  WETH collateral feed, which converts the ETH-quoted Comet's figures. */
+  ethUsd?: number;
 }
 
-export async function fetchCompoundBaseWallet(p: {
+/** The wallet read from a deployment's own route (`route`, e.g.
+ *  /api/chain/compound-arbitrum/wallet). */
+export async function fetchCompoundWallet(p: {
   wallet: string;
+  route: string;
   baseUrl?: string;
 }): Promise<CompoundWalletChainResponse> {
   const qs = new URLSearchParams({ wallet: p.wallet });
-  const res = await fetch(`${p.baseUrl ?? ""}/api/chain/compound-base/wallet?${qs.toString()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`fetchCompoundBaseWallet failed: ${res.status} ${res.statusText}`);
+  const res = await fetch(`${p.baseUrl ?? ""}${p.route}?${qs.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`fetchCompoundWallet failed: ${res.status} ${res.statusText}`);
   return (await res.json()) as CompoundWalletChainResponse;
 }

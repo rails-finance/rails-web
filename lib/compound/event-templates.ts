@@ -80,7 +80,7 @@ export function compoundModal(key: CompoundL5Key, form: string[] = []): LearnMor
 }
 
 /** Which Comet deployment the card belongs to. */
-export type CompoundPositionDeployment = "compound" | "compound-base";
+export type CompoundPositionDeployment = "compound" | "compound-base" | "compound-v3-arbitrum";
 
 /** The position card's "?": by how the position stands, in the deployment's words. */
 export function compoundPositionModal(opts: {
@@ -90,7 +90,14 @@ export function compoundPositionModal(opts: {
   deployment?: CompoundPositionDeployment;
   side?: "lend" | "borrow" | "flat";
 }): LearnMoreContent {
-  const form = opts.deployment === "compound-base" ? ["base"] : [];
+  // Arbitrum's history, like Base's swept one, carries no block state, so its
+  // peaks take the Base words where the file has no Arbitrum form.
+  const form =
+    opts.deployment === "compound-base"
+      ? ["base"]
+      : opts.deployment === "compound-v3-arbitrum"
+        ? ["arbitrum", "base"]
+        : [];
   if (opts.status === "liquidated") return compoundModal("position_liquidated", form);
   if (opts.status === "closed") return compoundModal("position_closed", form);
   return compoundModal(opts.side === "borrow" ? "position_borrowing" : "position_lending", form);

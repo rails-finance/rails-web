@@ -36,9 +36,18 @@ import {
 import { storedCometPrices } from "@/lib/compound/at-block-prices";
 import { fetchStoredCometPrices } from "@/lib/api/fetch-compound-stored-prices";
 import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
+import type { CompoundDeploymentKey } from "@/lib/compound/deployments";
 
 const DAY_S = 86_400;
-const CHAIN_ID = { ethereum: 1, base: 8453 } as const;
+const CHAIN_ID = { ethereum: 1, base: 8453, arbitrum: 42161 } as const;
+
+/** The deployments whose event-block prices and daily prices rails-server
+ *  stores; elsewhere (Arbitrum) every price is an archive read and assets are
+ *  carried between events at their latest priced row. */
+const STORED: Record<CompoundDeploymentKey, boolean> = { ethereum: true, base: true, arbitrum: false };
+/** Archive price reads in flight at once; the keyless Arbitrum gateway
+ *  refuses a wide burst. */
+const READS_AT_ONCE: Record<CompoundDeploymentKey, number> = { ethereum: 6, base: 6, arbitrum: 2 };
 
 /** At most this many blocks' price reads per position; the rest take the
  *  nearest priced row's prices, and the Explanation counts them. */
@@ -49,7 +58,7 @@ const cache = new Map<string, Promise<Record<string, number> | null>>();
 /** Comet's oracle prices at one block, cached for the page's life (a past
  *  block's answer never changes); null where the read failed. */
 function loadPricesAt(
-  deployment: "ethereum" | "base",
+  deployment: CompoundDeploymentKey,
   market: string,
   block: number,
   assets: string[],
@@ -76,7 +85,7 @@ export interface CompoundFlowsInput {
   /** Reads the whole flat history; null where the page has no such read
    *  (the panel then states the history was not read). */
   fetchAll: (() => Promise<{ events: BaseActivityEvent[]; missing: number }>) | null;
-  deployment: "ethereum" | "base";
+  deployment: CompoundDeploymentKey;
   market: CometMarket;
   open: boolean;
   /** The page's live read of the position, where it has one. */
@@ -139,7 +148,7 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
       // The stored prices first; the archive for the blocks the server has not
       // stored (or every block, where the stored read failed).
       const stored =
-        blocks.length > 0
+        blocks.length > 0 && STORED[p.deployment]
           ? await fetchStoredCometPrices(CHAIN_ID[p.deployment], market.comet, blocks).catch(() => null)
           : null;
       let list = blocks.slice();
@@ -160,7 +169,7 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
           if (r) map.set(b, r);
         }
       };
-      await Promise.all(Array.from({ length: Math.min(6, list.length) }, worker));
+      await Promise.all(Array.from({ length: Math.min(READS_AT_ONCE[p.deployment], list.length) }, worker));
     };
     run().then(() => {
       if (live) setPrices({ key: blocksKey, map });
@@ -187,6 +196,10 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
   const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
   useEffect(() => {
     if (!want) return;
+    if (!STORED[p.deployment]) {
+      setDaily({ key: want.key, prices: null });
+      return;
+    }
     const ac = new AbortController();
     const comet = market.comet.toLowerCase();
     fetchDailyPrices(

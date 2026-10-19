@@ -383,7 +383,8 @@ export function useCompoundCardSlots({
   const ended = v.status === "closed" || v.status === "liquidated";
   // The "?" every state panel owns — one content function for Ethereum and
   // Base; the deployment named by the card's session changes the prose.
-  const deployment: CompoundPositionDeployment = session === "compound-base" ? "compound-base" : "compound";
+  const deployment: CompoundPositionDeployment =
+    session === "compound-base" || session === "compound-v3-arbitrum" ? session : "compound";
 
   const status: PositionCardStatus | null =
     v.status === "liquidated"

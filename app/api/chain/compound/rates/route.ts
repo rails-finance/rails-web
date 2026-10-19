@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseAbi } from "viem";
 import { chainClient } from "@/lib/sources/chain/rpc";
-import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
-import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
+import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deployments";
 
 // A Comet market's interest rates at past blocks — what a row's interest line
 // sets its average against. Comet charges and pays at the rate its
 // utilisation gives at each moment, so the rate at the previous event and the
 // rate just before this one bracket what a balance earned or paid between them.
 //
-// `?deployment=ethereum|base&market=<key>&blocks=a,b,…` (at most four)
+// `?deployment=ethereum|base|arbitrum&market=<key>&blocks=a,b,…` (at most four)
 // answers `{ rates: { [block]: { utilization, supply, borrow } } }`, yearly
 // fractions: getUtilization, then getSupplyRate and getBorrowRate at it, each
 // per second × 31,536,000 (Comet's SECONDS_PER_YEAR). A block whose read
@@ -29,7 +28,7 @@ const SECONDS_PER_YEAR = 31_536_000;
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const deployment = q.get("deployment") === "base" ? COMPOUND_BASE_DEPLOYMENT : COMPOUND_DEPLOYMENT;
+  const deployment = cometDeploymentOf(compoundDeploymentParam(q.get("deployment")));
   const market = deployment.markets.find((m) => m.key === (q.get("market") ?? "").toLowerCase());
   const blocks = [
     ...new Set(

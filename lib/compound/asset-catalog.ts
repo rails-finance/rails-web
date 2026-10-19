@@ -45,6 +45,36 @@ export interface CometMarket {
    *  only where a sweep reads it (the Base roster); the Ethereum markets are
    *  served from an index whose own floor is the backfill's. */
   deployBlock?: number;
+  /** The Comet's base feed (`baseTokenPriceFeed()`), where the roster states
+   *  it (Arbitrum). */
+  baseFeed?: string;
+  /** `baseScale()`, `baseBorrowMin()` and `trackingIndexScale()` as raw
+   *  integer strings, where the roster states them (Arbitrum). */
+  baseScale?: string;
+  baseBorrowMin?: string;
+  trackingIndexScale?: string;
+  /** The collateral roster as `getAssetInfo` answered it when the roster was
+   *  written (Arbitrum). With it the wallet read asks every asset in one
+   *  multicall per Comet and checks each asset and feed against the
+   *  contract's `getAssetInfo` in the same call; a mismatch falls back to
+   *  reading the roster from the contract. */
+  collateral?: CometCollateralAsset[];
+}
+
+/** One collateral asset of a stated roster. Factors are fractions of 1e18;
+ *  `scale` and `supplyCap` are raw integer strings. A `supplyCap` of "0" turns
+ *  new supply off and a `borrowCollateralFactor` of 0 turns new borrowing
+ *  against the asset off; both appear on Arbitrum. */
+export interface CometCollateralAsset {
+  asset: string;
+  symbol: string;
+  decimals: number;
+  priceFeed: string;
+  scale: string;
+  borrowCollateralFactor: number;
+  liquidateCollateralFactor: number;
+  liquidationFactor: number;
+  supplyCap: string;
 }
 
 export const COMPOUND_MARKETS: Record<string, CometMarket> = {

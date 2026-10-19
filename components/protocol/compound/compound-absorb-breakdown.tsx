@@ -38,7 +38,7 @@ import {
 } from "@/lib/compound/event-provenance";
 import { compoundAbsorbSplit, compoundAmount, impliedYearlyRate } from "@/lib/compound/row-facts";
 import { formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
-import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { compoundDeploymentOfChain } from "@/lib/compound/deployments";
 import { formatDate } from "@/lib/date";
 import { createReadStore } from "./read-store";
 
@@ -108,7 +108,7 @@ export function CompoundAbsorbBreakdown({
   useEffect(() => {
     if (!coords.blockNumber || !addrKey) return;
     const ac = new AbortController();
-    const deployment = coords.chainId === BASE_CHAIN_ID ? "base" : "ethereum";
+    const deployment = compoundDeploymentOfChain(coords.chainId);
     const prev = previous?.blockNumber ? `&prev=${previous.blockNumber}` : "";
     const url = `/api/chain/compound/absorb-factors?deployment=${deployment}&market=${marketKey}&block=${coords.blockNumber}&assets=${addrKey}${prev}`;
     setFactorsState("loading");

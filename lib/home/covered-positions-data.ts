@@ -290,6 +290,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "aave-v3-arbitrum",
   // Morpho Blue on Arbitrum, position-first on the same terms (item 13).
   "morpho-arbitrum",
+  // Compound V3 on Arbitrum, position-first on the same terms (item 12).
+  "compound-v3-arbitrum",
   // Otherwise empty since 2026-08-26. The five Base explorers (Aave V3 Base,
   // Moonwell Base, Morpho Blue Base, Compound V3 Base, Seamless) sat here from
   // 2026-08-23 for the same reason Compound V2 once did — they had positions

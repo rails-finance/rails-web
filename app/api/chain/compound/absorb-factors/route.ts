@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseAbi } from "viem";
 import { chainClient } from "@/lib/sources/chain/rpc";
-import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
-import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
+import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deployments";
 
 // The collateral factors a Comet held just before an absorb — what the
 // liquidation row needs to show the line the account crossed and the credit
@@ -10,7 +9,7 @@ import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 // liquidation factor live in its asset settings, which governance can change,
 // so they are read at the block BEFORE the absorb (an archive read), not now.
 //
-// `?deployment=ethereum|base&market=<key>&block=<absorb block>&assets=a,b,…`
+// `?deployment=ethereum|base|arbitrum&market=<key>&block=<absorb block>&assets=a,b,…`
 // Answers `{ readBlock, factors: { [asset]: { borrow, liquidate, liquidation } } }`
 // as fractions (0.85 = 85%); an asset the Comet does not list is absent.
 //
@@ -93,7 +92,7 @@ async function pricesAt(
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const deployment = q.get("deployment") === "base" ? COMPOUND_BASE_DEPLOYMENT : COMPOUND_DEPLOYMENT;
+  const deployment = cometDeploymentOf(compoundDeploymentParam(q.get("deployment")));
   const market = deployment.markets.find((m) => m.key === (q.get("market") ?? "").toLowerCase());
   const block = Number(q.get("block"));
   const assets = [

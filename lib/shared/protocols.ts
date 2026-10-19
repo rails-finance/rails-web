@@ -333,6 +333,22 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
   },
   {
+    // Compound V3 on Arbitrum One, position-first (rails-ops
+    // TO-DO-arbitrum-scoping.md item 12): no listing and no sub-pages, so the
+    // explorer's own route is the protocol page, a wallet input over the four
+    // Comets' market overview.
+    id: "compound-v3-arbitrum",
+    session: "compound-v3-arbitrum",
+    label: "Compound V3",
+    chainId: 42161,
+    slug: "compound-v3",
+    protocolKey: "compound",
+    tags: ["Lend", "Borrow"],
+    desc: "Compound V3's Arbitrum deployment — four Comets read live, and any wallet's standing in each one read from the contracts at one block",
+    positionListing: false,
+    subPages: [],
+  },
+  {
     id: "dolomite",
     session: "dolomite",
     label: "Dolomite",
@@ -765,6 +781,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   spark: "Position",
   compound: "Position",
   "compound-base": "Position",
+  "compound-v3-arbitrum": "Position",
   "compound-v2": "Position",
   dolomite: "Account",
   pwn: "Loans",
@@ -816,7 +833,10 @@ export function protocolIconSrc(id: string): string {
   // chain ("aave-v3-base") but the brand does not, and no `<id>-base.png`
   // exists — without the strip, every Base entry rendered a broken image. An
   // Arbitrum deployment ("aave-v3-arbitrum") is the same case.
-  return `/icons/protocols/${id.replace(/-(base|arbitrum)$/, "")}.png`;
+  const brand = id.replace(/-(base|arbitrum)$/, "");
+  // Compound V3 on Arbitrum is keyed by its server lane, `compound-v3-arbitrum`;
+  // its mark is Compound's, as Base's (`compound-base`) is.
+  return `/icons/protocols/${brand === "compound-v3" ? "compound" : brand}.png`;
 }
 
 /** Resolve a bookmarks/session-store key (`SessionProtocol`) to its explorer

@@ -85,7 +85,7 @@ import type { CompoundEventType } from "@/lib/shared/types/event-shape";
  *  amounts UNSIGNED — the sign is this module's, per kind, exactly as the
  *  sweep signs a decoded log. A transfer row carries both sides and yields
  *  the wallet's leg(s). */
-interface IndexRow {
+export interface CometIndexRow {
   kind:
     | "supply"
     | "withdraw"
@@ -101,7 +101,9 @@ interface IndexRow {
   log_index: number;
   tx_hash: string;
   block_timestamp: string;
-  tx_from: string;
+  /** Null on the Arbitrum lane until its validator fills it; Base always
+   *  sends one. */
+  tx_from: string | null;
   asset: string | null;
   amount: string;
   counterparty: string | null;
@@ -112,7 +114,7 @@ interface IndexRow {
 
 interface IndexResponse {
   wallet: string;
-  rows: IndexRow[];
+  rows: CometIndexRow[];
   totalEvents: number;
   /** The API's row ceiling was hit — the list is cut, so a replay over it
    *  would be wrong from the cut on. Not whole. */
@@ -260,94 +262,7 @@ export async function readCometIndex(p: LoadCometIndexParams, readerIp?: string)
   const cov = json.coverage;
   const marketByKey = new Map(p.deployment.markets.map((m) => [m.key, m]));
 
-  const rows: CometDecodedRow[] = [];
-  const timestamps = new Map<number, number>();
-  const senders = new Map<string, string>();
-  for (const r of json.rows) {
-    const market = marketByKey.get(r.market);
-    // A market the roster does not name is not silently reshaped into one it
-    // does; the server's table set and this roster are meant to be the same
-    // five, and a row outside them is a drift to notice, not to draw.
-    if (!market) continue;
-    const blockNumber = Number(r.block_number);
-    const txHash = r.tx_hash.toLowerCase();
-    timestamps.set(blockNumber, Number(r.block_timestamp));
-    senders.set(txHash, r.tx_from.toLowerCase());
-    const head = { market, blockNumber, txIndex: r.tx_index, logIndex: r.log_index, txHash };
-    const baseToken = market.baseToken.toLowerCase();
-    const amount = BigInt(r.amount);
-    const usd = r.usd_value != null ? { usdValue: BigInt(r.usd_value) } : {};
-    const counterparty = (r.counterparty ?? "").toLowerCase();
-    switch (r.kind) {
-      case "supply":
-        rows.push({ ...head, kind: "supply", asset: baseToken, delta: amount, counterparty });
-        break;
-      case "withdraw":
-        rows.push({ ...head, kind: "withdraw", asset: baseToken, delta: -amount, counterparty });
-        break;
-      case "supply_collateral":
-        rows.push({
-          ...head,
-          kind: "supply_collateral",
-          asset: (r.asset ?? "").toLowerCase(),
-          delta: amount,
-          counterparty,
-        });
-        break;
-      case "withdraw_collateral":
-        rows.push({
-          ...head,
-          kind: "withdraw_collateral",
-          asset: (r.asset ?? "").toLowerCase(),
-          delta: -amount,
-          counterparty,
-        });
-        break;
-      case "absorb_debt":
-        rows.push({ ...head, kind: "absorb_debt", asset: baseToken, delta: amount, counterparty, ...usd });
-        break;
-      case "absorb_collateral":
-        rows.push({
-          ...head,
-          kind: "absorb_collateral",
-          asset: (r.asset ?? "").toLowerCase(),
-          delta: -amount,
-          counterparty,
-          ...usd,
-        });
-        break;
-      case "transfer":
-      case "transfer_collateral": {
-        // The wallet's leg(s): a peer-to-peer move it is on both sides of
-        // yields both, as the sweep's decoder and mig 053 do. Mint / burn legs
-        // never reach here (the server leaves them out, as the sweep does).
-        const from = (r.xfer_from ?? "").toLowerCase();
-        const to = (r.xfer_to ?? "").toLowerCase();
-        const collateral = r.kind === "transfer_collateral";
-        const asset = collateral ? (r.asset ?? "").toLowerCase() : baseToken;
-        if (from === wallet)
-          rows.push({
-            ...head,
-            kind: collateral ? "transfer_collateral_out" : "transfer_out",
-            asset,
-            delta: -amount,
-            counterparty: to,
-          });
-        if (to === wallet)
-          rows.push({
-            ...head,
-            kind: collateral ? "transfer_collateral_in" : "transfer_in",
-            asset,
-            delta: amount,
-            counterparty: from,
-          });
-        break;
-      }
-    }
-  }
-  // The API orders by (block, tx, log) and the key is unique, but the replay's
-  // contract is stated here rather than assumed of the wire.
-  rows.sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex || a.logIndex - b.logIndex);
+  const { rows, timestamps, senders } = decodeCometIndexRows(json.rows, wallet, p.deployment);
   // An ETH-quoted market's absorb values are in WETH: read WETH/USD at their blocks.
   await attachCometEthUsd(rows, p.deployment);
 
@@ -484,4 +399,108 @@ export async function readCometIndex(p: LoadCometIndexParams, readerIp?: string)
     reason,
     peakWithheldMarkets: json.peakWithheldMarkets ?? [],
   };
+}
+
+/** The rows of a Comet timeline answer as the replay takes them: each row
+ *  signed per kind and resolved against the deployment's roster (a row whose
+ *  `market` the roster does not name is left out), with the timestamps and
+ *  the senders the rows carry. A null `tx_from` names no sender. Shared by the
+ *  Base index reader and the Arbitrum lane's (lib/sources/api/compound-
+ *  arbitrum-timeline.ts). */
+export function decodeCometIndexRows(
+  wire: readonly CometIndexRow[],
+  walletRaw: string,
+  deployment: CometDeployment,
+): { rows: CometDecodedRow[]; timestamps: Map<number, number>; senders: Map<string, string> } {
+  const wallet = walletRaw.toLowerCase();
+  const marketByKey = new Map(deployment.markets.map((m) => [m.key, m]));
+  const rows: CometDecodedRow[] = [];
+  const timestamps = new Map<number, number>();
+  const senders = new Map<string, string>();
+  for (const r of wire) {
+    const market = marketByKey.get(r.market);
+    // A market the roster does not name is not silently reshaped into one it
+    // does; the server's roster and this one are meant to be the same, and
+    // a row outside them is a drift to notice, not to draw.
+    if (!market) continue;
+    const blockNumber = Number(r.block_number);
+    const txHash = r.tx_hash.toLowerCase();
+    timestamps.set(blockNumber, Number(r.block_timestamp));
+    if (r.tx_from) senders.set(txHash, r.tx_from.toLowerCase());
+    const head = { market, blockNumber, txIndex: r.tx_index, logIndex: r.log_index, txHash };
+    const baseToken = market.baseToken.toLowerCase();
+    const amount = BigInt(r.amount);
+    const usd = r.usd_value != null ? { usdValue: BigInt(r.usd_value) } : {};
+    const counterparty = (r.counterparty ?? "").toLowerCase();
+    switch (r.kind) {
+      case "supply":
+        rows.push({ ...head, kind: "supply", asset: baseToken, delta: amount, counterparty });
+        break;
+      case "withdraw":
+        rows.push({ ...head, kind: "withdraw", asset: baseToken, delta: -amount, counterparty });
+        break;
+      case "supply_collateral":
+        rows.push({
+          ...head,
+          kind: "supply_collateral",
+          asset: (r.asset ?? "").toLowerCase(),
+          delta: amount,
+          counterparty,
+        });
+        break;
+      case "withdraw_collateral":
+        rows.push({
+          ...head,
+          kind: "withdraw_collateral",
+          asset: (r.asset ?? "").toLowerCase(),
+          delta: -amount,
+          counterparty,
+        });
+        break;
+      case "absorb_debt":
+        rows.push({ ...head, kind: "absorb_debt", asset: baseToken, delta: amount, counterparty, ...usd });
+        break;
+      case "absorb_collateral":
+        rows.push({
+          ...head,
+          kind: "absorb_collateral",
+          asset: (r.asset ?? "").toLowerCase(),
+          delta: -amount,
+          counterparty,
+          ...usd,
+        });
+        break;
+      case "transfer":
+      case "transfer_collateral": {
+        // The wallet's leg(s): a peer-to-peer move it is on both sides of
+        // yields both, as the sweep's decoder and mig 053 do. Mint / burn legs
+        // never reach here (the server leaves them out, as the sweep does).
+        const from = (r.xfer_from ?? "").toLowerCase();
+        const to = (r.xfer_to ?? "").toLowerCase();
+        const collateral = r.kind === "transfer_collateral";
+        const asset = collateral ? (r.asset ?? "").toLowerCase() : baseToken;
+        if (from === wallet)
+          rows.push({
+            ...head,
+            kind: collateral ? "transfer_collateral_out" : "transfer_out",
+            asset,
+            delta: -amount,
+            counterparty: to,
+          });
+        if (to === wallet)
+          rows.push({
+            ...head,
+            kind: collateral ? "transfer_collateral_in" : "transfer_in",
+            asset,
+            delta: amount,
+            counterparty: from,
+          });
+        break;
+      }
+    }
+  }
+  // The API orders by (block, tx, log) and the key is unique, but the replay's
+  // contract is stated here rather than assumed of the wire.
+  rows.sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex || a.logIndex - b.logIndex);
+  return { rows, timestamps, senders };
 }

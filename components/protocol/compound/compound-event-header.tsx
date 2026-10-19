@@ -101,16 +101,17 @@ export function useCompoundHeadSpec({
   const transferOut = ctx.eventType === "transfer_out" || ctx.eventType === "transfer_collateral_out";
   const transferIn = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_collateral_in";
   const transferCollateral = ctx.eventType === "transfer_collateral_in" || ctx.eventType === "transfer_collateral_out";
-  const party =
-    ctx.counterparty != null
-      ? {
-          prefix: transferOut ? "to" : "from",
-          address: ctx.counterparty,
-          prov: transferCounterpartyProv(transferOut ? "out" : "in", transferCollateral, coords),
-          // Named by ENS where the address has a reverse record.
-          ens: true,
-        }
-      : undefined;
+  // A kept transfer leg whose other account is outside the history (the
+  // Arbitrum lane's, whose zero side the server leaves null) names no party.
+  const party = ctx.counterparty
+    ? {
+        prefix: transferOut ? "to" : "from",
+        address: ctx.counterparty,
+        prov: transferCounterpartyProv(transferOut ? "out" : "in", transferCollateral, coords),
+        // Named by ENS where the address has a reverse record.
+        ens: true,
+      }
+    : undefined;
 
   const externalActor =
     externalBy && wallet && ctx.txFrom && ctx.funder

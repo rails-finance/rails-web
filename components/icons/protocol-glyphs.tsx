@@ -184,6 +184,7 @@ const GLYPHS: Record<string, Glyph> = {
   "compound-v2": COMPOUND_MARK,
   // And Base's Comets are the same protocol again, on another chain.
   "compound-base": COMPOUND_MARK,
+  "compound-v3-arbitrum": COMPOUND_MARK,
   // Paths are authored in a ~0–160 space; the two source group transforms
   // (outer scale+translate, inner translate) map them into the 50×50 viewBox.
   asymmetry: {
