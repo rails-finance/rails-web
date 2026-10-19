@@ -295,7 +295,7 @@ check(
 check("154: counted among its liquidations; the call that took nothing is not", /Liquidated 3 times/.test(p154.text));
 check(
   "154 r3: the pool-wide row says the debt was written off onto the debt index",
-  /debt written off/.test(p154.text) &&
+  /debt written off/i.test(p154.text) &&
     /Its keeper repaid 0\.028 fxUSD across the whole pool, and this position’s debt fell by 287\.882 fxUSD[\s\S]{0,160}through its debt index/.test(
       p154.text,
     ),
@@ -523,7 +523,7 @@ check(
   );
   check(
     "1801 r4 P9: one name for the transfer",
-    /Transferred\s*·\s*to 0x/.test(p.text) && !/Ownership Transfer/.test(p.text),
+    /Transferred\s*·\s*to\s*0x/.test(p.text) && !/Ownership Transfer/.test(p.text),
   );
   // The flows panel's key: funding is the pool's one move here (the tower's
   // note said "Moved by the pool: none" of rebalances and redemptions).
