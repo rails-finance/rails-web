@@ -270,6 +270,49 @@ export function LiquityEventCard({
     ];
   };
 
+  // A Trove transfer: the NFT changed hands, so the Trove's collateral and
+  // debt at the transfer went with it. Each wears the custody badge, its
+  // figure on the flank the owner's side moved by, out on a transfer sent and
+  // in on one received (rails-ops decision 0045, "Ruled since"). The Figures
+  // sheet's Collateral and Debt cells carry their receipts.
+  const transferRows = ((): SpineTokenRow[] | undefined => {
+    if (ctx.operation !== "transferTrove" || ctx.transfer?.transferType !== "transfer") return undefined;
+    const coll = ctx.stateAfter?.coll ?? 0;
+    const debt = ctx.stateAfter?.debt ?? 0;
+    const sent = ctx.transfer.toAddress?.toLowerCase() !== wallet?.toLowerCase();
+    const dir = sent ? ("left" as const) : ("right" as const);
+    // Spoken on the phone spine, as the owner's legs below name theirs.
+    const verb = sent ? "transferred out" : "transferred in";
+    const debtSym = ctx.assetType ?? "BOLD";
+    const rows: SpineTokenRow[] = [
+      ...(coll > 0
+        ? [
+            {
+              symbol: ctx.collateralType,
+              address: soleFlowAddress(event.flows, ctx.collateralType),
+              badge: "send" as const,
+              direction: dir,
+              value: coll,
+              verb,
+            },
+          ]
+        : []),
+      ...(debt >= 0.01
+        ? [
+            {
+              symbol: debtSym,
+              address: soleFlowAddress(event.flows, debtSym),
+              badge: "send" as const,
+              direction: dir,
+              value: debt,
+              verb,
+            },
+          ]
+        : []),
+    ];
+    return rows.length > 0 ? rows : undefined;
+  })();
+
   const spine: SpineColumnProps = isWarning
     ? // A redemption changes the Trove without the owner acting: caution
       // (color-grammar.md §5). Liquidation stays critical red.
@@ -286,10 +329,11 @@ export function LiquityEventCard({
       : isRateChange
         ? { icon: "rate-change", iconDirection: rateUp ? "up" : "down", ...rateFlank, isLast: !!isLast }
         : ctx.operation === "transferTrove"
-          ? // The Trove NFT changed hands; no collateral or BOLD moved. The
-            // custody plane in its neutral disc (detail-page-anatomy.md, "The
-            // custody row"), the mark Polaris's position transfer wears.
-            { icon: "custody", isLast: !!isLast }
+          ? transferRows
+            ? { tokens: transferRows, isLast: !!isLast }
+            : // A mint, a burn or an empty Trove: the custody plane in its
+              // neutral disc (detail-page-anatomy.md, "The custody row").
+              { icon: "custody", isLast: !!isLast }
           : isNoChangeAdjust(ctx)
             ? // Zero-delta touch: no flows to draw, but an empty spine slot
               // reads as a rendering hole — mark the event with the neutral

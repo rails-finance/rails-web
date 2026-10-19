@@ -296,7 +296,14 @@ export interface ChainTruthRowSpec {
   /** A liquidated neighbour's debt and collateral this event took on, in the
    *  caution tone after the amounts: "from liquidation 1.2K ♭ and 0.4 ◊". No
    *  token moved for it, so the figures stay at every width. */
-  redistribution?: { label: string; and: string; deltas: ChainTruthDelta[] };
+  redistribution?: {
+    label: string;
+    and: string;
+    deltas: ChainTruthDelta[];
+    /** The label alone, its figures on the spine's flank or in the sheet
+     *  (the Liquity V2 forks; decision 0045). */
+    wordsOnly?: boolean;
+  };
   /** A liquidation's collateral surplus, claimable by the owner; muted, with
    *  the date, once claimed. */
   surplus?: { amount: number; symbol: string; word: string; claimed?: { timestamp?: number | null } };
@@ -924,21 +931,22 @@ export function ChainTruthRow({
         </span>
       )}
 
-      {redist && redist.deltas.length > 0 && (
+      {redist && (redist.deltas.length > 0 || redist.wordsOnly) && (
         <span className={`inline-flex items-center ${sz.gap} ${sz.txt}`}>
           <span className="text-tone-caution">{redist.label}</span>
-          {redist.deltas.map((d, i) => {
-            const exact = d.exact ?? formatExact(Math.abs(d.value));
-            return (
-              <Fragment key={i}>
-                {i > 0 && <span className="text-tone-caution">{redist.and}</span>}
-                <Prov value={exact} symbol={d.symbol} info={d.prov}>
-                  {figure(d, fmtHeaderMagnitude(d.value, d.symbol), exact)}
-                </Prov>
-                <TokenChipIcon symbol={d.symbol} address={d.address} size={sz.icon} />
-              </Fragment>
-            );
-          })}
+          {!redist.wordsOnly &&
+            redist.deltas.map((d, i) => {
+              const exact = d.exact ?? formatExact(Math.abs(d.value));
+              return (
+                <Fragment key={i}>
+                  {i > 0 && <span className="text-tone-caution">{redist.and}</span>}
+                  <Prov value={exact} symbol={d.symbol} info={d.prov}>
+                    {figure(d, fmtHeaderMagnitude(d.value, d.symbol), exact)}
+                  </Prov>
+                  <TokenChipIcon symbol={d.symbol} address={d.address} size={sz.icon} />
+                </Fragment>
+              );
+            })}
         </span>
       )}
 
