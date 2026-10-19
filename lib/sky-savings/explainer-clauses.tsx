@@ -1,12 +1,12 @@
 // T3 for a Sky Savings event: this event's figures, in plain words. Figures are
 // stated to six decimals (the opened card's tooltips hold every digit), so a
 // change the card's compact figures round away still shows. Each event states
-// the interest earned since the previous one and adds the parts up to the
-// running total; the lesson that holds for any holder is T4
+// what it did, the interest earned since the previous one, and adds the parts
+// up to the running total; the lesson that holds for any holder is T4
 // (lib/sky-savings/learn-more.ts).
 
-import type { ReactNode } from "react";
-import { H } from "@/lib/shared/explainer-prose";
+import { isValidElement, type ReactNode } from "react";
+import { H, splitFirstSentence } from "@/lib/shared/explainer-prose";
 import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
 import { formatDate } from "@/lib/date";
 import { annualRate, exact, fixed6, pct, pctString, rayNumber, skyTransition } from "@/lib/sky-savings/math";
@@ -149,6 +149,11 @@ export function skyEventBullets(c: SkySavingsContext, prev?: SkyPreviousEvent | 
       break;
   }
 
+  // The event's own act leads: the explanation's first sentence is the event
+  // page's title (rails-ops decision 0045, "Ruled since"), so it states what
+  // this event did; what the balance earned since the previous one follows.
+  out.push(...out.splice(0, 1));
+
   // 3. Why the event itself moved no interest.
   const still =
     c.eventType === "deposit"
@@ -200,4 +205,24 @@ export function skyEventBullets(c: SkySavingsContext, prev?: SkyPreviousEvent | 
     ),
   );
   return out;
+}
+
+/** A node's words: its strings, its elements' children, in order. */
+function nodeText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) return nodeText(node.props.children);
+  return "";
+}
+
+/** The Explanation's first sentence as text: the event page's browser title
+ *  (rails-ops decision 0045, "Ruled since"), which its h1 states. It reads the
+ *  event alone; the act's bullet needs nothing of the previous event. */
+export function skyFirstSentence(c: SkySavingsContext): string | null {
+  const lead = skyEventBullets(c, undefined)[0];
+  if (lead == null) return null;
+  const head = splitFirstSentence(nodeText(lead)).head;
+  const text = typeof head === "string" ? head.replace(/\s+/g, " ").trim() : "";
+  return text || null;
 }
