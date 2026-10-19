@@ -18,6 +18,7 @@ import { resolveErc20Meta, scaleRaw, decimalsUnreadFlag, type Erc20Meta } from "
 import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
+import { readSparkNotCollateral } from "@/lib/sources/chain/spark-position";
 
 export type SparkPositionStatus = "open" | "closed" | "liquidated";
 // Mirrors the rails route's sortBy allowlist (mig 183's debt_usd/collateral_usd
@@ -70,6 +71,10 @@ export interface SparkPositionSummary {
   /** True when the chain snapshot doesn't cover this wallet (never swept, or the
    *  sweep marked it stale). The row carries no health factor (0018). */
   chainHfStale: boolean;
+  /** An open account's supplied reserves that back no borrowing (lowercased),
+   *  read live from the Pool by the position page's rule
+   *  (lib/spark/collateral-split.ts). Absent where the read failed. */
+  notCollateral?: string[];
 }
 
 /** One open (wallet, reserve) balance pair as returned by the rails route. */
@@ -141,7 +146,17 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
   // On-chain oracle USD for every reserve on the page, from SparkLend's own
   // IAaveOracle (chain-derived). Batched into one multicall; degrades to an empty
   // map (token-only) if RPC is down, so callers never assert a partial total.
-  const oraclePrices = await resolveAaveOraclePrices([{ oracle: SPARK_ADDRESSES.ORACLE, assets: [...allAddrs] }]);
+  // Each open account's collateral split, read live from the Pool by the
+  // position page's rule, so the row's Collateral is the card's.
+  const [oraclePrices, notCollateral] = await Promise.all([
+    resolveAaveOraclePrices([{ oracle: SPARK_ADDRESSES.ORACLE, assets: [...allAddrs] }]),
+    readSparkNotCollateral(
+      raw.map((w) => ({
+        wallet: w.wallet,
+        supplied: w.reserves.filter((r) => bigintOf(r.supplyBalanceRaw) > ZERO).map((r) => r.reserve),
+      })),
+    ),
+  ]);
   const priceOf = (addr: string) => aaveOraclePriceOf(oraclePrices, SPARK_ADDRESSES.ORACLE, addr);
 
   // Dev-only reconciliation: the reduced balances the page renders should equal a
@@ -274,6 +289,9 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
       ),
       // Coverage flag passed straight through; stale when uncovered.
       chainHfStale: w.chainHfStale ?? true,
+      ...(notCollateral.has(w.wallet.toLowerCase())
+        ? { notCollateral: [...(notCollateral.get(w.wallet.toLowerCase()) ?? [])] }
+        : {}),
     };
   });
 }

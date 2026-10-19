@@ -16,10 +16,12 @@ import { alchemyClient } from "./rpc";
 import { SPARK_ADDRESSES, SPARK_LT_BY_ADDR } from "@/lib/spark/asset-catalog";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { SparkChainReserve, SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
+import { sparkNotCollateral } from "@/lib/spark/collateral-split";
 
 const SPARK_POOL = SPARK_ADDRESSES.POOL as `0x${string}`;
 
 const POOL_ABI = parseAbi([
+  "function getReservesList() view returns (address[])",
   "function getUserAccountData(address user) view returns (uint256 totalCollateralBase, uint256 totalDebtBase, uint256 availableBorrowsBase, uint256 currentLiquidationThreshold, uint256 ltv, uint256 healthFactor)",
   "function getUserConfiguration(address user) view returns (uint256 data)",
   "function getUserEMode(address user) view returns (uint256)",
@@ -49,6 +51,25 @@ interface ReserveData {
 
 const RAY = 1e27; // Aave-family rates are ray-scaled APR fractions (1e27 = 100%)
 
+/** The account's collateral switch for a reserve: bit 2*id+1 of the user
+ *  configuration bitmap. */
+export function sparkUsesAsCollateral(userConfig: bigint, reserveId: number): boolean {
+  return ((userConfig >> BigInt(2 * reserveId + 1)) & BigInt(1)) === BigInt(1);
+}
+
+/** A reserve's liquidation threshold (0..1) from its configuration (bits
+ *  16-31, bps); the curated catalog's where the configuration reads 0, else
+ *  null. */
+export function sparkReserveLt(configuration: bigint, addr: string): number | null {
+  const ltBps = Number((configuration >> BigInt(16)) & BigInt(0xffff));
+  return ltBps > 0 ? ltBps / PRECISION_BPS : (SPARK_LT_BY_ADDR[addr.toLowerCase()] ?? null);
+}
+
+/** A reserve's e-mode category: its configuration's bits 168-175. */
+export function sparkReserveEmodeId(configuration: bigint): number {
+  return Number((configuration >> BigInt(168)) & BigInt(0xff));
+}
+
 function stub(wallet: string): SparkPositionChainResponse {
   return {
     wallet,
@@ -67,10 +88,28 @@ function stub(wallet: string): SparkPositionChainResponse {
   };
 }
 
+/** The Pool's reserves (getReservesList), kept an hour: a reserve the curated
+ *  catalog does not list (RLUSD) is still read. Null where the read failed. */
+let reservesList: { at: number; list: string[] } | null = null;
+async function poolReserves(): Promise<string[] | null> {
+  if (reservesList && Date.now() - reservesList.at < 3_600_000) return reservesList.list;
+  try {
+    const list = (await alchemyClient().readContract({
+      address: SPARK_POOL,
+      abi: POOL_ABI,
+      functionName: "getReservesList",
+    })) as readonly string[];
+    reservesList = { at: Date.now(), list: list.map((a) => a.toLowerCase()) };
+    return reservesList.list;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Read a wallet's live SparkLend position straight from chain over the candidate
- * reserve set (the full Spark catalog — the multicall returns 0 for reserves the
- * wallet hasn't touched). Returns a `chainStale` stub on RPC failure so the
+ * reserve set (the caller's, with every reserve the Pool lists — the multicall
+ * returns 0 for reserves the wallet hasn't touched). Returns a `chainStale` stub on RPC failure so the
  * caller falls back to its event-derived numbers.
  */
 export async function loadSparkPositionFromChain(
@@ -78,7 +117,9 @@ export async function loadSparkPositionFromChain(
   reserveAddrs: string[],
 ): Promise<SparkPositionChainResponse> {
   const wallet = getAddress(walletRaw);
-  const reserves = [...new Set(reserveAddrs.map((a) => a.toLowerCase()).filter(Boolean))];
+  const reserves = [
+    ...new Set([...reserveAddrs, ...((await poolReserves()) ?? [])].map((a) => a.toLowerCase()).filter(Boolean)),
+  ];
 
   try {
     const client = alchemyClient();
@@ -190,18 +231,13 @@ export async function loadSparkPositionFromChain(
       const debt = balances[i * 4 + 1];
       const aTokenTotal = balances[i * 4 + 2]; // total supplied (available + borrowed)
       const variableDebtTotal = balances[i * 4 + 3]; // total variable debt
-      // bit 2*id+1 of the user config bitmap = useAsCollateral
-      const isCollateral = ((userConfig >> BigInt(2 * data.id + 1)) & BigInt(1)) === BigInt(1);
+      const isCollateral = sparkUsesAsCollateral(userConfig, data.id);
       if (supplied === ZERO && debt === ZERO && !isCollateral) return;
 
-      // LT from the live reserve configuration (bits 16-31, bps); fall back to the
-      // curated catalog, then null.
-      const ltBps = Number((data.configuration >> BigInt(16)) & BigInt(0xffff));
-      const lt = ltBps > 0 ? ltBps / PRECISION_BPS : (SPARK_LT_BY_ADDR[addr] ?? null);
-      // The reserve's own max LTV (bits 0-15) and e-mode category (bits 168-175).
+      const lt = sparkReserveLt(data.configuration, addr);
+      // The reserve's own max LTV (bits 0-15) and e-mode category.
       const reserveLtv = Number(data.configuration & BigInt(0xffff)) / PRECISION_BPS;
-      const inEmode =
-        emodeId != null && emodeId > 0 && Number((data.configuration >> BigInt(168)) & BigInt(0xff)) === emodeId;
+      const inEmode = emodeId != null && emodeId > 0 && sparkReserveEmodeId(data.configuration) === emodeId;
       // Reserve factor — config bits 64-79 (bps); the protocol's cut of borrow
       // interest. Reserve economics, all read from the same getReserveData.
       const reserveFactor = Number((data.configuration >> BigInt(64)) & BigInt(0xffff)) / PRECISION_BPS;
@@ -270,4 +306,96 @@ export async function loadSparkPositionFromChain(
   } catch {
     return stub(wallet.toLowerCase());
   }
+}
+
+/**
+ * The listing's collateral split: for each account, the lowercased supplied
+ * reserves that back no borrowing (`sparkNotCollateral`, the rule the position
+ * page reads from `loadSparkPositionFromChain`). One multicall for the
+ * accounts' collateral bitmaps and e-mode categories and the reserves'
+ * configurations, one for the categories' thresholds. An account any of whose
+ * reads failed is absent from the answer, and its row keeps no split.
+ */
+export async function readSparkNotCollateral(
+  accounts: readonly { wallet: string; supplied: readonly string[] }[],
+): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  const asked = accounts.filter((a) => a.supplied.length > 0);
+  if (asked.length === 0) return out;
+  try {
+    const client = alchemyClient();
+    const reserves = [...new Set(asked.flatMap((a) => a.supplied.map((r) => r.toLowerCase())))];
+    const results = await client.multicall({
+      allowFailure: true,
+      contracts: [
+        ...asked.flatMap(
+          (a) =>
+            [
+              {
+                address: SPARK_POOL,
+                abi: POOL_ABI,
+                functionName: "getUserConfiguration",
+                args: [getAddress(a.wallet)],
+              },
+              { address: SPARK_POOL, abi: POOL_ABI, functionName: "getUserEMode", args: [getAddress(a.wallet)] },
+            ] as const,
+        ),
+        ...reserves.map(
+          (r) =>
+            ({
+              address: SPARK_POOL,
+              abi: POOL_ABI,
+              functionName: "getReserveData",
+              args: [r as `0x${string}`],
+            }) as const,
+        ),
+      ],
+    });
+    const reserveData = new Map<string, ReserveData>();
+    reserves.forEach((r, i) => {
+      const got = results[asked.length * 2 + i];
+      if (got.status === "success") reserveData.set(r, got.result as unknown as ReserveData);
+    });
+    const userOf = (i: number) => {
+      const cfg = results[i * 2];
+      const em = results[i * 2 + 1];
+      return cfg.status === "success" && em.status === "success"
+        ? { config: cfg.result as bigint, emodeId: Number(em.result as bigint) }
+        : null;
+    };
+    const emodeIds = [...new Set(asked.map((_, i) => userOf(i)?.emodeId ?? 0).filter((id) => id > 0))];
+    const emodeLt = new Map<number, number | null>();
+    if (emodeIds.length > 0) {
+      const cats = await client.multicall({
+        allowFailure: true,
+        contracts: emodeIds.map(
+          (id) => ({ address: SPARK_POOL, abi: POOL_ABI, functionName: "getEModeCategoryData", args: [id] }) as const,
+        ),
+      });
+      emodeIds.forEach((id, i) => {
+        const c = cats[i];
+        if (c.status === "success") emodeLt.set(id, Number(c.result.liquidationThreshold) / PRECISION_BPS);
+      });
+    }
+    asked.forEach((a, i) => {
+      const user = userOf(i);
+      if (!user) return;
+      if (user.emodeId > 0 && !emodeLt.has(user.emodeId)) return;
+      const reads = [];
+      for (const addr of a.supplied.map((r) => r.toLowerCase())) {
+        const data = reserveData.get(addr);
+        if (!data) return;
+        reads.push({
+          address: addr,
+          isCollateral: sparkUsesAsCollateral(user.config, data.id),
+          lt: sparkReserveLt(data.configuration, addr),
+          inEmode: user.emodeId > 0 && sparkReserveEmodeId(data.configuration) === user.emodeId,
+        });
+      }
+      out.set(a.wallet.toLowerCase(), sparkNotCollateral(reads, emodeLt.get(user.emodeId)));
+    });
+  } catch {
+    // The RPC is down: no row keeps a split.
+  }
+  return out;
 }
