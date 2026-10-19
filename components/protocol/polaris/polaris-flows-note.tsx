@@ -23,18 +23,20 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
       <p>
         Every figure is in {stable}, the market&apos;s stablecoin: this is a testnet, and nothing on it has a market
         price. Each pETH flow is converted at the market&apos;s own price feed at its block, the price the protocol
-        holds the debt against, so on the collateral side the last line, Market move, is the change in that price since
-        each flow.
+        holds the debt against, so on the collateral side the last line, Market move and pETH built up since the last
+        event, is the change in that price since each flow, with the pETH built up since the CDP&apos;s last event.
       </p>
       <p>
         Each event states the CDP&apos;s collateral and debt after it and every part that changed them, so each part has
         a line of its own and the lines meet the recorded figures at every event. Interest (dashed) is charged on the
-        recorded debt at the market&apos;s rate and written in at each event; between two events the debt grows by the
-        next event&apos;s interest in a straight line, and after the last by the interest the live read states pending.
-        The other parts also build up between events, but nothing states them until the next one: Reward pETH (dashed),
-        the CDP&apos;s net share of every direct mint and redemption through the PSM since the last event (Net PSM
-        shares added, taken or cleared, each side split by its sign), Stability gains (dashed), and Settled to zero, the{" "}
-        {stable} the protocol mints where the shares took the debt below zero.
+        recorded debt at the market&apos;s rate and written in at each event. The other parts also build up between
+        events and are written in at the next one: Reward pETH (dashed), the CDP&apos;s net share of every direct mint
+        and redemption through the PSM since the last event (Net PSM shares added, taken or cleared, each side split by
+        its sign), Stability gains (vertical lines), and Settled to zero, the {stable} the protocol mints where the
+        shares took the debt below zero. Between two events each side&apos;s line runs straight from what the first
+        stated to what the second wrote in before the holder&apos;s act, and after the last to the live read&apos;s
+        entire figures. Each part&apos;s line moves on the event that wrote it in, so on the days between, what built up
+        sits in each side&apos;s last line.
         {facts && facts.psmRows > 0 && ` ${n(facts.psmRows, "One event", "events")} wrote PSM shares in.`}
         {facts && facts.settledRows > 0 && ` ${n(facts.settledRows, "One event", "events")} settled the debt to zero.`}
       </p>
@@ -61,7 +63,9 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
           {p.nearest + p.today > 0
             ? `${n(p.nearest + p.today, "One event takes", "events take")} the nearest recorded price in time, with no feed price read at ${p.nearest + p.today === 1 ? "its block" : "their blocks"}. `
             : ""}
-          Polaris is not in the daily price store, so between events the collateral keeps the price of its latest event,
+          {facts?.between === "store"
+            ? "On each day between events the collateral is valued at the market's feed price at the close of that day, from the daily price store, "
+            : "The daily price store did not answer, so between events the collateral keeps the price of its latest event, "}
           and the last stop takes the feed&apos;s price at the latest block, the one the position card values it at.
         </p>
       )}

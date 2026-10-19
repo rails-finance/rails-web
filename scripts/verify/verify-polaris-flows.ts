@@ -24,8 +24,13 @@
 // interest; at every day and the live stop each side's printed lines add to
 // its printed total, today is the live read and the debt's balancing item is
 // zero there (the pending legs on their lines); each event card's sum is
-// exact, its token lines add to the recorded balance and its ledger adds; and
-// the daily line's points are the bars' figures.
+// exact, its token lines add to the recorded balance and its ledger adds; the
+// daily line's points are the bars' figures; between two rows each side
+// slopes to what the next row stated before its holder's act, the legs
+// holding on their row's day, and after the last row to the live read, so the
+// line's last point is the card's equity at the feed; and with the daily store
+// a quiet collateral takes that day's price and a one-day life draws the price
+// chart.
 //
 //   npx tsx --test scripts/verify/verify-polaris-flows.ts
 import { test } from "node:test";
@@ -43,10 +48,14 @@ import {
   polarisFlowRows,
   polarisFlowTimeline,
   polarisFocusEvents,
+  polarisSlope,
   replayPolaris,
   units,
   type PolarisReplay,
 } from "@/lib/polaris/flows";
+import { flowsLife } from "@/lib/shared/flows-combined";
+import { flowPriceSeries } from "@/lib/shared/flows-price";
+import { lineStripScale } from "@/components/shared/lifetime-flows-combined";
 import { polarisLifetime } from "@/lib/polaris/economics";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
@@ -316,8 +325,20 @@ for (const name of NAMES) {
   });
 }
 
-test("between events the debt grows by its interest and the collateral keeps its event's price", () => {
+// The slope: between two rows each side runs in a straight line from what
+// the first stated to what the second stated before its holder's act (its
+// after less collChange / debtChange: the accrued legs it wrote in); after
+// the last row, to the live read's entire figures. The bars, the line and the
+// state card state that figure on every quiet day; the legs still land on
+// their row's day, and the balancing items hold what built up between.
+const preAct = (r: PolarisReplay["replayed"][number]) => ({
+  coll: units(r.row.newColl - r.row.collChange),
+  debt: units(r.row.newDebt - r.row.debtChange),
+});
+
+test("between two rows each side slopes to what the next row wrote in before its act", () => {
   let checked = 0;
+  let accrued = 0;
   for (const f of ALL) {
     const m = model(f);
     const rp = replay(f);
@@ -328,22 +349,144 @@ test("between events the debt grows by its interest and the collateral keeps its
     for (let i = 0; i + 1 < rs.length; i++) {
       const a = rs[i];
       const b = rs[i + 1];
-      if (Math.floor(rs[i + 1].row.ts / DAY) === Math.floor(a.row.ts / DAY)) continue;
-      const day = Math.floor(a.row.ts / DAY) + 1;
-      if (day >= Math.floor(b.row.ts / DAY)) continue;
-      const end = (day + 1) * DAY;
-      const st = stateAt(m, day - startDay);
-      const grown = a.debt * (1 + a.rate * ((end - a.row.ts) / YEAR));
-      assert.ok(near(st.debt.now / G, grown, 1e-9), `${f.name}: debt after ${a.row.id}`);
-      assert.ok(near(st.collateral.now / G, a.coll * a.price, 1e-9), `${f.name}: collateral after ${a.row.id}`);
-      const mo = flowMoment(m, focus, end - 1);
-      assert.ok(mo, "a state card between events");
-      if (a.debt > 0)
-        assert.ok(near(mo.sides.debt.assets[0].tokens, grown, 1e-6), "the state card's debt is the chart's");
-      checked++;
+      const to = preAct(b);
+      for (let day = Math.floor(a.row.ts / DAY) + 1; day < Math.floor(b.row.ts / DAY); day++) {
+        const end = (day + 1) * DAY;
+        const k = (end - a.row.ts) / (b.row.ts - a.row.ts);
+        const coll = a.coll + k * (to.coll - a.coll);
+        const debt = a.debt + k * (to.debt - a.debt);
+        const st = stateAt(m, day - startDay);
+        assert.ok(near(st.debt.now / G, debt, 1e-9), `${f.name} ${day}: debt after ${a.row.id}`);
+        // No store in the fixtures: a quiet day keeps the row's price.
+        assert.ok(near(st.collateral.now / G, coll * a.price, 1e-9), `${f.name} ${day}: collateral after ${a.row.id}`);
+        // The legs stay on their row: the cumulative lines do not move between rows.
+        const lines = (s: typeof st.debt) => s.sources.filter((x) => !x.key.endsWith("-market"));
+        const before = stateAt(m, Math.floor(a.row.ts / DAY) - startDay);
+        assert.deepEqual(
+          lines(st.debt).map((x) => x.value),
+          lines(before.debt).map((x) => x.value),
+          `${f.name} ${day}: the debt's lines hold between rows`,
+        );
+        const mo = flowMoment(m, focus, end - 1);
+        assert.ok(mo, "a state card between events");
+        if (a.debt > 0) {
+          assert.ok(near(mo.sides.debt.assets[0].tokens, debt, 1e-6), "the state card's debt is the chart's");
+          assert.ok(
+            near(mo.sides.debt.assets[0].recorded, a.debt, 1e-9),
+            "the state card's recorded debt is the row's",
+          );
+        }
+        if (a.coll > 0) assert.ok(near(mo.sides.collateral.assets[0].tokens, coll, 1e-6), "the card's pETH");
+        if (Math.abs(to.coll - a.coll) > 1e-9 || Math.abs(to.debt - a.debt - units(b.row.accruedInterest)) > 1e-6)
+          accrued++;
+        checked++;
+      }
+      // The line reaches the next row's before: its legs bound the slope.
+      const tsB = b.row.ts;
+      const s = polarisSlope(rp, open(f) ? polarisFlowLive(f.chain) : null);
+      const atB = s.at(i, tsB);
+      assert.ok(near(s.held[i].coll * atB.coll, to.coll, 1e-9), `${f.name}: coll to ${b.row.id}`);
+      assert.ok(near(s.held[i].debt * atB.debt, to.debt, 1e-9), `${f.name}: debt to ${b.row.id}`);
     }
   }
-  assert.ok(checked >= 5, `${checked} quiet stretches`);
+  assert.ok(checked >= 5, `${checked} quiet days`);
+  assert.ok(accrued >= 5, `${accrued} quiet days where more than interest built up`);
+});
+
+test("after the last row each side slopes to the live read, and the line's last point is the card's equity at the feed", () => {
+  let checked = 0;
+  for (const f of ALL) {
+    if (!open(f)) continue;
+    const live = polarisFlowLive(f.chain)!;
+    const rp = replay(f);
+    const t = polarisFlowTimeline(rp, { stable: STABLE[f.market], now: f.now, open: true, live })!;
+    const m = buildFlowModel(t)!;
+    const G = rp.grain;
+    const startDay = m.start / 86_400_000;
+    const last = rp.replayed[rp.replayed.length - 1];
+    for (let day = Math.floor(last.row.ts / DAY) + 1; day - startDay < m.liveStop; day++) {
+      const end = Math.min((day + 1) * DAY, f.now);
+      const k = Math.min(1, (end - last.row.ts) / (live.ts - last.row.ts));
+      const st = stateAt(m, day - startDay);
+      const debt = last.debt + k * (Math.max(0, live.entireDebt) - last.debt);
+      const coll = last.coll + k * (live.entireColl - last.coll);
+      assert.ok(near(st.debt.now / G, debt, 1e-9), `${f.name} ${day}: debt toward the live read`);
+      assert.ok(
+        near(st.collateral.now / G, coll * last.price, 1e-9),
+        `${f.name} ${day}: collateral toward the live read`,
+      );
+    }
+    // The line's last point, collateral less debt, is the card's equity
+    // (viewFromChain in polaris-position-card.tsx, which this offline script
+    // cannot import for its YAML): the entire collateral at the feed less the
+    // entire debt, a debt below zero counted as none.
+    const equity = f.chain.entireColl * f.chain.price!.pethInDebt - Math.max(0, f.chain.entireDebt);
+    const series = binSeries(binInputFromTimeline(t)!, seriesRouteBinFor(t.today! - startDay))!;
+    const drawn = lineStripScale(m, series, true).points;
+    const tail = drawn[drawn.length - 1];
+    const lineEquity = ((tail.collateral ?? 0) - (tail.debt ?? 0)) / G;
+    assert.ok(near(lineEquity, equity, 1e-9), `${f.name}: the line's last point ${lineEquity} vs ${equity}`);
+    // Where the last row is before today, the binned day reaches it by the
+    // slope alone (to the bin's rounding to a grain a side).
+    if (Math.floor(last.row.ts / DAY) < t.today!) {
+      const [, , c, d] = series.points[series.points.length - 1];
+      const binned = ((c ?? 0) - (d ?? 0)) / G;
+      assert.ok(Math.abs(binned - equity) <= 1 / G + 1e-9 * Math.abs(equity), `${f.name}: ${binned} vs ${equity}`);
+    }
+    checked++;
+  }
+  assert.ok(checked >= 3, `${checked} open CDPs`);
+});
+
+test("with the daily store a quiet collateral takes each day's price, and a one-day life draws the price chart", () => {
+  for (const name of ["busiest", "goldp-open"]) {
+    const f = fx(name);
+    const live = polarisFlowLive(f.chain);
+    const rp = replay(f);
+    const first = Math.floor(rp.replayed[0].row.ts / DAY);
+    const today = Math.floor(f.now / DAY);
+    // A store answer for every completed day: any price the rows do not hold.
+    const daily: [number, number][] = [];
+    for (let d = first; d < today; d++) daily.push([d, 1000 + (d - first) * 7.5]);
+    const t = polarisFlowTimeline(rp, { stable: STABLE[f.market], now: f.now, open: open(f), live, daily })!;
+    assert.equal(t.carriedWhy, undefined, `${name}: nothing carried`);
+    const m = buildFlowModel(t)!;
+    const G = rp.grain;
+    const startDay = m.start / 86_400_000;
+    const eventDays = new Set(rp.replayed.map((r) => Math.floor(r.row.ts / DAY)));
+    const s = polarisSlope(rp, open(f) ? live : null);
+    let quiet = 0;
+    for (let day = first; day < today && day - startDay < m.liveStop; day++) {
+      if (eventDays.has(day)) continue;
+      const end = (day + 1) * DAY;
+      let ei = 0;
+      while (ei + 1 < rp.replayed.length && rp.replayed[ei + 1].row.ts <= end) ei++;
+      const r = rp.replayed[ei];
+      const coll = s.held[ei].coll * s.at(ei, end).coll;
+      const st = stateAt(m, day - startDay);
+      assert.ok(
+        near(st.collateral.now / G, coll * (1000 + (day - first) * 7.5), 1e-9),
+        `${name} ${day}: the day's price`,
+      );
+      quiet++;
+    }
+    assert.ok(quiet > 0, `${name}: quiet days`);
+    const prices = flowPriceSeries(t);
+    assert.equal(prices.length, 1, `${name}: one price line`);
+    assert.ok(prices[0].points.length >= today - first, `${name}: a point a day`);
+  }
+  // A one-day life: the first row of an open CDP alone, held to today.
+  const f = fx("busiest");
+  const rp = replay(f);
+  const one: PolarisReplay = { ...rp, replayed: rp.replayed.slice(0, 1) };
+  const first = Math.floor(one.replayed[0].row.ts / DAY);
+  const today = Math.floor(f.now / DAY);
+  const daily: [number, number][] = [];
+  for (let d = first; d < today; d++) daily.push([d, 3000 + d - first]);
+  const t = polarisFlowTimeline(one, { stable: "USDp", now: f.now, open: true, live: null, daily })!;
+  const m = buildFlowModel(t)!;
+  assert.equal(flowsLife(m, t.today!), "price", "a one-day life draws the price chart alone");
+  assert.equal(flowPriceSeries(t)[0].points.length, today - first, "a point on each completed day");
 });
 
 // A redistribution, written into real rows: none of the 17 Sepolia

@@ -29,19 +29,23 @@
 // separate lines on the liquidated CDP; what a receiving CDP's touch states
 // past its legs is its Redistribution gains and Redistributed debt.
 //
-// Between rows. Interest accrues on the recorded debt at the market's rate
-// (primary + secondary, the secondary on no row), so the debt grows between
-// two rows by the next row's interest, in a straight line over the time
-// between them; after the last row, by the interest the live read states
-// pending. The PSM's shares, stability gains and reward pETH also build up
-// between touches, but nothing states them until the next row, so they step
-// on that row's day. Polaris is not in the daily price store: between events
-// the collateral keeps its latest event's price, and today's is the feed's
-// live price (the card's).
+// Between rows. Interest, the PSM's shares, stability gains and reward pETH
+// build up between touches and are written in at the next one. Each side's
+// figure runs in a straight line from what a row stated to what the next row
+// stated before its holder's act (its after less `collChange` / `debtChange`:
+// the accrued legs it wrote in); after the last row, to the live read's
+// entire collateral and debt. That line is the side's index (`FlowIndexes`,
+// basis `polaris-rows`), so the bars' totals, the line and the state card
+// state one figure; the legs still land on the row that wrote them in, and
+// the balancing items hold what built up between. The collateral is valued
+// on each completed day at the daily price store's pETH price for the market
+// (`polaris:<market>`, the feed's previewPrice() at the day's block), each
+// event day at its row's price, and today at the feed's live price (the
+// card's).
 //
 // Pure: tested offline in scripts/verify/verify-polaris-flows.ts.
 
-import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
+import type { FlowBucket, FlowDayRow, FlowEvent, FlowIndexes, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -531,6 +535,16 @@ export interface PolarisFlowOptions {
   /** The CDP is open (the page's verdict). */
   open: boolean;
   live: PolarisLive | null;
+  /** The daily price store's pETH price for the market, `[UTC day, stablecoin
+   *  per pETH]` ascending (`polarisSeriesKey`); null or absent where the store
+   *  did not answer, and a day between events keeps the last event's price. */
+  daily?: [number, number][] | null;
+}
+
+/** The daily price store's series for a market's stablecoin
+ *  (rails-ops reference/daily-prices.md, `polaris:<market>`). */
+export function polarisSeriesKey(stable: string): string | null {
+  return stable === "USDp" ? "polaris:usdp" : stable === "GOLDp" ? "polaris:goldp" : null;
 }
 
 const COLL = "coll";
@@ -551,8 +565,9 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
   const pending = live ? polarisPendingLegs(live) : [];
   const filled = new Set([...replayed.flatMap((r) => r.legs.map((l) => l.bucket)), ...pending.map((p) => p.bucket)]);
   const buckets = polarisFlowBuckets(filled);
+  const slope = polarisSlope(rp, open ? live : null);
 
-  const flowEvents: FlowEvent[] = replayed.map((r) => {
+  const flowEvents: FlowEvent[] = replayed.map((r, i) => {
     const moved = { coll: false, debt: false };
     for (const l of r.legs) {
       if (PL_ACCRUAL_KEYS.has(l.bucket)) continue;
@@ -593,8 +608,8 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
       // A liquidation is the liquidator's transaction.
       countsTx: r.row.kind === "owner",
       balances: [
-        { asset: COLL, symbol: PETH_SYMBOL, side: "collateral", amount: Math.max(0, r.coll) },
-        { asset: DEBT, symbol: o.stable, side: "debt", amount: Math.max(0, r.debt) },
+        { asset: COLL, symbol: PETH_SYMBOL, side: "collateral", amount: slope.held[i].coll, index: 1 },
+        { asset: DEBT, symbol: o.stable, side: "debt", amount: slope.held[i].debt, index: 1 },
       ],
       prices: [
         { asset: COLL, usd: cp(r) },
@@ -609,29 +624,37 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
 
   const today = Math.floor(o.now / DAY_S);
   const endDay = open ? Math.max(today, Math.floor(last.row.ts / DAY_S) + 1) : Math.floor(last.row.ts / DAY_S) + 1;
-  // Now: the live read's entire figures, else the last row's with the debt
-  // grown at its rate.
-  const growth = (r: PolarisReplayed, at: number) => 1 + r.rate * (Math.max(0, at - r.row.ts) / ONE_YEAR_S);
+  // Now: the live read's entire figures, else the last row's.
   const nowColl = open ? (live?.entireColl ?? last.coll) : 0;
-  const nowDebt = open ? (live ? Math.max(0, live.entireDebt) : last.debt * growth(last, o.now)) : 0;
+  const nowDebt = open ? (live ? Math.max(0, live.entireDebt) : last.debt) : 0;
   const priceNow = (livePrice ?? last.price) * G;
 
-  // The collateral's price: each event day the price its flows took, carried
-  // over the days between, and today's.
+  // The collateral's price: the store's on each completed day, each event
+  // day the price its flows took, and today's. Without the store, a day
+  // between events keeps the last event's price.
+  const daily = o.daily && o.daily.length > 0 ? o.daily : null;
   const collObs = new Map<number, number>();
+  for (const [d, p] of daily ?? []) if (d < today && p > 0) collObs.set(d, p * G);
   for (const r of replayed) collObs.set(Math.floor(r.row.ts / DAY_S), cp(r));
   if (livePrice != null) collObs.set(today, livePrice * G);
-  // The debt's price each day: its face grown by the interest since the
-  // day's last row, to the day's close (or now).
-  const debtObs: [number, number][] = [];
+  // Each side's index at each day's close (or now): the straight line from
+  // the day's last row to what the next row stated before its act, or after
+  // the last row to the live read. The stablecoin is one grain a token.
   const firstDay = Math.floor(replayed[0].row.ts / DAY_S);
-  let ei = 0;
+  const collRows: [number, number | null, number | null][] = [];
+  const debtRows: [number, number | null, number | null][] = [];
+  const unitObs: [number, number][] = [];
+  let ei = -1;
   for (let d = firstDay; d <= endDay; d++) {
+    unitObs.push([d, G]);
     const end = Math.min((d + 1) * DAY_S, o.now);
     while (ei + 1 < replayed.length && replayed[ei + 1].row.ts <= end) ei++;
-    const e = replayed[ei];
-    debtObs.push([d, e.row.ts <= end ? growth(e, end) * G : G]);
+    if (ei < 0) continue;
+    const at = slope.at(ei, end);
+    collRows.push([d, at.coll, null]);
+    debtRows.push([d, null, at.debt]);
   }
+  const indexes: FlowIndexes = { basis: "polaris-rows", assets: { [COLL]: collRows, [DEBT]: debtRows } };
 
   const assets: NonNullable<FlowTimeline["live"]["assets"]> = [];
   if (open) {
@@ -657,43 +680,106 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
         : {}),
     },
     todayPrices: { [COLL]: priceNow, [DEBT]: G },
-    dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: debtObs },
+    dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: unitObs },
     seriesCarry: true,
-    carriedWhy: {
-      [COLL]: "Polaris is not in the daily price store, so a day between events keeps the last event's price.",
-    },
+    ...(daily
+      ? {}
+      : {
+          carriedWhy: {
+            [COLL]: "the daily price store did not answer, so a day between events keeps the last event's price.",
+          },
+        }),
+    indexes,
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
-    words: polarisFlowWords(o.stable),
+    words: polarisFlowWords(o.stable, daily != null),
+  };
+}
+
+/** One wei: the balance a row that left a side at zero states to the model
+ *  where that side grows before the next row (a PSM share can add debt to a
+ *  CDP that owes none), so the side's line has a figure to grow from. */
+const ONE_WEI = 1e-18;
+
+/** Each side's line between rows. From row i the side runs in a straight
+ *  line from its stated after to what row i+1 stated before its holder's act
+ *  (its after less `collChange` / `debtChange`), over the time between them;
+ *  after the last row, to the live read's entire figure at its block, where
+ *  there is one, and held there. `held` is what each row states to the model
+ *  (its after, or one wei on a side at zero that grows), and `at` the side's
+ *  index at a moment after row i: what it holds then over `held`, so each
+ *  row's index at the row is 1. */
+export function polarisSlope(
+  rp: PolarisReplay,
+  live: PolarisLive | null,
+): {
+  held: { coll: number; debt: number }[];
+  at: (i: number, ts: number) => { coll: number; debt: number };
+} {
+  const rs = rp.replayed;
+  const ends = rs.map((r, i) => {
+    const next = rs[i + 1];
+    if (next)
+      return {
+        until: next.row.ts,
+        coll: units(next.row.newColl - next.row.collChange),
+        debt: units(next.row.newDebt - next.row.debtChange),
+      };
+    if (live?.open) return { until: live.ts, coll: live.entireColl, debt: Math.max(0, live.entireDebt) };
+    return { until: r.row.ts, coll: r.coll, debt: r.debt };
+  });
+  const from = (stated: number, to: number) => (stated > 0 ? stated : to > 0 ? ONE_WEI : 0);
+  const held = rs.map((r, i) => ({
+    coll: from(Math.max(0, r.coll), ends[i].coll),
+    debt: from(Math.max(0, r.debt), ends[i].debt),
+  }));
+  // A side the next row's legs take to zero runs to (nearly) zero: an index
+  // is never zero, or the day after would read the one before it.
+  const ratio = (to: number, h: number) => (h > 0 ? Math.max(to / h, 1e-12) : 1);
+  return {
+    held,
+    at: (i, ts) => {
+      const span = ends[i].until - rs[i].row.ts;
+      const f = span > 0 ? Math.min(1, Math.max(0, (ts - rs[i].row.ts) / span)) : 1;
+      return {
+        coll: 1 + f * (ratio(ends[i].coll, held[i].coll) - 1),
+        debt: 1 + f * (ratio(ends[i].debt, held[i].debt) - 1),
+      };
+    },
   };
 }
 
 /** The panel's words for a Polaris CDP. */
-export function polarisFlowWords(stable: string): NonNullable<FlowTimeline["words"]> {
+export function polarisFlowWords(stable: string, daily = false): NonNullable<FlowTimeline["words"]> {
+  const built = "in a straight line to what its next event wrote in (after the last, to the live read)";
   return {
     held: "Still deposited",
-    restBySide: { collateral: "Market move", debt: "Interest since the last event" },
+    restBySide: {
+      collateral: "Market move and pETH built up since the last event",
+      debt: "Built up since the last event",
+    },
     restNote: {
-      collateral: `the change in pETH's price, in ${stable}, since each flow`,
-      debt: "the interest built up on the recorded debt since the CDP's last event, at the rate its next event charged",
+      collateral: `the change in pETH's price, in ${stable}, since each flow, and the reward pETH and PSM shares built up since the CDP's last event, ${built}`,
+      debt: `the interest, stability gains and PSM shares built up on the debt since the CDP's last event, ${built}`,
     },
     basis: {
       collateral: `Every figure is in ${stable}, the market's stablecoin; each pETH flow is converted at the market's price feed at its block.`,
       debt: `Every figure is in ${stable}, the market's stablecoin.`,
     },
     heldBasis: {
-      collateral: `the pETH the CDP held after its last event by then, at the feed's price at that event, in ${stable}; at the latest block, the feed's price.`,
-      debt: `the ${stable} the CDP's last event recorded by then, plus the interest charged on it at the rate its next event charged (after the last, the live read's), to the end of that day.`,
+      collateral: daily
+        ? `the pETH the CDP held after its last event by then, with the reward pETH and PSM shares built up since, ${built}, at the feed's price at the close of that day, in ${stable}; at the latest block, the feed's price.`
+        : `the pETH the CDP held after its last event by then, with the reward pETH and PSM shares built up since, ${built}, at the feed's price at that event, in ${stable}; at the latest block, the feed's price.`,
+      debt: `the ${stable} the CDP's last event recorded by then, with the interest, stability gains and PSM shares built up since, ${built}, to the end of that day.`,
     },
-    linePrices: `in ${stable}, with the collateral at the feed's price of its latest event and the debt plus the interest built since`,
+    linePrices: daily
+      ? `in ${stable}, with the collateral at the feed's price at each day's close and both sides running from each event to what the next one wrote in`
+      : `in ${stable}, with the collateral at the feed's price of its latest event and both sides running from each event to what the next one wrote in`,
     moment: {
-      face: ["debt"],
       noPrice: {
         collateral: "No price is recorded for this day, so the collateral is stated in pETH only.",
       },
-      notes: [
-        "PSM shares, stability gains and reward pETH built up since the last event are not included: the CDP's next event writes them in.",
-      ],
+      notes: [],
     },
   };
 }
@@ -784,9 +870,16 @@ export interface PolarisFlowFacts {
   stabilityRows: number;
   /** The live read's pending legs were added at today's stop. */
   pendingToday: boolean;
+  /** The days between events took the daily price store's price, or kept the
+   *  last event's where the store did not answer. */
+  between: "store" | "carried";
 }
 
-export function polarisFlowFacts(rp: PolarisReplay, live: PolarisLive | null): PolarisFlowFacts {
+export function polarisFlowFacts(
+  rp: PolarisReplay,
+  live: PolarisLive | null,
+  daily: [number, number][] | null = null,
+): PolarisFlowFacts {
   const pricing: Record<PolarisPriceFrom, number> = { row: 0, nearest: 0, today: 0 };
   const has = (r: PolarisReplayed, ...ks: string[]) => r.legs.some((l) => ks.includes(l.bucket));
   for (const r of rp.replayed) if (r.legs.some((l) => PL_COLL_KEYS.has(l.bucket))) pricing[r.priceFrom]++;
@@ -799,5 +892,6 @@ export function polarisFlowFacts(rp: PolarisReplay, live: PolarisLive | null): P
     rewardRows: rs.filter((r) => has(r, PF.reward)).length,
     stabilityRows: rs.filter((r) => has(r, PF.stability)).length,
     pendingToday: !!live?.open && polarisPendingLegs(live).length > 0,
+    between: daily && daily.length > 0 ? "store" : "carried",
   };
 }

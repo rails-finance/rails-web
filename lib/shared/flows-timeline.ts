@@ -181,7 +181,9 @@ export interface FlowGrowth {
  *  a Dolomite market's supply and borrow index as the account's rows state
  *  them (lib/dolomite/flows.ts); a LlamaLend position's debt growth as its
  *  rows imply it (lib/llamalend/flows.ts); an Aave V3 Pool account on Base
- *  as its rows imply it (lib/aave-v3-base/flows.ts). */
+ *  as its rows imply it (lib/aave-v3-base/flows.ts); a Polaris CDP's
+ *  collateral and debt in a straight line from each row to what the next
+ *  wrote in (lib/polaris/flows.ts). */
 export interface FlowIndexes {
   basis:
     | "reserve-data"
@@ -191,7 +193,8 @@ export interface FlowIndexes {
     | "fluid-rows"
     | "dolomite-rows"
     | "llamalend-rows"
-    | "aave-rows";
+    | "aave-rows"
+    | "polaris-rows";
   assets: Record<string, [day: number, supply: number | null, borrow: number | null][]>;
 }
 

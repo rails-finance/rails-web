@@ -50,6 +50,7 @@ const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
   "dolomite-rows": { collateral: "supply index", debt: "borrow index" },
   "llamalend-rows": { collateral: "collateral", debt: "debt growth" },
   "aave-rows": { collateral: "supply growth", debt: "debt growth" },
+  "polaris-rows": { collateral: "collateral line", debt: "debt line" },
 };
 const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "the Pool's ReserveDataUpdated logs, grown at the logged rate to the moment",
@@ -66,6 +67,8 @@ const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
     "the position's rows (the debt before each row over the debt after the row before), grown at the rate between them to the moment, and after the last row at the rate that meets today's live debt",
   "aave-rows":
     "the account's rows (each row's balance before it over the balance after the reserve's row before), in a straight line between two rows and to the Pool's balance today after the last",
+  "polaris-rows":
+    "the CDP's rows (what each row stated before its holder's act over what the row before stated), in a straight line between two rows and to the live read's entire figures after the last",
 };
 /** Whose index it is, and what the grown balance is to the chain's. */
 const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
@@ -77,6 +80,7 @@ const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
   "dolomite-rows": "the market's",
   "llamalend-rows": "the market's",
   "aave-rows": "the reserve's",
+  "polaris-rows": "the CDP's",
 };
 const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
@@ -92,7 +96,16 @@ const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
     "The index runs in a straight line between the two rows around the day, so this is the Controller's debt to within how the market's rate moved between them.",
   "aave-rows":
     "The index runs in a straight line between the two rows around the day, so this is the Pool's balance to within how the reserve's rate moved between them.",
+  "polaris-rows":
+    "The line runs straight between the two rows around the day, so this is the CDP's entire figure to within how the rate and the PSM's mints and redemptions moved between them.",
 };
+/** Where a basis grows a balance by more than interest (a Polaris CDP: the
+ *  interest, stability gains, reward pETH and PSM shares its next row writes
+ *  in), the card's words for it; absent, interest. */
+const ACCRUAL: Partial<Record<FlowGrowth["basis"], { label: string; by: string; what: string }>> = {
+  "polaris-rows": { label: "Built up", by: "what built up", what: "built up" },
+};
+const accrualLabel = (g: FlowGrowth | null) => (g && ACCRUAL[g.basis]?.label) ?? "Interest";
 const fmtIndex = (v: number) =>
   v.toLocaleString("en-US", { minimumSignificantDigits: 12, maximumSignificantDigits: 12 });
 const plural = (n: number, w: string) => `${n.toLocaleString("en-US")} ${w}${n === 1 ? "" : "s"}`;
@@ -195,7 +208,7 @@ export function FlowMomentCard({
     a.grown
       ? {
           kind: "chain-derived",
-          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the last event recorded on ${dayStamp(a.grown.recordedDay * DAY_S)}, grown by the interest since: ${INDEX_OWNER[a.grown.basis]} ${INDEX_NAME[a.grown.basis][side]} at the close of ${date} over its value at that event. ${INDEX_CLAIM[a.grown.basis]}`,
+          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the last event recorded on ${dayStamp(a.grown.recordedDay * DAY_S)}, grown by ${ACCRUAL[a.grown.basis]?.by ?? "the interest"} since: ${INDEX_OWNER[a.grown.basis]} ${INDEX_NAME[a.grown.basis][side]} at the close of ${date} over its value at that event. ${INDEX_CLAIM[a.grown.basis]}`,
           formula: "recorded balance × index at the close ÷ index at the event",
           inputs: indexInputs(side, a, a.grown),
         }
@@ -243,7 +256,7 @@ export function FlowMomentCard({
     const g = a.grown as FlowGrowth;
     return {
       kind: "chain-derived",
-      summary: `${a.symbol} interest ${side === "collateral" ? "earned" : "owed"} to ${when} — from the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by ${INDEX_OWNER[g.basis]} ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
+      summary: `${a.symbol} ${ACCRUAL[g.basis]?.what ?? `interest ${side === "collateral" ? "earned" : "owed"}`} to ${when} — from the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by ${INDEX_OWNER[g.basis]} ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
       formula:
         a.interestUsd != null
           ? "recorded × (index at the close ÷ index at the event − 1) × price"
@@ -433,7 +446,7 @@ export function FlowMomentCard({
       rows.push({
         key: `${side}-${a.symbol}-interest`,
         line: `${side}-interest`,
-        label: `Interest since ${dayStamp(sinceDay(a) * DAY_S)}`,
+        label: `${accrualLabel(a.grown)} since ${dayStamp(sinceDay(a) * DAY_S)}`,
         role: "interest",
         seg: null,
         tokens: { units: interestUnits, text: signedTokens(interestUnits, decimals) },
@@ -507,7 +520,10 @@ export function FlowMomentCard({
               {
                 key: `asset-${a.symbol}-interest`,
                 label: interest.label,
-                tip: `The interest the ${a.symbol} accrued between its last event and this day's close.`,
+                tip:
+                  a.grown && ACCRUAL[a.grown.basis]
+                    ? `What built up on the ${a.symbol} between its last event and this day's close.`
+                    : `The interest the ${a.symbol} accrued between its last event and this day's close.`,
                 amount: { text: interest.tokens?.text ?? "", symbol: a.symbol, info: provs.token?.(interest) },
                 usd: usdOf(interest),
               },
@@ -562,6 +578,11 @@ export function FlowMomentCard({
     const days = new Set(moment.sides[side].assets.map((a) => a.grown?.recordedDay ?? null));
     const verb = side === "collateral" ? "earned" : "owed";
     const one = days.size === 1 ? [...days][0] : null;
+    const g = moment.sides[side].assets.find((a) => a.grown)?.grown;
+    if (g && ACCRUAL[g.basis])
+      return one != null
+        ? `as the last event left it on ${dayStamp(one * DAY_S)}, with what built up since, to the close of ${date}.`
+        : `each balance as its last event left it, with what built up since, to the close of ${date}.`;
     return one != null
       ? `as the last event left it on ${dayStamp(one * DAY_S)}, grown by the interest ${verb} since, to the close of ${date}.`
       : `each balance as its last event left it, grown by the interest ${verb} since, to the close of ${date}.`;
@@ -593,18 +614,21 @@ export function FlowMomentCard({
         {(() => {
           const g = sides.flatMap((s) => moment.sides[s].assets).find((a) => a.grown)?.grown;
           if (!g) return null;
-          return g.basis === "aave-rows"
-            ? " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event. The index runs in a straight line between the account's rows, so this is the Pool's balance to within how the rate moved between them."
-            : g.basis === "ctoken-rows" || g.basis === "dolomite-rows"
-              ? " Each balance is grown by the interest since its last event: the balance that event recorded × the market's index at the close of the day ÷ its index at that event. The index runs in a straight line between the account's rows, so this is the chain's balance to within how the rate moved between them."
-              : g.basis === "fluid-rows"
-                ? " Each balance is grown by the interest since its last event: the balance that event recorded × the vault's exchange price at the close of the day ÷ its exchange price at that event. The exchange price runs in a straight line between the position's rows, so this is the vault's balance to within how its rate moved between them."
-                : g.basis === "llamalend-rows"
-                  ? " The debt is grown by the interest since its last event, at the rate the market charged between that event and the next (after the last, the rate that meets today's live debt), so this is the Controller's debt to within how the rate moved between them."
-                  : " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held.";
+          return g.basis === "polaris-rows"
+            ? " Each side runs in a straight line from what the CDP's last event stated to what its next event wrote in before the holder's act: the interest, stability gains, reward pETH and PSM shares that built up between them (after the last event, to the live read's entire figures)."
+            : g.basis === "aave-rows"
+              ? " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event. The index runs in a straight line between the account's rows, so this is the Pool's balance to within how the rate moved between them."
+              : g.basis === "ctoken-rows" || g.basis === "dolomite-rows"
+                ? " Each balance is grown by the interest since its last event: the balance that event recorded × the market's index at the close of the day ÷ its index at that event. The index runs in a straight line between the account's rows, so this is the chain's balance to within how the rate moved between them."
+                : g.basis === "fluid-rows"
+                  ? " Each balance is grown by the interest since its last event: the balance that event recorded × the vault's exchange price at the close of the day ÷ its exchange price at that event. The exchange price runs in a straight line between the position's rows, so this is the vault's balance to within how its rate moved between them."
+                  : g.basis === "llamalend-rows"
+                    ? " The debt is grown by the interest since its last event, at the rate the market charged between that event and the next (after the last, the rate that meets today's live debt), so this is the Controller's debt to within how the rate moved between them."
+                    : " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held.";
         })()}{" "}
-        The breakdown lists each asset: what it comes to at the close, and where interest built, what its last event
-        left and the interest since.
+        {sides.some((s) => moment.sides[s].assets.some((a) => a.grown && ACCRUAL[a.grown.basis]))
+          ? "The breakdown lists each asset: what it comes to at the close, what its last event left and what built up since."
+          : "The breakdown lists each asset: what it comes to at the close, and where interest built, what its last event left and the interest since."}
       </p>
       {sides.map((s) => {
         const n = sideNote(s);
