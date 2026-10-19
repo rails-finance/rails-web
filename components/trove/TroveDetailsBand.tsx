@@ -10,6 +10,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { troveDebtInFrontProv, troveTrovesAheadProv } from "@/lib/liquity/trove-queue-provenance";
 import { troveAnnualCostProv } from "@/lib/liquity/trove-card-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 interface TroveDetailsBandProps {
   trove: TroveSummary;
@@ -93,7 +94,7 @@ export function TroveDetailsBand({
         {trove.batch.isMember && (
           <span className="inline-flex items-center gap-1">
             <Prov info={feeProv} value={formatExact(trove.batch.managementFee)}>
-              +{trove.batch.managementFee}%
+              <PanelFigure>+{trove.batch.managementFee}%</PanelFigure>
             </Prov>
             <Users className="w-3 h-3 shrink-0 text-pink-500" aria-hidden="true" />
           </span>
