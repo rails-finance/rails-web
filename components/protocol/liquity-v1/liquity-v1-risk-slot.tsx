@@ -19,6 +19,9 @@ import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { StatValue } from "@/components/shared/stat-value";
 import { AmountText } from "@/components/shared/amount-text";
+import { TokenFigure } from "@/components/shared/token-figure";
+import { FadeNumber } from "@/components/ui/FadeNumber";
+import { fmtLusd } from "@/lib/liquity-v1/event-figures";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fmtPrice } from "@/components/shared/price-pill";
 import type { PositionPanelColumns } from "@/components/shared/position-card";
@@ -46,7 +49,9 @@ export function LiquityV1RiskHeadline({ chain }: { chain: LiquityV1PositionChain
   if (chain.icr == null) return null;
   return (
     <StatValue>
-      <Prov info={icrProv()}>{pct(chain.icr)}</Prov>
+      <Prov info={icrProv()}>
+        <FadeNumber value={chain.icr * 100} decimals={1} />%
+      </Prov>
     </StatValue>
   );
 }
@@ -75,9 +80,11 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
               tip: V1_WORDS.tip_debt_in_front,
               value: (
                 <>
-                  <Prov info={debtInFrontProv()}>
-                    <AmountText value={chain.debtInFront} format="compact" /> {DEBT_SYMBOL}
-                  </Prov>
+                  <TokenFigure symbol={DEBT_SYMBOL} figure={`${fmtLusd(chain.debtInFront)} ${DEBT_SYMBOL}`}>
+                    <Prov info={debtInFrontProv()}>
+                      <AmountText value={chain.debtInFront} format="compact" />
+                    </Prov>
+                  </TokenFigure>
                   {share != null && (
                     <span className="text-rb-500">
                       {" "}
@@ -122,9 +129,10 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
         tip: `The LUSD this Trove could still owe before its ratio falls to the ${activeLabel} minimum${chain.recoveryMode ? " that Recovery Mode applies" : ""}, from its collateral at the PriceFeed price at the latest block.`,
         value: (
           <Prov info={borrowHeadroomProv(activeLabel)}>
-            <AmountText value={headroomLusd} format="compact" /> {DEBT_SYMBOL}
+            <AmountText value={headroomLusd} format="compact" />
           </Prov>
         ),
+        asset: { symbol: DEBT_SYMBOL, figure: `${fmtLusd(headroomLusd)} ${DEBT_SYMBOL}` },
       },
     ],
   ];
