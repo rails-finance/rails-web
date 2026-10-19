@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
-import { moonwellEventHeading, moonwellEventPageDescription } from "@/lib/moonwell/explorer";
+import { moonwellEventPageDescription, moonwellEventTabWords } from "@/lib/moonwell/explorer";
 import { loadMoonwellPositionTail } from "@/lib/moonwell/position-page-data";
 import MoonwellPositionPage from "../../page";
 
@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "moonwell",
     subject: wallet,
     canonicalPath: `/ethereum/moonwell/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: moonwellEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: moonwellEventTabWords(event), timestamp: event.timestamp } : null,
     description: event ? moonwellEventPageDescription("ethereum", wallet, event.timestamp) : undefined,
   });
 }

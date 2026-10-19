@@ -8,6 +8,8 @@ import { formatDateLong } from "@/lib/date";
 import { isMoonwellEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
+import { externalActor } from "@/lib/shared/external-actor";
+import { moonwellEventProse } from "@/lib/moonwell/event-prose";
 
 const WORDS = {
   paragraph: (deployment: string) => `This page is one transaction from this account's history in ${deployment}.`,
@@ -58,6 +60,24 @@ export function moonwellEventTitle(event: BaseActivityEvent, deployment: "ethere
 /** The event's heading: the title in words. Also read on the server. */
 export function moonwellEventHeading(event: BaseActivityEvent, deployment: "ethereum" | "base" = "ethereum"): string {
   return eventTitleWords(moonwellEventTitle(event, deployment));
+}
+
+/** The browser title's last words (rails-ops decision 0045, "Ruled since"):
+ *  the Explanation's first sentence, which the card's teaser and the page's
+ *  h1 state, else the heading. The market's identity is the deployment's, as
+ *  the card resolves it (lib/moonwell/deployment-context.tsx). Read on the
+ *  server. */
+export function moonwellEventTabWords(event: BaseActivityEvent, deployment: "ethereum" | "base" = "ethereum"): string {
+  if (!isMoonwellEvent(event)) return moonwellEventHeading(event, deployment);
+  const ctx = event.context.data;
+  const listed = deployment === "ethereum" ? MOONWELL_MARKET_BY_KEY[ctx.market] : undefined;
+  const { L4 } = moonwellEventProse({
+    ctx,
+    externalBy: externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet) ?? undefined,
+    mtoken: listed ? listed.mtoken : deployment === "base" ? ctx.market : undefined,
+    marketLabel: listed?.mSymbol ?? `m${ctx.marketSymbol}`,
+  });
+  return L4[0]?.text ?? moonwellEventHeading(event, deployment);
 }
 
 /** The page's metadata description, also read on the server. */
