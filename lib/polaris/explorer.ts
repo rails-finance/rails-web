@@ -6,7 +6,8 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isPolarisEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { polarisT1Caption, polarisT1Words } from "@/lib/polaris/event-prose";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 
 const WORDS = {
@@ -75,9 +76,11 @@ export function polarisEventTitle(event: BaseActivityEvent): EventTitle {
 
 const stableAddress = (market: PolarisMarket) => POLARIS_MARKET_CONFIG[market].stable.address;
 
-/** The event's heading: the title in words. Also read on the server. */
+/** The event's heading: the timeline head's words (decision 0045), the past
+ *  participle and its clause: "Liquidated · 0.3231 pETH claimable". Also read
+ *  on the server, for the tab title. */
 export function polarisEventHeading(event: BaseActivityEvent): string {
-  return eventTitleWords(polarisEventTitle(event));
+  return isPolarisEvent(event) ? polarisT1Caption(polarisT1Words(event.context.data)) : event.actionLabel;
 }
 
 /** The page's metadata description, also read on the server. */
