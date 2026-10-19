@@ -31,7 +31,7 @@ import {
   type PositionCardStatus,
 } from "@/components/shared/position-card";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
-import { collAmount, usdPrice } from "@/lib/makerdao/price-format";
+import { usdPrice } from "@/lib/makerdao/price-format";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -45,8 +45,7 @@ import {
   peakInkProv,
   peakDebtProv,
 } from "@/lib/makerdao/event-provenance";
-import { formatNumber } from "@/lib/utils/format";
-import { formatUsd } from "@/lib/shared/format-event";
+import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { makerPositionModal } from "@/lib/makerdao/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
@@ -318,7 +317,7 @@ export function makerVaultCardSlots({
         value:
           v.peakInk > 0 ? (
             <Prov info={peakInkProv(v.collateralSymbol, { ilk: v.ilk })}>
-              <AssetAmount value={v.peakInk} symbol={v.collateralSymbol} display={collAmount(v.peakInk)} />
+              <AssetAmount value={v.peakInk} symbol={v.collateralSymbol} />
             </Prov>
           ) : null,
       },
@@ -363,7 +362,7 @@ export function makerVaultCardSlots({
       usd:
         v.collateralUsd != null ? (
           <Prov info={collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0)}>
-            <span className="font-bold text-green-400">{formatUsd(v.collateralUsd)}</span>
+            <span className="font-bold text-green-400">{formatUsdValue(v.collateralUsd)}</span>
           </Prov>
         ) : null,
       // The feed is capped under the oracle, so the value is at the cap
@@ -390,9 +389,10 @@ export function makerVaultCardSlots({
           <Prov info={vaultArtProv(v.atBlock, false, v.source)}>{artHuman} art</Prov>
         ),
       usd:
-        v.debtDai != null && v.rate && v.debtDai > 0 ? (
+        // A zero debt states its zero dollars, as Liquity V2's does.
+        v.debtDai != null && v.rate && v.debtDai >= 0 ? (
           <Prov info={debtUsdProv(debtSym, v.debtDai)}>
-            <span className="font-bold text-green-400">{formatUsd(v.debtDai)}</span>
+            <span className="font-bold text-green-400">{formatUsdValue(v.debtDai)}</span>
           </Prov>
         ) : null,
     },
@@ -405,7 +405,7 @@ export function makerVaultCardSlots({
         ratio != null ? (
           <Prov
             info={collateralRatioProv(
-              v.collateralUsd != null ? formatUsd(v.collateralUsd) : "—",
+              v.collateralUsd != null ? formatUsdValue(v.collateralUsd) : "—",
               v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
             )}
           >
