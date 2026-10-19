@@ -4,7 +4,10 @@
 // (lib/morpho/event-prose.ts, its strings in content/morpho/event-prose.yaml),
 // one bullet each, under the three event headings when two of them hold two
 // or more bullets. Each figure the header or the forensics block also prints
-// echoes that receipt. The "?" modal depends on the event's kind only.
+// echoes that receipt. The "?" modal depends on the event's kind only. The
+// event page's card passes the first sentence as its title
+// (`MorphoExplainerLead`, rails-ops decision 0045, "Ruled since") and the pane
+// opens on the second (`leadOnTitle`).
 
 import type { MorphoContext } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
@@ -32,6 +35,9 @@ export interface MorphoEventExplainerProps {
   blockNumber?: number;
   /** The event's id, to find its neighbours (lib/morpho/timeline-neighbours). */
   eventId?: string;
+  /** The event page states the first sentence as its title: the pane leaves
+   *  it out. */
+  leadOnTitle?: boolean;
 }
 
 /** The event's "?" modal (it depends on the event's kind, and on whether the
@@ -83,7 +89,8 @@ function echoFor(
   }
 }
 
-export function MorphoEventExplainer({ ctx, txHash, blockNumber, eventId }: MorphoEventExplainerProps) {
+/** The generator's sentences for the event and the echo each figure takes. */
+function useMorphoProse({ ctx, txHash, blockNumber, eventId }: MorphoEventExplainerProps) {
   const chainId = useChainId();
   const coords: MorphoCoords = {
     txHash,
@@ -108,10 +115,24 @@ export function MorphoEventExplainer({ ctx, txHash, blockNumber, eventId }: Morp
     blockNumber,
   });
   const echo = (key: MorphoEchoKey) => echoFor(key, ctx, coords, prose.values);
-  const items = morphoExplanationRuns(prose).flatMap((run) =>
-    run.sentences.map((s) => {
+  return { runs: morphoExplanationRuns(prose), echo };
+}
+
+/** The Explanation's first sentence as printed (the first run's first), for
+ *  the event page's title. */
+export function MorphoExplainerLead(props: MorphoEventExplainerProps) {
+  const { runs, echo } = useMorphoProse(props);
+  const lead = runs[0]?.sentences[0];
+  return lead ? <ProseSentenceText s={lead} echo={echo} /> : null;
+}
+
+export function MorphoEventExplainer(props: MorphoEventExplainerProps) {
+  const { runs, echo } = useMorphoProse(props);
+  const items = runs.flatMap((run, r) =>
+    run.sentences.flatMap((s, i) => {
+      if (props.leadOnTitle && r === 0 && i === 0) return [];
       const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
-      return run.heading ? { group: run.heading, node } : node;
+      return [run.heading ? { group: run.heading, node } : node];
     }),
   );
   return <ProseExplainer items={items} />;

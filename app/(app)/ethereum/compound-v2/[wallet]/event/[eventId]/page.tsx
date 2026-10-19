@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { loadCompoundV2PositionTail } from "@/lib/compound-v2/position-page-data";
-import { compoundV2EventHeading, compoundV2EventPageDescription } from "@/lib/compound-v2/explorer";
+import { compoundV2EventPageDescription, compoundV2EventTabWords } from "@/lib/compound-v2/explorer";
 import CompoundV2PositionPage from "../../page";
 
 interface Props {
@@ -36,7 +36,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     session: "compound-v2",
     subject: wallet,
     canonicalPath: `/ethereum/compound-v2/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: compoundV2EventHeading(event), timestamp: event.timestamp } : null,
+    // The tab names the event in the Explanation's first sentence, as the h1.
+    event: event
+      ? { actionLabel: compoundV2EventTabWords(event, tail.events ?? []), timestamp: event.timestamp }
+      : null,
     description: event ? compoundV2EventPageDescription(wallet, event.timestamp) : undefined,
   });
 }

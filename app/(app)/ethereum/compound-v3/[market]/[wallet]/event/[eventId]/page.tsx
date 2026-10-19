@@ -3,7 +3,7 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { marketOf } from "@/lib/compound/asset-catalog";
 import { loadCompoundPositionTail } from "@/lib/compound/position-page-data";
-import { compoundEventHeading, compoundEventPageDescription } from "@/lib/compound/explorer";
+import { compoundEventPageDescription, compoundEventTabWords } from "@/lib/compound/explorer";
 import CompoundPositionPage from "../../page";
 
 interface Props {
@@ -39,7 +39,9 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     subject: wallet,
     market: marketOf(market).baseSymbol,
     canonicalPath: `/ethereum/compound-v3/${market}/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: compoundEventHeading(event, "ethereum"), timestamp: event.timestamp } : null,
+    event: event
+      ? { actionLabel: compoundEventTabWords(event, "ethereum", tail.events ?? []), timestamp: event.timestamp }
+      : null,
     description: event ? compoundEventPageDescription(event, wallet, "ethereum") : undefined,
   });
 }

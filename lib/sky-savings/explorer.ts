@@ -10,6 +10,7 @@ import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/e
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
 import { skyTransition, units } from "@/lib/sky-savings/math";
 import { SKY_EVENT_LABEL } from "@/lib/sky-savings/event-label";
+import { skyFirstSentence } from "@/lib/sky-savings/explainer-clauses";
 
 const WORDS = {
   paragraph: "This page is one transaction from this saver's sUSDS history.",
@@ -47,6 +48,14 @@ export function skySavingsEventTitle(event: BaseActivityEvent): EventTitle {
 /** The event's heading: the title in words. Also read on the server. */
 export function skySavingsEventHeading(event: BaseActivityEvent): string {
   return eventTitleWords(skySavingsEventTitle(event));
+}
+
+/** The browser title's event words: the Explanation's first sentence, which
+ *  the page's h1 states (rails-ops decision 0045, "Ruled since"), else the
+ *  heading. Also read on the server. */
+export function skySavingsEventPageTitle(event: BaseActivityEvent): string {
+  if (!isSkySavingsEvent(event)) return skySavingsEventHeading(event);
+  return skyFirstSentence(event.context.data) ?? skySavingsEventHeading(event);
 }
 
 /** The page's metadata description, also read on the server. */

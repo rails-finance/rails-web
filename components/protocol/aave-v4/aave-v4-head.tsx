@@ -8,13 +8,18 @@
 // reserve, the borrow rate on a borrow or repay, the acting party where it is
 // not the owner, and "2 of 3" first where the transaction holds several of the
 // position's operations.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words
+// (`aaveV4T1Kind`, lib/aave-v4/event-label.ts): the past-participle kind, the
+// "by" chip and the "2 of 3" chip. The spine carries the amounts and a
+// liquidation's legs; the borrow rate is in the Figures sheet.
 
 import { formatExact } from "@/lib/utils/format";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
-import { AAVE_V4_LABELS } from "@/lib/aave-v4/event-label";
+import { AAVE_V4_LABELS, aaveV4T1Kind } from "@/lib/aave-v4/event-label";
 import type { Provenance } from "@/components/shared/provenance";
 import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { eventLogProv, heldDebtRateProv, externalActorProv } from "@/lib/aave-v4/position-provenance";
@@ -124,6 +129,7 @@ export function useAaveV4HeadSpec({
   blockNumber,
   txGroup,
   externalBy,
+  mode = "title",
 }: {
   ctx: AaveV4Context;
   txHash?: string;
@@ -131,6 +137,9 @@ export function useAaveV4HeadSpec({
   txGroup?: AaveV4TxGroup;
   /** Third-party actor (the card's externalActor() verdict). */
   externalBy?: string;
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
 }): ChainTruthRowSpec {
   const { showInterestRates, showTickerLabels } = useTimelineDisplay();
   const coord = { spokeName: ctx.spokeName, spokeAddress: ctx.spokeAddress, txHash, blockNumber };
@@ -191,6 +200,29 @@ export function useAaveV4HeadSpec({
         }
       : undefined;
 
+  const externalActor =
+    !isLiq && externalBy && ctx.owner && ctx.txFrom && ctx.caller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: ctx.owner, txFrom: ctx.txFrom, caller: ctx.caller },
+            { ...coord, asset: ctx.reserveSymbol },
+          ),
+        }
+      : undefined;
+  const sameBlock =
+    txGroup && txGroup.count > 1
+      ? {
+          index: txGroup.index,
+          count: txGroup.count,
+          title: `Operation ${txGroup.index} of ${txGroup.count} in this transaction`,
+          lead: true,
+        }
+      : undefined;
+
+  if (mode === "row")
+    return { label: aaveV4T1Kind(ctx), critical: isLiq || undefined, deltas: [], externalActor, sameBlock };
+
   return {
     label: ctx.alsoToggledCollateral ? "Enable" : labelOf(ctx),
     status: ctx.alsoToggledCollateral ? "open" : undefined,
@@ -201,24 +233,7 @@ export function useAaveV4HeadSpec({
         ? { symbol: ctx.reserveSymbol, text: aaveV4DisplaySymbol(ctx.reserveSymbol) }
         : undefined,
     ratePill,
-    externalActor:
-      !isLiq && externalBy && ctx.owner && ctx.txFrom && ctx.caller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: ctx.owner, txFrom: ctx.txFrom, caller: ctx.caller },
-              { ...coord, asset: ctx.reserveSymbol },
-            ),
-          }
-        : undefined,
-    sameBlock:
-      txGroup && txGroup.count > 1
-        ? {
-            index: txGroup.index,
-            count: txGroup.count,
-            title: `Operation ${txGroup.index} of ${txGroup.count} in this transaction`,
-            lead: true,
-          }
-        : undefined,
+    externalActor,
+    sameBlock,
   };
 }

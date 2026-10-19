@@ -1,9 +1,11 @@
 // The gas compensation escrow of Liquity V2 and its forks: the constant each
 // deployment states (lib/<family>/event-provenance.ts), what an event does to
-// it, and its receipt. The card's parts are components/protocol/liquity-family/
-// gas-escrow.ts (rails-ops TO-DO-ui-jobs 363, 366).
+// it, its receipt, and the sheet's footnote line, which Polaris states too.
+// The card's parts are components/protocol/liquity-family/gas-escrow.ts
+// (rails-ops TO-DO-ui-jobs 363, 366, 388).
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
+import type { SheetFigure, SheetFootnote } from "@/components/shared/event-sheet";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 
 /** One deployment's escrow constant and where it was read. */
@@ -28,6 +30,39 @@ export type GasEscrowMove = "sent" | "held" | "returned" | "paid";
 /** The escrow's move at a holder event of an open Trove. */
 export function gasEscrowMove(kind: { open: boolean; close: boolean; liquidation: boolean }): GasEscrowMove {
   return kind.open ? "sent" : kind.close ? "returned" : kind.liquidation ? "paid" : "held";
+}
+
+/** The footnote's words after the figures, the same on every family. */
+const NOTE_WORDS: Record<GasEscrowMove, string> & { name: string } = {
+  name: "Gas compensation escrow",
+  sent: "held in escrow since the open",
+  held: "held in escrow",
+  returned: "returned from escrow",
+  paid: "paid from escrow to the liquidator",
+};
+
+/** The escrow's footnote under Risk and Limits on every event from the open
+ *  (`data-sheet-note="escrow"`): the amount, its dollars where the page
+ *  carries a price for the token, and what the event did with it. */
+export function gasEscrowFootnote(a: {
+  move: GasEscrowMove;
+  amount: number;
+  /** The amount as the sheet prints it. */
+  text: string;
+  symbol: string;
+  /** The receipt for the amount at this event. */
+  info: Provenance;
+  usd?: SheetFigure;
+  tip: string;
+}): SheetFootnote {
+  return {
+    key: "escrow",
+    amount: { text: a.text, symbol: a.symbol, info: a.info, value: String(a.amount) },
+    usd: a.usd,
+    words: NOTE_WORDS[a.move],
+    tip: a.tip,
+    name: NOTE_WORDS.name,
+  };
 }
 
 /** The receipt for the escrow at an event. `verify` and `inputs` are the

@@ -31,7 +31,7 @@ import {
   liquityGasEscrowProv,
 } from "@/lib/liquity/event-provenance";
 import { gasEscrowMove } from "@/lib/shared/liquity-gas-escrow";
-import { gasEscrowSide } from "@/components/protocol/liquity-family/gas-escrow";
+import { gasEscrowNote } from "@/components/protocol/liquity-family/gas-escrow";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { isLiquityEvent } from "@/lib/shared/types/activity";
@@ -865,38 +865,23 @@ export function useLiquityCells({
     totalTip: TIP.collTotal,
   };
 
-  // The gas compensation escrow: a panel of its own between Collateral and
-  // Debt on every event from the open to the close or the liquidation,
-  // outside the Collateral total and the ratio (rails-ops TO-DO-ui-jobs 363,
-  // 366). WETH on every branch; the WETH branch's price is WETH's, the other
-  // branches' events carry no WETH price and state the amount alone.
+  // The gas compensation escrow: a footnote under Risk and Limits on every
+  // event from the open to the close or the liquidation (rails-ops
+  // TO-DO-ui-jobs 388). WETH on every branch; the WETH branch's price is
+  // WETH's, the other branches' events carry no WETH price and state the
+  // amount alone.
   const escrowMove = gasEscrowMove({
     open: ctx.operation === "openTrove" || ctx.operation === "openTroveAndJoinBatch",
     close: isClose,
     liquidation: !!isLiquidation,
   });
   const wethBranch = collSym === "WETH" || collSym === "ETH";
-  const escrowSide = gasEscrowSide({
+  const escrowNote = gasEscrowNote({
     escrow: LIQUITY_V2_GAS_ESCROW,
     move: escrowMove,
-    words: {
-      name: L2_WORDS.sheet_escrow,
-      tip: L2_WORDS.tip_escrow,
-      sent: L2_WORDS.sheet_escrow_sent,
-      returned: L2_WORDS.sheet_escrow_returned,
-      paid: L2_WORDS.sheet_escrow_paid,
-      tipSent: L2_WORDS.tip_escrow_sent,
-      tipReturned: L2_WORDS.tip_escrow_returned,
-      tipPaid: L2_WORDS.tip_escrow_paid,
-      tipLast: L2_WORDS.tip_escrow_last,
-      tipMarket: L2_WORDS.tip_escrow_market,
-      tipBefore: L2_WORDS.tip_escrow_before,
-      tipTotal: L2_WORDS.tip_escrow_total,
-      tipTotalUnpriced: L2_WORDS.tip_escrow_total_unpriced,
-    },
-    prices: wethBranch ? { now: priceNow > 0 ? priceNow : null, prev: prevPrice ?? null } : { now: null, prev: null },
+    tip: L2_WORDS.tip_escrow_note,
+    price: wethBranch ? priceNow : null,
     info: liquityGasEscrowProv(escrowMove, coords),
-    held: liquityGasEscrowProv("held", coords),
     fmt: formatColl,
   });
 
@@ -1144,7 +1129,8 @@ export function useLiquityCells({
       ? (rateCell(isClose).sub ?? [])
       : [];
   const sheet: EventSheet = {
-    sides: [collSide, escrowSide, debtSide],
+    sides: [collSide, debtSide],
+    footnotes: [escrowNote],
     panels: [
       { panel: "risk", rows: risk },
       {

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { spokeFromSlug } from "@/lib/aave-v4/spoke-meta";
 import { loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
-import { aaveV4EventHeading, aaveV4EventPageDescription } from "@/lib/aave-v4/explorer";
+import { aaveV4EventPageDescription, aaveV4EventTabWords } from "@/lib/aave-v4/explorer";
 import AaveV4SpokePage from "../../page";
 
 interface Props {
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: rawWallet,
     market: spokeName,
     canonicalPath: `/ethereum/aave-v4/spoke/${rawSpoke}/${rawWallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: aaveV4EventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: aaveV4EventTabWords(event, tail?.events ?? []), timestamp: event.timestamp } : null,
     description: event ? aaveV4EventPageDescription(spokeName, rawWallet, event.timestamp) : undefined,
   });
 }

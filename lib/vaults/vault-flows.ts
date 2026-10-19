@@ -26,6 +26,8 @@ import type { VaultHolderEvent } from "@/lib/shared/vault-holder-timeline";
 
 const DAY_S = 86_400;
 const DUST = 1e-12;
+/** A held figure below this share of the panel's largest is drawn as none. */
+const HELD_FLOOR = 1e-9;
 const SHARE = "share";
 
 const BUCKETS: FlowBucket[] = [
@@ -96,6 +98,16 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
   const scale = unitScaleFor(peak);
   const G = 10 ** scale;
 
+  // A HOLDING TOO SMALL TO DRAW IS DRAWN AS NONE. A router that deposits and
+  // forwards in one transaction can keep one base unit of shares between its
+  // rows (1 wei of waEthWETH, 0.000001 waEthUSDT: ui-jobs 379). A held figure
+  // below a billionth of the panel's largest is no height on the line at any
+  // width, and the shared axis cannot be built over a peak that small
+  // (`axisFor`), so it is drawn as none held, and a live balance under it as
+  // closed. The card above the panel states the balance as read.
+  const floor = peak * HELD_FLOOR;
+  const drawnShares = (shares: number, price: number): number => (shares > 0 && shares * price >= floor ? shares : 0);
+
   const flowEvents: FlowEvent[] = rows.map((e, i) => {
     const b = BUCKET_OF[e.kind];
     const shares = Math.abs(toUnits(e.sharesDelta, o.shareDecimals));
@@ -115,7 +127,7 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
           asset: SHARE,
           symbol: o.shareSymbol,
           side: "collateral",
-          amount: Math.max(0, toUnits(e.balanceAfter, o.shareDecimals)),
+          amount: drawnShares(toUnits(e.balanceAfter, o.shareDecimals), priceOf[i]),
         },
       ],
       prices: [{ asset: SHARE, usd: priceOf[i] * G }],
@@ -130,7 +142,7 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
 
   const today = Math.floor(o.blockTimestamp / DAY_S);
   const lastRow = rows[rows.length - 1];
-  const open = sharesNow > DUST;
+  const open = sharesNow > DUST && drawnShares(sharesNow, priceNow ?? priceOf[priceOf.length - 1]) > 0;
   const lastDay = Math.floor(lastRow.timestamp / DAY_S);
   // The share price on each day a row read one (its last that day), and today
   // the page's read: a day between keeps the last (`seriesCarry`).

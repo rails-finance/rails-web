@@ -8,6 +8,7 @@ import { formatDateLong } from "@/lib/date";
 import { isAaveV4Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { aaveV4Label } from "@/lib/aave-v4/event-label";
+import { aaveV4EventProse, type AaveV4Event } from "@/lib/aave-v4/event-prose";
 
 const WORDS = {
   paragraph: (spoke: string) => `This page is one transaction from this account's history on the ${spoke} spoke.`,
@@ -50,6 +51,22 @@ export function aaveV4EventTitle(event: BaseActivityEvent): EventTitle {
 /** The event's heading: the title in words. Also read on the server. */
 export function aaveV4EventHeading(event: BaseActivityEvent): string {
   return eventTitleWords(aaveV4EventTitle(event));
+}
+
+/** The browser title's last words (rails-ops decision 0045, "Ruled since"):
+ *  the Explanation's first sentence, which the page's h1 states, else the
+ *  heading. `events`: the timeline's events, for the same-transaction seam.
+ *  Read on the server. */
+export function aaveV4EventTabWords(event: BaseActivityEvent, events: readonly BaseActivityEvent[]): string {
+  if (!isAaveV4Event(event)) return aaveV4EventHeading(event);
+  const self = event as AaveV4Event;
+  const siblings = events.filter((e): e is AaveV4Event => e.txHash === event.txHash && isAaveV4Event(e));
+  const { L4 } = aaveV4EventProse({
+    ctx: event.context.data,
+    siblings: siblings.length > 0 ? siblings : [self],
+    self,
+  });
+  return L4[0]?.text ?? aaveV4EventHeading(event);
 }
 
 /** The page's metadata description, also read on the server. */

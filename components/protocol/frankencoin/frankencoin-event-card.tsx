@@ -19,12 +19,19 @@ import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/e
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { FrankencoinLedgerProvider } from "./frankencoin-ledger";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { FRANKENCOIN_LEG_WORDS, frankencoinT1Caption } from "@/lib/frankencoin/head-words";
 
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { useFrankencoinHeadSpec } from "./frankencoin-event-header";
 import { useFrankencoinCells } from "./frankencoin-cells";
-import { FrankencoinEventExplainer, frankencoinLearnMoreContent } from "./frankencoin-event-explainer";
+import {
+  FrankencoinEventExplainer,
+  FrankencoinExplainerLead,
+  frankencoinLearnMoreContent,
+} from "./frankencoin-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { FRANKENCOIN_WORDS } from "@/lib/frankencoin/event-templates";
 import { useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
@@ -107,16 +114,47 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
         ]
       : undefined;
 
+  // The warning rows' figures on the node's flank: the collateral challenged,
+  // sold at auction or in a forced sale, the winning bid, and an auction
+  // settlement's collateral and the debt it cleared. None is a send the owner
+  // made, so no token-flow chip.
+  const collAddr = soleFlowAddress(event.flows, ctx.collateralSymbol);
+  const zchfAddr = soleFlowAddress(event.flows, "ZCHF");
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!critical && !caution) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    const coll = (label: string, value: number) =>
+      value !== 0 && legs.push({ label, value: Math.abs(value), symbol: ctx.collateralSymbol, address: collAddr });
+    const zchf = (label: string, value: number) =>
+      value !== 0 && legs.push({ label, value: Math.abs(value), symbol: "ZCHF", address: zchfAddr });
+    if (ctx.eventType === "challenge_started") coll(FRANKENCOIN_LEG_WORDS.challenged, num(ctx.challengeSize));
+    if (ctx.eventType === "challenge_succeeded") {
+      coll(FRANKENCOIN_LEG_WORDS.sold, num(ctx.acquiredCollateral));
+      zchf(FRANKENCOIN_LEG_WORDS.bid, num(ctx.bid));
+    }
+    if (ctx.eventType === "forced_sale") coll(FRANKENCOIN_LEG_WORDS.sold, num(ctx.forcedSaleAmount));
+    if (ctx.eventType === "auction_settlement") {
+      if (dColl != null && !ctx.collateralUnderstated) coll(FRANKENCOIN_LEG_WORDS.collateral, dColl);
+      if (dMint != null) zchf(FRANKENCOIN_LEG_WORDS.debtCleared, dMint);
+    }
+    return legs.length > 0 ? legs : undefined;
+  })();
+
   const spine: SpineColumnProps =
     critical || caution
-      ? { icon: "warning", warningTone: critical ? "critical" : "caution", isLast: !!isLast }
+      ? { icon: "warning", warningTone: critical ? "critical" : "caution", warningLegs, isLast: !!isLast }
       : ctx.eventType === "ownership_transferred"
         ? { icon: "delegate", iconDirection: "up", isLast: !!isLast }
         : { tokens, isLast: !!isLast };
 
   const actionLabel =
     ctx.eventType === "auction_settlement" && forcedTx ? FRANKENCOIN_WORDS.forced_settlement : event.actionLabel;
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useFrankencoinHeadSpec({
+    mode: page ? "title" : "row",
+    forcedTx,
     actionLabel,
     ctx,
     timestamp: event.timestamp,
@@ -144,7 +182,7 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
     },
     spine,
     head,
-    caption: actionLabel,
+    caption: page ? actionLabel : frankencoinT1Caption(ctx, { forcedTx }),
     // The transaction-sender test (ui-jobs 304).
     actor: { sent: { txFrom: ctx.txFrom, owner: event.wallet } },
     cells: body.cells,
@@ -162,6 +200,8 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
     // The owner's gas; a challenger's, a bidder's or a buyer's transaction is
     // theirs.
     price: { gas: ownerPaidGas(event, ctx.txFrom), prices: [] },
+    // The event page's title is the Explanation's first sentence (rails-ops
+    // decision 0045, "Ruled since"); the pane there opens on the second.
     explainer: {
       body: (
         <FrankencoinEventExplainer
@@ -170,8 +210,18 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
           blockNumber={event.blockNumber}
           timestamp={event.timestamp}
           eventId={event.id}
+          leadOnTitle={page}
         />
       ),
+      first: page ? (
+        <FrankencoinExplainerLead
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          timestamp={event.timestamp}
+          eventId={event.id}
+        />
+      ) : undefined,
     },
     learnMore: <LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash)} />,
   };

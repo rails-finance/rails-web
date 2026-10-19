@@ -19,18 +19,12 @@
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
-import type { AlchemixReading } from "@/lib/alchemix/readings-before";
-import { composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
+import { composeBullets, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import type { GasCost } from "@/lib/shared/types/event-shape";
-import {
-  alchemixBetweenReadingsClauses,
-  alchemixCustodyRoundTripClause,
-  alchemixEventClauses,
-  alchemixReadingClauses,
-  custodyPathInTx,
-  type AlchemistEvent,
-} from "@/lib/alchemix/explainer-clauses";
+import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
+import { alchemixCardClauses, type AlchemixCardProse } from "@/lib/alchemix/card-clauses";
+
+export { alchemixExplainerTeaser, type AlchemixCardProse } from "@/lib/alchemix/card-clauses";
 import {
   ALCHEMIX_BURN_REPAY,
   ALCHEMIX_CUSTODY,
@@ -106,83 +100,11 @@ export function alchemixLearnMoreFor(legs: AlchemistEvent[]): LearnMoreContent {
   return alchemixLearnMoreContent(lead.context.data);
 }
 
-/** The legs in the order their bullets read: an opening's narrator first (see
- *  the header note), log order otherwise. */
-function proseOrder(legs: AlchemistEvent[]): AlchemistEvent[] {
-  if (legs.length < 2) return legs;
-  const mintIdx = legs.findIndex((l) => l.context.data.transfer?.transferType === "mint");
-  if (mintIdx < 1) return legs;
-  return [legs[mintIdx], ...legs.filter((_, i) => i !== mintIdx)];
-}
-
-/** What a card's bullets need beyond its legs: the line's share ticker, its
- *  fee rate, and what a redemption took from the collateral. */
-export interface AlchemixCardProse {
-  underlyingDecimals: number | null;
-  mytSymbol: string;
-  protocolFeeBps: number | null;
-  collateralTakenRaw: string | null;
-  redemptionNet: RedemptionNet | null;
-  underlyingSymbol: string | null;
-  /** The reading before this card's block, which a close's returned
-   *  collateral is measured from. */
-  readingBefore?: AlchemixReading | null;
-  /** A line-scope row shares this card's block (`lineEventBlocks`). */
-  lineEventInBlock?: boolean;
-}
-
 /** The gas T2's price row states: the holder's transactions only. A line
  *  row is the Transmuter's transaction, and its gas is nobody's here. */
 export function alchemixOwnerGas(legs: AlchemistEvent[]): GasCost | undefined {
   if (legs.some((l) => l.context.data.scope === "line")) return undefined;
   return legs.find((l) => l.gas && l.gas.gasCostEth > 0)?.gas;
-}
-
-/** Every bullet the card can show, teaser included. */
-function alchemixCardClauses(
-  legs: AlchemistEvent[],
-  siblings: AlchemistEvent[],
-  prose: AlchemixCardProse,
-): ClauseInput[] {
-  const combined = legs.length > 1;
-  const reading = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated")?.context.data
-    .stateAtBlockFromReading;
-  const readingClauses = alchemixReadingClauses(reading, legs.length);
-  // A custody ROUND TRIP inside one transaction is one fact, not one per hop:
-  // the NFT went out to a contract that acted with it and came back, and each
-  // hop read alone would narrate a change of owner that did not happen.
-  const path = combined
-    ? custodyPathInTx(legs, legs.find((l) => l.context.data.tokenId != null)?.context.data.tokenId ?? null)
-    : null;
-  const roundTrip = path && !path.moved && !path.burnedFrom && path.moves.length > 1 ? path : null;
-  return [
-    ...proseOrder(legs).flatMap((leg) =>
-      alchemixEventClauses(leg.context.data, siblings, leg, {
-        combined,
-        skipCustody: roundTrip != null,
-        underlyingDecimals: prose.underlyingDecimals,
-        mytSymbol: prose.mytSymbol,
-        protocolFeeBps: prose.protocolFeeBps,
-        collateralTakenRaw: prose.collateralTakenRaw,
-        redemptionNet: prose.redemptionNet,
-        underlyingSymbol: prose.underlyingSymbol,
-        readingBefore: prose.readingBefore ?? null,
-      }),
-    ),
-    ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
-    ...readingClauses,
-    ...alchemixBetweenReadingsClauses(
-      legs,
-      prose.readingBefore,
-      { symbol: prose.underlyingSymbol, decimals: prose.underlyingDecimals },
-      { protocolFeeBps: prose.protocolFeeBps, lineEventInBlock: prose.lineEventInBlock ?? false },
-    ),
-  ];
-}
-
-/** The teaser: the first bullet, rendered on the card face. */
-export function alchemixExplainerTeaser(legs: AlchemistEvent[], siblings: AlchemistEvent[], prose: AlchemixCardProse) {
-  return splitLead(alchemixCardClauses(legs, siblings, prose)).lead;
 }
 
 export function AlchemixEventExplainer({ legs, siblings, skipLead, prose }: AlchemixEventExplainerProps) {

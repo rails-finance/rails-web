@@ -1432,8 +1432,10 @@ if (!allKinds.has("transfer-self"))
 // that read either way, and the counterparty is what makes the two directions
 // impossible to confuse (TO-DO-ui-jobs §38, the Ethereum arm's own shape).
 const LABELS_4E = {
-  deposit: () => "Deposit",
-  withdrawal: () => "Withdrawal",
+  // The head is words (decision 0045): past participles; a transfer reads
+  // "Transferred" with its counterparty as the clause.
+  deposit: () => "Deposited",
+  withdrawal: () => "Withdrew",
   "transfer-in": (e) => `from ${short(e.counterparty)}`,
   "transfer-out": (e) => `to ${short(e.counterparty)}`,
   "transfer-self": () => "No change",

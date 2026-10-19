@@ -78,28 +78,30 @@ import { resolveV3Tokens, type V3TokenMeta } from "@/lib/sources/chain/aave-v3-t
 import type { ChainId } from "@/lib/shared/chains";
 
 /** One row as rails-server's /api/<protocol>/timeline returns it (api/src/
- *  routes/baseLending.ts TimelineRow). Numerics are decimal strings. */
-interface IndexRow {
+ *  routes/baseLending.ts TimelineRow). Numerics are decimal strings. The
+ *  Arbitrum lane answers in the same shape (lib/aave-v3-arbitrum/api-contract.ts),
+ *  with `tx_from` null until its validator fills it. */
+export interface AaveV3IndexRow {
   kind: AaveV3DecodedRow["kind"];
   block_number: string;
   tx_index: number;
   log_index: number;
   tx_hash: string;
   block_timestamp: string;
-  tx_from: string;
+  tx_from: string | null;
   reserve: string;
   amount: string;
-  pool_caller: string | null;
-  collateral_asset: string | null;
-  liquidated_collateral_amount: string | null;
-  liquidator: string | null;
-  interest_rate_mode: string | null;
-  borrow_rate: string | null;
-  use_a_tokens: boolean | null;
-  counterparty: string | null;
-  atoken: string | null;
+  pool_caller?: string | null;
+  collateral_asset?: string | null;
+  liquidated_collateral_amount?: string | null;
+  liquidator?: string | null;
+  interest_rate_mode?: string | null;
+  borrow_rate?: string | null;
+  use_a_tokens?: boolean | null;
+  counterparty?: string | null;
+  atoken?: string | null;
   /** The liquidity index the BalanceTransfer emitted (transfer rows only). */
-  index_raw: string | null;
+  index_raw?: string | null;
   /** The index the Pool applied to this row, from its transaction's
    *  ReserveDataUpdated (rails-server services/aave-base-row-indexes.ts):
    *  liquidity index on the supply lane, variable borrow index on the debt
@@ -137,7 +139,7 @@ function priceOf(
 
 export interface AaveV3IndexResponse {
   wallet: string;
-  rows: IndexRow[];
+  rows: AaveV3IndexRow[];
   totalEvents: number;
   /** The API's row ceiling was hit — the list is cut, so a replay over it
    *  would be wrong from the cut on. Not whole. */
@@ -353,65 +355,7 @@ export function prepareAaveV3Index(
   const wallet = p.wallet.toLowerCase();
   const cov = json.coverage;
 
-  const rows: AaveV3DecodedRow[] = [];
-  const timestamps = new Map<number, number>();
-  const senders = new Map<string, string>();
-  for (const r of json.rows) {
-    const blockNumber = Number(r.block_number);
-    const txHash = r.tx_hash.toLowerCase();
-    timestamps.set(blockNumber, Number(r.block_timestamp));
-    senders.set(txHash, r.tx_from.toLowerCase());
-    const isTransfer = r.kind === "transfer_in" || r.kind === "transfer_out";
-    rows.push({
-      blockNumber,
-      txIndex: r.tx_index,
-      logIndex: r.log_index,
-      txHash,
-      kind: r.kind,
-      reserve: r.reserve.toLowerCase(),
-      // A transfer's emitted `value` is the SCALED balance; the underlying it
-      // moved is value × the index it emitted ÷ 1e27 — the sweep's arithmetic.
-      amount: isTransfer && r.index_raw != null ? (BigInt(r.amount) * BigInt(r.index_raw)) / RAY : BigInt(r.amount),
-      ...(r.collateral_asset ? { collateralAsset: r.collateral_asset.toLowerCase() } : {}),
-      ...(r.liquidated_collateral_amount != null
-        ? { liquidatedCollateralAmount: BigInt(r.liquidated_collateral_amount) }
-        : {}),
-      ...(r.liquidator ? { liquidator: r.liquidator.toLowerCase() } : {}),
-      ...(r.pool_caller ? { poolCaller: r.pool_caller.toLowerCase() } : {}),
-      ...(r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
-      ...(r.interest_rate_mode != null ? { interestRateMode: Number(r.interest_rate_mode) } : {}),
-      ...(r.borrow_rate != null ? { borrowRate: r.borrow_rate } : {}),
-      ...(r.use_a_tokens != null ? { useATokens: r.use_a_tokens } : {}),
-      // The index each lane was applied at: a transfer's own, a Pool row's
-      // from its transaction's reserve update.
-      ...(isTransfer
-        ? r.index_raw != null
-          ? { supplyIndex: BigInt(r.index_raw), scaledValue: BigInt(r.amount) }
-          : {}
-        : {
-            ...(r.sup_index != null ? { supplyIndex: BigInt(r.sup_index) } : {}),
-            ...(r.var_index != null ? { debtIndex: BigInt(r.var_index) } : {}),
-          }),
-      ...(r.receive_a_token != null ? { receiveAToken: r.receive_a_token } : {}),
-      ...(r.kind === "liquidation"
-        ? {
-            collateralPrice: priceOf(r.collateral_price_usd, r.collateral_price_source),
-            debtPrice: priceOf(r.debt_price_usd, r.debt_price_source),
-            ...(r.liquidation_bonus_bps != null && r.liquidation_bonus_bps > 0
-              ? {
-                  liquidationBonusAtBlock: {
-                    bonusBps: r.liquidation_bonus_bps,
-                    protocolFeeBps: r.protocol_fee_bps ?? 0,
-                  },
-                }
-              : {}),
-          }
-        : { price: priceOf(r.price_usd, r.price_source) }),
-    });
-  }
-  // The API orders by (block, tx, log) and the key is unique, but the replay's
-  // contract is stated here rather than assumed of the wire.
-  rows.sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex || a.logIndex - b.logIndex);
+  const { rows, timestamps, senders } = decodeAaveV3IndexRows(json.rows);
 
   // A heavy wallet's elided rows, as the state they left behind. Without
   // `heavy.seed` — or with one in a grammar this build does not speak —
@@ -536,4 +480,75 @@ export function prepareAaveV3Index(
     reason,
     peakWithheld: json.peakWithheld === "plumbing",
   };
+}
+
+/** An index answer's rows decoded for the replay: the rows in chain order, and
+ *  the block stamps and senders they carry. Pure. */
+export function decodeAaveV3IndexRows(wire: readonly AaveV3IndexRow[]): {
+  rows: AaveV3DecodedRow[];
+  timestamps: Map<number, number>;
+  senders: Map<string, string>;
+} {
+  const rows: AaveV3DecodedRow[] = [];
+  const timestamps = new Map<number, number>();
+  const senders = new Map<string, string>();
+  for (const r of wire) {
+    const blockNumber = Number(r.block_number);
+    const txHash = r.tx_hash.toLowerCase();
+    timestamps.set(blockNumber, Number(r.block_timestamp));
+    // A sender the store does not hold yet stays unknown: no entry, so no card
+    // and no anchor reads the row as the wallet's own.
+    if (r.tx_from) senders.set(txHash, r.tx_from.toLowerCase());
+    const isTransfer = r.kind === "transfer_in" || r.kind === "transfer_out";
+    rows.push({
+      blockNumber,
+      txIndex: r.tx_index,
+      logIndex: r.log_index,
+      txHash,
+      kind: r.kind,
+      reserve: r.reserve.toLowerCase(),
+      // A transfer's emitted `value` is the SCALED balance; the underlying it
+      // moved is value × the index it emitted ÷ 1e27 — the sweep's arithmetic.
+      amount: isTransfer && r.index_raw != null ? (BigInt(r.amount) * BigInt(r.index_raw)) / RAY : BigInt(r.amount),
+      ...(r.collateral_asset ? { collateralAsset: r.collateral_asset.toLowerCase() } : {}),
+      ...(r.liquidated_collateral_amount != null
+        ? { liquidatedCollateralAmount: BigInt(r.liquidated_collateral_amount) }
+        : {}),
+      ...(r.liquidator ? { liquidator: r.liquidator.toLowerCase() } : {}),
+      ...(r.pool_caller ? { poolCaller: r.pool_caller.toLowerCase() } : {}),
+      ...(r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
+      ...(r.interest_rate_mode != null ? { interestRateMode: Number(r.interest_rate_mode) } : {}),
+      ...(r.borrow_rate != null ? { borrowRate: r.borrow_rate } : {}),
+      ...(r.use_a_tokens != null ? { useATokens: r.use_a_tokens } : {}),
+      // The index each lane was applied at: a transfer's own, a Pool row's
+      // from its transaction's reserve update.
+      ...(isTransfer
+        ? r.index_raw != null
+          ? { supplyIndex: BigInt(r.index_raw), scaledValue: BigInt(r.amount) }
+          : {}
+        : {
+            ...(r.sup_index != null ? { supplyIndex: BigInt(r.sup_index) } : {}),
+            ...(r.var_index != null ? { debtIndex: BigInt(r.var_index) } : {}),
+          }),
+      ...(r.receive_a_token != null ? { receiveAToken: r.receive_a_token } : {}),
+      ...(r.kind === "liquidation"
+        ? {
+            collateralPrice: priceOf(r.collateral_price_usd, r.collateral_price_source),
+            debtPrice: priceOf(r.debt_price_usd, r.debt_price_source),
+            ...(r.liquidation_bonus_bps != null && r.liquidation_bonus_bps > 0
+              ? {
+                  liquidationBonusAtBlock: {
+                    bonusBps: r.liquidation_bonus_bps,
+                    protocolFeeBps: r.protocol_fee_bps ?? 0,
+                  },
+                }
+              : {}),
+          }
+        : { price: priceOf(r.price_usd, r.price_source) }),
+    });
+  }
+  // The API orders by (block, tx, log) and the key is unique, but the replay's
+  // contract is stated here rather than assumed of the wire.
+  rows.sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex || a.logIndex - b.logIndex);
+  return { rows, timestamps, senders };
 }

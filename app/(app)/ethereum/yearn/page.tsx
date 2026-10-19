@@ -16,5 +16,5 @@ import { redirect } from "next/navigation";
 import { protocolForHref } from "@/lib/shared/protocols";
 
 export default function YearnExplorerRoot() {
-  redirect(protocolForHref("/ethereum/yearn")!.subPages[0].href);
+  redirect(protocolForHref("/ethereum/yearn")!.subPages[0]!.href);
 }

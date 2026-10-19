@@ -8,10 +8,17 @@
 // position) — with the liquidator as a NEUTRAL party chip. Genuinely external
 // operates (initiator and tx sender both ≠ owner) get the pink external-actor
 // chip.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words
+// (`fluidT1Words`, lib/fluid/head-words.ts): the past-participle kind, an
+// operate's legs in leg order, an ownership transfer's new owner or its round
+// trip as the clause, the liquidator's and the "by" chips. The spine carries
+// the figures. The event page's card (mode "title") keeps the signed amounts.
 
 import type { AssetFlow, FluidContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { fluidT1Words } from "@/lib/fluid/head-words";
 import {
   colDeltaProv,
   debtDeltaProv,
@@ -44,6 +51,13 @@ export interface FluidEventHeaderProps {
    *  flows without a token address, so this resolves to nothing today and will
    *  start answering the moment that builder carries one. */
   flows?: AssetFlow[];
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
+  /** The position's Open row, and an ownership hop that came back within the
+   *  transaction: what the row's words name. */
+  opened?: boolean;
+  roundTrip?: boolean;
 }
 
 /** T1's head row spec (the card's `head` slot). */
@@ -57,6 +71,9 @@ export function useFluidHeadSpec({
   externalBy,
   wallet,
   flows,
+  mode = "title",
+  opened,
+  roundTrip,
 }: FluidEventHeaderProps): ChainTruthRowSpec {
   const supplySym = ctx.supplySymbol ?? "DEX shares";
   const borrowSym = ctx.borrowSymbol ?? "DEX shares";
@@ -126,20 +143,41 @@ export function useFluidHeadSpec({
         ? { prefix: "to", address: ctx.transferTo, prov: ownerProv(coords, ctx.transferTo) }
         : undefined;
 
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.initiator
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, initiator: ctx.initiator },
+            coords,
+          ),
+        }
+      : undefined;
+
+  if (mode === "row") {
+    const words = fluidT1Words(ctx, actionLabel, { opened, roundTrip });
+    const transfer = ctx.eventType === "transfer";
+    return {
+      label: words.kind,
+      critical: isLiq,
+      deltas: [],
+      // An ownership transfer's new owner is the clause after
+      // "Transferred"; a round trip states that instead.
+      clauses: words.clause
+        ? [words.clause]
+        : transfer && party
+          ? [<PartyChip key="party" party={party} />]
+          : undefined,
+      party: transfer ? undefined : party,
+      externalActor,
+    };
+  }
+
   return {
     label: actionLabel,
     critical: isLiq,
     deltas,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.initiator
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, initiator: ctx.initiator },
-              coords,
-            ),
-          }
-        : undefined,
+    externalActor,
     party,
   };
 }

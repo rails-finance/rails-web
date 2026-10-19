@@ -1,56 +1,40 @@
 "use client";
 
-// LlamaLend event header — adapter onto the shared ChainTruthRow grammar.
-// Maps the event's own emitted amounts (collateral and/or debt — one event
-// can move both) into the shared row spec; traces via <Prov>. Liquidation
-// rows follow their LEG: the borrower's row carries a NEUTRAL party chip
-// whose prefix says what happened ("liquidated by") — the balances were
-// TAKEN, and the copy never reads as an act the borrower performed; the
-// LIQUIDATOR's row is that subject's own act ("borrower <addr>" names whose
-// position moved); a SELF-liquidation is the user's own close.
+// LlamaLend event header (T1): the card's `head` slot, drawn by the shared
+// ChainTruthRow. The head is words (rails-ops decision 0045,
+// lib/llamalend/head-words.ts): the past-participle kind, the legs in leg
+// order, and "Self-liquidation" as the mode's label beside it. The figures are
+// on the spine's flank, a liquidation's on its warning node. Liquidation rows
+// follow their LEG: the borrower's row carries a NEUTRAL party chip ("by" the
+// liquidator) — the balances were TAKEN, and the copy never reads as an act
+// the borrower performed; the LIQUIDATOR's row is that subject's own act
+// ("borrower <addr>" names whose position moved); a SELF-liquidation is the
+// user's own close.
 
-import type { AssetFlow, LlamalendContext } from "@/lib/shared/types/event-shape";
-import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
-import {
-  collateralDeltaProv,
-  debtDeltaProv,
-  liquidationProv,
-  liquidationConvertedProv,
-  type LlamalendCoords,
-} from "@/lib/llamalend/event-provenance";
+import type { LlamalendContext } from "@/lib/shared/types/event-shape";
+import type { ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { liquidationProv, type LlamalendCoords } from "@/lib/llamalend/event-provenance";
 import type { LlamalendLoanMark } from "@/lib/llamalend/event-figures";
+import { llamalendT1Words } from "@/lib/llamalend/head-words";
 
 export interface LlamalendEventHeaderProps {
-  actionLabel: string;
   ctx: LlamalendContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** The position owner, for the receipt's user row. */
   wallet?: string;
-  /** The event's own movements, read for the two markets' contract addresses.
-   *  LlamaLend's controllers are deployed per collateral pair by a factory, so
-   *  the symbols arriving here are drawn from a growing set that no hand-kept
-   *  table can stay ahead of — and without an address the chip never reaches a
-   *  CDN at all. The event states both contracts; this reads them. */
-  flows?: AssetFlow[];
   /** Where the event sits among the page's loans: the first row of a loan
-   *  carries the "Open" pill, a repay that clears the debt the "Close" pill. */
+   *  reads "Opened loan" in the open pill, a repay that clears the debt
+   *  "Closed loan" in the close pill. */
   loanMark?: LlamalendLoanMark | null;
 }
 
 /** T1's head row spec (the card's `head` slot). */
 export function useLlamalendHeadSpec({
-  actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   wallet,
-  flows,
   loanMark,
 }: LlamalendEventHeaderProps): ChainTruthRowSpec {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
@@ -58,61 +42,6 @@ export function useLlamalendHeadSpec({
   const role = ctx.role ?? (isLiq ? "borrower" : undefined);
   const self = role === "self" || !!ctx.selfLiquidation;
   const borrowerLoss = isLiq && role === "borrower" && !self;
-
-  const deltas: ChainTruthDelta[] = [];
-  const coll = Number(ctx.collateralDelta ?? "0") || 0;
-  const debt = Number(ctx.debtDelta ?? "0") || 0;
-  // An operate row reads as Liquity V2's does: each amount carries its own
-  // verb and token, and the row label is the Open / Close pill or nothing.
-  const opens = !isLiq && (loanMark ? loanMark.opens : !!ctx.isOpen);
-  const closes = !isLiq && !!loanMark?.closes;
-  const verb = (axis: "coll" | "debt", v: number): Pick<ChainTruthDelta, "label" | "axisVerb"> =>
-    isLiq
-      ? {}
-      : {
-          label: axis === "coll" ? (v > 0 ? (opens ? "Deposit" : "Add") : "Withdraw") : v > 0 ? "Borrow" : "Repay",
-          axisVerb: true,
-        };
-  if (coll !== 0) {
-    deltas.push({
-      ...verb("coll", coll),
-      // The borrower's liquidation row names each figure: taken, converted,
-      // cleared.
-      ...(borrowerLoss ? { suffix: "taken" } : {}),
-      value: coll,
-      symbol: ctx.collateralSymbol,
-      address: soleFlowAddress(flows, ctx.collateralSymbol),
-      prov: isLiq
-        ? liquidationProv("collateral", ctx.collateralSymbol, role ?? "borrower", coords, ctx.raw?.collateralDelta)
-        : collateralDeltaProv(ctx.collateralSymbol, ctx.eventType, coords, ctx.raw?.collateralDelta),
-    });
-  }
-  // A hard liquidation takes both legs of the AMM holding: the borrower's row
-  // states the converted borrowed token beside the collateral, and tags each
-  // figure so the two borrowed-token figures read apart.
-  const convTaken = Number(ctx.convertedTaken ?? "0") || 0;
-  if (borrowerLoss && convTaken > 0) {
-    deltas.push({
-      value: -convTaken,
-      symbol: ctx.borrowedSymbol,
-      address: soleFlowAddress(flows, ctx.borrowedSymbol),
-      prov: liquidationConvertedProv(ctx.borrowedSymbol, coords, ctx.raw?.convertedTaken),
-      suffix: "converted",
-      noSpineCounterpart: true,
-    });
-  }
-  if (debt !== 0) {
-    deltas.push({
-      ...(borrowerLoss ? { suffix: "cleared" } : {}),
-      ...verb("debt", debt),
-      value: debt,
-      symbol: ctx.borrowedSymbol,
-      address: soleFlowAddress(flows, ctx.borrowedSymbol),
-      prov: isLiq
-        ? liquidationProv("debt", ctx.borrowedSymbol, role ?? "borrower", coords, ctx.raw?.debtDelta)
-        : debtDeltaProv(ctx.borrowedSymbol, ctx.eventType, coords, ctx.raw?.debtDelta),
-    });
-  }
 
   // No external-actor verdict here: the third-party predicate needs BOTH the tx
   // sender AND an event-emitted party param, and no LlamaLend row has ever
@@ -138,10 +67,11 @@ export function useLlamalendHeadSpec({
   // So this is NOT waiting on a backend fill. 🔑 A per-position sample cannot
   // tell "the pipeline never provides this" from "these rows are newer than the
   // last top-up" — ask the table.
+  // The chip prefixes are literals, which check:parties maps to their roles.
   const party = borrowerLoss
     ? ctx.liquidator
       ? {
-          prefix: "liquidated by",
+          prefix: "by",
           address: ctx.liquidator,
           prov: liquidationProv("debt", ctx.borrowedSymbol, "borrower", coords, ctx.raw?.debtDelta),
         }
@@ -154,11 +84,13 @@ export function useLlamalendHeadSpec({
         }
       : undefined;
 
+  const words = llamalendT1Words(ctx, loanMark);
   return {
-    label: isLiq ? actionLabel : opens ? "Open" : closes ? "Close" : "",
-    ...(opens ? { status: "open" as const } : closes ? { status: "close" as const } : {}),
+    label: words.kind,
+    ...(words.status ? { status: words.status } : {}),
     critical: borrowerLoss,
-    deltas,
+    deltas: [],
     party,
+    note: words.mode ? <span data-llamalend-mode-label="">{words.mode}</span> : undefined,
   };
 }

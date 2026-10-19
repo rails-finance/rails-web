@@ -8,6 +8,7 @@ import { formatDateLong } from "@/lib/date";
 import { isMorphoEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { shortMarketId } from "@/lib/morpho/asset-catalog";
+import { morphoEventProse, morphoExplanationRuns } from "@/lib/morpho/event-prose";
 
 const WORDS = {
   paragraph: (deployment: string) =>
@@ -55,6 +56,15 @@ export function morphoEventHeading(event: BaseActivityEvent): string {
 }
 
 /** The page's metadata description, also read on the server. */
+/** The browser title's event words: the Explanation's first sentence, which
+ *  the page's h1 states (rails-ops decision 0045, "Ruled since"), read from
+ *  the row alone; else the heading. Also read on the server. */
+export function morphoEventPageTitle(event: BaseActivityEvent): string {
+  if (!isMorphoEvent(event)) return morphoEventHeading(event);
+  const prose = morphoEventProse({ ctx: event.context.data, blockNumber: event.blockNumber });
+  return morphoExplanationRuns(prose)[0]?.sentences[0]?.text ?? morphoEventHeading(event);
+}
+
 export function morphoEventPageDescription(deployment: "ethereum" | "base", wallet: string, timestamp: number): string {
   return `${WORDS.description(DEPLOYMENT_NAME[deployment], short(wallet), formatDateLong(timestamp))} ${WORDS.timeline_link}`;
 }

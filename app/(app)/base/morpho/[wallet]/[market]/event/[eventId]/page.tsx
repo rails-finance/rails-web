@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
-import { morphoEventHeading, morphoEventPageDescription } from "@/lib/morpho/explorer";
+import { morphoEventPageDescription, morphoEventPageTitle } from "@/lib/morpho/explorer";
 import { loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: wallet,
     market: `${(market ?? rawMarket).slice(0, 10)}…`,
     canonicalPath: `/base/morpho/${wallet}/${market ?? rawMarket}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: morphoEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: morphoEventPageTitle(event), timestamp: event.timestamp } : null,
     description: event ? morphoEventPageDescription("base", wallet, event.timestamp) : undefined,
   });
 }

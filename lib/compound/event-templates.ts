@@ -40,6 +40,27 @@ export const PROSE = eventProseEngine<CompoundL5Key, CompoundEchoKey>(FILE, { do
 /** Words the code puts into a sentence or between a list's items. */
 export const COMPOUND_WORDS = FILE.words;
 
+/** The timeline head's words (lib/compound/head-words.ts). */
+export const COMPOUND_HEAD_WORDS = {
+  sep: COMPOUND_WORDS.t1_sep,
+  supplied: COMPOUND_WORDS.t1_supplied,
+  withdrew: COMPOUND_WORDS.t1_withdrew,
+  borrowed: COMPOUND_WORDS.t1_borrowed,
+  repaid: COMPOUND_WORDS.t1_repaid,
+  addedColl: COMPOUND_WORDS.t1_added_coll,
+  withdrewColl: COMPOUND_WORDS.t1_withdrew_coll,
+  zeroAmount: COMPOUND_WORDS.t1_zero_amount,
+  liquidated: COMPOUND_WORDS.t1_liquidated,
+  debtAbsorbed: COMPOUND_WORDS.t1_debt_absorbed,
+  collAbsorbed: COMPOUND_WORDS.t1_coll_absorbed,
+  transferred: COMPOUND_WORDS.t1_transferred,
+  to: COMPOUND_WORDS.t1_to,
+  from: COMPOUND_WORDS.t1_from,
+  legSent: COMPOUND_WORDS.t1_leg_sent,
+  legReceived: COMPOUND_WORDS.t1_leg_received,
+  legAbsorbed: COMPOUND_WORDS.t1_leg_absorbed,
+};
+
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 
 /** A position_words string as written, for a bullet that draws its {name}s as

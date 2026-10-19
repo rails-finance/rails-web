@@ -35,7 +35,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "pwn",
     subject: raw,
     canonicalPath: `/ethereum/pwn/${raw}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: pwnEventHeading(event), timestamp: event.timestamp } : null,
+    event: event
+      ? {
+          actionLabel: pwnEventHeading(
+            event,
+            tail?.events?.filter((e) => e.txHash === event.txHash),
+          ),
+          timestamp: event.timestamp,
+        }
+      : null,
     description:
       event && isPwnEvent(event)
         ? pwnEventPageDescription(event.context.data.loanId, raw.toLowerCase(), event.timestamp)

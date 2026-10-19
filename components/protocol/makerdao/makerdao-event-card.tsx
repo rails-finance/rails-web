@@ -9,7 +9,11 @@
 
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { MAKER_LEG_WORDS, makerT1Caption } from "@/lib/makerdao/head-words";
+import { ownerChipText } from "@/lib/makerdao/ownership-prose";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
@@ -19,7 +23,7 @@ import { useMakerHeadSpec } from "./makerdao-event-header";
 import { MakerLedgerProvider } from "./makerdao-ledger";
 import { useMakerCells, useMakerOpened } from "./makerdao-cells";
 import { useMakerSheet } from "./makerdao-sheet";
-import { MakerDAOEventExplainer, useMakerRowExtras } from "./makerdao-event-explainer";
+import { MakerDAOEventExplainer, MakerExplainerLead, useMakerRowExtras } from "./makerdao-event-explainer";
 import { makerEventModal } from "@/lib/makerdao/event-prose";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { openedForSigner, useMakerVaultHistory } from "@/lib/makerdao/vault-history";
@@ -97,9 +101,27 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
           : []),
       ];
 
+  // A liquidation's legs, the collateral seized below the debt cleared: the
+  // warning node's flank carries them. The debt leg needs the rate at the
+  // block (`debtChange`); without it the Vat's normalized debt is no token
+  // amount, and the sheet states it.
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!isGrab) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    if (dink !== 0) legs.push({ label: MAKER_LEG_WORDS.seized, value: Math.abs(dink), symbol: ctx.collateralSymbol });
+    if (dart !== 0 && ctx.debtChange != null)
+      legs.push({
+        label: MAKER_LEG_WORDS.cleared,
+        value: Math.abs(debt.value),
+        symbol: ilkDebtSymbol(ctx.ilk),
+        address: soleFlowAddress(event.flows, ilkDebtSymbol(ctx.ilk)),
+      });
+    return legs;
+  })();
+
   const spine: SpineColumnProps =
     isGrab || isLseLiq
-      ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+      ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
       : isGive
         ? // An ownership handover is a people event with no token flow — the
           // person glyph with the join badge marks the new owner taking over;
@@ -107,7 +129,15 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
           { icon: "delegate", iconDirection: "up", isLast: !!isLast }
         : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
+  const ownership = isGive ? history.ownership.get(event.id) : undefined;
+  const txContext = isGive ? history.txContext.get(makerTxHashOf(event)) : undefined;
+  const newOwner = ownership ? ownerChipText(ownership.after, txContext) : null;
+  const giveTo = isGive ? (ctx.giveDstOwner ?? ctx.giveDst) : undefined;
   const head = useMakerHeadSpec({
+    mode: page ? "title" : "row",
     actionLabel: event.actionLabel,
     ctx,
     timestamp: event.timestamp,
@@ -117,8 +147,8 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
     externalBy: extBy ?? undefined,
     wallet: event.wallet,
     flows: event.flows,
-    ownership: isGive ? history.ownership.get(event.id) : undefined,
-    txContext: isGive ? history.txContext.get(makerTxHashOf(event)) : undefined,
+    ownership,
+    txContext,
   });
   const cells = useMakerCells(ctx, coords, event.id);
   const sheet = useMakerSheet(ctx, coords);
@@ -134,7 +164,9 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption: page
+      ? event.actionLabel
+      : makerT1Caption(ctx, giveTo ? { address: newOwner?.address || giveTo, name: newOwner?.name } : undefined),
     actor: { by: extBy ?? undefined },
     cells,
     // The balance sheet, where the page holds the ilk read at the block; an
@@ -150,10 +182,21 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
       ),
     },
     useOpened: () => ({ ...useMakerOpened(ctx, coords, event.id, undefined), sheet: useMakerSheet(ctx, coords, true) }),
+    // The event page's title is the Explanation's first sentence (rails-ops
+    // decision 0045, "Ruled since"); the pane there opens on the second.
     explainer: {
       body: (
-        <MakerDAOEventExplainer ctx={ctx} eventId={event.id} txHash={event.txHash} blockNumber={event.blockNumber} />
+        <MakerDAOEventExplainer
+          ctx={ctx}
+          eventId={event.id}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          leadOnTitle={page}
+        />
       ),
+      first: page ? (
+        <MakerExplainerLead ctx={ctx} eventId={event.id} txHash={event.txHash} blockNumber={event.blockNumber} />
+      ) : undefined,
     },
     learnMore: <LearnMore inline content={makerEventModal(ctx, extras)} />,
   };

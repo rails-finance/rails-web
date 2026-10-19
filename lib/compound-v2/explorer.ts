@@ -8,6 +8,8 @@ import { formatDateLong } from "@/lib/date";
 import { isCompoundV2Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { externalActor } from "@/lib/shared/external-actor";
+import { compoundV2EventProse, type CompoundV2Event } from "@/lib/compound-v2/event-prose";
 
 const WORDS = {
   paragraph: "This page is one transaction from this account's history across the Compound V2 markets.",
@@ -58,6 +60,27 @@ export function compoundV2EventTitle(event: BaseActivityEvent): EventTitle {
 /** The event's heading: the title in words. Also read on the server. */
 export function compoundV2EventHeading(event: BaseActivityEvent): string {
   return eventTitleWords(compoundV2EventTitle(event));
+}
+
+/** The browser title's last words (rails-ops decision 0045, "Ruled since"):
+ *  the Explanation's first sentence, which the card's teaser and the page's
+ *  h1 state, else the heading. `events`: the timeline's events, for the
+ *  same-transaction seam a seizure reads. Read on the server. */
+export function compoundV2EventTabWords(event: BaseActivityEvent, events: readonly BaseActivityEvent[]): string {
+  if (!isCompoundV2Event(event)) return compoundV2EventHeading(event);
+  const ctx = event.context.data;
+  const self = event as CompoundV2Event;
+  const siblings = events.filter((e): e is CompoundV2Event => e.txHash === event.txHash && isCompoundV2Event(e));
+  const seized = ctx.eventType === "liquidation" || ctx.eventType.startsWith("seize_");
+  const by = seized ? null : externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet);
+  const { L4 } = compoundV2EventProse({
+    ctx,
+    siblings: siblings.length > 0 ? siblings : [self],
+    self,
+    externalBy: by ?? undefined,
+    blockNumber: event.blockNumber,
+  });
+  return L4[0]?.text ?? compoundV2EventHeading(event);
 }
 
 /** The page's metadata description, also read on the server. */

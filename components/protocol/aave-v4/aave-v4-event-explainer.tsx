@@ -11,6 +11,7 @@
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { useExplainerLeadOnTitle } from "@/components/shared/explainer-lead-context";
 import { formatExact } from "@/lib/utils/format";
 import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
 import {
@@ -63,6 +64,22 @@ function echoFor(key: AaveV4EchoKey, ctx: AaveV4Context, coord: EventProvDetail)
   }
 }
 
+/** The event page's title: the explanation's first sentence, the event's own
+ *  words, which read no position state. */
+export function AaveV4PageSentence({
+  ctx,
+  event,
+  siblings,
+}: {
+  ctx: AaveV4Context;
+  event: AaveV4Event;
+  siblings: AaveV4Event[];
+}) {
+  const lead = aaveV4EventProse({ ctx, siblings, self: event }).L4[0];
+  const coord = coordsFor(event);
+  return lead ? <ProseSentenceText s={lead} echo={(key) => echoFor(key, ctx, coord)} /> : null;
+}
+
 export function AaveV4EventExplainer({
   ctx,
   event,
@@ -100,5 +117,9 @@ export function AaveV4EventExplainer({
       return run.heading ? { group: run.heading, node } : node;
     }),
   );
-  return <ProseExplainer items={items} />;
+  // On the event page the title states the first sentence: a grouped pane
+  // leaves it out in ProseExplainer, a flat one here.
+  const leadOnTitle = useExplainerLeadOnTitle();
+  const grouped = items.some((i) => typeof i === "object" && i != null && "group" in i);
+  return <ProseExplainer items={leadOnTitle && !grouped ? items.slice(1) : items} />;
 }

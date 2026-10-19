@@ -16,7 +16,8 @@
 // rows, each value a level that swaps to its change since the previous event
 // (change-swap-value.tsx), the protocol's parameters as muted rows with the
 // breakdown on, and under them the lines a family keeps for the breakdown (a
-// swap's gross legs). Every row the family gives a `tip` ends its label with a "?"
+// swap's gross legs). Below everything, a family's footnotes (the gas
+// compensation escrow, rails-ops TO-DO-ui-jobs 388). Every row the family gives a `tip` ends its label with a "?"
 // that opens the tip on a click or a tap (reveal-tip.tsx), the totals and the
 // repaid row included.
 //
@@ -75,8 +76,8 @@ export interface SheetSide {
    *  `side` value. */
   name?: string;
   /** The panel's key and `data-sheet-side`, where it is not `side`: a panel
-   *  beside a side that holds an amount apart from it (Polaris's gas
-   *  compensation escrow, beside its Collateral). */
+   *  beside a side that holds an amount apart from it (Liquity V1's
+   *  reserve, beside its Debt). */
   id?: string;
   /** The heading's read-more, where `name` replaces the side's. */
   tip?: string;
@@ -136,10 +137,29 @@ export interface SheetPanel {
   caption?: ReactNode;
 }
 
+/** A footnote under Risk and Limits: an amount the protocol holds against the
+ *  position that is no figure of it (the gas compensation escrow), as one line,
+ *  "0.0375 pETH ($92.10) held in escrow since the open". It carries no running
+ *  balance. `data-sheet-note` on the line is `key`. */
+export interface SheetFootnote {
+  key: string;
+  amount: SheetFigure & { symbol: string };
+  /** The amount in dollars, where the page carries a price for the token. */
+  usd?: SheetFigure;
+  /** The words after the figures. */
+  words: string;
+  /** The line's read-more, behind a "?" after the words. */
+  tip?: string;
+  /** The read-more's accessible name. */
+  name: string;
+}
+
 /** The `sheet` slot. */
 export interface EventSheet {
   sides: SheetSide[];
   panels: SheetPanel[];
+  /** Lines under Risk and Limits (the gas compensation escrow). */
+  footnotes?: SheetFootnote[];
   /** Lines under the panels drawn with the breakdown on (a swap's gross
    *  legs). */
   breakdownNotes?: ReactNode;
@@ -505,6 +525,24 @@ function StatPanel({ p, breakdown }: { p: SheetPanel; breakdown: boolean }) {
   );
 }
 
+/** A footnote line under the panels, at the panels' inset. */
+function Footnote({ n }: { n: SheetFootnote }) {
+  return (
+    <p className="px-4 text-xs leading-relaxed text-rb-500" data-sheet-note={n.key}>
+      <span className="tabular-nums text-foreground" data-sheet-note-col="amount">
+        <Fig f={n.amount} /> {n.amount.symbol}
+      </span>
+      {n.usd && (
+        <span className="tabular-nums" data-sheet-note-col="usd">
+          {" ("}
+          <Fig f={n.usd} />)
+        </span>
+      )}{" "}
+      <HeadingTip text={n.words} tip={n.tip} name={n.name} />
+    </p>
+  );
+}
+
 /** The sheet before its figures land: its control row, its side panels
  *  (the first as a side the event moved: a row and the total; the rest the
  *  total alone) and its Risk and Limits pair, each line at the loaded line's
@@ -643,6 +681,13 @@ export function EventSheetView({
       {on && sheet.breakdownNotes && (
         <div className="-mx-5 pt-2" data-sheet-layer="notes">
           {sheet.breakdownNotes}
+        </div>
+      )}
+      {(sheet.footnotes?.length ?? 0) > 0 && (
+        <div className="flex flex-col gap-1 pt-2.5">
+          {sheet.footnotes!.map((n) => (
+            <Footnote key={n.key} n={n} />
+          ))}
         </div>
       )}
     </div>

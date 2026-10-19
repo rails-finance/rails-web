@@ -332,6 +332,65 @@ group_words:
 
 # ── Words the code puts into a sentence ──
 words:
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle, then at most one clause after the middle dot. A
+  # challenge and an auction keep Frankencoin's names; the head states what
+  # the protocol did and never judges the owner. Read by
+  # lib/frankencoin/head-words.ts. The spine carries the figures.
+  t1_sep: |-
+    ·
+  t1_opened: |-
+    Opened position
+  t1_cloned: |-
+    Cloned position
+  t1_added_coll: |-
+    Added collateral
+  t1_withdrew_coll: |-
+    Withdrew collateral
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_raised_price: |-
+    Raised liquidation price
+  t1_lowered_price: |-
+    Lowered liquidation price
+  t1_adjusted: |-
+    Adjusted position
+  t1_closed: |-
+    Closed position
+  t1_auction_settled: |-
+    Auction settled
+  t1_forced_settled: |-
+    Forced sale settled
+  t1_denied: |-
+    Denied
+  t1_challenged: |-
+    Challenged
+  t1_challenge_averted: |-
+    Challenge averted
+  t1_challenge_succeeded: |-
+    Challenge succeeded
+  t1_forced_sale: |-
+    Sold in a forced sale
+  t1_transferred: |-
+    Transferred
+  t1_owner_set: |-
+    Owner set at creation
+  t1_to: |-
+    to
+  t1_by: |-
+    by
+  t1_leg_challenged: |-
+    challenged
+  t1_leg_sold: |-
+    sold
+  t1_leg_bid: |-
+    bid
+  t1_leg_collateral: |-
+    collateral
+  t1_leg_debt_cleared: |-
+    debt cleared
   sale_challenge: |-
     The challenge sale
   sale_forced: |-

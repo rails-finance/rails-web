@@ -36,7 +36,8 @@ import { vaultEventPageDescription } from "@/lib/vaults/explorer";
 import { findVaultTailEvent } from "@/lib/vaults/event-share-card";
 import { ethereumVaultHref } from "@/lib/vaults/routes";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { AAVE_VAULT_TAIL_VERSION, KIND_LABEL } from "@/lib/shared/vault-holder-timeline";
+import { AAVE_VAULT_TAIL_VERSION } from "@/lib/shared/vault-holder-timeline";
+import { vaultT1Kind } from "@/lib/vaults/head-words";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import AaveEthereumVaultPositionPage from "../../page";
 
@@ -83,7 +84,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "aave-vaults",
     subject: ADDRESS.test(who) ? who : decodeURIComponent(holder),
     canonicalPath: `${ethereumVaultHref(address, holder)}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: KIND_LABEL[event.kind], timestamp: event.timestamp } : null,
+    // The head's words (decision 0045). The Explanation's first sentence names
+    // the share token, which this metadata does not read (see above).
+    event: event ? { actionLabel: vaultT1Kind(event.kind), timestamp: event.timestamp } : null,
     description: event
       ? vaultEventPageDescription("aave-vaults", "ethereum", null, address, who, event.timestamp)
       : undefined,

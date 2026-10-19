@@ -44,6 +44,10 @@ roundings:
     a whole number, grouped (1,204)
   address: |-
     a shortened address linked to the explorer
+  tx_hash: |-
+    a shortened transaction hash linked to the explorer
+  date_time: |-
+    a UTC date and time (5 Sep 2026, 09:30 UTC)
   text: |-
     a word or name as given
 
@@ -93,6 +97,18 @@ placeholders:
     rounding: text
     means: |-
       the event's type as the index names it
+  surplus:
+    rounding: units4
+    means: |-
+      the pETH the liquidation credited to the owner in the market's surplus pool
+  claimed_at:
+    rounding: date_time
+    means: |-
+      when the owner claimed the surplus, in UTC
+  claim_tx:
+    rounding: tx_hash
+    means: |-
+      the transaction of the owner's claim, linked to the explorer
   # The position card's figures, drawn by the card with their receipts.
   coll:
     rounding: token
@@ -236,6 +252,10 @@ words:
     Liquidated
   t1_claimable: |-
     claimable
+  t1_claimed: |-
+    claimed
+  t1_surplus: |-
+    surplus
   t1_transferred: |-
     Transferred
   t1_to: |-
@@ -389,6 +409,9 @@ words:
     The escrow just before this event, at this block's pETH price.
   tip_escrow_total: |-
     The escrow the CDP holds after this event in pETH, and in dollars at this block's pETH price.
+  # The escrow's footnote under Risk and Limits (TO-DO-ui-jobs 388).
+  tip_escrow_note: |-
+    The gas compensation escrow: the 0.0375 pETH every CDP sends at its open, held apart from its collateral and outside the collateral ratio. It returns on close and goes to the liquidator on a liquidation.
   spine_escrow_sent: |-
     gas compensation escrow sent
   spine_escrow_returned: |-
@@ -772,9 +795,24 @@ templates:
           The other CDPs' premium is the {penalty} liquidation penalty, which comes out of what the owner could have kept.
       liq.surplus:
         when: |-
-          the liquidation left a surplus for the owner
+          the liquidation left a surplus and the pool has been read past it with no claim
         text: |-
-          The surplus is set aside for the owner to claim.
+          The {surplus} pETH surplus is unclaimed and claimable by the owner.
+      liq.surplus_claimed:
+        when: |-
+          the owner has claimed the surplus
+        text: |-
+          The owner claimed the {surplus} pETH surplus on {claimed_at}, in {claim_tx}.
+      liq.surplus_claimed_all:
+        when: |-
+          the owner has claimed, and the claim paid more than this credit
+        text: |-
+          The owner claimed the {surplus} pETH surplus on {claimed_at} in {claim_tx}; the claim paid the owner's whole balance.
+      liq.surplus_unread:
+        when: |-
+          the pool's claims have not been read to this liquidation
+        text: |-
+          The surplus's claim state has not been read yet.
     order:
       - liq.what
       - liq.what_priced
@@ -784,6 +822,9 @@ templates:
       - liq.penalty_redist
       - legs.written
       - liq.surplus
+      - liq.surplus_claimed
+      - liq.surplus_claimed_all
+      - liq.surplus_unread
     groups:
       happened:
         - liq.what
@@ -796,7 +837,11 @@ templates:
         - legs.written
       leaves:
         - liq.surplus
+        - liq.surplus_claimed
+        - liq.surplus_claimed_all
+        - liq.surplus_unread
     alternates:
+      - [liq.surplus, liq.surplus_claimed, liq.surplus_claimed_all, liq.surplus_unread]
       - [liq.what, liq.what_priced]
       - [liq.pool, liq.redistributed]
       - [liq.penalty_pool, liq.penalty_redist]

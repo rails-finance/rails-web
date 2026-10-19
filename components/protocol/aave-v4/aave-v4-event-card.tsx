@@ -10,13 +10,16 @@
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { eventGas } from "@/components/shared/event-price-row";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { AAVE_V4_HEAD_WORDS } from "@/lib/aave-v4/event-templates";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { useAaveV4HeadSpec, type AaveV4TxGroup } from "./aave-v4-head";
-import { aaveV4Label } from "@/lib/aave-v4/event-label";
+import { aaveV4Label, aaveV4T1Kind } from "@/lib/aave-v4/event-label";
 import { useAaveV4Cells } from "./aave-v4-event-detail";
-import { AaveV4EventExplainer, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
+import { AaveV4EventExplainer, AaveV4PageSentence, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 
@@ -76,8 +79,27 @@ export function AaveV4EventCard({
   // undefined and falls back to the symbol lookup exactly as before.
   const symAddress = soleFlowAddress(event.flows, ctx.reserveSymbol);
 
+  // A liquidation's legs, the collateral seized below the debt repaid: the
+  // warning node's flank carries them.
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!isLiquidation) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    const seized = Number(ctx.liquidatedCollateralAmount ?? "0") || 0;
+    if (seized !== 0 && ctx.collateralSymbol)
+      legs.push({
+        label: AAVE_V4_HEAD_WORDS.legSeized,
+        value: seized,
+        symbol: ctx.collateralSymbol,
+        address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+      });
+    const repaid = Number(ctx.debtToCover ?? "0") || 0;
+    if (repaid !== 0 && ctx.reserveSymbol)
+      legs.push({ label: AAVE_V4_HEAD_WORDS.legRepaid, value: repaid, symbol: ctx.reserveSymbol, address: symAddress });
+    return legs;
+  })();
+
   const spine: SpineColumnProps = isLiquidation
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : isCollateralToggle
       ? // The toggle's check/cross badge is the event's MEANING, so it keeps
         // the icon corner even when a third party flipped it — the dotted
@@ -99,7 +121,11 @@ export function AaveV4EventCard({
             isLast: !!isLast,
           };
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useAaveV4HeadSpec({
+    mode: page ? "title" : "row",
     ctx,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -130,15 +156,19 @@ export function AaveV4EventCard({
     },
     spine,
     head,
-    caption: aaveV4Label(ctx),
+    caption: page ? aaveV4Label(ctx) : aaveV4T1Kind(ctx),
     actor: { by: extBy ?? undefined },
     cells,
     sheet,
     ledgers: { none: "no flows panel on Aave V4 yet" },
     price: { gas: eventGas(event.gas), prices },
     // The explanation reads the position state the card opens with, so the
-    // pane is the body alone, with no teaser.
+    // timeline's pane is the body alone, with no teaser. The event page's
+    // title is the first sentence, which reads no state: the pane then leaves
+    // it out (`AaveV4EventExplainer`).
     explainer: {
+      first: page ? <AaveV4PageSentence ctx={ctx} event={event} siblings={siblings ?? [event]} /> : undefined,
+      grouped: page || undefined,
       body: (
         <AaveV4EventExplainer
           ctx={ctx}

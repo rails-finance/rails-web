@@ -57,7 +57,8 @@
 // 1,482 events at its deepest. The boundary card is the one mechanism past
 // the cut on every arm (decision 0019, amended 2026-09-10).
 
-import type { ChainTimelineCoverage } from "@/lib/api/fetch-chain-timeline";
+import type { ChainTimelineCoverage, TimelineConfirmation } from "@/lib/api/fetch-chain-timeline";
+import type { CaptureSource } from "@/lib/shared/capture-source";
 import { explorerUrl } from "@/lib/shared/chains";
 import { useChainId } from "@/lib/shared/chain-context";
 import { formatDateLong } from "@/lib/date";
@@ -95,10 +96,19 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
   // Nothing missing, nothing to say — silence is the complete claim (header).
   // A capped list is not "missing" here: the boundary card on the spine
   // states it (rails-ops decision 0019), and one statement is enough.
-  if (!holed && coverage.fromDeployment && undated === 0) return null;
+  const confirmation = coverage.confirmation;
+  if (!holed && coverage.fromDeployment && undated === 0 && !confirmation) return null;
 
   return (
     <div className={`mt-2 pt-3 ${NOTE}`} data-anatomy="L10">
+      {confirmation && (
+        <ConfirmationLine
+          confirmation={confirmation}
+          source={coverage.source}
+          blockLink={blockLink}
+          txLink={(h) => explorerUrl(chainId, "tx-logs", h)}
+        />
+      )}
       {holed ? (
         <p>
           <span className="text-foreground">This history has holes in it.</span> Rails swept {sourceLabel} from block{" "}
@@ -149,5 +159,65 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
         </p>
       )}
     </div>
+  );
+}
+
+/** The Arbitrum store's verdict on the history (rails-ops
+ *  TO-DO-arbitrum-scoping.md §7 item 1): the card names the store, this line
+ *  names whether a second witness agrees. Until it does, the page holds back
+ *  the figures that read the history as a whole life. */
+function ConfirmationLine({
+  confirmation,
+  source,
+  blockLink,
+  txLink,
+}: {
+  confirmation: TimelineConfirmation;
+  source: CaptureSource | undefined;
+  blockLink: (b: number) => React.ReactNode;
+  txLink: (hash: string) => string;
+}) {
+  const body = source === "tenderly" ? "Tenderly" : "Etherscan";
+  const withheld = "The highest balances, the lifetime flows and the interest figures wait for that check.";
+  if (confirmation.status === "confirmed")
+    return (
+      <p className="mb-1.5" data-history-confirmation="confirmed">
+        History confirmed against Tenderly
+        {confirmation.confirmedThroughBlock != null && (
+          <> through block {blockLink(confirmation.confirmedThroughBlock)}</>
+        )}
+        .
+      </p>
+    );
+  if (confirmation.status === "disputed") {
+    const n = confirmation.droppedCount;
+    return (
+      <p className="mb-1.5" data-history-confirmation="disputed">
+        <span className="text-foreground">History body from {body}, disputed.</span> Etherscan returned{" "}
+        {n.toLocaleString("en-US")} {n === 1 ? "log" : "logs"} that no chain witness did, and{" "}
+        {n === 1 ? "it is" : "they are"} left off this list
+        {confirmation.dropped.length > 0 && (
+          <>
+            {": "}
+            {confirmation.dropped.map((d, i) => (
+              <span key={`${d.txHash}-${d.logIndex}`}>
+                {i > 0 && ", "}
+                <a href={txLink(d.txHash)} target="_blank" rel="noopener noreferrer" className="link-external">
+                  {d.txHash.slice(0, 10)}…
+                </a>{" "}
+                log {d.logIndex} at block {d.blockNumber.toLocaleString("en-US")}
+              </span>
+            ))}
+          </>
+        )}
+        . {withheld}
+      </p>
+    );
+  }
+  return (
+    <p className="mb-1.5" data-history-confirmation="unconfirmed">
+      <span className="text-foreground">History body from {body}, unconfirmed.</span> Rails has not yet checked these
+      events against a second chain witness. {withheld}
+    </p>
   );
 }

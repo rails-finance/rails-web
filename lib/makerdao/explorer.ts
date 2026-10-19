@@ -8,6 +8,7 @@ import { formatDateLong } from "@/lib/date";
 import { isMakerDAOEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
+import { makerEventProse, makerExplanationRuns } from "@/lib/makerdao/event-prose";
 
 const WORDS = {
   paragraph: "This page is one transaction from this vault's history.",
@@ -61,6 +62,15 @@ export function makerdaoEventHeading(event: BaseActivityEvent): string {
 }
 
 /** The page's metadata description, also read on the server. */
+/** The browser title's event words: the Explanation's first sentence, which
+ *  the page's h1 states (rails-ops decision 0045, "Ruled since"), read from
+ *  the row alone; else the heading. Also read on the server. */
+export function makerdaoEventPageTitle(event: BaseActivityEvent): string {
+  if (!isMakerDAOEvent(event)) return makerdaoEventHeading(event);
+  const lead = makerExplanationRuns(makerEventProse({ ctx: event.context.data }))[0]?.sentences[0];
+  return lead?.text ?? makerdaoEventHeading(event);
+}
+
 export function makerdaoEventPageDescription(ilk: string, vault: string, timestamp: number): string {
   return `${WORDS.description(ilk, short(vault), formatDateLong(timestamp))} ${WORDS.timeline_link}`;
 }

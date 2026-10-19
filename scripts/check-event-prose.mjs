@@ -351,6 +351,7 @@ const FAMILIES = {
       "components/protocol/makerdao/makerdao-event-explainer.tsx",
       "components/protocol/makerdao/makerdao-position-explanation.tsx",
       "components/protocol/makerdao/makerdao-sheet.tsx",
+      "lib/makerdao/head-words.ts",
     ],
     nodes: {
       section: "position_words",
@@ -410,6 +411,7 @@ const FAMILIES = {
       "lib/morpho/event-prose.ts",
       "lib/morpho/event-templates.ts",
       "components/protocol/morpho/morpho-event-explainer.tsx",
+      "lib/morpho/head-words.ts",
       "components/protocol/morpho/morpho-position-explanation.tsx",
       "components/protocol/morpho/morpho-sheet.ts",
     ],
@@ -469,6 +471,7 @@ const FAMILIES = {
     wordConsts: { FRANKENCOIN_WORDS: "words" },
     modalWords: null,
     readers: [
+      "lib/frankencoin/head-words.ts",
       "lib/frankencoin/event-prose.ts",
       "lib/frankencoin/event-templates.ts",
       "components/protocol/frankencoin/frankencoin-event-explainer.tsx",

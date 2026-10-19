@@ -262,7 +262,7 @@ export function mergeGroupSheet(cards: CollectedCard[], label: string): EventShe
       after: WORDS.after,
     });
   }
-  return { sides, panels: last.panels };
+  return { sides, panels: last.panels, footnotes: last.footnotes };
 }
 
 // ── A group read from its members' rows ─────────────────────────────────

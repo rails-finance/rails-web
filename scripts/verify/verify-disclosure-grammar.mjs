@@ -632,12 +632,12 @@ async function waitHeads(page) {
 }
 
 // 5d. Chain-truth families at 1280, values on: no icon beside a hidden amount,
-// the chevron last. A row whose amount never hands off to the spine (Maple's
-// "Shares received") keeps its amount and its icon together.
+// the chevron last. Maple's head is words since ui-jobs 367 (a transfer's
+// amount on the spine's flank), so it holds no icon either.
 const FLUID = "/ethereum/fluid/19428";
 for (const [name, path, strict] of [
   ["Aave V3", AAVE, true],
-  ["Maple", MAPLE, false],
+  ["Maple", MAPLE, true],
   ["Fluid", FLUID, true],
 ]) {
   const { ctx, page, errors } = await open(1280, path);
@@ -747,7 +747,8 @@ const SHEET_WORDS_SUBJECTS = [
     limits: ["Interest Rate"],
     params: ["Minimum ratio", "Critical ratio"],
     optional: ["Delegate's fee"],
-    headings: ["Collateral", "Gas compensation escrow", "Debt"],
+    // The gas compensation escrow, a footnote under Risk and Limits (ui-jobs 388).
+    note: /^0\.0375 WETH \(\$[\d,.]+\) held in escrow$/,
   },
   {
     name: "Aave V3 0x9ff6…0de5 Borrow",
@@ -830,8 +831,8 @@ const SHEET_WORDS_SUBJECTS = [
     limits: ["Interest rate"],
     params: ["Minimum ratio", "Critical ratio"],
     optional: [],
-    headings: ["Collateral", "Gas compensation escrow", "Debt"],
     // The escrow states its amount alone on the WBTC branch: no WETH price.
+    note: /^0\.0375 WETH held in escrow$/,
     carried: 2,
   },
   {
@@ -852,8 +853,8 @@ const SHEET_WORDS_SUBJECTS = [
     limits: ["Primary rate", "Reserve-to-debt ratio"],
     params: ["Minimum ratio", "Liquidation penalty, stability pool"],
     optional: [],
-    headings: ["Collateral", "Gas compensation escrow", "Debt"],
-    carried: 3,
+    note: /^0\.0375 pETH \(\$[\d,.]+\) held in escrow$/,
+    carried: 2,
   },
   {
     name: "Frankencoin",
@@ -969,6 +970,7 @@ const sheetWords = (sheet) =>
         carry: [...e.querySelectorAll('[data-sheet-layer="carry"] [data-sheet-row]')].map(label),
         before: [...e.querySelectorAll('[data-sheet-row="before"]')].map(label),
       })),
+      notes: [...s.querySelectorAll("[data-sheet-note]")].map(seen),
       panels: [...s.querySelectorAll("[data-sheet-panel]")].map((e) => ({
         panel: e.getAttribute("data-sheet-panel"),
         heading: seen(e.querySelector("h3")),
@@ -1009,13 +1011,20 @@ for (const s of SHEET_WORDS_SUBJECTS) {
     JSON.stringify(off?.switch),
   );
   // `headings`: a family that draws an amount held beside the two sides as a
-  // panel of its own (the gas compensation escrow, Liquity V1's reserve).
+  // panel of its own (Liquity V1's reserve).
   const headings = s.headings ?? ["Collateral", "Debt"];
   check(
     `6b. ${s.name}: the sides read ${headings.join(", ")}, the panels Risk and Limits`,
     JSON.stringify(off?.sides.map((x) => x.heading)) === JSON.stringify(headings) &&
       JSON.stringify(off?.panels.map((x) => x.heading)) === JSON.stringify(["Risk", "Limits"]),
     JSON.stringify({ sides: off?.sides.map((x) => x.heading), panels: off?.panels.map((x) => x.heading) }),
+  );
+  // `note`: the gas compensation escrow's footnote line (ui-jobs 388); none
+  // on a family without one.
+  check(
+    `6b2. ${s.name}: ${s.note ? `one footnote, ${s.note}` : "no footnote"}`,
+    s.note ? off?.notes.length === 1 && s.note.test(off.notes[0]) : off?.notes.length === 0,
+    JSON.stringify(off?.notes),
   );
   const sides = off?.sides ?? [];
   const untouched = sides.filter((x) => x.touched === "false");

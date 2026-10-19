@@ -9,6 +9,7 @@ import { isPolarisEvent, type BaseActivityEvent } from "@/lib/shared/types/event
 import { makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { polarisT1Caption, polarisT1Words } from "@/lib/polaris/event-prose";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { polarisSurplusLabel } from "@/lib/polaris/surplus-claim";
 
 const WORDS = {
   paragraph: "This page is one transaction from this CDP's history.",
@@ -67,7 +68,12 @@ export function polarisEventTitle(event: BaseActivityEvent): EventTitle {
       return makeEventTitle(event, event.actionLabel, [
         { value: num(ctx.collLiquidated), symbol: PETH.symbol, address: PETH.address, label: "Seized" },
         { value: num(ctx.debtLiquidated), symbol: stable, address: stableAddress(ctx.market), label: "Cleared" },
-        { value: num(ctx.collSurplus), symbol: PETH.symbol, address: PETH.address, label: "Claimable" },
+        {
+          value: num(ctx.collSurplus),
+          symbol: PETH.symbol,
+          address: PETH.address,
+          label: polarisSurplusLabel(ctx.surplus),
+        },
       ]);
     default:
       return makeEventTitle(event, event.actionLabel, []);
