@@ -17,8 +17,9 @@
 // a client component — the keys must not reach the browser bundle.
 
 import { createPublicClient, http, type Chain, type PublicClient, type Transport } from "viem";
-import { base, mainnet, sepolia } from "viem/chains";
+import { arbitrum, base, mainnet, sepolia } from "viem/chains";
 import {
+  ARBITRUM_CHAIN_ID,
   BASE_CHAIN_ID,
   MAINNET_CHAIN_ID,
   SEPOLIA_CHAIN_ID,
@@ -30,6 +31,9 @@ import {
 const VIEM_CHAINS: Record<ChainId, Chain> = {
   [MAINNET_CHAIN_ID]: mainnet,
   [BASE_CHAIN_ID]: base,
+  // Multicall3 sits at the canonical address on Arbitrum One too, and viem's
+  // definition carries it.
+  [ARBITRUM_CHAIN_ID]: arbitrum,
   // viem's definition carries Multicall3 at the canonical address, so
   // `multicall()` works on Sepolia without a contracts override.
   [SEPOLIA_CHAIN_ID]: sepolia,

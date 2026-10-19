@@ -13,7 +13,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { chainClient } from "@/lib/sources/chain/rpc";
-import { BASE_CHAIN_ID, CHAINS, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  BASE_CHAIN_ID,
+  CHAINS,
+  MAINNET_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 
 export const runtime = "nodejs";
 
@@ -26,6 +33,9 @@ interface ChainHead {
 const TTL_MS: Record<ChainId, number> = {
   [MAINNET_CHAIN_ID]: 12_000,
   [BASE_CHAIN_ID]: 2_000,
+  // Arbitrum's current rate. It has no fixed cadence, so anything mapping days
+  // to blocks on this chain must be timestamp-driven.
+  [ARBITRUM_CHAIN_ID]: 250,
   // Sepolia keeps Ethereum's 12-second slot.
   [SEPOLIA_CHAIN_ID]: 12_000,
 };

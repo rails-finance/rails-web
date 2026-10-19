@@ -13,10 +13,13 @@
 // does not pass a chain keeps rendering the exact Etherscan URL it rendered
 // before — the L1 protocol surface is untouched by the Base work.
 
-export type ChainId = 1 | 8453 | 11155111;
+export type ChainId = 1 | 8453 | 42161 | 11155111;
 
 export const MAINNET_CHAIN_ID = 1 satisfies ChainId;
 export const BASE_CHAIN_ID = 8453 satisfies ChainId;
+/** Arbitrum One. Registered ahead of any explorer on it: no roster entry names
+ *  this chain yet, so no route, nav link or scope phrase shows it. */
+export const ARBITRUM_CHAIN_ID = 42161 satisfies ChainId;
 /** Sepolia — the first testnet chain in Rails (Polaris runs there). A
  *  testnet's numbers are test numbers; `testnet: true` on its entry is what
  *  lets copy say so where it matters. */
@@ -81,6 +84,17 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     // public gateway, which since at least 2026-09-07 refuses any range over
     // 1,000 blocks — every chunk of every Base sweep failed and became a gap.
     logsRpcEnv: "BASE_BACKFILL_RPC_URL",
+  },
+  42161: {
+    id: 42161,
+    name: "Arbitrum",
+    slug: "arbitrum",
+    layer: "L2",
+    explorerName: "Arbiscan",
+    // Etherscan-family, so the PATHS below and the #eventlog anchor hold.
+    explorerBase: "https://arbiscan.io",
+    rpcEnv: "ARBITRUM_RPC_URL",
+    logsRpcEnv: "ARBITRUM_LOGS_RPC_URL",
   },
   11155111: {
     id: 11155111,

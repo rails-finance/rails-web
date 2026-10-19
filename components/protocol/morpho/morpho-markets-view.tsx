@@ -97,7 +97,14 @@ const loanTokenHref = (chainId: ChainId, token: string) =>
 
 /** For turning a span of blocks into a span of time in the family prose. Nominal
  *  block times, stated as "about". */
-const SECONDS_PER_BLOCK: Record<ChainId, number> = { 1: 12, 8453: 2, 11155111: 12 };
+const SECONDS_PER_BLOCK: Record<ChainId, number> = {
+  1: 12,
+  8453: 2,
+  // Arbitrum's current rate. It has no fixed cadence, so anything mapping days to
+  // blocks on this chain must be timestamp-driven.
+  42161: 0.25,
+  11155111: 12,
+};
 
 /** The page's headline instrument: every lltv in use across the protocol, with how many
  *  markets sit on each. Nine bars is the whole parameter space — that IS the claim. */
