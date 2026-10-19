@@ -116,6 +116,9 @@ export interface PolarisSinceLastTouch {
   };
   /** Seconds between the touch's block header and the head block's. */
   elapsedSeconds: number;
+  /** The last touch is the open (the CDP's one non-transfer row): the window
+   *  is the CDP's whole life, and the row says "Since its open". */
+  sinceOpen: boolean;
 }
 
 const DUST = 1e-9;
@@ -213,6 +216,7 @@ export function polarisSinceLastTouch(
       reward: chain.bcTokenGain,
     },
     elapsedSeconds: Math.max(0, chain.blockTimestamp - last.timestamp),
+    sinceOpen: touches.length === 1,
   };
 }
 
@@ -229,31 +233,41 @@ const formatPrice = (p: number): string => {
 export const signedFigure = (n: number, unit: string): string =>
   `${n >= 0 ? "+" : "−"}${formatCompact(Math.abs(n))} ${unit}`;
 
-/** The named protocol legs, largest first — the clause that says WHICH legs
- *  the protocol term is made of. Legs at dust are left out entirely rather
- *  than stated as zero. */
-export function polarisProtocolLegNames(w: PolarisSinceLastTouch): string[] {
-  const named: Array<[number, string]> = [
+/** The window's label: "Since its open" where the last touch is the open,
+ *  the one window where a whole-life statement is a fact. */
+export const polarisSinceLabel = (w: PolarisSinceLastTouch): string =>
+  w.sinceOpen ? "Since its open" : "Since its last touch";
+
+export type PolarisProtocolLegKey = "psm" | "settle" | "reward" | "interest" | "stabilityGain";
+
+export interface PolarisProtocolLeg {
+  key: PolarisProtocolLegKey;
+  name: string;
+  /** In the market's stablecoin, at the feed now. */
+  value: number;
+}
+
+/** The protocol term's legs, largest first, each drawn as its own line on the
+ *  row and named in the sentence. A leg at dust is left out. */
+export function polarisProtocolLegs(w: PolarisSinceLastTouch): PolarisProtocolLeg[] {
+  const named: PolarisProtocolLeg[] = [
     // The share is the net of every mint and redemption since the touch, so
     // it is named as a net, never after one of the two trades.
-    [w.legs.psm, "the net PSM share"],
-    [w.legs.settle, "the debt below zero the next touch settles"],
-    [w.legs.reward, "the pETH reward"],
-    [w.legs.interest, "interest charged"],
-    [w.legs.stabilityGain, "the stability gain"],
+    { key: "psm", name: "the net PSM share", value: w.legs.psm },
+    { key: "settle", name: "the debt below zero the next touch settles", value: w.legs.settle },
+    { key: "reward", name: "the pETH reward", value: w.legs.reward },
+    { key: "interest", name: "interest charged", value: w.legs.interest },
+    { key: "stabilityGain", name: "the stability gain", value: w.legs.stabilityGain },
   ];
-  return named
-    .filter(([v]) => Math.abs(v) > DUST)
-    .sort((a, b) => Math.abs(b[0]) - Math.abs(a[0]))
-    .map(([, name]) => name);
+  return named.filter((l) => Math.abs(l.value) > DUST).sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
 }
 
 /** One sentence, the same words the strip and the markdown export both use. */
 export function polarisSinceLastTouchSentence(w: PolarisSinceLastTouch, stable: string): string {
-  const names = polarisProtocolLegNames(w);
-  const made = names.length > 0 ? ` (${names.join(", ")})` : "";
+  const legs = polarisProtocolLegs(w);
+  const made = legs.length > 0 ? ` (${legs.map((l) => `${l.name} ${signedFigure(l.value, stable)}`).join(", ")})` : "";
   return (
-    `Since its last touch at block ${w.from.block.toLocaleString("en-US")}, the feed moved pETH from ` +
+    `${polarisSinceLabel(w)} at block ${w.from.block.toLocaleString("en-US")}, the feed moved pETH from ` +
     `${formatPrice(w.from.pethInDebt)} to ${formatPrice(w.to.pethInDebt)} ${stable}, worth ` +
     `${signedFigure(w.feed, stable)} on the collateral the CDP stated then, and the protocol added ` +
     `${signedFigure(w.protocol, stable)}${made} — together ${signedFigure(w.total, stable)}, the whole ` +

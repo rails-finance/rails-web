@@ -22,7 +22,11 @@ import { crPct2, polarisCrAtEvent } from "@/lib/polaris/cr-at-event";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 import { polarisLifetime, polarisPendingAtFeed, polarisPsmShareValue } from "@/lib/polaris/economics";
 import { polarisPsmOutcomeSentence } from "@/lib/polaris/economics-explanation";
-import { polarisSinceLastTouch, polarisSinceLastTouchSentence } from "@/lib/polaris/since-last-touch";
+import {
+  polarisSinceLabel,
+  polarisSinceLastTouch,
+  polarisSinceLastTouchSentence,
+} from "@/lib/polaris/since-last-touch";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import {
   anchorMarketNotes,
@@ -171,10 +175,11 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   }
 
   // The live window's two causes — the same sentence the page's "Since its
-  // last touch" block states, omitted wherever that block does not render.
+  // last touch" row states ("Since its open" where the last touch is the
+  // open), omitted wherever that row does not render.
   const sinceTouch = live && events.length > 0 ? polarisSinceLastTouch(live, events) : null;
   if (sinceTouch) {
-    lines.push("## Since its last touch");
+    lines.push(`## ${polarisSinceLabel(sinceTouch)}`);
     lines.push("");
     lines.push(polarisSinceLastTouchSentence(sinceTouch, stable));
     lines.push("");

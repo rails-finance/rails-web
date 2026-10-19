@@ -4,9 +4,12 @@
 // ----------------------------------------------------------------------------
 // Between two of a CDP's own touches its stated figures do not move, so exactly
 // two things changed what it is worth at the market's own feed — the feed, and
-// the protocol's own pending legs — and they add up to the whole move. That is
-// what this row states: three rows and a rule, every figure receipted, no
+// the protocol's pending legs — and they add up to the whole move. That is
+// what this row states: the feed, one line per protocol leg (largest first,
+// dust left out), and the total under a rule, every figure receipted, no
 // percentage and no colour (lib/polaris/since-last-touch.ts carries the why).
+// Where the last touch is the open, the row says "Since its open": the one
+// window where a statement over the CDP's whole life is a fact.
 //
 // IT IS A TIMELINE ROW, pinned in the head slot (rails-ops TO-DO-ui-jobs §44).
 // Every window between two touches is already told on the spine, between the
@@ -33,12 +36,18 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatExact } from "@/lib/utils/format";
 import { formatPethPrice } from "@/components/protocol/polaris/polaris-position-card";
 import { formatDuration } from "@/lib/date";
-import { polarisProtocolLegNames, signedFigure, type PolarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
+import {
+  polarisProtocolLegs,
+  polarisSinceLabel,
+  signedFigure,
+  type PolarisProtocolLeg,
+  type PolarisProtocolLegKey,
+  type PolarisSinceLastTouch,
+} from "@/lib/polaris/since-last-touch";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { formatCompact } from "@/lib/shared/format-compact";
-
-const DUST = 1e-9;
+import { formatPeth } from "@/lib/polaris/figure-format";
 
 const Signed = ({ value, unit }: { value: number; unit: string }) => (
   <span className="font-semibold text-foreground tabular-nums">
@@ -118,87 +127,121 @@ export function PolarisSinceLastTouchRow({
     ],
   };
 
-  const protocolProv: Provenance = {
-    kind: "chain-derived",
-    pclass: "state",
-    summary:
-      `Everything the protocol has done to this CDP since that touch — valued at the feed now. Each leg is its own ` +
-      `getter on the cdpManager, pending until the CDP's next touch settles it into the stated figures: interest ` +
-      `charged on the debt, the Protocol Safety Rate's stability gain against it, the pETH reward on the debt, and ` +
-      `the CDP's net pro-rata share of every PSM mint and redemption since, whose two sides can move in opposite ` +
-      `directions. Where those legs clear more than the debt, the part below zero is taken back out: the next touch ` +
-      `settles the debt to zero rather than paying the difference to the CDP.`,
-    formula:
-      "(mintRedeemCollChange + bcTokenGain) × price − accruedInterest − mintRedeemDebtChange + accruedStables + min(0, entireDebt)",
-    inputs: [
-      ...(Math.abs(w.raw.psmColl) > DUST || Math.abs(w.raw.psmDebt) > DUST
-        ? [
+  const priceNowInput = {
+    label: `pETH in ${stable} now`,
+    value: formatExact(w.to.pethInDebt),
+    kind: "chain-derived" as const,
+    pclass: "oracle" as const,
+    note: "the feed the pETH legs are valued at",
+  };
+  const pendingNote = "pending until the CDP's next touch settles it into the stated figures";
+  /** One receipt per protocol leg: its getter, valued at the feed now. */
+  const legProv = (key: PolarisProtocolLegKey): Provenance => {
+    switch (key) {
+      case "psm":
+        return {
+          kind: "chain-derived",
+          pclass: "state",
+          summary:
+            `This CDP's net PSM share — its pro-rata share of every PSM mint and redemption since that touch, valued ` +
+            `at the feed now; its two sides can move in opposite directions. The docs call these the peg-defence fees. ` +
+            `It is ${pendingNote}.`,
+          formula: "mintRedeemCollChange × price − mintRedeemDebtChange",
+          inputs: [
             {
               label: "net PSM share, collateral side",
               value: formatExact(w.raw.psmColl),
-              kind: "chain" as const,
-              pclass: "state" as const,
+              kind: "chain",
+              pclass: "state",
               note: "getCDPMintRedeemCollChange(id), in pETH",
             },
             {
               label: "net PSM share, debt side",
               value: formatExact(w.raw.psmDebt),
-              kind: "chain" as const,
-              pclass: "state" as const,
+              kind: "chain",
+              pclass: "state",
               note: `getCDPMintRedeemDebtChange(id), in ${stable}`,
             },
-          ]
-        : []),
-      ...(Math.abs(w.raw.reward) > DUST
-        ? [
+            priceNowInput,
+          ],
+        };
+      case "reward":
+        return {
+          kind: "chain-derived",
+          pclass: "state",
+          summary:
+            `This CDP's pETH reward — the pETH the protocol has distributed to it in proportion to its debt since ` +
+            `that touch, valued at the feed now. The docs call it the pETH yield to minters. It is ${pendingNote}.`,
+          formula: "bcTokenGain × price",
+          inputs: [
             {
               label: "pETH reward",
               value: formatExact(w.raw.reward),
-              kind: "chain" as const,
-              pclass: "state" as const,
-              note: "getCDPBcTokenGain(id) — the bonding curve's yield on the debt",
+              kind: "chain",
+              pclass: "state",
+              note: "getCDPBcTokenGain(id), in pETH",
             },
-          ]
-        : []),
-      ...(Math.abs(w.legs.interest) > DUST
-        ? [
+            priceNowInput,
+          ],
+        };
+      case "interest":
+        return {
+          kind: "chain",
+          pclass: "state",
+          summary: `Interest charged — the interest accrued on the debt since that touch, ${pendingNote}.`,
+          formula: "− accruedInterest",
+          inputs: [
             {
               label: "interest charged",
-              value: formatExact(w.legs.interest),
-              kind: "chain" as const,
-              pclass: "state" as const,
+              value: formatExact(-w.legs.interest),
+              kind: "chain",
+              pclass: "state",
               note: `getCDPAccruedInterest(id), in ${stable}`,
             },
-          ]
-        : []),
-      ...(Math.abs(w.legs.stabilityGain) > DUST
-        ? [
+          ],
+        };
+      case "stabilityGain":
+        return {
+          kind: "chain",
+          pclass: "state",
+          summary: `The stability gain — the Protocol Safety Rate's credit against the debt since that touch, ${pendingNote}.`,
+          formula: "accruedStables",
+          inputs: [
             {
               label: "stability gain",
               value: formatExact(w.legs.stabilityGain),
-              kind: "chain" as const,
-              pclass: "state" as const,
-              note: `getCDPAccruedStables(id) — the Protocol Safety Rate's receipt, against the debt`,
+              kind: "chain",
+              pclass: "state",
+              note: `getCDPAccruedStables(id), in ${stable}`,
             },
-          ]
-        : []),
-      {
-        label: `pETH in ${stable} now`,
-        value: formatExact(w.to.pethInDebt),
-        kind: "chain-derived",
-        pclass: "oracle",
-        note: "the feed the pETH legs are valued at",
-      },
-    ],
+          ],
+        };
+      case "settle":
+        return {
+          kind: "derived",
+          summary:
+            `The debt below zero — the pending legs clear more than the debt, and the next touch settles the debt to ` +
+            `zero, so this part is taken back out.`,
+          formula: "min(0, entireDebt)",
+          inputs: [
+            {
+              label: "entire debt",
+              value: formatExact(w.legs.settle),
+              kind: "chain",
+              pclass: "state",
+              note: `getCDPEntireDebt(id), in ${stable}`,
+            },
+          ],
+        };
+    }
   };
 
   const totalProv: Provenance = {
     kind: "derived",
     summary:
-      `The whole change in this CDP's equity at the feed since its last touch — the feed's effect plus the ` +
-      `protocol's, which is all of it: the holder did nothing inside this window, so no other cause exists. Equity ` +
-      `here is a valuation at a block, not a profit; naming a profit would need a price for the holder's own ` +
-      `deposits, which is a choice about basis rather than a fact of the chain.`,
+      `The whole change in this CDP's equity at the feed since its ${w.sinceOpen ? "open" : "last touch"}: the feed's ` +
+      `effect plus the protocol's legs. The holder did nothing inside this window, so no other cause exists. Equity ` +
+      `here is a valuation at a block.`,
     formula: "(entireColl × price now − max(0, entireDebt)) − (coll × price at the touch − debt)",
     inputs: [
       {
@@ -217,10 +260,33 @@ export function PolarisSinceLastTouchRow({
     ],
   };
 
-  const legNames = polarisProtocolLegNames(w);
+  const legs = polarisProtocolLegs(w);
+  const since = polarisSinceLabel(w);
+  const feedLegs = [
+    ["bonding curve", w.from.curve, w.to.curve, " ETH"],
+    ["ETH/USD", w.from.ethUsd, w.to.ethUsd, ""],
+    ...(market === "goldp" ? [["XAU/USD", w.from.xauUsd, w.to.xauUsd, ""]] : []),
+  ] as Array<[string, number | undefined, number | undefined, string]>;
+  const feedLegText = feedLegs
+    .filter(([, a, b]) => a != null && b != null)
+    .map(([name, a, b, unit]) => `${name} ${formatPethPrice(a as number)} → ${formatPethPrice(b as number)}${unit}`)
+    .join(", ");
+  const legDetail = (l: PolarisProtocolLeg): string => (l.key === "reward" ? `${formatPeth(w.raw.reward)} pETH` : "");
 
-  const Row = ({ label, detail, value }: { label: string; detail: ReactNode; value: ReactNode }) => (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-1.5">
+  const Row = ({
+    label,
+    detail,
+    value,
+    leg,
+    indent,
+  }: {
+    label: string;
+    detail: ReactNode;
+    value: ReactNode;
+    leg?: string;
+    indent?: boolean;
+  }) => (
+    <div className={`flex items-baseline justify-between gap-x-3 ${indent ? "py-1 pl-3" : "py-1.5"}`} data-leg={leg}>
       <span className="min-w-0">
         <span className="text-foreground">{label}</span> <span className="text-rb-500">{detail}</span>
       </span>
@@ -231,11 +297,11 @@ export function PolarisSinceLastTouchRow({
   return (
     <NoteRowShell
       icon="live-window"
-      label={`Since its last touch — ${signedFigure(w.total, stable)}`}
+      label={`${since} — ${signedFigure(w.total, stable)}`}
       marker={{ attr: "data-live-window", value: "polaris-since-touch" }}
       header={
         <>
-          <span className="text-sm text-foreground">Since its last touch</span>
+          <span className="text-sm text-foreground">{since}</span>
           {/* The closed row names its figure: a bare number read as nothing. */}
           <span className="text-xs text-rb-500">change in equity at the feed</span>
           {/* An ECHO of the "Change in equity at the feed" receipt below, not a
@@ -257,10 +323,11 @@ export function PolarisSinceLastTouchRow({
       <div className="px-5 pb-3 pt-1 text-xs">
         <Row
           label="The feed:"
+          leg="feed"
           detail={
             <>
-              pETH {formatPethPrice(w.from.pethInDebt)} → {formatPethPrice(w.to.pethInDebt)} {stable}, on the collateral
-              stated then
+              pETH {formatPethPrice(w.from.pethInDebt)} → {formatPethPrice(w.to.pethInDebt)} {stable}
+              {feedLegText ? ` (${feedLegText})` : ""}, on the collateral stated then
             </>
           }
           value={
@@ -269,24 +336,27 @@ export function PolarisSinceLastTouchRow({
             </Prov>
           }
         />
-        <Row
-          label="The protocol's pending legs:"
-          detail={
-            legNames.length > 1
-              ? `${legNames.slice(0, -1).join(", ")} and ${legNames[legNames.length - 1]}`
-              : legNames.length === 1
-                ? legNames[0]
-                : "the legs pending since that touch"
-          }
-          value={
-            <Prov info={protocolProv} value={formatExact(w.protocol)}>
-              <Signed value={w.protocol} unit={stable} />
-            </Prov>
-          }
-        />
+        {legs.length > 0 && (
+          <div className="pt-1.5 text-foreground">The protocol&rsquo;s legs, pending until the next touch:</div>
+        )}
+        {legs.map((l) => (
+          <Row
+            key={l.key}
+            leg={l.key}
+            indent
+            label={l.name.charAt(0).toUpperCase() + l.name.slice(1)}
+            detail={legDetail(l)}
+            value={
+              <Prov info={legProv(l.key)} value={formatExact(l.value)}>
+                <Signed value={l.value} unit={stable} />
+              </Prov>
+            }
+          />
+        ))}
         <div className="mt-1 border-t border-rb-300/40 pt-1 dark:border-rb-700/40">
           <Row
             label="Change in equity at the feed"
+            leg="total"
             detail=""
             value={
               <Prov info={totalProv} value={formatExact(w.total)}>
@@ -297,9 +367,9 @@ export function PolarisSinceLastTouchRow({
         </div>
 
         <p className="mt-1 text-[11px] leading-snug text-rb-400">
-          A CDP&rsquo;s stated collateral and debt do not change between its own touches, so these two are the whole of
-          what moved it — no basis is chosen and nothing is a profit. The protocol&rsquo;s legs settle into the stated
-          figures at the next touch.
+          {w.sinceOpen
+            ? "This CDP has had no touch since its open, and its stated collateral and debt change only at a touch, so these lines are the whole of what moved its equity at the feed over its life. Its first touch writes the protocol’s legs into the stated figures."
+            : "A CDP’s stated collateral and debt change only at a touch, so these lines are the whole of what moved its equity at the feed since the last one. The next touch writes the protocol’s legs into the stated figures."}
         </p>
       </div>
     </NoteRowShell>

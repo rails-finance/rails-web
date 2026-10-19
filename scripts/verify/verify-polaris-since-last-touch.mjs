@@ -13,18 +13,24 @@
 //                        − (coll × price then − debt)
 //
 // It proves:
-//   1. The identity closes to better than 1e-6 of the equity on both live
-//      fixtures — goldp/5 (a redemption share pending) and usdp/8 (the whale,
-//      a mint share) — and the residual is not merely inside the render's
-//      rounding: the two terms are recomputed at full precision.
+//   1. The identity closes to better than 1e-6 of the equity on the live
+//      fixtures — goldp/5 (a redemption share pending), usdp/8 (the whale,
+//      a mint share) and usdp/70 (never touched since its open) — and the
+//      residual is not merely inside the render's rounding: the two terms are
+//      recomputed at full precision.
 //   2. Both pages draw the row — the timeline's pinned head row, marked
 //      `data-live-window="polaris-since-touch"` (rails-ops TO-DO-ui-jobs §44
 //      moved it there from the retired standalone `detail-since-touch`
 //      section). It is COLLAPSED at rest and its body mounts only while open,
 //      so the check opens it on NoteRowShell's own disclosure control; then
-//      each of its three figures parses back to the recomputed value within
-//      the page's own compact rounding, and the closed headline's figure is
-//      the open row's total.
+//      the feed line, one line per protocol leg (`data-leg`, largest first,
+//      dust left out) and the total each parse back to the recomputed value
+//      within the page's own compact rounding, and the closed headline's
+//      figure is the open row's total. The feed line states the feed's legs
+//      at both ends (bonding curve and ETH/USD).
+//   2b. The label says "Since its open" where the last touch is the open (one
+//      non-transfer row, usdp/70) and "Since its last touch" elsewhere; the
+//      note says the same.
 //   3. The window's opening end IS the CDP's last touch: the row names the
 //      newest non-transfer row's block, and its opening price is that row's
 //      own priceAtBlock.
@@ -34,7 +40,7 @@
 //      window anywhere: the window has no live end, and the grammar is
 //      silence, never a dash.
 //   6. goldp/5's markdown export carries the same sentence with the same
-//      figures.
+//      figures, and usdp/70's says "Since its open".
 //
 // The figures MOVE between runs — the feed is live — so nothing here is pinned
 // to a value; what is pinned is the identity and the provenance of each end.
@@ -72,13 +78,15 @@ const parseSignedCompact = (s) => {
 };
 // The card's own price grain (three dp under 1, two under 100, whole above).
 const fmtPrice = (p) =>
-  p < 0.01
-    ? "<0.01"
-    : p < 1
-      ? p.toFixed(3)
-      : p < 100
-        ? p.toFixed(2)
-        : p.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  p == null
+    ? "(no read)"
+    : p < 0.01
+      ? "<0.01"
+      : p < 1
+        ? p.toFixed(3)
+        : p < 100
+          ? p.toFixed(2)
+          : p.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
 async function api(p_, tries = 4) {
   let last;
@@ -112,7 +120,20 @@ async function windowFor(market, id) {
     chain.accruedStables;
   const equityNow = chain.entireColl * priceNow - chain.entireDebt;
   const equityThen = coll * priceThen - debt;
+  const legs = {
+    psm: chain.mintRedeemCollChange * priceNow - chain.mintRedeemDebtChange,
+    reward: chain.bcTokenGain * priceNow,
+    interest: -chain.accruedInterest,
+    stabilityGain: chain.accruedStables,
+    settle: Math.min(0, chain.entireDebt),
+  };
   return {
+    sinceOpen: rows.length === 1,
+    legs,
+    curveThen: d.priceAtBlock?.curve,
+    ethUsdThen: d.priceAtBlock?.ethUsd,
+    curveNow: chain.price?.curve,
+    ethUsdNow: chain.price?.ethUsd,
     chain,
     touchBlock: last.blockNumber,
     touchTs: last.timestamp,
@@ -180,6 +201,7 @@ const context = await browser.newContext({
 const FIXTURES = [
   { market: "goldp", id: "5", stable: "GOLDp", n: 1 },
   { market: "usdp", id: "8", stable: "USDp", n: 2 },
+  { market: "usdp", id: "70", stable: "USDp", n: 3 },
 ];
 
 const pages = {};
@@ -232,23 +254,77 @@ for (const f of FIXTURES) {
   if (!opened) continue;
   const text = await block.innerText();
 
-  // Four figures while open: the header's ECHO of the total, then the body's
-  // feed, protocol and total. The echo is one fact stated twice, so it is
-  // compared against the total rather than parsed as a fourth term.
+  // While open: the header's ECHO of the total, then the feed, one line per
+  // protocol leg, and the total. The echo is one fact stated twice, so it is
+  // compared against the total rather than parsed as another term.
   const allFigures = signed(await block.locator("span.tabular-nums").allInnerTexts());
-  const figures = allFigures.slice(1);
-  shownFigures[tag] = figures;
+  shownFigures[tag] = allFigures.slice(1);
   check(
     `${f.n}. ${tag}: the closed headline's figure is the open row's own total`,
-    allFigures.length === 4 && allFigures[0] === allFigures[3] && closedFigures[0] === allFigures[0],
-    `headline ${allFigures[0] ?? "—"} against total ${allFigures[3] ?? "—"} (${allFigures.length} figures in the row)`,
+    allFigures.length >= 3 && allFigures[0] === allFigures[allFigures.length - 1] && closedFigures[0] === allFigures[0],
+    `headline ${allFigures[0] ?? "—"} against total ${allFigures[allFigures.length - 1] ?? "—"} (${allFigures.length} figures in the row)`,
   );
-  const parsed = figures.map(parseSignedCompact).filter((n) => Number.isFinite(n));
   const near = (shown, want) => Math.abs(shown - want) <= Math.max(Math.abs(want) * 0.005, 0.002);
+  // A leg's line is drawn compact ("+3.0K"), so it is held to half a unit of
+  // its last shown digit, plus the 0.5% the page's own rounding allows.
+  const legNear = (shown, want) => {
+    const m = /\.(\d+)\s*([MK])?/.exec(shown.text ?? "");
+    const mult = m?.[2] === "M" ? 1e6 : m?.[2] === "K" ? 1e3 : 1;
+    const grain = m ? 0.5 * 10 ** -m[1].length * mult : 0.5 * mult;
+    return Math.abs(shown.value - want) <= grain + Math.max(Math.abs(want) * 0.005, 0.002);
+  };
+  const lineShown = async (key) => {
+    const line = block.locator(`[data-leg="${key}"]`).first();
+    if ((await line.count()) === 0) return { value: NaN, text: "" };
+    const t = signed(await line.locator("span.tabular-nums").allInnerTexts());
+    return t.length ? { value: parseSignedCompact(t[t.length - 1]), text: t[t.length - 1] } : { value: NaN, text: "" };
+  };
+  const lineFigure = async (key) => (await lineShown(key)).value;
+  const feedShown = await lineFigure("feed");
+  const totalShown = await lineFigure("total");
   check(
-    `${f.n}. ${tag}: the three figures are the recomputed feed, protocol and total`,
-    parsed.length === 3 && near(parsed[0], w.feed) && near(parsed[1], w.protocol) && near(parsed[2], w.total),
-    `shown ${figures.join(" · ")} against ${fmtCompact(w.feed)} / ${fmtCompact(w.protocol)} / ${fmtCompact(w.total)}`,
+    `${f.n}. ${tag}: the feed line and the total row are the recomputed feed and total`,
+    near(feedShown, w.feed) && near(totalShown, w.total),
+    `shown ${feedShown} / ${totalShown} against ${fmtCompact(w.feed)} / ${fmtCompact(w.total)}`,
+  );
+
+  // One line per leg, largest first, dust left out; each its own figure.
+  const shownKeys = await block
+    .locator("[data-leg]")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-leg")).filter((k) => k !== "feed" && k !== "total"));
+  const wantKeys = Object.entries(w.legs)
+    .filter(([, v]) => Math.abs(v) > 1e-9)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .map(([k]) => k);
+  const legMisses = [];
+  for (const k of wantKeys) {
+    const v = await lineShown(k);
+    if (!legNear(v, w.legs[k])) legMisses.push(`${k} shown ${v.text || "nothing"} want ${fmtCompact(w.legs[k])}`);
+  }
+  check(
+    `${f.n}. ${tag}: the protocol term is one line per leg, largest first, each the recomputed figure`,
+    shownKeys.join(",") === wantKeys.join(",") && legMisses.length === 0,
+    `lines ${shownKeys.join(", ")}${shownKeys.join(",") === wantKeys.join(",") ? "" : ` (want ${wantKeys.join(", ")})`}${legMisses.length ? `; ${legMisses.join("; ")}` : ""}`,
+  );
+
+  // The feed line states the feed's legs at both ends.
+  const feedText = await block.locator('[data-leg="feed"]').first().innerText();
+  const curvePair = `bonding curve ${fmtPrice(w.curveThen)} → ${fmtPrice(w.curveNow)}`;
+  const ethPair = `ETH/USD ${fmtPrice(w.ethUsdThen)} → ${fmtPrice(w.ethUsdNow)}`;
+  check(
+    `${f.n}. ${tag}: the feed line states the bonding-curve price and ETH/USD at both ends`,
+    feedText.includes(curvePair) && feedText.includes(ethPair),
+    `${curvePair}; ${ethPair}`,
+  );
+
+  // 2b. "Since its open" where the last touch is the open.
+  const label = w.sinceOpen ? "Since its open" : "Since its last touch";
+  const otherLabel = w.sinceOpen ? "Since its last touch" : "Since its open";
+  const noteSaysOpen = /since its open/i.test(text) && /over its life/i.test(text);
+  check(
+    `${f.n}. ${tag}: the row says "${label}"${w.sinceOpen ? ", in its label and its note" : ""}`,
+    text.trim().startsWith(label) && !text.includes(otherLabel) && (!w.sinceOpen || noteSaysOpen),
+    `${w.sinceOpen ? "one non-transfer row" : "more than one touch"}; row opens "${text.trim().slice(0, 30)}"`,
   );
 
   // ── 3. the window's opening end is the CDP's own last touch ───────────────
@@ -306,7 +382,7 @@ for (const f of FIXTURES) {
 // pass a count-only check.
 const closedPage = await open(context, polarisUrl("goldp", "1561"));
 const closedCount = await closedPage.locator(ROW).count();
-const closedSilent = !/Since its last touch/i.test(await closedPage.locator("body").innerText());
+const closedSilent = !/Since its (last touch|open)/i.test(await closedPage.locator("body").innerText());
 const closedChain = await api("/api/chain/polaris/position?market=goldp&id=1561");
 check(
   "3. a closed CDP draws no live window row, and does not name the window at all",
@@ -322,26 +398,36 @@ await closedPage.close();
 // must be the page's own, character for character. Comparing it against a
 // fresh recomputation instead would fail whenever the feed moved between the
 // two reads — a moving target, not a broken export.
-const page5 = pages["goldp/5"];
-await page5
-  .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
-  .first()
-  .click();
-await page5.getByRole("menuitem", { name: /Copy Position/i }).click();
-await page5.waitForTimeout(500);
-const md = await page5.evaluate(() => navigator.clipboard.readText());
+async function exportMarkdown(page) {
+  await page
+    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
+    .first()
+    .click();
+  await page.getByRole("menuitem", { name: /Copy Position/i }).click();
+  await page.waitForTimeout(500);
+  return page.evaluate(() => navigator.clipboard.readText());
+}
+const md = await exportMarkdown(pages["goldp/5"]);
 const hasSection = /## Since its last touch/.test(md);
 const shown5 = shownFigures["goldp/5"] ?? [];
 const missing = shown5.filter((f) => !md.includes(f));
 check(
-  "4. goldp/5's markdown export states the page's own three figures",
-  hasSection && shown5.length === 3 && missing.length === 0,
+  "4. goldp/5's markdown export states the page's own figures, the per-leg lines among them",
+  hasSection && shown5.length >= 3 && missing.length === 0,
   hasSection
     ? missing.length === 0
       ? `section present with ${shown5.join(" · ")}`
       : `section present, missing ${missing.join(" · ")}`
     : "section absent",
 );
+if (pages["usdp/70"]) {
+  const md70 = await exportMarkdown(pages["usdp/70"]);
+  check(
+    '4. usdp/70\'s markdown export says "Since its open" in its heading and its sentence',
+    /## Since its open/.test(md70) && /Since its open at block/.test(md70) && !/Since its last touch/.test(md70),
+    /## Since its open/.test(md70) ? "heading and sentence present" : "heading absent",
+  );
+}
 
 for (const p of Object.values(pages)) await p.close();
 await context.close();
