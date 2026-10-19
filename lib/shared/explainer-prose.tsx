@@ -26,16 +26,9 @@
 //     does not exist (it would open the paragraph) is dropped — a continuation
 //     attaches to the previous clause or dies with it.
 
-import {
-  Fragment,
-  cloneElement,
-  createContext,
-  createElement,
-  isValidElement,
-  useContext,
-  type ReactNode,
-} from "react";
+import { Fragment, cloneElement, createElement, isValidElement, type ReactNode } from "react";
 import { EXPLAIN_GROUP_RULE, ExplainHeading } from "@/components/shared/explain-groups";
+import { useExplainerLeadOnTitle } from "@/components/shared/explainer-lead-context";
 
 /** The one emphasis helper for explainer copy — the charter §3 highlight rule's
  *  render form (semibold + foreground tone against the muted body). Wrap a
@@ -224,11 +217,6 @@ function Bullets({ items }: { items: ReactNode[] }) {
   );
 }
 
-/** True where the event page's title states the explanation's first
- *  sentence (rails-ops decision 0045, "Ruled since"): a grouped pane leaves
- *  its first bullet out. Provided by the event card in page mode. */
-export const ExplainerLeadOnTitleContext = createContext(false);
-
 export function ProseExplainer({
   paragraph,
   items: given,
@@ -247,7 +235,7 @@ export function ProseExplainer({
   /** A one-line lead-in above the list. */
   listLead?: ReactNode;
 }) {
-  const leadOnTitle = useContext(ExplainerLeadOnTitleContext);
+  const leadOnTitle = useExplainerLeadOnTitle();
   const items = leadOnTitle && given?.some(isGrouped) ? given.slice(1) : given;
   const hasItems = items != null && items.length > 0;
   const hasList = list != null && list.length > 0;

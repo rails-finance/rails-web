@@ -40,7 +40,8 @@ import {
   type EventSheet,
 } from "@/components/shared/event-sheet";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
-import { ExplainerLeadOnTitleContext, splitFirstSentence } from "@/lib/shared/explainer-prose";
+import { ExplainerLeadOnTitleContext } from "@/components/shared/explainer-lead-context";
+import { splitFirstSentence } from "@/lib/shared/explainer-prose";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
