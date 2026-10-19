@@ -33,11 +33,15 @@ export interface MorphoChainTimelineResponse extends ReplayGroupedFields {
 const ROUTE = "/api/chain/morpho-base/timeline";
 
 /** `market` asks for that position as ROWS; absent, the wallet's history
- *  flat. */
-export function fetchMorphoBaseTimeline(wallet: string, market?: string): Promise<MorphoChainTimelineResponse> {
+ *  flat. `route` names another deployment's history route (Arbitrum's). */
+export function fetchMorphoBaseTimeline(
+  wallet: string,
+  market?: string,
+  route: string = ROUTE,
+): Promise<MorphoChainTimelineResponse> {
   return fetchChainTimeline<MorphoChainTimelineResponse>({
     wallet,
-    route: ROUTE,
+    route,
     mark: "morpho-base-timeline",
     params: market ? { group: "1", market } : undefined,
   });

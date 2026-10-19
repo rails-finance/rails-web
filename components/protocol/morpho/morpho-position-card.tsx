@@ -63,6 +63,7 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { morphoPositionModal, type MorphoPositionModalOpts } from "@/lib/morpho/event-templates";
 import { morphoBasePositionHref } from "@/lib/morpho-base/routes";
+import { morphoArbitrumPositionHref } from "@/lib/morpho-arbitrum/routes";
 import { isPendlePt } from "@/lib/morpho/pendle-pt";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { AmountText } from "@/components/shared/amount-text";
@@ -248,9 +249,9 @@ export function morphoPagePath(
   session: SessionProtocol,
   v: Pick<MorphoPositionView, "positionId" | "owner" | "marketId">,
 ) {
-  return session === "morpho-base"
-    ? morphoBasePositionHref(v.owner, v.marketId)
-    : `/ethereum/morpho/${encodeURIComponent(v.positionId)}`;
+  if (session === "morpho-base") return morphoBasePositionHref(v.owner, v.marketId);
+  if (session === "morpho-arbitrum") return morphoArbitrumPositionHref(v.owner, v.marketId);
+  return `/ethereum/morpho/${encodeURIComponent(v.positionId)}`;
 }
 
 const STATUS: Record<"closed" | "liquidated" | "unread", PositionCardStatus> = {
@@ -323,7 +324,12 @@ export function useMorphoCardSlots({
   // only the deployment the card's session names, and a Pendle principal token
   // as collateral, change the prose.
   const positionModal = (o: Pick<MorphoPositionModalOpts, "status" | "hasDebt" | "peakDebt">) =>
-    morphoPositionModal({ ...o, base: session === "morpho-base", pt: isPendlePt(v.collateralSymbol) });
+    morphoPositionModal({
+      ...o,
+      base: session === "morpho-base",
+      arbitrum: session === "morpho-arbitrum",
+      pt: isPendlePt(v.collateralSymbol),
+    });
 
   const status: PositionCardStatus | null = v.status === "open" ? null : STATUS[v.status];
   const marketPair = <MorphoMarketPair label={v.marketLabel} marketId={v.marketId} loanToken={v.loanToken} />;
@@ -399,7 +405,11 @@ export function useMorphoCardSlots({
     // The live read counts only when it is fresh.
     const chain = live && !live.chainStale ? live : null;
     const chainCoords: MorphoChainCoords | undefined = live
-      ? { marketId: live.marketId, marketLabel: `${live.loanSymbol} / ${live.collateralSymbol}` }
+      ? {
+          marketId: live.marketId,
+          marketLabel: `${live.loanSymbol} / ${live.collateralSymbol}`,
+          chainId: coords.chainId,
+        }
       : undefined;
     const collateral: PositionCardHead = {
       id: "collateral",
@@ -631,7 +641,7 @@ export function useMorphoCardSlots({
     leading: () => (
       <MorphoMenuRows
         marketId={v.marketId}
-        positionId={session === "morpho-base" ? undefined : v.positionId}
+        positionId={session === "morpho-base" || session === "morpho-arbitrum" ? undefined : v.positionId}
         pagePath={morphoPagePath(session, v)}
       />
     ),

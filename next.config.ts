@@ -120,6 +120,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/moonwell-base", "/base/moonwell"],
   ["/morpho", "/ethereum/morpho"],
   ["/morpho-base", "/base/morpho"],
+  // Morpho Blue on Arbitrum never had a pre-0016 path; the row is for check:routes.
+  ["/morpho-arbitrum", "/arbitrum/morpho"],
   // Polaris never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /polaris is
   // the address anyone will guess.

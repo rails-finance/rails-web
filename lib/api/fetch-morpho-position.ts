@@ -68,6 +68,9 @@ export interface MorphoChainPositionResponse {
 
   /** 1 whole collateral token in whole loan tokens (the market's own oracle). */
   oraclePrice: number;
+  /** The oracle's `price()` as read, a raw integer string ("0" where the
+   *  market has no oracle); absent from a reader that predates it. */
+  oraclePriceRaw?: string;
   /** The feeds the oracle names (a MorphoChainlinkOracleV2's four feed
    *  getters, zero ones skipped), each as its latestRoundData() answered at
    *  `blockNumber`. Null when the oracle names none, is not that kind (the

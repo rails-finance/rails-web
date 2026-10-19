@@ -12,11 +12,13 @@
 import type { CaptureSource } from "@/lib/shared/capture-source";
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { MORPHO_ADDRESSES } from "./asset-catalog";
+import { MORPHO_ADDRESSES, morphoBlueContract } from "./asset-catalog";
 import { formatDate } from "@/lib/date";
 import type { MorphoIndexRead } from "@/lib/sources/api/morpho-positions";
 
 const MORPHO = { name: "Morpho Blue", address: MORPHO_ADDRESSES.MORPHO_BLUE };
+/** The singleton on the receipt's chain (Arbitrum's is its own address). */
+const blueOf = (coords?: MorphoCoords) => (coords?.chainId === 42161 ? morphoBlueContract(coords.chainId) : MORPHO);
 
 // Custody, not origin — the via line's leading segment only (the embedded
 // receipt renderer drops it; provenance-receipts-grammar §3). Summaries state
@@ -119,7 +121,7 @@ export const assetsDeltaProv = (
     summary: isLiq
       ? `Collateral (${sym}) seized in this liquidation — the collateral the liquidator took, exactly as Morpho Blue emitted it${atBlock(coords)}, scaled by the token's decimals. Decoded from the log, never recomputed.`
       : `The ${side === "loan" ? "loan" : "collateral"} asset (${sym}) this operation moved — the amount the event itself carries, exactly as Morpho Blue emitted it${atBlock(coords)}, scaled by the token's decimals. Decoded from the log, never recomputed.`,
-    contract: MORPHO,
+    contract: blueOf(coords),
     via: `${captureVia(coords)} · ${log ? `${log} log · ` : ""}${isLiq ? "seizedAssets" : "assets"}`,
     inputs: eventInputs(coords),
   };
@@ -137,7 +139,7 @@ export const externalActorProv = (
   pclass: "emitted",
   verify: txVerify(coords),
   summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party: the position owner neither signed the transaction nor made the Morpho call. The transaction sender and the event's own caller param (msg.sender, authorized for the position) are both chain facts${atBlock(coords)}; each is compared against the owner. Bundler-routed flows keep the owner as signer and contract-owned positions keep the owner as caller — this event has the owner as neither.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · tx envelope from + ${MORPHO_LOG[args.eventType] ?? args.eventType} caller param vs owner`,
   inputs: eventInputs(coords, [
     { label: "position owner", value: args.owner, kind: "chain", note: "whose position this event moved (onBehalf)" },
@@ -162,7 +164,7 @@ export const collateralAfterProv = (sym: string, coords: MorphoCoords): Provenan
   pclass: "state",
   verify: stateVerify(coords),
   summary: `Collateral (${sym}) the position held AFTER this event — the position's running collateral, replayed from its own on-chain events (deposits add, withdrawals and liquidation seizures subtract) in log order up to this block${atBlock(coords)}. Collateral doesn't accrue, so the replay is exact.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · Σ ±assets across SupplyCollateral/WithdrawCollateral/Liquidate logs · in on-chain order`,
   inputs: eventInputs(coords),
 });
@@ -172,7 +174,7 @@ export const borrowedAfterProv = (sym: string, coords: MorphoCoords): Provenance
   kind: "chain",
   pclass: "indexed",
   summary: `Net borrowed PRINCIPAL (${sym}) after this event — the position's running loan-asset principal, replayed from its own on-chain events (draws add; repayments and the debt a liquidation clears — bad debt included — subtract) in log order up to this block${atBlock(coords)}. Principal only: interest accrued since each draw is excluded (current debt with interest needs the market index — a derived layer).`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · Σ ±assets across Borrow/Repay/Liquidate logs · in on-chain order`,
   inputs: eventInputs(coords),
 });
@@ -184,7 +186,7 @@ export const debtAfterProv = (sym: string, coords: MorphoCoords): Provenance => 
   pclass: "indexed",
   verify: stateVerify(coords),
   summary: `${sym} the position owed AFTER this event${atBlock(coords)}: its borrow shares after the event priced at the market's totalBorrowAssets ÷ totalBorrowShares there, rounded up as Morpho rounds a debt. Equals Morpho.position(id, user).borrowShares converted at Morpho.market(id) read at the block; the interest accrued up to the block is in it.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · borrow shares × market totals replayed from Borrow/Repay/Liquidate/AccrueInterest logs`,
   formula: "ceil(shares × (totalBorrowAssets + 1) ÷ (totalBorrowShares + 10^6))",
   inputs: eventInputs(coords),
@@ -195,7 +197,7 @@ export const debtBeforeProv = (sym: string, coords: MorphoCoords): Provenance =>
   kind: "chain-derived",
   pclass: "indexed",
   summary: `${sym} the position owed just BEFORE this event: its borrow shares before the event priced at the market's totals just before it. It includes the interest accrued since the previous row.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "borrow shares before × market totals before this event",
   formula: "after − change",
   inputs: eventInputs(coords, [
@@ -215,7 +217,7 @@ export const debtChangeProv = (sym: string, coords: MorphoCoords): Provenance =>
   pclass: "indexed",
   verify: txVerify(coords),
   summary: `${sym} of debt this event added or cleared${atBlock(coords)}: the debt after less the debt before, both at the market's totals. It matches the event's own assets to within the one-unit rounding of the share conversion.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "debt after − debt before",
   inputs: eventInputs(coords),
 });
@@ -225,7 +227,7 @@ export const interestSincePreviousProv = (sym: string, coords: MorphoCoords): Pr
   kind: "chain-derived",
   pclass: "indexed",
   summary: `${sym} of interest the debt accrued since the position's previous event, up to this one${atBlock(coords)}: the debt just before this event less the debt just after the previous one. The shares did not move between them, so this is the shares × the rise in the market's totalBorrowAssets ÷ totalBorrowShares.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "debt before this event − debt after the previous event",
   formula: "shares × (ratio now − ratio at the previous row)",
   inputs: eventInputs(coords),
@@ -239,7 +241,7 @@ export const suppliedAfterProv = (sym: string, coords: MorphoCoords): Provenance
   kind: "chain",
   pclass: "indexed",
   summary: `Net supplied PRINCIPAL (${sym}) after this event — the wallet's running lender-side principal in this market, replayed from its own Supply and Withdraw logs in log order up to this block${atBlock(coords)}. Principal only: the interest the supply has earned since accrues in the market index and is excluded.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · Σ ±assets across Supply/Withdraw logs · in on-chain order`,
   inputs: eventInputs(coords),
 });
@@ -250,7 +252,7 @@ export const suppliedBeforeProv = (sym: string, coords: MorphoCoords): Provenanc
   kind: "chain-derived",
   pclass: "indexed",
   summary: `Net supplied PRINCIPAL (${sym}) before this event — the after-balance minus the amount this event moved (after − change), reconstructed in the browser from the replayed after and the logged delta. Principal only, same basis as the after.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "supplied after − this event's amount",
   formula: "after − change",
   inputs: eventInputs(coords, [
@@ -266,7 +268,7 @@ export const supplyAfterProv = (sym: string, coords: MorphoCoords): Provenance =
   pclass: "indexed",
   verify: stateVerify(coords),
   summary: `${sym} the position's supply stood at AFTER this event${atBlock(coords)}: its supply shares after the event priced at the market's totalSupplyAssets ÷ totalSupplyShares there, rounded down as Morpho rounds a lender's claim. Equals Morpho.position(id, user).supplyShares converted at Morpho.market(id) read at the block; the interest earned up to the block is in it.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · supply shares × market totals replayed from Supply/Withdraw/Liquidate/AccrueInterest logs`,
   formula: "floor(shares × (totalSupplyAssets + 1) ÷ (totalSupplyShares + 10^6))",
   inputs: eventInputs(coords),
@@ -277,7 +279,7 @@ export const supplyBeforeProv = (sym: string, coords: MorphoCoords): Provenance 
   kind: "chain-derived",
   pclass: "indexed",
   summary: `${sym} the position's supply stood at just BEFORE this event: its supply shares before the event priced at the market's totals just before it. It includes the interest earned since the previous row.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "supply shares before × market totals before this event",
   formula: "after − change",
   inputs: eventInputs(coords, [
@@ -297,7 +299,7 @@ export const supplyChangeProv = (sym: string, coords: MorphoCoords): Provenance 
   pclass: "indexed",
   verify: txVerify(coords),
   summary: `${sym} of supply this event added or took out${atBlock(coords)}: the supply after less the supply before, both at the market's totals. It matches the event's own assets to within the one-unit rounding of the share conversion.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "supply after − supply before",
   inputs: eventInputs(coords),
 });
@@ -307,7 +309,7 @@ export const supplyGapSincePreviousProv = (sym: string, coords: MorphoCoords): P
   kind: "chain-derived",
   pclass: "indexed",
   summary: `${sym} the supply moved between the position's previous event and this one${atBlock(coords)}: the supply just before this event less the supply just after the previous one. The shares did not move between them, so this is the shares × the change in the market's totalSupplyAssets ÷ totalSupplyShares: the interest earned, less any bad debt a liquidation socialised in between.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "supply before this event − supply after the previous event",
   formula: "shares × (ratio now − ratio at the previous row)",
   inputs: eventInputs(coords),
@@ -321,7 +323,7 @@ export const collateralBeforeProv = (sym: string, coords: MorphoCoords): Provena
   kind: "chain-derived",
   pclass: "state",
   summary: `Collateral (${sym}) the position held BEFORE this event — the after-balance minus the amount this event moved (after − change), reconstructed in the browser from the replayed after and the logged delta. Collateral doesn't accrue, so this is exact.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "collateral after − this event's amount",
   formula: "after − change",
   // Operand rows: the driver (reconstructTransition) fills the values it
@@ -342,7 +344,7 @@ export const borrowedBeforeProv = (sym: string, coords: MorphoCoords): Provenanc
   kind: "chain-derived",
   pclass: "indexed",
   summary: `Net borrowed PRINCIPAL (${sym}) before this event — the after-balance minus the amount this event moved (after − change), reconstructed in the browser from the replayed after and the logged delta. Principal only, same basis as the after (interest since each draw is a derived layer).`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "borrowed after − this event's amount",
   formula: "after − change",
   inputs: eventInputs(coords, [
@@ -357,7 +359,7 @@ export const positionCollateralProv = (sym: string, atBlockNum?: number, coords?
   pclass: "state",
   verify: stateVerify({ blockNumber: atBlockNum }),
   summary: `Collateral (${sym}) the position holds — replayed from the position's own collateral deposits and withdrawals (and liquidation seizures)${atBlockNum ? ` at block ${atBlockNum}` : ""}. Exact (collateral doesn't accrue).`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · Σ ±assets across SupplyCollateral/WithdrawCollateral/Liquidate logs`,
 });
 
@@ -366,7 +368,7 @@ export const positionBorrowedProv = (sym: string, atBlockNum?: number, coords?: 
   kind: "chain",
   pclass: "indexed",
   summary: `Net borrowed PRINCIPAL (${sym}) — replayed from the position's own draws and repayments (and the debt a liquidation cleared)${atBlockNum ? ` at block ${atBlockNum}` : ""}. Principal only; current debt with interest is a derived layer.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · Σ ±assets across Borrow/Repay/Liquidate logs`,
 });
 
@@ -377,7 +379,7 @@ export const morphoPeakCollateralProv = (sym: string, coords?: MorphoCoords): Pr
   kind: "chain",
   pclass: "indexed",
   summary: `The highest ${sym} collateral this position ever recorded — the maximum of the running balance after each captured event (deposits, withdrawals, liquidation seizures). Exact: collateral only moves when an event touches it, so the recorded maximum is the true peak.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · max(collateral after each event) · open → close${coords?.marketId ? ` · market ${coords.marketId.slice(0, 10)}…` : ""}`,
 });
 
@@ -389,7 +391,7 @@ export const morphoPeakBorrowedProv = (sym: string, coords?: MorphoCoords): Prov
   kind: "chain",
   pclass: "indexed",
   summary: `The highest net borrowed PRINCIPAL (${sym}) this position ever recorded — the maximum of the running principal after each captured event (draws, repayments, debt a liquidation cleared). Principal only: interest accrues in the market index between events, so the debt owed at that moment sat above this figure by the interest accrued to then.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · max(net principal after each event) · open → close${coords?.marketId ? ` · market ${coords.marketId.slice(0, 10)}…` : ""}`,
 });
 
@@ -400,7 +402,7 @@ export const morphoPeakOwedProv = (sym: string, coords?: MorphoCoords): Provenan
   kind: "chain-derived",
   pclass: "indexed",
   summary: `The highest ${sym} debt this position owed at any of its events — the maximum of the debt after each captured event, each one the borrow shares at the market's totals at that event, so the interest accrued to then is included. Between events the debt kept growing with interest until the next one.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · max(debt after each event) · open → close${coords?.marketId ? ` · market ${coords.marketId.slice(0, 10)}…` : ""}`,
 });
 
@@ -425,7 +427,7 @@ export const morphoCurrentDebtProv = (
       ? ` Rails read those totals on ${formatDate(index.readAt)} and has not refreshed them since, so interest after that date is missing from this figure.`
       : ""),
   source: index ? { block: index.block } : undefined,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · borrowShares → assets (toAssetsUp)`,
   formula: "shares × (totalBorrowAssets + 1) ÷ (totalBorrowShares + 1e6), rounded up",
   inputs: [
@@ -478,7 +480,7 @@ export const atBlockOraclePriceProv = (
         : "Re-run the market oracle's price() eth_call against an archive node",
   },
   summary: `${collSym} priced in ${loanSym} at this event's block — the market's OWN oracle (IOracle.price(), fixed in the market's immutable params at creation), ${coords.source === "sweep" ? "asked for its answer at that block directly" : "read at the block and captured into the index"}. This is the exact figure Morpho's LLTV test and liquidation-incentive math acted on. Morpho prices in the loan token by design; no USD is asserted anywhere.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "market oracle · price() eth_call at the event's block · 1e36-scaled, decimals-adjusted",
   inputs: [
     { label: `${collSym} price`, value: `${price} ${loanSym}`, kind: "chain", note: "oracle price(), at block" },
@@ -498,7 +500,7 @@ export const liqSeizedValueProv = (
   formula: "seized collateral × oracle price at block",
   verify: txVerify(coords),
   summary: `What the seized collateral was worth at the moment of the liquidation — in the market's own loan token: the Liquidate log's seizedAssets times the market oracle's price at the event's block. Both factors are chain values pinned to this block; the denomination is the loan token because that is the only unit Morpho itself prices in.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · Liquidate log · seizedAssets × oracle price at block`,
   inputs: [
     { label: "seized", value: `${vals.amount} ${collSym}`, kind: "chain", note: "Liquidate · seizedAssets" },
@@ -513,7 +515,7 @@ export const liqClearedValueProv = (loanSym: string, coords: MorphoCoords, vals:
   pclass: "emitted",
   verify: txVerify(coords),
   summary: `The ${loanSym} debt this liquidation cleared — the Liquidate log's repaid assets plus any bad debt the market socialized in the same event, exactly as emitted. Already in the market's own loan token: no price is applied to this leg.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `${captureVia(coords)} · Liquidate log · repaidAssets + badDebtAssets`,
   inputs: [
     { label: "cleared", value: `${vals.amount} ${loanSym}`, kind: "chain", note: "repaid + bad debt, emitted" },
@@ -532,7 +534,7 @@ export const liqPremiumProv = (
   formula: "seized ÷ cleared − 1",
   verify: txVerify(coords),
   summary: `The premium realized on this liquidation — seized collateral value (at the market oracle's price this block, in ${loanSym}) over the loan cleared, minus one. This reproduces the market's Liquidation Incentive Factor as actually realized by the liquidator; when the event also socialized bad debt, the cleared leg includes it, and the figure can fall below the incentive (or negative — the seizure no longer covered the debt).`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "seized ÷ cleared − 1 · both legs in the market's loan token",
   inputs: [
     { label: "seized", value: vals.seized, kind: "chain", note: "seizedAssets × price at block" },
@@ -564,7 +566,7 @@ export const morphoHealthAtEventProv = (
   summary: vals.liquidation
     ? `The position's ${metric} ${side} this liquidation: its ${collSym} collateral and ${loanSym} debt ${side} it, as this row states them, with the collateral valued at the oracle price the liquidation ran at — the read, at the end of block ${vals.priceBlock}, that reproduces seized = repaid × incentive ÷ price. Both sides use that one price, so the move is the liquidation's alone.`
     : `The position's ${metric} ${side} this event: its ${collSym} collateral and ${loanSym} debt ${side} the event, as this row states them, with the collateral valued at the market's own oracle at the end of block ${vals.priceBlock}. Both sides use that one price, so the move is the event's alone.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `market oracle price() at block ${vals.priceBlock} · row collateral and debt`,
   formula: metric === "health factor" ? "collateral × price × LLTV ÷ debt" : "debt ÷ (collateral × price)",
   inputs: [
@@ -587,7 +589,7 @@ export const morphoBorrowRateAtBlockProv = (coords: MorphoCoords, block: number,
     text: `Re-run the market IRM's borrowRateView eth_call at block ${block}, with the market's params and its market() slots at that block`,
   },
   summary: `The market's borrow rate at the end of block ${block}: the interest rate model's per-second rate for the market's state there, times the seconds in a year. It moves with the market's utilization, so the debt accrued at this rate only until the next change.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `market IRM · borrowRateView at block ${block} · × 31,536,000`,
   formula: "rate per second × seconds per year",
   inputs: [
@@ -602,7 +604,7 @@ export const morphoLifProv = (coords: MorphoCoords, lltv: number, lif: number): 
   pclass: "state",
   verify: txVerify(coords),
   summary: `Liquidation incentive — the collateral a liquidator may seize per unit of debt repaid, fixed by the market's LLTV. The whole bonus goes to the liquidator.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: "Morpho Blue liquidate() · min(1.15, 1 ÷ (0.3 × LLTV + 0.7))",
   formula: "min(1.15, 1 ÷ (0.3 × LLTV + 0.7))",
   inputs: [
@@ -629,7 +631,7 @@ export const liqPriceUsedProv = (
     coords.blockNumber != null && block !== coords.blockNumber
       ? `${collSym} priced in ${loanSym} by the market's own oracle at the end of block ${block}, the block before the liquidation. The oracle updated later in block ${coords.blockNumber}, after the liquidation had run; this earlier price is the one that reproduces the seized amount from the repaid amount and the market's incentive.`
       : `${collSym} priced in ${loanSym} by the market's own oracle at the end of block ${block}, the liquidation's block. It reproduces the seized amount from the repaid amount and the market's incentive.`,
-  contract: MORPHO,
+  contract: blueOf(coords),
   via: `market oracle · price() eth_call at block ${block} · 1e36-scaled, decimals-adjusted`,
   inputs: [
     { label: `${collSym} price`, value: `${price} ${loanSym}`, kind: "chain", note: `oracle price(), block ${block}` },

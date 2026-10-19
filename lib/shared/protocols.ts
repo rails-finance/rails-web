@@ -502,6 +502,22 @@ const SPECS: ProtocolSpec[] = [
     ],
   },
   {
+    // Morpho Blue on Arbitrum One, position-first (rails-ops
+    // TO-DO-arbitrum-scoping.md item 13): no listing and no sub-pages, so the
+    // explorer's own route is the protocol page, a wallet input over the
+    // census's markets read live.
+    id: "morpho-arbitrum",
+    session: "morpho-arbitrum",
+    label: "Morpho Blue",
+    chainId: 42161,
+    slug: "morpho",
+    protocolKey: "morpho",
+    tags: ["Lend", "Borrow"],
+    desc: "Morpho Blue's Arbitrum deployment — 258 isolated markets censused from the singleton, any wallet's positions read from the contract at one block",
+    positionListing: false,
+    subPages: [],
+  },
+  {
     // The first testnet explorer. A Sepolia figure is a test figure, and the
     // chain axis says so (`CHAINS[11155111].testnet`); the roster entry is
     // otherwise an ordinary one — same rail header, same coverage row.
@@ -745,6 +761,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "moonwell-base": "Position",
   morpho: "Position",
   "morpho-base": "Position",
+  "morpho-arbitrum": "Position",
   spark: "Position",
   compound: "Position",
   "compound-base": "Position",

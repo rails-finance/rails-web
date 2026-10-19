@@ -28,14 +28,22 @@ export interface MorphoWalletChainResponse {
   positionsFound: number;
   positions: MorphoChainPositionResponse[];
   chainStale: boolean;
+  /** Dollars per whole loan token, keyed on the lowercase loan token, for the
+   *  held markets whose loan token a USD oracle prices at `blockNumber`.
+   *  Arbitrum only (the Aave V3 Arbitrum oracle, lib/morpho-arbitrum/usd.ts);
+   *  absent on Base and Ethereum, which state no dollars. */
+  loanUsd?: Record<string, number>;
 }
 
 export async function fetchMorphoBaseWallet(p: {
   wallet: string;
   baseUrl?: string;
+  /** Another deployment's slot route (Arbitrum's); Base's by default. */
+  route?: string;
 }): Promise<MorphoWalletChainResponse> {
   const qs = new URLSearchParams({ wallet: p.wallet });
-  const res = await fetch(`${p.baseUrl ?? ""}/api/chain/morpho-base/wallet?${qs.toString()}`, { cache: "no-store" });
+  const route = p.route ?? "/api/chain/morpho-base/wallet";
+  const res = await fetch(`${p.baseUrl ?? ""}${route}?${qs.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`fetchMorphoBaseWallet failed: ${res.status} ${res.statusText}`);
   return (await res.json()) as MorphoWalletChainResponse;
 }

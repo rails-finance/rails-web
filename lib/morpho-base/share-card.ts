@@ -69,12 +69,14 @@ function statsFor(p: MorphoChainPositionResponse): PositionCardModel["stats"] {
 export function morphoBaseWalletShareCardModel(
   head: MorphoWalletChainResponse | null,
   wallet: string,
+  /** The explorer the card names; Arbitrum's wallet page reads this too. */
+  session: "morpho-base" | "morpho-arbitrum" = "morpho-base",
 ): PositionCardModel | null {
   if (!head || head.positionsFound === 0) return null;
   const market = largestMarket(head.positions);
   if (!market) return null;
   return {
-    session: "morpho-base",
+    session,
     subject: shortSubject(wallet),
     market: marketLabel(market.loanSymbol, market.collateralSymbol, market.lltv === 0),
     // The slot read only says whether the wallet holds anything in this
@@ -94,6 +96,7 @@ export function morphoBaseMarketShareCardModel(
   head: MorphoWalletChainResponse | null,
   wallet: string,
   marketId: string,
+  session: "morpho-base" | "morpho-arbitrum" = "morpho-base",
 ): PositionCardModel | null {
   const market = head?.positions.find((p) => p.marketId.toLowerCase() === marketId.toLowerCase()) ?? null;
   // No slot for this market, or the wallet holds nothing in it —
@@ -101,7 +104,7 @@ export function morphoBaseMarketShareCardModel(
   // rendering an empty one.
   if (!market || !holdsSomething(market)) return null;
   return {
-    session: "morpho-base",
+    session,
     subject: shortSubject(wallet),
     // Mirrors the page's own `generateMetadata`, which has no static id →
     // symbol map for a permissionless market and names it by its id's first

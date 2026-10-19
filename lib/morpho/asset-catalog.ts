@@ -14,11 +14,20 @@
 // Pure data + a regex parse — no chain reads here (token symbols/decimals are
 // resolved separately via the ERC20 multicall).
 
+import { MORPHO_ARBITRUM_BLUE } from "@/lib/morpho-arbitrum/asset-catalog";
+
 /** Morpho Blue singleton (mainnet, lowercase). The one contract every market,
  *  position, and event belongs to — the provenance dock names it. */
 export const MORPHO_ADDRESSES = {
   MORPHO_BLUE: "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb",
 } as const;
+
+/** The singleton a receipt names on each chain. Ethereum and Base share the
+ *  vanity address above; Arbitrum's is its own (lib/morpho-arbitrum/asset-catalog.ts). */
+export function morphoBlueContract(chainId?: number): { name: string; address: string } {
+  if (chainId === 42161) return { name: "Morpho Blue (Arbitrum)", address: MORPHO_ARBITRUM_BLUE };
+  return { name: chainId === 8453 ? "Morpho Blue (Base)" : "Morpho Blue", address: MORPHO_ADDRESSES.MORPHO_BLUE };
+}
 
 /** WAD (1e18) — Morpho lltv and shares-virtual scaling are WAD/1e6 respectively. */
 export const WAD = 1e18;

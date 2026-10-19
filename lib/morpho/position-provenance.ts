@@ -15,7 +15,7 @@
 // scripts/verify-morpho-chain.mjs. The summaries say so.
 
 import type { Provenance } from "@/components/shared/provenance";
-import { MORPHO_ADDRESSES } from "./asset-catalog";
+import { MORPHO_ADDRESSES, morphoBlueContract } from "./asset-catalog";
 import { publishedText } from "./oracle-age";
 import { formatUnitsExact } from "@/lib/utils/format";
 import type { MorphoOracleFeed } from "@/lib/api/fetch-morpho-position";
@@ -26,7 +26,11 @@ const LANE = "GET /api/chain/morpho/position";
 export interface MorphoChainCoords {
   marketId?: string;
   marketLabel?: string;
+  /** The chain the read was made on; Arbitrum's singleton has its own address. */
+  chainId?: number;
 }
+
+const blueOf = (c?: MorphoChainCoords) => (c?.chainId === 42161 ? morphoBlueContract(c.chainId) : MORPHO);
 
 const marketNote = (c?: MorphoChainCoords): string => (c?.marketLabel ? ` in the ${c.marketLabel} market` : "");
 
@@ -38,7 +42,7 @@ export const lltvProv = (c?: MorphoChainCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   summary: `The market's liquidation loan-to-value${marketNote(c)} — the lltv field of the immutable market params tuple (its keccak IS the market id), governance-enabled at market creation. Debt above lltv × collateral value is liquidatable; there is no separate borrow threshold.`,
-  contract: MORPHO,
+  contract: blueOf(c),
   via: `${LANE} · Morpho.idToMarketParams(id).lltv @ head`,
   inputs: marketInputs(c),
 });
@@ -48,7 +52,7 @@ export const capacityProv = (label: string, formula: string, c?: MorphoChainCoor
   kind: "chain-derived",
   pclass: "state",
   summary: `${label}${marketNote(c)} — arithmetic over the position's own slots, the market's own oracle price and the lltv, all read at the same head. In loan-token units (the oracle's numeraire); no USD anywhere.`,
-  contract: MORPHO,
+  contract: blueOf(c),
   via: `${LANE} · ${formula}`,
   formula,
   inputs: marketInputs(c),
@@ -57,7 +61,11 @@ export const capacityProv = (label: string, formula: string, c?: MorphoChainCoor
 /** The live read's endpoint on each chain — Base reads every position a
  *  wallet holds through one sweep, Ethereum one position at a time. */
 export const morphoLiveLane = (chainId: number): string =>
-  chainId === 8453 ? "GET /api/chain/morpho-base/wallet" : LANE;
+  chainId === 8453
+    ? "GET /api/chain/morpho-base/wallet"
+    : chainId === 42161
+      ? "GET /api/chain/morpho-arbitrum/wallet"
+      : LANE;
 
 const ORACLE = (address: string) => ({ name: "Market oracle", address });
 

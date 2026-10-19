@@ -28,7 +28,8 @@ import {
   morphoCardTag,
 } from "@/components/protocol/morpho/morpho-position-card";
 import { PositionCard, type PositionCardExports, type PositionCardSlots } from "@/components/shared/position-card";
-import { morphoBasePositionHref } from "@/lib/morpho-base/routes";
+import type { MorphoPageDeployment } from "@/lib/morpho/page-deployment";
+import { MORPHO_BASE_PAGE } from "@/lib/morpho-base/page-deployment";
 import {
   MorphoClosedPositionExplanation,
   MorphoPositionExplanation,
@@ -59,14 +60,7 @@ import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morpho/morpho-flows-note";
 import { useMorphoFlows } from "@/hooks/useMorphoFlows";
 import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
-import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-
-/** The contract the sweep read, for the footer's "from its first block" claim. */
-const SOURCE_LABEL = "the Morpho Blue singleton on Base";
-
-const TIMELINE_ROUTE = "/api/chain/morpho-base/timeline";
-const FOLDER_ROUTE = "/api/chain/morpho-base/timeline/folder";
 
 export interface MorphoBasePositionSectionProps {
   wallet: string;
@@ -95,6 +89,9 @@ export interface MorphoBasePositionSectionProps {
   onEventPage?: boolean;
   /** The card ⋮'s export shapes (ui-jobs 308 point 2). */
   exports?: PositionCardExports | null;
+  /** Which deployment's routes, links and words (lib/morpho/page-deployment.ts);
+   *  Base by default. */
+  deployment?: MorphoPageDeployment;
 }
 
 export function MorphoBasePositionSection({
@@ -107,7 +104,11 @@ export function MorphoBasePositionSection({
   grouped = null,
   onEventPage = false,
   exports = null,
+  deployment = MORPHO_BASE_PAGE,
 }: MorphoBasePositionSectionProps) {
+  const TIMELINE_ROUTE = deployment.routes.timeline;
+  // A flat-only deployment has no folders to open; the path is never asked.
+  const FOLDER_ROUTE = deployment.routes.folder ?? `${deployment.routes.timeline}/folder`;
   const events = useMemo(() => pos.events.filter(isMorphoEvent), [pos.events]);
 
   const servedRows = useMemo(
@@ -141,7 +142,7 @@ export function MorphoBasePositionSection({
   // card states them.
   const segmentReads = useMemo(
     () => replaySegmentReads(TIMELINE_ROUTE, wallet, { market: pos.marketId }),
-    [wallet, pos.marketId],
+    [TIMELINE_ROUTE, wallet, pos.marketId],
   );
   // The Lifetime flows panel (lib/morpho/flows.ts), drawn under the rule the
   // card follows: only a sweep that read every block.
@@ -165,7 +166,7 @@ export function MorphoBasePositionSection({
     }
     all.sort((a, b) => a.blockNumber - b.blockNumber);
     return { events: all, missing: 0 };
-  }, [events, servedFolders, wallet, pos.marketId]);
+  }, [events, servedFolders, wallet, pos.marketId, FOLDER_ROUTE]);
   const flowLive = useMemo(
     () =>
       live
@@ -184,7 +185,7 @@ export function MorphoBasePositionSection({
     wholeEvents: flowsOn && whole ? events : null,
     fetchAll: flowsOn && !pos.omitted?.count ? fetchAll : null,
     marketId: pos.marketId,
-    chainId: MORPHO_BASE_CHAIN_ID,
+    chainId: deployment.chainId,
     loanSymbol: flowsOn && !pos.loanDecimalsUnread ? pos.loanSymbol : null,
     collSymbol: pos.collateralDecimalsUnread ? null : pos.collateralSymbol,
     loanAddress: pos.loanToken,
@@ -211,7 +212,7 @@ export function MorphoBasePositionSection({
     readFlat: segmentReads.readFlat,
     folderPath: FOLDER_ROUTE,
     folderParams: { wallet, market: pos.marketId },
-    storageKey: `morpho-base-${pos.marketId}-${wallet}`,
+    storageKey: `${deployment.session}-${pos.marketId}-${wallet}`,
     protocolKey: "morpho",
     // Navigated by the Lifetime flows cursor through "Sync to chart": no Dates.
     dates: !flowsOn,
@@ -256,16 +257,29 @@ export function MorphoBasePositionSection({
           sweptClean &&
           !borrowerSide &&
           (live ? (
-            <MorphoLenderOpenCard p={live} surface="detail" vault={vaultOwner} exports={exports} />
+            <MorphoLenderOpenCard
+              p={live}
+              surface="detail"
+              vault={vaultOwner}
+              exports={exports}
+              deployment={deployment}
+            />
           ) : (
-            <LenderClosedCard pos={pos} wallet={wallet} surface="detail" vault={vaultOwner} exports={exports} />
+            <LenderClosedCard
+              pos={pos}
+              wallet={wallet}
+              surface="detail"
+              vault={vaultOwner}
+              exports={exports}
+              deployment={deployment}
+            />
           ))}
         {!onEventPage && sweptClean && borrowerSide && (
           <MorphoPositionCard
             v={{ ...view, vaultOwner }}
             surface="detail"
             viewHref={tl.viewHref}
-            session="morpho-base"
+            session={deployment.session}
             // The LTV, the rate and the room to borrow from the live market read.
             live={chain}
             exports={exports}
@@ -320,11 +334,11 @@ export function MorphoBasePositionSection({
                   facts={flows.facts}
                   loanSymbol={pos.loanSymbol}
                   collSymbol={pos.collateralSymbol}
-                  name="Morpho Blue on Base"
+                  name={deployment.name}
                 />
               </div>
             }
-            learnMore={morphoFlowsContent("Morpho Blue on Base")}
+            learnMore={morphoFlowsContent(deployment.name)}
           />
         )}
 
@@ -343,7 +357,7 @@ export function MorphoBasePositionSection({
               marketId: pos.marketId,
               marketLabel: pos.marketLabel,
               wallet,
-              deployment: "base",
+              deployment: deployment.explorerDeployment,
             })
           }
           closed={view.status !== "open"}
@@ -355,12 +369,8 @@ export function MorphoBasePositionSection({
               firstAt={pos.firstEventAt}
             />
           }
-          emptyLabel={
-            sweptClean
-              ? "No events to show for this market."
-              : "No events to show — the sweep could not read this wallet's history."
-          }
-          footer={<TimelineCoverageFooter coverage={ownCoverage} sourceLabel={SOURCE_LABEL} />}
+          emptyLabel={sweptClean ? "No events to show for this market." : deployment.words.emptyNotWhole}
+          footer={<TimelineCoverageFooter coverage={ownCoverage} sourceLabel={deployment.sourceLabel} />}
           // On a grouped answer the list covers `eventsServed`; a month read
           // holds no card, the grid holding the other months.
           boundary={
@@ -390,6 +400,7 @@ export function MorphoLenderOpenCard({
   surface = "listing",
   vault = null,
   exports,
+  deployment = MORPHO_BASE_PAGE,
 }: {
   p: MorphoChainPositionResponse;
   /** `detail` on the position page; `listing` in a row. */
@@ -399,11 +410,13 @@ export function MorphoLenderOpenCard({
   vault?: { name: string; href: string } | null;
   /** The ⋮'s export shapes on the position page. */
   exports?: PositionCardExports | null;
+  /** Which deployment's links; Base by default. */
+  deployment?: MorphoPageDeployment;
 }) {
   const identity = morphoCardIdentity({
     market: marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0),
     lltv: p.lltv,
-    listingOwner: surface === "detail" ? undefined : { wallet: p.user, session: "morpho-base", vault },
+    listingOwner: surface === "detail" ? undefined : { wallet: p.user, session: deployment.session, vault },
   });
   const heads = [
     {
@@ -427,7 +440,7 @@ export function MorphoLenderOpenCard({
           learnMore: null,
           menu: {
             leading: () => (
-              <MorphoMenuRows marketId={p.marketId} pagePath={morphoBasePositionHref(p.user, p.marketId)} />
+              <MorphoMenuRows marketId={p.marketId} pagePath={deployment.positionHref(p.user, p.marketId)} />
             ),
             exports: exports ?? null,
           },
@@ -464,6 +477,7 @@ export function LenderClosedCard({
   surface = "listing",
   vault = null,
   exports,
+  deployment = MORPHO_BASE_PAGE,
 }: {
   pos: MorphoSweptPosition;
   wallet: string;
@@ -474,6 +488,8 @@ export function LenderClosedCard({
   vault?: { name: string; href: string } | null;
   /** The ⋮'s export shapes on the position page. */
   exports?: PositionCardExports | null;
+  /** Which deployment's links; Base by default. */
+  deployment?: MorphoPageDeployment;
 }) {
   const detail = surface === "detail";
   const common = {
@@ -482,7 +498,7 @@ export function LenderClosedCard({
     identity: morphoCardIdentity({
       market: pos.marketLabel,
       lltv: pos.lltv,
-      listingOwner: detail ? undefined : { wallet, session: "morpho-base", vault },
+      listingOwner: detail ? undefined : { wallet, session: deployment.session, vault },
     }),
     counters: {
       lastActivityAt: pos.lastTs,
@@ -500,7 +516,7 @@ export function LenderClosedCard({
         learnMore: null,
         menu: {
           leading: () => (
-            <MorphoMenuRows marketId={pos.marketId} pagePath={morphoBasePositionHref(wallet, pos.marketId)} />
+            <MorphoMenuRows marketId={pos.marketId} pagePath={deployment.positionHref(wallet, pos.marketId)} />
           ),
           exports: exports ?? null,
         },

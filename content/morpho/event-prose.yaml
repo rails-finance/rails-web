@@ -1078,6 +1078,8 @@ L5:
       A Morpho position is one wallet's collateral and debt in one isolated market, which shares nothing with any other market.
     intro_base: |-
       A Morpho Blue position on Base is one wallet's collateral and debt in one isolated market of that deployment, separate from the markets on Ethereum.
+    intro_arbitrum: |-
+      A Morpho Blue position on Arbitrum is one wallet's collateral and debt in one isolated market of that deployment, separate from Ethereum's and Base's.
     detailsHeading: |-
       Key concepts:
     details:

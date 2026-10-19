@@ -27,6 +27,8 @@ export const ORACLE_USD_REASON: Record<string, string> = {
     "USDC and USDT amounts are shown in the token, with no dollar price: Maple's own USDC price is a fixed $1 set by its governance, and it states none for USDT",
   morpho:
     "prices are in the market's loan token — each market's oracle quotes the collateral in it — so the loan token has no price of its own; Morpho Blue has no USD oracle",
+  "morpho-arbitrum":
+    "prices are in the market's loan token — each market's oracle quotes the collateral in it; Morpho Blue has no USD oracle, so the wallet's dollar totals convert the loan token at the Aave V3 Arbitrum oracle's price",
   "morpho-base":
     "prices are in the market's loan token — each market's oracle quotes the collateral in it — so the loan token has no price of its own; Morpho Blue has no USD oracle",
   pwn: "no protocol oracle — the two parties set the price",

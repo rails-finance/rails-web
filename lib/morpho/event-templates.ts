@@ -99,6 +99,7 @@ export interface MorphoPositionModalOpts extends MorphoModalForms {
    *  and no lifecycle claim is made. */
   status: "open" | "closed" | "liquidated" | "unread";
   base?: boolean;
+  arbitrum?: boolean;
   hasDebt?: boolean;
   /** What the terminal card's debt peak is: the highest owed at an event,
    *  interest included ("owed"), the principal peak ("principal"), or not
@@ -115,6 +116,7 @@ export function morphoPositionModal(opts: MorphoPositionModalOpts): LearnMoreCon
     return morphoModal(opts.status === "closed" ? "position_closed" : "position_liquidated", forms);
   }
   if (opts.base) forms.push("base");
+  if (opts.arbitrum) forms.push("arbitrum");
   if (!opts.hasDebt) forms.push("no_debt");
   return morphoModal("position_open", forms);
 }

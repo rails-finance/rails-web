@@ -288,6 +288,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // accounts to count until the listing step. It leaves this set in the change
   // that adds its LISTING_ENDPOINT.
   "aave-v3-arbitrum",
+  // Morpho Blue on Arbitrum, position-first on the same terms (item 13).
+  "morpho-arbitrum",
   // Otherwise empty since 2026-08-26. The five Base explorers (Aave V3 Base,
   // Moonwell Base, Morpho Blue Base, Compound V3 Base, Seamless) sat here from
   // 2026-08-23 for the same reason Compound V2 once did — they had positions

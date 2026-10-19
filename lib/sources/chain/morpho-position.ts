@@ -210,6 +210,9 @@ export async function loadMorphoPositionFromChain(
   marketRaw: string,
   userRaw: string,
   deployment: MorphoDeployment = MORPHO_DEPLOYMENT,
+  /** Read at this block rather than the head: a caller reading several
+   *  markets states them all at one block. */
+  atBlock?: bigint,
 ): Promise<MorphoChainPositionResponse> {
   const marketId = (marketRaw.startsWith("0x") ? marketRaw : `0x${marketRaw}`).toLowerCase();
   let user: string;
@@ -227,9 +230,10 @@ export async function loadMorphoPositionFromChain(
     // Phase 1 — the three singleton slots + the head block (its timestamp
     // anchors the view accrual, exactly as the contract's _accrueInterest does).
     const [block, [params, mkt, pos]] = await Promise.all([
-      client.getBlock(),
+      atBlock != null ? client.getBlock({ blockNumber: atBlock }) : client.getBlock(),
       client.multicall({
         allowFailure: false,
+        ...(atBlock != null ? { blockNumber: atBlock } : {}),
         contracts: [
           { address: MORPHO, abi: MORPHO_ABI, functionName: "idToMarketParams", args: [id] },
           { address: MORPHO, abi: MORPHO_ABI, functionName: "market", args: [id] },
@@ -266,6 +270,7 @@ export async function loadMorphoPositionFromChain(
             abi: IRM_ABI,
             functionName: "borrowRateView",
             args: [paramsStruct, marketStruct],
+            ...(atBlock != null ? { blockNumber: atBlock } : {}),
           }),
       resolveErc20Meta(
         [loanToken.toLowerCase(), ...(isIdle ? [] : [collateralToken.toLowerCase()])],
@@ -343,6 +348,7 @@ export async function loadMorphoPositionFromChain(
       currentSupply: scaleRaw(supplyRaw, loanDecimals),
       sinceUpdate,
       oraclePrice,
+      oraclePriceRaw: price.toString(),
       oracleFeeds: feeds,
       oraclePublishedAt: feeds ? Math.min(...feeds.map((f) => f.updatedAt)) : null,
       collateral: collateralHuman,

@@ -23,8 +23,8 @@
 // the listing never ran.
 
 import type { Provenance } from "@/components/shared/provenance";
-import { BASE_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { MORPHO_ADDRESSES } from "./asset-catalog";
+import type { ChainId } from "@/lib/shared/chains";
+import { morphoBlueContract } from "./asset-catalog";
 
 export interface ListedMorphoReceiptsArgs {
   chainId: ChainId;
@@ -52,10 +52,7 @@ export interface ListedMorphoReceipts {
 }
 
 export function makeListedMorphoReceipts(id: ListedMorphoReceiptsArgs): ListedMorphoReceipts {
-  const contract = {
-    name: id.chainId === BASE_CHAIN_ID ? "Morpho Blue (Base)" : "Morpho Blue",
-    address: MORPHO_ADDRESSES.MORPHO_BLUE,
-  };
+  const contract = morphoBlueContract(id.chainId);
   const custody =
     id.custody ??
     `read by Rails at the block the row names, after the account's most recent event; the position page reads it live · served by GET ${id.positionsRoute}`;

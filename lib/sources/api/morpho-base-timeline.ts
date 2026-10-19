@@ -52,15 +52,17 @@ import type { MorphoDeployment } from "@/lib/sources/chain/morpho-deployments";
 
 /** One row as rails-server's /api/morpho-base/timeline returns it (api/src/
  *  routes/baseMorpho.ts TimelineRow). Numerics are decimal strings; the
- *  market id is 64 hex without 0x. */
-interface IndexRow {
+ *  market id is 64 hex without 0x. The Arbitrum lane sends the same row
+ *  (lib/sources/api/morpho-arbitrum-timeline.ts). */
+export interface MorphoIndexRow {
   kind: MorphoDecodedRow["kind"];
   block_number: string;
   tx_index: number;
   log_index: number;
   tx_hash: string;
   block_timestamp: string;
-  tx_from: string;
+  /** Null on the Arbitrum lane until its validator fills it. */
+  tx_from: string | null;
   /** The transaction's gas (Sieve's context columns); absent from a route
    *  that predates them. */
   tx_gas_used?: string | null;
@@ -118,7 +120,7 @@ interface IndexSeed {
 
 interface IndexResponse {
   wallet: string;
-  rows: IndexRow[];
+  rows: MorphoIndexRow[];
   totalEvents: number;
   /** The API's row ceiling was hit — the list is cut, so a replay over it
    *  would be wrong from the cut on. Not whole. */
@@ -211,52 +213,7 @@ export async function readMorphoIndex(
   const json = (await res.json()) as IndexResponse;
   const cov = json.coverage;
 
-  const rows: MorphoDecodedRow[] = [];
-  const timestamps = new Map<number, number>();
-  const senders = new Map<string, string>();
-  for (const r of json.rows) {
-    const blockNumber = Number(r.block_number);
-    const txHash = r.tx_hash.toLowerCase();
-    timestamps.set(blockNumber, Number(r.block_timestamp));
-    senders.set(txHash, r.tx_from.toLowerCase());
-    const gas = morphoGasOf(r);
-    const base = {
-      blockNumber,
-      txIndex: r.tx_index,
-      logIndex: r.log_index,
-      txHash,
-      kind: r.kind,
-      marketId: `0x${r.market.toLowerCase()}`,
-      ...(r.totals
-        ? { totals: { before: morphoTotalsOf(r.totals.before), after: morphoTotalsOf(r.totals.after) } }
-        : {}),
-      ...(gas ? { gas } : {}),
-    };
-    const caller = r.caller ? r.caller.toLowerCase() : undefined;
-    switch (r.kind) {
-      case "supply_collateral":
-      case "withdraw_collateral":
-        // The event's `assets` IS the collateral moved — the sweep's decode.
-        rows.push({ ...base, assets: ZERO, shares: ZERO, collateral: BigInt(r.assets), caller });
-        break;
-      case "liquidation":
-        // repaid + bad debt on both axes, seized as the collateral — the
-        // sweep's exact sums, so the replay cannot tell the sources apart.
-        rows.push({
-          ...base,
-          assets: BigInt(r.assets) + BigInt(r.bad_debt_assets ?? "0"),
-          shares: BigInt(r.shares ?? "0") + BigInt(r.bad_debt_shares ?? "0"),
-          collateral: BigInt(r.seized_assets ?? "0"),
-          badDebtAssets: BigInt(r.bad_debt_assets ?? "0"),
-        });
-        break;
-      default:
-        rows.push({ ...base, assets: BigInt(r.assets), shares: BigInt(r.shares ?? "0"), collateral: ZERO, caller });
-    }
-  }
-  // The API orders by (block, tx, log) and the key is unique, but the replay's
-  // contract is stated here rather than assumed of the wire.
-  rows.sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex || a.logIndex - b.logIndex);
+  const { rows, timestamps, senders } = decodeMorphoIndexRows(json.rows);
 
   // What the index is a complete record of. The backfill walks up from the
   // deploy block and Sieve holds everything past its checkpoint, so an
@@ -334,4 +291,61 @@ export async function readMorphoIndex(
             ? "no Sieve checkpoint"
             : undefined;
   return { input, whole: reason === undefined, reason };
+}
+
+/** The index's rows decoded into the replay's input, in (block, tx, log)
+ *  order, with each block's timestamp and each transaction's sender where the
+ *  row carries one. Shared by the Base and Arbitrum readers. */
+export function decodeMorphoIndexRows(indexRows: MorphoIndexRow[]): {
+  rows: MorphoDecodedRow[];
+  timestamps: Map<number, number>;
+  senders: Map<string, string>;
+} {
+  const rows: MorphoDecodedRow[] = [];
+  const timestamps = new Map<number, number>();
+  const senders = new Map<string, string>();
+  for (const r of indexRows) {
+    const blockNumber = Number(r.block_number);
+    const txHash = r.tx_hash.toLowerCase();
+    timestamps.set(blockNumber, Number(r.block_timestamp));
+    if (r.tx_from) senders.set(txHash, r.tx_from.toLowerCase());
+    const gas = morphoGasOf(r);
+    const base = {
+      blockNumber,
+      txIndex: r.tx_index,
+      logIndex: r.log_index,
+      txHash,
+      kind: r.kind,
+      marketId: `0x${r.market.toLowerCase()}`,
+      ...(r.totals
+        ? { totals: { before: morphoTotalsOf(r.totals.before), after: morphoTotalsOf(r.totals.after) } }
+        : {}),
+      ...(gas ? { gas } : {}),
+    };
+    const caller = r.caller ? r.caller.toLowerCase() : undefined;
+    switch (r.kind) {
+      case "supply_collateral":
+      case "withdraw_collateral":
+        // The event's `assets` IS the collateral moved — the sweep's decode.
+        rows.push({ ...base, assets: ZERO, shares: ZERO, collateral: BigInt(r.assets), caller });
+        break;
+      case "liquidation":
+        // repaid + bad debt on both axes, seized as the collateral — the
+        // sweep's exact sums, so the replay cannot tell the sources apart.
+        rows.push({
+          ...base,
+          assets: BigInt(r.assets) + BigInt(r.bad_debt_assets ?? "0"),
+          shares: BigInt(r.shares ?? "0") + BigInt(r.bad_debt_shares ?? "0"),
+          collateral: BigInt(r.seized_assets ?? "0"),
+          badDebtAssets: BigInt(r.bad_debt_assets ?? "0"),
+        });
+        break;
+      default:
+        rows.push({ ...base, assets: BigInt(r.assets), shares: BigInt(r.shares ?? "0"), collateral: ZERO, caller });
+    }
+  }
+  // The API orders by (block, tx, log) and the key is unique, but the replay's
+  // contract is stated here rather than assumed of the wire.
+  rows.sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex || a.logIndex - b.logIndex);
+  return { rows, timestamps, senders };
 }

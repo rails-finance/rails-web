@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { useChainId } from "@/lib/shared/chain-context";
-import { morphoMarketHref } from "@/lib/morpho/market-routes";
+import { morphoHasMarketPages, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 
 export function MorphoMarketPair({
@@ -28,7 +28,7 @@ export function MorphoMarketPair({
 }) {
   const router = useRouter();
   const chainId = useChainId();
-  if (!loanToken) return <>{label}</>;
+  if (!loanToken || !morphoHasMarketPages(chainId)) return <>{label}</>;
   const href = morphoMarketHref(chainId, loanToken, marketId);
   return (
     <button
@@ -62,7 +62,7 @@ export function MorphoMarketPageLine({
   loanToken?: string;
 }) {
   const chainId = useChainId();
-  if (!loanToken) return null;
+  if (!loanToken || !morphoHasMarketPages(chainId)) return null;
   return (
     <p className="mb-3 text-sm">
       <Link href={morphoMarketHref(chainId, loanToken, marketId)} className={PAGE_LINK} prefetch={false}>

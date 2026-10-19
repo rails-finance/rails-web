@@ -21,7 +21,7 @@
 
 import { encodeAbiParameters, keccak256 } from "viem";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { BASE_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { MorphoMarketCatalogEntry } from "@/lib/morpho/market-catalog";
 import type { MorphoDeployment } from "./morpho-deployments";
 
@@ -57,7 +57,11 @@ interface CreatedResponse {
   indexedTo: number | null;
 }
 
-function route(chainId: ChainId): string {
+/** The index's CreateMarket tail for a chain; null where none is served —
+ *  Arbitrum's census is static (rails-ops TO-DO-arbitrum-scoping.md item 13),
+ *  so its roster is the census alone and the surfaces state the census block. */
+function route(chainId: ChainId): string | null {
+  if (chainId === ARBITRUM_CHAIN_ID) return null;
   return chainId === BASE_CHAIN_ID ? "/api/morpho-base/markets/created" : "/api/morpho/markets/created";
 }
 
@@ -91,10 +95,11 @@ function verified(row: CreatedResponse["markets"][number]): MorphoMarketCatalogE
 }
 
 async function readIndexed(deployment: MorphoDeployment): Promise<MorphoDeployment> {
-  if (!RAILS_API_URL) return deployment;
-  const url = `${RAILS_API_URL}${route(deployment.chainId)}?after=${deployment.censusBlock}`;
+  const path = route(deployment.chainId);
+  if (!RAILS_API_URL || !path) return deployment;
+  const url = `${RAILS_API_URL}${path}?after=${deployment.censusBlock}`;
   const res = await fetch(url, createAuthFetchOptions({ cache: "no-store", signal: AbortSignal.timeout(TIMEOUT_MS) }));
-  if (!res.ok) throw new Error(`${route(deployment.chainId)} answered ${res.status}`);
+  if (!res.ok) throw new Error(`${path} answered ${res.status}`);
   const body = (await res.json()) as CreatedResponse;
 
   const known = new Set(deployment.markets.map((m) => m.id.toLowerCase()));

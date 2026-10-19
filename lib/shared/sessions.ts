@@ -50,6 +50,9 @@ export type SessionProtocol =
   | "moonwell-base"
   | "morpho"
   | "morpho-base"
+  // Morpho Blue on Arbitrum, at `/arbitrum/morpho`: its own singleton and
+  // markets, so its own scope.
+  | "morpho-arbitrum"
   | "spark"
   | "compound"
   | "compound-base"

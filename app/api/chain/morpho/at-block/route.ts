@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadMorphoMarketAtBlock } from "@/lib/sources/chain/morpho-position";
-import { MORPHO_DEPLOYMENT, MORPHO_BASE_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
-import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import {
+  MORPHO_ARBITRUM_DEPLOYMENT,
+  MORPHO_BASE_DEPLOYMENT,
+  MORPHO_DEPLOYMENT,
+} from "@/lib/sources/chain/morpho-deployments";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID } from "@/lib/shared/chains";
 
 // A Morpho Blue market around one event: the market oracle's price and the
 // IRM's borrow rate at the end of block N − 1 and of block N. The event card
@@ -22,7 +26,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "market must be a 32-byte hex id" }, { status: 400 });
   if (!Number.isInteger(block) || block <= 1)
     return NextResponse.json({ error: "block must be a block number" }, { status: 400 });
-  const deployment = chain === BASE_CHAIN_ID ? MORPHO_BASE_DEPLOYMENT : MORPHO_DEPLOYMENT;
+  const deployment =
+    chain === BASE_CHAIN_ID
+      ? MORPHO_BASE_DEPLOYMENT
+      : chain === ARBITRUM_CHAIN_ID
+        ? MORPHO_ARBITRUM_DEPLOYMENT
+        : MORPHO_DEPLOYMENT;
   try {
     const data = await loadMorphoMarketAtBlock(market, block, deployment);
     return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });

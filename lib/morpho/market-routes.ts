@@ -5,7 +5,14 @@
 // every market in its loan token). Both segments lowercased, the id 0x-prefixed.
 // Client-safe: the position card and the markets view link here.
 
-import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
+
+/** Whether the chain's Morpho explorer has the markets pages these routes
+ *  name. Arbitrum's is position-first: its markets table sits on the protocol
+ *  page, with no page per market. */
+export function morphoHasMarketPages(chainId: ChainId): boolean {
+  return chainId !== ARBITRUM_CHAIN_ID;
+}
 
 /** One loan token's page — every market that lends it. */
 export function morphoLoanTokenHref(chainId: ChainId, loanToken: string): string {

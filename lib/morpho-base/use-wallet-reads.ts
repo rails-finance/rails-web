@@ -35,6 +35,8 @@ import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-positio
 import { fetchMorphoBaseWallet, type MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
 import type { CaptureSource } from "@/lib/shared/capture-source";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
+import type { MorphoPageDeployment } from "@/lib/morpho/page-deployment";
+import { MORPHO_BASE_PAGE } from "@/lib/morpho-base/page-deployment";
 
 export type MorphoBaseTimelineState = "loading" | "ready" | "unavailable" | "failed";
 
@@ -84,7 +86,11 @@ export function useMorphoBaseWalletReads(
   /** The position page's market, when it reads that position as ROWS
    *  (`fetchMorphoBaseTimeline`); absent, the wallet's history flat. */
   groupedMarket?: string,
+  /** Which deployment's routes and whole-life rule; Base by default. */
+  deployment: MorphoPageDeployment = MORPHO_BASE_PAGE,
 ): MorphoBaseWalletReads {
+  const walletRoute = deployment.routes.wallet;
+  const timelineRoute = deployment.routes.timeline;
   const slotsSeeded = seedSlots != null;
   const [data, setData] = useState<MorphoWalletChainResponse | null>(seedSlots ?? null);
   const [loading, setLoading] = useState(!slotsSeeded);
@@ -103,7 +109,7 @@ export function useMorphoBaseWalletReads(
     if (slotsSeeded || !wallet) return;
     let cancelled = false;
     setLoading(true);
-    fetchMorphoBaseWallet({ wallet })
+    fetchMorphoBaseWallet({ wallet, route: walletRoute })
       .then((d) => {
         if (cancelled) return;
         setData(d);
@@ -118,7 +124,7 @@ export function useMorphoBaseWalletReads(
     return () => {
       cancelled = true;
     };
-  }, [wallet, slotsSeeded]);
+  }, [wallet, slotsSeeded, walletRoute]);
 
   // ── 2. The history ────────────────────────────────────────────────────────
   // Only when the server could not seed it. Off the critical path: it is the
@@ -129,7 +135,7 @@ export function useMorphoBaseWalletReads(
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
     setTimelineState("loading");
-    fetchMorphoBaseTimeline(wallet, groupedMarket)
+    fetchMorphoBaseTimeline(wallet, groupedMarket, timelineRoute)
       .then((d) => {
         if (cancelled) return;
         setTimeline(d);
@@ -142,19 +148,18 @@ export function useMorphoBaseWalletReads(
     return () => {
       cancelled = true;
     };
-  }, [wallet, timelineSeeded, groupedMarket]);
+  }, [wallet, timelineSeeded, groupedMarket, timelineRoute]);
 
   // "The sweep read every block of the singleton's life." Both conditions are
   // needed: no holes inside the span, AND the span reaching the contract's own
   // first block. A horizon leaves the events contiguous but the history
   // starting later than the protocol, which disqualifies a replayed principal
   // from standing as the position's and a lifetime total from "all time".
-  const sweptClean =
-    timelineState === "ready" &&
-    (timeline?.coverage.gaps.length ?? 0) === 0 &&
-    timeline?.coverage.fromDeployment === true;
+  // On Arbitrum the deployment's rule also asks for the store's confirmation.
+  const sweptClean = timelineState === "ready" && timeline != null && deployment.wholeOf(timeline.coverage);
 
-  const captureSource: CaptureSource = timeline?.coverage.source === "index" ? "index" : "sweep";
+  // The source the route names; a sweep states none.
+  const captureSource: CaptureSource = timeline?.coverage.source ?? "sweep";
 
   const chainByMarket = useMemo(() => {
     const m = new Map<string, MorphoChainPositionResponse>();

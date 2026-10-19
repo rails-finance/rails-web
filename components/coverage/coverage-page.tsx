@@ -268,8 +268,9 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
                   </Link>
                 </span>
               ))}{" "}
-              {listingExceptions.length === 1 ? "opens" : "open"} on a wallet rather than a list: there is no roster of its
-              accounts yet. Everything a single wallet holds is unaffected.
+              {listingExceptions.length === 1 ? "opens" : "open"} on a wallet rather than a list: there is no roster of{" "}
+              {listingExceptions.length === 1 ? "its" : "their"} accounts yet. Everything a single wallet holds is
+              unaffected.
             </p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-4">

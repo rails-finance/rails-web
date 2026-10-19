@@ -113,8 +113,11 @@ const block = (v: unknown): number | null => {
 
 /** The answer checked against the contract; null when it does not hold one.
  *  Block fields are read as numbers whether the server sends them as numbers
- *  or decimal strings. */
-export function readTimelineAnswer(raw: unknown): AaveV3ArbitrumTimelineResponse | null {
+ *  or decimal strings. Every Arbitrum family answers this envelope; `Row` is
+ *  the family's row (Morpho's reader passes its own). */
+export function readTimelineAnswer<Row = AaveV3ArbitrumTimelineRow>(
+  raw: unknown,
+): (Omit<AaveV3ArbitrumTimelineResponse, "rows"> & { rows: Row[] }) | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const c = r.coverage as Record<string, unknown> | undefined;
@@ -140,7 +143,7 @@ export function readTimelineAnswer(raw: unknown): AaveV3ArbitrumTimelineResponse
     : [];
   return {
     truncated: r.truncated === true,
-    rows: r.rows as AaveV3ArbitrumTimelineRow[],
+    rows: r.rows as Row[],
     totalEvents: block(r.totalEvents) ?? r.rows.length,
     transfersCaptured: r.transfersCaptured === true,
     coverage: {

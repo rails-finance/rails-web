@@ -16,7 +16,7 @@
 //
 // SERVER-ONLY.
 
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { MORPHO_ADDRESSES } from "@/lib/morpho/asset-catalog";
 import { MORPHO_BASE_BLUE } from "@/lib/morpho-base/asset-catalog";
 import {
@@ -24,6 +24,13 @@ import {
   MORPHO_MARKET_CENSUS_BLOCK as L1_CENSUS_BLOCK,
   type MorphoMarketCatalogEntry,
 } from "@/lib/morpho/market-catalog";
+import {
+  MORPHO_ARBITRUM_BLUE,
+  MORPHO_ARBITRUM_DEPLOY_BLOCK,
+  MORPHO_ARBITRUM_IRM,
+  MORPHO_ARBITRUM_METAMORPHO_FACTORY,
+} from "@/lib/morpho-arbitrum/asset-catalog";
+import { MORPHO_ARBITRUM_CENSUS_BLOCK, MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
 import {
   MORPHO_MARKETS as BASE_MARKETS,
   MORPHO_MARKET_CENSUS_BLOCK as BASE_CENSUS_BLOCK,
@@ -43,6 +50,12 @@ export interface MorphoDeployment {
    *  until the census is re-run, and every surface states this block rather
    *  than implying the roster is live. */
   censusBlock: number;
+  /** The Adaptive Curve IRM, where the deployment names it. */
+  irm?: string;
+  /** The singleton's creation block, where the deployment names it. */
+  deployBlock?: number;
+  /** The MetaMorpho V1.1 factory, where the deployment names it. */
+  metaMorphoFactory?: string;
 }
 
 /** Morpho Blue on Ethereum — 1,648 markets. */
@@ -60,4 +73,17 @@ export const MORPHO_BASE_DEPLOYMENT: MorphoDeployment = {
   blue: MORPHO_BASE_BLUE,
   markets: BASE_MARKETS,
   censusBlock: BASE_CENSUS_BLOCK,
+};
+
+/** Morpho Blue on Arbitrum One — 258 markets at the census block, served
+ *  position-first (rails-ops TO-DO-arbitrum-scoping.md item 13). The census is
+ *  static: no index serves this chain's CreateMarket tail (morpho-roster.ts). */
+export const MORPHO_ARBITRUM_DEPLOYMENT: MorphoDeployment = {
+  chainId: ARBITRUM_CHAIN_ID,
+  blue: MORPHO_ARBITRUM_BLUE,
+  markets: MORPHO_ARBITRUM_MARKETS,
+  censusBlock: MORPHO_ARBITRUM_CENSUS_BLOCK,
+  irm: MORPHO_ARBITRUM_IRM,
+  deployBlock: MORPHO_ARBITRUM_DEPLOY_BLOCK,
+  metaMorphoFactory: MORPHO_ARBITRUM_METAMORPHO_FACTORY,
 };

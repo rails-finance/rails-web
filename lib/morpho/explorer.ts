@@ -23,7 +23,15 @@ const WORDS = {
     `One transaction from the ${deployment} market position of ${account}, on ${day}.`,
 };
 
-const DEPLOYMENT_NAME = { ethereum: "Morpho Blue", base: "Morpho Blue on Base" } as const;
+const DEPLOYMENT_NAME = {
+  ethereum: "Morpho Blue",
+  base: "Morpho Blue on Base",
+  arbitrum: "Morpho Blue on Arbitrum",
+} as const;
+
+export type MorphoExplorerDeployment = keyof typeof DEPLOYMENT_NAME;
+
+const SESSION = { ethereum: "morpho", base: "morpho-base", arbitrum: "morpho-arbitrum" } as const;
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -33,7 +41,7 @@ export interface MorphoEventPageInput extends EventPageSlot {
   /** The pair as the page names it ("USDC / WBTC"); null before the position's read lands. */
   marketLabel: string | null;
   wallet: string;
-  deployment: "ethereum" | "base";
+  deployment: MorphoExplorerDeployment;
 }
 
 /** The event's title: T1's word and the amounts its head states (the side's
@@ -65,7 +73,11 @@ export function morphoEventPageTitle(event: BaseActivityEvent): string {
   return morphoExplanationRuns(prose)[0]?.sentences[0]?.text ?? morphoEventHeading(event);
 }
 
-export function morphoEventPageDescription(deployment: "ethereum" | "base", wallet: string, timestamp: number): string {
+export function morphoEventPageDescription(
+  deployment: MorphoExplorerDeployment,
+  wallet: string,
+  timestamp: number,
+): string {
   return `${WORDS.description(DEPLOYMENT_NAME[deployment], short(wallet), formatDateLong(timestamp))} ${WORDS.timeline_link}`;
 }
 
@@ -92,7 +104,7 @@ export const morphoExplorer: ExplorerAdapter<MorphoEventPageInput> = {
         value: wallet,
         mono: true,
         copy: WORDS.copy_account,
-        href: listingHrefForWallet(deployment === "base" ? "morpho-base" : "morpho", wallet) ?? undefined,
+        href: listingHrefForWallet(SESSION[deployment], wallet) ?? undefined,
       },
     ],
     ...slot,

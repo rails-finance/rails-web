@@ -808,6 +808,21 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // collateral/borrowShares checked against a live position() read at the
   // row's own block, on BOTH rails.finance and dev.rails.finance (the Vercel
   // bypass header).
+  // Morpho Blue on Arbitrum (2026-10-19), position-first (rails-ops
+  // TO-DO-arbitrum-scoping.md item 13). The wallet and position pages are the
+  // Base pages through the deployment seam: the singleton's slots read live
+  // (`dashboard`), the census's markets on the protocol page (`views`), the
+  // shared cards and explainers over the history rails-server serves per
+  // wallet (`explainers`, `forensics`), and the Markdown/CSV export (`llm`).
+  // Not yet: no offline verifier runs against this singleton.
+  "morpho-arbitrum": explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON["morpho-arbitrum"] },
+    explainers: true,
+    forensics: true,
+    views: true,
+    llm: true,
+  }),
   "morpho-base": explorerDepth({
     atBlockPrices: true,
     dashboard: true,
@@ -1380,6 +1395,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   // Aave V3 on Arbitrum ships position-first (2026-10-19): a wallet input over
   // the market overview, any address readable, no roster of accounts yet.
   "aave-v3-arbitrum",
+  // Morpho Blue on Arbitrum ships position-first on the same terms (item 13).
+  "morpho-arbitrum",
   // The history below is why each earlier member left.
   // aave-v3-base left 2026-08-26: the listing lane by config over the Seamless
   // shape (same aToken/debt-token grain, the live Pool for status) — its history
@@ -1491,6 +1508,8 @@ export const VIEW_NOTES: Record<string, string> = {
     "The full reserve roster of a market that is closing — eighteen reserves, every one of them carrying the frozen bit, with the sizes, rates and risk parameters the Pool still enforces on what is left.",
   "aave-v3-base":
     "The Base Pool's full reserve roster — sizes, rates, risk configuration and oracle prices — with every risk parameter decoded from the reserve's own configuration rather than a copied governance table.",
+  "morpho-arbitrum":
+    "The census's 258 markets under the wallet input, read at one block: the funded ones in dollar stables or WETH ranked by supply in dollars, the rest listed in their own loan tokens.",
   "aave-v3-arbitrum":
     "The Arbitrum Pool's full reserve roster under the wallet input — sizes, rates, risk configuration and oracle prices, every risk parameter decoded from the reserve's own configuration.",
   "aave-v3":
