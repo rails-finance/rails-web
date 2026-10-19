@@ -632,12 +632,12 @@ async function waitHeads(page) {
 }
 
 // 5d. Chain-truth families at 1280, values on: no icon beside a hidden amount,
-// the chevron last. A row whose amount never hands off to the spine (Maple's
-// "Shares received") keeps its amount and its icon together.
+// the chevron last. Maple's head is words since ui-jobs 367 (a transfer's
+// amount on the spine's flank), so it holds no icon either.
 const FLUID = "/ethereum/fluid/19428";
 for (const [name, path, strict] of [
   ["Aave V3", AAVE, true],
-  ["Maple", MAPLE, false],
+  ["Maple", MAPLE, true],
   ["Fluid", FLUID, true],
 ]) {
   const { ctx, page, errors } = await open(1280, path);

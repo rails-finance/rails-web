@@ -8,6 +8,7 @@ import { formatDateLong } from "@/lib/date";
 import { isMapleEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { mapleRowLabel } from "@/lib/maple/event-label";
+import { mapleTeaserSentence } from "@/lib/maple/explainer-clauses";
 
 const WORDS = {
   paragraph: "This page is one transaction from this lender's history in the Maple pools.",
@@ -60,6 +61,16 @@ export function mapleEventTitle(event: BaseActivityEvent): EventTitle {
 /** The event's heading: the title in words. Also read on the server. */
 export function mapleEventHeading(event: BaseActivityEvent): string {
   return eventTitleWords(mapleEventTitle(event));
+}
+
+/** The browser title's event words: the Explanation's first sentence, which
+ *  the page's h1 states (rails-ops decision 0045, "Ruled since"), else the
+ *  heading. Also read on the server. */
+export function mapleEventPageTitle(event: BaseActivityEvent): string {
+  if (!isMapleEvent(event)) return mapleEventHeading(event);
+  const ctx = event.context.data;
+  const coords = { txHash: event.txHash, blockNumber: event.blockNumber, pool: ctx.pool, account: event.wallet };
+  return mapleTeaserSentence(ctx, coords) ?? mapleEventHeading(event);
 }
 
 /** The page's metadata description, also read on the server. */

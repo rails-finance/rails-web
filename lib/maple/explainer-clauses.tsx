@@ -30,12 +30,18 @@
 // aggregate/act context (§5.5) via the same-transaction fill narration and the
 // CCIP bridge escrow variants; the highlight rule (§5.6) via Fig echoes.
 
-import type { ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 import type { MapleContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
+import {
+  clause,
+  eventClauses,
+  splitFirstSentence,
+  splitLead,
+  type ClauseInput,
+  type EventProseSlots,
+} from "@/lib/shared/explainer-prose";
 import { externalActor } from "@/lib/shared/external-actor";
 import {
   assetsDeltaProv,
@@ -52,7 +58,14 @@ import {
 import { getCcipEscrow, getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { shortAddress } from "@/lib/maple/asset-catalog";
-import { formatNumber } from "@/lib/utils/format";
+import { formatExact, formatNumber } from "@/lib/utils/format";
+
+/** A header delta's receipt value, `chainTruthDeltaValue(v, false)`
+ *  (components/shared/chain-truth-event.tsx) restated here: that module is a
+ *  client one, and the event page's metadata builds the first sentence on the
+ *  server (`mapleTeaserSentence`). */
+const chainTruthDeltaValue = (value: number, labeled: boolean): string =>
+  `${labeled ? "" : value < 0 ? "−" : "+"}${formatExact(Math.abs(value))}`;
 
 /** Dust epsilon — a balance below this reads as zero (a fully-exited leg). */
 export const MAPLE_EPS = 1e-9;
@@ -582,4 +595,23 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
  *  trailing continuations). */
 export function mapleExplainerTeaser(ctx: MapleContext, coords: MapleCoords): ReactNode | null {
   return splitLead(eventClauses(mapleEventSlots(ctx, coords))).lead;
+}
+
+/** A node's words: its strings, its elements' children, in order. */
+function nodeText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) return nodeText(node.props.children);
+  return "";
+}
+
+/** The Explanation's first sentence as text: the event page's browser title
+ *  (rails-ops decision 0045, "Ruled since"), which its h1 states. Server-safe. */
+export function mapleTeaserSentence(ctx: MapleContext, coords: MapleCoords): string | null {
+  const lead = mapleExplainerTeaser(ctx, coords);
+  if (lead == null) return null;
+  const head = splitFirstSentence(nodeText(lead)).head;
+  const text = typeof head === "string" ? head.replace(/\s+/g, " ").trim() : "";
+  return text || null;
 }

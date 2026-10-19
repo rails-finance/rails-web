@@ -3,7 +3,7 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
 import { loadMaplePositionTail } from "@/lib/maple/position-page-data";
-import { mapleEventHeading, mapleEventPageDescription } from "@/lib/maple/explorer";
+import { mapleEventPageDescription, mapleEventPageTitle } from "@/lib/maple/explorer";
 import MaplePositionPage from "../../page";
 
 interface Props {
@@ -40,7 +40,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     session: "maple",
     subject: wallet,
     canonicalPath: `/ethereum/maple/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: mapleEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: mapleEventPageTitle(event), timestamp: event.timestamp } : null,
     description: event ? mapleEventPageDescription(wallet, event.timestamp) : undefined,
   });
 }

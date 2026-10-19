@@ -517,6 +517,22 @@ export const interestSincePrevProv = (
   ]),
 });
 
+/** How long a queue fill waited: its block's time less the block time of the
+ *  request it paid, both read off the timeline's rows. */
+export const queueWaitProv = (requestAt: number, filledAt: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary:
+    "Time from the withdrawal request to this fill. The fill's block time less the request's block time, both from the wallet's rows in this pool; the queue fills requests first in, first out, from the pool's liquid cash.",
+  contract: { name: "Maple withdrawal queue", address: "" },
+  via: `fill block time − request block time = ${filledAt - requestAt} s`,
+  formula: "fill time − request time",
+  inputs: [
+    { label: "request time", kind: "chain", pclass: "indexed", note: String(requestAt) },
+    { label: "fill time", kind: "chain", pclass: "indexed", note: String(filledAt) },
+  ],
+});
+
 /** Interest earned over the position's life, whether the claim still holds it
  *  or withdrawals have taken it out. */
 export const interestEarnedLifetimeProv = (sym: string): Provenance => ({

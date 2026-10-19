@@ -42,9 +42,11 @@ import {
   claimBeforeProv,
   interestSincePrevProv,
   flankedLegProv,
+  queueWaitProv,
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
+import { formatWait } from "@/lib/maple/row-times";
 import { dayStamp } from "@/components/shared/event-ledger";
 import type { MapleHeld } from "./maple-ledger";
 import type { EventSheet } from "@/components/shared/event-sheet";
@@ -58,6 +60,8 @@ export interface MapleCellsProps {
   /** Unix seconds of this row and of the previous row in its pool. */
   timestamp?: number;
   prevAt?: number;
+  /** Queue fills: unix seconds of the request this fill paid, where loaded. */
+  requestAt?: number;
   /** The row's id, for its Lifetime flows ledger. */
   eventId?: string;
   /** Token contracts by symbol, from the event's flows, for the sheet's icons. */
@@ -86,7 +90,16 @@ const ACT: Partial<Record<MapleContext["eventType"], string>> = {
   request_fill: "fill",
 };
 
-export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, prevAt, addresses }: MapleCellsProps): {
+export function useMapleCells({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  timestamp,
+  prevAt,
+  requestAt,
+  addresses,
+}: MapleCellsProps): {
   cells: EventCellSpec[];
   sheet?: EventSheet;
   notes: ReactNode;
@@ -175,6 +188,16 @@ export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, pre
         prov: paid.prov,
       });
   }
+
+  // How long a fill waited after its request: the head's words leave it to
+  // the sheet (rails-ops decision 0045).
+  if (ctx.eventType === "request_fill" && requestAt != null && timestamp != null && timestamp >= requestAt)
+    stats.push({
+      label: "Waited in the queue",
+      value: formatWait(timestamp - requestAt),
+      symbol: "",
+      prov: queueWaitProv(requestAt, timestamp),
+    });
 
   if (ctx.eventType === "deposit" || ctx.eventType === "withdraw" || ctx.eventType === "request_fill") {
     stats.push({

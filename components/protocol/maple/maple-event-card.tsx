@@ -15,12 +15,14 @@ import { formatNumber } from "@/lib/utils/format";
 import { flankedLegProv, sharesLegProv, type MapleCoords } from "@/lib/maple/event-provenance";
 import { mapleExplainerTeaser } from "@/lib/maple/explainer-clauses";
 import { useMapleHeadSpec } from "./maple-event-header";
-import { TRANSFER_LABEL } from "@/lib/maple/event-label";
+import { MAPLE_T1, mapleT1Caption, TRANSFER_LABEL } from "@/lib/maple/event-label";
 import { useMapleCells } from "./maple-cells";
 import { MapleEventExplainer, mapleLearnMoreContent } from "./maple-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { MapleRowTimes } from "@/lib/maple/row-times";
 import { MapleLedgerProvider } from "./maple-ledger";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
 
 export interface MapleEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "maple"; data: MapleContext } };
@@ -33,8 +35,8 @@ export interface MapleEventCardProps {
 // direction "right" = token moves away from the wallet (deposit / escrow),
 // "left" = toward the wallet (withdraw / fill / return). A transfer is neither —
 // the pool token changed hands, nothing entered or left the pool — so it has
-// no entry here: the row wears the paper-plane badge and no flank (see
-// `tokens`).
+// no entry here: the row wears the paper-plane badge, its amount on the flank
+// the position's balance moved by (see `tokens`).
 const DIRECTION: Record<Exclude<MapleContext["eventType"], "transfer_in" | "transfer_out">, "right" | "left"> = {
   deposit: "right",
   withdraw: "left",
@@ -81,15 +83,25 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
   // without it those rows fall through to a letter. Matching by symbol keeps
   // the two legs apart, and a symbol on both would resolve to neither.
   //
-  // A transfer is a custody move: the token's icon wears the paper-plane badge
-  // and neither flank is drawn — the two flanks are "out to the wallet" and
-  // "into the protocol", and a transfer to another account is neither. The
-  // header states the amount and the to/from counterparty.
+  // A transfer is a custody move: the token's icon wears the paper-plane
+  // badge, its amount on the flank the position's balance moved by, out to the
+  // left or in to the right; the head's clause names the counterparty.
   const tokens =
     mag === 0 || !flanked
       ? undefined
       : isTransfer
-        ? [{ symbol, address: soleFlowAddress(event.flows, symbol), badge: "send" as const }]
+        ? [
+            {
+              symbol,
+              address: soleFlowAddress(event.flows, symbol),
+              badge: "send" as const,
+              direction: kind === "transfer_out" ? ("left" as const) : ("right" as const),
+              value: mag,
+              display: formatNumber(mag),
+              unit: symbol,
+              verb: kind === "transfer_out" ? MAPLE_T1.legSent : MAPLE_T1.legReceived,
+            },
+          ]
         : [
             {
               symbol,
@@ -115,7 +127,11 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
               : []),
           ];
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useMapleHeadSpec({
+    mode: page ? "title" : "row",
     actionLabel: event.actionLabel,
     ctx,
     timestamp: event.timestamp,
@@ -134,6 +150,7 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
     wallet: event.wallet,
     timestamp: event.timestamp,
     prevAt: times?.prevAt,
+    requestAt: times?.requestAt,
     eventId: event.id,
     addresses: {
       [ctx.assetSymbol]: soleFlowAddress(event.flows, ctx.assetSymbol),
@@ -152,13 +169,19 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
     },
     spine: { tokens, externalParty: !!extBy, isLast: !!isLast },
     head,
-    caption: isTransfer ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL] : event.actionLabel,
+    caption: page
+      ? isTransfer
+        ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL]
+        : event.actionLabel
+      : mapleT1Caption(ctx),
     actor: {
       by: extBy ?? undefined,
       // A queue fill, and a transfer received: the sender acted (ui-jobs 304).
       byOwner: ctx.eventType === "request_fill" || kind === "transfer_in" ? false : undefined,
+      // The event page's caption names the counterparty; the timeline's
+      // head states it as its clause.
       custody:
-        ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
+        page && ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
           ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
           : undefined,
     },

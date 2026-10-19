@@ -71,7 +71,9 @@ const FIXTURES = [
   {
     label: "maple 0x6823 (CCIP escrow)",
     path: "/ethereum/maple/0x68230e37b83fd2b586b51f3e58f6ed4a0689a4af",
-    expect: [{ text: "from CCIP escrow · syrupUSDC", icon: null }],
+    // The timeline head's clause names the escrow without its share token,
+    // which the spine names (rails-ops decision 0045, ui-jobs 367).
+    expect: [{ text: "from CCIP escrow", icon: null }],
   },
 ];
 
