@@ -49,6 +49,7 @@ import { fetchSparkGroupedTimeline, type SparkGroupedTimelineResult } from "@/li
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { sparkExplorer } from "@/lib/spark/explorer";
+import { sparkNotCollateral } from "@/lib/spark/collateral-split";
 import { SparkEventCard } from "@/components/protocol/spark/spark-event-card";
 import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
@@ -682,7 +683,7 @@ export default function SparkPositionDetail({
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
   const captions = liveView
-    ? computeSparkCardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, sparkEvents)
+    ? computeSparkCardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, sparkEvents, servedFolders)
     : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
@@ -706,13 +707,10 @@ export default function SparkPositionDetail({
     if (!view) return null;
     if (view.status === "open") {
       if (!chain) return null;
-      const out = new Set<string>();
-      for (const r of chain.reserves) {
-        if (r.supplyBalanceRaw === "0") continue;
-        const lt = r.inEmode && chain.emode?.lt ? chain.emode.lt : r.lt;
-        if (!r.isCollateral || !lt) out.add(r.address.toLowerCase());
-      }
-      return out;
+      return sparkNotCollateral(
+        chain.reserves.filter((r) => r.supplyBalanceRaw !== "0"),
+        chain.emode?.lt,
+      );
     }
     if (!switches) return null;
     const on = new Set(switches.collateralEnabled);

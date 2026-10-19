@@ -4,9 +4,10 @@ import { SPARK_CATALOG } from "@/lib/spark/asset-catalog";
 
 // Chain arm of the SparkLend position read — the exact live-head detail.
 // SparkLend is a single pooled account per wallet on one mainnet Pool, so this
-// needs only `?wallet=`. The candidate reserve set is the full Spark catalog
-// (18 reserves, Pool.getReservesList), read straight from the Pool at the live
-// head (the multicall returns 0 for any reserve the wallet hasn't touched).
+// needs only `?wallet=`. The candidate reserve set is the Spark catalog and
+// every reserve Pool.getReservesList names (a reserve the catalog does not
+// list, RLUSD, is read too), read straight from the Pool at the live head (the
+// multicall returns 0 for any reserve the wallet hasn't touched).
 // Node runtime, no edge caching.
 
 export const runtime = "nodejs";

@@ -139,8 +139,10 @@ export function computeSparkCardCaptions(
   precomputedLifetime?: ReserveFlows[],
   /** The rows on the page, for the interest inside today's balances. */
   rowEvents?: BaseActivityEvent[],
+  /** The folders served beside the rows: a side they moved states no interest. */
+  folders?: readonly ServedFolder[] | null,
 ): SparkCardCaptions {
-  return computeAaveV3CardCaptions(view, events, chain, lifetimeOf(events, precomputedLifetime), rowEvents);
+  return computeAaveV3CardCaptions(view, events, chain, lifetimeOf(events, precomputedLifetime), rowEvents, folders);
 }
 
 export function computeSparkEconomics(

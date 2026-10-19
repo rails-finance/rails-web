@@ -7,6 +7,7 @@
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
 import { buildSparkPositionRows, type RawSparkWalletRow } from "@/lib/sources/api/spark-positions";
+import { isSparkTreasury } from "@/lib/spark/liquidation-fee";
 import { buildSparkTimeline, type MvRow } from "@/lib/sources/api/spark-timeline";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import {
@@ -80,9 +81,16 @@ export async function readSparkPositions(
     return proxyFail(response.status, { success: false, error: `Backend error: ${response.statusText}` });
   }
   const raw = (await response.json()) as PositionsRawResponse;
-  const data = await buildSparkPositionRows(raw.rows);
+  // SparkLend's treasury is not a position (Miles, 19 Oct 2026, ui-jobs 392):
+  // its spTokens arrive as liquidation fees and reserve mints, never as a
+  // supply, so the listing leaves it out. The index still counts it; the page's
+  // total drops by the rows left out here, and its page by address stays. The
+  // address is noted in rails-ops reference/interesting-addresses.md.
+  const rows = raw.rows.filter((w) => !isSparkTreasury(w.wallet));
+  const data = await buildSparkPositionRows(rows);
+  const total = raw.total - (raw.rows.length - rows.length);
   return proxyOk(
-    { success: true, data, pagination: { total: raw.total, limit: raw.limit, offset: raw.offset } },
+    { success: true, data, pagination: { total, limit: raw.limit, offset: raw.offset } },
     proxyCacheControl(response, LISTING_CACHE_CONTROL),
   );
 }
