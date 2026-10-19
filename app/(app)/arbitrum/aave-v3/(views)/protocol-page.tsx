@@ -15,7 +15,7 @@ import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
 export function AaveV3ArbitrumProtocolPage() {
   return (
     <>
-      <div className="py-8">
+      <div className="py-8" data-anatomy="N5">
         <header className="mb-10">
           <div className="mb-6">
             <RailHeader session="aave-v3-arbitrum" venue="listing" stamp />

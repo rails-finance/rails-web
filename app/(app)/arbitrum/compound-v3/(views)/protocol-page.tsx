@@ -17,7 +17,7 @@ import { compoundArbitrumWalletHref } from "@/lib/compound-arbitrum/routes";
 export function CompoundArbitrumProtocolPage({ data }: { data: CompoundV3MarketsResponse }) {
   return (
     <>
-      <div className="py-8">
+      <div className="py-8" data-anatomy="N5">
         <header className="mb-10">
           <div className="mb-6">
             <RailHeader session="compound-v3-arbitrum" venue="listing" stamp />

@@ -180,7 +180,7 @@ export function MorphoArbitrumMarketsView() {
   const excluded = data.unranked.filter((m) => m.excluded).length;
   return (
     <ProvReceiptsScope registry={registry}>
-      <section className="space-y-8" data-morpho-arbitrum-markets={data.marketCount}>
+      <section className="space-y-8" data-anatomy="N6" data-morpho-arbitrum-markets={data.marketCount}>
         {/* The roster count and the two blocks are cardinality and chrome, not
             slot reads. */}
         <p className="text-sm text-rb-500" data-prov-exempt="">

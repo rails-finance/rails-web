@@ -39,7 +39,7 @@ export function MorphoArbitrumUsdLine({ data, market }: { data: MorphoWalletChai
   const block = data.blockNumber;
   if (totals.supplyUsd == null)
     return (
-      <p className="text-[12px] text-rb-500" data-morpho-arbitrum-usd="unpriced">
+      <p className="text-[12px] text-rb-500" data-anatomy="H13.1" data-morpho-arbitrum-usd="unpriced">
         No dollar figure: the Aave V3 Arbitrum oracle does not price{" "}
         {market ? "this market's loan token" : "the loan tokens these markets lend"}.
       </p>
@@ -52,7 +52,7 @@ export function MorphoArbitrumUsdLine({ data, market }: { data: MorphoWalletChai
   if (parts.length === 0) return null;
   return (
     <ProvReceiptsScope registry={registry}>
-      <p className="text-[12px] text-rb-500" data-morpho-arbitrum-usd={block}>
+      <p className="text-[12px] text-rb-500" data-anatomy="H13.1" data-morpho-arbitrum-usd={block}>
         {parts.map((p, i) => (
           <span key={p.label}>
             {i > 0 && " · "}

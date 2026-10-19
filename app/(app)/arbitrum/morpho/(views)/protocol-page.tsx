@@ -14,7 +14,7 @@ import { morphoArbitrumWalletHref } from "@/lib/morpho-arbitrum/routes";
 export function MorphoArbitrumProtocolPage() {
   return (
     <>
-      <div className="py-8">
+      <div className="py-8" data-anatomy="N5">
         <header className="mb-10">
           <div className="mb-6">
             <RailHeader session="morpho-arbitrum" venue="listing" stamp />
