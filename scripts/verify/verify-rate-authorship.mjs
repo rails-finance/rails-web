@@ -43,6 +43,7 @@
 import { chromium } from "playwright";
 
 import { startInjectingProxy } from "./injecting-proxy.mjs";
+import { CARD_TAB_OPEN, showCardTab } from "./lib/card-tabs.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3021";
 
@@ -79,7 +80,7 @@ const assert = (cond, msg) => {
 
 // A card is its `data-event-id` row (the shared event card, ui-jobs 309).
 const CARD_SEL = "[data-event-id]";
-const MODAL_SEL = ".fixed.inset-0.z-\\[9999\\]";
+const MODAL_SEL = ".fixed.inset-0.overflow-y-auto";
 
 /** Expand the event card whose header matches `labelRe`, open its explanation
  *  drawer, and return the card's innerText. Throws if no such card exists, or
@@ -115,25 +116,20 @@ async function expandCardWithLabel(page, labelRe) {
 
   await page.click("[data-verify-target]");
 
-  // The detail panel loads its own data, and the explainer prose then sits
-  // behind a "Show … explanation" toggle — the header expansion alone paints
-  // none of it. Poll rather than guess a settling time.
+  // The opened card reads its Explanation | Figures tabs (ui-jobs 370): the
+  // explainer prose is the Explanation tab. Poll until the card draws a tab
+  // panel or any text beyond its header, then press the Explanation tab.
   let drawer = false;
   for (let i = 0; i < 40 && !drawer; i++) {
     await page.waitForTimeout(250);
-    drawer = await page.evaluate((sel) => {
-      const card = document.querySelector("[data-verify-target]")?.closest(sel);
-      // The toggle is an icon button — its label lives in aria-label, and
-      // innerText alone comes back empty.
-      const btn = Array.from(card?.querySelectorAll("button") || []).find((b) =>
-        /show (event )?explanation/i.test(`${b.innerText || ""} ${b.getAttribute("aria-label") || ""}`.trim()),
-      );
-      if (!btn) return false;
-      btn.click();
-      return true;
-    }, CARD_SEL);
+    drawer =
+      (await page
+        .locator(`[data-verify-target] >> xpath=ancestor::*[@data-event-id][1]`)
+        .locator(CARD_TAB_OPEN)
+        .count()) > 0;
   }
-  if (!drawer) throw new Error(`the "Show … explanation" toggle never appeared on the /${labelRe.source}/ card`);
+  if (!drawer) throw new Error(`the Explanation tab never appeared on the /${labelRe.source}/ card`);
+  await showCardTab(page.locator(`[data-verify-target] >> xpath=ancestor::*[@data-event-id][1]`), "explanation");
   await page.waitForTimeout(700);
 
   return page.evaluate((sel) => {
@@ -156,7 +152,7 @@ console.log("§1 fork explainer — UNBATCHED rate adjust (real chain data)");
   const body = await page.evaluate(() => document.body.innerText);
   assert(!/No transaction history available/.test(body), "timeline actually loaded (not a rate-limited empty page)");
 
-  const card = await expandCardWithLabel(page, /(Increase|Decrease|Adjust) interest rate/);
+  const card = await expandCardWithLabel(page, /Adjusted rate/);
   assert(BORROWER.test(card), `unbatched bullet credits the borrower (${BORROWER})`);
   assert(!DELEGATE.test(card), "unbatched bullet does NOT claim a delegate set the rate");
   await page.close();
@@ -190,7 +186,7 @@ console.log("§2 fork explainer — BATCHED rate adjust (timeline response rewri
   // proves nothing — fail loudly rather than report a green switch.
   assert(patched > 0, `the interception actually flipped isBatched on ${patched} rate event(s)`);
 
-  const card = await expandCardWithLabel(page, /(Increase|Decrease|Adjust|Delegate) (interest )?rate/);
+  const card = await expandCardWithLabel(page, /(Increased|Decreased|Adjusted|Delegated) (the )?(interest )?rate/);
   assert(DELEGATE.test(card), `batched bullet credits the batch manager (${DELEGATE})`);
   assert(!BORROWER.test(card), "batched bullet does NOT credit the borrower with the delegate's decision");
   await page.close();
@@ -207,11 +203,11 @@ console.log("§3 Liquity V2 'How borrowing works' modal — on a batched trove")
   const body = await page.evaluate(() => document.body.innerText);
   assert(!/No transaction history available/.test(body), "V2 timeline actually loaded");
 
-  const openCard = await expandCardWithLabel(page, /^Open$/);
+  const openCard = await expandCardWithLabel(page, /^Opened trove/);
   // Confirm this really is an openTroveAndJoinBatch — the reader for whom the
   // old sentence was flatly untrue. Without this the section would assert the
   // copy against an ordinary borrower and the fixture would prove nothing.
-  assert(/Joined a batch manager on open/i.test(openCard), "the fixture trove opened straight into a batch");
+  assert(/joined batch manager/i.test(openCard), "the fixture trove opened straight into a batch");
 
   // The Learn-More trigger, scoped to THIS card — an unscoped document-wide
   // search picks up whichever card comes first in the DOM.

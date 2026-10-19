@@ -15,15 +15,16 @@
 
 import { chromium } from "playwright";
 const BASE = process.env.BASE || "http://localhost:3000";
-const CARD = "div.flex.w-full.items-start.relative.rounded-xl:has(> div.min-w-0.grow)";
-const SPINE = "div.hidden.sm\\:flex.flex-col.items-center.relative";
+// The event card is the row `[data-event-id]` and its spine is the `.spine-cell` (the shared spine row).
+const CARD = "[data-event-id]";
+const SPINE = ".spine-cell";
 
 const ROUTES = [
   [
     "morpho",
     "/ethereum/morpho/a4774e3e693fff2ebd1dcbbd69b1b0a5b9bb0ccc753bfda5dd07bdac97c4818a-0x3b3bdaa4462851621818d2cebc835e077587147a",
   ],
-  ["fx (transfer → delegate glyph)", "/ethereum/fx/wbtc-811"],
+  ["fx (transfer → delegate glyph)", "/ethereum/fx/wsteth-1801"],
   ["makerdao", "/ethereum/makerdao/31731"],
   ["maple (shares leg row)", "/ethereum/maple/0x9ec2d8dd95ee25975ba2a5bb4e9d50dd57b7c87a"],
   ["fluid", "/ethereum/fluid/11044"],
