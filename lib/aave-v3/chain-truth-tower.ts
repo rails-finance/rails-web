@@ -729,12 +729,15 @@ export function sinceZeroInterest(
 
 /** One side's since-zero interest in USD, summed over its live reserves, and
  *  the earliest start among them. STRICT: a reserve that cannot state it, or an
- *  unpriced one, nulls the side. */
+ *  unpriced one, nulls the side. A served folder that moved the reserve at or
+ *  after the start holds rows the walk cannot see, so it nulls the side too
+ *  (ui-jobs 378: the gaps across a folder read as interest). */
 function sideSinceZeroUsd(
   side: "supply" | "debt",
   view: AaveFamilyTowerView,
   events: readonly BaseActivityEvent[] | undefined,
   usdOf: (address: string | undefined, amount: number) => number | null,
+  folders?: readonly ServedFolder[] | null,
 ): { usd: number; since: number } | null {
   if (!events || events.length === 0) return null;
   const live = (side === "supply" ? view.supplies : view.borrows).filter((r) => r.amount > 0 && !r.decimalsUnread);
@@ -747,6 +750,8 @@ function sideSinceZeroUsd(
     // A balance worth under a cent counts as starting from zero.
     const got = sinceZeroInterest(events, side, r.address, r.amount, 0.01 / unit);
     if (!got) return null;
+    const addr = r.address.toLowerCase();
+    if (folders?.some((f) => f.lastAt >= got.since && f.legs.some((l) => l.asset.toLowerCase() === addr))) return null;
     usd += got.amount * unit;
     since = Math.min(since, got.since);
   }
@@ -765,6 +770,9 @@ export function computeAaveV3CardCaptions(
   /** The rows on the page, for the interest since each balance last started
    *  from zero. Defaults to `events`. */
   rowEvents?: BaseActivityEvent[],
+  /** The folders the index served beside `rowEvents`: their members are not
+   *  rows, so a side they moved since its start states no interest. */
+  folders?: readonly ServedFolder[] | null,
 ): AaveV3CardCaptions {
   const prices = view.priceByAddress;
   const usdOf = (address: string | undefined, amount: number): number | null => {
@@ -798,8 +806,8 @@ export function computeAaveV3CardCaptions(
 
   // The interest inside today's balances: since each last started from zero.
   const rows = rowEvents ?? events;
-  const supplyInterest = sideSinceZeroUsd("supply", view, rows, usdOf);
-  const debtInterest = sideSinceZeroUsd("debt", view, rows, usdOf);
+  const supplyInterest = sideSinceZeroUsd("supply", view, rows, usdOf, folders);
+  const debtInterest = sideSinceZeroUsd("debt", view, rows, usdOf, folders);
   return {
     supplyInterestUsd: supplyInterest?.usd ?? null,
     debtInterestUsd: debtInterest?.usd ?? null,

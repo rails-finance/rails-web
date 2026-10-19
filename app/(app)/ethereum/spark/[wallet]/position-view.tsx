@@ -683,7 +683,7 @@ export default function SparkPositionDetail({
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
   const captions = liveView
-    ? computeSparkCardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, sparkEvents)
+    ? computeSparkCardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, sparkEvents, servedFolders)
     : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
