@@ -48,6 +48,7 @@ import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
 import { AmountText } from "@/components/shared/amount-text";
+import { TokenFigure } from "@/components/shared/token-figure";
 import { FluidMenuRows } from "./fluid-menu-rows";
 
 export interface FluidPositionView {
@@ -169,9 +170,11 @@ function sigmaRow(
   const gap = Number.isFinite(headline) ? headline - n : NaN;
   const showGap = Number.isFinite(gap) && gap > 0 && formatNumber(gap) !== "0";
   const sigmaFig = (
-    <Prov info={positionSigmaProv(side, sym)} value={formatExact(n)}>
-      <AmountText value={n} format="compact" /> {sym}
-    </Prov>
+    <TokenFigure symbol={sym} figure={`${formatExact(n)} ${sym}`}>
+      <Prov info={positionSigmaProv(side, sym)} value={formatExact(n)}>
+        <AmountText value={n} format="compact" />
+      </Prov>
+    </TokenFigure>
   );
   return {
     id: `events-${side === "supply" ? "collateral" : "debt"}`,
@@ -180,9 +183,11 @@ function sigmaRow(
     value: showGap ? (
       <>
         {sigmaFig} +{" "}
-        <Prov info={accruedInterestProv(side, sym)} value={formatExact(gap)}>
-          <AmountText value={gap} format="compact" /> {sym}
-        </Prov>{" "}
+        <TokenFigure symbol={sym} figure={`${formatExact(gap)} ${sym}`}>
+          <Prov info={accruedInterestProv(side, sym)} value={formatExact(gap)}>
+            <AmountText value={gap} format="compact" />
+          </Prov>
+        </TokenFigure>{" "}
         interest
       </>
     ) : (
@@ -386,9 +391,11 @@ export function fluidCardSlots({
         tip: "How much more debt the position can take before it reaches the vault's borrow limit (its collateral factor), where Fluid stops lending. Read from the vault on chain at the latest block.",
         value: (
           <>
-            <Prov info={fluidLiqPriceProv(colSym, debtSym, riskLive.vault, pairText)}>
-              <AmountText value={headroom} format="compact" /> {debtSym}
-            </Prov>{" "}
+            <TokenFigure symbol={debtSym} figure={`${formatExact(headroom)} ${debtSym}`}>
+              <Prov info={fluidLiqPriceProv(colSym, debtSym, riskLive.vault, pairText)}>
+                <AmountText value={headroom} format="compact" />
+              </Prov>
+            </TokenFigure>{" "}
             to the{" "}
             <Prov
               info={vaultConfigProv("Collateral factor (borrow gate)", "collateralFactor", riskLive.vault, pairText)}
