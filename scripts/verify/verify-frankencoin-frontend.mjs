@@ -258,7 +258,7 @@ const noDollar = (name, text) => {
     runCount === 1 &&
       /: sold 2 WETH, raised 2,435 ZCHF$/.test(runLabel) &&
       /^2 2\.4K Auction 5\b/.test(runText) &&
-      !/Auction Settlement/.test(t) &&
+      !/Auction settled/.test(t) &&
       rowsCollapsed === 9,
     `${runCount} run row(s), label "${runLabel}", text "${runText}", ${rowsCollapsed} event rows at rest (19 events, 10 of them inside the run)`,
   );
@@ -268,15 +268,16 @@ const noDollar = (name, text) => {
   if (runCount === 1) await openGroup(page, runFrame.first());
   for (let attempt = 0; attempt < 12; attempt++) {
     expanded = await page.evaluate(() => document.body.innerText);
-    if (/Auction Settlement/.test(expanded)) break;
+    if (/Auction settled/.test(expanded)) break;
     await page.waitForTimeout(400);
   }
-  const settlements = (expanded.match(/Auction Settlement/g) ?? []).length;
+  // The timeline head reads "Auction settled" since ui-jobs 367.
+  const settlements = (expanded.match(/Auction settled/g) ?? []).length;
   const rowsExpanded = await page.locator("[data-event-id]").count();
   check(
-    "Auction Settlement reclassification renders (expanded run)",
+    "Auction settlement reclassification renders (expanded run)",
     settlements === 5 && rowsExpanded === 19,
-    `${settlements} "Auction Settlement" row(s), ${rowsExpanded} event rows once expanded`,
+    `${settlements} "Auction settled" row(s), ${rowsExpanded} event rows once expanded`,
   );
   // `5f9b4e1e` renamed the closed card's mint peak to "Highest recorded debt"
   // as part of the roster's one card vocabulary. The FIGURES stay pinned here
@@ -289,9 +290,11 @@ const noDollar = (name, text) => {
   noDollar("challenge detail", t);
 
   // F. the denied + forced-sale position.
-  const d = await textOf(`${EXPLORER}/${DENIED_FORCED}`, "text=Position Denied");
-  check("DENIED lifecycle renders from the index", /Position Denied/.test(d) && /vetoed by|denied/i.test(d));
-  check("Forced Sale rows render", /Forced Sale/.test(d));
+  // The timeline head reads "Denied · by 0x…" and "Sold in a forced sale"
+  // since ui-jobs 367.
+  const d = await textOf(`${EXPLORER}/${DENIED_FORCED}`, "text=Sold in a forced sale");
+  check("DENIED lifecycle renders from the index", /Denied\s*·\s*by/.test(d));
+  check("Forced Sale rows render", /Sold in a forced sale/.test(d));
   noDollar("denied/forced-sale detail", d);
 }
 

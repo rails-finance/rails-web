@@ -1,7 +1,15 @@
 "use client";
 
 // Frankencoin event header — adapter onto the shared ChainTruthRow grammar.
-// Maps each event's own chain figures into the shared row spec; traces via
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`frankencoinT1Kind`, lib/frankencoin/head-words.ts)
+// and one clause naming the row's party (a challenger, the vetoing address, a
+// new owner). The spine carries the figures; a declared-price move's before →
+// after is in the Figures sheet.
+//
+// The event page's card (mode "title") maps each event's own chain figures
+// into the shared row spec; traces via
 // <Prov>. The challenge rows carry NEUTRAL party chips whose prefixes say what
 // happened ("challenged by") — a challenge is an act AGAINST the position, and
 // the copy never reads as an act the owner performed. Deltas on the minting
@@ -11,7 +19,8 @@
 
 import type { AssetFlow, FrankencoinContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { frankencoinT1Kind, frankencoinT1Party } from "@/lib/frankencoin/head-words";
 import {
   changeProv,
   challengeFigureProv,
@@ -37,6 +46,11 @@ export interface FrankencoinEventHeaderProps {
    *  house symbol table was never going to keep up with; ZCHF is fixed and
    *  already resolves, and reads from the same place for consistency. */
   flows?: AssetFlow[];
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
+  /** A settlement written in a forced sale's transaction. */
+  forcedTx?: boolean;
 }
 
 const num = (s?: string): number => {
@@ -53,6 +67,8 @@ export function useFrankencoinHeadSpec({
   blockNumber,
   eventNumber,
   flows,
+  mode = "title",
+  forcedTx,
 }: FrankencoinEventHeaderProps): ChainTruthRowSpec {
   const coords: FrankencoinCoords = { txHash, blockNumber, position: ctx.position, hub: ctx.hub };
   const sym = ctx.collateralSymbol;
@@ -261,6 +277,17 @@ export function useFrankencoinHeadSpec({
         : ctx.eventType === "ownership_transferred" && ctx.newOwner
           ? { prefix: "to", address: ctx.newOwner, prov: ownershipProv(coords) }
           : undefined;
+
+  if (mode === "row") {
+    const p = frankencoinT1Party(ctx);
+    return {
+      label: frankencoinT1Kind(ctx, { forcedTx }),
+      status: isOpen ? "open" : undefined,
+      critical: ctx.eventType === "challenge_succeeded" || ctx.eventType === "denied",
+      deltas: [],
+      clauses: p && party ? [<PartyChip key="party" party={{ ...party, prefix: p.lead }} />] : undefined,
+    };
+  }
 
   // A declared-price move names its direction in the row (a raise starts the
   // minting cooldown, a cut does not) and carries its before → after, on a

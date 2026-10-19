@@ -471,6 +471,7 @@ const FAMILIES = {
     wordConsts: { FRANKENCOIN_WORDS: "words" },
     modalWords: null,
     readers: [
+      "lib/frankencoin/head-words.ts",
       "lib/frankencoin/event-prose.ts",
       "lib/frankencoin/event-templates.ts",
       "components/protocol/frankencoin/frankencoin-event-explainer.tsx",

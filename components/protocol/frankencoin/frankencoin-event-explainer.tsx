@@ -43,6 +43,9 @@ export interface FrankencoinEventExplainerProps {
   timestamp?: number;
   /** The event id, whose log index isolates this event's receipt logs. */
   eventId?: string;
+  /** The event page states the first sentence as its title: the pane leaves
+   *  it out. */
+  leadOnTitle?: boolean;
 }
 
 /** The event's "?" modal: by its kind, and whether a settlement row belongs
@@ -180,13 +183,8 @@ function echoFor(
   }
 }
 
-export function FrankencoinEventExplainer({
-  ctx,
-  txHash,
-  blockNumber,
-  timestamp,
-  eventId,
-}: FrankencoinEventExplainerProps) {
+/** The generator's sentences for the event and the echo each figure takes. */
+function useFrankencoinProse({ ctx, txHash, blockNumber, timestamp, eventId }: FrankencoinEventExplainerProps) {
   const coords: FrankencoinCoords = { txHash, blockNumber, position: ctx.position, hub: ctx.hub };
   // The same receipt read the opened grid makes; one request serves both.
   const { read } = useFrankencoinEventRead(ctx, txHash, eventId);
@@ -195,10 +193,24 @@ export function FrankencoinEventExplainer({
   const split = frankencoinZchfSplit(read, dMint, ctx.hub);
   const prose = frankencoinEventProse({ ctx, read, split, facts, timestamp, txHash, blockNumber });
   const echo = (key: FrankencoinEchoKey) => echoFor(key, ctx, coords, prose.values, read);
-  const items = frankencoinExplanationRuns(prose).flatMap((run) =>
-    run.sentences.map((s) => {
+  return { runs: frankencoinExplanationRuns(prose), echo };
+}
+
+/** The Explanation's first sentence as printed (the first run's first), for
+ *  the event page's title (rails-ops decision 0045, "Ruled since"). */
+export function FrankencoinExplainerLead(props: FrankencoinEventExplainerProps) {
+  const { runs, echo } = useFrankencoinProse(props);
+  const lead = runs[0]?.sentences[0];
+  return lead ? <ProseSentenceText s={lead} echo={echo} /> : null;
+}
+
+export function FrankencoinEventExplainer(props: FrankencoinEventExplainerProps) {
+  const { runs, echo } = useFrankencoinProse(props);
+  const items = runs.flatMap((run, r) =>
+    run.sentences.flatMap((s, i) => {
+      if (props.leadOnTitle && r === 0 && i === 0) return [];
       const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
-      return run.heading ? { group: run.heading, node } : node;
+      return [run.heading ? { group: run.heading, node } : node];
     }),
   );
   return <ProseExplainer items={items} />;
