@@ -5,10 +5,18 @@
 // <Prov>. Router-proxied mints/redeems carry a NEUTRAL "via 0x…" party chip
 // (routing, not a third-party verdict — the owner initiated it); genuinely
 // external actions (someone else repaid) get the pink external-actor chip.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`cTokenT1Kind`, lib/compound-v2/head-words.ts), a
+// transfer's counterparty as its clause, and the chips for what the spine
+// cannot show. The spine carries the figures. The event page's card (mode
+// "title") keeps the signed amounts.
 
 import type { AssetFlow, MoonwellContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { cTokenT1Caption, cTokenT1Kind } from "@/lib/compound-v2/head-words";
+import { MOONWELL_HEAD_WORDS } from "@/lib/moonwell/event-templates";
 import {
   assetsDeltaProv,
   transferAmountProv,
@@ -36,6 +44,44 @@ export interface MoonwellEventHeaderProps {
    *  row asks about the underlying. The address has to identify whatever the
    *  chip is resolving, and here those are the same thing. */
   flows?: AssetFlow[];
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
+}
+
+const isTransferKind = (t: MoonwellContext["eventType"]) => t === "transfer_in" || t === "transfer_out";
+
+/** The timeline head's words as one line: the phone caption and the row's
+ *  accessible name. `partyLead`: the transfer chip's prefix ("to the
+ *  liquidator"). */
+export function moonwellT1Caption(ctx: MoonwellContext, actionLabel: string, partyLead?: string): string {
+  const kind = cTokenT1Kind(ctx.eventType, MOONWELL_HEAD_WORDS, actionLabel);
+  if (!isTransferKind(ctx.eventType) || !ctx.counterparty) return kind;
+  return cTokenT1Caption(kind, MOONWELL_HEAD_WORDS, {
+    lead: partyLead ?? (ctx.eventType === "transfer_out" ? MOONWELL_HEAD_WORDS.to : MOONWELL_HEAD_WORDS.from),
+    address: ctx.counterparty,
+  });
+}
+
+/** A transfer out's chip prefix: the protocol's share of a seizure goes to
+ *  the market itself; a seizure's transfer to the liquidator goes to the
+ *  contract that called the market, in a transaction someone other than the
+ *  owner sent. */
+export function moonwellTransferOutLead(
+  ctx: MoonwellContext,
+  wallet: string | undefined,
+  mtoken: string | undefined,
+  mSym: string,
+): string {
+  if (!ctx.counterparty) return "to";
+  if (mtoken != null && ctx.counterparty === mtoken.toLowerCase()) return `to the ${mSym} market`;
+  return wallet &&
+    ctx.caller &&
+    ctx.caller.toLowerCase() === ctx.counterparty.toLowerCase() &&
+    ctx.txFrom &&
+    ctx.txFrom.toLowerCase() !== wallet.toLowerCase()
+    ? "to the liquidator"
+    : "to";
 }
 
 export function useMoonwellHeadSpec({
@@ -46,6 +92,7 @@ export function useMoonwellHeadSpec({
   externalBy,
   wallet,
   flows,
+  mode = "title",
 }: MoonwellEventHeaderProps): ChainTruthRowSpec {
   const dep = useMoonwellDeployment();
   const coords = useMoonwellCoords({ market: ctx.market, symbol: ctx.marketSymbol, txHash, blockNumber, wallet });
@@ -109,20 +156,7 @@ export function useMoonwellHeadSpec({
         }
       : ctx.eventType === "transfer_out" && ctx.counterparty
         ? {
-            // The protocol's share of a seizure goes to the market itself.
-            prefix:
-              coords.mtoken != null && ctx.counterparty === coords.mtoken.toLowerCase()
-                ? `to the ${mSym} market`
-                : // A seizure's transfer to the liquidator: the contract that
-                  // called the market is the one receiving, in a transaction
-                  // someone other than the owner sent.
-                  wallet &&
-                    ctx.caller &&
-                    ctx.caller.toLowerCase() === ctx.counterparty.toLowerCase() &&
-                    ctx.txFrom &&
-                    ctx.txFrom.toLowerCase() !== wallet.toLowerCase()
-                  ? "to the liquidator"
-                  : "to",
+            prefix: moonwellTransferOutLead(ctx, wallet, coords.mtoken, mSym),
             address: ctx.counterparty,
             prov: transferAmountProv(mSym, "out", coords),
             ens: true,
@@ -135,6 +169,43 @@ export function useMoonwellHeadSpec({
             }
           : undefined;
 
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.caller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+            coords,
+          ),
+          // A contract made the repayment for the wallet that sent the
+          // transaction (a liquidation bot's contract, say): both named.
+          ...(ctx.eventType === "repay" && ctx.caller.toLowerCase() !== ctx.txFrom.toLowerCase()
+            ? {
+                prefix: "sent by",
+                tip: (
+                  <>
+                    {ctx.txFrom.slice(0, 6)}…{ctx.txFrom.slice(-4)} sent the transaction. The contract{" "}
+                    {ctx.caller.slice(0, 6)}…{ctx.caller.slice(-4)} it called made the repayment.
+                  </>
+                ),
+              }
+            : {}),
+        }
+      : undefined;
+
+  if (mode === "row") {
+    const transfer = isTransferKind(ctx.eventType);
+    return {
+      label: cTokenT1Kind(ctx.eventType, MOONWELL_HEAD_WORDS, actionLabel),
+      critical: ctx.eventType === "liquidation",
+      deltas: [],
+      // A transfer's counterparty is the clause after "Transferred".
+      clauses: transfer && party ? [<PartyChip key="party" party={party} />] : undefined,
+      party: transfer ? undefined : party,
+      externalActor,
+    };
+  }
+
   return {
     label: actionLabel,
     critical: ctx.eventType === "liquidation",
@@ -142,29 +213,7 @@ export function useMoonwellHeadSpec({
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out",
     deltas,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.caller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-              coords,
-            ),
-            // A contract made the repayment for the wallet that sent the
-            // transaction (a liquidation bot's contract, say): both named.
-            ...(ctx.eventType === "repay" && ctx.caller.toLowerCase() !== ctx.txFrom.toLowerCase()
-              ? {
-                  prefix: "sent by",
-                  tip: (
-                    <>
-                      {ctx.txFrom.slice(0, 6)}…{ctx.txFrom.slice(-4)} sent the transaction. The contract{" "}
-                      {ctx.caller.slice(0, 6)}…{ctx.caller.slice(-4)} it called made the repayment.
-                    </>
-                  ),
-                }
-              : {}),
-          }
-        : undefined,
+    externalActor,
     party,
   };
 }

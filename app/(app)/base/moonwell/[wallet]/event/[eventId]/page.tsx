@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
-import { moonwellEventHeading, moonwellEventPageDescription } from "@/lib/moonwell/explorer";
+import { moonwellEventPageDescription, moonwellEventTabWords } from "@/lib/moonwell/explorer";
 import { loadMoonwellBaseHead } from "@/lib/moonwell-base/position-page-data";
 import { loadMoonwellEventsFromIndex } from "@/lib/sources/api/moonwell-base-timeline";
 import {
@@ -68,7 +68,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "moonwell-base",
     subject: wallet,
     canonicalPath: `/base/moonwell/${wallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: moonwellEventHeading(event, "base"), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: moonwellEventTabWords(event, "base"), timestamp: event.timestamp } : null,
     description: event ? moonwellEventPageDescription("base", wallet, event.timestamp) : undefined,
   });
 }

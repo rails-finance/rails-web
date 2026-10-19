@@ -7,7 +7,11 @@
 
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { COMPOUND_HEAD_WORDS } from "@/lib/compound/event-templates";
+import { compoundT1Caption } from "@/lib/compound/head-words";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -27,7 +31,7 @@ import {
   isGroupedExplanation,
 } from "./compound-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { compoundRowLabel } from "@/lib/compound/row-facts";
+import { compoundAbsorbSplit, compoundRowLabel } from "@/lib/compound/row-facts";
 
 export interface CompoundEventCardProps {
   event: CompoundEvent;
@@ -121,10 +125,10 @@ export function CompoundEventCard({
   // an unambiguous match is used — one flow, one symbol — because resolving a
   // shared symbol by picking a flow is the error this whole change is undoing.
   //
-  // A transfer is a custody move: the token's icon wears the paper-plane badge
-  // and neither flank is drawn — the two flanks are "out to the wallet" and
-  // "into the protocol", and a transfer to another account is neither. The
-  // header states the amount and the to/from counterparty.
+  // A transfer is a custody move: the token's icon wears the paper-plane
+  // badge, its amount on the flank the position's balance moved by, out to the
+  // left or in to the right; the head's clause names the counterparty.
+  const transferOut = kind === "transfer_out" || kind === "transfer_collateral_out";
   const tokens =
     isLiq || mag === 0
       ? undefined
@@ -134,6 +138,11 @@ export function CompoundEventCard({
               symbol: ctx.assetSymbol,
               address: soleFlowAddress(event.flows, ctx.assetSymbol),
               badge: "send" as const,
+              direction: transferOut ? ("left" as const) : ("right" as const),
+              value: mag,
+              unit: ctx.assetSymbol,
+              fullValue: true,
+              verb: transferOut ? COMPOUND_HEAD_WORDS.legSent : COMPOUND_HEAD_WORDS.legReceived,
             },
           ]
         : [
@@ -146,12 +155,32 @@ export function CompoundEventCard({
             },
           ];
 
+  // An absorb's leg on the warning node's flank: the debt it cleared, or the
+  // collateral it seized.
+  const absorbSplit = compoundAbsorbSplit(ctx);
+  const absorbed = absorbSplit ? Number(absorbSplit.cleared) : mag;
+  const warningLegs: SpineWarningLeg[] | undefined =
+    isLiq && Number.isFinite(absorbed) && absorbed !== 0
+      ? [
+          {
+            label: COMPOUND_HEAD_WORDS.legAbsorbed,
+            value: absorbed,
+            symbol: ctx.assetSymbol,
+            address: soleFlowAddress(event.flows, ctx.assetSymbol),
+          },
+        ]
+      : undefined;
+
   const spine: SpineColumnProps = isLiq
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   const rowLabel = compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals);
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useCompoundHeadSpec({
+    mode: page ? "title" : "row",
     actionLabel: rowLabel,
     ctx,
     txHash: event.txHash,
@@ -184,7 +213,7 @@ export function CompoundEventCard({
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption: page ? event.actionLabel : compoundT1Caption(ctx, rowLabel, m.baseDecimals),
     // A transfer received: the sender acted (ui-jobs 304).
     actor: {
       by: extBy ?? undefined,

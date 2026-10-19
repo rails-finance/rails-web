@@ -9,15 +9,24 @@
 
 import type { BaseActivityEvent, MoonwellContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { MOONWELL_HEAD_WORDS } from "@/lib/moonwell/event-templates";
+import { moonwellEventProse } from "@/lib/moonwell/event-prose";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { useMoonwellCoords } from "@/lib/moonwell/deployment-context";
-import { useMoonwellHeadSpec } from "./moonwell-event-header";
+import { useMoonwellCoords, useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
+import { moonwellT1Caption, moonwellTransferOutLead, useMoonwellHeadSpec } from "./moonwell-event-header";
 import { useMoonwellCells } from "./moonwell-event-detail";
 import { useMoonwellSheet } from "./moonwell-event-sheet";
-import { MoonwellEventExplainer, moonwellLearnMoreContent } from "./moonwell-event-explainer";
+import {
+  MoonwellEventExplainer,
+  MoonwellExplainerTeaser,
+  isGroupedMoonwellExplanation,
+  moonwellLearnMoreContent,
+} from "./moonwell-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 
 export interface MoonwellEventCardProps {
@@ -62,10 +71,9 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
   const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet);
 
   //
-  // A transfer is a custody move: the token's icon wears the paper-plane badge
-  // and neither flank is drawn — the two flanks are "out to the wallet" and
-  // "into the protocol", and a transfer to another account is neither. The
-  // header states the amount and the to/from counterparty.
+  // A transfer is a custody move: the token's icon wears the paper-plane
+  // badge, its amount on the flank the position's balance moved by, out to the
+  // left or in to the right; the head's clause names the counterparty.
   const tokens =
     isLiq || mag === 0
       ? undefined
@@ -76,6 +84,11 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
               iconSymbol: ctx.marketSymbol,
               address: soleFlowAddress(event.flows, ctx.marketSymbol),
               badge: "send" as const,
+              direction: kind === "transfer_out" ? ("left" as const) : ("right" as const),
+              value: mag,
+              unit: symbol,
+              fullValue: true,
+              verb: kind === "transfer_out" ? MOONWELL_HEAD_WORDS.legSent : MOONWELL_HEAD_WORDS.legReceived,
             },
           ]
         : [
@@ -97,11 +110,39 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
             },
           ];
 
+  // A liquidation's legs, the collateral seized below the debt repaid: the
+  // warning node's flank carries them.
+  const dep = useMoonwellDeployment();
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!isLiq) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    const seized = Math.abs(Number(ctx.seizeTokens ?? "0")) || 0;
+    if (seized !== 0 && ctx.collateralSymbol) {
+      const collMSym = ctx.collateralMarket
+        ? dep.market(ctx.collateralMarket, ctx.collateralSymbol).mSymbol
+        : `m${ctx.collateralSymbol}`;
+      legs.push({ label: MOONWELL_HEAD_WORDS.legSeized, value: seized, symbol: collMSym });
+    }
+    const repaid = Math.abs(Number(ctx.assetsDelta ?? "0")) || 0;
+    if (repaid !== 0)
+      legs.push({
+        label: MOONWELL_HEAD_WORDS.legRepaid,
+        value: repaid,
+        symbol: ctx.marketSymbol,
+        address: soleFlowAddress(event.flows, ctx.marketSymbol),
+      });
+    return legs;
+  })();
+
   const spine: SpineColumnProps = isLiq
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useMoonwellHeadSpec({
+    mode: page ? "title" : "row",
     actionLabel: event.actionLabel,
     ctx,
     txHash: event.txHash,
@@ -120,6 +161,13 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
   });
   const sheet = useMoonwellSheet({ ctx, eventId: event.id, label: event.actionLabel, coords });
 
+  const prose = moonwellEventProse({
+    ctx,
+    externalBy: extBy ?? undefined,
+    mtoken: coords.mtoken,
+    marketLabel: coords.marketLabel,
+  });
+
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -131,7 +179,13 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption: page
+      ? event.actionLabel
+      : moonwellT1Caption(
+          ctx,
+          event.actionLabel,
+          kind === "transfer_out" ? moonwellTransferOutLead(ctx, event.wallet, coords.mtoken, symbol) : undefined,
+        ),
     // A transfer received: the sender acted (ui-jobs 304).
     actor: { by: extBy ?? undefined, byOwner: kind === "transfer_in" ? false : undefined },
     cells,
@@ -149,6 +203,8 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
           externalBy={extBy ?? undefined}
         />
       ),
+      first: prose.L4.length > 0 ? <MoonwellExplainerTeaser ctx={ctx} coords={coords} prose={prose} /> : undefined,
+      grouped: isGroupedMoonwellExplanation(prose),
     },
     learnMore: <LearnMore inline content={moonwellLearnMoreContent(ctx, coords)} />,
   };

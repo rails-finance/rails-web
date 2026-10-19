@@ -16,12 +16,16 @@
 
 import type { CompoundV2Context } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_HEAD_WORDS } from "@/lib/compound-v2/event-templates";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { compoundV2EventProse, type CompoundV2Event } from "@/lib/compound-v2/event-prose";
-import { compoundV2HeadSpec } from "./compound-v2-event-header";
+import { compoundV2HeadSpec, compoundV2T1Caption } from "./compound-v2-event-header";
 import { useCompoundV2Cells } from "./compound-v2-event-detail";
 import { useCompoundV2Sheet } from "./compound-v2-event-sheet";
 import {
@@ -101,15 +105,26 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
   // appear in the flows; matching by symbol picks out the right one, and a
   // symbol carried by two flows is left unresolved rather than guessed at.
   //
-  // A transfer is a custody move: the token's icon wears the paper-plane badge
-  // and neither flank is drawn — the two flanks are "out to the wallet" and
-  // "into the protocol", and a transfer to another account is neither. The
-  // header states the amount and the to/from counterparty.
+  // A transfer is a custody move: the token's icon wears the paper-plane
+  // badge, its amount on the flank the position's balance moved by, out to the
+  // left or in to the right; the head's clause names the counterparty.
   const tokens =
     isLiq || isSeizeLoss || mag === 0
       ? undefined
       : isTransfer
-        ? [{ symbol, address: soleFlowAddress(event.flows, symbol), badge: "send" as const }]
+        ? [
+            {
+              symbol,
+              address: soleFlowAddress(event.flows, symbol),
+              badge: "send" as const,
+              direction: ctx.eventType === "transfer_out" ? ("left" as const) : ("right" as const),
+              value: mag,
+              unit: symbol,
+              fullValue: true,
+              verb:
+                ctx.eventType === "transfer_out" ? COMPOUND_V2_HEAD_WORDS.legSent : COMPOUND_V2_HEAD_WORDS.legReceived,
+            },
+          ]
         : !dir
           ? undefined
           : [
@@ -121,9 +136,48 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
               },
             ];
 
+  // The warning node's flank carries what the head stated before decision
+  // 0045: a liquidation's legs, the collateral seized below the debt repaid,
+  // and a seizure leg's cTokens.
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (isSeizeLoss)
+      return mag !== 0
+        ? [
+            {
+              label: COMPOUND_V2_HEAD_WORDS.legSeized,
+              value: mag,
+              symbol: cSymbol,
+              address: soleFlowAddress(event.flows, cSymbol),
+            },
+          ]
+        : undefined;
+    if (!isLiq) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    const seized = Math.abs(Number(ctx.seizeTokens ?? "0")) || 0;
+    if (seized !== 0 && ctx.collateralSymbol) {
+      const collM = ctx.collateralMarket ? COMPOUND_V2_MARKET_BY_KEY[ctx.collateralMarket] : undefined;
+      const collCSym = collM?.cSymbol ?? `c${ctx.collateralSymbol}`;
+      legs.push({
+        label: COMPOUND_V2_HEAD_WORDS.legSeized,
+        value: seized,
+        symbol: collCSym,
+        address: soleFlowAddress(event.flows, collCSym),
+      });
+    }
+    const repaid = Math.abs(Number(ctx.assetsDelta ?? "0")) || 0;
+    if (repaid !== 0)
+      legs.push({
+        label: COMPOUND_V2_HEAD_WORDS.legRepaid,
+        value: repaid,
+        symbol: ctx.marketSymbol,
+        address: soleFlowAddress(event.flows, ctx.marketSymbol),
+      });
+    return legs;
+  })();
+
   const spine: SpineColumnProps =
     isLiq || isSeizeLoss
-      ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+      ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
       : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   const { cells, ledgers, notes, prices } = useCompoundV2Cells({
@@ -144,6 +198,9 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
     wallet: event.wallet,
   });
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -155,6 +212,7 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
     },
     spine,
     head: compoundV2HeadSpec({
+      mode: page ? "title" : "row",
       actionLabel: event.actionLabel,
       ctx,
       txHash: event.txHash,
@@ -163,17 +221,13 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
       wallet: event.wallet,
       flows: event.flows,
     }),
-    caption: event.actionLabel,
+    caption: page ? event.actionLabel : compoundV2T1Caption(ctx, event.actionLabel),
     actor: {
       by: extBy ?? (isLiq ? ctx.liquidator : undefined) ?? undefined,
       // A transfer received: the sender acted; any other kind follows the
       // transaction-sender test (ui-jobs 304).
       byOwner: ctx.eventType === "transfer_in" ? false : undefined,
       sent: { txFrom: ctx.txFrom, caller: ctx.caller, owner: event.wallet },
-      custody:
-        ctx.counterparty && isTransfer
-          ? { dir: ctx.eventType === "transfer_out" ? "to" : "from", address: ctx.counterparty }
-          : undefined,
     },
     cells,
     sheet,

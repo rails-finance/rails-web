@@ -7,6 +7,7 @@
 // (`pnpm check:prose` fails on one).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { CTokenHeadTable } from "@/lib/compound-v2/head-words";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
 import type { ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { MoonwellEchoKey } from "@/lib/moonwell/event-prose";
@@ -40,6 +41,24 @@ export const PROSE = eventProseEngine<MoonwellL5Key, MoonwellEchoKey>(FILE, { do
 
 /** Words the generator and the renderers put into a sentence. */
 export const MOONWELL_WORDS = FILE.words;
+
+/** The timeline head's words (lib/compound-v2/head-words.ts). */
+export const MOONWELL_HEAD_WORDS: CTokenHeadTable = {
+  sep: MOONWELL_WORDS.t1_sep,
+  supplied: MOONWELL_WORDS.t1_supplied,
+  withdrew: MOONWELL_WORDS.t1_withdrew,
+  borrowed: MOONWELL_WORDS.t1_borrowed,
+  repaid: MOONWELL_WORDS.t1_repaid,
+  liquidated: MOONWELL_WORDS.t1_liquidated,
+  transferred: MOONWELL_WORDS.t1_transferred,
+  to: MOONWELL_WORDS.t1_to,
+  from: MOONWELL_WORDS.t1_from,
+  by: MOONWELL_WORDS.t1_by,
+  legSent: MOONWELL_WORDS.t1_leg_sent,
+  legReceived: MOONWELL_WORDS.t1_leg_received,
+  legSeized: MOONWELL_WORDS.t1_leg_seized,
+  legRepaid: MOONWELL_WORDS.t1_leg_repaid,
+};
 
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 

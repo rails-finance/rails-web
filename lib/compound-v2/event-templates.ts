@@ -6,6 +6,7 @@
 // string the prose writer cannot see (`pnpm check:prose` fails on one).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { CTokenHeadTable } from "@/lib/compound-v2/head-words";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
 import type { ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { CompoundV2EchoKey } from "@/lib/compound-v2/event-prose";
@@ -42,6 +43,27 @@ export const PROSE = eventProseEngine<CompoundV2L5Key, CompoundV2EchoKey>(FILE, 
 
 /** Words the code puts into a sentence or between a list's items. */
 export const COMPOUND_V2_WORDS = FILE.words;
+
+/** The timeline head's words (lib/compound-v2/head-words.ts). */
+export const COMPOUND_V2_HEAD_WORDS: CTokenHeadTable = {
+  sep: COMPOUND_V2_WORDS.t1_sep,
+  supplied: COMPOUND_V2_WORDS.t1_supplied,
+  withdrew: COMPOUND_V2_WORDS.t1_withdrew,
+  borrowed: COMPOUND_V2_WORDS.t1_borrowed,
+  repaid: COMPOUND_V2_WORDS.t1_repaid,
+  liquidated: COMPOUND_V2_WORDS.t1_liquidated,
+  transferred: COMPOUND_V2_WORDS.t1_transferred,
+  to: COMPOUND_V2_WORDS.t1_to,
+  from: COMPOUND_V2_WORDS.t1_from,
+  by: COMPOUND_V2_WORDS.t1_by,
+  seizedOut: COMPOUND_V2_WORDS.t1_seized_out,
+  seizedIn: COMPOUND_V2_WORDS.t1_seized_in,
+  seizeBurn: COMPOUND_V2_WORDS.t1_seize_burn,
+  legSent: COMPOUND_V2_WORDS.t1_leg_sent,
+  legReceived: COMPOUND_V2_WORDS.t1_leg_received,
+  legSeized: COMPOUND_V2_WORDS.t1_leg_seized,
+  legRepaid: COMPOUND_V2_WORDS.t1_leg_repaid,
+};
 
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 

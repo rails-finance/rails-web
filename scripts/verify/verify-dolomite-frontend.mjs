@@ -87,7 +87,8 @@ const detailBody = await page.textContent("body");
 check("detail: mode pill reads Borrowing", /Borrowing/.test(detailBody));
 check("detail: WLFI-frontend account named", /WLFI frontend account/.test(detailBody));
 check("detail: real balances render (USDC + USD1 supplies)", /USDC/.test(detailBody) && /USD1/.test(detailBody));
-check("detail: timeline renders real events", /Deposit/.test(detailBody) && /Withdraw/.test(detailBody));
+// The timeline's head reads as past participles (rails-ops decision 0045).
+check("detail: timeline renders real events", /Deposited/.test(detailBody) && /Withdrew/.test(detailBody));
 check(
   "detail: the margin lane landed (requirement stated)",
   /117\.65%|111\.11%/.test(detailBody),

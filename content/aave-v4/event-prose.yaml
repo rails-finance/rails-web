@@ -252,6 +252,31 @@ words:
     borrowed {symbol}
   act_repay: |-
     repaid {symbol}
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle, the legs in order where a supply also turned the
+  # reserve on as collateral, each after the middle dot. Read through
+  # AAVE_V4_HEAD_WORDS (lib/aave-v4/event-templates.ts). The spine carries the
+  # figures.
+  t1_sep: |-
+    ·
+  t1_supplied: |-
+    Supplied
+  t1_withdrew: |-
+    Withdrew
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_liquidated: |-
+    Liquidated
+  t1_enabled: |-
+    Enabled as collateral
+  t1_disabled: |-
+    Disabled as collateral
+  t1_leg_seized: |-
+    seized
+  t1_leg_repaid: |-
+    repaid
 
 position_words:
   heading_holdings: |-

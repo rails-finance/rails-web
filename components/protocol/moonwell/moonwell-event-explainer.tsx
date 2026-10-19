@@ -14,7 +14,12 @@ import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
 import { useMoonwellCoords } from "@/lib/moonwell/deployment-context";
-import { moonwellEventProse, moonwellExplanationRuns, type MoonwellEchoKey } from "@/lib/moonwell/event-prose";
+import {
+  moonwellEventProse,
+  moonwellExplanationRuns,
+  type MoonwellEchoKey,
+  type MoonwellEventProse,
+} from "@/lib/moonwell/event-prose";
 import { MOONWELL_WORDS } from "@/lib/moonwell/event-templates";
 import {
   assetsDeltaProv,
@@ -82,13 +87,35 @@ function echoFor(key: MoonwellEchoKey, ctx: MoonwellContext, coords: MoonwellCoo
   }
 }
 
+/** The explanation draws its groups' headings. */
+export const isGroupedMoonwellExplanation = (prose: MoonwellEventProse) => prose.L4.some((s) => s.group);
+
+/** The card's teaser: the first sentence, which the event page states as its
+ *  title. A grouped explanation has none. */
+export function MoonwellExplainerTeaser({
+  ctx,
+  coords,
+  prose,
+}: {
+  ctx: MoonwellContext;
+  coords: MoonwellCoords;
+  prose: MoonwellEventProse;
+}) {
+  const lead = prose.L4[0];
+  return lead ? <ProseSentenceText s={lead} echo={(key) => echoFor(key, ctx, coords)} /> : null;
+}
+
 export function MoonwellEventExplainer({ ctx, txHash, blockNumber, wallet, externalBy }: MoonwellEventExplainerProps) {
   const coords = useMoonwellCoords({ market: ctx.market, symbol: ctx.marketSymbol, txHash, blockNumber, wallet });
   const prose = moonwellEventProse({ ctx, externalBy, mtoken: coords.mtoken, marketLabel: coords.marketLabel });
   const echo = (key: MoonwellEchoKey) => echoFor(key, ctx, coords);
+  const sentence = (s: MoonwellEventProse["L4"][number]) => <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+  // Ungrouped, the card's teaser states the first sentence and the pane the
+  // rest.
+  if (!isGroupedMoonwellExplanation(prose)) return <ProseExplainer items={prose.L4.slice(1).map(sentence)} />;
   const items = moonwellExplanationRuns(prose).flatMap((run) =>
     run.sentences.map((s) => {
-      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+      const node = sentence(s);
       return run.heading ? { group: run.heading, node } : node;
     }),
   );

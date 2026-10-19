@@ -295,6 +295,45 @@ words:
     The share of the {symbol} posted that counts toward the borrowing limit, from the Comet's asset settings.
   tip_liquidate_factor: |-
     The share of the {symbol} posted that counts toward the liquidation line, from the Comet's asset settings.
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle, the legs in order where a base row crosses zero,
+  # then at most one clause for what the spine cannot show, each after the
+  # middle dot. Read through COMPOUND_HEAD_WORDS (lib/compound/event-templates.ts).
+  # The spine carries the figures.
+  t1_sep: |-
+    ·
+  t1_supplied: |-
+    Supplied
+  t1_withdrew: |-
+    Withdrew
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_added_coll: |-
+    Added collateral
+  t1_withdrew_coll: |-
+    Withdrew collateral
+  t1_zero_amount: |-
+    Zero amount
+  t1_liquidated: |-
+    Liquidated
+  t1_debt_absorbed: |-
+    Debt absorbed
+  t1_coll_absorbed: |-
+    Collateral absorbed
+  t1_transferred: |-
+    Transferred
+  t1_to: |-
+    to
+  t1_from: |-
+    from
+  t1_leg_sent: |-
+    transferred out
+  t1_leg_received: |-
+    transferred in
+  t1_leg_absorbed: |-
+    absorbed
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk and History when two of them hold two or more bullets

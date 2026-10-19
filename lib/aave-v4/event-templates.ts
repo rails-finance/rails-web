@@ -40,6 +40,20 @@ export const PROSE = eventProseEngine<AaveV4L5Key, AaveV4EchoKey>(FILE, { doc: F
 /** Words the generator puts into a sentence. */
 export const V4_WORDS = FILE.words;
 
+/** The timeline head's words (lib/aave-v4/event-label.ts). */
+export const AAVE_V4_HEAD_WORDS = {
+  sep: V4_WORDS.t1_sep,
+  supplied: V4_WORDS.t1_supplied,
+  withdrew: V4_WORDS.t1_withdrew,
+  borrowed: V4_WORDS.t1_borrowed,
+  repaid: V4_WORDS.t1_repaid,
+  liquidated: V4_WORDS.t1_liquidated,
+  enabled: V4_WORDS.t1_enabled,
+  disabled: V4_WORDS.t1_disabled,
+  legSeized: V4_WORDS.t1_leg_seized,
+  legRepaid: V4_WORDS.t1_leg_repaid,
+};
+
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 
 /** A position_words string as written, for a bullet that draws its {name}s as

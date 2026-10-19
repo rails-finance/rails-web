@@ -10,7 +10,10 @@ import type { FluidContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { FluidLedgerProvider } from "./fluid-ledger";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventPageContext } from "@/components/shared/event-page-aside";
+import { useContext } from "react";
+import { FLUID_HEAD_WORDS, fluidT1Caption } from "@/lib/fluid/head-words";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type FluidCoords } from "@/lib/fluid/event-provenance";
@@ -108,8 +111,22 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
             ? [{ ...debtRow, direction: DIRECTION[ctx.eventType] }]
             : undefined;
 
+  // A liquidation's per-position impact, the collateral seized below the debt
+  // cleared: the warning node's flank carries it.
+  const warningLegs = ((): SpineWarningLeg[] | undefined => {
+    if (!isLiq) return undefined;
+    const legs: SpineWarningLeg[] = [];
+    const seized = Number(ctx.liqSupplyBefore ?? "0") - Number(ctx.liqSupplyAfter ?? "0");
+    const cleared = Number(ctx.liqBorrowBefore ?? "0") - Number(ctx.liqBorrowAfter ?? "0");
+    if (Number.isFinite(seized) && seized > 0)
+      legs.push({ label: FLUID_HEAD_WORDS.legSeized, value: seized, symbol: supplySym, address: colRow.address });
+    if (Number.isFinite(cleared) && cleared > 0)
+      legs.push({ label: FLUID_HEAD_WORDS.legCleared, value: cleared, symbol: borrowSym, address: debtRow.address });
+    return legs;
+  })();
+
   const spine: SpineColumnProps = isLiq
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
     : ctx.eventType === "mint"
       ? { icon: "mint", isLast: !!isLast }
       : ctx.eventType === "transfer"
@@ -121,13 +138,20 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
   // T1's word, which the phone spine view's caption repeats. A hop of an NFT
   // round trip inside one transaction says so at T1; the explainer states the
   // holder it left and came back to.
+  const roundTrip = transferRoundTrip(sibs, event) != null;
   const headLabel = openedBy
     ? "Open"
-    : transferRoundTrip(sibs, event)
+    : roundTrip
       ? "Ownership transfer · round trip in this transaction"
       : event.actionLabel;
 
+  // The timeline's head is words (decision 0045); the event page's card keeps
+  // the head its title states.
+  const page = useContext(EventPageContext) != null;
   const head = useFluidHeadSpec({
+    mode: page ? "title" : "row",
+    opened: openedBy != null,
+    roundTrip,
     actionLabel: headLabel,
     ctx,
     timestamp: event.timestamp,
@@ -178,7 +202,7 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
     },
     spine,
     head,
-    caption: headLabel,
+    caption: page ? headLabel : fluidT1Caption(ctx, headLabel, { opened: openedBy != null, roundTrip }),
     actor: {
       by: extBy ?? (ctx.eventType === "liquidated" ? ctx.liquidator : undefined) ?? undefined,
       // The transaction-sender test, the NFT's mint and transfer among the

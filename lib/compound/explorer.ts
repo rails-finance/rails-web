@@ -11,6 +11,10 @@ import { COMPOUND_DEPLOYMENT, marketOf, type CometMarket } from "@/lib/compound/
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 import { compoundAbsorbSplit, compoundRowLabel } from "@/lib/compound/row-facts";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { externalActor } from "@/lib/shared/external-actor";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { isCompoundBulker } from "@/lib/compound/bulkers";
+import { compoundEventProse, type CompoundEvent } from "@/lib/compound/event-prose";
 
 export type CompoundDeployment = "ethereum" | "base";
 
@@ -61,6 +65,36 @@ export function compoundEventTitle(event: BaseActivityEvent, deployment: Compoun
 /** The event's heading: the title in words. Also read on the server. */
 export function compoundEventHeading(event: BaseActivityEvent, deployment: CompoundDeployment): string {
   return eventTitleWords(compoundEventTitle(event, deployment));
+}
+
+/** The browser title's last words (rails-ops decision 0045, "Ruled since"):
+ *  the Explanation's first sentence, which the card's teaser and the page's
+ *  h1 state, else the heading. `events`: the timeline's events, for the
+ *  absorb-leg seam. Read on the server. */
+export function compoundEventTabWords(
+  event: BaseActivityEvent,
+  deployment: CompoundDeployment,
+  events: readonly BaseActivityEvent[],
+): string {
+  if (!isCompoundEvent(event)) return compoundEventHeading(event, deployment);
+  const ctx = event.context.data;
+  const self = event as CompoundEvent;
+  const siblings = events.filter((e): e is CompoundEvent => e.txHash === event.txHash && isCompoundEvent(e));
+  // The card's external test (compoundExternal), with no smart-account read.
+  const chainId = deployment === "base" ? BASE_CHAIN_ID : MAINNET_CHAIN_ID;
+  const actor =
+    ctx.eventType === "supply" || ctx.eventType === "supply_collateral"
+      ? externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.funder }, event.wallet)
+      : null;
+  const { L4 } = compoundEventProse({
+    ctx,
+    market: cometOf(ctx.market, deployment),
+    siblings: siblings.length > 0 ? siblings : [self],
+    self,
+    external:
+      actor && ctx.funder ? { actor, smartAccount: false, bulker: isCompoundBulker(ctx.funder, chainId) } : null,
+  });
+  return L4[0]?.text ?? compoundEventHeading(event, deployment);
 }
 
 /** The page's metadata description, also read on the server. */
