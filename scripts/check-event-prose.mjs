@@ -411,6 +411,7 @@ const FAMILIES = {
       "lib/morpho/event-prose.ts",
       "lib/morpho/event-templates.ts",
       "components/protocol/morpho/morpho-event-explainer.tsx",
+      "lib/morpho/head-words.ts",
       "components/protocol/morpho/morpho-position-explanation.tsx",
       "components/protocol/morpho/morpho-sheet.ts",
     ],

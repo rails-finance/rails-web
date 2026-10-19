@@ -193,6 +193,27 @@ group_words:
 
 # ── Words the code puts into a sentence ──
 words:
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle. Read by lib/morpho/head-words.ts. The spine carries
+  # the figures.
+  t1_supplied: |-
+    Supplied
+  t1_withdrew: |-
+    Withdrew
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_added_coll: |-
+    Added collateral
+  t1_withdrew_coll: |-
+    Withdrew collateral
+  t1_liquidated: |-
+    Liquidated
+  t1_leg_seized: |-
+    seized
+  t1_leg_cleared: |-
+    cleared
   tx_one: |-
     transaction
   tx_many: |-

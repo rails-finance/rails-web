@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
-import { morphoEventHeading, morphoEventPageDescription } from "@/lib/morpho/explorer";
+import { morphoEventPageDescription, morphoEventPageTitle } from "@/lib/morpho/explorer";
 import { loadMorphoPositionTail } from "@/lib/morpho/position-page-data";
 import MorphoPositionPage from "../../page";
 
@@ -41,7 +41,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     session: "morpho",
     subject: user,
     canonicalPath: `/ethereum/morpho/${positionId}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: morphoEventHeading(event), timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: morphoEventPageTitle(event), timestamp: event.timestamp } : null,
     description: event ? morphoEventPageDescription("ethereum", user, event.timestamp) : undefined,
   });
 }

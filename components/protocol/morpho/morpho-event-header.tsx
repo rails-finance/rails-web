@@ -1,9 +1,16 @@
 "use client";
 
 // Morpho event header (chain-state tier): the card's `head` slot, drawn by the
-// shared ChainTruthRow. Maps the single signed amount this event moved (loan or collateral
-// side) into the shared row spec; traces via <Prov>. No health factor, no USD —
-// those are layers, absent from the baseline.
+// shared ChainTruthRow.
+//
+// The timeline's head (mode "row", rails-ops decision 0045) is words: the
+// past-participle kind (`morphoT1Kind`, lib/morpho/head-words.ts) and the pink
+// "by" chip where another account acted. The spine carries the figures.
+//
+// The event page's card (mode "title") maps the single signed amount this
+// event moved (loan or collateral side) into the shared row spec; traces via
+// <Prov>. No health factor, no USD: those are layers, absent from the
+// baseline.
 
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -17,6 +24,7 @@ import {
 import { formatNumber } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
+import { morphoT1Kind } from "@/lib/morpho/head-words";
 
 export interface MorphoEventHeaderProps {
   actionLabel: string;
@@ -33,6 +41,9 @@ export interface MorphoEventHeaderProps {
    *  table cannot name most of what lists here and a symbol-only chip draws
    *  the initial letter. The flow carries the contract the transfer touched. */
   flows?: AssetFlow[];
+  /** "row": the timeline's head, in words; "title" (default): the event
+   *  page's card, with the figures. */
+  mode?: "row" | "title";
 }
 
 /** T1's head row spec (the card's `head` slot). */
@@ -44,6 +55,7 @@ export function useMorphoHeadSpec({
   externalBy,
   wallet,
   flows,
+  mode = "title",
 }: Omit<MorphoEventHeaderProps, "timestamp" | "eventNumber">): ChainTruthRowSpec {
   const coords: MorphoCoords = {
     txHash,
@@ -79,19 +91,29 @@ export function useMorphoHeadSpec({
       debtSide: true,
     });
 
+  const externalActor =
+    externalBy && wallet && ctx.txFrom && ctx.caller
+      ? {
+          address: externalBy,
+          prov: externalActorProv(
+            { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+            coords,
+          ),
+        }
+      : undefined;
+
+  if (mode === "row")
+    return {
+      label: morphoT1Kind(ctx.eventType),
+      critical: ctx.eventType === "liquidation",
+      deltas: [],
+      externalActor,
+    };
+
   return {
     label: actionLabel,
     critical: ctx.eventType === "liquidation",
     deltas,
-    externalActor:
-      externalBy && wallet && ctx.txFrom && ctx.caller
-        ? {
-            address: externalBy,
-            prov: externalActorProv(
-              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-              coords,
-            ),
-          }
-        : undefined,
+    externalActor,
   };
 }
