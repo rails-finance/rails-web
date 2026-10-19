@@ -392,7 +392,7 @@ export function DelegateAdjustRunCard({
   );
   // The collector mounts under whichever tab is open, so the sheet's figures
   // reach the bullets on the default tab.
-  const explainer = groupExplainer(bullets, true, collector);
+  const explainer = groupExplainer(bullets, collector);
 
   return (
     <GroupFrame

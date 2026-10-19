@@ -504,7 +504,6 @@ export function TimelineRunCard({
   // members are read and the sheet's sides reach the bullets while it is open.
   const explainer = groupExplainer(
     bullets,
-    saidLegs.length > 0,
     <>
       {hasSums && collector}
       {hasSums && onOpen && !members && <AskMembers onOpen={onOpen} askedRef={askedRef} />}
@@ -677,7 +676,6 @@ export const GROUP_EXPLANATION_WORDS = {
   wentFrom: "went from",
   to: "to",
   side: { collateral: "The collateral", debt: "The debt" } as Record<FlowSide, string>,
-  note: "Open the group for each event and its receipt.",
   moreSums: (n: number) => `The Figures tab has the other ${n.toLocaleString("en-US")} sums.`,
   /** A header verb that is a participle, in the past tense a sentence takes. */
   pastTense: { withdrawn: "withdrew", "written off": "wrote off", "debt cleared": "cleared" } as Record<string, string>,
@@ -732,12 +730,11 @@ export function sheetSideBullets(sheet: EventSheet | undefined, covered: Set<str
 }
 
 /** A group's Explanation in the shell's slot: the first bullet as the teaser
- *  (`data-group-sentence`), the rest under it, at most five, with the note on
- *  where the members are when `note` and there is room. `extra` mounts in the
- *  body and draws nothing (the sheet's collector). */
-export function groupExplainer(bullets: ReactNode[], note: boolean, extra?: ReactNode) {
-  const all = note && bullets.length < MAX_BULLETS ? [...bullets, GROUP_EXPLANATION_WORDS.note] : bullets;
-  const [first, ...rest] = all.slice(0, MAX_BULLETS);
+ *  (`data-group-sentence`), the rest under it, at most five. It explains the
+ *  position and carries no interface hint (Miles, 19 Oct 2026). `extra` mounts
+ *  in the body and draws nothing (the sheet's collector). */
+export function groupExplainer(bullets: ReactNode[], extra?: ReactNode) {
+  const [first, ...rest] = bullets.slice(0, MAX_BULLETS);
   return {
     first: <span data-group-sentence="">{first}</span>,
     body: (
