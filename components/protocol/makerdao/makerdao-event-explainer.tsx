@@ -5,8 +5,10 @@
 // content/makerdao/event-prose.yaml), one bullet each, under the three event
 // headings when two of them hold two or more bullets. Each figure the header
 // or the detail grid also prints echoes that receipt. The pane reads the ilk
-// at the row's block when it opens, which can add a sentence, so the card
-// passes the body alone and no teaser.
+// at the row's block when it opens, which can add a sentence, so a timeline
+// card passes the body alone and no teaser. The event page's card passes the
+// first sentence as its title (`MakerExplainerLead`, rails-ops decision 0045,
+// "Ruled since") and the pane opens on the second (`leadOnTitle`).
 
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
@@ -27,6 +29,9 @@ export interface MakerDAOEventExplainerProps {
   eventId?: string;
   txHash?: string;
   blockNumber?: number;
+  /** The event page states the first sentence as its title: the pane leaves
+   *  it out. */
+  leadOnTitle?: boolean;
 }
 
 /** What the page holds about one row (lib/makerdao/vault-history.tsx), as the
@@ -95,15 +100,31 @@ function echoFor(key: MakerEchoKey, ctx: MakerDAOContext, coords: MakerCoords): 
   }
 }
 
-export function MakerDAOEventExplainer({ ctx, eventId, txHash, blockNumber }: MakerDAOEventExplainerProps) {
+/** The Explanation's first sentence as printed (the first run's first), for
+ *  the event page's title. */
+export function MakerExplainerLead({ ctx, eventId, txHash, blockNumber }: MakerDAOEventExplainerProps) {
+  const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
+  const extras = useMakerRowExtras(ctx, eventId, txHash, blockNumber);
+  const lead = makerExplanationRuns(makerEventProse({ ctx, extras }))[0]?.sentences[0];
+  return lead ? <ProseSentenceText s={lead} echo={(key: MakerEchoKey) => echoFor(key, ctx, coords)} /> : null;
+}
+
+export function MakerDAOEventExplainer({
+  ctx,
+  eventId,
+  txHash,
+  blockNumber,
+  leadOnTitle,
+}: MakerDAOEventExplainerProps) {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const extras = useMakerRowExtras(ctx, eventId, txHash, blockNumber);
   const prose = makerEventProse({ ctx, extras });
   const echo = (key: MakerEchoKey) => echoFor(key, ctx, coords);
-  const items = makerExplanationRuns(prose).flatMap((run) =>
-    run.sentences.map((s) => {
+  const items = makerExplanationRuns(prose).flatMap((run, r) =>
+    run.sentences.flatMap((s, i) => {
+      if (leadOnTitle && r === 0 && i === 0) return [];
       const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
-      return run.heading ? { group: run.heading, node } : node;
+      return [run.heading ? { group: run.heading, node } : node];
     }),
   );
   return <ProseExplainer items={items} />;

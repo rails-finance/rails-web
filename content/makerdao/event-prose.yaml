@@ -278,6 +278,44 @@ words:
     left for another vault
   fork_in: |-
     arrived from another vault
+  # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
+  # as a past participle in Rails's words (the Vat's lock, free, draw and
+  # wipe read as the legs), then at most one clause after the middle dot.
+  # Read by lib/makerdao/head-words.ts. The spine carries the figures.
+  t1_sep: |-
+    ·
+  t1_opened: |-
+    Opened vault
+  t1_adjusted: |-
+    Adjusted vault
+  t1_added_coll: |-
+    Added collateral
+  t1_withdrew_coll: |-
+    Withdrew collateral
+  t1_borrowed: |-
+    Borrowed
+  t1_repaid: |-
+    Repaid
+  t1_liquidated: |-
+    Liquidated
+  t1_moved_out: |-
+    Moved to another vault
+  t1_moved_in: |-
+    Moved from another vault
+  t1_transferred: |-
+    Transferred
+  t1_to: |-
+    to
+  t1_auction_started: |-
+    Auction started
+  t1_auction_sale: |-
+    Sold at auction
+  t1_auction_settled: |-
+    Auction settled
+  t1_leg_seized: |-
+    seized
+  t1_leg_cleared: |-
+    cleared
   # The balance sheet's read-more, one per row: what the figure is and where it is read.
   tip_coll_last: |-
     The vault's {coll_symbol} after its previous event, from the Vat's log.

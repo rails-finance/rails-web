@@ -351,6 +351,7 @@ const FAMILIES = {
       "components/protocol/makerdao/makerdao-event-explainer.tsx",
       "components/protocol/makerdao/makerdao-position-explanation.tsx",
       "components/protocol/makerdao/makerdao-sheet.tsx",
+      "lib/makerdao/head-words.ts",
     ],
     nodes: {
       section: "position_words",
