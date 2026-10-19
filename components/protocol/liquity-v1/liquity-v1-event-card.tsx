@@ -15,6 +15,7 @@ import { useLiquityV1Sheet } from "./liquity-v1-sheet";
 import { liquityV1HeadSpec, liquityV1Legs } from "./liquity-v1-event-header";
 import { EventPageContext } from "@/components/shared/event-page-aside";
 import { liquityV1T1Caption, liquityV1T1Words } from "@/lib/liquity-v1/head-words";
+import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { LIQUITY_V1_CELL_HEADS, useLiquityV1Opened } from "./liquity-v1-event-detail";
 import { LiquityV1EventExplainer, liquityV1LearnMoreContent } from "./liquity-v1-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -129,8 +130,11 @@ export function LiquityV1EventCard({
     active,
   });
   // The timeline's head is words (decision 0045); the event page's title is
-  // the Explanation's first sentence, the pane opening on the second.
+  // the Explanation's first sentence, the pane opening on the second. A full
+  // redemption's head states its surplus, claimable or claimed: the page's
+  // CollSurplusPool read says which.
   const page = useContext(EventPageContext) != null;
+  const surplusClaimed = useSurplusClaimFor(event.txHash);
   const explainerProps = {
     ctx,
     txHash: event.txHash,
@@ -148,8 +152,8 @@ export function LiquityV1EventCard({
       number: eventNumber,
     },
     spine,
-    head: liquityV1HeadSpec(event.actionLabel, ctx, coords, page ? "title" : "row"),
-    caption: page ? event.actionLabel : liquityV1T1Caption(liquityV1T1Words(ctx)),
+    head: liquityV1HeadSpec(event.actionLabel, ctx, coords, page ? "title" : "row", { surplusClaimed }),
+    caption: page ? event.actionLabel : liquityV1T1Caption(liquityV1T1Words(ctx, { surplusClaimed })),
     // Collateral, Debt and Collateral ratio; V1 has no interest rate. The
     // figures, the price row and the notes are built once the card opens.
     cells: { pending: LIQUITY_V1_CELL_HEADS },
