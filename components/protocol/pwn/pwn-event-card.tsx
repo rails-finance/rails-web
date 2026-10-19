@@ -14,7 +14,8 @@ import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { rowRepay, type PwnCoords } from "@/lib/pwn/event-provenance";
 import { pwnExplainerTeaser, type PwnEvent } from "@/lib/pwn/explainer-clauses";
-import { fullAmount, usePwnHeadSpec } from "./pwn-event-header";
+import { fullAmount, pwnExtendedTo, usePwnHeadSpec } from "./pwn-event-header";
+import { PWN_HEAD_WORDS, pwnT1Caption, pwnT1Words } from "@/lib/pwn/head-words";
 import { usePwnCells } from "./pwn-cells";
 import { PwnEventExplainer, pwnLearnMoreContent } from "./pwn-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -130,21 +131,29 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings, creation }:
           ? ("extend" as const)
           : undefined;
 
+  // A default's claim: the collateral passed to the lender, on the warning
+  // node's flank. For an NFT the amount is a unit count (1).
   const spine: SpineColumnProps = isSeizure
-    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    ? {
+        icon: "warning",
+        warningTone: "critical",
+        warningLegs: ctx.collateralSymbol
+          ? [
+              {
+                label: PWN_HEAD_WORDS.legClaimed,
+                value: Number(ctx.collateralAmount ?? "1") || 1,
+                symbol: ctx.collateralSymbol,
+                address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+              },
+            ]
+          : undefined,
+        isLast: !!isLast,
+      }
     : lifecycleIcon
       ? { icon: lifecycleIcon, isLast: !!isLast }
       : { tokens, isLast: !!isLast };
 
-  const head = usePwnHeadSpec({
-    actionLabel: event.actionLabel,
-    ctx,
-    timestamp: event.timestamp,
-    txHash: event.txHash,
-    blockNumber: event.blockNumber,
-    eventNumber,
-    flows: event.flows,
-  });
+  const head = usePwnHeadSpec({ ctx, txHash: event.txHash, blockNumber: event.blockNumber });
   const body = usePwnCells({
     ctx,
     txHash: event.txHash,
@@ -167,7 +176,7 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings, creation }:
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption: pwnT1Caption(pwnT1Words(ctx), pwnExtendedTo(ctx)),
     // The transaction-sender test (ui-jobs 304).
     actor: { sent: { txFrom: ctx.txFrom, owner: event.wallet } },
     cells: body.cells,

@@ -179,7 +179,7 @@ function expectedProse(e) {
   const net = mrColl(e) * price - mrDebt(e);
   return {
     net,
-    text: `netted ${fmtFullLike(net)} USDp ${net < 0 ? "against the holder" : "in the holder's favour"} at this block's pETH price`,
+    text: `netted ${fmtFullLike(net)} USDp ${net < 0 ? "against the holder" : "for the holder"} since the previous touch at this block's price`,
   };
 }
 

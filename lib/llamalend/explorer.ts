@@ -6,7 +6,10 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isLlamalendEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
+import { eventTitleWords, kindTitle, type EventTitle } from "@/lib/shared/event-title";
+import { llamalendT1Caption, llamalendT1Words } from "@/lib/llamalend/head-words";
+import { llamalendExplainerTeaser } from "@/lib/llamalend/explainer-clauses";
+import { firstSentenceText } from "@/lib/llamalend/sentence-text";
 import type { LlamalendLoanMark } from "@/lib/llamalend/event-figures";
 
 const WORDS = {
@@ -39,40 +42,30 @@ export interface LlamalendEventPageInput extends EventPageSlot {
   loanMark?: LlamalendLoanMark | null;
 }
 
-/** The event's title: T1's word and the amounts its head states. A
- *  liquidation states the collateral and debt it moved; any other row the
- *  verbs on each axis, led by Open on a loan's first row and Close on a repay
- *  that clears the debt. `mark` is the page's read of which row opens or closes
- *  a loan; where the server has none, the row's own flags decide. Also read on
+/** The event's title where the card has no teaser: T1's words (rails-ops
+ *  decision 0045). `mark` is the page's read of which row opens or closes a
+ *  loan; where the server has none, the row's own flags decide. Also read on
  *  the server. */
 export function llamalendEventTitle(event: BaseActivityEvent, mark?: LlamalendLoanMark | null): EventTitle {
-  if (!isLlamalendEvent(event)) return makeEventTitle(event, event.actionLabel, []);
-  const ctx = event.context.data;
-  const coll = Number(ctx.collateralDelta ?? "0") || 0;
-  const debt = Number(ctx.debtDelta ?? "0") || 0;
-  if (ctx.eventType === "liquidation")
-    return makeEventTitle(event, event.actionLabel, [
-      { value: coll, symbol: ctx.collateralSymbol },
-      { value: debt, symbol: ctx.borrowedSymbol },
-    ]);
-  const opens = mark ? mark.opens : !!ctx.isOpen;
-  const closes = mark
-    ? mark.closes
-    : ctx.eventType === "repay" && ctx.debtAfter != null && Number(ctx.debtAfter) <= 1e-12;
-  const title = makeEventTitle(event, opens ? "Open" : closes ? "Close" : "", [
-    {
-      value: coll,
-      symbol: ctx.collateralSymbol,
-      label: coll > 0 ? (opens ? "Deposit" : "Add") : "Withdraw",
-    },
-    { value: debt, symbol: ctx.borrowedSymbol, label: debt > 0 ? "Borrow" : "Repay" },
-  ]);
-  return title.kind || title.amounts.length > 0 ? title : { ...title, kind: event.actionLabel };
+  if (!isLlamalendEvent(event)) return kindTitle(event.actionLabel);
+  return kindTitle(llamalendT1Caption(llamalendT1Words(event.context.data, mark)));
 }
 
-/** The event's heading: the title in words. Also read on the server. */
+/** The event's heading, the browser title's last words: the Explanation's
+ *  first sentence, as the page's h1 states it, else T1's words. Also read on
+ *  the server. */
 export function llamalendEventHeading(event: BaseActivityEvent, mark?: LlamalendLoanMark | null): string {
-  return eventTitleWords(llamalendEventTitle(event, mark));
+  if (!isLlamalendEvent(event)) return event.actionLabel;
+  const ctx = event.context.data;
+  const coords = {
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    controller: ctx.controller,
+    user: event.wallet,
+  };
+  return (
+    firstSentenceText(llamalendExplainerTeaser(ctx, coords, mark)) ?? eventTitleWords(llamalendEventTitle(event, mark))
+  );
 }
 
 /** The page's metadata description, also read on the server. */

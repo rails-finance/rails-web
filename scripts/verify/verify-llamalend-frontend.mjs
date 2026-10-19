@@ -511,12 +511,12 @@ try {
   // a warning about: gate on chrome, not on explanation. The header button is
   // the row itself and is the thing the checks below are about.
   await page
-    .getByRole("button", { name: /^(Self-)?[Ll]iquidation/ })
+    .getByRole("button", { name: /^(Liquidated|(Closed loan|Repaid) · Self-liquidation)/ })
     .first()
     .waitFor({ timeout: 120000 });
   body = await page.textContent("body");
   check("liq detail: closed/liquidated card renders (no false OPEN)", /LIQUIDATED|CLOSED/.test(body));
-  check("liq detail: hard-liquidation row renders with 'liquidated by' chip", /liquidated by/.test(body));
+  check("liq detail: hard-liquidation row reads Liquidated with the 'by' chip", /Liquidated\s*by 0x/.test(body));
   check("liq detail: SELF-liquidation renders as its own label", /Self-liquidation/.test(body));
   // Assert absence of the caption open cards DO render — "soft-liquidation
   // begins" no longer renders anywhere, so testing for it was vacuously green.
@@ -528,7 +528,7 @@ try {
   // liquidation-family row so both the partial hard-liq and the self-liq
   // explainers are in the DOM.
   {
-    const liqHeaders = page.getByRole("button", { name: /^(Self-)?[Ll]iquidat/ });
+    const liqHeaders = page.getByRole("button", { name: /^(Liquidated|(Closed loan|Repaid) · Self-liquidation)/ });
     const n = await liqHeaders.count();
     for (let i = 0; i < n; i++) {
       await liqHeaders
@@ -590,12 +590,13 @@ try {
     waitUntil: "networkidle",
     timeout: 180000,
   });
-  // The row reads "Add ◊": the collateral verb alone, no Borrow beside it.
-  await page.waitForSelector("text=/^Add$/", { timeout: 120000 });
-  const addRow = await page.locator("text=/^Add$/").first().locator("xpath=..").textContent();
+  // The row reads "Added collateral" alone, no "Borrowed" beside it (decision
+  // 0045: the head is words).
+  await page.waitForSelector("text=/^Added collateral$/", { timeout: 120000 });
+  const addRow = await page.locator("text=/^Added collateral$/").first().locator("xpath=..").textContent();
   check(
-    "add-collateral: the row reads Add with no Borrow verb (never a zero Borrow)",
-    !/Borrow/.test(addRow ?? ""),
+    "add-collateral: the row reads Added collateral with no Borrowed (never a zero borrow)",
+    !/Borrowed/.test(addRow ?? ""),
     addRow ?? "",
   );
 
@@ -734,7 +735,7 @@ try {
     /from those sales is on the collateral bar: received, spent, withdrawn or seized/.test(body),
   );
   check("inband: mint market line on the card", /This is a mint market/.test(body));
-  check("inband: opening row reads Open · Deposit · Borrow", /Open\s*Deposit\s*Borrow/.test(body));
+  check("inband: opening row reads Opened loan", /Opened loan/.test(body));
   check(
     "inband: heading states the start date, no freshness",
     /Active since \d{1,2} [A-Z][a-z]{2} '\d\d/.test(body) && !/last activity \d+ days ago/.test(body),

@@ -3,6 +3,8 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
 import { loadLlamalendPositionTail } from "@/lib/llamalend/position-page-data";
 import { llamalendEventHeading, llamalendEventPageDescription } from "@/lib/llamalend/explorer";
+import { llamalendLoanMarks } from "@/lib/llamalend/event-figures";
+import { isLlamalendEvent } from "@/lib/shared/types/event-shape";
 import LlamalendPositionPage from "../../page";
 
 interface Props {
@@ -26,11 +28,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const user = normalizeAddressParam(rawUser ?? "");
   const tail = controller && user ? await loadLlamalendPositionTail(controller, user) : null;
   const event = tail?.events?.find((e) => e.id === decoded) ?? null;
+  // Which row opens or closes a loan, read over the whole history only, as the
+  // page reads it: the title is the Explanation's first sentence.
+  const marks =
+    tail?.events && tail.cutoffBlock == null ? llamalendLoanMarks(tail.events.filter(isLlamalendEvent)) : null;
   return eventMetadata({
     session: "llamalend",
     subject: rawUser,
     canonicalPath: `/ethereum/llamalend/${rawController}/${rawUser}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: llamalendEventHeading(event), timestamp: event.timestamp } : null,
+    event: event
+      ? { actionLabel: llamalendEventHeading(event, marks?.get(event.id)), timestamp: event.timestamp }
+      : null,
     description: event && user ? llamalendEventPageDescription(event, user) : undefined,
   });
 }

@@ -8,6 +8,7 @@ import { formatDateLong } from "@/lib/date";
 import { isLiquityV1Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { eventTitleWords, makeEventTitle, type EventTitle, type EventTitleAmount } from "@/lib/shared/event-title";
 import { COLL_VERB, DEBT_VERB } from "@/lib/shared/liquity-fork-ops";
+import { liquityV1EventProse } from "@/lib/liquity-v1/event-prose";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
 import {
   LIQUIDATION_COLL_VERB,
@@ -105,8 +106,15 @@ export function liquityV1EventTitle(event: BaseActivityEvent): EventTitle {
   return isAdjust && title.amounts.length > 0 ? { ...title, kind: "" } : title;
 }
 
-/** The event's heading: the title in words. Also read on the server. */
+/** The event's heading in words, for the browser title. It follows the
+ *  page's h1 (rails-ops decision 0045, "Ruled since"): the Explanation's first
+ *  sentence, else the title in words. Also read on the server. */
 export function liquityV1EventHeading(event: BaseActivityEvent): string {
+  if (isLiquityV1Event(event)) {
+    const ctx = event.context.data;
+    const lead = liquityV1EventProse({ ctx, price: ctx.priceAtBlock?.usd ?? null }).L4[0]?.text;
+    if (lead) return lead;
+  }
   return eventTitleWords(liquityV1EventTitle(event));
 }
 

@@ -40,7 +40,6 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { ALCHEMIX_CAUTION, alchemixHeaderSpec } from "./alchemix-event-header";
-import { chainTruthCaption } from "@/components/shared/chain-truth-event";
 import { useAlchemixDetail } from "./alchemix-event-detail";
 import {
   AlchemixEventExplainer,
@@ -170,7 +169,7 @@ export function AlchemixEventCard({
   const cautioned = closed ? undefined : legs.find((l) => ALCHEMIX_CAUTION.has(l.context.data.eventType));
   const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
 
-  const header = alchemixHeaderSpec(legs, sibs, mytSymbol, coordsFor, before);
+  const { head: header, warningLegs, caption } = alchemixHeaderSpec(legs, sibs, mytSymbol, coordsFor, before);
   const tokens = adverse || cautioned || closed ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
 
   const spine: SpineColumnProps = custodyOnly
@@ -182,7 +181,12 @@ export function AlchemixEventCard({
           // changes the position without the owner acting: caution
           // (color-grammar.md §5), told apart by the pill's word. A
           // liquidation stays critical.
-          { icon: "warning", warningTone: adverse ? "critical" : "caution", isLast: !!isLast }
+          {
+            icon: "warning",
+            warningTone: adverse ? "critical" : "caution",
+            warningLegs: warningLegs.length > 0 ? warningLegs : undefined,
+            isLast: !!isLast,
+          }
         : { tokens, isLast: !!isLast };
 
   const detail = useAlchemixDetail({ legs, mytSymbol, coordsFor });
@@ -198,7 +202,7 @@ export function AlchemixEventCard({
     },
     spine,
     head: header,
-    caption: chainTruthCaption(header) ?? "",
+    caption,
     cells: detail.cells,
     sheet: detail.sheet,
     ledgers: { none: "no flows panel on the Alchemist yet" },

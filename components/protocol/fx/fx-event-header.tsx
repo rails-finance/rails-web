@@ -1,64 +1,63 @@
 "use client";
 
-// f(x) event header — adapter onto the shared ChainTruthRow grammar. Maps the
-// signed amount(s) this event moved into the shared row spec; traces via
-// <Prov>. Collateral on every row is the TOKEN (wstETH / WBTC) — an operate's
-// delta, what a liquidation or rebalance sent to the keeper; the detail grid
-// states the stETH-equivalent. Debt is fxUSD everywhere, never equated to
-// dollars.
+// f(x) event header (T1): the card's `head` slot, drawn by the shared
+// ChainTruthRow. The head is words (rails-ops decision 0045,
+// lib/fx/head-words.ts): the past-participle kind, the legs in leg order, and
+// at most one clause ("Nothing left to take", "Debt written off", a transfer's
+// "to 0x…" chip). The figures are on the spine's flank: an operate's moved
+// amounts, a liquidation's seized collateral and cleared debt, a rebalance's
+// or redemption's change to this position on its block's lead row. A tick's
+// or the pool's totals are in the Explanation. Debt is fxUSD everywhere, never
+// equated to dollars.
 
-import type { AssetFlow, FxContext } from "@/lib/shared/types/event-shape";
-import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
-import {
-  collDeltaProv,
-  debtDeltaProv,
-  liqCollsProv,
-  liqDebtTotalProv,
-  transferPartyProv,
-  fxExternalActorProv,
-  tickRebAmountProv,
-  rowChangeProv,
-  type FxCoords,
-} from "@/lib/fx/event-provenance";
+import type { FxContext } from "@/lib/shared/types/event-shape";
+import { PartyChip, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { transferPartyProv, fxExternalActorProv, type FxCoords } from "@/lib/fx/event-provenance";
 import { fxBlockChange, useFxSocializedReads } from "@/lib/fx/socialized-reads";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
-import { fxLiquidationMoved } from "@/lib/fx/row-figures";
+import { fxT1Words } from "@/lib/fx/head-words";
 
 export interface FxEventHeaderProps {
-  actionLabel: string;
   ctx: FxContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** The verdict-passing third-party signer (fx-event-card's two-fact
    *  predicate) — presence renders the pink external-actor chip. */
   externalBy?: string;
-  /** The event's flows, read for the contract behind each delta's symbol. */
-  flows?: AssetFlow[];
   /** The row's id: a socialized row states the position's change only when it
    *  is its block's first row (lib/fx/socialized-reads.tsx). */
   eventId?: string;
 }
 
+/** A rebalance's, a redemption's or a pool-wide liquidation's change to this
+ *  position: getPosition at block − 1 and at the block, stated on the block's
+ *  first row (the read covers every row in it). `peers`: the position's rows
+ *  in the block. */
+export function useFxRowChange(
+  ctx: FxContext,
+  blockNumber: number | undefined,
+  eventId: string | undefined,
+): { change: { coll: number; debt: number } | null; lead: boolean; peers: number } {
+  const socialized = useFxSocializedReads();
+  const socializedRow = ctx.eventType === "tickRebalance" || (ctx.eventType === "liquidation" && ctx.poolWide === true);
+  if (!socializedRow || blockNumber == null) return { change: null, lead: false, peers: 1 };
+  const lead = eventId != null && socialized?.leads.has(eventId) === true;
+  return {
+    change: lead ? fxBlockChange(socialized?.reads, blockNumber) : null,
+    lead,
+    peers: socialized?.peers?.get(blockNumber) ?? 1,
+  };
+}
+
 /** T1's head row spec (the card's `head` slot). */
 export function useFxHeadSpec({
-  actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
-  flows,
   eventId,
 }: FxEventHeaderProps): ChainTruthRowSpec {
-  const socialized = useFxSocializedReads();
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
-  const tokenSym = meta?.tokenSymbol ?? ctx.poolSymbol;
-  const tokenAddr = meta?.tokenAddress ?? soleFlowAddress(flows, tokenSym);
-  const fxusdAddr = soleFlowAddress(flows, "fxUSD");
   const coords: FxCoords = {
     txHash,
     blockNumber,
@@ -66,149 +65,35 @@ export function useFxHeadSpec({
     poolLabel: ctx.poolSymbol,
     positionId: ctx.positionId,
   };
-  const deltas: ChainTruthDelta[] = [];
-
-  // Opens + owner adjusts (operate events) get V2's per-axis grammar: each axis
-  // its own imperative verb (Deposit/Withdraw collateral, Borrow/Repay fxUSD), so
-  // an open shows a green pill + labeled axes and a combined adjust drops the
-  // merged "Deposit & Borrow" verb. `ctx.isOpen` already rides the context. A
-  // close (emptiesPosition) keeps its "Close Position" label; liquidations,
-  // rebalances and transfers keep their own grammar. No rate pill (no chosen rate).
-  const isOpen = !!ctx.isOpen || !!ctx.reopens;
-  const isAdjust = ctx.eventType === "operate" && !isOpen && !ctx.emptiesPosition;
-  const perAxis = isOpen || isAdjust;
-
   const poolLiq = ctx.eventType === "liquidation" && ctx.poolWide === true;
-  let note: string | undefined;
-  if (ctx.eventType === "liquidation" && !poolLiq && !fxLiquidationMoved(ctx)) note = "nothing left to take";
-  if (ctx.eventType === "tickRebalance" || poolLiq) {
-    // This position's change first: getPosition at block − 1 and at the block,
-    // stated on the block's top row (the read covers every row in it).
-    const lead = blockNumber != null && eventId != null && socialized?.leads.has(eventId) === true;
-    const change = lead ? fxBlockChange(socialized?.reads, blockNumber as number) : null;
-    const peers = blockNumber != null ? (socialized?.peers?.get(blockNumber) ?? 1) : 1;
-    // Kept short: a longer note pushes the date onto a second line at 1280 px.
-    if (peers > 1) note = lead ? `${peers === 2 ? "both" : `all ${peers}`} in this block` : "included above";
-    if (poolLiq && change) {
-      const repaid = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
-      if (-change.debt - repaid > 0.001) note = "debt written off";
-    }
-    const normSym = meta?.normalizedSymbol ?? tokenSym;
-    if (change) {
-      if (Math.abs(change.coll) > 1e-12)
-        deltas.push({
-          value: change.coll,
-          symbol: normSym,
-          address: normSym === tokenSym ? tokenAddr : undefined,
-          prov: rowChangeProv("coll", normSym, coords),
-          noSpineCounterpart: true,
-          readableLabel: true,
-        });
-      if (Math.abs(change.debt) > 1e-12)
-        deltas.push({
-          value: change.debt,
-          symbol: "fxUSD",
-          address: fxusdAddr,
-          prov: rowChangeProv("debt", normSym, coords),
-          noSpineCounterpart: true,
-          readableLabel: true,
-        });
-    }
-  }
-  if (ctx.eventType === "tickRebalance" || poolLiq) {
-    // TICK-level amounts (the whole tick's clear), NOT this position's slice:
-    // drawn muted with the scope word ("Tick cleared 140.58 ◊ · repaid
-    // 249K ♭"), so the position's own change beside them reads first.
-    const scope = ctx.poolWide ? "Pool" : "Tick";
-    const colls = Number(ctx.tickRebColls ?? "0") || 0;
-    if (colls !== 0)
-      deltas.push({
-        value: -colls,
-        symbol: tokenSym,
-        address: tokenAddr,
-        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
-        label: poolLiq ? "Pool liquidated" : ctx.redemption ? "Pool redeemed" : `${scope} cleared`,
-        muted: true,
-        readableLabel: true,
-      });
-    const debt = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
-    if (debt !== 0)
-      deltas.push({
-        value: -debt,
-        symbol: "fxUSD",
-        address: fxusdAddr,
-        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
-        // The collateral delta already scopes the clause; a second scope word
-        // would only repeat it.
-        label: colls !== 0 ? "repaid" : `${scope} repaid`,
-        muted: true,
-        readableLabel: true,
-      });
-  } else if (ctx.eventType === "liquidation") {
-    // Collateral sent to the liquidator — token units.
-    const seized = Number(ctx.liqColls ?? "0") || 0;
-    if (seized !== 0)
-      deltas.push({
-        value: -seized,
-        symbol: tokenSym,
-        address: tokenAddr,
-        prov: liqCollsProv(tokenSym, coords),
-        readableLabel: true,
-      });
-    // The combined debt cleared (fxUSD-side + stable-side), signed negative —
-    // the detail grid splits the two lanes.
-    const debt = Number(ctx.debtDelta ?? "0") || 0;
-    if (debt !== 0)
-      deltas.push({
-        value: debt,
-        symbol: "fxUSD",
-        address: fxusdAddr,
-        prov: liqDebtTotalProv(coords),
-        readableLabel: true,
-      });
-  } else {
-    const coll = Number(ctx.collDelta ?? "0") || 0;
-    if (coll !== 0)
-      deltas.push({
-        value: coll,
-        symbol: ctx.poolSymbol,
-        address: soleFlowAddress(flows, ctx.poolSymbol),
-        prov: collDeltaProv(ctx.poolSymbol, coords),
-        ...(perAxis ? { label: coll > 0 ? "Deposit" : "Withdraw", axisVerb: true } : {}),
-      });
-    const debt = Number(ctx.debtDelta ?? "0") || 0;
-    if (debt !== 0)
-      deltas.push({
-        value: debt,
-        symbol: "fxUSD",
-        address: fxusdAddr,
-        prov: debtDeltaProv(coords),
-        ...(perAxis ? { label: debt > 0 ? "Borrow" : "Repay", axisVerb: true } : {}),
-      });
-  }
+  const { change, lead, peers } = useFxRowChange(ctx, blockNumber, eventId);
+  // Same-block rows state the change once, on the first.
+  const note =
+    peers > 1 ? (lead ? `${peers === 2 ? "both" : `all ${peers}`} in this block` : "included above") : undefined;
+  const repaid = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
+  const writtenOff = poolLiq && change != null && -change.debt - repaid > 0.001;
+  const words = fxT1Words(ctx, { writtenOff });
 
-  // Ownership rows: the new holder as a neutral "to 0x…" chip (a mint's
-  // holder is its first owner).
+  // Ownership rows: the new holder as a neutral "to 0x…" chip, the clause
+  // after "Transferred" (a mint's holder is its first owner). The chip prefix
+  // is a literal, which check:parties maps to its role.
   const transferTo = ctx.eventType === "transfer" ? ctx.transferTo : undefined;
+  const party = transferTo ? { prefix: "to", address: transferTo, prov: transferPartyProv("to", coords) } : undefined;
 
   return {
-    label: ctx.reopens ? "Opened again" : isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
-    status: isOpen ? "open" : undefined,
+    label: words.kind,
+    status: words.status,
     critical: ctx.eventType === "liquidation",
-    // Rebalance rows follow the redemption grammar: the spine's caution
-    // pill carries the action name on desktop, the label becomes a
-    // mobile badge, and the tick-level amounts stay in the header (the
-    // warning spine shows no flanking numbers).
+    // Rebalance rows follow the redemption grammar: the label in the caution
+    // tone, the position's change on the warning node's flank.
     labelOnSpine: ctx.eventType === "tickRebalance" || poolLiq,
-    deltas,
+    deltas: [],
+    clauses: words.clause
+      ? [<span key="clause">{words.clause}</span>]
+      : party
+        ? [<PartyChip key="party" party={party} />]
+        : undefined,
     note,
-    party: transferTo
-      ? {
-          prefix: "to",
-          address: transferTo,
-          prov: transferPartyProv("to", coords),
-        }
-      : undefined,
     externalActor:
       externalBy && ctx.ownerAt && ctx.txFrom
         ? {

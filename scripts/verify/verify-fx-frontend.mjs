@@ -348,7 +348,12 @@ check(
 );
 check("243 r3: dust after liquidation 1", /dust left/.test(p243.text));
 check("243 r3: the card names the position's tick", /in tick #\d+ · find it on the pools page/.test(p243.text));
-check("243 r3: pool figures carry their scope word", /Pool cleared/.test(p243.text) && /Tick cleared/.test(p243.text));
+// The head is words (decision 0045): a tick's or the pool's totals are in the
+// Explanation, none on the row.
+check(
+  "243 r3: rebalance rows read Rebalanced, no tick or pool total in the head",
+  /Rebalanced/.test(p243.text) && !/Pool cleared|Tick cleared/.test(p243.text),
+);
 
 // ── round 3: listing price, path, pools highlight ───────────────────────────
 const pList = await openAndRead("/ethereum/fx");
@@ -378,7 +383,7 @@ check(
     /The protocol kept 0\.000583 stETH, its 10% share of the liquidation bonus/.test(p137.text),
 );
 check("137: the unpaid 1.234 fxUSD is named", /did not cover the last 1\.234 fxUSD of debt/.test(p137.text));
-check("137: the reopened row says so", /Opened again/.test(p137.text) && /Loan 2 of 2/.test(p137.text));
+check("137: the reopened row says so", /Reopened position/.test(p137.text) && /Loan 2 of 2/.test(p137.text));
 check("137: 'seizure is quoted' copy is gone", !/quoted in the pool/.test(p137.text));
 
 const pPools = await openAndRead("/ethereum/fx/pools");
@@ -516,7 +521,10 @@ check(
       p.text,
     ),
   );
-  check("1801 r4 P9: one name for the transfer", /Ownership Transfer/.test(p.text) && !/\nTransferred\n/.test(p.text));
+  check(
+    "1801 r4 P9: one name for the transfer",
+    /Transferred\s*·\s*to 0x/.test(p.text) && !/Ownership Transfer/.test(p.text),
+  );
   // The flows panel's key: funding is the pool's one move here (the tower's
   // note said "Moved by the pool: none" of rebalances and redemptions).
   check(

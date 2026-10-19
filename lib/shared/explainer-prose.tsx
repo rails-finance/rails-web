@@ -140,7 +140,17 @@ export function splitFirstSentence(node: ReactNode): { head: ReactNode; tail: Re
   return cutSentence(node) ?? { head: node, tail: null };
 }
 
+/** A teaser a component draws, with its cut stated by the card that knows
+ *  the text (the Liquity V2 forks' `InLedgerFigures`): it renders `whole`, and
+ *  `splitFirstSentence` takes `head` and `tail` from it. Opt-in; any other
+ *  component stays whole. */
+export function CutTeaser({ whole }: { whole: ReactNode; head: ReactNode; tail: ReactNode | null }) {
+  return <>{whole}</>;
+}
+
 function cutSentence(node: ReactNode): { head: ReactNode; tail: ReactNode } | null {
+  if (isValidElement<{ head: ReactNode; tail: ReactNode | null }>(node) && node.type === CutTeaser)
+    return node.props.tail != null ? { head: node.props.head, tail: node.props.tail } : null;
   if (typeof node === "string") {
     const m = SENTENCE_END.exec(node);
     if (!m) return null;
