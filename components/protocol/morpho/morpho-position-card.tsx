@@ -467,6 +467,8 @@ export function useMorphoCardSlots({
     }
 
     if (detail) {
+      // A panel figure in the loan token draws its icon after it (anatomy C18).
+      const loanAsset = { symbol: v.loanSymbol, address: v.loanToken };
       // The left column: what the debt costs and how much more it can take.
       const debtNow = listed ? v.borrowed : v.currentDebt?.amount;
       const apr = v.borrowApr ?? chain?.borrowApr;
@@ -483,9 +485,10 @@ export function useMorphoCardSlots({
             label: "Costs per year",
             value: (
               <>
-                ~<AmountText value={debtNow * apr} format="compact" /> {v.loanSymbol}
+                ~<AmountText value={debtNow * apr} format="compact" />
               </>
             ),
+            asset: loanAsset,
             tip: "The debt now times the borrow rate: what a year costs while the rate holds.",
           },
         );
@@ -525,10 +528,10 @@ export function useMorphoCardSlots({
               info={capacityProv("Available to borrow", "collateral value × lltv − live debt", chainCoords)}
               value={formatExact(Math.max(0, chain.maxBorrow - chain.currentDebt))}
             >
-              <AmountText value={Math.max(0, chain.maxBorrow - chain.currentDebt)} format="compact" />{" "}
-              {chain.loanSymbol}
+              <AmountText value={Math.max(0, chain.maxBorrow - chain.currentDebt)} format="compact" />
             </Prov>
           ),
+          asset: loanAsset,
           tip: "How much more the position can borrow: the collateral's value at the market's oracle times the LLTV, less the debt.",
         });
       }
@@ -549,9 +552,10 @@ export function useMorphoCardSlots({
                     : capacityProv("Collateral value", "collateral × oracle price", chainCoords)
                 }
               >
-                <AmountText value={collValue} format="compact" /> {v.loanSymbol}
+                <AmountText value={collValue} format="compact" />
               </Prov>
             ),
+            asset: loanAsset,
             tip: "The collateral valued in the loan token at the market's oracle, the price Morpho's liquidation test uses.",
           });
         } else if (listed) {
