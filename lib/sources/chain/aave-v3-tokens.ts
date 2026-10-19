@@ -17,8 +17,9 @@
 
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
-import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { V3_SYMBOL_BY_ADDR, V3_LT_BY_ADDR } from "@/lib/aave-v3/asset-catalog";
+import { AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR } from "@/lib/aave-v3-arbitrum/asset-catalog";
 import type { AssetFlow } from "@/lib/shared/types/event-shape";
 
 const ERC20_ABI = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
@@ -57,6 +58,9 @@ export async function resolveV3Tokens(
   chainId: ChainId = MAINNET_CHAIN_ID,
 ): Promise<Map<string, V3TokenMeta>> {
   const curated = chainId === MAINNET_CHAIN_ID;
+  // Arbitrum's two USDC reserves both answer `symbol()` with "USDC"; its
+  // catalog names the bridged one USDC.e. No other chain overrides a symbol.
+  const named = chainId === ARBITRUM_CHAIN_ID ? AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR : undefined;
   const out = new Map<string, V3TokenMeta>();
   const want = new Set<string>();
   for (const a of addresses) {
@@ -92,7 +96,7 @@ export async function resolveV3Tokens(
     const decimalsRead = decRes?.status === "success" && decRes.result != null;
     const decimals = decimalsRead ? Number(decRes.result as number | bigint) : 18;
     const symbol =
-      (curated ? V3_SYMBOL_BY_ADDR[addr] : undefined) ?? onChainSym ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+      (curated ? V3_SYMBOL_BY_ADDR[addr] : named?.[addr]) ?? onChainSym ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`;
     const meta: V3TokenMeta = {
       address: addr,
       symbol,

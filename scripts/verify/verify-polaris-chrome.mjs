@@ -17,8 +17,9 @@
 //      (<img alt="USDp"> / <img alt="GOLDp">); picking one still writes
 //      ?market=usdp (the codec is untouched).
 //   4. usdp/175 and usdp/166: the liquidation's head reads "Liquidated" and
-//      one clause, "0.0211 claimable", restating the timeline API's
-//      collSurplus at four places (rails-ops decision 0045); the seizure's
+//      one clause, "0.0211 claimable" (or "0.3231 claimed" once the owner has
+//      claimed), restating the timeline API's collSurplus at four places
+//      (rails-ops decision 0045); the seizure's
 //      figures stay off the head; usdp/8's heads carry no claimable clause.
 //      The zero-surplus branch is proven on the model: a node child feeds
 //      polarisLiquidationDeltas a row with collSurplus "0" and gets two legs,
@@ -202,7 +203,10 @@ for (const id of ["175", "166"]) {
   );
   const page = await openPosition(`${BASE}/sepolia/polaris/usdp/${id}`);
   const head = await liquidationHead(page);
-  const want = `${surplusFig(surplus)} claimable`;
+  // The head's word follows what the timeline's `surplus` says became of it.
+  const sur = liq?.context?.data?.surplus;
+  const word = sur?.claim ? "claimed" : sur?.read ? "claimable" : "surplus";
+  const want = `${surplusFig(surplus)} ${word}`;
   check(
     `4b. usdp/${id}: the liquidation head reads "Liquidated · ${want}"`,
     // The figure, the pETH mark and the word sit in one flex box with no text
@@ -265,7 +269,9 @@ const coords = { txHash: "0xab", blockNumber: 1, market: "usdp", cdpId: "175" };
 const strip = (d) => d.map(({ prov, ...r }) => r);
 console.log("RESULT " + JSON.stringify({
   zero: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0" }, coords)),
-  some: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5" }, coords)),
+  some: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5", surplus: { read: true, claim: null } }, coords)),
+  claimed: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5", surplus: { read: true, claim: { block: 1 } } }, coords)),
+  unread: strip(polarisLiquidationDeltas({ ...base, collSurplus: "0.5" }, coords)),
 }));
 `;
   const probe = spawnSync(

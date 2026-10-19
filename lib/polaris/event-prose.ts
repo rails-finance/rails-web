@@ -19,9 +19,10 @@ import {
 import { polarisModal, POLARIS_WORDS, PROSE, type PolarisL5Key } from "@/lib/polaris/event-templates";
 import { polarisPsmShareValue } from "@/lib/polaris/economics";
 import { PETH } from "@/lib/polaris/asset-catalog";
+import { polarisClaimPaidWholeBalance, polarisSurplusState } from "@/lib/polaris/surplus-claim";
 
 /** The receipt a figure echoes on the card. */
-export type PolarisEchoKey = "coll" | "debt" | "zero" | "psm_coll" | "psm_debt" | "psm_net";
+export type PolarisEchoKey = "coll" | "debt" | "zero" | "psm_coll" | "psm_debt" | "psm_net" | "surplus" | "claimed";
 
 export type PolarisEventProse = EventProseCore<PolarisL5Key, PolarisEchoKey>;
 
@@ -124,6 +125,27 @@ export function polarisEventProse(input: PolarisProseInput): PolarisEventProse {
     v.psm_debt = mrDebt;
     sp.say("psm.share_unpriced", { psm_coll: "psm_coll", psm_debt: "psm_debt" });
   };
+  // The surplus the liquidation left, by what became of it: claimed (and when),
+  // unclaimed where the pool has been read past it, or not yet read.
+  const saySurplus = () => {
+    const sur = ctx.surplus;
+    const state = polarisSurplusState(sur);
+    if (state === "unread" || !sur) {
+      sp.say("liq.surplus_unread");
+      return;
+    }
+    v.surplus = num(sur.credit);
+    if (state === "unclaimed" || !sur.claim) {
+      sp.say("liq.surplus", { surplus: "surplus" });
+      return;
+    }
+    v.claimed_at = sur.claim.timestamp;
+    v.claim_tx = sur.claim.txHash;
+    sp.say(polarisClaimPaidWholeBalance(sur) ? "liq.surplus_claimed_all" : "liq.surplus_claimed", {
+      surplus: "surplus",
+      claimed_at: "claimed",
+    });
+  };
   const saySettled = () => {
     if (num(ctx.stablesMintedToEnsureZeroDebt) > EPS) {
       v.zero_mint = num(ctx.stablesMintedToEnsureZeroDebt);
@@ -175,7 +197,7 @@ export function polarisEventProse(input: PolarisProseInput): PolarisEventProse {
       else sp.say("liq.redistributed");
       if (figures) sp.say(figures.path === "sp" ? "liq.penalty_pool" : "liq.penalty_redist", { penalty: "bold" });
       sayLegs();
-      if (num(ctx.collSurplus) > EPS) sp.say("liq.surplus");
+      if (num(ctx.collSurplus) > EPS) saySurplus();
       break;
     }
     case "polaris.transfer": {
@@ -239,7 +261,18 @@ export function polarisT1Words(ctx: PolarisContext): PolarisT1Words {
       const surplus = num(ctx.collSurplus);
       return {
         kind: W.t1_liquidated,
-        clauses: surplus > 0 ? [{ surplus, symbol: PETH.symbol, word: W.t1_claimable }] : [],
+        clauses:
+          surplus > 0
+            ? [
+                {
+                  surplus,
+                  symbol: PETH.symbol,
+                  word: { claimed: W.t1_claimed, unclaimed: W.t1_claimable, unread: W.t1_surplus }[
+                    polarisSurplusState(ctx.surplus)
+                  ],
+                },
+              ]
+            : [],
       };
     }
     case "transfer":

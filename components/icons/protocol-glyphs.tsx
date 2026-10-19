@@ -216,6 +216,8 @@ const GLYPHS: Record<string, Glyph> = {
   "aave-v3": AAVE_V3_MARK,
   // Aave V3 on Base — same protocol, same mark, its own deployment.
   "aave-v3-base": AAVE_V3_MARK,
+  // Aave V3 on Arbitrum — the same mark, its own deployment.
+  "aave-v3-arbitrum": AAVE_V3_MARK,
   // Aave's vault layer — same protocol, same mark, its own roster subject.
   "aave-vaults": AAVE_V3_MARK,
   "aave-v4": AAVE_V4_MARK,

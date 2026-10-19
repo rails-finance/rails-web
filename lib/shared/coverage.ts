@@ -292,6 +292,22 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     llm: true,
     verification: true,
   }),
+  // Aave V3 on Arbitrum (2026-10-19), position-first (rails-ops
+  // TO-DO-arbitrum-scoping.md §9 item 5). The position page is the Base page
+  // through the deployment seam: the Pool read live (`dashboard`), its oracle
+  // for USD (`oracleUsd`), the reserve roster on the protocol page (`views`),
+  // the shared cards and explainers over the history rails-server serves per
+  // wallet (`explainers`, `forensics`), and the Markdown/CSV export (`llm`).
+  // Not yet: the history rows carry no at-block price, and no offline
+  // verifier runs against this Pool.
+  "aave-v3-arbitrum": explorerDepth({
+    dashboard: true,
+    oracleUsd: true,
+    explainers: true,
+    forensics: true,
+    views: true,
+    llm: true,
+  }),
   // Seamless (2026-08-23) — the same wallet-first shape as Aave V3 Base, which
   // it is a fork of, and it now carries the same five cells for the same
   // reasons: the Pool's own account view carries HF, LT, LTV and per-reserve
@@ -1361,9 +1377,10 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
  * discovery listing.
  */
 export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
-  // Empty since 2026-08-26 — every explorer on the roster can enumerate its
-  // subjects. The set stays so the next explorer that ships without a listing
-  // has somewhere to say so; the history below is why each member left.
+  // Aave V3 on Arbitrum ships position-first (2026-10-19): a wallet input over
+  // the market overview, any address readable, no roster of accounts yet.
+  "aave-v3-arbitrum",
+  // The history below is why each earlier member left.
   // aave-v3-base left 2026-08-26: the listing lane by config over the Seamless
   // shape (same aToken/debt-token grain, the live Pool for status) — its history
   // is still backfilling, but a partial history is a coverage cell, not a
@@ -1456,8 +1473,8 @@ export function coverageRows(comingSoon: ComingSoonEntry[], chainId: ChainId): C
  * block above; do not invent capabilities a view doesn't offer.
  *
  * Invariant: an entry exists here iff that protocol's `views` cell is `true`.
- * All twenty qualify; aave-v4-base's /base/aave-v4/hubs (launched 2026-09-27)
- * is the newest.
+ * aave-v3-arbitrum's protocol page (2026-10-19), where the roster sits under
+ * the wallet input, is the newest.
  */
 export const VIEW_NOTES: Record<string, string> = {
   frankencoin:
@@ -1474,6 +1491,8 @@ export const VIEW_NOTES: Record<string, string> = {
     "The full reserve roster of a market that is closing — eighteen reserves, every one of them carrying the frozen bit, with the sizes, rates and risk parameters the Pool still enforces on what is left.",
   "aave-v3-base":
     "The Base Pool's full reserve roster — sizes, rates, risk configuration and oracle prices — with every risk parameter decoded from the reserve's own configuration rather than a copied governance table.",
+  "aave-v3-arbitrum":
+    "The Arbitrum Pool's full reserve roster under the wallet input — sizes, rates, risk configuration and oracle prices, every risk parameter decoded from the reserve's own configuration.",
   "aave-v3":
     "The Core Pool's full reserve roster — sizes, rates, risk configuration and oracle prices — read live from the Pool and its oracle.",
   spark: "The single SparkLend Pool's reserve roster read live, on the same shared surface as Aave V3's.",

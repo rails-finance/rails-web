@@ -11,17 +11,21 @@
 // after-balance.
 //
 // Every Aave V3 market on Ethereum (Core, Prime, EtherFi) pays the same
-// Collector. Other chains' collectors are not listed, so there the row stays a
-// plain transfer.
+// Collector. On Arbitrum the Collector is what every one of the Pool's twenty
+// aTokens answers to RESERVE_TREASURY_ADDRESS(), read at block 516,330,701
+// (2026-10-19), and the Aave address book's AaveV3Arbitrum.COLLECTOR agrees.
+// Other chains' collectors are not listed, so there the row stays a plain
+// transfer.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
-import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 type V3Event = BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
 
 const AAVE_COLLECTOR: Partial<Record<ChainId, string>> = {
   [MAINNET_CHAIN_ID]: "0x464c71f6c2f760dda6093dcb91c24c39e5d6e18c",
+  [ARBITRUM_CHAIN_ID]: "0x053d55f9b5af8694c503eb288a1b7e552f590710",
 };
 
 export const isAaveCollector = (address: string | undefined, chainId: ChainId = MAINNET_CHAIN_ID): boolean =>

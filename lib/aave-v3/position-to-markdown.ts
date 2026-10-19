@@ -12,6 +12,7 @@
 // precision (no compact "60K" notation) because an LLM reasons better over
 // exact values than over rounded display strings.
 
+import type { CaptureSource } from "@/lib/shared/capture-source";
 import { formatDate } from "@/lib/date";
 import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -50,7 +51,7 @@ export interface AaveV3PositionMarkdownArgs {
    *  history and scaled-balance reduction. `sweep`: the page's own live reads
    *  of the Pool at a named block, with the history swept from the Pool's
    *  logs for this request — the Base lenders. The preamble says which. */
-  source?: "index" | "sweep";
+  source?: CaptureSource;
   /** The card view the page renders (oracle prices merged). */
   view: AaveV3PositionView;
   /** The live Pool read (HF / LTV / rates); null while it streams in. */
@@ -116,7 +117,10 @@ function sideLines(view: AaveV3PositionView, reserves: AaveV3ReserveAmount[], la
 
 export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): string {
   const { wallet, marketName, view, chain, captions, events, generatedAt } = args;
-  const swept = args.source === "sweep";
+  // The Arbitrum store's rows replay the same way a sweep's do, over balances
+  // read live from the tokens; only where the logs came from differs.
+  const stored = args.source === "etherscan" || args.source === "tenderly";
+  const swept = args.source === "sweep" || stored;
   const protocolName = args.protocolName ?? "Aave V3";
   const lines: string[] = [];
 
@@ -130,7 +134,9 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
           `The account is ${view.status} — no open balances remain. Balances below are each reserve's ` +
           (swept
             ? `HIGHEST recorded principal (the largest running balance replayed from the wallet's own Pool events, ` +
-              `swept live from the Pool's logs from its first block; interest accrued between events is not included). `
+              (stored
+                ? `read from rails-server's store of the Pool's logs from its first block; interest accrued between events is not included). `
+                : `swept live from the Pool's logs from its first block; interest accrued between events is not included). `)
             : `HIGHEST recorded balance (largest running scaled claim over every captured flow, aToken transfers ` +
               `included, valued at the index of the moment it stood — interest to then included). `) +
           `Not financial advice.`
@@ -191,7 +197,7 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
     const openedT = markdownFirstTimestamp(events, args.history);
     const lastT = events[events.length - 1]?.timestamp;
     lines.push("## Lifetime");
-    if (openedT) lines.push(`- **First ${swept ? "swept" : "captured"} activity:** ${fmtUtc(openedT)}`);
+    if (openedT) lines.push(`- **First ${swept && !stored ? "swept" : "captured"} activity:** ${fmtUtc(openedT)}`);
     if (lastT) lines.push(`- **Record closed:** ${fmtUtc(lastT)}`);
     lines.push(`- **Transactions (own, excludes liquidations):** ${view.txCount}`);
     lines.push("");
@@ -267,7 +273,7 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
   const opened = markdownFirstTimestamp(events, args.history);
   const last = events[events.length - 1]?.timestamp;
   lines.push("## Lifetime");
-  if (opened) lines.push(`- **First ${swept ? "swept" : "captured"} activity:** ${fmtUtc(opened)}`);
+  if (opened) lines.push(`- **First ${swept && !stored ? "swept" : "captured"} activity:** ${fmtUtc(opened)}`);
   if (last) lines.push(`- **Last activity:** ${fmtUtc(last)}`);
   lines.push(`- **Transactions (own, excludes liquidations):** ${view.txCount}`);
   lines.push("");

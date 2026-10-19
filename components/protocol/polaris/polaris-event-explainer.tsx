@@ -15,6 +15,8 @@ import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sen
 import { formatNumber } from "@/lib/utils/format";
 import { formatPeth } from "@/lib/polaris/figure-format";
 import { ledgerFieldProv, psmShareNetProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
+import { polarisSurplusClaimProv, polarisSurplusCreditProv } from "@/lib/polaris/surplus-claim";
+import { dateTimeText } from "@/lib/frankencoin/figures";
 import {
   polarisEventProse,
   polarisExplanationRuns,
@@ -75,6 +77,18 @@ export function polarisEchoFor(key: PolarisEchoKey, ctx: PolarisContext, coords:
         value: formatNumber(Math.abs(num(ctx.mintRedeemDebtGain))),
         symbol: ctx.stableSymbol,
       };
+    case "surplus":
+      return ctx.surplus
+        ? {
+            info: polarisSurplusCreditProv(coords, ctx.surplus),
+            value: formatPeth(num(ctx.surplus.credit)),
+            symbol: "pETH",
+          }
+        : null;
+    case "claimed": {
+      const info = ctx.surplus ? polarisSurplusClaimProv(coords, ctx.surplus) : null;
+      return info && ctx.surplus?.claim ? { info, value: dateTimeText(ctx.surplus.claim.timestamp) } : null;
+    }
     case "psm_net": {
       const price = ctx.priceAtBlock?.pethInDebt;
       if (price == null || price <= 0) return null;

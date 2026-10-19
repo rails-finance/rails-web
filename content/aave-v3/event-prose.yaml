@@ -592,10 +592,54 @@ templates:
           the asset is off as collateral and could be switched on
         text: |-
           {symbol} stayed off as collateral, so this supply earns interest and backs no debt.
-    order: [supply.what, supply.by, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    order:
+      [
+        supply.what,
+        supply.by,
+        coll.on,
+        coll.was_on,
+        coll.zero_ltv,
+        coll.stays_off,
+        hf.under,
+        hf.close,
+        hf.close_basket,
+        hf.close_same,
+        hf.near,
+        hf.near_basket,
+        hf.near_same,
+        hf.started_close,
+        prior.price,
+        prior.prices,
+        prior.interest,
+        prior.threshold,
+        prior.emode,
+        prior.plain,
+        rate.avg,
+        rate.moved,
+        rate.held,
+      ]
     groups:
       happened: [supply.what, supply.by, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
-      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+      leaves:
+        [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          prior.price,
+          prior.prices,
+          prior.interest,
+          prior.threshold,
+          prior.emode,
+          prior.plain,
+          rate.avg,
+          rate.moved,
+          rate.held,
+        ]
     alternates:
       - [supply.what, supply.by]
       - [coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
@@ -625,12 +669,68 @@ templates:
           gateway
         text: |-
           Withdrew {amount} {symbol} as ETH through the WETH gateway.
-    order: [withdraw.what, withdraw.gateway, off.switched, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    order:
+      [
+        withdraw.what,
+        withdraw.gateway,
+        off.switched,
+        hf.under,
+        hf.close,
+        hf.close_basket,
+        hf.close_same,
+        hf.near,
+        hf.near_basket,
+        hf.near_same,
+        hf.started_close,
+        hf.cleared,
+        hf.closed,
+        prior.price,
+        prior.prices,
+        prior.interest,
+        prior.threshold,
+        prior.emode,
+        prior.plain,
+        rate.avg,
+        rate.moved,
+        rate.held,
+      ]
     groups:
       happened: [withdraw.what, withdraw.gateway, off.switched]
-      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+      leaves:
+        [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+          prior.price,
+          prior.prices,
+          prior.interest,
+          prior.threshold,
+          prior.emode,
+          prior.plain,
+          rate.avg,
+          rate.moved,
+          rate.held,
+        ]
     alternates:
-      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+        ]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
       - [rate.avg, rate.moved, rate.held]
 
@@ -654,10 +754,52 @@ templates:
           another account sent it, with credit the owner delegated
         text: |-
           {actor} borrowed {amount} {symbol} on the owner's behalf, with credit the owner delegated.
-    order: [borrow.what, borrow.by, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held, rate.at]
+    order:
+      [
+        borrow.what,
+        borrow.by,
+        hf.under,
+        hf.close,
+        hf.close_basket,
+        hf.close_same,
+        hf.near,
+        hf.near_basket,
+        hf.near_same,
+        hf.started_close,
+        prior.price,
+        prior.prices,
+        prior.interest,
+        prior.threshold,
+        prior.emode,
+        prior.plain,
+        rate.avg,
+        rate.moved,
+        rate.held,
+        rate.at,
+      ]
     groups:
       happened: [borrow.what, borrow.by]
-      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held, rate.at]
+      leaves:
+        [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          prior.price,
+          prior.prices,
+          prior.interest,
+          prior.threshold,
+          prior.emode,
+          prior.plain,
+          rate.avg,
+          rate.moved,
+          rate.held,
+          rate.at,
+        ]
     alternates:
       - [borrow.what, borrow.by]
       - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
@@ -709,13 +851,74 @@ templates:
           a withdraw and swap within the hour before sent this token to the wallet
         text: |-
           The {symbol} came from the withdraw and swap just before, which sent {swap_received} {symbol} to the wallet.
-    order: [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared, repay.funded, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    order:
+      [
+        repay.what,
+        repay.cleared,
+        repay.atokens,
+        repay.atokens_cleared,
+        repay.by,
+        repay.by_cleared,
+        repay.funded,
+        hf.under,
+        hf.close,
+        hf.close_basket,
+        hf.close_same,
+        hf.near,
+        hf.near_basket,
+        hf.near_same,
+        hf.started_close,
+        hf.cleared,
+        hf.closed,
+        prior.price,
+        prior.prices,
+        prior.interest,
+        prior.threshold,
+        prior.emode,
+        prior.plain,
+        rate.avg,
+        rate.moved,
+        rate.held,
+      ]
     groups:
-      happened: [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared, repay.funded]
-      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+      happened:
+        [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared, repay.funded]
+      leaves:
+        [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+          prior.price,
+          prior.prices,
+          prior.interest,
+          prior.threshold,
+          prior.emode,
+          prior.plain,
+          rate.avg,
+          rate.moved,
+          rate.held,
+        ]
     alternates:
       - [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared]
-      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+        ]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
       - [rate.avg, rate.moved, rate.held]
 
@@ -797,14 +1000,85 @@ templates:
           supply_from_swap
         text: |-
           The {r_symbol} left the wallet, and the {symbol} entered the position as supply.
-    order: [swap.debt, swap.repay, swap.supply_from, swap.withdraw, swap.withdraw_wallet, swap.withdraw_receiver, swap.collateral, swap.off, swap.debt_funded, swap.repay_net, swap.debt_owes, swap.supply_wallet, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+    order:
+      [
+        swap.debt,
+        swap.repay,
+        swap.supply_from,
+        swap.withdraw,
+        swap.withdraw_wallet,
+        swap.withdraw_receiver,
+        swap.collateral,
+        swap.off,
+        swap.debt_funded,
+        swap.repay_net,
+        swap.debt_owes,
+        swap.supply_wallet,
+        hf.under,
+        hf.close,
+        hf.close_basket,
+        hf.close_same,
+        hf.near,
+        hf.near_basket,
+        hf.near_same,
+        hf.started_close,
+        hf.cleared,
+        hf.closed,
+        prior.price,
+        prior.prices,
+        prior.interest,
+        prior.threshold,
+        prior.emode,
+        prior.plain,
+      ]
     groups:
-      happened: [swap.debt, swap.repay, swap.supply_from, swap.withdraw, swap.withdraw_wallet, swap.withdraw_receiver, swap.collateral, swap.off]
+      happened:
+        [
+          swap.debt,
+          swap.repay,
+          swap.supply_from,
+          swap.withdraw,
+          swap.withdraw_wallet,
+          swap.withdraw_receiver,
+          swap.collateral,
+          swap.off,
+        ]
       adds_up: [swap.debt_funded, swap.repay_net]
-      leaves: [swap.debt_owes, swap.supply_wallet, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+      leaves:
+        [
+          swap.debt_owes,
+          swap.supply_wallet,
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+          prior.price,
+          prior.prices,
+          prior.interest,
+          prior.threshold,
+          prior.emode,
+          prior.plain,
+        ]
     alternates:
       - [swap.withdraw_wallet, swap.withdraw_receiver]
-      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+        ]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
 
   - id: aave3.transfer_in
@@ -857,12 +1131,62 @@ templates:
           the recipient is a known contract
         text: |-
           The recipient is {role}.
-    order: [tout.what, tout.named, off.switched, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+    order:
+      [
+        tout.what,
+        tout.named,
+        off.switched,
+        hf.under,
+        hf.close,
+        hf.close_basket,
+        hf.close_same,
+        hf.near,
+        hf.near_basket,
+        hf.near_same,
+        hf.started_close,
+        hf.cleared,
+        hf.closed,
+        prior.price,
+        prior.prices,
+        prior.interest,
+        prior.threshold,
+        prior.emode,
+        prior.plain,
+      ]
     groups:
       happened: [tout.what, tout.named, off.switched]
-      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+      leaves:
+        [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+          prior.price,
+          prior.prices,
+          prior.interest,
+          prior.threshold,
+          prior.emode,
+          prior.plain,
+        ]
     alternates:
-      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [
+          hf.under,
+          hf.close,
+          hf.close_basket,
+          hf.close_same,
+          hf.near,
+          hf.near_basket,
+          hf.near_same,
+          hf.started_close,
+          hf.cleared,
+          hf.closed,
+        ]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
 
   - id: aave3.liq_fee
@@ -966,7 +1290,21 @@ templates:
           other debt assets were left as they were
         text: |-
           The {other_debt} debt was left as it was, and the account stays open.
-    order: [liq.what, liq.why, liq.why_unread, liq.bonus_fee, liq.bonus_all, liq.bonus, liq.fee, liq.half_usd, liq.half_asset, liq.again, liq.again_now, liq.left]
+    order:
+      [
+        liq.what,
+        liq.why,
+        liq.why_unread,
+        liq.bonus_fee,
+        liq.bonus_all,
+        liq.bonus,
+        liq.fee,
+        liq.half_usd,
+        liq.half_asset,
+        liq.again,
+        liq.again_now,
+        liq.left,
+      ]
     groups:
       happened: [liq.what, liq.why, liq.why_unread]
       adds_up: [liq.bonus_fee, liq.bonus_all, liq.bonus, liq.fee, liq.half_usd, liq.half_asset]
@@ -1577,6 +1915,8 @@ L5:
           Core, Prime and EtherFi are separate Pools on Ethereum, each a separate account with a separate health factor.
         text_base: |-
           Aave V3 on Base keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
+        text_arbitrum: |-
+          Aave V3 on Arbitrum keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
         text_seamless: |-
           every Seamless reserve has been frozen since April 2025: repayment, withdrawal and liquidation work, and nothing new can be supplied or borrowed.
     links:
@@ -1621,6 +1961,8 @@ L5:
           Core, Prime and EtherFi are separate Pools on Ethereum, each a separate account with a separate health factor.
         text_base: |-
           Aave V3 on Base keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
+        text_arbitrum: |-
+          Aave V3 on Arbitrum keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
         text_seamless: |-
           every Seamless reserve has been frozen since April 2025; repayment, withdrawal and liquidation still work.
     links:
@@ -1663,6 +2005,8 @@ L5:
           Core, Prime and EtherFi are separate Pools on Ethereum, each a separate account with a separate health factor.
         text_base: |-
           Aave V3 on Base keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
+        text_arbitrum: |-
+          Aave V3 on Arbitrum keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
         text_seamless: |-
           every Seamless reserve has been frozen since April 2025; repayment, withdrawal and liquidation still work.
     links:
@@ -1680,6 +2024,8 @@ L5:
       Aave V3 Core is one Pool holding every reserve, where a wallet's supply backs its borrowing under one health factor. This page reads each reserve's size, rates and settings from that Pool.
     intro_base: |-
       Aave V3 on Base is one Pool holding every reserve, apart from Aave V3 on Ethereum. This page reads each reserve's size, rates and settings from that Pool.
+    intro_arbitrum: |-
+      Aave V3 on Arbitrum is one Pool holding every reserve, apart from Aave V3 on Ethereum. This section reads each reserve's size, rates and settings from that Pool.
     intro_seamless: |-
       Seamless is an Aave V3 fork on Base: one Pool holding every reserve, all frozen since April 2025. This page reads each reserve's size, rates and settings from that Pool.
     detailsHeading: |-

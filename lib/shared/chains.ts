@@ -17,8 +17,8 @@ export type ChainId = 1 | 8453 | 42161 | 11155111;
 
 export const MAINNET_CHAIN_ID = 1 satisfies ChainId;
 export const BASE_CHAIN_ID = 8453 satisfies ChainId;
-/** Arbitrum One. Registered ahead of any explorer on it: no roster entry names
- *  this chain yet, so no route, nav link or scope phrase shows it. */
+/** Arbitrum One. Its first roster entry is Aave V3 (`aave-v3-arbitrum`), which
+ *  puts the chain on the nav, the sitemap and /coverage/arbitrum. */
 export const ARBITRUM_CHAIN_ID = 42161 satisfies ChainId;
 /** Sepolia — the first testnet chain in Rails (Polaris runs there). A
  *  testnet's numbers are test numbers; `testnet: true` on its entry is what
