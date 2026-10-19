@@ -204,6 +204,14 @@ group_words:
 words:
   and: |-
     and
+  # The official docs' names beside ours (docs.polaris.finance, pAsset
+  # Minting): our label names the chain leg, the docs' name the mechanism a
+  # reader arriving from the Polaris app looks for. Drawn after the leg's
+  # label in the live window's lines and the card's tips.
+  docs_psm: |-
+    (the peg-defence fees, in the docs)
+  docs_reward: |-
+    (the pETH yield to minters, in the docs)
   # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind as
   # a past participle, then at most one present-tense clause for what the
   # spine cannot show, each after the middle dot. The spine carries the
@@ -450,7 +458,7 @@ position_words:
   sum_gain: |-
     stability gain
   sum_psm: |-
-    net PSM share
+    net PSM share (the peg-defence fees, in the docs)
   drop: |-
     pETH's price can fall {drop} before this CDP reaches the {mcr} minimum.
   drop_far: |-
@@ -942,7 +950,7 @@ L5:
       - bold: |-
           Reward pETH
         text: |-
-          pETH the protocol distributes to borrowers in proportion to their debt, added to the collateral.
+          pETH the protocol distributes to borrowers in proportion to their debt, added to the collateral (the pETH yield to minters, in the docs).
       - bold: |-
           The PSM
         text: |-
@@ -1142,7 +1150,7 @@ L5:
       - bold: |-
           The PSM share
         text: |-
-          traders' mints and redemptions at the PSM add or remove collateral and debt from every open CDP at a touch.
+          traders' PSM mints and redemptions add or remove collateral and debt from every open CDP at a touch (the peg-defence fees, in the docs).
       - bold: |-
           Settled to zero
         text: |-

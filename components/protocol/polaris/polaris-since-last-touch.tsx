@@ -44,6 +44,7 @@ import {
   type PolarisProtocolLegKey,
   type PolarisSinceLastTouch,
 } from "@/lib/polaris/since-last-touch";
+import { POLARIS_WORDS } from "@/lib/polaris/event-templates";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -271,7 +272,13 @@ export function PolarisSinceLastTouchRow({
     .filter(([, a, b]) => a != null && b != null)
     .map(([name, a, b, unit]) => `${name} ${formatPethPrice(a as number)} → ${formatPethPrice(b as number)}${unit}`)
     .join(", ");
-  const legDetail = (l: PolarisProtocolLeg): string => (l.key === "reward" ? `${formatPeth(w.raw.reward)} pETH` : "");
+  // The docs' names beside ours (content/polaris/event-prose.yaml, `words`).
+  const legDetail = (l: PolarisProtocolLeg): string =>
+    l.key === "psm"
+      ? POLARIS_WORDS.docs_psm
+      : l.key === "reward"
+        ? `${formatPeth(w.raw.reward)} pETH ${POLARIS_WORDS.docs_reward}`
+        : "";
 
   const Row = ({
     label,

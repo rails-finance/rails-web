@@ -77,7 +77,7 @@ import {
   polarisAnnualCostProv,
 } from "@/lib/polaris/live-provenance";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
-import { polarisPositionModal } from "@/lib/polaris/event-templates";
+import { POLARIS_WORDS, polarisPositionModal } from "@/lib/polaris/event-templates";
 import { polarisCdpNftUrl, polarisPositionHref } from "@/lib/polaris/routes";
 import { SEPOLIA_CHAIN_ID } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
@@ -657,7 +657,7 @@ export function polarisCardSlots({
       right.push({
         id: "pending-to-settle",
         label: "Pending to settle",
-        tip: `Interest, the stability gain, the PSM share and reward pETH accrued since the last touch, netted at the feed in ${stable}; the next touch writes them in.`,
+        tip: `Interest, the stability gain, the PSM share ${POLARIS_WORDS.docs_psm} and reward pETH ${POLARIS_WORDS.docs_reward} accrued since the last touch, netted at the feed in ${stable}; the next touch writes them in.`,
         value: (
           <TokenFigure symbol={stable} address={stableAddress}>
             <Prov info={livePendingToSettleProv(v.market, v.pending, feed)}>
@@ -676,7 +676,7 @@ export function polarisCardSlots({
     left.push({
       id: "psm-outcome",
       label: "PSM outcome at the feed",
-      tip: `Every PSM share the CDP has settled, its pETH at the latest feed less the debt it moved, in ${stable}.`,
+      tip: `Every PSM share the CDP has settled ${POLARIS_WORDS.docs_psm}, its pETH at the latest feed less the debt it moved, in ${stable}.`,
       value: (
         <TokenFigure symbol={stable} address={stableAddress}>
           <Prov info={psmAtFeedProv}>
