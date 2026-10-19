@@ -17,7 +17,8 @@ import { decodeEventId, eventMetadata, positionMetadata } from "@/lib/shared/pag
 import { positionImage } from "@/lib/share/position-image";
 import { eventCardModel } from "@/lib/share/event-model";
 import { eventImage } from "@/lib/share/event-image";
-import { alchemixEventHeading, alchemixEventPageDescription } from "@/lib/alchemix/explorer";
+import { alchemixEventPageDescription } from "@/lib/alchemix/explorer";
+import { alchemixEventSentence } from "@/lib/alchemix/event-sentence";
 import { AlchemistPositionView } from "@/components/protocol/alchemix/alchemist-position-view";
 import { isLineOnChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { loadAlchemistPositionTail, loadAlchemistLiveState } from "@/lib/alchemix/position-page-data";
@@ -142,7 +143,13 @@ export async function alchemixEventMetadata(
     canonicalPath: `${deployment.basePath}/${lineKey}/${tokenId}/event/${encodeURIComponent(decoded)}`,
     event:
       event && tail.events
-        ? { actionLabel: alchemixEventHeading(event, tail.events), timestamp: event.timestamp }
+        ? {
+            actionLabel: alchemixEventSentence(event, tail.events, {
+              mytSymbol: tail.position?.figures.collateral?.mytSymbol,
+              underlyingDecimals: tail.position?.figures.collateral?.underlying?.decimals,
+            }),
+            timestamp: event.timestamp,
+          }
         : null,
     description: event ? alchemixEventPageDescription(deployment, sym, tokenId, event.timestamp) : undefined,
   });

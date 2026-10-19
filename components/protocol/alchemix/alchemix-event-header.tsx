@@ -2,13 +2,17 @@
 
 // Alchemist transaction header: the card's `head` slot, in the shared ChainTruthRow grammar.
 //
+// THE HEAD IS WORDS (rails-ops decision 0045): the kind as a past participle
+// from lib/alchemix/event-label.ts ("Opened position", "Deposited · Minted",
+// "Liquidated", "Transferred · to 0x…"), with its chips. Below, each leg's
+// figure spec is still built with its receipts: the warning node's legs and the
+// chips are read from it (`alchemixHeaderSpec`), and the rules it follows are
+// the ones the figures keep in the sheet.
+//
 // ONE TRANSACTION, ONE ROW. An opening emits two or three logs from two
 // contracts and they arrive here together, so the row states the whole
-// transaction the way Liquity V2's opener does: the green `Open` pill, then one
-// per-axis verb and magnitude for each leg that moved something
-// (`Open  Deposit 169.83 ●  Mint 72.52 ●`). Nothing about a leg's own receipt
-// changes: each delta still carries the log field it came from.
-//
+// transaction the way Liquity V2's opener does.
+
 // FIVE THINGS THIS HEADER GETS RIGHT THAT A GENERIC ONE WOULD NOT.
 //
 // 1. A REPAY SHOWS TWO DIFFERENT QUANTITIES. The log's `amount` is the vault
@@ -47,7 +51,10 @@
 //    delta stays in the header, which is what those two flags already mean.
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import type { SpineWarningLeg } from "@/components/shared/spine-column";
+import { alchemixLegsLabel } from "@/lib/alchemix/event-label";
+import { ALCHEMIX_HEAD_WORDS } from "@/lib/alchemix/head-words";
 import {
   custodyPathInTx,
   openingInTx,
@@ -411,9 +418,10 @@ export function legTokenId(legs: AlchemistEvent[]): string | null {
   return legs.find((l) => l.context.data.tokenId != null)?.context.data.tokenId ?? null;
 }
 
-/** The row the header draws, for a card that echoes a header figure onto its
- *  spine flank and must name the same receipt with the same value. */
-export function alchemixHeaderSpec(
+/** The transaction's figures as the header used to state them: every leg's
+ *  amount with its receipt. The words head below reads its party, tone and
+ *  the warning node's legs from it. */
+function alchemixFigureSpec(
   legs: AlchemistEvent[],
   siblings: AlchemistEvent[],
   mytSymbol: string,
@@ -423,27 +431,48 @@ export function alchemixHeaderSpec(
   const combined = legs.length > 1;
   const specs = legs.map((leg) => legSpec(leg, mytSymbol, coordsFor(leg), siblings, combined, before));
   const tokenId = legTokenId(legs);
-  let spec = combined
+  return combined
     ? combineLegSpecs(specs, legs, openingInTx(siblings, tokenId), custodyPathInTx(legs, tokenId), coordsFor)
     : specs[0];
-  // A transaction of single-axis moves that is not an opening (a top-up that
-  // deposits and mints, a withdrawal through the router) is named by its verbs,
-  // "Deposit · Mint", and its deltas take the lone card's signed grammar, so it
-  // reads like every other event's row. Liquity names a combined Open the same
-  // way.
-  const axisLegs = legs.filter((l) => l.context.data.eventType !== "transfer");
-  if (
-    combined &&
-    spec.label === "" &&
-    axisLegs.length > 0 &&
-    axisLegs.every((l) => AXIS_VERB[l.context.data.eventType] != null)
-  ) {
-    const verbs = [...new Set(axisLegs.map((l) => AXIS_VERB[l.context.data.eventType]))];
-    spec = {
-      ...spec,
-      label: axisLegs.length === 1 ? axisLegs[0].actionLabel : verbs.join(" · "),
-      deltas: axisLegs.flatMap((l) => legSpec(l, mytSymbol, coordsFor(l), siblings, false, before).deltas),
+}
+
+/** The row the header draws (decision 0045): the kind in words
+ *  (`alchemixLegsLabel`, lib/alchemix/event-label.ts), a change of hands'
+ *  counterparty as its clause, the liquidator, fee receiver or opening's
+ *  "position to" chip kept. The figures leave the head: an adverse row's legs
+ *  are the warning node's (`warningLegs`), the holder's own moves stay on the
+ *  spine's token flank, and the rest (a repay's debt cleared, a close's paid
+ *  and returned shares, a redemption's cleared and taken) are in the Figures
+ *  sheet and the Explanation. */
+export function alchemixHeaderSpec(
+  legs: AlchemistEvent[],
+  siblings: AlchemistEvent[],
+  mytSymbol: string,
+  coordsFor: (leg: AlchemistEvent) => AlchemixCoords,
+  before: AlchemixReading | null,
+): { head: ChainTruthRowSpec; warningLegs: SpineWarningLeg[]; caption: string } {
+  const fig = alchemixFigureSpec(legs, siblings, mytSymbol, coordsFor, before);
+  const adverse = !!fig.critical || !!fig.labelOnSpine;
+  const warningLegs: SpineWarningLeg[] = adverse
+    ? fig.deltas
+        .filter((d) => !d.muted && !d.noSpineCounterpart)
+        .map((d) => ({ label: d.label, value: Math.abs(d.value), symbol: d.symbol, address: d.address }))
+    : [];
+  const label = alchemixLegsLabel(legs, siblings);
+  const head: ChainTruthRowSpec = {
+    label,
+    deltas: [],
+    critical: fig.critical,
+    labelOnSpine: fig.labelOnSpine,
+    status: label === ALCHEMIX_HEAD_WORDS.opened ? "open" : undefined,
+  };
+  // A change of hands: the counterparty is the clause after "Transferred",
+  // and the phone caption and accessible name say it too.
+  if (fig.custody && fig.party)
+    return {
+      head: { ...head, clauses: [<PartyChip key="party" party={fig.party} />] },
+      warningLegs,
+      caption: `${label} ${ALCHEMIX_HEAD_WORDS.sep} ${fig.party.prefix} ${fig.party.address.slice(0, 6)}…${fig.party.address.slice(-4)}`,
     };
-  }
-  return spec;
+  return { head: { ...head, party: fig.party }, warningLegs, caption: label };
 }
