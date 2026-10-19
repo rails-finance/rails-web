@@ -14,6 +14,7 @@
 // (`--donut-collateral`, `--donut-debt`, `--donut-other`, app/globals.css).
 
 import { useEffect, useState, type ReactNode } from "react";
+import { formatUsdValue } from "@/lib/utils/format";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { RowHelp } from "@/components/shared/row-help";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
@@ -27,9 +28,10 @@ export interface BreakdownAsset {
   address?: string;
   /** The traced token amount. */
   amount: ReactNode;
-  /** The oracle USD value, for the share and the order; null where unpriced. */
+  /** The oracle USD value, for the share, the order and the row's figure (in
+   *  cents, `formatUsdValue`); null where unpriced. */
   usd: number | null;
-  /** The traced USD figure. */
+  /** The traced USD figure, drawn only where `usd` is null. */
   usdText?: ReactNode;
 }
 
@@ -413,7 +415,7 @@ export function AssetBreakdownPanel({
                       </span>
                     </th>
                     <td className="whitespace-nowrap py-1 pr-3 text-right tabular-nums text-green-400">
-                      <Plain>{a.usdText ?? "—"}</Plain>
+                      <Plain>{a.usd != null ? formatUsdValue(a.usd) : (a.usdText ?? "—")}</Plain>
                     </td>
                     {/* The key, beside the share it stands for. */}
                     <td className="py-1 pr-2" aria-hidden>
