@@ -38,7 +38,10 @@ export const formatPrice = (value: number): string => {
   });
 };
 
+// Cents, grouped: "$2,725,629.68". A positive amount under a cent reads
+// "< $0.01", never a false "$0.00".
 export const formatUsdValue = (value: number): string => {
+  if (value > 0 && value < 0.01) return "< $0.01";
   return toLocaleStringHelper(value, {
     prefix: "$",
     minimumFractionDigits: 2,
@@ -115,17 +118,6 @@ export const formatExact = (value: number): string => {
   return `${neg ? "-" : ""}${grouped}${frac ? `.${frac}` : ""}`;
 };
 
-// Compact headline form for big values: 170,177,469 → "170.18M", 195,000 →
-// "195K", 8,100 → "8.1K". Sub-1000 values are already short, so they pass
-// through formatNumber unchanged (e.g. 4.973, 0.262) — the exact value lives in
-// the reveal-on-hover tooltip (see RevealTip / AssetAmount).
-export const formatCompact = (value: number): string => {
-  if (Math.abs(value) >= 1_000) {
-    return value.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 });
-  }
-  return formatNumber(value);
-};
-
 /** BTC-class, ETH-class and gold tokens: a unit is worth thousands of
  *  dollars, so "<0.01" on a headline would hide up to about $830 of BTC, $41
  *  of gold (28 Sep 2026 prices) or about $40 of ETH.
@@ -137,18 +129,6 @@ export const formatCompact = (value: number): string => {
 export const isHighValueUnit = (symbol: string | null | undefined): boolean =>
   !!symbol &&
   (/btc/i.test(symbol) || /^(xau|paxg)/i.test(symbol) || /^(w|st|wst|cb|r|we|ez|rs|wrs|os)?eth$/i.test(symbol));
-
-// Headline form (the timeline card's collapsed header, the share card's flow
-// line): a magnitude below 0.01 reads "<0.01" rather than digits. For a
-// BTC-class or gold token (isHighValueUnit) the headline keeps formatCompact's
-// significant digits instead ("0.00512"), so no material amount hides behind
-// "<0.01"; those still floor at "<0.000001". Everywhere else (balances,
-// totals, a card's open detail, the explanation) formatNumber's form stands.
-export const formatHeadlineAmount = (value: number, symbol?: string | null): string => {
-  const abs = Math.abs(value);
-  if (abs > 0 && abs < 0.01 && !isHighValueUnit(symbol)) return "<0.01";
-  return formatCompact(value);
-};
 
 // Plain decimal for a data export (CSV cell): every digit String(n) would
 // give, without its exponent form below 1e-6 or above 1e21, and ungrouped.
@@ -164,16 +144,6 @@ export const toPlainDecimal = (value: number): string => {
 // a balance, which can never be negative. Idempotent on an already-positive
 // string.
 export const withRealMinus = (s: string): string => s.replace(/^-/, "−");
-
-export const formatApproximate = (value: number): string => {
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(1)}M`;
-  }
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(1)}K`;
-  }
-  return formatPrice(value);
-};
 
 // "A" vs "An" for a display name or symbol dropped into a sentence. Read by
 // spelling, with named exceptions for an acronym that spells with a vowel but

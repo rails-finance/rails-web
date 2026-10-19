@@ -41,7 +41,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import {
   positionSupplyProv,
@@ -56,12 +56,14 @@ import { accountDataProv, reserveDataProv, avgBorrowRateProv } from "@/lib/spark
 import { sparkLiquidationRead, type SparkCardCaptions } from "@/lib/spark/economics";
 import { sparkPositionModal } from "@/lib/spark/event-templates";
 import { formatUsd } from "@/lib/shared/format-event";
-import { fmtLiqPrice, fmtUsd, hfLabelV4 } from "@/lib/aave-v4/format";
+import { fmtLiqPrice, hfLabelV4 } from "@/lib/aave-v4/format";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import type { SparkPositionSummary, SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { TokenFigure } from "@/components/shared/token-figure";
 
 export interface SparkPositionView {
   wallet: string;
@@ -185,26 +187,35 @@ const dustUsdOf =
   (r: SparkReserveAmount): number | null =>
     r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
 
-/** One reserve's amount, traced to its balance read. */
+/** One reserve's amount, traced to its balance read; `withIcon` puts the
+ *  asset's icon after it (a panel row), where the breakdown's row draws its
+ *  own. */
 function ReserveAmountText({
   r,
   side,
   atBlock,
-  withSymbol = true,
+  withIcon = false,
 }: {
   r: SparkReserveAmount;
   side: "supply" | "debt";
   atBlock?: number;
-  withSymbol?: boolean;
+  withIcon?: boolean;
 }) {
   if (r.decimalsUnread) return <TokenAmountNotLoaded address={r.address} label={r.symbol} />;
-  return (
+  const exact = formatUnitsExact(r.amountRaw, r.decimals);
+  const amount = (
     <Prov info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}>
-      <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+      <ExactSpan exact={exact} symbol={r.symbol}>
         {formatCompact(r.amount)}
-        {withSymbol ? ` ${r.symbol}` : ""}
       </ExactSpan>
     </Prov>
+  );
+  return withIcon ? (
+    <TokenFigure symbol={r.symbol} address={r.address} figure={`${exact} ${r.symbol}`}>
+      {amount}
+    </TokenFigure>
+  ) : (
+    amount
   );
 }
 
@@ -250,7 +261,16 @@ function TokenStack({
  *  the scaled-delta reducer's largest running claim, valued at the index of
  *  the moment it stood. No USD: the peaks are maxima at different moments, so
  *  pricing them at one block would assert a portfolio that never existed. */
-function PeakLines({ reserves, side }: { reserves: SparkReserveAmount[]; side: "supply" | "debt" }) {
+function PeakLines({
+  reserves,
+  side,
+  iconSize,
+}: {
+  reserves: SparkReserveAmount[];
+  side: "supply" | "debt";
+  /** The icon's size: a headline's default, 16 in a panel row. */
+  iconSize?: number;
+}) {
   return (
     <span className="flex flex-col gap-1">
       {reserves.map((r) => (
@@ -259,7 +279,12 @@ function PeakLines({ reserves, side }: { reserves: SparkReserveAmount[]; side: "
             {r.decimalsUnread ? (
               <TokenAmountNotLoaded address={r.address} label={r.symbol} />
             ) : (
-              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+              <AssetAmount
+                value={r.amount}
+                symbol={r.symbol}
+                exact={formatUnitsExact(r.amountRaw, r.decimals)}
+                iconSize={iconSize}
+              />
             )}
           </Prov>
         </span>
@@ -306,7 +331,7 @@ function interestRow(
     id: side === "supply" ? "supply-interest" : "borrow-interest",
     label: side === "supply" ? "Supply interest" : "Borrow interest",
     sub: since != null ? `since ${formatDate(since)}` : undefined,
-    value: <Prov info={sparkInterestCaptionProv(side)}>{formatUsd(usd)}</Prov>,
+    value: <Prov info={sparkInterestCaptionProv(side)}>{formatCompactUsd(usd)}</Prov>,
     tip: `The ${side === "supply" ? "supply" : "borrow"} interest added since the balance last started from zero; lifetime interest is in the Lifetime flows panel.`,
   };
 }
@@ -422,7 +447,7 @@ export function useSparkCardSlots({
             tip: PEAK_NOT_COLLATERAL_TIP,
             value: (
               <span data-spark-not-collateral="">
-                <PeakLines reserves={peakOthers} side="supply" />
+                <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
               </span>
             ),
           },
@@ -469,7 +494,7 @@ export function useSparkCardSlots({
           usd:
             usd != null ? (
               <Prov info={sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed")}>
-                <span className="font-bold text-green-400">{formatUsd(usd)}</span>
+                <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
               </Prov>
             ) : null,
         };
@@ -487,8 +512,10 @@ export function useSparkCardSlots({
         // token amounts are the headline, so a partial total is never asserted.
         value:
           reserves.length === 0 ? null : usd != null ? (
-            <TitleTip title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
-              <Prov info={sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed")}>{formatUsd(usd)}</Prov>
+            <TitleTip title={formatUsdValue(usd)}>
+              <Prov info={sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed")}>
+                {formatCompactUsd(usd)}
+              </Prov>
             </TitleTip>
           ) : (
             <TokenStack
@@ -565,7 +592,7 @@ export function useSparkCardSlots({
         symbol: r.symbol,
         address: r.address,
         usd,
-        amount: <ReserveAmountText r={r} side={s} atBlock={v.atBlock} withSymbol={false} />,
+        amount: <ReserveAmountText r={r} side={s} atBlock={v.atBlock} />,
         usdText:
           usd != null ? (
             <Prov info={sparkUsdProvOnchain(`${r.symbol} ${s === "supply" ? "supplied" : "borrowed"}`)}>
@@ -593,11 +620,11 @@ export function useSparkCardSlots({
       value: (
         <span className="flex flex-col gap-0.5" data-spark-not-collateral="">
           {otherUsd != null && (
-            <Prov info={sparkUsdProvOnchain("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
+            <Prov info={sparkUsdProvOnchain("Supplied, not collateral")}>{formatCompactUsd(otherUsd)}</Prov>
           )}
           {othersRanked.map((r) => (
             <span key={r.address} className={otherUsd != null ? "text-rb-500" : undefined}>
-              <ReserveAmountText r={r} side="supply" atBlock={v.atBlock} />
+              <ReserveAmountText r={r} side="supply" atBlock={v.atBlock} withIcon />
             </span>
           ))}
         </span>
@@ -636,7 +663,7 @@ export function useSparkCardSlots({
       label: "Room to borrow",
       value: (
         <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase")}>
-          {fmtUsd(chain.availableBorrowsUsd).display}
+          {formatCompactUsd(chain.availableBorrowsUsd)}
         </Prov>
       ),
       tip: "How much more, in USD, the account can borrow before it reaches its loan-to-value limit, from the Pool's account read.",

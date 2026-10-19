@@ -85,6 +85,19 @@ export function comptrollerVerdictProv(what: string, lane?: MoonwellLane): Prove
   };
 }
 
+/** One entered market's collateral factor — Comptroller.markets at head: the
+ *  share of the supply's oracle value the account may borrow against. */
+export function moonwellCollateralFactorProv(sym: string, lane?: MoonwellLane): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    verify: recompute("Comptroller", "markets"),
+    summary: `${sym} collateral factor — the Comptroller's markets entry for the ${sym} market, read at the latest block: the share of an entered supply's oracle value the account may borrow against, and the line it is liquidated at.`,
+    contract: comptrollerOf(lane),
+    via: `${laneVia(lane)} · Comptroller.markets(mToken).collateralFactorMantissa @ head`,
+  };
+}
+
 /** A capacity aggregate — Σ entered supply × oracle price × collateral factor.
  *  Every input a chain read at the same head, and the sum reproduces the
  *  Comptroller's own liquidity walk EXACTLY (its truncation order included),

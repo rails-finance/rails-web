@@ -88,7 +88,7 @@ import type { GroupLane } from "@/components/shared/group-sheet";
 import type { EventSheet } from "@/components/shared/event-sheet";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { exactLeg, exactUsd, reserveSymbol, statePricePills, type TouchedLeg } from "./aave-v3-position-state";
-import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
@@ -106,6 +106,7 @@ import {
 import { AmountText, ExactTip } from "@/components/shared/amount-text";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface AaveV3CtEventDetailProps {
   ctx: AaveV3Context;

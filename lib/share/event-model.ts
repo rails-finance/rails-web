@@ -9,8 +9,8 @@
 import type { AssetFlow, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatUsd } from "@/lib/shared/format-event";
-import { formatHeadlineAmount } from "@/lib/utils/format";
 import type { EventCardModel } from "@/lib/share/event-card";
+import { formatHeadlineAmount } from "@/lib/shared/format-compact";
 
 /** Up to three flows: sorted by |valueUsd| descending when at least one flow
  *  carries a price (unpriced flows sink to the bottom, valued at 0 for the

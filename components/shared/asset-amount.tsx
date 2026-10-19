@@ -1,7 +1,8 @@
 "use client";
 
-// AssetAmount — a position card's headline value: the number renders compact
-// (170.18M) and the ticker collapses into its glyph. A click on the glyph opens
+// AssetAmount — a position card's headline value: the number renders in the
+// shared compact form (lib/shared/format-compact.ts: "932.59", "277.8K",
+// "2.1M") and the ticker collapses into its glyph. A click on the glyph opens
 // the asset's popover (asset-popover.tsx), whose first line is the exact value
 // and full ticker; a click on the number is the provenance inspector's. Lives
 // inside <StatValue> (which owns the big type), so this only composes the
@@ -9,7 +10,8 @@
 
 import { TokenChipIcon } from "./token-chip-icon";
 import { AssetPopover } from "./asset-popover";
-import { formatCompact, formatExact, withRealMinus } from "@/lib/utils/format";
+import { formatExact, withRealMinus } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface AssetAmountProps {
   value: number;
@@ -38,7 +40,7 @@ export interface AssetAmountProps {
    *  glyph alone reads as a dollar figure. */
   unit?: boolean;
   /** The figure as shown, where the family states amounts at its own
-   *  precision. Default: formatCompact of `value`. */
+   *  precision. Default: `formatCompact(value)`. */
   display?: string;
   /** The unit `exact` is stated in, where it is not `symbol` — a cToken
    *  balance behind an underlying headline. Default: `symbol`. */

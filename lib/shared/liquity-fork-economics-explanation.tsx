@@ -7,10 +7,11 @@
 import type { ReactNode } from "react";
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import type { ChainTruthTowerData, TowerSideData } from "@/lib/shared/chain-truth-economics";
-import { formatCompact, formatExact } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
 import { formatCompactUsd, formatUsdValue } from "@/components/shared/economics-chart-primitives";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const DUST = 1e-9;
 

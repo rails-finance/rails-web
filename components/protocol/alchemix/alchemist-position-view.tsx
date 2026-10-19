@@ -70,7 +70,6 @@ import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { useWalletContext } from "@/components/nav/wallet-context";
-import { formatCompact } from "@/lib/shared/format-event";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent, isAlchemixV2Event } from "@/lib/shared/types/event-shape";
@@ -143,6 +142,7 @@ import type {
   AlchemixPositionSummary,
 } from "@/types/api/alchemix";
 import { BlockRef } from "@/components/shared/block-ref";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -635,7 +635,7 @@ export function AlchemistPositionView({
                   value={String(Number(dlb.debtRaw) / 1e18)}
                   symbol={sym}
                 >
-                  {formatCompact(Number(dlb.debtRaw) / 1e18).display}
+                  {formatCompactTitled(Number(dlb.debtRaw) / 1e18).display}
                 </Prov>{" "}
                 {sym}
               </span>
@@ -661,7 +661,7 @@ export function AlchemistPositionView({
                         value={String(redemptionTotals.cleared)}
                         symbol={sym}
                       >
-                        {formatCompact(redemptionTotals.cleared).display}
+                        {formatCompactTitled(redemptionTotals.cleared).display}
                       </Prov>{" "}
                       {sym} by {redemptionTotals.count} {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
                     </span>

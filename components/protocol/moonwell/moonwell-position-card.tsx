@@ -35,7 +35,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import { moonwellPositionModal } from "@/lib/moonwell/event-templates";
@@ -54,7 +54,10 @@ import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import { moonwellHealthHead, moonwellRiskRows } from "./moonwell-risk-slot";
+import { moonwellCollateralFactorProv, type MoonwellLane } from "@/lib/moonwell/position-provenance";
 import { MoonwellMenuRows } from "./moonwell-menu-rows";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
+import { TokenFigure } from "@/components/shared/token-figure";
 
 export interface MoonwellPositionView {
   wallet: string;
@@ -171,14 +174,17 @@ function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply
   );
 }
 
-/** One side's USD total as the headline figure, traced to the oracle read. */
-function UsdFigure({ usd, what }: { usd: number; what: string }) {
+/** A USD figure traced to the oracle read: `compact` for a side of several
+ *  markets (its cents on hover), `cents` for the line under a one-market
+ *  head and a panel row, `whole` in the breakdown. */
+function UsdFigure({ usd, what, form }: { usd: number; what: string; form: "compact" | "cents" | "whole" }) {
   const dep = useMoonwellDeployment();
-  return (
-    <TitleTip title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
-      <Prov info={dep.card.usd(what)}>{formatUsd(usd)}</Prov>
-    </TitleTip>
+  const figure = (
+    <Prov info={dep.card.usd(what)}>
+      {form === "cents" ? formatUsdValue(usd) : form === "compact" ? formatCompactUsd(usd) : formatUsd(usd)}
+    </Prov>
   );
+  return form === "cents" ? figure : <TitleTip title={formatUsdValue(usd)}>{figure}</TitleTip>;
 }
 
 /** A panel row's value for one market line: the amount, then its USD and its
@@ -201,7 +207,7 @@ function LineValue({
       {usd != null && (
         <span className="text-rb-500">
           {" · "}
-          <Prov info={dep.card.usd(usdWhat)}>{formatUsd(usd)}</Prov>
+          <Prov info={dep.card.usd(usdWhat)}>{formatUsdValue(usd)}</Prov>
           {share != null && ` · ${shareText(share)}`}
         </span>
       )}
@@ -209,16 +215,26 @@ function LineValue({
   );
 }
 
-/** "WETH 84% · USDC 88%": the entered markets the card lists, each at the
- *  factor the Comptroller applies to it now. */
-function factorsRow(v: MoonwellPositionView, addresses: string[]): PositionPanelRow | null {
+/** "84% · 88%", each with its market's icon: the entered markets the card
+ *  lists, each at the factor the Comptroller applies to it now. */
+function factorsRow(v: MoonwellPositionView, addresses: string[], lane: MoonwellLane): PositionPanelRow | null {
   const rows = (v.entered ?? []).filter((e) => addresses.some((a) => a.toLowerCase() === e.underlying));
   if (rows.length === 0) return null;
   return {
     id: "collateral-factors",
     label: rows.length > 1 ? "Collateral factors" : "Collateral factor",
     tip: FACTOR_TIP,
-    value: rows.map((e) => `${e.symbol} ${+(e.collateralFactor * 100).toFixed(1)}%`).join(" · "),
+    value: (
+      <span className="inline-flex flex-wrap items-center gap-x-3">
+        {rows.map((e) => (
+          <TokenFigure key={e.underlying} symbol={e.symbol} address={e.underlying}>
+            <Prov
+              info={moonwellCollateralFactorProv(e.symbol, lane)}
+            >{`${+(e.collateralFactor * 100).toFixed(1)}%`}</Prov>
+          </TokenFigure>
+        ))}
+      </span>
+    ),
   };
 }
 
@@ -355,7 +371,7 @@ export function useMoonwellCardSlots({
         label: CARD_VOCAB.collateral,
         value:
           vc.supplies.length === 0 ? null : collUsd != null ? (
-            <UsdFigure usd={collUsd} what="Collateral" />
+            <UsdFigure usd={collUsd} what="Collateral" form="compact" />
           ) : (
             <AmountStack>
               {collDust.lines.map((r) => (
@@ -379,7 +395,7 @@ export function useMoonwellCardSlots({
         label: CARD_VOCAB.debt,
         value:
           v.borrows.length === 0 ? null : debtUsd != null ? (
-            <UsdFigure usd={debtUsd} what="Borrowed" />
+            <UsdFigure usd={debtUsd} what="Borrowed" form="compact" />
           ) : (
             <AmountStack>
               {debtDust.lines.map((r) => (
@@ -413,7 +429,7 @@ export function useMoonwellCardSlots({
         usd:
           collUsd != null ? (
             <span className="font-bold text-green-400">
-              <UsdFigure usd={collUsd} what="Collateral" />
+              <UsdFigure usd={collUsd} what="Collateral" form="cents" />
             </span>
           ) : null,
       };
@@ -431,7 +447,7 @@ export function useMoonwellCardSlots({
         usd:
           debtUsd != null ? (
             <span className="font-bold text-green-400">
-              <UsdFigure usd={debtUsd} what="Borrowed" />
+              <UsdFigure usd={debtUsd} what="Borrowed" form="cents" />
             </span>
           ) : null,
       };
@@ -478,11 +494,13 @@ export function useMoonwellCardSlots({
       value: (
         <LineValue
           amount={
-            <Prov info={supplyProv(r)}>
-              <ExactSpan exact={exact} symbol={r.current != null ? mSymbolOf(r) : r.symbol}>
-                {formatCompact(supplyAmount(r))} {r.symbol}
-              </ExactSpan>
-            </Prov>
+            <TokenFigure symbol={r.symbol} address={r.address}>
+              <Prov info={supplyProv(r)}>
+                <ExactSpan exact={exact} symbol={r.current != null ? mSymbolOf(r) : r.symbol}>
+                  {formatCompact(supplyAmount(r))}
+                </ExactSpan>
+              </Prov>
+            </TokenFigure>
           }
           usd={usd}
           share={usd != null && total ? usd / total : null}
@@ -497,6 +515,7 @@ export function useMoonwellCardSlots({
   const collateralFactors = factorsRow(
     v,
     vc.supplies.map((r) => r.address),
+    { comptroller: dep.comptroller, positionRoute: dep.positionRoute },
   );
   // Each side's markets open under its headline (the chevron by the icons);
   // the panel keeps the additive values and the supplies that are not
@@ -504,7 +523,7 @@ export function useMoonwellCardSlots({
   const usdCell = (usd: number | null, what: string) =>
     usd != null ? (
       <span className="text-foreground">
-        <UsdFigure usd={usd} what={what} />
+        <UsdFigure usd={usd} what={what} form="whole" />
       </span>
     ) : undefined;
   const collBreakdown: AssetBreakdown = {

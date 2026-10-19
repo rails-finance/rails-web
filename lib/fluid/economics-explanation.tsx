@@ -9,8 +9,8 @@
 import type { ReactNode } from "react";
 import type { TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { FluidTowerData } from "@/lib/fluid/economics";
-import { formatCompact } from "@/lib/utils/format";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const FLUID_DOC_URL = "https://docs.fluid.io";
 

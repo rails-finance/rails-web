@@ -6,9 +6,9 @@
 
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import { poolShareLabel } from "@/lib/fluid/asset-catalog";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** A leg's display name off the tail alone — the symbol when the roster names
  *  one, else the pool pair a smart leg's shares are of, else bare shares.

@@ -53,7 +53,7 @@ import { assetText, pctText, shareText, shortAddress } from "@/components/protoc
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
 import { VaultVenueMark } from "@/components/vaults/vault-venue-mark";
 import { vaultContextRows, type VaultContextStripProps } from "@/components/vaults/vault-context-strip";
-import { formatApproximate, formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { explorerUrl, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { baseVaultHref, ethereumVaultHref } from "@/lib/vaults/routes";
@@ -83,6 +83,7 @@ import {
   aaveVaultValueUsdProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -113,7 +114,7 @@ const vaultHref = (row: VaultPositionRow, holder?: string) =>
  *  (decision 2026-09-09): the magnitude above a thousand ("60.9M"), the
  *  section's print rule below it, and the full figure in the tip and the
  *  receipt. */
-const headline = (exact: string, value: number) => (Math.abs(value) >= 1000 ? formatApproximate(value) : exact);
+const headline = (exact: string, value: number) => (Math.abs(value) >= 1000 ? formatCompact(value) : exact);
 
 /** The words a card prints where nothing was read. */
 const Unread = ({ what }: { what: string }) => <span className="text-base font-normal text-rb-500">{what}</span>;
@@ -262,7 +263,7 @@ export function vaultCardSlots({
         tip={`${usdText(row.value.usdE8!)} at census block ${n(pricedBlock)}, via the chain's Aave V3 oracle`}
       >
         <Prov info={aaveVaultValueUsdProv(coords, row.value, shareDecimals)}>
-          {usd >= 1000 ? `$${formatApproximate(usd)}` : usdText(row.value.usdE8!)}
+          {usd >= 1000 ? `$${formatCompact(usd)}` : usdText(row.value.usdE8!)}
         </Prov>
       </Figure>
     ) : (

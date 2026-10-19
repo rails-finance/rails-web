@@ -16,10 +16,10 @@ import type { ChainTimelineResponse } from "@/lib/api/fetch-chain-timeline";
 import type { AaveV3ReserveAmount } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 // "unread": no state recorded for the account yet (0018); never read as closed.
 const STATUS_WORD = { open: "Open", closed: "Closed", liquidated: "Liquidated", unread: "Not loaded" } as const;

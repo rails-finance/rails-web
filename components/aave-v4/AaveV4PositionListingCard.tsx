@@ -26,7 +26,7 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { Icon } from "@/components/icons/icon";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useMemo } from "react";
-import type { AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
+import type { AaveV4SpokePositionRow, AaveV4SpokeReserveSummary } from "@/lib/api/fetch-aave-v4-spoke-positions";
 import { holdsNothingOnChain, scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { SPOKE_HUB, debtHubsOf, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
@@ -38,6 +38,9 @@ import {
 } from "@/components/shared/position-card";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { fmtUsd, hfLabelV4 } from "@/lib/aave-v4/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
+import { AssetAmount } from "@/components/shared/asset-amount";
+
 import {
   calculateAaveV4Position,
   computeSupplyBreakdown,
@@ -247,13 +250,51 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     return <PositionCard slots={slots} />;
   }
 
+  // A side of one asset states its amount with its icon and the dollars
+  // beneath in cents; a side of several, compact dollars with the icons.
+  const oneAsset = (
+    r: AaveV4SpokeReserveSummary,
+    raw: string,
+    usd: number,
+    label: string,
+    onChain: boolean,
+  ): Pick<PositionCardHead, "value" | "usd"> => {
+    const amount = scaleChainBalance(raw, r.decimals);
+    const info = onChain
+      ? usdProvOnchain(label)
+      : usdProv(label, { amountLabel: `${label.toLowerCase()} balance`, amountKind: "chain" });
+    return {
+      value: (
+        <AssetAmount value={amount} symbol={r.symbol} address={r.address} exact={formatUnitsExact(raw, r.decimals)} />
+      ),
+      usd:
+        r.usdPrice != null && r.usdPrice > 0 ? (
+          <Prov info={info}>
+            <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+          </Prov>
+        ) : null,
+    };
+  };
   const symbols = supplyOnly ? calc.supplyingSymbols : calc.breakdown.collateralSymbols;
+  const oneColl = collateralReserves.length === 1 && symbols.length === 1 ? collateralReserves[0] : null;
+  const oneDebt = debtReserves.length === 1 ? debtReserves[0] : null;
+  const collUsd = supplyOnly ? calc.totalCollateralUsd : calc.breakdown.collateralUsd;
   const heads: PositionCardHead[] = [
     {
       id: supplyOnly ? "supplied" : "collateral",
       label: supplyOnly ? "Supplied" : CARD_VOCAB.collateral,
-      assets: symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined,
-      value: collateralValue,
+      ...(oneColl
+        ? oneAsset(
+            oneColl,
+            oneColl.supplyBalanceRaw,
+            collUsd,
+            supplyOnly ? "Supplied" : "Collateral",
+            collateralOnChain,
+          )
+        : {
+            assets: symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined,
+            value: collateralValue,
+          }),
     },
     // Supply-only draws the one head: no Debt or Health factor to assert.
     ...(supplyOnly
@@ -262,9 +303,15 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
           {
             id: "debt",
             label: CARD_VOCAB.debt,
-            assets:
-              calc.borrowingSymbols.length > 0 ? <InlineAssetCluster symbols={calc.borrowingSymbols} /> : undefined,
-            value: debtValue,
+            ...(oneDebt
+              ? oneAsset(oneDebt, oneDebt.debtBalanceRaw, calc.totalDebtUsd, "Debt", debtOnChain)
+              : {
+                  assets:
+                    calc.borrowingSymbols.length > 0 ? (
+                      <InlineAssetCluster symbols={calc.borrowingSymbols} />
+                    ) : undefined,
+                  value: debtValue,
+                }),
           },
           {
             id: "health-factor",

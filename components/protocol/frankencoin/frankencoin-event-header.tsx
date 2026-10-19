@@ -21,8 +21,8 @@ import {
   liqPriceAfterProv,
   type FrankencoinCoords,
 } from "@/lib/frankencoin/event-provenance";
-import { formatCompact } from "@/lib/utils/format";
 import { fmtFcPrice } from "@/lib/frankencoin/figures";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface FrankencoinEventHeaderProps {
   actionLabel: string;

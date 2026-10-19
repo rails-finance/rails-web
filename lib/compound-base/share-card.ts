@@ -14,10 +14,10 @@ import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-walle
 import { scaleCompoundChainBalance, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import { largestCompoundAsset, type CompoundAssetLike } from "@/lib/compound/share-card";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const holdsSomething = (m: CompoundMarketChainResponse): boolean =>
   m.supplyBalanceRaw !== "0" || m.borrowBalanceRaw !== "0" || m.collateral.length > 0;

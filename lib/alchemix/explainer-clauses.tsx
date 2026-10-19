@@ -49,13 +49,14 @@ import type {
 } from "@/lib/shared/types/event-shape";
 import type { ReactNode } from "react";
 import { clause, cont, H, type ClauseInput } from "@/lib/shared/explainer-prose";
-import { formatCompact, shortAddr } from "@/lib/shared/format-event";
+import { shortAddr } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import { isLineRouter } from "@/lib/alchemix/lines";
 import type { AlchemixReading } from "@/lib/alchemix/readings-before";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 // The synthetic and every MYT carry 18 decimals on every line, so every figure
 // an Alchemist log emits in one of those two is scaled here (see the note on
@@ -812,7 +813,7 @@ const LEAVES_SET_ASIDE = new Set(["deposit", "mint", "withdraw", "transfer", "bu
  *  three figures of a repay's sentence add up as printed. */
 const setAsideFigure = (wei: bigint): string => {
   const n = Number(wei) / WAD;
-  return n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : formatCompact(n).display;
+  return n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : formatCompactTitled(n).display;
 };
 
 /** The set-aside part of the debt a repay cleared, in the synthetic's wei. A
@@ -936,7 +937,7 @@ export function alchemixBetweenReadingsClauses(
       out.push(
         clause(
           <>
-            Set aside rose {formatCompact(Number(grew) / WAD).display} {sym} {sincePrevious}, as Transmuter stakes
+            Set aside rose {formatCompactTitled(Number(grew) / WAD).display} {sym} {sincePrevious}, as Transmuter stakes
             matured; {act} did not move it.
           </>,
         ),

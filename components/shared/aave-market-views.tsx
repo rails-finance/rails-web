@@ -43,7 +43,6 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown, Ban, ChevronUp, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { formatCompact } from "@/lib/utils/format";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { type AssetClass, ASSET_CLASS_TITLE, ASSET_CLASS_COLOR } from "@/lib/aave-v4/asset-class";
@@ -59,6 +58,7 @@ import { aaveMarketVocab, type AaveMarketVocab } from "@/lib/shared/aave-market-
 import { VitalsBand } from "@/components/shared/vitals-band";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const LINK = "text-blue-500 hover:underline";
 const CLOSED = "text-tone-caution";

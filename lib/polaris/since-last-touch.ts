@@ -36,8 +36,8 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
 import { flowsReconcile } from "@/lib/shared/chain-truth-economics";
-import { formatCompact } from "@/lib/utils/format";
 import { polarisPendingAtFeed } from "@/lib/polaris/economics";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** The overlay fields this needs — a structural subset of PolarisChainResponse
  *  so the markdown export and the verifier can pass a plain object. */

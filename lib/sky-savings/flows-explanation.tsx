@@ -2,10 +2,10 @@
 
 import type { ReactNode } from "react";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { formatCompact } from "@/lib/utils/format";
 import { units } from "@/lib/sky-savings/math";
 import type { SkyLifetimeTotals } from "@/lib/sky-savings/flows";
 import type { SkyPosition } from "@/lib/sky-savings/types";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export function skyFlowsExplanation(p: SkyPosition, totals: SkyLifetimeTotals | null): ReactNode {
   const f = (raw: bigint | string) => formatCompact(units(raw));

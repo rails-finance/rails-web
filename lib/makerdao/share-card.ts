@@ -14,9 +14,9 @@
 import type { loadMakerVaultTail } from "./position-page-data";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 type MakerTail = Awaited<ReturnType<typeof loadMakerVaultTail>>;
 

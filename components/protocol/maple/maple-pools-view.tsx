@@ -34,7 +34,6 @@
 import { RatioBar, type RatioBarTick, pct } from "@/components/shared/ratio-bar";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { formatCompact } from "@/lib/shared/format-event";
 import { MAPLE_POOL_BY_KEY, shortAddress, type MaplePool } from "@/lib/maple/asset-catalog";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
 import {
@@ -57,9 +56,10 @@ import {
   MAPLE_NO_IMPAIRMENT_TIP,
 } from "./maple-pools-copy";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 const amount = (v: number, symbol: string): React.ReactNode => {
-  const f = formatCompact(v);
+  const f = formatCompactTitled(v);
   return <span title={`${f.title} ${symbol}`}>{`${f.display} ${symbol}`}</span>;
 };
 
@@ -67,7 +67,7 @@ const amount = (v: number, symbol: string): React.ReactNode => {
  *  the compact form reads "1B", beside parts in millions to one decimal. */
 const poolTotal = (v: number, symbol: string): React.ReactNode => {
   if (Math.abs(v) < 1e9) return amount(v, symbol);
-  const f = formatCompact(v);
+  const f = formatCompactTitled(v);
   const millions = (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return <span title={`${f.title} ${symbol}`}>{`${millions}M ${symbol}`}</span>;
 };
@@ -142,8 +142,8 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
 
       <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
         <Prov info={poolTotalSupplyProv(cat.symbol, s.blockNumber)}>
-          <span title={`${formatCompact(s.totalSupply).title} ${cat.symbol}`}>
-            {formatCompact(s.totalSupply).display} shares outstanding
+          <span title={`${formatCompactTitled(s.totalSupply).title} ${cat.symbol}`}>
+            {formatCompactTitled(s.totalSupply).display} shares outstanding
           </span>
         </Prov>
         <Prov info={poolNavRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
@@ -199,7 +199,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
 
       {Math.abs(residual) > 1 && (
         <MapleResidualNote
-          display={formatCompact(Math.abs(residual)).display}
+          display={formatCompactTitled(Math.abs(residual)).display}
           symbol={cat.assetSymbol}
           over={residual < 0}
         />
@@ -209,14 +209,17 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
         <span>
           queue{" "}
           <Prov info={poolQueueSharesProv(cat.symbol, s.blockNumber)}>
-            <span className="text-foreground/80" title={`${formatCompact(s.queueShares).title} ${cat.symbol} waiting`}>
-              {formatCompact(s.queueShares).display} {cat.symbol}
+            <span
+              className="text-foreground/80"
+              title={`${formatCompactTitled(s.queueShares).title} ${cat.symbol} waiting`}
+            >
+              {formatCompactTitled(s.queueShares).display} {cat.symbol}
             </span>
           </Prov>
           {s.queueShares > 0 && (
             <>
               {" "}
-              (≈ {formatCompact(queueValue).display} {cat.assetSymbol} at exit) ·{" "}
+              (≈ {formatCompactTitled(queueValue).display} {cat.assetSymbol} at exit) ·{" "}
               {s.cash >= queueValue ? "coverable from liquid cash" : "exceeds liquid cash"}
             </>
           )}
@@ -227,7 +230,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
             <span>
               impairment live:{" "}
               <span className="text-foreground/80">
-                {formatCompact(s.unrealizedLosses).display} {cat.assetSymbol}
+                {formatCompactTitled(s.unrealizedLosses).display} {cat.assetSymbol}
               </span>{" "}
               marked — exits realize it
             </span>

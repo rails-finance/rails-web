@@ -20,10 +20,10 @@ import { scaleChainBalance, type AaveV4SpokePositionChainResponse } from "@/lib/
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** Neutral HF headline — matches the V3/Spark mappers' identical reading (the
  *  ratio stops meaning anything as a number once it clears 100). */

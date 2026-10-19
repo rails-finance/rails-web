@@ -9,14 +9,8 @@
 
 import type { ReactNode } from "react";
 import { RevealTip } from "./reveal-tip";
-import {
-  formatCompact,
-  formatExact,
-  formatHeadlineAmount,
-  formatNumber,
-  formatTinyNonZero,
-  isFloorText,
-} from "@/lib/utils/format";
+import { formatExact, formatNumber, formatTinyNonZero, isFloorText } from "@/lib/utils/format";
+import { formatCompact, formatHeadlineAmount } from "@/lib/shared/format-compact";
 
 type AmountFormat = "number" | "compact" | "headline" | "tiny";
 

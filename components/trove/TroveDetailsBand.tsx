@@ -4,11 +4,12 @@ import { TokenFigure } from "@/components/shared/token-figure";
 import { Users } from "lucide-react";
 import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
-import { formatPrice, formatApproximate, formatExact } from "@/lib/utils/format";
+import { formatPrice, formatExact } from "@/lib/utils/format";
 import { FadeNumber } from "@/components/ui/FadeNumber";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { troveDebtInFrontProv, troveTrovesAheadProv } from "@/lib/liquity/trove-queue-provenance";
 import { troveAnnualCostProv } from "@/lib/liquity/trove-card-provenance";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 interface TroveDetailsBandProps {
   trove: TroveSummary;
@@ -86,7 +87,7 @@ export function TroveDetailsBand({
       <span className="inline-flex flex-wrap items-center gap-x-2">
         <TokenFigure symbol="BOLD">
           <Prov info={costsProv} value={formatExact(annualInterestCost)} symbol="BOLD">
-            ~<FadeNumber value={annualInterestCost} formatFn={formatApproximate} animateOnMount={true} />
+            ~<FadeNumber value={annualInterestCost} formatFn={formatCompact} animateOnMount={true} />
           </Prov>
         </TokenFigure>
         {trove.batch.isMember && (
@@ -116,7 +117,7 @@ export function TroveDetailsBand({
       <span>
         <TokenFigure symbol="BOLD">
           <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
-            {formatApproximate(debtInFront)}
+            {formatCompact(debtInFront)}
           </Prov>
         </TokenFigure>
       </span>
@@ -141,7 +142,7 @@ export function TroveDetailsBand({
             Costs:{" "}
             <Prov info={costsProv} value={formatExact(annualInterestCost)}>
               <span className="text-foreground/80 font-semibold">
-                ~<FadeNumber value={annualInterestCost} formatFn={formatApproximate} animateOnMount={true} />
+                ~<FadeNumber value={annualInterestCost} formatFn={formatCompact} animateOnMount={true} />
               </span>
             </Prov>{" "}
             BOLD / year
@@ -164,7 +165,7 @@ export function TroveDetailsBand({
         <div className={`${align} text-xs text-rb-500 leading-relaxed tabular-nums`}>
           Debt in front:{" "}
           <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
-            <span className="text-foreground/80 font-semibold">{formatApproximate(debtInFront)}</span>
+            <span className="text-foreground/80 font-semibold">{formatCompact(debtInFront)}</span>
           </Prov>{" "}
           BOLD
           {trovesAhead !== null && trovesAhead !== undefined && (

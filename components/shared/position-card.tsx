@@ -36,7 +36,7 @@ import { useId, useRef, useState, type CSSProperties, type ReactNode } from "rea
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { QuietTipsContext } from "@/components/shared/reveal-tip";
-import { formatUsd } from "@/lib/shared/format-event";
+import { formatUsdValue } from "@/lib/utils/format";
 import { OVERLAY_HEADING, POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   POSITION_CARD_SCOPE,
@@ -287,7 +287,7 @@ function PositionCardRow({
   children: ReactNode;
 }) {
   return (
-    <div className={className} style={style} data-card-row={index} data-card-head={head}>
+    <div className={`min-w-0 ${className ?? ""}`} style={style} data-card-row={index} data-card-head={head}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
         {explain ? (
           <HeadingTip text={label} tip={labelTip ?? help} />
@@ -362,7 +362,7 @@ function HeadBody({
       aria-expanded={toggle.open}
       aria-controls={toggle.open ? toggle.panelId : undefined}
       aria-label={[
-        head.total ? `${head.label} ${formatUsd(head.total.usd)}` : head.label,
+        head.total ? `${head.label} ${formatUsdValue(head.total.usd)}` : head.label,
         head.breakdown ? `${head.breakdown.assets.length} assets` : null,
         "show breakdown",
       ]
@@ -389,7 +389,9 @@ function HeadBody({
           {trigger ? (
             trigger
           ) : head.assets ? (
-            <span className="flex items-center gap-1.5">
+            // Wraps inside the column: a long figure puts its icons on the
+            // next line rather than push the page out at 390 (ui-jobs 361).
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
               {head.value}
               {/* shrink-0: a long figure must never squeeze the icon away. */}
               <span className="inline-flex shrink-0 items-center">{head.assets}</span>
@@ -439,8 +441,7 @@ function OpenGrid({ heads, detail }: { heads: PositionCardHead[]; detail: boolea
     setOpen(null);
     if (refocus && id) buttons.current[id]?.focus();
   };
-  const exact = (usd: number) =>
-    "$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const exact = formatUsdValue;
   const title = openHead ? (openHead.total ? `${openHead.label} ${exact(openHead.total.usd)}` : openHead.label) : "";
   return (
     <>

@@ -7,11 +7,22 @@ import type { ReactNode } from "react";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
-export function TokenFigure({ children, symbol, address }: { children: ReactNode; symbol: string; address?: string }) {
+export function TokenFigure({
+  children,
+  symbol,
+  address,
+  figure,
+}: {
+  children: ReactNode;
+  symbol: string;
+  address?: string;
+  /** The exact amount with its ticker, the asset panel's first line. */
+  figure?: string;
+}) {
   return (
     <span className="inline-flex items-center gap-1.5">
       {children}
-      <AssetPopover symbol={symbol} address={address}>
+      <AssetPopover symbol={symbol} address={address} figure={figure}>
         <TokenChipIcon symbol={symbol} address={address} size={16} filterable={false} untitled />
       </AssetPopover>
     </span>

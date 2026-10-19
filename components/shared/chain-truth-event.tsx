@@ -44,7 +44,6 @@ import { usdShown } from "@/lib/shared/usd-display";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
   decimalSub,
-  formatCompact,
   formatExact,
   formatExactDecimal,
   formatExactFromString,
@@ -60,6 +59,7 @@ import { usdAt } from "@/components/shared/event-ledger";
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import type { EventCellSpec } from "@/components/shared/event-cells";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** Compact a full grouped number string ("10,967,283.723" → "10.97M") for the
  *  snapshot grid; the full string rides the tooltip + provenance trace. Passes

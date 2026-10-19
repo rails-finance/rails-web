@@ -35,12 +35,13 @@ import { StatCard } from "@/components/shared/state-transition";
 import { EVENT_NUMBER_PILL, EventHeadChevron } from "@/components/shared/event-number-pill";
 import { FeedbackModal } from "@/components/shared/feedback-modal";
 import { actionLabel } from "@/lib/shared/event-filter-helpers";
-import { formatCompact, shortDate, shortDateYear } from "@/lib/shared/format-event";
+import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
 import { explorerUrl } from "@/lib/shared/chains";
 import { useChainId } from "@/lib/shared/chain-context";
 import type { TimelineBoundary } from "@/lib/shared/timeline-boundary";
 import { BlockRef } from "@/components/shared/block-ref";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -268,7 +269,7 @@ export function TimelineBoundaryCard({ boundary: b, protocolKey, csvExport, isLa
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm tabular-nums">
             {(b.state as NonNullable<typeof b.state>).map((l, i) => {
               const v = Number(l.value);
-              const f = Number.isFinite(v) ? formatCompact(Math.abs(v)) : { display: l.value, title: l.value };
+              const f = Number.isFinite(v) ? formatCompactTitled(Math.abs(v)) : { display: l.value, title: l.value };
               return (
                 <div key={`${i}:${l.label}`} className="contents">
                   <dt className="text-rb-500">{l.label}</dt>

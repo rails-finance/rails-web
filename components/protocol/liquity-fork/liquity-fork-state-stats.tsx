@@ -32,10 +32,11 @@ import {
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 import { forkAmount, forkCollAmount, forkDebtMove, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import { AmountText } from "@/components/shared/amount-text";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** The fork vocabulary's builders the cells read (lib/<fork>/event-provenance.ts). */
 export interface LiquityForkStateProvs {

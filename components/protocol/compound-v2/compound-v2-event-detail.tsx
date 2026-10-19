@@ -64,7 +64,8 @@ import {
 } from "@/components/shared/ctoken-event-ledger";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
-import { formatCompact, formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface CompoundV2CellsInput {
   ctx: CompoundV2Context;

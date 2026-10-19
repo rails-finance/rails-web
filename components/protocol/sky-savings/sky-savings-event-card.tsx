@@ -36,7 +36,7 @@ import { ExactTip } from "@/components/shared/amount-text";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { Prov } from "@/components/shared/provenance";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { formatCompact, withRealMinus } from "@/lib/utils/format";
+import { withRealMinus } from "@/lib/utils/format";
 import type { BaseActivityEvent, SkySavingsContext } from "@/lib/shared/types/event-shape";
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
 import {
@@ -68,6 +68,7 @@ import { skySavingsSheet } from "@/components/protocol/sky-savings/sky-savings-s
 import { SKY_EVENT_LABEL } from "@/lib/sky-savings/event-label";
 import { skyEventContent } from "@/lib/sky-savings/learn-more";
 import { skyEventBullets, skyInterestSince, type SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export type SkySavingsEvent = BaseActivityEvent & { context: { protocol: "sky-savings"; data: SkySavingsContext } };
 

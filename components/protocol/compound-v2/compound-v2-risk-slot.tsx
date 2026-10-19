@@ -16,7 +16,7 @@
 import { Prov } from "@/components/shared/provenance";
 import type { PositionCardHead, PositionPanelRow } from "@/components/shared/position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
-import { formatUsd } from "@/lib/shared/format-event";
+import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { compoundV2CapacityProv, comptrollerVerdictProv } from "@/lib/compound-v2/position-provenance";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 
@@ -66,7 +66,7 @@ export function compoundV2LineRows(chain: CompoundV2ChainResponse | null): {
           <Prov
             info={compoundV2CapacityProv("Liquidation line", "Σ entered supply × price × collateral factor (replica)")}
           >
-            {formatUsd(chain.collateralCapacityUsd)}
+            {formatCompactUsd(chain.collateralCapacityUsd)}
           </Prov>
         ),
         tip: "The debt, in dollars, at which the account can be liquidated: each entered market's supply times its price times its collateral factor, added up from the Comptroller's reads.",
@@ -76,7 +76,7 @@ export function compoundV2LineRows(chain: CompoundV2ChainResponse | null): {
       {
         id: "room-to-borrow",
         label: "Room to borrow",
-        value: <Prov info={comptrollerVerdictProv("Account liquidity")}>{formatUsd(chain.liquidityUsd)}</Prov>,
+        value: <Prov info={comptrollerVerdictProv("Account liquidity")}>{formatCompactUsd(chain.liquidityUsd)}</Prov>,
         tip: "How many more dollars the account can borrow before the liquidation line: the Comptroller's account liquidity, read at the latest block.",
       },
       ...(dropPct != null

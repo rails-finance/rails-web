@@ -6,7 +6,7 @@ import { Link2 } from "lucide-react";
 import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
-import { formatPrice, formatUsdValue, formatApproximate, formatExact } from "@/lib/utils/format";
+import { formatPrice, formatUsdValue, formatExact } from "@/lib/utils/format";
 import { formatDateRange, formatDuration } from "@/lib/date";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { getLiquidationThreshold, troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
@@ -26,6 +26,7 @@ import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/t
 import { troveWords } from "@/lib/liquity/event-templates";
 import { troveNodes } from "@/lib/liquity/trove-nodes";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
 const TROVE_MANAGER: Record<string, string> = {
@@ -564,7 +565,7 @@ function buildOpenItems({
   if (debtInFront !== null && debtInFront !== undefined) {
     const debtNode = (
       <Prov info={troveDebtInFrontProv(trove.collateralType)} value={formatExact(debtInFront)} symbol="BOLD">
-        <span className="font-bold text-foreground">{formatApproximate(debtInFront)} BOLD</span>
+        <span className="font-bold text-foreground">{formatCompact(debtInFront)} BOLD</span>
       </Prov>
     );
     const queueShare =

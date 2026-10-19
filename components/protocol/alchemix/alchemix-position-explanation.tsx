@@ -13,15 +13,15 @@ import type { ReactNode } from "react";
 import { ProseExplainer, H } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net";
-import { formatCompact } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import type { AlchemixLiveState } from "@/types/api/alchemix";
 import { AmountText } from "@/components/shared/amount-text";
 import type { SelfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 import { formatDate } from "@/lib/date";
 import { formatSharePrice } from "@/components/protocol/alchemix/alchemix-position-card";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
-const compact = (n: number) => formatCompact(n).display;
+const compact = (n: number) => formatCompactTitled(n).display;
 /** A signed figure that keeps its sign and size however small: a lifetime net
  *  of a few millionths reads as that, never as "−0.00". */
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatNumber(Math.abs(n))}`;

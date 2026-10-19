@@ -22,13 +22,13 @@ import type { MaplePoolAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
 import { shortAddress } from "@/lib/maple/asset-catalog";
-import { formatCompact as bandCompact } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
 import { formatDate, formatDateRange } from "@/lib/date";
 import type { MaplePoolHolding } from "@/lib/maple/row-times";
+import { formatCompactTitled as bandCompact } from "@/lib/shared/format-compact";
 
 /** The figure the card's claim line asserts — the current redeemable value
  *  when the chain read landed, the recorded net deposits otherwise (the same

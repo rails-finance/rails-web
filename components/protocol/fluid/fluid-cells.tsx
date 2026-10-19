@@ -52,10 +52,11 @@ import {
   type FluidCoords,
 } from "@/lib/fluid/event-provenance";
 import { pairLabel, shortAddress } from "@/lib/fluid/asset-catalog";
-import { formatNumber, formatCompact, formatExact } from "@/lib/utils/format";
+import { formatNumber, formatExact } from "@/lib/utils/format";
 import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { useFluidLedgerCells } from "./fluid-ledger";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface FluidCellsProps {
   ctx: FluidContext;

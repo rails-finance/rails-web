@@ -47,7 +47,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TipLabel } from "@/components/shared/tip-label";
@@ -83,6 +83,7 @@ import { ExactSpan } from "@/components/shared/amount-text";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import { compoundV2LineRows, compoundV2RiskHead } from "./compound-v2-risk-slot";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -221,11 +222,13 @@ function TokenStack({ lines }: { lines: ReactNode[] }) {
   );
 }
 
-/** A side's USD headline, its full figure on hover. */
-function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
+/** A USD figure, its cents on hover: `compact` for a side of several
+ *  markets, `whole` in the breakdown. The line under a one-market head writes
+ *  the cents (`formatUsdValue`). */
+function UsdFigure({ usd, info, form }: { usd: number; info: Provenance; form: "compact" | "whole" }) {
   return (
-    <TitleTip title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
-      <Prov info={info}>{formatUsd(usd)}</Prov>
+    <TitleTip title={formatUsdValue(usd)}>
+      <Prov info={info}>{form === "compact" ? formatCompactUsd(usd) : formatUsd(usd)}</Prov>
     </TitleTip>
   );
 }
@@ -403,7 +406,7 @@ export function useCompoundV2CardSlots({
       label: CARD_VOCAB.collateral,
       value:
         v.supplies.length === 0 ? null : collUsd != null ? (
-          <UsdFigure usd={collUsd.usd} info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)} />
+          <UsdFigure usd={collUsd.usd} info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)} form="compact" />
         ) : (
           <TokenStack lines={suppliesShown.map(supplyUnit)} />
         ),
@@ -416,7 +419,7 @@ export function useCompoundV2CardSlots({
       label: CARD_VOCAB.debt,
       value:
         v.borrows.length === 0 ? null : debtUsd != null ? (
-          <UsdFigure usd={debtUsd.usd} info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)} />
+          <UsdFigure usd={debtUsd.usd} info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)} form="compact" />
         ) : (
           <TokenStack lines={borrowsShown.map(borrowUnit)} />
         ),
@@ -445,7 +448,7 @@ export function useCompoundV2CardSlots({
       usd:
         collUsd != null ? (
           <span className="font-bold text-green-400">
-            <UsdFigure usd={collUsd.usd} info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)} />
+            <Prov info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)}>{formatUsdValue(collUsd.usd)}</Prov>
           </span>
         ) : null,
     };
@@ -463,7 +466,7 @@ export function useCompoundV2CardSlots({
       usd:
         debtUsd != null ? (
           <span className="font-bold text-green-400">
-            <UsdFigure usd={debtUsd.usd} info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)} />
+            <Prov info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)}>{formatUsdValue(debtUsd.usd)}</Prov>
           </span>
         ) : null,
     };
@@ -495,7 +498,7 @@ export function useCompoundV2CardSlots({
   // the rate, the room to borrow and the drop on the right.
   const lineRows = compoundV2LineRows(chain);
   const usdCell = (usd: number | null, what: string, fixed: boolean) =>
-    usd != null ? <UsdFigure usd={usd} info={compoundV2UsdProvOnchain(what, fixed)} /> : undefined;
+    usd != null ? <UsdFigure usd={usd} info={compoundV2UsdProvOnchain(what, fixed)} form="whole" /> : undefined;
   const supplyBreakdown: AssetBreakdown = {
     assets: supplyLines.lines.map((r) => {
       const usd = lineUsd(v, r.market, supplyAmount(r));

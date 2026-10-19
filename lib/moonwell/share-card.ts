@@ -14,9 +14,9 @@ import type {
 } from "@/lib/sources/api/moonwell-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<MoonwellPositionSummary["status"], string> = {
   open: "Open",

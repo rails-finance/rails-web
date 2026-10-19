@@ -19,10 +19,11 @@ import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledg
 import { offPar, usdShown } from "@/lib/shared/usd-display";
 import { todayUsdProv, useTodayBasisPrices } from "@/components/shared/price-basis";
 import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
-import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import type { ChainTruthStat } from "@/components/shared/chain-truth-event";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** A stat with the key a derived cell's `inputs` name, and those inputs. */
 export type ChainTruthCellStat = ChainTruthStat & { key: string; inputs?: string[] };

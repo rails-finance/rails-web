@@ -3,10 +3,11 @@
 
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 import { pctString, rayNumber, skyYearlyEarnings, units, yearlyText } from "@/lib/sky-savings/math";
 import type { SkyLifetimeTotals } from "@/lib/sky-savings/flows";
 import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export function SkySavingsPositionExplanation({
   position: p,

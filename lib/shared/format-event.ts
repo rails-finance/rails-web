@@ -92,34 +92,3 @@ export function formatUsd(value: number | undefined | null): string {
 export function shortAddr(a: string): string {
   return `${a.slice(0, 6)}\u2026${a.slice(-4)}`;
 }
-
-/**
- * Format a headline value with compact notation for 4+ digit numbers.
- * Returns `{ display, title }` — wire `title` to the wrapping element so
- * hovering reveals the full-precision number.
- *
- * - n >= 1000:   "60K", "1.2M", "3.4B"   (title: "60,000.00")
- * - 100 <= n:    "1,234.56"                (title same)
- * - 1 <= n:      "12.4500"                (title same)
- * - n < 1:       "0.004567"               (title same)
- */
-export function formatCompact(n: number, opts?: { decimals?: number }): { display: string; title: string } {
-  const decimals = opts?.decimals;
-  const fullDecimals = decimals ?? (n >= 100 ? 2 : n >= 1 ? 4 : 6);
-  const title = n.toLocaleString("en-US", {
-    minimumFractionDigits: fullDecimals,
-    maximumFractionDigits: fullDecimals,
-  });
-  if (n >= 1000) {
-    const compact = Intl.NumberFormat("en", {
-      notation: "compact",
-      maximumFractionDigits: 1,
-    }).format(n);
-    return { display: compact, title };
-  }
-  const display = n.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: fullDecimals,
-  });
-  return { display, title };
-}

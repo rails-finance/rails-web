@@ -16,10 +16,10 @@
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import { marketOf } from "@/lib/compound/asset-catalog";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<CompoundPositionSummary["status"], string> = {
   open: "Open",

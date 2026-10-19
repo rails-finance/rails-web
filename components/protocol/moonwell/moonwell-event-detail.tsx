@@ -54,17 +54,11 @@ import {
 } from "@/lib/moonwell/event-provenance";
 import { useMoonwellCoords, useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
-import {
-  decimalSub,
-  formatCompact,
-  formatExact,
-  formatExactFromString,
-  formatNumber,
-  formatUsdValue,
-} from "@/lib/utils/format";
+import { decimalSub, formatExact, formatExactFromString, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { pillPriceChips, useCTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface MoonwellCellsInput {
   ctx: MoonwellContext;

@@ -14,8 +14,9 @@ import { forkLiveVocab, FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { pct } from "@/components/shared/ratio-bar";
-import { formatApproximate, formatExact, formatPrice } from "@/lib/utils/format";
+import { formatExact, formatPrice } from "@/lib/utils/format";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 // A debt-token figure: the figure, then the token's icon.
 const amount = (figure: ReactNode, symbol: string) => <TokenFigure symbol={symbol}>{figure}</TokenFigure>;
@@ -33,7 +34,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
       label: "Debt in front",
       value: amount(
         <Prov info={vocab.debtInFrontProv(chain.symbol)} value={formatExact(chain.debtInFront)} symbol={debtSym}>
-          {formatApproximate(chain.debtInFront)}
+          {formatCompact(chain.debtInFront)}
         </Prov>,
         debtSym,
       ),
@@ -78,7 +79,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
       label: "Costs per year",
       value: amount(
         <Prov info={costsProv} value={formatExact(annualCost)}>
-          ~{formatApproximate(annualCost)}
+          ~{formatCompact(annualCost)}
         </Prov>,
         debtSym,
       ),
@@ -109,7 +110,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
       tip: `How much more ${debtSym} this Trove could borrow before its collateral ratio falls to the branch's ${pct(chain.mcr)} minimum, at today's price. Below that minimum it can be liquidated.`,
       value: amount(
         <Prov info={roomProv} value={formatExact(room)} symbol={debtSym}>
-          {formatApproximate(room)}
+          {formatCompact(room)}
         </Prov>,
         debtSym,
       ),

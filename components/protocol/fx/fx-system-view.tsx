@@ -36,7 +36,7 @@ import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { VitalsBand } from "@/components/shared/vitals-band";
 import { Stat } from "@/components/shared/stat";
-import { formatCompact, formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
+import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
 import type { FxPoolSystem, FxSystemChainResponse, FxTickRow } from "@/lib/sources/chain/fx-system";
 import {
   poolRosterProv,
@@ -71,6 +71,7 @@ import {
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 // A percentage with the false-zero guard: a tick holding 1e-12 fxUSD of the
 // pool must never render as "0.0%" — holding something is why it is listed.

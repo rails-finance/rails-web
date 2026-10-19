@@ -50,14 +50,7 @@ import { StatValue } from "@/components/shared/stat-value";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import {
-  formatCompact,
-  formatExact,
-  formatNumber,
-  formatUnitsExact,
-  formatUsdValue,
-  withRealMinus,
-} from "@/lib/utils/format";
+import { formatExact, formatNumber, formatUnitsExact, formatUsdValue, withRealMinus } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { latestStateProv, lifetimeLegProv, peakProv } from "@/lib/polaris/event-provenance";
@@ -95,6 +88,7 @@ import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import { AmountText } from "@/components/shared/amount-text";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface PolarisPositionView {
   market: PolarisMarket;

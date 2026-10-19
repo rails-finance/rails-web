@@ -37,7 +37,11 @@ import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel, yearlyDebtC
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
-import { fmtUsd, hfLabelV4, fmtYearly, fmtLiqPrice } from "@/lib/aave-v4/format";
+import { fmtUsd, hfLabelV4, fmtLiqPrice } from "@/lib/aave-v4/format";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { formatUsdValue } from "@/lib/utils/format";
+import { AssetAmount } from "@/components/shared/asset-amount";
+import { TokenFigure } from "@/components/shared/token-figure";
 import {
   AaveV4PositionExplanation,
   AaveV4ClosedExplanation,
@@ -46,6 +50,8 @@ import { aaveV4PositionModal } from "@/lib/aave-v4/event-templates";
 import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
+  accumProv,
+  chainTruthProv,
   usdProvOnchain,
   healthFactorProv,
   interestSinceZeroProv,
@@ -62,7 +68,7 @@ import {
   SUPPLY_USD_PROV,
   YEARLY_COST_PROV,
 } from "@/lib/aave-v4/position-provenance";
-import { listSymbols, PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
+import { PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 
@@ -104,6 +110,36 @@ function HeadlineUsd({
       <Prov info={info}>{v.display}</Prov>
     </RevealTip>
   );
+}
+
+/** A side holding one asset: its amount with its icon, and the USD line
+ *  beneath in cents (the Liquity V2 headline). The amount is the spoke's
+ *  balance where the chain read has landed (`chainBalances`), else the
+ *  events' sum. The USD follows `HeadlineUsd`'s rule: the oracle figure,
+ *  else the fallback price's, and no line where no source prices the asset. */
+function oneAssetHead(
+  leg: { symbol: string; amount: number },
+  what: string,
+  chainBalances: boolean,
+  defillamaUsd: number,
+  onchainUsd: number | null | undefined,
+  derivedProv: Provenance,
+  unpricedSymbols: string[],
+): Pick<PositionCardHead, "value" | "usd"> {
+  const unpriced = onchainUsd == null && unpricedSymbols.includes(leg.symbol);
+  const usd = onchainUsd ?? defillamaUsd;
+  return {
+    value: (
+      <Prov info={chainBalances ? chainTruthProv(what) : accumProv(what, { formula: "in − out" })}>
+        <AssetAmount value={leg.amount} symbol={leg.symbol} />
+      </Prov>
+    ),
+    usd: unpriced ? null : (
+      <Prov info={onchainUsd != null ? usdProvOnchain(what) : derivedProv}>
+        <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
+      </Prov>
+    ),
+  };
 }
 
 /** A closed card's peak, muted as a historic figure. */
@@ -206,9 +242,11 @@ function liquidationRow(spoke: AaveSpokeCardInfo): PositionPanelRow | null {
       value: (
         <span className="inline-flex items-center gap-1">
           <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
-          <Prov info={liqRatioProv(coll, debt)}>
-            {a.liqRatio.toLocaleString("en-US", { maximumFractionDigits: 4 })} {debt}
-          </Prov>
+          <TokenFigure symbol={a.symbol}>
+            <Prov info={liqRatioProv(coll, debt)}>
+              {a.liqRatio.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+            </Prov>
+          </TokenFigure>
         </span>
       ),
     };
@@ -358,22 +396,45 @@ export function useAaveV4SpokeCardSlots({
   const cluster = (symbols: string[]) => (symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined);
   const onc = spoke.onchainUsd;
 
+  // A side of one asset states its amount, the dollars beneath; a side of
+  // several, compact dollars with the icons.
+  const chainBalances = spoke.healthFactorBasis != null;
+  const supplyLegs = (spoke.supplyLegs ?? []).filter((l) => l.amount > 0);
+  const debtLegs = (spoke.debtLegs ?? []).filter((l) => l.amount > 0);
+  const collLegs = supplyLegs.filter((l) => l.collateralEnabled);
+  const single = <T,>(legs: T[], symbols: string[]): T | null =>
+    legs.length === 1 && symbols.length === 1 ? legs[0] : null;
+  const oneSupply = single(supplyLegs, spoke.supplyingSymbols);
+  const oneColl = single(collLegs, spoke.supplyBreakdown.collateralSymbols);
+  const oneDebt = single(debtLegs, spoke.borrowingSymbols);
   const heads: PositionCardHead[] = supplyOnly
     ? [
         {
           id: "supplied",
           label: "Supplied",
-          pending: supplyUsdPending,
-          assets: cluster(spoke.supplyingSymbols),
-          value: (
-            <HeadlineUsd
-              defillamaUsd={spoke.totalSupplyUsd}
-              onchainUsd={onc?.supply}
-              derivedProv={SUPPLY_USD_PROV}
-              onchainLabel="Currently supplied"
-              unpricedSymbols={spoke.unpricedSymbols}
-            />
-          ),
+          ...(oneSupply
+            ? oneAssetHead(
+                oneSupply,
+                "Currently supplied",
+                chainBalances,
+                spoke.totalSupplyUsd,
+                onc?.supply,
+                SUPPLY_USD_PROV,
+                spoke.unpricedSymbols,
+              )
+            : {
+                pending: supplyUsdPending,
+                assets: cluster(spoke.supplyingSymbols),
+                value: (
+                  <HeadlineUsd
+                    defillamaUsd={spoke.totalSupplyUsd}
+                    onchainUsd={onc?.supply}
+                    derivedProv={SUPPLY_USD_PROV}
+                    onchainLabel="Currently supplied"
+                    unpricedSymbols={spoke.unpricedSymbols}
+                  />
+                ),
+              }),
         },
       ]
     : [
@@ -383,31 +444,55 @@ export function useAaveV4SpokeCardSlots({
           // lives in the health factor.
           id: "collateral",
           label: CARD_VOCAB.collateral,
-          pending: supplyUsdPending,
-          assets: cluster(spoke.supplyBreakdown.collateralSymbols),
-          value: (
-            <HeadlineUsd
-              defillamaUsd={spoke.supplyBreakdown.collateralUsd}
-              onchainUsd={onc?.collateral}
-              derivedProv={COLL_USD_PROV}
-              onchainLabel="Current collateral"
-              unpricedSymbols={spoke.unpricedSymbols}
-            />
-          ),
+          ...(oneColl
+            ? oneAssetHead(
+                oneColl,
+                "Current collateral",
+                chainBalances,
+                spoke.supplyBreakdown.collateralUsd,
+                onc?.collateral,
+                COLL_USD_PROV,
+                spoke.unpricedSymbols,
+              )
+            : {
+                pending: supplyUsdPending,
+                assets: cluster(spoke.supplyBreakdown.collateralSymbols),
+                value: (
+                  <HeadlineUsd
+                    defillamaUsd={spoke.supplyBreakdown.collateralUsd}
+                    onchainUsd={onc?.collateral}
+                    derivedProv={COLL_USD_PROV}
+                    onchainLabel="Current collateral"
+                    unpricedSymbols={spoke.unpricedSymbols}
+                  />
+                ),
+              }),
         },
         {
           id: "debt",
           label: CARD_VOCAB.debt,
-          assets: cluster(spoke.borrowingSymbols),
-          value: (
-            <HeadlineUsd
-              defillamaUsd={spoke.totalDebtUsd}
-              onchainUsd={onc?.debt}
-              derivedProv={DEBT_USD_PROV}
-              onchainLabel="Current debt"
-              unpricedSymbols={spoke.unpricedSymbols}
-            />
-          ),
+          ...(oneDebt
+            ? oneAssetHead(
+                oneDebt,
+                "Current debt",
+                chainBalances,
+                spoke.totalDebtUsd,
+                onc?.debt,
+                DEBT_USD_PROV,
+                spoke.unpricedSymbols,
+              )
+            : {
+                assets: cluster(spoke.borrowingSymbols),
+                value: (
+                  <HeadlineUsd
+                    defillamaUsd={spoke.totalDebtUsd}
+                    onchainUsd={onc?.debt}
+                    derivedProv={DEBT_USD_PROV}
+                    onchainLabel="Current debt"
+                    unpricedSymbols={spoke.unpricedSymbols}
+                  />
+                ),
+              }),
         },
         {
           id: "health-factor",
@@ -437,7 +522,12 @@ export function useAaveV4SpokeCardSlots({
           id: "unpriced",
           label: "Not in the totals",
           tip: "Assets held here that no price source covers. The dollar figures above leave them out and are marked partial.",
-          value: `${listSymbols(spoke.unpricedSymbols)}, no price source`,
+          value: (
+            <span className="inline-flex flex-wrap items-center gap-x-1.5">
+              <InlineAssetCluster symbols={spoke.unpricedSymbols} size={16} overlap={4} max={6} />
+              no price source
+            </span>
+          ),
         }
       : null;
 
@@ -501,9 +591,11 @@ export function useAaveV4SpokeCardSlots({
           label: "Costs per year",
           tip: "What the debt costs in a year at the latest borrow rate, in the borrowed token, if the rate and the debt stay where they are.",
           value: (
-            <span>
-              ~<Prov info={YEARLY_COST_PROV}>{fmtYearly(yearly.amount)}</Prov> {aaveV4DisplaySymbol(yearly.symbol)}
-            </span>
+            <TokenFigure symbol={yearly.symbol}>
+              <span>
+                ~<Prov info={YEARLY_COST_PROV}>{formatCompact(yearly.amount)}</Prov>
+              </span>
+            </TokenFigure>
           ),
         }
       : null;

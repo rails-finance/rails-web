@@ -131,11 +131,12 @@ export function PositionCardMeta({
         })()}
       {showRedemption &&
         (() => {
-          const label = `Redeemed against ${redemptionCount} time${redemptionCount === 1 ? "" : "s"}`;
+          const n = redemptionCount as number;
+          const label = `Redeemed against ${n.toLocaleString("en-US")} time${n === 1 ? "" : "s"}`;
           return (
             <RevealTip tip={label} label={label} focusable className="text-caution-400 focus-ring rounded-sm">
               <Icon name="triangle" size={12} />
-              <span className="ml-1 font-semibold">{redemptionCount}</span>
+              <span className="ml-1 font-semibold">{n.toLocaleString("en-US")}</span>
             </RevealTip>
           );
         })()}

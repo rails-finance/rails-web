@@ -23,7 +23,6 @@
 // here keeps the driver's behaviour identical for every other protocol.
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { formatCompact } from "@/lib/shared/format-event";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import {
   poolCashProv,
@@ -36,6 +35,7 @@ import { Stat } from "@/components/shared/stat";
 import { MAPLE_POOL_BY_KEY } from "@/lib/maple/asset-catalog";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, MaplePoolState> }) {
   const registry = useReceiptRegistry();
@@ -51,9 +51,9 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
             const pctLiquid = s.totalAssets > 0 ? (s.cash / s.totalAssets) * 100 : null;
             const pctLoans = s.totalAssets > 0 ? (s.loansAum / s.totalAssets) * 100 : null;
             const queueValue = mapleExitAssets(s.raw.queueShares, s);
-            const cash = formatCompact(s.cash);
-            const loans = formatCompact(s.loansAum);
-            const queue = formatCompact(queueValue);
+            const cash = formatCompactTitled(s.cash);
+            const loans = formatCompactTitled(s.loansAum);
+            const queue = formatCompactTitled(queueValue);
             return (
               <div key={s.pool} className="rounded-xl bg-raised px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -114,8 +114,8 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                   <div className="mt-2 text-xs text-rb-500">
                     <Prov info={poolUnrealizedLossesProv(cat.assetSymbol, s.blockNumber)}>
                       <span>
-                        impairment live: {formatCompact(s.unrealizedLosses).display} {cat.assetSymbol} marked — exits
-                        realize it
+                        impairment live: {formatCompactTitled(s.unrealizedLosses).display} {cat.assetSymbol} marked —
+                        exits realize it
                       </span>
                     </Prov>
                   </div>

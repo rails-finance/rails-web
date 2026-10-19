@@ -22,7 +22,7 @@ import {
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import {
   custodySharesProv,
   custodySupplyShareProv,
@@ -33,6 +33,7 @@ import type { CcipEscrow } from "@/lib/shared/known-infrastructure";
 import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 import { MapleMenuRows } from "./maple-menu-rows";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** The first headline: what the locked shares redeem for, in the pool's own
  *  asset, or shares alone when the value derivation degraded. */

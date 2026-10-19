@@ -5,9 +5,9 @@
 
 import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/lib/sources/api/frankencoin-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<FrankencoinPositionStatus, string> = {
   open: "Open",

@@ -30,12 +30,13 @@
 import type { ReactNode } from "react";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { formatCompact, formatExact } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
 import { formatPethPrice } from "@/components/protocol/polaris/polaris-position-card";
 import { formatDuration } from "@/lib/date";
 import { polarisProtocolLegNames, signedFigure, type PolarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const DUST = 1e-9;
 

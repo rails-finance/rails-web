@@ -46,7 +46,7 @@ import { Icon } from "@/components/icons/icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { useDustLines } from "@/components/shared/dust-reserves";
 import { ExactSpan } from "@/components/shared/amount-text";
-import { formatUnitsExact, formatCompact, formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
+import { formatUnitsExact, formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import {
   compoundUsdProvOnchain,
@@ -68,6 +68,7 @@ import type {
   CompoundBaseAmount,
   CompoundCurrentBase,
 } from "@/lib/sources/api/compound-positions";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** Highest-recorded amounts over a position's life (closed/liquidated cards). */
 interface CompoundPeak {

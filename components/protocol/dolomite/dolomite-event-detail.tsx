@@ -56,12 +56,12 @@ import { pillPriceChips, useCTokenLedgerCells } from "@/components/shared/ctoken
 import {
   decimalSub,
   formatNumber,
-  formatCompact,
   formatExact,
   formatExactDecimal,
   formatUnitsExact,
   formatUsdValue,
 } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface DolomiteCellsInput {
   ctx: DolomiteContext;

@@ -47,7 +47,7 @@ import type { EventPriceChip } from "@/components/shared/event-price-row";
 import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
 import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
 import { usdShown } from "@/lib/shared/usd-display";
-import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import {
   assetTokenSum,
@@ -105,6 +105,7 @@ import {
   type Figure,
   type TouchedLeg,
 } from "./aave-v3-position-state";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 type Side = "supply" | "debt";
 const ZERO = BigInt(0);

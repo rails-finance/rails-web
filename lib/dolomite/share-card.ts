@@ -11,8 +11,8 @@ import type {
 } from "@/lib/sources/api/dolomite-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
-import { formatCompact } from "@/lib/utils/format";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<DolomitePositionStatus, string> = {
   open: "Open",

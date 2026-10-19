@@ -40,7 +40,7 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   positionCurrentProv,
@@ -72,6 +72,7 @@ import {
   dolomiteHasRisk,
   dolomiteRiskRows,
 } from "@/components/protocol/dolomite/dolomite-risk-slot";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface DolomitePositionView {
   owner: string;

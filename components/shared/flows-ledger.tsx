@@ -22,7 +22,7 @@ import {
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 import {
   type ChainTruthTowerData,
   type TowerLine,
@@ -30,6 +30,7 @@ import {
   lineScalar,
 } from "@/lib/shared/chain-truth-economics";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 // ── Colour grammar (shared with the Aave reference tower) ────────────────────
 const COLL_SOLID = "bg-blue-500"; // collateral held

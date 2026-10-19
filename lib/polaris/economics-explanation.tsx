@@ -4,9 +4,10 @@
 
 import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { formatCompact, formatExact } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
 import { polarisPsmOutcomeAtFeed, type PolarisLifetime } from "./economics";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const DUST = 1e-9;
 

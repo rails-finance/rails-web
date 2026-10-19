@@ -201,6 +201,9 @@ export interface AaveSpokeCardInfo {
   }[];
   /** The debt held now, per asset, at the price the card values it. */
   debtLegs?: { symbol: string; amount: number; price: number }[];
+  /** The supplies held now, per asset, at the price the card values them: a
+   *  side of one asset states its amount (ui-jobs 377). */
+  supplyLegs?: { symbol: string; amount: number; price: number; collateralEnabled: boolean }[];
   /** Remaining USD that can be borrowed before HF=1. */
   borrowingPowerUsd: number;
   /** True when the wallet has ever been liquidated on this spoke. Drives the
@@ -985,6 +988,7 @@ export function buildSpokeCards(
       liqPrice,
       assetLiqPrices,
       debtLegs: calcDebts,
+      supplyLegs: calcSupplies,
       borrowingPowerUsd: calcResult.borrowCapacityUsd,
       wasLiquidated,
       endedByLiquidation: g.result.lastAction === "liquidation",

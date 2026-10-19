@@ -11,10 +11,11 @@
 
 import { Stat } from "@/components/shared/stat";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { formatCompact, formatUsd } from "@/lib/shared/format-event";
+import { formatUsd } from "@/lib/shared/format-event";
 import type { FxPoolStatsSummary } from "@/lib/sources/api/fx-stats";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
 import type { FxListingPrice } from "@/components/protocol/fx/fx-position-card";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 export function FxPoolStatsBand({
   pools,
@@ -29,8 +30,8 @@ export function FxPoolStatsBand({
   return (
     <div className="mb-6 grid gap-3 sm:grid-cols-2">
       {pools.map((p) => {
-        const coll = p.totalColls != null ? formatCompact(p.totalColls) : null;
-        const debt = p.totalDebts != null ? formatCompact(p.totalDebts) : null;
+        const coll = p.totalColls != null ? formatCompactTitled(p.totalColls) : null;
+        const debt = p.totalDebts != null ? formatCompactTitled(p.totalDebts) : null;
         const a = anchors?.[p.pool];
         const price = a ? a.anchor : p.oraclePriceUsd;
         const collUsd = a && p.totalColls != null ? p.totalColls * a.anchor : p.totalCollUsd;

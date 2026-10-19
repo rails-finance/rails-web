@@ -56,13 +56,7 @@ import { formatMonthDayYear } from "@/lib/date";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { troveCardTips } from "@/lib/liquity/trove-card-tips";
 import type { PositionPanelRow } from "@/components/shared/position-card-panel";
-import {
-  formatApproximate,
-  formatExactFromString,
-  formatPrice,
-  formatUnitsExact,
-  formatUsdValue,
-} from "@/lib/utils/format";
+import { formatExactFromString, formatPrice, formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { getLiquidationThreshold, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
@@ -135,6 +129,7 @@ import type {
   LiquityTroveSurplus,
   LiquityTroveView,
 } from "./types";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 // The shared card renders inside Link-wrapped rows on
 // listing/umbrella pages, so an inner <a> would nest anchors (invalid HTML,
@@ -694,7 +689,7 @@ export function useLiquityCardSlots({
                 variant="card"
                 className="text-rb-500"
               >
-                {formatApproximate(v.peakDebt)}
+                {formatCompact(v.peakDebt)}
               </HighlightableValue>
             </Prov>
           ) : null,
@@ -763,7 +758,7 @@ export function useLiquityCardSlots({
         value: (
           <Prov info={fp.debt} value={exactOf(debt, lv?.entireDebtRaw, 18)}>
             <HighlightableValue type="debt" state="after" value={debt} className="text-foreground/80">
-              <FadeNumber value={debt} formatFn={formatApproximate} animateOnMount={animate} />
+              <FadeNumber value={debt} formatFn={formatCompact} animateOnMount={animate} />
             </HighlightableValue>
           </Prov>
         ),

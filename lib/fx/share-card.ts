@@ -5,8 +5,8 @@
 
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export function fxShareCardModel(position: FxPositionSummary | null, subject: string): PositionCardModel | null {
   // No summary row for this pool/id — `positionImage` degrades to the static

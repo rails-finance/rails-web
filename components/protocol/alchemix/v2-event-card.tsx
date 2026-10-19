@@ -33,7 +33,6 @@ import {
 } from "@/components/shared/chain-truth-event";
 import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
-import { formatCompact } from "@/lib/shared/format-event";
 import type { GasCost } from "@/lib/shared/types/event-shape";
 import type { AlchemixV2Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { ChainId } from "@/lib/shared/chains";
@@ -41,6 +40,7 @@ import { v2EmittedProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenan
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { ALCHEMIX_V2 } from "@/lib/alchemix/learn-more";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 export type AlchemixV2Event = BaseActivityEvent & { context: { protocol: "alchemix-v2"; data: AlchemixV2Context } };
 
@@ -140,7 +140,7 @@ function spine(d: AlchemixV2Context, a: Amount | null): SpineTokenRow[] {
       symbol: a.symbol,
       address: a.address,
       direction: toward,
-      value: a.shares ? `${formatCompact(a.value).display} shares` : a.value,
+      value: a.shares ? `${formatCompactTitled(a.value).display} shares` : a.value,
     },
   ];
 }

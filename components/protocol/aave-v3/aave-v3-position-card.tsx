@@ -44,9 +44,10 @@ import { ExactSpan } from "@/components/shared/amount-text";
 import { DustToggle, splitDust, useDustOpen } from "@/components/shared/dust-reserves";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatDate } from "@/lib/date";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
-import { fmtLiqPrice, fmtUsd } from "@/lib/aave-v4/format";
+import { formatUsdValue } from "@/lib/utils/format";
+import { fmtLiqPrice } from "@/lib/aave-v4/format";
 import { CARD_VOCAB, ratioLabel, notRecordedNote } from "@/lib/shared/card-vocab";
 import {
   accountDataProv,
@@ -66,6 +67,7 @@ import {
 import { aaveV3PositionModal, type AaveV3Deployment } from "@/lib/aave-v3/event-templates";
 import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aave-v3-positions";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
+import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -186,7 +188,6 @@ function scaleRaw(raw: string | null | undefined, decimals: number): number {
   return Number(rawBigInt(raw)) / 10 ** decimals;
 }
 
-/** A side's oracle-USD total as a headline figure, its cents on hover. */
 /** The headlines' read-mores on a detail card. */
 const SIDE_TIP = {
   supply:
@@ -196,10 +197,12 @@ const SIDE_TIP = {
 const HF_TIP =
   "The collateral, each asset counted up to its liquidation threshold, divided by the debt. Below 1 the account can be liquidated.";
 
+/** A side's oracle-USD total as a compact headline figure, its cents on
+ *  hover. */
 function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
   return (
-    <RevealTip tip={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
-      <Prov info={info}>{formatUsd(usd)}</Prov>
+    <RevealTip tip={formatUsdValue(usd)}>
+      <Prov info={info}>{formatCompactUsd(usd)}</Prov>
     </RevealTip>
   );
 }
@@ -442,7 +445,7 @@ export function useAaveV3CardSlots({
         usd:
           usd != null ? (
             <Prov info={dep.usd(usdWhat)}>
-              <span className="font-bold text-green-400">{formatUsd(usd)}</span>
+              <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
             </Prov>
           ) : pending ? (
             <span className="inline-block h-3 w-16 animate-pulse rounded-md bg-rb-200 dark:bg-rb-700" />
@@ -578,7 +581,7 @@ export function useAaveV3CardSlots({
           ? "The interest inside the supplied balance, in dollars: what the balance holds beyond its deposits and withdrawals since it last started from zero."
           : "The interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
       sub: since != null ? `since ${formatDate(since)}` : undefined,
-      value: <Prov info={dep.interestCaption(side)}>{formatUsd(usd)}</Prov>,
+      value: <Prov info={dep.interestCaption(side)}>{formatCompactUsd(usd)}</Prov>,
     };
   };
 
@@ -625,7 +628,7 @@ export function useAaveV3CardSlots({
           tip: "How much more the account can borrow, in dollars, before it reaches its loan-to-value limit, as the Pool gives it at the latest block.",
           value: (
             <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", chainPool)}>
-              {fmtUsd(chain.availableBorrowsUsd).display}
+              {formatCompactUsd(chain.availableBorrowsUsd)}
             </Prov>
           ),
         }
@@ -645,7 +648,7 @@ export function useAaveV3CardSlots({
           value: (
             <span className="inline-flex items-center gap-1">
               <TokenChipIcon symbol={liq.sameAsset.symbol} size={14} filterable={false} />
-              {liq.sameAsset.symbol} on both sides: only interest moves it
+              on both sides: only interest moves it
             </span>
           ),
         }

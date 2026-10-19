@@ -18,9 +18,9 @@ import type { MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
 import { marketLabel } from "@/lib/morpho/asset-catalog";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** Neutral HF headline — matches the Aave V3 / Moonwell Base mappers'
  *  identical reading (the ratio stops meaning anything as a number once it

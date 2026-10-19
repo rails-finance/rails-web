@@ -51,11 +51,11 @@ import type {
   AlchemixUnderlyingValue,
   AlchemixUsdValue,
 } from "@/types/api/alchemix";
-import { formatCompact } from "@/lib/shared/format-event";
 import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import { BlockRef } from "@/components/shared/block-ref";
 import { isStableDenominated } from "@/lib/aave-v4/asset-class";
 import { DEPEG_BAND } from "@/lib/shared/usd-display";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 /** A vault share price at the asset underneath's own precision, up to six
  *  places (1.000934 USDC), so the share count times it gives the value the
@@ -84,7 +84,7 @@ export function alchemixChip(symbol: string): ReactNode {
 /** An amount as a headline figure: the compact form, the exact one on hover,
  *  inside its receipt where the surface has one. */
 export function alchemixAmountFigure(a: AlchemixAmount, unit: string, prov?: Provenance): ReactNode {
-  const { display, title } = formatCompact(a.formatted);
+  const { display, title } = formatCompactTitled(a.formatted);
   const figure = (
     <span title={title} className="tabular-nums">
       {display}
@@ -115,7 +115,7 @@ export function collateralUsdText(
   if (underlying.symbol && isStableDenominated(underlying.symbol) && Math.abs(usd.pricePerUnit - 1) <= DEPEG_BAND)
     return null;
   if (usd.usd > 0 && usd.usd < 0.01) return "< $0.01";
-  return `$${formatCompact(usd.usd).display}`;
+  return `$${formatCompactTitled(usd.usd).display}`;
 }
 
 /** The Deposited headline, on either surface. What a holder recognises is the
@@ -140,7 +140,7 @@ export function depositedHead(
   const u = c.underlying;
   const shares = (
     <span className="tabular-nums">
-      {formatCompact(c.formatted).display} {myt}
+      {formatCompactTitled(c.formatted).display} {myt}
     </span>
   );
   const sharesNode = prov?.shares ? (

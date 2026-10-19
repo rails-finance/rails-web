@@ -9,6 +9,7 @@
 // carries at most 4 headlines and 6 stats; a stat's label reads on its own.
 import type { ReactNode } from "react";
 import { HeadingTip } from "@/components/shared/tip-label";
+import { TokenFigure } from "@/components/shared/token-figure";
 
 export interface PositionPanelRow {
   /** Stable key, and the row's `data-panel-row`. */
@@ -19,6 +20,11 @@ export interface PositionPanelRow {
   sub?: ReactNode;
   /** The row's read-more, opened from a "?" after the label on a click. */
   tip?: string;
+  /** The token `value` is stated in: its icon follows the figure, at panel
+   *  size, and opens the asset panel (the ticker and, with `figure`, the exact
+   *  amount). A value in dollars, a ratio, a count or a percentage has none.
+   *  A row stating several tokens draws `TokenFigure` per figure instead. */
+  asset?: { symbol: string; address?: string; figure?: string };
 }
 
 /** The family's two lists, left then right; the grid reads them in order. */
@@ -38,7 +44,15 @@ function Stat({ r }: { r: PositionPanelRow }) {
         <HeadingTip text={r.label} tip={r.tip} />
         {r.sub != null && <span className="block font-normal">{r.sub}</span>}
       </dt>
-      <dd className="min-w-0 pb-4 text-base font-semibold tabular-nums text-foreground">{r.value}</dd>
+      <dd className="min-w-0 pb-4 text-base font-semibold tabular-nums text-foreground">
+        {r.asset && r.value != null ? (
+          <TokenFigure symbol={r.asset.symbol} address={r.asset.address} figure={r.asset.figure}>
+            {r.value}
+          </TokenFigure>
+        ) : (
+          r.value
+        )}
+      </dd>
     </div>
   );
 }

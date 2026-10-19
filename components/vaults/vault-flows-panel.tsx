@@ -20,8 +20,8 @@ import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubb
 import { vaultFlowsContent } from "@/lib/shared/learn-more-content";
 import type { VaultPositionEconomics, VaultPositionFlows } from "@/lib/aave-vaults/position-economics";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
-import { formatCompact } from "@/lib/utils/format";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 /** The figures behind the share and asset sums, as the feeder has them. */
 const sum = (xs: number[]): string => String(xs.reduce((a, b) => a + b, 0));

@@ -15,10 +15,10 @@
 
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import { splitMorphoPositionId } from "@/lib/morpho/position-id";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<MorphoPositionSummary["status"], string> = {
   open: "Open",

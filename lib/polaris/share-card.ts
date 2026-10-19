@@ -9,11 +9,11 @@
 import type { PolarisPositionSummary, PolarisPositionStatus } from "@/lib/sources/api/polaris-positions";
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { holderCardModel } from "@/lib/share/holder-card";
 import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
 import { positionNounPlural } from "@/lib/shared/protocols";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<PolarisPositionStatus, string> = {
   open: "Open",

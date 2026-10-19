@@ -49,7 +49,7 @@ import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
 import { CLAIMABLE_BY_OWNER, CLAIMABLE_WHERE } from "@/lib/shared/liquity-coll-surplus-provenance";
 import { surplusClaimableProv, surplusUsdProv } from "@/lib/liquity-v1/event-provenance";
-import { formatCompact, formatUsdValue } from "@/lib/utils/format";
+import { formatUsdValue } from "@/lib/utils/format";
 import { fmtEth, fmtLusd } from "@/lib/liquity-v1/event-figures";
 import {
   LiquityV1RiskHeadline,
@@ -57,6 +57,7 @@ import {
   liquityV1Panel,
   liquityV1RecoveryNotice,
 } from "@/components/protocol/liquity-v1/liquity-v1-risk-slot";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface LiquityV1PositionView {
   wallet: string;

@@ -16,7 +16,7 @@
 import { Prov } from "@/components/shared/provenance";
 import type { PositionCardHead, PositionPanelRow } from "@/components/shared/position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
-import { formatUsd } from "@/lib/shared/format-event";
+import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { moonwellCapacityProv, comptrollerVerdictProv, type MoonwellLane } from "@/lib/moonwell/position-provenance";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
@@ -51,7 +51,7 @@ function ShareValue({ chain }: { chain: MoonwellChainResponse }) {
 
 function RoomValue({ chain }: { chain: MoonwellChainResponse }) {
   const lane = useLane();
-  return <Prov info={comptrollerVerdictProv("Account liquidity", lane)}>{formatUsd(chain.liquidityUsd)}</Prov>;
+  return <Prov info={comptrollerVerdictProv("Account liquidity", lane)}>{formatCompactUsd(chain.liquidityUsd)}</Prov>;
 }
 
 /** Whether the read states a health factor: debt and capacity both stand. */

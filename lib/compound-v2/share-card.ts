@@ -13,10 +13,10 @@
 import type { CompoundV2PositionSummary } from "@/lib/sources/api/compound-v2-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import { largestCompoundAsset, type CompoundAssetLike } from "@/lib/compound/share-card";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<CompoundV2PositionSummary["status"], string> = {
   open: "Open",

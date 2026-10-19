@@ -17,7 +17,8 @@ import {
   liquidationBuffer,
   yearlyDebtCost,
 } from "@/lib/aave-v4/spoke-cards";
-import { fmtUsd, hfProseV4, fmtLiqPrice, fmtYearly } from "@/lib/aave-v4/format";
+import { fmtUsd, hfProseV4, fmtLiqPrice } from "@/lib/aave-v4/format";
+import { formatCompact } from "@/lib/shared/format-compact";
 import { useSpokeCollateralFactors } from "@/lib/aave-v4/use-spoke-collateral-factors";
 import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
@@ -266,7 +267,7 @@ function openBullets(spoke: AaveSpokeCardInfo): { lead: ReactNode; bullets: Bull
     const yearly =
       y && y.amount > 0 ? (
         <H>
-          <Prov info={YEARLY_COST_PROV}>{fmtYearly(y.amount)}</Prov> {aaveV4DisplaySymbol(y.symbol)}
+          <Prov info={YEARLY_COST_PROV}>{formatCompact(y.amount)}</Prov> {aaveV4DisplaySymbol(y.symbol)}
         </H>
       ) : null;
     // The rate names its asset where the position has borrowed more than one.

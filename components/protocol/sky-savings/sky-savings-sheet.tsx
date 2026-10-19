@@ -12,7 +12,6 @@
 import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
 import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow } from "@/components/shared/event-sheet";
 import type { Provenance } from "@/components/shared/provenance";
-import { formatCompact } from "@/lib/utils/format";
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
 import { exact, fixed6, skyTransition, units } from "@/lib/sky-savings/math";
 import type { SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
@@ -24,6 +23,7 @@ import {
   eventValueProv,
   type SkyEventCoords,
 } from "@/lib/sky-savings/provenance";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const WORDS = {
   side: "Savings",

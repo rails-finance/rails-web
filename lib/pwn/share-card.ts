@@ -18,11 +18,11 @@
 
 import type { PwnPositionSummary, PwnAsset } from "@/lib/sources/api/pwn-positions";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import { shortTokenId } from "@/lib/pwn/asset-catalog";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { loanCost, pwnLoanState, viewFromSummary } from "@/lib/pwn/economics";
+import { formatCompact } from "@/lib/shared/format-compact";
 
 const STATUS_WORD: Record<ReturnType<typeof pwnLoanState>, string> = {
   running: "Open",
