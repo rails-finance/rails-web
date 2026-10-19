@@ -32,6 +32,9 @@ export interface CompoundPageWords {
   emptyNowHistory: { loading: string; notWhole: string; failed: string };
   /** "Base’s" in the line above the sections. */
   chainPossessive: string;
+  /** A store that reads a wallet's history on its first request: while it
+   *  reads, and once the page has stopped asking. */
+  firstRead?: { reading: string; still: string };
 }
 
 export interface CompoundPageDeployment {
@@ -52,6 +55,10 @@ export interface CompoundPageDeployment {
   /** A history that did not come from the index is asked again for a while,
    *  for its balances (Base's sweep). */
   askIndexAgain: boolean;
+  /** A history that is not yet the whole life (the store's confirmation
+   *  pending) is asked again for a while, and the Lifetime flows panel waits
+   *  for the whole life instead of stating a failed read. */
+  askUntilWhole?: boolean;
   /** What the rows say in place of a balance the history does not carry,
    *  when the page does not ask again. */
   balanceRead: CompoundBalanceRead;

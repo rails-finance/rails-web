@@ -43,7 +43,7 @@ import { morphoHasCollateralRaw, morphoHasDebt } from "@/lib/morpho/position-leg
 import { explorerUrl } from "@/lib/shared/chains";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
-import { SweepInFlight } from "@/components/shared/sweep-in-flight";
+import { StoreFirstRead, SweepInFlight } from "@/components/shared/sweep-in-flight";
 
 /** The receipts a hub row's LIVE card cites — the same head read of the
  *  singleton the position page's own live card names, not a listing row of
@@ -101,6 +101,7 @@ export function MorphoWalletView({
     error,
     timeline,
     timelineState,
+    firstReadStalled,
     sweptClean,
     captureSource,
     chainByMarket,
@@ -277,6 +278,8 @@ export function MorphoWalletView({
               </div>
             ) : timelineState === "loading" ? (
               <SweepInFlight>{w.reading}</SweepInFlight>
+            ) : timelineState === "first-read" ? (
+              <StoreFirstRead words={w.firstRead} stalled={firstReadStalled} />
             ) : (
               <p className="py-6 text-center text-sm text-rb-500">
                 {timelineState === "unavailable" ? w.unavailableWallet : w.failedWallet}

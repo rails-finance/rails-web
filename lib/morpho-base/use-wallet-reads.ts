@@ -29,7 +29,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ChainTimelineUnavailable } from "@/lib/api/fetch-chain-timeline";
+import { ChainTimelinePending, ChainTimelineUnavailable } from "@/lib/api/fetch-chain-timeline";
+import { FIRST_READ_ASKS, FIRST_READ_GAP_MS, WHOLE_ASKS, WHOLE_GAP_MS } from "@/lib/shared/store-history-asks";
 import { fetchMorphoBaseTimeline, type MorphoChainTimelineResponse } from "@/lib/api/fetch-morpho-base-timeline";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
 import { fetchMorphoBaseWallet, type MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
@@ -38,7 +39,9 @@ import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { MorphoPageDeployment } from "@/lib/morpho/page-deployment";
 import { MORPHO_BASE_PAGE } from "@/lib/morpho-base/page-deployment";
 
-export type MorphoBaseTimelineState = "loading" | "ready" | "unavailable" | "failed";
+/** `first-read`: the store is reading this wallet's history for the first
+ *  time, and the hook asks again. */
+export type MorphoBaseTimelineState = "loading" | "first-read" | "ready" | "unavailable" | "failed";
 
 export interface MorphoBaseWalletReads {
   /** The slot read; null until it answers. */
@@ -49,6 +52,8 @@ export interface MorphoBaseWalletReads {
   error: string | null;
   timeline: MorphoChainTimelineResponse | null;
   timelineState: MorphoBaseTimelineState;
+  /** The hook has stopped asking a store that is still on its first read. */
+  firstReadStalled: boolean;
   /** The sweep read every block from the singleton's first — the only case
    *  the shared card and the tower's "all time" are entitled to. */
   sweptClean: boolean;
@@ -131,24 +136,71 @@ export function useMorphoBaseWalletReads(
   // slow read when the route has to sweep, and the present is already on
   // screen. "Could not sweep" and "swept, found nothing" are kept apart — one
   // is our failure and the other is the wallet's history.
+  // A store on its first read of this wallet answers "pending"; the hook asks
+  // again a few times (lib/shared/store-history-asks.ts), then states that
+  // the read goes on.
+  const [firstReadStalled, setFirstReadStalled] = useState(false);
   useEffect(() => {
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pendingAnswers = 0;
     setTimelineState("loading");
-    fetchMorphoBaseTimeline(wallet, groupedMarket, timelineRoute)
-      .then((d) => {
-        if (cancelled) return;
-        setTimeline(d);
-        setTimelineState("ready");
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
-      });
+    setFirstReadStalled(false);
+    const ask = () =>
+      fetchMorphoBaseTimeline(wallet, groupedMarket, timelineRoute)
+        .then((d) => {
+          if (cancelled) return;
+          setTimeline(d);
+          setTimelineState("ready");
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (e instanceof ChainTimelinePending) {
+            setTimelineState("first-read");
+            if (++pendingAnswers >= FIRST_READ_ASKS) setFirstReadStalled(true);
+            else timer = setTimeout(ask, FIRST_READ_GAP_MS);
+            return;
+          }
+          setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
+        });
+    ask();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [wallet, timelineSeeded, groupedMarket, timelineRoute]);
+
+  // A history the store has not yet confirmed is asked again for a while, and
+  // taken once it is the whole life.
+  const confirmationPending =
+    deployment.askUntilWhole === true &&
+    timelineState === "ready" &&
+    timeline != null &&
+    timeline.coverage.confirmation?.status === "unconfirmed";
+  useEffect(() => {
+    if (!confirmationPending || !wallet) return;
+    let cancelled = false;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const retry = () => {
+      if (cancelled || tries++ >= WHOLE_ASKS) return;
+      fetchMorphoBaseTimeline(wallet, groupedMarket, timelineRoute)
+        .then((t) => {
+          if (cancelled) return;
+          if (deployment.wholeOf(t.coverage)) setTimeline(t);
+          else timer = setTimeout(retry, WHOLE_GAP_MS);
+        })
+        .catch(() => {
+          if (!cancelled) timer = setTimeout(retry, WHOLE_GAP_MS);
+        });
+    };
+    timer = setTimeout(retry, WHOLE_GAP_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [confirmationPending, wallet, groupedMarket, timelineRoute, deployment]);
 
   // "The sweep read every block of the singleton's life." Both conditions are
   // needed: no holes inside the span, AND the span reaching the contract's own
@@ -194,6 +246,7 @@ export function useMorphoBaseWalletReads(
     error,
     timeline,
     timelineState,
+    firstReadStalled,
     sweptClean,
     captureSource,
     chainByMarket,

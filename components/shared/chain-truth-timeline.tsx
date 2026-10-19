@@ -441,6 +441,11 @@ export interface ChainTruthTimelineProps {
    *  without the footer beneath it an empty list reads as "there is nothing
    *  here" when the truth is "nobody looked". */
   footer?: ReactNode;
+  /** In the footer's place while rows are still paging in: a statement that
+   *  holds whatever part of the list is drawn (the Arbitrum store's
+   *  confirmation line, <TimelineConfirmationFooter>). Gone once the whole
+   *  list is drawn and `footer` stands. */
+  footerWhileMore?: ReactNode;
   /** A statement about what this list IS, rendered between the toolbar and the
    *  first card and never held back.
    *
@@ -724,6 +729,7 @@ function ChainTruthTimelineBody({
   liveNotesPending,
   liveWindow,
   footer,
+  footerWhileMore,
   notice,
   boundary,
   csvExportCeiling,
@@ -2282,6 +2288,7 @@ function ChainTruthTimelineBody({
               </div>
             )}
             {footer && !hasMore && footer}
+            {hasMore && footerWhileMore}
           </>
         ) : (
           <>

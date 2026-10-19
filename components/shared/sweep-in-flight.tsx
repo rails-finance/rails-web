@@ -25,6 +25,29 @@ import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 
 const SPINE_DECAY = [1, 0.75, 0.5, 0.3];
 
+/** A per-wallet store on its first read of this wallet (the Arbitrum lane):
+ *  the placeholder with the page's words while it asks again, the words
+ *  alone once it has stopped asking. */
+export function StoreFirstRead({
+  words,
+  stalled,
+}: {
+  words: { reading: string; still: string } | undefined;
+  stalled: boolean;
+}) {
+  if (stalled)
+    return (
+      <p className="py-6 text-center text-sm text-rb-500" data-history-first-read="stalled">
+        {words?.still}
+      </p>
+    );
+  return (
+    <div data-history-first-read="reading">
+      <SweepInFlight>{words?.reading}</SweepInFlight>
+    </div>
+  );
+}
+
 export function SweepInFlight({ children }: { children: ReactNode }) {
   const { sizes } = useSkeletonSizes();
   return (

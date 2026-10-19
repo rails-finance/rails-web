@@ -162,6 +162,34 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
   );
 }
 
+/** The confirmation line alone, for a list still paging in
+ *  (ChainTruthTimeline's `footerWhileMore`): it is a verdict on the whole
+ *  history, so it holds whatever part of the list is drawn. Nothing where the
+ *  coverage carries no confirmation. */
+export function TimelineConfirmationFooter({ coverage }: { coverage: ChainTimelineCoverage }) {
+  const chainId = useChainId();
+  if (!coverage.confirmation) return null;
+  return (
+    <div className={`mt-2 pt-3 ${NOTE}`} data-anatomy="L10">
+      <ConfirmationLine
+        confirmation={coverage.confirmation}
+        source={coverage.source}
+        blockLink={(b) => (
+          <a
+            href={explorerUrl(chainId, "block", b)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-external"
+          >
+            {b.toLocaleString("en-US")}
+          </a>
+        )}
+        txLink={(h) => explorerUrl(chainId, "tx-logs", h)}
+      />
+    </div>
+  );
+}
+
 /** The Arbitrum store's verdict on the history (rails-ops
  *  TO-DO-arbitrum-scoping.md §7 item 1): the card names the store, this line
  *  names whether a second witness agrees. Until it does, the page holds back

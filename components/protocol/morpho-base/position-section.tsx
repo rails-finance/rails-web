@@ -36,7 +36,7 @@ import {
 } from "@/components/protocol/morpho/morpho-position-explanation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
-import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
+import { TimelineConfirmationFooter, TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
@@ -371,6 +371,7 @@ export function MorphoBasePositionSection({
           }
           emptyLabel={sweptClean ? "No events to show for this market." : deployment.words.emptyNotWhole}
           footer={<TimelineCoverageFooter coverage={ownCoverage} sourceLabel={deployment.sourceLabel} />}
+          footerWhileMore={<TimelineConfirmationFooter coverage={ownCoverage} />}
           // On a grouped answer the list covers `eventsServed`; a month read
           // holds no card, the grid holding the other months.
           boundary={

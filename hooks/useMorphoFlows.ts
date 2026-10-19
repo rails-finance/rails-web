@@ -7,7 +7,8 @@
 // makes), and a read short of the whole history is a failed read, since a
 // replay of part of a history would state the wrong lifetime. The market
 // oracle at each row's block comes from the row (liquidations) or from
-// /api/chain/morpho/at-block, the read the opened card makes, six at a time.
+// /api/chain/morpho/at-block, the read the opened card makes, six at a time
+// (two on Arbitrum).
 // It also gives the page the value that ties the panel to the timeline
 // (components/shared/flow-focus-context.tsx).
 
@@ -17,6 +18,7 @@ import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/comp
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { loadMorphoAtBlock } from "@/lib/morpho/use-market-at-block";
+import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
 import {
   MO,
   morphoFlowEvents,
@@ -120,7 +122,9 @@ export function useMorphoFlows(p: MorphoFlowsInput): {
         if (r && r.at.price > 0) map.set(b, r.at.price);
       }
     };
-    Promise.all(Array.from({ length: Math.min(6, list.length) }, worker)).then(() => {
+    // Two at a time on Arbitrum: the keyless gateway refuses a wide burst.
+    const atOnce = p.chainId === ARBITRUM_CHAIN_ID ? 2 : 6;
+    Promise.all(Array.from({ length: Math.min(atOnce, list.length) }, worker)).then(() => {
       if (live) setPrices({ key: blocksKey, map });
     });
     return () => {

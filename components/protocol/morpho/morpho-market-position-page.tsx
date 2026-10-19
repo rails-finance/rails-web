@@ -37,7 +37,7 @@ import { morphoListedViewFromLive, morphoViewFromSweep } from "@/lib/morpho/swep
 import { morphoHasCollateralRaw, morphoHasDebt } from "@/lib/morpho/position-legs";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
-import { SweepInFlight } from "@/components/shared/sweep-in-flight";
+import { StoreFirstRead, SweepInFlight } from "@/components/shared/sweep-in-flight";
 import type { WholeHistoryFetch } from "@/components/shared/export-menu";
 import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
@@ -85,7 +85,7 @@ export function MorphoMarketPositionView({
   // among the served events, and a folder's members arrive only when opened.
   const routeParams = useParams<{ eventId?: string | string[] }>();
   const pinnedRoute = routeParams?.eventId != null;
-  const { data, loading, error, timeline, timelineState, sweptClean, captureSource, chainByMarket } =
+  const { data, loading, error, timeline, timelineState, firstReadStalled, sweptClean, captureSource, chainByMarket } =
     useMorphoBaseWalletReads(
       wallet,
       initialSlots,
@@ -293,6 +293,11 @@ export function MorphoMarketPositionView({
               <div className="space-y-6">
                 {liveCard}
                 <SweepInFlight>{w.reading}</SweepInFlight>
+              </div>
+            ) : timelineState === "first-read" ? (
+              <div className="space-y-6">
+                {liveCard}
+                <StoreFirstRead words={w.firstRead} stalled={firstReadStalled} />
               </div>
             ) : (
               <div className="space-y-6">

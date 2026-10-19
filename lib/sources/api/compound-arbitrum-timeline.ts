@@ -18,8 +18,7 @@
 //
 // SERVER-ONLY.
 
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { fetchStore } from "@/lib/sources/api/arbitrum-store-read";
 import {
   attachCometEthUsd,
   replayCometRows,
@@ -36,9 +35,15 @@ import {
 } from "@/lib/compound-arbitrum/asset-catalog";
 
 /** The server fetches Etherscan on a wallet it has not seen (40 queries at
- *  400 ms for the four Comets); past this the page states the history as
- *  unread rather than wait. */
-const TIMEOUT_MS = 25_000;
+ *  400 ms for the four Comets, 16 s and more) and answers once the body is
+ *  stored; past this wait the store is still reading, and the page asks
+ *  again (ChainTimelinePending). */
+const TIMEOUT_MS = 45_000;
+
+/** The rows drawn: the whole life, the lane's whole-life rule stated in the
+ *  header's count, up to this ceiling; past it the boundary card states the
+ *  older rows. */
+const DRAW_CEILING_ROWS = 10_000;
 
 const BASE_KINDS = new Set(["supply", "withdraw", "absorb_debt", "transfer_in", "transfer_out"]);
 
@@ -54,11 +59,7 @@ export async function loadCompoundArbitrumTimeline(
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const w = wallet.toLowerCase();
-  const res = await fetch(`${base}${COMPOUND_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, {
-    ...createAuthFetchOptions(undefined, readerIp),
-    cache: "no-store",
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  const res = await fetchStore(`${base}${COMPOUND_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, readerIp, TIMEOUT_MS);
   if (!res.ok) {
     console.error(`${COMPOUND_ARBITRUM_API_PREFIX}/timeline answered ${res.status} ${res.statusText}`);
     return null;
@@ -92,7 +93,7 @@ export async function loadCompoundArbitrumTimeline(
     metas,
     timestamps,
     senders,
-    maxRendered: TIMELINE_WINDOW_EVENTS,
+    maxRendered: DRAW_CEILING_ROWS,
     // The anchor draws every row the wallet signed from below the cut, and
     // decides that by the sender; while the validator has not filled every
     // `tx_from`, the cut is a plain depth cut instead.

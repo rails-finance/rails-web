@@ -220,6 +220,13 @@ export interface ChainTimelineResponse<L = ChainLifetimeFlows> extends ChainTime
  *  different answers and the page must not print one for the other. */
 export class ChainTimelineUnavailable extends Error {}
 
+/** A store that reads a wallet's history on its first request (the Arbitrum
+ *  lane, rails-ops TO-DO-arbitrum-scoping.md items 12 and 13) is still reading
+ *  it: the route answers 202, and the page asks again. Distinct from
+ *  `ChainTimelineUnavailable`, which is a read that failed. The SERVER reader
+ *  throws it too, when its wait for the store runs out. */
+export class ChainTimelinePending extends Error {}
+
 export async function fetchChainTimeline<T extends ChainTimelineEnvelope = ChainTimelineResponse>(p: {
   wallet: string;
   /** The sweep route for this explorer, e.g. `/api/chain/aave-v3-base/timeline`. */
@@ -236,6 +243,10 @@ export async function fetchChainTimeline<T extends ChainTimelineEnvelope = Chain
   const url = `${p.baseUrl ?? ""}${p.route}?${qs.toString()}`;
   const done = settleFetchMark(p.mark ?? "chain-timeline");
   const res = await fetch(url, { cache: "no-store", signal: p.signal });
+  if (res.status === 202) {
+    done(false);
+    throw new ChainTimelinePending("The history is being read for the first time.");
+  }
   if (!res.ok) {
     done(false);
     if (res.status === 503) throw new ChainTimelineUnavailable("The history endpoint did not answer.");

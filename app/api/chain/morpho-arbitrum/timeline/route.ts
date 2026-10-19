@@ -4,17 +4,25 @@ import { loadMorphoArbitrumTimeline } from "@/lib/sources/api/morpho-arbitrum-ti
 import { MORPHO_ARBITRUM_CHAIN_ID } from "@/lib/morpho-arbitrum/asset-catalog";
 import { toGroupedTimelineWire } from "@/lib/shared/timeline-wire";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { ChainTimelinePending } from "@/lib/api/fetch-chain-timeline";
 
 // A wallet's history on Morpho Blue Arbitrum: one read of rails-server's store
 // (lib/sources/api/morpho-arbitrum-timeline), replayed per market into the
 // shared cards. There is no sweep to fall back to on this chain, so a store
 // that does not answer is a 503 the page states as "history not read", never
 // an empty life. The answer carries `coverage` with the store's confirmation.
+// A wallet the store is still reading for the first time is a 202 the page
+// asks again on (ChainTimelinePending).
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** The reader waits up to 45 s for a first read of the store, and holds the
+ *  request open after that while the store writes the body
+ *  (lib/sources/api/arbitrum-store-read.ts). */
+export const maxDuration = 240;
 
-/** The validator moves the confirmation on: a minute fresh, then revalidated. */
+/** The validator moves the confirmation on: a confirmed answer is a minute
+ *  fresh, then revalidated; any other is asked again by the page, uncached. */
 const CACHE_CONTROL = "public, s-maxage=60, stale-while-revalidate=300";
 
 export async function GET(request: NextRequest) {
@@ -30,11 +38,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(toGroupedTimelineWire(data, MORPHO_ARBITRUM_CHAIN_ID), {
       headers: timelineCacheHeaders(
         data.positions.flatMap((p) => p.events),
-        { "Cache-Control": CACHE_CONTROL },
+        { "Cache-Control": data.coverage.confirmation?.status === "confirmed" ? CACHE_CONTROL : "no-store" },
         unread,
       ),
     });
   } catch (error) {
+    if (error instanceof ChainTimelinePending)
+      return NextResponse.json({ pending: true }, { status: 202, headers: { "Cache-Control": "no-store" } });
     console.error("Error reading Morpho Blue Arbitrum history:", error);
     return NextResponse.json({ error: "The history store did not answer", unavailable: true }, { status: 503 });
   }

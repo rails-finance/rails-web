@@ -17,10 +17,13 @@ export const runtime = "nodejs";
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const MAX_ASSETS = 24;
+const RETRY_BACKOFF_MS = 500;
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const deployment = cometDeploymentOf(compoundDeploymentParam(q.get("deployment")));
+  const key = compoundDeploymentParam(q.get("deployment"));
+  const deployment = cometDeploymentOf(key);
+  const arbitrum = key === "arbitrum";
   const market = deployment.markets.find((m) => m.key === (q.get("market") ?? "").toLowerCase());
   const block = Number(q.get("block"));
   const assets = [
@@ -35,7 +38,16 @@ export async function GET(request: NextRequest) {
   if (!market || !Number.isInteger(block) || block < 1)
     return NextResponse.json({ error: "deployment, market and block are required" }, { status: 400 });
   try {
-    const prices = await cometPricesAtBlock(deployment, market, assets, block);
+    let prices = await cometPricesAtBlock(deployment, market, assets, block).catch((e: unknown) => {
+      if (!arbitrum) throw e;
+      return {} as Record<string, number>;
+    });
+    // The keyless Arbitrum gateway refuses a burst now and then: one more
+    // read after a short back-off.
+    if (arbitrum && Object.keys(prices).length === 0) {
+      await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
+      prices = await cometPricesAtBlock(deployment, market, assets, block);
+    }
     if (Object.keys(prices).length === 0)
       return NextResponse.json({ error: "No price was read at that block" }, { status: 502 });
     return NextResponse.json(

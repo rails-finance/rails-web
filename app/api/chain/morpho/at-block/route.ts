@@ -16,6 +16,7 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID } from "@/lib/shared/chains";
 export const runtime = "nodejs";
 
 const MARKET_ID = /^(0x)?[0-9a-fA-F]{64}$/;
+const RETRY_BACKOFF_MS = 500;
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
@@ -33,7 +34,15 @@ export async function GET(request: NextRequest) {
         ? MORPHO_ARBITRUM_DEPLOYMENT
         : MORPHO_DEPLOYMENT;
   try {
-    const data = await loadMorphoMarketAtBlock(market, block, deployment);
+    // The keyless Arbitrum gateway refuses a burst now and then: one more
+    // read after a short back-off.
+    const data =
+      chain === ARBITRUM_CHAIN_ID
+        ? await loadMorphoMarketAtBlock(market, block, deployment).catch(async () => {
+            await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
+            return loadMorphoMarketAtBlock(market, block, deployment);
+          })
+        : await loadMorphoMarketAtBlock(market, block, deployment);
     return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });
   } catch (error) {
     console.error("Error reading Morpho market at block:", error);

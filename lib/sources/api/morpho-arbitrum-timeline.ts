@@ -15,7 +15,7 @@
 //
 // SERVER-ONLY.
 
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { fetchStore } from "@/lib/sources/api/arbitrum-store-read";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import { replayMorphoRows, type MorphoChainTimelineResult } from "@/lib/sources/chain/morpho-blue-events";
 import { decodeMorphoIndexRows } from "@/lib/sources/api/morpho-base-timeline";
@@ -24,9 +24,10 @@ import { readTimelineAnswer } from "@/lib/aave-v3-arbitrum/api-contract";
 import { MORPHO_ARBITRUM_API_PREFIX, type MorphoArbitrumTimelineRow } from "@/lib/morpho-arbitrum/api-contract";
 import { MORPHO_ARBITRUM_DEPLOY_BLOCK } from "@/lib/morpho-arbitrum/asset-catalog";
 
-/** The server fetches Etherscan on a wallet it has not seen; past this the
- *  page states the history as unread rather than wait. */
-const TIMEOUT_MS = 20_000;
+/** The server fetches Etherscan on a wallet it has not seen and answers once
+ *  the body is stored; past this wait the store is still reading, and the
+ *  page asks again (ChainTimelinePending). */
+const TIMEOUT_MS = 45_000;
 
 /**
  * The history, replayed. Null when the store could not be asked or did not
@@ -40,11 +41,7 @@ export async function loadMorphoArbitrumTimeline(
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const w = wallet.toLowerCase();
-  const res = await fetch(`${base}${MORPHO_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, {
-    ...createAuthFetchOptions(undefined, readerIp),
-    cache: "no-store",
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  const res = await fetchStore(`${base}${MORPHO_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, readerIp, TIMEOUT_MS);
   if (!res.ok) {
     console.error(`${MORPHO_ARBITRUM_API_PREFIX}/timeline answered ${res.status} ${res.statusText}`);
     return null;

@@ -28,6 +28,7 @@ export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
   csvPrefix: "compound-arbitrum",
   grouped: false,
   askIndexAgain: false,
+  askUntilWhole: true,
   balanceRead: "absent",
   captureSourceOf: (coverage) => (coverage?.source === "tenderly" ? "tenderly" : "etherscan"),
   wholeOf: compoundArbitrumWholeLife,
@@ -54,5 +55,10 @@ export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
       failed: "Whether it ever did is unknown: the history store did not answer.",
     },
     chainPossessive: "Arbitrum’s",
+    firstRead: {
+      reading:
+        "Rails is reading this wallet’s history for the first time, from the Comets’ logs. That takes a minute or two, and the page asks again until it lands.",
+      still: "Rails is still reading this wallet’s history for the first time. Reload in a minute to see it.",
+    },
   },
 };

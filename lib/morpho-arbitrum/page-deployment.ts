@@ -30,6 +30,7 @@ export const MORPHO_ARBITRUM_PAGE: MorphoPageDeployment = {
   explorerDeployment: "arbitrum",
   wholeOf: morphoArbitrumWholeLife,
   grouped: false,
+  askUntilWhole: true,
   vaultHoldings: false,
   words: {
     reading: "Reading this wallet’s history from Rails’ store of the singleton’s logs.",
@@ -58,5 +59,10 @@ export const MORPHO_ARBITRUM_PAGE: MorphoPageDeployment = {
     failedPosition:
       "The history read failed. Reload to try again — the card, where there is one, is read live from the singleton and is unaffected.",
     emptyNotWhole: "No events in the history read so far; the line under the list says what it rests on.",
+    firstRead: {
+      reading:
+        "Rails is reading this wallet’s history for the first time, from the singleton’s logs. That takes a minute or two, and the page asks again until it lands.",
+      still: "Rails is still reading this wallet’s history for the first time. Reload in a minute to see it.",
+    },
   },
 };

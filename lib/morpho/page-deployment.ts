@@ -35,6 +35,9 @@ export interface MorphoPageWords {
   failedPosition: string;
   /** The timeline's empty line when the history is not a whole life. */
   emptyNotWhole: string;
+  /** A store that reads a wallet's history on its first request: while it
+   *  reads, and once the page has stopped asking. */
+  firstRead?: { reading: string; still: string };
 }
 
 export interface MorphoPageDeployment {
@@ -60,6 +63,9 @@ export interface MorphoPageDeployment {
   wholeOf: (coverage: ChainTimelineCoverage) => boolean;
   /** The history can be served as rows with folders (`?group=1`). */
   grouped: boolean;
+  /** A history that is not yet the whole life (the store's confirmation
+   *  pending) is asked again for a while. */
+  askUntilWhole?: boolean;
   /** The wallet page asks whether the address holds MetaMorpho shares. */
   vaultHoldings: boolean;
   words: MorphoPageWords;

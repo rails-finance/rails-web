@@ -64,7 +64,7 @@ import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
-import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
+import { TimelineConfirmationFooter, TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { CaptureSourceProvider, type CaptureSource } from "@/lib/shared/capture-source";
@@ -93,13 +93,14 @@ import type { CometMarket } from "@/lib/compound/asset-catalog";
 import type { CompoundPageDeployment } from "@/lib/compound/page-deployment";
 import { fetchCompoundWallet, type CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
-import { ChainTimelineUnavailable, fetchChainTimeline } from "@/lib/api/fetch-chain-timeline";
+import { ChainTimelinePending, ChainTimelineUnavailable, fetchChainTimeline } from "@/lib/api/fetch-chain-timeline";
+import { FIRST_READ_ASKS, FIRST_READ_GAP_MS, WHOLE_ASKS, WHOLE_GAP_MS } from "@/lib/shared/store-history-asks";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { CometChainTimelineResult, CometMarketReplay } from "@/lib/sources/chain/compound-v3-events";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import { decodeEventId } from "@/lib/shared/page-metadata";
-import { SweepInFlight } from "@/components/shared/sweep-in-flight";
+import { StoreFirstRead, SweepInFlight } from "@/components/shared/sweep-in-flight";
 
 /** The history as the route answers it: flat, or — asked `?group=1`, the
  *  page default — as ROWS, where `events` holds only the ungrouped events of
@@ -113,7 +114,9 @@ type CompoundBaseTimeline = CometChainTimelineResult & {
   cutoffBlock?: number | null;
   marketRows?: Record<string, CompoundBaseMarketRows> | null;
 };
-type TimelineState = "loading" | "ready" | "unavailable" | "failed";
+/** `first-read`: the store is reading this wallet's history for the first
+ *  time, and the page asks again. */
+type TimelineState = "loading" | "first-read" | "ready" | "unavailable" | "failed";
 
 /** Prices keyed `${marketKey}:${token}` — each Comet reads its own feeds, so a
  *  token has one price PER MARKET, not one price. */
@@ -151,6 +154,7 @@ function MarketSection({
   events,
   timeline,
   timelineState,
+  firstReadStalled,
   sweptClean,
   captureSource,
 }: {
@@ -162,6 +166,8 @@ function MarketSection({
   events: BaseActivityEvent[];
   timeline: CompoundBaseTimeline | null;
   timelineState: TimelineState;
+  /** The page has stopped asking a store that is still on its first read. */
+  firstReadStalled: boolean;
   sweptClean: boolean;
   /** Which capture answered — the index or the sweep. Words below differ. */
   captureSource: CaptureSource;
@@ -348,8 +354,10 @@ function MarketSection({
           )}
 
           {/* Lifetime flows: the bars and the line over this market's replay
-          (lib/compound/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
-          {!onEventPage && timelineState === "ready" && (
+          (lib/compound/flows.ts), in place of the tower (TO-DO-ui-jobs 206).
+          A store whose confirmation is pending holds the panel back; the
+          footer's confirmation line says the flows wait for it. */}
+          {!onEventPage && timelineState === "ready" && (!d.askUntilWhole || sweptClean) && (
             <LifetimeFlowsPanel
               scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
               read={flows.read}
@@ -406,6 +414,7 @@ function MarketSection({
                     : d.words.emptyMarket
               }
               footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={d.sourceLabel} />}
+              footerWhileMore={<TimelineConfirmationFooter coverage={timeline.coverage} />}
               // On a grouped answer the list covers the market's `eventsServed`; a
               // month read holds no card, the grid holding the other months.
               boundary={
@@ -431,6 +440,8 @@ function MarketSection({
             />
           ) : timelineState === "loading" ? (
             <SweepInFlight>{d.words.reading}</SweepInFlight>
+          ) : timelineState === "first-read" ? (
+            <StoreFirstRead words={d.words.firstRead} stalled={firstReadStalled} />
           ) : (
             <p className="py-6 text-center text-sm text-rb-500">
               {timelineState === "unavailable" ? d.words.unavailable : d.words.failed}
@@ -508,31 +519,77 @@ export function CompoundWalletView({
 
   // The sweep, off the critical path. "Could not sweep" and "swept, found
   // nothing" are kept apart — one is our failure, the other is the history.
+  // A store on its first read of this wallet answers "pending"; the page asks
+  // again a few times, then states that the read goes on.
+  const [firstReadStalled, setFirstReadStalled] = useState(false);
   useEffect(() => {
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pendingAnswers = 0;
     setTimelineState("loading");
-    fetchChainTimeline<CompoundBaseTimeline>({
-      wallet,
-      route: d.routes.timeline,
-      mark: `${d.csvPrefix}-timeline`,
-      // `?folders=0` is the way back to the flat list, the test every grouped
-      // page shares; the event route reads flat, its card among the events.
-      params: d.grouped && servedFoldersEnabled() && !pinnedRoute ? { group: "1" } : undefined,
-    })
-      .then((d) => {
-        if (cancelled) return;
-        setTimeline(d);
-        setTimelineState("ready");
+    setFirstReadStalled(false);
+    const ask = () =>
+      fetchChainTimeline<CompoundBaseTimeline>({
+        wallet,
+        route: d.routes.timeline,
+        mark: `${d.csvPrefix}-timeline`,
+        // `?folders=0` is the way back to the flat list, the test every grouped
+        // page shares; the event route reads flat, its card among the events.
+        params: d.grouped && servedFoldersEnabled() && !pinnedRoute ? { group: "1" } : undefined,
       })
-      .catch((e) => {
-        if (cancelled) return;
-        setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
-      });
+        .then((d) => {
+          if (cancelled) return;
+          setTimeline(d);
+          setTimelineState("ready");
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (e instanceof ChainTimelinePending) {
+            setTimelineState("first-read");
+            if (++pendingAnswers >= FIRST_READ_ASKS) setFirstReadStalled(true);
+            else timer = setTimeout(ask, FIRST_READ_GAP_MS);
+            return;
+          }
+          setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
+        });
+    ask();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [wallet, timelineSeeded, pinnedRoute, d]);
+
+  // A history the store has not yet confirmed is asked again for a while, and
+  // taken once it is the whole life.
+  const confirmationPending =
+    d.askUntilWhole === true &&
+    timelineState === "ready" &&
+    timeline != null &&
+    timeline.coverage.confirmation?.status === "unconfirmed";
+  useEffect(() => {
+    if (!confirmationPending || !wallet) return;
+    let cancelled = false;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const retry = () => {
+      if (cancelled || tries++ >= WHOLE_ASKS) return;
+      fetchChainTimeline<CompoundBaseTimeline>({ wallet, route: d.routes.timeline, mark: `${d.csvPrefix}-timeline` })
+        .then((t) => {
+          if (cancelled) return;
+          if (d.wholeOf(t.coverage)) setTimeline(t);
+          else timer = setTimeout(retry, WHOLE_GAP_MS);
+        })
+        .catch(() => {
+          if (!cancelled) timer = setTimeout(retry, WHOLE_GAP_MS);
+        });
+    };
+    timer = setTimeout(retry, WHOLE_GAP_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [confirmationPending, wallet, d]);
 
   // A swept answer carries the amounts moved but no balance with interest, so
   // its rows say "reading…" while the page asks the index again, a few times.
@@ -609,7 +666,7 @@ export function CompoundWalletView({
   // driving a retry loop.
   const pricedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (sections.length === 0 || timelineState === "loading") return;
+    if (sections.length === 0 || timelineState === "loading" || timelineState === "first-read") return;
     if (pricedRef.current === wallet) return;
     const pairs = new Set<string>();
     for (const s of sections) {
@@ -809,7 +866,7 @@ export function CompoundWalletView({
                 <p className="text-sm">
                   All {data?.marketsScanned} markets were asked, and none holds a balance, a debt or collateral for this
                   address.{" "}
-                  {timelineState === "loading"
+                  {timelineState === "loading" || timelineState === "first-read"
                     ? d.words.emptyNowHistory.loading
                     : timelineState === "ready"
                       ? d.words.emptyNowHistory.notWhole
@@ -840,6 +897,7 @@ export function CompoundWalletView({
                     events={compoundEvents.filter((e) => e.context.data.market === s.market.key)}
                     timeline={timeline}
                     timelineState={timelineState}
+                    firstReadStalled={firstReadStalled}
                     sweptClean={sweptClean}
                     captureSource={captureSource}
                   />

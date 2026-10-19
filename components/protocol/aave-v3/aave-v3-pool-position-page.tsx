@@ -78,7 +78,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
-import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
+import { TimelineConfirmationFooter, TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { formatNumber } from "@/lib/utils/format";
 import { aaveV3BaseWriteOffLeftovers, type WriteOffLeftover } from "@/lib/aave-v3-base/write-off-gap";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
@@ -772,6 +772,7 @@ export function AaveV3PoolPositionView({
                           <WriteOffGapNote leftovers={writeOffLeftovers} chain={d.writeOff.chain} />
                         </>
                       }
+                      footerWhileMore={<TimelineConfirmationFooter coverage={timeline.coverage} />}
                       // On a grouped answer the list covers `eventsServed`; a month
                       // read holds no card, the grid holding the other months.
                       boundary={

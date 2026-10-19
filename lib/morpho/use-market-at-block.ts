@@ -10,6 +10,7 @@ import type { MorphoContext } from "@/lib/shared/types/event-shape";
 import type { MorphoMarketAtBlockResponse } from "@/lib/sources/chain/morpho-position";
 import { blockTimeText } from "@/lib/morpho/oracle-age";
 import { fmtMorphoAmount } from "@/lib/morpho/figure-format";
+import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
 
 export { fmtMorphoAmount };
 
@@ -32,10 +33,18 @@ function load(marketId: string, block: number, chainId: number) {
   const url = `/api/chain/morpho/at-block?market=${marketId}&block=${block}&chain=${chainId}&v=3`;
   let p = cache.get(url);
   if (!p) {
-    p = fetch(url)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => (d?.prev && d?.at ? (d as MorphoMarketAtBlockResponse) : null))
-      .catch(() => null);
+    const once = () =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => (d?.prev && d?.at ? (d as MorphoMarketAtBlockResponse) : null))
+        .catch(() => null);
+    // The keyless Arbitrum gateway refuses a burst now and then: one more
+    // ask after a short back-off.
+    p = once().then((v) =>
+      v != null || chainId !== ARBITRUM_CHAIN_ID
+        ? v
+        : new Promise<MorphoMarketAtBlockResponse | null>((r) => setTimeout(() => r(once()), 800)),
+    );
     p.then((v) => {
       if (v == null) cache.delete(url);
     });

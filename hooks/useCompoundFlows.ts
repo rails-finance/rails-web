@@ -48,6 +48,10 @@ const STORED: Record<CompoundDeploymentKey, boolean> = { ethereum: true, base: t
 /** Archive price reads in flight at once; the keyless Arbitrum gateway
  *  refuses a wide burst. */
 const READS_AT_ONCE: Record<CompoundDeploymentKey, number> = { ethereum: 6, base: 6, arbitrum: 2 };
+/** A failed archive read is asked once more where the gateway refuses
+ *  bursts. */
+const RETRY: Record<CompoundDeploymentKey, boolean> = { ethereum: false, base: false, arbitrum: true };
+const RETRY_BACKOFF_MS = 800;
 
 /** At most this many blocks' price reads per position; the rest take the
  *  nearest priced row's prices, and the Explanation counts them. */
@@ -66,10 +70,18 @@ function loadPricesAt(
   const url = `/api/chain/compound/prices-at-block?deployment=${deployment}&market=${market}&block=${block}&assets=${assets.join(",")}`;
   let p = cache.get(url);
   if (!p) {
-    p = fetch(url)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => (d?.prices && typeof d.prices === "object" ? (d.prices as Record<string, number>) : null))
-      .catch(() => null);
+    const once = () =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => (d?.prices && typeof d.prices === "object" ? (d.prices as Record<string, number>) : null))
+        .catch(() => null);
+    // The keyless Arbitrum gateway refuses a burst now and then: one more
+    // ask after a short back-off.
+    p = once().then((v) =>
+      v != null || !RETRY[deployment]
+        ? v
+        : new Promise<Record<string, number> | null>((r) => setTimeout(() => r(once()), RETRY_BACKOFF_MS)),
+    );
     p.then((v) => {
       if (v == null) cache.delete(url);
     });
