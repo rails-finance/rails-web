@@ -1,7 +1,7 @@
 // Liquity V1: the figures that state what happened to the owner.
 //
 //   A. An open states the LUSD the owner received. The open row's LUSD flow
-//      (the CSV "Token Flows" cell and the T1 figure) is the debt added less
+//      (the CSV "Token Flows" cell and the spine's flank figure) is the debt added less
 //      the borrowing fee and the 200 LUSD reserve, with the fee carried on the
 //      row (mig 375's borrowing_fee). Fixture: 0x6c26…9a0f, opened with a
 //      2,009 LUSD debt for 1,800 received.

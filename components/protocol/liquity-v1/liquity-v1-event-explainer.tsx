@@ -34,6 +34,10 @@ export interface LiquityV1EventExplainerProps {
   wallet?: string;
   /** On a liquidation, what the Trove's life left its owner. */
   ownerOutcome?: LiquityV1OwnerOutcome | null;
+  /** "lead": the first sentence alone, the event page's title (rails-ops
+   *  decision 0045, "Ruled since"); "rest": every bullet after it, the page's
+   *  pane. Unset: every bullet, the timeline card's pane. */
+  part?: "lead" | "rest";
 }
 
 /** The event's "?" modal (it depends on the event's kind only). */
@@ -93,6 +97,7 @@ export function LiquityV1EventExplainer({
   blockNumber,
   wallet,
   ownerOutcome,
+  part,
 }: LiquityV1EventExplainerProps) {
   const coords: LiquityV1Coords = { txHash, blockNumber };
   // The same read the opened grid makes; the hooks share one request.
@@ -100,11 +105,15 @@ export function LiquityV1EventExplainer({
   const collDecimals = useLedgerDecimals("collateral");
   const prose = liquityV1EventProse({ ctx, read, price: liquityV1EventPrice(ctx, read), ownerOutcome, collDecimals });
   const echo = (key: LiquityV1EchoKey) => echoFor(key, ctx, coords);
+  const lead = prose.L4[0];
+  if (part === "lead") return lead ? <ProseSentenceText s={lead} echo={echo} /> : null;
   const items = liquityV1ExplanationRuns(prose).flatMap((run) =>
-    run.sentences.map((s) => {
-      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
-      return run.heading ? { group: run.heading, node } : node;
-    }),
+    run.sentences
+      .filter((s) => part !== "rest" || s !== lead)
+      .map((s) => {
+        const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+        return run.heading ? { group: run.heading, node } : node;
+      }),
   );
   return <ProseExplainer items={items} />;
 }
