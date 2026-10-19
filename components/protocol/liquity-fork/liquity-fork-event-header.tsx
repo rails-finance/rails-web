@@ -7,23 +7,17 @@
 // The timeline's head is words (rails-ops decision 0045, TO-DO-ui-jobs 367):
 // the past-participle kind, in its status pill where it has one, then the
 // clauses for what the spine cannot show (`liquityForkT1Words`). The spine
-// carries the figures: the legs, the escrow and the rate. The head keeps a
-// redistribution's arrival, which moves no token, a pending debt's figure,
-// whose spine draws no flank, and a liquidation's claimable surplus.
+// carries the figures: the legs, the escrow, the rate and a pending debt's
+// figure. The head keeps a liquidation's claimable surplus, and a
+// redistribution's arrival as words.
 
-import type {
-  AssetFlow,
-  EbisuContext,
-  AsymmetryContext,
-  BasedollarContext,
-  OriginEnvelope,
-} from "@/lib/shared/types/event-shape";
-import { soleFlowAddress } from "@/lib/shared/format-event";
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import type { EbisuContext, AsymmetryContext, BasedollarContext, OriginEnvelope } from "@/lib/shared/types/event-shape";
+import type { ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { LiquityForkCoords, DeltaOps, LiquityForkLiquidationLeg } from "@/lib/shared/liquity-fork-provenance";
-import { FORK_DEBT_DUST_FLOAT, forkDebtMove, forkDebtMoveOps, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
+import { FORK_DEBT_DUST_FLOAT, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
+import { L1_WORDS } from "@/lib/liquity/event-templates";
 import { liquityForkT1Words, type LiquityForkT1Clause } from "@/lib/shared/liquity-fork-head-words";
 import { zombieTitle } from "@/lib/liquity/trove-page-words";
 import { formatDate } from "@/lib/date";
@@ -65,10 +59,6 @@ export interface LiquityForkHeadArgs {
   txHash?: string;
   blockNumber?: number;
   builders: LiquityForkHeaderBuilders;
-  /** The event's own movements, read for the contracts the head's figures
-   *  name: a fork adds branches over time, so the house table is the wrong
-   *  authority on a collateral's address. */
-  flows?: AssetFlow[];
   /** The liquidation's surplus has since been claimed (the page's head read). */
   surplusClaimed?: { timestamp?: number | null } | null;
 }
@@ -122,7 +112,6 @@ export function liquityForkHeadSpec({
   txHash,
   blockNumber,
   builders,
-  flows,
   surplusClaimed,
 }: LiquityForkHeadArgs): ChainTruthRowSpec {
   const coords: LiquityForkCoords = {
@@ -133,47 +122,16 @@ export function liquityForkHeadSpec({
   };
   const words = liquityForkT1Words(ctx, { noChange, minDebt: builders.minDebt, surplusClaimed });
   const et = ctx.eventType;
-  const deltas: ChainTruthDelta[] = [];
-
-  // A pending debt's spine draws no flank: its figure stays in the head.
-  if (et === "applyPendingDebt") {
-    const debt = forkDebtMove(ctx).value;
-    if (Math.abs(debt) >= FORK_DEBT_DUST_FLOAT)
-      deltas.push({
-        value: debt,
-        symbol: builders.debtSymbol,
-        address: soleFlowAddress(flows, builders.debtSymbol),
-        prov: builders.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
-        noSpineCounterpart: true,
-      });
-  }
 
   // A redistribution from a liquidated Trove on this branch, applied on this
-  // touch, in the caution tone. No token moved for it, so the spine draws no
-  // row and the figure stays in the head.
+  // touch: the chip names it in the caution tone. Its figures stand on the
+  // spine's flank where the node is a warning one (Interest applied), and in
+  // the Figures sheet and the Explanation on every row.
   const redist = forkRedistArrival(ctx);
-  if (redist && builders.redistProv) {
-    if (redist.debt >= FORK_DEBT_DUST_FLOAT)
-      deltas.push({
-        value: redist.debt,
-        symbol: builders.debtSymbol,
-        address: soleFlowAddress(flows, builders.debtSymbol),
-        prov: builders.redistProv(coords, { leg: "debt", amount: redist.debtText }),
-        label: "From a liquidation",
-        tone: "caution",
-        noSpineCounterpart: true,
-      });
-    if (redist.coll > 0)
-      deltas.push({
-        value: redist.coll,
-        symbol: ctx.collateralSymbol,
-        address: soleFlowAddress(flows, ctx.collateralSymbol),
-        prov: builders.redistProv(coords, { leg: "coll", amount: redist.collText }),
-        label: redist.debt >= FORK_DEBT_DUST_FLOAT ? "and" : "From a liquidation",
-        tone: "caution",
-        noSpineCounterpart: true,
-      });
-  }
+  const redistribution =
+    redist && (redist.debt >= FORK_DEBT_DUST_FLOAT || redist.coll > 0)
+      ? { label: L1_WORDS.from_liquidation, and: L1_WORDS.and, deltas: [], wordsOnly: true }
+      : undefined;
 
   const isOpen = et === "openTrove" || et === "openTroveAndJoinBatch";
   return {
@@ -190,6 +148,7 @@ export function liquityForkHeadSpec({
         ? "delegate"
         : undefined,
     clauses: words.clauses.map((c) => clauseNode(c, ctx, coords, builders)),
-    deltas,
+    deltas: [],
+    redistribution,
   };
 }
