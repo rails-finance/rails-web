@@ -10,8 +10,8 @@
 // SPINE GRAMMAR. The stake draws the synthetic moving right, into the
 // Transmuter. The claim draws two rows moving left, toward the wallet: the
 // vault shares the converted part paid out, and the synthetic handed back.
-// Each moved amount shows once: the numbers ride the spine at ≥sm and the
-// header carries the verbs (detail-page-anatomy §4). A custody move draws the
+// Each moved amount shows once, on the spine; the head is words (rails-ops
+// decision 0045). A custody move draws the
 // send mark and no direction. A poke moves nothing and draws nothing.
 //
 // NO READING. These rows carry no `stateAtBlockFromReading`, and the card
@@ -22,12 +22,7 @@ import { gasPrice } from "@/components/shared/event-price-row";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
-import {
-  type ChainTruthDelta,
-  type ChainTruthRowSpec,
-  type ChainTruthStat,
-  chainTruthCaption,
-} from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthRowSpec, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { ALCHEMIX_TRANSMUTER } from "@/lib/alchemix/learn-more";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
@@ -36,8 +31,15 @@ import type { AlchemixV3Context, BaseActivityEvent } from "@/lib/shared/types/ev
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { transmuterEarlyClaimProv, transmuterEmittedProv } from "@/lib/alchemix/transmuter-provenance";
 import type { TransmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
+import {
+  claimShareSymbol,
+  earlyClaimSentence,
+  transmuterExplainerLines,
+  type TransmuterEvent,
+} from "@/lib/alchemix/transmuter-lines";
+import { ALCHEMIX_HEAD_WORDS, alchemixLegKind } from "@/lib/alchemix/head-words";
 
-export type TransmuterEvent = BaseActivityEvent & { context: { protocol: "alchemix-v3"; data: AlchemixV3Context } };
+export { earlyClaimSentence, type TransmuterEvent };
 
 const scaled = (raw: string | null | undefined): number => {
   if (raw == null) return 0;
@@ -48,7 +50,6 @@ const scaled = (raw: string | null | undefined): number => {
 const positive = (raw: string | null | undefined): boolean =>
   raw != null && /^\d+$/.test(raw) && BigInt(raw) > BigInt(0);
 
-const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const isZero = (a: string | undefined) => !a || /^0x0{40}$/i.test(a);
 
 export function coordsForTransmuterLeg(leg: TransmuterEvent): AlchemixCoords {
@@ -64,13 +65,6 @@ export function coordsForTransmuterLeg(leg: TransmuterEvent): AlchemixCoords {
 }
 
 const find = (legs: TransmuterEvent[], type: string) => legs.find((l) => l.context.data.eventType === type);
-
-/** The vault share a claim paid out in. The claim's own flow names it; the
- *  position's row is the fallback. */
-function claimShareSymbol(claim: TransmuterEvent, mytSymbol: string): string {
-  const syn = claim.context.data.syntheticSymbol;
-  return claim.flows.find((f) => f.tokenSymbol !== syn)?.tokenSymbol ?? mytSymbol;
-}
 
 function spineTokens(legs: TransmuterEvent[], mytSymbol: string): SpineTokenRow[] {
   const created = find(legs, "transmuter_position_created");
@@ -96,124 +90,89 @@ function spineTokens(legs: TransmuterEvent[], mytSymbol: string): SpineTokenRow[
   return rows;
 }
 
-function rowSpec(legs: TransmuterEvent[], mytSymbol: string): ChainTruthRowSpec {
+/** The row's head (decision 0045): the kind in words, the chip that names
+ *  where the position landed or who claimed it, and on a custody move the
+ *  counterparty as the clause. The amounts are on the spine's flank and in
+ *  the cells. `caption`: the words in one line. */
+function rowSpec(legs: TransmuterEvent[]): { spec: ChainTruthRowSpec; caption: string } {
   const created = find(legs, "transmuter_position_created");
   const claimed = find(legs, "transmuter_position_claimed");
   const poked = find(legs, "transmuter_position_poked");
   const transfers = legs.filter((l) => l.context.data.eventType === "transfer");
   const mint = transfers.find((l) => l.context.data.transfer?.transferType === "mint");
-  const deltas: ChainTruthDelta[] = [];
 
   if (created) {
     const d = created.context.data;
-    const coords = coordsForTransmuterLeg(created);
-    deltas.push({
-      value: scaled(d.raw.amount_staked),
-      symbol: d.syntheticSymbol,
-      label: "Stake",
-      axisVerb: true,
-      prov: transmuterEmittedProv("amount_staked", d.syntheticSymbol, d.raw.amount_staked ?? null, coords),
-    });
-    // Where the new position landed, once: the mint's recipient.
+    // Where the new position landed, once: the mint's recipient. The chip
+    // prefixes are literals, which check:parties maps to their roles.
     const to = mint?.context.data.transfer?.toAddress;
     return {
-      label: "Open",
-      status: "open",
-      deltas,
-      party: to
-        ? {
-            prefix: "to",
-            address: to,
-            ens: true,
-            prov: transmuterEmittedProv("to_addr", d.syntheticSymbol, null, coordsForTransmuterLeg(mint!)),
-          }
-        : undefined,
+      spec: {
+        label: ALCHEMIX_HEAD_WORDS.staked,
+        status: "open",
+        deltas: [],
+        party: to
+          ? {
+              prefix: "to",
+              address: to,
+              ens: true,
+              prov: transmuterEmittedProv("to_addr", d.syntheticSymbol, null, coordsForTransmuterLeg(mint!)),
+            }
+          : undefined,
+      },
+      caption: ALCHEMIX_HEAD_WORDS.staked,
     };
   }
 
   if (claimed) {
     const d = claimed.context.data;
     const coords = coordsForTransmuterLeg(claimed);
-    const share = claimShareSymbol(claimed, mytSymbol);
-    if (positive(d.raw.amount_claimed)) {
-      deltas.push({
-        value: scaled(d.raw.amount_claimed),
-        symbol: share,
-        label: "Paid out",
-        axisVerb: true,
-        prov: transmuterEmittedProv("amount_claimed", share, d.raw.amount_claimed ?? null, coords),
-      });
-    }
-    if (positive(d.raw.amount_unclaimed)) {
-      deltas.push({
-        value: scaled(d.raw.amount_unclaimed),
-        symbol: d.syntheticSymbol,
-        label: "Handed back",
-        axisVerb: true,
-        prov: transmuterEmittedProv("amount_unclaimed", d.syntheticSymbol, d.raw.amount_unclaimed ?? null, coords),
-      });
-    }
     return {
-      label: "Claim",
-      deltas,
-      party: d.raw.claimer
-        ? {
-            prefix: "by",
-            address: d.raw.claimer,
-            ens: true,
-            prov: transmuterEmittedProv("claimer", d.syntheticSymbol, null, coords),
-          }
-        : undefined,
+      spec: {
+        label: ALCHEMIX_HEAD_WORDS.claimed,
+        deltas: [],
+        party: d.raw.claimer
+          ? {
+              prefix: "by",
+              address: d.raw.claimer,
+              ens: true,
+              prov: transmuterEmittedProv("claimer", d.syntheticSymbol, null, coords),
+            }
+          : undefined,
+      },
+      caption: ALCHEMIX_HEAD_WORDS.claimed,
     };
   }
 
-  if (poked) {
-    return { label: poked.actionLabel, deltas };
-  }
+  if (poked) return { spec: { label: ALCHEMIX_HEAD_WORDS.poked, deltas: [] }, caption: ALCHEMIX_HEAD_WORDS.poked };
 
-  // Custody alone: where the position ended the transaction.
+  // Custody alone: where the position ended the transaction, the clause after
+  // the kind.
   const last = transfers[transfers.length - 1];
   const t = last?.context.data.transfer;
   const burned = t?.transferType === "burn";
   const counterparty = burned ? t?.fromAddress : t?.toAddress;
+  const kind = last ? alchemixLegKind(last.context.data) : ALCHEMIX_HEAD_WORDS.transferred;
+  const party =
+    counterparty && !isZero(counterparty)
+      ? {
+          prefix: burned ? "from" : "to",
+          address: counterparty,
+          ens: true,
+          prov: transmuterEmittedProv(
+            burned ? "from_addr" : "to_addr",
+            last.context.data.syntheticSymbol,
+            null,
+            coordsForTransmuterLeg(last),
+          ),
+        }
+      : undefined;
   return {
-    label: last?.actionLabel ?? "Transfer",
-    deltas,
-    custody: true,
-    party:
-      counterparty && !isZero(counterparty)
-        ? {
-            prefix: burned ? "from" : "to",
-            address: counterparty,
-            ens: true,
-            prov: transmuterEmittedProv(
-              burned ? "from_addr" : "to_addr",
-              last.context.data.syntheticSymbol,
-              null,
-              coordsForTransmuterLeg(last),
-            ),
-          }
-        : undefined,
+    spec: { label: kind, deltas: [], clauses: party ? [<PartyChip key="party" party={party} />] : undefined },
+    caption: party
+      ? `${kind} ${ALCHEMIX_HEAD_WORDS.sep} ${party.prefix} ${party.address.slice(0, 6)}…${party.address.slice(-4)}`
+      : kind,
   };
-}
-
-const plain = (raw: string) => (Number(raw) / 1e18).toLocaleString("en-US", { maximumFractionDigits: 2 });
-const pct = (share: number) => `${(share * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
-
-/** The sentence a claim before maturity owes its reader: what converted, what
- *  came back, what the fee took, and why only part converted. */
-export function earlyClaimSentence(
-  e: TransmuterEarlyClaim,
-  syn: string,
-  share: string,
-  paidOutRaw: string,
-  withWhy = true,
-): string {
-  return (
-    `This claim came ${e.blocksEarly.toLocaleString("en-US")} blocks before maturity, when ${pct(e.termPassed)} of the blocks from the stake to its maturity had passed. ` +
-    `${withWhy ? "A stake converts a little every block until it matures, so " : "So "}${plain(e.convertedRaw)} ${syn} had converted and was paid out as ${plain(paidOutRaw)} ${share}. ` +
-    `Of the ${plain(e.unconvertedRaw)} ${syn} still to convert, ${plain(e.returnedRaw)} came back as ${syn} and the Transmuter kept ${plain(e.exitFeeRaw)} ${syn}, ${pct(e.exitFeeShare)}, as its early exit fee.`
-  );
 }
 
 function detailStats(legs: TransmuterEvent[], mytSymbol: string, early: TransmuterEarlyClaim | null): ChainTruthStat[] {
@@ -259,52 +218,6 @@ function detailStats(legs: TransmuterEvent[], mytSymbol: string, early: Transmut
   return stats;
 }
 
-/** The transaction in plain words, one sentence a leg. The stake or the claim
- *  leads, since it is what the card is about; the NFT's moves follow in log
- *  order. */
-function explainerLines(legs: TransmuterEvent[], mytSymbol: string, early: TransmuterEarlyClaim | null): string[] {
-  const out: string[] = [];
-  const ordered = [
-    ...legs.filter((l) => l.context.data.eventType !== "transfer"),
-    ...legs.filter((l) => l.context.data.eventType === "transfer"),
-  ];
-  for (const leg of ordered) {
-    const d = leg.context.data;
-    const amount = (field: string) => formatUnitsExact(d.raw[field] ?? "0", 18);
-    switch (d.eventType) {
-      case "transmuter_position_created":
-        out.push(
-          `${amount("amount_staked")} ${d.syntheticSymbol} went into the Transmuter to be converted at maturity, opening this position.`,
-        );
-        break;
-      case "transmuter_position_claimed":
-        if (early) {
-          out.push(
-            earlyClaimSentence(early, d.syntheticSymbol, claimShareSymbol(leg, mytSymbol), d.raw.amount_claimed ?? "0"),
-          );
-          break;
-        }
-        out.push(
-          `The claim paid out ${amount("amount_claimed")} ${claimShareSymbol(leg, mytSymbol)} for the part of the stake that had converted, and handed back ${amount("amount_unclaimed")} ${d.syntheticSymbol} that had not.`,
-        );
-        break;
-      case "transmuter_position_poked":
-        out.push("The position was poked. A poke updates the Transmuter's accounting and moves no tokens.");
-        break;
-      case "transfer": {
-        const t = d.transfer;
-        if (t?.transferType === "mint") out.push(`The Transmuter minted the position's NFT to ${short(t.toAddress)}.`);
-        else if (t?.transferType === "burn") out.push("The claim burned the position's NFT, which ends the position.");
-        else if (t) out.push(`The position's NFT moved from ${short(t.fromAddress)} to ${short(t.toAddress)}.`);
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  return out;
-}
-
 export function TransmuterEventCard({
   legs,
   mytSymbol,
@@ -335,8 +248,8 @@ export function TransmuterEventCard({
   const claimLeg = find(legs, "transmuter_position_claimed");
   const earlyHere = claimLeg ? early : null;
   const stats = detailStats(legs, mytSymbol, earlyHere);
-  const lines = explainerLines(legs, mytSymbol, earlyHere);
-  const spec = rowSpec(legs, mytSymbol);
+  const lines = transmuterExplainerLines(legs, mytSymbol, earlyHere);
+  const { spec, caption } = rowSpec(legs);
   // The gas, where a holder sent every leg on Ethereum: the index's figure is
   // the transaction's, and on Base it leaves out the L1 data fee.
   const ownerPaid =
@@ -354,7 +267,7 @@ export function TransmuterEventCard({
     },
     spine,
     head: spec,
-    caption: chainTruthCaption(spec) ?? "",
+    caption,
     // The logs' figures are the event's cells: a Transmuter position has no
     // reading.
     cells:

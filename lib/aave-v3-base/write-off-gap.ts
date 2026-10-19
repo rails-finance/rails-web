@@ -37,11 +37,14 @@ export interface WriteOffLeftover {
 export function aaveV3BaseWriteOffLeftovers(
   events: readonly BaseActivityEvent[],
   position: AaveV3PositionChainResponse | null,
+  /** The Pool's first DeficitCreated; Base's unless another Pool names its own
+   *  (Aave V3 Arbitrum, lib/aave-v3-arbitrum/asset-catalog.ts). */
+  firstWriteOffBlock: number = AAVE_V3_BASE_FIRST_WRITE_OFF_BLOCK,
 ): WriteOffLeftover[] {
   if (!position || position.chainStale) return [];
   const aave = events.filter(isAaveV3Event);
   const liquidatedSince = aave.some(
-    (e) => e.context.data.eventType === "liquidation" && e.blockNumber >= AAVE_V3_BASE_FIRST_WRITE_OFF_BLOCK,
+    (e) => e.context.data.eventType === "liquidation" && e.blockNumber >= firstWriteOffBlock,
   );
   if (!liquidatedSince) return [];
 

@@ -19,6 +19,7 @@
 // yourself" link points at (`chainId`). Each defaults to what every existing
 // call site meant, so the Ethereum receipts render byte-identical.
 
+import type { CaptureSource } from "@/lib/shared/capture-source";
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
@@ -39,7 +40,7 @@ export interface CompoundCoords {
   chainId?: ChainId;
   /** How the decoded log reached the page: the rails-server index (default), or
    *  a live sweep of the Comet's logs run for this request (the Base lane). */
-  source?: "index" | "sweep";
+  source?: CaptureSource;
   /** The Comet proxy address for this market — the contract every value cites. */
   comet?: string;
   /** Market label, e.g. "cUSDCv3". */

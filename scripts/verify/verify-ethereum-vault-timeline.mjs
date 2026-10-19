@@ -1344,8 +1344,10 @@ if (!allKinds.has("transfer-self"))
 // counterparty, read from its own log's topics. Re-pinned 2026-09-19 from the
 // page as served.
 const LABELS = {
-  deposit: () => "Deposit",
-  withdrawal: () => "Withdrawal",
+  // The head is words (decision 0045): past participles; a transfer reads
+  // "Transferred" with its counterparty as the clause.
+  deposit: () => "Deposited",
+  withdrawal: () => "Withdrew",
   "transfer-in": (e) => `from ${short(e.counterparty)}`,
   "transfer-out": (e) => `to ${short(e.counterparty)}`,
   "transfer-self": () => "No change",

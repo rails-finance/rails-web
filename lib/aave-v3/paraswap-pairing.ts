@@ -26,7 +26,7 @@
 // below. The adapter's identity carries the proof, so an adapter is listed
 // only with the evidence for it.
 
-import { BASE_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { AaveV3SwapKind } from "@/lib/shared/types/event-shape";
 
 type ParaswapKind = Extract<AaveV3SwapKind, "collateral_swap" | "debt_swap" | "repay_with_collateral">;
@@ -42,6 +42,16 @@ const PARASWAP_ADAPTERS: Partial<Record<ChainId, Record<string, ParaswapKind>>> 
     "0x2e549104c516b8657a7d888494dfbabd7c70b464": "collateral_swap",
     "0x63dfa7c09dc2ff4030d6b8dc2ce6262bf898c8a4": "repay_with_collateral",
     "0xb12e82df057bf16ecfa89d7d089dc7e5c1dc057b": "debt_swap",
+  },
+  // Aave V3 on Arbitrum: the address book's `AaveV3Arbitrum` adapters, each
+  // read back on 2026-10-19 at block 516,330,701 — POOL() returns the Arbitrum
+  // Pool, and Arbiscan's verified source names the kind (ParaSwapLiquiditySwap-
+  // Adapter, ParaSwapRepayAdapter, ParaSwapDebtSwapAdapterV3). 0x63df…c8a4 is
+  // Base's repay adapter above; on Arbitrum it is the debt swap adapter.
+  [ARBITRUM_CHAIN_ID]: {
+    "0xf3c3f14dd7bdb7e03e6ebc3bc5ffc6d66de12251": "collateral_swap",
+    "0xe28e2c8d240dd5ebd0adcab86fbd79df7a052034": "repay_with_collateral",
+    "0x63dfa7c09dc2ff4030d6b8dc2ce6262bf898c8a4": "debt_swap",
   },
 };
 

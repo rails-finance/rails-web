@@ -8,7 +8,7 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { isAaveV3Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
 import { feeLiquidation } from "@/lib/aave-v3/liquidation-fee";
@@ -17,10 +17,12 @@ import { AAVE_V3_PAGE_WORDS, PROSE } from "@/lib/aave-v3/event-templates";
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** Seamless draws through this adapter: an Aave V3 fork on Base with a separate listing. */
-export type AaveV3Deployment = "ethereum" | "base" | "seamless";
+export type AaveV3Deployment = "ethereum" | "base" | "seamless" | "arbitrum";
 
-const chainOf = (d: AaveV3Deployment) => (d === "ethereum" ? MAINNET_CHAIN_ID : BASE_CHAIN_ID);
-const listingOf = (d: AaveV3Deployment) => (d === "ethereum" ? "aave-v3" : d === "base" ? "aave-v3-base" : "seamless");
+const chainOf = (d: AaveV3Deployment) =>
+  d === "ethereum" ? MAINNET_CHAIN_ID : d === "arbitrum" ? ARBITRUM_CHAIN_ID : BASE_CHAIN_ID;
+const listingOf = (d: AaveV3Deployment) =>
+  d === "ethereum" ? "aave-v3" : d === "base" ? "aave-v3-base" : d === "arbitrum" ? "aave-v3-arbitrum" : "seamless";
 
 type SiblingRows = Parameters<typeof feeLiquidation>[1];
 

@@ -113,8 +113,8 @@ function readChainNames() {
 const iconPath = (id) => {
   const own = join(ROOT, `public/icons/protocols/${id}.png`);
   if (existsSync(own)) return own;
-  const parent = join(ROOT, `public/icons/protocols/${id.replace(/-base$/, "")}.png`);
-  if (id.endsWith("-base") && existsSync(parent)) return parent;
+  const parent = join(ROOT, `public/icons/protocols/${id.replace(/-(base|arbitrum)$/, "")}.png`);
+  if (/-(base|arbitrum)$/.test(id) && existsSync(parent)) return parent;
   throw new Error(`no colour icon for roster id "${id}" at public/icons/protocols/`);
 };
 const iconDataUri = (id) => `data:image/png;base64,${readFileSync(iconPath(id)).toString("base64")}`;

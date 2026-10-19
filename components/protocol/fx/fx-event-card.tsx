@@ -10,8 +10,9 @@
 // liquidation is a keeper's or a redeemer's transaction, and an operate a
 // third party sent is theirs: none states gas.
 //
-// Collateral on the spine chips and in the header is the TOKEN as transferred
-// (wstETH / WBTC); the detail grid adds the pool's stETH-equivalent.
+// Collateral on the spine chips is the TOKEN as transferred (wstETH / WBTC);
+// the detail grid adds the pool's stETH-equivalent. A socialized row's change
+// is the pool's rate-adjusted unit, as the sheet states it.
 //
 // Third-party marking is TWO-fact here, like the actor protocols but with a
 // different second fact: f(x)'s Operate carries no caller param, so the
@@ -25,14 +26,16 @@ import type { BaseActivityEvent, FxContext } from "@/lib/shared/types/event-shap
 import { useCallback, useState } from "react";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
-import type { SpineColumnProps } from "@/components/shared/spine-column";
+import type { SpineColumnProps, SpineWarningLeg } from "@/components/shared/spine-column";
+import { FX_HEAD_WORDS, fxT1Caption, fxT1Words } from "@/lib/fx/head-words";
 
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type FxCoords } from "@/lib/fx/event-provenance";
 import { fxExplainerTeaser } from "@/lib/fx/explainer-clauses";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
-import { useFxHeadSpec } from "./fx-event-header";
+import { fxLiquidationMoved } from "@/lib/fx/row-figures";
+import { useFxHeadSpec, useFxRowChange } from "./fx-event-header";
 import { FX_HEADS, useFxOpened } from "./fx-cells";
 import { useFxSheet } from "./fx-sheet";
 import { FxEventExplainer, fxLearnMoreContent } from "./fx-event-explainer";
@@ -118,10 +121,66 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
           : []),
       ];
 
+  // The warning node's flank: a liquidation's collateral seized below the debt
+  // cleared; a rebalance's, a redemption's or a pool-wide liquidation's change
+  // to this position, on its block's lead row once the reads land.
+  const tokenSym = meta?.tokenSymbol ?? ctx.poolSymbol;
+  const normSym = meta?.normalizedSymbol ?? tokenSym;
+  const fxusdAddr = soleFlowAddress(event.flows, "fxUSD");
+  const { change } = useFxRowChange(ctx, event.blockNumber, event.id);
+  const warningLegs: SpineWarningLeg[] = [];
+  const moved = fxLiquidationMoved(ctx);
+  // A call that reached the position with nothing left to take draws none:
+  // the head's clause says so.
+  if (isLiq && !ctx.poolWide) {
+    const seized = Number(ctx.liqColls ?? "0") || 0;
+    if (moved && seized !== 0)
+      warningLegs.push({
+        label: FX_HEAD_WORDS.legSeized,
+        value: Math.abs(seized),
+        symbol: tokenSym,
+        address: meta?.tokenAddress ?? soleFlowAddress(event.flows, tokenSym),
+      });
+    if (moved && debtDelta !== 0)
+      warningLegs.push({
+        label: FX_HEAD_WORDS.legCleared,
+        value: Math.abs(debtDelta),
+        symbol: "fxUSD",
+        address: fxusdAddr,
+      });
+  } else if (change) {
+    if (Math.abs(change.coll) > 1e-12)
+      warningLegs.push({
+        label: FX_HEAD_WORDS.legCollateral,
+        value: Math.abs(change.coll),
+        symbol: normSym,
+        address: normSym === tokenSym ? meta?.tokenAddress : undefined,
+      });
+    if (Math.abs(change.debt) > 1e-12)
+      warningLegs.push({
+        label: FX_HEAD_WORDS.legDebt,
+        value: Math.abs(change.debt),
+        symbol: "fxUSD",
+        address: fxusdAddr,
+      });
+  }
+  const legs = warningLegs.length > 0 ? warningLegs : undefined;
+  // The head's words in one line: the phone caption and the accessible name.
+  const writtenOff =
+    isLiq &&
+    ctx.poolWide === true &&
+    change != null &&
+    -change.debt - (Number(ctx.tickRebFxusdDebts ?? "0") || 0) > 0.001;
+  const caption = fxT1Caption(
+    fxT1Words(ctx, { writtenOff }),
+    isTransfer && ctx.transferTo ? `to ${ctx.transferTo.slice(0, 6)}…${ctx.transferTo.slice(-4)}` : undefined,
+  );
+
   const spine: SpineColumnProps = isLiq
     ? {
         icon: "warning",
         warningTone: "critical",
+        warningLegs: legs,
         warningTip: ctx.poolWide
           ? "A keeper liquidated the pool from its top tick down, reaching this position's tick. The owner did not act."
           : "A keeper liquidated this position: it repaid the debt and took the collateral plus the bonus. The owner did not act.",
@@ -131,6 +190,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
       ? {
           icon: "warning",
           warningTone: "caution",
+          warningLegs: legs,
           warningTip:
             "Someone redeemed fxUSD for collateral from the pool's highest-ratio ticks, including this position's. The position gave up collateral and debt of equal value and stays open; the owner did not act.",
           isLast: !!isLast,
@@ -141,6 +201,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
           {
             icon: "warning",
             warningTone: "caution",
+            warningLegs: legs,
             warningTip:
               "A keeper rebalanced the tick this position sat in: it repaid part of the debt and took collateral plus the bonus. The position stays open; the owner did not act.",
             isLast: !!isLast,
@@ -156,14 +217,10 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
             { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   const head = useFxHeadSpec({
-    actionLabel: event.actionLabel,
     ctx,
-    timestamp: event.timestamp,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
-    eventNumber,
     externalBy: extBy ?? undefined,
-    flows: event.flows,
     eventId: event.id,
   });
   // The owner-paid rule (above): an operate or a transfer the owner in force
@@ -196,7 +253,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
     },
     spine,
     head,
-    caption: event.actionLabel,
+    caption,
     // The transaction-sender test (ui-jobs 304), judged where the owner in
     // force is a known EOA, as f(x)'s verdict is.
     actor: {

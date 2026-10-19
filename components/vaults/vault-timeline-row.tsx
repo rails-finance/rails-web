@@ -46,7 +46,7 @@
 
 import type { ReactNode } from "react";
 
-import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { PartyChip, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
@@ -57,7 +57,8 @@ import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { assetText, shareText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { sharePriceText } from "@/components/vaults/aave-vault-format";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
-import { KIND_LABEL, type VaultHolderEvent, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
+import type { VaultHolderEvent, VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
+import { VAULT_HEAD_WORDS, vaultT1Kind } from "@/lib/vaults/head-words";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import type { SheetRow } from "@/components/shared/event-sheet";
 import { vaultSheet } from "@/components/vaults/vault-sheet";
@@ -146,47 +147,39 @@ export function VaultTimelineRow({
   const isDeposit = event.kind === "deposit";
   const isWithdrawal = event.kind === "withdrawal";
   // A share transfer to or from another address is a custody move: the share
-  // row wears the paper-plane badge and no flank (the flanks are "out to the
-  // wallet" and "into the vault", and this is neither), and the header states
-  // the amount and the counterparty. A self-transfer moved nothing and keeps
-  // its "no change" glyph.
+  // row wears the paper-plane badge, its amount on the flank the holder's
+  // balance moved by, and the head's clause names the counterparty (decision
+  // 0045). A self-transfer moved nothing and keeps its "no change" glyph.
   const isTransfer = event.kind === "transfer-in" || event.kind === "transfer-out";
   const movesShares = event.kind !== "cooldown";
 
-  const deltas: ChainTruthDelta[] = [];
   const tokens: SpineTokenRow[] = [];
 
   // The asset leg leads, where the contract emitted one: it is what the holder
   // actually put in or took out, in the token they think in.
   if (event.assets && (isDeposit || isWithdrawal)) {
-    const value = (isDeposit ? 1 : -1) * (Number(event.assets) / Math.pow(10, ad));
-    const info = prov.assets(rowCoords, isDeposit ? "deposit" : "withdrawal");
-    deltas.push({ value, symbol: assetSymbol, prov: info });
-    tokens.push({
-      symbol: assetSymbol,
-      direction: isDeposit ? "right" : "left",
-      value: Math.abs(value),
-    });
+    const value = Number(event.assets) / Math.pow(10, ad);
+    tokens.push({ symbol: assetSymbol, direction: isDeposit ? "right" : "left", value });
   }
 
-  if (movesShares) {
-    const info = prov.shares(rowCoords, event.kind);
-    deltas.push({ value: deltaValue, symbol: shareUnit, prov: info });
-    tokens.push(
-      isTransfer
-        ? { symbol: shareUnit, address: vaultAddress, badge: "send" }
-        : {
-            symbol: shareUnit,
-            address: vaultAddress,
-            direction: deltaValue < 0 ? "right" : "left",
-            value: Math.abs(deltaValue),
-          },
-    );
-  }
+  if (movesShares)
+    tokens.push({
+      symbol: shareUnit,
+      address: vaultAddress,
+      direction: deltaValue < 0 ? "right" : "left",
+      value: Math.abs(deltaValue),
+      ...(isTransfer
+        ? {
+            badge: "send" as const,
+            verb: event.kind === "transfer-out" ? VAULT_HEAD_WORDS.legSent : VAULT_HEAD_WORDS.legReceived,
+          }
+        : {}),
+    });
 
   // The counterparty of a transfer, as the address alone (rule 3 above: no
   // names here). Its receipt is the log's own — the same Transfer the shares
-  // figure is read from.
+  // figure is read from. The chip prefixes are literals, which check:parties
+  // maps to their roles.
   const party =
     isTransfer && event.counterparty
       ? {
@@ -196,7 +189,12 @@ export function VaultTimelineRow({
         }
       : undefined;
 
-  const spec: ChainTruthRowSpec = { label: KIND_LABEL[event.kind], custody: isTransfer, deltas, party };
+  const kind = vaultT1Kind(event.kind);
+  const spec: ChainTruthRowSpec = {
+    label: kind,
+    deltas: [],
+    clauses: party ? [<PartyChip key="party" party={party} />] : undefined,
+  };
   const lines = explainerLines(event, shareUnit, assetSymbol);
   const slots: EventCardSlots = {
     event: {
@@ -209,7 +207,9 @@ export function VaultTimelineRow({
     },
     spine: { tokens: tokens.length ? tokens : undefined, icon, isLast },
     head: spec,
-    caption: KIND_LABEL[event.kind],
+    caption: party
+      ? `${kind} ${VAULT_HEAD_WORDS.sep} ${party.prefix} ${party.address.slice(0, 6)}…${party.address.slice(-4)}`
+      : kind,
     cells: rowCells(event, rowCoords, shareUnit, assetSymbol, prov, extraCells),
     sheet: vaultSheet({
       event,

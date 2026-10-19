@@ -97,13 +97,14 @@ export function positionWords(id: string, values: Record<string, string | number
   return POSITION.fill(id, values);
 }
 
-/** The deployment a modal is worded for: Aave V3 on Ethereum, on Base, or
- *  Seamless. A modal's `intro_<form>` and `text_<form>` hold its wording. */
-export type AaveV3Deployment = "aave-v3" | "aave-v3-base" | "seamless";
+/** The deployment a modal is worded for: Aave V3 on Ethereum, on Base, on
+ *  Arbitrum, or Seamless. A modal's `intro_<form>` and `text_<form>` hold its wording. */
+export type AaveV3Deployment = "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "seamless";
 
 const FORM: Record<AaveV3Deployment, string[]> = {
   "aave-v3": [],
   "aave-v3-base": ["base"],
+  "aave-v3-arbitrum": ["arbitrum"],
   seamless: ["seamless"],
 };
 

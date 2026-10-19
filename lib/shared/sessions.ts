@@ -26,6 +26,8 @@ export type SessionProtocol =
   | "aave-v4-base"
   | "aave-v3"
   | "aave-v3-base"
+  // Aave V3 on Arbitrum, at `/arbitrum/aave-v3`: its own Pool, so its own scope.
+  | "aave-v3-arbitrum"
   // Aave's vault layer — savings GHO, Umbrella stake tokens and static
   // aTokens. Its own roster subject at an UNSTAMPED door, `/ethereum/aave`,
   // because those contracts carry no version and a version in the URL of a

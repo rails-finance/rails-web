@@ -7,7 +7,8 @@ import { notFound } from "next/navigation";
 import { decodeEventId, eventMetadata, positionMetadata, shortSubject } from "@/lib/shared/page-metadata";
 import { eventCardModel } from "@/lib/share/event-model";
 import { eventImage } from "@/lib/share/event-image";
-import { alchemixEventHeading, alchemixEventPageDescription } from "@/lib/alchemix/explorer";
+import { alchemixEventPageDescription } from "@/lib/alchemix/explorer";
+import { alchemixEventSentence } from "@/lib/alchemix/event-sentence";
 import { positionImage } from "@/lib/share/position-image";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import { formatNumber } from "@/lib/utils/format";
@@ -91,7 +92,7 @@ export async function alchemixV2EventMetadata(
     canonicalPath: `${v2PositionPath(deployment, lineKey, account)}/event/${encodeURIComponent(decoded)}`,
     event:
       event && position
-        ? { actionLabel: alchemixEventHeading(event, position.events), timestamp: event.timestamp }
+        ? { actionLabel: alchemixEventSentence(event, position.events), timestamp: event.timestamp }
         : null,
     description: event
       ? alchemixEventPageDescription(deployment, sym, account.toLowerCase(), event.timestamp, "v2")
