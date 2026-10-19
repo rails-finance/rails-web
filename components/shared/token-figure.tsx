@@ -1,7 +1,9 @@
 "use client";
 
 // A stat's token figure: the figure, then its asset's icon (which opens the
-// asset panel, as a headline's icon does), in place of the ticker.
+// asset panel, as a headline's icon does), in place of the ticker. It carries
+// the panel's figure mark, so the words round it in a stat value read muted
+// (position-card-panel.tsx).
 
 import type { ReactNode } from "react";
 import { AssetPopover } from "@/components/shared/asset-popover";
@@ -20,7 +22,7 @@ export function TokenFigure({
   figure?: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5" data-panel-figure="">
       {children}
       <AssetPopover symbol={symbol} address={address} figure={figure}>
         <TokenChipIcon symbol={symbol} address={address} size={16} filterable={false} untitled />

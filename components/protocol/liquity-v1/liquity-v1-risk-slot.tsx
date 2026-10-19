@@ -38,6 +38,7 @@ import {
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { V1_WORDS } from "@/lib/liquity-v1/event-templates";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 /** Whether the read describes an active Trove with debt and a live ratio. */
 export function liquityV1HasRisk(chain: LiquityV1PositionChainResponse): boolean {
@@ -86,10 +87,14 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
                     </Prov>
                   </TokenFigure>
                   {share != null && (
-                    <span className="text-rb-500">
+                    <>
                       {" "}
-                      · <Prov info={queueShareProv()}>{pct(share)}</Prov> of the queue
-                    </span>
+                      ·{" "}
+                      <Prov info={queueShareProv()}>
+                        <PanelFigure>{pct(share)}</PanelFigure>
+                      </Prov>{" "}
+                      of the queue
+                    </>
                   )}
                 </>
               ),

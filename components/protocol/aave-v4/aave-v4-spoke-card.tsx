@@ -71,6 +71,7 @@ import {
 import { PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export type { AaveSpokeCardInfo };
 
@@ -195,7 +196,10 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
         tip: "The supply interest inside the collateral, in dollars: what the supplied balance holds beyond its deposits and withdrawals since it last started from zero.",
         value: (
           <span>
-            <Prov info={supplyInterestProv()}>{v.display}</Prov> since {formatDate(got.since)}
+            <Prov info={supplyInterestProv()}>
+              <PanelFigure>{v.display}</PanelFigure>
+            </Prov>{" "}
+            since {formatDate(got.since)}
           </span>
         ),
       }
@@ -205,7 +209,10 @@ function interestRow(spoke: AaveSpokeCardInfo, side: "supply" | "debt"): Positio
         tip: "The borrow interest inside the debt, in dollars: what the debt holds beyond its draws and repayments since it last started from zero.",
         value: (
           <span>
-            <Prov info={borrowInterestProv()}>{v.display}</Prov> since {formatDate(got.since)}
+            <Prov info={borrowInterestProv()}>
+              <PanelFigure>{v.display}</PanelFigure>
+            </Prov>{" "}
+            since {formatDate(got.since)}
           </span>
         ),
       };

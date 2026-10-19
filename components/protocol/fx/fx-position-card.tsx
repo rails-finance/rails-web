@@ -37,7 +37,7 @@ import {
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   settledCollateralProv,
   settledDebtProv,
@@ -77,6 +77,7 @@ import { formatExact, formatUnitsExact, formatUsdValue } from "@/lib/utils/forma
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { TokenFigure } from "@/components/shared/token-figure";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
 import { summariseFxDrift, type FxDriftResult } from "@/lib/sources/api/fx-drift";
@@ -163,8 +164,12 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       {
         id: "recorded-events",
         label: "Recorded events",
-        value:
-          "none: this position was created by a path that logs nothing; only the pool's current figures describe it",
+        value: (
+          <>
+            <PanelFigure>none</PanelFigure>: this position was created by a path that logs nothing; only the pool&apos;s
+            current figures describe it
+          </>
+        ),
         tip: "A chain-only position: the pool minted it by a path that emits no Operate event, so there is no event record to check the pool's figures against.",
       },
     ];
@@ -350,7 +355,7 @@ function ratioRows(
       value: (
         <>
           <Prov info={px ? oracleLegAtProv("anchor", sym, px.block) : anchorPriceProv(sym, v.settled.block)}>
-            {formatLiquidationPrice(anchor)}
+            <PanelFigure>{formatLiquidationPrice(anchor)}</PanelFigure>
           </Prov>{" "}
           per {sym}
           {v.settled.block != null ? (
@@ -370,8 +375,13 @@ function ratioRows(
       label: "Ratio at the min price",
       value: (
         <>
-          <Prov info={minRatioProv(px.block)}>{(minRatio * 100).toFixed(1)}%</Prov> at{" "}
-          <Prov info={oracleLegAtProv("min", sym, px.block)}>{formatLiquidationPrice(px.min)}</Prov>
+          <Prov info={minRatioProv(px.block)}>
+            <PanelFigure>{(minRatio * 100).toFixed(1)}%</PanelFigure>
+          </Prov>{" "}
+          at{" "}
+          <Prov info={oracleLegAtProv("min", sym, px.block)}>
+            <PanelFigure>{formatLiquidationPrice(px.min)}</PanelFigure>
+          </Prov>
         </>
       ),
       tip: "The debt ratio judged at the oracle's min price, the price the pool's lines are judged at. It sits at or above the ratio at the anchor price.",
@@ -385,7 +395,7 @@ function ratioRows(
       value: (
         <>
           <Prov info={positionTickProv(sym, px.block)} value={String(px.tick)}>
-            #{px.tick}
+            <PanelFigure>#{px.tick}</PanelFigure>
           </Prov>{" "}
           ·{" "}
           <Link
@@ -402,7 +412,13 @@ function ratioRows(
       lines.push({
         id: "redemption",
         label: "Redemption",
-        value: terms.redeemAllowed ? "open now" : "closed now (opens only while fxUSD trades below its peg)",
+        value: terms.redeemAllowed ? (
+          "open now"
+        ) : (
+          <>
+            <PanelFigure>closed now</PanelFigure> (opens only while fxUSD trades below its peg)
+          </>
+        ),
         tip: "Whether the pool lets fxUSD be redeemed for collateral now. Redemption takes from the highest-ratio ticks first.",
       });
       if (px.ticksAbove != null)
@@ -411,7 +427,9 @@ function ratioRows(
           label: "Debt ticks above",
           value:
             px.ticksAbove === 0 ? (
-              "none, this position's tick is the top one"
+              <>
+                <PanelFigure>none</PanelFigure>, this position&apos;s tick is the top one
+              </>
             ) : (
               <Prov info={ticksAboveProv(px.block)} value={String(px.ticksAbove)}>
                 {px.ticksAbove}
@@ -456,7 +474,9 @@ function ratioRows(
             label: "Rebalances at",
             value: (
               <>
-                <Prov info={minTriggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatLiquidationPrice(rb)}</Prov>{" "}
+                <Prov info={minTriggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>
+                  <PanelFigure>{formatLiquidationPrice(rb)}</PanelFigure>
+                </Prov>{" "}
                 min price ({fall(rb, px.min)})
               </>
             ),
@@ -467,7 +487,9 @@ function ratioRows(
             label: "Liquidates at",
             value: (
               <>
-                <Prov info={minTriggerPriceProv(pctLine(terms.liquidateRatio), sym)}>{formatLiquidationPrice(lq)}</Prov>{" "}
+                <Prov info={minTriggerPriceProv(pctLine(terms.liquidateRatio), sym)}>
+                  <PanelFigure>{formatLiquidationPrice(lq)}</PanelFigure>
+                </Prov>{" "}
                 min price ({fall(lq, px.min)})
               </>
             ),
@@ -489,8 +511,10 @@ function ratioRows(
         label: "Rebalances at",
         value: (
           <>
-            <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatLiquidationPrice(at)}</Prov> anchor
-            price ({fall(at, anchor)})
+            <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>
+              <PanelFigure>{formatLiquidationPrice(at)}</PanelFigure>
+            </Prov>{" "}
+            anchor price ({fall(at, anchor)})
           </>
         ),
         tip: reachTip("rebalance"),
@@ -522,30 +546,46 @@ function collateralDriftRow(
   const taken = s.complete ? socializedTaken(rows) : null;
   const inside = s.complete && inTx && inTx.total > DUST ? inTx : null;
   const between = -s.collsDrift;
+  const sym = v.normalizedSymbol;
+  // The value is the one figure, what the pool moved in all; the parts behind
+  // it, each with its receipt, are the sentence in the row's tip (ui-jobs 381).
   const insideNote = inside ? (
     <>
       {" "}
       (
-      <PanelToken symbol={v.normalizedSymbol} value={between}>
-        <Prov info={lifetimeCollateralDriftProv(v.normalizedSymbol, s.intervals, s.complete, drift.headBlock)}>
-          {formatCompact(Math.abs(between))}
-        </Prov>
-      </PanelToken>{" "}
-      between the transactions and{" "}
-      <PanelToken symbol={v.normalizedSymbol} value={inside.total}>
-        <Prov info={lifetimeInTxFundingProv(v.normalizedSymbol, inTx?.reads ?? 0)}>
-          {formatCompact(Math.abs(inside.total))}
-        </Prov>
-      </PanelToken>{" "}
+      <Prov info={lifetimeCollateralDriftProv(sym, s.intervals, s.complete, drift.headBlock)}>
+        {formatCompact(Math.abs(between))}
+      </Prov>{" "}
+      {sym} between the transactions and{" "}
+      <Prov info={lifetimeInTxFundingProv(sym, inTx?.reads ?? 0)}>{formatCompact(Math.abs(inside.total))}</Prov> {sym}{" "}
       inside {inside.rows.length === 1 ? "one of them" : `${inside.rows.length} of them`})
     </>
   ) : null;
   const funding = taken ? between - taken.coll + (inside?.total ?? 0) : null;
-  const row = (value: ReactNode): PositionPanelRow => ({
+  const scope = s.complete
+    ? "without a transaction"
+    : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far`;
+  const prov = lifetimeCollateralDriftProv(sym, s.intervals, s.complete, drift.headBlock);
+  const row = (total: number, info: Provenance, sentence: ReactNode): PositionPanelRow => ({
     id: "collateral-moved",
     label: "Collateral moved by the pool",
-    value,
-    tip: "Collateral the pool took or added with no transaction of this position's: funding, which it charges on collateral, and tick rebalances. Summed over the quiet stretches between the position's events, each read from the pool at its two ends.",
+    value: (
+      <PanelToken symbol={sym} value={total}>
+        <Prov info={info}>
+          {total < -DUST ? "+" : ""}
+          <AmountText value={Math.abs(total)} format="compact" />
+        </Prov>
+      </PanelToken>
+    ),
+    // A history still being read says how much of it the figure covers.
+    sub: s.complete ? undefined : scope,
+    tip: (
+      <>
+        Collateral the pool took or added with no transaction of this position&apos;s: funding, which it charges on
+        collateral, and tick rebalances. Summed over the quiet stretches between the position&apos;s events, each read
+        from the pool at its two ends. <span data-collateral-moved-parts="">{sentence}</span>
+      </>
+    ),
   });
   // Funding and the rows apart: the rows' blocks read one by one, funding the
   // remainder of the drift (never below zero; if it is, the row keeps the
@@ -553,57 +593,33 @@ function collateralDriftRow(
   if (taken && rows && funding != null && funding >= -DUST && Math.abs(s.collsDrift) > DUST) {
     const n = rows.blocks.length;
     return row(
+      between + (inside?.total ?? 0),
+      inside ? lifetimeCollateralMovedProv(sym, drift.headBlock) : prov,
       <>
-        {rowsNoun(rows)} took{" "}
-        <PanelToken symbol={v.normalizedSymbol} value={Math.abs(taken.coll)}>
-          <Prov info={socializedCollTakenProv(v.normalizedSymbol, n)}>
-            <AmountText value={Math.abs(taken.coll)} format="compact" />
-          </Prov>
-        </PanelToken>{" "}
-        and funding took{" "}
-        <PanelToken symbol={v.normalizedSymbol} value={funding}>
-          <Prov info={fundingTakenProv(v.normalizedSymbol)}>{formatCompact(Math.abs(funding))}</Prov>
-        </PanelToken>
-        {insideNote}
+        {rowsNoun(rows).replace(/^./, (c) => c.toUpperCase())} took{" "}
+        <Prov info={socializedCollTakenProv(sym, n)}>
+          <AmountText value={Math.abs(taken.coll)} format="compact" />
+        </Prov>{" "}
+        {sym} and funding took <Prov info={fundingTakenProv(sym)}>{formatCompact(Math.abs(funding))}</Prov> {sym}
+        {insideNote}.
       </>,
     );
   }
-  const scope = s.complete
-    ? "without a transaction"
-    : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far`;
-  const prov = lifetimeCollateralDriftProv(v.normalizedSymbol, s.intervals, s.complete, drift.headBlock);
   if (Math.abs(s.collsDrift) <= DUST && !inside) {
-    return row(
-      <>
-        <PanelToken symbol={v.normalizedSymbol} value={0}>
-          <Prov info={prov}>{formatCompact(0)}</Prov>
-        </PanelToken>{" "}
-        of funding or rebalance movement {scope}
-      </>,
-    );
+    return row(0, prov, <>Nothing moved by funding or rebalances {scope}.</>);
   }
   if (inside) {
     return row(
-      <>
-        funding and rebalances took{" "}
-        <PanelToken symbol={v.normalizedSymbol} value={between + inside.total}>
-          <Prov info={lifetimeCollateralMovedProv(v.normalizedSymbol, drift.headBlock)}>
-            {formatCompact(Math.abs(between + inside.total))}
-          </Prov>
-        </PanelToken>
-        {insideNote}
-      </>,
+      between + inside.total,
+      lifetimeCollateralMovedProv(sym, drift.headBlock),
+      <>Funding and rebalances took it{insideNote}.</>,
     );
   }
   return row(
+    between,
+    prov,
     <>
-      funding and rebalances {s.collsDrift < 0 ? "took" : "added"}{" "}
-      <PanelToken symbol={v.normalizedSymbol} value={Math.abs(s.collsDrift)}>
-        <Prov info={prov}>
-          <AmountText value={Math.abs(s.collsDrift)} format="compact" />
-        </Prov>
-      </PanelToken>{" "}
-      {scope}
+      Funding and rebalances {s.collsDrift < 0 ? "took" : "added"} it {scope}.
     </>,
   );
 }

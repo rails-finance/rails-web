@@ -58,6 +58,7 @@ import { moonwellCollateralFactorProv, type MoonwellLane } from "@/lib/moonwell/
 import { MoonwellMenuRows } from "./moonwell-menu-rows";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export interface MoonwellPositionView {
   wallet: string;
@@ -205,11 +206,18 @@ function LineValue({
     <>
       {amount}
       {usd != null && (
-        <span className="text-rb-500">
+        <>
           {" · "}
-          <Prov info={dep.card.usd(usdWhat)}>{formatUsdValue(usd)}</Prov>
-          {share != null && ` · ${shareText(share)}`}
-        </span>
+          <Prov info={dep.card.usd(usdWhat)}>
+            <PanelFigure>{formatUsdValue(usd)}</PanelFigure>
+          </Prov>
+          {share != null && (
+            <>
+              {" · "}
+              <PanelFigure>{shareText(share)}</PanelFigure>
+            </>
+          )}
+        </>
       )}
     </>
   );

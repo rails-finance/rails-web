@@ -64,6 +64,7 @@ import { ExactSpan } from "@/components/shared/amount-text";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 import { TokenFigure } from "@/components/shared/token-figure";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export interface SparkPositionView {
   wallet: string;
@@ -620,10 +621,12 @@ export function useSparkCardSlots({
       value: (
         <span className="flex flex-col gap-0.5" data-spark-not-collateral="">
           {otherUsd != null && (
-            <Prov info={sparkUsdProvOnchain("Supplied, not collateral")}>{formatCompactUsd(otherUsd)}</Prov>
+            <Prov info={sparkUsdProvOnchain("Supplied, not collateral")}>
+              <PanelFigure>{formatCompactUsd(otherUsd)}</PanelFigure>
+            </Prov>
           )}
           {othersRanked.map((r) => (
-            <span key={r.address} className={otherUsd != null ? "text-rb-500" : undefined}>
+            <span key={r.address}>
               <ReserveAmountText r={r} side="supply" atBlock={v.atBlock} withIcon />
             </span>
           ))}

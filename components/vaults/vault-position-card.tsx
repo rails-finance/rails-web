@@ -85,6 +85,7 @@ import {
 } from "@/lib/aave-vaults/vault-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { AssetAmount } from "@/components/shared/asset-amount";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -420,7 +421,10 @@ export function vaultCardSlots({
             label: "Read at",
             value: (
               <>
-                block <BlockRef block={row.live.blockNumber} />
+                block{" "}
+                <PanelFigure>
+                  <BlockRef block={row.live.blockNumber} />
+                </PanelFigure>
               </>
             ),
             tip: "The block the shares, the claim, the share of the vault and the redeemable figure were read at.",
@@ -432,7 +436,10 @@ export function vaultCardSlots({
       label: "Census at",
       value: (
         <>
-          block <BlockRef block={row.census.block} />
+          block{" "}
+          <PanelFigure>
+            <BlockRef block={row.census.block} />
+          </PanelFigure>
         </>
       ),
       tip: "The block the daily census swept to: the transfers, first seen and the dollar value are counted there.",

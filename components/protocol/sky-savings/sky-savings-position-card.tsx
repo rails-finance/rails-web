@@ -25,6 +25,7 @@ import { SUSDS, USDS } from "@/lib/sky-savings/constants";
 import { exact, pctString, rayExact, rayNumber, skyYearlyEarnings, units, yearlyText } from "@/lib/sky-savings/math";
 import { chiProv, earnedProv, rateProv, sharesHeldProv, valueProv, yearlyProv } from "@/lib/sky-savings/provenance";
 import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const worthHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
   const v = p.value ? units(p.value.raw) : 0;
@@ -198,7 +199,8 @@ export function skySavingsCardSlots({
               value: (
                 <Prov info={chiProv(asOf)} value={rayExact(asOf.chi)} symbol={USDS.symbol}>
                   <span className="tabular-nums">
-                    1 {SUSDS.symbol} = {rayNumber(asOf.chi).toFixed(6)} {USDS.symbol}
+                    <PanelFigure>1</PanelFigure> {SUSDS.symbol} ={" "}
+                    <PanelFigure>{rayNumber(asOf.chi).toFixed(6)}</PanelFigure> {USDS.symbol}
                   </span>
                 </Prov>
               ),

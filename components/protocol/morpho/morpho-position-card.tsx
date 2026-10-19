@@ -67,6 +67,7 @@ import { isPendlePt } from "@/lib/morpho/pendle-pt";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 export interface MorphoPositionView {
   positionId: string;
@@ -477,7 +478,11 @@ export function useMorphoCardSlots({
           {
             id: "borrow-rate",
             label: "Borrow rate",
-            value: <Prov info={morphoBorrowRateNowProv(apr)}>{(apr * 100).toFixed(2)}% APR</Prov>,
+            value: (
+              <Prov info={morphoBorrowRateNowProv(apr)}>
+                <PanelFigure>{(apr * 100).toFixed(2)}%</PanelFigure> APR
+              </Prov>
+            ),
             tip: "The market's borrow rate now, read from its interest rate model at the head block. It moves with how much of the market is lent out.",
           },
           {
@@ -506,7 +511,8 @@ export function useMorphoCardSlots({
           label: "Interest to",
           value: (
             <>
-              {formatDate(v.currentDebt.index.readAt)} (<BlockRef block={v.currentDebt.index.block} />)
+              <PanelFigure>{formatDate(v.currentDebt.index.readAt)}</PanelFigure> (
+              <BlockRef block={v.currentDebt.index.block} />)
             </>
           ),
           tip: "The market's interest index was last read at this block, so the debt includes interest to that date.",
@@ -581,11 +587,13 @@ export function useMorphoCardSlots({
                   chainCoords,
                 )}
               >
-                {share.text}
+                <PanelFigure>{share.text}</PanelFigure>
               </Prov>{" "}
-              <span className="text-rb-500">
-                (LLTV <Prov info={lltvProv(chainCoords)}>{pct(ltvUsable.lltv)}</Prov>)
-              </span>
+              (LLTV{" "}
+              <Prov info={lltvProv(chainCoords)}>
+                <PanelFigure>{pct(ltvUsable.lltv)}</PanelFigure>
+              </Prov>
+              )
             </>
           ),
           tip: "The debt as a share of the most the collateral supports at the market's LLTV. At 100% the position can be liquidated.",

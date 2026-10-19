@@ -34,6 +34,7 @@ import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 import { MapleMenuRows } from "./maple-menu-rows";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { PanelFigure } from "@/components/shared/position-card-panel";
 
 /** The first headline: what the locked shares redeem for, in the pool's own
  *  asset, or shares alone when the value derivation degraded. */
@@ -165,14 +166,14 @@ export function MapleCustodyCard({
       <span className="tabular-nums">
         <Prov info={custodySharesProv(h.symbol, h.blockNumber)}>
           <ExactSpan exact={`${formatUnitsExact(h.raw.shares, 6)} ${h.symbol}`} symbol={h.symbol}>
-            {formatCompact(h.shares)} {h.symbol}
+            <PanelFigure>{formatCompact(h.shares)}</PanelFigure> {h.symbol}
           </ExactSpan>
         </Prov>
         {h.exitValue != null && (
           <>
             {" "}
             <Prov info={poolExitRateProv(h.assetSymbol, h.symbol, h.blockNumber)}>
-              <span className="text-rb-500">@ {h.exitRate.toFixed(4)}</span>
+              @ <PanelFigure>{h.exitRate.toFixed(4)}</PanelFigure>
             </Prov>
           </>
         )}
