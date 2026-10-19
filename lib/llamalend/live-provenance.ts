@@ -109,7 +109,7 @@ export function llamalendOraclePriceProv(
     verify: recompute("Re-run the AMM's price_oracle eth_call against any node."),
     summary: `${collateralSymbol} priced in ${borrowedSymbol} — the AMM's own price_oracle() at the latest block (1e18), the same price the LLAMMA conversion mechanism trades against. ${
       isCrvusd
-        ? "The borrowed token is crvUSD (~$1), so this reading is presented as USD — unit: crvUSD, the protocol's own denomination."
+        ? "The borrowed token is crvUSD (~$1); the card states the price in crvUSD, the protocol's own denomination."
         : `⚠️ This market borrows ${borrowedSymbol}, NOT crvUSD — the price stays in ${borrowedSymbol} and no dollar figure is asserted from it.`
     }`,
     contract: ammOf(amm),

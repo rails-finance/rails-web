@@ -31,8 +31,11 @@ import {
   llamalendOraclePriceProv,
 } from "@/lib/llamalend/live-provenance";
 import { llamalendLostProv, llamalendSoldProv } from "@/lib/llamalend/event-provenance";
-import { fmtColl, fmtHealth } from "@/lib/llamalend/event-figures";
-import { formatUnitsExact } from "@/lib/utils/format";
+import { fmtHealth } from "@/lib/llamalend/event-figures";
+import { formatExact, formatUnitsExact } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
+import { TokenFigure } from "@/components/shared/token-figure";
 import { AmountText } from "@/components/shared/amount-text";
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
 
@@ -59,18 +62,6 @@ export function llamalendHealthSub(chain: LlamalendChainResponse): ReactNode {
   if (chain.healthFull > 0 && chain.healthFull < HEALTH_NEAR_ZERO)
     return <span className="text-tone-caution">close to 0; below 0 anyone may liquidate it</span>;
   return undefined;
-}
-
-/** The band edges and the price at one decimal count, chosen so the band's own
- *  width keeps two significant digits (per-figure formatting let the captions
- *  disagree, `1,745.17` beside `2,359.293`, on figures of one precision). */
-function bandPriceFormat(pUp: number, pDown: number, price: number): (v: number) => string {
-  const width = Math.abs(pUp - pDown);
-  // Prices under 1 keep four significant digits (0.3958).
-  const least = Math.min(pUp, pDown, price);
-  const sigDp = least > 0 && least < 1 ? Math.ceil(-Math.log10(least)) + 3 : 0;
-  const dp = Math.max(2, sigDp, Math.min(6, width > 0 ? Math.ceil(-Math.log10(width)) + 1 : 2));
-  return (v) => v.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
 /** The panel's rows from the live read: the converted amount, the
@@ -107,16 +98,24 @@ export function llamalendRiskRows(
             chain.amm,
           )}
         >
-          <span
-            title={
-              chain.convertedRaw != null
-                ? `${formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals)} — exact`
-                : undefined
-            }
-          >
-            {chain.converted != null ? <AmountText value={chain.converted} format="compact" /> : "—"}{" "}
-            {chain.borrowedSymbol}
-          </span>
+          {chain.converted != null ? (
+            <TokenFigure
+              symbol={chain.borrowedSymbol}
+              figure={`${chain.convertedRaw != null ? formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals) : formatExact(chain.converted)} ${chain.borrowedSymbol}`}
+            >
+              <span
+                title={
+                  chain.convertedRaw != null
+                    ? `${formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals)} — exact`
+                    : undefined
+                }
+              >
+                <AmountText value={chain.converted} format="compact" />
+              </span>
+            </TokenFigure>
+          ) : (
+            "—"
+          )}
         </Prov>
         {chain.inSoftLiq && <span className="text-rb-500">from sold {chain.collateralSymbol}</span>}
         {/* The misleading-figure caution (copy charter §2's one exception): the
@@ -145,22 +144,16 @@ export function llamalendRiskRows(
     left.push({
       id: "sold-net",
       label: "Sold by the AMM, net",
-      value: (
-        <Prov info={llamalendSoldProv(chain.collateralSymbol, chain.controller)}>
-          {fmtColl(sold)} {chain.collateralSymbol}
-        </Prov>
-      ),
+      value: <Prov info={llamalendSoldProv(chain.collateralSymbol, chain.controller)}>{formatCompact(sold)}</Prov>,
+      asset: { symbol: chain.collateralSymbol, figure: `${formatExact(sold)} ${chain.collateralSymbol}` },
       tip: `${chain.collateralSymbol} the AMM has sold from this position and not bought back: everything deposited, less everything withdrawn, less what the position holds now.`,
     });
   if (lost != null && lost > 0)
     left.push({
       id: "lost-to-soft-liquidation",
       label: "Lost to soft-liquidation",
-      value: (
-        <Prov info={llamalendLostProv(chain.collateralSymbol, chain.controller)}>
-          {fmtColl(lost)} {chain.collateralSymbol}
-        </Prov>
-      ),
+      value: <Prov info={llamalendLostProv(chain.collateralSymbol, chain.controller)}>{formatCompact(lost)}</Prov>,
+      asset: { symbol: chain.collateralSymbol, figure: `${formatExact(lost)} ${chain.collateralSymbol}` },
       tip: `${chain.collateralSymbol} the AMM sold while the price sat in this position's bands and did not buy back, with nothing converted at the latest block and nothing liquidated: deposited, less withdrawn, less held now.`,
     });
 
@@ -179,7 +172,10 @@ export function llamalendRiskRows(
 
   const { pUp, pDown, priceOracle: price } = chain;
   if (pUp != null && pDown != null && price != null && pUp > 0) {
-    const p = bandPriceFormat(pUp, pDown, price);
+    // The band edges and the price are in the borrowed token per collateral
+    // token, in Liquity V2's price form ("2.43K": two places in K below 10K),
+    // with the borrowed token's icon in place of its ticker (ui-jobs 377).
+    const p = (v: number) => formatLiquidationPrice(v).replace("$", "");
     const converted = price <= pDown;
     const inBand = !converted && price <= pUp;
     right.push({
@@ -209,11 +205,15 @@ export function llamalendRiskRows(
             </span>
           </Prov>{" "}
           →{" "}
-          <Prov info={llamalendBandEdgeProv("pDown", chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm)}>
-            <span title={chain.pDownRaw != null ? `${formatUnitsExact(chain.pDownRaw, 18)} (exact, 1e18)` : undefined}>
-              {p(pDown)}
-            </span>
-          </Prov>
+          <TokenFigure symbol={chain.borrowedSymbol}>
+            <Prov info={llamalendBandEdgeProv("pDown", chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm)}>
+              <span
+                title={chain.pDownRaw != null ? `${formatUnitsExact(chain.pDownRaw, 18)} (exact, 1e18)` : undefined}
+              >
+                {p(pDown)}
+              </span>
+            </Prov>
+          </TokenFigure>
         </>
       ),
       tip: `The bands this position's collateral sits in, from the price where conversion begins to the price where it completes, in ${chain.borrowedSymbol} per ${chain.collateralSymbol}${chain.n1 != null && chain.n2 != null ? ` (n${chain.n1}…${chain.n2})` : ""}. They come from the AMM's A, its base price and the position's ticks.`,
@@ -221,28 +221,32 @@ export function llamalendRiskRows(
     right.push({
       id: "oracle-price",
       label: "Oracle price",
+      asset: {
+        symbol: chain.borrowedSymbol,
+        figure:
+          chain.priceOracleRaw != null
+            ? `${formatUnitsExact(chain.priceOracleRaw, 18)} ${chain.borrowedSymbol}`
+            : `${formatExact(price)} ${chain.borrowedSymbol}`,
+      },
       value: (
-        <>
-          <Prov
-            info={llamalendOraclePriceProv(
-              chain.collateralSymbol,
-              chain.borrowedSymbol,
-              chain.borrowedIsCrvusd,
-              chain.amm,
-            )}
+        <Prov
+          info={llamalendOraclePriceProv(
+            chain.collateralSymbol,
+            chain.borrowedSymbol,
+            chain.borrowedIsCrvusd,
+            chain.amm,
+          )}
+        >
+          <span
+            title={
+              chain.priceOracleRaw != null
+                ? `${formatUnitsExact(chain.priceOracleRaw, 18)} (price_oracle, 1e18)`
+                : undefined
+            }
           >
-            <span
-              title={
-                chain.priceOracleRaw != null
-                  ? `${formatUnitsExact(chain.priceOracleRaw, 18)} (price_oracle, 1e18)`
-                  : undefined
-              }
-            >
-              {p(price)}
-            </span>
-          </Prov>{" "}
-          {chain.borrowedSymbol}
-        </>
+            {p(price)}
+          </span>
+        </Prov>
       ),
       tip: `The ${chain.collateralSymbol} price in ${chain.borrowedSymbol}, the AMM's price_oracle at the latest block: the price the conversion trades against.`,
     });

@@ -43,9 +43,8 @@ import {
 import { StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
-import { formatUsd } from "@/lib/shared/format-event";
 import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
 import { type LlamalendFactoryKind, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
@@ -203,12 +202,7 @@ function usdLine(
   if (usd == null) return v.borrowedIsCrvusd ? null : undefined;
   return (
     <Prov info={llamalendUsdProv(what, v.borrowedSymbol, v.amm ?? undefined)}>
-      <span
-        className="font-bold text-green-400"
-        title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-      >
-        {formatUsd(usd)}
-      </span>
+      <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
     </Prov>
   );
 }
