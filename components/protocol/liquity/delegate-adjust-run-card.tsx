@@ -351,7 +351,7 @@ export function DelegateAdjustRunCard({
         ? troveNodes("run_explain_rate_unchanged", { rate: rateFig("last", reading.to) })
         : troveNodes("run_explain_rate", { from: rateFig("first", reading.from), to: rateFig("last", reading.to) }),
     );
-  bullets.push(...sheetSideBullets(merged?.sheet, new Set(["collateral", "escrow"])));
+  bullets.push(...sheetSideBullets(merged?.sheet, new Set(["collateral"])));
   const debtRows = merged?.sheet.sides.find((s) => s.side === "debt" && !s.id)?.rows ?? [];
   // What the run added to the debt, as the sheet sums it, with the upfront
   // fees in the same bullet where there are any; a zero sum says nothing.

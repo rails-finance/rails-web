@@ -67,7 +67,6 @@ export function mergeDelegateRunSheet(cards: CollectedCard[], steps: DelegateRun
   const last = sheets[sheets.length - 1]!;
   const sideOf = (sh: EventSheet, side: string) => sh.sides.find((s) => s.side === side && !s.id);
   const lastColl = sideOf(last, "collateral");
-  const lastEscrow = last.sides.find((s) => s.id === "escrow");
   const lastDebt = sideOf(last, "debt");
   const firstDebt = sideOf(first, "debt");
   if (!lastColl || !lastDebt || !firstDebt) return null;
@@ -159,10 +158,6 @@ export function mergeDelegateRunSheet(cards: CollectedCard[], steps: DelegateRun
     return { ...p, rows };
   });
 
-  // The gas compensation escrow: the last member's panel, untouched.
-  const escrowSide: SheetSide | null = lastEscrow
-    ? { ...lastEscrow, carry: [], before: undefined, rows: [], untouched: troveWords("run_sheet_untouched") }
-    : null;
-
-  return { sides: escrowSide ? [collSide, escrowSide, debtSide] : [collSide, debtSide], panels };
+  // The gas compensation escrow: the last member's footnote.
+  return { sides: [collSide, debtSide], panels, footnotes: last.footnotes };
 }

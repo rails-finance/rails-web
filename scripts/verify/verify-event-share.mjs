@@ -503,7 +503,7 @@ const SHEET_SUBJECTS = {
       event: "0xe5509980170a44f3f5878afd1b13d3e797cba9789b1509de475fcb9fb97ad930_1", // #3, a Borrow
       second: "0x46fb24cd6c2b19b143699504bfa3ed11b08a2bb8af11c96953a39cef053eb33c_17", // #1, the open
       first: "0x46fb24cd6c2b19b143699504bfa3ed11b08a2bb8af11c96953a39cef053eb33c_17",
-      sides: ["collateral", "escrow", "debt"],
+      notes: ["escrow"],
     },
   ],
   "aave-v3": [
@@ -597,7 +597,7 @@ const SHEET_SUBJECTS = {
       // 9 Jun 2026, a Withdraw. Ebisu, Asymmetry and Basedollar share liquity-fork-sheet.tsx.
       event: "0x8496531fb5d25fc73d0d2df3695176b44d86f057871e9b89a5de224f16590a18-0",
       second: "0x56f402df843e775def041e3096fbef00dcebc3873d309b8d52629b204f7f0c32-2",
-      sides: ["collateral", "escrow", "debt"],
+      notes: ["escrow"],
     },
   ],
   basedollar: [
@@ -608,7 +608,7 @@ const SHEET_SUBJECTS = {
       // this page" (Basedollar's operate rows carry no price).
       event: "0x81c3c97a12ae9b68adfa808ef542f7cfb157f5fd0890e7eb37b21336e5e0f757-2",
       second: "0x08ed0149157d9954c4ea33ff7567578a91cd94deb0e0d93e2d22bf5489dae6e8-2",
-      sides: ["collateral", "escrow", "debt"],
+      notes: ["escrow"],
     },
   ],
   makerdao: [
@@ -630,7 +630,7 @@ const SHEET_SUBJECTS = {
       // The open.
       first: "cdp_updated:0xc3cd88b40626d8f4caa15c76e73b9a9e3b2982ca3727f2a0a1b6a9f14256dc28:21",
 
-      sides: ["collateral", "escrow", "debt"],
+      notes: ["escrow"],
     },
   ],
   maple: [
@@ -810,8 +810,8 @@ const readSheet = (page, id) =>
             name: e.querySelector("h3")?.textContent.trim() ?? "",
             touched: e.getAttribute("data-sheet-touched"),
             totals: rows.filter((r) => r === "total").length,
-            // The escrow's and the reserve's panels key their row by the move.
-            events: rows.filter((r) => /^(event|escrow-|reserve-)/.test(r)).length,
+            // The reserve's panel keys its row by the move.
+            events: rows.filter((r) => /^(event|reserve-)/.test(r)).length,
             // The rows outside every layer, less the total and Before: the
             // event's rows, whatever key the builder gave them.
             moved: [...e.querySelectorAll("[data-sheet-row]")].filter(
@@ -820,6 +820,14 @@ const readSheet = (page, id) =>
             ).length,
           };
         }),
+        notes: [...s.querySelectorAll("[data-sheet-note]")].map((e) => ({
+          note: e.getAttribute("data-sheet-note"),
+          // Below the panels: nothing of the sheet's sides or panels follows it.
+          last: ![...s.querySelectorAll("[data-sheet-side], [data-sheet-panel]")].some(
+            (x) => e.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING,
+          ),
+          amount: e.querySelectorAll('[data-sheet-note-col="amount"]').length,
+        })),
         panels: [...s.querySelectorAll("[data-sheet-panel]")].map((e) => ({
           panel: e.getAttribute("data-sheet-panel"),
           rows: rowsOf(e).length,
@@ -961,8 +969,8 @@ async function verifySheetSubject(name, s) {
       );
     else {
       // A family whose position holds an amount beside the two sides draws it
-      // as a panel of its own (`sides`): the gas compensation escrow between
-      // Collateral and Debt, Liquity V1's liquidation reserve after Debt.
+      // as a panel of its own (`sides`): Liquity V1's liquidation reserve
+      // after Debt.
       const want = s.sides ?? ["collateral", "debt"];
       check(
         `${tag} @1280: the sides are ${want.join(", ")}`,
@@ -970,6 +978,15 @@ async function verifySheetSubject(name, s) {
         JSON.stringify(sides.map((x) => x.side)),
       );
     }
+    // The gas compensation escrow is a footnote under Risk and Limits
+    // (`notes`, ui-jobs 388), with its amount; none elsewhere.
+    const wantNotes = s.notes ?? [];
+    check(
+      `${tag} @1280: the footnotes are [${wantNotes.join(", ")}], below the panels, each with its amount`,
+      JSON.stringify((at?.notes ?? []).map((n) => n.note)) === JSON.stringify(wantNotes) &&
+        (at?.notes ?? []).every((n) => n.last && n.amount === 1),
+      JSON.stringify(at?.notes),
+    );
     check(
       `${tag} @1280: each side has one total row`,
       sides.length > 0 && sides.every((x) => x.totals === 1),

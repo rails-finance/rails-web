@@ -10,9 +10,8 @@
 // between the two, and whose primary rate the rate's change reads against.
 // A liquidation draws the sheet as Liquity V2's does: the seized pETH and the
 // cleared debt as the event's rows. A transfer keeps its cells. Every other
-// event draws the gas compensation escrow as a panel of its own between the
-// two sides, touched on the open, the close and the liquidation (rails-ops
-// TO-DO-ui-jobs 363, 366).
+// event draws the gas compensation escrow as a footnote under Risk and Limits
+// (rails-ops TO-DO-ui-jobs 388).
 //
 // Dollars: pETH at the market's feed price in its stablecoin times the
 // stablecoin's price; a USDp is $1 in the feed (it prices pETH as the bonding
@@ -21,6 +20,7 @@
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { SHEET_WORDS, sheetUsd, type EventSheet, type SheetRow, type SheetStat } from "@/components/shared/event-sheet";
+import { gasEscrowFootnote, type GasEscrowMove } from "@/lib/shared/liquity-gas-escrow";
 import { changeText } from "@/components/shared/change-swap-value";
 import {
   ledgerFieldProv,
@@ -381,110 +381,29 @@ export function polarisSheet(
   };
 
   // ── The gas compensation escrow ──
-  // Its own panel between the Collateral and the Debt on every event from the
-  // open to the close or the liquidation, outside the Collateral total and
-  // the ratio (rails-ops decision 0042): the constant every open sends with
-  // the collateral, every close returns and a liquidation pays the
-  // liquidator. Between them the panel is an untouched side. The CDPUpdated
-  // log does not carry it.
+  // A footnote under Risk and Limits on every event from the open to the
+  // close or the liquidation (rails-ops TO-DO-ui-jobs 388): the constant every
+  // open sends with the collateral, every close returns and a liquidation
+  // pays the liquidator. The CDPUpdated log does not carry it.
   const escrowAmount = POLARIS_LIQ_CONSTANTS.gasComp.amount;
-  const isOpenEvent = ctx.eventType === "open";
-  const heldProv = gasCompHeldProv(coords);
-  const escrowEnd = isClose || isLiq;
-  const paid = isLiq && num(ctx.flatComp) > 0 ? num(ctx.flatComp) : escrowAmount;
-  const escrowRow: SheetRow | null = isOpenEvent
-    ? {
-        key: "escrow-sent",
-        label: W.sheet_escrow_sent,
-        amount: {
-          text: amountText(escrowAmount, "coll"),
-          symbol: PETH.symbol,
-          address: PETH.address,
-          info: gasCompEscrowProv(coords),
-          value: String(escrowAmount),
-        },
-        usd: usdOf(W.sheet_escrow_sent, "coll", escrowAmount),
-        tip: W.tip_escrow_sent,
-      }
-    : isClose
-      ? {
-          key: "escrow-returned",
-          label: W.sheet_escrow_returned,
-          amount: {
-            text: amountText(-escrowAmount, "coll"),
-            symbol: PETH.symbol,
-            address: PETH.address,
-            info: gasCompReturnProv(coords),
-            value: String(escrowAmount),
-          },
-          usd: usdOf(W.sheet_escrow_returned, "coll", -escrowAmount),
-          tip: W.tip_escrow_returned,
-        }
-      : isLiq
-        ? {
-            key: "escrow-paid",
-            label: W.sheet_escrow_paid,
-            amount: {
-              text: amountText(-paid, "coll"),
-              symbol: PETH.symbol,
-              address: PETH.address,
-              info: liquidationFieldProv("flatComp", coords, ctx.raw?.flatComp),
-              value: String(paid),
-            },
-            usd: usdOf(W.sheet_escrow_paid, "coll", -paid),
-            tip: W.tip_escrow_paid,
-          }
-        : null;
-  // Held since the open: the carry states it at the previous event, as the
-  // Collateral's does.
-  const escrowCarry: EventSheet["sides"][number]["carry"] = [];
-  if (!isOpenEvent) {
-    escrowCarry.push({
-      key: "last",
-      label: SHEET_WORDS.last,
-      amount: { text: formatPeth(escrowAmount), symbol: PETH.symbol, address: PETH.address, info: heldProv },
-      usd:
-        prevPethUsd != null
-          ? { text: sheetUsd(escrowAmount * prevPethUsd), info: prevUsdProv(SHEET_WORDS.last, "coll", escrowAmount) }
-          : undefined,
-      tip: W.tip_escrow_last,
-    });
-    const escrowMarket = marketRow("coll", escrowAmount, W.tip_escrow_market, "gas compensation escrow");
-    if (escrowMarket) escrowCarry.push(escrowMarket);
-  }
-  const escrowSide: EventSheet["sides"][number] = {
-    side: "collateral",
-    id: "escrow",
-    name: W.sheet_escrow,
-    tip: W.tip_escrow,
-    icons: [PETH.symbol],
-    carry: escrowCarry,
-    before: isOpenEvent
-      ? undefined
-      : {
-          key: "before",
-          label: SHEET_WORDS.before,
-          amount: { text: formatPeth(escrowAmount), symbol: PETH.symbol, address: PETH.address, info: heldProv },
-          usd: usdOf(SHEET_WORDS.before, "coll", escrowAmount),
-          tip: W.tip_escrow_before,
-        },
-    rows: escrowRow ? [escrowRow] : [],
-    total: escrowEnd
-      ? { text: "$0", info: escrowRow?.amount?.info }
-      : pethUsd != null
-        ? {
-            text: sheetUsd(escrowAmount * pethUsd),
-            info: usdProv("The gas compensation escrow after this event", "coll", escrowAmount),
-          }
-        : { none: W.sheet_no_price },
-    totalAmount: {
-      text: formatPeth(escrowEnd ? 0 : escrowAmount),
-      symbol: PETH.symbol,
-      address: PETH.address,
-      info: escrowRow?.amount?.info ?? heldProv,
-    },
-    totalTip: W.tip_escrow_total,
-  };
+  const escrowMove: GasEscrowMove = ctx.eventType === "open" ? "sent" : isClose ? "returned" : isLiq ? "paid" : "held";
+  const escrowShown = escrowMove === "paid" && num(ctx.flatComp) > 0 ? num(ctx.flatComp) : escrowAmount;
+  const escrowNote = gasEscrowFootnote({
+    move: escrowMove,
+    amount: escrowShown,
+    text: formatPeth(escrowShown),
+    symbol: PETH.symbol,
+    info:
+      escrowMove === "sent"
+        ? gasCompEscrowProv(coords)
+        : escrowMove === "returned"
+          ? gasCompReturnProv(coords)
+          : escrowMove === "paid"
+            ? liquidationFieldProv("flatComp", coords, ctx.raw?.flatComp)
+            : gasCompHeldProv(coords),
+    usd: usdOf("The gas compensation escrow", "coll", escrowShown),
+    tip: W.tip_escrow_note,
+  });
 
   // ── Debt ──
   const debtRows = [
@@ -734,10 +653,11 @@ export function polarisSheet(
   ];
 
   return {
-    sides: [collSide, escrowSide, debtSide],
+    sides: [collSide, debtSide],
     panels: [
       { panel: "risk", rows: risk },
       { panel: "limits", rows: limits, breakdown: params },
     ],
+    footnotes: [escrowNote],
   };
 }

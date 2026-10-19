@@ -626,35 +626,11 @@ L2_words:
     The collateral ratio below which a Trove on the {coll_symbol} branch can be liquidated, a constant of the branch's contracts.
   tip_critical_ratio: |-
     The branch-wide collateral ratio below which the {coll_symbol} branch restricts borrowing, a constant of the branch's contracts.
-  # The gas compensation escrow's panel, between Collateral and Debt on every
+  # The gas compensation escrow's footnote, under Risk and Limits on every
   # event from the open to the close or the liquidation (rails-ops
-  # TO-DO-ui-jobs 363, 366). Liquity's docs call it the liquidation reserve.
-  sheet_escrow: |-
-    Gas compensation escrow
-  sheet_escrow_sent: |-
-    Sent with the collateral
-  sheet_escrow_returned: |-
-    Returned to the owner
-  sheet_escrow_paid: |-
-    Paid to the liquidator
-  tip_escrow: |-
-    The 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral. Liquity calls it the liquidation reserve. It returns on close and goes to the liquidator on a liquidation.
-  tip_escrow_sent: |-
-    The escrow the owner sent to the GasPool in the open's transaction, beside the collateral. It counts toward neither the collateral nor the collateral ratio.
-  tip_escrow_returned: |-
-    The escrow the GasPool sent back to the owner in the close's transaction.
-  tip_escrow_paid: |-
-    The escrow the GasPool paid to the liquidator, beside the liquidator's share of the collateral. It sits apart from the collateral, so it is not part of the seizure.
-  tip_escrow_last: |-
-    The escrow the Trove held after its previous event, the fixed amount since the open, in dollars at that event's WETH price.
-  tip_escrow_market: |-
-    The change the WETH price made to the dollar value of the escrow between the Trove's previous event and this one.
-  tip_escrow_before: |-
-    The escrow just before this event, at this block's WETH price.
-  tip_escrow_total: |-
-    The escrow the Trove holds after this event in WETH, and in dollars at this block's WETH price.
-  tip_escrow_total_unpriced: |-
-    The escrow the Trove holds after this event, in WETH. This branch's events carry the price of their collateral and not WETH's, so there is no dollar figure.
+  # TO-DO-ui-jobs 388). Liquity's docs call it the liquidation reserve.
+  tip_escrow_note: |-
+    The gas compensation escrow: the 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral and outside the collateral ratio. Liquity calls it the liquidation reserve. It returns on close and goes to the liquidator on a liquidation.
 
 # ── Copy for LLM: the block's context header ──
 context_words:

@@ -381,6 +381,9 @@ words:
     The escrow just before this event, at this block's pETH price.
   tip_escrow_total: |-
     The escrow the CDP holds after this event in pETH, and in dollars at this block's pETH price.
+  # The escrow's footnote under Risk and Limits (TO-DO-ui-jobs 388).
+  tip_escrow_note: |-
+    The gas compensation escrow: the 0.0375 pETH every CDP sends at its open, held apart from its collateral and outside the collateral ratio. It returns on close and goes to the liquidator on a liquidation.
   spine_escrow_sent: |-
     gas compensation escrow sent
   spine_escrow_returned: |-
