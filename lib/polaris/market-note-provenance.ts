@@ -17,7 +17,8 @@
 // whichever face of the sentence it backs.
 
 import type { Provenance } from "@/components/shared/provenance";
-import type { MarketNotePoint, RateSetLog, RateStepNote } from "@/lib/shared/market-note";
+import type { MarketNotePoint, PsmGapNote, RateSetLog, RateStepNote } from "@/lib/shared/market-note";
+import { ledgerFieldProv, psmShareNetProv } from "@/lib/polaris/event-provenance";
 import { polarisEndLabel } from "@/lib/shared/market-note";
 
 const shortHex = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
@@ -360,3 +361,18 @@ export const rateStepInterestProv = (note: RateStepNote, part: "debt" | "before"
     ],
   };
 };
+
+/** The share a PSM gap's closing touch wrote, netted in the stablecoin at
+ *  that touch's feed (ui-jobs 402): the event's own PSM-share receipt. */
+export function psmGapNetProv(note: PsmGapNote): Provenance {
+  const coords = { market: note.market, cdpId: note.cdpId, txHash: note.to.txHash, blockNumber: note.to.block };
+  return note.priceAtTouch != null
+    ? psmShareNetProv(coords, {
+        coll: note.collShare,
+        debt: note.debtShare,
+        price: note.priceAtTouch,
+        collRaw: note.collShareRaw,
+        debtRaw: note.debtShareRaw,
+      })
+    : ledgerFieldProv("mintRedeemDebtGain", coords, note.debtShareRaw);
+}

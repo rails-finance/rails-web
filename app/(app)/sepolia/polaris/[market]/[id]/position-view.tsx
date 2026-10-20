@@ -40,6 +40,7 @@ import {
 import { PolarisPositionExplanation } from "@/components/protocol/polaris/polaris-position-explanation";
 import { polarisLifetime } from "@/lib/polaris/economics";
 import { polarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
+import { polarisPsmGapNotes } from "@/lib/polaris/psm-gap";
 import { PolarisSinceLastTouchRow } from "@/components/protocol/polaris/polaris-since-last-touch";
 import { polarisPsmOutcome } from "@/lib/polaris/economics-explanation";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -214,14 +215,18 @@ export default function PolarisPositionView({
   // (lib/shared/market-note.ts). Both ends are this CDP's own rows — the
   // rate is already on them — so this needs nothing the timeline doesn't
   // already hold.
+  // With them, the PSM's trades in each closed gap between touches, one row
+  // per touch that wrote a share (lib/polaris/psm-gap.ts, ui-jobs 402).
   const notes: MarketNote[] = useMemo(
-    () =>
-      rateStepNotesFor(tl.sortedEvents, {
+    () => [
+      ...rateStepNotesFor(tl.sortedEvents, {
         key: market,
         stableSymbol: stable,
         cdpManager: POLARIS_MARKET_CONFIG[market].cdpManager,
       }),
-    [tl.sortedEvents, market, stable],
+      ...polarisPsmGapNotes(tl.sortedEvents, cdpId),
+    ],
+    [tl.sortedEvents, market, stable, cdpId],
   );
 
   // The live note: the market's primary rate read at the chain head, against

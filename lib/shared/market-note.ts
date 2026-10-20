@@ -190,7 +190,37 @@ export interface VaultTermsRate {
  *  "… decreased", and "… adjusted" for a group whose members went both ways. */
 export type RateNoteWords = Record<RateMove, string>;
 
-export type MarketNote = RateStepNote | VaultTermsNote;
+/** The PSM's mints and redemptions in one closed gap between two of a Polaris
+ *  CDP's touches, as one row (ui-jobs 402): each trade changed every open
+ *  CDP's collateral and debt pro rata, and the closing touch wrote the CDP's
+ *  net share into its stated figures. Both ends are the CDP's own touches;
+ *  the row anchors on the closing one, so it draws just below it. Built by
+ *  `polarisPsmGapNotes` (lib/polaris/psm-gap.ts). */
+export interface PsmGapNote extends MarketNoteBase {
+  kind: "psm-gap";
+  market: "usdp" | "goldp";
+  cdpId: string;
+  /** The PSM's mints and redemptions in the gap: the market's PrimaryRateSet
+   *  count at the closing touch less the count at the earlier one (the rate
+   *  is re-set at every mint and redemption). Null where either touch
+   *  carries no count. */
+  trades: number | null;
+  /** The two counts `trades` is the difference of, earlier first. */
+  ordinals: [number, number] | null;
+  /** The share the closing touch wrote, as its log states it: pETH added to
+   *  the collateral, and the stablecoin added to the debt (`_mintRedeemCollGain`,
+   *  `_mintRedeemDebtGain`). */
+  collShare: number;
+  debtShare: number;
+  /** The raw log values, for the receipts. */
+  collShareRaw?: string;
+  debtShareRaw?: string;
+  /** pETH in the stablecoin at the closing touch's block, where the oracle
+   *  lane has it: the net share in the stablecoin. */
+  priceAtTouch: number | null;
+}
+
+export type MarketNote = RateStepNote | VaultTermsNote | PsmGapNote;
 
 // ── A rate note as a T1 row, and a run of them as one group ────────────────
 // A note that states a rate from → to (every rate step; a vault's terms where
@@ -228,6 +258,7 @@ export const RATE_NOTE_T1 = {
  *  note that states no rate (a vault's fee, a name). */
 export function noteRateSpan(note: MarketNote): [number, number] | null {
   if (note.kind === "rate-step") return [note.from.value * 100, note.to.value * 100];
+  if (note.kind === "psm-gap") return null;
   return note.rate ? [note.rate.from, note.rate.to] : null;
 }
 
@@ -243,6 +274,7 @@ export function noteRateMove(note: MarketNote): RateMove {
 /** The head's words for a rate note, or null on a note that states no rate. */
 export function noteT1Words(note: MarketNote): RateNoteWords | null {
   if (note.kind === "vault-terms") return note.rate?.t1 ?? null;
+  if (note.kind === "psm-gap") return null;
   const noun =
     note.protocol === "makerdao"
       ? RATE_NOTE_T1.makerdao
@@ -273,7 +305,9 @@ function runKey(note: MarketNote): string | null {
   if (note.live || !noteRateSpan(note)) return null;
   return note.kind === "rate-step"
     ? `rate-step:${note.protocol ?? "polaris"}:${note.marketAddress}:${note.marketSymbol}:${note.side ?? ""}`
-    : `vault-terms:${note.termsKind}:${note.marketAddress}`;
+    : note.kind === "vault-terms"
+      ? `vault-terms:${note.termsKind}:${note.marketAddress}`
+      : null;
 }
 
 /** One gap's notes with each run of two or more same-kind rate notes as one
@@ -1113,6 +1147,24 @@ function aaveFamilyInterestClause(note: RateStepNote, f: RateStepFigures, live: 
 // markdown export) reads these, so a note reads the same on the page as in an
 // export, and a third kind lands here rather than in four files.
 
+const signedShare = (n: number, digits: number) =>
+  `${n < 0 ? "−" : "+"}${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: digits })}`;
+
+/** A PSM gap in one sentence: the trades between two touches and the share
+ *  the later touch wrote. */
+export function psmGapSentence(note: PsmGapNote): string {
+  const stable = note.marketSymbol;
+  const trades =
+    note.trades != null
+      ? `${note.trades.toLocaleString("en-US")} PSM mints and redemptions`
+      : "PSM mints and redemptions";
+  return (
+    `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, ${trades} moved the market; ` +
+    `the touch at block ${formatBlock(note.to.block)} wrote this CDP's share, ${signedShare(note.collShare, 4)} pETH ` +
+    `to the collateral and ${signedShare(note.debtShare, 2)} ${stable} to the debt`
+  );
+}
+
 /** The note as one plain sentence — the markdown export's paragraph, and the
  *  wording the row renders figure by figure. */
 export function marketNoteSentence(note: MarketNote): string {
@@ -1122,6 +1174,7 @@ export function marketNoteSentence(note: MarketNote): string {
   // than composing a second version of it out of figures this module cannot
   // read.
   if (note.kind === "vault-terms") return `At block ${formatBlock(note.to.block)}, ${note.statement}.`;
+  if (note.kind === "psm-gap") return `${psmGapSentence(note)}.`;
   const f = rateStepFigures(note);
   if (note.protocol === "makerdao") {
     const ilk = makerMarketName(note);
@@ -1202,6 +1255,7 @@ export function marketNoteSentence(note: MarketNote): string {
 /** The note in one clause, with both blocks — the export's summary line. */
 export function marketNoteHeadline(note: MarketNote): string {
   if (note.kind === "vault-terms") return `${note.statement}, at block ${formatBlock(note.to.block)}`;
+  if (note.kind === "psm-gap") return psmGapSentence(note);
   // The later rate leads, on the page and here alike (Miles, 2026-09-10):
   // the question a rate note answers is what the position pays now, and the
   // move is the qualifier rather than the figure.
@@ -1233,6 +1287,7 @@ export function marketNoteRowAnnotation(note: MarketNote): string {
   // rows must not print a "between blocks" annotation for a note that runs
   // to the chain head instead.
   if (note.kind === "vault-terms") return `vault note: ${note.statement}, at block ${formatBlock(note.to.block)}`;
+  if (note.kind === "psm-gap") return `PSM note: ${psmGapSentence(note)}`;
   const f = rateStepFigures(note);
   if (note.protocol === "makerdao") {
     const ilk = makerMarketName(note);
@@ -1286,6 +1341,8 @@ const groupedClause = (note: RateStepNote): string => {
 };
 
 export function marketNoteReceiptLine(note: MarketNote): string {
+  if (note.kind === "psm-gap")
+    return `${psmGapSentence(note)} (CDPUpdated at block ${formatBlock(note.to.block)}, _mintRedeemCollGain and _mintRedeemDebtGain)`;
   if (note.kind === "vault-terms")
     return (
       `- Receipt: the vault's own \`${note.termsKind}\` configuration log at block ` +

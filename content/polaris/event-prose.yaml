@@ -288,7 +288,7 @@ words:
   sheet_reward: |-
     Reward pETH
   sheet_psm: |-
-    PSM share
+    PSM share written
   sheet_stability_gain: |-
     Stability gain
   sheet_settled: |-
@@ -347,7 +347,7 @@ words:
   tip_coll_reward: |-
     The reward pETH the CDP's share of the bonding curve's rewards added to its collateral at this event, from the CDPManager's log.
   tip_coll_psm: |-
-    The CDP's share of the pETH the market's PSM moved since the previous event, settled at this event, from the CDPManager's log.
+    This touch wrote the CDP's share of the pETH the market's PSM moved since the previous event, from the CDPManager's log; the row beneath it sets out the gap.
   tip_coll_total: |-
     The CDP's pETH after this event, from the CDPManager's log, in dollars at this block's pETH price.
   tip_debt_last: |-
@@ -367,7 +367,7 @@ words:
   tip_debt_gain: |-
     The CDP's share of the market's revenue, credited against the debt at this event, from the CDPManager's log.
   tip_debt_psm: |-
-    The CDP's share of the debt the market's PSM moved since the previous event, settled at this event, from the CDPManager's log.
+    This touch wrote the CDP's share of the debt the market's PSM moved since the previous event, from the CDPManager's log; the row beneath it sets out the gap.
   tip_debt_settled: |-
     The stablecoin added so the debt lands on zero when the gains and the PSM share clear more than was owed, from the CDPManager's log.
   tip_debt_total: |-
@@ -416,6 +416,31 @@ words:
     The collateral ratio below which the CDP can be liquidated, in the market's normal mode.
   tip_liquidation_penalty: |-
     The share of the seized collateral that goes as a penalty when the stability pool absorbs a liquidation, a constant of the market's contracts.
+  # The PSM's trades in one closed gap between touches, as one row (ui-jobs 402).
+  psm_gap_head: |-
+    Peg defence moved the market
+  psm_gap_head_short: |-
+    Peg defence
+  psm_gap_coll: |-
+    Collateral share
+  psm_gap_debt: |-
+    Debt share
+  psm_gap_net: |-
+    Net, at the touch's feed
+  psm_gap_trades: |-
+    PSM mints and redemptions in the gap
+  psm_gap_trades_word: |-
+    PSM mints and redemptions
+  psm_pro_rata: |-
+    A buy above the target upsizes the market, so every open CDP takes the new collateral, debt and fee pro rata; the touch that closes the gap writes this CDP's share into its stated figures.
+  tip_psm_gap_coll: |-
+    The pETH the closing touch added to the collateral as the CDP's share of the gap's PSM trades, from the CDPManager's log.
+  tip_psm_gap_debt: |-
+    The stablecoin the closing touch added to the debt as the CDP's share of the gap's PSM trades, from the CDPManager's log.
+  tip_psm_gap_net: |-
+    The two shares as one figure in the market's stablecoin, the pETH at the feed for the closing touch's block less the debt.
+  tip_psm_gap_trades: |-
+    The market's PrimaryRateSet count at the closing touch less the count at the earlier one: the primary rate is re-set at every PSM mint and redemption.
   # The live window's sheet (ui-jobs 396): the figures as the last touch wrote
   # them, what is pending until the next touch, and the figures at the feed,
   # each a view call on the cdpManager at the head block.

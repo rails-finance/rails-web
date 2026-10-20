@@ -57,8 +57,9 @@ export interface NoteRowShellProps {
    *  caption line, the words, the date and the chevron. Unset, the chevron
    *  stands at the right end. */
   meta?: ReactNode;
-  /** The spine's rate flank, on a rate note. */
-  spine?: Pick<SpineColumnProps, "rateSpan" | "rateMoves" | "rateTone" | "rateProv">;
+  /** The spine's rate flank, on a rate note; token rows under the node, on a
+   *  row that moved a share into the position (ui-jobs 402). */
+  spine?: Pick<SpineColumnProps, "rateSpan" | "rateMoves" | "rateTone" | "rateProv" | "tokens">;
 }
 
 export function NoteRowShell({

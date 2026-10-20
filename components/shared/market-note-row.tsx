@@ -85,7 +85,7 @@ import { polarisModal } from "@/lib/polaris/event-templates";
 import { aaveFamilyRateStepInterestProv, aaveFamilyRateStepProv } from "@/lib/aave-v3/market-note-provenance";
 import { makerModal } from "@/lib/makerdao/event-templates";
 import { makerRateStepInterestProv, makerRateStepProv } from "@/lib/makerdao/market-note-provenance";
-import { rateStepInterestProv, rateStepProv } from "@/lib/polaris/market-note-provenance";
+import { psmGapNetProv, rateStepInterestProv, rateStepProv } from "@/lib/polaris/market-note-provenance";
 import {
   aaveFamilyEndLabel,
   aaveFamilyRateNoun,
@@ -98,12 +98,14 @@ import {
   noteRateSpan,
   isNoteRun,
   noteRunReading,
+  psmGapSentence,
   noteT1Words,
   RATE_NOTE_T1,
   type LiveNoteGroup,
   type MarketNote,
   type MarketNotePoint,
   type NoteRun,
+  type PsmGapNote,
   type RateNoteWords,
   type RateStepNote,
   type VaultTermsNote,
@@ -309,6 +311,7 @@ export function noteSpine(item: MarketNote | NoteRun): NoteSpine | undefined {
 /** The receipt behind a rate note's earlier or later rate. */
 function rateProvOf(note: MarketNote, end: "from" | "to"): Provenance {
   if (note.kind === "vault-terms") return end === "from" && note.rate ? note.rate.fromProv : note.prov;
+  if (note.kind === "psm-gap") return psmGapNetProv(note);
   if (note.protocol === "makerdao") return makerRateStepProv(note, "rate");
   if (note.protocol === "aave-v3" || note.protocol === "spark") return aaveFamilyRateStepProv(note, "rate");
   return rateStepProv(note, "rate");
@@ -449,7 +452,11 @@ function useNoteBody(note: MarketNote): NoteBody {
   };
 
   // The one switch. Everything below it is the same row whatever was observed.
-  return note.kind === "rate-step" ? rateStepBody(note, links) : vaultTermsBody(note, links);
+  return note.kind === "rate-step"
+    ? rateStepBody(note, links)
+    : note.kind === "psm-gap"
+      ? psmGapBody(note)
+      : vaultTermsBody(note, links);
 }
 
 /** The header's figures: the marks, the direction, the headline and its
@@ -739,6 +746,24 @@ function observationLinks(p: MarketNotePoint, links: NoteLinks) {
 // It states no direction and draws no step mark. A `TargetRateUpdated` carries
 // one rate and no earlier one, and an arrow over a single reading would be a
 // move nobody observed.
+
+// ── Polaris's PSM gap (ui-jobs 402): drawn by its own row
+//    (components/protocol/polaris/polaris-psm-gap-row.tsx); this body serves
+//    a line that lists one, with the sentence as its (i). ─────────────────────
+
+function psmGapBody(note: PsmGapNote): NoteBody {
+  const prov = psmGapNetProv(note);
+  return {
+    label: `${note.marketSymbol} PSM share`,
+    measure: { kind: "protocol", id: "polaris" },
+    headline: { text: `${note.debtShare < 0 ? "−" : "+"}${Math.abs(note.debtShare).toFixed(2)}`, prov },
+    quantity: `${note.marketSymbol} PSM share`,
+    direction: false,
+    stats: [],
+    learnMore: polarisModal("market"),
+    derivation: <>{psmGapSentence(note)}.</>,
+  };
+}
 
 function vaultTermsBody(note: VaultTermsNote, links: NoteLinks): NoteBody {
   const figure: NoteFigure = { text: note.headline, prov: note.prov };

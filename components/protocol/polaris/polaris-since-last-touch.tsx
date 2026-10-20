@@ -35,6 +35,7 @@
 
 import type { ReactNode } from "react";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { Prov, type Provenance, type ProvInput } from "@/components/shared/provenance";
 import {
   EventSheetView,
@@ -308,8 +309,10 @@ export function PolarisSinceLastTouchRow({
     value,
     leg,
     indent,
+    tip,
   }: {
     label: string;
+    tip?: string;
     detail: ReactNode;
     value: ReactNode;
     leg?: string;
@@ -317,7 +320,10 @@ export function PolarisSinceLastTouchRow({
   }) => (
     <div className={`flex items-baseline justify-between gap-x-3 ${indent ? "py-1 pl-3" : "py-1.5"}`} data-leg={leg}>
       <span className="min-w-0">
-        <span className="text-foreground">{label}</span> <span className="text-rb-500">{detail}</span>
+        <span className="text-foreground">
+          <HeadingTip text={label} tip={tip} />
+        </span>{" "}
+        <span className="text-rb-500">{detail}</span>
       </span>
       <span className="shrink-0">{value}</span>
     </div>
@@ -349,6 +355,8 @@ export function PolarisSinceLastTouchRow({
           leg={l.key}
           indent
           label={l.name.charAt(0).toUpperCase() + l.name.slice(1)}
+          // The PSM leg's read-more is the pro-rata sentence (ui-jobs 402).
+          tip={l.key === "psm" ? W.psm_pro_rata : undefined}
           detail={legDetail(l)}
           value={
             <Prov info={legProv(l.key)} value={formatExact(l.value)}>

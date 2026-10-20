@@ -1113,7 +1113,9 @@ export function SpineColumn({
   })();
 
   // Token flow mode — 1 or 2 rows of token icons with directional arrows.
-  const rows = effectiveIcon ? [] : (tokens ?? []);
+  // A market node may carry token rows beneath it: the share a protocol-wide
+  // act moved into this position (the PSM's, ui-jobs 402).
+  const rows = effectiveIcon && effectiveIcon !== "market" ? [] : (tokens ?? []);
   // The external badge occupies the same bottom-right corner as check/cross, so
   // it takes the same paddingBottom compensation — without it the badge clips
   // into the row below.
@@ -1200,11 +1202,12 @@ export function SpineColumn({
       <div
         data-spine-node=""
         {...nodeAttrs}
-        className={`relative z-10${effectiveIcon ? "" : " flex flex-col gap-y-1 items-center"}`}
+        className={`relative z-10${effectiveIcon && !(effectiveIcon === "market" && rows.length) ? "" : " flex flex-col gap-y-1 items-center"}`}
         style={{ backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}`, paddingBottom: hasBadge ? 6 : undefined }}
       >
         {leadIn}
         {effectiveIcon ? node : tokenRows}
+        {effectiveIcon === "market" && tokenRows}
         {!effectiveIcon && rateSpan && nodeRow(<RateIcon size={T} />, rateFlank(rateSpan))}
       </div>
       {!bare && <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>}
