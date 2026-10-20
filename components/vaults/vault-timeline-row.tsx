@@ -55,7 +55,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { SpineTokenRow } from "@/components/shared/spine-column";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { assetText, shareText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
-import { sharePriceText } from "@/components/vaults/aave-vault-format";
+import { sharePriceText } from "@/lib/shared/vault-amount-text";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { VaultHolderEvent, VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import { VAULT_HEAD_WORDS, vaultT1Kind } from "@/lib/vaults/head-words";

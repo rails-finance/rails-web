@@ -7,9 +7,11 @@ import type { EventPageSlot, ExplorerAdapter } from "@/lib/shared/explorer-adapt
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { formatDateLong } from "@/lib/date";
 import { kindTitle } from "@/lib/shared/event-title";
+import type { VaultExplorer } from "@/lib/vaults/families";
 
-/** The three vault families, as the session key each one's listing sits under. */
-export type VaultFamilyKey = "aave-vaults" | "yearn" | "morpho-base";
+/** The three vault explorers, as the session key each one's listing sits
+ *  under (lib/vaults/families.ts). */
+export type VaultFamilyKey = VaultExplorer;
 
 const FAMILY_NOUN: Record<VaultFamilyKey, string> = {
   "aave-vaults": "Aave vault",

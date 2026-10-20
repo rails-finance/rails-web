@@ -12,39 +12,24 @@
 // These render on the server AND in the browser, and an unpinned format writes
 // different markup in each.
 
-import { formatUnitsExact } from "@/lib/utils/format";
 import { monthShort } from "@/lib/date";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
+import { VAULT_FAMILIES } from "@/lib/vaults/families";
 
-/** The family as a heading names it — the mechanic, not the ticker. */
+/** The family as a heading names it — the mechanic, not the ticker
+ *  (lib/vaults/families.ts names each family once). */
 export const AAVE_FAMILY_LABEL: Record<AaveVaultFamily, string> = {
-  sgho: "Savings GHO",
-  stata: "Static aTokens",
-  "umbrella-stake": "Umbrella stake tokens",
+  sgho: VAULT_FAMILIES.sgho.label,
+  stata: VAULT_FAMILIES.stata.label,
+  "umbrella-stake": VAULT_FAMILIES["umbrella-stake"].label,
 };
 
 /** The same, in the singular, for a page about one vault. */
 export const AAVE_FAMILY_SINGULAR: Record<AaveVaultFamily, string> = {
-  sgho: "Savings GHO",
-  stata: "Static aToken",
-  "umbrella-stake": "Umbrella stake token",
-};
-
-/** A SHARE PRICE, which is not an amount and does not print like one.
- *
- *  `assetText` keys on the asset's own decimals — two places for a 6-decimal
- *  asset, because that is what a payment in it can express. A share price is a
- *  ratio-shaped quantity that sits near one: printed to two places, every
- *  static aToken in this section would read "1.17" or "1.18" and two vaults
- *  with different prices would be indistinguishable. So the rule is the amount
- *  rule with six places allowed whatever the asset is —
- *  `convertToAssets(10^6)` answering 1,184,649 is exactly 1.184649 USDC,
- *  invented precision nowhere — and a non-zero figure that would still round to
- *  nothing is printed exactly from its raw units. */
-export const sharePriceText = (a: RawAmount, decimals: number) => {
-  const text = a.value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-  return a.value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? formatUnitsExact(a.raw, decimals) : text;
+  sgho: VAULT_FAMILIES.sgho.singular,
+  stata: VAULT_FAMILIES.stata.singular,
+  "umbrella-stake": VAULT_FAMILIES["umbrella-stake"].singular,
 };
 
 /** A duration in the contract's own seconds, said in the largest whole unit it

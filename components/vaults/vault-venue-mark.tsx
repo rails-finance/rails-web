@@ -17,6 +17,7 @@
 
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
+import { familyOfCensus, VAULT_FAMILIES } from "@/lib/vaults/families";
 
 /** Every venue this mark stands for. WIDER than `VaultPositionFamily`, which is
  *  the census's vocabulary: the census counts positions, and Yearn has no
@@ -25,23 +26,18 @@ import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
  *  surfaces pass what they have always passed. */
 export type VaultVenue = VaultPositionFamily | "yearn";
 
-/** Which explorer's mark stands for the venue each family was deployed by.
- *  Aave's three families are all Aave deployments and take the Aave mark; a
- *  MetaMorpho vault takes Morpho's; a Yearn V3 vault takes Yearn's, and the
- *  caller draws it only where the Registry endorses that vault at the block it
- *  read (rails-ops decision 0027 call 1). */
-const FAMILY_VENUE: Record<VaultVenue, string> = {
-  sgho: "aave-v3",
-  stata: "aave-v3",
-  "umbrella-stake": "aave-v3",
-  morpho: "morpho",
-  yearn: "yearn",
-};
+/** Which explorer's mark stands for the venue each family was deployed by
+ *  (lib/vaults/families.ts): Aave's three families take the Aave mark, a
+ *  MetaMorpho vault Morpho's, a Yearn V3 vault Yearn's, and the caller draws
+ *  Yearn's only where the Registry endorses that vault at the block it read
+ *  (rails-ops decision 0027 call 1). */
+const venueOf = (family: VaultVenue): string =>
+  VAULT_FAMILIES[family === "yearn" ? "yearn-v3" : familyOfCensus(family)].venue;
 
 export function VaultVenueMark({ family, className = "" }: { family: VaultVenue; className?: string }) {
   return (
     <span aria-hidden className={`inline-flex shrink-0 items-center ${className}`}>
-      <ProtocolIcon id={FAMILY_VENUE[family]} className="h-3.5 w-3.5" />
+      <ProtocolIcon id={venueOf(family)} className="h-3.5 w-3.5" />
     </span>
   );
 }

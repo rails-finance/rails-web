@@ -19,8 +19,7 @@
 
 import { SHEET_NO_USD, SHEET_WORDS, type EventSheet, type SheetRow } from "@/components/shared/event-sheet";
 import type { Provenance } from "@/components/shared/provenance";
-import { assetText, shareText } from "@/lib/shared/vault-amount-text";
-import { sharePriceText } from "@/components/vaults/aave-vault-format";
+import { assetText, sharePriceText, shareText } from "@/lib/shared/vault-amount-text";
 import type { VaultHolderEvent, VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import type { VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
 

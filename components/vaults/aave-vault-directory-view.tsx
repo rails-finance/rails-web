@@ -57,7 +57,8 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import Link from "next/link";
 import { assetText, shareText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
-import { AAVE_FAMILY_LABEL, durationText, sharePriceText } from "@/components/vaults/aave-vault-format";
+import { AAVE_FAMILY_LABEL, durationText } from "@/components/vaults/aave-vault-format";
+import { sharePriceText } from "@/lib/shared/vault-amount-text";
 import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sources";
 import { VaultVenueMark } from "@/components/vaults/vault-venue-mark";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
