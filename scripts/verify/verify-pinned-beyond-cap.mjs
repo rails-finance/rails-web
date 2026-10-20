@@ -35,12 +35,23 @@
 // rather than pin a second literal that the next redesign could just as
 // easily retire.
 //
+// READ AGAIN 2026-10-20 (ui-jobs 339): the index arm now serves this life
+// WHOLE — 2,407 of 2,407, the liquidations listed individually, no
+// `coverage.omitted` — so nothing is beyond a cap any more and the old
+// precondition (DEEP_ID never served, liquidations the stated reason) cannot
+// hold. The lookup routes the checks guard are unchanged, so §0 now asserts
+// the one invariant that holds either way — the response serves everything
+// or states what it left out — and 1 to 5 read as before. The event page's
+// title carries the event's own sentence ("A liquidator repaid … and seized
+// …"; item 236), so check 1 reads the sentence.
+//
 // Checks:
-//   0. Precondition — DEEP_ID (a liquidation) is never in the default list;
-//      the list's own `coverage.omitted` shows liquidations are the reason;
-//      SHALLOW_ID (read off the default list itself) IS served.
+//   0. Precondition — the default list serves the whole life or its
+//      `coverage.omitted` states what it left out; SHALLOW_ID (read off the
+//      default list itself) IS served.
 //   1. Server lookup — the event page's HTML (no JS) titles DEEP_ID with its
-//      verb ("· Liquidated"), so metadata and the share image name it.
+//      own sentence (a liquidator repaid … and seized …), so metadata and the
+//      share image name it.
 //   2. Pinned page, fresh context — `/event/DEEP_ID` renders the card
 //      (`[data-event-id]` equals the id) and never the not-found notice.
 //   3. Control — `/event/SHALLOW_ID` renders the same way.
@@ -108,22 +119,16 @@ check(
   byDefault.coverage?.source === "index",
   `source=${byDefault.coverage?.source}`,
 );
-check(
-  "0b default response omits rows",
-  byDefault.totalEvents > byDefault.events.length,
-  `${byDefault.events.length} served of ${byDefault.totalEvents}`,
-);
-check("0c DEEP_ID is NOT served", !defaultIds.has(DEEP_ID));
-// The reason 0c holds: liquidations are an omitted TYPE, not a below-cut
-// depth — `?limit=` does not change this (retired 2026-09-27, see the
-// header). `omitted.summary.byType` states which types and how many.
+// Whole, or stated: a list that serves fewer rows than the life has says so
+// in `coverage.omitted` (the summary names the types and counts). Since
+// 20 Oct 2026 the arm serves the life whole, DEEP_ID among the rows.
 const omittedTypes = byDefault.coverage?.omitted?.summary?.byType ?? [];
-const omittedLiquidations = omittedTypes.find((t) => t.key === "liquidation")?.count ?? 0;
 check(
-  "0d the default response's own omitted-summary names liquidations as a reason",
-  omittedLiquidations > 0,
-  `omitted by type: ${JSON.stringify(omittedTypes)}`,
+  "0b the default response serves the whole life or states what it left out",
+  byDefault.totalEvents === byDefault.events.length || omittedTypes.length > 0,
+  `${byDefault.events.length} served of ${byDefault.totalEvents}; omitted by type: ${JSON.stringify(omittedTypes)}`,
 );
+console.log(`INFO  0c DEEP_ID ${defaultIds.has(DEEP_ID) ? "is" : "is NOT"} in the default list`);
 // The control: whichever row the list route itself currently serves — read
 // off the list rather than a second pinned id, so a future redesign of WHAT
 // gets served (not just how deep) fails this precondition instead of quietly
@@ -136,7 +141,7 @@ check("0e the default response serves at least one row to use as the control", B
   const res = await fetch(`${BASE}${POSITION}/event/${encodeURIComponent(DEEP_ID)}`);
   const html = await res.text();
   const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? "";
-  check("1  event page HTML titles the deep event with its verb", /· Liquidation/.test(title), title);
+  check("1  event page HTML titles the deep event with its own sentence", /· A liquidator repaid/.test(title), title);
 }
 
 const browser = await chromium.launch();

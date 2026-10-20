@@ -215,13 +215,6 @@ const usdText = (usdE8) => {
   if (e8 !== 0n && cents === 0n) return `$0.${(e8 % E8).toString().padStart(8, "0").replace(/0+$/, "")}`;
   return `$${(Number(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
-/** lib/utils/format.ts `formatApproximate`, above a thousand. */
-const approx = (v) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : `${(v / 1_000).toFixed(1)}k`);
-/** components/vaults/vault-position-card.tsx: compact rows approximate ≥ $1,000. */
-const compactUsd = (usdE8) => {
-  const usd = Number(BigInt(usdE8)) / 1e8;
-  return usd >= 1000 ? `$${approx(usd)}` : usdText(usdE8);
-};
 
 const api = async (qs) => {
   const res = await fetch(`${BASE}/api/vaults/positions?${qs}&overlay=0`);
@@ -240,22 +233,17 @@ async function readCards(url) {
   const cards = await page.locator("[data-position-card]").evaluateAll(async (els) => {
     const out = [];
     for (const e of els) {
-      const stat = [...e.querySelectorAll("div")].find(
-        (d) => d.firstElementChild && (d.firstElementChild.textContent ?? "").trim() === "Value · USD",
-      );
-      // Since `aa0ea5e` the exact dollars are a click-opened RevealTip in place
-      // of a `title`: the tip is opened, read and closed.
-      const valueEl = stat?.querySelector("[data-reveal-tip]");
-      let valueTitle = "";
-      if (valueEl) {
-        valueEl.click();
-        await new Promise((r) => setTimeout(r, 80));
-        valueTitle = (valueEl.querySelector('[role="tooltip"]')?.textContent ?? "").trim();
-        valueEl.click();
-        await new Promise((r) => setTimeout(r, 20));
-      }
-      const shown = valueEl?.cloneNode(true);
+      // Since web `2c8fa977` (ui-jobs 377) the card's one-asset head is Balance,
+      // the shares with the census's USD beneath: the value sits in the head's
+      // `[data-card-usd]` line, where "not priced" stands when the oracle declined.
+      const stat = e.querySelector('[data-card-head="balance"] [data-card-usd]');
+      // The line prints the dollars exact (formatUsdValue, cents), and the head's
+      // sub line beneath names the census block the oracle was read at.
+      const shown = stat?.cloneNode(true);
       shown?.querySelector('[role="tooltip"]')?.remove();
+      const valueTitle = (e.querySelector('[data-card-head="balance"] [data-card-sub]')?.textContent ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
       const statText = stat ? (stat.textContent ?? "").replace(/\s+/g, " ").trim() : "";
       out.push({
         vault: e.getAttribute("data-vault"),
@@ -709,16 +697,19 @@ for (const chainId of [8453, 1]) {
     domOrder.length === apiOrder.length && domOrder.every((k, i) => k === apiOrder[i]),
     `${domOrder.length} cards${domOrder.length && domOrder[0] !== apiOrder[0] ? `; DOM leads ${domOrder[0]}, API ${apiOrder[0]}` : ""}`,
   );
+  // Since web `2c8fa977` (ui-jobs 377) the Balance head's USD line prints the
+  // dollars exact, in cents, and its sub names the census block; the compact
+  // form is the Size chip's bracket, not the card's.
+  // The line is formatUsdValue's: the e8 figure rounded to the cent
+  // (`usdText` above truncates, as the old title did).
+  const usdRounded = (usdE8) =>
+    `$${(Number(BigInt(usdE8)) / 1e8).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const topCard = rest.cards[0];
-  const expectText = topCard?.valueUsdE8 ? compactUsd(topCard.valueUsdE8) : null;
-  const expectTitle = topCard?.valueUsdE8 ? usdText(topCard.valueUsdE8) : null;
+  const expectText = topCard?.valueUsdE8 ? usdRounded(topCard.valueUsdE8) : null;
   check(
     `V6${tag}b the top card prints its value through the section's print rule, exact dollars on title=`,
-    !!topCard &&
-      topCard.valueText === expectText &&
-      topCard.valueTitle.startsWith(expectTitle ?? " ") &&
-      /census block/.test(topCard.valueTitle),
-    topCard ? `"${topCard.valueText}" (title "${topCard.valueTitle}")` : "no card",
+    !!topCard && topCard.valueText === expectText && /census block/.test(topCard.valueTitle),
+    topCard ? `"${topCard.valueText}" (sub "${topCard.valueTitle}")` : "no card",
   );
 }
 

@@ -463,10 +463,14 @@ const first = await listingHtml();
 const route0 = await readRoute(`chain=${CHAIN}&sortBy=value&sortOrder=desc&limit=20`);
 
 check("L0a the listing answers 200", first.status === 200, `status ${first.status}`);
+// Counted by card id: the needle "data-position-card" also matched the shell's
+// `data-position-card-shell` (40 on 20 Oct 2026, ui-jobs 339), and a row drawn
+// twice in one streamed document is one card either way.
+const cardIds = (html) => new Set([...html.matchAll(/data-position-card="([^"]+)"/g)].map((m) => m[1]));
 check(
   "L0b the INITIAL HTML carries a full page of position cards",
-  countMatches(first.html, "data-position-card") === 20,
-  `${countMatches(first.html, "data-position-card")} cards in the server's own HTML`,
+  cardIds(first.html).size === 20,
+  `${cardIds(first.html).size} cards in the server's own HTML`,
 );
 // The route is `force-dynamic` behind a `loading.tsx`, so Next streams the
 // boundary's fallback ahead of the resolved content and BOTH arrive in one
@@ -787,34 +791,24 @@ async function readListingDom(qs = "") {
   const cards = await page.locator("[data-position-card]").evaluateAll(async (els) => {
     const out = [];
     for (const e of els) {
-      // The two headline figures, read as the reader sees them: the printed
-      // text AND the tip the exact value rides on. The listing's cards
-      // carry no `data-figure` markers on purpose (twenty rows would make
-      // twenty of each name), so each column is found by its own label —
-      // "Shares · <symbol>" / "Claim · <symbol>". Since `aa0ea5e` the exact
-      // value is a click-opened RevealTip in place of a `title`, so the tip
-      // is opened, read and closed.
-      const stats = [];
-      for (const d of [...e.querySelectorAll("div")].filter(
-        (d) => d.firstElementChild && /^(Shares|Claim) · /.test(d.firstElementChild.textContent ?? ""),
-      )) {
-        const value = d.querySelector("[data-reveal-tip]");
-        let title = "";
-        if (value) {
-          value.click();
-          await new Promise((r) => setTimeout(r, 80));
-          title = (value.querySelector('[role="tooltip"]')?.textContent ?? "").trim();
-          value.click();
-          await new Promise((r) => setTimeout(r, 20));
-        }
-        const shown = value?.cloneNode(true);
-        shown?.querySelector('[role="tooltip"]')?.remove();
-        stats.push({
-          label: (d.firstElementChild.textContent ?? "").trim(),
-          text: (shown?.textContent ?? "").trim(),
-          title,
-        });
-      }
+      // The listing card's headlines (the shared card, ui-jobs 407): Balance and
+      // Share of the vault. The listing's cards carry no `data-figure` markers on
+      // purpose (twenty rows would make twenty of each name), so the headline is
+      // found by its `data-card-head`. An AssetAmount prints the compact form in
+      // an aria-hidden span and carries the exact figure and the ticker on that
+      // span's `data-prov-exact` and `data-prov-symbol`. The card prints no Claim:
+      // it is the holder page's headline, and the card's `data-claim-raw` is
+      // compared at L2e instead.
+      const amount = e.querySelector('[data-card-head="balance"] [data-prov-exact]');
+      const stats = amount
+        ? [
+            {
+              label: "Balance",
+              text: (amount.textContent ?? "").trim(),
+              title: `${amount.getAttribute("data-prov-exact")} ${amount.getAttribute("data-prov-symbol")}`,
+            },
+          ]
+        : [];
       const symbolEl = e.querySelector("[data-card-vault-symbol]");
       const pillEl = e.querySelector("[data-wallet-label]");
       out.push({
@@ -969,24 +963,17 @@ liveCards.forEach((card, i) => {
   const asset = assetOf.get(card.vault);
   if (BigInt(card.sharesRaw) !== ownDomShares[i])
     rawBad.push(`${card.holder}: card ${card.sharesRaw}, own ${ownDomShares[i]} @ ${domBlock}`);
+  // The card's one headline figure since ui-jobs 377/407: the Balance in
+  // shares (the claim is the holder page's, and `data-claim-raw` is compared
+  // raw above).
   const want = [
     {
-      label: `Shares · ${shareSymbol}`,
+      label: "Balance",
       exact: shareText(ownDomShares[i], sd),
       text: headline(shareText(ownDomShares[i], sd), Number(ownDomShares[i]) / Math.pow(10, sd)),
       title: `${exactUnits(ownDomShares[i], sd)} ${shareSymbol}`,
     },
   ];
-  if (asset && card.claimRaw)
-    want.push({
-      label: `Claim · ${asset.symbol}`,
-      exact: assetText(ownDomClaims[i], asset.decimals),
-      text: headline(
-        assetText(ownDomClaims[i], asset.decimals),
-        Number(ownDomClaims[i]) / Math.pow(10, asset.decimals),
-      ),
-      title: `${exactUnits(ownDomClaims[i], asset.decimals)} ${asset.symbol}`,
-    });
   for (const w of want) {
     const got = card.stats.find((st) => st.label === w.label);
     if (!got) {
@@ -1485,8 +1472,10 @@ const FAMILY_WORDS = (() => {
 })();
 const VALUE_LABELS = (() => {
   const src = fs.readFileSync(path.join(ROOT, "components/vaults/vault-position-card.tsx"), "utf8");
-  const labels = [...src.matchAll(/label: "(Value · [^"]+)"/g)].map((m) => m[1]);
-  if (labels.length === 0) throw new Error("vault-position-card parse read no Value label");
+  // The card's head labels ("Balance", "Share of the vault", "Closed by" since
+  // ui-jobs 377/407; "Value · USD" before) — whatever the card names them.
+  const labels = [...src.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);
+  if (labels.length === 0) throw new Error("vault-position-card parse read no head label");
   return labels;
 })();
 const CURATOR_NAMES = [
@@ -1559,9 +1548,9 @@ if (!MEMBERSHIP) {
   check(
     "L11 the filtered URL carries the fixture's rows in the INITIAL HTML",
     ssr.status === 200 &&
-      countMatches(ssr.html, "data-position-card") === Math.min(20, membershipRows.length) &&
+      cardIds(ssr.html).size === Math.min(20, membershipRows.length) &&
       countMatches(ssr.html, `data-vault="${MEMBERSHIP}"`) === Math.min(20, membershipRows.length),
-    `${countMatches(ssr.html, "data-position-card")} cards, the fixture has ${membershipRows.length} participants`,
+    `${cardIds(ssr.html).size} cards, the fixture has ${membershipRows.length} participants`,
   );
 }
 
@@ -1640,13 +1629,17 @@ const idOnPosition = await (async () => {
   });
   const rails = await page.locator('nav[aria-label="Explorer sections"]').count();
   const marks = await page.locator("[data-vaults-identity]").count();
+  const back = await page.locator('button[aria-label="Back"]').count();
   await page.close();
-  return { rails, marks };
+  return { rails, marks, back };
 })();
+// Since ui-jobs 407 step 4 (web 2b9e6c6e) the holder page is a position page
+// under the three-section rule: Back to the listing and no explorer rail, and
+// still no Vaults-section mark.
 check(
   "L14b and so does a position page under the roster",
-  idOnPosition.rails === 1 && idOnPosition.marks === 0,
-  `${idOnPosition.rails} rail(s), ${idOnPosition.marks} section mark(s)`,
+  idOnPosition.rails === 0 && idOnPosition.marks === 0 && idOnPosition.back > 0,
+  `${idOnPosition.rails} rail(s), ${idOnPosition.marks} section mark(s), ${idOnPosition.back} Back button(s)`,
 );
 
 // The explorer's four slots are one row (components/shared/rail-header.tsx):

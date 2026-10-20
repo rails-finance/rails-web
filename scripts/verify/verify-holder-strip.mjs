@@ -51,10 +51,10 @@ const REPO = path.resolve(__dirname, "..", "..");
 
 // The two wallets the plan pins as SHAPES, not as figures: Polaris's sample
 // holds CDPs in both markets and has a closed and a liquidated one; V2's holds
-// one trove on each of the three branches. Every number about them is read at
-// run time.
+// open troves on more than one branch (picked from the index below). Every
+// number about them is read at run time.
 const POLARIS_WALLET = "0xedb7cca3ba468055b0062d2cd033dfe6c6632959";
-const V2_WALLET = "0x8b0afadfde6fa271325305ff24a016b4fb6e3846";
+const V2_WALLET = await pickV2Wallet();
 // An address no protocol has ever seen — the "nothing to summarise" case.
 const EMPTY_WALLET = "0x00000000000000000000000000000000000dead0";
 
@@ -80,6 +80,32 @@ async function api(path_, tries = 4) {
     await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
   }
   throw last ?? new Error(`failed ${path_}`);
+}
+
+/** The V2 wallet is read from the index at run time: the pinned one
+ *  (0x8b0a…3846, one trove on each branch) closed its last trove by 20 Oct 2026,
+ *  and a wallet with nothing open draws a strip with no totals and no nearest
+ *  trove, which is a different shape. The pick is the first page of open troves'
+ *  owners, narrowed to one whose whole set fits on a page, with open troves on
+ *  the most branches, then with ended ones to state alongside. */
+async function pickV2Wallet() {
+  const open = await api("/api/troves?status=active,zombie&limit=100");
+  const owners = [...new Set((open.data ?? []).map((t) => t.owner).filter(Boolean))];
+  let best = null;
+  for (const owner of owners) {
+    const held = await api(`/api/troves?ownerAddress=${owner}&limit=50`);
+    const rows = held.data ?? [];
+    const total = held.pagination?.total ?? rows.length;
+    const openRows = rows.filter((t) => t.status === "open");
+    const branches = new Set(openRows.map((t) => t.collateralType)).size;
+    const ended = rows.length - openRows.length;
+    if (total > 20 || openRows.length < 2 || branches < 2) continue;
+    const score = branches * 10 + Math.min(ended, 5);
+    if (!best || score > best.score) best = { owner, score, branches, ended, total };
+  }
+  if (!best) throw new Error("no V2 wallet on the first page of open troves holds open troves on two branches");
+  console.log(`INFO  V2 wallet — ${best.owner}: ${best.total} troves, open on ${best.branches} branches, ${best.ended} ended`);
+  return best.owner;
 }
 
 // ── the app's own number grammar, restated ─────────────────────────────────

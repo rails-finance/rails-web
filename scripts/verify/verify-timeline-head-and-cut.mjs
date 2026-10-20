@@ -66,9 +66,15 @@ check(
   /^(Active|Open) for \d[\d,]* (days?|hrs?|minutes?)$/.test(tenureText),
   tenureText,
 );
-await page.reload({ waitUntil: "domcontentloaded" });
+await page.reload({ waitUntil: "domcontentloaded", timeout: 180000 });
 await head.waitFor({ state: "visible", timeout: 120000 });
-await page.waitForTimeout(500);
+// The choice is read from localStorage through useSyncExternalStore, so the
+// hydrating render states the date and the tenure follows once the store
+// subscribes: wait for the swap rather than read a fixed beat after paint.
+await head
+  .locator('button[data-head-form="tenure"]')
+  .waitFor({ state: "attached", timeout: 15000 })
+  .catch(() => {});
 const kept = await toggle.getAttribute("data-head-form");
 check("231: the choice survives a reload", kept === "tenure", String(kept));
 await toggle.click();
@@ -80,9 +86,16 @@ await countTip.waitFor({ state: "attached", timeout: 120000 }).catch(() => {});
 const tip = ((await countTip.textContent().catch(() => "")) ?? "").trim();
 check(
   "231: the card counts the owner's transactions and names the rest",
-  /^41 transactions · 44 events: 1 liquidation by a liquidator, 2 aToken transfers in that liquidation's transaction/.test(
-    tip,
-  ),
+  // The position is live and gains transactions (41 · 44 on 13 Oct 2026, 42 ·
+  // 45 by 20 Oct), so the arithmetic is the pin: the events are the owner's
+  // transactions plus the liquidation and its two aToken transfers.
+  (() => {
+    const m =
+      /^(\d+) transactions · (\d+) events: 1 liquidation by a liquidator, 2 aToken transfers in that liquidation's transaction/.exec(
+        tip,
+      );
+    return m != null && Number(m[2]) === Number(m[1]) + 3;
+  })(),
   tip,
 );
 
@@ -108,10 +121,14 @@ check("232: a plain wallet's row carries no kind label", owner.kind == null, JSO
 // ── 232: a cut that empties the loaded list ────────────────────────────────
 await page.goto(`${BASE}${CONTRACT}?to=2026-09-06`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page.locator("[data-flow-rewind-chip]").first().waitFor({ state: "visible", timeout: 180000 });
-// Either the read up to the cut brought its rows, or the list says what it hides.
+// Either the read up to the cut brought its rows, or the list says what it
+// hides: the empty line, or the boundary card that counts the events before
+// the window (decision 0019; since the cut is before the window's start, the
+// card is the whole list).
 await page.waitForFunction(
   () =>
     document.querySelector("[data-timeline-empty]") != null ||
+    document.querySelector("[data-figure='timeline-boundary'] [data-boundary-count]") != null ||
     (Number(document.querySelector("[data-timeline-rows-drawn]")?.getAttribute("data-timeline-rows-drawn")) || 0) > 0,
   null,
   { timeout: 180000 },
@@ -127,6 +144,15 @@ const empty = (
 const drawn = Number(
   (await page.locator("[data-timeline-rows-drawn]").first().getAttribute("data-timeline-rows-drawn")) ?? 0,
 );
+const boundary = (
+  (await page
+    .locator("[data-figure='timeline-boundary']")
+    .first()
+    .innerText()
+    .catch(() => "")) ?? ""
+)
+  .replace(/\s+/g, " ")
+  .trim();
 check(
   "232: the cut list never says the wallet has no activity",
   !/has no .* activity/.test(empty),
@@ -134,8 +160,8 @@ check(
 );
 check(
   "232: the cut holds rows, or says what it hides",
-  drawn > 0 || /on or before 6 Sep '26/.test(empty),
-  empty || `${drawn} rows`,
+  drawn > 0 || /on or before 6 Sep '26/.test(empty) || /\d events before it are accounted for/.test(boundary),
+  empty || (boundary ? `boundary card: ${boundary.slice(0, 160)}` : `${drawn} rows`),
 );
 
 await browser.close();

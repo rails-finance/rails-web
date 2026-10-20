@@ -25,10 +25,12 @@ const EXPECT_COPY = [
   "DeFi protocols run here as public contracts. Every deposit, loan and repayment is on the record.",
   "Rails reads every event in order and explains each in plain English.",
   "Rails asks those same contracts what the position holds and owes today.",
-  "Lifetime totals are checked against live state. Anything that doesn’t reconcile is left out rather than guessed.",
+  "Lifetime totals are checked against live state. Anything that doesn’t reconcile is left out.",
   "Every figure shows its source, so you can check it on a block explorer that isn’t ours.",
 ];
-const EXPECT_EYEBROWS = ["Ethereum / Base", "Historic events", "Live state", "Reconciled", "On the page"];
+// The first station names the launched production chains (roster order); the
+// pin moves when a chain launches — Arbitrum joined it on 20 Oct 2026.
+const EXPECT_EYEBROWS = ["Ethereum / Base / Arbitrum", "Historic events", "Live state", "Reconciled", "On the page"];
 // lucide adds a `lucide-<kebab>` class to the rendered <svg>.
 const EXPECT_ICONS = ["lucide-box", "lucide-history", "lucide-radio", "lucide-circle-check", "lucide-layout-grid"];
 

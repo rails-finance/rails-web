@@ -170,14 +170,16 @@ const FIXTURES = [
     mark: "flow",
     // The bought WETH has no position row: it reads from the adapter's Swapped
     // log, as a line under the sheet. The WBTC it sold is the Collateral side's
-    // event row, exact, interest to the block included; the side stands at
-    // $586 at the last event, with no interest or market move since, so no
-    // "Before this event" (decision 0042, point 10), and $38 after. Still
-    // borrowable shows the account figures drew.
+    // event row, exact, interest to the block included: the row states the
+    // withdrawal's own change (−0.00913 WBTC, −$548 at the block's price) and
+    // the side's $38 after it; there is no "Last event" line (item 330's
+    // balance-sheet T2, read 2026-10-20). Still borrowable shows the account
+    // figures drew.
     readsWhenOpen: [
-      /Last event\b.{0,60}?\$586\b/,
+      /Withdraw and swap WBTC → WETH\b.{0,80}?−\$548\b/,
       /After this event\b.{0,60}?\$38\b/,
-      "Bought 0.339",
+      // The bought line prints the compact figure first, then the exact one.
+      /Bought\b.{0,12}?0\.339 WETH/,
       "Still borrowable",
     ],
   },
@@ -403,7 +405,10 @@ for (const fx of FIXTURES) {
       ok(`${fx.label}: an open "${fx.kind}" card reads ${wanted}`);
     else
       bad(
-        `${fx.label}: no open "${fx.kind}" card reads ${wanted} (opened ${n}: ${opened.map((t) => t.slice(0, 300)).join(" | ") || "none"})`,
+        `${fx.label}: no open "${fx.kind}" card reads ${wanted} (opened ${n}; missing ${fx.readsWhenOpen
+          .filter((want) => !opened.some((t) => reads(t, want)))
+          .map(String)
+          .join(", ")}: ${opened.map((t) => t.slice(0, 600)).join(" | ") || "none"})`,
       );
     if (opened.some((t) => t.includes("Position state isn’t available")))
       bad(`${fx.label}: an open "${fx.kind}" card says its position state isn't available`);

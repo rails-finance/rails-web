@@ -84,10 +84,21 @@ const checkVsWire = (name, wireValue, cond, detail = "") => {
  *  in compact notation at two fraction digits, anything smaller plainly. Kept
  *  independent of the code under test so the expected string is derived, not
  *  borrowed from the renderer. */
-const compact = (n) =>
-  Math.abs(n) >= 1000
-    ? n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 })
-    : n.toLocaleString("en-US");
+// The house compact rule (lib/shared/format-compact.ts, one decimal and a K/M/B
+// unit from a thousand up, two decimals below), restated.
+const compact = (n) => {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  const one = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (const [size, suffix] of [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ]) {
+    if (abs >= size) return `${sign}${one(Math.round((abs / size) * 10) / 10)}${suffix}`;
+  }
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 /**
  * Find a position that is soft-liquidating RIGHT NOW.
@@ -378,18 +389,16 @@ try {
       `${sl.converted} ${sl.borrowedSymbol} converted across ${sl.bands} bands`,
   );
 
-  // The subject's row must carry the converted column (the O(page) user_state
-  // overlay on an open row) and say it is soft-liquidating. The figure is the
-  // per-position chain read's, formatted the way the card formats it — so this
-  // is the batched page overlay checked against the single-position multicall,
-  // two code paths over the same contracts, not the listing checked against
-  // itself.
+  // The subject's row must say it is soft-liquidating (the O(page) user_state
+  // overlay on an open row). Since the listing card is the position page's
+  // headlines alone (ui-jobs 324) the converted figure is not on the row; the
+  // detail section below checks it against the single-position multicall.
   await page.goto(`${BASE}${EXPLORER}?q=${SOFTLIQ.user}`, { waitUntil: "networkidle", timeout: 180000 });
   body = await page.textContent("body");
   check(
     `listing: soft-liq overlay lands on the searched row (${converted} converted)`,
-    /In soft-liquidation/.test(body) && body.includes(converted) && !/Liquidatable/.test(body),
-    body.includes(converted) ? converted : "no converted figure matching the chain read",
+    /In soft-liquidation/i.test(body) && !/Liquidatable/.test(body),
+    /In soft-liquidation/i.test(body) ? "the row states it" : "no soft-liquidation state on the row",
   );
 
   // ── 3. detail — index + chain, the full soft-liq surface ────────────────────
@@ -398,16 +407,15 @@ try {
     waitUntil: "networkidle",
     timeout: 180000,
   });
-  // Gate on the risk strip's "Soft-liquidation:" label — the one caption every
-  // band state kept through the 07-27 axis redraws. This gate has now rotted
-  // TWICE on retired copy ("converted by the AMM", then "soft-liquidation
-  // begins" — which survives only inside the closed Learn-More modal, so the
-  // locator resolved forever to a hidden span). Gate on chrome labels, not
-  // explanatory prose.
+  // Gate on the card's "Band state" stat label — a chrome label every band
+  // state keeps (llamalend-risk-slot.tsx). This gate has rotted THREE times on
+  // retired copy ("converted by the AMM", "soft-liquidation begins", then the
+  // risk strip's "Soft-liquidation:" caption, gone with the stats panel of
+  // ui-jobs 322). Gate on chrome labels, not explanatory prose.
   // The card draws closed (ui-jobs 209); the risk lines and the converted
   // figure are in its opened layer.
   await openPositionCards(page);
-  await page.waitForSelector("text=Soft-liquidation:", { timeout: 120000 });
+  await page.waitForSelector("text=Band state", { timeout: 120000 });
   body = await page.textContent("body");
   check(
     `detail: card renders (index + chain merged) — ${sl.collateralSymbol} / ${sl.borrowedSymbol}`,

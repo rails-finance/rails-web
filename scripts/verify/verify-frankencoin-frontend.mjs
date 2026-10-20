@@ -81,15 +81,26 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures++;
 };
 
-/** The card's own compact rule, reproduced from the standard library rather
- *  than imported: `lib/utils/format.formatCompact` groups four digits and up
- *  into compact notation at two fraction digits, and renders anything smaller
- *  plainly. Writing it out here keeps the expected value independent of the
- *  code under test — if the house rule changes, this goes red and says so. */
-const compact = (n) =>
-  Math.abs(n) >= 1000
-    ? n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 })
-    : n.toLocaleString("en-US");
+/** The card's own compact rule, reproduced rather than imported:
+ *  `lib/shared/format-compact.ts` groups four digits and up into one decimal
+ *  and a K/M/B unit, and renders anything smaller plainly. Writing it out here
+ *  keeps the expected value independent of the code under test — if the house
+ *  rule changes, this goes red and says so. */
+const compact = (n) => {
+  // The house rule since web `4e4d3007` (lib/shared/format-compact.ts): one
+  // decimal and a capital K/M/B from a thousand up; plain below.
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  const one = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (const [size, suffix] of [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ]) {
+    if (abs >= size) return `${sign}${one(Math.round((abs / size) * 10) / 10)}${suffix}`;
+  }
+  return n.toLocaleString("en-US");
+};
 
 /** Navigate, assert the browser LANDED on the route we meant, and return the
  *  page text. Two claims, not one: the text is read off whatever path the
@@ -147,7 +158,9 @@ const noDollar = (name, text) => {
 
   const collateral = compact(api.collateral);
   const minted = compact(api.minted);
-  const liqPrice = api.liqPrice.toLocaleString("en-US");
+  // The card prints the price through the house compact rule too ("50.0K"),
+  // read 2026-10-20 (ui-jobs 339; capital K since web `4e4d3007`).
+  const liqPrice = compact(api.liqPrice);
   const interest = (api.annualInterestPPM / 10000).toFixed(2);
   const text = await textOf(`${EXPLORER}/${POSITION.toLowerCase()}`, "text=ZCHF");
 
@@ -166,13 +179,19 @@ const noDollar = (name, text) => {
   // own token: no oracle prices cbBTC in ZCHF.
   check(
     "lifetime flows carry native units (cbBTC + ZCHF)",
-    /LIFETIME FLOWS\s*\n\s*[\d.,]+[KM]? cbBTC\s*\n\s*Collateral\s*\n\s*[\d.,]+[KM]? ZCHF\s*\n\s*Debt/i.test(text),
+    // The panel's head carries the "Today" stop of its scrubber between the
+    // title and the first side (read 2026-10-20).
+    /Lifetime flows[\s\S]{0,60}?[\d.,]+[KMB]? cbBTC\s*\n\s*Collateral\s*\n\s*[\d.,]+[KMB]? ZCHF\s*\n\s*Debt/i.test(
+      text,
+    ),
   );
   check(
     `owner-declared liq. price renders (${liqPrice} ZCHF/cbBTC, off the chain read)`,
     new RegExp(`${rx(liqPrice)}(\\.\\d+)?\\s*ZCHF/cbBTC`).test(text) && /owner-declared/i.test(text),
   );
-  check("expiry renders", /expires in \d+d|expired/i.test(text), "countdown against expiration()");
+  // "Expires · 31 Mar 2027, in 162 days" since the card's stats took the
+  // date (read 2026-10-20).
+  check("expiry renders", /Expires[\s\S]{0,80}?\bin \d+ days\b|expired/i.test(text), "countdown against expiration()");
   // Newcomer round 2 (web 26cd5a8) words the rate as charged at each mint.
   check(
     `interest renders (${interest}% charged at each mint, off annualInterestPPM)`,
@@ -257,7 +276,9 @@ const noDollar = (name, text) => {
     "auction run card collapses the settlement echoes",
     runCount === 1 &&
       /: sold 2 WETH, raised 2,435 ZCHF$/.test(runLabel) &&
-      /^2 2\.4K Auction 5\b/.test(runText) &&
+      // The header's text since ui-jobs 331: the bracket numbers, then the
+      // spine's two sums in either order, then the count chip.
+      /(^|\s)(2 2\.4K|2\.4K 2) Auction 5\b/.test(runText) &&
       !/Auction settled/.test(t) &&
       rowsCollapsed === 9,
     `${runCount} run row(s), label "${runLabel}", text "${runText}", ${rowsCollapsed} event rows at rest (19 events, 10 of them inside the run)`,

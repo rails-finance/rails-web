@@ -137,7 +137,7 @@ async function readPills(page, rowSel) {
     // yet — no state recorded, and never "closed" (rails-ops decision 0018).
     // It is a lifecycle word like the rest, so it is read as one; which sections
     // accept it is each section's own business.
-    const words = ["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED", "NOT LOADED", "DEFAULTED · UNCLAIMED"];
+    const words = ["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED", "NOT LOADED", "DEFAULTED · UNCLAIMED", "REPAID", "DEFAULTED"];
     const rows = [...document.querySelectorAll(sel)];
     return rows.map((row) => {
       for (const el of row.querySelectorAll("span")) {
@@ -189,16 +189,34 @@ async function waitForTotalChange(page, rowSel, itemsPerPage, previous, tries = 
   return readTotal(page, rowSel, itemsPerPage);
 }
 
-/** The active-filter chips row: the Status chip's text, and whether Reset is
- *  drawn at all. */
+/** The active-filter chips row: the Status SELECTION chip's text, the DEFAULT
+ *  chip's text, and whether Reset is drawn at all. Since web `2a948029` (16 Oct
+ *  2026) a listing that rests on open positions names that default in a
+ *  removable "Status: Open" chip (`FilterDimension.defaultChip`, drawn as
+ *  `[data-default-chip="status"]`); it is the list's resting view, not a
+ *  selection, so it is read apart from the selection chip and never counts as
+ *  one. */
 async function readChips(page) {
   return page.evaluate(() => {
     const toolbar = document.querySelector('[data-skel-section="listing-toolbar"]');
-    const text = toolbar?.innerText ?? "";
+    const dflt = toolbar?.querySelector('[data-default-chip="status"]');
+    const defaultChip = dflt ? (dflt.textContent ?? "").replace(/\s+/g, " ").trim() : null;
+    let text = toolbar?.innerText ?? "";
+    if (defaultChip) text = text.replace(defaultChip, "");
     const m = /Status:[^\n]*/.exec(text);
-    return { statusChip: m ? m[0].trim() : null, reset: /(^|\n)\s*Reset\s*(\n|$)/.test(text) };
+    return {
+      statusChip: m ? m[0].trim() : null,
+      defaultChip,
+      reset: /(^|\n)\s*Reset\s*(\n|$)/.test(text),
+    };
   });
 }
+
+/** The resting view's own chip and nothing selected: the default "Status: Open"
+ *  chip is drawn, no selection chip, no Reset. */
+const restsOnOpen = (chips) => chips.defaultChip === "Status: Open" && chips.statusChip == null && !chips.reset;
+const describeChips = (chips) =>
+  `${chips.defaultChip ? `default "${chips.defaultChip}"` : "no default chip"}, ${chips.statusChip ?? "no selection chip"}${chips.reset ? ", Reset drawn" : ""}`;
 
 /** Type into the listing's search box and let the driver's 300 ms debounce push
  *  the URL. Given `rowSel`, wait for the row set to CHANGE before reading it: a
@@ -259,19 +277,34 @@ if (wants("Liquity V2")) {
   // ── fixtures, read from the API ───────────────────────────────────────────
   const openApi = await api("/api/troves?status=active,zombie&limit=1");
   const allApi = await api("/api/troves?limit=1");
-  const closedApi = await api("/api/troves?status=closed&limit=1");
+  const closedApi = await api("/api/troves?status=closed&limit=50");
   const openTotal = openApi.pagination?.total;
-  const closedRow = closedApi.data?.[0];
-  // A closed trove's NFT is burned, so `owner` is null and `lastOwner` names who
-  // held it — that is the holder to search for.
-  const holder = closedRow?.lastOwner ?? closedRow?.owner ?? null;
-  const closedId = closedRow?.id ?? null;
   info(label("fixtures"), `open total ${openTotal}, every status ${allApi.pagination?.total}`);
-  info(label("fixtures"), `closed trove ${closedId?.slice(0, 12)}… held by ${holder}`);
 
-  const holderApi = holder ? await api(`/api/troves?ownerAddress=${holder}&limit=100`) : null;
-  const holderTotal = holderApi?.pagination?.total ?? 0;
-  const holderClosed = (holderApi?.data ?? []).filter((r) => r.status === "closed" || r.status === "liquidated").length;
+  // A closed trove's NFT is burned, so `owner` is null and `lastOwner` names who
+  // held it — that is the holder to search for. The holder's whole set has to
+  // fit on the first page, so the rendered rows ARE the answer (5a counts ended
+  // pills on the page against the API's count for the holder); the newest
+  // closed trove's holder had 28 on 20 Oct 2026, more than one page draws.
+  let holder = null;
+  let closedId = null;
+  let holderTotal = 0;
+  let holderClosed = 0;
+  for (const row of closedApi.data ?? []) {
+    const addr = row.lastOwner ?? row.owner ?? null;
+    if (!addr) continue;
+    const held = await api(`/api/troves?ownerAddress=${addr}&limit=100`);
+    const total = held.pagination?.total ?? 0;
+    const ended = (held.data ?? []).filter((r) => r.status === "closed" || r.status === "liquidated").length;
+    if (total > 0 && total <= PER_PAGE && ended > 0) {
+      holder = addr;
+      closedId = row.id ?? null;
+      holderTotal = total;
+      holderClosed = ended;
+      break;
+    }
+  }
+  info(label("fixtures"), `closed trove ${closedId?.slice(0, 12)}… held by ${holder}`);
   info(label("fixtures"), `that holder has ${holderTotal} trove(s), ${holderClosed} of them ended`);
 
   // ── 1-4. the bare directory ──────────────────────────────────────────────
@@ -295,9 +328,9 @@ if (wants("Liquity V2")) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label("3. the bare directory names its resting view in the Status: Open chip and draws no Reset"),
+    restsOnOpen(bareChips),
+    describeChips(bareChips),
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -394,8 +427,8 @@ if (wants("Liquity V2")) {
   const openAfterCleared = (await api("/api/troves?status=active,zombie&limit=1")).pagination?.total;
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
-    `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
+    restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
+    `${describeChips(clearedChips)}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
   );
 
   await bare.close();
@@ -490,9 +523,9 @@ if (wants("Polaris")) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label("3. the bare directory names its resting view in the Status: Open chip and draws no Reset"),
+    restsOnOpen(bareChips),
+    describeChips(bareChips),
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -639,8 +672,8 @@ if (wants("Polaris")) {
   const openAfterCleared = (await api("/api/polaris/positions?status=open&limit=1")).pagination?.total;
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
-    `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
+    restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
+    `${describeChips(clearedChips)}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
   );
 
   await bare.close();
@@ -800,9 +833,9 @@ async function runRestingViewSection(spec) {
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label("3. the bare directory names its resting view in the Status: Open chip and draws no Reset"),
+    restsOnOpen(bareChips),
+    describeChips(bareChips),
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -951,8 +984,8 @@ async function runRestingViewSection(spec) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openAfter, clearedIndex),
-    `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs index ${openAfter}→${clearedIndex}`,
+    restsOnOpen(clearedChips) && withinIndex(clearedTotal.total, openAfter, clearedIndex),
+    `${describeChips(clearedChips)}, page ${clearedTotal.total} vs index ${openAfter}→${clearedIndex}`,
   );
   await picked.close();
 }
@@ -1294,7 +1327,8 @@ for (const spec of ROSTER) {
 // Vocabulary: PWN's buckets are open (running) / unclaimed / repaid / defaulted.
 // The resting view is the index's open loans: running ones draw OPEN, and those
 // past their deadline draw DEFAULTED · UNCLAIMED (lib/pwn/economics.ts
-// `pwnLoanState`); both terminal ones draw the shared CLOSED badge.
+// `pwnLoanState`); the settled ones draw their own word, REPAID or DEFAULTED
+// (pwn-position-card.tsx, the closed card).
 if (wants("PWN")) {
   const ROWS = 'a[href^="/ethereum/pwn/0x"]';
   // The memory tier draws no pagination strip (the driver only builds one for
@@ -1303,6 +1337,7 @@ if (wants("PWN")) {
   const PER_PAGE = Number.MAX_SAFE_INTEGER;
   const label = (s) => `PWN ${s}`;
   const ENDED = new Set(["repaid", "defaulted"]);
+  const ENDED_PILLS_PWN = new Set(["REPAID", "DEFAULTED"]);
 
   /** Every loan the index has, read whole — the memory tier's own input. */
   const allLoans = async () => rowsOf(await api("/api/pwn/positions?limit=500"));
@@ -1336,12 +1371,12 @@ if (wants("PWN")) {
       barePills.every((p) => p != null && (OPEN_PILLS_ROSTER.has(p) || p === "DEFAULTED · UNCLAIMED")),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
-  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
-  // `defaultChip`): no remove control, no Reset, nothing in the URL.
+  // The resting view names its default in the "Status: in escrow" chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`, removable since web `2a948029`): no selection, no Reset, nothing in the URL.
   check(
-    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
-    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
-    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
+    label('3. the bare directory draws the default "Status: in escrow" chip and no Reset'),
+    bareChips.defaultChip === "Status: in escrow" && bareChips.statusChip == null && !bareChips.reset,
+    describeChips(bareChips),
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -1374,8 +1409,8 @@ if (wants("PWN")) {
     info(label("5. after typing the party"), `location.search "${searchUrl}"`);
     check(
       label("5a. the party's settled loan renders"),
-      searchPills.filter((p) => ENDED_PILLS_ROSTER.has(p)).length === theirEnded && theirEnded > 0,
-      `${searchPills.filter((p) => ENDED_PILLS_ROSTER.has(p)).length} settled of ${searchPills.length} rows vs index ${theirEnded}`,
+      searchPills.filter((p) => ENDED_PILLS_PWN.has(p)).length === theirEnded && theirEnded > 0,
+      `${searchPills.filter((p) => ENDED_PILLS_PWN.has(p)).length} settled of ${searchPills.length} rows vs index ${theirEnded}`,
     );
     check(
       label("5b. the party's row count is every loan they are on"),
@@ -1409,7 +1444,7 @@ if (wants("PWN")) {
     );
     check(
       label("5e. the settled loan of that number renders, settled"),
-      idPills.some((p) => ENDED_PILLS_ROSTER.has(p)),
+      idPills.some((p) => ENDED_PILLS_PWN.has(p)),
       [...new Set(idPills)].join(", ") || "none",
     );
     check(
@@ -1461,9 +1496,10 @@ if (wants("PWN")) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip === "Status: in escrow" &&
+    clearedChips.defaultChip === "Status: in escrow" &&
+      clearedChips.statusChip == null &&
       withinIndex(clearedPills.length, openAfter, now.filter((r) => r.status === "open").length),
-    `${clearedChips.statusChip ?? "no chip"}, page ${clearedPills.length} rows vs index ${openAfter} open`,
+    `${describeChips(clearedChips)}, page ${clearedPills.length} rows vs index ${openAfter} open`,
   );
   await picked.close();
 }

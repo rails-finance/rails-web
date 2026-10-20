@@ -59,9 +59,10 @@ const REPO = path.resolve(__dirname, "..", "..");
 
 // The two wallets the plan pins as SHAPES, not as figures: Polaris's holds CDPs
 // in both markets and has closed and liquidated ones; V2's holds one trove on
-// each of the three branches. Every number about them is read at run time.
+// more than one branch, open (picked from the index below). Every number about
+// them is read at run time.
 const POLARIS_WALLET = "0xedb7cca3ba468055b0062d2cd033dfe6c6632959";
-const V2_WALLET = "0x8b0afadfde6fa271325305ff24a016b4fb6e3846";
+const V2_WALLET = await pickV2Wallet();
 // A CDP number that exists in BOTH Polaris markets — a position-id search, not
 // a holder — and a name nobody has registered.
 const BOTH_MARKETS_ID = "27";
@@ -89,6 +90,32 @@ async function api(path_, tries = 4) {
     await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
   }
   throw last ?? new Error(`failed ${path_}`);
+}
+
+/** The V2 wallet is read from the index at run time: the pinned one
+ *  (0x8b0a…3846, one trove on each branch) closed its last trove by 20 Oct 2026,
+ *  and a wallet with nothing open draws a strip with no totals and no nearest
+ *  trove, which is a different shape. The pick is the first page of open troves'
+ *  owners, narrowed to one whose whole set fits on a page, with open troves on
+ *  the most branches, then with ended ones to state alongside. */
+async function pickV2Wallet() {
+  const open = await api("/api/troves?status=active,zombie&limit=100");
+  const owners = [...new Set((open.data ?? []).map((t) => t.owner).filter(Boolean))];
+  let best = null;
+  for (const owner of owners) {
+    const held = await api(`/api/troves?ownerAddress=${owner}&limit=50`);
+    const rows = held.data ?? [];
+    const total = held.pagination?.total ?? rows.length;
+    const openRows = rows.filter((t) => t.status === "open");
+    const branches = new Set(openRows.map((t) => t.collateralType)).size;
+    const ended = rows.length - openRows.length;
+    if (total > 20 || openRows.length < 2 || branches < 2) continue;
+    const score = branches * 10 + Math.min(ended, 5);
+    if (!best || score > best.score) best = { owner, score, branches, ended, total };
+  }
+  if (!best) throw new Error("no V2 wallet on the first page of open troves holds open troves on two branches");
+  console.log(`INFO  V2 wallet — ${best.owner}: ${best.total} troves, open on ${best.branches} branches, ${best.ended} ended`);
+  return best.owner;
 }
 
 // ── the app's own number grammar, restated ─────────────────────────────────
@@ -191,8 +218,8 @@ check("A2. …and twitter:image is the same URL", rel(pMeta.twitterImage) === pS
 }
 check(
   "A4. the title names the holder in the explorer's own plural noun",
-  pMeta.ogTitle === `Rails | Polaris positions held by ${short(POLARIS_WALLET)}` &&
-    pMeta.ogImageAlt === "This wallet's Polaris positions at a glance",
+  pMeta.ogTitle === `Rails | Polaris Positions held by ${short(POLARIS_WALLET)}` &&
+    pMeta.ogImageAlt === "This wallet's Polaris Positions at a glance",
   `"${pMeta.ogTitle}" / alt "${pMeta.ogImageAlt}"`,
 );
 
@@ -521,24 +548,28 @@ async function statedTotal(page) {
 
 // Spark rests on `status:["open"]` with NO contextual default, so the rule this
 // change added does not reach it: clearing Status must still write an explicit
-// empty param, because an absent one would snap back to "open".
+// param, because an absent one would snap back to "open". Since web `2a948029`
+// (16 Oct 2026) the resting default is the removable "Status: Open" chip, and
+// removing it widens to an explicit selection of every bucket
+// (lib/spark/list-filter-dimensions.tsx `clearDefault`).
+const SPARK_EVERY_STATUS = "?status=open,closed,liquidated";
 {
   const openTotal = (await api("/api/spark/positions?limit=1&status=open")).pagination?.total;
   const everyTotal = (await api("/api/spark/positions?limit=1")).pagination?.total;
   info("F3 fixtures (Spark)", `${openTotal} open of ${everyTotal} positions in all`);
 
   const page = await openListing(context, `${BASE}/ethereum/spark`);
-  await page.getByRole("button", { name: "Remove Status filter" }).first().click();
+  await page.getByRole("button", { name: "Remove Status: Open" }).first().click();
   await page.waitForTimeout(3500);
   const cleared = await page.evaluate(() => location.search);
   check(
     "F3. Spark: clearing Status still writes an explicit `?status=` — the open-only explorers are untouched",
-    cleared === "?status=",
+    cleared === SPARK_EVERY_STATUS,
     `"${cleared}"`,
   );
   await page.close();
 
-  const reloaded = await openListing(context, `${BASE}/ethereum/spark?status=`);
+  const reloaded = await openListing(context, `${BASE}/ethereum/spark${SPARK_EVERY_STATUS}`);
   await reloaded.waitForTimeout(2500);
   const total = await statedTotal(reloaded);
   check(

@@ -270,7 +270,9 @@ const FIXTURES = [
   {
     label: "case study / a life that closed and reopened",
     vault: CASE_STUDY,
-    holder: "0xaa3e1a91fc83723e527062ff929a357354d10dcb",
+    // Repinned 2026-10-20 (ui-jobs 339): 0xaa3e…0dcb exited the vault. This
+    // address minted, burned to nothing and minted again, and holds now.
+    holder: "0xc3840f38c8edc39f65443243aa7399d607e9f599",
     expect: { mints: true, burns: true, transfersIn: false, transfersOut: false },
   },
   {
@@ -819,6 +821,30 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
       }
     }
     await page.waitForTimeout(900);
+    // An opened card shows its Explanation first; the sheet, with the share
+    // row 5c reads, is under its Figures tab (ui-jobs 370).
+    const figureTabs = page.locator("[data-vault-timeline-rows] [data-card-tab='figures']");
+    const tabCount = await figureTabs.count();
+    for (let i = 0; i < tabCount; i++) {
+      try {
+        await figureTabs.nth(i).click({ force: true, timeout: 4000 });
+      } catch {
+        /* a tab that would not open leaves its row's share unread, which 5c reports */
+      }
+    }
+    await page.waitForTimeout(600);
+    // The share row is a row of the sheet's breakdown layer, drawn with the
+    // breakdown on (the sheet's switch).
+    const switches = page.locator("[data-vault-timeline-rows] [data-sheet-switch]");
+    const switchCount = await switches.count();
+    for (let i = 0; i < switchCount; i++) {
+      try {
+        await switches.nth(i).evaluate((el) => el.click());
+      } catch {
+        /* a switch that would not take leaves the row's share unread, which 5c reports */
+      }
+    }
+    await page.waitForTimeout(600);
   }
   // THE TYPE FILTER'S OWN OPTIONS. Read by opening the dropdown and closing it
   // again — the options are not in the DOM until it opens, and the one thing
@@ -863,8 +889,10 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     unreadText: await text("[data-figure='timeline-unread']"),
     exponentText: await text("[data-figure='timeline-exponent']"),
     accrualText: await text("[data-figure='timeline-accrual']"),
+    // The proportion is a row of the event sheet since ui-jobs 330 (the cell
+    // marker stays where a card still draws the cell).
     shareOfVaultTexts: await page
-      .locator("[data-figure='row-share-of-vault']")
+      .locator("[data-figure='row-share-of-vault'], [data-sheet-row='share-of-vault']")
       .evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, " ").trim())),
     cardStatus: await attr("[data-position-card]", "data-status"),
     cardValueUsdE8: await attr("[data-position-card]", "data-value-usd-e8"),

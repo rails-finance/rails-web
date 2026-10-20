@@ -38,8 +38,9 @@
 //      liquidationCount, firstEventAt, lastActivityAt, and every lifetime leg
 //      with `===` on the raw strings; its drawn events must be the whole
 //      list's own rows after the cut; and `coverage.omitted` must count the
-//      seeded rows up to the seed's last block without the `anchored` licence
-//      (a wallet-signed row before the cut is not drawn).
+//      seeded rows up to the seed's last block and carry `anchored` with
+//      `anchoredComplete: false` (the anchor stays on over the tail, but a
+//      wallet-signed row before the cut is not drawn).
 //
 //   4. THE HORIZON PATH DID NOT MOVE. The same tail replayed with only the
 //      debt-only `seeds` (what the route sends while no seed is stored) still
@@ -654,8 +655,9 @@ function checkSeededReplay(name, { decoded, whole }) {
   assert(
     seeded.coverage.omitted?.count === cut &&
       seeded.coverage.omitted?.upToBlock === head[head.length - 1].blockNumber &&
-      !("anchored" in seeded.coverage.omitted),
-    `coverage.omitted counts the ${cut} seeded rows up to the seed's last block, without the anchored licence`,
+      seeded.coverage.omitted?.anchored != null &&
+      seeded.coverage.omitted?.anchoredComplete === false,
+    `coverage.omitted counts the ${cut} seeded rows up to the seed's last block, with the anchored count and anchoredComplete false`,
   );
   assert(
     !("omitted" in wholeDrawn.coverage) || wholeDrawn.coverage.omitted.anchored != null,

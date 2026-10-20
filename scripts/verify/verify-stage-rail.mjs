@@ -57,12 +57,14 @@ async function checkHome(theme) {
   const count = await stages.count();
   assert(count === 5, `rail is a 5-stage <ol> (got ${count})`);
 
-  // Eyebrows present, in pipeline order.
+  // Eyebrows present, in pipeline order. The first station names the launched
+  // production chains (`launchedProductionChains()`, roster order), so this pin
+  // moves when a chain launches: Arbitrum joined it on 20 Oct 2026.
   const eyebrows = await ol.locator("li p.font-semibold").allTextContents();
   const norm = eyebrows.map((s) => s.trim());
   assert(
     JSON.stringify(norm) ===
-      JSON.stringify(["Ethereum / Base", "Historic events", "Live state", "Reconciled", "On the page"]),
+      JSON.stringify(["Ethereum / Base / Arbitrum", "Historic events", "Live state", "Reconciled", "On the page"]),
     "stage eyebrows in pipeline order: " + norm.join(" · "),
   );
 
