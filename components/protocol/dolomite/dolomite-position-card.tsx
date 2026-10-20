@@ -219,7 +219,7 @@ export function DolomiteAccountLabel({ text, accountNumber }: { text: string; ac
       focusable
       className="focus-ring rounded-sm"
     >
-      <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">{text}</span>
+      <span className="tip-underline">{text}</span>
     </RevealTip>
   );
 }
