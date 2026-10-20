@@ -72,7 +72,6 @@ import { BlockRef } from "@/components/shared/block-ref";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { formatCompact } from "@/lib/shared/format-compact";
 
 const ORACLE_LINE_TIP =
   "The collateral valued in the loan token at the market's oracle, the price Morpho's liquidation test uses.";
@@ -419,8 +418,8 @@ export function useMorphoCardSlots({
         }
       : undefined;
     // The line under Collateral: the collateral's value at the market's oracle,
-    // in the loan token (ui-jobs 398). A listing reads no market (decision
-    // 0018) and draws none.
+    // in the loan token (ui-jobs 398), at the two places the USD line writes
+    // its cents. A listing reads no market (decision 0018) and draws none.
     const collValue = listed ? listed.L.collateralValue : chain ? chain.collateralValue : undefined;
     const oracleLine =
       !detail || !hasColl || v.loanDecimalsUnread ? undefined : collValue != null ? (
@@ -434,7 +433,9 @@ export function useMorphoCardSlots({
               }
               value={formatExact(collValue)}
             >
-              <span className="font-bold text-green-400">{formatCompact(collValue)}</span>
+              <span className="font-bold text-green-400">
+                {collValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </Prov>
             <TokenChipIcon symbol={v.loanSymbol} address={v.loanToken} size={16} filterable={false} untitled />
             <span className="whitespace-nowrap text-rb-500">at the market&apos;s oracle</span>
