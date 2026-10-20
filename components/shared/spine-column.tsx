@@ -6,7 +6,7 @@ import { ArrowRightToLine, Clock, Layers, LogOut, TestTube } from "lucide-react"
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { DelegateRatePillShell, GavelGlyph, RatePillShell, UsersGlyph } from "@/components/shared/rate-pill";
+import { DelegateRatePillShell, GavelGlyph, RatePillShell, UserGlyph } from "@/components/shared/rate-pill";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine } from "@/components/shared/activity-timeline";
@@ -21,8 +21,8 @@ import type { Tone } from "@/lib/shared/tone";
 export type SpineIcon =
   | "warning" // A change the owner did not make: redemption, liquidation (caution/critical tone via warningTone). Draws `warningLegs` as nodes; a triangle only where no leg is known
   | "rate-change" // Interest rate / parameter change (% with up/down arrow)
-  | "delegate" // Delegation change (users icon with +/- badge)
-  | "external" // Third-party action with nothing to draw (pink users icon) — the FALLBACK for `externalParty`; cards pass the flag, not this
+  | "delegate" // Delegation change (user icon with +/- badge)
+  | "external" // Third-party action with nothing to draw (pink user icon) — the FALLBACK for `externalParty`; cards pass the flag, not this
   | "mint" // Token minted into existence (e.g. a loan NFT) — plus-in-circle
   | "burn" // Token burned / destroyed (e.g. a settled loan NFT) — flame
   | "extend" // Term renegotiated / duration extended — clock
@@ -69,8 +69,8 @@ export const WARNING_TONE_TEXT: Record<Tone, string> = {
 /** Who acted, the badge in the node's top-left corner (ui-jobs 408; rails-ops
  *  `standards/detail-page-anatomy.md`, "The spine", "Three marks"): the owner
  *  draws none; a third party (a delegate, a batch manager, a keeper, a
- *  liquidator) the people glyph in party pink; the protocol (a formula or the
- *  market set it) the test tube; governance the gavel, both in neutral ink. */
+ *  liquidator) the person glyph; governance the gavel, both on party pink; the
+ *  protocol (a formula or the market set it) the test tube on neutral ink. */
 export type SpineActor = "owner" | "third-party" | "protocol" | "governance";
 
 // ── Vertical order ──────────────────────────────────────────────────────────
@@ -631,8 +631,8 @@ function BothWaysArrow({ size }: { size: number }) {
   );
 }
 
-/** Two-person glyph for delegation (batch manager join/leave) events */
-function UsersIcon({ size, color = "var(--color-rb-500)" }: { size: number; color?: string }) {
+/** One-person glyph for delegation (batch manager join/leave) events */
+function UserIcon({ size, color = "var(--color-rb-500)" }: { size: number; color?: string }) {
   return (
     <svg
       width={size}
@@ -644,10 +644,8 @@ function UsersIcon({ size, color = "var(--color-rb-500)" }: { size: number; colo
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
     </svg>
   );
 }
@@ -678,9 +676,9 @@ function DelegateBadge({ size, join }: { size: number; join: boolean }) {
   );
 }
 
-/** Who acted, overlaid top-left of the node (ui-jobs 408): the people glyph
- *  on party pink for a third party, the test tube for the protocol and the
- *  gavel for governance on the spine's neutral ink. The owner draws none.
+/** Who acted, overlaid top-left of the node (ui-jobs 408): the person glyph
+ *  for a third party and the gavel for governance on party pink, the test
+ *  tube for the protocol on the spine's neutral ink. The owner draws none.
  *  The top-left corner is the actor's alone; check / cross / send / swap keep
  *  the bottom-right. The badge sits off the node, 12px to the left and 2px
  *  up, so the node's own glyph stays whole under it. */
@@ -696,13 +694,13 @@ function ActorBadge({ size, actor }: { size: number; actor: SpineActor }) {
         left: -12,
         width: r,
         height: r,
-        backgroundColor: actor === "third-party" ? "#EC4899" : "var(--color-rb-500)",
+        backgroundColor: actor === "third-party" || actor === "governance" ? "#EC4899" : "var(--color-rb-500)",
         boxShadow: "0 0 0 2px var(--background)",
       }}
       data-spine-actor-badge={actor}
     >
       {actor === "third-party" ? (
-        <UsersGlyph size={g} />
+        <UserGlyph size={g} />
       ) : actor === "governance" ? (
         <GavelGlyph size={g} />
       ) : (
@@ -1138,17 +1136,17 @@ export function SpineColumn({
         // A join's `rateSpan` puts the delegate's rate on the right flank.
         return nodeRow(
           <div className="relative">
-            <UsersIcon size={T} />
+            <UserIcon size={T} />
             <DelegateBadge size={T} join={iconDirection !== "down"} />
           </div>,
           rateSpan ? rateFlank(rateSpan) : undefined,
         );
       case "external":
-        // A third-party action with NOTHING TO DRAW: the people glyph in the
+        // A third-party action with NOTHING TO DRAW: the person glyph in the
         // pink external-party tint (color-grammar.md §4b) stands alone, with
         // no join/leave badge. Where the event moved tokens, the flow renders
-        // and the people glyph rides it as the actor badge instead.
-        return nodeRow(<UsersIcon size={T} color="#EC4899" />);
+        // and the person glyph rides it as the actor badge instead.
+        return nodeRow(<UserIcon size={T} color="#EC4899" />);
       case "mint":
         return nodeRow(<MintIcon size={T} />);
       case "burn":

@@ -19,6 +19,7 @@
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import type { VaultFamilyEntry } from "@/lib/vaults/families";
 
 /** How long a served roster is reused before it is asked for again. The box
  *  writes Base's once a day and Yearn's once a week. */
@@ -41,7 +42,7 @@ export interface ServedRosterVault {
 
 export interface ServedRoster {
   chainId: number;
-  family: "metamorpho" | "yearn-v3";
+  family: NonNullable<VaultFamilyEntry["served"]>;
   rosterBlock: number;
   rosterBlockTime: string;
   factories: unknown[];

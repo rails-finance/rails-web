@@ -76,12 +76,6 @@ export interface AaveVaultCoords {
   chainId?: number;
 }
 
-const FAMILY_NAME: Record<AaveVaultFamily, string> = {
-  sgho: "sGHO",
-  stata: "static aToken",
-  "umbrella-stake": "Umbrella stake token",
-};
-
 const vaultContract = (c: AaveVaultCoords): Provenance["contract"] => ({
   name: c.vaultName ? `${c.vaultName} (ERC-4626)` : "the vault",
   address: c.vault,
@@ -122,24 +116,9 @@ export const aaveVaultCatalogueProv = (
     kind: "recompute",
     text: `Re-run StataTokenFactory.getStataTokens() and Umbrella.getStkTokens()${atBlock(c)} and count what they return`,
   },
-  summary: `Vaults listed — ${counts.catalogSize}: sGHO, the ${counts.stakeCount} stake tokens \`Umbrella.getStkTokens()\` returned, and the ${counts.stataCount} static aTokens \`StataTokenFactory.getStataTokens()\` returned, every one of them read${atBlock(c)}. The roster is not a census and not a floor: both calls answer their whole family in one read, and sGHO is a single address Aave's address book names, so the list is complete AT THIS BLOCK by construction. A vault deployed one block earlier is in it. What is outside it is stated in the prose beside this figure.`,
+  summary: `Vaults listed — ${counts.catalogSize}: sGHO, the ${counts.stakeCount} stake tokens \`Umbrella.getStkTokens()\` returned, and the ${counts.stataCount} static aTokens \`StataTokenFactory.getStataTokens()\` returned, every one of them read${atBlock(c)}. The roster is not a census and not a floor: both calls answer their whole family in one read, and sGHO is a single address Aave's address book names, so the list is complete AT THIS BLOCK by construction. A vault deployed one block earlier is in it. What is outside it is stated in the roster's intro drawer.`,
   via: `${LANE} · getStataTokens() + getStkTokens() + GhoEthereum.SGHO @ the pinned block`,
   formula: "1 (sGHO) + getStkTokens().length + getStataTokens().length",
-});
-
-/** How many vaults are in one family — a count over the same reads. */
-export const aaveVaultFamilyCountProv = (
-  c: AaveVaultCoords,
-  family: AaveVaultFamily,
-  counts: { funded: number; total: number },
-  attestation: AaveVaultAttestation,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${counts.funded === 1 ? "One vault" : `${counts.funded} vaults`} shown here — the ${FAMILY_NAME[family]} rows holding something${atBlock(c)}, out of ${counts.total} in the family. ${attestationClause(attestation)}. Counted from that answer; a vault in this family whose \`totalAssets()\` read zero is in the trailing group below rather than dropped from the count.`,
-  via: `${LANE} · ${attestation.kind === "book" ? attestation.constant : attestation.call} @ the pinned block`,
-  formula: attestation.kind === "book" ? "one published address" : `length of ${attestation.call}`,
 });
 
 // ── what a vault says about itself ───────────────────────────────────────────
@@ -273,15 +252,23 @@ export const aaveVaultReserveHopProv = (c: AaveVaultCoords, reserveSymbol: strin
   formula: "stakeToken.asset() → (stataToken.asset() where that is a wrapper)",
 });
 
-/** The stata factory, cited where the page names the enumerator itself. */
-export const aaveStataFactoryProv = (c: AaveVaultCoords, n: number): Provenance => ({
-  kind: "chain",
+/** How many funded vaults hold one asset — a count over the same reads. */
+export const aaveVaultAssetGroupCountProv = (c: AaveVaultCoords, n: number): Provenance => ({
+  kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  verify: recompute("StataTokenFactory.getStataTokens()", c),
-  summary: `Static aTokens deployed — \`getStataTokens()\` on the factory Aave publishes as \`AaveV3Ethereum.STATA_FACTORY\` returned ${n} addresses${atBlock(c)}. The factory allows one wrapper per underlying asset, so this is the whole family at this block rather than a sample of it.`,
-  contract: { name: "StataTokenFactory", address: AAVE_STATA_FACTORY },
-  via: `${LANE} · StataTokenFactory.getStataTokens() @ the pinned block`,
+  summary: `${n === 1 ? "One vault" : `${n} vaults`} over ${asset(c)} — the listed vaults whose \`asset()\` is ${asset(c)} and whose \`totalAssets()\` was above zero${atBlock(c)}. A vault that read zero sits in the trailing group.`,
+  via: `${LANE} · count of listed vaults per asset() @ the pinned block`,
+  formula: "count of listed vaults where asset() = this asset and totalAssets() > 0",
+});
+
+/** The address-book pill: Aave publishes this vault's address. */
+export const aaveVaultBookProv = (c: AaveVaultCoords, attestation: AaveVaultAttestation): Provenance => ({
+  kind: "offchain",
+  pclass: "offchain",
+  summary: `In Aave's address book — ${attestationClause(attestation)}.`,
+  contract: vaultContract(c),
+  via: "aave-dao/aave-address-book at the pinned commit",
 });
 
 /** How many vaults hold nothing at the block. A READING, not an omission. */

@@ -264,21 +264,34 @@ const skip = (name, why) => {
   skipped++;
 };
 
-/** The house print rule, restated here from lib/shared/vault-amount-text.ts so
- *  a change to the page's rule that this script did not agree to goes red. */
-const expectedAmountText = (raw, decimals) => {
-  const value = Number(raw) / Math.pow(10, decimals);
-  const text = value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: decimals <= 6 ? 2 : 6,
-  });
-  if (value !== 0 && parseFloat(text.replace(/,/g, "")) === 0) {
-    const s = String(raw).padStart(decimals + 1, "0");
-    const cut = s.length - decimals;
-    return (s.slice(0, cut) + "." + s.slice(cut)).replace(/\.?0+$/, "");
+// 2026-10-20 (ui-jobs 407, V1): a roster row is the shared card's listing
+// surface. It states total assets in the listing's compact form ("413.0M", the
+// exact value on `data-prov-exact`) and the share price by the print rules'
+// share-price rule (two to six places, whatever the asset's decimals). Both
+// rules restated here from their definitions (lib/shared/format-compact.ts,
+// lib/shared/vault-amount-text.ts `sharePriceText`), for figures of 0.01 and up.
+const expectedCompactText = (raw, decimals) => {
+  const v = Number(raw) / Math.pow(10, decimals);
+  const units = [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  const one = (x) => x.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (let i = 0; i < units.length; i++) {
+    const [size, suffix] = units[i];
+    if (v < size) continue;
+    const scaled = Math.round((v / size) * 10) / 10;
+    if (scaled >= 1000 && i > 0) return `${one(v / units[i - 1][0])}${units[i - 1][1]}`;
+    return `${one(scaled)}${suffix}`;
   }
-  return text;
+  return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
+const expectedSharePriceText = (raw, decimals) =>
+  (Number(raw) / Math.pow(10, decimals)).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  });
 
 /** viem in chunks, so one Multicall3 request never carries 247 `totalAssets()`
  *  calls — each one walks a vault's whole default queue. */
@@ -311,7 +324,10 @@ await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 12
 // five V3 factories had deployed … at block N") and the block this READING was
 // taken at. The sentence anchored on is the one that names the CALL.
 const rosterText = (await page.locator("[data-roster-panel]").innerText()).replace(/\s+/g, " ");
-const statedBlock = Number((rosterText.match(/totalAssets\(\) at block ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
+// 2026-10-20 (ui-jobs 407, V1): the roster's read-at line moved into the
+// panel ("Read at 52,854,244"), and the empty group's sentence that named
+// the call went to the intro drawer, so the line is what is read.
+const statedBlock = Number((rosterText.match(/Read at ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
 const headerBlockAttr = (await page.locator("[data-directory-block]").count())
   ? Number(await page.locator("[data-directory-block]").first().getAttribute("data-directory-block"))
   : null;
@@ -359,8 +375,10 @@ const rows = await page.locator("[data-roster-panel] [data-vault-row]").evaluate
     sharePriceRaw: el.getAttribute("data-share-price-raw"),
     groupAsset: el.closest("[data-asset-group]")?.getAttribute("data-asset-group") ?? null,
     inEmpty: Boolean(el.closest("[data-empty-rows]")),
-    familyText: el.querySelectorAll("td")[1]?.textContent?.trim() ?? null,
-    hasMark: Boolean(el.querySelectorAll("td")[1]?.querySelector("svg, img")),
+    // 2026-10-20 (ui-jobs 407, V1): the row is a card; the family word is its
+    // family pill and the mark sits on the asset icon.
+    familyText: el.querySelector('[data-pill="family"]')?.textContent?.trim() ?? null,
+    hasMark: Boolean(el.querySelector("[data-venue-mark]")),
     hasBadge: Boolean(el.querySelector("[data-endorsed-badge]")),
     amountText: el.querySelector('[data-cell="total-assets"]')?.textContent?.trim() ?? null,
     sharePriceText: el.querySelector('[data-cell="share-price"]')?.textContent?.trim() ?? null,
@@ -469,7 +487,7 @@ const amountTextBad = [];
 for (const group of byGroupSize) {
   const r = group[0];
   const decimals = CATALOG_BY_ADDRESS.get(r.address).asset.decimals;
-  const want = expectedAmountText(r.raw, decimals);
+  const want = expectedCompactText(r.raw, decimals);
   if (!r.amountText?.startsWith(want)) amountTextBad.push(`${r.address}: "${r.amountText}" vs "${want}"`);
 }
 check(
@@ -510,7 +528,7 @@ const priceTextBad = [];
 for (const r of priceSample) {
   const decimals = CATALOG_BY_ADDRESS.get(r.address).asset.decimals;
   if (!r.sharePriceRaw) continue;
-  const want = expectedAmountText(r.sharePriceRaw, decimals);
+  const want = expectedSharePriceText(r.sharePriceRaw, decimals);
   if (!r.sharePriceText?.startsWith(want)) priceTextBad.push(`${r.address}: "${r.sharePriceText}" vs "${want}"`);
 }
 check(

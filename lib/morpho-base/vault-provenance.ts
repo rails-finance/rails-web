@@ -465,24 +465,6 @@ export const vaultDirectorySharePriceProv = (c: MorphoVaultCoords): Provenance =
   via: `${LANE} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
 });
 
-/** `curator()` — or, where the vault names none, `owner()` — as an ADDRESS. No
- *  name is attached: nothing on chain attests who holds the role, and the
- *  directory does not infer one from a vault's branding. */
-export const vaultDirectoryStewardProv = (c: MorphoVaultCoords, role: "curator" | "owner" | "none"): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute(role === "curator" ? "MetaMorpho.curator()" : "MetaMorpho.owner()", c),
-  summary:
-    role === "curator"
-      ? `Curator — the vault's \`curator()\`${atBlock(c)}: the address the vault's owner has set to manage its market caps and queue. Stated as an address and only as an address; no name is attached, because nothing on chain says who holds it.`
-      : role === "owner"
-        ? `Owner — the vault's \`owner()\`${atBlock(c)}. Shown because this vault's \`curator()\` is the zero address: it names no curator, and putting the owner under a "Curator" label would attribute a role nobody holds. Stated as an address; no name is attached.`
-        : `No curator and no owner — both \`curator()\` and \`owner()\` answered the zero address${atBlock(c)}: the vault names nobody in either role (ownership renounced). A reading about the vault, stated plainly.`,
-  contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.${role === "none" ? "curator() and MetaMorpho.owner" : role}() @ the pinned block`,
-});
-
 /** How many catalogued vaults in one asset hold something at the block — a
  *  count over the rows' `totalAssets()` reads, and the size of a group. */
 export const vaultDirectoryGroupCountProv = (c: MorphoVaultCoords, n: number): Provenance => ({
@@ -506,17 +488,9 @@ export const vaultDirectoryEmptyCountProv = (c: MorphoVaultCoords, n: number, ca
   formula: "count of catalogued vaults where totalAssets() = 0",
 });
 
-// ── the position census: membership, and only membership ─────────────────────
-// What the roster's Positions column states about ONE vault. Every other figure
-// on this chain's cards rides the shared receipts
-// (lib/aave-vaults/vault-provenance.ts) — the calls are the same calls on
-// either chain, and a second copy of "balanceOf at this block" would be two
-// statements about one read. What is Base's own is the census's ROSTER (the two
-// MetaMorpho factories, not a live enumerator) and its FLOOR (each vault's own
-// creation block, because a fixed window of six million blocks is 139 days on
-// this chain), which is what the builder below says.
-
-const BASE_CENSUS_LANE = "the daily Base vault census (whole-Transfer sweep, Σ balanceOf == totalSupply)";
+// ── the position census ──────────────────────────────────────────────────────
+// The roster rows' Holders figure carries the receipt every family's vault row
+// shares (lib/vaults/row-provenance.ts `vaultHoldersProv`).
 
 /* The listing's own census receipt, and the one that stated the lane's
    `finalized` block beside it, are gone with the drawer that carried them: the
@@ -524,24 +498,3 @@ const BASE_CENSUS_LANE = "the daily Base vault census (whole-Transfer sweep, Σ 
    the section's about page says the rest in words. The `finalized` cut is still
    receipted where it is READ — on a position page's timeline
    (lib/morpho-base/vault-timeline-provenance.ts), beside the rows it decides. */
-
-/** ONE VAULT'S participant count, as the census read it — the roster's Positions
- *  column, and the "no holder yet" a zero prints instead. */
-export const baseVaultCensusVaultProv = (
-  c: MorphoVaultCoords & { censusBlock?: number },
-  counts: { participants: number; liveCount: number; sumMatches: boolean },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.censusBlock },
-  verify: {
-    kind: "recompute",
-    text: `Sweep this vault's whole Transfer stream from its own creation block to block ${c.censusBlock ?? "the census block"}, take the addresses either side of each log, and count the distinct ones`,
-  },
-  summary:
-    counts.participants === 0
-      ? `No address has ever held it — the sweep of this vault's whole \`Transfer\` stream${c.censusBlock != null ? ` to block ${c.censusBlock.toLocaleString("en-US")}` : ""} returned no logs at all. The vault exists: one of the two MetaMorpho factories made it and its creation log names it. Nobody has minted a share of it. That is a reading about the vault, not an absence of data about it — and it is why the listing beside this offers it as no filter option, since a choice that always answers an empty page states nothing.`
-      : `${counts.participants.toLocaleString("en-US")} address${counts.participants === 1 ? " has" : "es have"} held a share of this vault, ${counts.liveCount.toLocaleString("en-US")} of them holding one${c.censusBlock != null ? ` at census block ${c.censusBlock.toLocaleString("en-US")}` : ""} — every address named either side of any \`Transfer\` it has emitted since its own creation block. ${counts.sumMatches ? "Σ `balanceOf` over that set equalled the share token's `totalSupply()` wei-exact at that block, which is what makes the set whole rather than merely long." : "Σ `balanceOf` over that set did NOT equal `totalSupply()` at that block, so this count is not stated as whole."} It is a count at the census block, not at the block the figures beside it were read at.`,
-  contract: vaultContract({ ...c, vaultName: c.vaultName }),
-  via: `${BASE_CENSUS_LANE} · eth_getLogs(Transfer) @ the census block`,
-});

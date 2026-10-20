@@ -45,7 +45,7 @@ import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-
 import { CollSurplusCtx, type CollSurplusState } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { LiquityTroveMetaContext, type LiquityTroveMeta } from "@/components/protocol/liquity/event-prose-render";
-import { UsersGlyph } from "@/components/shared/rate-pill";
+import { UserGlyph } from "@/components/shared/rate-pill";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
 import { PreviousEventContext } from "@/components/protocol/liquity/delegate-run-sheet";
@@ -198,13 +198,13 @@ export function TroveBody({
   const lastEventTs = tl.sortedEvents.length > 0 ? tl.sortedEvents[tl.sortedEvents.length - 1].timestamp : null;
 
   // Delegate-set rate shares the "Interest rate" label with the owner's own
-  // rate change; the people glyph marks it as the delegate's action in the
+  // rate change; the person glyph marks it as the delegate's action in the
   // "Types of event" filter — a decoration `useTimelineEvents`'s generic
   // eventOptions builder has no slot for, so it's layered on here.
   const tlWithGlyph = {
     ...tl,
     eventOptions: tl.eventOptions.map((o) =>
-      o.key === "setBatchManagerAnnualInterestRate" ? { ...o, suffix: <UsersGlyph /> } : o,
+      o.key === "setBatchManagerAnnualInterestRate" ? { ...o, suffix: <UserGlyph /> } : o,
     ),
   };
 

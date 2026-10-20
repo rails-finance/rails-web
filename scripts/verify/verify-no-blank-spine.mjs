@@ -94,7 +94,7 @@ for (const [label, path] of ROUTES.filter(([label]) => label.includes(ROUTE_FILT
         else if (hasSvg) {
           out.glyph++;
           // Which glyph landed, not merely that one did. An ownership handover
-          // must read as the people glyph (delegate), never the generic
+          // must read as the person glyph (delegate), never the generic
           // zero-delta equals sign — the party changing IS the event.
           const label = (card.innerText || "").trim().slice(0, 40).replace(/\s+/g, " ");
           // The timeline head reads "Transferred · to 0x…" since ui-jobs 367.
@@ -124,7 +124,7 @@ for (const [label, path] of ROUTES.filter(([label]) => label.includes(ROUTE_FILT
   for (const h of r.handovers) {
     if (h.isPeople) {
       pass++;
-      console.log(`PASS  ${label}: handover "${h.label}" wears the people glyph, not the equals sign`);
+      console.log(`PASS  ${label}: handover "${h.label}" wears the person glyph, not the equals sign`);
     } else {
       fail++;
       console.log(`FAIL  ${label}: handover "${h.label}" fell through to the generic zero-delta glyph`);

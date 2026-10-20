@@ -53,16 +53,14 @@
 //      are the addresses that book publishes at the pinned commit
 //   2  every row's raw `totalAssets()` (a data attribute) equals this script's
 //      own read at the stated block, wei-exact
-//   3  grouping and order: one section per family, each row inside its own
-//      family's section, rows contiguous by asset, assets ascending by symbol,
-//      and non-increasing raw totals WITHIN one asset (never across two) — that
-//      last one SKIPS out loud when no two funded vaults share an asset, which
-//      is the state of this catalogue today (see B4)
+//   3  grouping and order (ui-jobs 407): one group per funded asset, each
+//      funded row in its own asset's group, raw totals non-increasing inside a
+//      group
 //   4  funded + empty + unread == the roster size, and unread == 0
 //   5  the empty group is collapsed at rest and expands to exactly the stated N
 //      rows, with N this script's own count of zero readings
-//   6  the printed total follows the section's amount rule on the largest row
-//      of each family
+//   6  the printed total follows the listing's compact rule on the largest row
+//      of the three largest groups
 //   7  the share price: every row's raw equals this script's own
 //      `convertToAssets(10 ** decimals)` with the exponent read PER VAULT, the
 //      sample provably spans a 6-decimal and an 18-decimal share token, and the
@@ -78,10 +76,8 @@
 //      on Base at Base's, and none on Sepolia
 //  12  /coverage/ethereum carries the Vaults section linking here;
 //      /coverage/sepolia carries none
-//  13  each family's mechanic, as printed, equals this script's own reads: the
-//      sGHO rate and cap, each stata row's `aToken()`, and each stake token's
-//      cooldown, unstake window and `Umbrella.isReserveSlashable(reserve)` —
-//      with the reserve reached by this script's own `asset()` hops
+//  13  no roster row carries a family mechanic column: the deposit cap, the
+//      wrapped aToken and the cooldown are the vault page's (ui-jobs 407)
 //  14  the citation block: every URL lib/aave-vaults/first-party-sources.ts
 //      lists is rendered as an href and answers 200 (the `aave.com/docs` ones
 //      under `Accept: text/markdown` too), the URL that is not a page is absent,
@@ -264,14 +260,6 @@ const VAULT_ABI = parseAbi([
   "function totalAssets() view returns (uint256)",
   "function convertToAssets(uint256) view returns (uint256)",
 ]);
-const MECH_ABI = parseAbi([
-  "function aToken() view returns (address)",
-  "function getCooldown() view returns (uint256)",
-  "function getUnstakeWindow() view returns (uint256)",
-  "function isReserveSlashable(address) view returns (bool, uint256)",
-  "function targetRate() view returns (uint16)",
-  "function supplyCap() view returns (uint160)",
-]);
 
 let failures = 0;
 let passes = 0;
@@ -288,18 +276,28 @@ const skip = (name, why) => {
 
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-/** The section's AMOUNT rule, restated here from
- *  components/protocol/morpho-base/vault-exposure-parts.tsx so a change to the
+/** The listing's COMPACT rule (2026-10-20, ui-jobs 407: a roster row is the
+ *  shared card's listing surface), restated here from
+ *  lib/shared/format-compact.ts for figures of 0.01 and up, so a change to the
  *  page's rule this script did not agree to goes red. */
-const expectedAmountText = (raw, decimals) => {
-  const value = Number(raw) / Math.pow(10, decimals);
-  const text = value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: decimals <= 6 ? 2 : 6,
-  });
-  return value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? exactUnits(raw, decimals) : text;
+const expectedCompactText = (raw, decimals) => {
+  const v = Number(raw) / Math.pow(10, decimals);
+  const units = [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  const one = (x) => x.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (let i = 0; i < units.length; i++) {
+    const [size, suffix] = units[i];
+    if (v < size) continue;
+    const scaled = Math.round((v / size) * 10) / 10;
+    if (scaled >= 1000 && i > 0) return `${one(v / units[i - 1][0])}${units[i - 1][1]}`;
+    return `${one(scaled)}${suffix}`;
+  }
+  return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-/** The SHARE-PRICE rule, restated from the directory view: the amount rule with
+/** The SHARE-PRICE rule, restated from lib/shared/vault-amount-text.ts: the amount rule with
  *  six places allowed whatever the asset's decimals are, because a share price
  *  is a ratio near one and cents would make every stata row read "1.18". */
 const expectedSharePriceText = (raw, decimals) => {
@@ -311,13 +309,6 @@ const exactUnits = (raw, decimals) => {
   const s = String(raw).padStart(decimals + 1, "0");
   const cut = s.length - decimals;
   return (s.slice(0, cut) + "." + s.slice(cut)).replace(/\.?0+$/, "");
-};
-/** The duration rule, restated from the view. */
-const expectedDuration = (seconds) => {
-  if (seconds % 86400 === 0)
-    return `${(seconds / 86400).toLocaleString("en-US")} ${seconds === 86400 ? "day" : "days"}`;
-  if (seconds % 3600 === 0) return `${(seconds / 3600).toLocaleString("en-US")} ${seconds === 3600 ? "hour" : "hours"}`;
-  return `${seconds.toLocaleString("en-US")} seconds`;
 };
 
 const browser = await chromium.launch();
@@ -441,11 +432,11 @@ const readRows = async () =>
       asset: el.getAttribute("data-asset"),
       raw: el.getAttribute("data-total-assets-raw"),
       sharePriceRaw: el.getAttribute("data-share-price-raw"),
-      familyGroup: el.closest("[data-family-group]")?.getAttribute("data-family-group") ?? null,
+      groupAsset: el.closest("[data-asset-group]")?.getAttribute("data-asset-group") ?? null,
       inEmpty: Boolean(el.closest("[data-empty-rows]")),
       amountText: el.querySelector('[data-cell="total-assets"]')?.textContent?.trim() ?? null,
       sharePriceText: el.querySelector('[data-cell="share-price"]')?.textContent?.trim() ?? null,
-      mechanicText: el.querySelector('[data-cell="mechanic"]')?.textContent?.trim() ?? null,
+      mechanicCells: el.querySelectorAll('[data-cell="mechanic"], [data-cell="family"]').length,
     })),
   );
 const rows = await readRows();
@@ -545,75 +536,47 @@ check(
 );
 
 // ── 3: grouping and order ───────────────────────────────────────────────────
-const familySections = await page
-  .locator("[data-family-group]")
-  .evaluateAll((els) => els.map((e) => e.getAttribute("data-family-group")));
-const chainFamilies = [...new Set(CHAIN_ROSTER.map((r) => r.family))];
-check(
-  "3a one section per family the chain's roster contains, and no other",
-  chainFamilies.every((f) => familySections.includes(f)) && familySections.length === chainFamilies.length,
-  `sections ${JSON.stringify(familySections)}, chain families ${JSON.stringify(chainFamilies)}`,
-);
+// 2026-10-20 (ui-jobs 407, V1): every vault roster groups by asset, so this
+// one does too, and the family moved to a facet and a pill on the row. The
+// assertions are the Base roster's 3a–3c, against this script's own reads (1c
+// holds each row's family to the chain's).
 const funded = rows.filter((r) => r.group === "funded");
-const misplaced = funded.filter((r) => r.familyGroup !== CHAIN_FAMILY.get(r.address));
+const groupAssets = await page
+  .locator("[data-roster-panel] [data-asset-group]")
+  .evaluateAll((els) => els.map((e) => e.getAttribute("data-asset-group")));
+const ownFundedAssets = [
+  ...new Set(
+    CHAIN_ROSTER.filter((r) => BigInt(OWN.get(r.address)?.totalAssets ?? 0) > 0n).map((r) => OWN.get(r.address).asset),
+  ),
+];
 check(
-  "3b every funded row sits in the section of the family the chain puts it in",
+  "3a one group per asset among the funded vaults, by this script's own reads, and no other",
+  ownFundedAssets.every((a) => groupAssets.includes(a)) && groupAssets.length === ownFundedAssets.length,
+  `${groupAssets.length} groups on the page, ${ownFundedAssets.length} funded assets read`,
+);
+const misplaced = funded.filter((r) => r.groupAsset !== OWN.get(r.address)?.asset);
+check(
+  "3b every funded row sits in the group of its own asset()",
   misplaced.length === 0,
   misplaced
     .slice(0, 3)
-    .map((r) => `${short(r.address)} in ${r.familyGroup}`)
+    .map((r) => `${short(r.address)} in ${r.groupAsset}`)
     .join("; ") || `${funded.length} funded rows placed`,
 );
 let disorder = 0;
-let assetBreaks = 0;
 let comparablePairs = 0;
-for (const family of familySections) {
-  const inGroup = funded.filter((r) => r.familyGroup === family);
-  const seen = new Set();
-  let prevAsset = null;
-  for (let i = 0; i < inGroup.length; i++) {
-    const a = inGroup[i].asset;
-    if (a !== prevAsset) {
-      // A new asset must not be one already left behind (rows of one asset are
-      // contiguous), and its symbol must sort after the previous asset's.
-      if (seen.has(a)) assetBreaks++;
-      if (prevAsset && (ASSET.get(a)?.symbol ?? "").localeCompare(ASSET.get(prevAsset)?.symbol ?? "", "en-US") < 0)
-        assetBreaks++;
-      seen.add(a);
-      prevAsset = a;
-      continue;
-    }
-    // Two funded rows of the SAME asset, in one family — the only pair the size
-    // rule can be exercised on. Counted, because a run with none of them proves
-    // nothing about the rule (see 3d).
+for (const asset of groupAssets) {
+  const inGroup = funded.filter((r) => r.groupAsset === asset);
+  for (let i = 1; i < inGroup.length; i++) {
     comparablePairs++;
     if (BigInt(inGroup[i].raw) > BigInt(inGroup[i - 1].raw)) disorder++;
   }
 }
 check(
-  "3c inside a family, rows are contiguous by asset and ascending by asset symbol (this script's own symbol reads)",
-  assetBreaks === 0,
-  `${assetBreaks} breaks across ${familySections.length} families`,
+  "3c inside every group the totals are non-increasing (largest first)",
+  disorder === 0,
+  `${disorder} out-of-order pairs across ${comparablePairs} pairs in ${groupAssets.length} groups`,
 );
-// 🔑 VACUITY GUARD. Aave's catalogue has at most one funded vault per asset per
-// family today — the stata factory allows one wrapper per underlying, each stake
-// token holds a different wrapper, and sGHO is alone — so there is usually NO
-// pair this rule can be exercised on, and a green "0 out-of-order pairs" would
-// say nothing whatever about the comparator. Proved: reversing the comparator in
-// the view left this check green (break B4). So it SKIPS out loud when it has no
-// pair rather than passing.
-if (comparablePairs === 0) {
-  skip(
-    "3d within ONE asset the totals are non-increasing",
-    "no family holds two funded vaults of the same asset at this block — the size rule has no pair to order, and a pass would be vacuous",
-  );
-} else {
-  check(
-    "3d within ONE asset the totals are non-increasing — and two assets are never ordered against each other",
-    disorder === 0,
-    `${disorder} out-of-order pairs across ${comparablePairs} same-asset pairs`,
-  );
-}
 
 // ── 4: the three kinds of row add up ────────────────────────────────────────
 const emptyRows = rows.filter((r) => r.group === "empty");
@@ -643,21 +606,20 @@ check(
   `stated ${statedEmpty}, drawn ${emptyRows.length}, own ${ownEmpty}`,
 );
 
-// ── 6: the print rule on the largest row of each family ─────────────────────
+// ── 6: the print rule on the largest row of the three largest groups ────────
 const printBad = [];
-for (const family of familySections) {
-  const inGroup = funded.filter((r) => r.familyGroup === family);
-  const top = inGroup.reduce((a, b) => (a && BigInt(a.raw) >= BigInt(b.raw) ? a : b), null);
+const sampleGroups = groupAssets.slice(0, 3);
+for (const asset of sampleGroups) {
+  const top = funded.find((r) => r.groupAsset === asset);
   if (!top) continue;
   const decimals = ASSET.get(OWN.get(top.address).asset)?.decimals;
-  const want = expectedAmountText(OWN.get(top.address).totalAssets, Number(decimals));
-  if (!top.amountText?.startsWith(want))
-    printBad.push(`${family} ${short(top.address)}: "${top.amountText}" vs "${want}"`);
+  const want = expectedCompactText(OWN.get(top.address).totalAssets, Number(decimals));
+  if (!top.amountText?.startsWith(want)) printBad.push(`${short(top.address)}: "${top.amountText}" vs "${want}"`);
 }
 check(
-  "6  the largest row of every family prints its total by the section's amount rule",
-  printBad.length === 0 && familySections.length > 0,
-  printBad.join("; ") || `${familySections.length} families sampled`,
+  "6  the largest row of the three largest groups prints its total by the listing's compact rule",
+  printBad.length === 0 && sampleGroups.length > 0,
+  printBad.join("; ") || `${sampleGroups.length} groups sampled`,
 );
 
 // ── 7: the share price, and the decimals trap it exists for ─────────────────
@@ -741,7 +703,7 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
 
 // ── 11: the chain switcher ──────────────────────────────────────────────────
 // The drawn one: the bar keeps a hidden copy below `md` (ui-jobs 68).
-await page.locator('button[aria-label="Switch blockchain"]:visible').click();
+await page.locator('button[aria-label$="switch blockchain"]:visible').click();
 await page.waitForSelector("[role='menu']");
 // The chains the panel OFFERS, read off the panel rather than listed here: it
 // shows the launched chains (`launchedChains()`), so a hardcoded list here
@@ -832,95 +794,16 @@ check(
   retiredStatuses.join(", "),
 );
 
-// ── 13: each family's mechanic, against this script's own reads ─────────────
+// ── 13: the family columns left the row ─────────────────────────────────────
+// 2026-10-20 (ui-jobs 407, V1): the deposit cap, the wrapped aToken and the
+// cooldown and slashing state are the vault page's (verify-ethereum-vault-page
+// .mjs sections 3–5 hold them to the chain); the roster row carries none.
 await openRoster();
-const mechRows = (await readRows()).filter((r) => r.mechanicText != null);
-// sGHO: the rate is in the family line, the cap in the row's mechanic cell.
-const sghoRow = mechRows.find((r) => r.address === SGHO);
-const sghoMech = await client.multicall({
-  contracts: [
-    { address: SGHO, abi: MECH_ABI, functionName: "targetRate" },
-    { address: SGHO, abi: MECH_ABI, functionName: "supplyCap" },
-  ],
-  allowFailure: false,
-  batchSize: 0,
-  blockNumber,
-});
-const sghoLineEl = page.locator('[data-family-mechanic="sgho"]');
-// A missing section is a FAILURE of 13a, never an exception: an unguarded
-// locator would abort the run here and hide 13b and 13c behind it (the P5
-// lesson in verify-base-vault-directory.mjs).
-const sghoLine = (await sghoLineEl.count()) > 0 ? (await sghoLineEl.innerText()).replace(/\s+/g, " ") : "";
-const wantRate = `${Number(sghoMech[0]).toLocaleString("en-US")} basis points`;
-const wantCap = expectedAmountText(sghoMech[1], Number(ASSET.get(OWN.get(SGHO).asset)?.decimals));
+const withMechanic = (await readRows()).filter((r) => r.mechanicCells > 0);
 check(
-  "13a the sGHO family line states this script's own targetRate(), and the row its own supplyCap()",
-  sghoLine.includes(wantRate) && Boolean(sghoRow?.mechanicText?.startsWith(wantCap)),
-  `line wants "${wantRate}" (${sghoLine.includes(wantRate)}), cell "${sghoRow?.mechanicText}" wants "${wantCap}"`,
-);
-// stata: every row's printed aToken is that wrapper's own aToken().
-const aTokens = await client.multicall({
-  contracts: stata.map((a) => ({ address: a, abi: MECH_ABI, functionName: "aToken" })),
-  allowFailure: true,
-  batchSize: 0,
-  blockNumber,
-});
-const aBad = [];
-stata.forEach((a, i) => {
-  const row = mechRows.find((r) => r.address === a);
-  if (!row) return; // an empty stata row has no mechanic cell — 5b counts those
-  const mine = aTokens[i].status === "success" ? aTokens[i].result.toLowerCase() : null;
-  if (!mine) return aBad.push(`${short(a)}: own aToken() did not answer`);
-  if (row.mechanicText !== short(mine)) aBad.push(`${short(a)}: page "${row.mechanicText}" vs own ${short(mine)}`);
-});
-check(
-  "13b every static aToken row names the aToken this script's own aToken() call returns",
-  aBad.length === 0,
-  aBad.slice(0, 3).join("; ") || `${stata.filter((a) => mechRows.some((r) => r.address === a)).length} rows compared`,
-);
-// umbrella: cooldown, unstake window, the reserve reached by this script's own
-// asset() hops, and Umbrella's own answer about that reserve.
-const stakeMech = await client.multicall({
-  contracts: stake.flatMap((s) => [
-    { address: s, abi: MECH_ABI, functionName: "getCooldown" },
-    { address: s, abi: MECH_ABI, functionName: "getUnstakeWindow" },
-  ]),
-  allowFailure: false,
-  batchSize: 0,
-  blockNumber,
-});
-const reserves = stake.map((s) => {
-  const asset = OWN.get(s).asset;
-  return OWN.has(asset) && OWN.get(asset).family === "stata" ? OWN.get(asset).asset : asset;
-});
-const slashable = await client.multicall({
-  contracts: reserves.map((r) => ({
-    address: CATALOG.umbrella,
-    abi: MECH_ABI,
-    functionName: "isReserveSlashable",
-    args: [r],
-  })),
-  allowFailure: false,
-  batchSize: 0,
-  blockNumber,
-});
-const stakeBad = [];
-stake.forEach((s, i) => {
-  const row = mechRows.find((r) => r.address === s);
-  if (!row) return stakeBad.push(`${short(s)}: no row`);
-  const text = row.mechanicText.replace(/\s+/g, " ");
-  const wantCooldown = `${expectedDuration(Number(stakeMech[i * 2]))}, then ${expectedDuration(Number(stakeMech[i * 2 + 1]))} to redeem`;
-  const wantReserve = `covers ${ASSET.get(reserves[i])?.symbol}`;
-  const wantSlash = slashable[i][0] ? "a deficit is outstanding" : "no deficit outstanding";
-  if (!text.includes(wantCooldown) || !text.includes(wantReserve) || !text.includes(wantSlash))
-    stakeBad.push(
-      `${short(s)}: "${text}" wants "${wantCooldown}" + "${wantReserve}" + "${wantSlash}" (own ${stakeMech[i * 2]}s / ${stakeMech[i * 2 + 1]}s)`,
-    );
-});
-check(
-  "13c every stake token states this script's own cooldown, unstake window, reserve hop and slashable answer",
-  stakeBad.length === 0 && stake.length > 0,
-  stakeBad.slice(0, 2).join("; ") || `${stake.length} stake tokens compared`,
+  "13 no roster row carries a family mechanic column",
+  withMechanic.length === 0,
+  withMechanic.length ? `${withMechanic.length} rows, e.g. ${short(withMechanic[0].address)}` : "none",
 );
 
 // ── 14: the citation block — Aave's own pages, and what it may not be ───────
@@ -990,6 +873,8 @@ check(
 );
 
 await openRoster();
+// The citation block is in the roster's intro drawer (ui-jobs 407): open it.
+await page.locator('button[aria-controls="vault-roster-intro"]').click();
 const citation = page.locator("[data-first-party-sources]");
 const citationDrawn = (await citation.count()) === 1;
 const citedHrefs = citationDrawn
@@ -1052,7 +937,9 @@ const missingClause = wantClauses.filter((c) => !citationText.includes(c));
 check(
   "14e the block states both facts — that a holder here is the holder's own address and no row names an app, and that Aave's surfaces carry no per-address route",
   citationDrawn && missingClause.length === 0,
-  missingClause.length ? `missing "${missingClause.join('", "')}"` : `${wantClauses.length} clauses on the face`,
+  missingClause.length
+    ? `missing "${missingClause.join('", "')}"`
+    : `${wantClauses.length} clauses in the intro drawer`,
 );
 
 // The block is a citation. A tile inside it, or an app's name inside it, would

@@ -69,7 +69,8 @@ import {
   shareText,
   shortAddress,
 } from "@/components/protocol/morpho-base/vault-exposure-parts";
-import { durationText, sharePriceText, signedText, utcInstant } from "@/components/vaults/aave-vault-format";
+import { durationText, signedText, utcInstant } from "@/components/vaults/aave-vault-format";
+import { sharePriceText } from "@/lib/shared/vault-amount-text";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import {

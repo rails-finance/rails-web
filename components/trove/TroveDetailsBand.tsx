@@ -34,7 +34,7 @@ interface TroveDetailsBandProps {
  * (`Debt in front: 2.7M BOLD 41`). Each leads with its label; the footnote
  * directly below spells both out in plain language, so the card carries only
  * the glanceable figures. The delegate fee rides on inline with the cost
- * figure as a bare percentage + pink people glyph — the name and its BOLD/day
+ * figure as a bare percentage + pink person glyph — the name and its BOLD/day
  * cost live in the footnote; the peak-collateral and debt-breakdown columns
  * this band used to carry were dropped because the economics chart shows
  * them.

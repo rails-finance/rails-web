@@ -30,6 +30,24 @@ export const assetText = (a: RawAmount, decimals: number) => {
   return a.value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? formatUnitsExact(a.raw, decimals) : text;
 };
 
+/** A SHARE PRICE, which is not an amount and does not print like one — the
+ *  rule every family's share price prints through (moved here from
+ *  components/vaults/aave-vault-format.ts, ui-jobs 407).
+ *
+ *  `assetText` keys on the asset's own decimals — two places for a 6-decimal
+ *  asset, because that is what a payment in it can express. A share price is a
+ *  ratio-shaped quantity that sits near one: printed to two places, every
+ *  static aToken would read "1.17" or "1.18" and two vaults with different
+ *  prices would be indistinguishable. So the rule is the amount rule with six
+ *  places allowed whatever the asset is — `convertToAssets(10^6)` answering
+ *  1,184,649 is exactly 1.184649 USDC, invented precision nowhere — and a
+ *  non-zero figure that would still round to nothing is printed exactly from
+ *  its raw units. */
+export const sharePriceText = (a: RawAmount, decimals: number) => {
+  const text = a.value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  return a.value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? formatUnitsExact(a.raw, decimals) : text;
+};
+
 /** A share count, to six decimals. The same rule as `assetText`: a balance that
  *  would print as "0" is printed exactly instead. Keyed on the magnitude, not on
  *  the holder's fraction of the vault — the sole holder of a 1-wei vault holds
