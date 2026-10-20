@@ -5,17 +5,14 @@
 // does the filter / sort / offset over mv_compound_v3_positions. Dimensions carry a
 // `param` (for the shareable URL) but no in-memory `matches` — the backend filters.
 //
-// Every facet here ships LIVE — rails-server + the proxy honor all of these params
-// (verified by count: status open/closed/liquidated and hasDebt/noDebt/market each
-// partition the set):
+// Facets:
 //   • Status  — open / closed / liquidated (lifecycle).
 //   • Market  — cUSDCv3 / cWETHv3 / cUSDTv3 (Comet's fixed, known market set).
 //   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
 //     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
 //     replaces the old Position dropdown: its `?state=borrowing` reads as at
-//     least $1 and `?state=supply-only` as $0. Those two exact ranges also send
-//     the old hasDebt / noDebt flags (signed base < 0 / ≥ 0), which say the same
-//     thing to a server that predates the USD bounds.
+//     least $1 and `?state=supply-only` as $0. Only the USD bounds are sent:
+//     the old hasDebt / noDebt flags name a column the live view no longer has.
 //   • History — Liquidated before.
 //   • Transactions — a range over the position's transaction count (`minTx` /
 //     `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
@@ -174,9 +171,6 @@ export function compoundFiltersToFetchParams(filters: CompoundListFilters, page:
     market: filters.market[0] || undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    // The old Position dropdown's flags, for the two Debt ranges it maps to.
-    hasDebt: filters.debt[0] === "1-" ? true : undefined,
-    noDebt: filters.debt[0] === "-0" ? true : undefined,
     ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
     ...transactionBounds(filters.tx),

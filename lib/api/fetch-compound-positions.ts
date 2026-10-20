@@ -21,10 +21,6 @@ export interface FetchCompoundPositionsParams {
   market?: string;
   /** wallet address — restrict to one account. */
   wallet?: string;
-  /** borrowing positions (signed base < 0). */
-  hasDebt?: boolean;
-  /** non-borrowing positions (signed base ≥ 0). */
-  noDebt?: boolean;
   hasLiquidations?: boolean;
   /** Inclusive bounds on the position's transaction count; either alone. */
   minTx?: number;
@@ -61,8 +57,6 @@ export async function fetchCompoundPositions(p: FetchCompoundPositionsParams): P
   const qs = new URLSearchParams();
   if (p.market) qs.set("market", p.market);
   if (p.wallet) qs.set("wallet", p.wallet);
-  if (p.hasDebt) qs.set("hasDebt", "true");
-  if (p.noDebt) qs.set("noDebt", "true");
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
   for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
     if (p[k] != null) qs.set(k, String(p[k]));
