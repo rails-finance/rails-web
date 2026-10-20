@@ -153,13 +153,13 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
 
   return (
     <ChainTruthListingPage<PolarisPositionSummary, PolarisListFilters, PolarisUsdValuation | null>
-      title="Polaris CDPs"
-      noun="CDPs"
+      title="Polaris positions"
+      noun="Positions"
       basePath={POLARIS_BASE_PATH}
       bookmarksProtocol="polaris"
       defaults={POLARIS_LIST_DEFAULTS}
       sortOptions={polarisSortOptions}
-      searchPlaceholder="Address, ENS, or CDP number"
+      searchPlaceholder="Address, ENS, or position number"
       renderCard={(p) => <PolarisPositionCard v={viewFromSummary(p, markets, !marketsSettled)} surface="listing" />}
       hrefFor={(p) => polarisPositionHref(p.market, p.cdpId)}
       keyFor={(p) => `${p.market}:${p.cdpId}`}

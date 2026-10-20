@@ -543,7 +543,7 @@ const SPECS: ProtocolSpec[] = [
     chainId: 11155111,
     slug: "polaris",
     tags: ["CDP", "Stablecoin"],
-    desc: "Polaris's Sepolia testnet — USDp and GOLDp minted against pETH, every CDP replayed from the market's own events, liquidations absorbed by the stability pools",
+    desc: "Polaris's Sepolia testnet — USDp and GOLDp minted against pETH, every position replayed from the market's own events, liquidations absorbed by the stability pools",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -793,9 +793,9 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   fluid: "Position",
   frankencoin: "Position",
   llamalend: "Position",
-  // Polaris's own noun: the position is a CDP NFT, and the protocol's
-  // getters, events and analytics all say "CDP".
-  polaris: "CDP",
+  // Polaris calls the position a CDP; the page says position and teaches the
+  // acronym once (rails-ops TO-DO-ui-jobs 405).
+  polaris: "Position",
   // A holder address of sUSDS (rails-ops TO-DO-sky-savings-scoping §1).
   "sky-savings": "Position",
 };

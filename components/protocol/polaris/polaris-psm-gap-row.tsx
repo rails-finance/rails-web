@@ -48,7 +48,7 @@ export function PolarisPsmGapRow({ note, isLast = false }: { note: PsmGapNote; i
   // A run of touches' row sums its members' shares (ui-jobs 404).
   const sumProv = (side: "coll" | "debt"): Provenance => ({
     kind: "derived",
-    summary: `${side === "coll" ? "Collateral" : "Debt"} share over the run — the sum of the ${side === "coll" ? "pETH" : stable} each touch in it wrote as the CDP's PSM share (${side === "coll" ? "_mintRedeemCollGain" : "_mintRedeemDebtGain"}).`,
+    summary: `${side === "coll" ? "Collateral" : "Debt"} share over the run — the sum of the ${side === "coll" ? "pETH" : stable} each touch in it wrote as the position's PSM share (${side === "coll" ? "_mintRedeemCollGain" : "_mintRedeemDebtGain"}).`,
     formula: `Σ ${side === "coll" ? "_mintRedeemCollGain" : "_mintRedeemDebtGain"}`,
     inputs: (note.members ?? []).map((g) => ({
       label: `touch at block ${g.to.block.toLocaleString("en-US")}`,

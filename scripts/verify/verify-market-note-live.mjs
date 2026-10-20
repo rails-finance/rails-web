@@ -268,7 +268,7 @@ check(
 );
 check(
   "9c. the export's Market notes section carries the rate live sentence",
-  /Since this CDP.s adjustment at block 11,610,231 the USDp market.s primary rate has moved/.test(md8),
+  /Since this position.s adjustment at block 11,610,231 the USDp market.s primary rate has moved/.test(md8),
 );
 const tableRows = (md) => (md.match(/^\| \d+ \| /gm) ?? []).length;
 const usdp8Timeline = await api("/api/polaris/timeline?market=usdp&id=8");

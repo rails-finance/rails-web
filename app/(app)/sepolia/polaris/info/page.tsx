@@ -17,7 +17,7 @@ const LINK = "text-blue-500 hover:underline";
 const intro = (
   <>
     <p>
-      Every Polaris CDP on Sepolia, with its history. A CDP is a loan: pETH locked as collateral, a stablecoin borrowed
+      Every Polaris position on Sepolia, with its history. A position is a loan: pETH locked as collateral, a stablecoin borrowed
       against it. All numbers are test numbers, not money. Reserve loans and Stability Pool deposits are not shown yet.
     </p>
 
@@ -37,28 +37,28 @@ const intro = (
       </li>
       <li>
         The PSM is the peg module: anyone can mint USDp or GOLDp directly against pETH, or redeem them for pETH. Nobody
-        picks a CDP, so every open CDP takes a share.
+        picks a position, so every open position takes a share.
       </li>
-      <li>A CDP is an NFT, so it can change hands without being closed.</li>
+      <li>A position is an NFT, so it can change hands without being closed.</li>
       <li>
-        A CDP also moves without its holder doing anything: interest is added to the debt, stability gains are credited
+        A position also moves without its holder doing anything: interest is added to the debt, stability gains are credited
         against it, reward pETH is added to the collateral, and PSM activity applies its share.
       </li>
     </ul>
 
     <h2 className={H}>Listing</h2>
     <ul className={UL}>
-      <li>One row per CDP: pETH collateral, debt, and current holder.</li>
+      <li>One row per position: pETH collateral, debt, and current holder.</li>
       <li>
-        Search by wallet or ENS name to see the CDPs that address holds on Sepolia. Names resolve on Ethereum mainnet,
+        Search by wallet or ENS name to see the positions that address holds on Sepolia. Names resolve on Ethereum mainnet,
         since Sepolia has no name registry this site reads.
       </li>
     </ul>
 
-    <h2 className={H}>CDP page</h2>
+    <h2 className={H}>Position page</h2>
     <ul className={UL}>
       <li>
-        Opening a CDP shows every touch the market&apos;s contracts recorded. Each shows what the holder moved, plus
+        Opening a position shows every touch the market&apos;s contracts recorded. Each shows what the holder moved, plus
         everything the protocol applied at the same moment: interest, stability gains, reward pETH and the PSM share.
       </li>
       <li>

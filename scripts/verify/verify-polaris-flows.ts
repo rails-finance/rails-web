@@ -566,7 +566,7 @@ test("a redistribution takes separate lines, on the liquidated CDP and on a rece
   assert.ok(near(total(rp, PF.debtLiquidated) + total(rp, PF.debtRedistOut), total(before, PF.debtLiquidated), 1e-12));
   const m1 = linesAdd(passed, "liquidated");
   const labels1 = m1.buckets.map((b) => b.label);
-  assert.equal(labels1.filter((l) => l === "Redistributed to other CDPs").length, 2, "a line on each side");
+  assert.equal(labels1.filter((l) => l === "Redistributed to other positions").length, 2, "a line on each side");
 
   // A receiving CDP: 1.5 pETH and 300 USDp arrive at its 20th touch.
   const host = fx("open-interest");

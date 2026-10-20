@@ -34,7 +34,7 @@ export function polarisPsmOutcomeSentence(
   const todayEffect = pethInDebt != null ? (polarisPsmOutcomeAtFeed(lifetime, pethInDebt)?.value ?? null) : null;
 
   let s =
-    `The net PSM shares, valued at the feed at each settling block, changed the CDP's equity by ` +
+    `The net PSM shares, valued at the feed at each settling block, changed the position's equity by ` +
     `${signedText(lifetime.psmEffectAtSettle, stable)}`;
   if (todayEffect != null) {
     s += `; at the latest block's feed price the same legs come to ${signedText(todayEffect, stable)}`;
@@ -64,7 +64,7 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
   const effectProv: Provenance = {
     kind: "derived",
     summary:
-      "The net PSM shares' effect on this CDP's equity — valued at the feed at the end of the block each share settled onto this CDP at its own touch, never the price the PSM's own mints or redemptions used (the share accrued between touches at a different price, and the settling block's own feed is what this CDP's equity is judged against). Each row's share is the net of every mint and redemption since the previous touch; its effect is the pETH it added or took × that feed, minus the debt it added or cleared.",
+      "The net PSM shares' effect on this position's equity — valued at the feed at the end of the block each share settled onto this position at its own touch, never the price the PSM's own mints or redemptions used (the share accrued between touches at a different price, and the settling block's own feed is what this position's equity is judged against). Each row's share is the net of every mint and redemption since the previous touch; its effect is the pETH it added or took × that feed, minus the debt it added or cleared.",
     formula: "Σ (mintRedeemCollGain × priceAtBlock − mintRedeemDebtGain)",
     inputs: [
       {
@@ -133,7 +133,7 @@ export function polarisPsmOutcomeAtFeedProv(
   if (!at) return null;
   return {
     kind: "chain-derived",
-    summary: `The same PSM legs at the latest block's feed price — the net pETH the PSM's shares moved over the CDP's life, priced at the pETH/${stable} feed, minus the net debt they moved.`,
+    summary: `The same PSM legs at the latest block's feed price — the net pETH the PSM's shares moved over the position's life, priced at the pETH/${stable} feed, minus the net debt they moved.`,
     formula: "(collFromPsm − collToPsm) × pethInDebt − (debtFromPsm − debtToPsm)",
     inputs: [
       { label: "pETH from PSM mints", value: formatExact(lifetime.collFromPsm), kind: "derived", note: "collFromPsm" },

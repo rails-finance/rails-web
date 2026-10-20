@@ -11,7 +11,7 @@
 //      redemption at block 11,637,899 (event 21) and usdp CDP 22's PSM-only
 //      touch at block 11,670,597: the row HEAD carries no "PSM share" label,
 //      no net and neither leg, and it opens on the holder's own act as a
-//      past participle ("Borrowed", "Added collateral", "Touched CDP"); the opened card's sheet carries two "PSM share"
+//      past participle ("Borrowed", "Added collateral", "Touched position"); the opened card's sheet carries two "PSM share"
 //      rows with the route's two legs, each signed; the explanation states
 //      the legs netted at the route's own price at block,
 //      mintRedeemCollGain × pethInDebt − mintRedeemDebtGain, in the debt unit,
@@ -162,7 +162,7 @@ const FIXTURES = [
   // while its sheet read −108,803.567 (ui-jobs 357 point 1).
   { cdp: "9", block: 11637899, holderVerb: "Added collateral" },
   // A touch whose only content was a PSM share: the head reads the docs' touch.
-  { cdp: "22", block: 11670597, holderVerb: "Touched CDP" },
+  { cdp: "22", block: 11670597, holderVerb: "Touched position" },
 ];
 
 // The pETH leg reads to four decimals (lib/polaris/figure-format.ts), the debt to three.
@@ -175,7 +175,7 @@ const sheetSigned = (v, fig) => `${v < 0 ? "−" : ""}${fig}`;
 function expectedProse(e) {
   const price = e.context?.data?.priceAtBlock?.pethInDebt;
   if (price == null)
-    return { net: null, text: `moved ${signedPeth(mrColl(e))} pETH and ${signedFig(mrDebt(e))} USDp through this CDP` };
+    return { net: null, text: `moved ${signedPeth(mrColl(e))} pETH and ${signedFig(mrDebt(e))} USDp through this position` };
   const net = mrColl(e) * price - mrDebt(e);
   return {
     net,

@@ -72,7 +72,7 @@ placeholders:
   escrow:
     rounding: units4
     means: |-
-      the fixed gas compensation a CDP escrows at its open
+      the fixed gas compensation a position escrows at its open
   legs:
     rounding: text
     means: |-
@@ -88,7 +88,7 @@ placeholders:
   from_addr:
     rounding: address
     means: |-
-      the address that held the CDP before a transfer
+      the address that held the position before a transfer
   to_addr:
     rounding: address
     means: |-
@@ -113,11 +113,11 @@ placeholders:
   coll:
     rounding: token
     means: |-
-      the pETH the CDP holds now
+      the pETH the position holds now
   debt:
     rounding: token
     means: |-
-      the debt the CDP owes now
+      the debt the position owes now
   price:
     rounding: token
     means: |-
@@ -133,7 +133,7 @@ placeholders:
   drop:
     rounding: pct_whole
     means: |-
-      how far pETH's price can fall before the CDP reaches the minimum
+      how far pETH's price can fall before the position reaches the minimum
   defensive:
     rounding: pct_whole
     means: |-
@@ -149,11 +149,11 @@ placeholders:
   transfers:
     rounding: count
     means: |-
-      the transfers of the CDP's NFT since it opened
+      the transfers of the position's NFT since it opened
   deposited:
     rounding: token
     means: |-
-      the pETH the holder deposited over the CDP's life
+      the pETH the holder deposited over the position's life
   withdrawn:
     rounding: token
     means: |-
@@ -181,19 +181,19 @@ placeholders:
   psm_coll_in:
     rounding: token
     means: |-
-      the pETH the CDP's PSM shares added to its collateral over its life
+      the pETH the position's PSM shares added to its collateral over its life
   psm_debt_in:
     rounding: token
     means: |-
-      the stablecoin the CDP's PSM shares added to its debt over its life
+      the stablecoin the position's PSM shares added to its debt over its life
   psm_coll_out:
     rounding: token
     means: |-
-      the pETH the CDP's PSM shares removed from its collateral over its life
+      the pETH the position's PSM shares removed from its collateral over its life
   psm_debt_out:
     rounding: token
     means: |-
-      the stablecoin the CDP's PSM shares removed from its debt over its life
+      the stablecoin the position's PSM shares removed from its debt over its life
   psm_coll:
     rounding: units4_signed
     means: |-
@@ -237,9 +237,9 @@ words:
   t1_sep: |-
     ·
   t1_opened: |-
-    Opened CDP
+    Opened position
   t1_closed: |-
-    Closed CDP
+    Closed position
   t1_added_coll: |-
     Added collateral
   t1_withdrew_coll: |-
@@ -249,7 +249,7 @@ words:
   t1_repaid: |-
     Repaid
   t1_touched: |-
-    Touched CDP
+    Touched position
   t1_liquidated: |-
     Liquidated
   t1_claimable: |-
@@ -345,7 +345,7 @@ words:
   sheet_liq_coll_pool: |-
     Of which to the stability pool
   sheet_liq_coll_redistributed: |-
-    Of which redistributed to other CDPs
+    Of which redistributed to other positions
   sheet_liq_coll_liquidator: |-
     Of which to the liquidator (0.5%)
   sheet_liq_coll_surplus: |-
@@ -378,23 +378,23 @@ words:
     Liquidation penalty, stability pool
   # The sheet's read-more, one per row: what the figure is and where it is read.
   tip_coll_last: |-
-    The CDP's pETH after its previous event, from the CDPManager's log, in dollars at that event's pETH price.
+    The position's pETH after its previous event, from the CDPManager's log, in dollars at that event's pETH price.
   tip_coll_market: |-
-    The change the pETH price made to the dollar value of the CDP's pETH between its previous event and this one.
+    The change the pETH price made to the dollar value of the position's pETH between its previous event and this one.
   tip_coll_before: |-
-    The CDP's pETH just before this event: what the previous event left, at this block's pETH price.
+    The position's pETH just before this event: what the previous event left, at this block's pETH price.
   tip_coll_event: |-
     The pETH the holder moved at this event, from the CDPManager's log, at this block's pETH price.
   tip_coll_liquidated: |-
-    The pETH the liquidation took from the CDP, from the CDPManager's log. What it left over the debt's value, less the penalty, is the holder's to claim.
+    The pETH the liquidation took from the position, from the CDPManager's log. What it left over the debt's value, less the penalty, is the holder's to claim.
   tip_coll_reward: |-
-    The reward pETH the CDP's share of the bonding curve's rewards added to its collateral at this event, from the CDPManager's log.
+    The reward pETH the position's share of the bonding curve's rewards added to its collateral at this event, from the CDPManager's log.
   tip_coll_psm: |-
-    This touch wrote the CDP's share of the pETH the market's PSM moved since the previous event, from the CDPManager's log; the row beneath it sets out the gap.
+    This touch wrote the position's share of the pETH the market's PSM moved since the previous event, from the CDPManager's log; the row beneath it sets out the gap.
   tip_coll_total: |-
-    The CDP's pETH after this event, from the CDPManager's log, in dollars at this block's pETH price.
+    The position's pETH after this event, from the CDPManager's log, in dollars at this block's pETH price.
   tip_debt_last: |-
-    The CDP's debt after its previous event, from the CDPManager's log, in dollars at the stablecoin's price then.
+    The position's debt after its previous event, from the CDPManager's log, in dollars at the stablecoin's price then.
   tip_debt_market: |-
     The change the stablecoin's dollar price made to the debt's value between the previous event and this one. A USDp is $1 at every block; a GOLDp follows XAU/USD.
   tip_debt_interest: |-
@@ -406,15 +406,15 @@ words:
   tip_debt_event: |-
     The stablecoin the holder borrowed or repaid at this event, from the CDPManager's log.
   tip_debt_liquidated: |-
-    The debt the liquidation cleared from the CDP, from the CDPManager's log.
+    The debt the liquidation cleared from the position, from the CDPManager's log.
   tip_debt_gain: |-
-    The CDP's share of the market's revenue, credited against the debt at this event, from the CDPManager's log.
+    The position's share of the market's revenue, credited against the debt at this event, from the CDPManager's log.
   tip_debt_psm: |-
-    This touch wrote the CDP's share of the debt the market's PSM moved since the previous event, from the CDPManager's log; the row beneath it sets out the gap.
+    This touch wrote the position's share of the debt the market's PSM moved since the previous event, from the CDPManager's log; the row beneath it sets out the gap.
   tip_debt_settled: |-
     The stablecoin added so the debt lands on zero when the gains and the PSM share clear more than was owed, from the CDPManager's log.
   tip_debt_total: |-
-    The CDP's debt after this event, from the CDPManager's log, in dollars at the stablecoin's price at this block.
+    The position's debt after this event, from the CDPManager's log, in dollars at the stablecoin's price at this block.
   tip_cr: |-
     The collateral's value divided by the debt after this event, both in the market's stablecoin, at the market's pETH price at this block.
   tip_cr_liquidated: |-
@@ -422,7 +422,7 @@ words:
   tip_liq_coll_pool: |-
     The seized pETH the stability pool received: the seizure less the liquidator's share and the owner's surplus, from the CDPManager's log.
   tip_liq_coll_redistributed: |-
-    The seized pETH shared out to the market's other CDPs, from the CDPManager's log.
+    The seized pETH shared out to the market's other positions, from the CDPManager's log.
   tip_liq_coll_liquidator: |-
     The liquidator's 0.5% of the seized pETH, from the CDPManager's log.
   tip_liq_coll_surplus: |-
@@ -430,7 +430,7 @@ words:
   # The gas-compensation escrow: its own spine row, held apart from the
   # collateral (rails-ops TO-DO-ui-jobs 363). Its footnote under Risk and Limits (TO-DO-ui-jobs 388).
   tip_escrow_note: |-
-    The gas compensation escrow: the 0.0375 pETH every CDP sends at its open, held apart from its collateral and outside the collateral ratio. It returns on close and goes to the liquidator on a liquidation.
+    The gas compensation escrow: the 0.0375 pETH every position sends at its open, held apart from its collateral and outside the collateral ratio. It returns on close and goes to the liquidator on a liquidation.
   spine_escrow_sent: |-
     gas compensation escrow sent
   spine_escrow_returned: |-
@@ -448,15 +448,15 @@ words:
   tip_liq_debt_pool: |-
     The debt the stability pool absorbed, from the CDPManager's log.
   tip_liq_debt_redistributed: |-
-    The debt shared out to the market's other CDPs, from the CDPManager's log.
+    The debt shared out to the market's other positions, from the CDPManager's log.
   tip_liquidates_at: |-
-    The pETH price, in the market's stablecoin, at which the CDP's collateral ratio meets the minimum: the debt times the minimum ratio, divided by the collateral.
+    The pETH price, in the market's stablecoin, at which the position's collateral ratio meets the minimum: the debt times the minimum ratio, divided by the collateral.
   tip_primary_rate: |-
     The part of the market's interest rate that follows its stablecoin's peg, set by the market and read from its last rate event at this block.
   tip_reserve_to_debt: |-
     The market's reserve divided by its debt, which sets the secondary interest rate and the market's defensive mode.
   tip_minimum_ratio: |-
-    The collateral ratio below which the CDP can be liquidated, in the market's normal mode.
+    The collateral ratio below which the position can be liquidated, in the market's normal mode.
   tip_liquidation_penalty: |-
     The share of the seized collateral that goes as a penalty when the stability pool absorbs a liquidation, a constant of the market's contracts.
   # The PSM's trades in one closed gap between touches, as one row (ui-jobs 402).
@@ -475,11 +475,11 @@ words:
   psm_gap_trades_word: |-
     PSM mints and redemptions
   psm_pro_rata: |-
-    A buy above the target upsizes the market, so every open CDP takes the new collateral, debt and fee pro rata; the touch that closes the gap writes this CDP's share into its stated figures.
+    A buy above the target upsizes the market, so every open position takes the new collateral, debt and fee pro rata; the touch that closes the gap writes this position's share into its stated figures.
   tip_psm_gap_coll: |-
-    The pETH the closing touch added to the collateral as the CDP's share of the gap's PSM trades, from the CDPManager's log.
+    The pETH the closing touch added to the collateral as the position's share of the gap's PSM trades, from the CDPManager's log.
   tip_psm_gap_debt: |-
-    The stablecoin the closing touch added to the debt as the CDP's share of the gap's PSM trades, from the CDPManager's log.
+    The stablecoin the closing touch added to the debt as the position's share of the gap's PSM trades, from the CDPManager's log.
   tip_psm_gap_net: |-
     The two shares as one figure in the market's stablecoin, the pETH at the feed for the closing touch's block less the debt.
   tip_psm_gap_trades: |-
@@ -500,25 +500,25 @@ words:
   live_liq_stated: |-
     Liquidates at, as last written
   live_note_open: |-
-    This CDP has had no touch since its open, and its stated collateral and debt change only at a touch, so the figures at the feed are what its open wrote plus what is pending, and the breakdown is the whole of what moved its equity at the feed over its life. Its first touch writes the pending legs into the stated figures.
+    This position has had no touch since its open, and its stated collateral and debt change only at a touch, so the figures at the feed are what its open wrote plus what is pending, and the breakdown is the whole of what moved its equity at the feed over its life. Its first touch writes the pending legs into the stated figures.
   live_note_touch: |-
-    A CDP's stated collateral and debt change only at a touch, so the figures at the feed are what its last touch wrote plus what is pending, and the breakdown is the whole of what moved its equity at the feed since then. The next touch writes the pending legs into the stated figures.
+    A position's stated collateral and debt change only at a touch, so the figures at the feed are what its last touch wrote plus what is pending, and the breakdown is the whole of what moved its equity at the feed since then. The next touch writes the pending legs into the stated figures.
   live_legs: |-
     The protocol's legs, pending until the next touch:
   live_change: |-
     Change in equity at the feed
   tip_live_coll_stated: |-
-    The pETH the CDP's last touch wrote to its collateral (getCDP), in dollars at the feed now. It moves only at a touch.
+    The pETH the position's last touch wrote to its collateral (getCDP), in dollars at the feed now. It moves only at a touch.
   tip_live_coll_pending: |-
     The pETH pending since the last touch, the net PSM collateral share and the pETH reward, read from the cdpManager at the head block. The next touch writes it into the collateral.
   tip_live_coll_total: |-
-    The CDP's collateral at the feed, the stated pETH with the pending PSM share and reward (getCDPEntireColl at the head block), in dollars at the feed now.
+    The position's collateral at the feed, the stated pETH with the pending PSM share and reward (getCDPEntireColl at the head block), in dollars at the feed now.
   tip_live_debt_stated: |-
-    The debt the CDP's last touch wrote (getCDP). It moves only at a touch.
+    The debt the position's last touch wrote (getCDP). It moves only at a touch.
   tip_live_debt_pending: |-
     The debt pending since the last touch: interest charged, less the stability gain, with the net PSM debt share, read from the cdpManager at the head block. The next touch writes it into the debt.
   tip_live_debt_total: |-
-    The CDP's debt at the feed, the stated debt with the pending legs (getCDPEntireDebt at the head block), in dollars at the stablecoin's price now.
+    The position's debt at the feed, the stated debt with the pending legs (getCDPEntireDebt at the head block), in dollars at the stablecoin's price now.
   tip_live_cr: |-
     The collateral at the feed divided by the debt at the feed, both in the market's stablecoin, at the pETH price read at the head block.
   tip_live_cr_stated: |-
@@ -549,15 +549,15 @@ position_words:
     History
   # ── Leads ──
   lead_holds: |-
-    This CDP holds {coll} pETH of collateral and owes {debt} {stable}:
+    This position holds {coll} pETH of collateral and owes {debt} {stable}:
   lead_settles: |-
-    This CDP holds {coll} pETH of collateral and owes nothing at this block; its next touch settles the debt to zero:
+    This position holds {coll} pETH of collateral and owes nothing at this block; its next touch settles the debt to zero:
   lead_no_debt: |-
-    This CDP holds {coll} pETH of collateral and has no debt:
+    This position holds {coll} pETH of collateral and has no debt:
   lead_closed: |-
-    This CDP is closed and holds nothing now.
+    This position is closed and holds nothing now.
   lead_liquidated: |-
-    This CDP was liquidated and holds nothing now.
+    This position was liquidated and holds nothing now.
   # ── An open CDP ──
   worth: |-
     At the feed's price of {price} {stable} per pETH, the collateral is worth {worth} {stable}.
@@ -566,7 +566,7 @@ position_words:
   debt_sum: |-
     The debt is {recorded} {stable} recorded at the last touch{legs} pending since.
   debt_touch: |-
-    A touch is any transaction on the CDP; the next one writes the pending amounts into its figures.
+    A touch is any transaction on the position; the next one writes the pending amounts into its figures.
   sum_interest: |-
     interest
   sum_gain: |-
@@ -574,9 +574,9 @@ position_words:
   sum_psm: |-
     net PSM share (the peg-defence fees, in the docs)
   drop: |-
-    pETH's price can fall {drop} before this CDP reaches the {mcr} minimum.
+    pETH's price can fall {drop} before this position reaches the {mcr} minimum.
   drop_far: |-
-    pETH's price would have to fall over 99% before this CDP reaches the {mcr} minimum.
+    pETH's price would have to fall over 99% before this position reaches the {mcr} minimum.
   below: |-
     It is below the {mcr} minimum, so anyone may liquidate it.
   mode_normal: |-
@@ -586,11 +586,11 @@ position_words:
   rate: |-
     Interest is a primary rate of {primary} plus a secondary rate of {secondary}, both set by the market.
   holder: |-
-    The CDP is an NFT held by the address on the card.
+    The position is an NFT held by the address on the card.
   holder_one: |-
-    The CDP is an NFT held by the address on the card, after one transfer.
+    The position is an NFT held by the address on the card, after one transfer.
   holder_many: |-
-    The CDP is an NFT held by the address on the card, after {transfers} transfers.
+    The position is an NFT held by the address on the card, after {transfers} transfers.
   # ── A closed or liquidated CDP: its life, from the index ──
   life_coll: |-
     Over its life the holder deposited {deposited} pETH and withdrew {withdrawn} pETH.
@@ -634,7 +634,7 @@ shared_sentences:
     when: |-
       a PSM share was written in at this touch and its block has no price
     text: |-
-      PSM trades, the market's peg defence, moved {psm_coll} pETH and {psm_debt} {stable} through this CDP since the previous touch.
+      PSM trades, the market's peg defence, moved {psm_coll} pETH and {psm_debt} {stable} through this position since the previous touch.
   zero.settled:
     when: |-
       the protocol added debt so it settled at zero
@@ -659,7 +659,7 @@ templates:
     title: |-
       Open
     when: |-
-      the CDP's first touch
+      the position's first touch
     L5: open
     variants:
       with_debt: |-
@@ -673,22 +673,22 @@ templates:
         when: |-
           with_debt
         text: |-
-          The holder opened this CDP with {coll_change} pETH of collateral and borrowed {debt_change} {stable}.
+          The holder opened this position, which Polaris calls a CDP, with {coll_change} pETH of collateral and borrowed {debt_change} {stable}.
       open.what_no_debt:
         when: |-
           no_debt
         text: |-
-          The holder opened this CDP with {coll_change} pETH of collateral and no debt.
+          The holder opened this position, which Polaris calls a CDP, with {coll_change} pETH of collateral and no debt.
       open.what_bare:
         when: |-
           bare
         text: |-
-          This CDP opened.
+          This position, which Polaris calls a CDP, opened.
       open.escrow:
         when: |-
           with_debt, no_debt
         text: |-
-          The {escrow} pETH gas compensation escrow is held apart from the collateral and comes back when the CDP closes.
+          The {escrow} pETH gas compensation escrow is held apart from the collateral and comes back when the position closes.
     order:
       - open.what_debt
       - open.what_no_debt
@@ -740,12 +740,12 @@ templates:
         when: |-
           unmoved
         text: |-
-          The holder touched this CDP without moving collateral or debt.
+          The holder touched this position without moving collateral or debt.
       adj.none_keeper:
         when: |-
           unmoved, sent by an account that is not the holder
         text: |-
-          An account other than the holder touched this CDP without moving collateral or debt.
+          An account other than the holder touched this position without moving collateral or debt.
     order:
       - adj.deposit
       - adj.withdraw
@@ -780,7 +780,7 @@ templates:
     title: |-
       Close
     when: |-
-      the touch that closed the CDP
+      the touch that closed the position
     L5: close
     variants:
       both: |-
@@ -796,22 +796,22 @@ templates:
         when: |-
           both
         text: |-
-          The holder closed this CDP, repaying {debt_change} {stable} and withdrawing {coll_change} pETH.
+          The holder closed this position, repaying {debt_change} {stable} and withdrawing {coll_change} pETH.
       close.repay:
         when: |-
           repay_only
         text: |-
-          The holder closed this CDP, repaying {debt_change} {stable}.
+          The holder closed this position, repaying {debt_change} {stable}.
       close.withdraw:
         when: |-
           withdraw_only
         text: |-
-          The holder closed this CDP, withdrawing {coll_change} pETH.
+          The holder closed this position, withdrawing {coll_change} pETH.
       close.bare:
         when: |-
           bare
         text: |-
-          The holder closed this CDP.
+          The holder closed this position.
       close.ended:
         when: |-
           always
@@ -849,7 +849,7 @@ templates:
     title: |-
       Liquidation
     when: |-
-      the touch that liquidated the CDP
+      the touch that liquidated the position
     L5: liquidation
     variants:
       pool: |-
@@ -865,12 +865,12 @@ templates:
         when: |-
           pool, redistributed
         text: |-
-          This CDP was liquidated because its collateral ratio fell below the market's minimum.
+          This position was liquidated because its collateral ratio fell below the market's minimum.
       liq.what_priced:
         when: |-
           pool_priced, redistributed_priced
         text: |-
-          This CDP was liquidated: its collateral ratio at the feed's price was below the normal-mode minimum of {mcr}.
+          This position was liquidated: its collateral ratio at the feed's price was below the normal-mode minimum of {mcr}.
       liq.pool:
         when: |-
           pool, pool_priced
@@ -880,7 +880,7 @@ templates:
         when: |-
           redistributed, redistributed_priced
         text: |-
-          The pool covered part of the debt; the market's other CDPs took the rest of the debt and collateral.
+          The pool covered part of the debt; the market's other positions took the rest of the debt and collateral.
       liq.penalty_pool:
         when: |-
           pool_priced
@@ -890,7 +890,7 @@ templates:
         when: |-
           redistributed_priced
         text: |-
-          The other CDPs' premium is the {penalty} liquidation penalty, which comes out of what the owner could have kept.
+          The other positions' premium is the {penalty} liquidation penalty, which comes out of what the owner could have kept.
       liq.surplus:
         when: |-
           the liquidation left a surplus and the pool has been read past it with no claim
@@ -948,7 +948,7 @@ templates:
     title: |-
       Transfer
     when: |-
-      the CDP's NFT moved between two holders
+      the position's NFT moved between two holders
     L5: transfer
     variants:
       both: |-
@@ -960,17 +960,17 @@ templates:
         when: |-
           both
         text: |-
-          This CDP changed hands, from {from_addr} to {to_addr}.
+          This position changed hands, from {from_addr} to {to_addr}.
       xfer.what_none:
         when: |-
           none
         text: |-
-          This CDP changed hands.
+          This position changed hands.
       xfer.holder:
         when: |-
           always
         text: |-
-          The new holder can now act on the CDP and the previous holder cannot.
+          The new holder can now act on the position and the previous holder cannot.
     order:
       - xfer.what
       - xfer.what_none
@@ -998,7 +998,7 @@ templates:
         when: |-
           always
         text: |-
-          The CDP recorded a {event_type} event.
+          The position recorded a {event_type} event.
     order:
       - fallback.what
     groups:
@@ -1038,9 +1038,9 @@ doc_urls:
 L5:
   open:
     title: |-
-      How Opening a CDP Works
+      How Opening a Position Works
     intro: |-
-      Opening a CDP deposits pETH as collateral and can borrow the market's stablecoin against it. The CDP is an NFT, so it can change hands without being closed.
+      Opening a Position deposits pETH as collateral and can borrow the market's stablecoin against it. The position is an NFT, so it can change hands without being closed.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1051,7 +1051,7 @@ L5:
       - bold: |-
           Gas compensation
         text: |-
-          a fixed 0.0375 pETH the CDP escrows beside its collateral; it returns on close and goes to a liquidator on liquidation.
+          a fixed 0.0375 pETH the position escrows beside its collateral; it returns on close and goes to a liquidator on liquidation.
       - bold: |-
           Minimum ratio
         text: |-
@@ -1076,20 +1076,20 @@ L5:
 
   adjust:
     title: |-
-      How Adjusting a CDP Works
+      How Adjusting a Position Works
     intro: |-
-      An adjustment adds or removes collateral, or borrows or repays debt, on an open CDP. Each one is a touch, which also writes in what built up since the previous touch.
+      An adjustment adds or removes collateral, or borrows or repays debt, on an open position. Each one is a touch, which also writes in what built up since the previous touch.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Touch
         text: |-
-          any transaction on the CDP, which writes the interest, stability gains, reward pETH and PSM share that built up into its figures.
+          any transaction on the position, which writes the interest, stability gains, reward pETH and PSM share that built up into its figures.
       - bold: |-
           Stability gain
         text: |-
-          a share of the secondary-rate payments, credited against the debt (Protocol Safety Rate, in the docs); CDPs with less leverage receive more than they pay.
+          a share of the secondary-rate payments, credited against the debt (Protocol Safety Rate, in the docs); positions with less leverage receive more than they pay.
       - bold: |-
           Reward pETH
         text: |-
@@ -1097,11 +1097,11 @@ L5:
       - bold: |-
           The PSM
         text: |-
-          the market's peg defence: a buy above the target upsizes the market, so every open CDP takes the new collateral, debt and fee pro rata.
+          the market's peg defence: a buy above the target upsizes the market, so every open position takes the new collateral, debt and fee pro rata.
       - bold: |-
           Settled to zero
         text: |-
-          when a net PSM share clears more debt than a CDP owes, the protocol adds the difference so the debt lands on zero.
+          when a net PSM share clears more debt than a position owes, the protocol adds the difference so the debt lands on zero.
     links:
       - label: |-
           Adaptive Peg Defense and position effects
@@ -1115,9 +1115,9 @@ L5:
 
   close:
     title: |-
-      How Closing a CDP Works
+      How Closing a Position Works
     intro: |-
-      Closing repays the whole debt and takes back the collateral. The CDP's NFT is burned and its escrowed gas compensation returns to the holder.
+      Closing repays the whole debt and takes back the collateral. The position's NFT is burned and its escrowed gas compensation returns to the holder.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1128,15 +1128,15 @@ L5:
       - bold: |-
           Settled to zero
         text: |-
-          when a net PSM share clears more debt than the CDP owes, the protocol adds the difference so the debt lands on zero.
+          when a net PSM share clears more debt than the position owes, the protocol adds the difference so the debt lands on zero.
       - bold: |-
           Defensive mode
         text: |-
-          while a market is in defensive mode, closing a CDP is restricted because it would lower the market's backing.
+          while a market is in defensive mode, closing a position is restricted because it would lower the market's backing.
       - bold: |-
           The NFT
         text: |-
-          burned at the close, so the CDP's number is never reused.
+          burned at the close, so the position's number is never reused.
     links:
       - label: |-
           Defensive mode restrictions
@@ -1152,7 +1152,7 @@ L5:
     title: |-
       How Liquidations Work
     intro: |-
-      A CDP whose collateral ratio falls below the market's minimum can be liquidated by anyone. The stability pool, called the Earn Pool in the docs, repays the debt first.
+      A position whose collateral ratio falls below the market's minimum can be liquidated by anyone. The stability pool, called the Earn Pool in the docs, repays the debt first.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1163,11 +1163,11 @@ L5:
       - bold: |-
           Redistribution
         text: |-
-          if the pool cannot cover it all, the rest of the debt and collateral is shared across the market's other open CDPs.
+          if the pool cannot cover it all, the rest of the debt and collateral is shared across the market's other open positions.
       - bold: |-
           Liquidator's pay
         text: |-
-          a fixed 0.0375 pETH gas compensation from the CDP's escrow, plus 0.5% of the seized collateral.
+          a fixed 0.0375 pETH gas compensation from the position's escrow, plus 0.5% of the seized collateral.
       - bold: |-
           Surplus
         text: |-
@@ -1189,20 +1189,20 @@ L5:
 
   transfer:
     title: |-
-      Transferring a CDP
+      Transferring a Position
     intro: |-
-      A Polaris CDP is an NFT, so transferring it hands the whole position to a new holder without opening or closing anything.
+      A Polaris position is an NFT, so transferring it hands the whole position to a new holder without opening or closing anything.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Control
         text: |-
-          whoever holds the NFT can act on the CDP, and its collateral, debt and pending legs go with it.
+          whoever holds the NFT can act on the position, and its collateral, debt and pending legs go with it.
       - bold: |-
           Mint and burn
         text: |-
-          the NFT is minted when the CDP opens and burned when it closes or is liquidated; those two moves are the open and the close.
+          the NFT is minted when the position opens and burned when it closes or is liquidated; those two moves are the open and the close.
     links:
       - label: |-
           Opening a mint position
@@ -1210,16 +1210,16 @@ L5:
 
   fallback:
     title: |-
-      How a CDP Changes
+      How a Position Changes
     intro: |-
-      A Polaris CDP changes through a touch: an open, an adjustment, a close or a liquidation. Moving its NFT to another holder changes only who can act on it.
+      A Polaris position changes through a touch: an open, an adjustment, a close or a liquidation. Moving its NFT to another holder changes only who can act on it.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Touch
         text: |-
-          any transaction on the CDP; it writes in the interest, stability gains, reward pETH and PSM share that built up before it.
+          any transaction on the position; it writes in the interest, stability gains, reward pETH and PSM share that built up before it.
       - bold: |-
           The NFT
         text: |-
@@ -1234,16 +1234,16 @@ L5:
 
   position_open:
     title: |-
-      About This CDP
+      About This Position
     intro: |-
-      The lead says what the CDP holds and owes now. The bullets say what the figures mean for it.
+      The lead says what the position holds and owes now. The bullets say what the figures mean for it.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Collateral ratio
         text: |-
-          collateral at the feed's price divided by the debt; below the market's minimum, 115% or 150% in defensive mode, a CDP can be liquidated.
+          collateral at the feed's price divided by the debt; below the market's minimum, 115% or 150% in defensive mode, a position can be liquidated.
       - bold: |-
           The feed
         text: |-
@@ -1276,16 +1276,16 @@ L5:
 
   position_closed:
     title: |-
-      About This CDP
+      About This Position
     intro: |-
-      This CDP is closed and its debt repaid. The card shows the most it ever held, and its NFT is burned.
+      This position is closed and its debt repaid. The card shows the most it ever held, and its NFT is burned.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Highest recorded
         text: |-
-          the most pETH and debt the CDP held after any touch, once the legs that had built up were written in.
+          the most pETH and debt the position held after any touch, once the legs that had built up were written in.
       - bold: |-
           Interest at each touch
         text: |-
@@ -1293,11 +1293,11 @@ L5:
       - bold: |-
           The PSM share
         text: |-
-          traders' PSM mints and redemptions add or remove collateral and debt from every open CDP at a touch (the peg-defence fees, in the docs).
+          traders' PSM mints and redemptions add or remove collateral and debt from every open position at a touch (the peg-defence fees, in the docs).
       - bold: |-
           Settled to zero
         text: |-
-          when a net PSM share clears more debt than the CDP owes, the protocol adds the difference so the close lands on zero.
+          when a net PSM share clears more debt than the position owes, the protocol adds the difference so the close lands on zero.
     links:
       - label: |-
           The Peg Stability Rate
@@ -1308,20 +1308,20 @@ L5:
 
   position_liquidated:
     title: |-
-      About This CDP
+      About This Position
     intro: |-
-      This CDP was liquidated: its collateral ratio fell below the market's minimum and a liquidator closed it. Its NFT is burned.
+      This position was liquidated: its collateral ratio fell below the market's minimum and a liquidator closed it. Its NFT is burned.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Stability pool
         text: |-
-          it repaid the debt and received the collateral; any debt it could not cover was redistributed across other CDPs.
+          it repaid the debt and received the collateral; any debt it could not cover was redistributed across other positions.
       - bold: |-
           Liquidator's pay
         text: |-
-          a fixed 0.0375 pETH gas compensation from the CDP's escrow, plus 0.5% of the seized collateral.
+          a fixed 0.0375 pETH gas compensation from the position's escrow, plus 0.5% of the seized collateral.
       - bold: |-
           Surplus
         text: |-
@@ -1329,7 +1329,7 @@ L5:
       - bold: |-
           Highest recorded
         text: |-
-          the most pETH and debt the CDP held after any touch, the liquidation's included.
+          the most pETH and debt the position held after any touch, the liquidation's included.
     links:
       - label: |-
           The liquidation process
@@ -1356,7 +1356,7 @@ L5:
       - bold: |-
           The PSM
         text: |-
-          anyone can buy a pAsset with pETH or redeem it at its target value; each trade changes every open CDP pro rata.
+          anyone can buy a pAsset with pETH or redeem it at its target value; each trade changes every open position pro rata.
       - bold: |-
           Two rates
         text: |-
@@ -1381,9 +1381,9 @@ L5:
 
   price_gap:
     title: |-
-      How a Price Move Reaches a CDP
+      How a Price Move Reaches a Position
     intro: |-
-      A market note states something the market did while this CDP transacted nothing, and no count moves because of it. This kind states how the price feed moved between two touches.
+      A market note states something the market did while this position transacted nothing, and no count moves because of it. This kind states how the price feed moved between two touches.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1420,9 +1420,9 @@ L5:
 
   rate_step:
     title: |-
-      How the Primary Rate Moves a CDP
+      How the Primary Rate Moves a Position
     intro: |-
-      A market note states something the market did while this CDP transacted nothing, and no count moves because of it. This kind states a step in the primary rate between two touches.
+      A market note states something the market did while this position transacted nothing, and no count moves because of it. This kind states a step in the primary rate between two touches.
     detailsHeading: |-
       Key concepts:
     details:

@@ -12,8 +12,8 @@ interface Props {
 
 /** The metadata a never-minted number gets — the same words the 404 body
  *  leads with, so the tab and the page agree. */
-const NOT_A_CDP_TITLE = "Not a CDP";
-const NOT_A_CDP_DESCRIPTION = "No CDP with this number has been minted on this Polaris market.";
+const NOT_A_CDP_TITLE = "Not a position";
+const NOT_A_CDP_DESCRIPTION = "No position with this number has been minted on this Polaris market.";
 
 // The CDP's numbers are stated as current, so the route renders per request
 // and every backend read is `no-store`.

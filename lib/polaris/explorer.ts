@@ -12,16 +12,16 @@ import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/a
 import { polarisSurplusLabel } from "@/lib/polaris/surplus-claim";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this CDP's history.",
+  paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the CDP's timeline",
+  timeline_hint: "Open this event in the position's timeline",
   market: "Market",
-  cdp: "CDP",
-  copy_cdp: "Copy the CDP's number",
+  cdp: "Position",
+  copy_cdp: "Copy the position's number",
   holder: "Holder",
   last_holder: "Last holder",
   description: (stable: string, cdpId: string, day: string) =>
-    `One transaction from the Polaris ${stable} CDP #${cdpId}, on ${day}.`,
+    `One transaction from the Polaris ${stable} position #${cdpId}, on ${day}.`,
 };
 
 const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;

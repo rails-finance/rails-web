@@ -357,7 +357,7 @@ info(
   const page = await openListing(context, `${BASE}/sepolia/polaris`, {
     route: inflateTotal("**/api/polaris/positions**", 21),
   });
-  await searchWallet(page, "Address, ENS, or CDP number", POLARIS_WALLET);
+  await searchWallet(page, "Address, ENS, or position number", POLARIS_WALLET);
   const strip = await readStrip(page);
   check(
     "P8. a wallet stated as holding 21 positions states the count only — no legs, no nearest-floor line, and says why",
@@ -671,7 +671,7 @@ if (!probeLine) {
   );
   check(
     "G1e. Polaris: the counts sentence names the markets it actually spans",
-    /2 open CDPs across both markets/.test(got.polaris.countsLine) && /has closed 1/.test(got.polaris.countsLine),
+    /2 open positions across both markets/.test(got.polaris.countsLine) && /has closed 1/.test(got.polaris.countsLine),
     got.polaris.countsLine,
   );
 
