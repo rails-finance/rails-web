@@ -30,6 +30,24 @@ test("the old dropdown's values read as their Debt range", () => {
   assert.deepEqual(debtRangeFromUrl(["borrowing"]), ["1-"]);
   assert.deepEqual(debtRangeFromUrl(["supply-only"]), ["-0"]);
   assert.deepEqual(debtRangeFromUrl(["collateral-only"]), ["-0"]);
+  assert.deepEqual(debtRangeFromUrl(["lending-only"]), ["-0"]);
+});
+
+test("one side only: the range drawn carries the note and its own word", () => {
+  const dims = sizeDimensions({
+    getDebt: (f) => f.debt,
+    setDebt: (f, debt) => ({ ...f, debt }),
+    getColl: (f) => f.coll,
+    setColl: (f, coll) => ({ ...f, coll }),
+    panelNote: "note",
+    sides: ["coll"],
+    collLabel: "Deposited",
+  });
+  assert.equal(dims.length, 1);
+  assert.equal(dims[0].id, "coll");
+  assert.equal(dims[0].label, "Deposited (USD)");
+  assert.equal(dims[0].panelNote, "note");
+  assert.equal(dims[0].chipLabel(["1000-"], []), "Deposited: ≥ $1K");
 });
 
 test("a range value passes through in canonical form", () => {

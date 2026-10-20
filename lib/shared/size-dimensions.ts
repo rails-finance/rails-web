@@ -10,8 +10,10 @@
 // and at least $1 is the borrowing set, so the Debt range replaces a
 // Borrowing / Supply only dropdown. `debtRangeFromUrl` reads that dropdown's
 // old values, so a shared link keeps its meaning: `borrowing` is at least $1,
-// `supply-only` and `collateral-only` are $0. A registry that had the dropdown
-// on another param names it in the Debt dimension's `aliases`.
+// `supply-only`, `collateral-only` and `lending-only` are $0. A registry that
+// had the dropdown on another param names it in the Debt dimension's `aliases`.
+// A listing with one side (a lender's deposits, a spoke's supply) passes
+// `sides` and `collLabel`; the note sits on the last range drawn.
 
 import type { ReactNode } from "react";
 import { decodeRange, normalizeRange, rangeChipLabel } from "@/components/shared/filter-bar/types";
@@ -23,7 +25,9 @@ export const SIZE_USD_TOP = 1_000_000;
 /** A Debt selection from the URL: the old dropdown's values as their range,
  *  anything else as a range value. */
 export function debtRangeFromUrl(values: string[]): string[] {
-  if (values.includes("collateral-only") || values.includes("supply-only")) return ["-0"];
+  if (values.includes("collateral-only") || values.includes("supply-only") || values.includes("lending-only")) {
+    return ["-0"];
+  }
   if (values.includes("borrowing")) return ["1-"];
   return normalizeRange(values);
 }
@@ -40,36 +44,44 @@ export function sizeDimensions<F>(opts: {
   /** Older params the Debt range reads when `debt` is absent (Aave V3's
    *  `state`). */
   debtAliases?: readonly string[];
+  /** Which ranges to draw; both by default. */
+  sides?: readonly ("debt" | "coll")[];
+  /** The second range's word where "Collateral" is wrong: "Deposited",
+   *  "Supply". The label adds "(USD)"; the chip reads "Deposited: ≥ $1K". */
+  collLabel?: string;
 }): SerializableDimension<F>[] {
   const range = { min: 0, max: opts.top ?? SIZE_USD_TOP, usd: true };
-  return [
-    {
-      id: "debt",
-      label: "Debt (USD)",
-      group: "Size",
-      cardinality: "range",
-      range,
-      param: "debt",
-      ...(opts.debtAliases ? { aliases: opts.debtAliases } : {}),
-      options: [],
-      get: opts.getDebt,
-      set: (f, v) => opts.setDebt(f, debtRangeFromUrl(v)),
-      chipLabel: (v) => rangeChipLabel("Debt", v, true),
-    },
-    {
-      id: "coll",
-      label: "Collateral (USD)",
-      group: "Size",
-      cardinality: "range",
-      range,
-      param: "coll",
-      options: [],
-      get: opts.getColl,
-      set: (f, v) => opts.setColl(f, normalizeRange(v)),
-      chipLabel: (v) => rangeChipLabel("Collateral", v, true),
-      panelNote: opts.panelNote,
-    },
-  ];
+  const sides = opts.sides ?? ["debt", "coll"];
+  const collWord = opts.collLabel ?? "Collateral";
+  const debt: SerializableDimension<F> = {
+    id: "debt",
+    label: "Debt (USD)",
+    group: "Size",
+    cardinality: "range",
+    range,
+    param: "debt",
+    ...(opts.debtAliases ? { aliases: opts.debtAliases } : {}),
+    options: [],
+    get: opts.getDebt,
+    set: (f, v) => opts.setDebt(f, debtRangeFromUrl(v)),
+    chipLabel: (v) => rangeChipLabel("Debt", v, true),
+  };
+  const coll: SerializableDimension<F> = {
+    id: "coll",
+    label: `${collWord} (USD)`,
+    group: "Size",
+    cardinality: "range",
+    range,
+    param: "coll",
+    options: [],
+    get: opts.getColl,
+    set: (f, v) => opts.setColl(f, normalizeRange(v)),
+    chipLabel: (v) => rangeChipLabel(collWord, v, true),
+  };
+  const dims = [debt, coll].filter((d) => sides.includes(d.id as "debt" | "coll"));
+  const last = dims[dims.length - 1];
+  if (last) last.panelNote = opts.panelNote;
+  return dims;
 }
 
 export interface UsdBounds {
