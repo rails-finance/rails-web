@@ -62,6 +62,11 @@ export async function readFluidPositions(
     const v = sp.get(key);
     if (v != null && v !== "") qs.set(key, v);
   }
+  // A transaction-count bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   const url = `${hop.baseUrl}/api/fluid/positions?${qs.toString()}`;
   const response = await fetch(url, { signal, headers: hop.headers });
   if (!response.ok) {

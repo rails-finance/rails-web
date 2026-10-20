@@ -18,6 +18,9 @@ export interface FetchFluidPositionsParams {
   supplyAssets?: string[];
   borrowAssets?: string[];
   vaultKind?: "t1" | "smart";
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   sortBy?: "lastActivity" | "debt" | "collateral" | "events";
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -45,6 +48,8 @@ export async function fetchFluidPositions(p: FetchFluidPositionsParams = {}): Pr
   if (p.supplyAssets?.length) qs.set("supplyAssets", p.supplyAssets.join(","));
   if (p.borrowAssets?.length) qs.set("borrowAssets", p.borrowAssets.join(","));
   if (p.vaultKind) qs.set("vaultKind", p.vaultKind);
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));
