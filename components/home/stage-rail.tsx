@@ -117,7 +117,7 @@ function Station({
             className={`h-[18px] w-[18px] shrink-0 ${accent ? "text-blue-500 dark:text-blue-400" : "text-foreground"}`}
             aria-hidden="true"
           />
-          <p className="text-[15px] font-semibold text-foreground">{eyebrow}</p>
+          <p className="text-[15px] font-semibold text-foreground lg:text-sm">{eyebrow}</p>
         </div>
         <p className="body-text">{children}</p>
       </div>
