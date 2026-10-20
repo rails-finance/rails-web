@@ -60,6 +60,9 @@ function liquityV1Deltas(ctx: LiquityV1Context, coords: LiquityV1Coords): ChainT
   // A liquidation names what happened to each side: the ETH was seized, the
   // debt cleared. A full redemption splits the collateral: the redeemer's
   // ETH is "Reduced", the rest moved to the CollSurplusPool for the owner.
+  // The surplus is not a leg: the spine draws what the redeemer ordered, ETH
+  // for LUSD, and the surplus the order left behind is the head's clause, the
+  // sheet's Surplus row and the Explanation's (Miles, 20 Oct 2026).
   const isLiq = ctx.eventType === "liquidation";
   const split = redemptionSplit(ctx);
   const coll = Number(ctx.collDelta) || 0;
@@ -72,16 +75,6 @@ function liquityV1Deltas(ctx: LiquityV1Context, coords: LiquityV1Coords): ChainT
       label: "Reduced",
       tone: "caution",
     });
-    if (split.ethSurplus > 0)
-      deltas.push({
-        value: split.ethSurplus,
-        symbol: COLLATERAL_SYMBOL,
-        prov: redemptionLegProv(coords, "surplus", legVals),
-        label: "Surplus",
-        // Still the owner's, claimable: the spine draws it as a locked node
-        // after the legs that left.
-        locked: true,
-      });
   } else if (coll !== 0)
     deltas.push({
       value: coll,
@@ -148,12 +141,12 @@ function liquityV1Deltas(ctx: LiquityV1Context, coords: LiquityV1Coords): ChainT
 }
 
 /** A redemption's or a liquidation's legs on the warning spine: the
- *  collateral below the debt, then a full redemption's surplus, locked. */
+ *  collateral below the debt. A full redemption's surplus is no leg. */
 export function liquityV1Legs(ctx: LiquityV1Context, coords: LiquityV1Coords): SpineWarningLeg[] {
-  const rank = (d: ChainTruthDelta) => (d.locked ? 2 : d.symbol === DEBT_SYMBOL ? 1 : 0);
+  const rank = (d: ChainTruthDelta) => (d.symbol === DEBT_SYMBOL ? 1 : 0);
   return liquityV1Deltas(ctx, coords)
     .sort((a, b) => rank(a) - rank(b))
-    .map((d) => ({ label: d.label, locked: d.locked, value: Math.abs(d.value), symbol: d.symbol, address: d.address }));
+    .map((d) => ({ label: d.label, value: Math.abs(d.value), symbol: d.symbol, address: d.address }));
 }
 
 /** One clause of the head, drawn: words, or the full redemption's surplus

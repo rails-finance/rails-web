@@ -141,10 +141,6 @@ export interface ChainTruthDelta {
    *  label does not say so: the spine draws the debt above the collateral,
    *  whatever order the head states (ui-jobs 250 point 8). */
   debtSide?: boolean;
-  /** Still the owner's, held for them to claim (Liquity V1's collateral
-   *  surplus): on a redemption or a liquidation it is a locked node after the
-   *  legs, and the head states it only where the spine draws no numbers. */
-  locked?: boolean;
   /** A figure that is not the position's own (a whole tick's or pool's
    *  total): label and value drawn in the muted tone, so the position's own
    *  change beside it reads first. */
@@ -611,9 +607,9 @@ export function chainTruthCaption(spec: ChainTruthRowSpec): string | undefined {
 /** A leg on the debt side: flagged, or labelled so ("Cleared", "Debt …",
  *  "Repaid"). */
 const isDebtLeg = (d: ChainTruthDelta) => !!d.debtSide || /^(cleared|debt|repaid|covered)/i.test(d.label ?? "");
-/** The legs' order, drawn bottom to top: the collateral that left, the debt,
- *  then what is held. */
-const legRank = (d: ChainTruthDelta) => (d.locked ? 2 : isDebtLeg(d) ? 1 : 0);
+/** The legs' order, drawn bottom to top: the collateral that left, then the
+ *  debt. */
+const legRank = (d: ChainTruthDelta) => (isDebtLeg(d) ? 1 : 0);
 
 export function ChainTruthRow({
   spec,
@@ -660,7 +656,6 @@ export function ChainTruthRow({
           .sort((a, b) => legRank(a) - legRank(b))
           .map((d) => ({
             label: d.label,
-            locked: d.locked,
             value: Math.abs(d.value),
             symbol: d.symbol,
             address: d.address,

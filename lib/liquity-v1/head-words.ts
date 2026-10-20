@@ -62,8 +62,9 @@ export function liquityV1T1Words(ctx: LiquityV1Context, opts: LiquityV1T1Options
       return { kind: adjustLegs(ctx) ?? V1_WORDS.t1_adjusted, clauses: [] };
     case "redemption": {
       // A full redemption closes the Trove. The surplus it leaves is the
-      // spine's locked node, the sheet's Surplus row, the Explanation's, and
-      // the head's one figure: the owner has to claim it.
+      // sheet's Surplus row, the Explanation's, and the head's one figure: the
+      // owner has to claim it. The spine draws none of it: its nodes are what
+      // the redeemer ordered, not what the order left behind.
       const split = redemptionSplit(ctx);
       if (!split?.full) return { kind: V1_WORDS.t1_redeemed, clauses: [{ text: V1_WORDS.t1_coll_debt_reduced }] };
       if (!(split.ethSurplus > 0)) return { kind: V1_WORDS.t1_redeemed, clauses: [{ text: V1_WORDS.t1_trove_closed }] };

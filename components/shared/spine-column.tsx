@@ -2,7 +2,7 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
-import { ArrowRightToLine, Clock, Layers, Lock, LogOut } from "lucide-react";
+import { ArrowRightToLine, Clock, Layers, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -146,10 +146,6 @@ export type SpineSwapAxis = "supply" | "debt" | "mixed";
 export interface SpineWarningLeg {
   /** The header's word for the leg ("Cleared"), for the spoken label. */
   label?: string;
-  /** Still the owner's, held for them to claim (Liquity V1's collateral
-   *  surplus): the token with a lock at its corner, no arrow and no number,
-   *  after the legs that left. */
-  locked?: boolean;
   value: number;
   symbol: string;
   address?: string;
@@ -251,7 +247,7 @@ export const SpineLegsContext = createContext<{
 } | null>(null);
 
 const legsKey = (legs: SpineWarningLeg[] | null) =>
-  legs ? legs.map((l) => `${l.symbol}|${l.address ?? ""}|${l.value}|${l.locked ? "l" : ""}`).join(";") : "";
+  legs ? legs.map((l) => `${l.symbol}|${l.address ?? ""}|${l.value}`).join(";") : "";
 
 /** The state EventCard holds for SpineLegsContext. */
 export function useSpineLegsState() {
@@ -487,22 +483,6 @@ function SwapLegs({ legs }: { legs: SpineSwapLeg[] }) {
  *  shares the corner with check / cross / the pink external badge under the
  *  same one-corner rule. Neutral rb fill: a transfer is not a loss, not a gain,
  *  and not a verdict about who acted. */
-/** Lock badge: the asset is still the owner's, held for them to claim (a
- *  collateral surplus). Same corner and neutral disc as the custody badge. */
-function LockBadge({ size }: { size: number }) {
-  const r = Math.round(size * 0.48);
-  return (
-    <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center text-white"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", border: "2px solid var(--background)" }}
-      role="img"
-      aria-label="Claimable"
-    >
-      <Lock size={Math.round(r * 0.6)} strokeWidth={2.5} aria-hidden />
-    </div>
-  );
-}
-
 function SendBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
@@ -806,12 +786,14 @@ const RING_GAP = 2;
  *  in the event's tone. Both point out of the position — the collateral left
  *  it and the debt was cleared — so a redemption reads as a withdraw plus a
  *  repay. Drawn bottom to top in the order given (`bottomUp`'s rule): the
- *  collateral below, the debt above, a locked leg on top.
+ *  collateral below, the debt above.
  *
- *  A taken leg wears a ring in the tone's ink at the node size, the token
- *  drawn smaller inside it with a gap of page ground, so the node's footprint
- *  and the line's halo hold (ui-jobs 331). The locked leg (Liquity V1's
- *  collateral surplus) stayed with the owner and draws bare. */
+ *  A leg wears a ring in the tone's ink at the node size, the token drawn
+ *  smaller inside it with a gap of page ground, so the node's footprint and
+ *  the line's halo hold (ui-jobs 331). A node is an order the actor gave
+ *  (redeem ETH for LUSD, seize the collateral), never what the order left
+ *  behind: Liquity V1's redemption surplus drew here as a locked node until
+ *  Miles ruled it out (20 Oct 2026); it is the head's clause and the sheet's. */
 function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; tone: Tone; filterable: boolean }) {
   const scale = useTimelineScale();
   const unreadOf = useUnreadTokenOf();
@@ -827,40 +809,24 @@ function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; 
           <div key={i} className="spine-grid" data-spine-leg="">
             <span />
             <span />
-            {leg.locked ? (
-              <div className="relative" data-spine-leg-locked="">
-                <TokenChipIcon
-                  symbol={leg.symbol}
-                  address={leg.address}
-                  size={scale.tokenSize}
-                  filterable={filterable}
-                />
-                <LockBadge size={scale.tokenSize} />
-              </div>
-            ) : (
-              <span
-                className="flex items-center justify-center rounded-full shrink-0"
-                style={{
-                  width: scale.tokenSize,
-                  height: scale.tokenSize,
-                  border: `${RING_WIDTH}px solid ${SPINE_COLORS[tone]}`,
-                }}
-                data-spine-ring={tone}
-              >
-                <TokenChipIcon
-                  symbol={leg.symbol}
-                  address={leg.address}
-                  size={scale.tokenSize - 2 * (RING_WIDTH + RING_GAP)}
-                  filterable={filterable}
-                />
-              </span>
-            )}
-            {leg.locked ? (
-              <span />
-            ) : (
-              <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
-            )}
-            {txt && !leg.locked ? (
+            <span
+              className="flex items-center justify-center rounded-full shrink-0"
+              style={{
+                width: scale.tokenSize,
+                height: scale.tokenSize,
+                border: `${RING_WIDTH}px solid ${SPINE_COLORS[tone]}`,
+              }}
+              data-spine-ring={tone}
+            >
+              <TokenChipIcon
+                symbol={leg.symbol}
+                address={leg.address}
+                size={scale.tokenSize - 2 * (RING_WIDTH + RING_GAP)}
+                filterable={filterable}
+              />
+            </span>
+            <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
+            {txt ? (
               <span
                 className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
                 data-spine-leg-value=""
