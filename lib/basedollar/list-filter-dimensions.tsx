@@ -3,8 +3,14 @@
 // of them once and filters client-side. Declares the categorical facets (Status,
 // Collateral branch) as ListDimensions over the in-memory row set; sort + search are
 // the non-categorical controls. All values are read from the chain (replayed status, raw
-// collateral / BD debt, user-set interest rate). No collateral-ratio / USD facet —
-// Basedollar ships no oracle here, so those interpreted axes can't be offered.
+// collateral / BD debt, user-set interest rate).
+//
+// Size is the Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts):
+// debt is BD at face value, a dollar a coin for this facet, and collateral is
+// the row's collateralUsd at the branch's last indexed price, so an unpriced
+// branch falls out of any Collateral bound (an emptied trove reads $0).
+// Transactions is a range over the row's txCount
+// (lib/shared/transactions-dimension.ts).
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { indexZombie } from "@/lib/basedollar/asset-catalog";
@@ -12,10 +18,18 @@ import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
+import { rangeAdmits, sizeDimensions } from "@/lib/shared/size-dimensions";
+import { transactionsDimension } from "@/lib/shared/transactions-dimension";
 
 export interface BasedollarListFilters extends BaseListFilters {
   status: string[];
   branches: string[];
+  /** Debt range in USD, one encodeRange value or [] for no bound. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. */
+  coll: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 export const BASEDOLLAR_LIST_DEFAULTS: BasedollarListFilters = {
@@ -24,7 +38,17 @@ export const BASEDOLLAR_LIST_DEFAULTS: BasedollarListFilters = {
   sortOrder: "desc",
   status: [],
   branches: [],
+  debt: [],
+  coll: [],
+  tx: [],
 };
+
+/** The Transactions slider's top: the round number above the busiest trove
+ *  (39 transactions in the api's own count over all 47 troves, 20 Oct 2026). */
+const BASEDOLLAR_TX_TOP = 50;
+
+/** The Size panel's price line. */
+const BASEDOLLAR_SIZE_NOTE = "Collateral at the branch's last indexed price; debt in BD at face value.";
 
 export const BASEDOLLAR_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
@@ -47,6 +71,10 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
 
 const lifecycleOf = (row: BasedollarTroveSummary): string =>
   indexZombie(row.status, row.debt) ? "zombie" : row.status;
+
+/** Collateral in USD: $0 once the trove holds none, null while its branch is
+ *  unpriced. */
+const collUsdOf = (row: BasedollarTroveSummary): number | null => (row.collateral > 0 ? row.collateralUsd : 0);
 
 export function basedollarListDimensions(
   rows: BasedollarTroveSummary[],
@@ -84,6 +112,25 @@ export function basedollarListDimensions(
       get: (f) => f.branches,
       set: (f, v) => ({ ...f, branches: v }),
       matches: (row, v) => v.includes(row.collateralType),
+    },
+    ...sizeDimensions<BasedollarListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: BASEDOLLAR_SIZE_NOTE,
+    }).map((d) => ({
+      ...d,
+      matches: (row: BasedollarTroveSummary, v: string[]) =>
+        rangeAdmits(v, d.id === "debt" ? row.debt : collUsdOf(row)),
+    })),
+    {
+      ...transactionsDimension<BasedollarListFilters>({
+        get: (f) => f.tx,
+        set: (f, tx) => ({ ...f, tx }),
+        top: BASEDOLLAR_TX_TOP,
+      }),
+      matches: (row, v) => rangeAdmits(v, row.txCount),
     },
   ];
 }
