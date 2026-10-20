@@ -18,6 +18,12 @@
 // holding an open position on the protocol at its daily chain read (rails-ops
 // reference/arbitrum-position-first-lane.md, "The census"). Without a census
 // it states the indexed count alone.
+//
+// A Compound row that carries the stored visit's `markets` draws one card per
+// open (wallet, Comet), each linking to that Comet's section of the wallet
+// page (lib/compound-arbitrum/comet-cards.ts; rails-ops
+// reference/arbitrum-position-first-lane.md). A row without it keeps the
+// wallet's card.
 
 import type { ReactNode } from "react";
 import { ChainTruthListingPage, memoryStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -40,6 +46,16 @@ import { formatUsdValue } from "@/lib/utils/format";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { AAVE_V3_ARBITRUM_POOL } from "@/lib/aave-v3-arbitrum/asset-catalog";
 import { MORPHO_ARBITRUM_BLUE } from "@/lib/morpho-arbitrum/asset-catalog";
+import { ListingTag } from "@/components/shared/listing-tag";
+import type { CompoundArbitrumVisitMarket } from "@/lib/compound-arbitrum/api-contract";
+import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
+import {
+  cometFooterLead,
+  expandCards,
+  footerFigures,
+  type CometCard,
+  type ListingCard,
+} from "@/lib/compound-arbitrum/comet-cards";
 
 /** The fields the three families' rows share (lib/<family>-arbitrum/api-contract.ts). */
 export interface ArbitrumReadRow {
@@ -62,7 +78,11 @@ export interface ArbitrumReadRow {
   /** The wallet's last block in the daily discovery log read; absent or null
    *  for a wallet no discovery named. */
   lastActivityBlock?: number | null;
+  /** Compound only: the stored visit's Comets; absent until the server sends it. */
+  markets?: CompoundArbitrumVisitMarket[];
 }
+
+type Card = ListingCard<ArbitrumReadRow>;
 
 export type ArbitrumPositionsFamily = "aave-v3" | "compound-v3" | "morpho";
 
@@ -137,15 +157,21 @@ const SORTS: SortOption[] = [
   { value: "debt", label: "Debt" },
 ];
 
-/** Collateral plus the lent side: what the wallet has in, in dollars. */
-const sizeOf = (r: ArbitrumReadRow) => (r.totalCollateralUsd ?? 0) + (r.totalSupplyUsd ?? 0);
+/** A card's dollar figures: its Comet's where it draws one, the wallet's
+ *  totals otherwise. */
+const collateralOf = (c: Card) => (c.comet ? c.comet.market.collateralUsd : c.row.totalCollateralUsd);
+const debtOf = (c: Card) => (c.comet ? c.comet.market.borrowUsd : c.row.totalDebtUsd);
+const supplyOf = (c: Card) => (c.comet ? c.comet.market.supplyUsd : c.row.totalSupplyUsd);
+
+/** Collateral plus the lent side: what the card has in, in dollars. */
+const sizeOf = (c: Card) => (collateralOf(c) ?? 0) + (supplyOf(c) ?? 0);
 
 const SIZE_BRACKETS = [1000, 10000, 100000] as const;
 const SIZE_OPTIONS: FilterOptionDef[] = SIZE_BRACKETS.map((b) => ({
   value: String(b),
   label: `$${b.toLocaleString("en-US")} or more`,
 }));
-function dimensions(): ListDimension<ArbitrumPositionsFilters, ArbitrumReadRow>[] {
+function dimensions(): ListDimension<ArbitrumPositionsFilters, Card>[] {
   return [
     {
       id: "size",
@@ -163,13 +189,14 @@ function dimensions(): ListDimension<ArbitrumPositionsFilters, ArbitrumReadRow>[
 }
 
 const APPLY = {
-  search: (r: ArbitrumReadRow, q: string) => r.wallet.includes(q),
+  search: (c: Card, q: string) => c.row.wallet.includes(q),
   sort: {
-    // Rows without a discovery block sort last.
-    activity: (r: ArbitrumReadRow) => r.lastActivityBlock ?? -1,
-    visited: (r: ArbitrumReadRow) => r.lastVisitedAt ?? "",
-    collateral: (r: ArbitrumReadRow) => r.totalCollateralUsd ?? -1,
-    debt: (r: ArbitrumReadRow) => r.totalDebtUsd ?? -1,
+    // Rows without a discovery block sort last; a wallet's Comet cards share
+    // its block.
+    activity: (c: Card) => c.row.lastActivityBlock ?? -1,
+    visited: (c: Card) => c.row.lastVisitedAt ?? "",
+    collateral: (c: Card) => collateralOf(c) ?? -1,
+    debt: (c: Card) => debtOf(c) ?? -1,
   },
 };
 
@@ -213,6 +240,65 @@ function ReadLine({ row }: { row: ArbitrumReadRow }) {
       Read at block {row.blockNumber.toLocaleString("en-US")}
       {at != null && <MountedAge from={at} short prefix=" · " suffix=" ago" />}
     </span>
+  );
+}
+
+/** The receipt for one Comet's stored dollar figure. */
+function cometReceipt(what: string, row: ArbitrumReadRow, c: CometCard): Provenance {
+  const block = blockOf(row);
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block },
+    contract: { name: `Compound V3 ${c.label} Comet (Arbitrum)`, address: c.market.comet },
+    via: `${c.label} Comet.userBasic / collateralBalanceOf(${row.wallet}) at block ${block}, ${RECORDED}`,
+    formula: "Comet figure × Comet getPrice",
+    summary: `${what} in dollars in the ${c.label} Comet — read from it at block ${block} and priced at its getPrice${c.key === "weth" ? ", the ETH figure converted at the USDC Comet's WETH feed" : ""}.`,
+    verify: {
+      kind: "recompute",
+      text: `Re-read userBasic, collateralBalanceOf and getPrice on ${c.market.comet} at block ${block}`,
+    },
+  };
+}
+
+/** One Comet of a wallet: its collateral, debt and lent base in dollars. */
+function CometReadCard({ row, comet }: { row: ArbitrumReadRow; comet: CometCard }) {
+  const session = FAMILIES["compound-v3"].session;
+  const m = comet.market;
+  const r = (what: string) => cometReceipt(what, row, comet);
+  const posted = m.collateral.filter((c) => BigInt(c.amount) > BigInt(0)).length;
+  const base = comet.baseSymbol ?? "Base";
+  const baseHead = (id: string, label: string, raw: string, usd: number | null, verb: string, what: string) => {
+    const held = BigInt(raw) > BigInt(0);
+    return {
+      id,
+      label,
+      value: held && usd != null ? <UsdValue usd={usd} info={r(what)} /> : null,
+      sub: held ? `${base} ${verb}` : undefined,
+    };
+  };
+  const heads: PositionCardHead[] = [
+    usdHead("collateral", CARD_VOCAB.collateral, m.collateralUsd, posted, "posted", r("Collateral")),
+    baseHead("debt", CARD_VOCAB.debt, m.baseBorrowed, m.borrowUsd, "borrowed", "Debt"),
+    baseHead("supply", CARD_VOCAB.supply, m.baseSupplied, m.supplyUsd, "lent", "Supply"),
+  ];
+  const status: PositionCardStatus | null = m.isLiquidatable ? { word: "Liquidatable", tone: "caution" } : null;
+  return (
+    <div data-wallet-row={row.wallet} data-comet={m.comet}>
+      <PositionCard
+        slots={{
+          surface: "listing",
+          status,
+          heads,
+          identity: (
+            <WalletPill wallet={row.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+          ),
+          counters: { extra: <ReadLine row={row} /> },
+          menu: null,
+          tag: <ListingTag market={comet.label} />,
+        }}
+      />
+    </div>
   );
 }
 
@@ -301,17 +387,34 @@ export function ArbitrumPositionsListing({
 }) {
   const cfg = FAMILIES[family];
   const entry = protocolForSession(cfg.session)!;
-  const n = rows.length;
+  const cards: Card[] =
+    family === "compound-v3" ? expandCards(rows, COMPOUND_ARBITRUM_DEPLOYMENT.markets) : rows.map((row) => ({ row }));
+  const fig = footerFigures(cards);
+  const n = fig.cards;
+  // The per-Comet words once any row carries its Comets.
+  const perComet = family === "compound-v3" && rows.some((r) => r.markets);
   const checkedMs = census?.checkedAt ? Date.parse(census.checkedAt) : NaN;
   const checkedAt = Number.isFinite(checkedMs) ? Math.floor(checkedMs / 1000) : null;
   const footer: ReactNode = (
     <p
       className="mt-6 text-[11px] leading-relaxed text-rb-500"
       data-arbitrum-positions={n}
+      data-arbitrum-wallets={fig.wallets}
       data-arbitrum-recorded={recorded}
       data-arbitrum-census-open={census?.open}
     >
-      {census ? (
+      {perComet && census ? (
+        <>
+          {cometFooterLead(fig, census.open)}
+          {checkedAt != null ? <MountedAge from={checkedAt} short prefix=" " suffix=" ago" /> : null}. From each
+          day&rsquo;s most active wallets since 20 Oct 2026 and any wallet a reader opened.
+        </>
+      ) : perComet ? (
+        <>
+          {cometFooterLead(fig, null)}, from each day&rsquo;s most active wallets since 20 Oct 2026 and any wallet a
+          reader opened.
+        </>
+      ) : census ? (
         <>
           Indexed {n.toLocaleString("en-US")} of {census.open.toLocaleString("en-US")} open positions, counted on the
           chain
@@ -328,7 +431,7 @@ export function ArbitrumPositionsListing({
   );
   return (
     <>
-      <ChainTruthListingPage<ArbitrumReadRow, ArbitrumPositionsFilters>
+      <ChainTruthListingPage<Card, ArbitrumPositionsFilters>
         title={`${entry.label} positions read`}
         noun="positions"
         basePath={`${entry.href}/positions`}
@@ -340,16 +443,20 @@ export function ArbitrumPositionsListing({
         // comes in as the identity, and the title goes sr-only beneath it.
         identity={<RailHeader session={cfg.session} venue="listing" stamp />}
         titleHidden
-        renderCard={(row) => <ArbitrumReadCard row={row} family={family} />}
-        hrefFor={(row) => `${entry.href}/${row.wallet}`}
-        keyFor={(row) => row.wallet}
-        strategy={memoryStrategy<ArbitrumReadRow, ArbitrumPositionsFilters>({
+        renderCard={(c) =>
+          c.comet ? <CometReadCard row={c.row} comet={c.comet} /> : <ArbitrumReadCard row={c.row} family={family} />
+        }
+        hrefFor={(c) =>
+          c.comet?.key ? `${entry.href}/${c.row.wallet}#market-${c.comet.key}` : `${entry.href}/${c.row.wallet}`
+        }
+        keyFor={(c) => (c.comet ? `${c.row.wallet}:${c.comet.market.comet}` : c.row.wallet)}
+        strategy={memoryStrategy<Card, ArbitrumPositionsFilters>({
           // The server page reads the store; the rows arrive with the render.
-          fetchAll: async () => rows,
+          fetchAll: async () => cards,
           dimensions,
           apply: APPLY,
         })}
-        initialItems={rows}
+        initialItems={cards}
       />
       {footer}
     </>
