@@ -2,7 +2,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fetchCensusCount } from "../../lib/home/census-leg.ts";
+import { fetchCensus, fetchCensusCount } from "../../lib/home/census-leg.ts";
 
 const URL_ = "https://api.example/api/aave-v3-arbitrum/coverage";
 
@@ -65,4 +65,15 @@ test("a failed or malformed answer is null", async () => {
 
 test("wallets below open does not reconcile and is null", async () => {
   assert.equal(await fetchCensusCount("aave-v3-arbitrum", URL_, stub(census({ wallets: 10, open: 20 }))), null);
+});
+
+test("fetchCensus returns the figures with the read's block and time", async () => {
+  assert.deepEqual(await fetchCensus("aave-v3-arbitrum", URL_, stub(census())), {
+    open: 300,
+    wallets: 1200,
+    checkedBlock: 516611478,
+    checkedAt: "2026-10-20T00:00:00Z",
+  });
+  const unread = await fetchCensus("aave-v3-arbitrum", URL_, stub(census({ checkedBlock: null, checkedAt: null })));
+  assert.deepEqual(unread, { open: 300, wallets: 1200, checkedBlock: null, checkedAt: null });
 });

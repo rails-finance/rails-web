@@ -70,7 +70,7 @@ import { fetchWithRetry } from "@/lib/api/resilient-fetch";
 import { CHAINS } from "@/lib/shared/chains";
 import { LAUNCHED_PROTOCOLS } from "@/lib/shared/protocols";
 import type { CoveredPositions } from "./covered-positions";
-import { fetchCensusCount, type RosterCount, type RosterState } from "./census-leg";
+import { CENSUS_ENDPOINT, fetchCensusCount, type RosterCount, type RosterState } from "./census-leg";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
@@ -118,18 +118,8 @@ const LISTING_ENDPOINT: Record<string, string> = {
   spark: "/api/spark/positions",
 };
 
-/**
- * The explorers counted from a census rather than a listing, keyed by
- * `ProtocolEntry.id`: the position-first Arbitrum families, whose coverage
- * route states `census: { wallets, open, complete, … } | null` (census-leg.ts).
- * The route key is the server's family key, which differs from the explorer id
- * for Morpho.
- */
-const CENSUS_ENDPOINT: Record<string, string> = {
-  "aave-v3-arbitrum": "/api/aave-v3-arbitrum/coverage",
-  "compound-v3-arbitrum": "/api/compound-v3-arbitrum/coverage",
-  "morpho-arbitrum": "/api/morpho-blue-arbitrum/coverage",
-};
+// CENSUS_ENDPOINT (census-leg.ts): the explorers counted from a census rather
+// than a listing.
 
 /**
  * How to ask an explorer for ALL-TIME, where its unfiltered default isn't that.

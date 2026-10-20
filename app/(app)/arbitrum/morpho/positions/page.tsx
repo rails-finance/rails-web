@@ -8,6 +8,7 @@ import { ArbitrumPositionsListing } from "@/components/shared/arbitrum-positions
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { loadMorphoArbitrumPositions } from "@/lib/sources/api/morpho-arbitrum-positions";
+import { loadArbitrumCensus } from "@/lib/sources/api/arbitrum-census";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,11 @@ export const metadata = listingMetadata({
 });
 
 export default async function MorphoArbitrumPositionsPage() {
-  const answer = await loadMorphoArbitrumPositions({ readerIp: await readerIpFromHeaders() });
+  const readerIp = await readerIpFromHeaders();
+  const [answer, census] = await Promise.all([
+    loadMorphoArbitrumPositions({ readerIp }),
+    loadArbitrumCensus("morpho-arbitrum"),
+  ]);
   if (!answer)
     return (
       <div className="py-8">
@@ -29,5 +34,5 @@ export default async function MorphoArbitrumPositionsPage() {
     );
   // A read that found nothing held is not a position.
   const open = answer.rows.filter((r) => r.chainOpen === true);
-  return <ArbitrumPositionsListing family="morpho" rows={open} recorded={answer.total} />;
+  return <ArbitrumPositionsListing family="morpho" rows={open} recorded={answer.total} census={census} />;
 }

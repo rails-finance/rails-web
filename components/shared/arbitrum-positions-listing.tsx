@@ -13,6 +13,11 @@
 // market's legs) and the Compound and Morpho cards describe one market each,
 // so the row feeds the shared PositionCard they draw through: wallet,
 // status, the totals as headlines, and the read's block at the foot.
+//
+// The footer sets the open rows against the server's census, the wallets
+// holding an open position on the protocol at its daily chain read (rails-ops
+// reference/arbitrum-position-first-lane.md, "The census"). Without a census
+// it states the indexed count alone.
 
 import type { ReactNode } from "react";
 import { ChainTruthListingPage, memoryStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -28,6 +33,7 @@ import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { BaseListFilters, ListDimension } from "@/lib/shared/list-filter";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import type { CensusFigures } from "@/lib/home/census-leg";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatUsdValue } from "@/lib/utils/format";
@@ -281,6 +287,7 @@ export function ArbitrumPositionsListing({
   family,
   rows,
   recorded,
+  census,
 }: {
   family: ArbitrumPositionsFamily;
   /** The store's rows the chain read found open; the page drops the rest
@@ -288,18 +295,35 @@ export function ArbitrumPositionsListing({
   rows: ArbitrumReadRow[];
   /** Every wallet the store has recorded, the open ones included. */
   recorded: number;
+  /** The server's census of open wallets on the protocol; absent or null
+   *  until a complete one is read. */
+  census?: CensusFigures | null;
 }) {
   const cfg = FAMILIES[family];
   const entry = protocolForSession(cfg.session)!;
   const n = rows.length;
+  const checkedMs = census?.checkedAt ? Date.parse(census.checkedAt) : NaN;
+  const checkedAt = Number.isFinite(checkedMs) ? Math.floor(checkedMs / 1000) : null;
   const footer: ReactNode = (
     <p
       className="mt-6 text-[11px] leading-relaxed text-rb-500"
       data-arbitrum-positions={n}
       data-arbitrum-recorded={recorded}
+      data-arbitrum-census-open={census?.open}
     >
-      Indexed {n.toLocaleString("en-US")} {n === 1 ? "position" : "positions"}, from each day&rsquo;s most active
-      wallets since 20 Oct 2026 and any wallet a reader opened.
+      {census ? (
+        <>
+          Indexed {n.toLocaleString("en-US")} of {census.open.toLocaleString("en-US")} open positions, counted on the
+          chain
+          {checkedAt != null ? <MountedAge from={checkedAt} short prefix=" " suffix=" ago" /> : null}. From each
+          day&rsquo;s most active wallets since 20 Oct 2026 and any wallet a reader opened.
+        </>
+      ) : (
+        <>
+          Indexed {n.toLocaleString("en-US")} {n === 1 ? "position" : "positions"}, from each day&rsquo;s most active
+          wallets since 20 Oct 2026 and any wallet a reader opened.
+        </>
+      )}
     </p>
   );
   return (
