@@ -226,6 +226,8 @@ words:
   # label in the live window's lines and the card's tips.
   docs_psm: |-
     (the peg-defence fees, in the docs)
+  docs_gain: |-
+    (from the Protocol Safety Rate, in the docs)
   docs_reward: |-
     (the pETH yield to minters, in the docs)
   # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind as
@@ -479,7 +481,7 @@ position_words:
   sum_interest: |-
     interest
   sum_gain: |-
-    stability gain
+    stability gain (from the Protocol Safety Rate, in the docs)
   sum_psm: |-
     net PSM share (the peg-defence fees, in the docs)
   drop: |-
@@ -991,7 +993,7 @@ L5:
       - bold: |-
           Stability gain
         text: |-
-          a share of the secondary-rate payments, credited against the debt; CDPs with less leverage receive more than they pay.
+          a share of the secondary-rate payments, credited against the debt (Protocol Safety Rate, in the docs); CDPs with less leverage receive more than they pay.
       - bold: |-
           Reward pETH
         text: |-
