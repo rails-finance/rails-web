@@ -421,6 +421,14 @@ export const COMPOUND_ARBITRUM_DEPLOYMENT: CometDeployment = {
   markets: ARBITRUM_MARKETS,
 };
 
+/** The Comet a market page's `market` segment names, by roster key in any
+ *  case; null for a key the roster does not hold, which the route answers
+ *  with a 404 (rails-ops reference/arbitrum-position-first-lane.md). */
+export function compoundArbitrumMarketOf(key: string): CometMarket | null {
+  const k = key.toLowerCase();
+  return ARBITRUM_MARKETS.find((m) => m.key === k) ?? null;
+}
+
 /** The USDC.e Comet's creation block, the earliest of the four: where the
  *  history rails-server serves starts, and what lets it claim a whole life. */
 export const COMPOUND_ARBITRUM_DEPLOY_BLOCK = 87_335_214;
