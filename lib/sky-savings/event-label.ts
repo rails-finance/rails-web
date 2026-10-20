@@ -30,6 +30,13 @@ export const SKY_T1 = {
   /** The flank's words for a transfer's sUSDS. */
   legSent: "transferred out",
   legReceived: "transferred in",
+  /** A Savings Rate change, a market note in the T1 shape (ui-jobs 399): the
+   *  kind in words; the rate after rides the spine's flank. */
+  rateNote: {
+    increased: "Savings rate increased",
+    decreased: "Savings rate decreased",
+    adjusted: "Savings rate adjusted",
+  },
 } as const;
 
 /** The other address the head names as its clause, and the word before it: a

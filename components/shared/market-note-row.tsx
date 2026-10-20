@@ -14,6 +14,14 @@
 // list, so no total, no filter count and no export table can move because a
 // note rendered.
 //
+// A RATE NOTE IS A T1 ROW (Miles, 20 Oct 2026, ui-jobs 399): a note that
+// states a rate from → to (every rate step; a vault's terms where the family
+// hands a `rate`) names its kind in words ("Savings rate increased"), the
+// rate after in the pink pill on the spine's flank, the date at the right and
+// no ⋮ (a note has no event page or share link for one to hold). A run of
+// them in one gap is one group row (`NoteRunRow`). What follows describes
+// the row every other note keeps.
+//
 // THE MARK IS THE HEADER (Miles, 2026-09-04: "the numbers speak for
 // themselves"). At rest the row reads on one vertical centre line — a pair
 // of marks (the asset, and what it was measured in, overlapping), a
@@ -86,12 +94,21 @@ import {
   polarisEndLabel,
   rateStepFigures,
   formatRatePercent,
+  noteRateMove,
+  noteRateSpan,
+  noteRunReading,
+  noteT1Words,
+  RATE_NOTE_T1,
   type LiveNoteGroup,
   type MarketNote,
   type MarketNotePoint,
+  type NoteRun,
+  type RateNoteWords,
   type RateStepNote,
   type VaultTermsNote,
 } from "@/lib/shared/market-note";
+import { CountChip } from "@/components/shared/count-chip";
+import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 
 /** A receipted figure in a stat card: the text, its receipt, and the mark of
  *  the asset it counts (none for a block, a ratio, a percentage). */
@@ -195,6 +212,33 @@ export function MarketNoteRow({
   isLast?: boolean;
 }) {
   const body = useNoteBody(note);
+  const span = noteRateSpan(note);
+  const words = noteT1Words(note);
+  // A rate note takes the event row's shape, a T1 (ui-jobs 399): the kind in
+  // words, the rate after in the pink pill on the spine's flank.
+  if (span && words) {
+    const move = noteRateMove(note);
+    const head = words[move];
+    return (
+      <NoteRowShell
+        icon={opened ? "market-open" : "market"}
+        isLast={isLast}
+        label={`${head}, ${pct(span[0])} ${RATE_NOTE_T1.to} ${pct(span[1])}`}
+        marker={{ attr: "data-market-note", value: note.id }}
+        defaultOpen={defaultOpen}
+        // The arrow from the move itself: a rate that rose from 0.00% rose.
+        spine={rateFlank(
+          span,
+          rateProvOf(note, "to"),
+          move === "increased" ? "up" : move === "decreased" ? "down" : undefined,
+        )}
+        header={<T1Words>{head}</T1Words>}
+        meta={<NoteTime note={note} datePrefix={datePrefix} />}
+      >
+        <NoteBodyPanel body={body} />
+      </NoteRowShell>
+    );
+  }
   return (
     <NoteRowShell
       icon={opened ? "market-open" : "market"}
@@ -212,6 +256,168 @@ export function MarketNoteRow({
       <NoteBodyPanel body={body} />
     </NoteRowShell>
   );
+}
+
+const pct = (r: number) => `${r.toFixed(2)}%`;
+
+/** The head's words, as an event row's T1 states its kind. */
+function T1Words({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex max-w-full shrink-0 items-center text-sm text-rb-500" data-head-kind="">
+      {children}
+    </span>
+  );
+}
+
+/** The spine's flank on a rate note: the rate after in the pink pill (a third
+ *  party set it), the arrow the way it moved. */
+function rateFlank(
+  span: [number, number],
+  info: Provenance,
+  moves?: "up" | "down" | "both",
+): NonNullable<Parameters<typeof NoteRowShell>[0]["spine"]> {
+  return {
+    rateSpan: span,
+    rateMoves: moves,
+    rateTone: "delegate",
+    rateProv: { info, value: pct(span[1]) },
+  };
+}
+
+/** The receipt behind a rate note's earlier or later rate. */
+function rateProvOf(note: MarketNote, end: "from" | "to"): Provenance {
+  if (note.kind === "vault-terms") return end === "from" && note.rate ? note.rate.fromProv : note.prov;
+  if (note.protocol === "makerdao") return makerRateStepProv(note, "rate");
+  if (note.protocol === "aave-v3" || note.protocol === "spark") return aaveFamilyRateStepProv(note, "rate");
+  return rateStepProv(note, "rate");
+}
+
+/** A note's day stamp inside a group, on the timeline's rule. */
+const dayStamp = (ts: number): string | null => (ts > 0 ? `${shortDate(ts)} ${shortDateYear(ts)}` : null);
+
+/** A run of rate notes of one kind, no event between them, as one group row
+ *  (ui-jobs 399; `noteRuns` in lib/shared/market-note.ts): the kind in words
+ *  with the count, the last rate on the spine's flank with the group's arrow,
+ *  the first and last dates. Opened: the run's first → last rate and its
+ *  range, then one line per change, each opening to its own panel. */
+export function NoteRunRow({
+  run,
+  isLast = false,
+  defaultOpen,
+  opened,
+}: {
+  run: NoteRun;
+  isLast?: boolean;
+  defaultOpen?: boolean;
+  opened?: boolean;
+}) {
+  const r = noteRunReading(run);
+  const first = r.members[0];
+  const last = r.members[r.members.length - 1];
+  const words = noteT1Words(first) as RateNoteWords;
+  const head = words[r.move];
+  const moves = r.move === "increased" ? "up" : r.move === "decreased" ? "down" : "both";
+  const range = noteRunDates(r.members);
+  const lowNote = r.members.find((n) => noteRateSpan(n)!.some((v) => v === r.low)) ?? first;
+  const highNote = r.members.find((n) => noteRateSpan(n)!.some((v) => v === r.high)) ?? first;
+  const endOf = (n: MarketNote, v: number): "from" | "to" => (noteRateSpan(n)![1] === v ? "to" : "from");
+  const fig = (n: MarketNote, v: number, end: "from" | "to", echo = false) => (
+    <Prov echo={echo} info={rateProvOf(n, end)} value={pct(v)}>
+      <span className="tabular-nums text-foreground">{pct(v)}</span>
+    </Prov>
+  );
+  return (
+    <NoteRowShell
+      icon={opened ? "market-open" : "market"}
+      isLast={isLast}
+      label={`${head}, ${changesWord(run.notes.length)}, ${noteRunMovementWords(run)}, ${range}`}
+      marker={{ attr: "data-market-note-run", value: run.id }}
+      defaultOpen={defaultOpen}
+      spine={rateFlank([r.from, r.to], rateProvOf(last, "to"), moves)}
+      header={
+        <T1Words>
+          {head}
+          <CountChip count={run.notes.length} />
+        </T1Words>
+      }
+      meta={
+        <span className="evt-meta ml-auto inline-flex min-h-6 items-center gap-2 whitespace-nowrap">
+          <span className="text-xs text-foreground">{range}</span>
+        </span>
+      }
+    >
+      <p className="px-5 pt-3 pb-1 text-sm text-rb-500" data-note-run-rate="">
+        {fig(first, r.from, "from")} <span aria-hidden="true">→</span>
+        <span className="sr-only">{RATE_NOTE_T1.to}</span> {fig(last, r.to, "to", true)}
+        {r.showRange && (
+          <>
+            {`, ${RATE_NOTE_T1.between} `}
+            {fig(lowNote, r.low, endOf(lowNote, r.low))}
+            {` ${RATE_NOTE_T1.and} `}
+            {fig(highNote, r.high, endOf(highNote, r.high))}
+          </>
+        )}
+      </p>
+      <div className="pb-1.5">
+        {run.notes.map((note) => (
+          <NoteLine key={note.id} note={note} headline={<RunLineHead note={note} words={words} />} />
+        ))}
+      </div>
+    </NoteRowShell>
+  );
+}
+
+/** One change inside a run: its words, the rate it set from → to, its date. */
+function RunLineHead({ note, words }: { note: MarketNote; words: RateNoteWords }) {
+  const span = noteRateSpan(note) as [number, number];
+  return (
+    <>
+      <span className="text-sm text-rb-500">{words[noteRateMove(note)]}</span>
+      <span className="inline-flex items-center gap-1 text-sm">
+        <Prov info={rateProvOf(note, "from")} value={pct(span[0])}>
+          <span className="tabular-nums text-rb-500">{pct(span[0])}</span>
+        </Prov>
+        <span aria-hidden="true" className="text-rb-500">
+          →
+        </span>
+        <Prov info={rateProvOf(note, "to")} value={pct(span[1])}>
+          <span className="tabular-nums font-semibold text-foreground">{pct(span[1])}</span>
+        </Prov>
+      </span>
+      <span className="ml-auto text-xs">
+        <EventDateContext.Provider value={dayStamp(note.to.timestamp)}>
+          <EventTime ts={note.to.timestamp} />
+        </EventDateContext.Provider>
+      </span>
+    </>
+  );
+}
+
+/** A run's dates: "29 Jul '25 – 5 Jul '26", or the one day. */
+function noteRunDates(members: MarketNote[]): string {
+  const a = dayStamp(members[0].to.timestamp) ?? "";
+  const b = dayStamp(members[members.length - 1].to.timestamp) ?? "";
+  return a === b ? a : `${a} – ${b}`;
+}
+
+/** The run's movement in words: "4.50% to 3.80%", the range after it where
+ *  the run went outside its two ends. */
+function noteRunMovementWords(run: NoteRun): string {
+  const r = noteRunReading(run);
+  const net = `${pct(r.from)} ${RATE_NOTE_T1.to} ${pct(r.to)}`;
+  return r.showRange ? `${net}, ${RATE_NOTE_T1.between} ${pct(r.low)} ${RATE_NOTE_T1.and} ${pct(r.high)}` : net;
+}
+
+const changesWord = (n: number) => `${n.toLocaleString("en-US")} ${RATE_NOTE_T1.changes}`;
+
+/** A run as its spine marker states it. */
+export function noteRunMarkerText(run: NoteRun): { tip: string; spoken: string } {
+  const r = noteRunReading(run);
+  const head = (noteT1Words(r.members[0]) as RateNoteWords)[r.move];
+  return {
+    tip: `${head} · ${changesWord(run.notes.length)} · ${pct(r.from)} → ${pct(r.to)}`,
+    spoken: `${head}, ${changesWord(run.notes.length)}, ${noteRunMovementWords(run)}`,
+  };
 }
 
 /** What one note hands the row: its label, headline, cells and (i). The one
@@ -407,16 +613,17 @@ export function LiveNoteGroupRow({
           <span className="ml-auto text-xs text-rb-500">Now</span>
         </div>
         {group.notes.map((note) => (
-          <LiveNoteLine key={note.id} note={note} />
+          <NoteLine key={note.id} note={note} />
         ))}
       </div>
     </div>
   );
 }
 
-/** One line of the live group: the note's headline, a chevron, and the note's
- *  panel beneath while open. Its own receipt scope, as a lone row has. */
-function LiveNoteLine({ note }: { note: MarketNote }) {
+/** One line of a group (the live group's, a run's): the note's headline, a
+ *  chevron, and the note's panel beneath while open. Its own receipt scope,
+ *  as a lone row has. */
+function NoteLine({ note, headline }: { note: MarketNote; headline?: ReactNode }) {
   const body = useNoteBody(note);
   const registry = useReceiptRegistry();
   const [open, setOpen] = useState(false);
@@ -440,7 +647,7 @@ function LiveNoteLine({ note }: { note: MarketNote }) {
         >
           <div className="flex items-center gap-2 pr-5">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 py-1.5 pl-5">
-              <NoteHeadline note={note} body={body} />
+              {headline ?? <NoteHeadline note={note} body={body} />}
             </div>
             <ExpandChevron isOpen={open} group="evt" className="shrink-0" />
           </div>

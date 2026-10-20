@@ -307,6 +307,27 @@ export const rateChangeProv = (block: number, txHash: string, ssr: string, annua
   source: { block, txHash },
 });
 
+/** The rate a change replaced: the File('ssr') log before it where the page
+ *  holds that log, else the change's own row, which states the earlier rate
+ *  beside the new one. */
+export const rateChangeFromProv = (
+  change: { blockNumber: number; txHash: string },
+  previous: { blockNumber: number; txHash: string; ssr: string } | undefined,
+  annual: string,
+): Provenance =>
+  previous
+    ? {
+        ...rateChangeProv(previous.blockNumber, previous.txHash, previous.ssr, annual),
+        summary: `Savings Rate before this change, ${annual} — set by the previous File('ssr', data) log; data is the per-second rate.`,
+      }
+    : {
+        kind: "chain-derived",
+        pclass: "indexed",
+        summary: `Savings Rate before this change, ${annual} — the rate the previous File('ssr', data) log set, which the rate history states beside this change.`,
+        contract: SUSDS_CONTRACT,
+        source: { block: change.blockNumber, txHash: change.txHash },
+      };
+
 export const eventInterestSinceProv = (
   c: SkyEventCoords,
   raw: string,

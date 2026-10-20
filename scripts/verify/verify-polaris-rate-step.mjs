@@ -428,6 +428,10 @@ for (const f of FIXTURES) {
 // quantity word carries the direction and the earlier rate ("0.00% primary
 // rate, down from 5.96%"). A newcomer read "↓ 0.00%" on a rate that fell to
 // zero as a move of nothing. The later rate still leads, once.
+// 2026-10-20 (ui-jobs 399): the note is a T1 row. The head names the kind in
+// words ("Primary rate decreased") and the later rate stands in the pink pill
+// on the spine's flank, which comes first in the row's text; the earlier rate
+// is not on the row at rest.
 
 const page27 = await open(context, polarisUrl("usdp", "27"));
 const rowText = async (page, noteId) =>
@@ -446,34 +450,31 @@ const squash = (t) =>
     .replace(/\s+/g, "");
 const restA = await rowText(page27, want27[0].id);
 const restB = await rowText(page27, want27[1].id);
+/** A rate note's row at rest: the flank's later rate, then the head's words. */
+const atRestWords = (to, from) =>
+  `${to} Primary rate ${Number(to.replace("%", "")) < Number(from.replace("%", "")) ? "decreased" : "increased"}`;
 check(
-  "2. at rest, each usdp/27 header states the LATER rate, then the direction and the earlier rate in words (0.00%, then 9.39%)",
-  squash(restA) === squash(`${ratePct(want27[0].rateB)} primary rate, down from ${ratePct(want27[0].rateA)}`) &&
-    squash(restB) === squash(`${ratePct(want27[1].rateB)} primary rate, up from ${ratePct(want27[1].rateA)}`),
+  "2. at rest, each usdp/27 row states the LATER rate on the flank and the kind in words (0.00% decreased, then 9.39% increased)",
+  squash(restA) === squash(atRestWords(ratePct(want27[0].rateB), ratePct(want27[0].rateA))) &&
+    squash(restB) === squash(atRestWords(ratePct(want27[1].rateB), ratePct(want27[1].rateA))),
   `first "${restA}", second "${restB}"`,
 );
 check(
-  "2b. each header states the later rate first and the earlier rate once, after it",
+  "2b. at rest the earlier rate is not on the row",
   [
     [restA, want27[0]],
     [restB, want27[1]],
-  ].every(
-    ([t, w]) =>
-      t.split(ratePct(w.rateA)).length - 1 === 1 && t.indexOf(ratePct(w.rateB)) < t.indexOf(`from ${ratePct(w.rateA)}`),
-  ),
+  ].every(([t, w]) => !t.includes(ratePct(w.rateA)) || ratePct(w.rateA) === ratePct(w.rateB)),
   `first "${restA}", second "${restB}"`,
 );
-const glyphOf = async (noteId) => {
-  const row = page27.locator(`[data-market-note="${noteId}"]`);
-  const down = await row.locator("svg.lucide-arrow-down-right").count();
-  const up = await row.locator("svg.lucide-arrow-up-right").count();
-  return down > 0 ? "down" : up > 0 ? "up" : "none";
-};
+const glyphOf = async (noteId) =>
+  (await page27.locator(`[data-market-note="${noteId}"] [data-spine-rate]`).first().getAttribute("data-spine-rate")) ??
+  "none";
 const glyphA = await glyphOf(want27[0].id);
 const glyphB = await glyphOf(want27[1].id);
 check(
-  "2c. no direction glyph on either header — the words carry it",
-  glyphA === "none" && glyphB === "none",
+  "2c. the flank's arrow points the way each rate moved (down, then up from 0.00%)",
+  glyphA === "down" && glyphB === "up",
   `first ${glyphA}, second ${glyphB}`,
 );
 
@@ -600,7 +601,7 @@ for (const key of ["usdp/296"]) {
   const text = historical.length === 1 ? await rowText(page, historical[0]) : "";
   check(
     `5a. ${key}'s header states the run's later rate (${run.toPct.toFixed(2)}%), not a step's`,
-    squash(text) === squash(`${run.toPct.toFixed(2)}% primary rate, down from ${run.fromPct.toFixed(2)}%`),
+    squash(text) === squash(atRestWords(`${run.toPct.toFixed(2)}%`, `${run.fromPct.toFixed(2)}%`)),
     `"${text}"`,
   );
   check(
@@ -641,7 +642,7 @@ for (const key of ["usdp/296"]) {
   check(
     `6a. ${CLOSED_FIXTURE.key}'s header states the later rate (${CLOSED_FIXTURE.toPct.toFixed(2)}%)`,
     squash(atRest) ===
-      squash(`${CLOSED_FIXTURE.toPct.toFixed(2)}% primary rate, down from ${CLOSED_FIXTURE.fromPct.toFixed(2)}%`),
+      squash(atRestWords(`${CLOSED_FIXTURE.toPct.toFixed(2)}%`, `${CLOSED_FIXTURE.fromPct.toFixed(2)}%`)),
     `"${atRest}"`,
   );
   let opened = "";

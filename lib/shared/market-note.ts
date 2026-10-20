@@ -169,9 +169,147 @@ export interface VaultTermsNote extends MarketNoteBase {
   /** The event's own non-indexed words, raw, in the order the contract
    *  declares them — what the sentence above was written from. */
   fields: Record<string, string>;
+  /** Set where the terms are a rate stated from → to (Sky's Savings Rate):
+   *  the row then takes the T1 shape and a run of them groups (ui-jobs 399).
+   *  Unset, the row states `headline` as before. */
+  rate?: VaultTermsRate;
 }
 
+/** A vault's rate set from one figure to another, as its family states it. */
+export interface VaultTermsRate {
+  /** Percent a year, before and after: 3.6 for 3.60%. */
+  from: number;
+  to: number;
+  /** The receipt behind the earlier rate; `prov` carries the later. */
+  fromProv: Provenance;
+  /** The head's words for each direction. */
+  t1: RateNoteWords;
+}
+
+/** A rate note's T1 head, one phrase per direction: "Savings rate increased",
+ *  "… decreased", and "… adjusted" for a group whose members went both ways. */
+export type RateNoteWords = Record<RateMove, string>;
+
 export type MarketNote = RateStepNote | VaultTermsNote;
+
+// ── A rate note as a T1 row, and a run of them as one group ────────────────
+// A note that states a rate from → to (every rate step; a vault's terms where
+// the family hands a `rate`) reads as an event row does: the kind in words in
+// the head, the rate after in the pink pill on the spine's flank. Two or more
+// such notes of one kind in one gap, no event between them, draw as one group
+// row (ui-jobs 399). A note is not an event, so the run's floor is the notes'
+// own two, not decision 0039's five.
+
+export type RateMove = "increased" | "decreased" | "adjusted";
+
+/** The shared kinds' words (rate steps). A family's vault rate brings its
+ *  own (`VaultTermsRate.t1`). */
+export const RATE_NOTE_T1 = {
+  increased: "increased",
+  decreased: "decreased",
+  adjusted: "adjusted",
+  makerdao: "Stability fee",
+  polaris: "Primary rate",
+  supply: "supply rate",
+  borrow: "borrow rate",
+  /** The group's line: first → last, then ", moved between low and high"
+   *  where the run left them. */
+  to: "to",
+  between: "moved between",
+  and: "and",
+  /** After the count in a group's spoken name: "9 changes". */
+  changes: "changes",
+} as const;
+
+/** The rate a note states, in percent a year, before and after; null on a
+ *  note that states no rate (a vault's fee, a name). */
+export function noteRateSpan(note: MarketNote): [number, number] | null {
+  if (note.kind === "rate-step") return [note.from.value * 100, note.to.value * 100];
+  return note.rate ? [note.rate.from, note.rate.to] : null;
+}
+
+const cents = (pct: number): number => Math.round(pct * 100);
+
+/** Which way one note moved its rate, at the two decimals the row shows. */
+export function noteRateMove(note: MarketNote): RateMove {
+  const span = noteRateSpan(note);
+  if (!span || cents(span[0]) === cents(span[1])) return "adjusted";
+  return span[1] > span[0] ? "increased" : "decreased";
+}
+
+/** The head's words for a rate note, or null on a note that states no rate. */
+export function noteT1Words(note: MarketNote): RateNoteWords | null {
+  if (note.kind === "vault-terms") return note.rate?.t1 ?? null;
+  const noun =
+    note.protocol === "makerdao"
+      ? RATE_NOTE_T1.makerdao
+      : note.protocol === "aave-v3" || note.protocol === "spark"
+        ? `${note.marketSymbol} ${note.side === "supply" ? RATE_NOTE_T1.supply : RATE_NOTE_T1.borrow}`
+        : RATE_NOTE_T1.polaris;
+  return {
+    increased: `${noun} ${RATE_NOTE_T1.increased}`,
+    decreased: `${noun} ${RATE_NOTE_T1.decreased}`,
+    adjusted: `${noun} ${RATE_NOTE_T1.adjusted}`,
+  };
+}
+
+/** Two or more rate notes of one kind, adjacent in one gap, as one row. */
+export interface NoteRun {
+  group: "run";
+  /** `run:` and the first member's id: the open state and the marker key on it. */
+  id: string;
+  /** In the gap's display order. */
+  notes: MarketNote[];
+}
+
+export const isNoteRun = (x: MarketNote | LiveNoteGroup | NoteRun): x is NoteRun => (x as NoteRun).group === "run";
+
+/** What makes two notes the same kind for a run: the quantity and the
+ *  market. Null on a note that never joins one (no rate, or live). */
+function runKey(note: MarketNote): string | null {
+  if (note.live || !noteRateSpan(note)) return null;
+  return note.kind === "rate-step"
+    ? `rate-step:${note.protocol ?? "polaris"}:${note.marketAddress}:${note.marketSymbol}:${note.side ?? ""}`
+    : `vault-terms:${note.termsKind}:${note.marketAddress}`;
+}
+
+/** One gap's notes with each run of two or more same-kind rate notes as one
+ *  `NoteRun`, in the order given. */
+export function noteRuns(notes: readonly MarketNote[]): (MarketNote | NoteRun)[] {
+  const out: (MarketNote | NoteRun)[] = [];
+  let i = 0;
+  while (i < notes.length) {
+    const key = runKey(notes[i]);
+    let j = i + 1;
+    while (key && j < notes.length && runKey(notes[j]) === key) j++;
+    if (j - i >= 2) out.push({ group: "run", id: `run:${notes[i].id}`, notes: notes.slice(i, j) });
+    else out.push(notes[i]);
+    i = j;
+  }
+  return out;
+}
+
+/** A run as its head and line state it: the members oldest first, the rate
+ *  before the first and after the last, the lowest and highest it passed
+ *  through, which way the members moved it, and whether the range is drawn
+ *  (the run went outside its two ends). */
+export function noteRunReading(run: NoteRun) {
+  const members = [...run.notes].sort((a, b) => a.to.block - b.to.block || cmp(a.id, b.id));
+  const spans = members.map((n) => noteRateSpan(n) as [number, number]);
+  const from = spans[0][0];
+  const to = spans[spans.length - 1][1];
+  const all = spans.flat();
+  const low = Math.min(...all);
+  const high = Math.max(...all);
+  const movesEach = members.map(noteRateMove);
+  const move: RateMove = movesEach.every((m) => m === "increased")
+    ? "increased"
+    : movesEach.every((m) => m === "decreased")
+      ? "decreased"
+      : "adjusted";
+  const showRange = cents(low) < Math.min(cents(from), cents(to)) || cents(high) > Math.max(cents(from), cents(to));
+  return { members, from, to, low, high, move, showRange };
+}
 
 // ── The live notes as one card ──────────────────────────────────────────────
 // Where the head slot holds two or more LIVE notes (an Aave position borrowing
@@ -191,7 +329,7 @@ export interface LiveNoteGroup {
 
 export const LIVE_NOTE_GROUP_ID = "live-notes:head";
 
-export const isLiveNoteGroup = (x: MarketNote | LiveNoteGroup): x is LiveNoteGroup =>
+export const isLiveNoteGroup = (x: MarketNote | LiveNoteGroup | NoteRun): x is LiveNoteGroup =>
   (x as LiveNoteGroup).group === "live";
 
 /** The size of the move a note states: points of rate for a rate step. A
@@ -251,6 +389,7 @@ export function vaultTermsNotes<N extends VaultTermsSource>(
     prov: Provenance;
     title?: string;
     tip?: string;
+    rate?: VaultTermsRate;
   },
 ): VaultTermsNote[] {
   return notes.map((note) => {
@@ -285,6 +424,7 @@ export function vaultTermsNotes<N extends VaultTermsSource>(
       prov: words.prov,
       measureProtocolId: vault.protocolId,
       fields: note.fields,
+      ...(words.rate ? { rate: words.rate } : {}),
     };
   });
 }

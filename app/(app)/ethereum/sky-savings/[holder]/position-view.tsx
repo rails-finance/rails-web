@@ -31,7 +31,8 @@ import { skySavingsExplorer } from "@/lib/sky-savings/explorer";
 import { skyFlowTimeline, skyLifetimeTotals } from "@/lib/sky-savings/flows";
 import { skyFlowsExplanation } from "@/lib/sky-savings/flows-explanation";
 import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
-import { chiProv, psmPriceProv, rateChangeProv } from "@/lib/sky-savings/provenance";
+import { chiProv, psmPriceProv, rateChangeFromProv, rateChangeProv } from "@/lib/sky-savings/provenance";
+import { SKY_T1 } from "@/lib/sky-savings/event-label";
 import type { SkyAsOf, SkyFlowDay, SkyGate, SkyPosition, SkyRateChange, SkyRates } from "@/lib/sky-savings/types";
 
 export default function SkySavingsPositionView({
@@ -103,6 +104,7 @@ export default function SkySavingsPositionView({
   // no row to sit beside and stand in the timeline's head slot. A change
   // applies to every holder at once, so it is a note, counted in nothing.
   const newestBlock = useMemo(() => skyEvents.reduce((m, e) => Math.max(m, e.blockNumber), 0), [skyEvents]);
+  const history = rates?.ssr ?? rateNotes;
   const toNotes = useMemo(
     () => (list: SkyRateChange[]) =>
       vaultTermsNotes(
@@ -117,6 +119,11 @@ export default function SkySavingsPositionView({
         (n) => {
           const to = pctString(n.fields.annualRate);
           const from = pctString(n.fields.previousAnnualRate);
+          const previous = history
+            .filter((r) => r.blockNumber < n.blockNumber)
+            .reduce<
+              SkyRateChange | undefined
+            >((best, r) => (!best || r.blockNumber > best.blockNumber ? r : best), undefined);
           return {
             headline: `${from} → ${to}`,
             quantity: "Savings Rate",
@@ -124,10 +131,16 @@ export default function SkySavingsPositionView({
             tip: `Savings Rate ${from} → ${to}`,
             statement: `Sky governance set the Savings Rate to ${to} a year, from ${from}, for every sUSDS holder`,
             prov: rateChangeProv(n.blockNumber, n.txHash, n.fields.ssr, to),
+            rate: {
+              from: Number(n.fields.previousAnnualRate) * 100,
+              to: Number(n.fields.annualRate) * 100,
+              fromProv: rateChangeFromProv(n, previous, from),
+              t1: SKY_T1.rateNote,
+            },
           };
         },
       ),
-    [],
+    [history],
   );
   const notes: MarketNote[] = useMemo(
     () => toNotes(rateNotes.filter((r) => r.blockNumber <= newestBlock)),

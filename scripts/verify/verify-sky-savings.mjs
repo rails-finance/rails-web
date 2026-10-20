@@ -203,9 +203,17 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     saved: [...document.querySelectorAll("[aria-label]")].some((e) =>
       /^Balance: .* still saved, of /.test(e.getAttribute("aria-label") ?? ""),
     ),
+    // A lone change's marker names it; a run's marker names its count.
     rateMarkers: [...document.querySelectorAll("[data-note-marker]")]
       .map((b) => b.getAttribute("aria-label") ?? "")
-      .filter((l) => l.startsWith("Savings Rate change")).length,
+      .reduce(
+        (n, l) =>
+          n +
+          (l.startsWith("Savings Rate change")
+            ? 1
+            : Number(l.match(/^Savings rate (?:increased|decreased|adjusted), (\d+) changes, /)?.[1] ?? 0)),
+        0,
+      ),
   }));
   check(`${name} page: no refusal while the gate passes`, !got.gate);
   check(`${name} page: states the sealed block`, got.asof === String(pos.asOf.block), `${got.asof}`);
@@ -381,7 +389,8 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   );
 }
 
-// At 390px, consecutive Savings Rate changes draw as one row that counts them.
+// Consecutive Savings Rate changes draw as one group row that counts them
+// (ui-jobs 399), its marker on the spine at 390px.
 {
   const phone = await browser.newPage({ viewport: { width: 390, height: 900 } });
   await phone.addInitScript(() => {
@@ -392,11 +401,13 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   const pos = positions.small;
   await phone.goto(`${BASE}/ethereum/sky-savings/${HOLDERS.small}`, { waitUntil: "networkidle", timeout: 120000 });
   const got = await phone.evaluate(() => ({
-    runs: [...document.querySelectorAll("[data-phone-note-run]")].map((e) => ({
-      n: Number(e.getAttribute("data-phone-note-run")),
-      text: e.innerText.split("\n")[0],
-    })),
-    single: document.querySelectorAll("[data-market-note]").length,
+    runs: [...document.querySelectorAll('[data-note-marker^="run:"]')].map((e) => {
+      const text = e.getAttribute("aria-label") ?? "";
+      return { n: Number(text.match(/, (\d+) changes, /)?.[1] ?? 0), text };
+    }),
+    single: [...document.querySelectorAll("[data-note-marker]")].filter((e) =>
+      (e.getAttribute("aria-label") ?? "").startsWith("Savings Rate change"),
+    ).length,
     width: document.documentElement.scrollWidth,
   }));
   const changes = rates.data.ssr.filter(
@@ -411,7 +422,9 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   );
   check(
     "small page at 390: each run row names its count",
-    got.runs.every((r) => r.text.startsWith(`${r.n} Savings Rate changes, `)),
+    got.runs.every(
+      (r) => r.n >= 2 && new RegExp(`^Savings rate (increased|decreased|adjusted), ${r.n} changes, `).test(r.text),
+    ),
     JSON.stringify(got.runs),
   );
   check("small page at 390: no horizontal overflow", got.width <= 390, `${got.width}`);

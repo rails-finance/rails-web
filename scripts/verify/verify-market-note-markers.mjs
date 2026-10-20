@@ -154,7 +154,16 @@ console.log(`Market notes — against ${BASE}\n`);
   );
   await openAllItem.click();
   await page.waitForTimeout(500);
-  const rowsOpenAll = await page.locator("[data-market-note]").count();
+  // A run of rate notes in one gap is one group row (ui-jobs 399): it stands
+  // for as many notes as its count chip says.
+  const rowsOpenAll = await page.evaluate(
+    () =>
+      document.querySelectorAll("[data-market-note]").length +
+      [...document.querySelectorAll("[data-market-note-run] [data-group-count]")].reduce(
+        (n, e) => n + Number(e.getAttribute("data-group-count")),
+        0,
+      ),
+  );
   const panelsOpenAll = await page.locator("[data-market-note-open]").count();
   check(
     "7. Open all shows every note as its header row, no panel open",
@@ -197,9 +206,13 @@ console.log(`Market notes — against ${BASE}\n`);
   }
   await page.getByRole("button", { name: "Types of event", exact: true }).click();
   await page.waitForTimeout(800);
-  const left = await closedMarkers(page).count();
+  // The notes now share one gap, so a run of one kind stands as one marker
+  // (ui-jobs 399) that names how many changes it holds.
+  const left = await closedMarkers(page).evaluateAll((els) =>
+    els.reduce((n, e) => n + Number((e.getAttribute("aria-label") ?? "").match(/, (\d+) changes, /)?.[1] ?? 1), 0),
+  );
   check(
-    "9. with every event type filtered out, every marker stays",
+    "9. with every event type filtered out, every note keeps a marker",
     countBefore && (await page.locator("[data-event-id]").count()) === 0 && left === total,
     `${left} of ${total}`,
   );

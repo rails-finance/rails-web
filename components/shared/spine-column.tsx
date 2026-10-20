@@ -185,7 +185,7 @@ export interface SpineColumnProps {
    *  publishes (`usePublishSpineLegs`) are drawn; with neither, the triangle
    *  stands in. */
   warningLegs?: SpineWarningLeg[];
-  /** icon="rate-change" or "delegate": the rate before and after (%). The
+  /** icon="rate-change", "delegate", or a rate note's "market": the rate before and after (%). The
    *  right flank, where a row's leg numbers stand, states the rate after
    *  ("0.50%") in a rate pill with no sign, an up or down arrow beside the
    *  node where the rate moved from a prior rate. Unset, the glyph carries
@@ -1057,8 +1057,11 @@ export function SpineColumn({
         // small hollow diamond in the spine's neutral ink, no fill, no party
         // colour, no pulse. Nothing happened to the ACCOUNT here. A note
         // opened from its marker fills the diamond in the same ink.
+        // A rate note (ui-jobs 399) puts the rate after on the flank, as a
+        // rate change does.
         return nodeRow(
           <MarketNoteIcon size={T} color={SPINE_COLORS.default} filled={effectiveIcon === "market-open"} />,
+          rateSpan ? rateFlank(rateSpan) : undefined,
         );
       case "live-window":
         // The live window's node: the note's register (the account did

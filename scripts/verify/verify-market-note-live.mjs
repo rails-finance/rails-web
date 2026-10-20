@@ -182,11 +182,7 @@ check(
   rateText8.includes(formatStableAmount(interestBefore8)) && rateText8.includes(formatStableAmount(interestAfter8)),
   `wanted ${formatStableAmount(interestBefore8)} → ${formatStableAmount(interestAfter8)}`,
 );
-check(
-  '2e. the rate note names the quantity "primary rate"',
-  rateText8.includes("primary rate"),
-  rateText8.slice(0, 80),
-);
+check('2e. the rate note names the quantity "primary rate"', /primary rate/i.test(rateText8), rateText8.slice(0, 80));
 
 // ── 2. usdp/27 and usdp/166 — no live note ─────────────────────────────────
 

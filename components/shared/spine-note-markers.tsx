@@ -35,7 +35,7 @@
 // one. The list's line runs behind the markers (`SpineLine`), so a gap draws
 // no line of its own.
 
-import { useLayoutEffect, useRef, type CSSProperties } from "react";
+import { useLayoutEffect, useMemo, useRef, type CSSProperties } from "react";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
 import { useTimelineScale } from "@/components/shared/activity-timeline";
@@ -44,10 +44,20 @@ import {
   liveGroupMarkerText,
   MarketNoteRow,
   noteMarkerText,
+  noteRunMarkerText,
+  NoteRunRow,
 } from "@/components/shared/market-note-row";
 import { isPhoneViewport, useSpineView } from "@/components/shared/mobile-spine";
 import { PulsingDot, type SpineTip } from "@/components/shared/spine-column";
-import { isLiveNoteGroup, type LiveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
+import {
+  isLiveNoteGroup,
+  isNoteRun,
+  noteRunReading,
+  noteRuns,
+  type LiveNoteGroup,
+  type MarketNote,
+  type NoteRun,
+} from "@/lib/shared/market-note";
 import { formatDate } from "@/lib/date";
 
 /** The phone marker's tap target: 44px tall, 64px wide. */
@@ -57,16 +67,37 @@ const GROWTH = 20;
 /** The caption's padding below it, inside the segment above the gap. */
 const CAPTION_PAD = 10;
 
-/** What a gap holds: a note, or the head slot's live notes as one card. The
- *  group takes one marker, one open state and one row, as a note does. */
-export type GapItem = MarketNote | LiveNoteGroup;
+/** What a gap holds: a note, the head slot's live notes as one card, or a
+ *  run of rate notes as one group row (ui-jobs 399). A group takes one
+ *  marker, one open state and one row, as a note does. */
+export type GapItem = MarketNote | LiveNoteGroup | NoteRun;
+
+/** A gap's items with each run of same-kind rate notes as one `NoteRun`. */
+function withRuns(items: readonly GapItem[]): GapItem[] {
+  const out: GapItem[] = [];
+  let pending: MarketNote[] = [];
+  const flush = () => {
+    out.push(...noteRuns(pending));
+    pending = [];
+  };
+  for (const item of items) {
+    if (isLiveNoteGroup(item) || isNoteRun(item)) {
+      flush();
+      out.push(item);
+    } else pending.push(item);
+  }
+  flush();
+  return out;
+}
 
 export const noteOpenId = (item: GapItem) => `note:${item.id}`;
 
-const markerText = (item: GapItem) => (isLiveNoteGroup(item) ? liveGroupMarkerText(item) : noteMarkerText(item));
+const markerText = (item: GapItem) =>
+  isLiveNoteGroup(item) ? liveGroupMarkerText(item) : isNoteRun(item) ? noteRunMarkerText(item) : noteMarkerText(item);
 
 function markerLabel(item: GapItem): string {
   if (isLiveNoteGroup(item)) return liveGroupMarkerText(item).spoken;
+  if (isNoteRun(item)) return noteRunMarkerText(item).spoken;
   const note = item;
   const when = note.live ? "now" : note.to.timestamp > 0 ? formatDate(note.to.timestamp) : null;
   const title = (note.kind === "vault-terms" && note.title) || "Market note";
@@ -78,7 +109,9 @@ function markerLabel(item: GapItem): string {
 const openFocusSelector = (item: GapItem) =>
   isLiveNoteGroup(item)
     ? `[data-live-note-group] [role="button"]`
-    : `[data-market-note="${CSS.escape(item.id)}"] [role="button"]`;
+    : isNoteRun(item)
+      ? `[data-market-note-run="${CSS.escape(item.id)}"] [role="button"]`
+      : `[data-market-note="${CSS.escape(item.id)}"] [role="button"]`;
 
 function Diamond({ filled }: { filled: boolean }) {
   return (
@@ -107,7 +140,11 @@ function Diamond({ filled }: { filled: boolean }) {
 function Direction({ note }: { note: GapItem }) {
   // A group draws the direction its notes share, and none where they part.
   let rising: boolean;
-  if (isLiveNoteGroup(note)) {
+  if (isNoteRun(note)) {
+    const move = noteRunReading(note).move;
+    if (move === "adjusted") return null;
+    rising = move === "increased";
+  } else if (isLiveNoteGroup(note)) {
     const ups = note.notes.filter((n) => n.to.value >= n.from.value).length;
     if (ups !== 0 && ups !== note.notes.length) return null;
     rising = ups > 0;
@@ -181,7 +218,7 @@ const SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
  *  `head` is the slot above the newest row: `tip` draws the tip's dot above
  *  the markers. */
 export function NoteGap({
-  notes,
+  notes: given,
   datePrefixFor,
   openIds,
   openAll,
@@ -199,6 +236,7 @@ export function NoteGap({
 }) {
   const phone = useSpineView();
   const ref = useRef<HTMLDivElement>(null);
+  const notes = useMemo(() => withRuns(given), [given]);
   // Focus follows the click: opening a marker moves it to the note's header,
   // closing returns it to the marker.
   const focusNext = useRef<string | null>(null);
@@ -257,7 +295,7 @@ export function NoteGap({
             panel={g.panel}
             head={!!head}
             openAll={openAll}
-            datePrefix={isLiveNoteGroup(g.note) ? null : datePrefixFor(g.note)}
+            datePrefix={isLiveNoteGroup(g.note) || isNoteRun(g.note) ? null : datePrefixFor(g.note)}
             onClose={() => toggle(g.note, false)}
           />
         ) : (
@@ -370,6 +408,9 @@ function OpenNote({
         {isLiveNoteGroup(note) ? (
           // The group opens to its lines, each closed.
           <LiveNoteGroupRow group={note} opened />
+        ) : isNoteRun(note) ? (
+          // A run opens to its rate line and its changes, each closed.
+          <NoteRunRow key={panel ? "panel" : "row"} run={note} defaultOpen={panel} opened />
         ) : (
           <MarketNoteRow
             // Remounts when a marker opens it, so the panel opens with it.

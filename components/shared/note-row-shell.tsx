@@ -26,9 +26,9 @@
 import { useId, useState, type ReactNode } from "react";
 
 import { useTimelineScale } from "@/components/shared/activity-timeline";
-import { ExpandChevron } from "@/components/shared/expand-chevron";
+import { DiscChevron, ExpandChevron } from "@/components/shared/expand-chevron";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { SpineColumn, type SpineIcon } from "@/components/shared/spine-column";
+import { SpineColumn, type SpineColumnProps, type SpineIcon } from "@/components/shared/spine-column";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { useRowTarget } from "@/components/shared/row-target";
 
@@ -52,6 +52,13 @@ export interface NoteRowShellProps {
   /** Mount with the body open: a note opened from its spine marker opens
    *  straight to the row and its panel. */
   defaultOpen?: boolean;
+  /** The T1 shape (ui-jobs 399): `header` is the head's words, the chevron
+   *  follows them as on an event row, and this stands at the right end (the
+   *  date). The row draws no ⋮ and keeps its width, so the date lines up
+   *  with the event rows' dates. Unset, the chevron stands at the right end. */
+  meta?: ReactNode;
+  /** The spine's rate flank, on a rate note. */
+  spine?: Pick<SpineColumnProps, "rateSpan" | "rateMoves" | "rateTone" | "rateProv">;
 }
 
 export function NoteRowShell({
@@ -62,6 +69,8 @@ export function NoteRowShell({
   header,
   children,
   defaultOpen = false,
+  meta,
+  spine,
 }: NoteRowShellProps) {
   const scale = useTimelineScale();
   const registry = useReceiptRegistry();
@@ -80,22 +89,38 @@ export function NoteRowShell({
         {...rowClick}
       >
         <div className="spine-cell">
-          <SpineColumn icon={icon} isLast={isLast} />
+          <SpineColumn icon={icon} isLast={isLast} {...spine} />
         </div>
         <div className="spine-content">
           {/* ── Header panel — what the row states at rest ──────────────── */}
           <div className={`overflow-visible rounded-xl bg-note ${open ? "rounded-b-none" : ""}`}>
             <div
-              className="group/evt cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500"
+              className={`group/evt cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500${meta !== undefined ? " disc-row disc-row-slow" : ""}`}
               {...disclosureProps<HTMLDivElement>(open, panelId, toggle, "role")}
               aria-label={label}
             >
-              <div className="relative flex items-start gap-2 evt-has-chev">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 pl-5 pt-4 pb-3">
+              {meta !== undefined ? (
+                // 56px tall, the marks row's height, so a marker's slot
+                // (spine-note-markers.tsx) holds the row whichever shape it is.
+                <div className="flex min-h-14 flex-wrap items-center gap-1.5 pb-3 pl-5 pr-5 pt-4 sm:pr-[52px]">
                   {header}
+                  <span className="inline-flex items-center self-center" data-evt-head-chev="">
+                    <DiscChevron isOpen={open} />
+                  </span>
+                  {meta}
                 </div>
-                <ExpandChevron isOpen={open} group="evt" className="absolute right-0 top-0 mr-5 mt-[18px] sm:static" />
-              </div>
+              ) : (
+                <div className="relative flex items-start gap-2 evt-has-chev">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 pl-5 pt-4 pb-3">
+                    {header}
+                  </div>
+                  <ExpandChevron
+                    isOpen={open}
+                    group="evt"
+                    className="absolute right-0 top-0 mr-5 mt-[18px] sm:static"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
