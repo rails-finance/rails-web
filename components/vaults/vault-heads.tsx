@@ -45,6 +45,7 @@ const VENUE: Record<VaultFamily, VaultVenue> = {
   stata: "stata",
   "umbrella-stake": "umbrella-stake",
   "yearn-v3": "yearn",
+  "maple-pool": "maple",
 };
 
 export const VAULT_PILL =

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, DraftingCompass, FileText, Home, LayoutGrid } from "lucide-react";
+import { Activity, DraftingCompass, FileText, Home, LayoutGrid, Vault } from "lucide-react";
+import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
+import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { DonateModal } from "@/components/site/DonateModal";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
@@ -113,6 +115,18 @@ export function SiteFooter() {
                   <span>Coverage</span>
                 </Link>
               </li>
+              {/* The vault index joins the list once every roster it reads is launched. */}
+              {vaultIndexLaunched() && (
+                <li>
+                  <Link
+                    href={VAULT_INDEX_HREF}
+                    className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  >
+                    <Vault className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    <span>Vaults</span>
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link
                   href="/about/architecture"
