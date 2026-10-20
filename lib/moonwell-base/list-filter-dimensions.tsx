@@ -1,9 +1,9 @@
 // Moonwell Base listing filter registry — Ethereum's dimensions, with the asset
 // facets rebuilt on a roster nobody wrote down.
 // ----------------------------------------------------------------------------
-// Status, position side, liquidation history and wallet search are the same
+// Status, size, liquidation history, transactions and wallet search are the same
 // questions asked of the same Comptroller model, so they are Ethereum's
-// dimensions unchanged — including the resting-view rule, which lands here
+// dimensions (with this deployment's slider top and price line) — including the resting-view rule, which lands here
 // through them: the status dimension carries Ethereum's contextual default
 // (lib/moonwell/listing-visibility.ts), so this directory rests on the open
 // wallets and relaxes to every status on a wallet search, with no chip either
@@ -60,6 +60,14 @@ export const MOONWELL_BASE_SORT_OPTIONS: SortOption[] = [
   { value: "coll", label: "Collateral" },
 ];
 
+/** The Transactions slider's top on Base: the round number above the busiest
+ *  listed account (1,665,820 transactions, 20 Oct 2026). */
+const MOONWELL_BASE_TX_TOP = 2000000;
+
+/** The Size panel's price line: the Base route values each account at its
+ *  markets' price feed at a pinned block. */
+const MOONWELL_BASE_SIZE_NOTE = "At the market's own price feed at the pinned block.";
+
 export const MOONWELL_BASE_POSITIONS_ROUTE = "/api/moonwell-base/positions";
 
 export const MOONWELL_BASE_LIST_DEFAULTS: MoonwellListFilters = {
@@ -101,9 +109,10 @@ function marketOptions(markets: MoonwellBaseRosterMarket[]): FilterOptionDef[] {
 }
 
 /**
- * The registry as a function of the roster. Ethereum's status / position /
- * history dimensions come through untouched; the two asset dimensions are
- * replaced rather than filtered out, keeping Ethereum's `supply` / `borrow`
+ * The registry as a function of the roster. Ethereum's status / size /
+ * history / transactions dimensions come through with this deployment's slider
+ * top and price line; the two asset dimensions are replaced rather than
+ * filtered out, keeping Ethereum's `supply` / `borrow`
  * params and "Assets" group so both deployments share one URL grammar.
  */
 export function moonwellBaseListDimensions(
@@ -114,7 +123,7 @@ export function moonwellBaseListDimensions(
   const offered = markets != null && markets.length > 0;
   const options = offered ? marketOptions(markets) : null;
 
-  return moonwellListDimensions().map((d) => {
+  return moonwellListDimensions(MOONWELL_BASE_TX_TOP, MOONWELL_BASE_SIZE_NOTE).map((d) => {
     if (d.id !== "supplying" && d.id !== "borrowing") return d;
     const selected = d.get(filters);
     return {
