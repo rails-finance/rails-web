@@ -125,6 +125,10 @@ export interface MorphoArbitrumPositionRow {
   firstVisitedAt: string | null;
   lastVisitedAt: string | null;
   visitCount: number;
+  /** The wallet's last block in the daily discovery log read; null for a
+   *  wallet no discovery named. Optional on the wire until rails-server
+   *  sends it (rails-ops TO-DO-arbitrum-scoping.md item 16). */
+  lastActivityBlock: number | null;
   history: MorphoArbitrumPositionHistory | null;
 }
 
@@ -180,6 +184,7 @@ export function readPositionsAnswer(raw: unknown): MorphoArbitrumPositionsRespon
         firstVisitedAt: str(p.firstVisitedAt),
         lastVisitedAt: str(p.lastVisitedAt),
         visitCount: num(p.visitCount) ?? 0,
+        lastActivityBlock: num(p.lastActivityBlock),
         history,
       },
     ];

@@ -3,9 +3,9 @@
 // The positions page of a position-first Arbitrum explorer (rails-ops
 // TO-DO-arbitrum-scoping.md item 18): the wallets rails-server has recorded a
 // position read for, in the standard listing (ChainTruthListingPage, the
-// memory tier over the route's rows). The store keeps every wallet a reader
-// opened, and a wallet that held nothing at its read is not a position: the
-// server page passes the rows the chain read found open, and the footer says so.
+// memory tier over the route's rows), fed by the daily discovery and the
+// reader's open (item 16). A wallet that held nothing at its read is not a
+// position: the server page passes the rows the chain read found open.
 //
 // A row is one wallet's stored read: dollar totals and asset counts at one
 // block, and no per-asset list. The family cards build their headlines from
@@ -53,14 +53,15 @@ export interface ArbitrumReadRow {
   chainStale: boolean;
   refreshedAt: string | null;
   lastVisitedAt: string | null;
+  /** The wallet's last block in the daily discovery log read; absent or null
+   *  for a wallet no discovery named. */
+  lastActivityBlock?: number | null;
 }
 
 export type ArbitrumPositionsFamily = "aave-v3" | "compound-v3" | "morpho";
 
 interface FamilyConfig {
   session: SessionProtocol;
-  /** Where the footer says the reads were taken. */
-  where: string;
   /** The receipt for a stored dollar total, or the health factor. */
   receipt: (what: string, row: ArbitrumReadRow) => Provenance;
 }
@@ -71,7 +72,6 @@ const RECORDED = "recorded by rails-server when the wallet's page was opened";
 const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   "aave-v3": {
     session: "aave-v3-arbitrum",
-    where: "on this Pool",
     receipt: (what, row) => ({
       kind: "chain",
       pclass: "state",
@@ -90,7 +90,6 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   },
   "compound-v3": {
     session: "compound-v3-arbitrum",
-    where: "in these four Comets",
     receipt: (what, row) => ({
       kind: "chain-derived",
       pclass: "state",
@@ -103,7 +102,6 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   },
   morpho: {
     session: "morpho-arbitrum",
-    where: "on this singleton",
     receipt: (what, row) => ({
       kind: "chain-derived",
       pclass: "state",
@@ -124,9 +122,10 @@ interface ArbitrumPositionsFilters extends BaseListFilters {
   size?: string;
 }
 
-const DEFAULTS: ArbitrumPositionsFilters = { q: "", sortBy: "visited", sortOrder: "desc" };
+const DEFAULTS: ArbitrumPositionsFilters = { q: "", sortBy: "activity", sortOrder: "desc" };
 
 const SORTS: SortOption[] = [
+  { value: "activity", label: "Last activity" },
   { value: "visited", label: "Last opened" },
   { value: "collateral", label: "Collateral" },
   { value: "debt", label: "Debt" },
@@ -160,6 +159,8 @@ function dimensions(): ListDimension<ArbitrumPositionsFilters, ArbitrumReadRow>[
 const APPLY = {
   search: (r: ArbitrumReadRow, q: string) => r.wallet.includes(q),
   sort: {
+    // Rows without a discovery block sort last.
+    activity: (r: ArbitrumReadRow) => r.lastActivityBlock ?? -1,
     visited: (r: ArbitrumReadRow) => r.lastVisitedAt ?? "",
     collateral: (r: ArbitrumReadRow) => r.totalCollateralUsd ?? -1,
     debt: (r: ArbitrumReadRow) => r.totalDebtUsd ?? -1,
@@ -290,15 +291,15 @@ export function ArbitrumPositionsListing({
 }) {
   const cfg = FAMILIES[family];
   const entry = protocolForSession(cfg.session)!;
+  const n = rows.length;
   const footer: ReactNode = (
     <p
       className="mt-6 text-[11px] leading-relaxed text-rb-500"
-      data-arbitrum-positions={rows.length}
+      data-arbitrum-positions={n}
       data-arbitrum-recorded={recorded}
     >
-      <span className="text-foreground">Indexed positions.</span> Rails reads a wallet {cfg.where} when its page is
-      opened and keeps the read. {recorded.toLocaleString("en-US")} {recorded === 1 ? "wallet" : "wallets"} recorded so
-      far; the ones holding nothing at their read are not listed.
+      Indexed {n.toLocaleString("en-US")} {n === 1 ? "position" : "positions"}, from each day&rsquo;s most active
+      wallets since 20 Oct 2026 and any wallet a reader opened.
     </p>
   );
   return (

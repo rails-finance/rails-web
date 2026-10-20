@@ -195,6 +195,10 @@ export interface AaveV3ArbitrumPositionRow {
   firstVisitedAt: string | null;
   lastVisitedAt: string | null;
   visitCount: number;
+  /** The wallet's last block in the daily discovery log read; null for a
+   *  wallet no discovery named. Optional on the wire until rails-server
+   *  sends it (rails-ops TO-DO-arbitrum-scoping.md item 16). */
+  lastActivityBlock: number | null;
   history: AaveV3ArbitrumPositionHistory | null;
 }
 
@@ -248,6 +252,7 @@ export function readPositionsAnswer(raw: unknown): AaveV3ArbitrumPositionsRespon
         firstVisitedAt: str(p.firstVisitedAt),
         lastVisitedAt: str(p.lastVisitedAt),
         visitCount: block(p.visitCount) ?? 0,
+        lastActivityBlock: block(p.lastActivityBlock),
         history,
       },
     ];
