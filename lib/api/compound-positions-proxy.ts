@@ -56,6 +56,11 @@ export async function readCompoundPositions(
   if (sp.get("noDebt")) qs.set("noDebt", sp.get("noDebt")!);
   if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
   if (sp.get("status")) qs.set("status", sp.get("status")!);
+  // A transaction-count or USD bound travels only as a whole number.
+  for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   if (t.supportsSort) {
     const sortBy = sp.get("sortBy");
     if (sortBy === "debt" || sortBy === "coll") qs.set("sortBy", sortBy);

@@ -26,6 +26,15 @@ export interface FetchCompoundPositionsParams {
   /** non-borrowing positions (signed base ≥ 0). */
   noDebt?: boolean;
   hasLiquidations?: boolean;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
+  /** Inclusive bounds in USD on the position's debt and collateral, valued on
+   *  the server; any one alone. */
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
   status?: CompoundPositionStatus[];
   sortBy?: CompoundPositionSort;
   sortOrder?: "asc" | "desc";
@@ -55,6 +64,9 @@ export async function fetchCompoundPositions(p: FetchCompoundPositionsParams): P
   if (p.hasDebt) qs.set("hasDebt", "true");
   if (p.noDebt) qs.set("noDebt", "true");
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
+  for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
