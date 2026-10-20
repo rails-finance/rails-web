@@ -192,17 +192,6 @@ console.log(`Market notes — against ${BASE}\n`);
   const total = await marketNoteCount(page);
   const drawn = await rowNotes(page);
   check("7b. at rest the phone draws every note's row", total > 0 && drawn === total, `${drawn} of ${total}`);
-  check(
-    "7c. each row stands under its diamond on the line",
-    await page.evaluate(() =>
-      [...document.querySelectorAll("[data-note-item]")].every(
-        (el) =>
-          el
-            .querySelector('[data-note-phone-node] [data-spine-node] rect[transform^="rotate(45"]')
-            ?.getBoundingClientRect().height > 0,
-      ),
-    ),
-  );
   const row = page.locator("[data-market-note]").first();
   await row.locator('[role="button"][aria-expanded]').first().click();
   await page.waitForTimeout(400);

@@ -108,7 +108,7 @@ async function run(name, fn) {
   }
 }
 
-// ── 1. Delegate (batched) pill — pink, with the people glyph, visible at ≥640px ──
+// ── 1. Delegate (batched) pill — pink, the figure alone, visible at ≥640px ──
 await run("fork delegate pill", async (page) => {
   console.log("\n[fork delegate pill — openTroveAndJoinBatch, batched (asymmetry specimen)]");
   const ok = await load(page, SPECIMENS.forkDelegate.url);
@@ -116,12 +116,16 @@ await run("fork delegate pill", async (page) => {
   const ps = await pills(page);
   console.log("    pills:", JSON.stringify(ps.slice(0, 6)));
   // The lozenge is the inline-flex span carrying a background (RatePillShell /
-  // DelegateRatePillShell); the delegate variant additionally holds the glyph.
+  // DelegateRatePillShell).
   const delegate = ps.find(
     (p) => p.text === SPECIMENS.forkDelegate.pill && p.display === "inline-flex" && p.bg !== "rgba(0, 0, 0, 0)",
   );
   assert(delegate, `delegate pill lozenge "${SPECIMENS.forkDelegate.pill}" present (2dp, coloured background)`);
-  assert(delegate.hasGlyph, "delegate pill carries the people glyph (delegate treatment)");
+  // ui-jobs 408: the pill carries the figure alone; the people glyph is the
+  // badge on the spine node.
+  assert(!delegate.hasGlyph, "delegate pill carries no glyph (the figure alone)");
+  const badged = await page.locator('[data-spine-node][data-spine-badge="third-party"]').count();
+  assert(badged > 0, `a spine node wears the third-party badge (${badged})`);
   // Theme colours are oklch(L C H) — a pink pill is saturated (chroma ≳ 0.1); a
   // neutral individual pill is ~0 chroma. Assert the delegate colour is saturated.
   const chroma = Number((delegate.color.match(/oklch\(\s*[\d.]+\s+([\d.]+)/) || [])[1] || 0);

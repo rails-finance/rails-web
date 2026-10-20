@@ -18,7 +18,7 @@
 
 import { useMemo, type CSSProperties } from "react";
 
-import { LiveNoteGroupRow, MarketNoteRow, noteSpine, NoteRunRow } from "@/components/shared/market-note-row";
+import { LiveNoteGroupRow, MarketNoteRow, noteActor, noteSpine, NoteRunRow } from "@/components/shared/market-note-row";
 import { PolarisPsmGapRow } from "@/components/protocol/polaris/polaris-psm-gap-row";
 import { isPsmGapNote } from "@/lib/polaris/psm-gap";
 import { PulsingDot, SpineColumn, type SpineTip } from "@/components/shared/spine-column";
@@ -71,7 +71,7 @@ function PhoneNode({ item }: { item: GapItem }) {
   if (!isLiveNoteGroup(item) && (noteSpine(item) || isPsmGapNote(item))) return null;
   return (
     <div aria-hidden className="pb-1 pt-2 sm:hidden" data-note-phone-node="">
-      <SpineColumn icon="market" isLast={false} tip={null} bare />
+      <SpineColumn icon="market" isLast={false} tip={null} bare actor={noteActor(item)} />
     </div>
   );
 }

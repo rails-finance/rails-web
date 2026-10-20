@@ -2,11 +2,11 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
-import { ArrowRightToLine, Clock, Layers, LogOut } from "lucide-react";
+import { ArrowRightToLine, Clock, Layers, LogOut, TestTube } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { DelegateRatePillShell, RatePillShell } from "@/components/shared/rate-pill";
+import { DelegateRatePillShell, GavelGlyph, RatePillShell, UsersGlyph } from "@/components/shared/rate-pill";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine } from "@/components/shared/activity-timeline";
@@ -63,6 +63,15 @@ export const WARNING_TONE_TEXT: Record<Tone, string> = {
   caution: "text-tone-caution",
   critical: "text-tone-critical",
 };
+
+// ── Who acted ───────────────────────────────────────────────────────────────
+
+/** Who acted, the badge in the node's top-left corner (ui-jobs 408; rails-ops
+ *  `standards/detail-page-anatomy.md`, "The spine", "Three marks"): the owner
+ *  draws none; a third party (a delegate, a batch manager, a keeper, a
+ *  liquidator) the people glyph in party pink; the protocol (a formula or the
+ *  market set it) the test tube; governance the gavel, both in neutral ink. */
+export type SpineActor = "owner" | "third-party" | "protocol" | "governance";
 
 // ── Vertical order ──────────────────────────────────────────────────────────
 
@@ -163,12 +172,10 @@ export interface SpineColumnProps {
   /** Semantic icon override — replaces token icons entirely */
   icon?: SpineIcon;
   /** The event was executed by a third party (someone other than the position
-   *  owner). Overlays the pink external-party badge (color-grammar.md §4b) on
-   *  the token icons rather than replacing them: WHO acted annotates the flow,
-   *  it doesn't substitute for it. When there are no token rows to draw, falls
-   *  back to the standalone `external` glyph so a card never renders a blank
-   *  spine slot. A row's own `badge` wins: an explicit check/cross IS that
-   *  event's meaning, and the header's "by …" chip names the actor. */
+   *  owner): the node takes the third party's badge (`actor`) on the token
+   *  icons rather than replacing them. When there are no token rows to draw,
+   *  falls back to the standalone `external` glyph so a card never renders a
+   *  blank spine slot. */
   externalParty?: boolean;
   /** Tone of a warning event — "caution" (orange) for a change to the
    *  owner's position the owner did not make (a redemption, every routine
@@ -196,11 +203,16 @@ export interface SpineColumnProps {
    *  every change went that way, "both" (a neutral double-headed arrow)
    *  otherwise. Overrides the direction `rateSpan` gives. */
   rateMoves?: "up" | "down" | "both";
-  /** The flank's rate pill in the delegate's pink: with the people glyph (a
-   *  rate a delegate set), the gavel (a market note's rate governance set) or
-   *  no glyph (a market note's rate the protocol's formula set; ui-jobs 403);
-   *  unset, the neutral pill of an owner's rate. */
+  /** Who set the flank's rate: a delegate, governance (a market note's rate
+   *  governance set) or the protocol's formula. Any of the three draws the
+   *  pill in pink and gives the node its badge (`actor`: third party,
+   *  governance, protocol); unset, the neutral pill of an owner's rate. */
   rateTone?: "delegate" | "governance" | "formula";
+  /** Who acted: the badge in the node's top-left corner. Unset reads it from the row:
+   *  `rateTone`, then a third party's act (`dotted`, `externalParty`, a row
+   *  whose card names another actor, a warning node), and a market note's
+   *  node is the protocol's; otherwise the owner, who draws no badge. */
+  actor?: SpineActor;
   /** The receipt the flank's rate traces: `echo` where another figure on the
    *  card registers it (the detail grid's rate). */
   rateProv?: { info: Provenance; value: string; echo?: boolean };
@@ -484,16 +496,19 @@ function SwapLegs({ legs }: { legs: SpineSwapLeg[] }) {
 }
 
 /** Custody badge — the plane in a small neutral disc, overlaid bottom-right of
- *  the token icon: the asset was transferred to or from another account. It
- *  shares the corner with check / cross / the pink external badge under the
- *  same one-corner rule. Neutral rb fill: a transfer is not a loss, not a gain,
- *  and not a verdict about who acted. */
+ *  the token icon: the asset was transferred to or from another account. A
+ *  row carries one of check / cross / swap / send in that corner; the actor's
+ *  badge takes the top-left. Neutral rb fill: a transfer is not a loss, not a
+ *  gain, and not a verdict about who acted.
+ *
+ *  Every corner badge draws its 2px ring of page ground as a box-shadow,
+ *  outside the disc, so the glyph has the whole disc. */
 function SendBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center text-white"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center text-white"
+      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <SendGlyph size={Math.round(r * 0.58)} />
     </div>
@@ -507,8 +522,8 @@ function SwapBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center text-white"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center text-white"
+      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
       role="img"
       aria-label="Swap"
       data-swap-mark="flow"
@@ -635,15 +650,15 @@ function UsersIcon({ size, color = "var(--color-rb-500)" }: { size: number; colo
   );
 }
 
-/** +/− badge overlaid bottom-right of the delegate glyph — pink, matching
- *  the "Delegate" party branding (pink = external party, color-grammar.md §4).
- *  Plus for a batch-manager join, minus for a leave. */
+/** +/− badge overlaid bottom-right of the delegate glyph, in the glyph's
+ *  neutral ink: the pink belongs to the actor's badge. Plus for a
+ *  batch-manager join, minus for a leave. */
 function DelegateBadge({ size, join }: { size: number; join: boolean }) {
   const r = Math.round(size * 0.5);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#EC4899", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
+      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <svg
         width={r * 0.6}
@@ -661,25 +676,35 @@ function DelegateBadge({ size, join }: { size: number; join: boolean }) {
   );
 }
 
-/** Third-party-action badge overlaid bottom-right of a token icon — pink, the
- *  external-party tint (color-grammar.md §4b), matching the standalone
- *  `external` glyph it replaces on rows that DO have a flow to draw.
- *
- *  A SINGLE filled silhouette, not the two-person outline `UsersIcon` uses: at
- *  badge scale (~16px circle) a stroked two-person glyph reads as noise, while
- *  a solid single figure stays unambiguous against the check / cross / lock-open
- *  badges it shares the corner with. */
-function ExternalBadge({ size }: { size: number }) {
+/** Who acted, overlaid top-left of the node (ui-jobs 408): the people glyph
+ *  on party pink for a third party, the test tube for the protocol and the
+ *  gavel for governance on the spine's neutral ink. The owner draws none.
+ *  The top-left corner is the actor's alone; check / cross / send / swap keep
+ *  the bottom-right. */
+function ActorBadge({ size, actor }: { size: number; actor: SpineActor }) {
+  if (actor === "owner") return null;
   const r = Math.round(size * 0.5);
+  const g = Math.round(r * 0.6);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#EC4899", border: "2px solid var(--background)" }}
+      className="absolute top-0 left-0 rounded-full flex items-center justify-center text-white"
+      style={{
+        width: r,
+        height: r,
+        backgroundColor: actor === "third-party" ? "#EC4899" : "var(--color-rb-500)",
+        boxShadow: "0 0 0 2px var(--background)",
+      }}
+      data-spine-actor-badge={actor}
     >
-      <svg width={r * 0.72} height={r * 0.72} viewBox="0 0 12 12" fill="white">
-        <circle cx="6" cy="3.7" r="2.4" />
-        <path d="M6 7c2.42 0 4.2 1.55 4.2 3.5V12H1.8v-1.5C1.8 8.55 3.58 7 6 7Z" />
-      </svg>
+      {actor === "third-party" ? (
+        <UsersGlyph size={g} />
+      ) : actor === "governance" ? (
+        <GavelGlyph size={g} />
+      ) : (
+        // Turned 45°: upright at badge size the tube and its liquid line read
+        // as an exclamation mark.
+        <TestTube size={g + 1} strokeWidth={2.5} style={{ transform: "rotate(45deg)" }} aria-hidden="true" />
+      )}
     </div>
   );
 }
@@ -750,8 +775,8 @@ function CheckBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#22C55E", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
+      style={{ width: r, height: r, backgroundColor: "#22C55E", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <svg width={r * 0.6} height={r * 0.6} viewBox="0 0 12 12" fill="none">
         <path d="M2.5 6.5L5 9L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -765,8 +790,8 @@ function CrossBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.4);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#EF4444", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
+      style={{ width: r, height: r, backgroundColor: "#EF4444", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <svg width={r * 0.55} height={r * 0.55} viewBox="0 0 12 12" fill="none">
         <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round" />
@@ -826,7 +851,17 @@ const RING_GAP = 2;
  *  (redeem ETH for LUSD, seize the collateral), never what the order left
  *  behind: Liquity V1's redemption surplus drew here as a locked node until
  *  Miles ruled it out (20 Oct 2026); it is the head's clause and the sheet's. */
-function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; tone: Tone; filterable: boolean }) {
+function WarningLegNodes({
+  legs,
+  tone,
+  filterable,
+  actor,
+}: {
+  legs: SpineWarningLeg[];
+  tone: Tone;
+  filterable: boolean;
+  actor: SpineActor;
+}) {
   const scale = useTimelineScale();
   const unreadOf = useUnreadTokenOf();
   return (
@@ -842,7 +877,7 @@ function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; 
             <span />
             <span />
             <span
-              className="flex items-center justify-center rounded-full shrink-0"
+              className="relative flex items-center justify-center rounded-full shrink-0"
               style={{
                 width: scale.tokenSize,
                 height: scale.tokenSize,
@@ -856,6 +891,7 @@ function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; 
                 size={scale.tokenSize - 2 * (RING_WIDTH + RING_GAP)}
                 filterable={filterable}
               />
+              <ActorBadge size={scale.tokenSize} actor={actor} />
             </span>
             <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
             {txt ? (
@@ -891,6 +927,7 @@ export function SpineColumn({
   rateMoves,
   rateTone,
   rateProv,
+  actor: actorProp,
   dotted,
   undrawn,
   isLast,
@@ -953,12 +990,45 @@ export function SpineColumn({
   // another actor) runs dotted in the party pink; a warning keeps its tone.
   const effectiveColor = effectiveIcon === "warning" ? warningTone : "default";
   const byParty = !!dotted || !!externalParty || spineRow?.byOwner === false;
+  // Who acted: the badge in the node's top-left corner. A warning is a change the
+  // owner did not make (a redemption, a liquidation): a third party's.
+  const actor: SpineActor =
+    actorProp ??
+    (rateTone === "delegate"
+      ? "third-party"
+      : rateTone === "governance"
+        ? "governance"
+        : rateTone === "formula"
+          ? "protocol"
+          : byParty || effectiveIcon === "warning"
+            ? "third-party"
+            : effectiveIcon === "market"
+              ? "protocol"
+              : "owner");
+  // The nodes that state an event take the badge; the people node of a third
+  // party with nothing to draw is the mark already, a delegation's node keeps
+  // its join/leave badge, and the boundary, the state card and the live
+  // window are no one's act.
+  const NO_BADGE: (SpineIcon | undefined)[] = ["external", "delegate", "live-window", "moment", "boundary", "none"];
+  const badged = !NO_BADGE.includes(effectiveIcon);
+  const shownActor: SpineActor = badged ? actor : "owner";
+  /** A glyph with the actor's badge in its corner. */
+  const withBadge = (glyph: ReactNode) =>
+    shownActor === "owner" ? (
+      glyph
+    ) : (
+      <div className="relative">
+        {glyph}
+        <ActorBadge size={scale.tokenSize} actor={shownActor} />
+      </div>
+    );
   const isDotted = byParty || !!undrawn || effectiveIcon === "warning";
   const lineInk: SpineInk = effectiveIcon === "warning" ? warningTone : byParty ? "party" : "default";
   const spineRgb = SPINE_COLORS[isDotted ? lineInk : "default"];
   const dotClass = DOT_COLORS[effectiveColor];
   const nodeAttrs = {
     ...(isDotted ? { "data-spine-dotted": lineInk } : {}),
+    ...(badged ? { "data-spine-badge": shownActor } : {}),
     ...(isLast ? { "data-spine-end": "" } : {}),
   };
   const spineEl = undrawn && isLast && (
@@ -988,7 +1058,7 @@ export function SpineColumn({
   const T = scale.tokenSize;
   /** A node row: the glyph on the spine, and what stands on its right flank
    *  (two empty cells unless given). The grid is `.spine-grid`. */
-  const nodeRow = (glyph: ReactNode, right?: ReactNode) => <NodeRow glyph={glyph} right={right} />;
+  const nodeRow = (glyph: ReactNode, right?: ReactNode) => <NodeRow glyph={withBadge(glyph)} right={right} />;
   /** The right flank of a rate node: the rate after, to two decimals, at the
    *  leg values' x (`SpineVal`'s pl-5); the arrow column points up or down
    *  where the rate moved from a prior rate, and stays empty with none.
@@ -999,15 +1069,7 @@ export function SpineColumn({
     const direction = rateMoves ?? (!moved ? "flat" : delta > 0 ? "up" : "down");
     const text = `${after.toFixed(2)}%`;
     const pill = (body: ReactNode) =>
-      rateTone ? (
-        <DelegateRatePillShell
-          glyph={rateTone === "delegate" ? "people" : rateTone === "governance" ? "gavel" : "none"}
-        >
-          {body}
-        </DelegateRatePillShell>
-      ) : (
-        <RatePillShell>{body}</RatePillShell>
-      );
+      rateTone ? <DelegateRatePillShell>{body}</DelegateRatePillShell> : <RatePillShell>{body}</RatePillShell>;
     return (
       <>
         {direction === "flat" ? (
@@ -1042,7 +1104,7 @@ export function SpineColumn({
       case "warning": {
         // The legs as nodes; the triangle only where the event names none.
         const legs = adverseLegs?.length ? (
-          <WarningLegNodes legs={adverseLegs} tone={warningTone} filterable={!rowTarget} />
+          <WarningLegNodes legs={adverseLegs} tone={warningTone} filterable={!rowTarget} actor={shownActor} />
         ) : (
           nodeRow(<WarningIcon size={T} color={SPINE_COLORS[warningTone]} />)
         );
@@ -1076,7 +1138,7 @@ export function SpineColumn({
         // A third-party action with NOTHING TO DRAW: the people glyph in the
         // pink external-party tint (color-grammar.md §4b) stands alone, with
         // no join/leave badge. Where the event moved tokens, the flow renders
-        // and this glyph rides it as ExternalBadge instead.
+        // and the people glyph rides it as the actor badge instead.
         return nodeRow(<UsersIcon size={T} color="#EC4899" />);
       case "mint":
         return nodeRow(<MintIcon size={T} />);
@@ -1146,10 +1208,12 @@ export function SpineColumn({
   // A market node may carry token rows beneath it: the share a protocol-wide
   // act moved into this position (the PSM's, ui-jobs 402).
   const rows = effectiveIcon && effectiveIcon !== "market" ? [] : (tokens ?? []);
-  // The external badge occupies the same bottom-right corner as check/cross, so
-  // it takes the same paddingBottom compensation — without it the badge clips
-  // into the row below.
-  const hasBadge = rows.some((r) => r.badge) || (externalParty && rows.length > 0);
+  // A bottom-right badge (check / cross / swap / send) takes a paddingBottom
+  // compensation; without it the badge clips into the row below.
+  // A market node's token rows (the PSM's share) leave the actor's badge to
+  // the diamond above them.
+  const rowActor: SpineActor = effectiveIcon ? "owner" : shownActor;
+  const hasBadge = rows.some((r) => r.badge);
   const tokenRows = bottomUp(rows).map((row, i) => {
     const chip = (
       <TokenChipIcon
@@ -1179,24 +1243,21 @@ export function SpineColumn({
           </>
         }
         glyph={
-          // One corner, one badge. An explicit row badge WINS over the
-          // external one: a check/cross is the event's own meaning (Aave V4's
-          // collateral toggle), whereas "a third party did this" is still
-          // carried by the header's "by …" chip.
-          row.badge || externalParty ? (
+          // The row's own badge (Aave V4's collateral toggle, an order, a
+          // transfer) bottom-right; who acted top-left, on every row.
+          row.badge || rowActor !== "owner" ? (
             <div className="relative">
               {chip}
               {row.badge === "check" ? (
                 <CheckBadge size={T} />
               ) : row.badge === "cross" ? (
                 <CrossBadge size={T} />
-              ) : row.badge === "send" ? (
-                <SendBadge size={T} />
               ) : row.badge === "swap" ? (
                 <SwapBadge size={T} />
-              ) : (
-                <ExternalBadge size={T} />
-              )}
+              ) : row.badge ? (
+                <SendBadge size={T} />
+              ) : null}
+              <ActorBadge size={T} actor={rowActor} />
             </div>
           ) : (
             chip
@@ -1238,7 +1299,7 @@ export function SpineColumn({
         {leadIn}
         {effectiveIcon ? node : tokenRows}
         {effectiveIcon === "market" && tokenRows}
-        {!effectiveIcon && rateSpan && nodeRow(<RateIcon size={T} />, rateFlank(rateSpan))}
+        {!effectiveIcon && rateSpan && <NodeRow glyph={<RateIcon size={T} />} right={rateFlank(rateSpan)} />}
       </div>
       {!bare && <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>}
       {legsEl}

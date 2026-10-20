@@ -97,6 +97,7 @@ import {
   noteRateMove,
   noteRateSpan,
   isNoteRun,
+  isLiveNoteGroup,
   noteRunReading,
   psmGapSentence,
   noteT1Words,
@@ -236,6 +237,7 @@ export function MarketNoteRow({
       isLast={isLast}
       label={body.label}
       marker={{ attr: "data-market-note", value: note.id }}
+      spine={{ actor: noteActor(note) }}
       header={
         <>
           <NoteHeadline note={note} body={body} />
@@ -259,12 +261,19 @@ function T1Words({ children }: { children: ReactNode }) {
   );
 }
 
-/** Who set a rate note's rate, for the pill's glyph (ui-jobs 403): governance
- *  (Sky's Savings Rate, a vault's terms, MakerDAO's stability fee) takes the
- *  gavel; a rate the protocol's formula sets (Polaris's primary rate, an Aave
- *  family reserve's rate) takes none. */
+/** Who set a note's figure (ui-jobs 403, 408): governance (Sky's Savings
+ *  Rate, a vault's terms, MakerDAO's stability fee) or the protocol's formula
+ *  (Polaris's primary rate and PSM, an Aave family reserve's rate). */
 function rateSetter(note: MarketNote): "governance" | "formula" {
   return note.kind === "vault-terms" || note.protocol === "makerdao" ? "governance" : "formula";
+}
+
+/** Who acted on a note, run or live group, for the badge in the spine node's
+ *  corner: the gavel where governance set it, the test tube where the
+ *  protocol did; a live group whose notes differ takes the protocol's. */
+export function noteActor(item: MarketNote | NoteRun | LiveNoteGroup): "governance" | "protocol" {
+  const notes = isLiveNoteGroup(item) ? item.notes : isNoteRun(item) ? item.notes : [item];
+  return notes.length > 0 && notes.every((n) => rateSetter(n) === "governance") ? "governance" : "protocol";
 }
 
 /** The spine's flank on a rate note: the rate after in the pink pill (a third
@@ -568,7 +577,7 @@ export function LiveNoteGroupRow({
   return (
     <div data-live-note-group={group.notes.length} className={`spine-row relative ${scale.cardRounded}`}>
       <div className="spine-cell">
-        <SpineColumn icon="market" isLast={isLast} />
+        <SpineColumn icon="market" isLast={isLast} actor={noteActor(group)} />
       </div>
       <div className="spine-content rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
         <div className="flex items-center gap-2 px-5 pb-1 pt-4">
