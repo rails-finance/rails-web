@@ -68,8 +68,8 @@ const QUEUED = process.env.QUEUED !== "0";
  *  paths, in the browser and through the queued export, write it. */
 const FAMILY_HEADER = {
   "aave-v3":
-    "Date (UTC),Block,Action,Wallet,Token Flows,Reserve,Amount,Price (USD),Value (USD),Supply Before,Supply After," +
-    "Debt Before,Debt After,Liq Collateral,Liq Collateral Seized,Liq Collateral Value (USD),Liq Debt Covered," +
+    "Date (UTC),Block,Action,Wallet,Token Flows,Reserve,Amount,Price (USD),Value (USD),Supply Balance Before," +
+    "Supply Balance After,Debt Balance Before,Debt Balance After,Liq Collateral,Liq Collateral Seized,Liq Collateral Value (USD),Liq Debt Covered," +
     "Liq Debt Value (USD),Tx Hash,Etherscan",
 };
 const headerOf = (text) => text.replace(/^\uFEFF/, "").split("\r\n")[0];
