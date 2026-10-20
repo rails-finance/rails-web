@@ -11,7 +11,12 @@ const intro = (
     <p>
       Morpho Blue&rsquo;s Arbitrum deployment: one singleton holding 258 independent lending markets, each one loan
       token, one collateral token, one oracle and one loan-to-value number that is both the borrow limit and the
-      liquidation line. There is no listing of positions yet; enter a wallet on the{" "}
+      liquidation line. The{" "}
+      <Link href="/arbitrum/morpho/positions" className="text-blue-500 hover:underline">
+        positions listing
+      </Link>{" "}
+      holds the positions Rails has read, from each day&rsquo;s most active wallets and any wallet a reader opened;
+      enter any wallet on the{" "}
       <Link href="/arbitrum/morpho" className="text-blue-500 hover:underline">
         protocol page
       </Link>{" "}

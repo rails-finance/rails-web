@@ -70,11 +70,14 @@ type ProtocolSpec = {
    *  whole product is vaults has no position listing to draw — a share in a
    *  vault is not a position in the roster's sense (rails-ops decision 0027
    *  call 2) — so its rail drops that tab and its own route opens on the first
-   *  sub-page. A position-first explorer keeps its own route as its front
-   *  door: a wallet field and links to its sub-pages. Omitted means
-   *  it has one; `false` is the only other value, because "has a listing"
-   *  needs no declaring. */
+   *  sub-page. Omitted means it has one; `false` is the only other value,
+   *  because "has a listing" needs no declaring. */
   positionListing?: false;
+  /** The explorer's own route is a front door (a wallet field and links to
+   *  its pages), and its position listing is at `<route>/positions`: the
+   *  position-first Arbitrum explorers (rails-ops TO-DO-arbitrum-scoping.md
+   *  items 16 and 18). Omitted means the route is the listing. */
+  frontDoor?: true;
   /** NOT LAUNCHED: this explorer serves at its URL and nothing on the site
    *  points at it. Every route under it renders exactly as it always did, with
    *  a strip at the top saying the surface is still being worked on; a reader
@@ -149,9 +152,12 @@ export type SubPageEntry = SubPageSpec & { href: string };
 
 /** A roster entry as everything else reads it — the spec plus its derived routes. */
 export type ProtocolEntry = Omit<ProtocolSpec, "subPages"> & {
-  /** Explorer home (discovery listing) — never a specific wallet. Derived, never
+  /** Explorer home (the discovery listing, or a front door) — never a specific wallet. Derived, never
    *  hand-written: see `explorerHref`. */
   href: string;
+  /** Where this explorer's position listing is: `href`, or `href` +
+   *  "/positions" on a front-door explorer (`frontDoor`). Derived. */
+  listingHref: string;
   /** The spec's sub-pages, each carrying its derived route. */
   subPages: [SubPageEntry, ...SubPageEntry[]] | [];
   /** This explorer's info page (`href` + "/info") — the intro prose and the
@@ -192,9 +198,9 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Aave V3 on Arbitrum One, position-first (rails-ops
-    // TO-DO-arbitrum-scoping.md): no listing, so the explorer's own route is
-    // the front door — a wallet field and links to the market overview, the
-    // positions read and the info page (item 18).
+    // TO-DO-arbitrum-scoping.md): the explorer's own route is the front door,
+    // a wallet field and links to the market overview, the positions listing
+    // and the info page (items 16 and 18).
     id: "aave-v3-arbitrum",
     session: "aave-v3-arbitrum",
     label: "Aave V3",
@@ -203,7 +209,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "aave-v3",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Arbitrum deployment — a separate Pool with its own reserves and risk parameters, any wallet's account read whole from the contracts, no modeled state",
-    positionListing: false,
+    frontDoor: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -333,8 +339,8 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Compound V3 on Arbitrum One, position-first (rails-ops
-    // TO-DO-arbitrum-scoping.md item 12): no listing, so the explorer's own
-    // route is the front door (item 18) and the four Comets' overview is the
+    // TO-DO-arbitrum-scoping.md item 12): the explorer's own route is the
+    // front door (items 16 and 18) and the four Comets' overview is the
     // markets sub-page.
     id: "compound-v3-arbitrum",
     session: "compound-v3-arbitrum",
@@ -344,7 +350,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "compound",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Arbitrum deployment — four Comets read live, and any wallet's standing in each one read from the contracts at one block",
-    positionListing: false,
+    frontDoor: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -518,9 +524,9 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Morpho Blue on Arbitrum One, position-first (rails-ops
-    // TO-DO-arbitrum-scoping.md item 13): no listing, so the explorer's own
-    // route is the front door (item 18) and the census's markets read live
-    // are the markets sub-page.
+    // TO-DO-arbitrum-scoping.md item 13): the explorer's own route is the
+    // front door (items 16 and 18) and the census's markets read live are the
+    // markets sub-page.
     id: "morpho-arbitrum",
     session: "morpho-arbitrum",
     label: "Morpho Blue",
@@ -529,7 +535,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "morpho",
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue's Arbitrum deployment — 258 isolated markets censused from the singleton, any wallet's positions read from the contract at one block",
-    positionListing: false,
+    frontDoor: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
@@ -642,7 +648,8 @@ export const PROTOCOLS: ProtocolEntry[] = SPECS.map((spec) => {
   const sub = (s: SubPageSpec): SubPageEntry => ({ ...s, href: `${href}/${s.segment}` });
   const [first, ...rest] = spec.subPages;
   const subPages: ProtocolEntry["subPages"] = first ? [sub(first), ...rest.map(sub)] : [];
-  return { ...spec, href, subPages, infoHref: `${href}/info` };
+  const listingHref = spec.frontDoor ? `${href}/positions` : href;
+  return { ...spec, href, listingHref, subPages, infoHref: `${href}/info` };
 });
 
 /** The roster a LISTING surface shows — the nav switcher, the home tile strip,
@@ -891,7 +898,7 @@ export function subPageForPathname(entry: ProtocolEntry, pathname: string | null
 export function listingHrefForWallet(session: SessionProtocol, wallet: string, takenOn?: string): string | null {
   const entry = protocolForSession(session);
   if (!entry) return null;
-  let listing = entry.href;
+  let listing = entry.listingHref;
   // A sub-page the caller names WINS over the explorer's own route: one rail
   // can own two listings of the same address, and only the caller knows which
   // one it is asking about. Morpho Blue Base lists Blue borrower positions at

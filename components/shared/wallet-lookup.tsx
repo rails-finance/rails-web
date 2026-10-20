@@ -1,8 +1,8 @@
 "use client";
 
 // One field that opens a wallet's position page — the front door of a
-// position-first explorer, which has no listing to search (Aave V3 on
-// Arbitrum). Takes a 0x address, or an ENS name resolved through
+// position-first explorer (Aave V3 on Arbitrum), whose listing holds only the
+// wallets Rails has read. Takes a 0x address, or an ENS name resolved through
 // /api/ens/resolve to the address it names; a value that is neither gets a
 // line under the field and the page stays put. The field wears the listing
 // search box's look (components/shared/filter-bar/list-toolbar.tsx) and the

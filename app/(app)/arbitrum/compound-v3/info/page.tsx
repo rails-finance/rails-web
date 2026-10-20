@@ -11,8 +11,12 @@ const intro = (
     <p>
       Compound V3&rsquo;s Arbitrum deployment runs four markets, each its own world: one base asset that is both the
       lending side and the borrowing side, backed by a short roster of collateral assets, nothing shared between markets
-      and nothing shared with the Ethereum or Base markets of the same names. There is no listing of positions yet;
-      enter a wallet on the{" "}
+      and nothing shared with the Ethereum or Base markets of the same names. The{" "}
+      <Link href="/arbitrum/compound-v3/positions" className="text-blue-500 hover:underline">
+        positions listing
+      </Link>{" "}
+      holds the positions Rails has read, from each day&rsquo;s most active wallets and any wallet a reader opened;
+      enter any wallet on the{" "}
       <Link href="/arbitrum/compound-v3" className="text-blue-500 hover:underline">
         protocol page
       </Link>{" "}

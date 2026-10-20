@@ -135,7 +135,7 @@ export function RailHeader({
               is its first sub-page and its own route opens on that sub-page. */}
           {entry.positionListing !== false && (
             <Link
-              href={entry.href}
+              href={entry.listingHref}
               className={venue === "listing" ? TAB_ACTIVE : TAB_IDLE}
               aria-current={venue === "listing" ? "page" : undefined}
             >

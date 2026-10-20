@@ -1396,7 +1396,9 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
 /**
  * Explorers that do NOT keep the foundation's first promise — "every position,
  * not just yours". The coverage page's closing band claims that of every
- * explorer, and on a deployment listing one of these it would be false.
+ * explorer, and on a deployment listing one of these it would be false. Every
+ * member today lists the positions Rails has read (rails-ops
+ * TO-DO-arbitrum-scoping.md item 16), and the caveat says so.
  *
  * This is not a capability cell, which is why it lives here rather than in
  * `DEPTH`: the seven cells describe how DEEP an explorer goes, and this is
@@ -1405,15 +1407,14 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
  * true of one member, say so where the claim is made.
  *
  * An entry leaves this set in the same change that gives its explorer a
- * discovery listing.
+ * listing of every account.
  */
 export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
-  // Aave V3 on Arbitrum ships position-first (2026-10-19): a wallet field on
-  // its front door, any address readable, no roster of accounts yet.
+  // The three Arbitrum explorers ship position-first (2026-10-19): a wallet
+  // field on the front door, any address readable, and a listing of the
+  // positions read (item 16) in place of a roster of accounts.
   "aave-v3-arbitrum",
-  // Morpho Blue on Arbitrum ships position-first on the same terms (item 13).
   "morpho-arbitrum",
-  // Compound V3 on Arbitrum ships position-first on the same terms (item 12).
   "compound-v3-arbitrum",
   // The history below is why each earlier member left.
   // aave-v3-base left 2026-08-26: the listing lane by config over the Seamless

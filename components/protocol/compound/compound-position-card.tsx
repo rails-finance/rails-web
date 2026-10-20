@@ -55,8 +55,6 @@ import {
 } from "@/lib/compound/event-provenance";
 import { COMPOUND_INDEXED_VOCABULARY, type CompoundTowerVocabulary } from "@/lib/compound/economics";
 import { compoundPositionModal, type CompoundPositionDeployment } from "@/lib/compound/event-templates";
-import { EXPLORERS_WITHOUT_LISTING } from "@/lib/shared/coverage";
-import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
@@ -273,30 +271,14 @@ function CompoundIdentity({
   wallet?: boolean;
   listing?: boolean;
 }) {
-  const entry = protocolForSession(session);
-  const hasListing = entry != null && !EXPLORERS_WITHOUT_LISTING.has(entry.id);
   const market = <span className="text-xs font-semibold text-rb-500">{v.marketLabel}</span>;
   // The listing keeps the wallet on the left and the market in the card's `tag`.
   if (listing) {
-    return (
-      <WalletPill
-        wallet={v.account}
-        ensName={null}
-        filterProtocol={hasListing ? session : undefined}
-        bookmarkProtocol={session}
-      />
-    );
+    return <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmarkProtocol={session} />;
   }
   return (
     <span className="flex items-center gap-2">
-      {wallet && (
-        <WalletPill
-          wallet={v.account}
-          ensName={null}
-          filterProtocol={hasListing ? session : undefined}
-          bookmarkProtocol={session}
-        />
-      )}
+      {wallet && <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmarkProtocol={session} />}
       {market}
     </span>
   );

@@ -10,7 +10,12 @@ const intro = (
   <>
     <p>
       Aave V3&rsquo;s Arbitrum deployment: one Pool, every reserve, one health factor per wallet, separate from the
-      Ethereum market of the same name. There is no listing of accounts yet; enter a wallet on the{" "}
+      Ethereum market of the same name. The{" "}
+      <Link href="/arbitrum/aave-v3/positions" className="text-blue-500 hover:underline">
+        positions listing
+      </Link>{" "}
+      holds the positions Rails has read, from each day&rsquo;s most active wallets and any wallet a reader opened;
+      enter any wallet on the{" "}
       <Link href="/arbitrum/aave-v3" className="text-blue-500 hover:underline">
         protocol page
       </Link>{" "}

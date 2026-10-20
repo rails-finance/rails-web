@@ -11,5 +11,5 @@ export const metadata = listingMetadata({
 });
 
 export default function Page() {
-  return <ProtocolFrontDoor session="compound-v3-arbitrum" positions={process.env.VERCEL_ENV !== "production"} />;
+  return <ProtocolFrontDoor session="compound-v3-arbitrum" />;
 }
