@@ -66,7 +66,7 @@ export const WARNING_TONE_TEXT: Record<Tone, string> = {
 
 // ── Who acted ───────────────────────────────────────────────────────────────
 
-/** Who acted, the badge in the node's corner (ui-jobs 408; rails-ops
+/** Who acted, the badge in the node's top-left corner (ui-jobs 408; rails-ops
  *  `standards/detail-page-anatomy.md`, "The spine", "Three marks"): the owner
  *  draws none; a third party (a delegate, a batch manager, a keeper, a
  *  liquidator) the people glyph in party pink; the protocol (a formula or the
@@ -208,7 +208,7 @@ export interface SpineColumnProps {
    *  pill in pink and gives the node its badge (`actor`: third party,
    *  governance, protocol); unset, the neutral pill of an owner's rate. */
   rateTone?: "delegate" | "governance" | "formula";
-  /** Who acted: the badge in the node's corner. Unset reads it from the row:
+  /** Who acted: the badge in the node's top-left corner. Unset reads it from the row:
    *  `rateTone`, then a third party's act (`dotted`, `externalParty`, a row
    *  whose card names another actor, a warning node), and a market note's
    *  node is the protocol's; otherwise the owner, who draws no badge. */
@@ -496,16 +496,19 @@ function SwapLegs({ legs }: { legs: SpineSwapLeg[] }) {
 }
 
 /** Custody badge — the plane in a small neutral disc, overlaid bottom-right of
- *  the token icon: the asset was transferred to or from another account. It
- *  shares the corner with check / cross / the actor's badge under the same
- *  one-corner rule. Neutral rb fill: a transfer is not a loss, not a gain,
- *  and not a verdict about who acted. */
+ *  the token icon: the asset was transferred to or from another account. A
+ *  row carries one of check / cross / swap / send in that corner; the actor's
+ *  badge takes the top-left. Neutral rb fill: a transfer is not a loss, not a
+ *  gain, and not a verdict about who acted.
+ *
+ *  Every corner badge draws its 2px ring of page ground as a box-shadow,
+ *  outside the disc, so the glyph has the whole disc. */
 function SendBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center text-white"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center text-white"
+      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <SendGlyph size={Math.round(r * 0.58)} />
     </div>
@@ -519,8 +522,8 @@ function SwapBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center text-white"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center text-white"
+      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
       role="img"
       aria-label="Swap"
       data-swap-mark="flow"
@@ -647,15 +650,15 @@ function UsersIcon({ size, color = "var(--color-rb-500)" }: { size: number; colo
   );
 }
 
-/** +/− badge overlaid bottom-right of the delegate glyph — pink, matching
- *  the "Delegate" party branding (pink = external party, color-grammar.md §4).
- *  Plus for a batch-manager join, minus for a leave. */
+/** +/− badge overlaid bottom-right of the delegate glyph, in the glyph's
+ *  neutral ink: the pink belongs to the actor's badge. Plus for a
+ *  batch-manager join, minus for a leave. */
 function DelegateBadge({ size, join }: { size: number; join: boolean }) {
   const r = Math.round(size * 0.5);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#EC4899", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
+      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <svg
         width={r * 0.6}
@@ -673,23 +676,23 @@ function DelegateBadge({ size, join }: { size: number; join: boolean }) {
   );
 }
 
-/** Who acted, overlaid bottom-right of the node (ui-jobs 408): the people
- *  glyph on party pink for a third party, the test tube for the protocol and
- *  the gavel for governance on the spine's neutral ink. The owner draws none.
- *  It shares the corner with check / cross / send / swap under the one-corner
- *  rule (see the token rows). */
+/** Who acted, overlaid top-left of the node (ui-jobs 408): the people glyph
+ *  on party pink for a third party, the test tube for the protocol and the
+ *  gavel for governance on the spine's neutral ink. The owner draws none.
+ *  The top-left corner is the actor's alone; check / cross / send / swap keep
+ *  the bottom-right. */
 function ActorBadge({ size, actor }: { size: number; actor: SpineActor }) {
   if (actor === "owner") return null;
   const r = Math.round(size * 0.5);
   const g = Math.round(r * 0.6);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center text-white"
+      className="absolute top-0 left-0 rounded-full flex items-center justify-center text-white"
       style={{
         width: r,
         height: r,
         backgroundColor: actor === "third-party" ? "#EC4899" : "var(--color-rb-500)",
-        border: "2px solid var(--background)",
+        boxShadow: "0 0 0 2px var(--background)",
       }}
       data-spine-actor-badge={actor}
     >
@@ -772,8 +775,8 @@ function CheckBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#22C55E", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
+      style={{ width: r, height: r, backgroundColor: "#22C55E", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <svg width={r * 0.6} height={r * 0.6} viewBox="0 0 12 12" fill="none">
         <path d="M2.5 6.5L5 9L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -787,8 +790,8 @@ function CrossBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.4);
   return (
     <div
-      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "#EF4444", border: "2px solid var(--background)" }}
+      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
+      style={{ width: r, height: r, backgroundColor: "#EF4444", boxShadow: "0 0 0 2px var(--background)" }}
     >
       <svg width={r * 0.55} height={r * 0.55} viewBox="0 0 12 12" fill="none">
         <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round" />
@@ -987,7 +990,7 @@ export function SpineColumn({
   // another actor) runs dotted in the party pink; a warning keeps its tone.
   const effectiveColor = effectiveIcon === "warning" ? warningTone : "default";
   const byParty = !!dotted || !!externalParty || spineRow?.byOwner === false;
-  // Who acted: the badge in the node's corner. A warning is a change the
+  // Who acted: the badge in the node's top-left corner. A warning is a change the
   // owner did not make (a redemption, a liquidation): a third party's.
   const actor: SpineActor =
     actorProp ??
@@ -1205,13 +1208,12 @@ export function SpineColumn({
   // A market node may carry token rows beneath it: the share a protocol-wide
   // act moved into this position (the PSM's, ui-jobs 402).
   const rows = effectiveIcon && effectiveIcon !== "market" ? [] : (tokens ?? []);
-  // The actor's badge occupies the same bottom-right corner as check/cross, so
-  // it takes the same paddingBottom compensation — without it the badge clips
-  // into the row below.
-  // A market node's token rows (the PSM's share) leave the badge to the
-  // diamond above them.
+  // A bottom-right badge (check / cross / swap / send) takes a paddingBottom
+  // compensation; without it the badge clips into the row below.
+  // A market node's token rows (the PSM's share) leave the actor's badge to
+  // the diamond above them.
   const rowActor: SpineActor = effectiveIcon ? "owner" : shownActor;
-  const hasBadge = rows.some((r) => r.badge) || (rowActor !== "owner" && rows.length > 0);
+  const hasBadge = rows.some((r) => r.badge);
   const tokenRows = bottomUp(rows).map((row, i) => {
     const chip = (
       <TokenChipIcon
@@ -1241,11 +1243,8 @@ export function SpineColumn({
           </>
         }
         glyph={
-          // One corner, one badge. A check, cross or swap is the event's own
-          // meaning (Aave V4's collateral toggle, an order) and wins; the
-          // actor's badge wins over the custody plane, so a transfer someone
-          // else sent wears the people glyph. The line and the header's
-          // "by …" chip still say who acted where the corner is taken.
+          // The row's own badge (Aave V4's collateral toggle, an order, a
+          // transfer) bottom-right; who acted top-left, on every row.
           row.badge || rowActor !== "owner" ? (
             <div className="relative">
               {chip}
@@ -1255,11 +1254,10 @@ export function SpineColumn({
                 <CrossBadge size={T} />
               ) : row.badge === "swap" ? (
                 <SwapBadge size={T} />
-              ) : rowActor !== "owner" ? (
-                <ActorBadge size={T} actor={rowActor} />
-              ) : (
+              ) : row.badge ? (
                 <SendBadge size={T} />
-              )}
+              ) : null}
+              <ActorBadge size={T} actor={rowActor} />
             </div>
           ) : (
             chip
