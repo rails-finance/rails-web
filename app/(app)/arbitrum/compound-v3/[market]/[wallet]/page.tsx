@@ -1,13 +1,20 @@
+// One Compound V3 position on Arbitrum: a Comet and a wallet. The Comet read
+// and the history are the whole wallet's (one batched call answers every
+// Comet); the view draws the market this URL names
+// (rails-ops reference/arbitrum-position-first-lane.md).
+
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
+import { compoundArbitrumMarketOf } from "@/lib/compound-arbitrum/asset-catalog";
+import { compoundArbitrumMarketHref } from "@/lib/compound-arbitrum/routes";
 import { loadCompoundArbitrumTail } from "@/lib/compound-arbitrum/position-page-data";
 import { recordCompoundArbitrumVisit } from "@/lib/compound-arbitrum/record-visit";
-import CompoundArbitrumWalletView from "./position-view";
+import CompoundArbitrumMarketView from "./position-view";
 
 interface Props {
-  params: Promise<{ wallet: string }>;
+  params: Promise<{ market: string; wallet: string }>;
 }
 
 // Every figure is read at one block per request; nothing is cacheable across requests.
@@ -18,18 +25,21 @@ export const dynamic = "force-dynamic";
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { wallet } = await params;
+  const { market, wallet } = await params;
+  const m = compoundArbitrumMarketOf(market);
   return positionMetadata({
     session: "compound-v3-arbitrum",
     subject: wallet,
-    canonicalPath: `/arbitrum/compound-v3/${wallet}`,
+    market: m?.label,
+    canonicalPath: compoundArbitrumMarketHref(m?.key ?? market, wallet),
     image: "dynamic",
   });
 }
 
-export default async function CompoundArbitrumWalletPage({ params }: Props) {
-  const { wallet: raw } = await params;
-  if (!ADDRESS.test(raw)) notFound();
+export default async function CompoundArbitrumMarketPage({ params }: Props) {
+  const { market: rawMarket, wallet: raw } = await params;
+  const market = compoundArbitrumMarketOf(rawMarket);
+  if (!market || !ADDRESS.test(raw)) notFound();
   const wallet = raw.toLowerCase();
 
   // The four Comets at one block, and the history from rails-server's store;
@@ -45,9 +55,10 @@ export default async function CompoundArbitrumWalletPage({ params }: Props) {
   }
 
   return (
-    <CompoundArbitrumWalletView
-      key={wallet}
+    <CompoundArbitrumMarketView
+      key={`${market.key}:${wallet}`}
       wallet={wallet}
+      market={market.key}
       initialWallet={tail.head}
       initialTimeline={tail.timeline}
     />
