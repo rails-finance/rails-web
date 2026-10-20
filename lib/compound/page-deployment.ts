@@ -6,7 +6,7 @@
 
 import type { ChainTimelineCoverage } from "@/lib/api/fetch-chain-timeline";
 import type { CaptureSource } from "@/lib/shared/capture-source";
-import type { CometDeployment } from "@/lib/compound/asset-catalog";
+import type { CometDeployment, CometMarket } from "@/lib/compound/asset-catalog";
 import type { CompoundTowerVocabulary } from "@/lib/compound/economics";
 import type { CompoundDeploymentKey } from "@/lib/compound/deployments";
 import type { CompoundCardLane } from "@/components/protocol/compound/compound-position-card";
@@ -74,6 +74,10 @@ export interface CompoundPageDeployment {
   /** When the history counts as the whole life: the card's lifetime figures,
    *  the flows panel and "never touched" wait for it. */
   wholeOf: (coverage: ChainTimelineCoverage) => boolean;
+  /** When one market's rows are its whole life though the wallet's are not;
+   *  unset, the flows panel takes `wholeOf` (rails-ops TO-DO-ui-jobs.md item
+   *  415). */
+  marketWholeOf?: (coverage: ChainTimelineCoverage, market: CometMarket) => boolean;
   /** The card's receipts for a market, by whether its last row was read at
    *  the chain. */
   vocab: (baseAtChain: boolean) => CompoundTowerVocabulary;
@@ -85,3 +89,14 @@ export interface CompoundPageDeployment {
 /** The sweep's rule: no holes, and the span reaching the first Comet's block. */
 export const compoundSweepWhole = (coverage: ChainTimelineCoverage): boolean =>
   coverage.gaps.length === 0 && coverage.fromDeployment === true;
+
+/** The sweep's rule for one market. The coverage is the wallet's, and its
+ *  span is one query over every Comet: a market whose Comet's first block sits
+ *  at or above the span's start, with no hole at or above that block, has all
+ *  its rows read though an older Comet's history starts at a horizon or holds
+ *  a hole (rails-ops TO-DO-ui-jobs.md item 415). */
+export const compoundMarketSweepWhole = (coverage: ChainTimelineCoverage, market: CometMarket): boolean => {
+  if (compoundSweepWhole(coverage)) return true;
+  const first = market.deployBlock;
+  return first != null && coverage.fromBlock <= first && coverage.gaps.every((g) => g.to < first);
+};

@@ -271,11 +271,18 @@ function MarketSection({
 
   // The Lifetime flows panel replays this market's whole history
   // (lib/compound/flows.ts): the loaded rows where they are all of it, else
-  // the rows with each folder opened for its members. A history the sweep
-  // did not read whole, or one cut below its newest rows (a seeded heavy
-  // wallet), has no read: the panel says the history was not read.
+  // the rows with each folder opened for its members. A market whose history
+  // the sweep did not read whole, or one cut below its newest rows (a seeded
+  // heavy wallet), has no read: the panel says the history was not read
+  // whole. The test is per market where the deployment states one
+  // (`marketWholeOf`: a horizon or a hole below this Comet's first block
+  // leaves its rows all of it), else the wallet's (rails-ops TO-DO-ui-jobs.md
+  // item 415).
   const omitted = replay?.omitted?.count ?? 0;
-  const flowWhole = sweptClean && omitted === 0 && !servedFolders?.length;
+  const marketWhole =
+    sweptClean ||
+    (timelineState === "ready" && timeline != null && (d.marketWholeOf?.(timeline.coverage, market) ?? false));
+  const flowWhole = marketWhole && omitted === 0 && !servedFolders?.length;
   const fetchMarketHistory = useCallback(async () => {
     const all: BaseActivityEvent[] = [...compoundEvents];
     for (const f of servedFolders ?? []) {
@@ -301,7 +308,7 @@ function MarketSection({
   }, [chain, view]);
   const flows = useCompoundFlows({
     wholeEvents: flowWhole ? compoundEvents : null,
-    fetchAll: sweptClean && omitted === 0 ? fetchMarketHistory : null,
+    fetchAll: marketWhole && omitted === 0 ? fetchMarketHistory : null,
     deployment: d.explorerDeployment,
     market,
     open: view.status === "open",

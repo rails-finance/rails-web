@@ -4,7 +4,7 @@
 // answer asked again for its balances.
 
 import type { CompoundPageDeployment } from "@/lib/compound/page-deployment";
-import { compoundSweepWhole } from "@/lib/compound/page-deployment";
+import { compoundMarketSweepWhole, compoundSweepWhole } from "@/lib/compound/page-deployment";
 import { COMPOUND_BASE_READ_VOCABULARY, COMPOUND_SWEPT_VOCABULARY } from "@/lib/compound/swept-tower-provenance";
 import { COMPOUND_BASE_DEPLOYMENT } from "./asset-catalog";
 
@@ -28,6 +28,7 @@ export const COMPOUND_BASE_PAGE: CompoundPageDeployment = {
   // before it gained an index.
   captureSourceOf: (coverage) => (coverage?.source === "index" ? "index" : "sweep"),
   wholeOf: compoundSweepWhole,
+  marketWholeOf: compoundMarketSweepWhole,
   vocab: (baseAtChain) => (baseAtChain ? COMPOUND_BASE_READ_VOCABULARY : COMPOUND_SWEPT_VOCABULARY),
   words: {
     reading:

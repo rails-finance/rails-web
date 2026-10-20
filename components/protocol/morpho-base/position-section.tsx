@@ -152,7 +152,8 @@ export function MorphoBasePositionSection({
   const live = chain && !chain.chainStale ? chain : null;
   // The whole history: the drawn rows where they are all of it; a grouped
   // answer's folders opened (the export's read); a position cut below its
-  // newest rows has no read here, and the panel says it was not read.
+  // newest rows has no read here, and the panel says the history was not read
+  // whole (rails-ops TO-DO-ui-jobs.md item 415).
   const whole = !servedFolders?.length && !pos.omitted?.count;
   const fetchAll = useCallback(async () => {
     const all: BaseActivityEvent[] = [...events];

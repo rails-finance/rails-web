@@ -38,8 +38,9 @@ export const MORPHO_PRICE_READS = 250;
 export interface MorphoFlowsInput {
   /** The page's events, when they are the whole history; null otherwise. */
   wholeEvents: BaseActivityEvent[] | null;
-  /** Reads the whole flat history; null where the page has no such read
-   *  (the panel then states the history was not read). */
+  /** Reads the whole flat history; null where the page withholds the read
+   *  because its history is not whole (the panel then says so: rails-ops
+   *  TO-DO-ui-jobs.md item 415). */
   fetchAll: (() => Promise<{ events: BaseActivityEvent[]; missing: number }>) | null;
   marketId: string;
   chainId: number;
@@ -82,7 +83,7 @@ export function useMorphoFlows(p: MorphoFlowsInput): {
   useEffect(() => {
     if (!needRead) return;
     if (!fetchAll) {
-      setFetched({ events: null, read: "failed" });
+      setFetched({ events: null, read: "withheld" });
       return;
     }
     let cancelled = false;

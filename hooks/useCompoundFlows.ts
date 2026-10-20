@@ -6,7 +6,9 @@
 // holds the whole history as events hands them over; a windowed or
 // folder-served page reads the flat history once (the read its CSV export
 // makes), and a read short of the whole history is a failed read, since a
-// replay of part of a history would state the wrong lifetime. Comet's oracle
+// replay of part of a history would state the wrong lifetime. A page whose
+// history is not whole makes no read, and the read is `withheld` (rails-ops
+// TO-DO-ui-jobs.md item 415). Comet's oracle
 // prices at each row's block, up to COMPOUND_PRICE_READS blocks, come from the
 // prices the server stores for every event block (/api/compound/prices-at),
 // and from the archive (/api/chain/compound/prices-at-block, six at a time)
@@ -94,8 +96,9 @@ export interface CompoundFlowsInput {
   /** The page's events in this market, when they are the whole history;
    *  null otherwise. */
   wholeEvents: BaseActivityEvent[] | null;
-  /** Reads the whole flat history; null where the page has no such read
-   *  (the panel then states the history was not read). */
+  /** Reads the whole flat history; null where the page withholds the read
+   *  because its history is not whole (the panel then says so: rails-ops
+   *  TO-DO-ui-jobs.md item 415). */
   fetchAll: (() => Promise<{ events: BaseActivityEvent[]; missing: number }>) | null;
   deployment: CompoundDeploymentKey;
   market: CometMarket;
@@ -120,7 +123,7 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
   useEffect(() => {
     if (!needRead) return;
     if (!fetchAll) {
-      setFetched({ events: null, read: "failed" });
+      setFetched({ events: null, read: "withheld" });
       return;
     }
     let cancelled = false;
