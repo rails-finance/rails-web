@@ -20,7 +20,7 @@ const REVALIDATE_SECONDS = 3600;
 export const vaultSeriesKey = (chainId: number, address: string) => `vault:${chainId}:${address.toLowerCase()}`;
 
 /** Each vault's Yield by lowercased address. A chunk whose read failed leaves
- *  its vaults out, so their rows draw no Yield slot. */
+ *  its vaults out, and their rows say the series was not read. */
 export async function loadVaultYields(
   chainId: number,
   addresses: readonly string[],

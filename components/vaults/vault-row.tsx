@@ -10,8 +10,8 @@
 // neutral (standards/color-grammar.md).
 //
 // Headlines, in this order: Total assets · Share price · Yield · Holders. The
-// first two are in the vault's asset. Yield is decision 0047's figure, drawn
-// only where the store's series measures it. Holders is the census's floor,
+// first two are in the vault's asset. Yield is decision 0047's figure where the
+// store's series measures 30 days, else no figure and a subline. Holders is the census's floor,
 // linked to the positions listing filtered to this vault, and a dash where
 // there is no census. The steward is not on the row.
 //
@@ -28,6 +28,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { VaultVenueMark, type VaultVenue } from "@/components/vaults/vault-venue-mark";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatUnitsExact } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 import { sharePriceText, shortAddress } from "@/lib/shared/vault-amount-text";
 import type { VaultStanding, VaultSummary } from "@/lib/vaults/summary";
 import type { VaultFamily } from "@/lib/vaults/families";
@@ -91,7 +92,7 @@ export function VaultRow({
   hooks,
 }: {
   vault: VaultSummary;
-  /** The store's measure for this vault; absent or unmeasured draws no Yield slot. */
+  /** The store's measure for this vault; absent means the store was not read. */
   yieldFigure?: VaultYield;
   /** The vault's page under its protocol. */
   href: string;
@@ -196,6 +197,9 @@ export function VaultRow({
     },
   ];
 
+  // The slot draws on every row so the four headlines align down a roster
+  // (decision 0047 point 4): a figure where the store measures 30 days, else
+  // no figure and a subline saying why. The interpretation tip goes with a figure.
   if (yieldFigure && "yearly" in yieldFigure) {
     heads.push({
       id: "yield",
@@ -213,6 +217,22 @@ export function VaultRow({
         </span>
       ),
       sub: `share price ${changeText(yieldFigure.change)} over the ${yieldFigure.days} days to block ${n(yieldFigure.to.block)}`,
+    });
+  } else {
+    const none = yieldFigure == null ? "unread" : yieldFigure.none;
+    heads.push({
+      id: "yield",
+      label: "Yield",
+      value: null,
+      sub: (
+        <span data-yield-none={none}>
+          {yieldFigure != null && "firstDay" in yieldFigure
+            ? `series from ${formatDate(new Date(yieldFigure.firstDay * 86_400_000))}`
+            : yieldFigure == null
+              ? "daily series not read"
+              : "no daily series yet"}
+        </span>
+      ),
     });
   }
 
