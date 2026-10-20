@@ -31,7 +31,6 @@ export type SpineIcon =
   | "no-change" // Operation that moved nothing (zero-delta adjust) — equals-in-circle
   | "custody" // Position moved between accounts (a receipt-token transfer run, or a position NFT's transfer: a Liquity V2 Trove, a Polaris position) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
-  | "market-open" // A market note opened from its spine marker (item 118): the same diamond, filled in the same neutral ink, so the open note is marked on the spine
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
   | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
@@ -226,6 +225,9 @@ export interface SpineColumnProps {
    *  <SpineTipContext>, which the shared timeline provides around the newest
    *  row alone; null refuses it. */
   tip?: SpineTip | null;
+  /** The node alone, no padding above it and no stretch of line below: a
+   *  phone note row's node, drawn above its card (note-gap.tsx). */
+  bare?: boolean;
 }
 
 export type SpineTip = "above";
@@ -314,7 +316,7 @@ function RateIcon({ size, color = "var(--color-rb-500)" }: { size: number; color
  *  same centre as every other glyph, with the diamond itself small enough that
  *  the row reads as an annotation beside the timeline rather than a row of it.
  *  The stroke is pinned in absolute pixels. */
-function MarketNoteIcon({ size, color, filled = false }: { size: number; color: string; filled?: boolean }) {
+function MarketNoteIcon({ size, color }: { size: number; color: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <rect
@@ -323,7 +325,7 @@ function MarketNoteIcon({ size, color, filled = false }: { size: number; color: 
         width={10}
         height={10}
         transform="rotate(45 16 16)"
-        fill={filled ? color : "none"}
+        fill="none"
         stroke={color}
         strokeWidth={1}
         vectorEffect="non-scaling-stroke"
@@ -863,6 +865,7 @@ export function SpineColumn({
   undrawn,
   isLast,
   tip,
+  bare,
 }: SpineColumnProps) {
   const scale = useTimelineScale();
   const contextTip = useContext(SpineTipContext);
@@ -1052,15 +1055,13 @@ export function SpineColumn({
           swapLegs?.length ? <SwapLegs legs={swapLegs} /> : undefined,
         );
       case "market":
-      case "market-open":
         // A market note's node, among the quietest marks on the column: a
         // small hollow diamond in the spine's neutral ink, no fill, no party
-        // colour, no pulse. Nothing happened to the ACCOUNT here. A note
-        // opened from its marker fills the diamond in the same ink.
+        // colour, no pulse. Nothing happened to the ACCOUNT here.
         // A rate note (ui-jobs 399) puts the rate after on the flank, as a
         // rate change does.
         return nodeRow(
-          <MarketNoteIcon size={T} color={SPINE_COLORS.default} filled={effectiveIcon === "market-open"} />,
+          <MarketNoteIcon size={T} color={SPINE_COLORS.default} />,
           rateSpan ? rateFlank(rateSpan) : undefined,
         );
       case "live-window":
@@ -1179,7 +1180,7 @@ export function SpineColumn({
 
   return (
     <div
-      className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch"
+      className={`flex max-w-full flex-col items-center relative px-1 ${bare ? "" : "pt-4 self-stretch"}`}
       // The spine carries no receipts of its own (TO-DO-mobile-timeline
       // decision 13): its figures re-state the card's, which carries them.
       // The rate pill on a rate flank echoes the card's rate receipt.
@@ -1195,7 +1196,7 @@ export function SpineColumn({
         {effectiveIcon ? node : tokenRows}
         {!effectiveIcon && rateSpan && nodeRow(<RateIcon size={T} />, rateFlank(rateSpan))}
       </div>
-      <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>
+      {!bare && <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>}
       {legsEl}
     </div>
   );

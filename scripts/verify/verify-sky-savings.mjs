@@ -203,15 +203,13 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     saved: [...document.querySelectorAll("[aria-label]")].some((e) =>
       /^Balance: .* still saved, of /.test(e.getAttribute("aria-label") ?? ""),
     ),
-    // A lone change's marker names it; a run's marker names its count.
-    rateMarkers: [...document.querySelectorAll("[data-note-marker]")]
-      .map((b) => b.getAttribute("aria-label") ?? "")
-      .reduce(
-        (n, l) =>
-          n +
-          (l.startsWith("Savings Rate change")
-            ? 1
-            : Number(l.match(/^Savings rate (?:increased|decreased|adjusted), (\d+) changes, /)?.[1] ?? 0)),
+    // A lone change is one row; a run's row counts its changes (ui-jobs 399).
+    rateMarkers:
+      [...document.querySelectorAll('[data-market-note^="vault-terms:savings-rate:"]')].filter(
+        (e) => !e.closest("[data-market-note-run]"),
+      ).length +
+      [...document.querySelectorAll("[data-market-note-run] [data-group-count]")].reduce(
+        (n, e) => n + Number(e.getAttribute("data-group-count")),
         0,
       ),
   }));
@@ -390,7 +388,7 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
 }
 
 // Consecutive Savings Rate changes draw as one group row that counts them
-// (ui-jobs 399), its marker on the spine at 390px.
+// (ui-jobs 399), at 390px as at every width.
 {
   const phone = await browser.newPage({ viewport: { width: 390, height: 900 } });
   await phone.addInitScript(() => {
@@ -401,12 +399,12 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   const pos = positions.small;
   await phone.goto(`${BASE}/ethereum/sky-savings/${HOLDERS.small}`, { waitUntil: "networkidle", timeout: 120000 });
   const got = await phone.evaluate(() => ({
-    runs: [...document.querySelectorAll('[data-note-marker^="run:"]')].map((e) => {
-      const text = e.getAttribute("aria-label") ?? "";
-      return { n: Number(text.match(/, (\d+) changes, /)?.[1] ?? 0), text };
-    }),
-    single: [...document.querySelectorAll("[data-note-marker]")].filter((e) =>
-      (e.getAttribute("aria-label") ?? "").startsWith("Savings Rate change"),
+    runs: [...document.querySelectorAll("[data-market-note-run]")].map((e) => ({
+      n: Number(e.querySelector("[data-group-count]")?.getAttribute("data-group-count") ?? 0),
+      text: e.querySelector('[role="button"][aria-label]')?.getAttribute("aria-label") ?? "",
+    })),
+    single: [...document.querySelectorAll('[data-market-note^="vault-terms:savings-rate:"]')].filter(
+      (e) => !e.closest("[data-market-note-run]"),
     ).length,
     width: document.documentElement.scrollWidth,
   }));
@@ -458,7 +456,9 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
     } catch {}
   });
   await p2.goto(`${BASE}/ethereum/sky-savings/${HOLDERS.mixed}`, { waitUntil: "networkidle", timeout: 120000 });
-  const heads = p2.locator('[role="button"][class*="group/evt"]');
+  // The event cards' heads: a market note row's head (ui-jobs 399) opens a
+  // note, and a run's opens lines that would shift this list as it is walked.
+  const heads = p2.locator('[role="button"][class*="group/evt"]:not([data-note-item] *)');
   const nh = await heads.count();
   for (let i = 0; i < nh; i++) {
     await heads.nth(i).scrollIntoViewIfNeeded();

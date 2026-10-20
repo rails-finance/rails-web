@@ -49,9 +49,6 @@ export interface NoteRowShellProps {
   header: ReactNode;
   /** The body panel, mounted only while the row is open — like a card's. */
   children: ReactNode;
-  /** Mount with the body open: a note opened from its spine marker opens
-   *  straight to the row and its panel. */
-  defaultOpen?: boolean;
   /** The T1 shape (ui-jobs 399): `header` is the head's words, the chevron
    *  follows them as on an event row, and this stands at the right end (the
    *  date). The row draws no ⋮ and keeps its width, so the date lines up
@@ -68,13 +65,12 @@ export function NoteRowShell({
   marker,
   header,
   children,
-  defaultOpen = false,
   meta,
   spine,
 }: NoteRowShellProps) {
   const scale = useTimelineScale();
   const registry = useReceiptRegistry();
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(false);
   const panelId = useId();
   const toggle = () => setOpen((o) => !o);
   const rowClick = useRowTarget(toggle);
@@ -100,8 +96,8 @@ export function NoteRowShell({
               aria-label={label}
             >
               {meta !== undefined ? (
-                // 56px tall, the marks row's height, so a marker's slot
-                // (spine-note-markers.tsx) holds the row whichever shape it is.
+                // 56px tall, the marks row's height, so every note row stands
+                // the same height whichever shape it is (note-gap.tsx).
                 <div className="flex min-h-14 flex-wrap items-center gap-1.5 pb-3 pl-5 pr-5 pt-4 sm:pr-[52px]">
                   {header}
                   <span className="inline-flex items-center self-center" data-evt-head-chev="">

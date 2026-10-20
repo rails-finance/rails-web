@@ -96,6 +96,7 @@ import {
   formatRatePercent,
   noteRateMove,
   noteRateSpan,
+  isNoteRun,
   noteRunReading,
   noteT1Words,
   RATE_NOTE_T1,
@@ -190,15 +191,8 @@ export function MarketNoteRow({
   note,
   isLast = false,
   datePrefix = null,
-  defaultOpen,
-  opened,
 }: {
   note: MarketNote;
-  /** Mount with the panel open (a note opened from its spine marker). */
-  defaultOpen?: boolean;
-  /** Opened from its marker: the node draws the diamond filled, and the
-   *  gap's control over it puts the note back (spine-note-markers.tsx). */
-  opened?: boolean;
   /** The day stamp the timeline gives this row on its day-stamp rule
    *  (`noteDatePrefixAfter` in ChainTruthTimeline). A live note reads "Now". */
   datePrefix?: string | null;
@@ -221,17 +215,12 @@ export function MarketNoteRow({
     const head = words[move];
     return (
       <NoteRowShell
-        icon={opened ? "market-open" : "market"}
+        icon="market"
         isLast={isLast}
         label={`${head}, ${pct(span[0])} ${RATE_NOTE_T1.to} ${pct(span[1])}`}
         marker={{ attr: "data-market-note", value: note.id }}
-        defaultOpen={defaultOpen}
         // The arrow from the move itself: a rate that rose from 0.00% rose.
-        spine={rateFlank(
-          span,
-          rateProvOf(note, "to"),
-          move === "increased" ? "up" : move === "decreased" ? "down" : undefined,
-        )}
+        spine={noteSpine(note)}
         header={<T1Words>{head}</T1Words>}
         meta={<NoteTime note={note} datePrefix={datePrefix} />}
       >
@@ -241,11 +230,10 @@ export function MarketNoteRow({
   }
   return (
     <NoteRowShell
-      icon={opened ? "market-open" : "market"}
+      icon="market"
       isLast={isLast}
       label={body.label}
       marker={{ attr: "data-market-note", value: note.id }}
-      defaultOpen={defaultOpen}
       header={
         <>
           <NoteHeadline note={note} body={body} />
@@ -271,17 +259,37 @@ function T1Words({ children }: { children: ReactNode }) {
 
 /** The spine's flank on a rate note: the rate after in the pink pill (a third
  *  party set it), the arrow the way it moved. */
-function rateFlank(
-  span: [number, number],
-  info: Provenance,
-  moves?: "up" | "down" | "both",
-): NonNullable<Parameters<typeof NoteRowShell>[0]["spine"]> {
+function rateFlank(span: [number, number], info: Provenance, moves?: "up" | "down" | "both"): NoteSpine {
   return {
     rateSpan: span,
     rateMoves: moves,
     rateTone: "delegate",
     rateProv: { info, value: pct(span[1]) },
   };
+}
+
+type NoteSpine = NonNullable<Parameters<typeof NoteRowShell>[0]["spine"]>;
+
+/** The spine's flank on a rate note or a run: the rate after the last change
+ *  in the pink pill, the arrow the note or every member moved it (the
+ *  double-headed arrow where a run's members went both ways). Undefined on a
+ *  note that states no rate. `echo` where the row's own flank registers the
+ *  receipt (the phone's node, note-gap.tsx). */
+export function noteSpine(item: MarketNote | NoteRun, echo = false): NoteSpine | undefined {
+  const flank = (span: [number, number], info: Provenance, moves?: "up" | "down" | "both") => {
+    const f = rateFlank(span, info, moves);
+    return echo && f.rateProv ? { ...f, rateProv: { ...f.rateProv, echo: true } } : f;
+  };
+  if (isNoteRun(item)) {
+    const r = noteRunReading(item);
+    const moves = r.move === "increased" ? "up" : r.move === "decreased" ? "down" : "both";
+    return flank([r.from, r.to], rateProvOf(r.members[r.members.length - 1], "to"), moves);
+  }
+  const span = noteRateSpan(item);
+  if (!span || !noteT1Words(item)) return undefined;
+  const move = noteRateMove(item);
+  // The arrow from the move itself: a rate that rose from 0.00% rose.
+  return flank(span, rateProvOf(item, "to"), move === "increased" ? "up" : move === "decreased" ? "down" : undefined);
 }
 
 /** The receipt behind a rate note's earlier or later rate. */
@@ -300,23 +308,12 @@ const dayStamp = (ts: number): string | null => (ts > 0 ? `${shortDate(ts)} ${sh
  *  with the count, the last rate on the spine's flank with the group's arrow,
  *  the first and last dates. Opened: the run's first → last rate and its
  *  range, then one line per change, each opening to its own panel. */
-export function NoteRunRow({
-  run,
-  isLast = false,
-  defaultOpen,
-  opened,
-}: {
-  run: NoteRun;
-  isLast?: boolean;
-  defaultOpen?: boolean;
-  opened?: boolean;
-}) {
+export function NoteRunRow({ run, isLast = false }: { run: NoteRun; isLast?: boolean }) {
   const r = noteRunReading(run);
   const first = r.members[0];
   const last = r.members[r.members.length - 1];
   const words = noteT1Words(first) as RateNoteWords;
   const head = words[r.move];
-  const moves = r.move === "increased" ? "up" : r.move === "decreased" ? "down" : "both";
   const range = noteRunDates(r.members);
   const lowNote = r.members.find((n) => noteRateSpan(n)!.some((v) => v === r.low)) ?? first;
   const highNote = r.members.find((n) => noteRateSpan(n)!.some((v) => v === r.high)) ?? first;
@@ -328,12 +325,11 @@ export function NoteRunRow({
   );
   return (
     <NoteRowShell
-      icon={opened ? "market-open" : "market"}
+      icon="market"
       isLast={isLast}
       label={`${head}, ${changesWord(run.notes.length)}, ${noteRunMovementWords(run)}, ${range}`}
       marker={{ attr: "data-market-note-run", value: run.id }}
-      defaultOpen={defaultOpen}
-      spine={rateFlank([r.from, r.to], rateProvOf(last, "to"), moves)}
+      spine={noteSpine(run)}
       header={
         <T1Words>
           {head}
@@ -409,16 +405,6 @@ function noteRunMovementWords(run: NoteRun): string {
 }
 
 const changesWord = (n: number) => `${n.toLocaleString("en-US")} ${RATE_NOTE_T1.changes}`;
-
-/** A run as its spine marker states it. */
-export function noteRunMarkerText(run: NoteRun): { tip: string; spoken: string } {
-  const r = noteRunReading(run);
-  const head = (noteT1Words(r.members[0]) as RateNoteWords)[r.move];
-  return {
-    tip: `${head} · ${changesWord(run.notes.length)} · ${pct(r.from)} → ${pct(r.to)}`,
-    spoken: `${head}, ${changesWord(run.notes.length)}, ${noteRunMovementWords(run)}`,
-  };
-}
 
 /** What one note hands the row: its label, headline, cells and (i). The one
  *  switch on `kind` is here, shared by the lone row and a live group's line. */
@@ -543,46 +529,8 @@ function NoteBodyPanel({ body }: { body: NoteBody }) {
   );
 }
 
-/** A note as its spine marker states it: the tooltip and the open caption
- *  ("ETH-A fee 2.00% → 9.50%") and the words a screen reader hears ("ETH-A
- *  fee from 2.00% to 9.50%"). */
-export function noteMarkerText(note: MarketNote): { tip: string; spoken: string } {
-  const sym = note.marketSymbol;
-  if (note.kind === "vault-terms") {
-    const text = note.tip ?? `${sym} terms`;
-    return { tip: text, spoken: text };
-  }
-  // MakerDAO's fee notes state the ilk's fee both ends: "ETH-A fee 2.00% → 9.50%".
-  if (note.kind === "rate-step" && note.protocol === "makerdao") {
-    const f = rateStepFigures(note);
-    const text = `${note.marketName ?? sym} fee ${f.fromRate} → ${f.toRate}`;
-    return { tip: text, spoken: `${note.marketName ?? sym} fee from ${f.fromRate} to ${f.toRate}` };
-  }
-  // Polaris's primary-rate notes state both ends too: "GOLDp primary rate 2.15% → 0.00%".
-  if (note.kind === "rate-step" && note.protocol == null) {
-    const f = rateStepFigures(note);
-    return {
-      tip: `${sym} primary rate ${f.fromRate} → ${f.toRate}`,
-      spoken: `${sym} primary rate from ${f.fromRate} to ${f.toRate}`,
-    };
-  }
-  // The Aave family's rate notes name the quantity and its direction, and the
-  // open row the figures.
-  const text = `${sym} rate ${note.to.value >= note.from.value ? "up" : "down"}`;
-  return { tip: text, spoken: text };
-}
-
 /** The live group card's header. */
 const LIVE_GROUP_TITLE = "Market since the last event";
-
-/** The live group as its spine marker states it: the tooltip counts the
- *  notes, and a screen reader hears each one. */
-export function liveGroupMarkerText(group: LiveNoteGroup): { tip: string; spoken: string } {
-  return {
-    tip: `${group.notes.length} market notes since the last event`,
-    spoken: `${LIVE_GROUP_TITLE}: ${group.notes.map((n) => noteMarkerText(n).spoken).join("; ")}`,
-  };
-}
 
 /** The head slot's live notes as ONE card (`liveNoteGroup` in
  *  lib/shared/market-note.ts): one spine node, a header naming the card with
@@ -593,19 +541,16 @@ export function liveGroupMarkerText(group: LiveNoteGroup): { tip: string; spoken
 export function LiveNoteGroupRow({
   group,
   isLast = false,
-  opened,
 }: {
   group: LiveNoteGroup;
   /** Spine terminus flags, as on a lone note row in the head slot. */
   isLast?: boolean;
-  /** Opened from its marker: the node draws the diamond filled. */
-  opened?: boolean;
 }) {
   const scale = useTimelineScale();
   return (
     <div data-live-note-group={group.notes.length} className={`spine-row relative ${scale.cardRounded}`}>
       <div className="spine-cell">
-        <SpineColumn icon={opened ? "market-open" : "market"} isLast={isLast} />
+        <SpineColumn icon="market" isLast={isLast} />
       </div>
       <div className="spine-content rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
         <div className="flex items-center gap-2 px-5 pb-1 pt-4">

@@ -6,7 +6,6 @@ export type TimelineDisplayKey =
   | "showTickerLabels"
   | "showInterestRates"
   | "showMarketNotes"
-  | "openAllMarketNotes"
   | "showTxHashes"
   | "followChart"
   | "figuresFirst";
@@ -20,13 +19,10 @@ export interface TimelineDisplayState {
   showInterestRates: boolean;
   /** "Market notes" in Display. When true, receipted market notes
    * (facts about the market observed between two of the account's own events)
-   * stand on the spine between the events they bracket, each as a marker that
-   * opens its note (rails-ops TO-DO-ui-jobs item 118). Off hides every note;
-   * nothing else changes. */
+   * stand between the events they bracket, each as its collapsed row
+   * (rails-ops TO-DO-ui-jobs items 118, 399). Off hides every note; nothing
+   * else changes. */
   showMarketNotes: boolean;
-  /** "Open all market notes" in Display: every note shows its header row in
-   * place of its marker. No effect while `showMarketNotes` is off. */
-  openAllMarketNotes: boolean;
   /** "Transaction hashes" in Display (ui-jobs 294): each timeline card's
    *  number pill shows its transaction's short hash in place of the number.
    *  Off by default. The event page's pill keeps the number. */
@@ -49,7 +45,6 @@ const DEFAULTS = {
   showTickerLabels: false,
   showInterestRates: false,
   showMarketNotes: true,
-  openAllMarketNotes: false,
   showTxHashes: false,
   followChart: false,
   figuresFirst: false,
@@ -73,7 +68,8 @@ const Ctx = createContext<TimelineDisplayState>({
  *  List choice: the spine view is the only phone view),
  *  `showFullBreakdown` (the sheet's breakdown is each card's, ui-jobs 330),
  *  `flowsView` (the Lifetime flows panel draws both strips) and
- *  `showCollateralRatio` (Polaris's row ratio chip, ui-jobs 368). */
+ *  `showCollateralRatio` (Polaris's row ratio chip, ui-jobs 368) and
+ *  `openAllMarketNotes` (every note is its row, ui-jobs 399). */
 function migrate(
   parsed: Partial<typeof DEFAULTS> & {
     showUsdValues?: boolean;
@@ -89,6 +85,7 @@ function migrate(
     showFullBreakdown?: boolean;
     flowsView?: unknown;
     showCollateralRatio?: boolean;
+    openAllMarketNotes?: boolean;
   },
 ): Partial<typeof DEFAULTS> {
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -106,6 +103,7 @@ function migrate(
     showFullBreakdown,
     flowsView,
     showCollateralRatio,
+    openAllMarketNotes,
     ...rest
   } = parsed;
   /* eslint-enable @typescript-eslint/no-unused-vars */

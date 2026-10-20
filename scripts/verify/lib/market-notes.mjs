@@ -1,17 +1,14 @@
 // Market notes on a desktop timeline, for the verifiers that read them.
 // ----------------------------------------------------------------------------
-// Since rails-ops TO-DO-ui-jobs item 118 a closed note on desktop is a MARKER on
-// the spine (`[data-note-marker]`), not a row: the `[data-market-note]` row
-// mounts only once the note is opened. A verifier that reads note rows turns on
-// Display's "Open all market notes" before the page loads, which draws every
-// note as its header row, the shape the rows had at rest before the markers.
+// Since rails-ops TO-DO-ui-jobs item 399 every note draws its collapsed row
+// (`[data-market-note]`, or `[data-market-note-run]` for a run of rate notes)
+// whenever Display's "Market notes" is on; the spine markers and "Open all
+// market notes" are gone.
 //
 //   import { showNoteRows, setMarketNotes, marketNoteCount } from "./lib/market-notes.mjs";
 //
-//   showNoteRows(context)       every page the context opens draws note rows.
-//                               A stored preference the page already holds for
-//                               the key wins, so a check that turns it off and
-//                               reloads reads what it set.
+//   showNoteRows(context)       nothing since item 399: the rows draw at rest.
+//                               Kept so its callers read unchanged.
 //   setMarketNotes(page, on)    Display's "Market notes", ticked or not;
 //                               false when the page offers no such item.
 //   marketNoteCount(page)       every note the timeline places, drawn or not:
@@ -19,18 +16,8 @@
 //                               toolbar's "Market notes · N" pill stated it
 //                               until item 118.
 
-const KEY = "timeline-display-v3";
-
-export async function showNoteRows(context) {
-  await context.addInitScript((key) => {
-    try {
-      const cur = JSON.parse(localStorage.getItem(key) ?? "{}");
-      if (cur.openAllMarketNotes === undefined) {
-        localStorage.setItem(key, JSON.stringify({ ...cur, openAllMarketNotes: true }));
-      }
-    } catch {}
-  }, KEY);
-}
+// eslint-disable-next-line no-unused-vars
+export async function showNoteRows(context) {}
 
 /** The timeline's own Display trigger; the page chrome has a Display control
  *  of its own with the same accessible name. */

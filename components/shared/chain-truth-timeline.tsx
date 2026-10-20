@@ -104,7 +104,7 @@ import {
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { usePublishLifeCount, type LifeCount } from "@/lib/shared/life-count-store";
-import { NoteGap, noteRowHeight, type GapItem } from "@/components/shared/spine-note-markers";
+import { NoteGap, noteRowHeight, type GapItem } from "@/components/shared/note-gap";
 import { SpineLine } from "@/components/shared/spine-line";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { anchorMarketNotes, liveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
@@ -257,7 +257,6 @@ const WINDOW_CHUNK = TIMELINE_PAGE_ROWS;
  *  no more than it did before notes existed. */
 const NO_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
 const NO_NOTES: MarketNote[] = [];
-const NO_OPEN_NOTES: ReadonlySet<string> = new Set();
 
 /** One closed event card's height, the unit the segment skeleton stacks. */
 const SEGMENT_SKELETON_ROW = 72;
@@ -377,8 +376,7 @@ export interface ChainTruthTimelineProps {
    *  `eventNumberOf`, the toolbar's count line, the filter option counts, the
    *  heatmap, run counts and the export tables all read exactly what they read
    *  with the array empty. Passing at least one note also adds Display's
-   *  market-note items ("Market notes", "Open all market notes");
-   *  passing none leaves the menu as it was.
+   *  "Market notes" item; passing none leaves the menu as it was.
    *
    *  Memoise it on the page: a fresh array identity per render recomputes the
    *  anchoring. */
@@ -740,23 +738,7 @@ function ChainTruthTimelineBody({
   spineKey,
   still,
 }: ChainTruthTimelineProps) {
-  const { showMarketNotes, openAllMarketNotes } = useTimelineDisplay();
-  // Desktop list view: the notes opened from their markers (item 118). Each
-  // opens on its own; turning "Open all market notes" off puts every note
-  // back to its marker.
-  const openAll = showMarketNotes && openAllMarketNotes;
-  const [openNoteIds, setOpenNoteIds] = useState<ReadonlySet<string>>(NO_OPEN_NOTES);
-  useEffect(() => {
-    if (!openAll) setOpenNoteIds(NO_OPEN_NOTES);
-  }, [openAll]);
-  const toggleNote = useCallback((note: GapItem) => {
-    setOpenNoteIds((cur) => {
-      const next = new Set(cur);
-      if (next.has(note.id)) next.delete(note.id);
-      else next.add(note.id);
-      return next;
-    });
-  }, []);
+  const { showMarketNotes } = useTimelineDisplay();
   const activeRuns = runs;
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
   // "Sync to chart" is pressed, the list holds every event up to that
@@ -2099,18 +2081,15 @@ function ChainTruthTimelineBody({
               {liveWindowAtTop && liveWindow && (
                 <SpineTipContext.Provider value={tipSide}>{liveWindow()}</SpineTipContext.Provider>
               )}
-              {/* From 640px the head slot reserves one marker's height for the
-                live notes while they load; a phone reserves nothing. */}
+              {/* From 640px the head slot reserves one note row's height for
+                the live notes while they load; a phone reserves nothing. */}
               {liveSkeletonAtTop && !liveSlotAtTop && (
-                <div aria-hidden className="hidden sm:block" style={{ height: noteRowHeight(cardPad, true) }} />
+                <div aria-hidden className="hidden sm:block" style={{ height: noteRowHeight(cardPad) }} />
               )}
               {liveSlotAtTop && (
                 <NoteGap
                   notes={topNotes}
                   datePrefixFor={headDatePrefix}
-                  openIds={openNoteIds}
-                  openAll={openAll}
-                  onToggle={toggleNote}
                   head={{ tip: liveWindowAtTop ? null : tipSide }}
                 />
               )}
@@ -2239,15 +2218,7 @@ function ChainTruthTimelineBody({
                   // have happened before. The row itself is untouched — this only
                   // wraps it.
                   // Markers in the gap below, at both widths.
-                  const noteRows = (
-                    <NoteGap
-                      notes={rowNotes}
-                      datePrefixFor={(note) => noteDatePrefixAfter(note)}
-                      openIds={openNoteIds}
-                      openAll={openAll}
-                      onToggle={toggleNote}
-                    />
-                  );
+                  const noteRows = <NoteGap notes={rowNotes} datePrefixFor={(note) => noteDatePrefixAfter(note)} />;
                   return (
                     <Fragment key={rowKey}>
                       {rowNode}
@@ -2319,19 +2290,12 @@ function ChainTruthTimelineBody({
               </div>
             ) : (
               <>
-                {/* The markers stay when a filter hides every event (item
-                    118): notes describe the market, not the account. */}
+                {/* The notes stay when a filter hides every event (item 118):
+                    they describe the market, not the account. */}
                 {tl.isFiltered && topNotes.length > 0 && (
                   <div className="relative flex flex-col gap-2">
                     <SpineLine />
-                    <NoteGap
-                      notes={topNotes}
-                      datePrefixFor={headDatePrefix}
-                      openIds={openNoteIds}
-                      openAll={openAll}
-                      onToggle={toggleNote}
-                      head={{ tip: null }}
-                    />
+                    <NoteGap notes={topNotes} datePrefixFor={headDatePrefix} head={{ tip: null }} />
                   </div>
                 )}
                 <div className="py-8 text-center text-sm text-rb-500" data-timeline-empty="">

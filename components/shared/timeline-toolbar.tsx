@@ -271,15 +271,12 @@ export interface TimelineDisplayItem {
  *  appends it only on a page that groups in the browser (defines `runs`, and
  *  was not answered in folders — rails-ops decision 0021). */
 
-/** The market-note items, under a rule after the rest (rails-ops TO-DO-ui-jobs
- *  item 118). ChainTruthTimeline appends them on a page that has notes. Notes
+/** The market-note item, under a rule after the rest (rails-ops TO-DO-ui-jobs
+ *  item 118). ChainTruthTimeline appends it on a page that has notes. Notes
  *  are not events, so they stay out of Types of event, the count and the
- *  exports; this is their only switch. "Open all" is desktop's: a phone draws
- *  notes as rows in the list view and as markers with one open at a time in
- *  the spine view, so it gets the first item only. */
+ *  exports; this is their only switch. */
 export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
   { key: "showMarketNotes", label: "Market notes", separatorBefore: true },
-  { key: "openAllMarketNotes", label: "Open all market notes" },
 ];
 
 /** "Transaction hashes": every family's number pill can show the short hash
@@ -302,22 +299,12 @@ export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [TX_HASH_ITEM, F
  *  copies; callers pass only the flags that have a render path on their cards. */
 export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] }) {
   const display = useTimelineDisplay() as TimelineDisplayState & Record<string, boolean>;
-  // "Open all market notes" reads ticked only while the markers are on, and
-  // is greyed while they are off: there is nothing for it to open.
-  const isOn = (key: TimelineDisplayKey) =>
-    key === "openAllMarketNotes" ? display.showMarketNotes && display.openAllMarketNotes : display[key];
-  const selected = new Set(items.filter((it) => isOn(it.key)).map((it) => it.key));
-  const options: FilterOption[] = items.map((it) =>
-    it.key === "openAllMarketNotes"
-      ? {
-          key: it.key,
-          label: it.label,
-          separatorBefore: it.separatorBefore,
-          disabled: !display.showMarketNotes,
-          title: display.showMarketNotes ? undefined : "Turn on market notes first",
-        }
-      : { key: it.key, label: it.label, separatorBefore: it.separatorBefore },
-  );
+  const selected = new Set(items.filter((it) => display[it.key]).map((it) => it.key));
+  const options: FilterOption[] = items.map((it) => ({
+    key: it.key,
+    label: it.label,
+    separatorBefore: it.separatorBefore,
+  }));
   return (
     <FilterDropdown
       label="Display"
