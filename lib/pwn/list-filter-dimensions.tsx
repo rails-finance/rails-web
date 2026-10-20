@@ -5,11 +5,14 @@
 // and the two asset sides (Credit advanced, Collateral locked),
 // their option lists derived from the loans actually present. All chain-state — the
 // replayed status and the named loan assets. No CR/USD facet: a fixed-term P2P loan
-// has no health factor or oracle price. The shared ListToolbar / applyListFilter
+// has no health factor or oracle price. Transactions is a range over the loan's
+// distinct transactions (lib/shared/transactions-dimension.ts), matched here
+// against `txCount`. The shared ListToolbar / applyListFilter
 // render and run this. Twin patterns in lib/morpho + lib/liquity-v1.
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { defaultChipLabel, type FilterOptionDef } from "@/components/shared/filter-bar/types";
+import { decodeRange, defaultChipLabel, type FilterOptionDef } from "@/components/shared/filter-bar/types";
+import { transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -27,7 +30,13 @@ export interface PwnListFilters extends BaseListFilters {
   status: string[];
   credit: string[];
   collateral: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
+
+/** The Transactions slider's top: the round number above the busiest loan
+ *  (7 transactions, 20 Oct 2026). */
+const PWN_TX_TOP = 10;
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open loans on the bare directory, every
@@ -41,6 +50,7 @@ export const PWN_LIST_DEFAULTS: PwnListFilters = {
   status: [],
   credit: [],
   collateral: [],
+  tx: [],
 };
 
 // "Due" and "Settled" are the book page's two orders, offered here so the book can
@@ -156,6 +166,22 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
       get: (f) => f.collateral,
       set: (f, v) => ({ ...f, collateral: v }),
       matches: (row, v) => (row.collateral ? v.includes(row.collateral.symbol) : false),
+    },
+    {
+      ...transactionsDimension<PwnListFilters>({
+        get: (f) => f.tx,
+        set: (f, tx) => ({ ...f, tx }),
+        top: PWN_TX_TOP,
+      }),
+      // `txCount` is null on a row the server has not counted yet. With no bound
+      // set this predicate is not asked and the row stays listed; under any
+      // bound it falls out, since its count cannot be placed in the range.
+      matches: (row, v) => {
+        const n = row.txCount;
+        if (n == null) return false;
+        const { min, max } = decodeRange(v);
+        return (min == null || n >= min) && (max == null || n <= max);
+      },
     },
   ];
 }
