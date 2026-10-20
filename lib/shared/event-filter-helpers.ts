@@ -270,7 +270,7 @@ const LIQUITY_OP_LABELS: Record<string, string> = {
   removeFromBatch: "Leave delegate",
   transferTrove: "Transfer",
   // Delegate-set rate. Shares the "Interest rate" label with the owner's own
-  // adjustTroveInterestRate — the filter row carries a people glyph (suffix) to
+  // adjustTroveInterestRate — the filter row carries a person glyph (suffix) to
   // mark it as the delegate's action. "Batch" is the contract term users read
   // as delegation; the UI never surfaces it.
   setBatchManagerAnnualInterestRate: "Interest rate",
