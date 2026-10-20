@@ -98,8 +98,15 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   lines.push(`- **CDP id:** ${view.cdpId}`);
   if (view.owner) lines.push(`- **Holder:** ${view.owner}`);
   lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
-  const notesLine = marketNotesLine(allNotes);
+  // The PSM's trades between touches (ui-jobs 402) are counted on their own
+  // line; "Market notes" counts the rate's.
+  const psmGaps = allNotes.filter((n) => n.kind === "psm-gap");
+  const notesLine = marketNotesLine(allNotes.filter((n) => n.kind !== "psm-gap"));
   if (notesLine) lines.push(notesLine);
+  if (psmGaps.length > 0)
+    lines.push(
+      `- **PSM trades between touches:** ${psmGaps.length} — gaps whose closing touch wrote this CDP's PSM share (see below)`,
+    );
   lines.push("");
 
   if (view.status !== "open") {
