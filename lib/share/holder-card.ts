@@ -88,7 +88,7 @@ export function holderCardModel(
     const name = opts.nearestLabel ? opts.nearestLabel(strip.nearest.label) : strip.nearest.label;
     stats.push({
       label: "Nearest its floor",
-      value: `${name} ${strip.nearest.approx ? "≈ " : ""}${pct(strip.nearest.ratioPct)}`,
+      value: `${name} ${strip.nearest.approx ? "≈ " : ""}${strip.nearest.measure === undefined ? pct(strip.nearest.ratioPct) : strip.nearest.measure}`,
     });
   }
 
