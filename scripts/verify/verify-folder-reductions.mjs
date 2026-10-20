@@ -258,7 +258,10 @@ const ARMS = [
     // 1,678 of 2,598 served inside folders (65 %), 44 hidden days. Restated
     // again for ParaSwap (mig 248): its 1,852 ParaSwap swaps each merge two rows
     // and 625 leftover rows net into their legs, 2,477 fewer: 6,989 events.
-    floors: { totalEvents: 5_500, folders: 30, inFolderShare: 0.5, dayGap: 30 },
+    // Restated 2026-10-20 (ui-jobs 339): under decision 0039's one rule of five
+    // the window holds 1,823 of 4,269 served events in folders (43 %), so the
+    // share floor is 0.35.
+    floors: { totalEvents: 5_500, folders: 30, inFolderShare: 0.35, dayGap: 30 },
   },
   {
     key: "spark",
@@ -268,8 +271,11 @@ const ARMS = [
       `${BASE}/ethereum/spark/0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5?folders=${grouped ? "1" : "0"}`,
     // This fixture's whole history fits its window, so there is no summary half
     // and no singleton: the in-folder share is 1.00 and every day is hidden.
-    // The floors say so rather than reusing the other arm's.
-    floors: { totalEvents: 2_000, folders: 15, inFolderShare: 0.5, dayGap: 100 },
+    // The floors say so rather than reusing the other arm's. Since decision 0039
+    // (web `af40fed1`, 2026-10-15) a run of five or more of the same act is one
+    // group whatever its length, and this wallet's whole history is ONE folder
+    // of 406 rows (read 2026-10-20, ui-jobs 339): the folder floor is 1.
+    floors: { totalEvents: 2_000, folders: 1, inFolderShare: 0.5, dayGap: 100 },
   },
 ];
 

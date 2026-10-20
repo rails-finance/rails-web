@@ -41,13 +41,22 @@ const DAY_MS = 86_400_000;
 // walk frontier (Aave V3 Base 32,140,552; Moonwell Base 10,147,054), the
 // "above" one after it. Which way each must render is read from the payload
 // at run time, not assumed from these notes.
+// A "below" fixture is read off the lane at run time (ui-jobs 339, 20 Oct 2026):
+// the walk runs DOWN the chain, so any pinned wallet is overtaken — the
+// Aave V3 Base pin (0x4e82…9ce8, first block 32,140,552) sat below a frontier
+// that has since passed 11,249,643, and Moonwell Base's walk reached the
+// Comptroller's first event. `below: true` picks the lane's oldest positions
+// (`sortBy=firstEventAt`) and takes the first whose payload still has unpriced
+// rows below the frontier; a lane whose walk is complete has no such wallet,
+// and the fixture then stands for the finished case (well absent) on the
+// oldest position, which the payload says is what it is.
 const FIXTURES = [
   {
     name: "aave-below",
     explorer: "aave-v3-base",
     page: "/base/aave-v3/",
-    wallet: "0x4e82c081fb87b180e23be2ba768184751b6f9ce8",
-    expectWell: true,
+    listing: "/api/aave-v3-base/positions",
+    below: true,
   },
   {
     name: "aave-above",
@@ -60,8 +69,8 @@ const FIXTURES = [
     name: "moonwell-below",
     explorer: "moonwell-base",
     page: "/base/moonwell/",
-    wallet: "0x9a699642f8d2bb9d03e77d0066cbeaf5c08f9f90",
-    expectWell: true,
+    listing: "/api/moonwell-base/positions",
+    below: true,
   },
   // Seamless's walk reached the Pool's first event before 2026-09-13.
   {
@@ -130,7 +139,32 @@ const ctx = await browser.newContext();
 const ov = overrides();
 console.log(`overrides in lib/shared/fill-eta-overrides.ts: ${JSON.stringify(ov)}`);
 
+/** The lane's oldest position still below the walk's frontier, or, once the
+ *  walk is complete, its oldest position at all (the finished case). */
+async function pickBelow(f) {
+  const oldest = await api(`${f.listing}?limit=20&sortBy=firstEventAt&sortOrder=asc`);
+  const wallets = (oldest.rows ?? oldest.data ?? []).map((r) => r.wallet).filter(Boolean);
+  let first = null;
+  for (const wallet of wallets) {
+    const tl = await api(`/api/chain/${f.explorer}/timeline?wallet=${wallet}`);
+    const fill = tl?.coverage?.fill;
+    first ??= { wallet, tl };
+    if (!fill?.filling) break;
+    if (fill.unpricedRowsBelowFrontier > 0) return { wallet, tl, expectWell: true };
+  }
+  if (!first) throw new Error(`${f.name}: the listing answered no wallet`);
+  return { ...first, expectWell: false };
+}
+
 for (const f of FIXTURES) {
+  if (f.below) {
+    const picked = await pickBelow(f);
+    f.wallet = picked.wallet;
+    f.expectWell = picked.expectWell;
+    console.log(
+      `INFO  ${f.name}: ${f.wallet} — ${picked.expectWell ? "below the frontier" : "the lane's walk has no unpriced row below its frontier, so this is the finished case"}`,
+    );
+  }
   const tl = await api(`/api/chain/${f.explorer}/timeline?wallet=${f.wallet}`);
   const fill = tl?.coverage?.fill;
   check(
@@ -148,8 +182,9 @@ for (const f of FIXTURES) {
 
   const page = await ctx.newPage();
   await page.goto(`${BASE}${f.page}${f.wallet}`, { waitUntil: "domcontentloaded", timeout: 90000 });
-  // The timeline has mounted when its toolbar's event-type filter is up.
-  await page.locator('[aria-label="Types of event"]').first().waitFor({ state: "attached", timeout: 90000 });
+  // The timeline has mounted when its activity head is up (the event-type
+  // filter is not drawn for a one-event life, which the oldest positions are).
+  await page.locator("[data-timeline-activity-head]").first().waitFor({ state: "attached", timeout: 90000 });
   const well = page.locator(`[data-fill-well="${f.explorer}"]`);
   const shown = (await well.count()) > 0;
   check(`${f.name}: well ${want ? "shown" : "absent"}`, shown === (want != null));
@@ -181,14 +216,19 @@ for (const f of FIXTURES) {
 {
   const page = await ctx.newPage();
   await page.goto(`${BASE}/coverage/ethereum`, { waitUntil: "domcontentloaded", timeout: 90000 });
-  const v4 = page.locator('[aria-label^="Included, except RLUSD"]');
+  // RLUSD has been priced at its own block since 2026-09-22 (server 7bf56da);
+  // the exceptions the cell names now are the PT-USDe and USDG rows on reserves
+  // the catalog does not list (lib/shared/coverage.ts, aave-v4 atBlockPrices).
+  const v4 = page.locator("tr", { hasText: /Aave V4/ }).locator('[aria-label^="Included, except"]');
   await v4
     .first()
     .waitFor({ state: "attached", timeout: 30000 })
     .catch(() => undefined);
+  const v4Label = (await v4.count()) > 0 ? ((await v4.first().getAttribute("aria-label")) ?? "") : "";
   check(
     "coverage/ethereum: Aave V4 prices-at-the-block is a tick naming RLUSD and PT-USDe",
-    (await v4.count()) > 0 && /PT-USDe/.test((await v4.first().getAttribute("aria-label")) ?? ""),
+    /PT-USDe/.test(v4Label) && /USDG/.test(v4Label),
+    v4Label || "no except tick on the Aave V4 row",
   );
   await page.close();
 

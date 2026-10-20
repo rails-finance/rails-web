@@ -179,7 +179,10 @@ if (!env.BASE_BACKFILL_RPC_URL) throw new Error("need BASE_BACKFILL_RPC_URL in .
 // twenty-plus and cannot, so only the second exercises collapse at all. A
 // sample of one would have left the collapse path written and untested.
 const CASE_STUDY = "0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2";
-const CASE_HOLDER = "0xaa3e1a91fc83723e527062ff929a357354d10dcb";
+// Repinned 2026-10-20 (ui-jobs 339): 0xaa3e…0dcb exited the vault. This address
+// minted, burned to nothing and minted again, and holds now — the one row where
+// it held nothing is what §0g and §4 read.
+const CASE_HOLDER = "0xc3840f38c8edc39f65443243aa7399d607e9f599";
 // Steakhouse High Yield USDC v1.1 — the widest withdraw queue in the catalogue.
 const WIDE_VAULT = "0xbeefa7b88064feef0cee02aaebbd95d30df3878f";
 // Pinned by sweeping that vault's own `Transfer` stream for a party that is
