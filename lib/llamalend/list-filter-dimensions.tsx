@@ -9,6 +9,9 @@
 // Facets:
 //   • Status  — open / closed / liquidated (lifecycle). 'liquidated' names
 //     only a CLOSED position — the two-axis status model.
+//   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
+//     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. Only a
+//     crvUSD-borrowed market has a dollar figure; the rest stay out of a range.
 //   • History — Liquidated before (the orthogonal flag): open SURVIVORS
 //     match too.
 //   • Transactions — a range over tx_count, every distinct transaction on the
@@ -25,6 +28,7 @@
 // backend cannot filter on it — the cards state it instead.
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -52,6 +56,11 @@ export interface LlamalendListFilters extends BaseListFilters {
   /** "" | "liquidated" — positions hard-liquidated at least once (the
    *  orthogonal flag; open survivors included). */
   liquidations: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
 }
@@ -67,6 +76,8 @@ export const LLAMALEND_LIST_DEFAULTS: LlamalendListFilters = {
   sortOrder: "desc",
   status: [],
   liquidations: [],
+  debt: [],
+  coll: [],
   tx: [],
 };
 
@@ -83,6 +94,10 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "closed", label: "Closed" },
   { value: "liquidated", label: "Liquidated" },
 ];
+
+/** The Size panel's price line. */
+const LLAMALEND_SIZE_NOTE =
+  "At the latest indexed price per asset, as of the listing's last refresh. A market with no dollar figure stays out of a range.";
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
@@ -104,6 +119,13 @@ export function llamalendListDimensions(): SerializableDimension<LlamalendListFi
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
     },
+    ...sizeDimensions<LlamalendListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: LLAMALEND_SIZE_NOTE,
+    }),
     {
       id: "liquidations",
       label: "History",
@@ -135,6 +157,7 @@ export function llamalendFiltersToFetchParams(
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...usdBounds(filters),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as LlamalendPositionSort,
     sortOrder: filters.sortOrder,

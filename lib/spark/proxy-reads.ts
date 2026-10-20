@@ -61,6 +61,11 @@ export async function readSparkPositions(
     const v = sp.get(k);
     if (v != null && /^\d+$/.test(v)) qs.set(k, v);
   }
+  // So is a USD bound on the debt or the collateral.
+  for (const k of ["minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   if (sp.get("supplyAssets")) qs.set("supplyAssets", symbolsToAddresses(sp.get("supplyAssets")!));
   if (sp.get("borrowAssets")) qs.set("borrowAssets", symbolsToAddresses(sp.get("borrowAssets")!));
   // Allowlist, like sortOrder: an unrecognised value is dropped rather than
