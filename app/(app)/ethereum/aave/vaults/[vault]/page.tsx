@@ -1,14 +1,10 @@
-// One Aave vault's MARKET VIEW — /ethereum/aave/vaults/<vault>.
+// One Aave vault's page — /ethereum/aave/vaults/<vault>.
 // ----------------------------------------------------------------------------
-// What the vault is and what it holds, as deep as its family goes, at one block
-// read from chain. No indexer and no backend table — the whole page is one
-// pinned read of the vault and of the contracts it hops to.
-//
-// THE TWO WAYS ON, and the page is deliberately short so they are visible: one
-// address's own position (/ethereum/aave/vaults/<vault>/<holder>, which the form
-// here navigates to) and every address that has ever held this vault (the
-// section's listing, filtered to it). A market view links to the filtered
-// listing rather than restating it.
+// The vault card (V2), where the assets are (V3) and the holder finder (V4),
+// rails-ops ui-jobs 407, drawn by components/vaults/aave-ethereum-vault-page.tsx
+// from one pinned read of the vault and of the contracts it hops to; Holders
+// is the census's, Yield the daily store's. The Holders headline links to the
+// section's listing filtered to this vault.
 //
 // `?holder=` IS NOT A READING HERE. It is what the native GET form emits, and
 // this route sends it straight on to that position's own path — a position is a
@@ -34,21 +30,19 @@
 
 import { cache } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { AaveEthereumVaultView } from "@/components/vaults/aave-ethereum-vault-view";
-import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
+import { AaveEthereumVaultPage } from "@/components/vaults/aave-ethereum-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { aaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
-import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
+import { ethereumVaultHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
 import { RailHeader } from "@/components/shared/rail-header";
-import { BlockRef } from "@/components/shared/block-ref";
+import { loadVaultCensusRow } from "@/lib/vaults/census-read";
+import { loadVaultYields } from "@/lib/vaults/yield-read";
 
 // Every figure is a call at the head — nothing about this is cacheable across
 // requests.
@@ -84,7 +78,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function AaveEthereumVaultPage({ params, searchParams }: Props) {
+export default async function AaveEthereumVaultRoute({ params, searchParams }: Props) {
   const { vault } = await params;
   const address = vault.toLowerCase();
   if (!ADDRESS.test(address)) notFound();
@@ -102,74 +96,25 @@ export default async function AaveEthereumVaultPage({ params, searchParams }: Pr
   if (!data.served) notFound();
 
   const attestation = aaveVaultAttestation(address, data.vault.family);
+  const [census, yields] = await Promise.all([
+    loadVaultCensusRow(MAINNET_CHAIN_ID, address),
+    loadVaultYields(MAINNET_CHAIN_ID, [address]),
+  ]);
 
   return (
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
-          <div className="mb-4">
-            <RailHeader session="aave-vaults" venue="subPage" />
-          </div>
-          <h1
-            className="text-2xl font-semibold text-foreground"
-            data-vault-page={address}
-            data-vault-family={data.vault.family}
-          >
-            {data.vault.name || shortAddr(address)}
-            {data.vault.symbol && <span className="ml-2 text-base font-normal text-rb-500">{data.vault.symbol}</span>}
-          </h1>
-
-          {data.chainStale ? (
-            <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for it — not the family either,
-              because which family it belongs to is a read like everything else on this page.
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 text-[12px] text-rb-500">
-                {AAVE_FAMILY_SINGULAR[data.vault.family]}, deployed by Aave ·{" "}
-                <a
-                  href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external font-mono"
-                >
-                  {shortAddr(address)}
-                </a>
-                {" · asset "}
-                <a
-                  href={explorerUrl(MAINNET_CHAIN_ID, "address", data.vault.asset.address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={data.vault.asset.named ? "link-external" : "link-external font-mono"}
-                >
-                  {data.vault.asset.symbol}
-                </a>
-              </p>
-              <p className="mt-2 max-w-3xl text-[11px] text-rb-500" data-vault-attestation={attestation.kind}>
-                {attestation.kind === "book"
-                  ? `Aave publishes this address in its own address book as ${attestation.constant}.`
-                  : `Aave publishes ${attestation.constant}, and that contract's own ${attestation.call} returned this address at the block below.`}
-              </p>
-              <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · every figure below is a call
-                answered at that block, on this vault and on the contracts it names.
-              </p>
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <Link
-                  href={ethereumVaultsListingHref()}
-                  className={PAGE_LINK}
-                  prefetch={false}
-                  data-link="vault-directory"
-                >
-                  All vault positions on Ethereum <span aria-hidden>→</span>
-                </Link>
-              </p>
-            </>
-          )}
+          <RailHeader session="aave-vaults" venue="subPage" />
         </header>
 
-        {!data.chainStale && <AaveEthereumVaultView data={data} />}
+        {data.chainStale ? (
+          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+            This vault could not be read from chain just now, so no figure is stated for it.
+          </p>
+        ) : (
+          <AaveEthereumVaultPage data={data} census={census} yieldFigure={yields[address]} attestation={attestation} />
+        )}
 
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />

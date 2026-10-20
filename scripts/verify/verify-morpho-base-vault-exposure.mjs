@@ -570,7 +570,14 @@ const page = await context.newPage();
 
 const href = (holder) => `${BASE}/base/morpho/vaults/${VAULT}${holder ? `?holder=${encodeURIComponent(holder)}` : ""}`;
 
-const figure = async (name) => (await page.locator(`[data-figure="${name}"] > div`).nth(1).textContent())?.trim();
+// A figure's value alone: a stat card's `[data-figure-value]` (the holder page),
+// the vault card's headline marks its full figure the same way, and a card stat
+// is the `[data-figure]` span itself (ui-jobs 407, V2).
+const figure = async (name) => {
+  const value = page.locator(`[data-figure="${name}"] [data-figure-value]`);
+  if ((await value.count()) > 0) return (await value.first().textContent())?.trim();
+  return (await page.locator(`[data-figure="${name}"]`).first().textContent())?.trim();
+};
 
 /** The holder-shape sentence as a reader sees it, or a stated absence. Count-
  *  guarded: a line the page never drew is a red check, never a locator timeout. */
@@ -591,6 +598,9 @@ const tryRead = async (address, functionName, blockNumber) => {
 
 /** The block the page STATES, from the stamp a reader sees — check 2's subject. */
 async function statedBlock() {
+  // The vault page states it in the card's foot (V2); the holder page in its header.
+  const card = page.locator("[data-vault-read-at]");
+  if ((await card.count()) > 0) return BigInt(await card.first().getAttribute("data-vault-read-at"));
   const text = (await page.locator('[data-skel-section="page-header"]').innerText()).replace(/\s+/g, " ");
   const m = text.match(/Read at (?:block )?(\d[\d,]*)/);
   return m ? BigInt(m[1].replace(/,/g, "")) : null;
@@ -638,8 +648,10 @@ const ownPrice = await read("convertToAssets", [BigInt(10) ** BigInt(own.decimal
 check(
   "2c the share price on the page re-reads at that block",
   pagePrice ===
+    // The print rule every family's share price goes through (sharePriceText,
+    // lib/shared/vault-amount-text.ts): two to six places.
     (Number(ownPrice) / 10 ** own.assetDecimals).toLocaleString("en-US", {
-      minimumFractionDigits: 4,
+      minimumFractionDigits: 2,
       maximumFractionDigits: 6,
     }),
   `${pagePrice}`,

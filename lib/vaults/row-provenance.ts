@@ -7,6 +7,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { formatUnitsExact } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -20,7 +21,7 @@ export const vaultYieldProv = (v: VaultSummary, y: Measured): Provenance => {
     kind: "derived",
     pclass: "state",
     source: { block: y.to.block },
-    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each the vault's \`convertToAssets\` stored once a day in the daily price store. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it, and it is no forecast.`,
+    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each the vault's \`convertToAssets\` stored once a day in the daily price store. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it, and it is no forecast.${y.jump ? ` One day carries most of the move: ${(y.jump.change * 100).toFixed(2)}% between two stored days, on ${formatDate(new Date(y.jump.day * 86_400_000))}.` : ""}`,
     contract: { name: v.name ?? v.catalogName ?? "vault", address: v.address },
     via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
     formula: `(p1 / p0 − 1) × 365 / ${y.days}`,

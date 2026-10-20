@@ -72,9 +72,9 @@ export default async function YearnVaultsInfoPage() {
         is no dollar value anywhere and no total across the page.
       </p>
       <p data-intro-scope>
-        Yearn V2 is a separate registry with different vault code and is absent from this page. A holder&rsquo;s reading
-        of a Yearn vault — what one address holds, and the history behind it — is work that has not been done here yet;
-        the roster is about the contracts.
+        Yearn V2 is a separate registry with different vault code and is absent from this page. One address&rsquo;s
+        holding in a vault, and the history behind it, opens from the vault&rsquo;s page: enter the address under
+        &ldquo;Find an address in this vault&rdquo;. There is no census of Yearn holders, so no count of them is stated.
       </p>
     </VaultsInfoPage>
   );

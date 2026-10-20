@@ -1,15 +1,14 @@
-// ONE VAULT'S MARKET VIEW — /base/morpho/vaults/<vault>.
+// ONE VAULT'S PAGE — /base/morpho/vaults/<vault>.
 // ----------------------------------------------------------------------------
-// A MetaMorpho vault pools holders' asset and a curator routes it into Morpho
-// Blue markets. This page is about the VAULT: what it holds, what Blue has
-// settled of it, and which markets its withdraw queue puts the asset into, all
-// at one block read from chain. No indexer and no backend table — the whole
-// page is one pinned read of the vault and of Blue.
+// The vault card (V2), where the assets are (V3) and the holder finder (V4),
+// rails-ops ui-jobs 407, drawn by components/vaults/morpho-base-vault-page.tsx
+// from one pinned read of the vault and of Blue; Holders is the census's,
+// Yield the daily store's.
 //
-// A MARKET VIEW LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. Who holds this
-// vault is the position listing's question, and the header carries the link to
-// it filtered to this address. What ONE address holds is the position page one
-// path segment down, /base/morpho/vaults/<vault>/<holder>.
+// THE PAGE LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. The Holders
+// headline links to the position listing filtered to this address. What ONE
+// address holds is the position page one segment down,
+// /base/morpho/vaults/<vault>/<holder>.
 //
 // `?holder=` IS A REDIRECT, NOT A READING. A position is the pair
 // `(vault, holder)` and it has a path of its own, so the lookup form's native
@@ -26,33 +25,27 @@
 //
 // WHERE IT LIVES. Under the Vaults tab of the Morpho Blue Base explorer
 // (rails-ops decision 0028): a MetaMorpho factory deployed this contract, so
-// Morpho is the door, and the rail above the H1 says so. The family words under
-// the H1 name the standard and the factory version, and no longer carry the one
-// link to the protocol. The sibling route /base/morpho/<vault> also resolves
+// Morpho is the door, and the rail above the card says so. The sibling route /base/morpho/<vault> also resolves
 // for the same address — it is the vault's OWN Blue positions, which is a true
-// and different page. The allocation table links into it per market, and that
-// page links back here.
+// and different page. The card's ⋮ links to it, V3 links into it per market,
+// and that page links back here.
 
 import { cache } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { MorphoBaseVaultExposureView } from "@/components/protocol/morpho-base/vault-exposure-view";
+import { MorphoBaseVaultPage as MorphoBaseVaultPageView } from "@/components/vaults/morpho-base-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { explorerUrl } from "@/lib/shared/chains";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { RailHeader } from "@/components/shared/rail-header";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { MORPHO_BASE_METAMORPHO_FACTORIES } from "@/lib/morpho-base/vault-catalog";
 import { isMorphoBaseRosterVault } from "@/lib/morpho-base/vault-roster";
-import { resolveHolder } from "@/lib/morpho-base/vault-holder";
-import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
-import { baseVaultHref, baseVaultsListingHref } from "@/lib/vaults/routes";
+import { baseVaultHref } from "@/lib/vaults/routes";
 import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
-import { BlockRef } from "@/components/shared/block-ref";
+import { loadVaultCensusRow } from "@/lib/vaults/census-read";
+import { loadVaultYields } from "@/lib/vaults/yield-read";
 
 // Every figure is a slot read at the head, and the holder rides in the query —
 // nothing about this is cacheable across requests.
@@ -101,114 +94,32 @@ export default async function MorphoBaseVaultPage({ params, searchParams }: Prop
   const holderParam = firstParam((await searchParams).holder);
   if (holderParam && holderParam.trim()) redirect(baseVaultHref(address, holderParam.trim()));
 
-  const lookup = await resolveHolder(null);
-  const data = await load(address, undefined);
-
+  const [data, census, yields] = await Promise.all([
+    load(address, undefined),
+    loadVaultCensusRow(MORPHO_BASE_CHAIN_ID, address),
+    loadVaultYields(MORPHO_BASE_CHAIN_ID, [address]),
+  ]);
   const factory = MORPHO_BASE_METAMORPHO_FACTORIES.find((f) => f.version === data.vault.factory);
-  // The label follows the chain rather than the convention: a vault whose
-  // `curator()` is the zero address names no curator, and saying "Curator" over
-  // an owner's address would attribute a role nobody holds.
-  const stewardLabel = data.vault.curator ? "Curator" : "Owner";
-  const steward = data.vault.curator ?? data.vault.owner;
 
   return (
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
-          <div className="mb-4">
-            <RailHeader session="morpho-base" venue="subPage" />
-          </div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            <a
-              href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", data.vault.address)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {data.vault.name || shortAddr(data.vault.address)}
-            </a>
-            {data.vault.symbol && <span className="ml-2 text-base font-normal text-rb-500">{data.vault.symbol}</span>}
-          </h1>
-
-          {data.chainStale ? (
-            <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for it. The page states nothing
-              it could not read.
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 text-[12px] text-rb-500">
-                {/* The venue is on the rail above by construction now
-                    (rails-ops decision 0028), so this line names the standard
-                    and the factory version and carries no link of its own. */}
-                MetaMorpho {data.vault.factory} on Morpho Blue
-                {factory && (
-                  <>
-                    {" · "}
-                    <a
-                      href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", factory.address)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="link-external"
-                    >
-                      factory
-                    </a>
-                  </>
-                )}
-                {" · asset "}
-                <a
-                  href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", data.vault.asset.address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={data.vault.asset.named ? "link-external" : "link-external font-mono"}
-                >
-                  {data.vault.asset.symbol}
-                </a>
-                {" · "}
-                {stewardLabel}{" "}
-                <a
-                  href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", steward)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external font-mono"
-                >
-                  {shortAddr(steward)}
-                </a>
-              </p>
-              <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at <BlockRef block={data.blockNumber} chainId={MORPHO_BASE_CHAIN_ID} /> · every figure below is a
-                slot read at that block, on the vault and on the{" "}
-                <a
-                  href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", data.vault.morpho)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  Morpho Blue singleton
-                </a>
-                .
-              </p>
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <Link href={morphoBaseWalletHref(data.vault.address)} className={PAGE_LINK} prefetch={false}>
-                  This vault&rsquo;s own positions on Morpho Blue <span aria-hidden>→</span>
-                </Link>
-                <Link
-                  href={baseVaultsListingHref({ vault: address })}
-                  className={PAGE_LINK}
-                  prefetch={false}
-                  data-link="vault-positions"
-                  data-positions-vault={address}
-                >
-                  Every address that has held this vault <span aria-hidden>→</span>
-                </Link>
-                <Link href={baseVaultsListingHref()} className={PAGE_LINK} prefetch={false} data-link="vault-directory">
-                  All vault positions on Base <span aria-hidden>→</span>
-                </Link>
-              </p>
-            </>
-          )}
+          <RailHeader session="morpho-base" venue="subPage" />
         </header>
 
-        {!data.chainStale && <MorphoBaseVaultExposureView data={data} lookup={lookup} />}
+        {data.chainStale ? (
+          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+            This vault could not be read from chain just now, so no figure is stated for it.
+          </p>
+        ) : (
+          <MorphoBaseVaultPageView
+            data={data}
+            census={census}
+            yieldFigure={yields[address]}
+            factory={factory?.address ?? null}
+          />
+        )}
 
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />

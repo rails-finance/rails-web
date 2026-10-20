@@ -472,6 +472,8 @@ async function readVaultPage(vault, holder) {
     stataLinkAgrees: await grab("[data-stata-link-agrees]", "data-stata-link-agrees"),
     // umbrella
     cooldown: await figure("umbrella-cooldown"),
+    unstakeWindow: await figure("umbrella-unstake-window"),
+    reserveRow: await grab('[data-panel-row="reserve"]'),
     maxSlashable: await figure("umbrella-max-slashable"),
     minRemaining: await figure("umbrella-min-remaining"),
     umbrellaAssetHeld: await figure("umbrella-asset-held"),
@@ -519,6 +521,21 @@ async function readVaultPage(vault, holder) {
     ensNote: (await page.getByText("resolved through mainnet ENS").count()) > 0,
     blockText: await grab("[data-vault-block]"),
     bodyText: (await page.locator("main, body").first().innerText()).replace(/\s+/g, " "),
+    // The page's words without the card's Yield headline and its (i) bullets:
+    // decision 0047 puts Rails's marked yield figure there, and check 8b looks
+    // for any other rate.
+    rateText: (
+      await page
+        .locator("main, body")
+        .first()
+        .evaluate((el) => {
+          const c = el.cloneNode(true);
+          c.querySelectorAll('script, style, [data-card-head="yield"], [data-vault-explanation]').forEach((n) =>
+            n.remove(),
+          );
+          return c.textContent ?? "";
+        })
+    ).replace(/\s+/g, " "),
     // The section rail's tabs — a vault's market view is the roster's child,
     // so VAULTS is the slot that must be lit here (0c).
     railTabs: await page.locator('nav[aria-label="Explorer sections"] a').evaluateAll((els) =>
@@ -802,15 +819,16 @@ check(
 );
 const ownGap = ownGhoHeld - OWN.get(SGHO).totalAssets;
 const wantGapText = (ownGap > BigInt(0) ? "+" : "") + amountText(ownGap, sghoAd);
+// The vault card (ui-jobs 407, V2) states the two figures and no gap between
+// them, and carries no RAY slot: 3c reads the held balance alone, 3d retired.
 check(
-  "3c the GHO the contract holds is a separate read from totalAssets(), and the gap is stated with the sign of this script's own subtraction",
-  sghoPage.sghoAssetHeld?.startsWith(amountText(ownGhoHeld, sghoAd)) && sghoPage.sghoAssetGap?.startsWith(wantGapText),
-  `held "${sghoPage.sghoAssetHeld}" vs "${amountText(ownGhoHeld, sghoAd)}"; gap "${sghoPage.sghoAssetGap}" vs "${wantGapText}" (own ${ownGap})`,
+  "3c the GHO the contract holds is a separate read from totalAssets(), this script's own balanceOf()",
+  sghoPage.sghoAssetHeld?.startsWith(amountText(ownGhoHeld, sghoAd)),
+  `held "${sghoPage.sghoAssetHeld}" vs "${amountText(ownGhoHeld, sghoAd)}" (gap own ${ownGap}, ${wantGapText}, not drawn)`,
 );
-check(
-  "3d both RAY slots print as the contract stores them — the yield index and the rate per second, neither compounded out",
-  sghoPage.sghoYieldIndex === String(ownIndex) && sghoPage.sghoRatePerSecond === String(ownRatePerSec),
-  `index page "${sghoPage.sghoYieldIndex}" vs own ${ownIndex}; rate page "${sghoPage.sghoRatePerSecond}" vs own ${ownRatePerSec}`,
+skip(
+  "3d both RAY slots print as the contract stores them",
+  `the vault card draws no RAY slot (ui-jobs 407); own index ${ownIndex}, rate ${ownRatePerSec}`,
 );
 check(
   "3e the stored lastUpdate() prints as a UTC instant in en-GB, and is NOT this block's own timestamp",
@@ -852,31 +870,26 @@ check(
   stataPage.mechanic === "stata" && lc(stataPage.stataAToken) === lc(ownAToken),
   `page ${stataPage.stataAToken} vs own ${lc(ownAToken)}`,
 );
-check(
-  "4b the liquidity index is this script's own getReserveData() on the Pool the WRAPPER names, not on a Pool assumed here",
-  stataPage.stataIndex === String(ownReserveData.liquidityIndex) && stataPage.bodyText.includes(short(lc(ownPool))),
-  `index page "${stataPage.stataIndex}" vs own ${ownReserveData.liquidityIndex}; pool ${short(lc(ownPool))} named: ${stataPage.bodyText.includes(short(lc(ownPool)))}`,
+// The liquidity index, the Pool and the two-ended link left the page with the
+// family section (ui-jobs 407, V2): 4b and 4c retired.
+skip(
+  "4b the liquidity index on the wrapper's Pool",
+  `not drawn on the vault card; own index ${ownReserveData.liquidityIndex}`,
 );
-check(
-  "4c the wrapper→aToken link is stated from BOTH ends, and this script's own two reads agree with the page's verdict",
-  stataPage.stataLinkAgrees === String(lc(ownReserveData.aTokenAddress) === lc(ownAToken)),
-  `page says "${stataPage.stataLinkAgrees}"; own wrapper.aToken() ${lc(ownAToken)}, own Pool aTokenAddress ${lc(ownReserveData.aTokenAddress)}`,
+skip(
+  "4c the wrapper→aToken link from both ends",
+  `not drawn on the vault card; own reads agree: ${lc(ownReserveData.aTokenAddress) === lc(ownAToken)}`,
 );
 const ownCustodyGap = ownATokenBalance - OWN.get(WA_USDC).totalAssets;
 const wantCustodyText = (ownCustodyGap > BigInt(0) ? "+" : "") + amountText(ownCustodyGap, stataAd);
 check(
-  "4d the aToken balance and the signed custody gap are this script's own balanceOf() and its own subtraction",
-  stataPage.stataATokenBalance?.startsWith(amountText(ownATokenBalance, stataAd)) &&
-    stataPage.stataCustodyGap?.startsWith(wantCustodyText),
-  `balance "${stataPage.stataATokenBalance}" vs "${amountText(ownATokenBalance, stataAd)}"; gap "${stataPage.stataCustodyGap}" vs "${wantCustodyText}" (own ${ownCustodyGap})`,
+  '4d the aToken balance in "Where the assets are" is this script\'s own balanceOf()',
+  stataPage.stataATokenBalance?.startsWith(amountText(ownATokenBalance, stataAd)),
+  `balance "${stataPage.stataATokenBalance}" vs "${amountText(ownATokenBalance, stataAd)}" (custody gap own ${ownCustodyGap}, ${wantCustodyText}, not drawn)`,
 );
-check(
-  "4e the reward registry is stated as what rewardTokens() answered — an empty list is a reading, and it is named as a registry",
-  (ownRewards.length === 0
-    ? /returned an empty list/.test(stataPage.stataRewardTokens ?? "")
-    : new RegExp(`returned ${ownRewards.length} address`).test(stataPage.stataRewardTokens ?? "")) &&
-    /registry/.test(stataPage.stataRewardTokens ?? ""),
-  `own rewardTokens() length ${ownRewards.length}; page "${(stataPage.stataRewardTokens ?? "").slice(0, 110)}…"`,
+skip(
+  "4e the reward registry",
+  `not drawn on the vault card (ui-jobs 407); own rewardTokens() length ${ownRewards.length}`,
 );
 
 // ── 5: an Umbrella stake token's mechanic ───────────────────────────────────
@@ -927,25 +940,23 @@ const [ownSlashableFlag, ownDeficitOffset, ownPendingDeficit] = umbrellaOwn;
 check(
   "5a the cooldown and the unstake window are this script's own getCooldown() and getUnstakeWindow(), by the section's duration rule",
   stkPage.mechanic === "umbrella-stake" &&
-    stkPage.cooldown === `${durationText(Number(ownCooldown))}, then ${durationText(Number(ownWindow))}`,
-  `page "${stkPage.cooldown}" vs "${durationText(Number(ownCooldown))}, then ${durationText(Number(ownWindow))}" (own ${ownCooldown}s / ${ownWindow}s)`,
+    stkPage.cooldown === durationText(Number(ownCooldown)) &&
+    stkPage.unstakeWindow === durationText(Number(ownWindow)),
+  `page "${stkPage.cooldown}" / "${stkPage.unstakeWindow}" vs "${durationText(Number(ownCooldown))}" / "${durationText(Number(ownWindow))}" (own ${ownCooldown}s / ${ownWindow}s)`,
 );
 check(
-  "5b the slashable amount and its floor are this script's own reads, and totalAssets − floor == slashable exactly",
+  "5b the slashable amount is this script's own read, and totalAssets − its floor == slashable exactly (the floor is not drawn)",
   stkPage.maxSlashable?.startsWith(amountText(ownSlashable, stkAd)) &&
-    stkPage.minRemaining?.startsWith(amountText(ownMinRemaining, stkAd)) &&
     OWN.get(STK_USDC).totalAssets - ownMinRemaining === ownSlashable,
   `slashable "${stkPage.maxSlashable}" vs "${amountText(ownSlashable, stkAd)}"; floor "${stkPage.minRemaining}" vs "${amountText(ownMinRemaining, stkAd)}"; invariant ${OWN.get(STK_USDC).totalAssets - ownMinRemaining === ownSlashable}`,
 );
 check(
   "5c the reserve is the one THIS SCRIPT's own asset() hops reach, and Umbrella's answers about it are this script's own",
-  stkPage.reserveLine?.includes(`covers ${reserveSymbol}`) &&
-    stkPage.reserveLine?.includes(
-      ownSlashableFlag[0] ? "reports a slashable deficit" : "reports no slashable deficit",
-    ) &&
-    stkPage.deficitOffset?.startsWith(amountText(ownDeficitOffset, Number(reserveDecimals))) &&
-    stkPage.pendingDeficit?.startsWith(amountText(ownPendingDeficit, Number(reserveDecimals))),
-  `own hops → ${reserveSymbol} (${short(ownWrapperAsset)}); line "${(stkPage.reserveLine ?? "").slice(0, 90)}…"; offset "${stkPage.deficitOffset}" vs "${amountText(ownDeficitOffset, Number(reserveDecimals))}"; pending "${stkPage.pendingDeficit}" vs "${amountText(ownPendingDeficit, Number(reserveDecimals))}"`,
+  // The card's Reserve stat (ui-jobs 407): the symbol and Umbrella's answer on
+  // its second line. The deficit offset and the pending deficit are not drawn.
+  stkPage.reserveLine === reserveSymbol &&
+    (stkPage.reserveRow ?? "").includes(ownSlashableFlag[0] ? "slashable deficit reported" : "no slashable deficit"),
+  `own hops → ${reserveSymbol} (${short(ownWrapperAsset)}); stat "${stkPage.reserveRow}"; own offset ${ownDeficitOffset}, pending ${ownPendingDeficit}`,
 );
 check(
   "5d the only address that can slash it is this script's own owner() read, and the asset custody is its own balanceOf()",
@@ -1186,18 +1197,23 @@ check(
 const hopFixture = HOLDERS.find((f) => f.vault === STK_USDC);
 const hopPage = holderPages.get(`${hopFixture.vault}:${hopFixture.holder}`);
 const hopOwn = holderOwn.get(`${hopFixture.vault}:${hopFixture.holder}`);
-const ownHopClaim = await client.readContract({
-  address: stkAsset,
-  abi: VAULT_ABI,
-  functionName: "convertToAssets",
-  args: [hopOwn.claim],
-  blockNumber: hopOwn.bn,
-});
-check(
-  "6h the third hop is the wrapper's own convertToAssets of this script's own claim read, printed in the RESERVE's units",
-  hopPage.wrapperClaim?.startsWith(amountText(ownHopClaim, Number(reserveDecimals))),
-  `page "${hopPage.wrapperClaim}" vs "${amountText(ownHopClaim, Number(reserveDecimals))}" (own claim ${hopOwn.claim} ${OWN.get(STK_USDC).symbol} → ${ownHopClaim} ${reserveSymbol})`,
-);
+// A fixture that has exited reads no claim (6a names it): the hop is skipped
+// rather than read with nothing.
+if (hopOwn.claim == null) skip("6h the third hop", `fixture ${short(hopFixture.holder)} has exited, see 6a`);
+else {
+  const ownHopClaim = await client.readContract({
+    address: stkAsset,
+    abi: VAULT_ABI,
+    functionName: "convertToAssets",
+    args: [hopOwn.claim],
+    blockNumber: hopOwn.bn,
+  });
+  check(
+    "6h the third hop is the wrapper's own convertToAssets of this script's own claim read, printed in the RESERVE's units",
+    hopPage.wrapperClaim?.startsWith(amountText(ownHopClaim, Number(reserveDecimals))),
+    `page "${hopPage.wrapperClaim}" vs "${amountText(ownHopClaim, Number(reserveDecimals))}" (own claim ${hopOwn.claim} ${OWN.get(STK_USDC).symbol} → ${ownHopClaim} ${reserveSymbol})`,
+  );
+}
 
 // ── 7: ENS ──────────────────────────────────────────────────────────────────
 const ownEns = await client.getEnsAddress({ name: normalize(ENS_NAME) });
@@ -1221,7 +1237,7 @@ check(
 const usdHits = [];
 const rateHits = [];
 for (const v of SAMPLE) {
-  const t = PAGES.get(v).bodyText;
+  const t = PAGES.get(v).rateText;
   for (const m of t.matchAll(/\$|\d[\d,]*(?:\.\d+)?\s?USD\b(?![A-Za-z])|\bUSD\s?\d[\d,]*(?:\.\d+)?/g))
     usdHits.push(`${short(v)}: ${m[0]}`);
   // The pattern is a rate FIGURE, not the vocabulary: the page's own copy says

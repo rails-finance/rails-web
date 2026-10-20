@@ -11,7 +11,9 @@
 //
 // Type-only imports of the loaders: a client component may read this module.
 
-import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
+import type { MorphoBaseVaultResponse, RawAmount } from "@/lib/sources/chain/morpho-base-vault";
+import type { AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
+import type { YearnVaultResponse } from "@/lib/sources/chain/yearn-ethereum-vault";
 import type {
   MorphoBaseVaultDirectoryResponse,
   MorphoBaseVaultDirectoryRow,
@@ -213,3 +215,92 @@ export const yearnVaultSummaries = (d: YearnVaultDirectoryResponse): VaultSummar
 /** The name a row prints: the live `name()`, else the catalogue's snapshot,
  *  else the share symbol, else null (the row then prints the address). */
 export const vaultDisplayName = (v: VaultSummary): string | null => v.name ?? v.catalogName ?? v.symbol;
+
+// ── The vault pages' reads (V2) ─────────────────────────────────────────────
+// Each vault page reads its vault at one block with its own loader; these turn
+// that read into the same shape, so the card and the row draw one summary.
+
+/** A MetaMorpho vault's page read. */
+export function morphoBaseVaultPageSummary(d: MorphoBaseVaultResponse, census: VaultCensusRow | null): VaultSummary {
+  const v = d.vault;
+  return {
+    chainId: 8453,
+    address: v.address.toLowerCase(),
+    family: "metamorpho",
+    release: v.factory,
+    releaseLabel: releaseLabel("metamorpho", v.factory),
+    name: v.name || null,
+    catalogName: null,
+    symbol: v.symbol || null,
+    asset: v.asset,
+    shareDecimals: v.decimals,
+    totalAssets: d.totalAssets,
+    totalSupply: d.totalSupply,
+    sharePrice: d.sharePrice,
+    steward: v.curator ? { role: "curator", address: v.curator } : { role: "owner", address: v.owner },
+    standing: [],
+    createdBlock: v.createdBlock,
+    census: censusOf(census ?? undefined),
+    readAt: { block: d.blockNumber, timestamp: "" },
+  };
+}
+
+/** An Aave vault's page read. sGHO's `paused()` is a standing. */
+export function aaveEthereumVaultPageSummary(
+  d: AaveEthereumVaultResponse,
+  inBook: boolean,
+  census: VaultCensusRow | null,
+): VaultSummary {
+  const v = d.vault;
+  const standing: VaultStanding[] = [];
+  if (d.sgho?.paused === true) standing.push("paused");
+  if (inBook) standing.push("address-book");
+  return {
+    chainId: 1,
+    address: v.address.toLowerCase(),
+    family: v.family,
+    release: null,
+    releaseLabel: releaseLabel(v.family, null),
+    name: v.name,
+    catalogName: null,
+    symbol: v.symbol,
+    asset: v.asset,
+    shareDecimals: v.shareDecimals,
+    totalAssets: d.totalAssets,
+    totalSupply: d.totalSupply,
+    sharePrice: d.sharePrice,
+    steward: d.umbrella?.owner ? { role: "owner", address: d.umbrella.owner } : null,
+    standing,
+    createdBlock: null,
+    census: censusOf(census ?? undefined),
+    readAt: { block: d.blockNumber, timestamp: "" },
+  };
+}
+
+/** A Yearn V3 vault's page read. There is no census. */
+export function yearnVaultPageSummary(d: YearnVaultResponse): VaultSummary {
+  const v = d.vault;
+  const standing: VaultStanding[] = [];
+  if (v.endorsed === true) standing.push("endorsed");
+  if (v.shutdown === true) standing.push("shut-down");
+  return {
+    chainId: 1,
+    address: v.address.toLowerCase(),
+    family: "yearn-v3",
+    release: v.apiVersion,
+    releaseLabel: releaseLabel("yearn-v3", v.apiVersion),
+    name: v.name,
+    catalogName: v.censusName,
+    symbol: v.symbol,
+    asset: v.asset,
+    shareDecimals: v.shareDecimals,
+    totalAssets: v.totalAssets,
+    totalSupply: v.totalSupply,
+    sharePrice: v.sharePrice,
+    steward: v.roleManager ? { role: "roleManager", address: v.roleManager } : null,
+    standing,
+    createdBlock: v.createdBlock,
+    census: null,
+    readAt: { block: d.blockNumber, timestamp: "" },
+  };
+}

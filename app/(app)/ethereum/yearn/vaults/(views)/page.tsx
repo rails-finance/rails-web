@@ -11,9 +11,9 @@
 // reader chooses to open, and a surface a reader chooses is a surface a reader
 // can link to. The loader caches for five minutes and never caches a failure.
 //
-// NO POSITION LANE. The rows' Holders slot reads "no census" and there is no
-// listing link: the census that counts holders is built per vault layer and
-// Yearn's is later work. The rows are V1 vault rows (ui-jobs 407).
+// NO CENSUS. The rows' Holders slot reads "no census" and there is no listing
+// link; one address's holding opens from the vault page's finder (V4). The
+// rows are V1 vault rows (ui-jobs 407).
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";

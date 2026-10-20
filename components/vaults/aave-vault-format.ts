@@ -13,7 +13,6 @@
 // different markup in each.
 
 import { monthShort } from "@/lib/date";
-import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 
@@ -51,8 +50,3 @@ export const utcInstant = (unixSeconds: number): string => {
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
   return `${d.getUTCDate()} ${monthShort(d.getUTCMonth())} ${d.getUTCFullYear()}, ${hh}:${mm} UTC`;
 };
-
-/** A signed amount, with the sign printed rather than implied. A gap between
- *  two reads can fall either way and the page asserts no order, so a positive
- *  one carries its "+". */
-export const signedText = (a: RawAmount, text: string): string => (BigInt(a.raw) > BigInt(0) ? `+${text}` : text);

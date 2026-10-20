@@ -187,6 +187,9 @@ interface PositionCardSlotsCommon {
 
 interface PositionCardDetailCommon extends PositionCardSlotsCommon {
   surface: "detail";
+  /** The heading's noun phrase; absent, "Position summary" (the vault card's
+   *  "Vault summary", survey 2026-10-20 §7.4). */
+  heading?: string;
   explainer: PositionCardExplainer;
   /** The "?" beside the (i) pane's foot, or `null`. */
   learnMore: LearnMoreContent | null;
@@ -256,10 +259,10 @@ const OPEN_GRID = "grid grid-cols-2 lg:grid-cols-4 gap-4";
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
 
 /** The "Position summary" heading at the left of a detail card's heading row. */
-function PositionSummaryTitle() {
+function PositionSummaryTitle({ text = "Position summary" }: { text?: string }) {
   return (
     <h2 className={`${SECTION_HEADING} text-rb-500`} data-position-summary="">
-      Position summary
+      {text}
     </h2>
   );
 }
@@ -618,7 +621,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
           {detail ? (
             <>
-              <PositionSummaryTitle />
+              <PositionSummaryTitle text={slots.surface === "detail" ? slots.heading : undefined} />
               {slots.status && <StatusTag status={slots.status} />}
             </>
           ) : (

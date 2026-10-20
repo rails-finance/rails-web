@@ -307,17 +307,6 @@ export const aaveSghoAssetHeldProv = (c: AaveVaultCoords): Provenance => ({
   via: `${LANE} · asset.balanceOf(vault) @ the pinned block`,
 });
 
-/** The difference between the two sGHO totals — its own number, signed. */
-export const aaveSghoAssetGapProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `Balance minus index total — the ${asset(c)} the contract holds less what \`totalAssets()\` says the shares are worth${atBlock(c)}. Both legs are reads at this block, so the difference is chain-derived and nothing is estimated into it. It is stated rather than reconciled: the index accrues continuously between updates while the balance moves only when someone deposits or withdraws, so the gap is a MECHANISM, not an error, and it can be either sign.`,
-  contract: vaultContract(c),
-  via: `${LANE} · asset.balanceOf(vault) − totalAssets() @ the pinned block`,
-  formula: "asset.balanceOf(vault) − totalAssets()",
-});
-
 /** `maxDeposit()` — what is left of the cap, answered by the vault. */
 export const aaveSghoCapacityProv = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
@@ -327,17 +316,6 @@ export const aaveSghoCapacityProv = (c: AaveVaultCoords): Provenance => ({
   summary: `Remaining capacity — the vault's own \`maxDeposit()\`${atBlock(c)}, in ${asset(c)}: the deposit cap the risk council has set less what \`totalAssets()\` already counts. Answered by the contract, and the two agree exactly. It is the ceiling at this block — the council can move the cap.`,
   contract: vaultContract(c),
   via: `${LANE} · maxDeposit() @ the pinned block`,
-});
-
-/** `yieldIndex()` — the RAY every sGHO conversion runs against. */
-export const aaveSghoYieldIndexProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("yieldIndex()", c),
-  summary: `Yield index — sGHO's stored \`yieldIndex()\`${atBlock(c)}, a RAY (10^27). It is the whole of this vault's accounting: \`convertToAssets(shares)\` is shares times this index over one RAY, and \`totalAssets()\` is that conversion applied to the whole supply. It grows in a straight line inside a rate period and compounds when the contract updates it, which happens on every mint, burn and transfer. A number as stored — this page derives no rate from it.`,
-  contract: vaultContract(c),
-  via: `${LANE} · yieldIndex() @ the pinned block`,
 });
 
 /** `lastUpdate()` — a STORED timestamp, and the distinction matters. */
@@ -351,30 +329,7 @@ export const aaveSghoLastUpdateProv = (c: AaveVaultCoords): Provenance => ({
   via: `${LANE} · lastUpdate() @ the pinned block`,
 });
 
-/** `ratePerSecond()` — a configuration slot, stated as one. */
-export const aaveSghoRatePerSecondProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("ratePerSecond()", c),
-  summary: `Rate per second — the vault's stored \`ratePerSecond()\`${atBlock(c)}, RAY-scaled, exactly as the contract holds it. It is the number the index is grown by, and it is a SETTING at this block: the risk council writes it from the target rate through the steward. This page states it and stops — nothing here compounds it out to a year or turns it into what a holder earns, which would be a forecast of a setting that can change.`,
-  contract: vaultContract(c),
-  via: `${LANE} · ratePerSecond() @ the pinned block`,
-});
-
 // ── static aTokens ───────────────────────────────────────────────────────────
-
-/** The reserve's liquidity index in the Pool — the same fact as the share
- *  price, read from the other end. */
-export const aaveStataLiquidityIndexProv = (c: AaveVaultCoords, pool: string | null): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("Pool.getReserveData(asset).liquidityIndex", c),
-  summary: `Reserve liquidity index — \`getReserveData(${asset(c)}).liquidityIndex\` on the Pool this wrapper names in its own \`POOL()\`${atBlock(c)}, a RAY (10^27). It is the same fact as the share price above, read from the other end: the wrapper converts shares to assets by multiplying by exactly this number, so one whole share in ${asset(c)} and this index are one reading stated twice.`,
-  contract: { name: "Aave V3 Pool", address: pool ?? undefined },
-  via: `${LANE} · POOL() then Pool.getReserveData(asset) @ the pinned block`,
-});
 
 /** `aToken.balanceOf(wrapper)` — the supply position the wrapper holds. */
 export const aaveStataATokenBalanceProv = (c: AaveVaultCoords, aToken: string | null): Provenance => ({
@@ -385,29 +340,6 @@ export const aaveStataATokenBalanceProv = (c: AaveVaultCoords, aToken: string | 
   summary: `aToken held — the aToken's own \`balanceOf()\` at this wrapper's address${atBlock(c)}, in ${asset(c)}. An aToken balance rebases with the reserve's interest, so this is the wrapper's supply position in the Pool as the Pool itself reports it. Everything the wrapper holds is this one aToken: it wraps exactly one, and the factory allows one wrapper per underlying asset.`,
   contract: { name: "aToken", address: aToken ?? undefined },
   via: `${LANE} · aToken.balanceOf(vault) @ the pinned block`,
-});
-
-/** The wrapper's custody gap — stated, not reconciled. */
-export const aaveStataCustodyGapProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `aToken held minus total assets — the wrapper's aToken balance less its own \`totalAssets()\`${atBlock(c)}, both read at this block. The two are close and need not be equal: \`totalAssets()\` is the share supply valued at the reserve's index and the conversion floors, so the remainder stays in the wrapper. The difference is stated as its own number rather than rounded away, and no order between the two legs is asserted.`,
-  contract: vaultContract(c),
-  via: `${LANE} · aToken.balanceOf(vault) − totalAssets() @ the pinned block`,
-  formula: "aToken.balanceOf(vault) − totalAssets()",
-});
-
-/** `rewardTokens()` — a registry that can under-report, and the receipt says
- *  so rather than presenting it as the Pool's truth. */
-export const aaveStataRewardTokensProv = (c: AaveVaultCoords, n: number): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("rewardTokens()", c),
-  summary: `Reward tokens registered — the wrapper's own \`rewardTokens()\` returned ${n === 0 ? "an empty list" : `${n} address${n === 1 ? "" : "es"}`}${atBlock(c)}. An empty list is a reading, not an absence of data. It is a REGISTRY rather than the Pool's truth: a reward the Pool starts paying after this wrapper was deployed has to be registered by a permissionless \`refreshRewardTokens()\` call before it appears here, so this list can under-report and this page does not present it as complete.`,
-  contract: vaultContract(c),
-  via: `${LANE} · rewardTokens() @ the pinned block`,
 });
 
 /** The share of this vault one stake token holds — the nesting, as two reads.
@@ -442,17 +374,6 @@ export const aaveUmbrellaMaxSlashableProv = (c: AaveVaultCoords): Provenance => 
   via: `${LANE} · getMaxSlashableAssets() @ the pinned block`,
 });
 
-/** `MIN_ASSETS_REMAINING()` — the floor the figure above stops at. */
-export const aaveUmbrellaMinRemainingProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("MIN_ASSETS_REMAINING()", c),
-  summary: `Minimum left behind — the token's \`MIN_ASSETS_REMAINING()\`${atBlock(c)}, in ${asset(c)}: the amount a slashing may not take the stake token below. Subtracting it from \`totalAssets()\` is what produces the slashable figure beside it.`,
-  contract: vaultContract(c),
-  via: `${LANE} · MIN_ASSETS_REMAINING() @ the pinned block`,
-});
-
 /** `asset.balanceOf(stakeToken)` beside the stored counter. */
 export const aaveUmbrellaCustodyProv = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
@@ -462,28 +383,6 @@ export const aaveUmbrellaCustodyProv = (c: AaveVaultCoords): Provenance => ({
   summary: `${asset(c)} the token holds — the ERC-20 \`balanceOf()\` of ${asset(c)} at this stake token's address${atBlock(c)}. Worth stating beside \`totalAssets()\` because that figure is a STORED COUNTER, incremented on deposit and decremented on withdrawal and on a slashing. Where the two agree, the counter and the custody agree; a slashing moves both, and only a slashing moves this token's share price.`,
   contract: vaultContract(c),
   via: `${LANE} · asset.balanceOf(vault) @ the pinned block`,
-});
-
-/** `Umbrella.getDeficitOffset(reserve)` — a buffer, in the reserve's units. */
-export const aaveUmbrellaDeficitOffsetProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute(`Umbrella.getDeficitOffset(${reserveOf(c)})`, c),
-  summary: `Deficit offset — \`Umbrella.getDeficitOffset()\` for ${reserveOf(c)}${atBlock(c)}, in ${reserveOf(c)}'s own units: the buffer a deficit on that reserve has to exceed before this stake token can be slashed at all. A governance configuration read at one block, stated in native units. It says what the threshold IS, never that anything will cross it.`,
-  contract: { name: "Umbrella", address: AAVE_UMBRELLA },
-  via: `${LANE} · Umbrella.getDeficitOffset(reserve) @ the pinned block`,
-});
-
-/** `Umbrella.getPendingDeficit(reserve)` — a reading, and zero is one. */
-export const aaveUmbrellaPendingDeficitProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute(`Umbrella.getPendingDeficit(${reserveOf(c)})`, c),
-  summary: `Pending deficit — \`Umbrella.getPendingDeficit()\` for ${reserveOf(c)}${atBlock(c)}, in ${reserveOf(c)}'s own units: the deficit Umbrella currently records against that reserve. A zero here is a reading — Umbrella records none at this block — and not missing data. Past slashings are not read on this page at all: it reads state, never history, and says so rather than implying none happened.`,
-  contract: { name: "Umbrella", address: AAVE_UMBRELLA },
-  via: `${LANE} · Umbrella.getPendingDeficit(reserve) @ the pinned block`,
 });
 
 /** `owner()` on a stake token — the only address that can slash it. */

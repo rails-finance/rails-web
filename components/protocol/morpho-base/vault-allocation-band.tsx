@@ -60,16 +60,10 @@ import type {
   VaultTimelineCoords,
 } from "@/lib/shared/vault-holder-timeline";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { planAllocation } from "@/lib/vaults/allocation-plan";
 
 const ZERO = BigInt(0);
 const n = (v: number) => v.toLocaleString("en-US");
-
-/** The smallest share of the band a segment may hold and still be drawn on its
- *  own. It is a WIDTH rule, not a count: at a panel of ~640px this is about
- *  13px, which is the narrowest thing an eye separates from its neighbour.
- *  However many legs clear it are drawn individually — five on a five-market
- *  vault, two or three on a twenty-market one — and the rest are collected. */
-const MIN_SEGMENT_SHARE = 0.02;
 
 const metaExtra = (event: VaultHolderEvent): MetaMorphoEventExtra | null =>
   event.extra?.kind === "metamorpho" ? event.extra : null;
@@ -111,29 +105,21 @@ interface BandPlan {
  * legs are which.
  */
 function planBand(legs: VaultAllocationLeg[]): BandPlan {
-  const unread = legs.filter((l) => attributedOf(l) == null);
-  const read = legs.filter((l) => attributedOf(l) != null);
-  const total = read.reduce((s, l) => s + (attributedOf(l) ?? ZERO), ZERO);
-  if (total === ZERO) return { shown: [], collected: [], total, unread };
-
-  const positive = read.filter((l) => (attributedOf(l) ?? ZERO) > ZERO);
-  const bySize = [...positive].sort((a, b) => {
-    const d = (attributedOf(b) ?? ZERO) - (attributedOf(a) ?? ZERO);
-    return d > ZERO ? 1 : d < ZERO ? -1 : 0;
-  });
-  const clears = bySize.filter((l) => Number(attributedOf(l) ?? ZERO) / Number(total) >= MIN_SEGMENT_SHARE);
-  // The largest always draws, whatever the width rule says about it: a band
-  // whose biggest segment is inside a collected group would misstate the shape.
-  let shownSet = clears.length ? clears : bySize.slice(0, 1);
-  let collected = bySize.filter((l) => !shownSet.includes(l));
-  // One leftover is not a group. Collecting a single leg into "and 1 more"
-  // hides a name to save nothing, so it draws on its own instead.
-  if (collected.length === 1) {
-    shownSet = [...shownSet, collected[0]];
-    collected = [];
-  }
-  const byQueue = (a: VaultAllocationLeg, b: VaultAllocationLeg) => a.queueIndex - b.queueIndex;
-  return { shown: [...shownSet].sort(byQueue), collected: [...collected].sort(byQueue), total, unread };
+  // The rule is the vault card's too (lib/vaults/allocation-plan.ts, V3).
+  const plan = planAllocation(
+    legs.map((leg) => ({
+      key: leg.marketId || `queue-${leg.queueIndex}`,
+      amount: attributedOf(leg),
+      order: leg.queueIndex,
+      leg,
+    })),
+  );
+  return {
+    shown: plan.shown.map((l) => l.leg),
+    collected: plan.collected.map((l) => l.leg),
+    total: plan.total,
+    unread: plan.unread.map((l) => l.leg),
+  };
 }
 
 export interface VaultAllocationBandProps {

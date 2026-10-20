@@ -75,3 +75,33 @@ test("30-digit raws keep their precision", () => {
   });
   assert.ok(Math.abs(y.change - (1017559953150443001 / 1013810617363032811 - 1)) < 1e-12);
 });
+
+test("a one-day jump carrying most of the move is named", () => {
+  const s = series(100, 130, { step: 10n });
+  // Day 115 doubles the price; every later day keeps the step.
+  s.obs = s.obs.map(([d, raw, b]) => [d, String(BigInt(raw) + (d >= 115 ? 1_000_000n : 0n)), b]);
+  const y = vaultYield(s);
+  assert.ok(y.jump);
+  assert.equal(y.jump.day, 115);
+  assert.ok(Math.abs(y.jump.change) > Math.abs(y.change) / 2);
+});
+
+test("a steady series names no jump", () => {
+  const y = vaultYield(series(100, 130, { step: 120n }));
+  assert.equal(y.jump, undefined);
+});
+
+test("a fall with a one-day drop names the drop", () => {
+  const s = series(100, 130, { start: 2_000_000n, step: -100n });
+  s.obs = s.obs.map(([d, raw, b]) => [d, String(BigInt(raw) - (d >= 120 ? 500_000n : 0n)), b]);
+  const y = vaultYield(s);
+  assert.ok(y.change < 0);
+  assert.equal(y.jump.day, 120);
+  assert.ok(y.jump.change < 0);
+});
+
+test("a flat series names no jump however its wobble falls", () => {
+  const s = series(100, 130, { step: 0n });
+  s.obs = s.obs.map(([d, raw, b]) => [d, String(BigInt(raw) + (d === 120 ? 1n : 0n)), b]);
+  assert.equal(vaultYield(s).jump, undefined);
+});

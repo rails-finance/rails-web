@@ -42,11 +42,19 @@ export type VaultYield =
       days: number;
       from: VaultYieldRead;
       to: VaultYieldRead;
+      /** The window's largest move between two stored days, where its size is
+       *  more than half the window's change: `day` is the later day, `change`
+       *  that step's change, a fraction (decision 0047 point 2). */
+      jump?: { day: number; change: number };
     }
   | { none: "young"; firstDay: number }
   | { none: "no-series" };
 
 export const YIELD_WINDOW_DAYS = 30;
+
+/** The smallest step the subline names: 0.005%, the least changeText prints
+ *  as other than 0.00%. */
+const JUMP_FLOOR = 0.00005;
 
 const SCALE = BigInt(10) ** BigInt(18);
 
@@ -57,6 +65,11 @@ function readOf(o: VaultSeriesObs): VaultYieldRead | null {
   if (!Number.isFinite(b)) return null;
   return { day, block: b, raw };
 }
+
+// The ratio in 18-place fixed point, so two 30-digit raws divide exactly
+// enough before the one conversion to a float.
+const ratioOf = (a: VaultYieldRead, b: VaultYieldRead) =>
+  Number((BigInt(b.raw) * SCALE) / BigInt(a.raw)) / Number(SCALE);
 
 export function vaultYield(series: VaultSeries | null | undefined): VaultYield {
   const reads = (series?.obs ?? [])
@@ -78,11 +91,22 @@ export function vaultYield(series: VaultSeries | null | undefined): VaultYield {
     return firstDay > target ? { none: "young", firstDay } : { none: "no-series" };
   }
   const days = to.day - from.day;
-  // The ratio in 18-place fixed point, so two 30-digit raws divide exactly
-  // enough before the one conversion to a float.
-  const ratio = Number((BigInt(to.raw) * SCALE) / BigInt(from.raw)) / Number(SCALE);
-  const change = ratio - 1;
-  return { yearly: (change * 365) / days, change, days, from, to };
+  const change = ratioOf(from, to) - 1;
+  // The step between two stored days that carries most of the window's move,
+  // either sign: named on the subline, never capped or hidden.
+  const window = reads.filter((r) => r.day >= from!.day && r.day <= to.day);
+  let jump: { day: number; change: number } | undefined;
+  for (let i = 1; i < window.length; i++) {
+    const step = ratioOf(window[i - 1], window[i]) - 1;
+    if (jump == null || Math.abs(step) > Math.abs(jump.change)) jump = { day: window[i].day, change: step };
+  }
+  // A step that would print as 0.00% names nothing: on a flat series any
+  // rounding wobble is "more than half" of a change of nothing.
+  const named =
+    jump != null && Math.abs(jump.change) > Math.abs(change) / 2 && Math.abs(jump.change) >= JUMP_FLOOR
+      ? jump
+      : undefined;
+  return { yearly: (change * 365) / days, change, days, from, to, ...(named ? { jump: named } : {}) };
 }
 
 /** "5.1% a year", to one decimal; a fall prints its minus. */
