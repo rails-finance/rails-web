@@ -187,11 +187,11 @@ export function GroupFrame({
       />
       {ends && !open && (
         <>
-          <span aria-hidden data-group-range="hi" className="group-range group-range-hi">
+          <span aria-hidden data-group-range="hi" data-prov-exempt="" className="group-range group-range-hi">
             <span className="num-pill">{ends[1]}</span>
           </span>
           {ends[0] !== ends[1] && (
-            <span aria-hidden data-group-range="lo" className="group-range group-range-lo">
+            <span aria-hidden data-group-range="lo" data-prov-exempt="" className="group-range group-range-lo">
               <span className="num-pill">{ends[0]}</span>
             </span>
           )}
