@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { Calculator } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
-import { GroupSheetCollector } from "@/components/shared/group-sheet";
+import { GroupSheetCollector, type CollectedCard } from "@/components/shared/group-sheet";
 import type { EventSheet, SheetFigure } from "@/components/shared/event-sheet";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
@@ -125,6 +125,16 @@ export interface TimelineRunCardProps {
    *  side's state before the first member and after the last ("the debt"
    *  first, then any other: "collateral"). */
   stateSpan?: { label: string; from: number; to: number; symbol: string }[];
+  /** The member noun's plural, where it is not the noun with "s" ("touches"). */
+  memberPlural?: string;
+  /** A family's own lines for the group's Explanation (ui-jobs 404): `who`
+   *  in place of the generic subject of the first line, `lines` after it,
+   *  and `covers` the sides those lines state, so the members' merged sheet
+   *  adds no second line for them. */
+  explain?: { who?: ReactNode; lines?: ReactNode[]; covers?: FlowSide[] };
+  /** The family's own reading of the members' sheets for the Figures tab,
+   *  where the shared merge does not read them as one (Polaris's touches). */
+  mergeSheet?: (cards: CollectedCard[]) => EventSheet | null;
   /** Header content drawn before the aggregate pairs: a shape run's summary. */
   lead?: ReactNode;
   /** A muted line at the left of the opened card's sheet controls. */
@@ -218,6 +228,9 @@ export function TimelineRunCard({
   readingLine,
   eventRange,
   stateSpan,
+  memberPlural: memberPluralProp,
+  explain,
+  mergeSheet,
 }: TimelineRunCardProps) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = ownOpen || !!forceOpen;
@@ -255,7 +268,7 @@ export function TimelineRunCard({
 
   const toggle = () => setOwnOpen((v) => !v);
 
-  const memberPlural = `${memberNoun}s`;
+  const memberPlural = memberPluralProp ?? `${memberNoun}s`;
 
   // The summed figures are chain-derived aggregates: every addend is a member
   // event's own chain delta, each carrying its own receipt once the run is
@@ -394,13 +407,13 @@ export function TimelineRunCard({
         )
       );
     });
-  const hasSums = legAggs.length > 0 || !!lead || !!sheetLead || !!extraHeader;
+  const hasSums = legAggs.length > 0 || !!lead || !!sheetLead || !!extraHeader || !!explain;
 
   // The members the sheet reads: a client-grouped run's cards, or a served
   // folder's once read (the summary's open asks for them).
   const sheetMembers = onOpen ? members : children;
   const collector = sheetMembers != null && (
-    <GroupSheetCollector members={sheetMembers} count={count} label={kindWord} onSheet={onSheet} />
+    <GroupSheetCollector members={sheetMembers} count={count} label={kindWord} merge={mergeSheet} onSheet={onSheet} />
   );
 
   // ── T3: the group's Explanation (rails-ops TO-DO-ui-jobs 372, decision
@@ -440,8 +453,9 @@ export function TimelineRunCard({
   // the members are another party's acts (`byOwner` false on an external
   // run: Maple's queue fills); a run of transfers, of the owner's losses or
   // of mixed events names its events alone.
-  const who =
-    actedByOwner && spineIcon !== "custody"
+  const who = explain?.who
+    ? explain.who
+    : actedByOwner && spineIcon !== "custody"
       ? W.holder
       : spineIcon === "external" && byOwner === false
         ? W.thirdParty
@@ -474,6 +488,7 @@ export function TimelineRunCard({
       </>,
     );
   if (unsaid > 0) bullets.push(W.moreSums(unsaid));
+  bullets.push(...(explain?.lines ?? []));
   const debtLeg = adverse ? saidLegs.find((a) => DEBT_VERB.test(a.verb)) : undefined;
   const collLeg = adverse ? saidLegs.find((a) => !DEBT_VERB.test(a.verb)) : undefined;
   if (debtLeg && collLeg && collLeg.value > 0 && USD_DEBT.test(debtLeg.symbol)) {
@@ -489,7 +504,7 @@ export function TimelineRunCard({
     );
   }
   const sideOf = (label: string): FlowSide => (/debt/i.test(label) ? "debt" : "collateral");
-  const covered = new Set<string>();
+  const covered = new Set<string>(explain?.covers ?? []);
   for (const st of stateSpan ?? []) {
     covered.add(sideOf(st.label));
     bullets.push(

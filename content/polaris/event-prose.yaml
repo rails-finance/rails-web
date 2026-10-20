@@ -262,6 +262,46 @@ words:
     Transferred
   t1_to: |-
     to
+  # A run of touches' Explanation (ui-jobs 404): who made them, the interest
+  # they wrote, the PSM share they wrote and the stated figures across them.
+  touch_noun: |-
+    touch
+  touch_plural: |-
+    touches
+  touch_run_other: |-
+    An account other than the holder,
+  touch_run_made: |-
+    made
+  touch_run_interest: |-
+    They wrote
+  touch_run_interest_tail: |-
+    of interest into the debt.
+  touch_run_psm: |-
+    Their PSM share wrote
+  touch_run_psm_coll: |-
+    into the collateral and
+  touch_run_psm_debt: |-
+    into the debt.
+  touch_run_coll: |-
+    The stated collateral went from
+  touch_run_debt: |-
+    The stated debt went from
+  touch_run_to: |-
+    before the first touch to
+  touch_run_after: |-
+    after the last.
+  touch_sheet_before: |-
+    Before the first touch
+  touch_sheet_after: |-
+    After the last touch
+  touch_sheet_interest: |-
+    Interest written
+  tip_touch_sheet_before: |-
+    The stated figure before the run's first touch, from the CDPManager's log.
+  tip_touch_sheet_sum: |-
+    Summed over the run's touches, each from its CDPUpdated log.
+  tip_touch_sheet_after: |-
+    The stated figure after the run's last touch, from the CDPManager's log.
   # A touch the holder did not send: its sender after the kind (ui-jobs 404).
   t1_by: |-
     by
