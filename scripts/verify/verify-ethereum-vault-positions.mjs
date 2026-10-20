@@ -350,26 +350,28 @@ const shareText = (raw, decimals) => {
   const text = value.toLocaleString("en-US", { maximumFractionDigits: 6 });
   return value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? exactUnits(raw, decimals) : text;
 };
-/** …the same file's `assetText`. */
-const assetText = (raw, decimals) => {
-  const value = Number(raw) / Math.pow(10, decimals);
-  const text = value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: decimals <= 6 ? 2 : 6,
-  });
-  return value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? exactUnits(raw, decimals) : text;
-};
-/** `lib/utils/format.ts` `formatApproximate`, and the card's own rule for when
- *  it applies: the LISTING states an approximate headline at or above a
- *  thousand and the section's exact print rule below it, where rounding to two
- *  decimals would state a zero the chain did not. Restated here so a change to
- *  either half goes red rather than being read off the page. */
-const formatApproximate = (value) => {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+/** lib/shared/format-compact.ts `formatCompact`, restated: the one figure form of
+ *  a position card's headline amounts. */
+const formatCompact = (value) => {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  const units = [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  const oneDecimal = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (let i = 0; i < units.length; i++) {
+    const [size, suffix] = units[i];
+    if (abs < size) continue;
+    const scaled = Math.round((abs / size) * 10) / 10;
+    if (scaled >= 1000 && i > 0) return `${sign}${oneDecimal(abs / units[i - 1][0])}${units[i - 1][1]}`;
+    return `${sign}${oneDecimal(scaled)}${suffix}`;
+  }
+  if (abs > 0 && abs < 0.01)
+    return abs < 0.000001 ? `${sign}<0.000001` : value.toLocaleString("en-US", { maximumSignificantDigits: 3 });
   return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-const headline = (exact, value) => (Math.abs(value) >= 1000 ? formatApproximate(value) : exact);
 
 /** lib/date.ts `formatDate`: en-GB, UTC. */
 const ukDate = (unix) =>
@@ -415,6 +417,9 @@ const listingHtml = async (qs = "") => {
 };
 
 const countMatches = (html, needle) => html.split(needle).length - 1;
+// The shell inside each card carries `data-position-card-shell`, which shares the
+// card attribute's prefix: a card is counted by the attribute and its `=`.
+const CARD_ATTR = "data-position-card=";
 
 console.log(`\n── /ethereum/aave/vaults · ${BASE} ──\n`);
 
@@ -430,8 +435,8 @@ const route0 = await readRoute("chain=1&sortBy=value&sortOrder=desc&limit=20");
 check("L0a the listing answers 200", first.status === 200, `status ${first.status}`);
 check(
   "L0b the INITIAL HTML carries a full page of position cards",
-  countMatches(first.html, "data-position-card") === 20,
-  `${countMatches(first.html, "data-position-card")} cards in the server's own HTML`,
+  countMatches(first.html, CARD_ATTR) === 20,
+  `${countMatches(first.html, CARD_ATTR)} cards in the server's own HTML`,
 );
 // ⚠️ RESTATED 2026-09-08, when `app/(app)/ethereum/aave/vaults/loading.tsx` landed.
 // This used to assert the initial HTML carried NO skeleton at all, which a
@@ -682,34 +687,24 @@ async function readListingDom(qs = "") {
   const cards = await page.locator("[data-position-card]").evaluateAll(async (els) => {
     const out = [];
     for (const e of els) {
-      // The two headline figures, read as the reader sees them: the printed
-      // text AND the tip the exact value rides on. The listing's cards
-      // carry no `data-figure` markers on purpose (twenty rows would make
-      // twenty of each name), so each column is found by its own label —
-      // "Shares · <symbol>" / "Claim · <symbol>". Since `aa0ea5e` the exact
-      // value is a click-opened RevealTip in place of a `title`, so the tip
-      // is opened, read and closed.
-      const stats = [];
-      for (const d of [...e.querySelectorAll("div")].filter(
-        (d) => d.firstElementChild && /^(Shares|Claim) \u00b7 /.test(d.firstElementChild.textContent ?? ""),
-      )) {
-        const value = d.querySelector("[data-reveal-tip]");
-        let title = "";
-        if (value) {
-          value.click();
-          await new Promise((r) => setTimeout(r, 80));
-          title = (value.querySelector('[role="tooltip"]')?.textContent ?? "").trim();
-          value.click();
-          await new Promise((r) => setTimeout(r, 20));
-        }
-        const shown = value?.cloneNode(true);
-        shown?.querySelector('[role="tooltip"]')?.remove();
-        stats.push({
-          label: (d.firstElementChild.textContent ?? "").trim(),
-          text: (shown?.textContent ?? "").trim(),
-          title,
-        });
-      }
+      // The listing card's headlines (the shared card, ui-jobs 407): Balance and
+      // Share of the vault. The listing's cards carry no `data-figure` markers on
+      // purpose (twenty rows would make twenty of each name), so each headline is
+      // found by its `data-card-head`. An AssetAmount prints the compact form in
+      // an aria-hidden span and carries the exact figure and the ticker on that
+      // span's `data-prov-exact` and `data-prov-symbol`. The card prints no Claim:
+      // it is the holder page's headline, and the card's `data-claim-raw` is
+      // compared at L2e instead.
+      const amount = e.querySelector('[data-card-head="balance"] [data-prov-exact]');
+      const stats = amount
+        ? [
+            {
+              label: "Balance",
+              text: (amount.textContent ?? "").trim(),
+              title: `${amount.getAttribute("data-prov-exact")} ${amount.getAttribute("data-prov-symbol")}`,
+            },
+          ]
+        : [];
       // DOM order of the two identities in the card header. 4 =
       // DOCUMENT_POSITION_FOLLOWING, i.e. the wallet pill comes after the
       // vault symbol.
@@ -813,7 +808,6 @@ const domBlock = Number(cardBlocks[0] ?? 0);
 // Symbols and decimals are constants of the vault, so they may come from the
 // route; every FIGURE below is read again by this script.
 const meta = new Map(route0.census.map((c) => [c.vault, { symbol: c.symbol, shareDecimals: c.shareDecimals ?? 18 }]));
-const assetOf = new Map(page1.filter((r) => r.asset).map((r) => [r.vault, r.asset]));
 
 const ownDomShares = liveCards.length
   ? await client.multicall({
@@ -849,27 +843,18 @@ liveCards.forEach((card, i) => {
   if (!m) return;
   const sd = m.shareDecimals;
   const shareSymbol = m.symbol ?? `${card.vault.slice(0, 6)}…${card.vault.slice(-4)}`;
-  const asset = assetOf.get(card.vault);
   if (BigInt(card.sharesRaw) !== ownDomShares[i])
     rawBad.push(`${card.holder}: card ${card.sharesRaw}, own ${ownDomShares[i]} @ ${domBlock}`);
+  if (card.claimRaw && BigInt(card.claimRaw) !== ownDomClaims[i])
+    rawBad.push(`${card.holder}: card claim ${card.claimRaw}, own ${ownDomClaims[i]} @ ${domBlock}`);
   const want = [
     {
-      label: `Shares · ${shareSymbol}`,
+      label: "Balance",
       exact: shareText(ownDomShares[i], sd),
-      text: headline(shareText(ownDomShares[i], sd), Number(ownDomShares[i]) / Math.pow(10, sd)),
+      text: formatCompact(Number(ownDomShares[i]) / Math.pow(10, sd)),
       title: `${exactUnits(ownDomShares[i], sd)} ${shareSymbol}`,
     },
   ];
-  if (asset && card.claimRaw)
-    want.push({
-      label: `Claim · ${asset.symbol}`,
-      exact: assetText(ownDomClaims[i], asset.decimals),
-      text: headline(
-        assetText(ownDomClaims[i], asset.decimals),
-        Number(ownDomClaims[i]) / Math.pow(10, asset.decimals),
-      ),
-      title: `${exactUnits(ownDomClaims[i], asset.decimals)} ${asset.symbol}`,
-    });
   for (const w of want) {
     const got = card.stats.find((st) => st.label === w.label);
     if (!got) {
@@ -1197,9 +1182,9 @@ const f1Live = f1Rows.filter((r) => r.census.live).length;
 check(
   "L11 the filtered URL carries F1's rows in the INITIAL HTML",
   ssr.status === 200 &&
-    countMatches(ssr.html, "data-position-card") === Math.min(20, f1Rows.length) &&
+    countMatches(ssr.html, CARD_ATTR) === Math.min(20, f1Rows.length) &&
     countMatches(ssr.html, `data-vault="${F1_VAULT}"`) === Math.min(20, f1Rows.length),
-  `${countMatches(ssr.html, "data-position-card")} cards, F1 has ${f1Rows.length} participants (${f1Live} live)`,
+  `${countMatches(ssr.html, CARD_ATTR)} cards, F1 has ${f1Rows.length} participants (${f1Live} live)`,
 );
 
 // ═══ L12 — the links in ════════════════════════════════════════════════════

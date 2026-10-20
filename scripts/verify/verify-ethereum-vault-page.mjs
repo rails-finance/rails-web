@@ -73,9 +73,12 @@
 //      this script's own reads), the reserve reached by this script's OWN
 //      asset() hops, the deficit figures, the owner, the wrapper hop and its
 //      share price — and that stkGHO, which holds GHO directly, has no wrapper
-//   6  the holder half: shares, claim, maxRedeem, fraction, the shape label
-//      against this script's own eth_getCode classification, the cooldown state
-//      against the block's OWN timestamp, and the catalogue-member cross-link
+//   6  the holder half, read off the holder card (ui-jobs 407): Balance, Share of
+//      the vault, Claim with its USD line, Earned; the stats Redeemable now
+//      (maxWithdraw, plus maxRedeem on a stake token), Exit, Cooldown, Read at,
+//      Census at, First seen; the shape label against this script's own
+//      eth_getCode classification, the cooldown state against the block's OWN
+//      timestamp, and the catalogue-member cross-link
 //   7  ENS: a name resolves to the address this script's own resolver returns,
 //      and a name that does not resolve states that rather than reading nothing
 //   8  no USD anywhere on any of the four pages, and no rate of return
@@ -273,8 +276,18 @@ const HOLDERS = [
   // Transfer-in at block 25,152,729, and eth_getCode answers 0x.
   { vault: SGHO, holder: "0xc2b7d2aedf1f24d3409788e3a95d021ceb2238f8", shape: "eoa" },
   { vault: SGHO, holder: "0x1676d23711186076fa74aa53511dda750a1f0d9a", shape: "safe" },
-  { vault: STK_USDC, holder: "0xcbc463beae0da08a439dc9d10a5690c084ef6b25", shape: "delegated-account" },
-  { vault: STK_GHO, holder: "0x3e43a976a28e593ef2494a8fda4135bf3260f8ee", shape: "eoa" },
+  // Re-pinned 2026-10-20 from the vault page's holder roster at census block
+  // 26,235,125 (/ethereum/aave/vaults/positions?vault=<stake token>): the two
+  // previous fixtures, 0xcbc4…6b25 on stkwaEthUSDC.v1 and 0x3e43…f8ee on stkGHO,
+  // had exited, so 6a/6b were red. Each replacement is a live holder of the
+  // roster whose census row counts one transfer, the one that brought the shares
+  // in, so it has never sent a share out and is the least likely to exit again.
+  //   0x7824…f23e on stkwaEthUSDC.v1: delegated-account, 898,062.996007 shares
+  //     (1.97% of supply), one transfer in. Keeps the EIP-7702 class in the sample.
+  //   0x621c…4b55 on stkGHO: eoa, 35,219.804142714681430031 shares (2.78% of
+  //     supply), one transfer in.
+  { vault: STK_USDC, holder: "0x7824f9796dea77ae4f41e79190878c8ada8ff23e", shape: "delegated-account" },
+  { vault: STK_GHO, holder: "0x621ca6444ebed845604e030d8ac0f09f66974b55", shape: "eoa" },
   // The layer holding itself: the stake token is the largest holder of the
   // wrapper it stakes. This is the cross-link's fixture.
   { vault: WA_USDC, holder: STK_USDC, shape: "aave-vault" },
@@ -309,6 +322,7 @@ const VAULT_ABI = parseAbi([
   "function convertToAssets(uint256) view returns (uint256)",
   "function balanceOf(address) view returns (uint256)",
   "function maxRedeem(address) view returns (uint256)",
+  "function maxWithdraw(address) view returns (uint256)",
 ]);
 const SGHO_ABI = parseAbi([
   "function targetRate() view returns (uint16)",
@@ -389,6 +403,34 @@ const formatApproximate = (value) => {
   return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 };
 const headline = (exact, value) => (Math.abs(value) >= 1000 ? formatApproximate(value) : exact);
+/** lib/shared/format-compact.ts `formatCompact`, restated: the one figure form
+ *  of the holder card's headlines and its Redeemable now stat. */
+const formatCompact = (value) => {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  const units = [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  const oneDecimal = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (let i = 0; i < units.length; i++) {
+    const [size, suffix] = units[i];
+    if (abs < size) continue;
+    const scaled = Math.round((abs / size) * 10) / 10;
+    if (scaled >= 1000 && i > 0) return `${sign}${oneDecimal(abs / units[i - 1][0])}${units[i - 1][1]}`;
+    return `${sign}${oneDecimal(scaled)}${suffix}`;
+  }
+  if (abs > 0 && abs < 0.01)
+    return abs < 0.000001 ? `${sign}<0.000001` : value.toLocaleString("en-US", { maximumSignificantDigits: 3 });
+  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** lib/date.ts `formatDate`: day, short month, year, in UTC. */
+const dayText = (unixSeconds) => {
+  const d = new Date(unixSeconds * 1000);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+};
 /** components/vaults/aave-vault-format.ts `sharePriceText`. */
 const sharePriceText = (raw, decimals) => {
   const value = Number(raw) / Math.pow(10, decimals);
@@ -440,6 +482,15 @@ async function readVaultPage(vault, holder) {
   // comparison against a formatted figure would either fail or pass on a
   // substring. `[data-figure-value]` is the value alone; an inline figure has no
   // such child and IS its own value.
+  const amount = async (name) => {
+    const box = page.locator(`[data-figure="${name}"] [data-prov-exact]`);
+    if ((await box.count()) === 0) return null;
+    return {
+      text: (await box.first().innerText()).replace(/\s+/g, " ").trim(),
+      exact: await box.first().getAttribute("data-prov-exact"),
+      symbol: await box.first().getAttribute("data-prov-symbol"),
+    };
+  };
   const figure = async (name) => {
     const value = page.locator(`[data-figure="${name}"] [data-figure-value]`);
     if ((await value.count()) > 0) return (await value.first().innerText()).replace(/\s+/g, " ").trim();
@@ -495,15 +546,37 @@ async function readVaultPage(vault, holder) {
     holderMaxRedeemRaw: await grab("[data-position-card][data-holder]", "data-max-redeem-raw"),
     holderShapeKind: await grab("[data-holder-shape-kind]", "data-holder-shape-kind"),
     holderCooldownState: await grab("[data-position-card][data-holder]", "data-holder-cooldown-state"),
-    holderSharesText: await figure("holder-shares"),
+    // The holder card's headlines (Balance, Share of the vault, Claim, Earned) and
+    // its stats (Redeemable now, Exit, Cooldown, Read at, Census at, First seen).
+    // An AssetAmount prints the compact form in an aria-hidden span and carries the
+    // exact figure and the ticker on that span's `data-prov-exact` and
+    // `data-prov-symbol`, so the compact text, the exact figure and the ticker are
+    // read off one element.
+    holderShares: await amount("holder-shares"),
     holderFraction: await figure("holder-fraction"),
-    holderClaim: await figure("holder-claim"),
-    // `StatValue` puts `title` and `data-figure` on ONE element, so the exact
-    // figure behind each headline is read off the very element that printed the
-    // headline — not off a neighbour that could agree by accident.
-    holderSharesTitle: await grab('[data-figure="holder-shares"]', "title"),
-    holderClaimTitle: await grab('[data-figure="holder-claim"]', "title"),
+    holderTotalSupply: await figure("total-supply"),
+    holderClaim: await amount("holder-claim"),
+    holderValueUsd: await figure("holder-value-usd"),
+    holderEarned: await amount("holder-earned"),
+    holderEarnedStatus: await grab('[data-figure="holder-earned"]', "data-earned-status"),
+    holderEarnedRaw: await grab('[data-figure="holder-earned"]', "data-earned-raw"),
+    holderMaxWithdraw: await figure("holder-max-withdraw"),
     holderMaxRedeem: await figure("holder-max-redeem"),
+    holderExit: await figure("holder-exit"),
+    holderMaxWithdrawRaw: await grab("[data-position-card][data-holder]", "data-max-withdraw-raw"),
+    holderTotalSupplyRaw: await grab("[data-position-card][data-holder]", "data-total-supply-raw"),
+    holderCensusBalanceRaw: await grab("[data-position-card][data-holder]", "data-census-balance-raw"),
+    holderCensusBlock: await grab("[data-position-card][data-holder]", "data-census-block"),
+    holderFirstBlock: await grab("[data-position-card][data-holder]", "data-first-block"),
+    holderSharePpm: await grab("[data-position-card][data-holder]", "data-share-ppm"),
+    holderValueUsdE8: await grab("[data-position-card][data-holder]", "data-value-usd-e8"),
+    holderStatus: await grab("[data-position-card][data-holder]", "data-status"),
+    holderStatLabels: await page
+      .locator("[data-position-card][data-holder] [data-panel-row]")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-panel-row"))),
+    holderReadAtText: await grab('[data-position-card][data-holder] [data-panel-row="read-at"]'),
+    holderCensusAtText: await grab('[data-position-card][data-holder] [data-panel-row="census-at"]'),
+    holderFirstSeenText: await figure("holder-first-seen"),
     holderShape: await figure("holder-shape"),
     holderCooldown: await figure("holder-cooldown"),
     holderCatalogued: await figure("holder-catalogued"),
@@ -1032,8 +1105,74 @@ for (const f of HOLDERS) {
           blockNumber: bn,
         })
       : null;
+  const maxWithdraw = await client.readContract({
+    address: f.vault,
+    abi: VAULT_ABI,
+    functionName: "maxWithdraw",
+    args: [f.holder],
+    blockNumber: bn,
+  });
   const code = await client.getCode({ address: f.holder, blockNumber: bn });
-  holderOwn.set(`${f.vault}:${f.holder}`, { bn, decimals, bal, supply, maxRedeem, claim, code: code ?? "0x" });
+  // The census figures the card collapses: the balance at the census block, and
+  // the first block the holder held the vault's shares.
+  const censusBn = p.holderCensusBlock ? BigInt(p.holderCensusBlock) : null;
+  const censusBal =
+    censusBn == null
+      ? null
+      : await client.readContract({
+          address: f.vault,
+          abi: VAULT_ABI,
+          functionName: "balanceOf",
+          args: [f.holder],
+          blockNumber: censusBn,
+        });
+  const censusSupply =
+    censusBn == null
+      ? null
+      : await client.readContract({
+          address: f.vault,
+          abi: VAULT_ABI,
+          functionName: "totalSupply",
+          blockNumber: censusBn,
+        });
+  const firstBn = p.holderFirstBlock ? BigInt(p.holderFirstBlock) : null;
+  const [balBeforeFirst, balAtFirst, firstTs] =
+    firstBn == null
+      ? [null, null, null]
+      : await Promise.all([
+          client.readContract({
+            address: f.vault,
+            abi: VAULT_ABI,
+            functionName: "balanceOf",
+            args: [f.holder],
+            blockNumber: firstBn - BigInt(1),
+          }),
+          client.readContract({
+            address: f.vault,
+            abi: VAULT_ABI,
+            functionName: "balanceOf",
+            args: [f.holder],
+            blockNumber: firstBn,
+          }),
+          client.getBlock({ blockNumber: firstBn }).then((b) => Number(b.timestamp)),
+        ]);
+  holderOwn.set(`${f.vault}:${f.holder}`, {
+    bn,
+    decimals,
+    bal,
+    supply,
+    maxRedeem,
+    maxWithdraw,
+    claim,
+    code: code ?? "0x",
+    censusBn,
+    censusBal,
+    censusSupply,
+    firstBn,
+    balBeforeFirst,
+    balAtFirst,
+    firstTs,
+  });
 }
 
 const zeroFixtures = HOLDERS.filter((f) => holderOwn.get(`${f.vault}:${f.holder}`).bal === BigInt(0));
@@ -1072,57 +1211,121 @@ check(
     )
     .join("; ") || `${HOLDERS.length} compared`,
 );
-const redeemBad = HOLDERS.filter((f) => {
-  const p = holderPages.get(`${f.vault}:${f.holder}`);
-  const o = holderOwn.get(`${f.vault}:${f.holder}`);
-  return p.holderMaxRedeemRaw !== String(o.maxRedeem);
-});
-const zeroRedeem = HOLDERS.filter((f) => holderOwn.get(`${f.vault}:${f.holder}`).maxRedeem === BigInt(0));
-check(
-  "6c maxRedeem is this script's own read and is compared SEPARATELY from the balance — the sample includes a positive balance reading zero",
-  redeemBad.length === 0 && zeroRedeem.length > 0,
-  redeemBad
-    .map(
-      (f) =>
-        `${short(f.holder)}: page ${holderPages.get(`${f.vault}:${f.holder}`).holderMaxRedeemRaw} vs own ${holderOwn.get(`${f.vault}:${f.holder}`).maxRedeem}`,
-    )
-    .join("; ") || `${HOLDERS.length} compared, ${zeroRedeem.length} of them redeeming zero against a positive balance`,
-);
-const printedBad = [];
+const fixtureKey = (f) => `${f.vault}:${f.holder}`;
+const pageOf = (f) => holderPages.get(fixtureKey(f));
+const ownOf = (f) => holderOwn.get(fixtureKey(f));
+const isStake = (f) => stake.includes(f.vault);
+const assetDecOf = (f) => Number(TOKEN.get(OWN.get(f.vault)?.asset)?.decimals ?? ownOf(f).decimals);
+const shareSymOf = (f) => OWN.get(f.vault)?.symbol ?? null;
+const assetSymOf = (f) => TOKEN.get(OWN.get(f.vault)?.asset)?.symbol ?? null;
+
+// 6c — the "Redeemable now" stat. It is the vault's maxWithdraw() in the asset on
+// every family; an Umbrella stake token adds maxRedeem() in shares beneath it.
+const redeemBad = [];
 for (const f of HOLDERS) {
-  const p = holderPages.get(`${f.vault}:${f.holder}`);
-  const o = holderOwn.get(`${f.vault}:${f.holder}`);
-  const sd = Number(o.decimals);
-  const ad = Number(TOKEN.get(OWN.get(f.vault)?.asset)?.decimals ?? sd);
-  const shareSymbol = OWN.get(f.vault)?.symbol ?? null;
-  const assetSymbol = TOKEN.get(OWN.get(f.vault)?.asset)?.symbol ?? null;
-  // The HEADLINE is the magnitude — the card states every figure this way now,
-  // on the listing and here. The exact figure is asserted straight after, off
-  // the same element's `title`, so the compact form costs the check nothing.
-  const wantShares = headline(shareText(o.bal, sd), Number(o.bal) / Math.pow(10, sd));
-  const wantSharesTitle = `${exactUnits(o.bal, sd)} ${shareSymbol}`;
-  const fraction = Number(o.bal) / Number(o.supply);
-  const wantFraction = fraction < 0.000001 ? "less than 0.0001%" : pctText(fraction);
-  if (!p.holderSharesText?.startsWith(wantShares))
-    printedBad.push(`${short(f.holder)} shares "${p.holderSharesText}" vs "${wantShares}"`);
-  if (p.holderSharesTitle !== wantSharesTitle)
-    printedBad.push(`${short(f.holder)} shares title "${p.holderSharesTitle}" vs "${wantSharesTitle}"`);
-  if (!p.holderFraction?.startsWith(wantFraction))
-    printedBad.push(`${short(f.holder)} fraction "${p.holderFraction}" vs "${wantFraction}"`);
-  if (o.claim != null) {
-    const wantClaim = headline(amountText(o.claim, ad), Number(o.claim) / Math.pow(10, ad));
-    const wantClaimTitle = `${exactUnits(o.claim, ad)} ${assetSymbol}`;
-    if (!p.holderClaim?.startsWith(wantClaim))
-      printedBad.push(`${short(f.holder)} claim "${p.holderClaim}" vs "${wantClaim}"`);
-    if (p.holderClaimTitle !== wantClaimTitle)
-      printedBad.push(`${short(f.holder)} claim title "${p.holderClaimTitle}" vs "${wantClaimTitle}"`);
+  const p = pageOf(f);
+  const o = ownOf(f);
+  const wantWithdraw = formatCompact(Number(o.maxWithdraw) / Math.pow(10, assetDecOf(f)));
+  if (p.holderMaxWithdrawRaw !== String(o.maxWithdraw))
+    redeemBad.push(`${short(f.holder)}: maxWithdraw raw page ${p.holderMaxWithdrawRaw} vs own ${o.maxWithdraw}`);
+  if (p.holderMaxWithdraw !== wantWithdraw)
+    redeemBad.push(`${short(f.holder)}: Redeemable now "${p.holderMaxWithdraw}" vs "${wantWithdraw}"`);
+  if (isStake(f)) {
+    const wantRedeem = `${formatCompact(Number(o.maxRedeem) / Math.pow(10, Number(o.decimals)))} ${shareSymOf(f)}`;
+    if (p.holderMaxRedeemRaw !== String(o.maxRedeem))
+      redeemBad.push(`${short(f.holder)}: maxRedeem raw page ${p.holderMaxRedeemRaw} vs own ${o.maxRedeem}`);
+    if (p.holderMaxRedeem !== wantRedeem)
+      redeemBad.push(`${short(f.holder)}: maxRedeem line "${p.holderMaxRedeem}" vs "${wantRedeem}"`);
+  } else if (p.holderMaxRedeemRaw !== "" || p.holderMaxRedeem !== null) {
+    redeemBad.push(`${short(f.holder)}: a vault with no unstake window draws a maxRedeem line`);
   }
 }
+const zeroRedeem = HOLDERS.filter((f) => ownOf(f).bal > BigInt(0) && ownOf(f).maxWithdraw === BigInt(0));
 check(
-  "6d the printed shares, fraction and claim are the card's headline form of this script's own reads, with the EXACT figure on each stat's title=, in en-US",
-  printedBad.length === 0,
+  "6c Redeemable now is this script's own maxWithdraw() in the asset (and, on a stake token, maxRedeem() in shares beneath it), compared SEPARATELY from the balance — the sample includes a positive balance redeeming zero",
+  redeemBad.length === 0 && zeroRedeem.length > 0,
+  redeemBad.slice(0, 3).join("; ") ||
+    `${HOLDERS.length} compared, ${zeroRedeem.length} of them redeeming zero against a positive balance`,
+);
+
+// 6d — the four headlines. Balance, Share of the vault and Claim are the compact
+// form of this script's own reads with the exact figure and the ticker on the
+// same element; the Claim's USD line is the census's value.
+const printedBad = [];
+let usdSeen = 0;
+for (const f of HOLDERS) {
+  const p = pageOf(f);
+  const o = ownOf(f);
+  const sd = Number(o.decimals);
+  const ad = assetDecOf(f);
+  const wantShares = formatCompact(Number(o.bal) / Math.pow(10, sd));
+  const fraction = Number(o.bal) / Number(o.supply);
+  const wantFraction = fraction < 0.000001 ? "less than 0.0001%" : pctText(fraction);
+  const k = short(f.holder);
+  if (p.holderShares?.text !== wantShares) printedBad.push(`${k} Balance "${p.holderShares?.text}" vs "${wantShares}"`);
+  if (p.holderShares?.exact !== exactUnits(o.bal, sd))
+    printedBad.push(`${k} Balance exact "${p.holderShares?.exact}" vs "${exactUnits(o.bal, sd)}"`);
+  if (p.holderShares?.symbol !== shareSymOf(f))
+    printedBad.push(`${k} Balance ticker "${p.holderShares?.symbol}" vs "${shareSymOf(f)}"`);
+  if (p.holderFraction !== wantFraction)
+    printedBad.push(`${k} Share of the vault "${p.holderFraction}" vs "${wantFraction}"`);
+  if (!p.holderTotalSupply?.startsWith(`of ${formatCompact(Number(o.supply) / Math.pow(10, sd))} ${shareSymOf(f)}`))
+    printedBad.push(
+      `${k} supply line "${p.holderTotalSupply}" vs "of ${formatCompact(Number(o.supply) / Math.pow(10, sd))} ${shareSymOf(f)}"`,
+    );
+  if (p.holderTotalSupplyRaw !== String(o.supply))
+    printedBad.push(`${k} total supply raw ${p.holderTotalSupplyRaw} vs own ${o.supply}`);
+  const wantClaim = formatCompact(Number(o.claim) / Math.pow(10, ad));
+  if (p.holderClaim?.text !== wantClaim) printedBad.push(`${k} Claim "${p.holderClaim?.text}" vs "${wantClaim}"`);
+  if (p.holderClaim?.exact !== exactUnits(o.claim, ad))
+    printedBad.push(`${k} Claim exact "${p.holderClaim?.exact}" vs "${exactUnits(o.claim, ad)}"`);
+  if (p.holderClaim?.symbol !== assetSymOf(f))
+    printedBad.push(`${k} Claim ticker "${p.holderClaim?.symbol}" vs "${assetSymOf(f)}"`);
+  if (p.holderValueUsdE8) {
+    usdSeen++;
+    const usd = Number(p.holderValueUsdE8) / 1e8;
+    const wantUsd = `$${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (p.holderValueUsd !== wantUsd) printedBad.push(`${k} Claim USD line "${p.holderValueUsd}" vs "${wantUsd}"`);
+  } else if (!/not priced/.test(p.holderValueUsd ?? ""))
+    printedBad.push(`${k} unpriced Claim says "${p.holderValueUsd}", not "not priced"`);
+}
+check(
+  "6d Balance, Share of the vault and Claim are the card's compact form of this script's own reads, with the exact figure and ticker on the same element, and the Claim's USD line is the census value, in en-US",
+  printedBad.length === 0 && usdSeen > 0,
   printedBad.slice(0, 3).join("; ") ||
-    `${HOLDERS.length * 5} figures compared (3 headlines, 2 exact titles per holder)`,
+    `${HOLDERS.length} holders: Balance, Share of the vault, supply line and Claim compared; ${usdSeen} USD lines`,
+);
+// Earned (decision 0048) is the claim plus every amount out minus every amount
+// in, over the vault's whole history. This suite makes eth_calls only, so it
+// reads the figure's shape and the statement behind it: a signed integer in the
+// asset's units that is the printed Earned figure, or the words "no figure"
+// with the reason and the block.
+const earnedBad = [];
+for (const f of HOLDERS) {
+  const p = pageOf(f);
+  const k = short(f.holder);
+  if (p.holderEarnedStatus === "ok") {
+    if (!/^-?\d+$/.test(p.holderEarnedRaw ?? "")) earnedBad.push(`${k} Earned raw "${p.holderEarnedRaw}"`);
+    else {
+      const neg = p.holderEarnedRaw.startsWith("-");
+      const mag = neg ? p.holderEarnedRaw.slice(1) : p.holderEarnedRaw;
+      const sign = neg && mag !== "0" ? "\u2212" : "";
+      const wantExact = `${sign}${exactUnits(mag, assetDecOf(f))}`;
+      const wantText = `${sign}${formatCompact(Number(mag) / Math.pow(10, assetDecOf(f)))}`;
+      if (p.holderEarned?.exact !== wantExact)
+        earnedBad.push(`${k} Earned exact "${p.holderEarned?.exact}" vs "${wantExact}"`);
+      if (p.holderEarned?.text !== wantText) earnedBad.push(`${k} Earned "${p.holderEarned?.text}" vs "${wantText}"`);
+    }
+    if (p.holderEarned?.symbol !== assetSymOf(f)) earnedBad.push(`${k} Earned ticker "${p.holderEarned?.symbol}"`);
+  } else if (["carried", "unreplayed", "unread"].includes(p.holderEarnedStatus ?? "")) {
+    if (!/no figure/.test(p.bodyText)) earnedBad.push(`${k} Earned ${p.holderEarnedStatus} but no "no figure" words`);
+  } else earnedBad.push(`${k} Earned status "${p.holderEarnedStatus}"`);
+}
+check(
+  '6d2 Earned is a signed integer in the asset\'s units whose exact figure and ticker are on the printed element, or it says "no figure" with the reason',
+  earnedBad.length === 0,
+  earnedBad.slice(0, 3).join("; ") ||
+    `${HOLDERS.length} holders: ${HOLDERS.map((f) => pageOf(f).holderEarnedStatus).join(", ")}`,
 );
 // The shape, classified here from the same code read the page makes.
 const classify = (code) => {
@@ -1146,11 +1349,12 @@ check(
   shapeBad.join("; ") ||
     `classes seen: ${[...new Set(HOLDERS.map((f) => holderPages.get(`${f.vault}:${f.holder}`).holderShapeKind))].join(", ")}`,
 );
-// The cooldown, against the block's OWN timestamp.
+// The Cooldown stat (Umbrella only), against the block's OWN timestamp: the
+// state on the card's root and the words in the stat.
 const cooldownBad = [];
-for (const f of HOLDERS.filter((h) => stake.includes(h.vault))) {
-  const p = holderPages.get(`${f.vault}:${f.holder}`);
-  const o = holderOwn.get(`${f.vault}:${f.holder}`);
+for (const f of HOLDERS.filter((h) => isStake(h))) {
+  const p = pageOf(f);
+  const o = ownOf(f);
   const snap = await client.readContract({
     address: f.vault,
     abi: STAKE_ABI,
@@ -1160,33 +1364,79 @@ for (const f of HOLDERS.filter((h) => stake.includes(h.vault))) {
   });
   const blk = await client.getBlock({ blockNumber: o.bn });
   const now = Number(blk.timestamp);
+  const end = Number(snap.endOfCooldown);
+  const win = Number(snap.withdrawalWindow);
   const want =
-    snap.amount === BigInt(0) || Number(snap.endOfCooldown) === 0
-      ? "none"
-      : now < Number(snap.endOfCooldown)
-        ? "waiting"
-        : now < Number(snap.endOfCooldown) + Number(snap.withdrawalWindow)
-          ? "open"
-          : "expired";
+    snap.amount === BigInt(0) || end === 0 ? "none" : now < end ? "waiting" : now < end + win ? "open" : "expired";
+  const wantWords = {
+    none: "None",
+    waiting: `Ends ${utcInstant(end)}`,
+    open: `Window open until ${utcInstant(end + win)}`,
+    expired: "Window passed",
+  }[want];
   if (p.holderCooldownState !== want)
     cooldownBad.push(
       `${short(f.holder)}: page "${p.holderCooldownState}" vs own "${want}" (snapshot amount ${snap.amount}, ends ${snap.endOfCooldown}, block ts ${now})`,
     );
-  if (!p.holderCooldown)
-    cooldownBad.push(
-      `${short(f.vault)}: no cooldown line for a holder whose getStakerCooldown() answers amount ${snap.amount}`,
-    );
+  if (p.holderCooldown !== wantWords)
+    cooldownBad.push(`${short(f.holder)}: Cooldown stat "${p.holderCooldown}" vs "${wantWords}"`);
 }
-const cooldownStates = new Set(
-  HOLDERS.filter((h) => stake.includes(h.vault)).map(
-    (f) => holderPages.get(`${f.vault}:${f.holder}`).holderCooldownState,
-  ),
-);
+for (const f of HOLDERS.filter((h) => !isStake(h)))
+  if (pageOf(f).holderCooldown !== null || pageOf(f).holderCooldownState !== "")
+    cooldownBad.push(`${short(f.holder)} on ${short(f.vault)}: a vault with no cooldown draws a Cooldown stat`);
+const cooldownStates = new Set(HOLDERS.filter((h) => isStake(h)).map((f) => pageOf(f).holderCooldownState));
 check(
-  "6f every stake-token holder carries a cooldown line, in the state this script's own getStakerCooldown() and the block's OWN timestamp put it in",
+  "6f every stake-token holder carries a Cooldown stat, in the state and words this script's own getStakerCooldown() and the block's OWN timestamp put it in, and no other family draws one",
   cooldownBad.length === 0 && cooldownStates.size > 1,
   cooldownBad.join("; ") ||
-    `${HOLDERS.filter((h) => stake.includes(h.vault)).length} stake-token holders across ${cooldownStates.size} state(s): ${[...cooldownStates].join(", ")}`,
+    `${HOLDERS.filter((h) => isStake(h)).length} stake-token holders across ${cooldownStates.size} state(s): ${[...cooldownStates].join(", ")}`,
+);
+// The remaining stats: Exit, Read at, Census at and First seen, and the cap of six.
+const statBad = [];
+for (const f of HOLDERS) {
+  const p = pageOf(f);
+  const o = ownOf(f);
+  const k = short(f.holder);
+  const wantExit = isStake(f) ? "cooldown(), then redeem()" : "redeem()";
+  if (p.holderExit !== wantExit) statBad.push(`${k} Exit "${p.holderExit}" vs "${wantExit}"`);
+  if (p.holderStatLabels.length > 6) statBad.push(`${k} draws ${p.holderStatLabels.length} stats, the cap is 6`);
+  const wantRows = [
+    "redeemable",
+    "exit",
+    ...(isStake(f) ? ["cooldown"] : []),
+    "read-at",
+    ...(p.holderCensusBlock ? ["census-at"] : []),
+    "first-seen",
+  ];
+  if (JSON.stringify(p.holderStatLabels) !== JSON.stringify(wantRows))
+    statBad.push(`${k} stats ${p.holderStatLabels.join("/")} vs ${wantRows.join("/")}`);
+  if (!p.holderReadAtText?.includes(`block ${o.bn.toLocaleString("en-US")}`))
+    statBad.push(`${k} Read at "${p.holderReadAtText}" vs block ${o.bn.toLocaleString("en-US")}`);
+  // Census at: the block the roster swept to, and the balance the census holds
+  // is this script's own balanceOf() at that block.
+  if (p.holderCensusBlock) {
+    if (!p.holderCensusAtText?.includes(`block ${Number(p.holderCensusBlock).toLocaleString("en-US")}`))
+      statBad.push(`${k} Census at "${p.holderCensusAtText}" vs block ${p.holderCensusBlock}`);
+    if (p.holderCensusBalanceRaw !== String(o.censusBal))
+      statBad.push(
+        `${k} census balance ${p.holderCensusBalanceRaw} vs own balanceOf at ${p.holderCensusBlock}: ${o.censusBal}`,
+      );
+    const wantPpm = (Number(o.censusBal) / Number(o.censusSupply)) * 1e6;
+    if (!(Math.abs(Number(p.holderSharePpm) - wantPpm) <= Math.max(1e-3, wantPpm * 1e-6)))
+      statBad.push(`${k} census share ${p.holderSharePpm} ppm vs own ${wantPpm}`);
+    // First seen: the block the holder first held shares. Own reads put zero the
+    // block before and a positive balance at it; the date is that block's.
+    const fb = Number(p.holderFirstBlock);
+    if (o.balBeforeFirst !== BigInt(0) || !(o.balAtFirst > BigInt(0)))
+      statBad.push(`${k} first block ${fb}: own balance ${o.balBeforeFirst} before, ${o.balAtFirst} at`);
+    const wantSeen = `${dayText(o.firstTs)} · ${fb.toLocaleString("en-US")}`;
+    if (p.holderFirstSeenText !== wantSeen) statBad.push(`${k} First seen "${p.holderFirstSeenText}" vs "${wantSeen}"`);
+  } else if (!/\d/.test(p.holderFirstSeenText ?? "")) statBad.push(`${k} First seen "${p.holderFirstSeenText}"`);
+}
+check(
+  "6i Exit names the family's function, Read at is the page's block, Census at is the roster's block and its balance is this script's own balanceOf() there, First seen is the block this script's own reads put the first balance at, and no card draws more than six stats",
+  statBad.length === 0,
+  statBad.slice(0, 3).join("; ") || `${HOLDERS.length} holders: the stat rows, blocks and dates compared`,
 );
 // The cross-link: the layer holding itself.
 const memberPage = holderPages.get(`${WA_USDC}:${STK_USDC}`);

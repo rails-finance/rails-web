@@ -609,7 +609,7 @@ const putTail = async (f, body) => {
 /** Visible words as the reader sees them: rendered `innerText`, never the RSC
  *  payload and never `body.textContent` — a `hidden` drawer's prose is not on
  *  the face, and the payload made an earlier vault check vacuous. */
-async function pageRead(browser, url, { expandRuns = false, growWindow = false } = {}) {
+async function pageRead(browser, url, { expandRuns = false, growWindow = false, growToRun = false } = {}) {
   const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   const started = Date.now();
   const res = await page.goto(url, { waitUntil: "networkidle", timeout: 180_000 });
@@ -638,6 +638,18 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false }
       await page.waitForTimeout(800);
     }
   }
+  // The render window paints the newest WINDOW_CHUNK rows and a run stands as one
+  // row, so a run older than the newest rows is in the document only once the
+  // reader has asked for more. Grow the window with the reader's own "Show N
+  // more" until the first run row is painted, or the rows run out.
+  if (growToRun)
+    for (let guard = 0; guard < 40; guard++) {
+      if ((await page.locator("[data-vault-timeline-rows] [data-group-frame]").count()) > 0) break;
+      const more = page.locator("[data-vault-timeline-rows] button", { hasText: /^Show \d/ });
+      if ((await more.count()) === 0) break;
+      await more.first().click({ force: true });
+      await page.waitForTimeout(500);
+    }
   if (expandRuns)
     for (let guard = 0; guard < 40; guard++) {
       // A group opens from its ⋮ since ui-jobs 250 (lib/group-rows.mjs).
@@ -1540,18 +1552,28 @@ check(
   f1Page.timelineToolbar === true,
   `toolbar present ${f1Page.timelineToolbar}`,
 );
+// The newest rows of this life hold no run (the first one in this script's own
+// grouping stands after row 137), so the window is grown with the reader's own
+// "Show N more" until the page paints its first run, and the run is read there.
+const firstOwnRun = f1Runs.findIndex((r) => r.kind === "run");
+const f1RunWin = await pageRead(browser, pageUrl(F_B1), { growToRun: true });
+const firstPageRun = f1RunWin.timelineRows.findIndex((r) => r.kind === "run");
 check(
-  "T9c at least one run row is painted COLLAPSED, standing for members that are not in the document",
-  f1Page.timelineRows.some((r) => r.kind === "run" && r.count >= MIN_TRANSACTIONS) &&
-    f1Page.paintedEvents <
-      f1Page.timelineRows.length + f1Page.timelineRows.filter((r) => r.kind === "run").reduce((a, r) => a + r.count, 0),
-  `${f1Page.timelineRows.filter((r) => r.kind === "run").length} run rows painted, ${f1Page.paintedEvents} event cards`,
+  "T9c once the window reaches it, the first run is painted COLLAPSED at the row this script's own grouping puts it, standing for members that are not in the document",
+  firstPageRun >= 0 &&
+    firstPageRun === firstOwnRun &&
+    f1RunWin.timelineRows[firstPageRun].count >= MIN_TRANSACTIONS &&
+    f1RunWin.timelineRows[firstPageRun].count === f1Runs[firstOwnRun].events.length &&
+    f1RunWin.paintedEvents <
+      f1RunWin.timelineRows.length +
+        f1RunWin.timelineRows.filter((r) => r.kind === "run").reduce((a, r) => a + r.count, 0),
+  `first run at row ${firstPageRun} (own ${firstOwnRun}), ${f1RunWin.timelineRows[firstPageRun]?.count ?? "none"} members (own ${f1Runs[firstOwnRun]?.events.length}); ${f1RunWin.timelineRows.filter((r) => r.kind === "run").length} run rows painted, ${f1RunWin.paintedEvents} event cards`,
 );
-const f1Expanded = await pageRead(browser, pageUrl(F_B1), { expandRuns: true });
+const f1Expanded = await pageRead(browser, pageUrl(F_B1), { growToRun: true, expandRuns: true });
 check(
   "T9d expanding every run restores its member rows",
-  f1Expanded.paintedEvents > f1Page.paintedEvents,
-  `${f1Page.paintedEvents} cards collapsed → ${f1Expanded.paintedEvents} expanded`,
+  f1Expanded.paintedEvents > f1RunWin.paintedEvents,
+  `${f1RunWin.paintedEvents} cards collapsed → ${f1Expanded.paintedEvents} expanded`,
 );
 
 // ═══ T10 — the card is the listing's card ═════════════════════════════════

@@ -1785,7 +1785,8 @@ check(
 // The plan's Phase D would have moved chain 1's `logsRpcEnv` onto a wide-range
 // lane and named three sibling sweeps a missing var would break; measured, every
 // route that calls those parametrised sweeps passes a Base chain id, so the only
-// serving-path caller of `chainLogsClient` on chain 1 is this timeline's loader.
+// serving-path caller of `chainLogsClient` on chain 1 was this timeline's loader
+// (13c names the callers there are now).
 // The move was declined (2026-09-08) but the bound is worth keeping true: 13c/13d
 // hold it mechanically, and 13e states whether the deployment under test has the
 // wide lane at all, so a future flip can be judged against a real deployment.
@@ -1817,9 +1818,18 @@ const chain1Callers = [...sourceFiles("lib"), ...sourceFiles("app")]
   .filter((file) => codeLines(file).some((l) => /chainLogsClient\((\)|1\b|MAINNET_CHAIN_ID)/.test(l)))
   .map((file) => path.relative(ROOT, file))
   .sort();
+// The set is named in full so a new caller goes red here before anyone moves the
+// lane. The two PWN sweeps joined the timeline's loader when PWN's deadline
+// extensions and collateral transfers were added (web `4de7d15f`), and a flip of
+// chain 1's lane would reach them as well.
+const CHAIN1_LOG_CALLERS = [
+  "lib/sources/chain/aave-ethereum-vault-timeline.ts",
+  "lib/sources/chain/pwn-collateral-transfer.ts",
+  "lib/sources/chain/pwn-extensions.ts",
+];
 check(
-  "13c the only serving-path caller of chainLogsClient on chain 1 is this timeline's loader",
-  chain1Callers.length === 1 && chain1Callers[0] === "lib/sources/chain/aave-ethereum-vault-timeline.ts",
+  "13c the serving-path callers of chainLogsClient on chain 1 are this timeline's loader and the two PWN sweeps, and no other",
+  JSON.stringify(chain1Callers) === JSON.stringify(CHAIN1_LOG_CALLERS),
   chain1Callers.join(", ") || "no caller at all",
 );
 const sweepRoutes = sourceFiles("app/api").filter((file) => codeLines(file).some((l) => /EventsFromChain\(/.test(l)));
