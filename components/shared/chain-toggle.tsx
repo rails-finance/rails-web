@@ -20,7 +20,7 @@ export const SEGMENT_SHELL =
   "inline-flex items-center gap-0.5 rounded-full border border-rb-200 bg-background/60 p-0.5 dark:border-rb-800";
 
 export const segmentClass = (active: boolean) =>
-  `${CTRL_GHOST} inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${
+  `${CTRL_GHOST} inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3.5 ${
     active ? "bg-rb-100 text-foreground dark:bg-rb-800" : "text-rb-500 hover:text-foreground"
   }`;
 
@@ -104,7 +104,7 @@ export function ChainToggleButtons({ chainId, onChange }: { chainId: ChainId; on
             onClick={() => onChange(id)}
             className={segmentClass(active)}
           >
-            <ChainGlyph chainId={id} className="h-3.5 w-3.5" />
+            <ChainGlyph chainId={id} className="h-3.5 w-3.5 max-[380px]:hidden" />
             {CHAINS[id].name}
           </button>
         );
@@ -130,7 +130,7 @@ export function ChainToggleLinks({ chainId, basePath }: { chainId: ChainId; base
             aria-current={active ? "page" : undefined}
             className={segmentClass(active)}
           >
-            <ChainGlyph chainId={id} className="h-3.5 w-3.5" />
+            <ChainGlyph chainId={id} className="h-3.5 w-3.5 max-[380px]:hidden" />
             {CHAINS[id].name}
           </Link>
         );
