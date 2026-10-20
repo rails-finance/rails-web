@@ -85,6 +85,14 @@ async function logs(url, address, topic0, from, to, chunk) {
       }),
     });
     const j = await res.json();
+    // -32005 is the provider's limit on one answer (range or result count):
+    // the range is halved and asked again, so the sweep stays whole.
+    if (j.error?.code === -32005 && hi > lo) {
+      const mid = lo + Math.floor((hi - lo) / 2);
+      out.push(...(await logs(url, address, topic0, lo, mid, mid - lo + 1)));
+      out.push(...(await logs(url, address, topic0, mid + 1, hi, hi - mid)));
+      continue;
+    }
     if (j.error || !Array.isArray(j.result))
       throw new Error(`eth_getLogs [${lo},${hi}] on ${address}: error ${j.error?.code ?? res.status}`);
     for (const l of j.result) {

@@ -418,6 +418,9 @@ const pctText = (fraction) => `${(fraction * 100).toPrecision(4)}%`;
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 1600 } });
 const page = await context.newPage();
+// A vault page reads the chain on the server; a cold dev route takes longer
+// than the 30s default to answer.
+page.setDefaultNavigationTimeout(180_000);
 
 const head = await client.getBlockNumber();
 
@@ -485,12 +488,13 @@ async function readVaultPage(vault, holder) {
     wrapperPrice: await figure("umbrella-wrapper-price"),
     wrapperIndex: await figure("umbrella-wrapper-index"),
     // holder
-    holderAddress: await grab("[data-holder]", "data-holder"),
-    holderSharesRaw: await grab("[data-holder]", "data-holder-shares-raw"),
-    holderClaimRaw: await grab("[data-holder]", "data-holder-claim-raw"),
-    holderMaxRedeemRaw: await grab("[data-holder]", "data-max-redeem-raw"),
-    holderShapeKind: await grab("[data-holder]", "data-holder-shape-kind"),
-    holderCooldownState: await grab("[data-holder]", "data-holder-cooldown-state"),
+    // The holder card (ui-jobs 407 step 4) carries the reads on its root.
+    holderAddress: await grab("[data-position-card][data-holder]", "data-holder"),
+    holderSharesRaw: await grab("[data-position-card][data-holder]", "data-shares-raw"),
+    holderClaimRaw: await grab("[data-position-card][data-holder]", "data-claim-raw"),
+    holderMaxRedeemRaw: await grab("[data-position-card][data-holder]", "data-max-redeem-raw"),
+    holderShapeKind: await grab("[data-holder-shape-kind]", "data-holder-shape-kind"),
+    holderCooldownState: await grab("[data-position-card][data-holder]", "data-holder-cooldown-state"),
     holderSharesText: await figure("holder-shares"),
     holderFraction: await figure("holder-fraction"),
     holderClaim: await figure("holder-claim"),

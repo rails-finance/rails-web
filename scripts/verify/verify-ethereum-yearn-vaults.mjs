@@ -327,7 +327,13 @@ const rosterText = (await page.locator("[data-roster-panel]").innerText()).repla
 // 2026-10-20 (ui-jobs 407, V1): the roster's read-at line moved into the
 // panel ("Read at 52,854,244"), and the empty group's sentence that named
 // the call went to the intro drawer, so the line is what is read.
-const statedBlock = Number((rosterText.match(/Read at ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
+// Pinned (ui-jobs 407 step 5): the printed block is the BlockRef inside the
+// read-at line, read by its hook, then held against the line's attribute.
+const statedBlock = Number(
+  (
+    (await page.locator("[data-roster-panel] [data-directory-block] [data-block-ref]").first().innerText()) ?? ""
+  ).replace(/[^\d]/g, "") || NaN,
+);
 const headerBlockAttr = (await page.locator("[data-directory-block]").count())
   ? Number(await page.locator("[data-directory-block]").first().getAttribute("data-directory-block"))
   : null;
@@ -382,7 +388,7 @@ const rows = await page.locator("[data-roster-panel] [data-vault-row]").evaluate
     hasBadge: Boolean(el.querySelector("[data-endorsed-badge]")),
     amountText: el.querySelector('[data-cell="total-assets"]')?.textContent?.trim() ?? null,
     sharePriceText: el.querySelector('[data-cell="share-price"]')?.textContent?.trim() ?? null,
-    nameText: el.querySelectorAll("td")[0]?.textContent?.trim() ?? null,
+    nameText: el.querySelector("[data-vault-name]")?.textContent?.trim() ?? null,
   })),
 );
 check(
@@ -727,8 +733,8 @@ check(
 
 // ── 13: one vault's factsheet, against this script's own reads ──────────────
 await page.goto(`${BASE}/ethereum/yearn/vaults/${F1}`, { waitUntil: "networkidle" });
-await page.waitForSelector("[data-vault-block]");
-const vaultBlock = Number(await page.locator("[data-vault-block]").first().getAttribute("data-vault-block"));
+await page.waitForSelector('[data-anatomy="V2"][data-vault-block]');
+const vaultBlock = Number(await page.locator('[data-anatomy="V2"]').first().getAttribute("data-vault-block"));
 check(
   "13a the factsheet states the block it read at",
   Number.isInteger(vaultBlock) && vaultBlock > 0,
@@ -737,7 +743,8 @@ check(
 const vb = BigInt(vaultBlock);
 const cells = Object.fromEntries(
   await page
-    .locator("[data-cell]")
+    // The card's figures, by the V2 mark: V3's table carries data-cell too.
+    .locator('[data-anatomy="V2"] [data-cell]')
     .evaluateAll((els) =>
       els.map((el) => [
         el.getAttribute("data-cell"),

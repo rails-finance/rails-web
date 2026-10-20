@@ -242,7 +242,6 @@ await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 12
 // the vaults that hold nothing rather than in a data attribute, so it is read
 // out of the panel's rendered text and then held against the block the header
 // names — the panel cannot state one block and have been read at another.
-const rosterText = (await page.locator("[data-roster-panel]").innerText()).replace(/\s+/g, " ");
 // ⚠️ NOT the first "at block" in the panel. The roster states TWO blocks and
 // they are different facts: the catalogue's census block ("the 511 vaults the
 // two factories had deployed on Base at block N") and the block this READING
@@ -253,7 +252,13 @@ const rosterText = (await page.locator("[data-roster-panel]").innerText()).repla
 // 2026-10-20 (ui-jobs 407, V1): the roster's read-at line moved into the
 // panel ("Read at 52,854,244"), and the empty group's sentence that named
 // the call went to the intro drawer, so the line is what is read.
-const statedBlock = Number((rosterText.match(/Read at ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
+// Pinned (ui-jobs 407 step 5): the printed block is the BlockRef inside the
+// read-at line, read by its hook, then held against the line's attribute.
+const statedBlock = Number(
+  (
+    (await page.locator("[data-roster-panel] [data-directory-block] [data-block-ref]").first().innerText()) ?? ""
+  ).replace(/[^\d]/g, "") || NaN,
+);
 // The page's own header states the same block in `[data-directory-block]`, and
 // it sits OUTSIDE the panel — so it is read off the page, never scoped to
 // `[data-roster-panel]`. Two statements of one reading: a header left on a
