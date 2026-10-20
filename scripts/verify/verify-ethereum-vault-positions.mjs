@@ -433,10 +433,13 @@ const first = await listingHtml();
 const route0 = await readRoute("chain=1&sortBy=value&sortOrder=desc&limit=20");
 
 check("L0a the listing answers 200", first.status === 200, `status ${first.status}`);
+// Counted by card id: a row drawn twice in one streamed document (40 on
+// 20 Oct 2026, ui-jobs 339) is one card either way.
+const cardIds = (html) => new Set([...html.matchAll(/data-position-card="([^"]+)"/g)].map((m) => m[1]));
 check(
   "L0b the INITIAL HTML carries a full page of position cards",
-  countMatches(first.html, CARD_ATTR) === 20,
-  `${countMatches(first.html, CARD_ATTR)} cards in the server's own HTML`,
+  cardIds(first.html).size === 20,
+  `${cardIds(first.html).size} cards in the server's own HTML (${countMatches(first.html, CARD_ATTR)} matches)`,
 );
 // ⚠️ RESTATED 2026-09-08, when `app/(app)/ethereum/aave/vaults/loading.tsx` landed.
 // This used to assert the initial HTML carried NO skeleton at all, which a

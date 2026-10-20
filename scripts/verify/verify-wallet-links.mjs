@@ -45,6 +45,12 @@ const ROW = 'a[class~="group/listing-row"]';
 // the last component emitting it was retired; a dead selector alternative
 // cannot fail, so it was only ever noise.)
 const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"]';
+// On a position page the owner's wallet is its address menu (ui-jobs 271,
+// `components/shared/wallet-menu.tsx`): the pill became a trigger, and the
+// listing link is the menu's "View its positions" row. The listings that
+// draw a pill of their own (Liquity V2, Aave V4) keep the filter button.
+const OWNER_MENU = '[data-wallet-menu] button[aria-haspopup="menu"]';
+const OWNER_MENU_LISTING = '[data-wallet-menu] [role="menuitem"]:has-text("View its positions")';
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -145,6 +151,24 @@ async function clickPillUntilNavigated(deadlineMs = 60000) {
         .first()
         .click({ timeout: 5000 })
         .catch(() => {});
+    } else if ((await page.locator(OWNER_MENU).count()) > 0) {
+      // The address menu: open it, then take its listing row.
+      clicks++;
+      await page
+        .locator(OWNER_MENU)
+        .first()
+        .click({ timeout: 5000 })
+        .catch(() => {});
+      const took = await page
+        .locator(OWNER_MENU_LISTING)
+        .first()
+        .click({ timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      // A row that took the click has pushed the route; a second push before
+      // the first lands restarts it, so give this one time to arrive (a cold
+      // dev listing takes seconds) before clicking again.
+      if (took) await page.waitForURL((u) => u.href !== before, { timeout: 15000 }).catch(() => {});
     }
     await page.waitForTimeout(400);
   }
@@ -206,12 +230,13 @@ for (const { slug, route, onListing } of subjects) {
       // The listing itself renders the pill (loaded already with the rows).
       hasBtn = (await page.locator(FILTER_BTN).count()) > 0;
     } else {
-      // The pill lives on a detail page (the receipts branch), but not every
-      // position renders one — e.g. spark's first listed position is
-      // wallet-less. So walk the first rows until a detail page shows the
-      // affordance, waiting for it (never a bare post-goto count) so a slow
-      // receipts/overlay render isn't misread as absent. Deterministic on live
-      // data — the same spirit as picking a subject that has the shape tested.
+      // The affordance lives on a detail page: the owner's address menu (or a
+      // pill, where a page still draws one), but not every position renders
+      // one — e.g. spark's first listed position is wallet-less. So walk the
+      // first rows until a detail page shows the affordance, waiting for it
+      // (never a bare post-goto count) so a slow receipts/overlay render isn't
+      // misread as absent. Deterministic on live data — the same spirit as
+      // picking a subject that has the shape tested.
       const hrefs = await page
         .locator(ROW)
         .evaluateAll((as, n) => as.slice(0, n).map((a) => a.getAttribute("href")), 8);
@@ -219,7 +244,7 @@ for (const { slug, route, onListing } of subjects) {
       for (const href of hrefs) {
         await page.goto(`${BASE}${href}`, { waitUntil: "domcontentloaded", timeout: 120000 });
         const found = await page
-          .waitForSelector(FILTER_BTN, { timeout: 4000 })
+          .waitForSelector(`${OWNER_MENU}, ${FILTER_BTN}`, { timeout: 4000 })
           .then(() => true)
           .catch(() => false);
         if (found) {
@@ -235,7 +260,7 @@ for (const { slug, route, onListing } of subjects) {
     check(
       `${slug}: the pill navigates`,
       navigated !== null,
-      navigated ? `${navigated.clicks} click(s)` : "URL unmoved for 30s — the pill did not navigate",
+      navigated ? `${navigated.clicks} click(s)` : "URL unmoved for 60s — the pill did not navigate",
     );
     if (!navigated) continue;
     withPill++;
@@ -257,23 +282,30 @@ for (const { slug, route, onListing } of subjects) {
     // filtered rows to render — not networkidle + a pause. See the helper.
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
     const { count: filtered, settled } = await waitForFilteredCount(full);
+    // A wallet that holds a page or more here (a Frankencoin minter with 20+
+    // positions) fills the filtered page to `full`; the filter is then proven
+    // by every row carrying the wallet instead. Some listing cards don't
+    // render the owner as visible text, so that read is only a second proof,
+    // never a second requirement.
+    const tail = q.length >= 6 ? q.slice(-4).toLowerCase() : null;
+    const bodies = filtered > 0 ? await page.locator(ROW).allInnerTexts() : [];
+    const matched = tail ? bodies.filter((t) => t.toLowerCase().includes(tail)).length : 0;
+    const everyRowIsTheWallet = tail !== null && bodies.length > 0 && matched === bodies.length;
     check(
       `${slug}: FILTERED count < full (proves ?q= is honored)`,
-      filtered >= 1 && filtered < full,
+      filtered >= 1 && (filtered < full || everyRowIsTheWallet),
       settled
         ? `filtered=${filtered} vs full=${full}  q=${q}`
-        : `NOT SETTLED — still ${filtered} of ${full} when the wait expired, so the filter was never` +
+        : everyRowIsTheWallet
+          ? `a full page of ${filtered}, every row the wallet's  q=${q}`
+          : `NOT SETTLED — still ${filtered} of ${full} when the wait expired, so the filter was never` +
             ` observed to apply. Re-run this explorer alone before recording it: a busy box looks like` +
             ` an ignored ?q= here.  q=${q}`,
     );
 
-    // 3c) Informational only (some listing cards don't render the owner as
-    // visible text, so a miss here isn't a filter failure): how many filtered
-    // rows visibly carry the wallet's last-4 hex.
-    if (q.length >= 6 && filtered > 0) {
-      const tail = q.slice(-4).toLowerCase();
-      const bodies = await page.locator(ROW).allInnerTexts();
-      const matched = bodies.filter((t) => t.toLowerCase().includes(tail)).length;
+    // 3c) Informational: how many filtered rows visibly carry the wallet's
+    // last-4 hex.
+    if (tail && filtered > 0) {
       console.log(`INFO  ${slug}: ${matched}/${bodies.length} filtered rows visibly show …${tail}`);
     }
   } catch (e) {

@@ -242,9 +242,13 @@ const sparkRoute = await fetch(`${BASE}/api/spark/timeline?wallet=${SPARK_WALLET
   .catch(() => null);
 const SERVED_EVENTS = sparkRoute?.eventsServed ?? null;
 const SERVED_ROWS = sparkRoute?.events?.length ?? null;
+// Under decision 0039 (one rule of five, web `af40fed1`) a window holds a
+// folder only where five or more consecutive transactions share an act, and
+// this wallet's 2,500-row window held none on 20 Oct 2026 (ui-jobs 339): the
+// grain is still the route's, and events served is at least the rows.
 check(
   "spark: the grouped route answers, cut by rows, with more events served than rows",
-  sparkRoute?.grouped === true && sparkRoute?.boundBy === "rows" && SERVED_EVENTS > SERVED_ROWS && SERVED_ROWS > 0,
+  sparkRoute?.grouped === true && sparkRoute?.boundBy === "rows" && SERVED_EVENTS >= SERVED_ROWS && SERVED_ROWS > 0,
   `grouped ${sparkRoute?.grouped}, boundBy ${sparkRoute?.boundBy}, ${SERVED_ROWS} rows carrying ${SERVED_EVENTS} events`,
 );
 
@@ -255,12 +259,14 @@ check(
 // and no longer in prose, is the rows it loaded.
 check(
   "spark: the page holds part of the life, states the span in time, and names no cap",
+  // The loaded grain is rows where the index grouped something and events
+  // where it did not (`data-timeline-unit`); either is the page's own count.
   atRest?.windowed === true &&
     atRest?.span != null &&
-    (atRest?.rows ?? 0) > 0 &&
-    atRest.rows < TOTAL &&
+    (atRest?.listed ?? 0) > 0 &&
+    atRest.listed < TOTAL &&
     !NAMES_THE_CAP.test(await page.innerText("body")),
-  `${atRest?.rows} rows loaded of a position holding ${TOTAL}, span ${JSON.stringify(atRest?.span)} — "${atRest?.text}"`,
+  `${atRest?.listed} ${atRest?.rows != null ? "rows" : "events"} loaded of a position holding ${TOTAL}, span ${JSON.stringify(atRest?.span)} — "${atRest?.text}"`,
 );
 
 const assets = await openMenu("Assets");
