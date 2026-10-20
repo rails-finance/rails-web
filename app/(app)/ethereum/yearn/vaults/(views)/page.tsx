@@ -11,11 +11,9 @@
 // reader chooses to open, and a surface a reader chooses is a surface a reader
 // can link to. The loader caches for five minutes and never caches a failure.
 //
-// NO POSITION LANE. There is no Positions column and no listing link, because
-// Yearn has neither here: the census that counts holders is built per vault
-// layer and Yearn's is later work. What this page states, it read from the
-// vaults themselves.
-import Link from "next/link";
+// NO POSITION LANE. The rows' Holders slot reads "no census" and there is no
+// listing link: the census that counts holders is built per vault layer and
+// Yearn's is later work. The rows are V1 vault rows (ui-jobs 407).
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
@@ -23,11 +21,9 @@ import { YearnVaultDirectoryView } from "@/components/vaults/yearn-vault-directo
 import { loadYearnEthereumVaultDirectory, YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { explorerUrl } from "@/lib/shared/chains";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
-import { yearnVaultRosterHref } from "@/lib/vaults/routes";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
-import { BlockRef } from "@/components/shared/block-ref";
+import { yearnVaultSummaries } from "@/lib/vaults/summary";
+import { loadVaultYields } from "@/lib/vaults/yield-read";
 
 export const dynamic = "force-dynamic";
 
@@ -44,36 +40,28 @@ export async function generateMetadata() {
 
 export default async function YearnVaultRosterPage() {
   const data = await loadYearnEthereumVaultDirectory();
+  const yields = await loadVaultYields(
+    YEARN_CHAIN_ID,
+    data.rows.map((r) => r.address),
+  );
 
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader
-          protocol={PROTOCOL}
-          title="Vaults"
-          stamp={
-            <>
-              {!data.chainStale && (
-                <p className="mt-2 text-[11px] text-rb-500" data-directory-block={data.blockNumber}>
-                  Read at <BlockRef block={data.blockNumber} chainId={YEARN_CHAIN_ID} /> · every name, total, share
-                  price and endorsement below is a call answered at that block, re-read at most every five minutes.
-                </p>
-              )}
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <Link href={`${yearnVaultRosterHref()}/info`} className={PAGE_LINK} prefetch={false}>
-                  How this is built <span aria-hidden>→</span>
-                </Link>
-              </p>
-            </>
-          }
-        />
+        <SubPageHeader protocol={PROTOCOL} title="Vaults" />
 
         {/* `data-roster-panel` marks the rows for the readers that hold them to
-            the chain, the same marker the two older vault rosters carry. The
-            view states a refused read in words, so this is never an empty
-            panel. */}
+            the chain, the same marker the two other vault rosters carry. */}
         <div data-roster-panel>
-          <YearnVaultDirectoryView data={data} />
+          <YearnVaultDirectoryView
+            vaults={yearnVaultSummaries(data)}
+            yields={yields}
+            blockNumber={data.blockNumber}
+            chainStale={data.chainStale}
+            catalogSize={data.catalogSize}
+            censusBlock={data.censusBlock}
+            endorsementUnread={data.rows.filter((r) => r.endorsed == null).map((r) => r.address)}
+          />
         </div>
 
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />

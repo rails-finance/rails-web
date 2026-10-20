@@ -226,6 +226,11 @@ export interface PositionCardListingSlots extends PositionCardSlotsCommon {
   tag?: ReactNode;
   /** Present on a closed position. */
   outcome?: PositionCardOutcome;
+  /** What stands where the lifecycle pill does, on a row that is not a
+   *  position (the vault row, V1: its asset and venue mark). Absent, the pill. */
+  lead?: ReactNode;
+  /** The frame's `data-anatomy` code; absent, `C1`. */
+  anatomy?: string;
 }
 
 export type PositionCardDetailSlots = PositionCardDetailOpen | PositionCardDetailClosed;
@@ -618,7 +623,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             </>
           ) : (
             <>
-              <ListingPill status={slots.status} />
+              {slots.lead ?? <ListingPill status={slots.status} />}
               {slots.identity}
             </>
           )}
@@ -670,7 +675,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-position-card-shell=""
       data-card-status={slots.status ? slots.status.word.toLowerCase() : "live"}
       data-skel-section={detail ? "detail-card" : "listing-row"}
-      data-anatomy={detail ? "P1 C1" : "C1"}
+      data-anatomy={detail ? "P1 C1" : (slots.anatomy ?? "C1")}
       data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
       data-prov-lit={lit ? "" : undefined}
       data-card-over-cap={over ?? undefined}

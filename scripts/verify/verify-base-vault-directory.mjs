@@ -195,23 +195,34 @@ const skip = (name, why) => {
   skipped++;
 };
 
-/** The section's print rule, restated here from the header of
- *  components/protocol/morpho-base/vault-exposure-parts.tsx so a change to the
- *  page's rule that this script did not agree to goes red. */
-const expectedAmountText = (raw, decimals) => {
-  const value = Number(raw) / Math.pow(10, decimals);
-  const text = value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: decimals <= 6 ? 2 : 6,
-  });
-  if (value !== 0 && parseFloat(text.replace(/,/g, "")) === 0) {
-    // exact from raw units, trailing zeros trimmed
-    let s = String(raw).padStart(decimals + 1, "0");
-    const cut = s.length - decimals;
-    return (s.slice(0, cut) + "." + s.slice(cut)).replace(/\.?0+$/, "");
+// 2026-10-20 (ui-jobs 407, V1): a roster row is the shared card's listing
+// surface. It states total assets in the listing's compact form ("413.0M", the
+// exact value on `data-prov-exact`) and the share price by the print rules'
+// share-price rule (two to six places, whatever the asset's decimals). Both
+// rules restated here from their definitions (lib/shared/format-compact.ts,
+// lib/shared/vault-amount-text.ts `sharePriceText`), for figures of 0.01 and up.
+const expectedCompactText = (raw, decimals) => {
+  const v = Number(raw) / Math.pow(10, decimals);
+  const units = [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  const one = (x) => x.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (let i = 0; i < units.length; i++) {
+    const [size, suffix] = units[i];
+    if (v < size) continue;
+    const scaled = Math.round((v / size) * 10) / 10;
+    if (scaled >= 1000 && i > 0) return `${one(v / units[i - 1][0])}${units[i - 1][1]}`;
+    return `${one(scaled)}${suffix}`;
   }
-  return text;
+  return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
+const expectedSharePriceText = (raw, decimals) =>
+  (Number(raw) / Math.pow(10, decimals)).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  });
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -239,7 +250,10 @@ const rosterText = (await page.locator("[data-roster-panel]").innerText()).repla
 // one — measured on the first run of this move: block 51,054,072 against a
 // reading at 51,054,846, and checks 2 and 13a both went red against a real
 // page. The sentence anchored on is the one that names the CALL.
-const statedBlock = Number((rosterText.match(/totalAssets\(\) at block ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
+// 2026-10-20 (ui-jobs 407, V1): the roster's read-at line moved into the
+// panel ("Read at 52,854,244"), and the empty group's sentence that named
+// the call went to the intro drawer, so the line is what is read.
+const statedBlock = Number((rosterText.match(/Read at ([\d,]+)/) ?? [])[1]?.replace(/,/g, "") ?? NaN);
 // The page's own header states the same block in `[data-directory-block]`, and
 // it sits OUTSIDE the panel — so it is read off the page, never scoped to
 // `[data-roster-panel]`. Two statements of one reading: a header left on a
@@ -391,11 +405,11 @@ let printBad = [];
 sampleAssets.forEach((asset, i) => {
   const top = funded.find((r) => r.groupAsset === asset);
   if (!top) return;
-  const want = expectedAmountText(top.raw, Number(decimalsRead[i]));
+  const want = expectedCompactText(top.raw, Number(decimalsRead[i]));
   if (!top.amountText?.startsWith(want)) printBad.push(`${top.address}: "${top.amountText}" vs "${want}"`);
 });
 check(
-  "6  the largest row of the three largest groups prints by the section's amount rule",
+  "6  the largest row of the three largest groups prints by the listing's compact rule",
   printBad.length === 0 && sampleAssets.length === 3,
   printBad.join("; ") || `${sampleAssets.length} sampled`,
 );
@@ -566,11 +580,11 @@ const priceTextBad = [];
 priceSample.forEach((r) => {
   const decimals = priceAssetDecimals.get(r.asset);
   if (decimals == null || !r.sharePriceRaw) return;
-  const want = expectedAmountText(r.sharePriceRaw, decimals);
+  const want = expectedSharePriceText(r.sharePriceRaw, decimals);
   if (!r.sharePriceText?.startsWith(want)) priceTextBad.push(`${r.address}: "${r.sharePriceText}" vs "${want}"`);
 });
 check(
-  "13b the printed share price follows the section's amount rule — the ASSET's own decimals, never a fixed two",
+  "13b the printed share price follows the share-price rule — two to six places, never a fixed two",
   priceTextBad.length === 0,
   priceTextBad.join("; ") || `${priceSample.length} sampled`,
 );
