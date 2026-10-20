@@ -73,7 +73,7 @@ const LANES = [
     api: "compound-base",
     line: "Borrowing limit used",
     debt: (r) => Math.max(0, -Number(r.base?.amount ?? 0)),
-    path: (r) => `/base/compound-v3/${r.account}`,
+    path: (r) => `/base/compound-v3/${r.market}/${r.account}`,
   },
   {
     api: "morpho-base",

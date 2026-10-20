@@ -1064,7 +1064,7 @@ const ROSTER = [
     name: "Compound V3 Base",
     route: "/base/compound-v3",
     api: "/api/compound-base/positions",
-    rows: 'a[href^="/base/compound-v3/0x"]',
+    rows: 'a[href^="/base/compound-v3/"][href*="/0x"]',
     perPage: 20,
     open: "status=open",
     all: "status=open,closed,liquidated",
