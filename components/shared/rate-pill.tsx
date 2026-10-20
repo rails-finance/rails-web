@@ -1,13 +1,11 @@
 "use client";
 
-// Interest-rate pills — the small lozenge that carries a trove's annual rate on
-// an event header. Two treatments: an individual (owner-set) rate in a muted
-// rb-500 tint, and a delegate (batch-manager-set) rate in party-pink with the
-// people glyph. Extracted from the Liquity V2 header so the two Liquity forks
-// render the identical pill through the chain-state row's rate-pill seam — the
-// pill asserts THE POSITION HOLDER (or a delegate acting for them) CHOSE this
-// rate, so it belongs only where a user sets a rate, never on a utilization
-// rate.
+// Interest-rate pills — the small lozenge that carries a rate's figure on an
+// event header or the spine's flank. Two treatments: an owner-set rate in a
+// muted rb-500 tint, and a rate someone else set (a delegate or batch
+// manager, or a market note's governance or formula) in party pink. A pill
+// carries the figure alone; who set the rate is the badge in the spine node's
+// corner (ui-jobs 408, `detail-page-anatomy.md`, "The spine").
 //
 // The SHELLS carry the visual; the shared row (ChainTruthRow) puts the rate's
 // <Prov echo> inside them, so the pill pulses with the detail grid's rate
@@ -15,21 +13,21 @@
 
 import type { ReactNode } from "react";
 
-/** Small "people" glyph inside the pink delegate / batch rate pills, and reused
- *  as the event-filter suffix that marks a delegate-set "Interest rate" row
- *  apart from the owner's own. Stroke is currentColor so it inherits the
- *  surrounding text colour (pink in the pill, muted in the filter menu). */
-export function UsersGlyph() {
+/** The people glyph (lucide `users`): a third party acted. The spine node's
+ *  third-party badge, and the event-filter suffix that marks a delegate-set
+ *  "Interest rate" row apart from the owner's own. Stroke is currentColor. */
+export function UsersGlyph({ size = 12 }: { size?: number }) {
   return (
     <svg
-      width="12"
-      height="12"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="2.5"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
     >
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
@@ -39,15 +37,14 @@ export function UsersGlyph() {
   );
 }
 
-/** The governance gavel with a tick (lucide `gavel`, a tick added): inside the
- *  pink pill of a rate governance set for every holder at once (a market
- *  note's, ui-jobs 403), where the people glyph would say a third party acted
- *  on this position. */
-export function GavelGlyph() {
+/** The governance gavel with a tick (lucide `gavel`, a tick added): the spine
+ *  node's badge where governance set the figure for every holder at once
+ *  (ui-jobs 403, 408). Stroke is currentColor. */
+export function GavelGlyph({ size = 12 }: { size?: number }) {
   return (
     <svg
-      width="12"
-      height="12"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -67,7 +64,7 @@ export function GavelGlyph() {
 }
 
 /** Visual shell for an individual (owner-set) rate pill — muted rb-500 tint,
- *  mirroring the visual weight of the pink delegate pill. */
+ *  mirroring the visual weight of the pink pill. */
 export function RatePillShell({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rb-500/15 text-foreground">
@@ -76,20 +73,12 @@ export function RatePillShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** Visual shell for a delegate (batch-manager-set) rate pill — pink with the
- *  people glyph (pink = external party, color-grammar.md §5). A market note's
- *  rate takes the same pink with the gavel where governance set it, and no
- *  glyph where the protocol's own formula did (ui-jobs 403). */
-export function DelegateRatePillShell({
-  children,
-  glyph = "people",
-}: {
-  children: ReactNode;
-  glyph?: "people" | "gavel" | "none";
-}) {
+/** Visual shell for a rate someone other than the owner set — pink (pink =
+ *  external party, color-grammar.md §4b): a delegate's or batch manager's
+ *  rate, and a market note's. */
+export function DelegateRatePillShell({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-400 text-xs font-bold">
-      {glyph === "people" ? <UsersGlyph /> : glyph === "gavel" ? <GavelGlyph /> : null}
       {children}
     </span>
   );
