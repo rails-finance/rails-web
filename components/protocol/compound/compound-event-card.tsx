@@ -140,7 +140,6 @@ export function CompoundEventCard({
               badge: "send" as const,
               direction: transferOut ? ("left" as const) : ("right" as const),
               value: mag,
-              unit: ctx.assetSymbol,
               fullValue: true,
               verb: transferOut ? COMPOUND_HEAD_WORDS.legSent : COMPOUND_HEAD_WORDS.legReceived,
             },
@@ -151,7 +150,6 @@ export function CompoundEventCard({
               address: soleFlowAddress(event.flows, ctx.assetSymbol),
               direction: DIRECTION[kind],
               value: mag,
-              unit: ctx.assetSymbol,
             },
           ];
 
