@@ -73,7 +73,7 @@ export interface SparkPositionSummary {
   chainHfStale: boolean;
   /** An open account's supplied reserves that back no borrowing (lowercased),
    *  read live from the Pool by the position page's rule
-   *  (lib/spark/collateral-split.ts). Absent where the read failed. */
+   *  (lib/aave-v3/collateral-split.ts). Absent where the read failed. */
   notCollateral?: string[];
 }
 

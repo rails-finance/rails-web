@@ -82,6 +82,10 @@ export interface AaveV3PositionRow {
    *  Resolved server-side in the positions route; omits any reserve the oracle
    *  didn't price. Feeds the card's USD footnotes and the valued economics tower. */
   priceByAddress: Record<string, number>;
+  /** An open account's supplied reserves that back no borrowing (lowercased),
+   *  read live from the Pool by the position page's rule
+   *  (lib/aave-v3/collateral-split.ts). Absent where the read failed. */
+  notCollateral?: string[];
 }
 
 /** How complete a Base lender's listing lane is right now — what the server's

@@ -18,6 +18,7 @@
 import { resolveV3Tokens, scaleV3 } from "@/lib/sources/chain/aave-v3-tokens";
 import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
+import { readAaveV3NotCollateral } from "@/lib/sources/chain/aave-v3-position";
 import { AAVE_V3_ORACLE, POOL_BY_MARKET, AAVE_V3_POOL } from "@/lib/aave-v3/asset-catalog";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
@@ -127,16 +128,25 @@ export async function buildAaveV3PositionRows(
   // On-chain oracle USD for every reserve on the page, from Aave's own
   // IAaveOracle (chain-derived). Batched into one multicall; degrades to an
   // empty map (token-only) if RPC is down, so callers never assert a partial.
-  const oraclePrices = await resolveAaveOraclePrices(
-    [{ oracle: deployment.oracle, assets: [...allAddrs] }],
-    deployment.chainId,
-  );
+  // Each open account's collateral split, read live from its Pool by the
+  // position page's rule, so the row's Collateral is the card's.
+  const poolOf = (market: string) => deployment.pool ?? POOL_BY_MARKET[market] ?? AAVE_V3_POOL;
+  const [oraclePrices, notCollateral] = await Promise.all([
+    resolveAaveOraclePrices([{ oracle: deployment.oracle, assets: [...allAddrs] }], deployment.chainId),
+    readAaveV3NotCollateral(
+      raw.map((w) => ({
+        wallet: w.wallet,
+        pool: poolOf(w.market ?? "core"),
+        supplied: w.reserves.filter((r) => bigintOf(r.supplyBalanceRaw) > ZERO).map((r) => r.reserve),
+      })),
+      deployment.chainId,
+    ),
+  ]);
 
   // Dev-only reconciliation: the reduced balances the page renders should equal a
   // live aToken / variableDebtToken `balanceOf` (the retired overlay's demoted
   // role). Core / Prime / EtherFi are SEPARATE Pool contracts, so key each row off
   // its own market pool. Fire-and-forget, never on the production request path.
-  const poolOf = (market: string) => deployment.pool ?? POOL_BY_MARKET[market] ?? AAVE_V3_POOL;
   sanityCheckAaveBalances(
     "aave-v3-positions",
     raw.flatMap((w) =>
@@ -153,6 +163,7 @@ export async function buildAaveV3PositionRows(
   const priceOf = (addr: string) => aaveOraclePriceOf(oraclePrices, deployment.oracle, addr);
 
   return raw.map((w) => {
+    const split = notCollateral.get(`${poolOf(w.market ?? "core").toLowerCase()}:${w.wallet.toLowerCase()}`);
     const reserves: (AaveV3ReserveSummary & { _scaled: number })[] = [];
     const supplies: Candidate[] = [];
     const debts: Candidate[] = [];
@@ -285,6 +296,7 @@ export async function buildAaveV3PositionRows(
           .map((r) => [r.address.toLowerCase(), aaveOraclePriceOf(oraclePrices, deployment.oracle, r.address)] as const)
           .filter((e): e is readonly [string, number] => e[1] != null),
       ),
+      ...(split ? { notCollateral: [...split] } : {}),
     };
   });
 }

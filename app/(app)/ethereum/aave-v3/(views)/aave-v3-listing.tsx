@@ -7,7 +7,11 @@
 import { aaveV3RestingCountLine } from "@/lib/aave-v3/listing-visibility";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
-import { AaveV3PositionCard, viewFromSummary } from "@/components/protocol/aave-v3/aave-v3-position-card";
+import {
+  AaveV3PositionCard,
+  notCollateralOf,
+  viewFromSummary,
+} from "@/components/protocol/aave-v3/aave-v3-position-card";
 import {
   aaveV3ListDimensions,
   aaveV3FiltersToFetchParams,
@@ -35,7 +39,7 @@ export function AaveV3Listing({ initialItems, initialTotal, initialKey, initialS
       defaults={AAVE_V3_LIST_DEFAULTS}
       sortOptions={AAVE_V3_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
-      renderCard={(p) => <AaveV3PositionCard v={viewFromSummary(p)} />}
+      renderCard={(p) => <AaveV3PositionCard v={viewFromSummary(p)} notCollateral={notCollateralOf(p)} />}
       hrefFor={(p) => `/ethereum/aave-v3/${p.wallet}?market=${p.market}`}
       keyFor={(p) => `${p.wallet}|${p.market}`}
       strategy={serverStrategy<AaveV3PositionRow, AaveV3ListFilters>({

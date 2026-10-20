@@ -8,7 +8,11 @@
 import { aaveV3RestingCountLine } from "@/lib/aave-v3/listing-visibility";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
-import { AaveV3PositionCard, viewFromSummary } from "@/components/protocol/aave-v3/aave-v3-position-card";
+import {
+  AaveV3PositionCard,
+  notCollateralOf,
+  viewFromSummary,
+} from "@/components/protocol/aave-v3/aave-v3-position-card";
 import { AAVE_V3_BASE_CARD_DEPLOYMENT } from "@/lib/aave-v3-base/position-provenance";
 import {
   aaveV3BaseListDimensions,
@@ -39,7 +43,12 @@ export function AaveV3BaseListing({ initialItems, initialTotal, initialKey, init
       // No replay lane behind a listing row: a closed row's "highest recorded"
       // says so rather than dashing as if nothing was ever held.
       renderCard={(p) => (
-        <AaveV3PositionCard v={viewFromSummary(p)} deployment={AAVE_V3_BASE_CARD_DEPLOYMENT} peaks={false} />
+        <AaveV3PositionCard
+          v={viewFromSummary(p)}
+          deployment={AAVE_V3_BASE_CARD_DEPLOYMENT}
+          peaks={false}
+          notCollateral={notCollateralOf(p)}
+        />
       )}
       hrefFor={(p) => `/base/aave-v3/${p.wallet}`}
       keyFor={(p) => p.wallet}

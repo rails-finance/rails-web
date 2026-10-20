@@ -36,7 +36,9 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import type { AssetBreakdown } from "@/components/shared/asset-donut";
+import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
+import { PanelFigure } from "@/components/shared/position-card-panel";
+import { TokenFigure } from "@/components/shared/token-figure";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -196,6 +198,13 @@ const SIDE_TIP = {
 } as const;
 const HF_TIP =
   "The collateral, each asset counted up to its liquidation threshold, divided by the debt. Below 1 the account can be liquidated.";
+/** The Collateral headline's read-more where the supplies are split. */
+const COLLATERAL_TIP =
+  "What the account supplies that backs its borrowing, in dollars at the Pool's oracle prices, earning each asset's supply rate.";
+const NOT_COLLATERAL_TIP =
+  "Supplied and earning the supply rate, but backing no borrowing: its collateral switch is off, or the Pool gives it a liquidation threshold of 0.";
+const PEAK_NOT_COLLATERAL_TIP =
+  "Supplied and earning the supply rate, but never backing borrowing: the account never turned its collateral switch on.";
 
 /** A side's oracle-USD total as a compact headline figure, its cents on
  *  hover. */
@@ -292,6 +301,10 @@ export interface AaveV3PositionCardProps {
   /** The ⋮'s export shapes (`aaveV3Exports`); `null` leaves the ⋮ with the
    *  link to the position and the provenance row. */
   exports?: PositionCardExports | null;
+  /** Lowercased reserves the account supplies (or, closed, supplied) that back
+   *  no borrowing (lib/aave-v3/collateral-split.ts): the card states them apart
+   *  from the collateral. Unset until read; every supply then heads Collateral. */
+  notCollateral?: ReadonlySet<string> | null;
 }
 
 /** The Aave V3 family's slots for the shared position card. */
@@ -306,6 +319,7 @@ export function useAaveV3CardSlots({
   peaks = true,
   pricesPending = false,
   exports,
+  notCollateral,
 }: Omit<AaveV3PositionCardProps, "deployment">): PositionCardSlots {
   const dep = useAaveV3CardDeployment();
   const lane = useV3Pool();
@@ -362,6 +376,7 @@ export function useAaveV3CardSlots({
     exports: exports ?? null,
   };
   const explainer = { body: explanation ?? null, viewHref };
+  const isOther = (r: AaveV3ReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
 
   // Closed / liquidated: the account holds no open reserves, so the headline is
   // what each asset held at its height — highest recorded per-reserve supply +
@@ -384,13 +399,77 @@ export function useAaveV3CardSlots({
     const status: PositionCardStatus = liquidated
       ? { word: "Liquidated", tone: "danger" }
       : { word: "Closed", tone: "muted" };
+    // Where the switches are read, the peaks of reserves never turned on as
+    // collateral leave the headline for a stat of their own; unread, the
+    // headline holds every supplied peak, collateral or not.
+    const split = peaks && notCollateral != null;
+    const peakColl = split ? v.peakSupplies.filter((r) => !isOther(r)) : v.peakSupplies;
+    const peakOthers = split ? v.peakSupplies.filter(isOther) : [];
+    const supplyHead = split
+      ? {
+          ...peakHead("peak-collateral", CARD_VOCAB.peakCollateral, peakColl, dep.peakSupply),
+          ...(peakColl.length === 0 && v.peakSupplies.length > 0
+            ? {
+                value: (
+                  <span className="text-rb-400" data-aave-peak-none="">
+                    None
+                  </span>
+                ),
+              }
+            : {}),
+        }
+      : peakHead("peak-supplied", "Highest recorded supplied", v.peakSupplies, dep.peakSupply);
+    const othersLines = (iconSize?: number) => (
+      <span className="flex flex-col gap-1">
+        {peakOthers.map((r) => (
+          <span key={r.address}>
+            <Prov info={dep.peakSupply(r.symbol)}>
+              {r.decimalsUnread ? (
+                <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+              ) : (
+                <AssetAmount
+                  value={r.amount}
+                  symbol={r.symbol}
+                  exact={formatUnitsExact(r.amountRaw, r.decimals)}
+                  iconSize={iconSize}
+                />
+              )}
+            </Prov>
+          </span>
+        ))}
+      </span>
+    );
+    const closedRows: PositionPanelRow[] =
+      peakOthers.length === 0
+        ? []
+        : [
+            {
+              id: "peak-not-collateral",
+              label: "Supplied, not collateral",
+              tip: PEAK_NOT_COLLATERAL_TIP,
+              // Many assets: their count opens the peaks, so the cell holds
+              // one line. The peaks carry no USD (ReserveAmounts).
+              value:
+                peakOthers.length > 1 ? (
+                  // A count of the peaks the overlay lists, each with its receipt.
+                  <span data-prov-exempt="">{peakOthers.length} assets</span>
+                ) : (
+                  othersLines(16)
+                ),
+              breakdown:
+                peakOthers.length > 1
+                  ? {
+                      symbols: loadedSymbols(peakOthers),
+                      panel: (
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{othersLines(16)}</span>
+                      ),
+                    }
+                  : undefined,
+            },
+          ];
     const common = {
       status,
-      // The peaks are supplied balances, collateral or not.
-      heads: [
-        peakHead("peak-supplied", "Highest recorded supplied", v.peakSupplies, dep.peakSupply),
-        peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt),
-      ],
+      heads: [supplyHead, peakHead("peak-debt", CARD_VOCAB.peakDebt, v.peakBorrows, dep.peakDebt)],
       identity,
       counters,
       outcome: {
@@ -399,10 +478,21 @@ export function useAaveV3CardSlots({
       },
     };
     if (!detail) return { ...common, surface: "listing", menu: null, tag };
-    return { ...common, surface: "detail", explainer, learnMore, menu: menuSlot };
+    return {
+      ...common,
+      surface: "detail",
+      explainer,
+      learnMore,
+      menu: menuSlot,
+      panel: closedRows.length > 0 ? [closedRows, []] : undefined,
+    };
   }
 
-  const collUsd = totalUsd(v, v.supplies);
+  // The supplies that back borrowing head Collateral; the rest are a stat.
+  const collSupplies = v.supplies.filter((r) => !isOther(r));
+  const otherSupplies = v.supplies.filter(isOther);
+  const collUsd = totalUsd(v, collSupplies);
+  const otherUsd = totalUsd(v, otherSupplies);
   const debtUsd = totalUsd(v, v.borrows);
   // Prices still loading: the side's figure pulses where the dollars will be.
   const collPending = pricesPending && collUsd == null;
@@ -411,11 +501,15 @@ export function useAaveV3CardSlots({
   // are the three largest by oracle USD. Dust reserves (under a cent) leave the
   // icon stack and its "+N"; the panel puts them behind the dust row.
   const usdOf = dustUsdOf(v);
-  const suppliesRanked = rankByValue(v, v.supplies);
+  const suppliesRanked = rankByValue(v, collSupplies);
   const borrowsRanked = rankByValue(v, v.borrows);
+  const othersRanked = rankByValue(v, otherSupplies);
   const suppliesSplit = splitDust(suppliesRanked, usdOf);
   const borrowsSplit = splitDust(borrowsRanked, usdOf);
+  const othersSplit = splitDust(othersRanked, usdOf);
 
+  const sideTip = (side: "supply" | "debt") =>
+    side === "supply" && notCollateral != null ? COLLATERAL_TIP : SIDE_TIP[side];
   const sideHead = (
     id: string,
     label: string,
@@ -433,7 +527,7 @@ export function useAaveV3CardSlots({
       return {
         id,
         label,
-        labelTip: detail ? SIDE_TIP[side] : undefined,
+        labelTip: detail ? sideTip(side) : undefined,
         value: (
           <Prov info={side === "supply" ? dep.supply(one.symbol, v.atBlock) : dep.debt(one.symbol, v.atBlock)}>
             <AssetAmount
@@ -457,7 +551,7 @@ export function useAaveV3CardSlots({
     return {
       id,
       label,
-      labelTip: detail ? SIDE_TIP[side] : undefined,
+      labelTip: detail ? sideTip(side) : undefined,
       value:
         reserves.length === 0 ? null : usd != null ? (
           <UsdFigure usd={usd} info={dep.usd(usdWhat)} />
@@ -504,7 +598,7 @@ export function useAaveV3CardSlots({
     sideHead(
       "collateral",
       CARD_VOCAB.collateral,
-      v.supplies,
+      collSupplies,
       suppliesSplit.shown,
       collUsd,
       collPending,
@@ -687,13 +781,71 @@ export function useAaveV3CardSlots({
         }
       : null;
 
+  // The supplies that back no borrowing: many and priced, their total and
+  // icons open the breakdown (C19); otherwise each line under the total.
+  const notCollRow: PositionPanelRow | null =
+    otherSupplies.length === 0
+      ? null
+      : otherSupplies.length > 1 && otherUsd != null
+        ? {
+            id: "not-collateral",
+            label: "Supplied, not collateral",
+            tip: NOT_COLLATERAL_TIP,
+            value: <Prov info={dep.usd("Supplied, not collateral")}>{formatCompactUsd(otherUsd)}</Prov>,
+            breakdown: {
+              symbols: loadedSymbols(othersSplit.shown),
+              total: { usd: otherUsd, info: dep.usd("Supplied, not collateral") },
+              panel: (
+                <AssetBreakdownPanel
+                  id="aave-v3-not-collateral-breakdown"
+                  name="Supplied, not collateral"
+                  side="collateral"
+                  breakdown={reserveBreakdown("supply", othersSplit)}
+                />
+              ),
+            },
+          }
+        : {
+            id: "not-collateral",
+            label: "Supplied, not collateral",
+            tip: NOT_COLLATERAL_TIP,
+            value: (
+              <span className="flex flex-col gap-0.5">
+                {otherUsd != null && (
+                  <Prov info={dep.usd("Supplied, not collateral")}>
+                    <PanelFigure>{formatCompactUsd(otherUsd)}</PanelFigure>
+                  </Prov>
+                )}
+                {othersRanked.map((r) => (
+                  <span key={r.address}>
+                    {r.decimalsUnread ? (
+                      <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+                    ) : (
+                      <TokenFigure
+                        symbol={r.symbol}
+                        address={r.address}
+                        figure={`${formatUnitsExact(r.amountRaw, r.decimals)} ${r.symbol}`}
+                      >
+                        <Prov info={dep.supply(r.symbol, v.atBlock)}>
+                          <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+                            {formatCompact(r.amount)}
+                          </ExactSpan>
+                        </Prov>
+                      </TokenFigure>
+                    )}
+                  </span>
+                ))}
+              </span>
+            ),
+          };
+
   const present = (rows: (PositionPanelRow | null)[]): PositionPanelRow[] =>
     rows.filter((r): r is PositionPanelRow => r != null);
 
   // Each side's reserves open under its headline (the chevron by the icons);
   // the panel keeps the additive values.
   const withRows = heads.map((h) =>
-    h.id === "collateral" && v.supplies.length > 1
+    h.id === "collateral" && collSupplies.length > 1
       ? { ...h, breakdown: reserveBreakdown("supply", suppliesSplit) }
       : h.id === "debt" && v.borrows.length > 1
         ? { ...h, breakdown: reserveBreakdown("debt", borrowsSplit) }
@@ -706,7 +858,10 @@ export function useAaveV3CardSlots({
     explainer,
     learnMore,
     menu: menuSlot,
-    panel: [present([interestRow("supply"), emodeRow]), present([rateRow, interestRow("debt"), roomRow, liqRow])],
+    panel: [
+      present([interestRow("supply"), notCollRow, emodeRow]),
+      present([rateRow, interestRow("debt"), roomRow, liqRow]),
+    ],
   };
 }
 
@@ -809,4 +964,9 @@ export function viewFromSummary(row: AaveV3PositionRow): AaveV3PositionView {
     healthFactor: null,
     chainHfStale: true,
   };
+}
+
+/** A listing row's collateral split, where the row read one. */
+export function notCollateralOf(row: AaveV3PositionRow): ReadonlySet<string> | null {
+  return row.notCollateral ? new Set(row.notCollateral) : null;
 }
