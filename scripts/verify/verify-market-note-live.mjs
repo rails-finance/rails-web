@@ -151,8 +151,8 @@ const FROM_RATE_8 = 0.09343584279726581;
 const FROM_DEBT_8 = 9191687.015714981855337009;
 
 check(
-  "2a. the rate note is a LIVE note naming the CDP's own last touch, block 11,610,231",
-  /this is a live note:.*this cdp.s own last touch/i.test(rateText8) &&
+  "2a. the rate note is a LIVE note naming the position's own last touch, block 11,610,231",
+  /this is a live note:.*this position.s own last touch/i.test(rateText8) &&
     /yearly interest on the debt at block 11,610,231/i.test(rateText8),
   rateText8.slice(0, 260),
 );
@@ -261,10 +261,21 @@ const copyMarkdown = async () => {
   return exportPage.evaluate(() => navigator.clipboard.readText());
 };
 const md8 = await copyMarkdown();
+// The export counts the rate's notes on its "Market notes" line and the PSM's
+// gaps (ui-jobs 402) on a line of their own; the page draws both as note rows.
+const PSM_GAP_COUNT_8 = ids8.filter((id) => id.startsWith("psm-gap:")).length;
+const RATE_NOTE_COUNT_8 = NOTE_COUNT_8 - PSM_GAP_COUNT_8;
 check(
-  `9a. the markdown export names "Market notes" and lists the same count, ${NOTE_COUNT_8}`,
-  new RegExp(`\\*\\*Market notes:\\*\\*\\s*${NOTE_COUNT_8}\\b`).test(md8),
+  `9a. the markdown export names "Market notes" and lists the rate notes' count, ${RATE_NOTE_COUNT_8}`,
+  new RegExp(`\\*\\*Market notes:\\*\\*\\s*${RATE_NOTE_COUNT_8}\\b`).test(md8),
   md8.includes("Market notes") ? md8.match(/\*\*Market notes:\*\*[^\n]*/)?.[0] : "absent",
+);
+check(
+  `9b. the export's PSM line counts the page's gap rows, ${PSM_GAP_COUNT_8}`,
+  PSM_GAP_COUNT_8 === 0
+    ? !md8.includes("PSM trades between touches")
+    : new RegExp(`\\*\\*PSM trades between touches:\\*\\*\\s*${PSM_GAP_COUNT_8}\\b`).test(md8),
+  md8.match(/\*\*PSM trades between touches:\*\*[^\n]*/)?.[0] ?? "absent",
 );
 check(
   "9c. the export's Market notes section carries the rate live sentence",
