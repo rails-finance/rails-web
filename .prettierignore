@@ -52,3 +52,5 @@ public/workbox-*.js
 # declaration in rails-server-onboarding/api/src/types/event-shape.ts (see file
 # header). Local prettier rules would diverge it from upstream.
 lib/shared/types/event-shape.ts
+# Verifier fixtures are written by scripts/verify/build-*-fixture.ts; a reformat is undone on the next build.
+scripts/verify/fixtures/*.json

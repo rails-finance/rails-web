@@ -26,7 +26,7 @@
     "verify:preflight": "node scripts/verify/preflight.mjs",
     "og": "node scripts/generate-og.mjs",
     "exports:liquity-v2": "node scripts/exports-liquity-v2.mjs",
-    "check": "npm run check:prov && npm run check:register && npm run check:prose-limits -- --summary && npm run check:receipts && npm run check:parties && npm run check:routes && npm run check:locale && npm run check:exponent && npm run check:og && npm run check:prose && npm run check:dead && npm run check:anatomy && npm run typecheck"
+    "check": "npm run check:prov && npm run check:register && npm run check:prose-limits -- --summary && npm run check:receipts && npm run check:parties && npm run check:routes && npm run check:locale && npm run check:exponent && npm run check:og && npm run check:prose && npm run check:dead && npm run check:anatomy && npm run format:check && npm run typecheck"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
