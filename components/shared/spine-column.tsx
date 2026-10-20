@@ -205,11 +205,13 @@ export interface SpineColumnProps {
   rateMoves?: "up" | "down" | "both";
   /** Who set the flank's rate: a delegate, governance (a market note's rate
    *  governance set) or the protocol's formula. Any of the three draws the
-   *  pill in pink and gives the node its badge (`actor`: third party,
-   *  governance, protocol); unset, the neutral pill of an owner's rate. */
+   *  pill in pink and gives the rate node its badge (third party, governance,
+   *  protocol): the rate-change icon, a rate note, or the % leg under token
+   *  rows, whose discs stay the row's actor's. Unset, the neutral pill of an
+   *  owner's rate. */
   rateTone?: "delegate" | "governance" | "formula";
-  /** Who acted: the badge in the node's top-left corner. Unset reads it from the row:
-   *  `rateTone`, then a third party's act (`dotted`, `externalParty`, a row
+  /** Who acted: the badge in the node's top-left corner, for every node of the
+   *  row. Unset reads it from the row: `rateTone` on a rate node, then a third party's act (`dotted`, `externalParty`, a row
    *  whose card names another actor, a warning node), and a market note's
    *  node is the protocol's; otherwise the owner, who draws no badge. */
   actor?: SpineActor;
@@ -992,7 +994,14 @@ export function SpineColumn({
   const byParty = !!dotted || !!externalParty || spineRow?.byOwner === false;
   // Who acted: the badge in the node's top-left corner. A warning is a change the
   // owner did not make (a redemption, a liquidation): a third party's.
-  const actor: SpineActor =
+  // `rateTone` names who set the rate, so it badges the rate node alone: an
+  // icon node (a rate change, a rate note) and the % leg under token rows.
+  // Token rows read the row's own third-party signals. An explicit `actor`
+  // speaks for the whole row.
+  const ownActor: SpineActor =
+    actorProp ??
+    (byParty || effectiveIcon === "warning" ? "third-party" : effectiveIcon === "market" ? "protocol" : "owner");
+  const rateActor: SpineActor =
     actorProp ??
     (rateTone === "delegate"
       ? "third-party"
@@ -1000,11 +1009,8 @@ export function SpineColumn({
         ? "governance"
         : rateTone === "formula"
           ? "protocol"
-          : byParty || effectiveIcon === "warning"
-            ? "third-party"
-            : effectiveIcon === "market"
-              ? "protocol"
-              : "owner");
+          : ownActor);
+  const actor: SpineActor = effectiveIcon ? rateActor : ownActor;
   // The nodes that state an event take the badge; the people node of a third
   // party with nothing to draw is the mark already, a delegation's node keeps
   // its join/leave badge, and the boundary, the state card and the live
@@ -1299,7 +1305,17 @@ export function SpineColumn({
         {leadIn}
         {effectiveIcon ? node : tokenRows}
         {effectiveIcon === "market" && tokenRows}
-        {!effectiveIcon && rateSpan && <NodeRow glyph={<RateIcon size={T} />} right={rateFlank(rateSpan)} />}
+        {!effectiveIcon && rateSpan && (
+          <NodeRow
+            glyph={
+              <div className="relative" data-spine-rate-leg={rateActor}>
+                <RateIcon size={T} />
+                <ActorBadge size={T} actor={rateActor} />
+              </div>
+            }
+            right={rateFlank(rateSpan)}
+          />
+        )}
       </div>
       {!bare && <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>}
       {legsEl}

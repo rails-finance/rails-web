@@ -124,8 +124,15 @@ await run("fork delegate pill", async (page) => {
   // ui-jobs 408: the pill carries the figure alone; the people glyph is the
   // badge on the spine node.
   assert(!delegate.hasGlyph, "delegate pill carries no glyph (the figure alone)");
-  const badged = await page.locator('[data-spine-node][data-spine-badge="third-party"]').count();
-  assert(badged > 0, `a spine node wears the third-party badge (${badged})`);
+  // The delegate set the rate: its badge sits on the % leg, and the open's
+  // token discs stay the owner's.
+  const rateLegs = await page
+    .locator('[data-spine-rate-leg="third-party"] [data-spine-actor-badge="third-party"]')
+    .count();
+  assert(rateLegs > 0, `the % leg wears the delegate's third-party badge (${rateLegs})`);
+  const openNode = page.locator('[data-spine-node]:has([data-spine-rate-leg="third-party"])').first();
+  const discBadges = await openNode.locator("[data-spine-actor-badge]:not([data-spine-rate-leg] *)").count();
+  assert(discBadges === 0, `the open's token discs carry no actor badge (${discBadges})`);
   // Theme colours are oklch(L C H) — a pink pill is saturated (chroma ≳ 0.1); a
   // neutral individual pill is ~0 chroma. Assert the delegate colour is saturated.
   const chroma = Number((delegate.color.match(/oklch\(\s*[\d.]+\s+([\d.]+)/) || [])[1] || 0);
