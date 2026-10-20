@@ -234,7 +234,7 @@ export interface ChainTruthRowSpec {
   custodyLabel?: boolean;
   /** A rate the position holder (or a delegate acting for them) CHOSE — never a
    *  utilization rate. Renders as the same lozenge Liquity V2 uses (individual
-   *  rb-500, or party-pink `tone: "delegate"` with the people glyph), and echoes
+   *  rb-500, or party-pink `tone: "delegate"` with the person glyph), and echoes
    *  the detail grid's rate receipt so pill and grid pulse as one identity.
    *  Subject to the `hideClass` value hand-off only with `onSpine`. */
   ratePill?: {

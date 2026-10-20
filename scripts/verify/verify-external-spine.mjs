@@ -102,7 +102,7 @@ const READ_SPINE = `(el) => {
     externalBadge: [...el.querySelectorAll('div')].some(
       (d) => (d.style.backgroundColor || '').replace(/\\s/g, '') === 'rgb(236,72,153)' && d.querySelector('svg[fill="white"]'),
     ),
-    // The standalone glyph: a STROKED pink users icon, not a filled badge.
+    // The standalone glyph: a STROKED pink user icon, not a filled badge.
     standaloneGlyph: svgs.some((s) => (s.getAttribute('stroke') || '').toUpperCase() === '#EC4899'),
     tokenIcons: el.querySelectorAll('img, [class*="token"]').length,
     checkBadge: [...el.querySelectorAll('div')].some(

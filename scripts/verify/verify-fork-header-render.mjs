@@ -121,7 +121,7 @@ await run("fork delegate pill", async (page) => {
     (p) => p.text === SPECIMENS.forkDelegate.pill && p.display === "inline-flex" && p.bg !== "rgba(0, 0, 0, 0)",
   );
   assert(delegate, `delegate pill lozenge "${SPECIMENS.forkDelegate.pill}" present (2dp, coloured background)`);
-  // ui-jobs 408: the pill carries the figure alone; the people glyph is the
+  // ui-jobs 408: the pill carries the figure alone; the person glyph is the
   // badge on the spine node.
   assert(!delegate.hasGlyph, "delegate pill carries no glyph (the figure alone)");
   // The delegate set the rate: its badge sits on the % leg, and the open's
@@ -249,7 +249,7 @@ await run("liquity-v2 regression", async (page) => {
   assert(cards > 0, "V2 trove page rendered");
   const ps = await pills(page);
   console.log("    v2 pills:", JSON.stringify(ps.slice(0, 5)));
-  assert(ps.length > 0, "V2 renders at least one rate pill (UsersGlyph/RatePill moved cleanly)");
+  assert(ps.length > 0, "V2 renders at least one rate pill (UserGlyph/RatePill moved cleanly)");
   const errors = await page.locator("text=/Application error|Unhandled Runtime/i").count();
   assert(errors === 0, "no runtime error on the V2 page");
 });

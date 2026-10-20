@@ -46,7 +46,7 @@ import {
 } from "@/components/shared/position-card";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { AssetPopover } from "@/components/shared/asset-popover";
-import { UsersGlyph } from "@/components/shared/rate-pill";
+import { UserGlyph } from "@/components/shared/rate-pill";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { FadeNumber } from "@/components/ui/FadeNumber";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -720,7 +720,7 @@ export function useLiquityCardSlots({
     const manager = (
       <span className="inline-flex items-center gap-1">
         <span className="text-pink-500/90" aria-hidden="true">
-          <UsersGlyph />
+          <UserGlyph />
         </span>
         {managerName}
       </span>
