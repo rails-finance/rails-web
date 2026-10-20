@@ -61,6 +61,11 @@ export async function readMakerVaults(
   if (sp.get("owner")) qs.set("owner", sp.get("owner")!);
   if (sp.get("ilks")) qs.set("ilks", sp.get("ilks")!);
   if (sp.get("status")) qs.set("status", sp.get("status")!);
+  // A transaction-count or USD bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   if (sp.get("sortBy")) qs.set("sortBy", sp.get("sortBy")!);
   qs.set("sortOrder", sp.get("sortOrder") === "asc" ? "asc" : "desc");
   if (sp.get("limit") != null) qs.set("limit", sp.get("limit")!);
