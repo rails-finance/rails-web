@@ -1,7 +1,9 @@
 "use client";
 
 // One vault roster (rails-ops ui-jobs 407, V1): the rows of one family's
-// vaults, grouped by asset, under one set of controls.
+// vaults, grouped by asset, under one set of controls. The cross-protocol
+// index (ui-jobs 39) is the same roster over the union, with a chain pill on
+// each row and a read-at line per roster.
 // ----------------------------------------------------------------------------
 // Every roster draws the same thing: an Asset facet and the family's own
 // facets, a search over name, symbol and address, one group per asset with
@@ -33,6 +35,7 @@ import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { VaultRow, type VaultRowReceipts } from "@/components/vaults/vault-row";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
@@ -63,23 +66,30 @@ export interface VaultRosterHead {
   listingHref: string | null;
   /** The intro drawer's body (standards/explanation-copy-charter.md §8a). */
   drawer: ReactNode;
-  /** The vault layer's about page. */
-  infoHref: string;
+  /** The vault layer's about page; null where there is none. */
+  infoHref: string | null;
+  /** In place of the one "Read at block N" line: the index's line per roster. */
+  readAt?: ReactNode;
+  /** The cross-protocol index, linked after the sentence; null on the index. */
+  indexHref?: string | null;
 }
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
 
 interface AssetGroup {
+  chainId: number;
   asset: VaultSummary["asset"];
   rows: VaultSummary[];
 }
 
+// One group per asset on one chain: the same address on two chains is two tokens.
 function groupByAsset(rows: VaultSummary[]): AssetGroup[] {
   const by = new Map<string, AssetGroup>();
   for (const row of rows) {
-    const g = by.get(row.asset.address);
+    const key = `${row.chainId}:${row.asset.address}`;
+    const g = by.get(key);
     if (g) g.rows.push(row);
-    else by.set(row.asset.address, { asset: row.asset, rows: [row] });
+    else by.set(key, { chainId: row.chainId, asset: row.asset, rows: [row] });
   }
   const groups = [...by.values()];
   for (const g of groups) {
@@ -93,7 +103,8 @@ function groupByAsset(rows: VaultSummary[]): AssetGroup[] {
     (a, b) =>
       b.rows.length - a.rows.length ||
       a.asset.symbol.localeCompare(b.asset.symbol, "en-US") ||
-      a.asset.address.localeCompare(b.asset.address),
+      a.asset.address.localeCompare(b.asset.address) ||
+      a.chainId - b.chainId,
   );
   return groups;
 }
@@ -110,24 +121,35 @@ export function VaultRoster({
   holdersHrefOf,
   receiptsOf,
   hooksOf,
+  chainOf,
+  yieldKeyOf,
+  assetFacet,
   groupCountProv,
   emptyCountProv,
   head,
 }: {
   vaults: readonly VaultSummary[];
-  /** Decision 0047's figure per lowercased vault address. */
+  /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
   yields: Record<string, VaultYield>;
   chainId: ChainId;
+  /** The block every row was read at; 0 on the index, whose rosters each
+   *  name their own. */
   blockNumber: number;
   chainStale: boolean;
   /** The `data-skel-section` prefix the family's skeleton records. */
-  skel: "directory" | "roster";
+  skel: "directory" | "roster" | "index";
   facets: readonly VaultRosterFacet[];
   hrefOf: (v: VaultSummary) => string;
-  holdersHrefOf: ((v: VaultSummary) => string) | null;
+  holdersHrefOf: ((v: VaultSummary) => string | null) | null;
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   hooksOf?: (v: VaultSummary) => Record<string, string>;
-  groupCountProv: (assetSymbol: string, count: number) => Provenance;
+  /** The chain pill's word, on the index only. */
+  chainOf?: (v: VaultSummary) => string;
+  /** The key a vault's Yield is held under; the address where absent. */
+  yieldKeyOf?: (v: VaultSummary) => string;
+  /** In place of the Asset facet (the index's Token, by symbol across chains). */
+  assetFacet?: VaultRosterFacet;
+  groupCountProv: (assetSymbol: string, count: number, chainId: number) => Provenance;
   emptyCountProv: (count: number) => Provenance;
   head: VaultRosterHead;
 }) {
@@ -144,7 +166,7 @@ export function VaultRoster({
   // because another facet hid its rows.
   const all = useMemo<VaultRosterFacet[]>(
     () => [
-      {
+      assetFacet ?? {
         id: "asset",
         label: "Asset",
         valueOf: (v) => v.asset.address,
@@ -152,7 +174,7 @@ export function VaultRoster({
       },
       ...facets,
     ],
-    [vaults, facets],
+    [vaults, facets, assetFacet],
   );
   const dimensions = useMemo<FilterDimension<Filters>[]>(
     () =>
@@ -206,34 +228,51 @@ export function VaultRoster({
     <VaultRow
       key={v.address}
       vault={v}
-      yieldFigure={yields[v.address]}
+      yieldFigure={yields[yieldKeyOf ? yieldKeyOf(v) : v.address]}
       href={hrefOf(v)}
       holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
       receipts={receiptsOf(v)}
+      chain={chainOf?.(v)}
       hooks={hooksOf?.(v)}
     />
   );
 
+  // On the index every roster has its own block, so a group says "at its block".
+  const atBlock = blockNumber > 0 ? "at this block" : "at its roster’s block";
+  const indexHref = head.indexHref === undefined ? VAULT_INDEX_HREF : head.indexHref;
+
   const intro = (
     <section className="mb-5" data-skel-section={`${skel}-denominator`}>
-      {!chainStale && (
-        // The block is the anchor every receipt below names, so the line
-        // carries the coverage exemption the tripwire reads.
-        <p
-          className="flex items-center gap-1 text-[11px] text-rb-500"
-          data-directory-block={blockNumber}
-          data-prov-exempt
-        >
-          <span>
-            Read at <BlockRef block={blockNumber} chainId={chainId} />
-          </span>
+      {head.readAt ? (
+        <div className="flex items-start gap-1 text-[11px] text-rb-500">
+          {head.readAt}
           <InfoDisclosureTrigger
             open={introOpen}
             onToggle={() => setIntroOpen((o) => !o)}
             label="about these vaults"
             ariaControls="vault-roster-intro"
           />
-        </p>
+        </div>
+      ) : (
+        !chainStale && (
+          // The block is the anchor every receipt below names, so the line
+          // carries the coverage exemption the tripwire reads.
+          <p
+            className="flex items-center gap-1 text-[11px] text-rb-500"
+            data-directory-block={blockNumber}
+            data-prov-exempt
+          >
+            <span>
+              Read at <BlockRef block={blockNumber} chainId={chainId} />
+            </span>
+            <InfoDisclosureTrigger
+              open={introOpen}
+              onToggle={() => setIntroOpen((o) => !o)}
+              label="about these vaults"
+              ariaControls="vault-roster-intro"
+            />
+          </p>
+        )
       )}
       <div
         id="vault-roster-intro"
@@ -242,23 +281,35 @@ export function VaultRoster({
         className="mt-2 max-w-3xl space-y-2 rounded-xl bg-raised px-3 py-3 text-[12px] leading-relaxed text-rb-500"
       >
         {head.drawer}
-        <p>
-          <Link href={head.infoHref} className={PAGE_LINK} prefetch={false}>
-            How this is built <span aria-hidden>→</span>
-          </Link>
-        </p>
-      </div>
-      <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure={head.censusFigure}>
-        {head.census}
-        {head.listingHref && (
-          <>
-            {" "}
-            <Link href={head.listingHref} className={PAGE_LINK} prefetch={false} data-link="every-holder">
-              Every holder <span aria-hidden>→</span>
+        {head.infoHref && (
+          <p>
+            <Link href={head.infoHref} className={PAGE_LINK} prefetch={false}>
+              How this is built <span aria-hidden>→</span>
             </Link>
-          </>
+          </p>
         )}
-      </p>
+      </div>
+      {head.census != null && (
+        <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure={head.censusFigure}>
+          {head.census}
+          {head.listingHref && (
+            <>
+              {" "}
+              <Link href={head.listingHref} className={PAGE_LINK} prefetch={false} data-link="every-holder">
+                Every holder <span aria-hidden>→</span>
+              </Link>
+            </>
+          )}
+          {indexHref && (
+            <>
+              {" "}
+              <Link href={indexHref} className={PAGE_LINK} prefetch={false} data-link="vault-index">
+                All vaults <span aria-hidden>→</span>
+              </Link>
+            </>
+          )}
+        </p>
+      )}
     </section>
   );
 
@@ -298,21 +349,29 @@ export function VaultRoster({
       {/* ── one group per asset ──────────────────────────────────────────── */}
       <div data-skel-section={`${skel}-groups`}>
         {groups.length === 0 && (
-          <p className="mb-6 text-[13px] text-rb-500">No funded vault matches at block {n(blockNumber)}.</p>
+          <p className="mb-6 text-[13px] text-rb-500">
+            {blockNumber > 0 ? `No funded vault matches at block ${n(blockNumber)}.` : "No funded vault matches."}
+          </p>
         )}
         {groups.map((g) => (
-          <section key={g.asset.address} className="mb-6" data-asset-group={g.asset.address}>
+          <section
+            key={`${g.chainId}:${g.asset.address}`}
+            className="mb-6"
+            data-asset-group={g.asset.address}
+            data-asset-group-chain={g.chainId}
+          >
             <h2 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground">
               <a
-                href={explorerUrl(chainId, "address", g.asset.address)}
+                href={explorerUrl(g.chainId as ChainId, "address", g.asset.address)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={g.asset.named ? "" : "font-mono"}
               >
                 {g.asset.symbol}
               </a>
+              {chainOf && <span className="font-normal text-rb-500">on {chainOf(g.rows[0])}</span>}
               <span className="text-[12px] font-normal text-rb-500" data-figure="group-count">
-                <Prov info={groupCountProv(g.asset.symbol, g.rows.length)}>
+                <Prov info={groupCountProv(g.asset.symbol, g.rows.length, g.chainId)}>
                   {g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`}
                 </Prov>
                 {filtering ? " shown" : ""}
@@ -336,8 +395,8 @@ export function VaultRoster({
             <span data-figure="empty-count">
               <Prov info={emptyCountProv(emptyRows.length)}>
                 {emptyRows.length === 1
-                  ? "1 vault holds nothing at this block"
-                  : `${n(emptyRows.length)} vaults hold nothing at this block`}
+                  ? `1 vault holds nothing ${atBlock}`
+                  : `${n(emptyRows.length)} vaults hold nothing ${atBlock}`}
               </Prov>
             </span>
             {filtering && emptyShown.length !== emptyRows.length && (
@@ -361,8 +420,8 @@ export function VaultRoster({
         <section className="mb-6" data-skel-section={`${skel}-unread`} data-unread-group>
           <h2 className="text-sm font-semibold text-foreground">
             {unread.length === 1
-              ? "1 vault could not be read at this block"
-              : `${n(unread.length)} vaults could not be read at this block`}
+              ? `1 vault could not be read ${atBlock}`
+              : `${n(unread.length)} vaults could not be read ${atBlock}`}
           </h2>
           <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
             {unread.map((v) => (

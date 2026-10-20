@@ -13,8 +13,10 @@
 // scripts all read it.
 
 /** One vault product. MetaMorpho on Base; savings GHO, static aTokens and
- *  Umbrella stake tokens on Ethereum (Aave); Yearn V3 on Ethereum. */
-export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3";
+ *  Umbrella stake tokens on Ethereum (Aave); Yearn V3 on Ethereum; Maple's
+ *  syrup pools on Ethereum, which keep their own pools page and join only the
+ *  cross-protocol index (ui-jobs 39; survey 2026-10-20 §7.6). */
+export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3" | "maple-pool";
 
 /** The explorer a vault sits under (decision 0028), which is also the session
  *  key its listing is filed under. */
@@ -25,9 +27,11 @@ export type VaultExplorer = "morpho-base" | "aave-vaults" | "yearn";
 export type VaultCensusFamily = "morpho" | "sgho" | "stata" | "umbrella-stake";
 
 export interface VaultFamilyEntry {
-  explorer: VaultExplorer;
+  /** Maple's explorer is a lender explorer with no vault holder pages, so it
+   *  is outside `VaultExplorer`. */
+  explorer: VaultExplorer | "maple";
   /** The `ProtocolIcon` id of the venue that deployed it. */
-  venue: "morpho" | "aave-v3" | "yearn";
+  venue: "morpho" | "aave-v3" | "yearn" | "maple";
   /** The family as a heading or a facet names it. */
   label: string;
   /** The same, for one vault. */
@@ -78,6 +82,14 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     singular: "Yearn V3 vault",
     census: null,
     served: "yearn-v3",
+  },
+  "maple-pool": {
+    explorer: "maple",
+    venue: "maple",
+    label: "Maple pools",
+    singular: "Maple pool",
+    census: null,
+    served: null,
   },
 };
 

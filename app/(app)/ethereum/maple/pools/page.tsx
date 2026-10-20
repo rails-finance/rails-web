@@ -27,6 +27,9 @@ import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import Link from "next/link";
+import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 
 // ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
 // same render serves every visitor, so re-reading the contracts per request
@@ -61,6 +64,12 @@ export default async function MaplePoolsPage() {
           stamp={<MaplePoolsStamp pools={pools} />}
         />
 
+        {/* The pools are rows on the cross-protocol vault index (ui-jobs 39). */}
+        <p className="-mt-3 mb-4 text-[13px]">
+          <Link href={VAULT_INDEX_HREF} className={PAGE_LINK} prefetch={false} data-link="vault-index">
+            All vaults <span aria-hidden>→</span>
+          </Link>
+        </p>
         <div data-skel-section="page-table">
           <MaplePoolsView pools={pools} />
         </div>

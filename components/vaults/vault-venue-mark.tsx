@@ -24,7 +24,7 @@ import { familyOfCensus, VAULT_FAMILIES } from "@/lib/vaults/families";
  *  position lane here — a Yearn venue reaches this component from a roster row
  *  and from nowhere else. A census family is assignable to this, so the position
  *  surfaces pass what they have always passed. */
-export type VaultVenue = VaultPositionFamily | "yearn";
+export type VaultVenue = VaultPositionFamily | "yearn" | "maple";
 
 /** Which explorer's mark stands for the venue each family was deployed by
  *  (lib/vaults/families.ts): Aave's three families take the Aave mark, a
@@ -32,7 +32,7 @@ export type VaultVenue = VaultPositionFamily | "yearn";
  *  Yearn's only where the Registry endorses that vault at the block it read
  *  (rails-ops decision 0027 call 1). */
 const venueOf = (family: VaultVenue): string =>
-  VAULT_FAMILIES[family === "yearn" ? "yearn-v3" : familyOfCensus(family)].venue;
+  VAULT_FAMILIES[family === "yearn" ? "yearn-v3" : family === "maple" ? "maple-pool" : familyOfCensus(family)].venue;
 
 export function VaultVenueMark({ family, className = "" }: { family: VaultVenue; className?: string }) {
   return (

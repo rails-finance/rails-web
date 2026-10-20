@@ -5,7 +5,14 @@ import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereu
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
-import { baseVaultHref, baseVaultRosterHref, ethereumVaultHref, ethereumVaultRosterHref } from "@/lib/vaults/routes";
+import {
+  baseVaultHref,
+  baseVaultRosterHref,
+  ethereumVaultHref,
+  ethereumVaultRosterHref,
+  VAULT_INDEX_HREF,
+} from "@/lib/vaults/routes";
+import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 
 // UNLAUNCHED EXPLORERS ARE NOT HERE. An explorer flagged `unlaunched` on the
 // roster serves at its URL and is linked from nowhere, so naming it in the
@@ -163,6 +170,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             },
           ],
     ),
+    // The cross-protocol vault index, once every roster it reads is launched.
+    ...(vaultIndexLaunched()
+      ? [
+          {
+            url: `${SITE_URL}${VAULT_INDEX_HREF}`,
+            lastModified: new Date(),
+            changeFrequency: "daily" as const,
+            priority: 0.7,
+          },
+        ]
+      : []),
     // Each catalogued vault's own page on Ethereum, under Aave's vault layer.
     ...vaultPages,
     // …and each Base vault the census has ever seen a holder of, under Morpho.

@@ -35,6 +35,13 @@
 //   /ethereum/yearn/vaults/<vault>           one vault's factsheet
 //   /ethereum/yearn/vaults/<vault>/<holder>  one holding — flows and timeline
 //
+// Maple's syrup pools keep their own pools page, which is where a pool's row on
+// the cross-protocol index links (survey 2026-10-20 §7.6). The index owns no
+// vault page (0028 point 8):
+//
+//   /ethereum/maple/pools                    Maple's pools, read from chain
+//   /vaults                                  every roster above, as one index
+//
 // The `vaults` segment itself is not spelled here: it is read off the roster
 // entry's sub-page, so the path text lives in lib/shared/protocols.ts alone and
 // moving the tab moves every href below with it.
@@ -217,3 +224,16 @@ export function yearnVaultHref(vault: string, holder?: string): string {
   const path = `${YEARN_VAULTS}/${vault.toLowerCase()}`;
   return holder ? `${path}/${encodeURIComponent(holder.toLowerCase())}` : path;
 }
+
+/** Maple's pools page (`/ethereum/maple/pools`), the page a Maple pool's row on
+ *  the index opens. Read off the roster entry's `pools` sub-page. */
+export function maplePoolsHref(): string {
+  const sub = protocolForHref("/ethereum/maple")?.subPages.find((s) => s.segment === "pools");
+  if (!sub) throw new Error(`/ethereum/maple has no "pools" sub-page on its roster entry.`);
+  return sub.href;
+}
+
+/** The cross-protocol vault index (ui-jobs 39; decision 0028 point 8): every
+ *  vault the rosters above list, each row linking to its page under its
+ *  protocol. It spans chains, so it sits under no chain. */
+export const VAULT_INDEX_HREF = "/vaults";

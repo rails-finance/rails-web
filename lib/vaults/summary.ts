@@ -1,9 +1,9 @@
 // One vault, in the shape every family's roster states it (rails-ops ui-jobs
 // 407, step 1; survey 2026-10-20 §6 "Naming, anatomy, code").
 // ----------------------------------------------------------------------------
-// The three directory loaders (Morpho Base, Aave Ethereum, Yearn Ethereum) each
-// read their family's own row; the functions below turn each into a
-// `VaultSummary`, the shape the vault row (V1) and the cross-protocol index
+// The three directory loaders (Morpho Base, Aave Ethereum, Yearn Ethereum) and
+// Maple's pool reader each read their family's own row; the functions below
+// turn each into a `VaultSummary`, the shape the vault row (V1) and the cross-protocol index
 // (ui-jobs 39) draw. Each field is the reading its loader already made: no
 // new chain read, and a figure the family's directory does not read is null
 // here rather than guessed (Yearn's directory reads no `totalSupply()`, so its
@@ -26,6 +26,8 @@ import type {
   YearnVaultDirectoryResponse,
   YearnVaultDirectoryRow,
 } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
+import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import type { MaplePool } from "@/lib/maple/asset-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
 
@@ -211,6 +213,39 @@ export function yearnVaultSummary(r: YearnVaultDirectoryRow, d: YearnVaultDirect
 
 export const yearnVaultSummaries = (d: YearnVaultDirectoryResponse): VaultSummary[] =>
   d.rows.map((r) => yearnVaultSummary(r, d));
+
+/** A Maple syrup pool on Ethereum (ERC-4626), from the pools page's read
+ *  (lib/sources/chain/maple-pool-state.ts): `totalAssets()`, `totalSupply()`
+ *  and `convertToAssets(1e6)` at one block. `state` is absent where the read
+ *  did not answer for this pool; its figures are then null. The pool's name is
+ *  the share symbol the catalogue holds; there is no census and no steward. */
+export function maplePoolSummary(
+  p: MaplePool,
+  state: MaplePoolState | undefined,
+  read: { block: number; timestamp: string },
+): VaultSummary {
+  const amount = (raw: string, value: number) => ({ raw, value });
+  return {
+    chainId: 1,
+    address: p.pool,
+    family: "maple-pool",
+    release: null,
+    releaseLabel: releaseLabel("maple-pool", null),
+    name: p.symbol,
+    catalogName: null,
+    symbol: p.symbol,
+    asset: { address: p.asset, symbol: p.assetSymbol, decimals: p.decimals, named: true },
+    shareDecimals: p.decimals,
+    totalAssets: state ? amount(state.raw.totalAssets, state.totalAssets) : null,
+    totalSupply: state ? amount(state.raw.totalSupply, state.totalSupply) : null,
+    sharePrice: state ? amount(state.raw.navRate, state.navRate) : null,
+    steward: null,
+    standing: [],
+    createdBlock: p.deployBlock,
+    census: null,
+    readAt: read,
+  };
+}
 
 /** The name a row prints: the live `name()`, else the catalogue's snapshot,
  *  else the share symbol, else null (the row then prints the address). */
