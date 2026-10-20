@@ -15,8 +15,9 @@
 // from the chain lane when that agrees with the index wei-exact.
 //
 // Morpho Blue states no USD price: a market's oracle prices the collateral in
-// its loan token, so no headline carries a USD line, and the collateral's
-// value at the oracle is a panel row in the loan token.
+// its loan token, so the line under Collateral states the collateral's value
+// at the oracle in the loan token, and Debt, already in the loan token,
+// carries no line.
 
 import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
@@ -69,6 +70,11 @@ import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { RevealTip } from "@/components/shared/reveal-tip";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+
+const ORACLE_LINE_TIP =
+  "The collateral valued in the loan token at the market's oracle, the price Morpho's liquidation test uses.";
 
 export interface MorphoPositionView {
   positionId: string;
@@ -411,9 +417,39 @@ export function useMorphoCardSlots({
           chainId: coords.chainId,
         }
       : undefined;
+    // The line under Collateral: the collateral's value at the market's oracle,
+    // in the loan token (ui-jobs 398), at the two places the USD line writes
+    // its cents. A listing reads no market (decision 0018) and draws none.
+    const collValue = listed ? listed.L.collateralValue : chain ? chain.collateralValue : undefined;
+    const oracleLine =
+      !detail || !hasColl || v.loanDecimalsUnread ? undefined : collValue != null ? (
+        <RevealTip tip={ORACLE_LINE_TIP} wrap>
+          <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1">
+            <Prov
+              info={
+                listed
+                  ? listed.R.collateralValue(collSym, v.loanSymbol, listed.L.block)
+                  : capacityProv("Collateral value", "collateral × oracle price", chainCoords)
+              }
+              value={formatExact(collValue)}
+            >
+              <span className="font-bold text-green-400">
+                {collValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </Prov>
+            <TokenChipIcon symbol={v.loanSymbol} address={v.loanToken} size={16} filterable={false} untitled />
+            <span className="whitespace-nowrap text-rb-500">at the market&apos;s oracle</span>
+          </span>
+        </RevealTip>
+      ) : listed ? (
+        <RevealTip tip="The market's oracle gave no price at the block the card was read at." wrap>
+          <span className="text-rb-500">no oracle price at that block</span>
+        </RevealTip>
+      ) : undefined;
     const collateral: PositionCardHead = {
       id: "collateral",
       label: CARD_VOCAB.collateral,
+      ...(oracleLine ? { usd: oracleLine } : {}),
       value: hasColl ? (
         <Prov
           info={
@@ -552,37 +588,7 @@ export function useMorphoCardSlots({
         });
       }
 
-      // The right column: the collateral at the oracle and the distance to
-      // liquidation.
-      if (hasColl && !v.loanDecimalsUnread) {
-        const collValue = listed ? listed.L.collateralValue : chain ? chain.collateralValue : undefined;
-        if (collValue != null) {
-          right.push({
-            id: "collateral-value",
-            label: "Collateral value",
-            value: (
-              <Prov
-                info={
-                  listed
-                    ? listed.R.collateralValue(collSym, v.loanSymbol, listed.L.block)
-                    : capacityProv("Collateral value", "collateral × oracle price", chainCoords)
-                }
-              >
-                <AmountText value={collValue} format="compact" />
-              </Prov>
-            ),
-            asset: loanAsset,
-            tip: "The collateral valued in the loan token at the market's oracle, the price Morpho's liquidation test uses.",
-          });
-        } else if (listed) {
-          right.push({
-            id: "collateral-value",
-            label: "Collateral value",
-            value: "no oracle price at that block",
-            tip: "The market's oracle gave no price at the block the card was read at.",
-          });
-        }
-      }
+      // The right column: the distance to liquidation.
       if (ltvUsable) {
         const share = capacityShare(ltvUsable.currentDebt, ltvUsable.maxBorrow);
         right.push({

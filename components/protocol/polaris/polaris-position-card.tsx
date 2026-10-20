@@ -708,7 +708,7 @@ export function polarisCardSlots({
       right.push({
         id: "pending-to-settle",
         label: "Pending to settle",
-        tip: `Interest, the stability gain, the PSM share ${POLARIS_WORDS.docs_psm} and reward pETH ${POLARIS_WORDS.docs_reward} accrued since the last touch, netted at the feed in ${stable}; the next touch writes them in.`,
+        tip: `Interest, the stability gain ${POLARIS_WORDS.docs_gain}, the PSM share ${POLARIS_WORDS.docs_psm} and reward pETH ${POLARIS_WORDS.docs_reward} accrued since the last touch, netted at the feed in ${stable}; the next touch writes them in.`,
         value: (
           <TokenFigure symbol={stable} address={stableAddress}>
             <Prov info={livePendingToSettleProv(v.market, v.pending, feed)}>

@@ -278,7 +278,9 @@ export function PolarisSinceLastTouchRow({
       ? POLARIS_WORDS.docs_psm
       : l.key === "reward"
         ? `${formatPeth(w.raw.reward)} pETH ${POLARIS_WORDS.docs_reward}`
-        : "";
+        : l.key === "stabilityGain"
+          ? POLARIS_WORDS.docs_gain
+          : "";
 
   const Row = ({
     label,
