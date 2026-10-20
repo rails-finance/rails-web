@@ -682,15 +682,18 @@ function DelegateBadge({ size, join }: { size: number; join: boolean }) {
  *  on party pink for a third party, the test tube for the protocol and the
  *  gavel for governance on the spine's neutral ink. The owner draws none.
  *  The top-left corner is the actor's alone; check / cross / send / swap keep
- *  the bottom-right. */
+ *  the bottom-right. The badge sits off the node, 12px to the left and 2px
+ *  up, so the node's own glyph stays whole under it. */
 function ActorBadge({ size, actor }: { size: number; actor: SpineActor }) {
   if (actor === "owner") return null;
   const r = Math.round(size * 0.5);
   const g = Math.round(r * 0.6);
   return (
     <div
-      className="absolute top-0 left-0 rounded-full flex items-center justify-center text-white"
+      className="absolute rounded-full flex items-center justify-center text-white"
       style={{
+        top: -2,
+        left: -12,
         width: r,
         height: r,
         backgroundColor: actor === "third-party" ? "#EC4899" : "var(--color-rb-500)",
