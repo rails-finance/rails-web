@@ -2,8 +2,8 @@
 // Next names one dynamic segment per level, so this level's segment is
 // `[market]` for the market pages beneath it (`[market]/[wallet]`), and here
 // it holds the wallet. A wallet with activity in exactly one Comet is sent to
-// that market page; otherwise one row per Comet it touched
-// (rails-ops reference/arbitrum-position-first-lane.md).
+// that market page; otherwise the holder strip and one card per Comet it
+// touched (rails-ops reference/arbitrum-position-first-lane.md).
 
 import type { Metadata } from "next";
 import { after } from "next/server";
@@ -14,6 +14,10 @@ import { recordCompoundArbitrumVisit } from "@/lib/compound-arbitrum/record-visi
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
 import { compoundArbitrumMarketHref, compoundArbitrumWalletHref } from "@/lib/compound-arbitrum/routes";
 import { compoundArbitrumWholeLife } from "@/lib/compound-arbitrum/whole-life";
+import { COMPOUND_ARBITRUM_PAGE } from "@/lib/compound-arbitrum/page-deployment";
+import { compoundArbitrumHolderStrip } from "@/lib/compound-arbitrum/holder-strip";
+import { cometViewFromChain } from "@/lib/compound/chain-position-view";
+import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { CometChainTimelineResult } from "@/lib/sources/chain/compound-v3-events";
 import { CompoundArbitrumWalletOverview, type OverviewHistory, type OverviewMarket } from "./wallet-overview";
@@ -24,6 +28,18 @@ interface Props {
 
 // Every figure is read at one block per request; nothing is cacheable across requests.
 export const dynamic = "force-dynamic";
+
+/** Each held token at its Comet's price in dollars, keyed by lowercase
+ *  address — the `prices` `cometViewFromChain` reads. The ETH-quoted Comet
+ *  converts at the read's `ethUsd`; a Comet with no conversion is unpriced. */
+function cometPricesUsd(p: CompoundMarketChainResponse, baseToken: string, ethUsd: number | undefined) {
+  const fx = p.quoteUnit === "USD" ? 1 : p.quoteUnit === "ETH" && ethUsd ? ethUsd : null;
+  const out: Record<string, number> = {};
+  if (fx == null) return out;
+  if (p.basePrice > 0) out[baseToken.toLowerCase()] = p.basePrice * fx;
+  for (const c of p.collateral) if (c.price > 0) out[c.address.toLowerCase()] = c.price * fx;
+  return out;
+}
 
 /** The chain reader calls viem's `getAddress`, which throws outside its try —
  *  a malformed wallet is turned away here. */
@@ -38,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     image: "dynamic",
   });
   const title = `Compound V3 on Arbitrum Wallet ${shortSubject(wallet)}`;
-  const description = `Every Compound V3 market on Arbitrum this wallet has touched, read live from the Comets, one row each.`;
+  const description = `Every Compound V3 market on Arbitrum this wallet has touched, read live from the Comets, one card each.`;
   return {
     ...base,
     title,
@@ -80,6 +96,33 @@ export default async function CompoundArbitrumWalletPage({ params }: Props) {
 
   const whole = history != null && compoundArbitrumWholeLife(history.coverage);
   const historyState: OverviewHistory = history == null ? "missing" : whole ? "whole" : "not-whole";
+  // One card per Comet, built as the wallet page builds its sections; open
+  // first, then the rest, the list's order within each.
+  const captureSource = COMPOUND_ARBITRUM_PAGE.captureSourceOf(history?.coverage);
+  const cards = markets
+    .map(({ market, chain }) => ({
+      market,
+      chain,
+      href: compoundArbitrumMarketHref(market.key, wallet),
+      view: cometViewFromChain(
+        market,
+        wallet,
+        chain,
+        history?.markets.find((r) => r.market === market.key) ?? null,
+        chain ? cometPricesUsd(chain, market.baseToken, head?.ethUsd) : undefined,
+        whole,
+      ),
+    }))
+    .sort((a, b) => Number(b.view.status === "open") - Number(a.view.status === "open"));
+  const strip =
+    cards.length > 0
+      ? compoundArbitrumHolderStrip(
+          wallet,
+          head,
+          cards.map((c) => ({ market: c.market, chain: c.chain, status: c.view.status })),
+        )
+      : null;
+
   const untouched =
     head != null &&
     head.positionsFound === 0 &&
@@ -93,6 +136,9 @@ export default async function CompoundArbitrumWalletPage({ params }: Props) {
       wallet={wallet}
       head={head}
       markets={markets}
+      cards={cards.map(({ market, chain, href, view }) => ({ key: market.key, href, view, live: chain }))}
+      strip={strip}
+      captureSource={captureSource}
       history={historyState}
       untouched={untouched}
     />
