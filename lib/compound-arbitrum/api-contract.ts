@@ -17,9 +17,11 @@ import type { CometIndexRow } from "@/lib/sources/api/compound-base-timeline";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
 import {
   readPositionsAnswer as readArbitrumPositionsAnswer,
+  type MorphoArbitrumPositionRow,
   type MorphoArbitrumPositionsResponse,
 } from "@/lib/morpho-arbitrum/api-contract";
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "./asset-catalog";
+import { readCometMarkets } from "./comet-cards";
 import { compoundArbitrumUsd } from "./usd";
 
 /** rails-server's mount for this lane. */
@@ -125,7 +127,35 @@ export type CompoundArbitrumTimelineRow = CometIndexRow & { comet?: string };
 
 // ── GET /positions?limit=&offset= ───────────────────────────────────────────
 
-export type CompoundArbitrumPositionsResponse = MorphoArbitrumPositionsResponse;
+/** Morpho Blue Arbitrum's row plus `markets`, the stored visit's Comets in
+ *  stored order (the visit body's shape). Absent where the server does not
+ *  send it; the listing then draws one card for the wallet. */
+export interface CompoundArbitrumPositionRow extends MorphoArbitrumPositionRow {
+  markets?: CompoundArbitrumVisitMarket[];
+}
 
-/** The answer checked against the contract; null when it does not hold one. */
-export const readPositionsAnswer = readArbitrumPositionsAnswer;
+export interface CompoundArbitrumPositionsResponse extends Omit<MorphoArbitrumPositionsResponse, "rows"> {
+  rows: CompoundArbitrumPositionRow[];
+}
+
+/** The answer checked against the contract; null when it does not hold one.
+ *  A malformed `markets` element is dropped, and a `markets` that is not an
+ *  array is no `markets` (lib/compound-arbitrum/comet-cards.ts). */
+export function readPositionsAnswer(raw: unknown): CompoundArbitrumPositionsResponse | null {
+  const answer = readArbitrumPositionsAnswer(raw);
+  if (!answer) return null;
+  const marketsByWallet = new Map<string, CompoundArbitrumVisitMarket[]>();
+  for (const p of (raw as { rows: unknown[] }).rows) {
+    if (!p || typeof p !== "object") continue;
+    const { wallet, markets } = p as Record<string, unknown>;
+    const read = readCometMarkets(markets);
+    if (typeof wallet === "string" && read) marketsByWallet.set(wallet.toLowerCase(), read);
+  }
+  return {
+    ...answer,
+    rows: answer.rows.map((row) => {
+      const markets = marketsByWallet.get(row.wallet);
+      return markets ? { ...row, markets } : row;
+    }),
+  };
+}
