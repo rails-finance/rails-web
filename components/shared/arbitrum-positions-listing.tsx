@@ -49,6 +49,7 @@ import { MORPHO_ARBITRUM_BLUE } from "@/lib/morpho-arbitrum/asset-catalog";
 import { ListingTag } from "@/components/shared/listing-tag";
 import type { CompoundArbitrumVisitMarket } from "@/lib/compound-arbitrum/api-contract";
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
+import { compoundArbitrumMarketHref } from "@/lib/compound-arbitrum/routes";
 import {
   cometFooterLead,
   expandCards,
@@ -447,7 +448,7 @@ export function ArbitrumPositionsListing({
           c.comet ? <CometReadCard row={c.row} comet={c.comet} /> : <ArbitrumReadCard row={c.row} family={family} />
         }
         hrefFor={(c) =>
-          c.comet?.key ? `${entry.href}/${c.row.wallet}#market-${c.comet.key}` : `${entry.href}/${c.row.wallet}`
+          c.comet?.key ? compoundArbitrumMarketHref(c.comet.key, c.row.wallet) : `${entry.href}/${c.row.wallet}`
         }
         keyFor={(c) => (c.comet ? `${c.row.wallet}:${c.comet.market.comet}` : c.row.wallet)}
         strategy={memoryStrategy<Card, ArbitrumPositionsFilters>({

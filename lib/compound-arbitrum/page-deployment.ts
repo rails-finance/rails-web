@@ -1,5 +1,6 @@
-// Compound V3 on Arbitrum as the wallet page draws it (the shape is
-// lib/compound/page-deployment.ts). Two things set it apart from Base
+// Compound V3 on Arbitrum as the market page draws it, one Comet per page
+// (the shape is lib/compound/page-deployment.ts; the route is rails-ops
+// reference/arbitrum-position-first-lane.md). Two things set it apart from Base
 // (rails-ops TO-DO-arbitrum-scoping.md item 12):
 //   • the history is one read of rails-server's store, served flat; nothing is
 //     swept, there are no folders and the rows carry no balance with interest;
@@ -10,7 +11,7 @@
 import type { CompoundPageDeployment } from "@/lib/compound/page-deployment";
 import { COMPOUND_ARBITRUM_VOCABULARY } from "@/lib/compound/swept-tower-provenance";
 import { COMPOUND_ARBITRUM_CHAIN_ID, COMPOUND_ARBITRUM_DEPLOYMENT } from "./asset-catalog";
-import { compoundArbitrumWalletHref } from "./routes";
+import { compoundArbitrumMarketHref, compoundArbitrumWalletHref } from "./routes";
 import { compoundArbitrumWholeLife } from "./whole-life";
 
 export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
@@ -24,6 +25,7 @@ export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
     prices: "/api/chain/compound-arbitrum/oracle-prices",
   },
   walletHref: compoundArbitrumWalletHref,
+  marketHref: compoundArbitrumMarketHref,
   sourceLabel: "the Compound V3 deployment on Arbitrum (all four Comets)",
   csvPrefix: "compound-arbitrum",
   grouped: false,
@@ -44,6 +46,7 @@ export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
     heldNoEvent: () =>
       "The store's history is confirmed and has no Comet event naming this account in this market — the balance arrived by a route the Comet logs without naming the account.",
     emptyMarket: "This wallet has no Compound V3 activity in this market.",
+    emptyMarketNow: "This wallet holds nothing in this market right now.",
     untouchedTitle: "This wallet has never touched Compound V3 on Arbitrum.",
     untouchedBody: (n) =>
       `All ${n} markets were asked and none holds a balance, a debt or collateral for this address — and no Comet has emitted an event naming it between the first Comet’s creation block and now.`,

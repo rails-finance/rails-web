@@ -24,6 +24,9 @@ export interface CompoundPageWords {
    *  in no event; `index` where the store or index answered. */
   heldNoEvent: (index: boolean) => string;
   emptyMarket: string;
+  /** A market page whose Comet holds nothing for the wallet while the history
+   *  cannot yet say whether it ever did. */
+  emptyMarketNow?: string;
   untouchedTitle: string;
   /** `n` is how many markets were asked. */
   untouchedBody: (n: number | undefined) => string;
@@ -46,6 +49,10 @@ export interface CompoundPageDeployment {
    *  (null where the history is served flat) and the oracle prices. */
   routes: { wallet: string; timeline: string; folder: string | null; prices: string };
   walletHref: (wallet: string) => string;
+  /** A deployment with a page per (market, wallet) names it here, and a
+   *  card's ⋮ links there; without it the card links its section of the
+   *  wallet page. */
+  marketHref?: (market: string, wallet: string) => string;
   /** What the coverage footer says was read. */
   sourceLabel: string;
   /** The CSV file names' prefix. */

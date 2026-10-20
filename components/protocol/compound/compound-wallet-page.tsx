@@ -27,6 +27,11 @@
 // state and no total to sum, and each market stands on its own exactly as it
 // does on the chain.
 //
+// A deployment with a page per (market, wallet) — Arbitrum (rails-ops
+// reference/arbitrum-position-first-lane.md) — passes `market`: the reads stay
+// whole-wallet, and the page draws that one market's section. Without it, as
+// on Base, every market the wallet touched is drawn.
+//
 // Two reads feed the sections, in the order they can answer: the Comets
 // (fast — three batched calls at one pinned block — feeds the cards) and the
 // history (the index in one read, or the sweep — slow, the whole chain in
@@ -38,6 +43,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 import {
   CompoundPositionCard,
@@ -333,7 +339,9 @@ function MarketSection({
               vocab={vocab}
               session={d.session}
               lane={d.lane ? { ...d.lane, source: captureSource } : undefined}
-              pagePath={`${d.walletHref(wallet)}#market-${market.key}`}
+              pagePath={
+                d.marketHref ? d.marketHref(market.key, wallet) : `${d.walletHref(wallet)}#market-${market.key}`
+              }
               exports={exports}
               // The risk headline and the panel's room and absorb rows from the
               // Comet read; a stale read states no figure, so it draws none.
@@ -467,6 +475,9 @@ export interface CompoundWalletViewProps {
    *  carries and `sweptClean` below reads. `null` means the client sweeps, as
    *  before. */
   initialTimeline: unknown | null;
+  /** The roster key of the one market this page draws. Absent, the page draws
+   *  every market the wallet touched. */
+  market?: string;
 }
 
 export function CompoundWalletView({
@@ -474,6 +485,7 @@ export function CompoundWalletView({
   wallet,
   initialWallet,
   initialTimeline,
+  market: onlyMarket,
 }: CompoundWalletViewProps & { deployment: CompoundPageDeployment }) {
   const seeded = initialWallet != null;
   // Rehydrated through the same function the fetch client runs on a response
@@ -628,7 +640,12 @@ export function CompoundWalletView({
   }, [swept, wallet, pinnedRoute, d]);
 
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
-  const compoundEvents = useMemo(() => events.filter(isCompoundEvent), [events]);
+  // A market page's events are its market's; `untouched` below reads the
+  // whole wallet's from `events`.
+  const compoundEvents = useMemo(
+    () => events.filter(isCompoundEvent).filter((e) => onlyMarket == null || e.context.data.market === onlyMarket),
+    [events, onlyMarket],
+  );
 
   // Which capture answered. The receipts' custody line and the footer's
   // whole-life sentence read from this.
@@ -654,8 +671,9 @@ export function CompoundWalletView({
           chain: data && !data.chainStale ? (data.positions.find((p) => p.market === market.key) ?? null) : null,
           replay: timeline?.markets.find((r) => r.market === market.key) ?? null,
         }))
-        .filter((s) => s.chain != null || s.replay != null),
-    [data, timeline, d],
+        .filter((s) => s.chain != null || s.replay != null)
+        .filter((s) => onlyMarket == null || s.market.key === onlyMarket),
+    [data, timeline, d, onlyMarket],
   );
 
   // Every token each section's card, tower or lifetime layer could price: the
@@ -858,6 +876,29 @@ export function CompoundWalletView({
                 <p className="mb-1">{d.words.untouchedTitle}</p>
                 <p className="text-sm">{d.words.untouchedBody(data?.marketsScanned)}</p>
               </div>
+            ) : onlyMarket != null && sections.length === 0 ? (
+              // A market page whose Comet holds nothing for the wallet and
+              // whose history names it in no event. The wallet's other
+              // markets are on the overview.
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">
+                  {sweptClean ? d.words.emptyMarket : (d.words.emptyMarketNow ?? d.words.emptyMarket)}
+                </p>
+                {!sweptClean && (
+                  <p className="text-sm">
+                    {timelineState === "loading" || timelineState === "first-read"
+                      ? d.words.emptyNowHistory.loading
+                      : timelineState === "ready"
+                        ? d.words.emptyNowHistory.notWhole
+                        : d.words.emptyNowHistory.failed}
+                  </p>
+                )}
+                <p className="mt-3 text-sm">
+                  <Link href={d.walletHref(wallet)} className="text-blue-500 hover:underline">
+                    Every market this wallet has touched
+                  </Link>
+                </p>
+              </div>
             ) : sections.length === 0 ? (
               // The Comets hold nothing for this wallet and the sweep could not
               // say whether it ever did: the two facts are stated apart.
@@ -875,7 +916,7 @@ export function CompoundWalletView({
               </div>
             ) : (
               <div className="space-y-10">
-                {!pinnedRoute && (
+                {!pinnedRoute && onlyMarket == null && (
                   <p className="text-[11px] text-rb-500">
                     This wallet has a position in{" "}
                     <span className="text-foreground">
