@@ -243,7 +243,7 @@ info(
 {
   const someId = pOpen[0]?.cdpId;
   const page = await openListing(context, `${BASE}/sepolia/polaris?q=${someId}`);
-  check("P1b. a CDP-number search draws no holder strip", (await readStrip(page)) === null, `q=${someId}`);
+  check("P1b. a position-number search draws no holder strip", (await readStrip(page)) === null, `q=${someId}`);
   await page.close();
 }
 
@@ -260,8 +260,8 @@ info(
     // The counts sentence's OWN numbers, against the API's statuses.
     const said = {
       open: Number(
-        /holds ([\d,]+) open CDPs?/.exec(strip.counts)?.[1]?.replace(/,/g, "") ??
-          (/holds no open CDPs/.test(strip.counts) ? 0 : NaN),
+        /holds ([\d,]+) open positions?/.exec(strip.counts)?.[1]?.replace(/,/g, "") ??
+          (/holds no open positions/.test(strip.counts) ? 0 : NaN),
       ),
       closed: Number(/has closed ([\d,]+)/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
       liquidated: Number(/([\d,]+) (?:was|were) liquidated/.exec(strip.counts)?.[1]?.replace(/,/g, "") ?? 0),
@@ -312,7 +312,7 @@ info(
 
     // Nearest its floor.
     check(
-      "P6a. the nearest-floor line names the restated CDP and links to it",
+      "P6a. the nearest-floor line names the restated position and links to it",
       strip.nearest?.text.includes(near[0].label) &&
         strip.nearest?.href === `/sepolia/polaris/${near[0].row.market}/${near[0].row.cdpId}`,
       `"${strip.nearest?.text}" → ${strip.nearest?.href} vs restated ${near[0].label}`,
@@ -379,7 +379,7 @@ info(
   const body = (await page.locator("body").innerText()).replace(/\s+/g, " ");
   check(
     "P9. a wallet holding nothing draws no strip — the empty state stands alone",
-    (await readStrip(page)) === null && /No CDPs match/i.test(body),
+    (await readStrip(page)) === null && /No positions match/i.test(body),
     body.slice(0, 120),
   );
   await page.close();
@@ -632,7 +632,7 @@ if (!probeLine) {
 
   // Restated from the stub: 10 + 2 = 12 pETH; 30,000 USDp at $1 plus 5 GOLDp at
   // $4,000 = $50,000; ratios 10 × 6000 ÷ 30000 = 200% (÷1.15 = 1.739) and
-  // 2 × 1.5 ÷ 5 = 60% (÷1.15 = 0.522) → the goldp CDP is nearest its floor.
+  // 2 × 1.5 ÷ 5 = 60% (÷1.15 = 0.522) → the goldp position is nearest its floor.
   check(
     "G1a. Polaris: the exact collateral leg is the emitted sum, unmarked, and its receipt is a chain fact",
     leg(got.polaris, "collateral").value === "12 pETH" &&
@@ -653,7 +653,7 @@ if (!probeLine) {
     JSON.stringify(leg(got.polaris, "debt")).slice(0, 260),
   );
   check(
-    "G1c. Polaris: nearest its floor is the restated goldp CDP at 60% against 115%",
+    "G1c. Polaris: nearest its floor is the restated goldp position at 60% against 115%",
     got.polaris.nearest?.label === "goldp/2" &&
       Math.abs(got.polaris.nearest.ratioPct - 60) < 1e-9 &&
       Math.abs(got.polaris.nearest.minPct - 115) < 1e-9 &&
