@@ -63,10 +63,7 @@ const REPORT = args.includes("--report");
 const SUMMARY = args.includes("--summary");
 const SELF_TEST = args.includes("--self-test");
 const rootIdx = args.indexOf("--root");
-const ROOT =
-  rootIdx >= 0
-    ? resolvePath(args[rootIdx + 1])
-    : resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = rootIdx >= 0 ? resolvePath(args[rootIdx + 1]) : resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 
 // ── The numbers (standard section 2) ─────────────────────────────────────────
@@ -110,14 +107,44 @@ const Z1_HEADINGS = ["Holdings", "Risk", "Rate", "History"];
 
 /** Liquity V2's position card explanation strings in trove_words (Z1). A lead ends in a colon. */
 const Z1_IDS = [
-  "liq_lead", "liq_lifecycle", "liq_nft", "closed_lead_redeemed", "closed_lead_repaid",
-  "closed_peak_debt", "closed_peak_coll", "closed_lifecycle", "open_lead", "debt_breakdown",
-  "debt_breakdown_fee", "coll_worth", "coll_secures", "coll_ratio", "liq_runway", "liq_runway_now",
-  "rate_cost_delegate", "rate_cost_owner", "debt_in_front", "queue_share", "nft_held",
-  "counts_both", "counts_owner", "counts_redeemed",
+  "liq_lead",
+  "liq_lifecycle",
+  "liq_nft",
+  "closed_lead_redeemed",
+  "closed_lead_repaid",
+  "closed_peak_debt",
+  "closed_peak_coll",
+  "closed_lifecycle",
+  "open_lead",
+  "debt_breakdown",
+  "debt_breakdown_fee",
+  "coll_worth",
+  "coll_secures",
+  "coll_ratio",
+  "liq_runway",
+  "liq_runway_now",
+  "rate_cost_delegate",
+  "rate_cost_owner",
+  "debt_in_front",
+  "queue_share",
+  "nft_held",
+  "counts_both",
+  "counts_owner",
+  "counts_redeemed",
 ];
 /** Liquity V2's Z1 placeholders that are names or links. Every other one ({coll}, {debt}, {range}, ...) is a figure. */
-const Z1_NAME_PLACEHOLDERS = new Set(["id", "owner", "nft", "coll_type", "delegate", "name", "time_word", "tx_word", "manager", "by"]);
+const Z1_NAME_PLACEHOLDERS = new Set([
+  "id",
+  "owner",
+  "nft",
+  "coll_type",
+  "delegate",
+  "name",
+  "time_word",
+  "tx_word",
+  "manager",
+  "by",
+]);
 /**
  * Each family's Z1 strings: the section, the ids (null: every id of the section
  * but its headings) and how a placeholder is told to be a figure ("names": every
@@ -150,8 +177,26 @@ const MODAL_CONSTANT_PLACEHOLDERS = new Set(["min_cr", "max_ltv", "coll_type", "
 const NAME_ROUNDINGS = new Set(["text", "manager", "address", "tx_hash"]);
 
 const UNITS = new Set([
-  "ETH", "WETH", "wstETH", "rETH", "BOLD", "USD", "USDC", "USDT", "DAI", "ZCHF", "LUSD",
-  "day", "days", "hour", "hours", "week", "weeks", "block", "blocks", "%",
+  "ETH",
+  "WETH",
+  "wstETH",
+  "rETH",
+  "BOLD",
+  "USD",
+  "USDC",
+  "USDT",
+  "DAI",
+  "ZCHF",
+  "LUSD",
+  "day",
+  "days",
+  "hour",
+  "hours",
+  "week",
+  "weeks",
+  "block",
+  "blocks",
+  "%",
 ]);
 
 // ── Findings ─────────────────────────────────────────────────────────────────
@@ -235,7 +280,14 @@ class Source {
     this.byZone = new Map();
     for (const [i, l] of this.lines.entries())
       if (/prose-limit:/.test(l) && !EXC_RE.test(l))
-        fail({ file: rel, id: `line ${i + 1}`, zone: "-", rule: "malformed prose-limit comment (words N (reason))", count: 0, limit: 0 });
+        fail({
+          file: rel,
+          id: `line ${i + 1}`,
+          zone: "-",
+          rule: "malformed prose-limit comment (words N (reason))",
+          count: 0,
+          limit: 0,
+        });
   }
   /** The 1-based line of the key whose value sits at `path`. */
   lineOf(path) {
@@ -261,10 +313,24 @@ class Source {
   finish() {
     for (const [i, l] of this.lines.entries())
       if (EXC_RE.test(l) && !this.used.has(i + 1))
-        fail({ file: this.rel, id: `line ${i + 1}`, zone: "-", rule: "prose-limit comment sits above no checked string", count: 0, limit: 0 });
+        fail({
+          file: this.rel,
+          id: `line ${i + 1}`,
+          zone: "-",
+          rule: "prose-limit comment sits above no checked string",
+          count: 0,
+          limit: 0,
+        });
     for (const [zone, ids] of this.byZone)
       if (ids.length > EXCEPTIONS_PER_ZONE)
-        fail({ file: this.rel, id: ids.join(", "), zone, rule: "exceptions per zone per file", count: ids.length, limit: EXCEPTIONS_PER_ZONE });
+        fail({
+          file: this.rel,
+          id: ids.join(", "),
+          zone,
+          rule: "exceptions per zone per file",
+          count: ids.length,
+          limit: EXCEPTIONS_PER_ZONE,
+        });
   }
 }
 
@@ -300,7 +366,8 @@ export function checkBullet(where, text, zone, { lead = false, isFig }) {
   const words = checkWords(where, text, limit, lead ? "words per lead sentence" : "words per bullet", isFig);
   const base = { file: where.file, id: where.id, zone, line: where.src?.lineOf(where.path) };
   const figures = countFigures(text, isFig);
-  if (figures > L.figures) fail({ ...base, rule: `figures per ${lead ? "lead" : "bullet"}`, count: figures, limit: L.figures });
+  if (figures > L.figures)
+    fail({ ...base, rule: `figures per ${lead ? "lead" : "bullet"}`, count: figures, limit: L.figures });
   if (!lead) {
     const joins = countJoins(text);
     if (joins > L.joins) fail({ ...base, rule: "joining marks per bullet", count: joins, limit: L.joins });
@@ -315,10 +382,12 @@ export function checkReveal(where, zone, paragraphs) {
   if (!R.reveals) return fail({ ...base, rule: "reveals per pane", count: 1, limit: 0 });
   const total = paragraphs.reduce((s, p) => s + countWords(p), 0);
   if (total > R.words) fail({ ...base, rule: "words per reveal", count: total, limit: R.words });
-  if (paragraphs.length > R.paragraphs) fail({ ...base, rule: "paragraphs per reveal", count: paragraphs.length, limit: R.paragraphs });
+  if (paragraphs.length > R.paragraphs)
+    fail({ ...base, rule: "paragraphs per reveal", count: paragraphs.length, limit: R.paragraphs });
   for (const p of paragraphs) {
     const ss = sentencesOf(p);
-    if (ss.length > R.paragraphSentences) fail({ ...base, rule: "sentences per reveal paragraph", count: ss.length, limit: R.paragraphSentences });
+    if (ss.length > R.paragraphSentences)
+      fail({ ...base, rule: "sentences per reveal paragraph", count: ss.length, limit: R.paragraphSentences });
     for (const s of ss) {
       const w = countWords(s);
       if (w > R.sentence) fail({ ...base, rule: "words per reveal sentence", count: w, limit: R.sentence });
@@ -331,14 +400,34 @@ export function checkReveal(where, zone, paragraphs) {
 /** Words a plain-zone string (Z1–Z3) does not use (ui-jobs 380); Z4 is exempt.
  *  Whole word or phrase, any case; placeholders are not read. */
 const BANNED_TERMS = [
-  ["value word", ["safe", "safer", "risky", "riskier", "healthy", "dangerous", "good", "bad", "cheap", "expensive", "protect", "opportunity"]],
+  [
+    "value word",
+    [
+      "safe",
+      "safer",
+      "risky",
+      "riskier",
+      "healthy",
+      "dangerous",
+      "good",
+      "bad",
+      "cheap",
+      "expensive",
+      "protect",
+      "opportunity",
+    ],
+  ],
   ["directive", ["should", "recommend"]],
   ["intensifier", ["noticeably", "significantly", "dangerously"]],
   ["motive phrase", ["in order to", "to keep", "keeping"]],
   ["address", ["you", "your"]],
 ];
 const BANNED_RE = BANNED_TERMS.flatMap(([kind, terms]) =>
-  terms.map((term) => ({ kind, term, re: new RegExp(`(?<![\\p{L}\\p{N}_'’])${term.replace(/ /g, "\\s+")}(?![\\p{L}\\p{N}_'’])`, "iu") })),
+  terms.map((term) => ({
+    kind,
+    term,
+    re: new RegExp(`(?<![\\p{L}\\p{N}_'’])${term.replace(/ /g, "\\s+")}(?![\\p{L}\\p{N}_'’])`, "iu"),
+  })),
 );
 /** Strings-file hits held for the family's sweep job: listed, not failed.
  *  "file id term" per entry; a stale entry fails. */
@@ -357,7 +446,15 @@ export function checkBanned(where, text, zone) {
   for (const { kind, term, re } of BANNED_RE) {
     if (!re.test(t)) continue;
     const key = `${where.file} ${where.id} ${term}`;
-    const row = { file: where.file, id: where.id, zone, line: where.src?.lineOf(where.path), rule: `banned ${kind} "${term}"`, count: 1, limit: 0 };
+    const row = {
+      file: where.file,
+      id: where.id,
+      zone,
+      line: where.src?.lineOf(where.path),
+      rule: `banned ${kind} "${term}"`,
+      count: 1,
+      limit: 0,
+    };
     if (BANNED_LISTED.has(key)) {
       bannedSeen.add(key);
       bannedListed.push(row);
@@ -447,31 +544,65 @@ export function checkPane(where, zone, wc) {
   const base = { file: where.file, id: where.id, zone };
   if (wc.perGroup > L.perGroup) fail({ ...base, rule: "bullets per group", count: wc.perGroup, limit: L.perGroup });
   if (wc.groups > L.groups) fail({ ...base, rule: "groups per pane", count: wc.groups, limit: L.groups });
-  if (wc.bullets > L.bullets) fail({ ...base, rule: "bullets per pane, closed (worst case)", count: wc.bullets, limit: L.bullets });
-  if (wc.words > L.words) fail({ ...base, rule: "words per pane, closed (worst case)", count: wc.words, limit: L.words });
+  if (wc.bullets > L.bullets)
+    fail({ ...base, rule: "bullets per pane, closed (worst case)", count: wc.bullets, limit: L.bullets });
+  if (wc.words > L.words)
+    fail({ ...base, rule: "words per pane, closed (worst case)", count: wc.words, limit: L.words });
 }
 
 /** Section 3: the group words are the standard's, in order, none renamed. */
 export function checkHeadingSet(file, groupWords, templates) {
   for (const [key, heading] of Z2_HEADINGS) {
     if (groupWords?.[key] !== heading)
-      fail({ file, id: `group_words.${key}`, zone: "Z2", rule: `heading is "${heading}"`, count: 0, limit: 0, got: groupWords?.[key] });
+      fail({
+        file,
+        id: `group_words.${key}`,
+        zone: "Z2",
+        rule: `heading is "${heading}"`,
+        count: 0,
+        limit: 0,
+        got: groupWords?.[key],
+      });
   }
   for (const k of Object.keys(groupWords ?? {}))
     if (!Z2_HEADINGS.some(([key]) => key === k))
       fail({ file, id: `group_words.${k}`, zone: "Z2", rule: "heading outside the standard set", count: 1, limit: 0 });
   for (const [k, h] of Object.entries(groupWords ?? {})) {
     const w = h.trim().split(/\s+/).length;
-    if (w > PLAIN.Z2.heading) fail({ file, id: `group_words.${k}`, zone: "Z2", rule: "words per heading", count: w, limit: PLAIN.Z2.heading });
+    if (w > PLAIN.Z2.heading)
+      fail({ file, id: `group_words.${k}`, zone: "Z2", rule: "words per heading", count: w, limit: PLAIN.Z2.heading });
     if (/:$/.test(h) || h !== h[0].toUpperCase() + h.slice(1) || /[A-Z]/.test(h.slice(1)))
-      fail({ file, id: `group_words.${k}`, zone: "Z2", rule: "heading is sentence case, no colon", count: 1, limit: 0 });
+      fail({
+        file,
+        id: `group_words.${k}`,
+        zone: "Z2",
+        rule: "heading is sentence case, no colon",
+        count: 1,
+        limit: 0,
+      });
   }
   const order = Z2_HEADINGS.map(([k]) => k);
   for (const t of templates) {
     const keys = Object.keys(t.groups ?? {});
     const idx = keys.map((k) => order.indexOf(k));
-    if (idx.includes(-1)) fail({ file, id: t.id, zone: "Z2", rule: "group outside the heading set", count: keys.length, limit: order.length });
-    else if (idx.some((v, i) => i && v < idx[i - 1])) fail({ file, id: t.id, zone: "Z2", rule: "groups out of heading order", count: keys.length, limit: order.length });
+    if (idx.includes(-1))
+      fail({
+        file,
+        id: t.id,
+        zone: "Z2",
+        rule: "group outside the heading set",
+        count: keys.length,
+        limit: order.length,
+      });
+    else if (idx.some((v, i) => i && v < idx[i - 1]))
+      fail({
+        file,
+        id: t.id,
+        zone: "Z2",
+        rule: "groups out of heading order",
+        count: keys.length,
+        limit: order.length,
+      });
   }
 }
 
@@ -487,7 +618,8 @@ export function checkModal(where, name, m, { faq = () => null } = {}) {
   };
   const place = (s, text) => {
     for (const [, ph] of text.matchAll(PH_RE))
-      if (!MODAL_CONSTANT_PLACEHOLDERS.has(ph)) fail({ ...base(s), rule: `instance placeholder {${ph}}`, count: 1, limit: 0 });
+      if (!MODAL_CONSTANT_PLACEHOLDERS.has(ph))
+        fail({ ...base(s), rule: `instance placeholder {${ph}}`, count: 1, limit: 0 });
   };
   const wordsOf = (t) => countWords(t);
   let totals = [0];
@@ -498,7 +630,8 @@ export function checkModal(where, name, m, { faq = () => null } = {}) {
   for (const [k, text] of intros) {
     if (typeof text !== "string") continue;
     const ss = sentencesOf(text);
-    if (ss.length > MODAL.introSentences) fail({ ...base(k), rule: "sentences in the intro", count: ss.length, limit: MODAL.introSentences });
+    if (ss.length > MODAL.introSentences)
+      fail({ ...base(k), rule: "sentences in the intro", count: ss.length, limit: MODAL.introSentences });
     checkWords(at(k, [k]), text, MODAL.introWords, "words in the intro", () => false);
     sentenceCheck(at(k, [k]), text);
     place(k, text);
@@ -508,11 +641,22 @@ export function checkModal(where, name, m, { faq = () => null } = {}) {
   // Paragraphs after the intro (event modals).
   const extras = m.extraParagraphs ?? [];
   if (extras.length && 1 + extras.length > MODAL.eventParagraphs)
-    fail({ ...base("extraParagraphs"), rule: "paragraphs in the modal", count: 1 + extras.length, limit: MODAL.eventParagraphs });
+    fail({
+      ...base("extraParagraphs"),
+      rule: "paragraphs in the modal",
+      count: 1 + extras.length,
+      limit: MODAL.eventParagraphs,
+    });
   for (const [i, p] of extras.entries()) {
     const s = `extraParagraphs[${i}]`;
     const ss = sentencesOf(p);
-    if (ss.length > MODAL.eventParagraphSentences) fail({ ...base(s), rule: "sentences per modal paragraph", count: ss.length, limit: MODAL.eventParagraphSentences });
+    if (ss.length > MODAL.eventParagraphSentences)
+      fail({
+        ...base(s),
+        rule: "sentences per modal paragraph",
+        count: ss.length,
+        limit: MODAL.eventParagraphSentences,
+      });
     checkWords(at(s, ["extraParagraphs", i]), p, MODAL.eventParagraphWords, "words per modal paragraph", () => false);
     sentenceCheck(at(s, ["extraParagraphs", i]), p);
     place(s, p);
@@ -523,7 +667,12 @@ export function checkModal(where, name, m, { faq = () => null } = {}) {
   const details = m.details ?? [];
   if (details.length) {
     if (details.length < MODAL.conceptMin || details.length > MODAL.conceptMax)
-      fail({ ...base("details"), rule: "key concepts", count: details.length, limit: details.length < MODAL.conceptMin ? MODAL.conceptMin : MODAL.conceptMax });
+      fail({
+        ...base("details"),
+        rule: "key concepts",
+        count: details.length,
+        limit: details.length < MODAL.conceptMin ? MODAL.conceptMin : MODAL.conceptMax,
+      });
     for (const [i, d] of details.entries()) {
       for (const key of Object.keys(d).filter((k) => /^text/.test(k))) {
         const s = `details[${i}].${key}`;
@@ -533,14 +682,19 @@ export function checkModal(where, name, m, { faq = () => null } = {}) {
         sentenceCheck(at(s, ["details", i, key]), d[key]);
         place(s, d[key]);
       }
-      const longest = Math.max(...Object.keys(d).filter((k) => /^text/.test(k)).map((k) => wordsOf(d[k])));
+      const longest = Math.max(
+        ...Object.keys(d)
+          .filter((k) => /^text/.test(k))
+          .map((k) => wordsOf(d[k])),
+      );
       add(wordsOf(d.bold) + longest);
     }
   }
 
   // Steps (only where sequence matters).
   if (m.steps) {
-    if (m.steps.length > MODAL.steps) fail({ ...base("steps"), rule: "steps", count: m.steps.length, limit: MODAL.steps });
+    if (m.steps.length > MODAL.steps)
+      fail({ ...base("steps"), rule: "steps", count: m.steps.length, limit: MODAL.steps });
     for (const [i, st] of m.steps.entries()) {
       checkWords(at(`steps[${i}]`, ["steps", i]), st, MODAL.stepWords, "words per step", () => false);
       add(wordsOf(st));
@@ -550,11 +704,17 @@ export function checkModal(where, name, m, { faq = () => null } = {}) {
   // Quick Links.
   const links = m.links ?? [];
   if (links.length < MODAL.linksMin || links.length > MODAL.linksMax)
-    fail({ ...base("links"), rule: "quick links", count: links.length, limit: links.length < MODAL.linksMin ? MODAL.linksMin : MODAL.linksMax });
+    fail({
+      ...base("links"),
+      rule: "quick links",
+      count: links.length,
+      limit: links.length < MODAL.linksMin ? MODAL.linksMin : MODAL.linksMax,
+    });
   void faq;
 
   const total = Math.max(...totals);
-  if (total > MODAL.totalWords) fail({ ...base("total"), rule: "words in the modal, links excluded", count: total, limit: MODAL.totalWords });
+  if (total > MODAL.totalWords)
+    fail({ ...base("total"), rule: "words in the modal, links excluded", count: total, limit: MODAL.totalWords });
 }
 
 // ── Reading the strings files ────────────────────────────────────────────────
@@ -627,7 +787,14 @@ function checkStringsFile({ family, rel }) {
   for (const id of z1Ids(family, d)) {
     const text = d[sec]?.[id];
     if (typeof text !== "string") {
-      fail({ file: rel, id: `${sec}.${id}`, zone: "Z1", rule: "Z1 string listed in the check is gone (update Z1_STRINGS)", count: 0, limit: 0 });
+      fail({
+        file: rel,
+        id: `${sec}.${id}`,
+        zone: "Z1",
+        rule: "Z1 string listed in the check is gone (update Z1_STRINGS)",
+        count: 0,
+        limit: 0,
+      });
       continue;
     }
     out.z1++;
@@ -637,11 +804,19 @@ function checkStringsFile({ family, rel }) {
   }
   for (const k of Object.keys((sec && d[sec]) ?? {}))
     if (/^(group|heading)_/.test(k) && !Z1_HEADINGS.includes(d[sec][k]))
-      fail({ file: rel, id: `${sec}.${k}`, zone: "Z1", rule: `heading outside ${Z1_HEADINGS.join(", ")}`, count: 1, limit: 0 });
+      fail({
+        file: rel,
+        id: `${sec}.${k}`,
+        zone: "Z1",
+        rule: `heading outside ${Z1_HEADINGS.join(", ")}`,
+        count: 1,
+        limit: 0,
+      });
 
   // Z4: modals.
   const faq = faqTable();
-  for (const [name, m] of Object.entries(d.L5 ?? {})) checkModal({ src, file: rel, id: "", zone: "Z4" }, name, m, { faq });
+  for (const [name, m] of Object.entries(d.L5 ?? {}))
+    checkModal({ src, file: rel, id: "", zone: "Z4" }, name, m, { faq });
 
   src.finish();
   return { d, src, out };
@@ -656,7 +831,9 @@ function termListing(family, rel, d) {
   const card = cardLabelWords(family, d);
   const strings = [
     ...Object.entries(d.shared_sentences ?? {}).map(([id, s]) => [`shared_sentences.${id}`, s.text]),
-    ...(d.templates ?? []).flatMap((t) => Object.entries(t.sentences ?? {}).map(([id, s]) => [`${t.id}/${id}`, s.text])),
+    ...(d.templates ?? []).flatMap((t) =>
+      Object.entries(t.sentences ?? {}).map(([id, s]) => [`${t.id}/${id}`, s.text]),
+    ),
     ...z1Ids(family, d).map((id) => [`${Z1_STRINGS[family].section}.${id}`, d[Z1_STRINGS[family].section]?.[id] ?? ""]),
   ];
   for (const [id, text] of strings)
@@ -720,7 +897,9 @@ function proseSegments(raw) {
 }
 
 function otherFamilies() {
-  const files = discoverGenericCopyFiles(ROOT).filter((f) => /\.tsx$/.test(f) && !/use-trove-explanation-items/.test(f));
+  const files = discoverGenericCopyFiles(ROOT).filter(
+    (f) => /\.tsx$/.test(f) && !/use-trove-explanation-items/.test(f),
+  );
   const found = [];
   let units = 0;
   for (const f of files) {
@@ -734,7 +913,15 @@ function otherFamilies() {
           const limit = lead ? PLAIN.Z1.lead : PLAIN[zone].bullet;
           const words = countWords(s);
           if (words > limit)
-            found.push({ file: rel, id: `line ${u.line}`, zone, rule: `words per ${lead ? "lead sentence" : "sentence"} (extracted)`, count: words, limit, text: s });
+            found.push({
+              file: rel,
+              id: `line ${u.line}`,
+              zone,
+              rule: `words per ${lead ? "lead sentence" : "sentence"} (extracted)`,
+              count: words,
+              limit,
+              text: s,
+            });
         }
     }
   }
@@ -763,9 +950,29 @@ function linkChecks(parsed) {
     checked++;
     if (docs.notDocumentation.includes(host)) return notDocs.push({ file, id, url, family, host });
     const allowed = family ? docs.families[family] : null;
-    if (family && !allowed) return fail({ file, id, zone: "Z4", rule: `family "${family}" has no official hosts in official-docs.json`, count: 0, limit: 0, got: url });
+    if (family && !allowed)
+      return fail({
+        file,
+        id,
+        zone: "Z4",
+        rule: `family "${family}" has no official hosts in official-docs.json`,
+        count: 0,
+        limit: 0,
+        got: url,
+      });
     const ok = allowed ? allowed.includes(host) : union.has(host);
-    if (!ok) fail({ file, id, zone: "Z4", rule: family ? `link host is not ${family}'s official documentation` : "link host is in no family's official documentation list", count: 0, limit: 0, got: url });
+    if (!ok)
+      fail({
+        file,
+        id,
+        zone: "Z4",
+        rule: family
+          ? `link host is not ${family}'s official documentation`
+          : "link host is in no family's official documentation list",
+        count: 0,
+        limit: 0,
+        got: url,
+      });
   };
 
   // Strings files: modal links, concept sources, video, faq and doc ids.
@@ -773,10 +980,21 @@ function linkChecks(parsed) {
   for (const { family, rel, d } of parsed) {
     const link = (id, l) => {
       const url = l.url ?? (l.faq !== undefined ? faq[l.faq] : d.doc_urls?.[l.doc]);
-      if (!url) fail({ file: rel, id, zone: "Z4", rule: `${l.faq !== undefined ? `faq id ${l.faq}` : `doc id ${l.doc}`} resolves to no url`, count: 0, limit: 0 });
+      if (!url)
+        fail({
+          file: rel,
+          id,
+          zone: "Z4",
+          rule: `${l.faq !== undefined ? `faq id ${l.faq}` : `doc id ${l.doc}`} resolves to no url`,
+          count: 0,
+          limit: 0,
+        });
       else judge({ file: rel, id, url, family });
     };
-    const modals = [...Object.entries(d.L5 ?? {}).map(([n, m]) => [`L5.${n}`, m]), ...(d.info ? [["info", d.info]] : [])];
+    const modals = [
+      ...Object.entries(d.L5 ?? {}).map(([n, m]) => [`L5.${n}`, m]),
+      ...(d.info ? [["info", d.info]] : []),
+    ];
     for (const [name, m] of modals) {
       for (const [i, l] of (m.links ?? []).entries()) link(`${name}.links[${i}]`, l);
       for (const [i, x] of (m.details ?? []).entries())
@@ -794,11 +1012,17 @@ function linkChecks(parsed) {
     ...(existsSync(join(ROOT, "lib"))
       ? readdirSync(join(ROOT, "lib"), { withFileTypes: true })
           .filter((e) => e.isDirectory())
-          .flatMap((e) => readdirSync(join(ROOT, "lib", e.name)).filter((f) => /^learn-more.*\.ts$/.test(f)).map((f) => `lib/${e.name}/${f}`))
+          .flatMap((e) =>
+            readdirSync(join(ROOT, "lib", e.name))
+              .filter((f) => /^learn-more.*\.ts$/.test(f))
+              .map((f) => `lib/${e.name}/${f}`),
+          )
       : []),
   ].filter((f, i, a) => existsSync(join(ROOT, f)) && a.indexOf(f) === i);
   const hostFamily = (host) => {
-    const fams = Object.entries(docs.families).filter(([, hs]) => hs.includes(host)).map(([f]) => f);
+    const fams = Object.entries(docs.families)
+      .filter(([, hs]) => hs.includes(host))
+      .map(([f]) => f);
     return fams.length ? fams.join("/") : null;
   };
   for (const rel of files) {
@@ -815,7 +1039,8 @@ function linkChecks(parsed) {
         if (fam) last = fam;
         judge({ file: rel, id: `line ${i + 1}`, url: m[0], family: null });
         const row = notDocs[notDocs.length - 1];
-        if (row && row.file === rel && row.id === `line ${i + 1}` && row.url === m[0]) row.family = last ?? "unattributed";
+        if (row && row.file === rel && row.id === `line ${i + 1}` && row.url === m[0])
+          row.family = last ?? "unattributed";
       }
     }
   }
@@ -842,20 +1067,69 @@ function selfTest() {
   const words = (n) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
   const isFig = () => true;
   run("words per bullet", () => checkBullet(where, words(21) + ".", "Z2", { isFig }), "words per bullet");
-  run("words per lead sentence", () => checkBullet(where, words(26) + ":", "Z1", { lead: true, isFig }), "words per lead sentence");
-  run("figures per bullet", () => checkBullet(where, "Debt {a} at {b} and 5% now.", "Z2", { isFig }), "figures per bullet");
-  run("joining marks per bullet", () => checkBullet(where, "One, two, three, and four.", "Z2", { isFig }), "joining marks");
-  run("bullets per group / groups / bullets / words per pane", () => checkPane(where, "Z2", { perGroup: 9, groups: 9, bullets: 99, words: 999 }), "bullets per group");
-  run("groups per pane", () => checkPane(where, "Z2", { perGroup: 1, groups: 9, bullets: 1, words: 1 }), "groups per pane");
-  run("words per pane", () => checkPane(where, "Z2", { perGroup: 1, groups: 1, bullets: 1, words: 999 }), "words per pane");
+  run(
+    "words per lead sentence",
+    () => checkBullet(where, words(26) + ":", "Z1", { lead: true, isFig }),
+    "words per lead sentence",
+  );
+  run(
+    "figures per bullet",
+    () => checkBullet(where, "Debt {a} at {b} and 5% now.", "Z2", { isFig }),
+    "figures per bullet",
+  );
+  run(
+    "joining marks per bullet",
+    () => checkBullet(where, "One, two, three, and four.", "Z2", { isFig }),
+    "joining marks",
+  );
+  run(
+    "bullets per group / groups / bullets / words per pane",
+    () => checkPane(where, "Z2", { perGroup: 9, groups: 9, bullets: 99, words: 999 }),
+    "bullets per group",
+  );
+  run(
+    "groups per pane",
+    () => checkPane(where, "Z2", { perGroup: 1, groups: 9, bullets: 1, words: 1 }),
+    "groups per pane",
+  );
+  run(
+    "words per pane",
+    () => checkPane(where, "Z2", { perGroup: 1, groups: 1, bullets: 1, words: 999 }),
+    "words per pane",
+  );
   run("reveal size", () => checkReveal(where, "Z1", [words(130), words(10), words(10), words(10)]), "words per reveal");
   run("reveals in Z2", () => checkReveal(where, "Z2", ["One."]), "reveals per pane");
-  run("heading set", () => checkHeadingSet("self-test", { happened: "What happens", adds_up: "How it adds up", leaves: "Where it leaves the position" }, []), "heading is");
-  run("heading order", () => checkHeadingSet("self-test", Object.fromEntries(Z2_HEADINGS), [{ id: "t", groups: { leaves: [], happened: [] } }]), "groups out of heading order");
+  run(
+    "heading set",
+    () =>
+      checkHeadingSet(
+        "self-test",
+        { happened: "What happens", adds_up: "How it adds up", leaves: "Where it leaves the position" },
+        [],
+      ),
+    "heading is",
+  );
+  run(
+    "heading order",
+    () =>
+      checkHeadingSet("self-test", Object.fromEntries(Z2_HEADINGS), [
+        { id: "t", groups: { leaves: [], happened: [] } },
+      ]),
+    "groups out of heading order",
+  );
   run("banned term", () => checkBanned(where, "The trove is safer now.", "Z2"), "banned value word");
-  run("banned phrase", () => checkBanned(where, "It repaid in order to free collateral.", "Z1"), "banned motive phrase");
+  run(
+    "banned phrase",
+    () => checkBanned(where, "It repaid in order to free collateral.", "Z1"),
+    "banned motive phrase",
+  );
   const cap = (n) => "Word " + words(n - 1);
-  const modal = { intro: cap(30) + ". " + cap(30) + ". " + cap(3) + ".", extraParagraphs: [words(60) + "{coll_x}", "B.", "C."], details: [{ bold: "A", text: words(30) + ". Two." }], links: [] };
+  const modal = {
+    intro: cap(30) + ". " + cap(30) + ". " + cap(3) + ".",
+    extraParagraphs: [words(60) + "{coll_x}", "B.", "C."],
+    details: [{ bold: "A", text: words(30) + ". Two." }],
+    links: [],
+  };
   for (const [rule, name] of [
     ["words in the intro", "intro"],
     ["sentences in the intro", "intro sentences"],
@@ -869,25 +1143,70 @@ function selfTest() {
     ["quick links", "link count"],
   ])
     run(`modal: ${name}`, () => checkModal(where, "t", modal), rule);
-  run("modal: words in the modal", () => checkModal(where, "t", { intro: "One.", extraParagraphs: [words(54), words(54)], details: ["A", "B", "C", "D"].map((b) => ({ bold: b, text: words(25) })), links: [{}] }), "words in the modal");
+  run(
+    "modal: words in the modal",
+    () =>
+      checkModal(where, "t", {
+        intro: "One.",
+        extraParagraphs: [words(54), words(54)],
+        details: ["A", "B", "C", "D"].map((b) => ({ bold: b, text: words(25) })),
+        links: [{}],
+      }),
+    "words in the modal",
+  );
   const exc = (s) => new Source("self-test.yaml", s);
-  run("exception: stale", () => {
-    const s = exc("a:\n  # prose-limit: words 40 (reason)\n  b: |-\n    " + words(22) + "\n");
-    checkWords({ src: s, path: ["a", "b"], file: "self-test.yaml", id: "a.b", zone: "Z2" }, words(22), 20, "words per bullet", () => false);
-  }, "words per bullet: exception says");
-  run("exception: margin", () => {
-    const s = exc("a:\n  # prose-limit: words 30 (reason)\n  b: |-\n    " + words(30) + "\n");
-    checkWords({ src: s, path: ["a", "b"], file: "self-test.yaml", id: "a.b", zone: "Z2" }, words(30), 20, "words per bullet", () => false);
-  }, "words per bullet: past the exception margin");
-  run("exception: four in a zone", () => {
-    const body = [1, 2, 3, 4].map((i) => `  # prose-limit: words 22 (r)\n  s${i}: |-\n    ${words(22)}\n`).join("");
-    const s = exc("a:\n" + body);
-    for (let i = 1; i <= 4; i++) checkWords({ src: s, path: ["a", `s${i}`], file: "self-test.yaml", id: `a.s${i}`, zone: "Z2" }, words(22), 20, "words per bullet", () => false);
-    s.finish();
-  }, "exceptions per zone per file");
-  run("exception: orphan comment", () => {
-    exc("a:\n  # prose-limit: words 22 (r)\n\n\n  b: |-\n    x\n").finish();
-  }, "prose-limit comment sits above no checked string");
+  run(
+    "exception: stale",
+    () => {
+      const s = exc("a:\n  # prose-limit: words 40 (reason)\n  b: |-\n    " + words(22) + "\n");
+      checkWords(
+        { src: s, path: ["a", "b"], file: "self-test.yaml", id: "a.b", zone: "Z2" },
+        words(22),
+        20,
+        "words per bullet",
+        () => false,
+      );
+    },
+    "words per bullet: exception says",
+  );
+  run(
+    "exception: margin",
+    () => {
+      const s = exc("a:\n  # prose-limit: words 30 (reason)\n  b: |-\n    " + words(30) + "\n");
+      checkWords(
+        { src: s, path: ["a", "b"], file: "self-test.yaml", id: "a.b", zone: "Z2" },
+        words(30),
+        20,
+        "words per bullet",
+        () => false,
+      );
+    },
+    "words per bullet: past the exception margin",
+  );
+  run(
+    "exception: four in a zone",
+    () => {
+      const body = [1, 2, 3, 4].map((i) => `  # prose-limit: words 22 (r)\n  s${i}: |-\n    ${words(22)}\n`).join("");
+      const s = exc("a:\n" + body);
+      for (let i = 1; i <= 4; i++)
+        checkWords(
+          { src: s, path: ["a", `s${i}`], file: "self-test.yaml", id: `a.s${i}`, zone: "Z2" },
+          words(22),
+          20,
+          "words per bullet",
+          () => false,
+        );
+      s.finish();
+    },
+    "exceptions per zone per file",
+  );
+  run(
+    "exception: orphan comment",
+    () => {
+      exc("a:\n  # prose-limit: words 22 (r)\n\n\n  b: |-\n    x\n").finish();
+    },
+    "prose-limit comment sits above no checked string",
+  );
   console.log("self-test: each rule must produce a failure on an over-limit input");
   for (const r of results) console.log(`${r.hit ? "ok  " : "MISS"}  ${r.name}`);
   const miss = results.filter((r) => !r.hit);
@@ -912,7 +1231,15 @@ for (const f of contentFiles()) {
   termListing(f.family, f.rel, d);
 }
 for (const key of BANNED_LISTED)
-  if (!bannedSeen.has(key)) fail({ file: key.split(" ")[0], id: key.split(" ").slice(1, -1).join(" "), zone: "-", rule: `BANNED_LISTED entry matches no string ("${key.split(" ").pop()}")`, count: 0, limit: 0 });
+  if (!bannedSeen.has(key))
+    fail({
+      file: key.split(" ")[0],
+      id: key.split(" ").slice(1, -1).join(" "),
+      zone: "-",
+      rule: `BANNED_LISTED entry matches no string ("${key.split(" ").pop()}")`,
+      count: 0,
+      limit: 0,
+    });
 const others = otherFamilies();
 const links = linkChecks(parsed);
 for (const n of links.notDocs) warn({ ...n, rule: "not documentation" });
@@ -921,13 +1248,14 @@ for (const n of links.notDocs) warn({ ...n, rule: "not documentation" });
 
 const loc = (f) => `${f.file}${f.line ? `:${f.line}` : ""}`;
 const fmt = (f) =>
-  `${f.id} :: ${f.zone} :: ${f.rule} :: ${f.count > 0 || f.limit > 0 ? `${f.count} (limit ${f.limit})` : f.got ?? ""}`;
+  `${f.id} :: ${f.zone} :: ${f.rule} :: ${f.count > 0 || f.limit > 0 ? `${f.count} (limit ${f.limit})` : (f.got ?? "")}`;
 
 if (!SUMMARY) {
   for (const f of failures) console.log(`FAIL  ${loc(f)} :: ${fmt(f)}`);
   for (const f of others.found) console.log(`LIST  ${loc(f)} :: ${fmt(f)}\n        "${f.text.slice(0, 160)}"`);
   for (const f of bannedListed) console.log(`LIST  ${loc(f)} :: ${fmt(f)}`);
-  for (const w of warnings) console.log(`WARN  ${w.file} :: ${w.id} :: ${w.family ?? ""} :: not documentation :: ${w.url}`);
+  for (const w of warnings)
+    console.log(`WARN  ${w.file} :: ${w.id} :: ${w.family ?? ""} :: not documentation :: ${w.url}`);
 }
 
 const tally = (rows, key) => {
@@ -936,23 +1264,35 @@ const tally = (rows, key) => {
   return [...m].sort((a, b) => b[1] - a[1]);
 };
 console.log(`\ncheck:prose-limits${REPORT ? " (report mode)" : ""}`);
-console.log(`  scanned: ${contentFiles().length} strings file(s), ${sentenceCount} event/shared sentences, ${z1Count} Z1 strings, ${panes.length} templates (Z2 panes), ${others.files} clause/pane files with ${others.units} units for other families, ${links.checked} links`);
-console.log("  Z3 Lifetime flows: skipped, the pane is TSX (lib/liquity/economics-explanation.tsx) until its words move into a strings file");
+console.log(
+  `  scanned: ${contentFiles().length} strings file(s), ${sentenceCount} event/shared sentences, ${z1Count} Z1 strings, ${panes.length} templates (Z2 panes), ${others.files} clause/pane files with ${others.units} units for other families, ${links.checked} links`,
+);
+console.log(
+  "  Z3 Lifetime flows: skipped, the pane is TSX (lib/liquity/economics-explanation.tsx) until its words move into a strings file",
+);
 console.log("  Reveal size: no reveal exists in a strings file yet; the rule is exercised by --self-test");
 console.log(`  failures: ${failures.length}`);
 for (const [zone, n] of tally(failures, (f) => f.zone)) console.log(`    ${zone}: ${n}`);
 console.log("  per rule:");
-for (const [rule, n] of tally(failures, (f) => `${f.zone} ${f.rule}`)) console.log(`    ${String(n).padStart(4)}  ${rule}`);
-const worst = [...failures].filter((f) => f.count > f.limit && f.limit > 0).sort((a, b) => b.count - b.limit - (a.count - a.limit)).slice(0, 12);
+for (const [rule, n] of tally(failures, (f) => `${f.zone} ${f.rule}`))
+  console.log(`    ${String(n).padStart(4)}  ${rule}`);
+const worst = [...failures]
+  .filter((f) => f.count > f.limit && f.limit > 0)
+  .sort((a, b) => b.count - b.limit - (a.count - a.limit))
+  .slice(0, 12);
 console.log("  worst strings (count over limit):");
 for (const f of worst) console.log(`    ${f.count}/${f.limit}  ${f.zone}  ${f.rule}  ${f.id}`);
 console.log(`  other families, extracted sentences over the limit (listed only): ${others.found.length}`);
-for (const [fam, n] of tally(others.found, (f) => f.file.split("/").slice(0, -1).join("/"))) console.log(`    ${String(n).padStart(3)}  ${fam}`);
+for (const [fam, n] of tally(others.found, (f) => f.file.split("/").slice(0, -1).join("/")))
+  console.log(`    ${String(n).padStart(3)}  ${fam}`);
 console.log(`  banned terms held for the family's sweep job (listed only): ${bannedListed.length}`);
 console.log(`  not documentation (listed only): ${warnings.length}`);
-for (const [fam, n] of tally(warnings, (w) => `${w.family ?? "-"} ${w.host}`)) console.log(`    ${String(n).padStart(3)}  ${fam}`);
+for (const [fam, n] of tally(warnings, (w) => `${w.family ?? "-"} ${w.host}`))
+  console.log(`    ${String(n).padStart(3)}  ${fam}`);
 console.log(`  term check, first half (listed for review only): ${listings.length}`);
-if (!SUMMARY) for (const l of listings) console.log(`    ${l.id}  uses "${l.term}" (modal ${l.modal}), which is not among the file's short card labels`);
+if (!SUMMARY)
+  for (const l of listings)
+    console.log(`    ${l.id}  uses "${l.term}" (modal ${l.modal}), which is not among the file's short card labels`);
 
 if (failures.length && !REPORT) {
   console.log("\nFAIL  check:prose-limits (strict). Run with --report to list without failing.");

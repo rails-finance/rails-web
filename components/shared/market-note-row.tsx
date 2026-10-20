@@ -953,14 +953,15 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     derivation: note.live ? (
       <>
         This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the
-        market&rsquo;s PSM mints and redemptions. The earlier value is the rate in force at this position&rsquo;s own last
-        touch; the later is the cdpManager&rsquo;s own rate read now — {observation("from")}, {observation("to")}. Shown
-        whenever this position is open, whatever the move — nothing having moved is itself the fact this note states.
+        market&rsquo;s PSM mints and redemptions. The earlier value is the rate in force at this position&rsquo;s own
+        last touch; the later is the cdpManager&rsquo;s own rate read now — {observation("from")}, {observation("to")}.
+        Shown whenever this position is open, whatever the move — nothing having moved is itself the fact this note
+        states.
         {note.setsBetween != null && (
           <>
             {" "}
-            The market has re-set the rate {f.sets} times since this position&rsquo;s last touch: the primary rate is re-set
-            at every PSM mint or redemption in the market.
+            The market has re-set the rate {f.sets} times since this position&rsquo;s last touch: the primary rate is
+            re-set at every PSM mint or redemption in the market.
           </>
         )}
         {note.interest && (
@@ -979,10 +980,10 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         {observation("from")}, {observation("to")}.{" "}
         {note.steps != null && (
           <>
-            Those two ends are {f.steps} of this position&rsquo;s touches apart: the rate moved the same way at every step in
-            between, and a run of steps one after another in one direction is one thing happening to this position — so
-            it is stated as one stretch, and the receipt lists each step it took in. A step the other way ends the run
-            and begins the next note.{" "}
+            Those two ends are {f.steps} of this position&rsquo;s touches apart: the rate moved the same way at every
+            step in between, and a run of steps one after another in one direction is one thing happening to this
+            position — so it is stated as one stretch, and the receipt lists each step it took in. A step the other way
+            ends the run and begins the next note.{" "}
           </>
         )}
         {note.setsBetween != null && (
@@ -997,9 +998,9 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         {note.interest && (
           <>
             {" "}
-            The interest figures hold this position&rsquo;s own debt at the earlier touch fixed and move only the rate; the
-            secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
-            and is not on this log.
+            The interest figures hold this position&rsquo;s own debt at the earlier touch fixed and move only the rate;
+            the secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the
+            protocol and is not on this log.
           </>
         )}
       </>

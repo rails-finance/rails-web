@@ -175,7 +175,10 @@ const sheetSigned = (v, fig) => `${v < 0 ? "−" : ""}${fig}`;
 function expectedProse(e) {
   const price = e.context?.data?.priceAtBlock?.pethInDebt;
   if (price == null)
-    return { net: null, text: `moved ${signedPeth(mrColl(e))} pETH and ${signedFig(mrDebt(e))} USDp through this position` };
+    return {
+      net: null,
+      text: `moved ${signedPeth(mrColl(e))} pETH and ${signedFig(mrDebt(e))} USDp through this position`,
+    };
   const net = mrColl(e) * price - mrDebt(e);
   return {
     net,

@@ -17,8 +17,9 @@ const LINK = "text-blue-500 hover:underline";
 const intro = (
   <>
     <p>
-      Every Polaris position on Sepolia, with its history. A position is a loan: pETH locked as collateral, a stablecoin borrowed
-      against it. All numbers are test numbers, not money. Reserve loans and Stability Pool deposits are not shown yet.
+      Every Polaris position on Sepolia, with its history. A position is a loan: pETH locked as collateral, a stablecoin
+      borrowed against it. All numbers are test numbers, not money. Reserve loans and Stability Pool deposits are not
+      shown yet.
     </p>
 
     <h2 className={H}>How it works</h2>
@@ -41,8 +42,8 @@ const intro = (
       </li>
       <li>A position is an NFT, so it can change hands without being closed.</li>
       <li>
-        A position also moves without its holder doing anything: interest is added to the debt, stability gains are credited
-        against it, reward pETH is added to the collateral, and PSM activity applies its share.
+        A position also moves without its holder doing anything: interest is added to the debt, stability gains are
+        credited against it, reward pETH is added to the collateral, and PSM activity applies its share.
       </li>
     </ul>
 
@@ -50,16 +51,17 @@ const intro = (
     <ul className={UL}>
       <li>One row per position: pETH collateral, debt, and current holder.</li>
       <li>
-        Search by wallet or ENS name to see the positions that address holds on Sepolia. Names resolve on Ethereum mainnet,
-        since Sepolia has no name registry this site reads.
+        Search by wallet or ENS name to see the positions that address holds on Sepolia. Names resolve on Ethereum
+        mainnet, since Sepolia has no name registry this site reads.
       </li>
     </ul>
 
     <h2 className={H}>Position page</h2>
     <ul className={UL}>
       <li>
-        Opening a position shows every touch the market&apos;s contracts recorded. Each shows what the holder moved, plus
-        everything the protocol applied at the same moment: interest, stability gains, reward pETH and the PSM share.
+        Opening a position shows every touch the market&apos;s contracts recorded. Each shows what the holder moved,
+        plus everything the protocol applied at the same moment: interest, stability gains, reward pETH and the PSM
+        share.
       </li>
       <li>
         Live figures come straight from the contracts at the latest block: collateral ratio against the minimum, current

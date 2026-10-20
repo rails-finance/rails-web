@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TrovePage({ params }: Props) {
   const { collateralType, troveId } = await params;
-  
+
   const tail = await loadTroveTail(collateralType, troveId);
   // Only an answered-and-empty backend roster reaches this — a failed read
   // leaves `missing` false and hands the client an unseeded view to retry.

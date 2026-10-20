@@ -528,7 +528,12 @@ export function listingIcrProv(market: PolarisMarket): Provenance {
     via: `${BOARD_VIA} · last emitted coll × previewPrice() ÷ last emitted debt`,
     formula: "coll × price ÷ debt",
     inputs: [
-      { label: "collateral", kind: "chain", pclass: "emitted", note: "the position's last emitted coll, from the index" },
+      {
+        label: "collateral",
+        kind: "chain",
+        pclass: "emitted",
+        note: "the position's last emitted coll, from the index",
+      },
       { label: "price", kind: "chain", pclass: "oracle", note: `the market's PriceFeed — pETH in ${stable}` },
       { label: "debt", kind: "chain", pclass: "emitted", note: "the position's last emitted debt, from the index" },
     ],
@@ -584,7 +589,12 @@ export function holderDebtSumProv(market: PolarisMarket): Provenance {
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted debt over the open rows",
     formula: `Σ debt over the wallet's open ${stable} positions`,
     inputs: [
-      { label: "debt", kind: "chain", pclass: "emitted", note: "each open position's last emitted debt, from the index" },
+      {
+        label: "debt",
+        kind: "chain",
+        pclass: "emitted",
+        note: "each open position's last emitted debt, from the index",
+      },
     ],
   };
 }

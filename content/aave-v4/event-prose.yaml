@@ -463,7 +463,19 @@ templates:
           the asset is not collateral after the event
         text: |-
           {symbol} is not collateral: it earns interest and backs no borrow.
-    order: [supply.what, supply.enabled, by_manager, by_manager_alone, sibling, coll.on, coll.was_on, coll.off, hf.at_line, hf.close]
+    order:
+      [
+        supply.what,
+        supply.enabled,
+        by_manager,
+        by_manager_alone,
+        sibling,
+        coll.on,
+        coll.was_on,
+        coll.off,
+        hf.at_line,
+        hf.close,
+      ]
     groups:
       happened: [supply.what, supply.enabled, by_manager, by_manager_alone, sibling]
       leaves: [coll.on, coll.was_on, coll.off, hf.at_line, hf.close]
@@ -533,7 +545,19 @@ templates:
           first, on a spoke that borrows from more than one hub
         text: |-
           Borrowed {amount} {symbol} from the {hub} hub, the position's first {symbol} debt here.
-    order: [borrow.what, borrow.what_hub, borrow.first, borrow.first_hub, by_manager, by_manager_alone, sibling, hf.at_line, hf.close, rate.moved]
+    order:
+      [
+        borrow.what,
+        borrow.what_hub,
+        borrow.first,
+        borrow.first_hub,
+        by_manager,
+        by_manager_alone,
+        sibling,
+        hf.at_line,
+        hf.close,
+        rate.moved,
+      ]
     groups:
       happened: [borrow.what, borrow.what_hub, borrow.first, borrow.first_hub, by_manager, by_manager_alone, sibling]
       leaves: [hf.at_line, hf.close, rate.moved]
@@ -591,9 +615,27 @@ templates:
           cleared, other debt remains
         text: |-
           The {other_debt} debt remains.
-    order: [repay.what, repay.what_hub, repay.all, repay.all_hub, by_manager, by_manager_alone, sibling, repay.dust, repay.life, repay.other, closed, hf.cleared, hf.at_line, hf.close, rate.moved]
+    order:
+      [
+        repay.what,
+        repay.what_hub,
+        repay.all,
+        repay.all_hub,
+        by_manager,
+        by_manager_alone,
+        sibling,
+        repay.dust,
+        repay.life,
+        repay.other,
+        closed,
+        hf.cleared,
+        hf.at_line,
+        hf.close,
+        rate.moved,
+      ]
     groups:
-      happened: [repay.what, repay.what_hub, repay.all, repay.all_hub, by_manager, by_manager_alone, sibling, repay.dust]
+      happened:
+        [repay.what, repay.what_hub, repay.all, repay.all_hub, by_manager, by_manager_alone, sibling, repay.dust]
       adds_up: [repay.life]
       leaves: [repay.other, closed, hf.cleared, hf.at_line, hf.close, rate.moved]
     alternates:
@@ -657,7 +699,18 @@ templates:
           some of the debt asset remains
         text: |-
           Debt remains, so the position can be liquidated again while its health factor is below 1.
-    order: [liq.what, liq.what_cleared, liq.what_seized, liq.by, liq.value, liq.bonus, liq.cleared_only, liq.cleared_one, liq.again]
+    order:
+      [
+        liq.what,
+        liq.what_cleared,
+        liq.what_seized,
+        liq.by,
+        liq.value,
+        liq.bonus,
+        liq.cleared_only,
+        liq.cleared_one,
+        liq.again,
+      ]
     groups:
       happened: [liq.what, liq.what_cleared, liq.what_seized, liq.by]
       adds_up: [liq.value, liq.bonus]

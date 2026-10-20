@@ -333,7 +333,12 @@ function judge(proto, subject, { bullets, idx }) {
   }
   const denom = Number(m[1].replace(/,/g, ""));
   const ext = Number(
-    (bullet.match(/, ([\d,]+) (?:(?:was|were) (?:executed|run|sent)|came from)|^([\d,]+) of the [\d,]+ events/) || [0, "0"])
+    (
+      bullet.match(/, ([\d,]+) (?:(?:was|were) (?:executed|run|sent)|came from)|^([\d,]+) of the [\d,]+ events/) || [
+        0,
+        "0",
+      ]
+    )
       .slice(1)
       .find(Boolean)
       .replace(/,/g, ""),

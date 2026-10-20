@@ -326,7 +326,8 @@ export function computeAlchemixEconomics(
   const r = input.redemptions;
   const redeemedAll = r != null && r.count > 0 && r.stated === r.count && r.cleared > 0;
   const redeemedCleared: Bucket = redeemedAll ? { amount: r!.cleared, events: r!.stated } : empty();
-  const redeemedTaken: Bucket = redeemedAll && r!.taken != null && r!.taken > 0 ? { amount: r!.taken, events: r!.stated } : empty();
+  const redeemedTaken: Bucket =
+    redeemedAll && r!.taken != null && r!.taken > 0 ? { amount: r!.taken, events: r!.stated } : empty();
 
   const collateral: TowerSideData = {
     current:
@@ -414,7 +415,14 @@ export function computeAlchemixEconomics(
         redeemedCleared,
         "Cleared by line redemptions",
         redeemedCleared.amount > 0
-          ? clearedRunProv(syntheticSymbol, r!.clearedRaw, r!.count, r!.stated, "every redemption on this timeline", coords)
+          ? clearedRunProv(
+              syntheticSymbol,
+              r!.clearedRaw,
+              r!.count,
+              r!.stated,
+              "every redemption on this timeline",
+              coords,
+            )
           : undefined,
         "redeemed",
       ),

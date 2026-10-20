@@ -237,7 +237,10 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               </Prov>
             </Stat>
             {book.psmMintCount != null && (
-              <Stat label="PSM" note={`direct ${stable} mints and redemptions against pETH, shared by every open position`}>
+              <Stat
+                label="PSM"
+                note={`direct ${stable} mints and redemptions against pETH, shared by every open position`}
+              >
                 <Prov
                   info={bookCountProv(
                     "PSM mints and redemptions",

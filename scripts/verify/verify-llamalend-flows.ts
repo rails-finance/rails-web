@@ -112,7 +112,8 @@ function storedEvents(f: Fixture, keep: (block: number) => boolean, pre = false)
     if (!v || !keep(e.blockNumber) || !e.context) return e;
     const c = e.context.data as LlamalendContext;
     // As the route serves it: on a closing repay's row only.
-    const b = pre && c.eventType === "repay" && c.raw?.debtAfter === "0" ? BEFORE[f.name]?.[String(e.blockNumber)] : undefined;
+    const b =
+      pre && c.eventType === "repay" && c.raw?.debtAfter === "0" ? BEFORE[f.name]?.[String(e.blockNumber)] : undefined;
     return {
       ...e,
       context: {
@@ -685,8 +686,16 @@ test("a closing repay with the state a block before: the close's amounts, no est
     const a = llamalendFlowReplay(rows(s), opts(s)).replayed;
     const b = llamalendFlowReplay(rows(p), opts(p)).replayed;
     const t = llamalendFlowTimeline(rows(p), opts(p))!;
-    assert.equal(llamalendFlowFacts(llamalendFlowReplay(rows(p), opts(p)), t).convEstimatedRows, 0, `${name}: no estimate`);
-    assert.deepEqual(t.days.flatMap((d) => d.unsure ?? []), [], `${name}: nothing dotted but the days between`);
+    assert.equal(
+      llamalendFlowFacts(llamalendFlowReplay(rows(p), opts(p)), t).convEstimatedRows,
+      0,
+      `${name}: no estimate`,
+    );
+    assert.deepEqual(
+      t.days.flatMap((d) => d.unsure ?? []),
+      [],
+      `${name}: nothing dotted but the days between`,
+    );
     b.forEach((r, i) => {
       // Rows that were not estimated keep every figure.
       if (!a[i].convEstimated) {

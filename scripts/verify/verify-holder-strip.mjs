@@ -104,7 +104,9 @@ async function pickV2Wallet() {
     if (!best || score > best.score) best = { owner, score, branches, ended, total };
   }
   if (!best) throw new Error("no V2 wallet on the first page of open troves holds open troves on two branches");
-  console.log(`INFO  V2 wallet — ${best.owner}: ${best.total} troves, open on ${best.branches} branches, ${best.ended} ended`);
+  console.log(
+    `INFO  V2 wallet — ${best.owner}: ${best.total} troves, open on ${best.branches} branches, ${best.ended} ended`,
+  );
   return best.owner;
 }
 

@@ -576,7 +576,8 @@ templates:
       - hf.none
     groups:
       happened: [supply.what, delegated.add]
-      leaves: [coll.on, coll.off, coll.zero, coll.low, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+      leaves:
+        [coll.on, coll.off, coll.zero, coll.low, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
     alternates:
       - [coll.on, coll.off, coll.zero, coll.low]
       - [emode.between, emode.now]
@@ -738,7 +739,8 @@ templates:
       - hf.none
     groups:
       happened: [transfer_in.what]
-      leaves: [coll.on, coll.off, coll.zero, coll.low, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+      leaves:
+        [coll.on, coll.off, coll.zero, coll.low, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
     alternates:
       - [coll.on, coll.off, coll.zero, coll.low]
       - [emode.between, emode.now]

@@ -31,7 +31,8 @@ const contractOf = (note: RateStepNote) => ({
 });
 
 /** One end of the step in prose: which of the CDP's own touches it is. */
-const touchClause = (point: MarketNotePoint): string => `this position's ${polarisEndLabel(point)} at block ${point.block}`;
+const touchClause = (point: MarketNotePoint): string =>
+  `this position's ${polarisEndLabel(point)} at block ${point.block}`;
 
 const observedOf = (note: RateStepNote, which: "earlier" | "later"): RateSetLog | null =>
   which === "earlier" ? note.observed.from : note.observed.to;

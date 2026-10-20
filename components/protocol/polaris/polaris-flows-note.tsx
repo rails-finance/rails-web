@@ -27,16 +27,16 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
         event, is the change in that price since each flow, with the pETH built up since the position&apos;s last event.
       </p>
       <p>
-        Each event states the position&apos;s collateral and debt after it and every part that changed them, so each part has
-        a line of its own and the lines meet the recorded figures at every event. Interest (dashed) is charged on the
-        recorded debt at the market&apos;s rate and written in at each event. The other parts also build up between
-        events and are written in at the next one: Reward pETH (dashed), the position&apos;s net share of every direct mint
-        and redemption through the PSM since the last event (Net PSM shares added, taken or cleared, each side split by
-        its sign), Stability gains (vertical lines), and Settled to zero, the {stable} the protocol mints where the
-        shares took the debt below zero. Between two events each side&apos;s line runs straight from what the first
-        stated to what the second wrote in before the holder&apos;s act, and after the last to the live read&apos;s
-        entire figures. Each part&apos;s line moves on the event that wrote it in, so on the days between, what built up
-        sits in each side&apos;s last line.
+        Each event states the position&apos;s collateral and debt after it and every part that changed them, so each
+        part has a line of its own and the lines meet the recorded figures at every event. Interest (dashed) is charged
+        on the recorded debt at the market&apos;s rate and written in at each event. The other parts also build up
+        between events and are written in at the next one: Reward pETH (dashed), the position&apos;s net share of every
+        direct mint and redemption through the PSM since the last event (Net PSM shares added, taken or cleared, each
+        side split by its sign), Stability gains (vertical lines), and Settled to zero, the {stable} the protocol mints
+        where the shares took the debt below zero. Between two events each side&apos;s line runs straight from what the
+        first stated to what the second wrote in before the holder&apos;s act, and after the last to the live
+        read&apos;s entire figures. Each part&apos;s line moves on the event that wrote it in, so on the days between,
+        what built up sits in each side&apos;s last line.
         {facts && facts.psmRows > 0 && ` ${n(facts.psmRows, "One event", "events")} wrote PSM shares in.`}
         {facts && facts.settledRows > 0 && ` ${n(facts.settledRows, "One event", "events")} settled the debt to zero.`}
       </p>
@@ -47,9 +47,9 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
       </p>
       {facts?.liquidated && (
         <p>
-          The liquidation took the whole position: its collateral less the surplus is Liquidated (with the liquidator&apos;s
-          compensation inside it), the surplus left for the owner is Surplus to claim, and the debt it cleared is
-          Liquidated on the debt side.
+          The liquidation took the whole position: its collateral less the surplus is Liquidated (with the
+          liquidator&apos;s compensation inside it), the surplus left for the owner is Surplus to claim, and the debt it
+          cleared is Liquidated on the debt side.
         </p>
       )}
       {facts?.pendingToday && (

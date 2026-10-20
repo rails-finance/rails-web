@@ -224,7 +224,11 @@ function MarketCard({
         </span>
         {(m.mintPaused || m.borrowPaused) && (
           <span className="text-caution-500" data-prov-exempt="" title={PAUSE_TITLE}>
-            {m.mintPaused && m.borrowPaused ? "supply and borrow paused" : m.mintPaused ? "supply paused" : "borrow paused"}
+            {m.mintPaused && m.borrowPaused
+              ? "supply and borrow paused"
+              : m.mintPaused
+                ? "supply paused"
+                : "borrow paused"}
           </span>
         )}
       </div>

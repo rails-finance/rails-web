@@ -21,11 +21,7 @@
 // asking for one would silently read as the whole history.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import type {
-  AlchemixPositionResponse,
-  AlchemixStateResponse,
-  AlchemixTimelineResponse,
-} from "@/types/api/alchemix";
+import type { AlchemixPositionResponse, AlchemixStateResponse, AlchemixTimelineResponse } from "@/types/api/alchemix";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 
 export type AlchemixPositionTimelineResponse = AlchemixTimelineResponse<BaseActivityEvent>;

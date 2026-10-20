@@ -45,8 +45,8 @@ export default async function CompoundBaseMarketPage() {
                   The roster is the{" "}
                   <span className="text-foreground">{s.total} Comets Compound governance deployed here</span> — Comet
                   exposes no call that enumerates its markets, so a roster is always stated. A name will not do it on
-                  this chain: four different proxies answer to cUSDCv3 and only one is Compound&rsquo;s. The five
-                  below are the ones its own Configurator deployed
+                  this chain: four different proxies answer to cUSDCv3 and only one is Compound&rsquo;s. The five below
+                  are the ones its own Configurator deployed
                 </>
               }
             />

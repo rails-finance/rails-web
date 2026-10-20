@@ -466,7 +466,17 @@ const MERGED_16745 = [
   { from: 21588554, to: 22213537, fromPct: 12.75, toPct: 6.0, dpp: -6.75, steps: 3, sets: 3, ordinalSpan: 3 },
   // The vault owed nothing at 22,556,727: this stretch stands alone, with no
   // interest, though the stretch after it (23,105,773 on) moves the same way.
-  { from: 22556727, to: 23105751, fromPct: 6.0, toPct: 7.0, dpp: 1.0, steps: 1, sets: 4, ordinalSpan: 4, owedNothing: true },
+  {
+    from: 22556727,
+    to: 23105751,
+    fromPct: 6.0,
+    toPct: 7.0,
+    dpp: 1.0,
+    steps: 1,
+    sets: 4,
+    ordinalSpan: 4,
+    owedNothing: true,
+  },
   { from: 23105773, to: 25634095, fromPct: 7.0, toPct: 9.5, dpp: 2.5, steps: 3, sets: 6, ordinalSpan: 6 },
 ];
 
@@ -994,7 +1004,9 @@ check(
   pinnedText != null &&
     new RegExp(`Times governance changed the fee\\s*${pinned.sets}(?!\\d)`).test(pinnedText.replace(/\s+/g, " ")) &&
     pinned.sets === pinned.ordinalSpan,
-  pinnedText ? (pinnedText.match(/Times governance changed the fee.{0,20}/)?.[0] ?? "no changes stat") : "note not found",
+  pinnedText
+    ? (pinnedText.match(/Times governance changed the fee.{0,20}/)?.[0] ?? "no changes stat")
+    : "note not found",
 );
 check(
   "3j. the explanation says how many stretches between the vault's events the merged run spans",
@@ -1142,7 +1154,11 @@ check(
   windowedNotes16745 < notes16745 && windowedPill16745 === notes16745,
   `${windowedNotes16745} row(s) drawn against count ${windowedPill16745}`,
 );
-check(`4a. its note count is ${notes16745}`, (await pillText(page16745)) === notes16745, `${await pillText(page16745)}`);
+check(
+  `4a. its note count is ${notes16745}`,
+  (await pillText(page16745)) === notes16745,
+  `${await pillText(page16745)}`,
+);
 // The 25,547,112 → 25,634,095 stretch is the LAST member of the run that ends
 // at 25,634,095 (from 23,105,773, where the vault owed something again), so it
 // is no row of its own: the page states the run, and the stretch has to be
@@ -1182,7 +1198,9 @@ check(
     deepText.includes(ratePct(0.0674)) &&
     /Covers\s*2 gaps between the vault.s events/.test(deepText) &&
     /Times governance changed the fee\s*7(?!\d)/.test(deepText.replace(/\s+/g, " ")),
-  deepText ? (deepText.match(/Covers.{0,40}|Times governance changed the fee.{0,12}/g) ?? []).join(" | ") : "note not found",
+  deepText
+    ? (deepText.match(/Covers.{0,40}|Times governance changed the fee.{0,12}/g) ?? []).join(" | ")
+    : "note not found",
 );
 // The stretch the vault began owing nothing: its own note, no interest stat, and
 // the page says the change cost it nothing.

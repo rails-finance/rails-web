@@ -367,7 +367,8 @@ export default function PolarisPositionView({
           <DetailBodySkeleton />
         ) : view == null ? (
           <div className="text-sm text-rb-500">
-            Nothing readable for this position — the market has no position with this number, or the chain read is unavailable.
+            Nothing readable for this position — the market has no position with this number, or the chain read is
+            unavailable.
           </div>
         ) : (
           <>
@@ -412,8 +413,8 @@ export default function PolarisPositionView({
 
             {indexPending && polarisEvents.length === 0 ? (
               <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-                Event history pending — the indexed backend for this explorer has not answered for this position. Everything
-                above is read from the market&rsquo;s contracts at the latest Sepolia block.
+                Event history pending — the indexed backend for this explorer has not answered for this position.
+                Everything above is read from the market&rsquo;s contracts at the latest Sepolia block.
               </div>
             ) : (
               // Runs: two or more touches in a row, one sender, as one row (ui-jobs 404).

@@ -137,7 +137,16 @@ async function readPills(page, rowSel) {
     // yet — no state recorded, and never "closed" (rails-ops decision 0018).
     // It is a lifecycle word like the rest, so it is read as one; which sections
     // accept it is each section's own business.
-    const words = ["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED", "NOT LOADED", "DEFAULTED · UNCLAIMED", "REPAID", "DEFAULTED"];
+    const words = [
+      "OPEN",
+      "ZOMBIE",
+      "CLOSED",
+      "LIQUIDATED",
+      "NOT LOADED",
+      "DEFAULTED · UNCLAIMED",
+      "REPAID",
+      "DEFAULTED",
+    ];
     const rows = [...document.querySelectorAll(sel)];
     return rows.map((row) => {
       for (const el of row.querySelectorAll("span")) {

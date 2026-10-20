@@ -176,7 +176,11 @@ async function openRow(page, row) {
   const sw = row.locator("[data-sheet-switch]").first();
   if ((await sw.count()) > 0 && (await sw.getAttribute("aria-label")) === "Show breakdown") {
     await sw.click({ timeout: 15000 }).catch(() => {});
-    await row.locator("[data-live-breakdown]").first().waitFor({ state: "attached", timeout: 15000 }).catch(() => {});
+    await row
+      .locator("[data-live-breakdown]")
+      .first()
+      .waitFor({ state: "attached", timeout: 15000 })
+      .catch(() => {});
   }
   return true;
 }

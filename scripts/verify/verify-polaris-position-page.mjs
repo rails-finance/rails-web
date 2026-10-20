@@ -139,7 +139,10 @@ const context = await browser.newContext({
   await page.waitForTimeout(1500);
 
   const copyBtn = card(page).getByRole("button", { name: "Copy position number" }).first();
-  check("a1. usdp/8 detail card — a 'Copy position number' button sits in the identity row", (await copyBtn.count()) > 0);
+  check(
+    "a1. usdp/8 detail card — a 'Copy position number' button sits in the identity row",
+    (await copyBtn.count()) > 0,
+  );
   if ((await copyBtn.count()) > 0) {
     await copyBtn.click();
     await page.waitForTimeout(200);
@@ -159,7 +162,10 @@ const context = await browser.newContext({
   }
 
   const nftBtn = card(page).getByRole("button", { name: "View the position NFT on Etherscan" }).first();
-  check("a4. usdp/8 detail card — a 'View the position NFT on Etherscan' button sits beside it", (await nftBtn.count()) > 0);
+  check(
+    "a4. usdp/8 detail card — a 'View the position NFT on Etherscan' button sits beside it",
+    (await nftBtn.count()) > 0,
+  );
   if ((await nftBtn.count()) > 0) {
     await nftBtn.click();
     await page.waitForTimeout(300);

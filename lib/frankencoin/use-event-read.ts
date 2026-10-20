@@ -286,4 +286,3 @@ export function applyFrankencoinOpening(events: FrankEvent[], read: FrankencoinE
     return { ...e, context: { ...e.context, data } };
   });
 }
-
