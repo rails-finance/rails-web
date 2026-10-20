@@ -201,7 +201,8 @@ async function readPage(f) {
     url,
     status,
     block: Number(await grab("[data-vault-block]", "data-vault-block")),
-    shapeKind: await grab("[data-holder]", "data-holder-shape-kind"),
+    // The shape line sits in the holder card's (i) since ui-jobs 407 step 4.
+    shapeKind: await grab('[data-figure="holder-shape"]', "data-holder-shape-kind"),
     shapeLine: await grab('[data-figure="holder-shape"]'),
     attestedConstant: await grab('[data-figure="holder-shape"]', "data-attested-constant"),
     attestedVia: await grab('[data-figure="holder-shape"]', "data-attested-via"),

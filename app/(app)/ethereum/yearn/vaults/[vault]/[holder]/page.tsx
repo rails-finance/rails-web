@@ -17,20 +17,16 @@
 // boundary and REUSE that block. Two `eth_blockNumber` calls a second apart are
 // two different moments, so nothing here reads a second one.
 //
-// THERE IS NO POSITION CARD AND NO SHARE IMAGE HERE, and both absences are
-// facts rather than omissions. The other two vault layers draw a card from the
-// daily census — transfers, first seen, what the holding address is — and Yearn
-// has no census: every `(vault, holder)` pair on this roster is the
-// share-ledger job parked at TO-DO-infra-and-backend §5.4. A card drawn without
-// it would have to invent the half it cannot read, and an unfurl image would
-// draw that same invention. What this page states is what it read: the flows
-// reduced over the whole life, and the life itself.
+// THE CARD NEEDS NO CENSUS. Balance, share of the vault, claim and Redeemable
+// now are calls at the page's block; First seen and Earned come from this page's
+// own sweep of the address's transfers. There is no USD line: no oracle is read
+// for this roster's assets. The page is the family header, the holder card,
+// Lifetime flows and the Activity timeline (rails-ops ui-jobs 407 step 4).
 //
-// The rows below DO carry a permalink each — `event/[eventId]` under this
-// route, added 2026-09-20 — and that route has no share image of its own for a
-// third, separate reason: a Yearn event can only be found by sweeping the whole
-// life, and an image route must not do that on a free parameter. Its own header
-// states it.
+// The rows below carry a permalink each — `event/[eventId]` under this route —
+// and neither route has a share image: a Yearn event can only be found by
+// sweeping the whole life, and an image route must not do that on a free
+// parameter.
 //
 // The vault's own figures — idle, debt, the withdrawal queue, the roles — are
 // NOT restated here. They are the factsheet one path segment up.
@@ -48,6 +44,11 @@ import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
 import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
+import { vaultHoldingHistory, type VaultHoldingHistory } from "@/lib/vaults/earned";
+import { VaultHoldingCard } from "@/components/vaults/vault-holding-card";
+import { HoldingExplanation } from "@/components/vaults/holding-explanation";
+import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
+import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
 import { YearnVaultTimeline } from "@/components/vaults/yearn-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
@@ -76,34 +77,22 @@ const load = cache((vault: string, holder: string | undefined) => loadYearnEther
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
-/** The holder's own events in this vault, streamed in beside the reading.
+/** The holder's whole history in this vault, read once per request: the card's
+ *  Earned and First seen, the Lifetime flows panel and the timeline all reduce
+ *  the same rows (React's cache() hands every caller one promise).
  *
  *  It takes the BLOCK the vault loader already pinned rather than reading one
  *  of its own: the reading and the history are one claim about one moment.
  *  Every read inside it ends at that block, and each row's share price is
- *  called at that row's own block — never at "latest".
- *
- *  Rendered inside a `<Suspense>` because its reads are log sweeps and the rest
- *  of the page is `eth_call`s that have already answered. */
-async function YearnTimelineSection({
-  data,
-  holder,
-  onEventPage,
-}: {
-  data: YearnVaultResponse;
-  holder: string;
-  onEventPage: boolean;
-}) {
-  // Without the vault's own `decimals()` there is no exponent to ask a share
-  // price with, and inventing one would print a 6-decimal price 1e12 too large.
-  // No reading, so no rows.
-  if (data.vault.shareDecimals == null) return null;
+ *  called at that row's own block — never at "latest". */
+const loadHistory = cache(async (data: YearnVaultResponse, holder: string) => {
+  const shareDecimals = data.vault.shareDecimals;
   const entry = await yearnRosterEntry(data.vault.address);
-  if (!entry) return null;
+  if (shareDecimals == null || !entry) return null;
 
   const { timeline, allEvents } = await loadYearnEthereumVaultTimeline(data.vault.address, holder, {
     blockNumber: data.blockNumber,
-    shareDecimals: data.vault.shareDecimals,
+    shareDecimals,
     assetDecimals: data.vault.asset.decimals,
     createdBlock: entry.createdBlock,
   });
@@ -120,9 +109,7 @@ async function YearnTimelineSection({
   // ⚠️ THE TOWER IS REDUCED HERE, ON THE SERVER, OVER `allEvents` — the WHOLE
   // life, not the window the client is handed. `timeline.events` is capped at
   // `VAULT_TIMELINE_DRAW_ROWS`, and a tower summed from that slice would be a
-  // window's arithmetic wearing a lifetime's caption. The component below is a
-  // renderer and holds no reducer at all, so there is no second place this
-  // could happen.
+  // window's arithmetic wearing a lifetime's caption.
   const economics = data.holder
     ? computeVaultPositionEconomics({
         timeline: { ...timeline, events: allEvents },
@@ -130,7 +117,7 @@ async function YearnTimelineSection({
         sharesRaw: data.holder.shares.raw,
         claimRaw: data.holder.claim?.raw ?? null,
         shareSymbol: data.vault.symbol ?? shortAddress(data.vault.address),
-        shareDecimals: data.vault.shareDecimals,
+        shareDecimals,
         assetSymbol: data.vault.asset.symbol,
         assetDecimals: data.vault.asset.decimals,
         vaultAddress: data.vault.address,
@@ -144,7 +131,7 @@ async function YearnTimelineSection({
       ? vaultFlowTimeline(allEvents, {
           assetSymbol: data.vault.asset.symbol,
           shareSymbol: data.vault.symbol ?? shortAddress(data.vault.address),
-          shareDecimals: data.vault.shareDecimals,
+          shareDecimals,
           assetDecimals: data.vault.asset.decimals,
           blockNumber: timeline.blockNumber,
           blockTimestamp: timeline.blockTimestamp,
@@ -155,6 +142,33 @@ async function YearnTimelineSection({
         })
       : null;
 
+  // Earned over the same rows, under the panel's condition (decision 0048).
+  const card = vaultHoldingHistory(allEvents, {
+    shareDecimals,
+    claimRaw: data.holder?.claim?.raw ?? null,
+    blockNumber: data.blockNumber,
+    replayed: economics != null && flowTimeline != null,
+  });
+  return { timeline, economics, flowTimeline, card };
+});
+
+/** The Lifetime flows panel and the timeline, streamed in behind a Suspense
+ *  boundary: their reads are log sweeps, and the card has painted first. */
+async function YearnTimelineSection({
+  data,
+  holder,
+  onEventPage,
+}: {
+  data: YearnVaultResponse;
+  holder: string;
+  onEventPage: boolean;
+}) {
+  // Without the vault's own `decimals()` there is no exponent to ask a share
+  // price with, and inventing one would print a 6-decimal price 1e12 too large.
+  // No reading, so no rows.
+  const history = await loadHistory(data, holder);
+  if (!history) return null;
+  const { timeline, economics, flowTimeline } = history;
   return (
     <>
       {/* The Lifetime flows panel, drawn under the condition the rows are: the
@@ -181,6 +195,65 @@ async function YearnTimelineSection({
   );
 }
 
+/** The holder card (components/vaults/vault-holding-card.tsx). Yearn has no
+ *  census, so every figure on it is a call at this page's block, and First seen
+ *  and Earned come from this page's own sweep. */
+function HoldingCard({
+  data,
+  holder,
+}: {
+  data: YearnVaultResponse;
+  holder: NonNullable<YearnVaultResponse["holder"]>;
+}) {
+  const { vault } = data;
+  const shareDecimals = vault.shareDecimals ?? vault.asset.decimals;
+  const shareSymbol = vault.symbol ?? shortAddress(vault.address);
+  const unread = { earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null };
+  const history: Promise<VaultHoldingHistory> = loadHistory(data, holder.address).then(
+    (r) => r?.card ?? unread,
+    () => unread,
+  );
+  const supply = vault.totalSupply ? BigInt(vault.totalSupply.raw) : BigInt(0);
+  const held = BigInt(holder.shares.raw);
+  return (
+    <VaultHoldingCard
+      coords={{
+        chainId: YEARN_CHAIN_ID,
+        blockNumber: data.blockNumber,
+        vault: vault.address,
+        vaultName: vault.name ?? undefined,
+        shareSymbol,
+        shareDecimals,
+        assetSymbol: vault.asset.symbol,
+        assetDecimals: vault.asset.decimals,
+        holder: holder.address,
+      }}
+      family="yearn"
+      venueMark={vault.endorsed === true}
+      vaultHref={yearnVaultHref(vault.address)}
+      holdingHref={yearnVaultHref(vault.address, holder.address)}
+      assetAddress={vault.asset.address}
+      shares={holder.shares}
+      claim={holder.claim}
+      totalSupply={vault.totalSupply}
+      dust={held > BigInt(0) && supply > BigInt(0) && Number(held) / Number(supply) < 0.000001}
+      maxWithdraw={holder.maxWithdraw}
+      exit="withdraw() or redeem()"
+      census={null}
+      history={history}
+      learnMore={vaultHoldingContent(vault.asset.symbol, shareSymbol, false, HOLDING_REWARDS.yearn)}
+      explanation={
+        <HoldingExplanation
+          blockNumber={data.blockNumber}
+          censusBlock={null}
+          assetSymbol={vault.asset.symbol}
+          rewards={HOLDING_REWARDS.yearn}
+        />
+      }
+    />
+  );
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { vault, holder } = await params;
   const address = vault.toLowerCase();
@@ -195,7 +268,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     market: name,
     subject,
     canonicalPath: yearnVaultHref(address, holder),
-    description: `A Rails reading of what this address holds of the ${name} Yearn V3 vault: shares, claim, lifetime flows and every one of its own events, read from chain at one block in native units.`,
+    description: `A Rails reading of this address's holding in the ${name} Yearn V3 vault: shares, claim, earned, what is redeemable now, lifetime flows and every one of its own events, read from chain at one block.`,
   });
 }
 
@@ -256,6 +329,8 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
             assets={shareAssets}
             priceReason={ORACLE_USD_REASON["yearn"]}
             owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
+            // The card's ⋮ carries the menu; the event route draws no card.
+            tools={onEventPage}
           />
           {!onEventPage && (
             <>
@@ -275,44 +350,16 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
           )}
           {data.chainStale ? (
             <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for this address in it. The page
-              states nothing it could not read.
+              This vault could not be read from chain just now, so no figure is stated for this address in it.
             </p>
           ) : onEventPage ? null : (
-            <>
-              <p className="mt-2 text-[12px] text-rb-500">
-                Yearn V3 {data.vault.apiVersion} · asset{" "}
-                <a
-                  href={explorerUrl(YEARN_CHAIN_ID, "address", data.vault.asset.address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={data.vault.asset.named ? "link-external" : "link-external font-mono"}
-                >
-                  {data.vault.asset.symbol}
-                </a>
-                {" · shares "}
-                <a
-                  href={explorerUrl(YEARN_CHAIN_ID, "address", address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external font-mono"
-                >
-                  {shortAddress(address)}
-                </a>
-              </p>
-              <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at <BlockRef block={data.blockNumber} chainId={YEARN_CHAIN_ID} /> · every figure read at this block
-                is a call answered at it, on this vault. Each row below states its own share price at its own block.
-              </p>
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <Link href={yearnVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
-                  {vaultName} <span aria-hidden>→</span>
-                </Link>
-                <Link href={yearnVaultRosterHref()} className={PAGE_LINK} prefetch={false} data-link="vault-roster">
-                  Every Yearn V3 vault <span aria-hidden>→</span>
-                </Link>
-              </p>
-            </>
+            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
+              {/* The release; the card names the block. */}
+              <span data-vault-block={data.blockNumber}>Yearn V3 {data.vault.apiVersion}</span>
+              <Link href={yearnVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
+                {vaultName} <span aria-hidden>→</span>
+              </Link>
+            </p>
           )}
         </header>
 
@@ -331,16 +378,19 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
           </p>
         )}
 
+        {!data.chainStale && !onEventPage && data.holder && <HoldingCard data={data} holder={data.holder} />}
         {!data.chainStale && data.holder && (
-          <Suspense
-            fallback={
-              <div className="mb-6" data-skel-section="vault-timeline-pending">
-                <SkeletonBlock height={180} />
-              </div>
-            }
-          >
-            <YearnTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
-          </Suspense>
+          <HoldingReceiptsScope>
+            <Suspense
+              fallback={
+                <div className="mb-6" data-skel-section="vault-timeline-pending">
+                  <SkeletonBlock height={180} />
+                </div>
+              }
+            >
+              <YearnTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
+            </Suspense>
+          </HoldingReceiptsScope>
         )}
 
         <ProvInspectorLayer />

@@ -701,6 +701,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             explanationDefaultOpen={slots.explainer.defaultOpen}
             onExplanationToggle={slots.explainer.onToggle}
             anatomy={CARD_ANATOMY}
+            label={explanationLabel(slots.heading)}
           />
         </>
       )}
@@ -719,3 +720,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
 }
 
 const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
+
+/** The (i) toggle's noun from the heading: "Vault summary" → "vault
+ *  explanation"; no heading, "position explanation". */
+const explanationLabel = (heading?: string): string =>
+  `${(heading ?? "Position summary").replace(/ summary$/i, "").toLowerCase()} explanation`;

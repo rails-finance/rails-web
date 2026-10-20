@@ -50,6 +50,8 @@
 //   9  the dev provenance tripwire reports no uncovered figure, every row
 //      expanded (SKIP when its bookends are absent — a production build renders
 //      none)
+//  10  the holder card: four headlines in order, at most six stats, Earned
+//      equal to the panel's end minus its net inflow, the (i) named
 //
 // ── THE FIXTURES ARE PINNED STATE, AND A CHANGE IS A FAILURE ──────────
 // Four holdings, pinned 2026-09-20: two 6-decimal assets and two 18-decimal
@@ -93,6 +95,7 @@
 // curator names; a counterparty is an address. Section 6 is those refusals as
 // checks, and it reads the RENDERED page rather than the source.
 
+import { holdingCardChecks, readHoldingCard } from "./lib/holding-card.mjs";
 import { chromium } from "playwright";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector, decodeAbiParameters } from "viem";
 import { mainnet } from "viem/chains";
@@ -368,6 +371,12 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
       }
     }
     await page.waitForTimeout(900);
+    // An opened card shows its Explanation tab first; the row's figures are on
+    // the other.
+    await page
+      .locator("[data-vault-timeline-rows] [data-card-tab='figures']")
+      .evaluateAll((els) => els.forEach((el) => el.click()));
+    await page.waitForTimeout(600);
   }
   const out = {
     url,
@@ -856,6 +865,17 @@ if (![...EXPANDED.values()].some((p) => p.tripwireBookends > 0)) {
       `${FIXTURES.length} pages, ${FIXTURES.reduce((a, f) => a + EXPANDED.get(`${f.vault}:${f.holder}`).domRows, 0)} rows expanded`,
   );
 }
+
+// ═══ 10: the holder card (ui-jobs 407 step 4, 410) ═════════════════════════
+// Yearn has no census: every figure is a call at the page's block, and Earned
+// is the page's replay. The first fixture is a 6-decimal asset with all four
+// kinds of leg.
+holdingCardChecks(
+  check,
+  "10",
+  await readHoldingCard(browser, `${BASE}/ethereum/yearn/vaults/${FIXTURES[0].vault}/${FIXTURES[0].holder}`),
+  FIXTURES[0].decimals,
+);
 
 console.log(`\n${passed}/${passed + failed} checks passed${skipped ? ` · ${skipped} SKIP` : ""}`);
 await browser.close();

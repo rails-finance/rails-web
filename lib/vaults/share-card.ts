@@ -1,4 +1,4 @@
-// One vault POSITION → share-card model. The bridge between the section's own
+// One vault HOLDING → share-card model. The bridge between the section's own
 // census row and the shared card renderer.
 // ----------------------------------------------------------------------------
 // SERVER-ONLY, and it adds NO CHAIN READ. The position page itself reads the
@@ -11,7 +11,7 @@
 //
 // The Vaults section is not an explorer (rails-ops decision 0017), so the model
 // carries an `identity` instead of a `session`: the card's mark is the section's
-// own vault glyph, its label is "Vaults", and the noun is "Position".
+// own vault glyph, its label is "Vaults", and the noun is "Holding".
 //
 // Null where the census has no row for this pair — an address it has never seen
 // has none until the next tick — and `positionImage` then serves the static

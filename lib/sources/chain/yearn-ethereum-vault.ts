@@ -53,6 +53,7 @@ const VAULT_ABI = parseAbi([
   // a default of 18 would be a trillion-fold error stated as a price.
   "function decimals() view returns (uint8)",
   "function balanceOf(address) view returns (uint256)",
+  "function maxWithdraw(address) view returns (uint256)",
 ]);
 const REGISTRY_ABI = parseAbi(["function isEndorsed(address) view returns (bool)"]);
 const STRATEGY_ABI = parseAbi([
@@ -175,6 +176,9 @@ export interface YearnVaultResponse {
     /** `convertToAssets(balanceOf(holder))` — the vault's own conversion of
      *  that exact balance, in the asset. Null where the call did not answer. */
     claim: RawAmount | null;
+    /** `maxWithdraw(holder)` in the asset, with the vault's default queue and
+     *  no loss allowed. Null where the call did not answer. */
+    maxWithdraw: RawAmount | null;
   } | null;
   /** One row per member of `get_default_queue()`, in queue order. */
   strategies: YearnVaultStrategyRow[];
@@ -310,18 +314,21 @@ export async function loadYearnEthereumVault(address: string, holder?: string): 
       )[0];
       const shares = ok(balance as Call) as bigint | undefined;
       if (shares != null) {
-        const claimRead = (
-          await client.multicall({
-            contracts: [{ address: vault, abi: VAULT_ABI, functionName: "convertToAssets", args: [shares] }],
-            allowFailure: true,
-            blockNumber,
-          })
-        )[0];
+        const [claimRead, maxRead] = await client.multicall({
+          contracts: [
+            { address: vault, abi: VAULT_ABI, functionName: "convertToAssets", args: [shares] },
+            { address: vault, abi: VAULT_ABI, functionName: "maxWithdraw", args: [who] },
+          ],
+          allowFailure: true,
+          blockNumber,
+        });
         const claim = ok(claimRead as Call) as bigint | undefined;
+        const max = ok(maxRead as Call) as bigint | undefined;
         holderReading = {
           address: who,
           shares: amount(shares, shareDecimals ?? decimals),
           claim: claim == null ? null : amount(claim, decimals),
+          maxWithdraw: max == null ? null : amount(max, decimals),
         };
       }
     }

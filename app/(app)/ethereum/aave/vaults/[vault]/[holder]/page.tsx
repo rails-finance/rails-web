@@ -1,7 +1,8 @@
-// ONE POSITION — /ethereum/aave/vaults/<vault>/<holder>.
+// ONE HOLDING — /ethereum/aave/vaults/<vault>/<holder>.
 // ----------------------------------------------------------------------------
-// A position is the pair `(vault, holder)`, and it has a path of its own the
-// way a trove does. The holder is a SEGMENT rather than a query because it is
+// A holding is the pair `(vault, holder)`, and it has a path of its own the
+// way a trove does. The page is the family header, the holder card, Lifetime
+// flows and the Activity timeline (rails-ops ui-jobs 407 step 4). The holder is a SEGMENT rather than a query because it is
 // the subject of the page, not a filter on the vault beside it: the card at the
 // top of this page is the same card the section's listing draws for this pair,
 // and clicking it is what brings a reader here.
@@ -22,8 +23,7 @@
 // second apart are two different moments, so nothing here reads a second one.
 //
 // The vault's own figures and its family's mechanic are NOT restated here: they
-// are the market view one path segment up, and the family's whole mechanic is
-// in this page's intro drawer.
+// are the vault card one path segment up.
 
 import { cache, Suspense } from "react";
 import type { Metadata } from "next";
@@ -33,30 +33,37 @@ import { after } from "next/server";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { AaveEthereumVaultPositionView } from "@/components/vaults/aave-ethereum-vault-view";
 import { AaveVaultTimeline } from "@/components/vaults/aave-vault-timeline";
 import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
 import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
-import { VaultPositionCard } from "@/components/vaults/vault-position-card";
-import { VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
+import { vaultHoldingHistory, type VaultHoldingHistory } from "@/lib/vaults/earned";
+import { VaultHoldingCard } from "@/components/vaults/vault-holding-card";
+import { HoldingExplanation } from "@/components/vaults/holding-explanation";
+import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
+import { HolderShapeLine } from "@/components/vaults/holder-shape-line";
+import { CatalogueMemberLink } from "@/components/vaults/aave-vault-holder-parts";
+import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
+import { Prov } from "@/components/shared/provenance";
+import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { holderListingSegment } from "@/lib/shared/protocols";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
-import { shareText } from "@/lib/shared/vault-amount-text";
-import { cooldownSentence } from "@/lib/aave-vaults/cooldown-words";
+import { assetText } from "@/lib/shared/vault-amount-text";
+import { cooldownSentence, cooldownWords } from "@/lib/aave-vaults/cooldown-words";
 import {
+  aaveAttestedNameProv,
+  aaveUmbrellaWrapperClaimProv,
   aaveVaultCooldownStateProv,
-  aaveVaultMaxRedeemProv,
+  aaveVaultHolderShapeProv,
   aaveVaultSharePriceProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
-import { resolveAaveVaultHolder, type AaveVaultHolderLookup } from "@/lib/aave-vaults/vault-holder";
-import { aaveVaultPositionContent } from "@/lib/shared/learn-more-content";
+import { resolveAaveVaultHolder } from "@/lib/aave-vaults/vault-holder";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault, type AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
 import { loadAaveEthereumVaultTimelineWithTail } from "@/lib/sources/chain/aave-ethereum-vault-timeline";
@@ -84,31 +91,16 @@ const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
-/** The holder's own events in this vault, streamed in beside the reading.
+/** The holder's whole history in this vault, read once per request: the card's
+ *  Earned, the Lifetime flows panel and the timeline all reduce the same rows
+ *  (React's cache() hands every caller one promise).
  *
  *  It takes the BLOCK the vault loader already pinned rather than reading one
- *  of its own: the reading and the history are one claim about one moment, and
- *  two `eth_blockNumber` calls a second apart are two different moments. Every
- *  read inside it ends at that block, and each row's share price is called at
- *  that row's own block — never at "latest".
- *
- *  Rendered inside a `<Suspense>` because its reads are log sweeps and the rest
- *  of the page is `eth_call`s that have already answered; the reading paints
- *  first and this arrives when the chain has spoken. */
-async function VaultTimelineSection({
-  data,
-  holder,
-  onEventPage,
-}: {
-  data: AaveEthereumVaultResponse;
-  holder: string;
-  onEventPage: boolean;
-}) {
-  // Without the share token's own `decimals()` there is no exponent to ask a
-  // share price with, and inventing one would print a 6-decimal price 1e12 too
-  // large. No reading, so no rows.
-  if (data.vault.shareDecimals == null) return null;
-
+ *  of its own: the reading and the history are one claim about one moment.
+ *  Every read inside it ends at that block, and each row's share price is
+ *  called at that row's own block — never at "latest". */
+const loadHistory = cache(async (data: AaveEthereumVaultResponse, holder: string) => {
+  const shareDecimals = data.vault.shareDecimals!;
   // The stored tail, read BEFORE the loader so the loader can sweep a head
   // instead of a life. A tail that is absent, stale or wrong costs this page a
   // whole-life sweep and nothing else — the gate below runs on the merged rows
@@ -128,7 +120,7 @@ async function VaultTimelineSection({
     {
       blockNumber: data.blockNumber,
       family: data.vault.family,
-      shareDecimals: data.vault.shareDecimals,
+      shareDecimals,
       assetDecimals: data.vault.asset.decimals,
       tail,
     },
@@ -164,23 +156,21 @@ async function VaultTimelineSection({
   // life, not the window the client is handed. `timeline.events` is capped at
   // `VAULT_TIMELINE_DRAW_ROWS` so that a 9,000-row life does not ship nine thousand rows
   // of RSC payload, and a tower summed from that slice would be a window's
-  // arithmetic wearing a lifetime's caption. The component below is a renderer
-  // and holds no reducer at all, so there is no second place this could happen.
-  const economics =
-    data.holder && data.vault.shareDecimals != null
-      ? computeVaultPositionEconomics({
-          timeline: { ...timeline, events: allEvents },
-          coords,
-          sharesRaw: data.holder.shares.raw,
-          claimRaw: data.holder.claim?.raw ?? null,
-          shareSymbol: data.vault.symbol ?? shortAddr(data.vault.address),
-          shareDecimals: data.vault.shareDecimals,
-          assetSymbol: data.vault.asset.symbol,
-          assetDecimals: data.vault.asset.decimals,
-          vaultAddress: data.vault.address,
-          assetAddress: data.vault.asset.address,
-        })
-      : null;
+  // arithmetic wearing a lifetime's caption.
+  const economics = data.holder
+    ? computeVaultPositionEconomics({
+        timeline: { ...timeline, events: allEvents },
+        coords,
+        sharesRaw: data.holder.shares.raw,
+        claimRaw: data.holder.claim?.raw ?? null,
+        shareSymbol: data.vault.symbol ?? shortAddr(data.vault.address),
+        shareDecimals,
+        assetSymbol: data.vault.asset.symbol,
+        assetDecimals: data.vault.asset.decimals,
+        vaultAddress: data.vault.address,
+        assetAddress: data.vault.asset.address,
+      })
+    : null;
 
   // The panel's day rows over the same whole life, where the gate passed.
   const flowTimeline =
@@ -188,7 +178,7 @@ async function VaultTimelineSection({
       ? vaultFlowTimeline(allEvents, {
           assetSymbol: data.vault.asset.symbol,
           shareSymbol: data.vault.symbol ?? shortAddr(data.vault.address),
-          shareDecimals: data.vault.shareDecimals,
+          shareDecimals,
           assetDecimals: data.vault.asset.decimals,
           blockNumber: timeline.blockNumber,
           blockTimestamp: timeline.blockTimestamp,
@@ -199,6 +189,32 @@ async function VaultTimelineSection({
         })
       : null;
 
+  // Earned over the same rows, under the panel's condition (decision 0048).
+  const card = vaultHoldingHistory(allEvents, {
+    shareDecimals,
+    claimRaw: data.holder?.claim?.raw ?? null,
+    blockNumber: data.blockNumber,
+    replayed: economics != null && flowTimeline != null,
+  });
+  return { timeline, economics, flowTimeline, card };
+});
+
+/** The Lifetime flows panel and the timeline, streamed in behind a Suspense
+ *  boundary: their reads are log sweeps, and the card has painted first. */
+async function VaultTimelineSection({
+  data,
+  holder,
+  onEventPage,
+}: {
+  data: AaveEthereumVaultResponse;
+  holder: string;
+  onEventPage: boolean;
+}) {
+  // Without the share token's own `decimals()` there is no exponent to ask a
+  // share price with, and inventing one would print a 6-decimal price 1e12 too
+  // large. No reading, so no rows.
+  if (data.vault.shareDecimals == null) return null;
+  const { timeline, economics, flowTimeline } = await loadHistory(data, holder);
   return (
     <>
       {/* The Lifetime flows panel, drawn under the condition the rows are: the
@@ -226,27 +242,19 @@ async function VaultTimelineSection({
   );
 }
 
-/** The listing's own card for this `(vault, holder)` pair, with receipts.
+/** The holder card (components/vaults/vault-holding-card.tsx).
  *
- *  Its CENSUS lane — transfers, first seen, last activity, what the holding
- *  address is — comes from the store through this deployment's own listing
- *  proxy, which is the only place that set exists. Its LIVE lane is replaced
- *  with the page's OWN reading, so the card and the sections under it state one
- *  block rather than two; the proxy's block timestamps are kept, because a
- *  block's timestamp is the same fact whichever request read it.
+ *  Its live figures are this page's reads at its block; its census figures
+ *  (the transfer count, first seen, the dollar value, what the address is)
+ *  come from the store through this deployment's listing proxy, where the
+ *  census has a row. Earned is a promise over the history, so the card paints
+ *  before the sweeps answer.
  *
- *  Null where the census has no row for this address. That is a fact about the
- *  census — a daily sweep, and an address that first appeared since the last
- *  tick has no row yet — and it says nothing about the reading below it. */
-async function VaultPositionCardSection({
-  data,
-  holder,
-  lookup,
-}: {
-  data: AaveEthereumVaultResponse;
-  holder: string;
-  lookup: AaveVaultHolderLookup;
-}) {
+ *  THE EXIT IS THE CONTRACT'S OWN FUNCTION, per family. sGHO and a static
+ *  aToken redeem outright; an Umbrella stake token cannot be redeemed until a
+ *  cooldown has been started and waited out, so its exit names both calls in
+ *  the order they must happen. */
+async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultResponse; holder: string }) {
   if (!data.holder) return null;
   const hop = (await ssrHop()) ?? undefined;
   let rows: VaultPositionRow[] = [];
@@ -260,65 +268,14 @@ async function VaultPositionCardSection({
     });
     rows = page.data;
   } catch (error) {
-    console.error("The vault position card's census row did not answer:", error);
+    console.error("The holder card's census row did not answer:", error);
   }
-  const row = rows.find((r) => r.holder.toLowerCase() === holder.toLowerCase());
-  const strip = vaultContextStrip(data);
-  // THE CENSUS HAS NO ROW, AND THE READING IS STILL A READING. What is
-  // redeemable at this block, the exit and the cooldown are calls this page
-  // made itself; they must not be lost because a daily sweep has not yet seen
-  // this address. The same three clusters stand alone in the card's place, with
-  // the sentence saying why there is no card.
-  if (!row)
-    return (
-      <VaultContextStripStandalone
-        {...strip}
-        absence={`The census has no row for this address in this vault yet — it sweeps once a day, and an address first seen since the last tick has none. Nothing above or below depends on it: every figure on this page is a call answered at block ${data.blockNumber.toLocaleString("en-US")}.`}
-      />
-    );
-
-  const shareDecimals = data.vault.shareDecimals ?? row.shareDecimals ?? 18;
-  const onPage: VaultPositionRow = {
-    ...row,
-    shareDecimals,
-    asset: {
-      address: data.vault.asset.address,
-      symbol: data.vault.asset.symbol,
-      decimals: data.vault.asset.decimals,
-    },
-    live: {
-      blockNumber: data.blockNumber,
-      shares: data.holder.shares,
-      claim: data.holder.claim,
-      totalSupply: data.totalSupply,
-      live: BigInt(data.holder.shares.raw) > BigInt(0),
-    },
-  };
-  return (
-    <VaultPositionCard
-      row={onPage}
-      receipts
-      learnMore={aaveVaultPositionContent(data.vault.family, data.vault.asset.symbol, data.vault.symbol)}
-      // What is redeemable, the exit and the cooldown: rows of the card's panel.
-      context={strip}
-      explanation={<PositionCardExplanation row={onPage} maxRedeemRead={data.holder.maxRedeem != null} />}
-    />
-  );
-}
-
-/** What the card's context strip says for THIS reading — built here, on the
- *  server, from the one loader the page already awaited, and handed to the card
- *  as already-formatted words plus the receipt that traces each.
- *
- *  THE EXIT IS THE CONTRACT'S OWN FUNCTION, per family. sGHO and a static
- *  aToken redeem outright; an Umbrella stake token cannot be redeemed until a
- *  cooldown has been started and waited out, so its exit names both calls in
- *  the order they must happen. No verb of this page's own choosing, and no
- *  advice about when to use either. */
-function vaultContextStrip(data: AaveEthereumVaultResponse) {
-  const holder = data.holder!;
+  const census = rows.find((r) => r.holder.toLowerCase() === holder.toLowerCase()) ?? null;
   const { vault } = data;
-  const sd = vault.shareDecimals ?? 18;
+  const h = data.holder;
+  const family = vault.family;
+  const sd = vault.shareDecimals ?? census?.shareDecimals ?? 18;
+  const shareSymbol = vault.symbol ?? shortAddr(vault.address);
   const coords: AaveVaultCoords = {
     blockNumber: data.blockNumber,
     vault: vault.address,
@@ -326,70 +283,110 @@ function vaultContextStrip(data: AaveEthereumVaultResponse) {
     assetSymbol: vault.asset.symbol,
     shareSymbol: vault.symbol ?? undefined,
     reserveSymbol: data.umbrella?.reserve?.symbol,
-    holder: holder.address,
+    holder: h.address,
   };
-  return {
-    redeemable: holder.maxRedeem
-      ? {
-          text: `${shareText(holder.maxRedeem, sd)} ${vault.symbol ?? "shares"}`,
-          prov: aaveVaultMaxRedeemProv(coords, vault.family),
-          figure: "holder-max-redeem" as const,
-          amount: {
-            ...holder.maxRedeem,
-            decimals: sd,
-            symbol: vault.symbol ?? "shares",
-            address: vault.address,
-          },
-        }
-      : { unread: true as const, figure: "holder-max-redeem" as const },
-    exit: vault.family === "umbrella-stake" ? "cooldown(), then redeem()" : "redeem()",
-    cooldown: holder.cooldown
-      ? {
-          text: `${cooldownSentence(holder.cooldown, sd)}. ${
-            holder.cooldown.state === "open"
-              ? "Inside it maxRedeem() answers what the snapshot covers."
-              : "Outside it maxRedeem() answers zero."
-          }`,
-          prov: aaveVaultCooldownStateProv(coords),
-        }
-      : undefined,
-  };
-}
-
-/** The card's Explanation pane — facts only, and its whole subject is WHICH
- *  LANE each figure came from, because the card is the one surface on this page
- *  that draws two: a live reading at the page's block and a counted set from
- *  the daily census at the census block. */
-function PositionCardExplanation({ row, maxRedeemRead }: { row: VaultPositionRow; maxRedeemRead: boolean }) {
-  const n = (v: number) => v.toLocaleString("en-US");
-  const open = row.live ? row.live.live : row.census.live;
-  const items = [
-    `Shares, claim and share of the vault are calls answered at block ${n(row.live?.blockNumber ?? 0)} — the same block every figure under this card is read at.`,
-    // A closed card draws no panel, so it has no Redeemable now row.
-    !open
-      ? null
-      : maxRedeemRead
-        ? `"Redeemable now" in the panel above is the vault's maxRedeem() for this address at that same block, in share units — what the contract says can be redeemed then; the Claim row states what the shares are worth. On a stake token it answers zero outside the holder's unstake window, and that zero is a state rather than an absence.`
-        : `"Redeemable now" reads "Not loaded": the vault's maxRedeem() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
-    `Transfers, first seen and last activity are counted by the census: one whole-Transfer sweep of this vault, proven complete by Σ balanceOf equalling totalSupply() wei-exact, swept to block ${n(row.census.block)}.`,
-    `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"} — never shares multiplied by a price.`,
-    row.value.usdE8 != null
-      ? `Value · USD is the census's figure at block ${n(row.value.pricedBlock ?? row.census.block)}: the balance at that block through the vault's own convertToAssets and the chain's Aave V3 oracle (IAaveOracle.getAssetPrice) at the same block, the oracle named on its receipt — computed once by the daily census and never read for this page, so it says what the position was worth then and nothing about now.`
-      : row.value.pricedBlock == null
-        ? "Value · USD is stated as not priced: the daily census has not yet run its price pass over this vault, so no oracle was asked."
-        : `Value · USD is stated as not priced: the chain's Aave V3 oracle declined ${row.value.assetSymbol ?? "this vault's asset"} at block ${n(row.value.pricedBlock)} — reverted or answered zero — and the card carries an empty slot rather than a figure from some other feed.`,
-    "Nothing here is annualised; the blocks are stated rather than reconciled into one.",
-  ].filter((text): text is string => text != null);
+  const history: Promise<VaultHoldingHistory> =
+    vault.shareDecimals == null
+      ? Promise.resolve({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null })
+      : loadHistory(data, holder).then(
+          (r) => r.card,
+          () => ({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null }),
+        );
+  const wrapper = data.umbrella?.wrapper;
+  const reserve = data.umbrella?.reserve;
+  const umbrella = family === "umbrella-stake";
   return (
-    <div className="space-y-2 text-sm text-rb-500">
-      <p className="leading-relaxed">This card draws two lanes, and each figure names the block its own lane read.</p>
-      {items.map((text) => (
-        <div key={text} className="flex items-start gap-2 leading-relaxed">
-          <span className="select-none text-rb-500">&bull;</span>
-          <span>{text}</span>
-        </div>
-      ))}
-    </div>
+    <VaultHoldingCard
+      coords={{
+        chainId: MAINNET_CHAIN_ID,
+        blockNumber: data.blockNumber,
+        vault: vault.address,
+        vaultName: vault.name ?? undefined,
+        shareSymbol,
+        shareDecimals: sd,
+        assetSymbol: vault.asset.symbol,
+        assetDecimals: vault.asset.decimals,
+        holder: h.address,
+      }}
+      family={family}
+      venueMark
+      vaultHref={ethereumVaultHref(vault.address)}
+      holdingHref={ethereumVaultHref(vault.address, h.address)}
+      assetAddress={vault.asset.address}
+      shares={h.shares}
+      claim={h.claim}
+      totalSupply={data.totalSupply}
+      dust={h.dust}
+      maxWithdraw={h.maxWithdraw}
+      maxRedeem={umbrella ? h.maxRedeem : undefined}
+      exit={umbrella ? "cooldown(), then redeem()" : "redeem()"}
+      cooldown={
+        h.cooldown
+          ? {
+              state: h.cooldown.state,
+              text: cooldownWords(h.cooldown),
+              sentence: cooldownSentence(h.cooldown, sd),
+              prov: aaveVaultCooldownStateProv(coords),
+            }
+          : undefined
+      }
+      census={census}
+      history={history}
+      learnMore={vaultHoldingContent(vault.asset.symbol, shareSymbol, census != null, HOLDING_REWARDS[family])}
+      explanation={
+        <HoldingExplanation
+          blockNumber={data.blockNumber}
+          censusBlock={census?.census.block ?? null}
+          assetSymbol={vault.asset.symbol}
+          rewards={HOLDING_REWARDS[family]}
+          shape={
+            h.shape ? (
+              <HolderShapeLine
+                shape={h.shape}
+                blockNumber={data.blockNumber}
+                chainId={MAINNET_CHAIN_ID}
+                prov={aaveVaultHolderShapeProv(coords, h.shape.kind, h.shape.codeSize)}
+                nameProv={h.shape.kind === "attested" ? aaveAttestedNameProv(coords, h.shape.attested) : undefined}
+              />
+            ) : undefined
+          }
+          extra={
+            <>
+              {h.catalogued && (
+                <ExplainBullet data-figure="holder-catalogued">
+                  It is itself <CatalogueMemberLink vault={h.catalogued} coords={coords} what="This holder" />, one
+                  vault in Aave&rsquo;s layer holding another:{" "}
+                  <Link
+                    href={ethereumVaultsListingHref({ vault: h.catalogued.address })}
+                    className={PAGE_LINK}
+                    prefetch={false}
+                    data-link="holder-vault-holders"
+                    data-holder-vault-holders={h.catalogued.address}
+                  >
+                    its holders
+                  </Link>
+                  .
+                </ExplainBullet>
+              )}
+              {wrapper && h.claim && wrapper.holderClaim && (
+                <ExplainBullet>
+                  Through the wrapper the claim is{" "}
+                  <Fig>
+                    <span data-figure="holder-wrapper-claim">
+                      <Prov info={aaveUmbrellaWrapperClaimProv(coords, wrapper.symbol ?? "the wrapper")}>
+                        {assetText(wrapper.holderClaim, reserve?.decimals ?? vault.asset.decimals)}
+                      </Prov>
+                    </span>{" "}
+                    {reserve?.symbol ?? ""}
+                  </Fig>
+                  , a conversion at this block.
+                </ExplainBullet>
+              )}
+            </>
+          }
+        />
+      }
+    />
   );
 }
 
@@ -408,7 +405,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     market: name,
     subject,
     canonicalPath: ethereumVaultHref(address, holder),
-    description: `A Rails reading of this address's position in the ${name} vault: shares, claim, what is redeemable now, lifetime flows and every one of its own events, read from chain at one block in native units.`,
+    description: `A Rails reading of this address's holding in the ${name} vault: shares, claim, earned, what is redeemable now, lifetime flows and every one of its own events, read from chain at one block.`,
     // The route's own opengraph-image.tsx draws this position's census row.
     image: "dynamic",
   });
@@ -523,41 +520,27 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
           )}
           {data.chainStale ? (
             <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for this address in it — not the
-              family either, because which family it belongs to is a read like everything else on this page.
+              This vault could not be read from chain just now, so no figure is stated for this address in it.
             </p>
           ) : onEventPage ? null : (
-            <>
-              <p className="mt-2 text-[12px] text-rb-500">
-                {AAVE_FAMILY_SINGULAR[data.vault.family]}, deployed by Aave · shares{" "}
-                <a
-                  href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external font-mono"
-                >
-                  {shortAddr(address)}
-                </a>
-              </p>
-              <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · every figure read at this
-                block is a call answered at it, on this vault and on the contracts it names.
-              </p>
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <Link href={ethereumVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
-                  {vaultName} <span aria-hidden>→</span>
-                </Link>
-                <Link
-                  href={ethereumVaultsListingHref({ vault: address })}
-                  className={PAGE_LINK}
-                  prefetch={false}
-                  data-link="vault-positions"
-                  data-positions-vault={address}
-                >
-                  Every address that has held this vault <span aria-hidden>→</span>
-                </Link>
-              </p>
-            </>
+            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
+              {/* The family; the card names the block. */}
+              <span data-vault-block={data.blockNumber}>
+                {AAVE_FAMILY_SINGULAR[data.vault.family]}, deployed by Aave
+              </span>
+              <Link href={ethereumVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
+                {vaultName} <span aria-hidden>→</span>
+              </Link>
+              <Link
+                href={ethereumVaultsListingHref({ vault: address })}
+                className={PAGE_LINK}
+                prefetch={false}
+                data-link="vault-positions"
+                data-positions-vault={address}
+              >
+                Every holder <span aria-hidden>→</span>
+              </Link>
+            </p>
           )}
         </header>
 
@@ -566,7 +549,7 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
             what was typed. */}
         {lookup.error === "invalid" && (
           <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
-            That is neither of the two accepted forms. A position is opened with a 20-byte address starting{" "}
+            That is neither of the two accepted forms. A holding is opened with a 20-byte address starting{" "}
             <code>0x</code>, or an ENS name ending <code>.eth</code>.
           </p>
         )}
@@ -576,28 +559,18 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
           </p>
         )}
 
-        {!data.chainStale &&
-          (onEventPage ? (
-            timelineSlot
-          ) : (
-            <AaveEthereumVaultPositionView
-              data={data}
-              positionCard={
-                data.holder ? (
-                  <Suspense
-                    fallback={
-                      <div data-skel-section="vault-position-card-pending">
-                        <SkeletonBlock height={120} />
-                      </div>
-                    }
-                  >
-                    <VaultPositionCardSection data={data} holder={data.holder.address} lookup={lookup} />
-                  </Suspense>
-                ) : null
-              }
-              timeline={timelineSlot}
-            />
-          ))}
+        {!data.chainStale && !onEventPage && data.holder && (
+          <Suspense
+            fallback={
+              <div className="mb-6" data-skel-section="vault-position-card-pending">
+                <SkeletonBlock height={120} />
+              </div>
+            }
+          >
+            <HoldingCardSection data={data} holder={data.holder.address} />
+          </Suspense>
+        )}
+        {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}
 
         <ProvInspectorLayer />
       </div>

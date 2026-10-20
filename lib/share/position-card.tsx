@@ -235,7 +235,7 @@ export async function renderPositionCard(model: PositionCardModel): Promise<Imag
   // unexplained blue block, and the words say it. Ethereum stays unsaid, as
   // everywhere else.
   const chainWord = chainId != null && chainId !== MAINNET_CHAIN_ID ? `on ${CHAINS[chainId].name}` : null;
-  const noun = model.identity ? "Position" : model.session ? POSITION_NOUN[model.session] : "Position";
+  const noun = model.identity ? "Holding" : model.session ? POSITION_NOUN[model.session] : "Position";
   const headline = model.headline ?? [model.market, noun, model.subject].filter(Boolean).join(" ");
   // The headline is ONE line — `whiteSpace: "nowrap"` — because a wrapped
   // headline pushes the stats off the canvas. A vault's share symbol is a

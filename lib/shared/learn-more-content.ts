@@ -734,50 +734,6 @@ const MORPHO_DOC_URLS = {
   VAULT: "https://docs.morpho.org/learn/concepts/vault/",
 } as const;
 
-/** What the vault-exposure lookup on /base/morpho/vaults/<vault> computes, and —
- *  the reason this modal exists — what it does NOT. The page's central figure is
- *  an attribution, and an attribution presented without its own definition reads
- *  as a statement about where one depositor's money went. It is not one. */
-export function morphoVaultExposureContent(): LearnMoreContent {
-  return {
-    title: "About attributed exposure",
-    intro:
-      "A MetaMorpho vault pools its depositors' assets and a curator allocates the pool across Morpho Blue markets. This page takes one address's share of the vault and applies it to each market the vault supplies, at one block read from chain.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Proportional, not fund-tracing",
-        text: "vault shares are fungible and the deposits were pooled before the curator allocated them, so no on-chain fact ties a particular deposit to a particular market. Two addresses holding equal shares carry equal figures here, whatever they deposited and whenever.",
-      },
-      {
-        bold: "What each row is",
-        text: "the address's shares over the vault's total shares, applied to the assets the vault's own supply position in that market converts to, floored to whole units of the asset.",
-      },
-      {
-        bold: "Two readings of the same holdings",
-        text: "the vault's own total extrapolates each market's interest to the block's timestamp; the market totals the rows are built from are what Morpho Blue last settled, because Blue accrues only when a market is touched. The difference between them is stated on the page as its own figure.",
-      },
-      {
-        bold: "One block",
-        text: "every figure is read at the block the page names. A share balance, a curator's allocation and a market's totals all move; nothing here is a running total or a projection past that block.",
-      },
-      {
-        bold: "What the address is",
-        text: "the page reads the address's own code at the same block and states what it found: no code at all (an externally owned account), a Safe, an ERC-4626 vault, or a proxy to another contract, whose address is printed. A contract holding shares holds them for its own holders, and the figures are attributed to the address either way.",
-      },
-      {
-        bold: "An address is not a person",
-        text: "a computed stake belongs to an address. Nothing on this page identifies who controls it unless the address carries a name of its own.",
-      },
-    ],
-    links: [
-      { label: "docs.morpho.org — Vaults", url: MORPHO_DOC_URLS.VAULT },
-      { label: "docs.morpho.org — Markets", url: MORPHO_DOC_URLS.MARKET },
-      { label: "docs.morpho.org — Overview", url: MORPHO_DOC_URLS.OVERVIEW },
-    ],
-  };
-}
-
 // ── Fluid (Instadapp) ─────────────────────────────────────────────────────────
 // Vault positions as factory-minted NFTs, one vault per (collateral, debt)
 // pair. ONE composite operate event moves either or both legs; liquidations
@@ -1453,71 +1409,6 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
 // holds, and the tower that states what moved over its whole life. Facts only —
 // what each figure is a reading OF, and what the section refuses to state.
 
-/** A short account of what one FAMILY's share token is, in the terms its own
- *  contract uses. Kept beside the two cells rather than in either, because both
- *  of them need it and neither owns it.
- *
- *  EVERY FAMILY THE CENSUS WRITES, on both chains. The cell below is the vault
- *  position card's, and that card is the same component on Ethereum and on
- *  Base — so the note has to cover MetaMorpho too, or the Base card is the one
- *  position card in the product with no "?" behind it. */
-const AAVE_VAULT_FAMILY_NOTE: Record<VaultPositionFamily, string> = {
-  sgho: "Savings GHO is a vault over GHO: depositing GHO mints sGHO, and the vault's own convertToAssets says what a balance of sGHO is worth in GHO at the block it is asked at.",
-  stata:
-    "A Static aToken wraps an Aave V3 aToken, whose balance rebases. The wrapper's own balance does not: it holds a fixed number of shares and the growth shows up in what a share converts to, which is what makes a balance comparable between two blocks.",
-  "umbrella-stake":
-    "An Umbrella stake token holds a Static aToken and can be slashed to cover a deficit in the Aave market it backs. Redemption runs through a cooldown: the holder starts one, waits it out, and then has a window in which maxRedeem() answers something other than zero.",
-  morpho:
-    "A MetaMorpho vault is an ERC-4626 vault over Morpho Blue: its curator allocates the deposits across a set of Blue markets, and the vault's own convertToAssets says what a balance of its shares is worth in the asset at the block it is asked at. There is no cooldown: a withdrawal is limited only by what the markets in the vault's withdraw queue can pay at that block, which is what maxWithdraw answers.",
-};
-
-/** The "?" on the position card — the three headline figures and the two lanes
- *  behind them. */
-export function aaveVaultPositionContent(
-  family: VaultPositionFamily,
-  assetSymbol: string,
-  shareSymbol: string | null,
-): LearnMoreContent {
-  const shares = shareSymbol ?? "the share token";
-  // The vaults themselves are Aave's on chain 1 and MetaMorpho's on Base, so
-  // the opening sentence names the catalogue the position is in rather than one
-  // issuer. Everything under it is true of both: the figures are ERC-4626 reads
-  // at a block the card names.
-  const catalogue =
-    family === "morpho" ? "one of the MetaMorpho vaults catalogued on Base" : "one of Aave's own ERC-4626 vaults";
-  return {
-    title: "What a vault position is",
-    intro: `A position here is one pair: an address, and ${catalogue}. Holding ${shares} is holding a share of that vault, and every figure on this card is a reading of a contract at a block the card names. ${AAVE_VAULT_FAMILY_NOTE[family]}`,
-    detailsHeading: "What each figure on the card is:",
-    details: [
-      {
-        bold: "Shares",
-        text: `the vault's own balanceOf for this address, in ${shares}'s own units. Share units, not ${assetSymbol}.`,
-      },
-      {
-        bold: "Claim",
-        text: `the vault's own convertToAssets of exactly that balance, in ${assetSymbol}. It is the contract's answer at one block, never the shares multiplied by a price.`,
-      },
-      {
-        bold: "Share of the vault",
-        text: "that balance over the share token's totalSupply at the same block — two integers in the same units, divided.",
-      },
-      {
-        bold: "The activity count and the dates",
-        text: "the census: one whole-Transfer sweep of the vault, proven complete by Σ balanceOf equalling totalSupply wei-exact, run daily. The card names the block it swept to, separately from the block the figures above were read at.",
-      },
-      {
-        bold: "Value · USD",
-        text: "the census's one priced figure: the balance at the census block through the vault's own convertToAssets and the chain's Aave V3 oracle (IAaveOracle.getAssetPrice) at that block, the oracle and the block named on its receipt. Computed once by the daily census, never read for the page — what the position was worth then, nothing about now. A vault that oracle does not price is stated as not priced, never guessed from another feed.",
-      },
-    ],
-    extraParagraphs: [
-      "Nothing here is annualised. A vault's share price moves, but a rate of return over it would be a line drawn between two blocks nobody read, so no figure spans the gap between one reading and the next.",
-      "A zero is a reading. A call that did not answer is stated as unread instead — the two are different facts and the card never prints one as the other.",
-    ],
-  };
-}
-
 /** The "?" on a vault holder's Lifetime flows panel. */
 export function vaultFlowsContent(assetSymbol: string, shareSymbol: string): LearnMoreContent {
   return {
@@ -1549,14 +1440,13 @@ export function vaultFlowsContent(assetSymbol: string, shareSymbol: string): Lea
   };
 }
 
-/** Where each vault family's documentation explains the vault. Yearn has
- *  no host in content/official-docs.json yet, so its rows link nothing. */
+/** Where each vault family's documentation explains the vault. */
 const VAULT_EVENT_LINKS: Record<VaultPositionFamily | "yearn", LearnMoreLink[]> = {
   sgho: [{ label: "Savings GHO (sGHO)", url: "https://aave.com/docs/ecosystem/gho/sgho" }],
   stata: [{ label: "Static aTokens", url: "https://aave.com/docs/aave-v3/smart-contracts/tokenization" }],
   "umbrella-stake": [{ label: "Umbrella", url: "https://aave.com/docs/aave-v3/umbrella" }],
   morpho: [{ label: "Morpho vaults", url: "https://docs.morpho.org/learn/concepts/vault/" }],
-  yearn: [],
+  yearn: [{ label: "Yearn documentation", url: "https://docs.yearn.fi/getting-started/intro" }],
 };
 
 /** The "?" on a vault timeline row (ui-jobs 309): what a row is and what its

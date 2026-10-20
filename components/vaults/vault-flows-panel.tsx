@@ -47,6 +47,14 @@ export function VaultFlowsPanel(props: VaultFlowsPanelProps) {
   if (!props.computed || !props.timeline) return null;
   const { data, flows } = props.computed;
   const total = flows.counts.mints + flows.counts.burns + flows.counts.transfersIn + flows.counts.transfersOut;
+  // The panel's own totals in the asset, as it draws them: what came in, what
+  // left and what is held at the page's block. The holder card's Earned is the
+  // last minus the net of the first two (decision 0048).
+  const t = props.timeline;
+  const g = 10 ** (t.unit?.scale ?? 0);
+  const cum = t.days[t.days.length - 1]?.cum ?? {};
+  const sumOf = (dir: "in" | "out") =>
+    t.buckets.filter((b) => b.dir === dir).reduce((s, b) => s + (cum[b.key] ?? 0), 0) / g;
 
   return (
     <div
@@ -71,6 +79,9 @@ export function VaultFlowsPanel(props: VaultFlowsPanelProps) {
       data-tower-deposited={sum([data.collateral.lifetimeInflow])}
       data-tower-withdrawn={sum(data.collateral.exited.map((l) => l.amount))}
       data-tower-claim-now={sum(data.collateral.current.map((l) => l.amount))}
+      data-flow-in={String(sumOf("in"))}
+      data-flow-out={String(sumOf("out"))}
+      data-flow-end={String(t.live.collateralUsd / g)}
     >
       <LifetimeFlowsPanel
         read="done"

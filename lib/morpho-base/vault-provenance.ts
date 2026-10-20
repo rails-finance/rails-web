@@ -258,18 +258,6 @@ export const vaultGapProv = (c: MorphoVaultCoords): Provenance => ({
 
 // ── one holder ───────────────────────────────────────────────────────────────
 
-/** `balanceOf(holder)` — the holder's shares. The one figure the whole exposure
- *  section is scaled from. */
-export const vaultHolderSharesProv = (c: MorphoVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("MetaMorpho.balanceOf(address)", c),
-  summary: `Shares held — the ERC-20 \`balanceOf\` of this address on the vault's share token${atBlock(c)}. One slot read, and the figure every proportional number in this section is scaled from.`,
-  contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.balanceOf(holder) @ the pinned block`,
-});
-
 /** What the address IS — the code read behind the shape sentence. The evidence
  *  is spelled out per verdict, because the verdict is only as good as the read:
  *  a Safe is an exact singleton match, an ERC-4626 is a contract that answered
@@ -318,45 +306,6 @@ export const vaultHolderShapeProv = (c: MorphoVaultCoords, shape: MorphoBaseVaul
     via: `${LANE} · eth_getCode / eth_getStorageAt / asset() on the holder @ the pinned block`,
   };
 };
-
-/** shares ÷ totalSupply. A ratio of two share counts — decimals cancel. */
-export const vaultHolderFractionProv = (c: MorphoVaultCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `Share of the vault — this address's \`balanceOf\` over the share token's \`totalSupply\`${atBlock(c)}. A ratio of two counts of the same share token, so the decimals cancel and no price is involved. Shares are fungible: this says how much of the pool the address holds, not which deposits are in it.`,
-  contract: vaultContract(c),
-  via: `${LANE} · balanceOf(holder) ÷ totalSupply @ the pinned block`,
-  formula: "balanceOf(holder) ÷ totalSupply",
-  inputs: [
-    { label: "balanceOf(holder)", kind: "chain", pclass: "state", note: "MetaMorpho.balanceOf @ the pinned block" },
-    { label: "totalSupply", kind: "chain", pclass: "state", note: "MetaMorpho.totalSupply @ the pinned block" },
-  ],
-});
-
-/** `convertToAssets(shares)` — the VAULT's answer for what these shares claim.
- *  Quoted as MetaMorpho's figure, beside our Σ of the stored legs. */
-export const vaultHolderClaimProv = (c: MorphoVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("MetaMorpho.convertToAssets(shares)", c),
-  summary: `Claim on the vault — \`convertToAssets(shares)\`${atBlock(c)}, in ${asset(c)}: the VAULT's own conversion of this balance, asked of the contract. It is deliberately NOT the arithmetic of the attributed rows: MetaMorpho converts against its extrapolated \`totalAssets()\` and against the share count it would have after its next accrual — including the performance-fee shares that accrual would mint. Both adjustments are small and they pull opposite ways, so this figure can land either side of the attributed sum.`,
-  contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.convertToAssets(balanceOf(holder)) @ the pinned block`,
-});
-
-/** `maxWithdraw(holder)` — what the VAULT says can leave at this block, which
- *  is a different question from what the shares claim. */
-export const vaultHolderMaxWithdrawProv = (c: MorphoVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("MetaMorpho.maxWithdraw(the holder)", c),
-  summary: `Redeemable now — \`maxWithdraw()\` for this address${atBlock(c)}, in ${asset(c)}: the vault's own answer for how much of the asset this address could take out at that block, asked of the contract. It is NOT the claim beside it. ERC-4626 clamps this to what the vault can actually pay: the withdraw queue is walked in order and each market can only give up what it holds unborrowed at that block, so a vault whose legs are fully utilised answers less than the claim, and a paused or capped vault can answer zero. A zero here is a reading of the queue's liquidity, not an absence. It is one block's answer and the next block's can differ — nothing about it is a promise.`,
-  contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.maxWithdraw(holder) @ the pinned block`,
-});
 
 /** The attribution itself — the page's central figure, and the one whose receipt
  *  must state what kind of claim it is. */

@@ -74,6 +74,8 @@
 //   T9  run rows: a run folder collapses, and expanding it restores its members
 //  T10  the card on the page is the listing's card, in its detail render, with
 //       receipts and the Explanation pane
+//  T15  the holder card: four headlines in order, at most six stats, Earned
+//       equal to the panel's end minus its net inflow, the (i) named
 //  T11  the words, and the phone: no USD / rate / yield, and the document does
 //       not scroll sideways at 390px
 //  T12  F-B8: the floor path is chosen by the LANE'S REFUSAL, not by
@@ -228,6 +230,7 @@
 // room and T4b–T4d SKIP OUT LOUD naming that. A run whose T4 skipped has not
 // tested the distrust path; wait for the tag to move and run again.
 //
+import { holdingCardChecks, readHoldingCard } from "./lib/holding-card.mjs";
 import { chromium } from "playwright";
 import { openGroup } from "./lib/group-rows.mjs";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector } from "viem";
@@ -1652,6 +1655,11 @@ check(
   phoneWidth.scrollWidth === 390,
   `document.scrollWidth ${phoneWidth.scrollWidth} at a 390px viewport (client ${phoneWidth.clientWidth})`,
 );
+
+// ═══ T15 — the holder card (ui-jobs 407 step 4, 410) ══════════════════════
+// Earned is the card's sum of the replay in wei; the panel's end balance minus
+// its net inflow is the same replay as the panel draws it.
+holdingCardChecks(check, "T15", await readHoldingCard(browser, pageUrl(F_B1), bypassHeaders()), ASSET_DECIMALS);
 
 // ═══ T14 — the rail the position page wears ═══════════════════════════════
 // One Morpho Blue Base title, linking to that explorer, and no mark from the

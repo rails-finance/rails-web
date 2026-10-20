@@ -297,10 +297,10 @@ const FIXTURES = [
   {
     label: "sGHO / a life that closed and reopened",
     vault: SGHO,
-    // Replaced 2026-09-19: 0x0c88…b63e withdrew everything and check 12a went
+    // Replaced 2026-10-20: 0x844c…b26e withdrew everything and check 12a went
     // red on it, as it is written to. This address is the same shape — mint,
-    // burn to zero, mint, mint, no transfers — and held 1.42M sGHO that day.
-    holder: "0x844ca21c1ba14da399b69fa0fecdefc0a0b5b26e",
+    // burn to zero, mint, no transfers — and held 1.10M sGHO that day.
+    holder: "0x926bf90196781cf2161535d48af542889cac4d2e",
     expect: { mints: true, burns: true, transfers: false, cooldowns: false },
   },
   {
@@ -326,7 +326,9 @@ const FIXTURES = [
   {
     label: "stkGHO / cooldown, and the stake token that holds GHO directly",
     vault: STK_GHO,
-    holder: "0x78622b0805ba35e0585c8aa0949eec00909a5cc1",
+    // Replaced 2026-10-20: 0x7862…5cc1 exited. Mints, burns and cooldown rows,
+    // no transfers, and 60,060 stkGHO that day.
+    holder: "0xcb7cd98c26b8e7bcda9445238d713ce8d59ce3b2",
     expect: { mints: true, burns: true, transfers: false, cooldowns: true },
   },
 ];
@@ -814,9 +816,9 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     buildingText: await text("[data-figure='timeline-building']"),
     unreadText: await text("[data-figure='timeline-unread']"),
     accrualText: await text("[data-figure='timeline-accrual']"),
-    cooldownState: await attr("[data-skel-section='vault-holder']", "data-holder-cooldown-state"),
-    maxRedeemRaw: await attr("[data-skel-section='vault-holder']", "data-max-redeem-raw"),
-    holderCooldownText: await text("[data-figure='holder-cooldown']"),
+    cooldownState: await attr("[data-position-card]", "data-holder-cooldown-state"),
+    // The holder card's Cooldown stat, its label and its value.
+    holderCooldownText: await text("[data-panel-row='cooldown']"),
     bodyText: (await page.locator("body").innerText()).replace(/\s+/g, " "),
     cardStatus: await attr("[data-position-card]", "data-status"),
     cardValueUsdE8: await attr("[data-position-card]", "data-value-usd-e8"),

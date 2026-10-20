@@ -141,6 +141,7 @@ const VAULT_ABI = parseAbi([
   "function convertToAssets(uint256) view returns (uint256)",
   "function balanceOf(address) view returns (uint256)",
   "function maxRedeem(address) view returns (uint256)",
+  "function maxWithdraw(address) view returns (uint256)",
 ]);
 
 const SGHO_ABI = parseAbi([
@@ -448,6 +449,8 @@ export interface AaveVaultHolderReading {
   /** `maxRedeem(holder)`, in SHARE units. Zero beside a positive balance is a
    *  state on a stake token, not missing data. */
   maxRedeem: RawAmount | null;
+  /** `maxWithdraw(holder)`, in the ASSET's units: Redeemable now on the card. */
+  maxWithdraw: RawAmount | null;
   /** From `eth_getCode` at the same block. Null when that read did not answer —
    *  an unread shape is stated as nothing, never guessed as a wallet. */
   shape: AaveVaultHolderShape | null;
@@ -608,6 +611,7 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
     if (holderAddress) {
       push("balanceOf", { address: self, abi: VAULT_ABI, functionName: "balanceOf", args: [holderAddress] });
       push("maxRedeem", { address: self, abi: VAULT_ABI, functionName: "maxRedeem", args: [holderAddress] });
+      push("maxWithdraw", { address: self, abi: VAULT_ABI, functionName: "maxWithdraw", args: [holderAddress] });
     }
     if (family === "sgho") {
       for (const fn of ["targetRate", "supplyCap", "yieldIndex", "ratePerSecond", "lastUpdate", "paused"] as const)
@@ -943,6 +947,7 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
             Number(holderShares) / Number(totalSupplyRaw) < 0.000001,
           claim: maybeAmount(holderClaimRaw, assetDecimals),
           maxRedeem: maybeAmount(b.get("maxRedeem") as bigint | undefined, shareDecimals ?? 18),
+          maxWithdraw: maybeAmount(b.get("maxWithdraw") as bigint | undefined, assetDecimals),
           shape,
           catalogued: refFor(holderAddress),
           cooldown:

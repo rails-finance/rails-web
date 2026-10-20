@@ -601,6 +601,10 @@ async function statedBlock() {
   // The vault page states it in the card's foot (V2); the holder page in its header.
   const card = page.locator("[data-vault-read-at]");
   if ((await card.count()) > 0) return BigInt(await card.first().getAttribute("data-vault-read-at"));
+  // The holder page names its block on the header's family line (ui-jobs 407
+  // step 4: the card's Read at stat states it too).
+  const holderBlock = page.locator("[data-skel-section='page-header'] [data-vault-block]");
+  if ((await holderBlock.count()) > 0) return BigInt(await holderBlock.first().getAttribute("data-vault-block"));
   const text = (await page.locator('[data-skel-section="page-header"]').innerText()).replace(/\s+/g, " ");
   const m = text.match(/Read at (?:block )?(\d[\d,]*)/);
   return m ? BigInt(m[1].replace(/,/g, "")) : null;
@@ -743,34 +747,49 @@ if (LARGEST == null) {
   skip("5  the largest holder's attributed exposure", "no address holds a non-zero balance at this block");
 } else {
   await page.goto(href(LARGEST), { waitUntil: "domcontentloaded" });
-  await page.locator('[data-skel-section="vault-exposure"] [data-figure="holder-shares"]').first().waitFor();
+  // ui-jobs 407 step 4: the holder card states the shares (wei on its frame),
+  // and the per-market slice is its "Claim by market" stat, whose rows draw
+  // when the stat is opened.
+  await page.locator('[data-position-card] [data-figure="holder-shares"]').first().waitFor({ timeout: 120_000 });
   const hBlock = await statedBlock();
   const hOwn = await readVaultAt(hBlock);
   const hShares = await read("balanceOf", [LARGEST], hBlock);
 
-  const pageShares = await figure("holder-shares");
+  const pageShares = await page.locator("[data-position-card]").first().getAttribute("data-shares-raw");
   check(
     "5a the shares stated equal balanceOf at the page's block",
-    pageShares === sharesText(hShares, hOwn.decimals),
-    `page ${pageShares} vs own ${sharesText(hShares, hOwn.decimals)}`,
+    pageShares === hShares.toString(),
+    `page ${pageShares} vs own ${hShares}`,
   );
+  await page
+    .locator('[data-stat-breakdown-toggle="by-market"]')
+    .first()
+    .click({ timeout: 10_000 })
+    .catch(() => {});
+  await page.waitForTimeout(400);
+  let rowsSum = BigInt(0);
   for (const leg of hOwn.legs) {
     const expected = (hShares * leg.assets) / hOwn.totalSupply;
-    const cellLoc = page.locator(`[data-exposure-leg="${leg.id}"] [data-cell="attributed"]`);
-    const cell = (await cellLoc.count()) ? ((await cellLoc.textContent()) ?? "").trim() : "(no row for this leg)";
+    const cellLoc = page.locator(`[data-holder-markets] [data-exposure-leg="${leg.id}"] [data-cell="attributed"]`);
+    const cell = (await cellLoc.count()) ? await cellLoc.first().getAttribute("data-attributed-raw") : null;
+    if (cell != null) rowsSum += BigInt(cell);
     check(
       `5-${leg.id.slice(0, 8)} attributed = floor(shares × leg ÷ totalSupply)`,
-      cell === assetText(expected, hOwn.assetDecimals),
-      `${cell} vs ${assetText(expected, hOwn.assetDecimals)}`,
+      cell === expected.toString(),
+      `${cell ?? "(no row for this leg)"} vs ${expected}`,
     );
   }
   const attributedTotal = hOwn.legs.reduce((s, l) => s + (hShares * l.assets) / hOwn.totalSupply, BigInt(0));
-  const pageAttrTotal = (await page.locator('[data-figure="attributed-total"]').textContent())?.trim();
+  const pageAttrTotal = await page
+    .locator('[data-figure="attributed-total"]')
+    .first()
+    .getAttribute("data-attributed-total-raw");
   check(
-    "5g the attributed total is the Σ of the rows, recomputed here",
-    pageAttrTotal === assetText(attributedTotal, hOwn.assetDecimals),
-    `${pageAttrTotal} vs ${assetText(attributedTotal, hOwn.assetDecimals)}`,
+    "5g the attributed total is the Σ of the rows, recomputed here, and the panel's rows sum to it",
+    pageAttrTotal === attributedTotal.toString() && rowsSum === attributedTotal,
+    `stated ${pageAttrTotal}, rows ${rowsSum}, own ${attributedTotal}`,
   );
+  await page.keyboard.press("Escape").catch(() => {});
 
   // ── 12: what the page says this address IS ────────────────────────────────
   // The page reads the holder's own code and states the shape it found. The
@@ -869,7 +888,7 @@ if (EOA_HOLDER == null) {
   );
 } else {
   await page.goto(href(EOA_HOLDER), { waitUntil: "domcontentloaded" });
-  await page.waitForSelector('[data-skel-section="vault-exposure"]');
+  await page.waitForSelector("[data-position-card]", { timeout: 120_000 });
   const eBlock = await statedBlock();
   const eCode = await client.getCode({ address: EOA_HOLDER, blockNumber: eBlock });
   const eEmpty = !eCode || eCode === "0x";
@@ -905,25 +924,28 @@ if (DUST == null) {
   // that page draws the listing's own position card above this view — the card
   // carries the same figure names, so an unscoped `[data-figure="holder-…"]`
   // matches twice on any address the census has a row for.
-  const exposure = page.locator('[data-skel-section="vault-exposure"]');
-  await exposure.locator('[data-figure="holder-shares"]').first().waitFor();
+  const exposure = page.locator("[data-position-card]");
+  await exposure.locator('[data-figure="holder-shares"]').first().waitFor({ timeout: 120_000 });
   const dBlock = await statedBlock();
   const dOwn = await readVaultAt(dBlock);
   const dShares = await read("balanceOf", [DUST], dBlock);
   const dFraction = dOwn.totalSupply === BigInt(0) ? 0 : Number(dShares) / Number(dOwn.totalSupply);
-  const dText = (await exposure.locator('[data-figure="holder-shares"]').innerText()).replace(/\s+/g, " ");
+  // The share of the vault's headline, with its subline (the wei count of a dust
+  // holding, or the shares issued).
+  const dText = (await exposure.locator('[data-card-head="share-of-vault"]').innerText()).replace(/\s+/g, " ");
   const dPct = (await exposure.locator('[data-figure="holder-fraction"]').innerText()).replace(/\s+/g, " ");
+  const dRaw = await exposure.getAttribute("data-shares-raw");
   if (dFraction < 1e-6) {
     check(
       "6a the page states the exact share count in wei",
-      dShares > BigInt(0) && dText.includes(`Exactly ${dShares.toString()} wei of shares`),
+      dShares > BigInt(0) && dText.includes(`${dShares.toString()} wei of shares`),
       `balanceOf ${dShares}, fraction ${dFraction}, card reads "${dText}"`,
     );
     check("6b the share of the vault reads as a floor, not a zero", dPct.includes("less than 0.0001%"), dPct);
   } else {
     check(
       "6c the share count is stated, not floored to an exact-wei sentence",
-      dText.includes(sharesText(dShares, dOwn.decimals)) && !dText.includes("wei of shares"),
+      dRaw === dShares.toString() && !dText.includes("wei of shares"),
       `balanceOf ${dShares}, fraction ${dFraction}, card reads "${dText}"`,
     );
     check(
@@ -936,23 +958,26 @@ if (DUST == null) {
 
 // ── 7: an address with no shares ────────────────────────────────────────────
 await page.goto(href(NO_SHARES), { waitUntil: "domcontentloaded" });
-await page.waitForSelector('[data-skel-section="vault-exposure"]');
+await page.waitForSelector("[data-position-card]", { timeout: 120_000 });
 const zBlock = await statedBlock();
 const zShares = await read("balanceOf", [NO_SHARES], zBlock);
 check("7a the fixture really holds nothing at the page's block", zShares === BigInt(0), `balanceOf ${zShares}`);
 // Guarded by a count: a MISSING line must be a red check, not a locator timeout
 // that ends the run before checks 8 to 10 are reached.
-const zLine = page.locator('[data-figure="no-shares"]');
-const zText = (await zLine.count()) ? (await zLine.innerText()).replace(/\s+/g, " ") : "(no no-shares line rendered)";
+// ui-jobs 407 step 4: no shares is the holder card's closed state, with the
+// balance it read.
+const zCard = page.locator("[data-position-card]").first();
+const zStatus = (await zCard.count()) ? await zCard.getAttribute("data-status") : null;
+const zRaw = (await zCard.count()) ? await zCard.getAttribute("data-shares-raw") : null;
 if (zShares > BigInt(0)) {
   // 7a has already reported the fixture; asserting the line here would be a
   // check that could only fail, about the fixture rather than about the page.
   skip("7b the page states the no-shares line, naming the block", `the fixture holds ${zShares} at this block`);
 } else {
   check(
-    "7b the page states the no-shares line, naming the block",
-    zText.includes("holds no shares of this vault at block") && zText.includes(Number(zBlock).toLocaleString("en-US")),
-    zText,
+    "7b the card reads closed, with the zero balance it read",
+    zStatus === "closed" && zRaw === "0",
+    `status ${zStatus}, shares ${zRaw} at block ${zBlock}`,
   );
 }
 
@@ -982,8 +1007,8 @@ check(
   invalid.slice(0, 160),
 );
 check(
-  "8b it does not render an exposure section for an input it could not use",
-  (await page.locator('[data-skel-section="vault-exposure"]').count()) === 0,
+  "8b it does not render a holder card for an input it could not use",
+  (await page.locator("[data-position-card]").count()) === 0,
 );
 
 // ── 9: an address outside the catalog, and a catalogued vault besides VAULT ─
@@ -1014,15 +1039,18 @@ check(
 // largest holder where there is one, and the no-shares reading where there is
 // not — the caveat must be there either way.
 await page.goto(href(LARGEST ?? NO_SHARES), { waitUntil: "domcontentloaded" });
-await page.waitForSelector('[data-skel-section="vault-caveat"]');
-const caveat = (await page.locator('[data-skel-section="vault-caveat"]').innerText()).replace(/\s+/g, " ");
-check(
-  "10 the attribution caveat is on the page with the exposure",
-  caveat.includes("proportional, not fund-tracing") &&
-    caveat.includes("equal shares carry equal figures") &&
-    caveat.includes("not an identified person"),
-  caveat.slice(0, 200),
-);
+// ui-jobs 407 step 4: the caveat box is gone; the holder card's (i) carries
+// one sentence on how the slice is attributed, and each row's receipt the rest.
+await page.waitForSelector("[data-position-card]", { timeout: 120_000 });
+const caveatLoc = page.locator("[data-attribution-explanation]");
+const caveat = (await caveatLoc.count()) ? ((await caveatLoc.first().textContent()) ?? "").replace(/\s+/g, " ") : "";
+if (LARGEST == null) skip("10 the card's (i) says how the slice is attributed", "no holder at this block");
+else
+  check(
+    "10 the card's (i) says how the slice is attributed",
+    caveat.includes("share of the vault") && caveat.includes("each market"),
+    caveat.slice(0, 200) || "(no attribution sentence)",
+  );
 
 await browser.close();
 console.log(

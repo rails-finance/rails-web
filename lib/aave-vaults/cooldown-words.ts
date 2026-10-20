@@ -32,3 +32,17 @@ export function cooldownSentence(cooldown: AaveVaultCooldown, shareDecimals: num
       return `A cooldown for ${covers} ended ${utcInstant(cooldown.endOfCooldown)} and its redemption window has since passed`;
   }
 }
+
+/** The same state in a few words, for the holder card's Cooldown stat. */
+export function cooldownWords(cooldown: AaveVaultCooldown): string {
+  switch (cooldown.state) {
+    case "none":
+      return "None";
+    case "waiting":
+      return `Ends ${utcInstant(cooldown.endOfCooldown)}`;
+    case "open":
+      return `Window open until ${utcInstant(cooldown.endOfCooldown + cooldown.withdrawalWindow)}`;
+    case "expired":
+      return "Window passed";
+  }
+}

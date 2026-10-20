@@ -1,62 +1,31 @@
 "use client";
 
-// One vault POSITION as a card — the pair `(vault, holder)` — for the Aave
-// vault layer on Ethereum and MetaMorpho on Base (Yearn has no census and draws
-// no card). The card is a slot builder (rails-ops TO-DO-position-card 322,
-// 323): `vaultCardSlots` turns the census row and the page's live read into one
-// `PositionCardSlots` object and the shared `PositionCard` draws it, on the
-// listing and on the position page.
+// One vault HOLDING as a listing card — the pair `(vault, holder)` — for the
+// Aave vault layer on Ethereum and MetaMorpho on Base (Yearn has no census and
+// no listing). The card is a slot builder (rails-ops TO-DO-position-card 322,
+// 323, 324): `vaultCardSlots` turns the census row and the listing's live read
+// into one `PositionCardSlots` object and the shared `PositionCard` draws it.
+// The holder page draws components/vaults/vault-holding-card.tsx.
 //
-// THREE LANES, KEPT APART. Shares, claim, share of the vault and what is
-// redeemable are read LIVE at the page's block; transfers, first seen, last
-// activity and what the address is come from the daily census at the census
-// block; the USD line is the census's figure at its priced block (mig 206),
-// through the vault's convertToAssets and the chain's Aave V3 oracle. Each
-// figure carries its receipt, and the panel names both blocks.
-//
-// THE SLOTS. Heads: Balance (the shares, with the census's USD beneath) and
-// Share of the vault. The panel (detail only): Claim on the left; the page's
-// reads (Redeemable now, Exit, Cooldown) and the two blocks on the right. A closed card has one head,
-// Closed by, and the Outcome column. Identity: the share symbol with the venue
-// mark, then the attested name or the shape word; the listing adds the wallet
-// pill, which the position page carries in its wallet row. Notice: the
-// divergence between the census and the live read. Foot: First seen and the
-// explorer link.
-//
-// UNREAD FIGURES ARE SAID IN WORDS ("not priced", "Not loaded"), never a zero
-// or a dash; where the live read did not answer, the shares fall back to the
-// census's balance and say so.
-//
-// THE WRAPPER. The verifiers read the card by `[data-position-card]` and its
-// `data-*` attributes, and on the position page by its
-// `closest("[data-skel-section='detail-card']")`, so the wrapper `div` stands
-// around the shell and carries that section name on the detail surface.
+// Heads: Balance (the shares, with the census's USD beneath) and Share of the
+// vault; a closed holding has one head, Closed by, and the Outcome column. The
+// identity is the share symbol with the venue mark, the attested name or the
+// shape word, and the wallet pill. Notice: the divergence between the census
+// and the live read. Unread figures are said in words.
 
-import Link from "next/link";
-import { useState, type ReactNode } from "react";
-import { Link2 } from "lucide-react";
-import { Icon } from "@/components/icons/icon";
+import type { ReactNode } from "react";
 import { Prov } from "@/components/shared/provenance";
-import {
-  PositionCard,
-  type PositionCardHead,
-  type PositionCardSlots,
-  type PositionPanelRow,
-} from "@/components/shared/position-card";
-import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { BlockRef } from "@/components/shared/block-ref";
 import { pctText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
 import { VaultVenueMark } from "@/components/vaults/vault-venue-mark";
-import { vaultContextRows, type VaultContextStripProps } from "@/components/vaults/vault-context-strip";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
-import { explorerUrl, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { baseVaultHref, ethereumVaultHref } from "@/lib/vaults/routes";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { BookmarkScope } from "@/lib/shared/sessions";
 import { holderListingSegment } from "@/lib/shared/protocols";
 import { attestedAddress, attestedShortName } from "@/lib/shared/attested-addresses";
@@ -72,7 +41,6 @@ import {
 } from "@/lib/aave-vaults/vault-position";
 import {
   aaveVaultCensusBalanceProv,
-  aaveVaultHolderClaimProv,
   aaveVaultHolderFractionProv,
   aaveVaultHolderSharesProv,
   aaveVaultPositionDivergenceProv,
@@ -83,9 +51,7 @@ import {
   aaveVaultValueUsdProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
-import { formatCompact } from "@/lib/shared/format-compact";
 import { AssetAmount } from "@/components/shared/asset-amount";
-import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -109,8 +75,6 @@ export const FAMILY_BOOKMARK_SCOPE: Record<VaultPositionFamily, BookmarkScope> =
 
 /** Which chain a row was censused on, and the routes that follow from it. */
 const chainOf = (row: VaultPositionRow): ChainId => (row.chainId === BASE_CHAIN_ID ? BASE_CHAIN_ID : MAINNET_CHAIN_ID);
-const vaultHref = (row: VaultPositionRow, holder?: string) =>
-  chainOf(row) === BASE_CHAIN_ID ? baseVaultHref(row.vault, holder) : ethereumVaultHref(row.vault, holder);
 
 /** The words a card prints where nothing was read. */
 const Unread = ({ what }: { what: string }) => <span className="text-base font-normal text-rb-500">{what}</span>;
@@ -132,45 +96,12 @@ function Figure({ name, tip, children }: { name?: string; tip?: string; children
   return <span data-figure={name}>{tip ? <RevealTip tip={tip}>{children}</RevealTip> : children}</span>;
 }
 
-/** The card ⋮'s identity row: the link to this position's page. */
-function VaultMenuRows({ href }: { href: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <ToolsMenuItem
-      icon={copied ? <Icon name="check" size={16} /> : <Link2 size={16} className="-rotate-45" />}
-      title="Link to this position"
-      subtitle={copied ? "Copied" : "Copy the page's address"}
-      onClick={() =>
-        void navigator.clipboard.writeText(`${window.location.origin}${href}`).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        })
-      }
-    />
-  );
-}
-
 export interface VaultPositionCardProps {
   row: VaultPositionRow;
-  /** The position page's card: receipts, the panel, the (i), the ⋮. */
-  receipts?: boolean;
-  /** The (i) pane's "?": what a vault position is and what each figure reads. */
-  learnMore?: LearnMoreContent | null;
-  /** The page's live reads for the panel's right column, above the two
-   *  blocks: Redeemable now, Exit and, on a stake token, Cooldown. */
-  context?: VaultContextStripProps;
-  /** The (i) pane's prose. */
-  explanation?: ReactNode;
 }
 
 /** The vault card's slots for the shared position card. */
-export function vaultCardSlots({
-  row,
-  receipts = false,
-  learnMore,
-  context,
-  explanation,
-}: VaultPositionCardProps): PositionCardSlots {
+function vaultCardSlots({ row }: VaultPositionCardProps): PositionCardSlots {
   const status = vaultPositionStatus(row);
   const chainId = chainOf(row);
   const shareDecimals = row.shareDecimals ?? 18;
@@ -191,9 +122,6 @@ export function vaultCardSlots({
     assetSymbol: row.asset?.symbol,
     holder: row.holder,
   };
-  // The detail card names its figures for the verifiers; twenty listing rows
-  // would make twenty of each name.
-  const figureName = (name: string) => (receipts ? name : undefined);
 
   // ── identity ─────────────────────────────────────────────────────────────
   // The vault leads, the way a Trove row leads with its collateral. On the
@@ -217,13 +145,7 @@ export function vaultCardSlots({
   const identity = (
     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
       <span className="text-sm font-semibold text-foreground" data-card-vault-symbol={shareSymbol}>
-        {receipts ? (
-          <Link href={vaultHref(row)} className="hover:underline" prefetch={false}>
-            {shareSymbol}
-          </Link>
-        ) : (
-          <span>{shareSymbol}</span>
-        )}
+        <span>{shareSymbol}</span>
         <span className="ml-1.5 inline-flex items-center gap-1 text-xs font-normal text-rb-500">
           <span>·</span>
           <VaultVenueMark family={row.family} />
@@ -232,14 +154,12 @@ export function vaultCardSlots({
       </span>
       {/* The listing names the holder; the toggle stops a click from reaching
           the row's <Link>, so bookmarking never navigates. */}
-      {!receipts && (
-        <WalletPill
-          wallet={row.holder}
-          ensName={null}
-          bookmarkProtocol={FAMILY_BOOKMARK_SCOPE[row.family]}
-          bookmarkListing={holderListingSegment(FAMILY_BOOKMARK_SCOPE[row.family])}
-        />
-      )}
+      <WalletPill
+        wallet={row.holder}
+        ensName={null}
+        bookmarkProtocol={FAMILY_BOOKMARK_SCOPE[row.family]}
+        bookmarkListing={holderListingSegment(FAMILY_BOOKMARK_SCOPE[row.family])}
+      />
       {nameOrShape}
     </span>
   );
@@ -259,7 +179,7 @@ export function vaultCardSlots({
       ? `The ${shareSymbol} this address holds: the vault's balanceOf() for it, read at the page's block. Beneath it, what the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.`
       : `The ${shareSymbol} this address held at the census block: the live read did not answer, so the census's balance stands in. Beneath it, what the holding was worth at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle.`,
     value: (
-      <Figure name={figureName("holder-shares")}>
+      <Figure>
         <Prov info={row.live ? aaveVaultHolderSharesProv(coords) : aaveVaultCensusBalanceProv(coords)}>
           <AssetAmount
             value={row.live ? row.live.shares.value : censusShares}
@@ -271,23 +191,19 @@ export function vaultCardSlots({
       </Figure>
     ),
     usd: priced ? (
-      <Figure
-        name={figureName("holder-value-usd")}
-        tip={`${usdText(row.value.usdE8!)} at census block ${n(pricedBlock)}, via the chain's Aave V3 oracle`}
-      >
+      <Figure tip={`${usdText(row.value.usdE8!)} at census block ${n(pricedBlock)}, via the chain's Aave V3 oracle`}>
         <Prov info={aaveVaultValueUsdProv(coords, row.value, shareDecimals)}>
           <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
         </Prov>
       </Figure>
     ) : (
-      <Figure name={figureName("holder-value-usd")}>
+      <Figure>
         <Prov info={aaveVaultUnpricedProv(coords, row.value)}>
           <Unread what="not priced" />
         </Prov>
       </Figure>
     ),
     sub: [
-      ...(row.live || !receipts ? [] : [`shares from the census at block ${n(row.census.block)}`]),
       priced
         ? `Aave V3 oracle at census block ${n(pricedBlock)}`
         : row.value.pricedBlock == null
@@ -300,7 +216,7 @@ export function vaultCardSlots({
     label: "Share of the vault",
     labelTip: "This holding's shares over the vault's totalSupply(), both read at the page's block.",
     value: (
-      <Figure name={figureName("holder-fraction")}>
+      <Figure>
         {dust ? (
           <Unread what="less than 0.0001%" />
         ) : fraction != null ? (
@@ -348,115 +264,20 @@ export function vaultCardSlots({
       lastActivityAt: row.lastActivityAt,
       eventCount: row.census.transferCount,
       eventCountNoun: "transfer",
-      ...(receipts ? { order: "age-last" as const } : {}),
     },
     outcome: status.live ? undefined : { word: "Closed" },
   };
-  if (!receipts) return { ...common, surface: "listing", menu: null };
-
-  // ── the detail card ──────────────────────────────────────────────────────
-  const detail = {
-    ...common,
-    surface: "detail" as const,
-    explainer: { body: explanation ?? null },
-    learnMore: learnMore ?? null,
-    menu: { leading: () => <VaultMenuRows href={vaultHref(row, row.holder)} />, exports: null },
-    foot: (
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-rb-500" data-card-foot>
-        <span>
-          First seen{" "}
-          <Prov info={aaveVaultPositionSeenProv(coords, "first", row.census.firstBlock)}>
-            <span>
-              <BlockStamp block={row.census.firstBlock} at={row.firstSeenAt} />
-            </span>
-          </Prov>
-        </span>
-        <a
-          href={explorerUrl(chainId, "address", row.holder)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="link-external"
-        >
-          {chainId === BASE_CHAIN_ID ? "on Basescan" : "on Etherscan"}
-        </a>
-      </div>
-    ),
-  };
-  if (!status.live) return { ...detail, outcome: { word: "Closed" } };
-
-  // ── the panel ────────────────────────────────────────────────────────────
-  const claim =
-    row.live?.claim && row.asset ? (
-      <Figure
-        name={figureName("holder-claim")}
-        tip={`${formatUnitsExact(row.live.claim.raw, row.asset.decimals)} ${row.asset.symbol}`}
-      >
-        <Prov info={aaveVaultHolderClaimProv(coords)}>{formatCompact(row.live.claim.value)}</Prov>
-      </Figure>
-    ) : (
-      <NotLoaded className="text-rb-500" />
-    );
-  const left: PositionPanelRow[] = [
-    {
-      id: "claim",
-      label: "Claim",
-      value: claim,
-      asset:
-        row.live?.claim && row.asset
-          ? {
-              symbol: row.asset.symbol,
-              address: row.asset.address,
-              figure: `${formatUnitsExact(row.live.claim.raw, row.asset.decimals)} ${row.asset.symbol}`,
-            }
-          : undefined,
-      tip: `What those shares convert to in ${assetSymbol}: the vault's convertToAssets() of this balance at the same block.`,
-    },
-  ];
-  const right: PositionPanelRow[] = [
-    ...(context ? vaultContextRows(context) : []),
-    ...(row.live
-      ? [
-          {
-            id: "read-at",
-            label: "Read at",
-            value: (
-              <>
-                block{" "}
-                <PanelFigure>
-                  <BlockRef block={row.live.blockNumber} />
-                </PanelFigure>
-              </>
-            ),
-            tip: "The block the shares, the claim, the share of the vault and the redeemable figure were read at.",
-          },
-        ]
-      : []),
-    {
-      id: "census-at",
-      label: "Census at",
-      value: (
-        <>
-          block{" "}
-          <PanelFigure>
-            <BlockRef block={row.census.block} />
-          </PanelFigure>
-        </>
-      ),
-      tip: "The block the daily census swept to: the transfers, first seen and the dollar value are counted there.",
-    },
-  ];
-  return { ...detail, outcome: undefined, panel: [left, right] };
+  return { ...common, surface: "listing", menu: null };
 }
 
 /** The vault position card: its slots, drawn by the shared card, inside the
  *  wrapper the verifiers read. */
 export function VaultPositionCard(props: VaultPositionCardProps) {
-  const { row, receipts = false } = props;
+  const { row } = props;
   const status = vaultPositionStatus(row);
   return (
     <div
       data-position-card={`${row.vault}:${row.holder}`}
-      data-skel-section={receipts ? "detail-card" : undefined}
       data-vault={row.vault}
       data-holder={row.holder}
       data-status={status.live ? "live" : "closed"}

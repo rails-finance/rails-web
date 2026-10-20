@@ -63,6 +63,8 @@
 //   T8  regression: the two shipped vault verifiers still pass unchanged
 //   T9  the card on the page is the listing's card, in its detail render
 //   10  the fixtures still are what the checks above assume they are
+//   T15 the holder card: four headlines in order, at most six stats, Earned
+//       equal to the panel's end minus its net inflow, the (i) named
 //
 // ── FIXTURES (plan §5), AS INPUTS ───────────────────────────────────────────
 //   F2  stkwaEthUSDC.v1 / 0xdd62… — 8 rows, a cooldown row, a live wallet
@@ -254,6 +256,7 @@
 // SKIP OUT LOUD naming that reason. A run whose T4 skipped has not tested the
 // distrust path; wait for the next epoch and run again.
 //
+import { holdingCardChecks, readHoldingCard } from "./lib/holding-card.mjs";
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector } from "viem";
@@ -1419,16 +1422,13 @@ check(
   f2Bare.words <= WORDS_WITHOUT_HOLDER,
   `${f2Bare.words} visible words`,
 );
-check(
+// The intro drawer is retired (ui-jobs 407 steps 3 and 4): the family mechanic
+// is in the vault card's (i) and "?" one path segment up, and the holder card's.
+skip(
   "T6c the family mechanic prose is reachable in the intro drawer, on both",
-  f2Page.mechanicInDrawer && f2Bare.mechanicInDrawer && /How an Umbrella stake token works/.test(f2Bare.drawerText),
-  `drawer present ${f2Bare.drawerPresent}, mechanic heading inside it ${f2Bare.mechanicInDrawer}`,
+  `the page draws no drawer; this script read drawer present ${f2Bare.drawerPresent}`,
 );
-check(
-  "T6d …and the drawer's statements are in the initial HTML, not only once opened",
-  /How an Umbrella stake token works/.test(await (await hostFetch(`${BASE}/ethereum/aave/vaults/${F2.vault}`)).text()),
-  "the drawer stays mounted and hidden",
-);
+skip("T6d …and the drawer's statements are in the initial HTML, not only once opened", "the page draws no drawer");
 check(
   "T6e no mechanic PARAGRAPH was left on the face",
   !/Staked, and slashable/.test(f2Page.mechanicOnFace) &&
@@ -1667,6 +1667,12 @@ async function openRowDetail(url, id) {
     .locator("visible=true")
     .first()
     .evaluate((el) => el.click());
+  // An opened card shows its Explanation tab first; the figures are the other.
+  await wrapper
+    .locator('[data-card-tab="figures"]')
+    .first()
+    .evaluate((el) => el.click())
+    .catch(() => {});
   await page.waitForSelector("[data-row-balance-after]", { timeout: 30_000 });
   // The sheet's breakdown holds the balance before and after (decision 0042).
   await wrapper
@@ -1830,6 +1836,12 @@ check(
   f2Page.cardSharesRaw === warmOwn.balance.toString(),
   `card ${f2Page.cardSharesRaw}, own balanceOf ${warmOwn.balance}`,
 );
+
+// ═══ T15 — the holder card (ui-jobs 407 step 4, 410) ══════════════════════
+// F5 has stated legs and read legs (transfers both ways): Earned is the card's
+// sum of the replay in wei, the panel's end minus its net inflow the same
+// replay as the panel draws it. WETH, 18 decimals.
+holdingCardChecks(check, "T15", await readHoldingCard(browser, pageUrl(F5), bypassHeaders()), 18);
 
 // ═══ 10 — the fixtures still are what they were ═══════════════════════════
 check(

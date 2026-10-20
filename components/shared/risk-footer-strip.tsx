@@ -100,10 +100,3 @@ export function RiskFigure({
     </div>
   );
 }
-
-/** The strongest value of a cluster — the reference's semibold foreground
- *  treatment. Wrap OUTSIDE or INSIDE an existing <Prov> without touching the
- *  Prov's own children when the receipt already styles them. */
-export function RiskStrong({ children }: { children: ReactNode }) {
-  return <span className="text-foreground/80 font-semibold">{children}</span>;
-}

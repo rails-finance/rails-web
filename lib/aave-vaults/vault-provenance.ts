@@ -447,36 +447,6 @@ export const aaveVaultHolderFractionProv = (c: AaveVaultCoords): Provenance => (
   formula: "balanceOf(holder) ÷ totalSupply()",
 });
 
-/** `convertToAssets(shares)` — the vault's own answer. */
-export const aaveVaultHolderClaimProv = (c: AaveVaultCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("convertToAssets(the holder's shares)", c),
-  summary: `What those shares convert to — \`convertToAssets()\` asked with this address's exact share balance${atBlock(c)}, in ${asset(c)}. Answered by the vault: the balance goes in as an argument and the contract's own conversion comes back, so the figure is the vault's arithmetic. What a redemption would return is a different question — this is a conversion at one block.`,
-  contract: vaultContract(c),
-  via: `${LANE} · convertToAssets(holder shares) @ the pinned block`,
-});
-
-/** `maxRedeem(holder)` — where a zero is a STATE. */
-export const aaveVaultMaxRedeemProv = (c: AaveVaultCoords, family: AaveVaultFamily): Provenance => {
-  const mechanic =
-    family === "umbrella-stake"
-      ? `On a stake token this answers ZERO unless the block's own timestamp sits inside this holder's unstake window — so a zero beside a positive balance is the contract's state, not missing data and not a balance of nothing. The cooldown line beside it says which state the holder is in.`
-      : family === "sgho"
-        ? `sGHO has no cooldown and no queue: the only things that reduce this below the balance are the pause flag, which zeroes it outright, and the GHO the contract actually holds, which clamps what can leave.`
-        : `A static aToken has no withdrawal delay, so this reads equal to the balance unless the reserve is inactive or paused, or the wrapper itself is.`;
-  return {
-    kind: "chain",
-    pclass: "state",
-    source: { block: c.blockNumber },
-    verify: recompute("maxRedeem(the holder)", c),
-    summary: `Redeemable now — \`maxRedeem()\` for this address${atBlock(c)}, in shares. ${mechanic} A reading at one block; the contract can answer differently at the next.`,
-    contract: vaultContract(c),
-    via: `${LANE} · maxRedeem(holder) @ the pinned block`,
-  };
-};
-
 /** `getStakerCooldown(holder)` — the struct the contract holds. */
 export const aaveVaultCooldownStateProv = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",

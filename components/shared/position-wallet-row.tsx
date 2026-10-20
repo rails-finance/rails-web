@@ -77,7 +77,7 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
     >
       <span className="flex min-w-0 items-center gap-1" data-address-kind={kind.kind}>
         <w.Icon className="size-3.5 shrink-0" aria-hidden />
-        {w.label && <span className="truncate">{w.label}</span>}
+        {w.label && <span className="max-w-[40vw] truncate sm:max-w-xs">{w.label}</span>}
       </span>
     </RevealTip>
   );

@@ -236,8 +236,8 @@ export function positionMetadata(opts: {
  *  everywhere else — the chain is said in WORDS because a title cannot carry
  *  the chain mark, and Ethereum stays unsaid.
  *
- *  The noun is "Position", which is what the routes are; `market` is the vault
- *  the position is in, and sits between the label and the noun exactly as an
+ *  The noun is "Holding" (survey 2026-10-20 §7.4); `market` is the vault the
+ *  holding is in, and sits between the label and the noun exactly as an
  *  explorer's market does. `image: "dynamic"` opts into the route's own
  *  `opengraph-image.tsx`. */
 export function sectionPositionMetadata(opts: {
@@ -253,7 +253,7 @@ export function sectionPositionMetadata(opts: {
     opts.section.chainId === MAINNET_CHAIN_ID
       ? opts.section.label
       : `${opts.section.label} on ${CHAINS[opts.section.chainId].name}`;
-  const title = [label, opts.market, "Position", shortSubject(opts.subject)].filter(Boolean).join(" ");
+  const title = [label, opts.market, "Holding", shortSubject(opts.subject)].filter(Boolean).join(" ");
   return {
     title,
     description: opts.description,

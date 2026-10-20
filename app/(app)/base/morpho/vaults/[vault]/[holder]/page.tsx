@@ -1,7 +1,8 @@
-// ONE POSITION — /base/morpho/vaults/<vault>/<holder>.
+// ONE HOLDING — /base/morpho/vaults/<vault>/<holder>.
 // ----------------------------------------------------------------------------
-// A position is the pair `(vault, holder)`, and it has a path of its own the
-// way a trove does. The holder is a SEGMENT rather than a query because it is
+// A holding is the pair `(vault, holder)`, and it has a path of its own the
+// way a trove does. The page is the family header, the holder card, Lifetime
+// flows and the Activity timeline (rails-ops ui-jobs 407 step 4). The holder is a SEGMENT rather than a query because it is
 // the subject of the page, not a filter on the vault beside it: the card at the
 // top of this page is the same card the position listing draws for this pair,
 // and clicking it is what brings a reader here.
@@ -44,32 +45,37 @@ import { after } from "next/server";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { MorphoBaseVaultExposureView } from "@/components/protocol/morpho-base/vault-exposure-view";
 import { MorphoBaseVaultTimeline } from "@/components/protocol/morpho-base/vault-timeline";
 import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
 import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
+import { vaultHoldingHistory, type VaultHoldingHistory } from "@/lib/vaults/earned";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
-import { VaultPositionCard } from "@/components/vaults/vault-position-card";
-import { VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
+import { VaultHoldingCard } from "@/components/vaults/vault-holding-card";
+import { HoldingExplanation } from "@/components/vaults/holding-explanation";
+import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
+import { HolderShapeLine } from "@/components/vaults/holder-shape-line";
+import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
+import { Prov } from "@/components/shared/provenance";
+import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { holderListingSegment } from "@/lib/shared/protocols";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { assetText } from "@/lib/shared/vault-amount-text";
+import { assetText, shortId } from "@/lib/shared/vault-amount-text";
 import {
-  vaultHolderMaxWithdrawProv,
+  vaultAttributedProv,
+  vaultAttributedTotalProv,
+  vaultHolderShapeProv,
   vaultSharePriceProv,
   type MorphoVaultCoords,
 } from "@/lib/morpho-base/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
-import { aaveVaultPositionContent } from "@/lib/shared/learn-more-content";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { MORPHO_BASE_METAMORPHO_FACTORIES } from "@/lib/morpho-base/vault-catalog";
 import { isMorphoBaseRosterVault } from "@/lib/morpho-base/vault-roster";
 import { resolveHolder, type HolderLookup } from "@/lib/morpho-base/vault-holder";
-import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { baseVaultHref, baseVaultsListingHref } from "@/lib/vaults/routes";
 import { loadMorphoBaseVault, type MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-vault";
 import { loadMorphoBaseVaultTimelineWithTail } from "@/lib/sources/chain/morpho-base-vault-timeline";
@@ -96,27 +102,16 @@ const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
-/** The holder's own events in this vault, streamed in beside the reading.
+/** The holder's whole history in this vault, read once per request: the card's
+ *  Earned and the Lifetime flows panel and the timeline below it all reduce the
+ *  same rows (React's cache() hands every caller one promise).
  *
  *  It takes the BLOCK the vault loader already pinned rather than reading one
  *  of its own: the reading and the history are one claim about one moment, and
  *  two `eth_blockNumber` calls a second apart are two different moments. Every
  *  read inside it ends at that block, each row's share price is called at that
- *  row's own block, and the sweeps start at the vault's own creation block —
- *  there is nothing to find before a vault exists.
- *
- *  Rendered inside a `<Suspense>` because its reads are log sweeps and the rest
- *  of the page is `eth_call`s that have already answered; the vault's figures
- *  paint first and this arrives when the chain has spoken. */
-async function VaultTimelineSection({
-  data,
-  holder,
-  onEventPage,
-}: {
-  data: MorphoBaseVaultResponse;
-  holder: string;
-  onEventPage: boolean;
-}) {
+ *  row's own block, and the sweeps start at the vault's own creation block. */
+const loadHistory = cache(async (data: MorphoBaseVaultResponse, holder: string) => {
   // The stored tail, read BEFORE the loader so the loader can sweep a head
   // instead of a life. A tail that is absent, stale or wrong costs this page a
   // whole-life sweep and nothing else — the gate runs on the merged rows either
@@ -202,6 +197,28 @@ async function VaultTimelineSection({
         })
       : null;
 
+  // Earned over the same rows, under the panel's condition (decision 0048).
+  const card = vaultHoldingHistory(allEvents, {
+    shareDecimals: data.vault.decimals,
+    claimRaw: data.holder?.claim?.raw ?? null,
+    blockNumber: data.blockNumber,
+    replayed: economics != null && flowTimeline != null,
+  });
+  return { timeline, economics, flowTimeline, card };
+});
+
+/** The Lifetime flows panel and the timeline, streamed in behind a Suspense
+ *  boundary: their reads are log sweeps, and the card has painted first. */
+async function VaultTimelineSection({
+  data,
+  holder,
+  onEventPage,
+}: {
+  data: MorphoBaseVaultResponse;
+  holder: string;
+  onEventPage: boolean;
+}) {
+  const { timeline, economics, flowTimeline } = await loadHistory(data, holder);
   return (
     <>
       {/* The Lifetime flows panel, drawn under the condition the rows are: the
@@ -229,27 +246,15 @@ async function VaultTimelineSection({
   );
 }
 
-/** The listing's own card for this `(vault, holder)` pair, with receipts.
+/** The holder card (components/vaults/vault-holding-card.tsx).
  *
- *  Its CENSUS lane — transfers, first seen, last activity, what the holding
- *  address is — comes from the store through this deployment's own listing
- *  proxy, which is the only place that set exists. Its LIVE lane is replaced
- *  with the page's OWN reading, so the card and the sections under it state one
- *  block rather than two; the proxy's block timestamps are kept, because a
- *  block's timestamp is the same fact whichever request read it.
- *
- *  Null where the census has no row for this address. That is a fact about the
- *  census — a daily sweep, and an address that first appeared since the last
- *  tick has no row yet — and it says nothing about the reading below it. */
-async function VaultPositionCardSection({
-  data,
-  holder,
-  lookup,
-}: {
-  data: MorphoBaseVaultResponse;
-  holder: string;
-  lookup: HolderLookup;
-}) {
+ *  Its live figures are this page's reads at its block; its census figures
+ *  (the transfer count, first seen, the dollar value, what the address is)
+ *  come from the store through this deployment's listing proxy, where the
+ *  census has a row. An address first seen since the last daily tick has none,
+ *  and the card draws without those figures. Earned is a promise over the
+ *  history, so the card paints before the sweeps answer. */
+async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultResponse; holder: string }) {
   if (!data.holder) return null;
   const hop = (await ssrHop()) ?? undefined;
   let rows: VaultPositionRow[] = [];
@@ -263,131 +268,94 @@ async function VaultPositionCardSection({
     });
     rows = page.data;
   } catch (error) {
-    console.error("The vault position card's census row did not answer:", error);
+    console.error("The holder card's census row did not answer:", error);
   }
-  const row = rows.find((r) => r.holder.toLowerCase() === holder.toLowerCase());
-  const strip = vaultContextStrip(data);
-  // THE CENSUS HAS NO ROW, AND THE READING IS STILL A READING — the same
-  // statement the Ethereum page makes, for the same reason. What can be
-  // withdrawn at this block and the exit are calls this page made itself.
-  if (!row)
-    return (
-      <VaultContextStripStandalone
-        {...strip}
-        absence={`The census has no row for this address in this vault yet — it sweeps once a day, and an address first seen since the last tick has none. Nothing above or below depends on it: every figure on this page is a call answered at block ${data.blockNumber.toLocaleString("en-US")}.`}
-      />
-    );
-
-  const onPage: VaultPositionRow = {
-    ...row,
-    shareDecimals: data.vault.decimals,
-    symbol: data.vault.symbol || row.symbol,
-    asset: {
-      address: data.vault.asset.address,
-      symbol: data.vault.asset.symbol,
-      decimals: data.vault.asset.decimals,
-    },
-    live: {
-      blockNumber: data.blockNumber,
-      shares: data.holder.shares,
-      claim: data.holder.claim,
-      totalSupply: data.totalSupply,
-      live: BigInt(data.holder.shares.raw) > BigInt(0),
-    },
-  };
-  return (
-    // `data-max-withdraw-raw` is the loader's own answer for this address at
-    // this block, stated as data so a check reads the wei rather than the
-    // printed words. The section's siblings on the other chain state
-    // `data-max-redeem-raw` in the same place and for the same reason.
-    <div className="mb-6" data-max-withdraw-raw={data.holder.maxWithdraw?.raw ?? ""}>
-      <VaultPositionCard
-        row={onPage}
-        receipts
-        // The same "?" the Ethereum position card carries, on this chain's own
-        // family: what each figure on the card is a reading of, and what the
-        // section refuses to state. It is where the prose that left the
-        // listing's face stays reachable from inside a position view.
-        learnMore={aaveVaultPositionContent("morpho", data.vault.asset.symbol, data.vault.symbol)}
-        context={strip}
-        explanation={<PositionCardExplanation row={onPage} maxWithdrawRead={data.holder.maxWithdraw != null} />}
-      />
-    </div>
-  );
-}
-
-/** What the card's context strip says for THIS reading. A MetaMorpho vault has
- *  no cooldown and no queue for a holder to join: a withdrawal is refused only
- *  by what the markets in the withdraw queue can pay at that block, which is
- *  exactly what `maxWithdraw` answers — so the strip states that figure and the
- *  two functions a holder leaves through, and nothing else. */
-function vaultContextStrip(data: MorphoBaseVaultResponse) {
-  const holder = data.holder!;
+  const census = rows.find((r) => r.holder.toLowerCase() === holder.toLowerCase()) ?? null;
   const { vault } = data;
+  const h = data.holder;
+  const shareSymbol = vault.symbol || shortAddr(vault.address);
   const coords: MorphoVaultCoords = {
     blockNumber: data.blockNumber,
     vault: vault.address,
     vaultName: vault.name || undefined,
     assetSymbol: vault.asset.symbol,
     shareSymbol: vault.symbol || undefined,
-    holder: holder.address,
+    holder: h.address,
   };
-  return {
-    redeemable: holder.maxWithdraw
-      ? {
-          text: `${assetText(holder.maxWithdraw, vault.asset.decimals)} ${vault.asset.symbol}`,
-          prov: vaultHolderMaxWithdrawProv(coords),
-          figure: "holder-max-withdraw" as const,
-          amount: {
-            ...holder.maxWithdraw,
-            decimals: vault.asset.decimals,
-            symbol: vault.asset.symbol,
-            address: vault.asset.address,
-          },
-        }
-      : { unread: true as const, figure: "holder-max-withdraw" as const },
-    // ERC-4626 offers both, and which one a holder uses decides which side is
-    // exact: `withdraw()` names an amount of the asset, `redeem()` names a
-    // count of shares. Both are the vault's own functions and neither is a
-    // recommendation.
-    exit: "withdraw() or redeem()",
-  };
-}
-
-/** The card's Explanation pane — facts only, and its whole subject is WHICH
- *  LANE each figure came from, because the card is the one surface on this page
- *  that draws two: a live reading at the page's block and a counted set from
- *  the daily census at the census block. */
-function PositionCardExplanation({ row, maxWithdrawRead }: { row: VaultPositionRow; maxWithdrawRead: boolean }) {
-  const n = (v: number) => v.toLocaleString("en-US");
-  const open = row.live ? row.live.live : row.census.live;
-  const items = [
-    `Shares, claim and share of the vault are calls answered at block ${n(row.live?.blockNumber ?? 0)} — the same block every figure under this card is read at.`,
-    // A closed card draws no panel, so it has no Redeemable now row.
-    !open
-      ? null
-      : maxWithdrawRead
-        ? `"Redeemable now" in the panel above is the vault's maxWithdraw() for this address at that same block, in ${row.asset?.symbol ?? "the vault's asset"} — what the vault says could be taken out then, bounded by the liquidity of the markets in its withdraw queue at that block. It is not the claim beside it and it is not a promise about the next block.`
-        : `"Redeemable now" reads "Not loaded": the vault's maxWithdraw() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
-    `Transfers, first seen and last activity are counted by the census: one whole-Transfer sweep of this vault from its own creation block, proven complete by Σ balanceOf equalling totalSupply() wei-exact, swept to block ${n(row.census.block)}.`,
-    `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"}.`,
-    row.value.usdE8 != null
-      ? `Value · USD is the census's figure at block ${n(row.value.pricedBlock ?? row.census.block)}: the balance at that block through the vault's own convertToAssets and the chain's Aave V3 oracle (IAaveOracle.getAssetPrice) at the same block, the oracle named on its receipt — computed once by the daily census and never read for this page, so it says what the position was worth then and nothing about now.`
-      : row.value.pricedBlock == null
-        ? "Value · USD is stated as not priced: the daily census has not yet run its price pass over this vault, so no oracle was asked."
-        : `Value · USD is stated as not priced: the chain's Aave V3 oracle declined ${row.value.assetSymbol ?? "this vault's asset"} at block ${n(row.value.pricedBlock)} — reverted or answered zero — and the card carries an empty slot rather than a figure from some other feed.`,
-    "Nothing here is annualised; the blocks are stated rather than reconciled into one.",
-  ].filter((text): text is string => text != null);
+  const history: Promise<VaultHoldingHistory> = loadHistory(data, holder).then(
+    (r) => r.card,
+    () => ({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null }),
+  );
+  const markets = data.legs.map((leg) => ({
+    id: leg.id,
+    label: leg.isIdle ? "Idle market" : (leg.collateralSymbol ?? shortId(leg.id)),
+    raw: leg.attributed?.raw ?? "0",
+    prov: vaultAttributedProv({ ...coords, marketId: leg.id, collateralSymbol: leg.collateralSymbol }),
+  }));
   return (
-    <div className="space-y-2 text-sm text-rb-500">
-      <p className="leading-relaxed">This card draws two lanes, and each figure names the block its own lane read.</p>
-      {items.map((text) => (
-        <div key={text} className="flex items-start gap-2 leading-relaxed">
-          <span className="select-none text-rb-500">&bull;</span>
-          <span>{text}</span>
-        </div>
-      ))}
-    </div>
+    <VaultHoldingCard
+      coords={{
+        chainId: BASE_CHAIN_ID,
+        blockNumber: data.blockNumber,
+        vault: vault.address,
+        vaultName: vault.name || undefined,
+        shareSymbol,
+        shareDecimals: vault.decimals,
+        assetSymbol: vault.asset.symbol,
+        assetDecimals: vault.asset.decimals,
+        holder: h.address,
+      }}
+      family="morpho"
+      venueMark
+      vaultHref={baseVaultHref(vault.address)}
+      holdingHref={baseVaultHref(vault.address, h.address)}
+      assetAddress={vault.asset.address}
+      shares={h.shares}
+      claim={h.claim}
+      totalSupply={data.totalSupply}
+      dust={h.dust}
+      maxWithdraw={h.maxWithdraw}
+      // ERC-4626 offers both, and which one a holder uses decides which side
+      // is exact: `withdraw()` names an amount of the asset, `redeem()` a count
+      // of shares.
+      exit="withdraw() or redeem()"
+      census={census}
+      markets={markets}
+      history={history}
+      learnMore={vaultHoldingContent(vault.asset.symbol, shareSymbol, census != null, HOLDING_REWARDS.morpho)}
+      explanation={
+        <HoldingExplanation
+          blockNumber={data.blockNumber}
+          censusBlock={census?.census.block ?? null}
+          assetSymbol={vault.asset.symbol}
+          rewards={HOLDING_REWARDS.morpho}
+          shape={
+            h.shape ? (
+              <HolderShapeLine
+                shape={h.shape}
+                blockNumber={data.blockNumber}
+                chainId={BASE_CHAIN_ID}
+                prov={vaultHolderShapeProv(coords, h.shape)}
+              />
+            ) : undefined
+          }
+          extra={
+            <ExplainBullet data-attribution-explanation="">
+              Claim by market applies this holding&rsquo;s share of the vault to each market&rsquo;s settled assets; its
+              sum,{" "}
+              <Fig>
+                <Prov info={vaultAttributedTotalProv(coords)}>
+                  <span data-figure="attributed-total" data-attributed-total-raw={h.attributedTotal.raw}>
+                    {assetText(h.attributedTotal, vault.asset.decimals)} {vault.asset.symbol}
+                  </span>
+                </Prov>
+              </Fig>
+              , differs slightly from the claim, which the vault extrapolates to this block.
+            </ExplainBullet>
+          }
+        />
+      }
+    />
   );
 }
 
@@ -405,7 +373,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     market: name,
     subject,
     canonicalPath: baseVaultHref(address, holder),
-    description: `A Rails reading of this address's position in the ${name} vault on Base: shares, claim, what is redeemable now, lifetime flows and every one of its own events, read from chain at one block in native units.`,
+    description: `A Rails reading of this address's holding in the ${name} vault on Base: shares, claim, earned, what is redeemable now, lifetime flows and every one of its own events, read from chain at one block.`,
     // The route's own opengraph-image.tsx draws this position's census row.
     image: "dynamic",
   });
@@ -512,16 +480,13 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
           )}
           {data.chainStale ? (
             <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for this address in it. The page
-              states nothing it could not read.
+              This vault could not be read from chain just now, so no figure is stated for this address in it.
             </p>
           ) : onEventPage ? null : (
-            <>
-              <p className="mt-2 text-[12px] text-rb-500">
-                {/* The venue is on the rail above by construction now
-                    (rails-ops decision 0028), so this line names the standard
-                    and the factory version and carries no link of its own. */}
-                MetaMorpho {data.vault.factory} on Morpho Blue
+            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
+              {/* The family and the factory; the card names the block. */}
+              <span data-vault-block={data.blockNumber}>
+                MetaMorpho {data.vault.factory}
                 {factory && (
                   <>
                     {" · "}
@@ -535,47 +500,20 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
                     </a>
                   </>
                 )}
-                {" · shares "}
-                <a
-                  href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external font-mono"
-                >
-                  {shortAddr(address)}
-                </a>
-              </p>
-              <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at <BlockRef block={data.blockNumber} chainId={MORPHO_BASE_CHAIN_ID} /> · every figure read at this
-                block is a call answered at it, on this vault and on the{" "}
-                <a
-                  href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", data.vault.morpho)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  Morpho Blue singleton
-                </a>
-                .
-              </p>
-              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <Link href={baseVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
-                  {vaultName} <span aria-hidden>→</span>
-                </Link>
-                <Link
-                  href={baseVaultsListingHref({ vault: address })}
-                  className={PAGE_LINK}
-                  prefetch={false}
-                  data-link="vault-positions"
-                  data-positions-vault={address}
-                >
-                  Every address that has held this vault <span aria-hidden>→</span>
-                </Link>
-                <Link href={morphoBaseWalletHref(address)} className={PAGE_LINK} prefetch={false}>
-                  This vault&rsquo;s own positions on Morpho Blue <span aria-hidden>→</span>
-                </Link>
-              </p>
-            </>
+              </span>
+              <Link href={baseVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
+                {vaultName} <span aria-hidden>→</span>
+              </Link>
+              <Link
+                href={baseVaultsListingHref({ vault: address })}
+                className={PAGE_LINK}
+                prefetch={false}
+                data-link="vault-positions"
+                data-positions-vault={address}
+              >
+                Every holder <span aria-hidden>→</span>
+              </Link>
+            </p>
           )}
         </header>
 
@@ -584,7 +522,7 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
             what was typed. */}
         {lookup.error === "invalid" && (
           <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
-            That is none of the accepted forms. A position is opened with a 20-byte address starting <code>0x</code>, an
+            That is none of the accepted forms. A holding is opened with a 20-byte address starting <code>0x</code>, an
             ENS name ending <code>.eth</code>, or a Basename ending <code>.base.eth</code>.
           </p>
         )}
@@ -599,30 +537,18 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
           </p>
         )}
 
-        {!data.chainStale &&
-          (onEventPage ? (
-            timelineSlot
-          ) : (
-            <MorphoBaseVaultExposureView
-              data={data}
-              lookup={lookup}
-              showLookup={false}
-              positionCard={
-                data.holder ? (
-                  <Suspense
-                    fallback={
-                      <div className="mb-6" data-skel-section="vault-position-card-pending">
-                        <SkeletonBlock height={120} />
-                      </div>
-                    }
-                  >
-                    <VaultPositionCardSection data={data} holder={data.holder.address} lookup={lookup} />
-                  </Suspense>
-                ) : null
-              }
-              timeline={timelineSlot}
-            />
-          ))}
+        {!data.chainStale && !onEventPage && data.holder && (
+          <Suspense
+            fallback={
+              <div className="mb-6" data-skel-section="vault-position-card-pending">
+                <SkeletonBlock height={120} />
+              </div>
+            }
+          >
+            <HoldingCardSection data={data} holder={data.holder.address} />
+          </Suspense>
+        )}
+        {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}
 
         <ProvInspectorLayer />
       </div>

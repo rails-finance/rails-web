@@ -246,6 +246,12 @@ export function YearnVaultPage({ data, yieldFigure }: { data: YearnVaultResponse
       href: eth("block", y.createdBlock),
     },
     { item: "venue-page", title: "On Yearn's site", subtitle: "yearn.fi", href: `https://yearn.fi/v3/1/${y.address}` },
+    {
+      item: "docs",
+      title: "Yearn's documentation",
+      subtitle: "docs.yearn.fi: Introduction",
+      href: "https://docs.yearn.fi/getting-started/intro",
+    },
   ];
 
   const explanation = (

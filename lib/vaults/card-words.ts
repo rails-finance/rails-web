@@ -202,3 +202,40 @@ export const yearnVaultAssetsContent = (): LearnMoreContent => ({
     { bold: "Share of this vault", text: "a row's amount over the vault's totalAssets() at the same block." },
   ],
 });
+
+/** The holder card's "?" (ui-jobs 407 step 4, 410), every family. */
+export const vaultHoldingContent = (
+  assetSymbol: string,
+  shareSymbol: string,
+  census: boolean,
+  rewards: string,
+): LearnMoreContent => ({
+  title: "What a holding is",
+  intro: `A holding is one address's ${shareSymbol} in one vault. Every figure on the card is a read of the vault at a block the card names, in ${shareSymbol} or in ${assetSymbol}.`,
+  detailsHeading: "The headlines:",
+  details: [
+    { bold: "Balance", text: `the vault's balanceOf() for this address, in ${shareSymbol}.` },
+    { bold: "Share of the vault", text: "that balance over the vault's totalSupply(), both read at the same block." },
+    {
+      bold: "Claim",
+      text: `the vault's convertToAssets() of that balance, in ${assetSymbol}.${census ? " Beneath it, the census's dollar value at its block, through Aave V3's oracle, where the oracle prices the asset." : ""}`,
+    },
+    {
+      bold: "Earned",
+      text: `the claim plus every amount that left, minus every amount that came in, in ${assetSymbol}. Deposits and withdrawals are the amounts the vault's events state; shares that arrived or left by transfer are valued at the share price read at that block. ${rewards[0].toUpperCase()}${rewards.slice(1)} are not counted. No figure where the replay of the address's transfers misses its balanceOf, or a transfer's share price did not answer.`,
+    },
+  ],
+  extraParagraphs: [
+    "Earned is a sum with no window: nothing here is annualised.",
+    "A zero is a reading; a call that did not answer is said in words.",
+  ],
+});
+
+/** The rewards each family pays outside the share, which Earned leaves out. */
+export const HOLDING_REWARDS: Record<"morpho" | "sgho" | "stata" | "umbrella-stake" | "yearn", string> = {
+  morpho: "rewards paid outside the share, such as MORPHO,",
+  sgho: "rewards paid outside the share",
+  stata: "incentives claimed outside the share",
+  "umbrella-stake": "Umbrella's rewards, paid outside the share,",
+  yearn: "gauge rewards paid outside the share",
+};

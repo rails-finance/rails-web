@@ -44,7 +44,7 @@
 //       Vaults on Base" on Base) and names a Position; `og:image` points at THIS
 //       route's own `opengraph-image`, and a GET of it answers 200 `image/png`
 //       with a body over 10 KB. `twitter:image` likewise.
-//   S4  BOOKMARKS. The card's own bookmark toggle writes the holder into the
+//   S4  BOOKMARKS. The wallet menu's bookmark row writes the holder into the
 //       RAIL's namespace — `morpho-base-sessions` on Base, `aave-vaults-
 //       sessions` on Ethereum — together with the listing it was taken on
 //       (S4a/b, always). Whether the header's bookmarks modal then SHOWS that
@@ -338,7 +338,9 @@ for (const f of fixtures) {
   if (!f) continue;
   const { context, page, url, status } = await openFixture(f);
   const isBase = f.chain === 8453;
-  const figure = isBase ? "holder-max-withdraw" : "holder-max-redeem";
+  // Redeemable now is `maxWithdraw` in the asset on every family since ui-jobs
+  // 407 step 4; Umbrella's `maxRedeem` is its subline.
+  const figure = "holder-max-withdraw";
   check(`S1·${f.label} the position page answers 200`, status === 200, `status ${status} · ${url}`);
 
   // The card's own frame streams in behind a Suspense boundary; wait for it
@@ -362,24 +364,14 @@ for (const f of fixtures) {
     // reaches an element that DIRECTLY contains such a button — which is what
     // riding `rowExtra` means structurally, and what a cluster rendered
     // anywhere else on the card would fail.
-    const onButtonRow = (el) => {
-      if (!el) return false;
-      let node = el.parentElement;
-      for (let i = 0; i < 8 && node; i++, node = node.parentElement) {
-        const direct = [...node.children].filter((c) => c.tagName === "BUTTON");
-        if (direct.some((b) => /explanation/i.test(b.getAttribute("aria-label") || ""))) return true;
-      }
-      return false;
-    };
-    // The strip's own root — the container-query wrapper the RiskFooterStrip
-    // renders. Everything below is asked of it, so a meter elsewhere on the
-    // page is not this check's business.
-    let root = fig;
-    for (let i = 0; i < 8 && root; i++, root = root.parentElement)
-      if (root.className && String(root.className).includes("@container")) break;
+    // Since ui-jobs 407 step 4 the figures are stats of the holder card
+    // (`[data-position-panel]`), and the card is the root asked below.
+    const onButtonRow = (el) => !!el?.closest("[data-position-panel]");
+    const root = inner;
     return {
       card: true,
       figureText: fig ? (fig.textContent || "").trim() : null,
+      figureRaw: inner.getAttribute("data-max-withdraw-raw"),
       figureOnRow: onButtonRow(fig),
       exitText: exit ? (exit.textContent || "").trim() : null,
       exitOnRow: onButtonRow(exit),
@@ -400,12 +392,12 @@ for (const f of fixtures) {
   }
 
   check(
-    `S1a·${f.label} the redeemable cluster is on the card's heading-button row`,
+    `S1a·${f.label} the redeemable figure is a stat of the holder card`,
     strip.figureOnRow,
     JSON.stringify({ figure, text: strip.figureText }),
   );
   check(
-    `S1b·${f.label} the exit cluster is on the same row`,
+    `S1b·${f.label} the exit is a stat beside it`,
     strip.exitOnRow && !!strip.exitText,
     JSON.stringify(strip.exitText),
   );
@@ -432,7 +424,7 @@ for (const f of fixtures) {
       own = await client.readContract({
         address: f.vault,
         abi: VAULT_ABI,
-        functionName: isBase ? "maxWithdraw" : "maxRedeem",
+        functionName: "maxWithdraw",
         args: [f.holder],
         blockNumber: BigInt(strip.block),
       });
@@ -440,12 +432,10 @@ for (const f of fixtures) {
       check(`S1h·${f.label} the redeemable figure is this script's own read`, false, scrub(error.message));
     }
     if (own != null) {
-      const { symbol, decimals } = await unitAt(client, f.vault, strip.block, isBase);
-      const expected = `${isBase ? assetText(own.toString(), decimals) : shareText(own.toString(), decimals)} ${symbol}`;
       check(
-        `S1h·${f.label} the redeemable figure is this script's own read`,
-        strip.figureText === expected,
-        `card ${JSON.stringify(strip.figureText)}, own ${JSON.stringify(expected)} @ ${strip.block}`,
+        `S1h·${f.label} the redeemable figure is this script's own maxWithdraw read`,
+        strip.figureRaw === own.toString(),
+        `card ${strip.figureRaw} (${JSON.stringify(strip.figureText)}), own ${own} @ ${strip.block}`,
       );
     }
   }
@@ -480,21 +470,16 @@ for (const f of fixtures) {
             : blockTs < end + window
               ? "open"
               : "expired";
-      const { decimals: sd } = await unitAt(eth, f.vault, strip.block, false);
-      const covers = `${shareText(amount.toString(), sd)} shares`;
-      const sentence =
+      // The card's Cooldown stat states the state in a few words; the sentence
+      // is its read-more.
+      const expected =
         state === "none"
-          ? "No cooldown is recorded for this address at this block"
+          ? "None"
           : state === "waiting"
-            ? `A cooldown is running for ${covers}, and ends ${utcInstant(end)}`
+            ? `Ends ${utcInstant(end)}`
             : state === "open"
-              ? `A cooldown for ${covers} has ended and its redemption window is open until ${utcInstant(end + window)}`
-              : `A cooldown for ${covers} ended ${utcInstant(end)} and its redemption window has since passed`;
-      const expected = `${sentence}. ${
-        state === "open"
-          ? "Inside it maxRedeem() answers what the snapshot covers."
-          : "Outside it maxRedeem() answers zero."
-      }`;
+              ? `Window open until ${utcInstant(end + window)}`
+              : "Window passed";
       check(
         `S1i·${f.label} the cooldown cluster is this script's own read`,
         strip.cooldownText === expected,
@@ -561,7 +546,7 @@ for (const f of fixtures) {
   };
   const wanted = isBase ? "Rails | Vaults on Base" : "Rails | Vaults";
   check(`S3a·${f.label} the title names the section`, title.startsWith(wanted), JSON.stringify(title));
-  check(`S3b·${f.label} the title names a Position`, title.includes("Position"), JSON.stringify(title));
+  check(`S3b·${f.label} the title names a Holding`, title.includes("Holding"), JSON.stringify(title));
   if (!isBase)
     check(
       `S3b'·${f.label} the title does not say a chain Ethereum never says`,
@@ -606,9 +591,16 @@ for (const f of fixtures) {
   const shouldGroup = LAUNCHED_SESSIONS.has(scope);
   const { context, page } = await openFixture(f);
 
-  const toggle = page.locator('[data-position-card] button[aria-label="Bookmark this wallet"]').first();
+  // The holder page's wallet row carries the bookmark, as the "Bookmark it" row
+  // of its address menu (the card leaves the wallet to that row).
+  await page
+    .locator('[data-wallet-menu] button[aria-haspopup="menu"]')
+    .first()
+    .click({ timeout: 10_000 })
+    .catch(() => {});
+  const toggle = page.locator("[data-wallet-menu]").getByText("Bookmark it", { exact: true }).first();
   const found = (await toggle.count()) > 0;
-  check(`S4a·${f.label} the card carries a bookmark toggle`, found, `${listingPath}/${f.vault}/${f.holder}`);
+  check(`S4a·${f.label} the page's wallet menu carries a bookmark row`, found, `${listingPath}/${f.vault}/${f.holder}`);
   if (!found) {
     await context.close();
     continue;
@@ -631,7 +623,10 @@ for (const f of fixtures) {
   // `display:none` at this script's desktop-width viewport — and hangs on
   // its own 30s actionability wait. `:visible` picks the one actually on
   // screen.
-  await page.click('button[aria-label="Bookmarks"]:visible');
+  await page
+    .locator('button[aria-label="Bookmarks"]:visible')
+    .first()
+    .evaluate((el) => el.click());
   await page.waitForSelector(`[data-bookmark-group="${scope}"]`, { timeout: 15_000 }).catch(() => {});
   const group = await page.evaluate((s) => {
     const g = document.querySelector(`[data-bookmark-group="${s}"]`);
@@ -680,7 +675,10 @@ for (const f of fixtures) {
   );
   await page.reload({ waitUntil: "networkidle", timeout: 180_000 });
   // Same ambiguous-locator fix as above: two mount, one hidden by breakpoint.
-  await page.click('button[aria-label="Bookmarks"]:visible');
+  await page
+    .locator('button[aria-label="Bookmarks"]:visible')
+    .first()
+    .evaluate((el) => el.click());
   await page.waitForSelector(`[data-bookmark-group="${scope}"]`, { timeout: 15_000 }).catch(() => {});
   const legacyRows = await page.evaluate(
     (sc) =>
