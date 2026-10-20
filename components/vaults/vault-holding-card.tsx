@@ -33,14 +33,20 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { BlockRef } from "@/components/shared/block-ref";
 import { AssetAmount } from "@/components/shared/asset-amount";
-import { VaultVenueMark, type VaultVenue } from "@/components/vaults/vault-venue-mark";
+import { VaultVenueMark } from "@/components/vaults/vault-venue-mark";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { pctText, shortAddress } from "@/lib/shared/vault-amount-text";
 import { VAULT_FAMILIES, familyOfCensus } from "@/lib/vaults/families";
 import type { ChainId } from "@/lib/shared/chains";
-import { VAULT_SHAPE_WORD, usdText, vaultPositionUsd, type VaultPositionRow } from "@/lib/aave-vaults/vault-position";
+import {
+  VAULT_SHAPE_WORD,
+  usdText,
+  vaultPositionUsd,
+  type VaultPositionFamily,
+  type VaultPositionRow,
+} from "@/lib/aave-vaults/vault-position";
 import {
   aaveAttestedNameProv,
   aaveVaultPositionDivergenceProv,
@@ -82,7 +88,8 @@ export interface VaultHoldingMarket {
 
 export interface VaultHoldingCardProps {
   coords: HoldingCoords & { chainId: ChainId };
-  family: VaultVenue;
+  /** The holding's family: a census family, or Yearn. */
+  family: VaultPositionFamily | "yearn";
   /** Draw the venue mark beside the family word (Yearn: only where endorsed). */
   venueMark: boolean;
   vaultHref: string;
