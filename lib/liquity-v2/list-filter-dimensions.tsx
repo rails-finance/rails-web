@@ -12,6 +12,10 @@
 // wallet view), now expressed as SerializableDimension so the one shared driver
 // owns the toolbar / URL / pagination.
 //
+// Transactions is a range over the trove's distinct transactions
+// (activity.transactionCount), sent as minTx / maxTx
+// (lib/shared/transactions-dimension.ts).
+//
 // The free-text search is the driver's `q`; it carries the tri-modal identity
 // lookup (trove ID / owner address / ENS), parsed in lib/liquity-v2/search.ts and
 // mapped onto the right fetch param by liquityV2FiltersToFetchParams below. That
@@ -33,6 +37,11 @@ import {
 } from "@/lib/liquity-v2/listing-visibility";
 import { parseTroveSearch } from "@/lib/liquity-v2/search";
 import type { FetchTrovesParams } from "@/lib/api/fetch-troves";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+
+/** The Transactions slider's top: the round number above the busiest trove
+ *  (937 transactions, 20 Oct 2026). */
+const LIQUITY_V2_TX_TOP = 1000;
 
 /** Backend caps `limit` at 1000; 20 keeps the page light and the grid familiar. */
 export const LIQUITY_V2_ITEMS_PER_PAGE = 20;
@@ -50,6 +59,8 @@ export interface LiquityV2ListFilters extends BaseListFilters {
   hasRedemptions?: boolean;
   batchOnly?: boolean;
   individualOnly?: boolean;
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: `statuses: undefined` is "no
@@ -62,6 +73,7 @@ export const LIQUITY_V2_LIST_DEFAULTS: LiquityV2ListFilters = {
   q: "",
   sortBy: "lastActivity",
   sortOrder: "desc",
+  tx: [],
 };
 
 // UI labels → backend sort fields (VALID_SORT_FIELDS in app/api/troves/route.ts).
@@ -179,7 +191,13 @@ export function liquityV2ListDimensions(
     chipLabel: bareLabel,
   };
 
-  return [status, collateral, redemptions, delegation];
+  const transactions = transactionsDimension<LiquityV2ListFilters>({
+    get: (f) => f.tx,
+    set: (f, tx) => ({ ...f, tx }),
+    top: LIQUITY_V2_TX_TOP,
+  });
+
+  return [status, collateral, redemptions, delegation, transactions];
 }
 
 /** Map the decoded selection + page onto the /api/troves fetch params — the
@@ -194,6 +212,7 @@ export function liquityV2FiltersToFetchParams(filters: LiquityV2ListFilters, pag
     hasRedemptions: filters.hasRedemptions,
     batchOnly: filters.batchOnly || undefined,
     individualOnly: filters.individualOnly || undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy,
     sortOrder: filters.sortOrder,
     limit: LIQUITY_V2_ITEMS_PER_PAGE,
