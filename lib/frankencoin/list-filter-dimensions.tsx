@@ -21,6 +21,8 @@
 //   • History — Challenged before / Challenge succeeded (the orthogonal
 //     flags): open SURVIVORS match too — a challenged position can survive
 //     its auction.
+//   • Transactions — a range over the position's distinct transactions
+//     (`minTx` / `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
 //   • Owner search (the `q` box → the `owner` param — "this owner's
 //     positions", plural on purpose: one owner can hold many Position
 //     contracts) + recency sort.
@@ -30,6 +32,7 @@
 // revisit when the backend exposes the observed-collateral table to build
 // chips from.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -46,6 +49,10 @@ import {
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const FRANKENCOIN_ITEMS_PER_PAGE = 20;
 
+/** The Transactions slider's top: the round number above the busiest position
+ *  (64 transactions, 20 Oct 2026). */
+const FRANKENCOIN_TX_TOP = 100;
+
 export interface FrankencoinListFilters extends BaseListFilters {
   /** open / closed / denied — multi (OR); the API's whole vocabulary. */
   status: string[];
@@ -54,6 +61,8 @@ export interface FrankencoinListFilters extends BaseListFilters {
   /** "" | "challenged" | "challenge-succeeded" — the orthogonal challenge
    *  axis (open survivors included). */
   challenges: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -68,6 +77,7 @@ export const FRANKENCOIN_LIST_DEFAULTS: FrankencoinListFilters = {
   status: [],
   hub: [],
   challenges: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -133,6 +143,11 @@ export function frankencoinListDimensions(): SerializableDimension<FrankencoinLi
       get: (f) => f.challenges,
       set: (f, v) => ({ ...f, challenges: v }),
     },
+    transactionsDimension<FrankencoinListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: FRANKENCOIN_TX_TOP,
+    }),
   ];
 }
 
@@ -155,6 +170,7 @@ export function frankencoinFiltersToFetchParams(
     hub: hub === "v1" || hub === "v2" ? hub : undefined,
     everChallenged: filters.challenges.includes("challenged") ? true : undefined,
     challengeSucceeded: filters.challenges.includes("challenge-succeeded") ? true : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as FrankencoinPositionSort,
     sortOrder: filters.sortOrder,
     limit: FRANKENCOIN_ITEMS_PER_PAGE,

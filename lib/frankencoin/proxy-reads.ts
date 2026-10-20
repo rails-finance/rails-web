@@ -52,6 +52,11 @@ export async function readFrankencoinPositions(
   if (sp.get("hub")) qs.set("hub", sp.get("hub")!);
   if (sp.get("everChallenged")) qs.set("everChallenged", sp.get("everChallenged")!);
   if (sp.get("challengeSucceeded")) qs.set("challengeSucceeded", sp.get("challengeSucceeded")!);
+  // A transaction-count bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   // Allowlist, like sortOrder: an unrecognised value is dropped rather than
   // forwarded verbatim, so rails-server's own default (recent) decides it.
   const sortBy = sp.get("sortBy");
