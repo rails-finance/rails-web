@@ -273,8 +273,7 @@ function MarketSection({
   // (lib/compound/flows.ts): the loaded rows where they are all of it, else
   // the rows with each folder opened for its members. A market whose history
   // the sweep did not read whole, or one cut below its newest rows (a seeded
-  // heavy wallet), has no read: the panel says the history was not read
-  // whole. The test is per market where the deployment states one
+  // heavy wallet), has no read, and the panel draws nothing. The test is per market where the deployment states one
   // (`marketWholeOf`: a horizon or a hole below this Comet's first block
   // leaves its rows all of it), else the wallet's (rails-ops TO-DO-ui-jobs.md
   // item 415).

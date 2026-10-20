@@ -61,15 +61,16 @@ import {
 /** Where the scrubber's timeline read stands. `withheld`: the page made no
  *  read, because the history it holds is not whole (a capped sweep, a horizon,
  *  rows cut below the newest), and a replay of part of a history would state
- *  the wrong lifetime; a reload gives the same answer (rails-ops
- *  TO-DO-ui-jobs.md item 415). `failed` is a read that was made and failed. */
+ *  the wrong lifetime; the panel draws nothing, and the timeline's coverage
+ *  line says the history is capped (rails-ops TO-DO-ui-jobs.md item 415).
+ *  `failed` is a read that was made and failed. */
 export type FlowsRead = "reading" | "failed" | "withheld" | "done";
 
 export interface LifetimeFlowsPanelProps {
   /** `<LifetimeFlowsScrubber>`, or null while its timeline is not in hand. */
   scrubber: ReactNode | null;
-  /** The timeline read. Done with no scrubber: nothing to draw, and the panel
-   *  renders nothing. */
+  /** The timeline read. Done or withheld with no scrubber: nothing to draw,
+   *  and the panel renders nothing. */
   read: FlowsRead;
   /** The Explanation's prose; the scrubber's Key follows it. */
   explanation?: ReactNode;
@@ -179,8 +180,8 @@ export function LifetimeFlowsPanel({
       {label}
     </button>
   );
-  if (scrubber == null && read === "done") return null;
-  const loading = scrubber == null && read !== "failed" && read !== "withheld";
+  if (scrubber == null && (read === "done" || read === "withheld")) return null;
+  const loading = scrubber == null && read !== "failed";
   const none = scrubber != null && life === "none";
 
   return (
@@ -263,14 +264,12 @@ export function LifetimeFlowsPanel({
                 </FlowsKeyNodeContext.Provider>
               </FlowsKeyContext.Provider>
             </FlowsLifeContext.Provider>
-          ) : read === "failed" || read === "withheld" ? (
+          ) : read === "failed" ? (
             <p
               className="mt-2 flex h-24 items-center justify-center rounded-md bg-sunken px-3 text-center text-xs text-rb-500"
               data-flows-read={read}
             >
-              {read === "withheld"
-                ? "The history was not read whole, so the flows are not replayed."
-                : "The flow history was not read. Reload to try again."}
+              The flow history was not read. Reload to try again.
             </p>
           ) : (
             <div className="relative" data-flows-read={read}>

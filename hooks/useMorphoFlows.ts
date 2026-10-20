@@ -39,7 +39,7 @@ export interface MorphoFlowsInput {
   /** The page's events, when they are the whole history; null otherwise. */
   wholeEvents: BaseActivityEvent[] | null;
   /** Reads the whole flat history; null where the page withholds the read
-   *  because its history is not whole (the panel then says so: rails-ops
+   *  because its history is not whole (the panel then draws nothing: rails-ops
    *  TO-DO-ui-jobs.md item 415). */
   fetchAll: (() => Promise<{ events: BaseActivityEvent[]; missing: number }>) | null;
   marketId: string;
