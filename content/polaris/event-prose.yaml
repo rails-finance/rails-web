@@ -416,6 +416,53 @@ words:
     The collateral ratio below which the CDP can be liquidated, in the market's normal mode.
   tip_liquidation_penalty: |-
     The share of the seized collateral that goes as a penalty when the stability pool absorbs a liquidation, a constant of the market's contracts.
+  # The live window's sheet (ui-jobs 396): the figures as the last touch wrote
+  # them, what is pending until the next touch, and the figures at the feed,
+  # each a view call on the cdpManager at the head block.
+  live_stated_open: |-
+    Stated at its open
+  live_stated_touch: |-
+    Stated at its last touch
+  live_pending: |-
+    Pending until the next touch
+  live_at_feed: |-
+    At the feed
+  live_cr_stated: |-
+    Collateral ratio, as last written
+  live_liq_stated: |-
+    Liquidates at, as last written
+  live_note_open: |-
+    This CDP has had no touch since its open, and its stated collateral and debt change only at a touch, so the figures at the feed are what its open wrote plus what is pending, and the breakdown is the whole of what moved its equity at the feed over its life. Its first touch writes the pending legs into the stated figures.
+  live_note_touch: |-
+    A CDP's stated collateral and debt change only at a touch, so the figures at the feed are what its last touch wrote plus what is pending, and the breakdown is the whole of what moved its equity at the feed since then. The next touch writes the pending legs into the stated figures.
+  live_legs: |-
+    The protocol's legs, pending until the next touch:
+  live_change: |-
+    Change in equity at the feed
+  tip_live_coll_stated: |-
+    The pETH the CDP's last touch wrote to its collateral (getCDP), in dollars at the feed now. It moves only at a touch.
+  tip_live_coll_pending: |-
+    The pETH pending since the last touch, the net PSM collateral share and the pETH reward, read from the cdpManager at the head block. The next touch writes it into the collateral.
+  tip_live_coll_total: |-
+    The CDP's collateral at the feed, the stated pETH with the pending PSM share and reward (getCDPEntireColl at the head block), in dollars at the feed now.
+  tip_live_debt_stated: |-
+    The debt the CDP's last touch wrote (getCDP). It moves only at a touch.
+  tip_live_debt_pending: |-
+    The debt pending since the last touch: interest charged, less the stability gain, with the net PSM debt share, read from the cdpManager at the head block. The next touch writes it into the debt.
+  tip_live_debt_total: |-
+    The CDP's debt at the feed, the stated debt with the pending legs (getCDPEntireDebt at the head block), in dollars at the stablecoin's price now.
+  tip_live_cr: |-
+    The collateral at the feed divided by the debt at the feed, both in the market's stablecoin, at the pETH price read at the head block.
+  tip_live_cr_stated: |-
+    The ratio on the figures the last touch wrote, at the pETH price at that touch's block.
+  tip_live_liq: |-
+    The pETH price, in the market's stablecoin, at which the ratio on the figures at the feed meets the minimum.
+  tip_live_liq_stated: |-
+    The same price on the figures the last touch wrote.
+  tip_live_rate: |-
+    The part of the market's interest rate that follows its stablecoin's peg, read from the cdpManager at the head block.
+  tip_live_reserve: |-
+    The market's reserve divided by its debt, read at the head block; it sets the secondary interest rate and the market's defensive mode.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk, Rate and History when two of them hold two or more

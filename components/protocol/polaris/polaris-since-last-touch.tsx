@@ -4,12 +4,15 @@
 // ----------------------------------------------------------------------------
 // Between two of a CDP's own touches its stated figures do not move, so exactly
 // two things changed what it is worth at the market's own feed — the feed, and
-// the protocol's pending legs — and they add up to the whole move. That is
-// what this row states: the feed, one line per protocol leg (largest first,
-// dust left out), and the total under a rule, every figure receipted, no
-// percentage and no colour (lib/polaris/since-last-touch.ts carries the why).
-// Where the last touch is the open, the row says "Since its open": the one
-// window where a statement over the CDP's whole life is a fact.
+// the protocol's pending legs — and they add up to the whole move. The closed
+// row states that move. Opened, it is an event card's balance sheet (decision
+// 0042, ui-jobs 396): Collateral and Debt as the last touch wrote them, what
+// is pending, and the figures at the feed; Risk and Limits at the feed beside
+// the stated ones; and behind the breakdown switch the feed, one line per
+// protocol leg (largest first, dust left out) and the total, every figure
+// receipted, no percentage and no colour (lib/polaris/since-last-touch.ts
+// carries the why). Where the last touch is the open, the row says "Since its
+// open": the one window where a statement over the CDP's whole life is a fact.
 //
 // IT IS A TIMELINE ROW, pinned in the head slot (rails-ops TO-DO-ui-jobs §44).
 // Every window between two touches is already told on the spine, between the
@@ -32,7 +35,22 @@
 
 import type { ReactNode } from "react";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { Prov, type Provenance, type ProvInput } from "@/components/shared/provenance";
+import {
+  EventSheetView,
+  sheetUsd,
+  type EventSheet,
+  type SheetSide,
+  type SheetStat,
+} from "@/components/shared/event-sheet";
+import { changeText } from "@/components/shared/change-swap-value";
+import { gasEscrowFootnote } from "@/lib/shared/liquity-gas-escrow";
+import { gasCompHeldProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
+import { crPct1, POLARIS_NORMAL_MCR_PCT } from "@/lib/polaris/cr-at-event";
+import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
+import { POLARIS_LIQ_CONSTANTS, polarisValueFormat } from "./polaris-liquidation-forensics";
+import { polarisParamStats } from "./polaris-sheet";
+import { formatNumber } from "@/lib/utils/format";
 import { formatExact } from "@/lib/utils/format";
 import { formatPethPrice } from "@/components/protocol/polaris/polaris-position-card";
 import { formatDuration } from "@/lib/date";
@@ -84,10 +102,12 @@ function feedLegInputs(w: PolarisSinceLastTouch, market: "usdp" | "goldp") {
 export function PolarisSinceLastTouchRow({
   window: w,
   market,
+  cdpId,
   stable,
 }: {
   window: PolarisSinceLastTouch;
-  market: "usdp" | "goldp";
+  market: PolarisMarket;
+  cdpId: string;
   stable: string;
 }) {
   // formatDuration reads a bare number as unix SECONDS, which is what both ends carry.
@@ -154,14 +174,14 @@ export function PolarisSinceLastTouchRow({
               value: formatExact(w.raw.psmColl),
               kind: "chain",
               pclass: "state",
-              note: "getCDPMintRedeemCollChange(id), in pETH",
+              note: `getCDPMintRedeemCollChange(id), in pETH, a view call at the head block ${w.to.block.toLocaleString("en-US")}`,
             },
             {
               label: "net PSM share, debt side",
               value: formatExact(w.raw.psmDebt),
               kind: "chain",
               pclass: "state",
-              note: `getCDPMintRedeemDebtChange(id), in ${stable}`,
+              note: `getCDPMintRedeemDebtChange(id), in ${stable}, a view call at the head block ${w.to.block.toLocaleString("en-US")}`,
             },
             priceNowInput,
           ],
@@ -180,7 +200,7 @@ export function PolarisSinceLastTouchRow({
               value: formatExact(w.raw.reward),
               kind: "chain",
               pclass: "state",
-              note: "getCDPBcTokenGain(id), in pETH",
+              note: `getCDPBcTokenGain(id), in pETH, a view call at the head block ${w.to.block.toLocaleString("en-US")}`,
             },
             priceNowInput,
           ],
@@ -197,7 +217,7 @@ export function PolarisSinceLastTouchRow({
               value: formatExact(-w.legs.interest),
               kind: "chain",
               pclass: "state",
-              note: `getCDPAccruedInterest(id), in ${stable}`,
+              note: `getCDPAccruedInterest(id), in ${stable}, a view call at the head block ${w.to.block.toLocaleString("en-US")}`,
             },
           ],
         };
@@ -213,7 +233,7 @@ export function PolarisSinceLastTouchRow({
               value: formatExact(w.legs.stabilityGain),
               kind: "chain",
               pclass: "state",
-              note: `getCDPAccruedStables(id), in ${stable}`,
+              note: `getCDPAccruedStables(id), in ${stable}, a view call at the head block ${w.to.block.toLocaleString("en-US")}`,
             },
           ],
         };
@@ -230,7 +250,7 @@ export function PolarisSinceLastTouchRow({
               value: formatExact(w.legs.settle),
               kind: "chain",
               pclass: "state",
-              note: `getCDPEntireDebt(id), in ${stable}`,
+              note: `getCDPEntireDebt(id), in ${stable}, a view call at the head block ${w.to.block.toLocaleString("en-US")}`,
             },
           ],
         };
@@ -303,6 +323,57 @@ export function PolarisSinceLastTouchRow({
     </div>
   );
 
+  // The breakdown: the five lines that sum to the change in equity at the
+  // feed, behind the sheet's switch.
+  const breakdown = (
+    <div className="px-9 pb-1 text-xs" data-live-breakdown="">
+      <Row
+        label="The feed:"
+        leg="feed"
+        detail={
+          <>
+            pETH {formatPethPrice(w.from.pethInDebt)} → {formatPethPrice(w.to.pethInDebt)} {stable}
+            {feedLegText ? ` (${feedLegText})` : ""}, on the collateral stated then
+          </>
+        }
+        value={
+          <Prov info={feedProv} value={formatExact(w.feed)}>
+            <Signed value={w.feed} unit={stable} />
+          </Prov>
+        }
+      />
+      {legs.length > 0 && <div className="pt-1.5 text-foreground">{W.live_legs}</div>}
+      {legs.map((l) => (
+        <Row
+          key={l.key}
+          leg={l.key}
+          indent
+          label={l.name.charAt(0).toUpperCase() + l.name.slice(1)}
+          detail={legDetail(l)}
+          value={
+            <Prov info={legProv(l.key)} value={formatExact(l.value)}>
+              <Signed value={l.value} unit={stable} />
+            </Prov>
+          }
+        />
+      ))}
+      <div className="mt-1 border-t border-rb-300/40 pt-1 dark:border-rb-700/40">
+        <Row
+          label={W.live_change}
+          leg="total"
+          detail=""
+          value={
+            <Prov info={totalProv} value={formatExact(w.total)}>
+              <Signed value={w.total} unit={stable} />
+            </Prov>
+          }
+        />
+      </div>
+    </div>
+  );
+
+  const sheet = polarisLiveSheet(w, { market, cdpId, stable, breakdown });
+
   return (
     <NoteRowShell
       icon="live-window"
@@ -313,9 +384,9 @@ export function PolarisSinceLastTouchRow({
           <span className="text-sm text-foreground">{since}</span>
           {/* The closed row names its figure: a bare number read as nothing. */}
           <span className="text-xs text-rb-500">change in equity at the feed</span>
-          {/* An ECHO of the "Change in equity at the feed" receipt below, not a
-              second receipt for the same figure: one fact, stated where the row
-              is closed and again where it opens. */}
+          {/* An ECHO of the "Change in equity at the feed" receipt in the
+              breakdown: one fact, stated where the row is closed and again
+              where it opens. */}
           <Prov echo info={totalProv} value={formatExact(w.total)}>
             <span className="text-sm">
               <Signed value={w.total} unit={stable} />
@@ -329,58 +400,400 @@ export function PolarisSinceLastTouchRow({
         </>
       }
     >
-      <div className="px-5 pb-3 pt-1 text-xs">
-        <Row
-          label="The feed:"
-          leg="feed"
-          detail={
-            <>
-              pETH {formatPethPrice(w.from.pethInDebt)} → {formatPethPrice(w.to.pethInDebt)} {stable}
-              {feedLegText ? ` (${feedLegText})` : ""}, on the collateral stated then
-            </>
-          }
-          value={
-            <Prov info={feedProv} value={formatExact(w.feed)}>
-              <Signed value={w.feed} unit={stable} />
-            </Prov>
-          }
-        />
-        {legs.length > 0 && (
-          <div className="pt-1.5 text-foreground">The protocol&rsquo;s legs, pending until the next touch:</div>
-        )}
-        {legs.map((l) => (
-          <Row
-            key={l.key}
-            leg={l.key}
-            indent
-            label={l.name.charAt(0).toUpperCase() + l.name.slice(1)}
-            detail={legDetail(l)}
-            value={
-              <Prov info={legProv(l.key)} value={formatExact(l.value)}>
-                <Signed value={l.value} unit={stable} />
-              </Prov>
-            }
-          />
-        ))}
-        <div className="mt-1 border-t border-rb-300/40 pt-1 dark:border-rb-700/40">
-          <Row
-            label="Change in equity at the feed"
-            leg="total"
-            detail=""
-            value={
-              <Prov info={totalProv} value={formatExact(w.total)}>
-                <Signed value={w.total} unit={stable} />
-              </Prov>
-            }
-          />
-        </div>
-
-        <p className="mt-1 text-[11px] leading-snug text-rb-400">
-          {w.sinceOpen
-            ? "This CDP has had no touch since its open, and its stated collateral and debt change only at a touch, so these lines are the whole of what moved its equity at the feed over its life. Its first touch writes the protocol’s legs into the stated figures."
-            : "A CDP’s stated collateral and debt change only at a touch, so these lines are the whole of what moved its equity at the feed since the last one. The next touch writes the protocol’s legs into the stated figures."}
-        </p>
-      </div>
+      <EventSheetView sheet={sheet} breakdown={false} data={{ "data-live-sheet": "" }} />
     </NoteRowShell>
   );
+}
+
+const W = POLARIS_WORDS;
+
+/** The live window on the event card's balance sheet (decision 0042, ui-jobs
+ *  396): Collateral and Debt as the last touch wrote them, what is pending
+ *  until the next touch, and the figures at the feed, every one a view call on
+ *  the cdpManager at the head block; then Risk and Limits at the feed beside
+ *  the stated ones. The breakdown is the window's five lines. */
+function polarisLiveSheet(
+  w: PolarisSinceLastTouch,
+  o: { market: PolarisMarket; cdpId: string; stable: string; breakdown: ReactNode },
+): EventSheet {
+  const { market, stable } = o;
+  const cfg = POLARIS_MARKET_CONFIG[market];
+  const head = w.to.block;
+  const atHead = `at the head block ${head.toLocaleString("en-US")}`;
+  const coords: PolarisCoords = { market, cdpId: o.cdpId, blockNumber: head };
+  const manager = { name: `Polaris ${stable} CDPManager`, address: cfg.cdpManager };
+  // The stablecoin in dollars now: a USDp is $1 in the feed, a GOLDp an ounce at XAU/USD.
+  const unitUsd = market === "usdp" ? 1 : (w.to.xauUsd ?? null);
+  const unitInput: ProvInput | null =
+    unitUsd == null
+      ? null
+      : market === "usdp"
+        ? {
+            label: `${stable} in USD`,
+            value: "$1.00",
+            kind: "chain-derived",
+            pclass: "oracle",
+            note: "the feed prices pETH as the bonding curve's rate times ETH/USD, so a USDp is $1 in it",
+          }
+        : {
+            label: `${stable} in USD`,
+            value: sheetUsd(unitUsd),
+            kind: "chain",
+            pclass: "oracle",
+            note: `the XAU/USD medianiser ${atHead}`,
+          };
+  const pethUsd = unitUsd != null ? w.to.pethInDebt * unitUsd : null;
+  const priceInput: ProvInput = {
+    label: `pETH price in ${stable}`,
+    value: `${formatExact(w.to.pethInDebt)} ${stable}`,
+    kind: "chain",
+    pclass: "oracle",
+    note: `the market's price feed, previewPrice() ${atHead}`,
+    contract: { name: `Polaris ${stable} price feed`, address: cfg.priceFeed },
+  };
+  const usd = (what: string, token: "coll" | "debt", n: number) => {
+    const price = token === "coll" ? pethUsd : unitUsd;
+    if (price == null) return undefined;
+    return {
+      text: sheetUsd(n * price),
+      info: {
+        kind: "chain-derived",
+        pclass: "oracle",
+        summary:
+          token === "coll"
+            ? `${what} in US dollars: the pETH times the feed's price for pETH in ${stable}, times ${stable} in dollars, ${atHead}.`
+            : `${what} in US dollars: the ${stable} times its price in dollars, ${atHead}.`,
+        formula:
+          token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
+        inputs: [
+          { label: token === "coll" ? "pETH" : stable, value: formatExact(Math.abs(n)), kind: "chain" },
+          ...(token === "coll" ? [priceInput] : []),
+          ...(unitInput ? [unitInput] : []),
+        ],
+      } satisfies Provenance,
+    };
+  };
+  /** A view call on the cdpManager at the head block, as a receipt. */
+  const view = (summary: string, fn: string, value: number, unit: string): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    summary,
+    contract: manager,
+    via: `${fn} ${atHead}`,
+    inputs: [{ label: fn, value: `${formatExact(value)} ${unit}`, kind: "chain", pclass: "state" }],
+  });
+  const signedAmount = (n: number, fmt: (x: number) => string) => `${n < 0 ? "−" : "+"}${fmt(Math.abs(n))}`;
+  const stated = w.sinceOpen ? W.live_stated_open : W.live_stated_touch;
+
+  // ── Collateral ──
+  const collPending = w.raw.psmColl + w.raw.reward;
+  const pethFig = (text: string, info: Provenance, value: number) => ({
+    text,
+    info,
+    value: formatExact(value),
+    symbol: PETH.symbol,
+    address: PETH.address,
+  });
+  const collSide: SheetSide = {
+    side: "collateral",
+    icons: [PETH.symbol],
+    carry: [],
+    rows: [
+      {
+        key: "stated",
+        label: stated,
+        amount: pethFig(
+          formatPeth(w.collAtTouch),
+          view(
+            `The collateral the CDP's last touch wrote, the slot nothing rewrites until the next touch.`,
+            "getCDP(id).coll",
+            w.collAtTouch,
+            "pETH",
+          ),
+          w.collAtTouch,
+        ),
+        usd: usd(stated, "coll", w.collAtTouch),
+        tip: W.tip_live_coll_stated,
+      },
+      ...(Math.abs(collPending) > 1e-12
+        ? [
+            {
+              key: "pending",
+              label: W.live_pending,
+              amount: pethFig(
+                signedAmount(collPending, formatPeth),
+                {
+                  kind: "chain",
+                  pclass: "state",
+                  summary: `The pETH pending since the last touch: the CDP's net PSM collateral share and its pETH reward, two view calls on the cdpManager ${atHead}. The next touch writes them into the collateral.`,
+                  formula: "getCDPMintRedeemCollChange(id) + getCDPBcTokenGain(id)",
+                  contract: manager,
+                  inputs: [
+                    {
+                      label: "net PSM share, collateral side",
+                      value: formatExact(w.raw.psmColl),
+                      kind: "chain",
+                      pclass: "state",
+                    },
+                    { label: "pETH reward", value: formatExact(w.raw.reward), kind: "chain", pclass: "state" },
+                  ],
+                },
+                collPending,
+              ),
+              usd: usd(W.live_pending, "coll", collPending),
+              tip: W.tip_live_coll_pending,
+            },
+          ]
+        : []),
+    ],
+    after: W.live_at_feed,
+    total: pethUsd != null ? usd("The collateral at the feed", "coll", w.atFeed.coll)! : { none: W.sheet_no_price },
+    totalAmount: pethFig(
+      formatPeth(w.atFeed.coll),
+      view(
+        "The CDP's collateral at the feed: the stated pETH with the pending PSM share and reward.",
+        "getCDPEntireColl(id)",
+        w.atFeed.coll,
+        "pETH",
+      ),
+      w.atFeed.coll,
+    ),
+    totalTip: W.tip_live_coll_total,
+  };
+
+  // ── Debt ──
+  const debtPending = w.atFeed.debt - w.debtAtTouch;
+  const stableFig = (text: string, info: Provenance, value: number) => ({
+    text,
+    info,
+    value: formatExact(value),
+    symbol: stable,
+    address: cfg.stable.address,
+  });
+  const debtSide: SheetSide = {
+    side: "debt",
+    icons: [stable],
+    carry: [],
+    rows: [
+      {
+        key: "stated",
+        label: stated,
+        amount: stableFig(
+          formatNumber(w.debtAtTouch),
+          view(
+            `The debt the CDP's last touch wrote, the slot nothing rewrites until the next touch.`,
+            "getCDP(id).debt",
+            w.debtAtTouch,
+            stable,
+          ),
+          w.debtAtTouch,
+        ),
+        usd: usd(stated, "debt", w.debtAtTouch),
+        tip: W.tip_live_debt_stated,
+      },
+      ...(Math.abs(debtPending) > 1e-12
+        ? [
+            {
+              key: "pending",
+              label: W.live_pending,
+              amount: stableFig(
+                signedAmount(debtPending, formatNumber),
+                {
+                  kind: "chain-derived",
+                  pclass: "state",
+                  summary: `The debt pending since the last touch: interest charged, less the stability gain, with the net PSM debt share, view calls on the cdpManager ${atHead}. The next touch writes them into the debt.`,
+                  formula: "getCDPAccruedInterest(id) − getCDPAccruedStables(id) + getCDPMintRedeemDebtChange(id)",
+                  contract: manager,
+                  inputs: [
+                    {
+                      label: "interest charged",
+                      value: formatExact(w.atFeed.accruedInterest),
+                      kind: "chain",
+                      pclass: "state",
+                    },
+                    {
+                      label: "stability gain",
+                      value: formatExact(w.atFeed.accruedStables),
+                      kind: "chain",
+                      pclass: "state",
+                    },
+                    {
+                      label: "net PSM share, debt side",
+                      value: formatExact(w.raw.psmDebt),
+                      kind: "chain",
+                      pclass: "state",
+                    },
+                  ],
+                },
+                debtPending,
+              ),
+              usd: usd(W.live_pending, "debt", debtPending),
+              tip: W.tip_live_debt_pending,
+            },
+          ]
+        : []),
+    ],
+    after: W.live_at_feed,
+    total: unitUsd != null ? usd("The debt at the feed", "debt", w.atFeed.debt)! : { none: W.sheet_no_price },
+    totalAmount: stableFig(
+      formatNumber(w.atFeed.debt),
+      view(
+        "The CDP's debt at the feed: the stated debt with the pending legs.",
+        "getCDPEntireDebt(id)",
+        w.atFeed.debt,
+        stable,
+      ),
+      w.atFeed.debt,
+    ),
+    totalTip: W.tip_live_debt_total,
+  };
+
+  // ── Risk: at the feed, beside the stated ──
+  const mcr = POLARIS_LIQ_CONSTANTS.mcr;
+  const pts = (a: number) => `${a.toFixed(2)} pts`;
+  const unitText = (n: number) => `${polarisValueFormat(market)(n)} ${stable}`;
+  const crNow = w.atFeed.debt > 0 ? ((w.atFeed.coll * w.to.pethInDebt) / w.atFeed.debt) * 100 : null;
+  const crThen = w.debtAtTouch > 0 ? ((w.collAtTouch * w.from.pethInDebt) / w.debtAtTouch) * 100 : null;
+  const liqNow = w.atFeed.debt > 0 && w.atFeed.coll > 0 ? (w.atFeed.debt * mcr.fraction) / w.atFeed.coll : null;
+  const liqThen = w.debtAtTouch > 0 && w.collAtTouch > 0 ? (w.debtAtTouch * mcr.fraction) / w.collAtTouch : null;
+  const crProv = (what: string, coll: number, debt: number, price: number, at: string): Provenance => ({
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary: `${what} — the collateral times the feed's pETH price in ${stable}, over the debt, ${at}.`,
+    formula: "coll × pETH price ÷ debt",
+    contract: manager,
+    inputs: [
+      { label: "collateral", value: `${formatExact(coll)} pETH`, kind: "chain", pclass: "state" },
+      { label: `pETH price in ${stable}`, value: `${formatExact(price)} ${stable}`, kind: "chain", pclass: "oracle" },
+      { label: "debt", value: `${formatExact(debt)} ${stable}`, kind: "chain", pclass: "state" },
+    ],
+  });
+  const liqProv = (what: string, coll: number, debt: number): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${what} — the price of pETH, in ${stable}, at which the ratio meets the market's normal-mode minimum, ${mcr.label}: the debt times the minimum ratio, divided by the collateral.`,
+    formula: "debt × minimum ratio ÷ collateral",
+    contract: manager,
+    inputs: [
+      { label: "debt", value: `${formatExact(debt)} ${stable}`, kind: "chain", pclass: "state" },
+      { label: "collateral", value: `${formatExact(coll)} pETH`, kind: "chain", pclass: "state" },
+      { label: "minimum ratio", value: mcr.label, kind: "chain", pclass: "state" },
+    ],
+  });
+  const sinceStated: Provenance = {
+    kind: "derived",
+    summary: "Change since the last touch — the value at the feed less the one the last touch wrote.",
+    formula: "at the feed − as last written",
+  };
+  const fromTouch = `at the last touch's block ${w.from.block.toLocaleString("en-US")}`;
+  const risk: SheetStat[] = [
+    {
+      key: "ratio",
+      label: W.collateral_ratio,
+      tip: W.tip_live_cr,
+      value:
+        crNow != null
+          ? {
+              text: crPct1(crNow),
+              info: crProv("Collateral ratio at the feed", w.atFeed.coll, w.atFeed.debt, w.to.pethInDebt, atHead),
+            }
+          : { none: W.sheet_no_debt },
+      tone: crNow != null && crNow < POLARIS_NORMAL_MCR_PCT ? "text-red-500" : undefined,
+      change: crNow != null && crThen != null ? { text: changeText(crNow - crThen, pts), info: sinceStated } : null,
+    },
+    {
+      key: "ratio-stated",
+      label: W.live_cr_stated,
+      tip: W.tip_live_cr_stated,
+      value:
+        crThen != null
+          ? {
+              text: crPct1(crThen),
+              info: crProv(
+                "Collateral ratio as last written",
+                w.collAtTouch,
+                w.debtAtTouch,
+                w.from.pethInDebt,
+                fromTouch,
+              ),
+            }
+          : { none: W.sheet_no_debt },
+    },
+    {
+      key: "liquidates-at",
+      label: W.liquidates_at,
+      tip: W.tip_live_liq,
+      value:
+        liqNow != null
+          ? { text: unitText(liqNow), info: liqProv("Liquidation price at the feed", w.atFeed.coll, w.atFeed.debt) }
+          : { none: W.sheet_no_debt },
+      change:
+        liqNow != null && liqThen != null ? { text: changeText(liqNow - liqThen, unitText), info: sinceStated } : null,
+    },
+    {
+      key: "liquidates-at-stated",
+      label: W.live_liq_stated,
+      tip: W.tip_live_liq_stated,
+      value:
+        liqThen != null
+          ? {
+              text: unitText(liqThen),
+              info: liqProv("Liquidation price as last written", w.collAtTouch, w.debtAtTouch),
+            }
+          : { none: W.sheet_no_debt },
+    },
+  ];
+
+  // ── Limits ──
+  const rate = w.atFeed.primaryRate;
+  const r2d = w.atFeed.reserveToDebt;
+  const limits: SheetStat[] = [
+    {
+      key: "primary-rate",
+      label: W.primary_rate,
+      tip: W.tip_live_rate,
+      value:
+        rate != null
+          ? {
+              text: `${(rate * 100).toFixed(2)}%`,
+              info: view("The primary rate in force now.", "primaryRate()", rate, ""),
+            }
+          : { none: W.sheet_no_rate },
+    },
+    {
+      key: "reserve-to-debt",
+      label: W.reserve_to_debt,
+      tip: W.tip_live_reserve,
+      value:
+        r2d != null
+          ? {
+              text: `${(r2d * 100).toFixed(1)}%`,
+              info: view("The market's reserve divided by its debt.", "getReserveToDebtRatio()", r2d, ""),
+            }
+          : { none: W.sheet_not_read },
+    },
+  ];
+
+  // ── The gas compensation escrow, below Risk and Limits (ui-jobs 388) ──
+  const escrow = POLARIS_LIQ_CONSTANTS.gasComp.amount;
+  const escrowNote = gasEscrowFootnote({
+    move: "held",
+    amount: escrow,
+    text: formatPeth(escrow),
+    symbol: PETH.symbol,
+    info: gasCompHeldProv(coords),
+    usd: usd("The gas compensation escrow", "coll", escrow),
+    tip: W.tip_escrow_note,
+  });
+
+  return {
+    note: w.sinceOpen ? W.live_note_open : W.live_note_touch,
+    sides: [collSide, debtSide],
+    panels: [
+      { panel: "risk", rows: risk },
+      { panel: "limits", rows: limits, breakdown: polarisParamStats(coords) },
+    ],
+    breakdownNotes: o.breakdown,
+    footnotes: [escrowNote],
+  };
 }

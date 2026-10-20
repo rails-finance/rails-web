@@ -620,6 +620,27 @@ export function polarisSheet(
       value: { none: W.sheet_not_read },
     },
   ];
+  const params = polarisParamStats(coords);
+
+  return {
+    sides: [collSide, debtSide],
+    panels: [
+      { panel: "risk", rows: risk },
+      { panel: "limits", rows: limits, breakdown: params },
+    ],
+    footnotes: [escrowNote],
+  };
+}
+
+/** The market's parameters under Limits with the breakdown on: the
+ *  normal-mode minimum ratio and the stability pool's penalty, constants of
+ *  the deployment. The written rows and the live window's row share them. */
+export function polarisParamStats(coords: PolarisCoords): SheetStat[] {
+  const mcr = POLARIS_LIQ_CONSTANTS.mcr;
+  const manager = {
+    name: `Polaris ${POLARIS_MARKET_CONFIG[coords.market].stable.symbol} CDPManager`,
+    address: POLARIS_MARKET_CONFIG[coords.market].cdpManager,
+  };
   const mcrProv: Provenance = {
     kind: "chain",
     pclass: "state",
@@ -629,7 +650,7 @@ export function polarisSheet(
     via: `${mcr.fn} ÷ 1e18 (read at block ${POLARIS_LIQ_CONSTANTS.readAtBlock}, identical on both markets)`,
   };
   const sp = POLARIS_LIQ_CONSTANTS.sp;
-  const params: SheetStat[] = [
+  return [
     {
       key: "minimum-ratio",
       label: W.minimum_ratio,
@@ -651,13 +672,4 @@ export function polarisSheet(
       },
     },
   ];
-
-  return {
-    sides: [collSide, debtSide],
-    panels: [
-      { panel: "risk", rows: risk },
-      { panel: "limits", rows: limits, breakdown: params },
-    ],
-    footnotes: [escrowNote],
-  };
 }

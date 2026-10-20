@@ -166,6 +166,10 @@ export interface EventSheet {
   /** A muted line at the left of the controls row (a delegate run's rate
    *  move). */
   lead?: ReactNode;
+  /** A muted sentence under the panels, above the footnotes: what the
+   *  figures are where they are not an event's (a live window's, ui-jobs
+   *  396). `data-sheet-note="note"`. */
+  note?: ReactNode;
 }
 
 /** The carry-forward layer's names, the same on every family's sheet. */
@@ -682,6 +686,11 @@ export function EventSheetView({
         <div className="-mx-5 pt-2" data-sheet-layer="notes">
           {sheet.breakdownNotes}
         </div>
+      )}
+      {sheet.note && (
+        <p className="px-4 pt-2.5 text-xs leading-relaxed text-rb-500" data-sheet-note="note">
+          {sheet.note}
+        </p>
       )}
       {(sheet.footnotes?.length ?? 0) > 0 && (
         <div className="flex flex-col gap-1 pt-2.5">

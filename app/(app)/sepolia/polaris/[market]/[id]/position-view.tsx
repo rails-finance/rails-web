@@ -422,7 +422,9 @@ export default function PolarisPositionView({
                 // the slot draws nothing.
                 liveWindow={
                   sinceTouch
-                    ? () => <PolarisSinceLastTouchRow window={sinceTouch} market={market} stable={stable} />
+                    ? () => (
+                        <PolarisSinceLastTouchRow window={sinceTouch} market={market} cdpId={cdpId} stable={stable} />
+                      )
                     : undefined
                 }
                 eventPage={(slot) =>

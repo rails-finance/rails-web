@@ -56,6 +56,10 @@ export interface PolarisSinceTouchChain {
   mintRedeemCollChange: number;
   mintRedeemDebtChange: number;
   lastTouchTime: number;
+  /** The market's figures at the head block, for the row's Limits panel;
+   *  optional so the export and the verifier can leave them out. */
+  primaryRate?: number | null;
+  reserveToDebtRatio?: number | null;
   price?: {
     pethInDebt: number;
     curve?: number | null;
@@ -113,6 +117,17 @@ export interface PolarisSinceLastTouch {
     psmColl: number;
     psmDebt: number;
     reward: number;
+  };
+  /** The CDP's figures at the feed, the protocol's view calls at the head
+   *  block: the stated slots with the pending legs (`getCDPEntireColl`,
+   *  `getCDPEntireDebt`), and the two debt legs in the stablecoin. */
+  atFeed: {
+    coll: number;
+    debt: number;
+    accruedInterest: number;
+    accruedStables: number;
+    primaryRate: number | null;
+    reserveToDebt: number | null;
   };
   /** Seconds between the touch's block header and the head block's. */
   elapsedSeconds: number;
@@ -214,6 +229,14 @@ export function polarisSinceLastTouch(
       psmColl: chain.mintRedeemCollChange,
       psmDebt: chain.mintRedeemDebtChange,
       reward: chain.bcTokenGain,
+    },
+    atFeed: {
+      coll: chain.entireColl,
+      debt: chain.entireDebt,
+      accruedInterest: chain.accruedInterest,
+      accruedStables: chain.accruedStables,
+      primaryRate: chain.primaryRate ?? null,
+      reserveToDebt: chain.reserveToDebtRatio ?? null,
     },
     elapsedSeconds: Math.max(0, chain.blockTimestamp - last.timestamp),
     sinceOpen: touches.length === 1,
