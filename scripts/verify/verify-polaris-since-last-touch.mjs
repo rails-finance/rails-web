@@ -164,12 +164,21 @@ async function openRow(page, row) {
   const control = row.locator('[role="button"][aria-expanded]').first();
   if ((await control.count()) === 0) return false;
   await control.click({ timeout: 30000 }).catch(() => {});
-  return page
+  const up = await page
     .locator(`${ROW}[data-live-window-open]`)
     .first()
     .waitFor({ state: "attached", timeout: 15000 })
     .then(() => true)
     .catch(() => false);
+  if (!up) return false;
+  // Since 396 the breakdown lines mount only while the sheet's own switch
+  // ("Show breakdown") is on, and it starts off each time the row opens.
+  const sw = row.locator("[data-sheet-switch]").first();
+  if ((await sw.count()) > 0 && (await sw.getAttribute("aria-label")) === "Show breakdown") {
+    await sw.click({ timeout: 15000 }).catch(() => {});
+    await row.locator("[data-live-breakdown]").first().waitFor({ state: "attached", timeout: 15000 }).catch(() => {});
+  }
+  return true;
 }
 
 async function open(context, url) {
@@ -257,7 +266,12 @@ for (const f of FIXTURES) {
   // While open: the header's ECHO of the total, then the feed, one line per
   // protocol leg, and the total. The echo is one fact stated twice, so it is
   // compared against the total rather than parsed as another term.
-  const allFigures = signed(await block.locator("span.tabular-nums").allInnerTexts());
+  // The header's echo, then the breakdown's lines: the sheet the switch turns
+  // on also draws the card's own panels, whose figures are not the window's.
+  const allFigures = [
+    ...closedFigures,
+    ...signed(await block.locator("[data-live-breakdown] span.tabular-nums").allInnerTexts()),
+  ];
   shownFigures[tag] = allFigures.slice(1);
   check(
     `${f.n}. ${tag}: the closed headline's figure is the open row's own total`,
@@ -341,14 +355,21 @@ for (const f of FIXTURES) {
   );
 
   // ── 4. no verdict ─────────────────────────────────────────────────────────
+  // The window's own words: its header and its breakdown lines. The sheet the
+  // breakdown switch turns on also draws the card's Risk and Limits panels,
+  // whose collateral ratio and rates are percentages by nature.
+  const ownText =
+    text.slice(0, text.indexOf("\n", text.indexOf("block"))) +
+    "\n" +
+    (await block.locator("[data-live-breakdown]").first().innerText());
   const banned = ["%", "profit", "P&L", "PNL", "return", "gain/loss"];
   const hit = banned.filter(
     (b) =>
-      text.toLowerCase().includes(b.toLowerCase()) &&
+      ownText.toLowerCase().includes(b.toLowerCase()) &&
       !/nothing is a profit/i.test(
-        text.slice(
-          Math.max(0, text.toLowerCase().indexOf(b.toLowerCase()) - 20),
-          text.toLowerCase().indexOf(b.toLowerCase()) + 20,
+        ownText.slice(
+          Math.max(0, ownText.toLowerCase().indexOf(b.toLowerCase()) - 20),
+          ownText.toLowerCase().indexOf(b.toLowerCase()) + 20,
         ),
       ),
   );
@@ -376,7 +397,7 @@ for (const f of FIXTURES) {
   );
 }
 
-// ── 5. a closed CDP draws nothing ───────────────────────────────────────────
+// ── 5. a closed position draws nothing ───────────────────────────────────────────
 // Silence, not a dash: the head slot draws no row, and the headline is not on
 // the page at all — a collapsed row saying "Since its last touch — —" would
 // pass a count-only check.
@@ -385,7 +406,7 @@ const closedCount = await closedPage.locator(ROW).count();
 const closedSilent = !/Since its (last touch|open)/i.test(await closedPage.locator("body").innerText());
 const closedChain = await api("/api/chain/polaris/position?market=goldp&id=1561");
 check(
-  "3. a closed CDP draws no live window row, and does not name the window at all",
+  "3. a closed position draws no live window row, and does not name the window at all",
   closedCount === 0 && closedSilent && closedChain.isOpen === false,
   `isOpen ${closedChain.isOpen}, rows on the page ${closedCount}, headline ${closedSilent ? "absent" : "PRESENT"}`,
 );
