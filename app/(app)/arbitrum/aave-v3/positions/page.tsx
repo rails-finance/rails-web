@@ -1,27 +1,22 @@
 // Aave V3 on Arbitrum — the wallets rails-server has recorded a position
 // read for (GET /api/aave-v3-arbitrum/positions), in the standard listing
-// (components/shared/arbitrum-positions-listing.tsx). Private until item 16's
-// daily feeder lands: noindex, and a 404 on the production deployment.
+// (components/shared/arbitrum-positions-listing.tsx). Public on every deployment
+// (rails-ops TO-DO-arbitrum-scoping.md item 16).
 
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { RailHeader } from "@/components/shared/rail-header";
 import { ArbitrumPositionsListing } from "@/components/shared/arbitrum-positions-listing";
+import { listingMetadata } from "@/lib/shared/page-metadata";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { loadAaveV3ArbitrumPositions } from "@/lib/sources/api/aave-v3-arbitrum-positions";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Positions read · Aave V3 on Arbitrum",
-  robots: { index: false, follow: false },
-};
-
-/** Vercel names the production deployment; local dev and preview render. */
-const isProductionDeployment = () => process.env.VERCEL_ENV === "production";
+export const metadata = listingMetadata({
+  title: "Explore Aave V3 Positions on Arbitrum",
+  canonicalPath: "/arbitrum/aave-v3/positions",
+});
 
 export default async function AaveV3ArbitrumPositionsPage() {
-  if (isProductionDeployment()) notFound();
   const answer = await loadAaveV3ArbitrumPositions({ readerIp: await readerIpFromHeaders() });
   if (!answer)
     return (
@@ -32,5 +27,7 @@ export default async function AaveV3ArbitrumPositionsPage() {
         <p className="text-sm text-rb-500">The store did not answer; the list could not be read.</p>
       </div>
     );
-  return <ArbitrumPositionsListing family="aave-v3" rows={answer.rows} total={answer.total} />;
+  // A read that found nothing held is not a position.
+  const open = answer.rows.filter((r) => r.chainOpen === true);
+  return <ArbitrumPositionsListing family="aave-v3" rows={open} recorded={answer.total} />;
 }

@@ -11,5 +11,5 @@ export const metadata = listingMetadata({
 });
 
 export default function Page() {
-  return <ProtocolFrontDoor session="aave-v3-arbitrum" positions={process.env.VERCEL_ENV !== "production"} />;
+  return <ProtocolFrontDoor session="aave-v3-arbitrum" />;
 }

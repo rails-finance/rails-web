@@ -16,22 +16,13 @@ import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
 
-export function ProtocolFrontDoor({
-  session,
-  positions,
-}: {
-  session: SessionProtocol;
-  /** Draw the Positions link. The positions page answers 404 on the
-   *  production deployment until its daily feeder lands (item 16), so the
-   *  server page passes false there. */
-  positions: boolean;
-}) {
+export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
   const entry = protocolForSession(session);
   if (!entry) return null;
   const markets = entry.subPages.find((s) => s.segment === "markets");
   const links = [
     markets && { href: markets.href, label: "Markets" },
-    positions && { href: `${entry.href}/positions`, label: "Positions" },
+    { href: entry.listingHref, label: "Positions" },
     { href: entry.infoHref, label: `About ${entry.label} on Rails` },
   ].filter((l): l is { href: string; label: string } => !!l);
 

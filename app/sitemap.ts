@@ -126,6 +126,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       })),
     ),
+    // A front-door explorer's position listing, which sits under its route
+    // (`listingHref`); every other explorer's listing is its route, above.
+    ...LAUNCHED_PROTOCOLS.filter((entry) => entry.listingHref !== entry.href).map((entry) => ({
+      url: `${SITE_URL}${entry.listingHref}`,
+      lastModified: new Date(),
+      changeFrequency: "daily" as const,
+      priority: 0.8,
+    })),
     // Each explorer's /info page — the intro prose, derived off `infoHref` the
     // same way.
     ...LAUNCHED_PROTOCOLS.map((entry) => ({

@@ -3,7 +3,9 @@
 // The positions page of a position-first Arbitrum explorer (rails-ops
 // TO-DO-arbitrum-scoping.md item 18): the wallets rails-server has recorded a
 // position read for, in the standard listing (ChainTruthListingPage, the
-// memory tier over the route's rows).
+// memory tier over the route's rows), fed by the daily discovery and the
+// reader's open (item 16). A wallet that held nothing at its read is not a
+// position: the server page passes the rows the chain read found open.
 //
 // A row is one wallet's stored read: dollar totals and asset counts at one
 // block, and no per-asset list. The family cards build their headlines from
@@ -51,14 +53,15 @@ export interface ArbitrumReadRow {
   chainStale: boolean;
   refreshedAt: string | null;
   lastVisitedAt: string | null;
+  /** The wallet's last block in the daily discovery log read; absent or null
+   *  for a wallet no discovery named. */
+  lastActivityBlock?: number | null;
 }
 
 export type ArbitrumPositionsFamily = "aave-v3" | "compound-v3" | "morpho";
 
 interface FamilyConfig {
   session: SessionProtocol;
-  /** Where the intro line says the reads were taken. */
-  where: string;
   /** The receipt for a stored dollar total, or the health factor. */
   receipt: (what: string, row: ArbitrumReadRow) => Provenance;
 }
@@ -69,7 +72,6 @@ const RECORDED = "recorded by rails-server when the wallet's page was opened";
 const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   "aave-v3": {
     session: "aave-v3-arbitrum",
-    where: "on this Pool",
     receipt: (what, row) => ({
       kind: "chain",
       pclass: "state",
@@ -88,7 +90,6 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   },
   "compound-v3": {
     session: "compound-v3-arbitrum",
-    where: "in these four Comets",
     receipt: (what, row) => ({
       kind: "chain-derived",
       pclass: "state",
@@ -101,7 +102,6 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   },
   morpho: {
     session: "morpho-arbitrum",
-    where: "on this singleton",
     receipt: (what, row) => ({
       kind: "chain-derived",
       pclass: "state",
@@ -118,15 +118,14 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
 // ── Filters ──────────────────────────────────────────────────────────────────
 
 interface ArbitrumPositionsFilters extends BaseListFilters {
-  /** "open" | "empty". Undefined = every row. */
-  status?: string;
   /** A whole-dollar lower bound on collateral plus supply. */
   size?: string;
 }
 
-const DEFAULTS: ArbitrumPositionsFilters = { q: "", sortBy: "visited", sortOrder: "desc" };
+const DEFAULTS: ArbitrumPositionsFilters = { q: "", sortBy: "activity", sortOrder: "desc" };
 
 const SORTS: SortOption[] = [
+  { value: "activity", label: "Last activity" },
   { value: "visited", label: "Last opened" },
   { value: "collateral", label: "Collateral" },
   { value: "debt", label: "Debt" },
@@ -140,25 +139,8 @@ const SIZE_OPTIONS: FilterOptionDef[] = SIZE_BRACKETS.map((b) => ({
   value: String(b),
   label: `$${b.toLocaleString("en-US")} or more`,
 }));
-const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
-  { value: "empty", label: "Nothing held" },
-];
-
 function dimensions(): ListDimension<ArbitrumPositionsFilters, ArbitrumReadRow>[] {
   return [
-    {
-      id: "status",
-      label: "Status",
-      group: "Status",
-      cardinality: "single",
-      param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => (f.status ? [f.status] : []),
-      set: (f, v) => ({ ...f, status: v[0] || undefined }),
-      chipLabel: (vals, opts) => `Status: ${joinOptionLabels(vals, opts)}`,
-      matches: (r, v) => (v[0] === "open" ? r.chainOpen === true : r.chainOpen === false),
-    },
     {
       id: "size",
       label: "Size",
@@ -177,6 +159,8 @@ function dimensions(): ListDimension<ArbitrumPositionsFilters, ArbitrumReadRow>[
 const APPLY = {
   search: (r: ArbitrumReadRow, q: string) => r.wallet.includes(q),
   sort: {
+    // Rows without a discovery block sort last.
+    activity: (r: ArbitrumReadRow) => r.lastActivityBlock ?? -1,
     visited: (r: ArbitrumReadRow) => r.lastVisitedAt ?? "",
     collateral: (r: ArbitrumReadRow) => r.totalCollateralUsd ?? -1,
     debt: (r: ArbitrumReadRow) => r.totalDebtUsd ?? -1,
@@ -245,7 +229,7 @@ function ArbitrumReadCard({ row, family }: { row: ArbitrumReadRow; family: Arbit
             id: "health-factor",
             label: ratioLabel("pooled"),
             value:
-              row.chainOpen !== true ? null : row.healthFactor == null ? (
+              row.healthFactor == null ? (
                 <span className="text-rb-400">No debt</span>
               ) : (
                 <Prov info={r("Health factor")}>{hfLabelV3(row.healthFactor)}</Prov>
@@ -264,14 +248,10 @@ function ArbitrumReadCard({ row, family }: { row: ArbitrumReadRow; family: Arbit
           usdHead("debt", CARD_VOCAB.debt, row.totalDebtUsd, row.borrowCount, "borrowed", r("Debt")),
           usdHead("supply", CARD_VOCAB.supply, row.totalSupplyUsd, row.supplyCount, "lent", r("Supply")),
         ];
+  // Every row is an open read, so the only state worth a word is the one the
+  // health factor adds.
   const status: PositionCardStatus | null =
-    row.chainStale || row.chainOpen == null
-      ? { word: "Not loaded", tone: "muted" }
-      : row.chainOpen === false
-        ? { word: "Nothing held", tone: "muted" }
-        : row.healthFactor != null && row.healthFactor < 1
-          ? { word: "Liquidatable", tone: "caution" }
-          : null;
+    row.healthFactor != null && row.healthFactor < 1 ? { word: "Liquidatable", tone: "caution" } : null;
   return (
     <div data-wallet-row={row.wallet}>
       <PositionCard
@@ -300,46 +280,54 @@ function ArbitrumReadCard({ row, family }: { row: ArbitrumReadRow; family: Arbit
 export function ArbitrumPositionsListing({
   family,
   rows,
-  total,
+  recorded,
 }: {
   family: ArbitrumPositionsFamily;
+  /** The store's rows the chain read found open; the page drops the rest
+   *  before they reach the client. */
   rows: ArbitrumReadRow[];
-  /** The store's count, which can exceed the rows one read returns. */
-  total: number;
+  /** Every wallet the store has recorded, the open ones included. */
+  recorded: number;
 }) {
   const cfg = FAMILIES[family];
   const entry = protocolForSession(cfg.session)!;
-  const intro: ReactNode = (
-    <p className="mb-4 text-sm text-rb-500" data-arbitrum-positions={total}>
-      The positions Rails has read {cfg.where}: any wallet a reader opened.
-      {rows.length < total &&
-        ` The ${rows.length.toLocaleString("en-US")} opened most recently of ${total.toLocaleString("en-US")} are listed.`}
+  const n = rows.length;
+  const footer: ReactNode = (
+    <p
+      className="mt-6 text-[11px] leading-relaxed text-rb-500"
+      data-arbitrum-positions={n}
+      data-arbitrum-recorded={recorded}
+    >
+      Indexed {n.toLocaleString("en-US")} {n === 1 ? "position" : "positions"}, from each day&rsquo;s most active
+      wallets since 20 Oct 2026 and any wallet a reader opened.
     </p>
   );
   return (
-    <ChainTruthListingPage<ArbitrumReadRow, ArbitrumPositionsFilters>
-      title={`${entry.label} positions read`}
-      noun="positions"
-      basePath={`${entry.href}/positions`}
-      bookmarksProtocol={cfg.session}
-      defaults={DEFAULTS}
-      sortOptions={SORTS}
-      searchPlaceholder="Search wallet address"
-      // The roster resolves an explorer's own route only, so the rail header
-      // comes in as the identity, and the title goes sr-only beneath it.
-      identity={<RailHeader session={cfg.session} venue="listing" stamp />}
-      titleHidden
-      headerExtra={intro}
-      renderCard={(row) => <ArbitrumReadCard row={row} family={family} />}
-      hrefFor={(row) => `${entry.href}/${row.wallet}`}
-      keyFor={(row) => row.wallet}
-      strategy={memoryStrategy<ArbitrumReadRow, ArbitrumPositionsFilters>({
-        // The server page reads the store; the rows arrive with the render.
-        fetchAll: async () => rows,
-        dimensions,
-        apply: APPLY,
-      })}
-      initialItems={rows}
-    />
+    <>
+      <ChainTruthListingPage<ArbitrumReadRow, ArbitrumPositionsFilters>
+        title={`${entry.label} positions read`}
+        noun="positions"
+        basePath={`${entry.href}/positions`}
+        bookmarksProtocol={cfg.session}
+        defaults={DEFAULTS}
+        sortOptions={SORTS}
+        searchPlaceholder="Search wallet address"
+        // The roster resolves an explorer's own route only, so the rail header
+        // comes in as the identity, and the title goes sr-only beneath it.
+        identity={<RailHeader session={cfg.session} venue="listing" stamp />}
+        titleHidden
+        renderCard={(row) => <ArbitrumReadCard row={row} family={family} />}
+        hrefFor={(row) => `${entry.href}/${row.wallet}`}
+        keyFor={(row) => row.wallet}
+        strategy={memoryStrategy<ArbitrumReadRow, ArbitrumPositionsFilters>({
+          // The server page reads the store; the rows arrive with the render.
+          fetchAll: async () => rows,
+          dimensions,
+          apply: APPLY,
+        })}
+        initialItems={rows}
+      />
+      {footer}
+    </>
   );
 }

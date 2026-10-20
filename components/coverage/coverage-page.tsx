@@ -263,12 +263,13 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
                   {/* A comma-only join reads as an unfinished list once there
                       are more than two, so the last item takes a conjunction. */}
                   {i > 0 && (i === listingExceptions.length - 1 ? (listingExceptions.length > 2 ? ", and " : " and ") : ", ")}
-                  <Link href={p.href} className="text-blue-500 hover:underline">
+                  <Link href={p.listingHref} className="text-blue-500 hover:underline">
                     {explorerName(p)}
                   </Link>
                 </span>
               ))}{" "}
-              {listingExceptions.length === 1 ? "opens" : "open"} on a wallet rather than a list: there is no roster of{" "}
+              {listingExceptions.length === 1 ? "lists" : "list"} the positions Rails has read, from each day&rsquo;s
+              most active wallets and any wallet a reader opened: there is no roster of{" "}
               {listingExceptions.length === 1 ? "its" : "their"} accounts yet. Everything a single wallet holds is
               unaffected.
             </p>
