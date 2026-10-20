@@ -16,23 +16,15 @@
 // each stated in dollars at each Comet's `getPrice`, the ETH-quoted Comet
 // converted at the read's `ethUsd` (lib/compound-arbitrum/usd.ts), wearing ≈,
 // with the per-Comet amounts beneath.
-//
-// The nearest-floor line ranks the open borrowing Comets by the share of the
-// absorb line their debt has reached (debt value ÷ liquidation capacity, the
-// "Absorb line reached" row of the card's risk slot,
-// components/protocol/compound/compound-risk-slot.tsx), stated with the same
-// `capacityShare` wording.
 
-import type { HolderLeg, HolderNearest, HolderStripProps } from "@/components/shared/holder-strip";
+import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance } from "@/components/shared/provenance";
 import type { CometMarket } from "@/lib/compound/asset-catalog";
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
 import { scaleCompoundChainBalance, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
-import { capacityShare } from "@/lib/shared/capacity-share";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { compoundArbitrumUsd } from "./usd";
-import { compoundArbitrumMarketHref } from "./routes";
 
 /** One Comet on the overview: the read's answer for it (null where it holds
  *  nothing now, or the read failed) and the status its card states. */
@@ -42,8 +34,6 @@ export interface HolderStripComet {
   status: CompoundPositionView["status"];
 }
 
-const WALLET_VIA = "GET /api/chain/compound-arbitrum/wallet";
-
 const LEG_TIP = {
   collateral:
     "An estimate: each Comet's collateral at that Comet's price feeds as of this read, added across the Comets. Each Comet holds its collateral against its loan alone.",
@@ -51,16 +41,25 @@ const LEG_TIP = {
   lent: "An estimate: each Comet's lent base, interest included, at that Comet's price feed as of this read, added across the Comets.",
 } as const;
 
-const NEAREST_TIP =
-  "Each Comet absorbs an account on its line alone; the wallet has no line. This is the open borrowing Comet whose debt has reached the largest share of its absorb line, at the Comet's prices as of this read.";
-
 const count = (n: number): string => n.toLocaleString("en-US");
 
 /** "a, b and c". */
 const joinAnd = (parts: string[]): string =>
   parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 
-function legProv(what: string, figure: string, block: number, comets: string[]): Provenance {
+/** Where a deployment's strip read its figures: the route the Comet read
+ *  answers on, and where the ETH-quoted Comet's WETH-in-dollars leg came from. */
+export interface HolderStripSource {
+  via: string;
+  ethUsdFrom: string;
+}
+
+const ARBITRUM_SOURCE: HolderStripSource = {
+  via: "GET /api/chain/compound-arbitrum/wallet",
+  ethUsdFrom: "from the same read",
+};
+
+function legProv(what: string, figure: string, block: number, comets: string[], src: HolderStripSource): Provenance {
   return {
     kind: "chain-derived",
     pclass: "oracle",
@@ -68,33 +67,12 @@ function legProv(what: string, figure: string, block: number, comets: string[]):
       kind: "recompute",
       text: `Re-run each Comet's ${figure} and getPrice at block ${block.toLocaleString("en-US")}, scale each by the asset's decimals, multiply by that Comet's price (the ETH-quoted Comet also by WETH in dollars) and add the Comets.`,
     },
-    summary: `${what}, in USD — each Comet's figure (${comets.join(", ")}) at that Comet's getPrice, read in one batched call at block ${block.toLocaleString("en-US")}; cWETHv3 quotes in ETH and converts at WETH in dollars from the same read. An estimate: the Comets hold different tokens and a sum of them exists only at a price, and each price moves every block.`,
-    via: `${WALLET_VIA} at block ${block.toLocaleString("en-US")} · Σ over the Comets of amount × the Comet's price`,
+    summary: `${what}, in USD: each Comet's figure (${comets.join(", ")}) at that Comet's getPrice, read in one batched call at block ${block.toLocaleString("en-US")}; cWETHv3 quotes in ETH and converts at WETH in dollars ${src.ethUsdFrom}. An estimate: the Comets hold different tokens and a sum of them exists only at a price, and each price moves every block.`,
+    via: `${src.via} at block ${block.toLocaleString("en-US")} · Σ over the Comets of amount × the Comet's price`,
     formula: "Σ amount × the Comet's price",
     inputs: [
       { label: "amounts", kind: "chain", pclass: "state", note: `${figure} @ the read block` },
       { label: "price", kind: "chain", pclass: "oracle", note: "the Comet's getPrice @ the read block" },
-    ],
-  };
-}
-
-function nearestProv(c: CompoundMarketChainResponse, label: string): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: {
-      kind: "recompute",
-      text: `Re-run ${label}'s collateralBalanceOf, getPrice, getAssetInfo and borrowBalanceOf at block ${c.blockNumber.toLocaleString("en-US")}, and divide the debt's value by Σ collateral × price × liquidate factor.`,
-    },
-    summary: `Debt share of the absorb line — ${label}'s debt value ÷ its liquidation capacity (Σ collateral × oracle price × liquidate factor), every input read from the Comet at block ${c.blockNumber.toLocaleString("en-US")}. The same figure as the card's "Absorb line reached"; the Comet's isLiquidatable says whether the account is past it.`,
-    contract: { name: `Compound V3 ${label} Comet (Arbitrum)`, address: c.comet },
-    via: `${WALLET_VIA} at block ${c.blockNumber.toLocaleString("en-US")} · debt value ÷ liquidation capacity`,
-    formula: "debt value ÷ liquidation capacity",
-    inputs: [
-      { label: "collateral balances", kind: "chain", pclass: "state", note: "collateralBalanceOf @ the read block" },
-      { label: "oracle prices", kind: "chain", pclass: "oracle", note: "getPrice @ the read block" },
-      { label: "liquidate factors", kind: "chain", pclass: "state", note: "getAssetInfo @ the read block" },
-      { label: "debt", kind: "chain", pclass: "state", note: "borrowBalanceOf @ the read block" },
     ],
   };
 }
@@ -118,9 +96,18 @@ function countsLine(n: number, counts: { open: number; closed: number; liquidate
 /** Build the strip for the wallet overview. `comets` is the overview's list,
  *  open first. */
 export function compoundArbitrumHolderStrip(
-  wallet: string,
   head: CompoundWalletChainResponse | null,
   comets: HolderStripComet[],
+): HolderStripProps {
+  return compoundHolderStrip(head, comets, ARBITRUM_SOURCE);
+}
+
+/** The strip over any Compound V3 deployment's whole-wallet Comet read, its
+ *  receipts naming `src`. Base's adapter is lib/compound-base/holder-strip.ts. */
+export function compoundHolderStrip(
+  head: CompoundWalletChainResponse | null,
+  comets: HolderStripComet[],
+  src: HolderStripSource,
 ): HolderStripProps {
   if (!head) {
     // No read: the history names the Comets, and nothing says which are open.
@@ -170,7 +157,13 @@ export function compoundArbitrumHolderStrip(
         value: formatUsdValue(sum),
         approx: true,
         tip: LEG_TIP.collateral,
-        prov: legProv("What the wallet holds as collateral across its Comets", "collateralBalanceOf", block, named),
+        prov: legProv(
+          "What the wallet holds as collateral across its Comets",
+          "collateralBalanceOf",
+          block,
+          named,
+          src,
+        ),
         footnote: { text: parts.join(" · ") },
       });
   }
@@ -203,7 +196,7 @@ export function compoundArbitrumHolderStrip(
             value: formatUsdValue(sum),
             approx: true,
             tip: LEG_TIP.debt,
-            prov: legProv("What the wallet owes across its Comets", "borrowBalanceOf", block, named),
+            prov: legProv("What the wallet owes across its Comets", "borrowBalanceOf", block, named, src),
             footnote: { text: parts.join(" · ") },
           }
         : {
@@ -212,7 +205,7 @@ export function compoundArbitrumHolderStrip(
             value: formatUsdValue(sum),
             approx: true,
             tip: LEG_TIP.lent,
-            prov: legProv("What the wallet lends across its Comets", "balanceOf", block, named),
+            prov: legProv("What the wallet lends across its Comets", "balanceOf", block, named, src),
             footnote: { text: parts.join(" · ") },
           },
     );
@@ -220,31 +213,10 @@ export function compoundArbitrumHolderStrip(
   baseLeg("borrow");
   baseLeg("supply");
 
-  // ── nearest its floor: the largest share of an absorb line reached ────────
-  let nearest: HolderNearest | undefined;
-  let highest = -Infinity;
-  for (const c of open) {
-    const ch = c.chain!;
-    if (!(ch.debtValue > 0) || !(ch.liquidationCapacity > 0)) continue;
-    const reached = ch.debtValue / ch.liquidationCapacity;
-    if (reached <= highest) continue;
-    highest = reached;
-    const share = capacityShare(ch.debtValue, ch.liquidationCapacity);
-    nearest = {
-      href: compoundArbitrumMarketHref(c.market.key, wallet),
-      label: c.market.label,
-      measure: share.beyond ? `${share.text} its absorb line` : `${share.text} of its absorb line`,
-      approx: true,
-      tip: NEAREST_TIP,
-      prov: nearestProv(ch, c.market.label),
-    };
-  }
-
   return {
     countsLine: countsLine(comets.length, counts, liquidatable),
     counts,
     legs,
-    nearest,
     truncated: false,
   };
 }

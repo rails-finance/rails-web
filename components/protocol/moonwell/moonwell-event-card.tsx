@@ -121,7 +121,7 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
       const collMSym = ctx.collateralMarket
         ? dep.market(ctx.collateralMarket, ctx.collateralSymbol).mSymbol
         : `m${ctx.collateralSymbol}`;
-      legs.push({ label: MOONWELL_HEAD_WORDS.legSeized, value: seized, symbol: collMSym });
+      legs.push({ label: MOONWELL_HEAD_WORDS.legSeized, value: seized, symbol: collMSym, direction: "left" });
     }
     const repaid = Math.abs(Number(ctx.assetsDelta ?? "0")) || 0;
     if (repaid !== 0)

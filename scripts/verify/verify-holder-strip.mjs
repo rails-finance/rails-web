@@ -10,11 +10,10 @@
 //   c  the wallet view: the counts line's own numbers equal the API's statuses;
 //      the exact leg (Polaris pETH, V2 BOLD) matches the RESTATED sum to the
 //      character; the priced leg matches the restated Σ legs × feed within $1
-//      and wears the ≈; the nearest-floor line names the restated position, its
-//      ratio within 0.05 pp, and links to it;
+//      and wears the ≈;
 //   d  clicking an ≈ figure reveals a sentence;
-//   e  a wallet holding more than one page states the count only — no legs, no
-//      nearest-floor line, and a footnote saying why (proved by rewriting the
+//   e  a wallet holding more than one page states the count only — no legs, and
+//      a footnote saying why (proved by rewriting the
 //      wallet response's `pagination.total` to 21 on the wire);
 //   f  a wallet holding nothing draws no strip at all;
 //   g  the receipts: the adapters are called directly in a node child with
@@ -23,8 +22,7 @@
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
 // page: Σ coll over the wallet's open rows, Σ debt × the market's own unit
-// price, ratio = coll × price ÷ debt, and "nearest" = the smallest ratio ÷ its
-// own minimum. All from the same two responses each page reads — the wallet
+// price. All from the same two responses each page reads — the wallet
 // route and the price read — fetched by this script itself. Nothing is pinned:
 // the feeds tick every block and the roster moves by the minute.
 //
@@ -122,8 +120,8 @@ const parseNum = (s) =>
       .replace(/−/g, "-"),
   );
 
-/** Read the strip off the page — its counts sentence, its legs, its
- *  nearest-floor line and its footnote. Null when no strip is drawn. */
+/** Read the strip off the page — its counts sentence, its legs and its
+ *  footnote. Null when no strip is drawn. */
 async function readStrip(page) {
   return page.evaluate(() => {
     const el = document.querySelector("[data-holder-strip]");
@@ -138,7 +136,6 @@ async function readStrip(page) {
         footnote: norm(kids[2]?.textContent),
       };
     }
-    const nearestEl = el.querySelector("[data-holder-nearest]");
     const noteEl = el.querySelector("[data-holder-note]");
     return {
       counts: norm(el.querySelector("[data-holder-counts]")?.textContent),
@@ -148,9 +145,6 @@ async function readStrip(page) {
         liquidated: Number(el.getAttribute("data-holder-liquidated")),
       },
       legs,
-      nearest: nearestEl
-        ? { text: norm(nearestEl.textContent), href: nearestEl.querySelector("a")?.getAttribute("href") ?? null }
-        : null,
       note: noteEl ? norm(noteEl.textContent) : null,
     };
   });
@@ -233,29 +227,9 @@ const boardOf = (board, m) => (board.markets ?? []).find((b) => b.market === m);
 const unitUsd = (board, m) => (m === "usdp" ? 1 : (boardOf(board, m)?.price.xauUsd ?? null));
 const pDebtUsd = (board) => [...pDebtByMarket].reduce((s, [m, amt]) => s + amt * unitUsd(board, m), 0);
 const pCollUsd = (board) => pColl * (boardOf(board, "usdp")?.price.pethUsd ?? 0);
-/** Nearest its floor: the smallest ratio ÷ its own market's minimum. */
-const pNearest = (board) => {
-  let best = null;
-  for (const r of pOpen) {
-    const b = boardOf(board, r.market);
-    if (!b || !(r.debt > 0) || !(r.coll > 0)) continue;
-    const min = b.defensiveMode ? b.defensiveMcr : b.mcr;
-    const ratio = (r.coll * b.price.pethInDebt) / r.debt;
-    if (!best || ratio / min < best.headroom) {
-      best = {
-        label: `${r.market}/${r.cdpId}`,
-        ratioPct: ratio * 100,
-        minPct: min * 100,
-        headroom: ratio / min,
-        row: r,
-      };
-    }
-  }
-  return best;
-};
 info(
   "P0 restated",
-  `${pCounts.open} open / ${pCounts.closed} closed / ${pCounts.liquidated} liquidated; coll ${fmtNum(pColl)} pETH; debt ${fmtUsd(pDebtUsd(boardBefore))}; nearest ${pNearest(boardBefore)?.label} at ${pNearest(boardBefore)?.ratioPct.toFixed(1)}%`,
+  `${pCounts.open} open / ${pCounts.closed} closed / ${pCounts.liquidated} liquidated; coll ${fmtNum(pColl)} pETH; debt ${fmtUsd(pDebtUsd(boardBefore))}`,
 );
 
 // ── a. the bare directory ──────────────────────────────────────────────────
@@ -278,7 +252,6 @@ info(
   const page = await openListing(context, `${BASE}/sepolia/polaris?q=${POLARIS_WALLET}`);
   const strip = await readStrip(page);
   const boardAfter = await api("/api/chain/polaris/markets");
-  const near = [pNearest(boardBefore), pNearest(boardAfter)];
 
   if (!check("P2. the wallet view draws the strip", strip != null, JSON.stringify(strip))) {
     await page.close();
@@ -336,22 +309,6 @@ info(
       `"${strip.legs.debt?.footnote}" wanted ${wantLegs.join(" + ")}`,
     );
 
-    // Nearest its floor.
-    check(
-      "P6a. the nearest-floor line names the restated position and links to it",
-      strip.nearest?.text.includes(near[0].label) &&
-        strip.nearest?.href === `/sepolia/polaris/${near[0].row.market}/${near[0].row.cdpId}`,
-      `"${strip.nearest?.text}" → ${strip.nearest?.href} vs restated ${near[0].label}`,
-    );
-    const shownRatio = parseNum(/≈\s*([\d,.]+)%/.exec(strip.nearest?.text ?? "")?.[1]);
-    check(
-      "P6b. …states its ratio within 0.05 pp and its market's own minimum",
-      near.some((n) => Math.abs(shownRatio - n.ratioPct) <= 0.05) &&
-        new RegExp(`minimum ${near[0].minPct.toLocaleString("en-US", { maximumFractionDigits: 2 })}%`).test(
-          strip.nearest?.text ?? "",
-        ),
-      `"${strip.nearest?.text}" vs restated ≈ ${near[0].ratioPct.toFixed(1)}% / minimum ${near[0].minPct.toLocaleString("en-US", { maximumFractionDigits: 2 })}%`,
-    );
     check(
       "P6c. the strip states no wallet-wide collateral ratio",
       !/wallet.{0,40}(collateral ratio|ratio of [\d.]+)/i.test(strip.counts + " " + JSON.stringify(strip.legs)),
@@ -386,10 +343,9 @@ info(
   await searchWallet(page, "Address, ENS, or position number", POLARIS_WALLET);
   const strip = await readStrip(page);
   check(
-    "P8. a wallet stated as holding 21 positions states the count only — no legs, no nearest-floor line, and says why",
+    "P8. a wallet stated as holding 21 positions states the count only — no legs, and says why",
     strip != null &&
       Object.keys(strip.legs).length === 0 &&
-      strip.nearest === null &&
       /21/.test(strip.counts) &&
       /up to 20 positions; this one holds 21/.test(strip.note ?? ""),
     JSON.stringify(strip),
@@ -435,25 +391,9 @@ const vByBranch = new Map();
 for (const t of vOpen) vByBranch.set(t.collateralType, (vByBranch.get(t.collateralType) ?? 0) + t.collateral.amount);
 const priceOf = (oracle, ct) => oracle?.[ct.toLowerCase()] ?? null;
 const vCollUsd = (oracle) => [...vByBranch].reduce((s, [ct, amt]) => s + amt * priceOf(oracle, ct), 0);
-/** The branch minimums are the protocol's own constants, restated here rather
- *  than read from the code under test: WETH 110%, the LSTs 120%. */
-const branchMin = (ct) => (ct === "WETH" || ct === "ETH" ? 110 : 120);
-const vNearest = (oracle) => {
-  let best = null;
-  for (const t of vOpen) {
-    const price = priceOf(oracle, t.collateralType);
-    if (!price || !(t.debt.current > 0) || !(t.collateral.amount > 0)) continue;
-    const ratioPct = ((t.collateral.amount * price) / t.debt.current) * 100;
-    const minPct = branchMin(t.collateralType);
-    if (!best || ratioPct / minPct < best.headroom) {
-      best = { trove: t, ratioPct, minPct, headroom: ratioPct / minPct };
-    }
-  }
-  return best;
-};
 info(
   "V0 restated",
-  `${vCounts.open} open / ${vCounts.closed} closed / ${vCounts.liquidated} liquidated; coll ${fmtUsd(vCollUsd(oracleBefore))}; debt ${fmtNum(vDebt)} BOLD; nearest ${vNearest(oracleBefore)?.trove.collateralType} at ${vNearest(oracleBefore)?.ratioPct.toFixed(1)}%`,
+  `${vCounts.open} open / ${vCounts.closed} closed / ${vCounts.liquidated} liquidated; coll ${fmtUsd(vCollUsd(oracleBefore))}; debt ${fmtNum(vDebt)} BOLD`,
 );
 
 // ── a + b ──────────────────────────────────────────────────────────────────
@@ -474,7 +414,6 @@ info(
   const page = await openListing(context, `${BASE}/ethereum/liquity-v2?q=${V2_WALLET}`);
   const strip = await readStrip(page);
   const oracleAfter = (await api("/api/oracle/liquity-v2")).data;
-  const near = [vNearest(oracleBefore), vNearest(oracleAfter)];
 
   if (!check("V2. the wallet view draws the strip", strip != null, JSON.stringify(strip))) {
     await page.close();
@@ -512,19 +451,6 @@ info(
       `"${strip.legs.collateral?.footnote}" wanted ${wantBranches.join(" + ")}`,
     );
 
-    check(
-      "V6a. the nearest-floor line names the restated trove and links to it",
-      strip.nearest?.href === `/ethereum/liquity-v2/trove/${near[0].trove.collateralType}/${near[0].trove.id}`,
-      `"${strip.nearest?.text}" → ${strip.nearest?.href} vs restated ${near[0].trove.collateralType} ${near[0].trove.id}`,
-    );
-    const shownRatio = parseNum(/≈\s*([\d,.]+)%/.exec(strip.nearest?.text ?? "")?.[1]);
-    check(
-      "V6b. …states its ratio within 0.05 pp and its branch's own minimum",
-      near.some((n) => Math.abs(shownRatio - n.ratioPct) <= 0.05) &&
-        new RegExp(`minimum ${near[0].minPct}%`).test(strip.nearest?.text ?? ""),
-      `"${strip.nearest?.text}" vs restated ≈ ${near[0].ratioPct.toFixed(1)}% / minimum ${near[0].minPct}%`,
-    );
-
     await page.locator('[data-figure="holder-collateral"]').getByText(/≈/).first().click();
     await page.waitForTimeout(500);
     const tip = await page
@@ -549,10 +475,9 @@ info(
   await searchWallet(page, "Address, ENS, or ID", V2_WALLET);
   const strip = await readStrip(page);
   check(
-    "V8. a wallet stated as holding 21 troves states the count only — no legs, no nearest-floor line, and says why",
+    "V8. a wallet stated as holding 21 troves states the count only — no legs, and says why",
     strip != null &&
       Object.keys(strip.legs).length === 0 &&
-      strip.nearest === null &&
       /21/.test(strip.counts) &&
       /up to 20 positions; this one holds 21/.test(strip.note ?? ""),
     JSON.stringify(strip),
@@ -638,8 +563,6 @@ const shape = (s) => ({
   countsLine: s.countsLine, counts: s.counts, truncated: s.truncated, note: s.note ?? null,
   legs: s.legs.map((l) => ({ id: l.id, value: l.value, approx: l.approx, tip: l.tip ?? null,
     footnote: l.footnote?.text ?? null, kind: l.prov.kind, pclass: l.prov.pclass, summary: l.prov.summary })),
-  nearest: s.nearest ? { label: s.nearest.label, href: s.nearest.href, ratioPct: s.nearest.ratioPct,
-    minPct: s.nearest.minPct, kind: s.nearest.prov.kind, pclass: s.nearest.prov.pclass } : null,
 });
 console.log("RESULT " + JSON.stringify({ polaris: shape(polaris), polarisTruncated: shape(polarisTruncated), v2: shape(v2) }));
 `;
@@ -657,8 +580,7 @@ if (!probeLine) {
   const leg = (s, id) => s.legs.find((l) => l.id === id);
 
   // Restated from the stub: 10 + 2 = 12 pETH; 30,000 USDp at $1 plus 5 GOLDp at
-  // $4,000 = $50,000; ratios 10 × 6000 ÷ 30000 = 200% (÷1.15 = 1.739) and
-  // 2 × 1.5 ÷ 5 = 60% (÷1.15 = 0.522) → the goldp position is nearest its floor.
+  // $4,000 = $50,000.
   check(
     "G1a. Polaris: the exact collateral leg is the emitted sum, unmarked, and its receipt is a chain fact",
     leg(got.polaris, "collateral").value === "12 pETH" &&
@@ -679,18 +601,9 @@ if (!probeLine) {
     JSON.stringify(leg(got.polaris, "debt")).slice(0, 260),
   );
   check(
-    "G1c. Polaris: nearest its floor is the restated goldp position at 60% against 115%",
-    got.polaris.nearest?.label === "goldp/2" &&
-      Math.abs(got.polaris.nearest.ratioPct - 60) < 1e-9 &&
-      Math.abs(got.polaris.nearest.minPct - 115) < 1e-9 &&
-      got.polaris.nearest.href === "/sepolia/polaris/goldp/2",
-    JSON.stringify(got.polaris.nearest),
-  );
-  check(
     "G1d. Polaris: a wallet past one page states the count only, with no legs and no receipt to give",
     got.polarisTruncated.truncated === true &&
       got.polarisTruncated.legs.length === 0 &&
-      got.polarisTruncated.nearest === null &&
       /21/.test(got.polarisTruncated.countsLine) &&
       /up to 20 positions/.test(got.polarisTruncated.note ?? ""),
     JSON.stringify(got.polarisTruncated).slice(0, 200),
@@ -702,8 +615,7 @@ if (!probeLine) {
   );
 
   // Restated from the stub: 100 × 2000 + 50 × 2200 = $310,000; debt 150,000
-  // BOLD; ratios 200% ÷ 110 = 1.818 (WETH) and 220% ÷ 120 = 1.833 (rETH) → the
-  // WETH trove is nearest its floor even though its ratio is the lower one.
+  // BOLD.
   check(
     "G2a. Liquity V2: the exact debt leg is the BOLD sum, unmarked, on a chain receipt",
     leg(got.v2, "debt").value === "150,000 BOLD" &&
@@ -719,11 +631,6 @@ if (!probeLine) {
       leg(got.v2, "collateral").pclass === "oracle" &&
       /PriceFeed/.test(leg(got.v2, "collateral").summary),
     JSON.stringify(leg(got.v2, "collateral")).slice(0, 260),
-  );
-  check(
-    "G2c. Liquity V2: nearest its floor ranks by ratio ÷ the branch's own minimum, so WETH at 200%/110% beats rETH at 220%/120%",
-    got.v2.nearest?.label.startsWith("WETH ") && Math.abs(got.v2.nearest.minPct - 110) < 1e-9,
-    JSON.stringify(got.v2.nearest),
   );
   check(
     "G2d. Liquity V2: the branch legs are named largest first",

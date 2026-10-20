@@ -137,6 +137,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
     if (moved && seized !== 0)
       warningLegs.push({
         label: FX_HEAD_WORDS.legSeized,
+        direction: "left",
         value: Math.abs(seized),
         symbol: tokenSym,
         address: meta?.tokenAddress ?? soleFlowAddress(event.flows, tokenSym),
@@ -152,6 +153,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
     if (Math.abs(change.coll) > 1e-12)
       warningLegs.push({
         label: FX_HEAD_WORDS.legCollateral,
+        direction: change.coll < 0 ? "left" : "right",
         value: Math.abs(change.coll),
         symbol: normSym,
         address: normSym === tokenSym ? meta?.tokenAddress : undefined,

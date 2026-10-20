@@ -2221,8 +2221,8 @@ await verifyFamily("seamless", {
 });
 await verifyFamily("compound-v3-base", {
   listingPath: "/base/compound-v3",
-  // A row's link carries its market as a fragment (`#market-usdc`).
-  rowHrefRe: /^\/base\/compound-v3\/0x[0-9a-fA-F]{40}(#[\w-]+)?$/,
+  // A row is `/base/compound-v3/<market>/<wallet>`, the market page.
+  rowHrefRe: /^\/base\/compound-v3\/[a-z]+\/0x[0-9a-fA-F]{40}$/,
 });
 
 // ── sweep batch d ──────────────────────────────────────────────────────────

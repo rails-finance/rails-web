@@ -13,7 +13,12 @@
 // Facets that ship LIVE (backend + proxy honor the params):
 //   • Status   — open / closed / liquidated (lifecycle), over mv_spark_wallets,
 //     resting on a CONTEXTUAL default (lib/spark/listing-visibility.ts).
-//   • Position — Borrowing (hasDebt) / Supply only (noDebt), from on-chain balances.
+//   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
+//     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
+//     replaces the old Position dropdown: its `?state=borrowing` reads as at
+//     least $1 and `?state=supply-only` as $0. Those two exact ranges also send
+//     the old hasDebt / noDebt flags, which say the same thing to a server that
+//     predates the USD bounds.
 //   • History  — Liquidated before (hasLiquidations, = ever liquidated).
 //   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive), the
 //     distinct transactions on the wallet, liquidations included
@@ -27,6 +32,7 @@
 //     proxy maps them to addresses, the backend matches within the position.
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -53,8 +59,11 @@ export interface SparkListFilters extends BaseListFilters {
    *  RAW intent: empty is "no opinion" and resolves to the contextual default
    *  (listing-visibility.ts). */
   status: string[];
-  /** "" | "borrowing" | "supply-only" — the on-chain debt-side of the position. */
-  state: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** "" | "liquidated" — positions that were liquidated at least once. */
   liquidations: string[];
   /** Reserve symbols the position must be SUPPLYING (multi, OR). */
@@ -75,7 +84,8 @@ export const SPARK_LIST_DEFAULTS: SparkListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
-  state: [],
+  debt: [],
+  coll: [],
   liquidations: [],
   supplying: [],
   borrowing: [],
@@ -96,10 +106,8 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "liquidated", label: "Liquidated" },
 ];
 
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "supply-only", label: "Supply only" },
-];
+/** The Size panel's price line. */
+const SPARK_SIZE_NOTE = "At the latest indexed price per asset, as of the listing's last refresh.";
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
@@ -125,16 +133,14 @@ export function sparkListDimensions(): SerializableDimension<SparkListFilters>[]
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<SparkListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: SPARK_SIZE_NOTE,
+      debtAliases: ["state"],
+    }),
     {
       id: "supplying",
       label: "Supplying",
@@ -177,14 +183,15 @@ export function sparkListDimensions(): SerializableDimension<SparkListFilters>[]
 /** Map the decoded selection + page onto the spoke fetch params. This is the
  *  server-driven counterpart of the in-memory tier's ApplyConfig. */
 export function sparkFiltersToFetchParams(filters: SparkListFilters, page: number): FetchSparkPositionsParams {
-  const state = filters.state[0];
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: state === "borrowing" ? true : undefined,
-    noDebt: state === "supply-only" ? true : undefined,
+    // The old Position dropdown's flags, for the two Debt ranges it maps to.
+    hasDebt: filters.debt[0] === "1-" ? true : undefined,
+    noDebt: filters.debt[0] === "-0" ? true : undefined,
+    ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
     supplyAssets: filters.supplying.length > 0 ? filters.supplying : undefined,
     borrowAssets: filters.borrowing.length > 0 ? filters.borrowing : undefined,

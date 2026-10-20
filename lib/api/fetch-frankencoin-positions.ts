@@ -29,6 +29,9 @@ export interface FetchFrankencoinPositionsParams {
   everChallenged?: boolean;
   /** At least one ChallengeSucceeded slice (the harder orthogonal flag). */
   challengeSucceeded?: boolean;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   sortBy?: FrankencoinPositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -55,6 +58,8 @@ export async function fetchFrankencoinPositions(
   if (p.hub) qs.set("hub", p.hub);
   if (p.everChallenged != null) qs.set("everChallenged", String(p.everChallenged));
   if (p.challengeSucceeded != null) qs.set("challengeSucceeded", String(p.challengeSucceeded));
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

@@ -138,6 +138,12 @@ export interface FetchAaveV3PositionsParams {
   /** Inclusive bounds on the position's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
+  /** Inclusive bounds in USD on the position's debt and collateral, valued on
+   *  the server; any one alone. */
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
   /** Lifecycle Status facet — any subset of open/closed/liquidated (mv_aave_v3_wallets).
    *  Omit = all statuses. */
   status?: ("open" | "closed" | "liquidated")[];
@@ -170,6 +176,9 @@ export async function fetchAaveV3Positions(p: FetchAaveV3PositionsParams): Promi
   if (p.hasLiquidations === false) qs.set("hasLiquidations", "false");
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
+  for (const k of ["minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.excludeClosed) qs.set("excludeClosed", "true");
   if (p.market) qs.set("market", p.market);

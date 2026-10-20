@@ -50,6 +50,11 @@ export async function readCompoundV2Positions(
   if (sp.get("hasDebt")) qs.set("hasDebt", sp.get("hasDebt")!);
   if (sp.get("noDebt")) qs.set("noDebt", sp.get("noDebt")!);
   if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
+  // A transaction-count or USD bound travels only as a whole number.
+  for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   if (sp.get("supplyAssets")) qs.set("supplyMarkets", symbolsToMarketKeys(sp.get("supplyAssets")!));
   if (sp.get("borrowAssets")) qs.set("borrowMarkets", symbolsToMarketKeys(sp.get("borrowAssets")!));
   // Allowlist, like sortOrder: an unrecognised value is dropped rather than

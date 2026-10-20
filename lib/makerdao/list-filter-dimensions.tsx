@@ -20,6 +20,13 @@
 //                           display symbols, then sent as that same `ilks` CSV.
 //   • A wallet address    → `owner`, with a `urn` retry — see list-fetch.ts.
 //   • Digits              → `cdpId`.
+//   • Size                → `minDebtUsd` / `maxDebtUsd` / `minCollUsd` /
+//                           `maxCollUsd` (lib/shared/size-dimensions.ts): debt
+//                           in DAI at face value, collateral at the ilk's
+//                           latest spot price.
+//   • Transactions        → `minTx` / `maxTx`, inclusive, over the vault's
+//                           distinct transactions
+//                           (lib/shared/transactions-dimension.ts).
 //
 // Every one of those params predates this change: rails-server has always taken
 // them, and the roster route is the only new backend surface. So the degraded
@@ -36,6 +43,8 @@ import type { MakerVaultSort } from "@/lib/sources/api/makerdao-vaults";
 import type { FetchMakerVaultsParams } from "@/lib/api/fetch-makerdao-vaults";
 import type { MakerIlkRosterResponse } from "@/lib/api/fetch-makerdao-ilk-roster";
 import { ilkToCollateralSymbol } from "@/lib/makerdao/asset-catalog";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import {
   canonicalStatuses,
   defaultStatuses,
@@ -47,9 +56,23 @@ import {
 /** The backend caps `limit` at 500; 20 is the page size the whole tier uses. */
 export const MAKER_ITEMS_PER_PAGE = 20;
 
+/** The Transactions slider's top: the round number above the busiest listed
+ *  vault (2,566 transactions, 20 Oct 2026). */
+const MAKER_TX_TOP = 3000;
+
+/** The Size panel's price line. */
+const MAKER_SIZE_NOTE = "Collateral at the ilk's latest spot price; debt in DAI at face value.";
+
 export interface MakerListFilters extends BaseListFilters {
   status: string[];
   ilks: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -63,6 +86,9 @@ export const MAKER_LIST_DEFAULTS: MakerListFilters = {
   sortOrder: "desc",
   status: [],
   ilks: [],
+  debt: [],
+  coll: [],
+  tx: [],
 };
 
 // Every ordering here is one rails-server applies over the whole index — the
@@ -164,6 +190,18 @@ export function makerListDimensions(
       set: (f, v) => ({ ...f, ilks: v }),
       available: (f) => offered || f.ilks.length > 0,
     },
+    ...sizeDimensions<MakerListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: MAKER_SIZE_NOTE,
+    }),
+    transactionsDimension<MakerListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: MAKER_TX_TOP,
+    }),
   ];
 }
 
@@ -240,6 +278,8 @@ export function makerFiltersToFetchParams(
     sortOrder: filters.sortOrder === "asc" ? "asc" : "desc",
     limit: MAKER_ITEMS_PER_PAGE,
     offset: (page - 1) * MAKER_ITEMS_PER_PAGE,
+    ...usdBounds(filters),
+    ...transactionBounds(filters.tx),
   };
 
   // Ilk chips need no roster — a chip's value IS the backend's ilk string.

@@ -19,8 +19,8 @@ const intro = (
     <p>
       Each row of the listing is one position: one wallet&apos;s account in one market (Compound calls each market a
       Comet), with base supplied or borrowed and collateral posted, every figure read from that market&rsquo;s contract
-      at the block the row names, with dollar values from the feeds the market liquidates with. Opening a row shows the
-      wallet across every market at once, with its whole history. Or{" "}
+      at the block the row names, with dollar values from the feeds the market liquidates with. Opening a row shows that
+      position with its whole history; the wallet&rsquo;s own page holds one card per market it has touched. Or{" "}
       <Link href="/base/compound-v3/market" className="text-blue-500 hover:underline">
         see each market and how heavily it is lent out
       </Link>

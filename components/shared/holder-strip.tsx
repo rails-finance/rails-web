@@ -10,15 +10,12 @@
 // Not an analytics surface, not a route of its own — a band, on the same
 // `?q=<address|ens>` URL, so it is shareable as it is.
 //
-// WHAT IT STATES, in this order: the counts by status, one leg per unit the
-// wallet holds (a total collateral, a total debt), and the position NEAREST ITS
-// FLOOR — named, linked, with its own market's minimum beside it, or, where the
-// family's risk is a share of a limit (Compound's absorb line), with that share.
+// WHAT IT STATES, in this order: the counts by status, and one leg per unit the
+// wallet holds (a total collateral, a total debt).
 //
 // WHAT IT NEVER STATES is a wallet-wide collateral ratio. Liquidation is per
 // position: a wallet holding one CDP at 118% and one at 400% has no single
-// ratio, and an average of the two reads as safety it does not have. The
-// nearest-floor line is the risk fact, and it says which position it is about.
+// ratio, and an average of the two reads as safety it does not have.
 //
 // EVERY VALUED FIGURE WEARS THE ≈ and carries its own receipt. A leg summed
 // across different tokens has to be priced to be summed at all, and the price
@@ -39,7 +36,6 @@
 // wallet overview's Comet read and history. This file owns the look; they own
 // the words and the units.
 
-import Link from "next/link";
 import { Prov, ProvUnscoped, type Provenance } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { StatValue } from "@/components/shared/stat-value";
@@ -66,23 +62,6 @@ export interface HolderLeg {
   prov: Provenance;
 }
 
-/** The nearest-floor line's position. A family whose floor is a minimum ratio
- *  (Polaris, Liquity V2) passes `ratioPct` and `minPct`, drawn as "at 131.2%,
- *  minimum 110%."; a family whose risk is a share of a limit (Compound's absorb
- *  line) passes `measure`, the phrase the strip prints after "at". */
-export type HolderNearest = {
-  href: string;
-  /** How the position is named on its own card ("usdp/2315"). */
-  label: string;
-  approx: boolean;
-  /** Why the wallet has no ratio of its own, in the protocol's own noun. */
-  tip: string;
-  prov: Provenance;
-} & (
-  | { ratioPct: number; minPct: number; measure?: undefined }
-  | { measure: string; ratioPct?: undefined; minPct?: undefined }
-);
-
 export interface HolderStripProps {
   /** The counts by status, as the adapter's own sentence — "CDPs across both
    *  markets" and "troves, one on each branch" are protocol facts, not a
@@ -94,11 +73,8 @@ export interface HolderStripProps {
   counts: { open: number; closed: number; liquidated: number; zombie?: number };
   /** One per summed unit. Empty while the wallet does not fit one page. */
   legs: HolderLeg[];
-  /** The open position closest to its floor. Absent when the wallet holds no
-   *  open position carrying debt. */
-  nearest?: HolderNearest;
-  /** The wallet holds more positions than the page shows — the legs and the
-   *  nearest-floor line are withheld rather than summed from a slice. */
+  /** The wallet holds more positions than the page shows — the legs are
+   *  withheld rather than summed from a slice. */
   truncated: boolean;
   /** One sentence beneath, saying why the totals are absent. */
   note?: string;
@@ -109,17 +85,6 @@ export interface HolderStripProps {
  *  they win over the bubble's own. Same shape the listing card's ratio tip
  *  uses — the two tips read identically because they are the same gesture. */
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
-
-const pct = (v: number): string =>
-  `${v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
-
-/** A MINIMUM is a constant of the market, not a measurement: 115%, not
- *  115.0%. It keeps a decimal only where the constant itself has one. */
-const minPct = (v: number): string => `${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
-
-/** What the nearest-floor line prints after "at": the ratio, or the family's
- *  phrase verbatim. */
-const nearestFigure = (n: HolderNearest): string => (n.measure === undefined ? pct(n.ratioPct) : n.measure);
 
 function LegFigure({ leg }: { leg: HolderLeg }) {
   const shown = leg.approx ? (
@@ -136,7 +101,7 @@ function LegFigure({ leg }: { leg: HolderLeg }) {
   );
 }
 
-export function HolderStrip({ countsLine, counts, legs, nearest, truncated, note }: HolderStripProps) {
+export function HolderStrip({ countsLine, counts, legs, truncated, note }: HolderStripProps) {
   return (
     // A BAND, not a card: the raised rounded surface belongs to a position, and
     // this states something about several of them. A rule under it separates it
@@ -180,28 +145,6 @@ export function HolderStrip({ countsLine, counts, legs, nearest, truncated, note
               </div>
             ))}
           </div>
-        )}
-        {!truncated && nearest && (
-          <p data-holder-nearest="" className="mt-3 text-xs text-rb-500 tabular-nums">
-            Nearest its floor:{" "}
-            <Link
-              href={nearest.href}
-              prefetch={false}
-              className="font-medium text-foreground/80 underline underline-offset-2 hover:no-underline"
-            >
-              {nearest.label}
-            </Link>{" "}
-            at{" "}
-            <Prov info={nearest.prov} value={`${nearest.approx ? "≈ " : ""}${nearestFigure(nearest)}`}>
-              <RevealTip tip={<span className={TIP_PROSE}>{nearest.tip}</span>}>
-                <span>
-                  {nearest.approx ? "≈" : ""}
-                  {nearestFigure(nearest)}
-                </span>
-              </RevealTip>
-            </Prov>
-            {nearest.measure === undefined ? `, minimum ${minPct(nearest.minPct)}.` : "."}
-          </p>
         )}
         {note && (
           <p data-holder-note="" className="mt-2 text-xs text-rb-500">

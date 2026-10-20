@@ -3,7 +3,6 @@
 // lib/aave-v4/list-filter-dimensions; this file holds the leaf types that both the
 // registry and the fetch-param mapper share.
 
-export type AaveV4Debt = "all" | "withDebt" | "noDebt";
 // "underwater" = HF < 1.0 (liquidatable — a factual on-chain state, not a risk
 // opinion). No "at risk" band: Rails doesn't editorialize where a still-healthy
 // position sits; the HF value carries that.

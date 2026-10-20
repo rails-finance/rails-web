@@ -659,6 +659,9 @@ export function ChainTruthRow({
             value: Math.abs(d.value),
             symbol: d.symbol,
             address: d.address,
+            // The collateral that left on the left, the debt cleared on the
+            // right (rails-ops TO-DO-ui-jobs.md item 408).
+            direction: isDebtLeg(d) ? ("right" as const) : ("left" as const),
           }))
       : null;
   usePublishSpineLegs(legs);

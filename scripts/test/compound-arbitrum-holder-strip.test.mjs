@@ -106,14 +106,14 @@ const comets = [
 ];
 
 test("the counts line names Comet positions by status", () => {
-  const s = compoundArbitrumHolderStrip(WALLET, head, comets);
+  const s = compoundArbitrumHolderStrip(head, comets);
   assert.equal(s.countsLine, "This wallet holds 4 Comet positions, 3 open and 1 closed.");
   assert.deepEqual(s.counts, { open: 3, closed: 1, liquidated: 0 });
   assert.equal(s.truncated, false);
 });
 
 test("the legs are dollars at each Comet's feed, wearing ≈, the parts beneath", () => {
-  const s = compoundArbitrumHolderStrip(WALLET, head, comets);
+  const s = compoundArbitrumHolderStrip(head, comets);
   const leg = (id) => s.legs.find((l) => l.id === id);
   // 10 × 2,000 + 1,000 × 0.5
   assert.equal(leg("collateral").value, "$20,500.00");
@@ -130,28 +130,19 @@ test("the legs are dollars at each Comet's feed, wearing ≈, the parts beneath"
   assert.ok(s.legs.every((l) => l.tip && l.approx));
 });
 
-test("nearest its floor is the largest share of an absorb line reached", () => {
-  const s = compoundArbitrumHolderStrip(WALLET, head, comets);
-  assert.equal(s.nearest.label, "cUSDTv3");
-  assert.equal(s.nearest.measure, "75.0% of its absorb line");
-  assert.equal(s.nearest.href, `/arbitrum/compound-v3/usdt/${WALLET}`);
-  assert.equal(s.nearest.ratioPct, undefined);
-});
-
 test("liquidatable is said only when a Comet is", () => {
   const hot = { ...usdt, isLiquidatable: true };
-  const s = compoundArbitrumHolderStrip(WALLET, { ...head, positions: [usdc, hot, weth] }, [
+  const s = compoundArbitrumHolderStrip({ ...head, positions: [usdc, hot, weth] }, [
     comets[0],
     { ...comets[1], chain: hot },
     comets[2],
   ]);
   assert.equal(s.countsLine, "This wallet holds 3 Comet positions, all open. 1 of the open ones is liquidatable.");
-  assert.doesNotMatch(compoundArbitrumHolderStrip(WALLET, head, comets).countsLine, /liquidatable/);
+  assert.doesNotMatch(compoundArbitrumHolderStrip(head, comets).countsLine, /liquidatable/);
 });
 
-test("a wallet with no debt has no nearest-floor line", () => {
-  const s = compoundArbitrumHolderStrip(WALLET, { ...head, positions: [weth] }, [comets[2], comets[3]]);
-  assert.equal(s.nearest, undefined);
+test("a wallet with no debt states the lent leg alone", () => {
+  const s = compoundArbitrumHolderStrip({ ...head, positions: [weth] }, [comets[2], comets[3]]);
   assert.deepEqual(
     s.legs.map((l) => l.id),
     ["lent"],
@@ -160,12 +151,10 @@ test("a wallet with no debt has no nearest-floor line", () => {
 
 test("no Comet read: the history's count and a note, no legs", () => {
   const s = compoundArbitrumHolderStrip(
-    WALLET,
     null,
     comets.map((c) => ({ ...c, chain: null, status: "closed" })),
   );
   assert.equal(s.countsLine, "The history names 4 Comet positions for this wallet.");
   assert.deepEqual(s.legs, []);
-  assert.equal(s.nearest, undefined);
   assert.match(s.note, /did not answer/);
 });

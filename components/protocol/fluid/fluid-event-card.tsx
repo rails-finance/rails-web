@@ -119,7 +119,13 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
     const seized = Number(ctx.liqSupplyBefore ?? "0") - Number(ctx.liqSupplyAfter ?? "0");
     const cleared = Number(ctx.liqBorrowBefore ?? "0") - Number(ctx.liqBorrowAfter ?? "0");
     if (Number.isFinite(seized) && seized > 0)
-      legs.push({ label: FLUID_HEAD_WORDS.legSeized, value: seized, symbol: supplySym, address: colRow.address });
+      legs.push({
+        label: FLUID_HEAD_WORDS.legSeized,
+        value: seized,
+        symbol: supplySym,
+        address: colRow.address,
+        direction: "left",
+      });
     if (Number.isFinite(cleared) && cleared > 0)
       legs.push({ label: FLUID_HEAD_WORDS.legCleared, value: cleared, symbol: borrowSym, address: debtRow.address });
     return legs;

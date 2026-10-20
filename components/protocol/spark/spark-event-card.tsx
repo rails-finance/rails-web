@@ -140,6 +140,7 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
     if (coll !== 0 && ctx.collateralSymbol)
       legs.push({
         label: SPARK_HEAD_WORDS.legSeized,
+        direction: "left",
         value: coll,
         symbol: ctx.collateralSymbol,
         address: soleFlowAddress(event.flows, ctx.collateralSymbol),

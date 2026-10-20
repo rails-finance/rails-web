@@ -1,6 +1,6 @@
-// This account's live share card — a second consumer of
-// `loadCompoundBaseTail`, the exact same server read the page itself awaits
-// (see `page.tsx` beside this file). No new read path.
+// The holder view's live share card: the same server read the page awaits
+// (`loadCompoundBaseTail`, see `page.tsx` beside this file), led by the
+// largest market the wallet holds. The `market` segment holds the wallet here.
 
 import { loadCompoundBaseTail } from "@/lib/compound-base/position-page-data";
 import { compoundBaseShareCardModel } from "@/lib/compound-base/share-card";
@@ -15,11 +15,11 @@ export const alt = "This account's live Compound V3 position card";
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 interface Props {
-  params: Promise<{ wallet: string }>;
+  params: Promise<{ market: string }>;
 }
 
 export default async function Image({ params }: Props) {
-  const { wallet: raw } = await params;
+  const { market: raw } = await params;
   const wallet = raw.toLowerCase();
   return positionImage({
     session: "compound-base",

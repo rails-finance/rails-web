@@ -5,9 +5,8 @@
 // (session, swept receipts, Basescan, no replay peaks), and the one thing the
 // Ethereum listing never has to say: how complete the lane is.
 //
-// A row is one (Comet, account) pair, as on Ethereum; the position page here
-// is per WALLET and answers every market at once, so several rows for one
-// wallet open the same page.
+// A row is one (Comet, account) pair, as on Ethereum, and opens that pair's
+// market page (lib/compound-base/routes.ts).
 
 import { useCallback, useRef } from "react";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
@@ -21,6 +20,7 @@ import {
 } from "@/components/protocol/compound/compound-position-card";
 import { COMPOUND_SWEPT_VOCABULARY } from "@/lib/compound/swept-tower-provenance";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { compoundBaseMarketHref } from "@/lib/compound-base/routes";
 import {
   compoundBaseListDimensions,
   compoundBaseFiltersToFetchParams,
@@ -75,8 +75,7 @@ export function CompoundBaseListing({
           peaks={false}
         />
       )}
-      // One page per wallet, one card per market: the row opens on its own card.
-      hrefFor={(p) => `/base/compound-v3/${p.account}#market-${p.market}`}
+      hrefFor={(p) => compoundBaseMarketHref(p.market, p.account)}
       keyFor={(p) => `${p.market}:${p.account}`}
       strategy={serverStrategy<CompoundPositionSummary, CompoundListFilters>({
         dimensions: compoundBaseListDimensions(),

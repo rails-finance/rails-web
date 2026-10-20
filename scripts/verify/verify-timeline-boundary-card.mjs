@@ -442,7 +442,7 @@ const FIXTURES = [
     id: "compound-base",
     arm: "base",
     tail: true,
-    path: "/base/compound-v3/0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6?folders=0",
+    path: "/base/compound-v3/aero/0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6?folders=0",
     route: "/api/chain/compound-base/timeline?wallet=0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6",
   },
   {
@@ -460,7 +460,7 @@ const FIXTURES = [
     // carries each market's rows under `marketRows`; `view` reads usdc's.
     id: "compound-base-grouped",
     arm: "grouped",
-    path: "/base/compound-v3/0x2b4ef83aee6bb3dd5253daa7d0756ef5bd95f40f",
+    path: "/base/compound-v3/usdc/0x2b4ef83aee6bb3dd5253daa7d0756ef5bd95f40f",
     route: "/api/chain/compound-base/timeline?wallet=0x2b4ef83aee6bb3dd5253daa7d0756ef5bd95f40f&group=1",
     view: (j) => {
       const m = j.marketRows?.usdc;

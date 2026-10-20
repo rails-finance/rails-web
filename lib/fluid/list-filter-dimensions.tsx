@@ -10,9 +10,12 @@
 //   • Position   — Borrowing (hasDebt) / Collateral only (noDebt).
 //   • History    — Liquidated before / Never liquidated (wasLiquidated).
 //   • Vault kind — Standard pairs (T1) / Smart vaults (DEX-share legs).
+//   • Transactions — a range over the position's distinct transactions
+//     (`minTx` / `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
 //   • Owner search (address → the `wallet` param; a bare integer → the `nft`
 //     param — positions are NFTs) and the four sort orders.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -28,6 +31,11 @@ import {
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const FLUID_ITEMS_PER_PAGE = 20;
 
+/** The Transactions slider's top: the round number above the busiest position.
+ *  The MV stores events, not transactions, so its largest event count stands in
+ *  (1,468 events, 20 Oct 2026). */
+const FLUID_TX_TOP = 2000;
+
 export interface FluidListFilters extends BaseListFilters {
   /** open / closed — multi (OR). Lifecycle over mv_fluid_positions. */
   status: string[];
@@ -37,6 +45,8 @@ export interface FluidListFilters extends BaseListFilters {
   liquidations: string[];
   /** "" | "t1" | "smart" — plain token pairs vs DEX-share-legged smart vaults. */
   vaultKind: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -52,6 +62,7 @@ export const FLUID_LIST_DEFAULTS: FluidListFilters = {
   state: [],
   liquidations: [],
   vaultKind: [],
+  tx: [],
 };
 
 export const FLUID_SORT_OPTIONS: SortOption[] = [
@@ -129,6 +140,11 @@ export function fluidListDimensions(): SerializableDimension<FluidListFilters>[]
       get: (f) => f.liquidations,
       set: (f, v) => ({ ...f, liquidations: v }),
     },
+    transactionsDimension<FluidListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: FLUID_TX_TOP,
+    }),
   ];
 }
 
@@ -152,6 +168,7 @@ export function fluidFiltersToFetchParams(filters: FluidListFilters, page: numbe
     noDebt: state === "collateral-only" ? true : undefined,
     wasLiquidated: liq === "liquidated" ? true : liq === "never" ? false : undefined,
     vaultKind: kind === "t1" || kind === "smart" ? kind : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: SORT_VALUES.has(filters.sortBy)
       ? (filters.sortBy as NonNullable<FetchFluidPositionsParams["sortBy"]>)
       : undefined,

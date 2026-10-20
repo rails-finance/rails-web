@@ -123,3 +123,10 @@ export const COMPOUND_BASE_DEPLOYMENT: CometDeployment = {
 /** The earliest Comet's first block (cUSDbCv3, 2,197,607) — where the
  *  whole-life sweep starts, so that no Compound V3 activity on Base predates it. */
 export const COMPOUND_BASE_DEPLOY_BLOCK = Math.min(...BASE_MARKETS.map((m) => m.deployBlock ?? Infinity));
+
+/** The roster entry a market page's `market` segment names, by key; null for
+ *  a key the roster does not hold. */
+export function compoundBaseMarketOf(key: string): CometMarket | null {
+  const k = key.toLowerCase();
+  return BASE_MARKETS.find((m) => m.key === k) ?? null;
+}

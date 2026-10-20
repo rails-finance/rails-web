@@ -9,7 +9,12 @@
 //   • Status  — open / closed / liquidated (lifecycle), over mv_aave_v3_wallets,
 //     resting on a CONTEXTUAL default (lib/aave-v3/listing-visibility.ts).
 //   • Market  — Core / Prime / EtherFi (the three V3 Pools).
-//   • Position — Borrowing (hasDebt) / Supply only (noDebt).
+//   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
+//     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
+//     replaces the old Position dropdown: its `?state=borrowing` reads as at
+//     least $1 and `?state=supply-only` as $0. Those two exact ranges also send
+//     the old hasDebt / noDebt flags, which say the same thing to a server that
+//     predates the USD bounds.
 //   • History — Liquidated before (hasLiquidations).
 //   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive), the
 //     distinct transactions on the position (lib/shared/transactions-dimension.ts).
@@ -26,10 +31,15 @@
 // → addresses off AAVE_V3_CATALOG) and can graduate later.
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
-import type { FetchAaveV3PositionsParams, AaveV3PositionSort } from "@/lib/api/fetch-aave-v3-positions";
+import type {
+  AaveV3DebtFacet,
+  FetchAaveV3PositionsParams,
+  AaveV3PositionSort,
+} from "@/lib/api/fetch-aave-v3-positions";
 import {
   canonicalStatuses,
   defaultStatuses,
@@ -50,8 +60,11 @@ export interface AaveV3ListFilters extends BaseListFilters {
   status: string[];
   /** core / prime / etherfi — single-select market (stored as an array). */
   market: string[];
-  /** "" | "borrowing" | "supply-only" — the debt side. */
-  state: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** "" | "liquidated" — positions liquidated at least once. */
   liquidations: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
@@ -69,7 +82,8 @@ export const AAVE_V3_LIST_DEFAULTS: AaveV3ListFilters = {
   sortOrder: "desc",
   status: [],
   market: [],
-  state: [],
+  debt: [],
+  coll: [],
   liquidations: [],
   tx: [],
 };
@@ -94,15 +108,21 @@ const MARKET_OPTIONS: FilterOptionDef[] = [
   { value: "etherfi", label: "EtherFi" },
 ];
 
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "supply-only", label: "Supply only" },
-];
+/** The Size panel's price line on Ethereum. */
+const AAVE_V3_SIZE_NOTE = "At the latest indexed price per asset, as of the listing's last refresh.";
+
+/** The Size panel's price line on the Base lanes (Aave V3 Base, Seamless),
+ *  whose server values each account at the Pool's oracle at a pinned block. */
+export const BASE_LENDING_SIZE_NOTE = "At the Pool's oracle at the pinned block.";
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
-/** `txTop` is the Transactions slider's top; the Base lane passes its own. */
-export function aaveV3ListDimensions(txTop: number = AAVE_V3_TX_TOP): SerializableDimension<AaveV3ListFilters>[] {
+/** `txTop` is the Transactions slider's top and `sizeNote` the Size panel's
+ *  price line; the Base lanes pass their own. */
+export function aaveV3ListDimensions(
+  txTop: number = AAVE_V3_TX_TOP,
+  sizeNote: string = AAVE_V3_SIZE_NOTE,
+): SerializableDimension<AaveV3ListFilters>[] {
   return [
     {
       id: "status",
@@ -130,16 +150,14 @@ export function aaveV3ListDimensions(txTop: number = AAVE_V3_TX_TOP): Serializab
       get: (f) => f.market,
       set: (f, v) => ({ ...f, market: v }),
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<AaveV3ListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: sizeNote,
+      debtAliases: ["state"],
+    }),
     {
       id: "liquidations",
       label: "History",
@@ -159,18 +177,24 @@ export function aaveV3ListDimensions(txTop: number = AAVE_V3_TX_TOP): Serializab
   ];
 }
 
+/** The old Position dropdown's flag for the two Debt ranges it maps to (see
+ *  the header); undefined for any other range. */
+function debtFacet(debt: string[]): AaveV3DebtFacet | undefined {
+  if (debt[0] === "1-") return "borrowing";
+  if (debt[0] === "-0") return "supply-only";
+  return undefined;
+}
+
 /** Map the decoded selection + page onto the V3 fetch params. */
 export function aaveV3FiltersToFetchParams(filters: AaveV3ListFilters, page: number): FetchAaveV3PositionsParams {
-  const state = filters.state[0];
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
     market: filters.market[0] || undefined,
-    // Tri-state debt facet (see AaveV3DebtFacet): only ever "borrowing" /
-    // "supply-only" / absent — a false-valued hasDebt/noDebt is unrepresentable.
-    debt: state === "borrowing" || state === "supply-only" ? state : undefined,
+    debt: debtFacet(filters.debt),
+    ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as AaveV3PositionSort,

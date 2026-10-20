@@ -25,10 +25,16 @@ export const AAVE_V4_BASE_UNIVERSE: AaveV4AssetUniverseEntry[] = [
  *  account (1,096 transactions, 16 Oct 2026). */
 const AAVE_V4_BASE_TX_TOP = 2000;
 
+/** The Size panel's price line on Base. */
+const AAVE_V4_BASE_SIZE_NOTE = "At the reserve's price feed at the latest read.";
+
 export function aaveV4BaseListDimensions() {
-  return aaveV4ListDimensions(AAVE_V4_LIST_DEFAULTS, AAVE_V4_BASE_UNIVERSE, AAVE_V4_BASE_TX_TOP).filter(
-    (d) => d.id !== "hubs" && d.id !== "spokes",
-  );
+  return aaveV4ListDimensions(
+    AAVE_V4_LIST_DEFAULTS,
+    AAVE_V4_BASE_UNIVERSE,
+    AAVE_V4_BASE_TX_TOP,
+    AAVE_V4_BASE_SIZE_NOTE,
+  ).filter((d) => d.id !== "hubs" && d.id !== "spokes");
 }
 
 export const AAVE_V4_BASE_LIST_DEFAULTS: AaveV4ListFilters = AAVE_V4_LIST_DEFAULTS;

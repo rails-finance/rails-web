@@ -9,8 +9,8 @@
 //   • Market  — USDp / GOLDp (single). Every CDP lives in exactly one.
 //   • Status  — open / closed / liquidated, the API's whole lifecycle
 //     vocabulary, resting on a CONTEXTUAL default (listing-visibility.ts).
-//   • Size    — two USD ranges, Debt and Collateral, over the CDP's last
-//     state, valued on the server at the market's latest indexed oracle price
+//   • Size    — two USD ranges, Debt and Collateral (lib/shared/size-dimensions.ts),
+//     over the CDP's last state, valued on the server at the market's latest indexed oracle price
 //     (polaris_oracle_at_block: 1 USDp at the ETH/USD medianiser over the usdp
 //     feed's ETH price, 1 GOLDp at the XAU/USD medianiser, pETH at the
 //     market's previewPrice()). Sent as minDebtUsd / maxDebtUsd / minCollUsd /
@@ -48,12 +48,7 @@
 // which is what a reviewer's first look asked for (2026-09-10).
 
 import type { ReactNode } from "react";
-import {
-  decodeRange,
-  normalizeRange,
-  rangeChipLabel,
-  type FilterOptionDef,
-} from "@/components/shared/filter-bar/types";
+import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FetchPolarisPositionsParams } from "@/lib/api/fetch-polaris-positions";
@@ -61,6 +56,7 @@ import type { PolarisPositionSort } from "@/lib/sources/api/polaris-positions";
 import { normalizeMarket } from "@/lib/polaris/asset-catalog";
 import { parsePolarisSearch } from "@/lib/polaris/search";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import {
   canonicalStatuses,
   defaultStatuses,
@@ -139,17 +135,6 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "liquidated", label: "Liquidated" },
 ];
 
-/** The Size sliders' span: $0 to $1M, with typed bounds past the top. */
-const USD_RANGE = { min: 0, max: 1_000_000, usd: true };
-
-/** The old Debt facet's values, still in shared links: collateral only is no
- *  debt, borrowing is at least a dollar. */
-function debtRangeFromUrl(values: string[]): string[] {
-  if (values.includes("collateral-only")) return ["-0"];
-  if (values.includes("borrowing")) return ["1-"];
-  return normalizeRange(values);
-}
-
 /**
  * Market options can be injected with token glyphs for the client toolbar;
  * the SSR decode path calls this bare. Options do not enter the URL codec or
@@ -193,31 +178,13 @@ export function polarisListDimensions(
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, def) ? [] : sel };
       },
     },
-    {
-      id: "debt",
-      label: "Debt (USD)",
-      group: "Size",
-      cardinality: "range",
-      range: USD_RANGE,
-      param: "debt",
-      options: [],
-      get: (f) => f.debt,
-      set: (f, v) => ({ ...f, debt: debtRangeFromUrl(v) }),
-      chipLabel: (v) => rangeChipLabel("Debt", v, true),
-    },
-    {
-      id: "coll",
-      label: "Collateral (USD)",
-      group: "Size",
-      cardinality: "range",
-      range: USD_RANGE,
-      param: "coll",
-      options: [],
-      get: (f) => f.coll,
-      set: (f, v) => ({ ...f, coll: normalizeRange(v) }),
-      chipLabel: (v) => rangeChipLabel("Collateral", v, true),
+    ...sizeDimensions<PolarisListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
       panelNote: priceNote,
-    },
+    }),
     transactionsDimension<PolarisListFilters>({
       get: (f) => f.tx,
       set: (f, tx) => ({ ...f, tx }),
@@ -250,18 +217,13 @@ export function polarisFiltersToFetchParams(filters: PolarisListFilters, page: n
         ? filters.sortBy
         : "recent"
   ) as PolarisPositionSort;
-  const debtUsd = decodeRange(filters.debt);
-  const collUsd = decodeRange(filters.coll);
   return {
     market: market ?? undefined,
     cdpId,
     wallet: ownerAddress,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    minDebtUsd: debtUsd.min ?? undefined,
-    maxDebtUsd: debtUsd.max ?? undefined,
-    minCollUsd: collUsd.min ?? undefined,
-    maxCollUsd: collUsd.max ?? undefined,
+    ...usdBounds(filters),
     ...transactionBounds(filters.tx),
     sortBy,
     sortOrder: filters.sortOrder,

@@ -108,7 +108,13 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
   const warningLegs = ((): SpineWarningLeg[] | undefined => {
     if (!isGrab) return undefined;
     const legs: SpineWarningLeg[] = [];
-    if (dink !== 0) legs.push({ label: MAKER_LEG_WORDS.seized, value: Math.abs(dink), symbol: ctx.collateralSymbol });
+    if (dink !== 0)
+      legs.push({
+        label: MAKER_LEG_WORDS.seized,
+        value: Math.abs(dink),
+        symbol: ctx.collateralSymbol,
+        direction: "left",
+      });
     if (dart !== 0 && ctx.debtChange != null)
       legs.push({
         label: MAKER_LEG_WORDS.cleared,

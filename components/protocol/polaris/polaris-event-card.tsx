@@ -131,7 +131,13 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent, ho
   // pool cleared. The surplus stays with the owner and the head states it.
   const warningLegs = polarisLiquidationDeltas(ctx, coords)
     .filter((d) => !d.noSpineCounterpart)
-    .map((d) => ({ label: d.label, value: Math.abs(d.value), symbol: d.symbol, address: d.address }));
+    .map((d) => ({
+      label: d.label,
+      value: Math.abs(d.value),
+      symbol: d.symbol,
+      address: d.address,
+      direction: d.symbol === PETH.symbol ? ("left" as const) : ("right" as const),
+    }));
 
   const spine: SpineColumnProps =
     ctx.eventType === "liquidate"

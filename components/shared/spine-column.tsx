@@ -158,6 +158,10 @@ export interface SpineWarningLeg {
   value: number;
   symbol: string;
   address?: string;
+  /** The leg's side: "left" for the collateral taken out of the position,
+   *  "right" (the default) for the debt cleared (rails-ops TO-DO-ui-jobs.md
+   *  item 408). */
+  direction?: "left" | "right";
 }
 
 export interface SpineColumnProps {
@@ -842,10 +846,12 @@ function spokenWarningLegs(legs: SpineWarningLeg[], unreadOf: ReturnType<typeof 
 const RING_WIDTH = 2;
 const RING_GAP = 2;
 
-/** A warning event's legs, one node each: the token, "→", and the magnitude
- *  in the event's tone. Both point out of the position — the collateral left
- *  it and the debt was cleared — so a redemption reads as a withdraw plus a
- *  repay. Drawn bottom to top in the order given (`bottomUp`'s rule): the
+/** A warning event's legs, one node each: the token, its arrow, and the
+ *  magnitude in the event's tone. Each leg takes the side the custody row's
+ *  rule gives it (standards/detail-page-anatomy.md): the collateral taken
+ *  leaves the position on the left, the debt cleared goes in on the right, so
+ *  a redemption reads as a withdraw plus a repay (rails-ops TO-DO-ui-jobs.md
+ *  item 408). Drawn bottom to top in the order given (`bottomUp`'s rule): the
  *  collateral below, the debt above.
  *
  *  A leg wears a ring in the tone's ink at the node size, the token drawn
@@ -875,10 +881,33 @@ function WarningLegNodes({
           isFinite(leg.value) && leg.value !== 0 && !unreadOf(leg.address, leg.symbol)
             ? fmtHeaderMagnitude(Math.abs(leg.value), leg.symbol)
             : "";
+        const left = leg.direction === "left";
+        const figure = txt ? (
+          <span
+            className={`text-base font-semibold whitespace-nowrap ${left ? "justify-self-end pr-5" : "justify-self-start pl-5"} ${WARNING_TONE_TEXT[tone]}`}
+            data-spine-leg-value=""
+          >
+            {txt}
+          </span>
+        ) : (
+          <span />
+        );
+        const arrow = (
+          <ArrowFromDot direction={left ? "left" : "right"} size={scale.arrowSize} color={SPINE_COLORS[tone]} />
+        );
         return (
-          <div key={i} className="spine-grid" data-spine-leg="">
-            <span />
-            <span />
+          <div key={i} className="spine-grid" data-spine-leg={left ? "left" : "right"}>
+            {left ? (
+              <>
+                {figure}
+                {arrow}
+              </>
+            ) : (
+              <>
+                <span />
+                <span />
+              </>
+            )}
             <span
               className="relative flex items-center justify-center rounded-full shrink-0"
               style={{
@@ -894,18 +923,20 @@ function WarningLegNodes({
                 size={scale.tokenSize - 2 * (RING_WIDTH + RING_GAP)}
                 filterable={filterable}
               />
-              <ActorBadge size={scale.tokenSize} actor={actor} />
+              {/* One actor badge per event, on its top leg (rails-ops
+                  TO-DO-ui-jobs.md item 408). */}
+              {i === 0 && <ActorBadge size={scale.tokenSize} actor={actor} />}
             </span>
-            <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
-            {txt ? (
-              <span
-                className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
-                data-spine-leg-value=""
-              >
-                {txt}
-              </span>
+            {left ? (
+              <>
+                <span />
+                <span />
+              </>
             ) : (
-              <span />
+              <>
+                {arrow}
+                {figure}
+              </>
             )}
           </div>
         );
@@ -1221,7 +1252,14 @@ export function SpineColumn({
   // the diamond above them.
   const rowActor: SpineActor = effectiveIcon ? "owner" : shownActor;
   const hasBadge = rows.some((r) => r.badge);
+  // A multi-leg event carries one actor badge, on its top node (rails-ops
+  // TO-DO-ui-jobs.md item 408): the first row drawn, the spine running
+  // collateral, debt, held from the bottom up (standards/detail-page-anatomy.md).
+  // The % leg under the rows wears the rate's actor unless the top row already
+  // wears that badge.
+  const rateLegBadged = !(rows.length && rowActor !== "owner" && rowActor === rateActor);
   const tokenRows = bottomUp(rows).map((row, i) => {
+    const rowBadge: SpineActor = i === 0 ? rowActor : "owner";
     const chip = (
       <TokenChipIcon
         symbol={row.symbol}
@@ -1251,8 +1289,9 @@ export function SpineColumn({
         }
         glyph={
           // The row's own badge (Aave V4's collateral toggle, an order, a
-          // transfer) bottom-right; who acted top-left, on every row.
-          row.badge || rowActor !== "owner" ? (
+          // transfer) bottom-right, on every row it belongs to; who acted
+          // top-left, on the top row alone.
+          row.badge || rowBadge !== "owner" ? (
             <div className="relative">
               {chip}
               {row.badge === "check" ? (
@@ -1264,7 +1303,7 @@ export function SpineColumn({
               ) : row.badge ? (
                 <SendBadge size={T} />
               ) : null}
-              <ActorBadge size={T} actor={rowActor} />
+              <ActorBadge size={T} actor={rowBadge} />
             </div>
           ) : (
             chip
@@ -1311,7 +1350,7 @@ export function SpineColumn({
             glyph={
               <div className="relative" data-spine-rate-leg={rateActor}>
                 <RateIcon size={T} />
-                <ActorBadge size={T} actor={rateActor} />
+                {rateLegBadged && <ActorBadge size={T} actor={rateActor} />}
               </div>
             }
             right={rateFlank(rateSpan)}

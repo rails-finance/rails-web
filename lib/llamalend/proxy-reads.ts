@@ -58,6 +58,11 @@ export async function readLlamalendPositions(
     const v = sp.get(k);
     if (v != null && /^\d+$/.test(v)) qs.set(k, v);
   }
+  // So is a USD bound on the debt or the collateral.
+  for (const k of ["minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   // Allowlist, like sortOrder: an unrecognised value is dropped rather than
   // forwarded verbatim, so rails-server's own default (recent) decides it —
   // same "unrecognised ⇒ default, no error" stance the route takes throughout.

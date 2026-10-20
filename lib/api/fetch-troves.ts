@@ -23,6 +23,9 @@ export interface FetchTrovesParams {
   hasRedemptions?: boolean;
   batchOnly?: boolean;
   individualOnly?: boolean;
+  /** Inclusive bounds on the trove's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -53,6 +56,8 @@ export function trovesQuery(p: FetchTrovesParams): URLSearchParams {
   if (p.hasRedemptions != null) qs.set("hasRedemptions", String(p.hasRedemptions));
   if (p.batchOnly) qs.set("batchOnly", "true");
   if (p.individualOnly) qs.set("individualOnly", "true");
+  if (p.minTx != null) qs.set("minTx", String(p.minTx));
+  if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

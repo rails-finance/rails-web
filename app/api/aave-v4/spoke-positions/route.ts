@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // A transaction bound is forwarded only as a whole number.
-    for (const k of ["minTx", "maxTx"]) {
+    // A transaction or USD bound is forwarded only as a whole number.
+    for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
       const v = params.get(k);
       if (v != null && !/^\d+$/.test(v)) params.delete(k);
     }

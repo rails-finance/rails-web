@@ -16,6 +16,15 @@ export interface FetchMakerVaultsParams {
   owner?: string;
   ilks?: string[];
   status?: MakerVaultStatus[];
+  /** Inclusive bounds on the vault's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
+  /** Inclusive bounds in USD on the vault's debt and collateral, valued on
+   *  the server; any one alone. */
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
   sortBy?: MakerVaultSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -39,6 +48,9 @@ export async function fetchMakerVaults(p: FetchMakerVaultsParams): Promise<Maker
   if (p.owner) qs.set("owner", p.owner);
   if (p.ilks && p.ilks.length > 0) qs.set("ilks", p.ilks.join(","));
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
+  for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

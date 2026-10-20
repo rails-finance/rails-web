@@ -40,8 +40,18 @@ const MARKET_OPTIONS: FilterOptionDef[] = COMPOUND_BASE_DEPLOYMENT.markets.map((
   label: m.label,
 }));
 
+/** The Transactions slider's top on Base: the round number above the busiest
+ *  listed account (75,366 transactions, 20 Oct 2026). */
+const COMPOUND_V3_BASE_TX_TOP = 100000;
+
+/** The Size panel's price line: the Base route values each account at its
+ *  Comet's price feed at a pinned block. */
+const COMPOUND_V3_BASE_SIZE_NOTE = "At the Comet's own price feed at the pinned block.";
+
 export function compoundBaseListDimensions(): SerializableDimension<CompoundListFilters>[] {
-  return compoundListDimensions().map((d) => (d.id === "market" ? { ...d, options: MARKET_OPTIONS } : d));
+  return compoundListDimensions(COMPOUND_V3_BASE_TX_TOP, COMPOUND_V3_BASE_SIZE_NOTE).map((d) =>
+    d.id === "market" ? { ...d, options: MARKET_OPTIONS } : d,
+  );
 }
 
 export const COMPOUND_BASE_LIST_DEFAULTS: CompoundListFilters = { ...COMPOUND_LIST_DEFAULTS };

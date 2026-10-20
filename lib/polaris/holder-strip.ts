@@ -26,24 +26,18 @@ import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions
 // erased before the client bundle is built (the position card does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import { POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
-import { polarisPositionHref } from "@/lib/polaris/routes";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import {
   holderCollProv,
   holderCollUsdProv,
   holderDebtSumProv,
   holderDebtValueProv,
-  listingIcrProv,
 } from "@/lib/polaris/live-provenance";
 
 /** The ≈ on the wallet's debt, in one sentence — the same gesture the listing
  *  card's ratio wears, saying what the figure is and what is not in it. */
 const DEBT_TIP =
   "An estimate: the wallet's open positions' last stated debts, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. Interest since each position's last touch and any PSM share are not in it.";
-
-/** Why a wallet has no ratio of its own. */
-const NEAREST_TIP =
-  "Each position is liquidated on its own ratio; the wallet has no ratio of its own. This is the open position closest to its market's minimum.";
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -169,37 +163,10 @@ export function polarisHolderStrip(
     });
   }
 
-  // ── nearest its floor: the open CDP whose ratio sits closest to its own
-  //    minimum. Ranked by ratio ÷ minimum, because the two markets' floors can
-  //    differ (defensive mode lifts one of them and not the other) and 130%
-  //    against 115% is further from the floor than 160% against 150%. ────────
-  let nearest: HolderStripProps["nearest"];
-  let closest = Infinity;
-  for (const r of open) {
-    if (!(r.debt > 0) || !(r.coll > 0)) continue;
-    const board = boardFor(r.market);
-    if (!board) continue;
-    const min = board.defensiveMode ? board.defensiveMcr : board.mcr;
-    const ratio = (r.coll * board.price.pethInDebt) / r.debt;
-    const headroom = ratio / min;
-    if (headroom >= closest) continue;
-    closest = headroom;
-    nearest = {
-      href: polarisPositionHref(r.market, r.cdpId),
-      label: `${r.market}/${r.cdpId}`,
-      ratioPct: ratio * 100,
-      minPct: min * 100,
-      approx: true,
-      tip: NEAREST_TIP,
-      prov: listingIcrProv(r.market),
-    };
-  }
-
   return {
     countsLine: countsLine(counts, new Set(open.map((r) => r.market))),
     counts,
     legs,
-    nearest,
     truncated: false,
   };
 }

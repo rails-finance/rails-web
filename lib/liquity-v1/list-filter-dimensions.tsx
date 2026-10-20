@@ -17,9 +17,12 @@
 // that ship LIVE:
 //   • Status  — open / closed / liquidated (mv_liquity_v1_positions.status).
 //   • History — Liquidated before / Redeemed before (ever, from the event stream).
+//   • Transactions — a range over the Trove's distinct transactions (`minTx` /
+//     `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
 //   • Wallet search + sort by recency / ETH collateral / LUSD debt / ratio
 //     (all chain-direct).
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -29,12 +32,18 @@ import type { LiquityV1PositionStatus, LiquityV1PositionSort } from "@/lib/sourc
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const LIQUITY_V1_ITEMS_PER_PAGE = 20;
 
+/** The Transactions slider's top: the round number above the busiest Trove
+ *  (1,019 transactions, 20 Oct 2026). */
+const LIQUITY_V1_TX_TOP = 2000;
+
 export interface LiquityV1ListFilters extends BaseListFilters {
   status: string[];
   /** ["with"] = Troves liquidated at least once (orthogonal to current status). */
   liquidations: string[];
   /** ["with"] = Troves redeemed against at least once. */
   redemptions: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // Resting view = the live Troves (84 of ~7,239). Status defaults to ["open"] as an
@@ -47,6 +56,7 @@ const LIQUITY_V1_LIST_DEFAULTS: LiquityV1ListFilters = {
   status: ["open"],
   liquidations: [],
   redemptions: [],
+  tx: [],
 };
 
 // A search for a wallet asks about that wallet's Troves, and most of them are
@@ -110,6 +120,11 @@ export function liquityV1ListDimensions(): SerializableDimension<LiquityV1ListFi
       set: (f, v) => ({ ...f, redemptions: v }),
       chipLabel: () => "Redeemed before",
     },
+    transactionsDimension<LiquityV1ListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: LIQUITY_V1_TX_TOP,
+    }),
   ];
 }
 
@@ -125,6 +140,7 @@ export function liquityV1FiltersToFetchParams(
     status: filters.status.length > 0 ? (filters.status as LiquityV1PositionStatus[]) : undefined,
     hasLiquidations: filters.liquidations.includes("with") ? true : undefined,
     hasRedemptions: filters.redemptions.includes("with") ? true : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as LiquityV1PositionSort,
     sortOrder: filters.sortOrder,
     limit: LIQUITY_V1_ITEMS_PER_PAGE,

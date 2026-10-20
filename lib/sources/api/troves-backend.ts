@@ -104,6 +104,11 @@ export async function readTrovesFromBackend(
   if (showZombieParam === "true" || showZombieParam === "false") {
     backendParams.set("showZombie", showZombieParam);
   }
+  // A transaction-count bound passes only as a whole number.
+  for (const k of ["minTx", "maxTx"]) {
+    const v = searchParams.get(k);
+    if (v != null && /^\d+$/.test(v)) backendParams.set(k, v);
+  }
   if (sortBy) backendParams.set("sortBy", sortBy);
   if (sortOrder) backendParams.set("sortOrder", sortOrder);
   if (limit) backendParams.set("limit", limit);

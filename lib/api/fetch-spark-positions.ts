@@ -19,6 +19,12 @@ export interface FetchSparkPositionsParams {
   /** Inclusive bounds on the position's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
+  /** Inclusive bounds in USD on the position's debt and collateral, valued on
+   *  the server; any one alone. */
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
   /** supply-side reserve symbols/addresses — restrict to positions supplying them. */
   supplyAssets?: string[];
   borrowAssets?: string[];
@@ -48,6 +54,9 @@ export async function fetchSparkPositions(p: FetchSparkPositionsParams): Promise
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
+  for (const k of ["minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.supplyAssets && p.supplyAssets.length > 0) qs.set("supplyAssets", p.supplyAssets.join(","));
   if (p.borrowAssets && p.borrowAssets.length > 0) qs.set("borrowAssets", p.borrowAssets.join(","));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
