@@ -90,9 +90,9 @@ type ProtocolSpec = {
    *  `protocolForSession` and the rest still answer for it, because its own
    *  pages are drawn from them and an unlaunched explorer is a working one.
    *
-   *  Per entry rather than per chain because the two unlaunched vault layers
-   *  (`aave-vaults`, `yearn`) are chain-1 rows sitting beside twenty launched
-   *  ones — a chain-level flag could not reach them. No chain carries a flag:
+   *  Per entry rather than per chain because an unlaunched explorer
+   *  (`sky-savings`; the two vault layers until 20 Oct 2026) is a chain-1 row
+   *  sitting beside twenty launched ones — a chain-level flag could not reach it. No chain carries a flag:
    *  `launchedChains()` below derives the offered chains from the entries, so
    *  a chain is offered exactly while one of its explorers is launched, with
    *  nothing to keep in step. The six Base explorers launched with phase one
@@ -249,8 +249,6 @@ const SPECS: ProtocolSpec[] = [
     label: "Aave vaults",
     chainId: 1,
     slug: "aave",
-    // The vault layer is off the nav while it is being refined — see `unlaunched`.
-    unlaunched: true,
     tags: ["Vaults", "Savings"],
     desc: "Aave's own vault layer — savings GHO, Umbrella stake tokens and static aTokens, each vault's totals and share price read from chain at one block, and every address that holds one",
     // No position listing: a holder's share in a vault is not a position in the
@@ -612,8 +610,6 @@ const SPECS: ProtocolSpec[] = [
     label: "Yearn V3",
     chainId: 1,
     slug: "yearn",
-    // The vault layer is off the nav while it is being refined — see `unlaunched`.
-    unlaunched: true,
     tags: ["Vaults", "Yield"],
     desc: "Every vault the V3 factories made rather than the endorsed shortlist, each one's totals, share price and endorsement read from chain at one block",
     // No position listing, for the reason Aave's vault layer has none: a
