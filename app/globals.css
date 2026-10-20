@@ -446,6 +446,21 @@ html.dark {
   background-color: var(--color-note);
 }
 
+/* The read-more cue (ui-jobs 384): the dotted underline under a label, figure
+   or mark that opens a tooltip. One strength for the whole site: change
+   --tip-underline-alpha to re-tune every cue at once. `tip-underline` is the
+   text form; --tip-underline-color is the same ink for a border-bottom cue
+   under an icon. */
+:root {
+  --tip-underline-alpha: 30%;
+  --tip-underline-color: color-mix(in srgb, currentColor var(--tip-underline-alpha), transparent);
+}
+@utility tip-underline {
+  text-decoration: underline dotted var(--tip-underline-color);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
 /* Notice panel — the left-border + tinted-bg "note" treatment (color-grammar.md
    §5). Chrome only: bg + left rule. Markup adds its own padding / text colour
    (text-caution-*) / layout so each site keeps its content shape. Theme-aware

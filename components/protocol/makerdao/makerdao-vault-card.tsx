@@ -281,7 +281,7 @@ export function makerVaultCardSlots({
       id={
         v.cdpId == null ? (
           <RevealTip tip={URN_TIP} label={`${vaultIdentityLabel(v)}: ${URN_TIP}`} focusable>
-            <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
+            <span className="tip-underline">
               {v.urn.slice(0, 6)}…{v.urn.slice(-4)}
             </span>
           </RevealTip>
@@ -371,9 +371,7 @@ export function makerVaultCardSlots({
       sub:
         capBinds && v.priceCap ? (
           <RevealTip tip={capTip(v)} label={`Capped price: ${capTip(v)}`} focusable className="focus-ring rounded-sm">
-            <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
-              at the {usdPrice(v.priceCap.capUsd)} cap
-            </span>
+            <span className="tip-underline">at the {usdPrice(v.priceCap.capUsd)} cap</span>
           </RevealTip>
         ) : undefined,
     },

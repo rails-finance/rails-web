@@ -91,9 +91,7 @@ function HeadToggle({ tenure, date, dur }: { tenure: boolean; date: React.ReactN
       onClick={() => writeHeadTenure(!tenure)}
       className="cursor-pointer rounded-sm focus-ring"
     >
-      <span className="underline decoration-current/40 decoration-dotted decoration-1 underline-offset-[3px]">
-        {tenure ? dur : date}
-      </span>
+      <span className="tip-underline">{tenure ? dur : date}</span>
     </button>
   );
 }

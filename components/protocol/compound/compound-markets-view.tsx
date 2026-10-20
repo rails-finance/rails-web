@@ -97,7 +97,7 @@ const val = (v: number | null, unit: string): string => {
 /** The bubble sized for a sentence: RevealTip's own is nowrap for numbers. */
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
 /** Marks a figure or heading that carries a tooltip. */
-const TIPPED = "cursor-help underline decoration-dotted decoration-rb-500/50 underline-offset-4";
+const TIPPED = "cursor-help tip-underline";
 
 /** A tooltip on the repo's RevealTip, prose-sized. */
 function Tip({

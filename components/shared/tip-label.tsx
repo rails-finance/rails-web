@@ -11,9 +11,7 @@ export function TipLabel({ text, tip }: { text: string; tip?: string }) {
   if (!tip) return <>{text}</>;
   return (
     <RevealTip tip={tip} label={`${text}: ${tip}`} focusable wrap className="focus-ring rounded-sm">
-      <span className="underline decoration-current/40 decoration-dotted decoration-1 underline-offset-[3px]">
-        {text}
-      </span>
+      <span className="tip-underline">{text}</span>
     </RevealTip>
   );
 }
@@ -33,10 +31,7 @@ export function HeadingTip({ text, tip, name }: { text: ReactNode; tip?: ReactNo
       focusable
       className="focus-ring rounded-sm"
     >
-      <span
-        className="underline decoration-current/40 decoration-dotted decoration-1 underline-offset-[3px]"
-        data-heading-tip=""
-      >
+      <span className="tip-underline" data-heading-tip="">
         {text}
       </span>
     </RevealTip>
