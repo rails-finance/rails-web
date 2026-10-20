@@ -8,6 +8,7 @@ import { ArbitrumPositionsListing } from "@/components/shared/arbitrum-positions
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { loadAaveV3ArbitrumPositions } from "@/lib/sources/api/aave-v3-arbitrum-positions";
+import { loadArbitrumCensus } from "@/lib/sources/api/arbitrum-census";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,11 @@ export const metadata = listingMetadata({
 });
 
 export default async function AaveV3ArbitrumPositionsPage() {
-  const answer = await loadAaveV3ArbitrumPositions({ readerIp: await readerIpFromHeaders() });
+  const readerIp = await readerIpFromHeaders();
+  const [answer, census] = await Promise.all([
+    loadAaveV3ArbitrumPositions({ readerIp }),
+    loadArbitrumCensus("aave-v3-arbitrum"),
+  ]);
   if (!answer)
     return (
       <div className="py-8">
@@ -29,5 +34,5 @@ export default async function AaveV3ArbitrumPositionsPage() {
     );
   // A read that found nothing held is not a position.
   const open = answer.rows.filter((r) => r.chainOpen === true);
-  return <ArbitrumPositionsListing family="aave-v3" rows={open} recorded={answer.total} />;
+  return <ArbitrumPositionsListing family="aave-v3" rows={open} recorded={answer.total} census={census} />;
 }

@@ -6,8 +6,23 @@
 // `census.wallets`, a wallet that has ever acted on the family (for Compound
 // and Morpho, distinct across Comets or markets); open is `census.open`.
 //
+// The positions pages' footer reads the same census (fetchCensus, through
+// lib/sources/api/arbitrum-census.ts) for its "X of Y open" figure.
+//
 // Imports nothing through `@/`, so scripts/test/census-leg.test.mjs can load
 // it; the loader passes the authenticated, retrying fetch in as `get`.
+
+/**
+ * The explorers counted from a census, keyed by `ProtocolEntry.id`: the
+ * position-first Arbitrum families, whose coverage route states
+ * `census: { wallets, open, complete, … } | null`. The route key is the
+ * server's family key, which differs from the explorer id for Morpho.
+ */
+export const CENSUS_ENDPOINT: Record<string, string> = {
+  "aave-v3-arbitrum": "/api/aave-v3-arbitrum/coverage",
+  "compound-v3-arbitrum": "/api/compound-v3-arbitrum/coverage",
+  "morpho-arbitrum": "/api/morpho-blue-arbitrum/coverage",
+};
 
 /** One explorer's roster, counted. `closed` is derived, never fetched. */
 export type RosterCount = { open: number; closed: number };
@@ -16,12 +31,23 @@ export type RosterCount = { open: number; closed: number };
  *  which suppresses the whole figure). */
 export type RosterState = RosterCount | { pending: string } | null;
 
+/** A complete census with its open figure read. `checkedBlock`/`checkedAt`
+ *  are when the open figure was read on the chain. */
+export type CensusFigures = {
+  open: number;
+  wallets: number;
+  checkedBlock: number | null;
+  checkedAt: string | null;
+};
+
 type CensusAnswer = {
   census?: {
     wallets?: unknown;
     open?: unknown;
     complete?: unknown;
     walkedThroughBlock?: unknown;
+    checkedBlock?: unknown;
+    checkedAt?: unknown;
     lastError?: unknown;
   } | null;
 };
@@ -31,15 +57,15 @@ function isCount(v: unknown): v is number {
 }
 
 /**
- * Read one explorer's census. Pending while the route states no census, the
+ * Read one explorer's census figures. Pending while the route states no census, the
  * walk is incomplete, or the open figure is not yet read; null when the
  * answer fails, is malformed, or does not reconcile (wallets < open).
  */
-export async function fetchCensusCount(
+export async function fetchCensus(
   id: string,
   url: string,
   get: (url: string) => Promise<Response>,
-): Promise<RosterState> {
+): Promise<CensusFigures | { pending: string } | null> {
   const path = new URL(url).pathname;
   try {
     const res = await get(url);
@@ -65,9 +91,26 @@ export async function fetchCensusCount(
       );
       return null;
     }
-    return { open: census.open, closed: census.wallets - census.open };
+    return {
+      open: census.open,
+      wallets: census.wallets,
+      checkedBlock: isCount(census.checkedBlock) ? census.checkedBlock : null,
+      checkedAt: typeof census.checkedAt === "string" ? census.checkedAt : null,
+    };
   } catch (err) {
     console.error(`covered-positions: ${id} ${path} [census] failed`, err);
     return null;
   }
+}
+
+/** One explorer's census as a home-count roster: open, and closed as
+ *  wallets minus open. */
+export async function fetchCensusCount(
+  id: string,
+  url: string,
+  get: (url: string) => Promise<Response>,
+): Promise<RosterState> {
+  const r = await fetchCensus(id, url, get);
+  if (r == null || "pending" in r) return r;
+  return { open: r.open, closed: r.wallets - r.open };
 }
