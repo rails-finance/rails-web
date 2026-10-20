@@ -141,6 +141,7 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings, creation }:
           ? [
               {
                 label: PWN_HEAD_WORDS.legClaimed,
+                direction: "left",
                 value: Number(ctx.collateralAmount ?? "1") || 1,
                 symbol: ctx.collateralSymbol,
                 address: soleFlowAddress(event.flows, ctx.collateralSymbol),

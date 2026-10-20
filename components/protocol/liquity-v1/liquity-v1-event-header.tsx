@@ -146,7 +146,13 @@ export function liquityV1Legs(ctx: LiquityV1Context, coords: LiquityV1Coords): S
   const rank = (d: ChainTruthDelta) => (d.symbol === DEBT_SYMBOL ? 1 : 0);
   return liquityV1Deltas(ctx, coords)
     .sort((a, b) => rank(a) - rank(b))
-    .map((d) => ({ label: d.label, value: Math.abs(d.value), symbol: d.symbol, address: d.address }));
+    .map((d) => ({
+      label: d.label,
+      value: Math.abs(d.value),
+      symbol: d.symbol,
+      address: d.address,
+      direction: rank(d) ? ("right" as const) : ("left" as const),
+    }));
 }
 
 /** One clause of the head, drawn: words, or the full redemption's surplus

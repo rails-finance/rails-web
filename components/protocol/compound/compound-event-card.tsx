@@ -167,6 +167,7 @@ export function CompoundEventCard({
             value: absorbed,
             symbol: ctx.assetSymbol,
             address: soleFlowAddress(event.flows, ctx.assetSymbol),
+            direction: ctx.eventType === "absorb_collateral" ? "left" : "right",
           },
         ]
       : undefined;

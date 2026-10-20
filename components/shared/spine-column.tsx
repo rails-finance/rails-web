@@ -158,6 +158,10 @@ export interface SpineWarningLeg {
   value: number;
   symbol: string;
   address?: string;
+  /** The leg's side: "left" for the collateral taken out of the position,
+   *  "right" (the default) for the debt cleared (rails-ops TO-DO-ui-jobs.md
+   *  item 408). */
+  direction?: "left" | "right";
 }
 
 export interface SpineColumnProps {
@@ -842,10 +846,12 @@ function spokenWarningLegs(legs: SpineWarningLeg[], unreadOf: ReturnType<typeof 
 const RING_WIDTH = 2;
 const RING_GAP = 2;
 
-/** A warning event's legs, one node each: the token, "→", and the magnitude
- *  in the event's tone. Both point out of the position — the collateral left
- *  it and the debt was cleared — so a redemption reads as a withdraw plus a
- *  repay. Drawn bottom to top in the order given (`bottomUp`'s rule): the
+/** A warning event's legs, one node each: the token, its arrow, and the
+ *  magnitude in the event's tone. Each leg takes the side the custody row's
+ *  rule gives it (standards/detail-page-anatomy.md): the collateral taken
+ *  leaves the position on the left, the debt cleared goes in on the right, so
+ *  a redemption reads as a withdraw plus a repay (rails-ops TO-DO-ui-jobs.md
+ *  item 408). Drawn bottom to top in the order given (`bottomUp`'s rule): the
  *  collateral below, the debt above.
  *
  *  A leg wears a ring in the tone's ink at the node size, the token drawn
@@ -875,10 +881,33 @@ function WarningLegNodes({
           isFinite(leg.value) && leg.value !== 0 && !unreadOf(leg.address, leg.symbol)
             ? fmtHeaderMagnitude(Math.abs(leg.value), leg.symbol)
             : "";
+        const left = leg.direction === "left";
+        const figure = txt ? (
+          <span
+            className={`text-base font-semibold whitespace-nowrap ${left ? "justify-self-end pr-5" : "justify-self-start pl-5"} ${WARNING_TONE_TEXT[tone]}`}
+            data-spine-leg-value=""
+          >
+            {txt}
+          </span>
+        ) : (
+          <span />
+        );
+        const arrow = (
+          <ArrowFromDot direction={left ? "left" : "right"} size={scale.arrowSize} color={SPINE_COLORS[tone]} />
+        );
         return (
-          <div key={i} className="spine-grid" data-spine-leg="">
-            <span />
-            <span />
+          <div key={i} className="spine-grid" data-spine-leg={left ? "left" : "right"}>
+            {left ? (
+              <>
+                {figure}
+                {arrow}
+              </>
+            ) : (
+              <>
+                <span />
+                <span />
+              </>
+            )}
             <span
               className="relative flex items-center justify-center rounded-full shrink-0"
               style={{
@@ -898,16 +927,16 @@ function WarningLegNodes({
                   TO-DO-ui-jobs.md item 408). */}
               {i === 0 && <ActorBadge size={scale.tokenSize} actor={actor} />}
             </span>
-            <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
-            {txt ? (
-              <span
-                className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
-                data-spine-leg-value=""
-              >
-                {txt}
-              </span>
+            {left ? (
+              <>
+                <span />
+                <span />
+              </>
             ) : (
-              <span />
+              <>
+                {arrow}
+                {figure}
+              </>
             )}
           </div>
         );

@@ -186,6 +186,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
           ? [
               {
                 label: isRedemption ? L1_WORDS.reduced : L1_WORDS.liquidated,
+                direction: "left" as const,
                 value: Math.abs(collDelta),
                 symbol: ctx.collateralSymbol,
                 address: soleFlowAddress(event.flows, ctx.collateralSymbol),

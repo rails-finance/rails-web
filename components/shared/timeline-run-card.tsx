@@ -304,8 +304,9 @@ export function TimelineRunCard({
 
   // ── The summed legs, as the spine's nodes ─────────────────────────────
   // A run of redemptions or liquidations draws its legs as set A's warning
-  // nodes: every leg left the position, so each points out ("12.41 →",
-  // "37K →"), the collateral below the debt, in the run's tone. Any other run
+  // nodes, the collateral below the debt, in the run's tone: the collateral
+  // taken on the left ("← 12.41"), the debt cleared on the right ("37K →"),
+  // as one member draws them (rails-ops TO-DO-ui-jobs.md item 408). Any other run
   // nets each token's legs: a leg whose verb moves the token into the position
   // counts plus, one that moves it to the wallet minus, and the node's arrow
   // points the way the net goes. A run whose members moved no asset draws no
@@ -314,8 +315,13 @@ export function TimelineRunCard({
   const legAggs = (aggregates ?? []).filter((agg) => agg.value > 0);
   const warningLegs = adverse
     ? [...legAggs]
-        .sort((a, b) => Number(DEBT_VERB.test(a.verb)) - Number(DEBT_VERB.test(b.verb)))
-        .map((agg) => ({ label: agg.verb, value: agg.value, symbol: agg.symbol }))
+        .sort((a, b) => Number(DEBT_LEG.test(a.verb)) - Number(DEBT_LEG.test(b.verb)))
+        .map((agg) => ({
+          label: agg.verb,
+          value: agg.value,
+          symbol: agg.symbol,
+          direction: DEBT_LEG.test(agg.verb) ? ("right" as const) : ("left" as const),
+        }))
     : undefined;
   const netTokens = adverse || spineIcon === "custody" ? [] : netLegs(legAggs);
   // The group opens from its row's ⋮ ("Show 48 grouped events") and closes
@@ -824,6 +830,10 @@ export function spanWords(a: number, b: number): string {
 /** A verb that names the debt side of a leg: drawn above the collateral, as
  *  set A's warning nodes are. */
 const DEBT_VERB = /^(cleared|repaid|repay|debt)/i;
+/** A summed warning leg on the debt side: the debt cleared, repaid, written
+ *  off, or the ZCHF an auction raised against it. Every other leg is the
+ *  collateral taken. */
+const DEBT_LEG = /^(cleared|repaid|repay|debt|liquidators repaid|written off|raised)/i;
 /** A verb that moves the token to the wallet; every other one into the
  *  position. */
 const OUT_VERB = /^(withdr|borrow|received|paid out|claimed|redeemed|sent)/i;
