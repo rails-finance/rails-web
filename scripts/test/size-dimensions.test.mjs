@@ -31,6 +31,7 @@ test("the old dropdown's values read as their Debt range", () => {
   assert.deepEqual(debtRangeFromUrl(["supply-only"]), ["-0"]);
   assert.deepEqual(debtRangeFromUrl(["collateral-only"]), ["-0"]);
   assert.deepEqual(debtRangeFromUrl(["lending-only"]), ["-0"]);
+  assert.deepEqual(debtRangeFromUrl(["supplyOnly"]), ["-0"]);
 });
 
 test("one side only: the range drawn carries the note and its own word", () => {
