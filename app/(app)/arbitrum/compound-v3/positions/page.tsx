@@ -32,5 +32,7 @@ export default async function CompoundArbitrumPositionsPage() {
         <p className="text-sm text-rb-500">The store did not answer; the list could not be read.</p>
       </div>
     );
-  return <ArbitrumPositionsListing family="compound-v3" rows={answer.rows} total={answer.total} />;
+  // A read that found nothing held is not a position; the footer counts it.
+  const open = answer.rows.filter((r) => r.chainOpen === true);
+  return <ArbitrumPositionsListing family="compound-v3" rows={open} recorded={answer.total} />;
 }
