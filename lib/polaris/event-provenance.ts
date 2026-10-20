@@ -590,6 +590,19 @@ export const transferProv = (coords: PolarisCoords): Provenance => ({
   inputs: eventInputs(coords),
 });
 
+/** A touch's sender where it is not the CDP's holder (ui-jobs 404): the
+ *  transaction's `from`, against the holder the page reads off the open and
+ *  the NFT's transfers. */
+export const touchSenderProv = (coords: PolarisCoords, holder: string): Provenance => ({
+  kind: "chain",
+  pclass: "emitted",
+  verify: txVerify(coords),
+  summary: `Sender of this touch — the account that sent the transaction${atBlock(coords)}, which is not the CDP's holder then (${holder}). Anyone may touch a CDP; the touch writes the pending legs into its figures and moves nothing the holder chose.`,
+  contract: managerContract(coords),
+  via: `${POLARIS_VIA} · the transaction's from`,
+  inputs: eventInputs(coords, [{ label: "holder at this touch", value: holder, kind: "chain", pclass: "indexed" }]),
+});
+
 // ── the rate in force (emitted, market-level) ────────────────────────────────
 
 /** The market's primary rate in force at this touch — its last

@@ -45,8 +45,20 @@ export function PolarisPsmGapRow({ note, isLast = false }: { note: PsmGapNote; i
   const stable = note.marketSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[note.market].stable.address;
   const coords = { market: note.market, cdpId: note.cdpId, txHash: note.to.txHash, blockNumber: note.to.block };
-  const collProv = ledgerFieldProv("mintRedeemCollGain", coords, note.collShareRaw);
-  const debtProv = ledgerFieldProv("mintRedeemDebtGain", coords, note.debtShareRaw);
+  // A run of touches' row sums its members' shares (ui-jobs 404).
+  const sumProv = (side: "coll" | "debt"): Provenance => ({
+    kind: "derived",
+    summary: `${side === "coll" ? "Collateral" : "Debt"} share over the run — the sum of the ${side === "coll" ? "pETH" : stable} each touch in it wrote as the CDP's PSM share (${side === "coll" ? "_mintRedeemCollGain" : "_mintRedeemDebtGain"}).`,
+    formula: `Σ ${side === "coll" ? "_mintRedeemCollGain" : "_mintRedeemDebtGain"}`,
+    inputs: (note.members ?? []).map((g) => ({
+      label: `touch at block ${g.to.block.toLocaleString("en-US")}`,
+      value: formatExact(side === "coll" ? g.collShare : g.debtShare),
+      kind: "chain" as const,
+      pclass: "emitted" as const,
+    })),
+  });
+  const collProv = note.members ? sumProv("coll") : ledgerFieldProv("mintRedeemCollGain", coords, note.collShareRaw);
+  const debtProv = note.members ? sumProv("debt") : ledgerFieldProv("mintRedeemDebtGain", coords, note.debtShareRaw);
   const collText = signed(note.collShare, formatPeth(Math.abs(note.collShare)));
   const debtText = signed(note.debtShare, formatNumber(Math.abs(note.debtShare)));
   const net = note.priceAtTouch != null ? note.collShare * note.priceAtTouch - note.debtShare : null;

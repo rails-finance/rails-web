@@ -16,12 +16,17 @@ import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import { PartyChip, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { Prov } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { liquidationFieldProv, transferProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
+import {
+  liquidationFieldProv,
+  touchSenderProv,
+  transferProv,
+  type PolarisCoords,
+} from "@/lib/polaris/event-provenance";
 import { polarisT1Words, type PolarisT1Clause } from "@/lib/polaris/event-prose";
 import { formatExact } from "@/lib/utils/format";
 
 /** One clause of the head, drawn. */
-function clauseNode(c: PolarisT1Clause, ctx: PolarisContext, coords: PolarisCoords) {
+function clauseNode(c: PolarisT1Clause, ctx: PolarisContext, coords: PolarisCoords, holder?: string | null) {
   if ("surplus" in c)
     // The one figure the head states: the collateral the holder can claim.
     return (
@@ -37,7 +42,8 @@ function clauseNode(c: PolarisT1Clause, ctx: PolarisContext, coords: PolarisCoor
         <span className="text-green-700 dark:text-green-400">{c.word}</span>
       </>
     );
-  return <PartyChip party={{ prefix: c.lead, address: c.address, prov: transferProv(coords), ens: true }} />;
+  const prov = c.sender && holder ? touchSenderProv(coords, holder) : transferProv(coords);
+  return <PartyChip party={{ prefix: c.lead, address: c.address, prov, ens: true }} />;
 }
 
 /** The head's spec: the timeline's ("row") or the event page's ("title"),
@@ -47,15 +53,16 @@ export function polarisHeadSpec(
   ctx: PolarisContext,
   coords: PolarisCoords,
   mode: "row" | "title" = "row",
+  holder?: string | null,
 ): ChainTruthRowSpec {
-  const words = polarisT1Words(ctx);
+  const words = polarisT1Words(ctx, holder);
   const surplus = mode === "title" ? words.clauses.find((c) => "surplus" in c) : undefined;
   const clauses = surplus ? words.clauses.filter((c) => c !== surplus) : words.clauses;
   return {
     label: words.kind,
     status: ctx.eventType === "open" ? "open" : ctx.eventType === "close" ? "close" : undefined,
     critical: ctx.eventType === "liquidate",
-    clauses: clauses.map((c) => clauseNode(c, ctx, coords)),
+    clauses: clauses.map((c) => clauseNode(c, ctx, coords, holder)),
     deltas: [],
     surplus:
       surplus && "surplus" in surplus

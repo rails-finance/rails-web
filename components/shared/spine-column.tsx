@@ -28,6 +28,7 @@ export type SpineIcon =
   | "extend" // Term renegotiated / duration extended — clock
   | "close" // The holder closed the position in one step with nothing left to draw (e.g. an Alchemix self-liquidation, collateral paying the debt) — lucide `log-out`, neutral ink: a holder action, never a hazard
   | "dead-end" // Debt repaid from the position's own collateral, with nothing else moved — an Alchemix V2 `Liquidate`: the account holder selling their own collateral shares to clear their own debt, never a third party (rails-ops reference/alchemix-v2-frozen-record.md) — lucide `arrow-right-to-line`, neutral ink: a holder action, never a hazard
+  | "touch" // A touch that moved nothing the holder chose and rewrote the position's figures (a Polaris CDP's interest and PSM share written in, ui-jobs 404) — lucide `fingerprint-pattern`, neutral ink
   | "no-change" // Operation that moved nothing (zero-delta adjust) — equals-in-circle
   | "custody" // Position moved between accounts (a receipt-token transfer run, or a position NFT's transfer: a Liquity V2 Trove, a Polaris position) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
@@ -518,6 +519,33 @@ function SwapBadge({ size }: { size: number }) {
 }
 
 /** Equals-in-circle for zero-delta operations — muted, states "nothing moved". */
+/** lucide `fingerprint-pattern` (not in the installed lucide-react): a touch. */
+function TouchIcon({ size, color = "var(--color-rb-500)" }: { size: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+      <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+      <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+      <path d="M2 12a10 10 0 0 1 18-6" />
+      <path d="M2 16h.01" />
+      <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+      <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+      <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+      <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+    </svg>
+  );
+}
+
 function NoChangeIcon({ size, color = "var(--color-rb-500)" }: { size: number; color?: string }) {
   return (
     <svg
@@ -1058,6 +1086,8 @@ export function SpineColumn({
         return nodeRow(<ExtendIcon size={T} />);
       case "no-change":
         return nodeRow(<NoChangeIcon size={T} />);
+      case "touch":
+        return nodeRow(<TouchIcon size={T} />);
       case "custody":
         return nodeRow(<CustodyIcon size={T} />);
       case "swap":

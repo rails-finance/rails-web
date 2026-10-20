@@ -21,7 +21,7 @@ import { eventGas } from "@/components/shared/event-price-row";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 
-import { polarisEventProse, polarisT1Caption, polarisT1Words } from "@/lib/polaris/event-prose";
+import { polarisEventProse, polarisSentByOther, polarisT1Caption, polarisT1Words } from "@/lib/polaris/event-prose";
 import { polarisLiquidationDeltas } from "@/lib/polaris/liquidation-legs";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
@@ -47,6 +47,9 @@ export interface PolarisEventCardProps {
   /** The CDP's previous event (not a transfer): its prices and rate are what
    *  the sheet's Last event, Market move and changes read. */
   previousEvent?: BaseActivityEvent & { context: { protocol: "polaris"; data: PolarisContext } };
+  /** The CDP's holder at this event, where the page knows it: a touch another
+   *  account sent names its sender (ui-jobs 404). */
+  holder?: string | null;
 }
 
 const num = (s?: string): number => {
@@ -54,10 +57,11 @@ const num = (s?: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: PolarisEventCardProps) {
+export function PolarisEventCard({ event, isLast, eventNumber, previousEvent, holder }: PolarisEventCardProps) {
   const ctx = event.context.data;
   const coords = polarisEchoCoords(ctx, event.txHash, event.blockNumber);
-  const prose = polarisEventProse({ ctx });
+  const sentByOther = polarisSentByOther(ctx, holder);
+  const prose = polarisEventProse({ ctx, sentByOther });
   const stable = ctx.stableSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[ctx.market].stable.address;
 
@@ -135,9 +139,10 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
       : ctx.eventType === "transfer"
         ? { icon: "custody", isLast: !!isLast }
         : tokens.length === 0
-          ? // An interest-only touch: the log wrote the pending legs in and
-            // moved nothing the holder chose.
-            { icon: "no-change", isLast: !!isLast }
+          ? // A touch: the log wrote the pending legs in and moved nothing
+            // the holder chose. The fingerprint (ui-jobs 404); dotted where
+            // another account sent it.
+            { icon: "touch", isLast: !!isLast, ...(sentByOther ? { dotted: true } : {}) }
           : { tokens, isLast: !!isLast };
 
   const escrowAt = useMemo(
@@ -146,7 +151,7 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
   );
   // The event page draws the claimable surplus beside its title.
   const onPage = useContext(EventPageContext) != null;
-  const head = polarisHeadSpec(ctx, coords, onPage ? "title" : "row");
+  const head = polarisHeadSpec(ctx, coords, onPage ? "title" : "row", holder);
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
   const body = polarisEventBody(ctx, coords, useFlowFocus() != null, previousEvent?.context.data);
@@ -162,10 +167,11 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
     spine,
     head,
     // The phone caption and the row's accessible name follow the head's words.
-    caption: polarisT1Caption(polarisT1Words(ctx)),
+    caption: polarisT1Caption(polarisT1Words(ctx, holder)),
     // A transfer: the holder it reached only received it (ui-jobs 304). A
     // liquidation: the liquidator acted.
-    actor: ctx.eventType === "transfer" || ctx.eventType === "liquidate" ? { byOwner: false } : undefined,
+    actor:
+      ctx.eventType === "transfer" || ctx.eventType === "liquidate" || sentByOther ? { byOwner: false } : undefined,
     cells: body.cells,
     sheet: body.sheet,
     ledgers: {
@@ -189,7 +195,14 @@ export function PolarisEventCard({ event, isLast, eventNumber, previousEvent }: 
       prices: body.price ? [body.price] : [],
     },
     explainer: {
-      body: <PolarisEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />,
+      body: (
+        <PolarisEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          sentByOther={sentByOther}
+        />
+      ),
       first:
         prose.L4.length > 0 ? (
           <PolarisExplainerTeaser prose={prose} echo={(key) => polarisEchoFor(key, ctx, coords)} />

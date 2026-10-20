@@ -107,7 +107,7 @@ import { usePublishLifeCount, type LifeCount } from "@/lib/shared/life-count-sto
 import { NoteGap, noteRowHeight, type GapItem } from "@/components/shared/note-gap";
 import { SpineLine } from "@/components/shared/spine-line";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { anchorMarketNotes, liveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
+import { anchorMarketNotes, liveNoteGroup, mergePsmGaps, type MarketNote } from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { folderTerminus } from "@/lib/shared/run-folders";
 import { settleRunRows } from "@/lib/shared/timeline-chunks";
@@ -304,6 +304,9 @@ export interface TimelineRunSpec {
    *  landing target all taken from the run's first member. A spec that leaves
    *  this off keeps the collapse behaviour unchanged. */
   asOneEvent?: boolean;
+  /** A collapse spec's own floor in acts, under `GROUP_MIN_TRANSACTIONS`
+   *  where a ruling sets one (Polaris's touches group from two, ui-jobs 404). */
+  floor?: number;
   /** Render the collapsed row. `children` holds the run's member cards
    *  (already rendered via renderCard, date-prefixed) for in-place expansion,
    *  one per member in run order; isLast is the run's spine-terminus flag. */
@@ -1945,7 +1948,8 @@ function ChainTruthTimelineBody({
     // two of the account's own events, and those are exactly the rows that
     // stay ungrouped.
     if (row.kind === "folder") return NO_NOTES;
-    return row.events.flatMap((e) => anchored.get(e.id) ?? NO_NOTES);
+    // A run's members' PSM gaps stand as one row (ui-jobs 404).
+    return mergePsmGaps(row.events.flatMap((e) => anchored.get(e.id) ?? NO_NOTES));
   };
 
   return (

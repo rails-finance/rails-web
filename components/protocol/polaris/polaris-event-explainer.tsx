@@ -28,6 +28,8 @@ export interface PolarisEventExplainerProps {
   ctx: PolarisContext;
   txHash?: string;
   blockNumber?: number;
+  /** The row's sender is not the CDP's holder (a keeper's touch). */
+  sentByOther?: boolean;
 }
 
 const num = (s?: string): number => {
@@ -125,8 +127,8 @@ export function PolarisExplainerTeaser({
   return lead ? <ProseSentenceText s={lead} echo={echo} /> : null;
 }
 
-export function PolarisEventExplainer({ ctx, txHash, blockNumber }: PolarisEventExplainerProps) {
-  const prose = polarisEventProse({ ctx });
+export function PolarisEventExplainer({ ctx, txHash, blockNumber, sentByOther }: PolarisEventExplainerProps) {
+  const prose = polarisEventProse({ ctx, sentByOther });
   const coords = polarisEchoCoords(ctx, txHash, blockNumber);
   const echo = (key: PolarisEchoKey) => polarisEchoFor(key, ctx, coords);
   const sentence = (s: PolarisEventProse["L4"][number]) => <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;

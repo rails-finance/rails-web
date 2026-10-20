@@ -38,6 +38,9 @@ export interface RunGroupingSpec<E> {
   /** One event's row drawn from several logs of one transaction: not a group,
    *  and qualified at its own `min`. */
   asOneEvent?: boolean;
+  /** A collapse spec's own floor in acts, where a ruling sets one under
+   *  `GROUP_MIN_TRANSACTIONS` (Polaris's touches group from two, ui-jobs 404). */
+  floor?: number;
 }
 
 /** The member lists settled so far, by their first member: a few per member,
@@ -116,7 +119,7 @@ export function settleRunRows<E extends { txHash: string; timestamp: number }, S
       const min = spec.min ?? 1;
       if (stretch.length < min) for (const e of stretch) loose(e);
       else run(spec, stretch, min);
-    } else if (transactionCount(stretch, spec.actKeyOf ?? ((e) => e.txHash)) < GROUP_MIN_TRANSACTIONS) {
+    } else if (transactionCount(stretch, spec.actKeyOf ?? ((e) => e.txHash)) < (spec.floor ?? GROUP_MIN_TRANSACTIONS)) {
       for (const e of stretch) loose(e);
     } else {
       run(spec, stretch, 2);

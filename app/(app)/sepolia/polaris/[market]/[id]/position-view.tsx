@@ -41,6 +41,7 @@ import { PolarisPositionExplanation } from "@/components/protocol/polaris/polari
 import { polarisLifetime } from "@/lib/polaris/economics";
 import { polarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
 import { polarisPsmGapNotes } from "@/lib/polaris/psm-gap";
+import { polarisHoldersAt, polarisTouchRuns } from "@/lib/polaris/touch-runs";
 import { PolarisSinceLastTouchRow } from "@/components/protocol/polaris/polaris-since-last-touch";
 import { polarisPsmOutcome } from "@/lib/polaris/economics-explanation";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -202,6 +203,11 @@ export default function PolarisPositionView({
     () => (chain && polarisEvents.length > 0 ? polarisSinceLastTouch(chain, polarisEvents) : null),
     [chain, polarisEvents],
   );
+
+  // The holder at each event, and the touch runs that read it (ui-jobs 404).
+  const ownerAtOpen = summary?.ownerAtOpen;
+  const holders = useMemo(() => polarisHoldersAt(polarisEvents, ownerAtOpen), [polarisEvents, ownerAtOpen]);
+  const touchRuns = useMemo(() => polarisTouchRuns((id) => holders.get(id)), [holders]);
 
   const tl = useTimelineEvents(polarisEvents, {
     storageKey: `polaris-${market}-${cdpId}`,
@@ -410,10 +416,9 @@ export default function PolarisPositionView({
                 above is read from the market&rsquo;s contracts at the latest Sepolia block.
               </div>
             ) : (
-              // No `runs`: measured 2026-09-10, no CDP on the index holds a run of
-              // no-change touches (rails-ops TO-DO-polaris-v2-parity §1.4), so
-              // the menu offers no collapse.
+              // Runs: two or more touches in a row, one sender, as one row (ui-jobs 404).
               <ChainTruthTimeline
+                runs={touchRuns}
                 persistKeyPrefix="polaris"
                 closed={view.status !== "open"}
                 tl={tl}
@@ -450,6 +455,7 @@ export default function PolarisPositionView({
                       eventNumber={meta.eventNumber}
                       isLast={meta.isLast}
                       previousEvent={previousById.get(event.id)}
+                      holder={holders.get(event.id)}
                     />
                   ) : null
                 }

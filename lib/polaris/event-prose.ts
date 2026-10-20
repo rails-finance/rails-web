@@ -28,6 +28,8 @@ export type PolarisEventProse = EventProseCore<PolarisL5Key, PolarisEchoKey>;
 
 export interface PolarisProseInput {
   ctx: PolarisContext;
+  /** The row's sender is not the CDP's holder (`polarisSentByOther`). */
+  sentByOther?: boolean;
 }
 
 const EPS = 1e-9;
@@ -162,7 +164,7 @@ export function polarisEventProse(input: PolarisProseInput): PolarisEventProse {
       break;
     }
     case "polaris.adjust": {
-      if (variant === "unmoved") sp.say("adj.none");
+      if (variant === "unmoved") sp.say(input.sentByOther ? "adj.none_keeper" : "adj.none");
       else {
         const dColl = num(ctx.collChange);
         const dDebt = num(ctx.debtChange);
@@ -228,7 +230,15 @@ export const polarisExplanationRuns = PROSE.explanationRuns;
 
 /** A clause after the head's kind (rails-ops decision 0045): a liquidation's
  *  surplus, or a transfer's recipient after `lead`. */
-export type PolarisT1Clause = { surplus: number; symbol: string; word: string } | { lead: string; address: string };
+export type PolarisT1Clause =
+  | { surplus: number; symbol: string; word: string }
+  | { lead: string; address: string; sender?: true };
+
+/** A row sent by an account that is not the CDP's holder at that row (a
+ *  keeper's touch). False where either is unknown. */
+export function polarisSentByOther(ctx: PolarisContext, holder?: string | null): boolean {
+  return !!holder && !!ctx.txFrom && ctx.txFrom.toLowerCase() !== holder.toLowerCase();
+}
 
 export interface PolarisT1Words {
   kind: string;
@@ -239,7 +249,7 @@ export interface PolarisT1Words {
  *  where the kind alone says nothing, in the order they run (what goes into
  *  the CDP before what comes out, the collateral first where both go one way;
  *  rails-ops reference/shared-event-card-spec.md, "Spine order"). */
-export function polarisT1Words(ctx: PolarisContext): PolarisT1Words {
+export function polarisT1Words(ctx: PolarisContext, holder?: string | null): PolarisT1Words {
   const W = POLARIS_WORDS;
   switch (ctx.eventType) {
     case "open":
@@ -251,7 +261,12 @@ export function polarisT1Words(ctx: PolarisContext): PolarisT1Words {
       const debt = num(ctx.debtChange);
       const c = coll > 0 ? W.t1_added_coll : W.t1_withdrew_coll;
       const d = debt > 0 ? W.t1_borrowed : W.t1_repaid;
-      if (coll === 0 && debt === 0) return { kind: W.t1_touched, clauses: [] };
+      // A touch names its sender where the holder did not send it (ui-jobs 404).
+      if (coll === 0 && debt === 0)
+        return {
+          kind: W.t1_touched,
+          clauses: polarisSentByOther(ctx, holder) ? [{ lead: W.t1_by, address: ctx.txFrom!, sender: true }] : [],
+        };
       if (debt === 0) return { kind: c, clauses: [] };
       if (coll === 0) return { kind: d, clauses: [] };
       // A repayment goes in and a withdrawal comes out: the repayment first.

@@ -218,6 +218,44 @@ export interface PsmGapNote extends MarketNoteBase {
   /** pETH in the stablecoin at the closing touch's block, where the oracle
    *  lane has it: the net share in the stablecoin. */
   priceAtTouch: number | null;
+  /** Set on the row that stands for a run of touches' gaps (`mergePsmGaps`):
+   *  the gaps it sums, oldest first. */
+  members?: PsmGapNote[];
+}
+
+/** A run of touches drawn as one row holds one PSM row (ui-jobs 404): its
+ *  members' gaps summed, from the first gap's start to the last's end, in
+ *  the place of the first. Every other note is left as it is. */
+export function mergePsmGaps(notes: readonly MarketNote[]): MarketNote[] {
+  const gaps = notes.filter((n): n is PsmGapNote => n.kind === "psm-gap");
+  if (gaps.length < 2) return notes as MarketNote[];
+  const asc = [...gaps].sort((a, b) => a.to.block - b.to.block);
+  const first = asc[0];
+  const last = asc[asc.length - 1];
+  const trades = asc.every((g) => g.trades != null) ? asc.reduce((n, g) => n + (g.trades ?? 0), 0) : null;
+  const merged: PsmGapNote = {
+    ...last,
+    id: `psm-gap:${last.market}:${first.from.block}-${last.to.block}:run`,
+    from: first.from,
+    trades,
+    ordinals: first.ordinals && last.ordinals ? [first.ordinals[0], last.ordinals[1]] : null,
+    collShare: asc.reduce((n, g) => n + g.collShare, 0),
+    debtShare: asc.reduce((n, g) => n + g.debtShare, 0),
+    collShareRaw: undefined,
+    debtShareRaw: undefined,
+    priceAtTouch: null,
+    members: asc,
+  };
+  const out: MarketNote[] = [];
+  let placed = false;
+  for (const n of notes) {
+    if (n.kind !== "psm-gap") out.push(n);
+    else if (!placed) {
+      out.push(merged);
+      placed = true;
+    }
+  }
+  return out;
 }
 
 export type MarketNote = RateStepNote | VaultTermsNote | PsmGapNote;

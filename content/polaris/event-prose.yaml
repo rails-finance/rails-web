@@ -262,6 +262,9 @@ words:
     Transferred
   t1_to: |-
     to
+  # A touch the holder did not send: its sender after the kind (ui-jobs 404).
+  t1_by: |-
+    by
   # The liquidation's notes: who liquidated the CDP.
   liquidated_by: |-
     Liquidated by
@@ -698,12 +701,18 @@ templates:
           unmoved
         text: |-
           The holder touched this CDP without moving collateral or debt.
+      adj.none_keeper:
+        when: |-
+          unmoved, sent by an account that is not the holder
+        text: |-
+          An account other than the holder touched this CDP without moving collateral or debt.
     order:
       - adj.deposit
       - adj.withdraw
       - adj.borrow
       - adj.repay
       - adj.none
+      - adj.none_keeper
       - legs.written
       - psm.share_pos
       - psm.share_neg
@@ -716,6 +725,7 @@ templates:
         - adj.borrow
         - adj.repay
         - adj.none
+        - adj.none_keeper
       adds_up:
         - legs.written
         - psm.share_pos
