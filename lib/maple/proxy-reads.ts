@@ -65,6 +65,11 @@ export async function readMaplePositions(
   if (sp.get("status")) qs.set("status", sp.get("status")!);
   if (sp.get("inQueue")) qs.set("inQueue", sp.get("inQueue")!);
   if (sp.get("pools")) qs.set("pools", symbolsToPoolKeys(sp.get("pools")!));
+  // A transaction-count or deposited-USD bound travels only as a whole number.
+  for (const k of ["minTx", "maxTx", "minCollUsd", "maxCollUsd"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   // Allowlist, like sortOrder: an unrecognised value is dropped rather than
   // forwarded verbatim, so rails-server's own default (recent) decides it.
   // No "debt" — a Maple lender position has no debt side.

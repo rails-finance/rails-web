@@ -5,17 +5,23 @@
 // does the filter / sort / offset over mv_compound_v3_positions. Dimensions carry a
 // `param` (for the shareable URL) but no in-memory `matches` — the backend filters.
 //
-// Every facet here ships LIVE — rails-server + the proxy honor all of these params
-// (verified by count: status open/closed/liquidated and hasDebt/noDebt/market each
-// partition the set):
+// Facets:
 //   • Status  — open / closed / liquidated (lifecycle).
 //   • Market  — cUSDCv3 / cWETHv3 / cUSDTv3 (Comet's fixed, known market set).
-//   • Position — Borrowing (signed base < 0) / Supply only (≥ 0).
+//   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
+//     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
+//     replaces the old Position dropdown: its `?state=borrowing` reads as at
+//     least $1 and `?state=supply-only` as $0. Only the USD bounds are sent:
+//     the old hasDebt / noDebt flags name a column the live view no longer has.
 //   • History — Liquidated before.
+//   • Transactions — a range over the position's transaction count (`minTx` /
+//     `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
 //   • Sort — Recent activity / Debt / Collateral. Debt/Collateral order by
 //     mig 185's debt_usd/collateral_usd on mv_compound_v3_positions (per
 //     (market, account) row, Ethereum only — see lib/api/compound-positions-proxy.ts).
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -30,6 +36,14 @@ import {
   sameStatusSet,
 } from "@/lib/compound/listing-visibility";
 
+/** The Transactions slider's top on Ethereum: the round number above the
+ *  busiest listed position. mv_compound_v3_positions carries no tx_count, so
+ *  its event_count stands in (10,361 events, 20 Oct 2026). */
+const COMPOUND_V3_TX_TOP = 20000;
+
+/** The Size panel's price line on Ethereum. */
+const COMPOUND_V3_SIZE_NOTE = "At the latest indexed price per asset, as of the listing's last refresh.";
+
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const COMPOUND_ITEMS_PER_PAGE = 20;
 
@@ -38,10 +52,15 @@ export interface CompoundListFilters extends BaseListFilters {
   status: string[];
   /** usdc / weth / usdt — single-select market (stored as an array for the registry). */
   market: string[];
-  /** "" | "borrowing" | "supply-only" — the signed base side. */
-  state: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** "" | "liquidated" — positions liquidated at least once. */
   liquidations: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -55,8 +74,10 @@ export const COMPOUND_LIST_DEFAULTS: CompoundListFilters = {
   sortOrder: "desc",
   status: [],
   market: [],
-  state: [],
+  debt: [],
+  coll: [],
   liquidations: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -80,14 +101,14 @@ const MARKET_OPTIONS: FilterOptionDef[] = Object.values(COMPOUND_MARKETS).map((m
   label: m.label,
 }));
 
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "supply-only", label: "Supply only" },
-];
-
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
-export function compoundListDimensions(): SerializableDimension<CompoundListFilters>[] {
+/** `txTop` is the Transactions slider's top and `sizeNote` the Size panel's
+ *  price line; the Base lane passes its own. */
+export function compoundListDimensions(
+  txTop: number = COMPOUND_V3_TX_TOP,
+  sizeNote: string = COMPOUND_V3_SIZE_NOTE,
+): SerializableDimension<CompoundListFilters>[] {
   return [
     {
       id: "status",
@@ -115,16 +136,14 @@ export function compoundListDimensions(): SerializableDimension<CompoundListFilt
       get: (f) => f.market,
       set: (f, v) => ({ ...f, market: v }),
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<CompoundListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: sizeNote,
+      debtAliases: ["state"],
+    }),
     {
       id: "liquidations",
       label: "History",
@@ -136,21 +155,25 @@ export function compoundListDimensions(): SerializableDimension<CompoundListFilt
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<CompoundListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: txTop,
+    }),
   ];
 }
 
 /** Map the decoded selection + page onto the Comet fetch params. */
 export function compoundFiltersToFetchParams(filters: CompoundListFilters, page: number): FetchCompoundPositionsParams {
-  const state = filters.state[0];
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
     market: filters.market[0] || undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: state === "borrowing" ? true : undefined,
-    noDebt: state === "supply-only" ? true : undefined,
+    ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as CompoundPositionSort,
     sortOrder: filters.sortOrder,
     limit: COMPOUND_ITEMS_PER_PAGE,

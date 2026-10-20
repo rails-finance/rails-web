@@ -20,6 +20,13 @@ export interface FetchMaplePositionsParams {
   inQueue?: boolean;
   /** Share-token symbols — restrict to wallets holding those pools. */
   pools?: string[];
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
+  /** Inclusive bounds in USD on the deposited principal, valued on the
+   *  server; either alone. */
+  minCollUsd?: number;
+  maxCollUsd?: number;
   status?: MaplePositionStatus[];
   sortBy?: MaplePositionSort;
   sortOrder?: "asc" | "desc";
@@ -44,6 +51,9 @@ export async function fetchMaplePositions(p: FetchMaplePositionsParams): Promise
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.inQueue != null) qs.set("inQueue", String(p.inQueue));
   if (p.pools && p.pools.length > 0) qs.set("pools", p.pools.join(","));
+  for (const k of ["minTx", "maxTx", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

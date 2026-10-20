@@ -7,12 +7,21 @@
 //
 // Facets that ship LIVE (backend + proxy honor the params):
 //   • Status   — open / closed / liquidated (lifecycle), over mv_moonwell_wallets.
-//   • Position — Borrowing (hasDebt) / Supply only (noDebt), from replayed balances.
+//   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
+//     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
+//     replaces the old Position dropdown: its `?state=borrowing` reads as at
+//     least $1 and `?state=supply-only` as $0. Those two exact ranges also send
+//     the old hasDebt / noDebt flags, which say the same thing to a server that
+//     predates the USD bounds.
 //   • History  — Liquidated before (hasLiquidations, = ever liquidated).
+//   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive;
+//     lib/shared/transactions-dimension.ts).
 //   • Wallet search (exact address → the `wallet` param) and recency sort order.
 //   • Supplying / Borrowing — per-market facets over the four-market catalog;
 //     chips carry underlying symbols, the proxy maps them to market keys.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -27,20 +36,32 @@ import {
   sameStatusSet,
 } from "@/lib/moonwell/listing-visibility";
 
+/** The Transactions slider's top on Ethereum: the round number above the
+ *  busiest listed wallet (92 transactions, 20 Oct 2026). */
+const MOONWELL_TX_TOP = 100;
+
+/** The Size panel's price line on Ethereum. */
+const MOONWELL_SIZE_NOTE = "At the latest indexed price per asset, as of the listing's last refresh.";
+
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const MOONWELL_ITEMS_PER_PAGE = 20;
 
 export interface MoonwellListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). Lifecycle over mv_moonwell_wallets. */
   status: string[];
-  /** "" | "borrowing" | "supply-only" — the debt-side of the position. */
-  state: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** "" | "liquidated" — positions that were liquidated at least once. */
   liquidations: string[];
   /** Underlying symbols the position must be SUPPLYING (multi, OR). */
   supplying: string[];
   /** Underlying symbols the position must be BORROWING (multi, OR). */
   borrowing: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -53,10 +74,12 @@ export const MOONWELL_LIST_DEFAULTS: MoonwellListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
-  state: [],
+  debt: [],
+  coll: [],
   liquidations: [],
   supplying: [],
   borrowing: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -73,17 +96,17 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "liquidated", label: "Liquidated" },
 ];
 
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "supply-only", label: "Supply only" },
-];
-
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
 // One chip per market (the whole four-market catalog).
 const ASSET_OPTIONS: FilterOptionDef[] = MOONWELL_MARKETS.map((m) => ({ value: m.symbol, label: m.symbol }));
 
-export function moonwellListDimensions(): SerializableDimension<MoonwellListFilters>[] {
+/** `txTop` is the Transactions slider's top and `sizeNote` the Size panel's
+ *  price line; the Base listing passes its own. */
+export function moonwellListDimensions(
+  txTop: number = MOONWELL_TX_TOP,
+  sizeNote: string = MOONWELL_SIZE_NOTE,
+): SerializableDimension<MoonwellListFilters>[] {
   return [
     {
       id: "status",
@@ -101,16 +124,14 @@ export function moonwellListDimensions(): SerializableDimension<MoonwellListFilt
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<MoonwellListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: sizeNote,
+      debtAliases: ["state"],
+    }),
     {
       id: "supplying",
       label: "Supplying",
@@ -142,21 +163,28 @@ export function moonwellListDimensions(): SerializableDimension<MoonwellListFilt
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<MoonwellListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: txTop,
+    }),
   ];
 }
 
 /** Map the decoded selection + page onto the fetch params — the server-driven
  *  counterpart of the in-memory tier's ApplyConfig. */
 export function moonwellFiltersToFetchParams(filters: MoonwellListFilters, page: number): FetchMoonwellPositionsParams {
-  const state = filters.state[0];
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: state === "borrowing" ? true : undefined,
-    noDebt: state === "supply-only" ? true : undefined,
+    // The old Position dropdown's flags, for the two Debt ranges it maps to.
+    hasDebt: filters.debt[0] === "1-" ? true : undefined,
+    noDebt: filters.debt[0] === "-0" ? true : undefined,
+    ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...transactionBounds(filters.tx),
     supplyAssets: filters.supplying.length > 0 ? filters.supplying : undefined,
     borrowAssets: filters.borrowing.length > 0 ? filters.borrowing : undefined,
     sortBy: filters.sortBy as MoonwellPositionSort,

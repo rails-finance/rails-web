@@ -8,13 +8,19 @@
 // Facets:
 //   • Status   — open / closed / liquidated (lifecycle). 'liquidated' names
 //     only a CLOSED account — the two-axis status model.
-//   • Position — Borrowing (any negative balance) / Lending only, from the
-//     replayed pars (a negative balance IS debt; there is no Borrow action).
+//   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
+//     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
+//     replaces the old Position dropdown: its `?state=borrowing` reads as at
+//     least $1 and `?state=lending-only` as $0. Those two exact ranges also send
+//     the old hasDebt / noDebt flags (any negative par / none), which say the
+//     same thing to a server that predates the USD bounds.
 //   • Account  — Dolomite Balance (account 0) vs isolated Borrow Positions —
 //     Dolomite's own account vocabulary, a facet no other explorer has
 //     because no other subject has the two-kind account grain.
 //   • History  — Liquidated before (the orthogonal flag): open SURVIVORS
 //     match too.
+//   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive;
+//     lib/shared/transactions-dimension.ts).
 //   • Owner search (the `q` box → the `owner` param — "this owner's
 //     accounts", plural on purpose: the grain is the pair) + recency sort.
 //
@@ -23,6 +29,8 @@
 // would assert a roster — revisit when the backend exposes the market table
 // to build chips from.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -36,19 +44,31 @@ import {
   sameStatusSet,
 } from "@/lib/dolomite/listing-visibility";
 
+/** The Transactions slider's top: the round number above the busiest listed
+ *  account (357 transactions, 20 Oct 2026). */
+const DOLOMITE_TX_TOP = 400;
+
+/** The Size panel's price line. */
+const DOLOMITE_SIZE_NOTE = "At the latest Dolomite oracle price per market, as of the listing's last refresh.";
+
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const DOLOMITE_ITEMS_PER_PAGE = 20;
 
 export interface DolomiteListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). */
   status: string[];
-  /** "" | "borrowing" | "lending-only" — the debt side of the account. */
-  state: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** "" | "dolomite-balance" | "borrow-position" — the account kind. */
   accountKind: string[];
   /** "" | "liquidated" — accounts liquidated at least once (the orthogonal
    *  flag; open survivors included). */
   liquidations: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -61,9 +81,11 @@ export const DOLOMITE_LIST_DEFAULTS: DolomiteListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
-  state: [],
+  debt: [],
+  coll: [],
   accountKind: [],
   liquidations: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -78,11 +100,6 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
   { value: "liquidated", label: "Liquidated" },
-];
-
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "lending-only", label: "Lending only" },
 ];
 
 const ACCOUNT_KIND_OPTIONS: FilterOptionDef[] = [
@@ -110,16 +127,14 @@ export function dolomiteListDimensions(): SerializableDimension<DolomiteListFilt
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<DolomiteListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: DOLOMITE_SIZE_NOTE,
+      debtAliases: ["state"],
+    }),
     {
       id: "accountKind",
       label: "Account",
@@ -141,23 +156,30 @@ export function dolomiteListDimensions(): SerializableDimension<DolomiteListFilt
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<DolomiteListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: DOLOMITE_TX_TOP,
+    }),
   ];
 }
 
 /** Map the decoded selection + page onto the fetch params — the server-driven
  *  counterpart of the in-memory tier's ApplyConfig. */
 export function dolomiteFiltersToFetchParams(filters: DolomiteListFilters, page: number): FetchDolomitePositionsParams {
-  const state = filters.state[0];
   const kind = filters.accountKind[0];
   const owner = filters.q.trim();
   return {
     owner: owner ? owner : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: state === "borrowing" ? true : undefined,
-    noDebt: state === "lending-only" ? true : undefined,
+    // The old Position dropdown's flags, for the two Debt ranges it maps to.
+    hasDebt: filters.debt[0] === "1-" ? true : undefined,
+    noDebt: filters.debt[0] === "-0" ? true : undefined,
+    ...usdBounds(filters),
     kind: kind === "dolomite-balance" ? "balance" : kind === "borrow-position" ? "borrow" : undefined,
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as DolomitePositionSort,
     sortOrder: filters.sortOrder,
     limit: DOLOMITE_ITEMS_PER_PAGE,
