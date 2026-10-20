@@ -40,7 +40,9 @@ same change.
 - `npx tsc --noEmit` — typecheck (the correctness gate; run before committing).
   `pnpm check` runs it after the static checks (`check:prov`, `check:receipts`,
   `check:routes`, `check:locale`, `check:dead` and the rest).
-- `pnpm format` — Prettier. No test framework configured.
+- `pnpm format` — Prettier.
+- `npm test` — the unit tests in `scripts/test/*.test.mjs` (`node:test`, type stripping; a
+  tested module imports nothing through `@/`).
 - `npm run verify:preflight` — **run this before any browser verifier.** A serving
   port is not a working server: a corrupted `.next` answers every route with a 500
   whose stack trace points into a real module, and the suite behind it then reports

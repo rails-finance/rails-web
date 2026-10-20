@@ -10,6 +10,7 @@
     "format:check": "prettier --check .",
     "build:svg": "node ../svg-build-tools/scripts/build-svg-templates.js",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --test scripts/test/*.test.mjs",
     "check:prov": "node scripts/check-prov-scope.mjs",
     "check:register": "node scripts/check-explainer-register.mjs",
     "check:receipts": "node scripts/check-receipt-summaries.mjs",
