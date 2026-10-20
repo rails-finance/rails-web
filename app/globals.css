@@ -818,6 +818,19 @@ body {
   .evt-has-chev:not(:has([data-evt-head-chev])) .evt-meta {
     padding-right: 3rem;
   }
+  /* A note row's caption (note-row-shell.tsx, ui-jobs 403) is one line: the
+     words, a dot, the date, the chevron. The dot is drawn here, out of the
+     row's text. */
+  [data-note-caption] .evt-meta {
+    order: 0;
+    flex-basis: auto;
+    margin-left: 0;
+  }
+  [data-note-caption] > .evt-meta::before {
+    content: "\00B7";
+    margin-right: 0.375rem;
+    color: var(--text-muted);
+  }
 }
 /* An event card's header that places its chevron after the action word
    (`EventHeadChevron`) hides the card's fallback at the right end. */

@@ -219,6 +219,9 @@ export const RATE_NOTE_T1 = {
   and: "and",
   /** After the count in a group's spoken name: "9 changes". */
   changes: "changes",
+  /** The row's spoken name opens with what it is (ui-jobs 403): "Market note,
+   *  Savings rate increased, 3.80%". */
+  name: "Market note",
 } as const;
 
 /** The rate a note states, in percent a year, before and after; null on a

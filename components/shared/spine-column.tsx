@@ -195,9 +195,11 @@ export interface SpineColumnProps {
    *  every change went that way, "both" (a neutral double-headed arrow)
    *  otherwise. Overrides the direction `rateSpan` gives. */
   rateMoves?: "up" | "down" | "both";
-  /** The flank's rate pill in the delegate's pink with the people glyph (a
-   *  rate a delegate set); unset, the neutral pill of an owner's rate. */
-  rateTone?: "delegate";
+  /** The flank's rate pill in the delegate's pink: with the people glyph (a
+   *  rate a delegate set), the gavel (a market note's rate governance set) or
+   *  no glyph (a market note's rate the protocol's formula set; ui-jobs 403);
+   *  unset, the neutral pill of an owner's rate. */
+  rateTone?: "delegate" | "governance" | "formula";
   /** The receipt the flank's rate traces: `echo` where another figure on the
    *  card registers it (the detail grid's rate). */
   rateProv?: { info: Provenance; value: string; echo?: boolean };
@@ -967,8 +969,17 @@ export function SpineColumn({
     const delta = after - before;
     const moved = before > 0 && Math.abs(delta).toFixed(2) !== "0.00";
     const direction = rateMoves ?? (!moved ? "flat" : delta > 0 ? "up" : "down");
-    const Shell = rateTone === "delegate" ? DelegateRatePillShell : RatePillShell;
     const text = `${after.toFixed(2)}%`;
+    const pill = (body: ReactNode) =>
+      rateTone ? (
+        <DelegateRatePillShell
+          glyph={rateTone === "delegate" ? "people" : rateTone === "governance" ? "gavel" : "none"}
+        >
+          {body}
+        </DelegateRatePillShell>
+      ) : (
+        <RatePillShell>{body}</RatePillShell>
+      );
     return (
       <>
         {direction === "flat" ? (
@@ -982,15 +993,15 @@ export function SpineColumn({
           className="justify-self-start whitespace-nowrap pl-5 leading-[0] tabular-nums"
           data-spine-rate={direction}
         >
-          <Shell>
-            {rateProv ? (
+          {pill(
+            rateProv ? (
               <Prov echo={rateProv.echo} info={rateProv.info} value={rateProv.value}>
                 {text}
               </Prov>
             ) : (
               text
-            )}
-          </Shell>
+            ),
+          )}
         </span>
       </>
     );

@@ -10,9 +10,10 @@
 // A note stays a note: these rows sit beside the event rows and are counted
 // in nothing. The "Market notes" switch in Display hides them all.
 //
-// Below 640px a row's spine cell is hidden (app/globals.css, `.spine-row`), so
-// the gap draws the diamond on the line above the card, where an event row's
-// node stands.
+// Below 640px a rate note or a run draws as an event row does, its node and
+// pill on the spine and its words as the caption under them (ui-jobs 403).
+// Any other row's spine cell is hidden there (app/globals.css, `.spine-row`),
+// so the gap draws the diamond on the line above that card.
 
 import { useMemo, type CSSProperties } from "react";
 
@@ -60,12 +61,14 @@ export const noteRowHeight = (cardPad: number) => 2 * cardPad + NOTE_HEADER;
 const SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
 
 /** The row's node on a phone, where the row's spine cell is hidden: the
- *  hollow diamond on the line, a rate note's pill on its flank. */
+ *  hollow diamond on the line. A rate note and a run are timeline rows at
+ *  both widths (`NoteRowShell`'s T1 shape), whose own cell stands on a phone,
+ *  so they take none. */
 function PhoneNode({ item }: { item: GapItem }) {
-  const spine = isLiveNoteGroup(item) ? undefined : noteSpine(item, true);
+  if (!isLiveNoteGroup(item) && noteSpine(item)) return null;
   return (
     <div aria-hidden className="pb-1 pt-2 sm:hidden" data-note-phone-node="">
-      <SpineColumn icon="market" isLast={false} tip={null} bare {...spine} />
+      <SpineColumn icon="market" isLast={false} tip={null} bare />
     </div>
   );
 }

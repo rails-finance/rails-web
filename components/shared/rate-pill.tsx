@@ -39,6 +39,33 @@ export function UsersGlyph() {
   );
 }
 
+/** The governance gavel with a tick (lucide `gavel`, a tick added): inside the
+ *  pink pill of a rate governance set for every holder at once (a market
+ *  note's, ui-jobs 403), where the people glyph would say a third party acted
+ *  on this position. */
+export function GavelGlyph() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381" />
+      <path d="m16 16 6-6" />
+      <path d="m21.5 10.5-8-8" />
+      <path d="m8 8 6-6" />
+      <path d="m8.5 7.5 8 8" />
+      <path d="M15.746 19.413l2 2 4-4" />
+    </svg>
+  );
+}
+
 /** Visual shell for an individual (owner-set) rate pill — muted rb-500 tint,
  *  mirroring the visual weight of the pink delegate pill. */
 export function RatePillShell({ children }: { children: ReactNode }) {
@@ -50,11 +77,19 @@ export function RatePillShell({ children }: { children: ReactNode }) {
 }
 
 /** Visual shell for a delegate (batch-manager-set) rate pill — pink with the
- *  people glyph (pink = external party, color-grammar.md §5). */
-export function DelegateRatePillShell({ children }: { children: ReactNode }) {
+ *  people glyph (pink = external party, color-grammar.md §5). A market note's
+ *  rate takes the same pink with the gavel where governance set it, and no
+ *  glyph where the protocol's own formula did (ui-jobs 403). */
+export function DelegateRatePillShell({
+  children,
+  glyph = "people",
+}: {
+  children: ReactNode;
+  glyph?: "people" | "gavel" | "none";
+}) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-400 text-xs font-bold">
-      <UsersGlyph />
+      {glyph === "people" ? <UsersGlyph /> : glyph === "gavel" ? <GavelGlyph /> : null}
       {children}
     </span>
   );

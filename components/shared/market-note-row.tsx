@@ -217,7 +217,7 @@ export function MarketNoteRow({
       <NoteRowShell
         icon="market"
         isLast={isLast}
-        label={`${head}, ${pct(span[0])} ${RATE_NOTE_T1.to} ${pct(span[1])}`}
+        label={`${RATE_NOTE_T1.name}, ${head}, ${pct(span[1])}`}
         marker={{ attr: "data-market-note", value: note.id }}
         // The arrow from the move itself: a rate that rose from 0.00% rose.
         spine={noteSpine(note)}
@@ -251,19 +251,32 @@ const pct = (r: number) => `${r.toFixed(2)}%`;
 /** The head's words, as an event row's T1 states its kind. */
 function T1Words({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex max-w-full shrink-0 items-center text-sm text-rb-500" data-head-kind="">
+    <span className="inline-flex max-w-full shrink-0 items-center text-sm text-rb-500 max-sm:text-xs" data-head-kind="">
       {children}
     </span>
   );
 }
 
+/** Who set a rate note's rate, for the pill's glyph (ui-jobs 403): governance
+ *  (Sky's Savings Rate, a vault's terms, MakerDAO's stability fee) takes the
+ *  gavel; a rate the protocol's formula sets (Polaris's primary rate, an Aave
+ *  family reserve's rate) takes none. */
+function rateSetter(note: MarketNote): "governance" | "formula" {
+  return note.kind === "vault-terms" || note.protocol === "makerdao" ? "governance" : "formula";
+}
+
 /** The spine's flank on a rate note: the rate after in the pink pill (a third
  *  party set it), the arrow the way it moved. */
-function rateFlank(span: [number, number], info: Provenance, moves?: "up" | "down" | "both"): NoteSpine {
+function rateFlank(
+  span: [number, number],
+  info: Provenance,
+  tone: "governance" | "formula",
+  moves?: "up" | "down" | "both",
+): NoteSpine {
   return {
     rateSpan: span,
     rateMoves: moves,
-    rateTone: "delegate",
+    rateTone: tone,
     rateProv: { info, value: pct(span[1]) },
   };
 }
@@ -273,23 +286,24 @@ type NoteSpine = NonNullable<Parameters<typeof NoteRowShell>[0]["spine"]>;
 /** The spine's flank on a rate note or a run: the rate after the last change
  *  in the pink pill, the arrow the note or every member moved it (the
  *  double-headed arrow where a run's members went both ways). Undefined on a
- *  note that states no rate. `echo` where the row's own flank registers the
- *  receipt (the phone's node, note-gap.tsx). */
-export function noteSpine(item: MarketNote | NoteRun, echo = false): NoteSpine | undefined {
-  const flank = (span: [number, number], info: Provenance, moves?: "up" | "down" | "both") => {
-    const f = rateFlank(span, info, moves);
-    return echo && f.rateProv ? { ...f, rateProv: { ...f.rateProv, echo: true } } : f;
-  };
+ *  note that states no rate, which is the note that keeps the boxed row. */
+export function noteSpine(item: MarketNote | NoteRun): NoteSpine | undefined {
   if (isNoteRun(item)) {
     const r = noteRunReading(item);
     const moves = r.move === "increased" ? "up" : r.move === "decreased" ? "down" : "both";
-    return flank([r.from, r.to], rateProvOf(r.members[r.members.length - 1], "to"), moves);
+    const last = r.members[r.members.length - 1];
+    return rateFlank([r.from, r.to], rateProvOf(last, "to"), rateSetter(last), moves);
   }
   const span = noteRateSpan(item);
   if (!span || !noteT1Words(item)) return undefined;
   const move = noteRateMove(item);
   // The arrow from the move itself: a rate that rose from 0.00% rose.
-  return flank(span, rateProvOf(item, "to"), move === "increased" ? "up" : move === "decreased" ? "down" : undefined);
+  return rateFlank(
+    span,
+    rateProvOf(item, "to"),
+    rateSetter(item),
+    move === "increased" ? "up" : move === "decreased" ? "down" : undefined,
+  );
 }
 
 /** The receipt behind a rate note's earlier or later rate. */
@@ -327,7 +341,7 @@ export function NoteRunRow({ run, isLast = false }: { run: NoteRun; isLast?: boo
     <NoteRowShell
       icon="market"
       isLast={isLast}
-      label={`${head}, ${changesWord(run.notes.length)}, ${noteRunMovementWords(run)}, ${range}`}
+      label={`${RATE_NOTE_T1.name}, ${head}, ${changesWord(run.notes.length)}, ${pct(r.to)}, ${range}`}
       marker={{ attr: "data-market-note-run", value: run.id }}
       spine={noteSpine(run)}
       header={
@@ -368,8 +382,8 @@ function RunLineHead({ note, words }: { note: MarketNote; words: RateNoteWords }
   const span = noteRateSpan(note) as [number, number];
   return (
     <>
-      <span className="text-sm text-rb-500">{words[noteRateMove(note)]}</span>
-      <span className="inline-flex items-center gap-1 text-sm">
+      <span className="min-w-0 truncate text-sm text-rb-500 max-sm:text-xs">{words[noteRateMove(note)]}</span>
+      <span className="inline-flex shrink-0 items-center gap-1 text-sm max-sm:text-xs">
         <Prov info={rateProvOf(note, "from")} value={pct(span[0])}>
           <span className="tabular-nums text-rb-500">{pct(span[0])}</span>
         </Prov>
@@ -380,10 +394,15 @@ function RunLineHead({ note, words }: { note: MarketNote; words: RateNoteWords }
           <span className="tabular-nums font-semibold text-foreground">{pct(span[1])}</span>
         </Prov>
       </span>
-      <span className="ml-auto text-xs">
-        <EventDateContext.Provider value={dayStamp(note.to.timestamp)}>
-          <EventTime ts={note.to.timestamp} />
-        </EventDateContext.Provider>
+      {/* Under 640px the day alone, so the line keeps its date beside its
+          words (ui-jobs 403); the change's panel states the time. */}
+      <span className="ml-auto shrink-0 whitespace-nowrap text-xs">
+        <span className="max-sm:hidden">
+          <EventDateContext.Provider value={dayStamp(note.to.timestamp)}>
+            <EventTime ts={note.to.timestamp} />
+          </EventDateContext.Provider>
+        </span>
+        <span className="sm:hidden">{dayStamp(note.to.timestamp)}</span>
       </span>
     </>
   );
@@ -394,14 +413,6 @@ function noteRunDates(members: MarketNote[]): string {
   const a = dayStamp(members[0].to.timestamp) ?? "";
   const b = dayStamp(members[members.length - 1].to.timestamp) ?? "";
   return a === b ? a : `${a} – ${b}`;
-}
-
-/** The run's movement in words: "4.50% to 3.80%", the range after it where
- *  the run went outside its two ends. */
-function noteRunMovementWords(run: NoteRun): string {
-  const r = noteRunReading(run);
-  const net = `${pct(r.from)} ${RATE_NOTE_T1.to} ${pct(r.to)}`;
-  return r.showRange ? `${net}, ${RATE_NOTE_T1.between} ${pct(r.low)} ${RATE_NOTE_T1.and} ${pct(r.high)}` : net;
 }
 
 const changesWord = (n: number) => `${n.toLocaleString("en-US")} ${RATE_NOTE_T1.changes}`;
@@ -590,8 +601,10 @@ function NoteLine({ note, headline }: { note: MarketNote; headline?: ReactNode }
             }
           }}
         >
-          <div className="flex items-center gap-2 pr-5">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 py-1.5 pl-5">
+          <div className={`flex items-center gap-2 pr-5${headline ? " max-sm:gap-1 max-sm:pr-3" : ""}`}>
+            <div
+              className={`flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 py-1.5 pl-5${headline ? " max-sm:flex-nowrap max-sm:gap-x-1.5 max-sm:pl-4" : ""}`}
+            >
               {headline ?? <NoteHeadline note={note} body={body} />}
             </div>
             <ExpandChevron isOpen={open} group="evt" className="shrink-0" />
