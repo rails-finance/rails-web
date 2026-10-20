@@ -10,10 +10,12 @@
 // and at least $1 is the borrowing set, so the Debt range replaces a
 // Borrowing / Supply only dropdown. `debtRangeFromUrl` reads that dropdown's
 // old values, so a shared link keeps its meaning: `borrowing` is at least $1,
-// `supply-only`, `collateral-only` and `lending-only` are $0. A registry that
-// had the dropdown on another param names it in the Debt dimension's `aliases`.
+// `supply-only` (Aave V4's `supplyOnly`), `collateral-only` and `lending-only`
+// are $0. A registry that had the dropdown on another param names it in the
+// Debt dimension's `aliases`.
 // A listing with one side (a lender's deposits, a spoke's supply) passes
-// `sides` and `collLabel`; the note sits on the last range drawn.
+// `sides` and `collLabel`; the note sits on the last range drawn. An in-memory
+// listing filters its rows with `rangeAdmits`.
 
 import type { ReactNode } from "react";
 import { decodeRange, normalizeRange, rangeChipLabel } from "@/components/shared/filter-bar/types";
@@ -25,9 +27,8 @@ export const SIZE_USD_TOP = 1_000_000;
 /** A Debt selection from the URL: the old dropdown's values as their range,
  *  anything else as a range value. */
 export function debtRangeFromUrl(values: string[]): string[] {
-  if (values.includes("collateral-only") || values.includes("supply-only") || values.includes("lending-only")) {
-    return ["-0"];
-  }
+  const noDebt = ["collateral-only", "supply-only", "supplyOnly", "lending-only"];
+  if (values.some((v) => noDebt.includes(v))) return ["-0"];
   if (values.includes("borrowing")) return ["1-"];
   return normalizeRange(values);
 }
@@ -102,4 +103,13 @@ export function usdBounds(filters: { debt: string[]; coll: string[] }): UsdBound
     minCollUsd: coll.min ?? undefined,
     maxCollUsd: coll.max ?? undefined,
   };
+}
+
+/** An in-memory listing's predicate for one range selection: does `figure`
+ *  sit within the inclusive bounds? A null figure falls out of any bound. */
+export function rangeAdmits(values: string[], figure: number | null | undefined): boolean {
+  const { min, max } = decodeRange(values);
+  if (min == null && max == null) return true;
+  if (figure == null || !Number.isFinite(figure)) return false;
+  return (min == null || figure >= min) && (max == null || figure <= max);
 }

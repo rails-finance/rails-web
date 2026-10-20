@@ -33,10 +33,9 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { MountedAge } from "@/components/shared/mounted-age";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
-import { joinOptionLabels } from "@/components/shared/filter-bar/types";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { BaseListFilters, ListDimension } from "@/lib/shared/list-filter";
+import { rangeAdmits, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import type { CensusFigures } from "@/lib/home/census-leg";
@@ -145,11 +144,14 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
 // ── Filters ──────────────────────────────────────────────────────────────────
 
 interface ArbitrumPositionsFilters extends BaseListFilters {
-  /** A whole-dollar lower bound on collateral plus supply. */
-  size?: string;
+  /** Debt range in USD, one encodeRange value or [] for no bound. */
+  debt: string[];
+  /** Collateral-plus-supply range in USD, as `debt`; read from the old
+   *  `size` bracket too. */
+  coll: string[];
 }
 
-const DEFAULTS: ArbitrumPositionsFilters = { q: "", sortBy: "activity", sortOrder: "desc" };
+const DEFAULTS: ArbitrumPositionsFilters = { q: "", sortBy: "activity", sortOrder: "desc", debt: [], coll: [] };
 
 const SORTS: SortOption[] = [
   { value: "activity", label: "Last activity" },
@@ -164,27 +166,38 @@ const collateralOf = (c: Card) => (c.comet ? c.comet.market.collateralUsd : c.ro
 const debtOf = (c: Card) => (c.comet ? c.comet.market.borrowUsd : c.row.totalDebtUsd);
 const supplyOf = (c: Card) => (c.comet ? c.comet.market.supplyUsd : c.row.totalSupplyUsd);
 
-/** Collateral plus the lent side: what the card has in, in dollars. */
-const sizeOf = (c: Card) => (collateralOf(c) ?? 0) + (supplyOf(c) ?? 0);
+/** Collateral plus the lent side: what the card has in, in dollars; null
+ *  when the row holds neither figure. */
+const collateralRangeOf = (c: Card): number | null => {
+  const coll = collateralOf(c);
+  const supply = supplyOf(c);
+  return coll == null && supply == null ? null : (coll ?? 0) + (supply ?? 0);
+};
 
-const SIZE_BRACKETS = [1000, 10000, 100000] as const;
-const SIZE_OPTIONS: FilterOptionDef[] = SIZE_BRACKETS.map((b) => ({
-  value: String(b),
-  label: `$${b.toLocaleString("en-US")} or more`,
-}));
+/** The Size panel's price line. */
+const SIZE_NOTE = "At each protocol's own oracle at the row's read block.";
+
+/** The Size panel over the cards: Debt, and Collateral as collateral plus
+ *  supply. The old `?size=1000` bracket reads as `coll=1000-`. */
 function dimensions(): ListDimension<ArbitrumPositionsFilters, Card>[] {
+  const [debt, coll] = sizeDimensions<ArbitrumPositionsFilters>({
+    getDebt: (f) => f.debt,
+    setDebt: (f, d) => ({ ...f, debt: d }),
+    getColl: (f) => f.coll,
+    setColl: (f, c) => ({ ...f, coll: c }),
+    panelNote: SIZE_NOTE,
+  });
   return [
+    { ...debt, matches: (c, v) => rangeAdmits(v, debtOf(c)) },
     {
-      id: "size",
-      label: "Size",
-      group: "Size",
-      cardinality: "single",
-      param: "size",
-      options: SIZE_OPTIONS,
-      get: (f) => (f.size ? [f.size] : []),
-      set: (f, v) => ({ ...f, size: v[0] || undefined }),
-      chipLabel: (vals, opts) => `Size: ${joinOptionLabels(vals, opts)}`,
-      matches: (r, v) => sizeOf(r) >= Number(v[0]),
+      ...coll,
+      aliases: ["size"],
+      set: (f, v) =>
+        coll.set(
+          f,
+          v.map((x) => (/^\d+$/.test(x) ? `${x}-` : x)),
+        ),
+      matches: (c, v) => rangeAdmits(v, collateralRangeOf(c)),
     },
   ];
 }

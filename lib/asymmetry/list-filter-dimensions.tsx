@@ -3,8 +3,14 @@
 // of them once and filters client-side. Declares the categorical facets (Status,
 // Collateral branch) as ListDimensions over the in-memory row set; sort + search are
 // the non-categorical controls. All values are read from the chain (replayed status, raw
-// collateral / USDaf debt, user-set interest rate). No collateral-ratio / USD facet —
-// Asymmetry ships no oracle here, so those interpreted axes can't be offered.
+// collateral / USDaf debt, user-set interest rate).
+//
+// Size is the Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts):
+// debt is USDaf at face value, a dollar a coin for this facet, and collateral is
+// the row's collateralUsd at the branch's last indexed price, so an unpriced
+// branch falls out of any Collateral bound (an emptied trove reads $0).
+// Transactions is a range over the row's txCount
+// (lib/shared/transactions-dimension.ts).
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { indexZombie } from "@/lib/asymmetry/asset-catalog";
@@ -12,10 +18,18 @@ import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
+import { rangeAdmits, sizeDimensions } from "@/lib/shared/size-dimensions";
+import { transactionsDimension } from "@/lib/shared/transactions-dimension";
 
 export interface AsymmetryListFilters extends BaseListFilters {
   status: string[];
   branches: string[];
+  /** Debt range in USD, one encodeRange value or [] for no bound. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. */
+  coll: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 export const ASYMMETRY_LIST_DEFAULTS: AsymmetryListFilters = {
@@ -24,7 +38,17 @@ export const ASYMMETRY_LIST_DEFAULTS: AsymmetryListFilters = {
   sortOrder: "desc",
   status: [],
   branches: [],
+  debt: [],
+  coll: [],
+  tx: [],
 };
+
+/** The Transactions slider's top: the round number above the busiest trove
+ *  (267 transactions in the api's own count over all 291 troves, 20 Oct 2026). */
+const ASYMMETRY_TX_TOP = 300;
+
+/** The Size panel's price line. */
+const ASYMMETRY_SIZE_NOTE = "Collateral at the branch's last indexed price; debt in USDaf at face value.";
 
 export const ASYMMETRY_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
@@ -46,6 +70,10 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
 ];
 
 const lifecycleOf = (row: AsymmetryTroveSummary): string => (indexZombie(row.status, row.debt) ? "zombie" : row.status);
+
+/** Collateral in USD: $0 once the trove holds none, null while its branch is
+ *  unpriced. */
+const collUsdOf = (row: AsymmetryTroveSummary): number | null => (row.collateral > 0 ? row.collateralUsd : 0);
 
 export function asymmetryListDimensions(
   rows: AsymmetryTroveSummary[],
@@ -83,6 +111,24 @@ export function asymmetryListDimensions(
       get: (f) => f.branches,
       set: (f, v) => ({ ...f, branches: v }),
       matches: (row, v) => v.includes(row.collateralType),
+    },
+    ...sizeDimensions<AsymmetryListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: ASYMMETRY_SIZE_NOTE,
+    }).map((d) => ({
+      ...d,
+      matches: (row: AsymmetryTroveSummary, v: string[]) => rangeAdmits(v, d.id === "debt" ? row.debt : collUsdOf(row)),
+    })),
+    {
+      ...transactionsDimension<AsymmetryListFilters>({
+        get: (f) => f.tx,
+        set: (f, tx) => ({ ...f, tx }),
+        top: ASYMMETRY_TX_TOP,
+      }),
+      matches: (row, v) => rangeAdmits(v, row.txCount),
     },
   ];
 }

@@ -15,9 +15,17 @@
 // / liquidation history / Hub / Spoke / Supplying / Borrowing / Dust), same market
 // topology + pruning, now expressed as SerializableDimension. The wallet/ENS search
 // rides the driver's `q`; `aaveV4FiltersToFetchParams` parses it back out.
+//
+// Size is the Debt and Supply ranges in USD (lib/shared/size-dimensions.ts), sent
+// as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd; the server values supply
+// as the collateral side. The Debt range replaces the ladder's Borrowing and
+// Supply only rungs: `?state=borrowing` reads as at least $1 and
+// `?state=supplyOnly` as $0, and those two exact ranges still send the old
+// hasDebt / noDebt flags. Liquidatable keeps the `state` param on its own.
 
 import Link from "next/link";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { joinOptionLabels } from "@/components/shared/filter-bar/types";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -27,7 +35,6 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
   AAVE_V4_DUST_USD,
   effectiveAaveV4Show,
-  type AaveV4Debt,
   type AaveV4Health,
   type AaveV4Liquidations,
   type AaveV4Show,
@@ -51,6 +58,9 @@ import {
  *  busiest position (861 transactions, 16 Oct 2026). */
 const AAVE_V4_TX_TOP = 1000;
 
+/** The Size panel's price line on Ethereum. */
+const AAVE_V4_SIZE_NOTE = "At the Aave oracle at the latest read.";
+
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const AAVE_V4_ITEMS_PER_PAGE = 20;
 
@@ -63,7 +73,11 @@ export interface AaveV4ListFilters extends BaseListFilters {
   hubs: string[];
   supplyAssets: string[];
   borrowAssets: string[];
-  debt: AaveV4Debt;
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
+  debt: string[];
+  /** Supply range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   health: AaveV4Health;
   liquidations: AaveV4Liquidations;
   statuses?: AaveV4StatusBucket[];
@@ -74,7 +88,7 @@ export interface AaveV4ListFilters extends BaseListFilters {
 
 // Resting view = every market, all sides, and the positions still open — the last of those a
 // CONTEXTUAL default that relaxes to every status once the search names a holder
-// (listing-visibility.ts). `statuses`/`show`/`debt`/`health`/`liquidations` at their defaults
+// (listing-visibility.ts). `statuses`/`show`/`debt`/`coll`/`health`/`liquidations` at their defaults
 // map to NO params + NO chips, so both views keep clean URLs.
 export const AAVE_V4_LIST_DEFAULTS: AaveV4ListFilters = {
   q: "",
@@ -84,7 +98,8 @@ export const AAVE_V4_LIST_DEFAULTS: AaveV4ListFilters = {
   hubs: [],
   supplyAssets: [],
   borrowAssets: [],
-  debt: "all",
+  debt: [],
+  coll: [],
   health: "all",
   liquidations: "all",
 };
@@ -188,6 +203,7 @@ export function aaveV4ListDimensions(
   filters: AaveV4ListFilters,
   universe: AaveV4AssetUniverseEntry[] | undefined,
   txTop: number = AAVE_V4_TX_TOP,
+  sizeNote: string = AAVE_V4_SIZE_NOTE,
 ): SerializableDimension<AaveV4ListFilters>[] {
   const spokeOptions = spokeOptionsForHubs(filters.hubs);
   const { supplyOptions, borrowOptions } = assetSideOptions(universe ?? []);
@@ -218,39 +234,17 @@ export function aaveV4ListDimensions(
     chipLabel: (vals, opts) => `Status: ${joinOptionLabels(canonicalStatuses(vals), opts)}`,
   };
 
-  // Position state — one mutually-exclusive axis off the health factor. Stored
-  // across the internal `debt` + `health` fields and serialized to a single
-  // `state` param (borrowing / supplyOnly / liquidatable), so the URL is clean and
-  // the page→backend mapping (noDebt / hasDebt / healthBelow) is unchanged.
+  // Liquidatable: HF below 1.0, a factual on-chain state. The `state` param
+  // once also carried Borrowing / Supply only, which the Debt range reads now.
   const state: SerializableDimension<AaveV4ListFilters> = {
     id: "state",
-    label: "Position state",
+    label: "Health",
     group: "Status",
     cardinality: "single",
     param: "state",
-    options: [
-      { value: "supplyOnly", label: "Supply only" },
-      { value: "borrowing", label: "Borrowing" },
-      { value: "liquidatable", label: "Liquidatable" },
-    ],
-    get: (f) => {
-      if (f.health === "underwater") return ["liquidatable"];
-      if (f.debt === "noDebt") return ["supplyOnly"];
-      if (f.debt === "withDebt") return ["borrowing"];
-      return [];
-    },
-    set: (f, values) => {
-      switch (values[0]) {
-        case "liquidatable":
-          return { ...f, debt: "all", health: "underwater" };
-        case "supplyOnly":
-          return { ...f, debt: "noDebt", health: "all" };
-        case "borrowing":
-          return { ...f, debt: "withDebt", health: "all" };
-        default:
-          return { ...f, debt: "all", health: "all" };
-      }
-    },
+    options: [{ value: "liquidatable", label: "Liquidatable" }],
+    get: (f) => (f.health === "underwater" ? ["liquidatable"] : []),
+    set: (f, values) => ({ ...f, health: values[0] === "liquidatable" ? "underwater" : "all" }),
     chipLabel: bareLabel,
   };
 
@@ -344,7 +338,17 @@ export function aaveV4ListDimensions(
     top: txTop,
   });
 
-  return [status, state, liquidated, hubs, spokes, supplying, borrowing, transactions, dust];
+  const size = sizeDimensions<AaveV4ListFilters>({
+    getDebt: (f) => f.debt,
+    setDebt: (f, debt) => ({ ...f, debt }),
+    getColl: (f) => f.coll,
+    setColl: (f, coll) => ({ ...f, coll }),
+    panelNote: sizeNote,
+    debtAliases: ["state"],
+    collLabel: "Supply",
+  });
+
+  return [status, state, liquidated, hubs, spokes, supplying, borrowing, ...size, transactions, dust];
 }
 
 /** Map the decoded selection + page onto the spoke-positions fetch params — the
@@ -356,8 +360,10 @@ export function aaveV4FiltersToFetchParams(filters: AaveV4ListFilters, page: num
     hubs: filters.hubs,
     supplyAssets: filters.supplyAssets,
     borrowAssets: filters.borrowAssets,
-    hasDebt: filters.debt === "withDebt",
-    noDebt: filters.debt === "noDebt",
+    // The old Position state flags, for the two Debt ranges they meant.
+    hasDebt: filters.debt[0] === "1-",
+    noDebt: filters.debt[0] === "-0",
+    ...usdBounds(filters),
     hasLiquidations: filters.liquidations === "with" ? true : filters.liquidations === "without" ? false : undefined,
     healthBelow: filters.health === "underwater" ? 1.0 : undefined,
     // Dust → server floor; the open/closed axis is the `status` filter, not a USD cut.

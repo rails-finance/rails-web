@@ -24,13 +24,16 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { debtRangeFromUrl, usdBounds, sizeDimensions } = await import("../../lib/shared/size-dimensions.ts");
+const { debtRangeFromUrl, usdBounds, sizeDimensions, rangeAdmits } = await import(
+  "../../lib/shared/size-dimensions.ts"
+);
 
 test("the old dropdown's values read as their Debt range", () => {
   assert.deepEqual(debtRangeFromUrl(["borrowing"]), ["1-"]);
   assert.deepEqual(debtRangeFromUrl(["supply-only"]), ["-0"]);
   assert.deepEqual(debtRangeFromUrl(["collateral-only"]), ["-0"]);
   assert.deepEqual(debtRangeFromUrl(["lending-only"]), ["-0"]);
+  assert.deepEqual(debtRangeFromUrl(["supplyOnly"]), ["-0"]);
 });
 
 test("one side only: the range drawn carries the note and its own word", () => {
@@ -93,4 +96,16 @@ test("the Debt dimension writes the alias as its range and reads `state` as an a
   assert.deepEqual(debt.set({ debt: [], coll: [] }, ["borrowing"]).debt, ["1-"]);
   assert.equal(debt.chipLabel(["1000-50000"], []), "Debt: $1K–$50K");
   assert.equal(coll.chipLabel(["10000-"], []), "Collateral: ≥ $10K");
+});
+
+test("rangeAdmits: inclusive bounds over an in-memory figure; null falls out", () => {
+  assert.equal(rangeAdmits(["1000-50000"], 1000), true);
+  assert.equal(rangeAdmits(["1000-50000"], 50000), true);
+  assert.equal(rangeAdmits(["1000-50000"], 999.99), false);
+  assert.equal(rangeAdmits(["1-"], 0), false);
+  assert.equal(rangeAdmits(["-0"], 0), true);
+  assert.equal(rangeAdmits(["-0"], 12), false);
+  assert.equal(rangeAdmits(["10000-"], null), false);
+  assert.equal(rangeAdmits([], null), true);
+  assert.equal(rangeAdmits(["junk"], 5), true);
 });
