@@ -81,11 +81,6 @@ export function liquityShareCardModel(
  *  here, and a wallet holding more than one page states its count and no
  *  totals, exactly as the strip does.
  *
- *  The nearest-floor stat names the BRANCH rather than the trove. On the page
- *  that label is a link a reader follows, so it carries the trove id; on a card
- *  there is nothing to follow, and a 6+4 slice of a uint256 identifies the
- *  trove to nobody while costing the line its width.
- *
  *  `null` — which the share route turns into the static roster card — for a
  *  wallet with no troves, and for an absent price read. The branch feeds are
  *  not an enhancement on this card: the three branches hold three different
@@ -105,7 +100,5 @@ export function liquityV2HolderCardModel(
     subject,
     total,
     plural: positionNounPlural("liquity-v2"),
-    // "rETH 0x1a2b…9f0c" → "rETH".
-    nearestLabel: (label) => label.split(" ")[0],
   });
 }

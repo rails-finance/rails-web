@@ -16,23 +16,15 @@
 // each stated in dollars at each Comet's `getPrice`, the ETH-quoted Comet
 // converted at the read's `ethUsd` (lib/compound-arbitrum/usd.ts), wearing ≈,
 // with the per-Comet amounts beneath.
-//
-// The nearest-floor line ranks the open borrowing Comets by the share of the
-// absorb line their debt has reached (debt value ÷ liquidation capacity, the
-// "Absorb line reached" row of the card's risk slot,
-// components/protocol/compound/compound-risk-slot.tsx), stated with the same
-// `capacityShare` wording.
 
-import type { HolderLeg, HolderNearest, HolderStripProps } from "@/components/shared/holder-strip";
+import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance } from "@/components/shared/provenance";
 import type { CometMarket } from "@/lib/compound/asset-catalog";
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
 import { scaleCompoundChainBalance, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
-import { capacityShare } from "@/lib/shared/capacity-share";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { compoundArbitrumUsd } from "./usd";
-import { compoundArbitrumMarketHref } from "./routes";
 
 /** One Comet on the overview: the read's answer for it (null where it holds
  *  nothing now, or the read failed) and the status its card states. */
@@ -50,9 +42,6 @@ const LEG_TIP = {
   debt: "An estimate: each Comet's borrowed base, interest included, at that Comet's price feed as of this read, added across the Comets.",
   lent: "An estimate: each Comet's lent base, interest included, at that Comet's price feed as of this read, added across the Comets.",
 } as const;
-
-const NEAREST_TIP =
-  "Each Comet absorbs an account on its line alone; the wallet has no line. This is the open borrowing Comet whose debt has reached the largest share of its absorb line, at the Comet's prices as of this read.";
 
 const count = (n: number): string => n.toLocaleString("en-US");
 
@@ -78,27 +67,6 @@ function legProv(what: string, figure: string, block: number, comets: string[]):
   };
 }
 
-function nearestProv(c: CompoundMarketChainResponse, label: string): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: {
-      kind: "recompute",
-      text: `Re-run ${label}'s collateralBalanceOf, getPrice, getAssetInfo and borrowBalanceOf at block ${c.blockNumber.toLocaleString("en-US")}, and divide the debt's value by Σ collateral × price × liquidate factor.`,
-    },
-    summary: `Debt share of the absorb line — ${label}'s debt value ÷ its liquidation capacity (Σ collateral × oracle price × liquidate factor), every input read from the Comet at block ${c.blockNumber.toLocaleString("en-US")}. The same figure as the card's "Absorb line reached"; the Comet's isLiquidatable says whether the account is past it.`,
-    contract: { name: `Compound V3 ${label} Comet (Arbitrum)`, address: c.comet },
-    via: `${WALLET_VIA} at block ${c.blockNumber.toLocaleString("en-US")} · debt value ÷ liquidation capacity`,
-    formula: "debt value ÷ liquidation capacity",
-    inputs: [
-      { label: "collateral balances", kind: "chain", pclass: "state", note: "collateralBalanceOf @ the read block" },
-      { label: "oracle prices", kind: "chain", pclass: "oracle", note: "getPrice @ the read block" },
-      { label: "liquidate factors", kind: "chain", pclass: "state", note: "getAssetInfo @ the read block" },
-      { label: "debt", kind: "chain", pclass: "state", note: "borrowBalanceOf @ the read block" },
-    ],
-  };
-}
-
 /** The counts sentence, in Comet positions. */
 function countsLine(n: number, counts: { open: number; closed: number; liquidated: number }, liquidatable: number) {
   const parts = [
@@ -118,7 +86,6 @@ function countsLine(n: number, counts: { open: number; closed: number; liquidate
 /** Build the strip for the wallet overview. `comets` is the overview's list,
  *  open first. */
 export function compoundArbitrumHolderStrip(
-  wallet: string,
   head: CompoundWalletChainResponse | null,
   comets: HolderStripComet[],
 ): HolderStripProps {
@@ -220,31 +187,10 @@ export function compoundArbitrumHolderStrip(
   baseLeg("borrow");
   baseLeg("supply");
 
-  // ── nearest its floor: the largest share of an absorb line reached ────────
-  let nearest: HolderNearest | undefined;
-  let highest = -Infinity;
-  for (const c of open) {
-    const ch = c.chain!;
-    if (!(ch.debtValue > 0) || !(ch.liquidationCapacity > 0)) continue;
-    const reached = ch.debtValue / ch.liquidationCapacity;
-    if (reached <= highest) continue;
-    highest = reached;
-    const share = capacityShare(ch.debtValue, ch.liquidationCapacity);
-    nearest = {
-      href: compoundArbitrumMarketHref(c.market.key, wallet),
-      label: c.market.label,
-      measure: share.beyond ? `${share.text} its absorb line` : `${share.text} of its absorb line`,
-      approx: true,
-      tip: NEAREST_TIP,
-      prov: nearestProv(ch, c.market.label),
-    };
-  }
-
   return {
     countsLine: countsLine(comets.length, counts, liquidatable),
     counts,
     legs,
-    nearest,
     truncated: false,
   };
 }

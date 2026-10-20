@@ -45,8 +45,12 @@ import { ChainSwitcher } from "@/components/nav/chain-switcher";
 /** The chain chooser as it sits on the title row: hidden below `md`, where
  *  HeaderBar still carries it. `-mr-2.5` pulls the trigger's own padding back
  *  so its glyph lines up with the content's right edge rather than the
- *  padding box. */
-function TitleRowChooser() {
+ *  padding box.
+ *
+ *  EXPORTED for the front door (ProtocolFrontDoor, rails-ops
+ *  TO-DO-arbitrum-scoping.md item 18), which draws no rail header but takes
+ *  the chooser at the top right where every rail page has it. */
+export function TitleRowChooser() {
   return (
     <div className="-mr-2.5 hidden shrink-0 md:block">
       <ChainSwitcher variant="chain" />

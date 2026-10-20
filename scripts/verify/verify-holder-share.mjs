@@ -16,8 +16,8 @@
 //      route answers those 200 with the static bytes rather than failing;
 //   d  the card's figures are the WALLET's — the model is called directly with
 //      the wallet response and the market board this script fetched itself, and
-//      every stat is restated here from those two: Σ coll, Σ debt legs × the
-//      markets' own units, the position nearest its own floor. A wallet stated
+//      every stat is restated here from those two: Σ coll and Σ debt legs × the
+//      markets' own units. A wallet stated
 //      as holding more than one page states its count and no totals;
 //   e  the same for Liquity V2, in its own units;
 //   f  the URL a reader ends up with carries the wallet and nothing else —
@@ -28,7 +28,7 @@
 //      `?status=`, and reloading that URL still shows every status.
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
-// card: the sums, the ratios and the counts all come from the wallet route and
+// card: the sums and the counts all come from the wallet route and
 // the price read this script makes for itself. Nothing is pinned — the feeds
 // tick every block and the campaign wave moves these wallets by the hour.
 //
@@ -96,8 +96,6 @@ async function api(path_, tries = 4) {
 const fmtNum = (v) => v.toLocaleString("en-US", { maximumFractionDigits: 3 });
 /** formatUsdValue: "$" + en-US, exactly two fraction digits. */
 const fmtUsd = (v) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-/** The ratio grammar: one decimal, en-US. */
-const fmtPct = (v) => `${v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 /** shortSubject: 6 + 4 with a Unicode ellipsis. */
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const parseNum = (s) => Number(String(s ?? "").replace(/[$,]/g, ""));
@@ -320,17 +318,6 @@ const pColl = pOpen.reduce((s, r) => s + r.coll, 0);
 const pDebtByMarket = new Map();
 for (const r of pOpen) if (r.debt > 0) pDebtByMarket.set(r.market, (pDebtByMarket.get(r.market) ?? 0) + r.debt);
 const pDebtUsd = [...pDebtByMarket].reduce((s, [m, amt]) => s + amt * unitUsd(m), 0);
-/** Nearest its floor: the smallest ratio ÷ its own market's minimum. */
-let pNearest = null;
-for (const r of pOpen) {
-  const b = boardOf(r.market);
-  if (!b || !(r.debt > 0) || !(r.coll > 0)) continue;
-  const min = b.defensiveMode ? b.defensiveMcr : b.mcr;
-  const ratio = (r.coll * b.price.pethInDebt) / r.debt;
-  if (!pNearest || ratio / min < pNearest.headroom) {
-    pNearest = { label: `${r.market}/${r.cdpId}`, ratioPct: ratio * 100, headroom: ratio / min };
-  }
-}
 const pStatus = [
   pCounts.open > 0 ? `${pCounts.open} open` : null,
   pCounts.closed > 0 ? `${pCounts.closed} closed` : null,
@@ -338,10 +325,7 @@ const pStatus = [
 ]
   .filter(Boolean)
   .join(" · ");
-info(
-  "D0 restated (Polaris)",
-  `${pStatus}; coll ${fmtNum(pColl)} pETH; debt ${fmtUsd(pDebtUsd)}; nearest ${pNearest?.label} at ${fmtPct(pNearest?.ratioPct ?? 0)}`,
-);
+info("D0 restated (Polaris)", `${pStatus}; coll ${fmtNum(pColl)} pETH; debt ${fmtUsd(pDebtUsd)}`);
 
 // ── Liquity V2, restated ───────────────────────────────────────────────────
 const vOpen = vRows.filter((t) => t.status === "open");
@@ -355,17 +339,6 @@ const vDebt = vOpen.reduce((s, t) => s + t.debt.current, 0);
 const vByBranch = new Map();
 for (const t of vOpen) vByBranch.set(t.collateralType, (vByBranch.get(t.collateralType) ?? 0) + t.collateral.amount);
 const vCollUsd = [...vByBranch].reduce((s, [ct, amt]) => s + amt * priceOf(ct), 0);
-/** The branch minimums are the protocol's own constants, restated here rather
- *  than read from the code under test: WETH 110%, the LSTs 120%. */
-const branchMin = (ct) => (ct === "WETH" || ct === "ETH" ? 110 : 120);
-let vNearest = null;
-for (const t of vOpen) {
-  const price = priceOf(t.collateralType);
-  if (!price || !(t.debt.current > 0) || !(t.collateral.amount > 0)) continue;
-  const ratioPct = ((t.collateral.amount * price) / t.debt.current) * 100;
-  const headroom = ratioPct / branchMin(t.collateralType);
-  if (!vNearest || headroom < vNearest.headroom) vNearest = { branch: t.collateralType, ratioPct, headroom };
-}
 const vStatus = [
   vCounts.open > 0 ? `${vCounts.open} open` : null,
   vCounts.closed > 0 ? `${vCounts.closed} closed` : null,
@@ -373,10 +346,7 @@ const vStatus = [
 ]
   .filter(Boolean)
   .join(" · ");
-info(
-  "E0 restated (Liquity V2)",
-  `${vStatus}; coll ${fmtUsd(vCollUsd)}; debt ${fmtNum(vDebt)} BOLD; nearest ${vNearest?.branch} at ${fmtPct(vNearest?.ratioPct ?? 0)}`,
-);
+info("E0 restated (Liquity V2)", `${vStatus}; coll ${fmtUsd(vCollUsd)}; debt ${fmtNum(vDebt)} BOLD`);
 
 // ── the probe ──────────────────────────────────────────────────────────────
 const PROBE = `
@@ -455,11 +425,6 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
     `"${stat(got.polaris, "Total debt")?.value}" vs restated ${fmtUsd(pDebtUsd)}`,
   );
   check(
-    "D5. Polaris: Nearest its floor names the restated CDP at its restated ratio",
-    stat(got.polaris, "Nearest its floor")?.value === `${pNearest.label} ≈ ${fmtPct(pNearest.ratioPct)}`,
-    `"${stat(got.polaris, "Nearest its floor")?.value}" vs restated "${pNearest.label} ≈ ${fmtPct(pNearest.ratioPct)}"`,
-  );
-  check(
     "D6. Polaris: a wallet stated as holding 21 CDPs states the count and NO totals — a slice is not an aggregate",
     got.polarisTruncated?.status === "21 Positions" && got.polarisTruncated?.stats.length === 0,
     JSON.stringify(got.polarisTruncated),
@@ -486,11 +451,6 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
     /^≈ /.test(stat(got.v2, "Total collateral")?.value ?? "") &&
       Math.abs(parseNum((stat(got.v2, "Total collateral")?.value ?? "").replace("≈ ", "")) - vCollUsd) <= 1,
     `"${stat(got.v2, "Total collateral")?.value}" vs restated ${fmtUsd(vCollUsd)}`,
-  );
-  check(
-    "E4. Liquity V2: Nearest its floor names the restated BRANCH at its restated ratio — no trove id nobody can click",
-    stat(got.v2, "Nearest its floor")?.value === `${vNearest.branch} ≈ ${fmtPct(vNearest.ratioPct)}`,
-    `"${stat(got.v2, "Nearest its floor")?.value}" vs restated "${vNearest.branch} ≈ ${fmtPct(vNearest.ratioPct)}"`,
   );
   check(
     "E5. Liquity V2: 21 troves states the count and no totals; an unanswered price read means no card at all",
