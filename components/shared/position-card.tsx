@@ -723,5 +723,7 @@ const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
 
 /** The (i) toggle's noun from the heading: "Vault summary" → "vault
  *  explanation"; no heading, "position explanation". */
-const explanationLabel = (heading?: string): string =>
-  `${(heading ?? "Position summary").replace(/ summary$/i, "").toLowerCase()} explanation`;
+const explanationLabel = (heading?: string): string => {
+  const noun = (heading ?? "Position summary").replace(/ summary$/i, "");
+  return `${noun.charAt(0).toLowerCase()}${noun.slice(1)} explanation`;
+};
