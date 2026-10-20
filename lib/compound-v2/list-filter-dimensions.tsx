@@ -9,15 +9,24 @@
 //   • Status   — open / closed / liquidated (lifecycle, over
 //     mv_compound_v2_wallets). 'liquidated' names only a CLOSED wallet that
 //     was liquidated — the two-axis status model.
-//   • Position — Borrowing (hasDebt) / Supply only (noDebt), from replayed balances.
+//   • Size: Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts),
+//     sent as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd. The Debt range
+//     replaces the old Position dropdown: its `?state=borrowing` reads as at
+//     least $1 and `?state=supply-only` as $0. Those two exact ranges also send
+//     the old hasDebt / noDebt flags, which say the same thing to a server that
+//     predates the USD bounds.
 //   • History  — Liquidated before (hasLiquidations = ever_liquidated, the
 //     orthogonal flag): open SURVIVORS match too. Close factor 0.5 makes V2
 //     liquidations partial — 26,639 land on 5,864 borrowers, ~4.5 each.
+//   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive;
+//     lib/shared/transactions-dimension.ts).
 //   • Wallet search (exact address → the `wallet` param) and recency sort order.
 //   • Supplying / Borrowing — per-market facets over the twenty-market
 //     catalog; chips carry underlying symbols (19 distinct — WBTC names TWO
 //     markets and its one chip reaches both), the proxy maps them to market keys.
 
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -32,14 +41,24 @@ import {
   sameStatusSet,
 } from "@/lib/compound-v2/listing-visibility";
 
+/** The Transactions slider's top: the round number above the busiest listed
+ *  wallet (24,845 transactions, 20 Oct 2026). */
+const COMPOUND_V2_TX_TOP = 30000;
+
+/** The Size panel's price line. */
+const COMPOUND_V2_SIZE_NOTE = "At the latest indexed price per asset, as of the listing's last refresh.";
+
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const COMPOUND_V2_ITEMS_PER_PAGE = 20;
 
 export interface CompoundV2ListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). Lifecycle over mv_compound_v2_wallets. */
   status: string[];
-  /** "" | "borrowing" | "supply-only" — the debt-side of the position. */
-  state: string[];
+  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`, read from `state` too. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** "" | "liquidated" — positions that were liquidated at least once (the
    *  orthogonal flag; open survivors included). */
   liquidations: string[];
@@ -47,6 +66,8 @@ export interface CompoundV2ListFilters extends BaseListFilters {
   supplying: string[];
   /** Underlying symbols the position must be BORROWING (multi, OR). */
   borrowing: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -59,10 +80,12 @@ export const COMPOUND_V2_LIST_DEFAULTS: CompoundV2ListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
-  state: [],
+  debt: [],
+  coll: [],
   liquidations: [],
   supplying: [],
   borrowing: [],
+  tx: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -77,11 +100,6 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
   { value: "liquidated", label: "Liquidated" },
-];
-
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "supply-only", label: "Supply only" },
 ];
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
@@ -108,16 +126,14 @@ export function compoundV2ListDimensions(): SerializableDimension<CompoundV2List
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<CompoundV2ListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: COMPOUND_V2_SIZE_NOTE,
+      debtAliases: ["state"],
+    }),
     {
       id: "supplying",
       label: "Supplying",
@@ -149,6 +165,11 @@ export function compoundV2ListDimensions(): SerializableDimension<CompoundV2List
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    transactionsDimension<CompoundV2ListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: COMPOUND_V2_TX_TOP,
+    }),
   ];
 }
 
@@ -158,15 +179,17 @@ export function compoundV2FiltersToFetchParams(
   filters: CompoundV2ListFilters,
   page: number,
 ): FetchCompoundV2PositionsParams {
-  const state = filters.state[0];
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: state === "borrowing" ? true : undefined,
-    noDebt: state === "supply-only" ? true : undefined,
+    // The old Position dropdown's flags, for the two Debt ranges it maps to.
+    hasDebt: filters.debt[0] === "1-" ? true : undefined,
+    noDebt: filters.debt[0] === "-0" ? true : undefined,
+    ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    ...transactionBounds(filters.tx),
     supplyAssets: filters.supplying.length > 0 ? filters.supplying : undefined,
     borrowAssets: filters.borrowing.length > 0 ? filters.borrowing : undefined,
     sortBy: filters.sortBy as CompoundV2PositionSort,

@@ -24,6 +24,15 @@ export interface FetchCompoundV2PositionsParams {
   /** Ever liquidated — the orthogonal flag, NOT the lifecycle status: open
    *  survivors match too (close factor 0.5 → borrowers commonly live on). */
   hasLiquidations?: boolean;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
+  /** Inclusive bounds in USD on the position's debt and collateral, valued on
+   *  the server; any one alone. */
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
   /** supply-side underlying symbols — restrict to positions supplying them. */
   supplyAssets?: string[];
   borrowAssets?: string[];
@@ -51,6 +60,9 @@ export async function fetchCompoundV2Positions(p: FetchCompoundV2PositionsParams
   if (p.hasDebt) qs.set("hasDebt", "true");
   if (p.noDebt) qs.set("noDebt", "true");
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
+  for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.supplyAssets && p.supplyAssets.length > 0) qs.set("supplyAssets", p.supplyAssets.join(","));
   if (p.borrowAssets && p.borrowAssets.length > 0) qs.set("borrowAssets", p.borrowAssets.join(","));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
