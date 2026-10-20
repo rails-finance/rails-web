@@ -1,8 +1,9 @@
-// Aave V3 on Arbitrum — the protocol page: a wallet input over the market
-// overview. The client half is protocol-page.tsx beside this file.
+// Aave V3 on Arbitrum — the front door: the protocol's mark, a wallet field
+// and the links to the market overview, the positions read and the info page
+// (components/shared/protocol-front-door.tsx).
 
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { AaveV3ArbitrumProtocolPage } from "./protocol-page";
+import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
 
 export const metadata = listingMetadata({
   title: "Aave V3 on Arbitrum",
@@ -10,5 +11,5 @@ export const metadata = listingMetadata({
 });
 
 export default function Page() {
-  return <AaveV3ArbitrumProtocolPage />;
+  return <ProtocolFrontDoor session="aave-v3-arbitrum" positions={process.env.VERCEL_ENV !== "production"} />;
 }

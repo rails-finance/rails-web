@@ -1,4 +1,4 @@
-// Receipts for the Morpho Blue Arbitrum protocol page's markets table
+// Receipts for the Morpho Blue Arbitrum markets page's table
 // (components/protocol/morpho/morpho-arbitrum-markets-view.tsx): every figure
 // a read of the Arbitrum singleton, the loan token or the Aave V3 Arbitrum
 // oracle at the one block the table names, served by

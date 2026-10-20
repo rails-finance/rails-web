@@ -26,7 +26,7 @@ export const MORPHO_ARBITRUM_CHAIN_ID = ARBITRUM_CHAIN_ID;
  *  serves runs from here, which is what lets it claim a whole life. */
 export const MORPHO_ARBITRUM_DEPLOY_BLOCK = 296_446_593;
 
-/** The loan tokens the protocol page ranks markets in: the dollar stables and
+/** The loan tokens the markets page ranks markets in: the dollar stables and
  *  WETH that the Aave V3 Arbitrum oracle prices, so a supply in any of them
  *  converts to dollars from a chain read. Keyed on the lowercase address. */
 export const MORPHO_ARBITRUM_RANKED_LOAN_TOKENS: Readonly<Record<string, string>> = {

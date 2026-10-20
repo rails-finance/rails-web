@@ -295,7 +295,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // Aave V3 on Arbitrum (2026-10-19), position-first (rails-ops
   // TO-DO-arbitrum-scoping.md §9 item 5). The position page is the Base page
   // through the deployment seam: the Pool read live (`dashboard`), its oracle
-  // for USD (`oracleUsd`), the reserve roster on the protocol page (`views`),
+  // for USD (`oracleUsd`), the reserve roster on the markets page (`views`),
   // the shared cards and explainers over the history rails-server serves per
   // wallet (`explainers`, `forensics`), and the Markdown/CSV export (`llm`).
   // Not yet: the history rows carry no at-block price, and no offline
@@ -811,7 +811,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // Morpho Blue on Arbitrum (2026-10-19), position-first (rails-ops
   // TO-DO-arbitrum-scoping.md item 13). The wallet and position pages are the
   // Base pages through the deployment seam: the singleton's slots read live
-  // (`dashboard`), the census's markets on the protocol page (`views`), the
+  // (`dashboard`), the census's markets on the markets page (`views`), the
   // shared cards and explainers over the history rails-server serves per
   // wallet (`explainers`, `forensics`), and the Markdown/CSV export (`llm`).
   // Not yet: no offline verifier runs against this singleton.
@@ -1004,7 +1004,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // TO-DO-arbitrum-scoping.md item 12). The wallet page is the Base page
   // through the deployment seam: the four Comets read live at one block
   // (`dashboard`), each Comet's own feeds for USD (`oracleUsd`), the market
-  // overview on the protocol page (`views`), the shared cards and explainers
+  // overview on the markets page (`views`), the shared cards and explainers
   // over the history rails-server serves per wallet (`explainers`,
   // `forensics`), and the Markdown/CSV export (`llm`). Not yet: no offline
   // verifier runs against these Comets.
@@ -1408,8 +1408,8 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
  * discovery listing.
  */
 export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
-  // Aave V3 on Arbitrum ships position-first (2026-10-19): a wallet input over
-  // the market overview, any address readable, no roster of accounts yet.
+  // Aave V3 on Arbitrum ships position-first (2026-10-19): a wallet field on
+  // its front door, any address readable, no roster of accounts yet.
   "aave-v3-arbitrum",
   // Morpho Blue on Arbitrum ships position-first on the same terms (item 13).
   "morpho-arbitrum",
@@ -1508,8 +1508,8 @@ export function coverageRows(comingSoon: ComingSoonEntry[], chainId: ChainId): C
  * block above; do not invent capabilities a view doesn't offer.
  *
  * Invariant: an entry exists here iff that protocol's `views` cell is `true`.
- * aave-v3-arbitrum's protocol page (2026-10-19), where the roster sits under
- * the wallet input, is the newest.
+ * The three Arbitrum explorers' markets sub-pages (2026-10-20) are the
+ * newest.
  */
 export const VIEW_NOTES: Record<string, string> = {
   frankencoin:
@@ -1527,9 +1527,9 @@ export const VIEW_NOTES: Record<string, string> = {
   "aave-v3-base":
     "The Base Pool's full reserve roster — sizes, rates, risk configuration and oracle prices — with every risk parameter decoded from the reserve's own configuration rather than a copied governance table.",
   "morpho-arbitrum":
-    "The census's 258 markets under the wallet input, read at one block: the funded ones in dollar stables or WETH ranked by supply in dollars, the rest listed in their own loan tokens.",
+    "The census's 258 markets, read at one block: the funded ones in dollar stables or WETH ranked by supply in dollars, the rest listed in their own loan tokens.",
   "aave-v3-arbitrum":
-    "The Arbitrum Pool's full reserve roster under the wallet input — sizes, rates, risk configuration and oracle prices, every risk parameter decoded from the reserve's own configuration.",
+    "The Arbitrum Pool's full reserve roster — sizes, rates, risk configuration and oracle prices, every risk parameter decoded from the reserve's own configuration.",
   "aave-v3":
     "The Core Pool's full reserve roster — sizes, rates, risk configuration and oracle prices — read live from the Pool and its oracle.",
   spark: "The single SparkLend Pool's reserve roster read live, on the same shared surface as Aave V3's.",
@@ -1556,7 +1556,7 @@ export const VIEW_NOTES: Record<string, string> = {
   morpho:
     "Every Blue market grouped by the token it measures in, each carrying the single immutable loan-to-value that is its whole risk surface.",
   "compound-v3-arbitrum":
-    "The four Comets on Arbitrum under the wallet input, read at one block: each one's base asset, collateral roster, rate curve and reserve line.",
+    "The four Comets on Arbitrum, read at one block: each one's base asset, collateral roster, rate curve and reserve line.",
   "compound-base":
     "The five Comets on Base, each with its own base asset, collateral roster, rate curve and reserve line — and one of them reading above 100% utilised, which is what a growing reserve line looks like.",
   "morpho-base":

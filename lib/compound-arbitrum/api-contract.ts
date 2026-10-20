@@ -17,7 +17,6 @@ import type { CometIndexRow } from "@/lib/sources/api/compound-base-timeline";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
 import {
   readPositionsAnswer as readArbitrumPositionsAnswer,
-  type MorphoArbitrumPositionRow,
   type MorphoArbitrumPositionsResponse,
 } from "@/lib/morpho-arbitrum/api-contract";
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "./asset-catalog";
@@ -126,7 +125,6 @@ export type CompoundArbitrumTimelineRow = CometIndexRow & { comet?: string };
 
 // ── GET /positions?limit=&offset= ───────────────────────────────────────────
 
-export type CompoundArbitrumPositionRow = MorphoArbitrumPositionRow;
 export type CompoundArbitrumPositionsResponse = MorphoArbitrumPositionsResponse;
 
 /** The answer checked against the contract; null when it does not hold one. */

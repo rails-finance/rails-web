@@ -1,23 +1,15 @@
-// Compound V3 on Arbitrum — the protocol page: a wallet input over the four
-// Comets' market overview. The overview is read here, on the server, as the
-// Base market page reads it; the client half is protocol-page.tsx beside this
-// file.
+// Compound V3 on Arbitrum — the front door: the protocol's mark, a wallet
+// field and the links to the market overview, the positions read and the info
+// page (components/shared/protocol-front-door.tsx).
 
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { loadCompoundV3Markets } from "@/lib/sources/chain/compound-markets";
-import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
-import { CompoundArbitrumProtocolPage } from "./protocol-page";
+import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
 
 export const metadata = listingMetadata({
   title: "Compound V3 on Arbitrum",
   canonicalPath: "/arbitrum/compound-v3",
 });
 
-// ISR, ten minutes, as the Base market page: one render serves every visitor,
-// and the stamp names the block the read happened at.
-export const revalidate = 600;
-
-export default async function Page() {
-  const data = await loadCompoundV3Markets(COMPOUND_ARBITRUM_DEPLOYMENT);
-  return <CompoundArbitrumProtocolPage data={data} />;
+export default function Page() {
+  return <ProtocolFrontDoor session="compound-v3-arbitrum" positions={process.env.VERCEL_ENV !== "production"} />;
 }
