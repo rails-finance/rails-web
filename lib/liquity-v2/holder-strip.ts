@@ -16,26 +16,17 @@
 // A ZOMBIE TROVE IS AN OPEN ONE — redeemed below the minimum debt, still on
 // chain, still the holder's, just unredeemable until it is topped back up. It is
 // counted with the open troves and SAID as one only when the wallet has any.
-//
-// The nearest-floor line ranks by ratio ÷ the branch's own MCR, because the
-// three branches do not share a floor: 125% on WETH (against 110%) is further
-// from liquidation than 125% on rETH (against 120%).
 
 import type { HolderLeg, HolderStripProps } from "@/components/shared/holder-strip";
 import type { Provenance } from "@/components/shared/provenance";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
 import { TROVE_MANAGER } from "@/lib/liquity/event-provenance";
-import { getLiquidationThreshold } from "@/lib/utils/liquidation-utils";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 
 /** The ≈ on the wallet's collateral, in one sentence. */
 const COLL_TIP =
   "An estimate: the troves' latest stated collateral on each branch, valued at that branch's own PriceFeed as of the latest read. It is a valuation at one moment, not an amount of any one token.";
-
-/** Why a wallet has no ratio of its own. */
-const NEAREST_TIP =
-  "Each trove is liquidated on its own ratio; the wallet has no ratio of its own. This is the open trove closest to its branch's minimum.";
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -87,37 +78,8 @@ function holderCollValueProv(branches: string[]): Provenance {
   };
 }
 
-/** coll × the branch's feed ÷ debt on the row's own figures — the card's own
- *  ratio, which is where the nearest-floor line reads it from. */
-function holderRatioProv(collateralType: string): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "oracle",
-    verify: {
-      kind: "recompute",
-      text: "Re-run the branch's PriceFeed at the stamped block, multiply the trove's collateral by it and divide by its debt.",
-    },
-    summary: `Collateral ratio — this trove's collateral × the ${collateralType} branch's own PriceFeed price ÷ its debt, the same figure its card states and the same formula the TroveManager's getCurrentICR computes. The branch liquidates below its own MCR, which is the minimum stated beside it.`,
-    contract: tmContract(collateralType),
-    via: "collateral × branch PriceFeed price ÷ debt",
-    formula: "coll × price ÷ debt",
-    inputs: [
-      { label: "collateral", kind: "chain", pclass: "indexed", note: "the trove's collateral, from the index" },
-      {
-        label: "price",
-        kind: "chain-derived",
-        pclass: "oracle",
-        note: `${collateralType} / USD — the branch's PriceFeed`,
-      },
-      { label: "debt", kind: "chain", pclass: "indexed", note: "the trove's entire debt, from the index" },
-    ],
-  };
-}
-
 const priceFor = (collateralType: string, prices: OraclePricesData): number | null =>
   prices[collateralType.toLowerCase() as keyof OraclePricesData] ?? null;
-
-const shortId = (id: string): string => `${id.slice(0, 6)}…${id.slice(-4)}`;
 
 /** The counts sentence — troves, and the branch spread only where it is a fact. */
 function countsLine(counts: { open: number; closed: number; liquidated: number; zombie: number }, branches: number) {
@@ -225,33 +187,10 @@ export function liquityV2HolderStrip(
     });
   }
 
-  // ── nearest its floor ─────────────────────────────────────────────────────
-  let nearest: HolderStripProps["nearest"];
-  let closest = Infinity;
-  for (const t of open) {
-    const price = priceFor(t.collateralType, prices);
-    if (price == null || !(t.debt.current > 0) || !(t.collateral.amount > 0)) continue;
-    const ratioPct = ((t.collateral.amount * price) / t.debt.current) * 100;
-    const minPct = getLiquidationThreshold(t.collateralType);
-    const headroom = ratioPct / minPct;
-    if (headroom >= closest) continue;
-    closest = headroom;
-    nearest = {
-      href: `/ethereum/liquity-v2/trove/${t.collateralType}/${t.id}`,
-      label: `${t.collateralType} ${shortId(t.id)}`,
-      ratioPct,
-      minPct,
-      approx: true,
-      tip: NEAREST_TIP,
-      prov: holderRatioProv(t.collateralType),
-    };
-  }
-
   return {
     countsLine: countsLine(counts, byBranch.size),
     counts: { open: counts.open, closed: counts.closed, liquidated: counts.liquidated, zombie: counts.zombie },
     legs,
-    nearest,
     truncated: false,
   };
 }

@@ -145,6 +145,7 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
         ? [
             {
               label: COMPOUND_V2_HEAD_WORDS.legSeized,
+              direction: "left",
               value: mag,
               symbol: cSymbol,
               address: soleFlowAddress(event.flows, cSymbol),
@@ -159,6 +160,7 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
       const collCSym = collM?.cSymbol ?? `c${ctx.collateralSymbol}`;
       legs.push({
         label: COMPOUND_V2_HEAD_WORDS.legSeized,
+        direction: "left",
         value: seized,
         symbol: collCSym,
         address: soleFlowAddress(event.flows, collCSym),

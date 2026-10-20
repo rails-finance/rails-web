@@ -88,6 +88,7 @@ export function AaveV4EventCard({
     if (seized !== 0 && ctx.collateralSymbol)
       legs.push({
         label: AAVE_V4_HEAD_WORDS.legSeized,
+        direction: "left",
         value: seized,
         symbol: ctx.collateralSymbol,
         address: soleFlowAddress(event.flows, ctx.collateralSymbol),

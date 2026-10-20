@@ -123,18 +123,19 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
   const warningLegs = ((): SpineWarningLeg[] | undefined => {
     if (!critical && !caution) return undefined;
     const legs: SpineWarningLeg[] = [];
-    const coll = (label: string, value: number) =>
-      value !== 0 && legs.push({ label, value: Math.abs(value), symbol: ctx.collateralSymbol, address: collAddr });
+    const coll = (label: string, value: number, direction?: "left") =>
+      value !== 0 &&
+      legs.push({ label, value: Math.abs(value), symbol: ctx.collateralSymbol, address: collAddr, direction });
     const zchf = (label: string, value: number) =>
       value !== 0 && legs.push({ label, value: Math.abs(value), symbol: "ZCHF", address: zchfAddr });
     if (ctx.eventType === "challenge_started") coll(FRANKENCOIN_LEG_WORDS.challenged, num(ctx.challengeSize));
     if (ctx.eventType === "challenge_succeeded") {
-      coll(FRANKENCOIN_LEG_WORDS.sold, num(ctx.acquiredCollateral));
+      coll(FRANKENCOIN_LEG_WORDS.sold, num(ctx.acquiredCollateral), "left");
       zchf(FRANKENCOIN_LEG_WORDS.bid, num(ctx.bid));
     }
-    if (ctx.eventType === "forced_sale") coll(FRANKENCOIN_LEG_WORDS.sold, num(ctx.forcedSaleAmount));
+    if (ctx.eventType === "forced_sale") coll(FRANKENCOIN_LEG_WORDS.sold, num(ctx.forcedSaleAmount), "left");
     if (ctx.eventType === "auction_settlement") {
-      if (dColl != null && !ctx.collateralUnderstated) coll(FRANKENCOIN_LEG_WORDS.collateral, dColl);
+      if (dColl != null && !ctx.collateralUnderstated) coll(FRANKENCOIN_LEG_WORDS.collateral, dColl, "left");
       if (dMint != null) zchf(FRANKENCOIN_LEG_WORDS.debtCleared, dMint);
     }
     return legs.length > 0 ? legs : undefined;

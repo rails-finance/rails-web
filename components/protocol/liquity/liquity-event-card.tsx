@@ -177,6 +177,7 @@ export function LiquityEventCard({
     if (collCp && Math.abs(collCp.change) >= 0.01)
       legs.push({
         label: isRedemption ? L1_WORDS.reduced : L1_WORDS.liquidated,
+        direction: "left",
         value: Math.abs(collCp.change),
         symbol: ctx.collateralType,
         address: soleFlowAddress(event.flows, ctx.collateralType),

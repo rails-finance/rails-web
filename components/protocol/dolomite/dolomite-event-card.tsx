@@ -95,6 +95,7 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
             value: mag,
             symbol: ctx.marketSymbol,
             address: ctx.marketToken ?? soleFlowAddress(event.flows, ctx.marketSymbol),
+            direction: ctx.eventType === "seize_out" ? "left" : "right",
           },
         ]
       : undefined;

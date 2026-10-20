@@ -109,6 +109,7 @@ export function LlamalendEventCard({
     if (coll !== 0)
       warningLegs.push({
         label: LLAMALEND_HEAD_WORDS.legTaken,
+        direction: "left",
         value: Math.abs(coll),
         symbol: ctx.collateralSymbol,
         address: soleFlowAddress(event.flows, ctx.collateralSymbol),
@@ -116,6 +117,7 @@ export function LlamalendEventCard({
     if (convTaken > 0)
       warningLegs.push({
         label: LLAMALEND_HEAD_WORDS.legConverted,
+        direction: "left",
         value: convTaken,
         symbol: ctx.borrowedSymbol,
         address: soleFlowAddress(event.flows, ctx.borrowedSymbol),

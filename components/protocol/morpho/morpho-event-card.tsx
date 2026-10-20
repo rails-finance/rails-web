@@ -80,6 +80,7 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
     if (mag !== 0)
       legs.push({
         label: MORPHO_LEG_WORDS.seized,
+        direction: "left",
         value: mag,
         symbol: sym,
         address: soleFlowAddress(event.flows, sym),

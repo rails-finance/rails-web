@@ -117,7 +117,6 @@ export default async function CompoundArbitrumWalletPage({ params }: Props) {
   const strip =
     cards.length > 0
       ? compoundArbitrumHolderStrip(
-          wallet,
           head,
           cards.map((c) => ({ market: c.market, chain: c.chain, status: c.view.status })),
         )

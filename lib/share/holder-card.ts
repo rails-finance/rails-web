@@ -2,8 +2,7 @@
 // ---------------------------------------------------------------------------
 // The strip (components/shared/holder-strip.tsx) already decided what a wallet
 // search may state about a wallet, in what units, and with what marks: the
-// counts by status, one leg per unit it holds, and the position nearest its
-// floor. A share card is that same statement at 1200×630 for a reader who has
+// counts by status, and one leg per unit it holds. A share card is that same statement at 1200×630 for a reader who has
 // not opened the page — so this maps the strip's props onto
 // `PositionCardModel` rather than deciding anything a second time.
 //
@@ -25,15 +24,9 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 
 /** The card canvas fits three stats across; a fourth would wrap onto its own
  *  row beneath the two it left behind, which reads as an afterthought rather
- *  than a set. Both explorers hand over at most three anyway (a collateral, a
- *  debt, the nearest position) — this is the floor under that, not a policy. */
+ *  than a set. Both explorers hand over at most two anyway (a collateral, a
+ *  debt) — this is the floor under that, not a policy. */
 const MAX_STATS = 3;
-
-/** The ratio on the nearest-floor stat, in the strip's own grammar — one
- *  decimal, en-US. A measurement, so it keeps its decimal even at a round
- *  number. */
-const pct = (v: number): string =>
-  `${v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 
 /** The counts as a card's status word — "4 open · 2 closed · 1 liquidated".
  *  The strip states them as a sentence, which at 24px in a pill would wrap; the
@@ -54,11 +47,7 @@ function statusWord(counts: HolderStripProps["counts"]): string | undefined {
  *  `subject` is the holder as the page names it (an ENS name, or a shortened
  *  address); `total` the wallet's own `pagination.total`, which is what a
  *  truncated card states; `plural` the explorer's plural position noun, for
- *  that same line. `nearestLabel` lets an explorer shorten the strip's own name
- *  for the nearest position: the strip's label is a LINK a reader can follow,
- *  so it carries the whole identity, and a card is an image with nothing to
- *  follow — Liquity V2 names the branch there rather than repeating a trove id
- *  no one can click. */
+ *  that same line. */
 export function holderCardModel(
   strip: HolderStripProps,
   opts: {
@@ -66,7 +55,6 @@ export function holderCardModel(
     subject: string;
     total: number;
     plural: string;
-    nearestLabel?: (label: string) => string;
   },
 ): PositionCardModel {
   if (strip.truncated) {
@@ -84,13 +72,6 @@ export function holderCardModel(
     label: leg.label,
     value: leg.approx ? `≈ ${leg.value}` : leg.value,
   }));
-  if (strip.nearest) {
-    const name = opts.nearestLabel ? opts.nearestLabel(strip.nearest.label) : strip.nearest.label;
-    stats.push({
-      label: "Nearest its floor",
-      value: `${name} ${strip.nearest.approx ? "≈ " : ""}${strip.nearest.measure === undefined ? pct(strip.nearest.ratioPct) : strip.nearest.measure}`,
-    });
-  }
 
   return {
     session: opts.session,
