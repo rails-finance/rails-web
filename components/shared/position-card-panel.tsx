@@ -10,12 +10,16 @@
 // the marked figures keep the bold white. A value with no mark (a figure alone,
 // bare or in its Prov) reads bold white whole.
 //
+// A stat of two or more assets carries a `breakdown`: its figure and the
+// assets' icons are one button that opens them over the card (C19).
+//
 // The stats stand apart from the headlines (decision 0040): one grid in the
 // card's order, six columns at lg, three below it, two on a phone. A card
 // carries at most 4 headlines and 6 stats; a stat's label reads on its own.
 import type { ReactNode } from "react";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { TokenFigure } from "@/components/shared/token-figure";
+import { StatBreakdown, type PanelRowBreakdown } from "@/components/shared/stat-breakdown";
 
 export interface PositionPanelRow {
   /** Stable key, and the row's `data-panel-row`. */
@@ -31,6 +35,9 @@ export interface PositionPanelRow {
    *  amount). A value in dollars, a ratio, a count or a percentage has none.
    *  A row stating several tokens draws `TokenFigure` per figure instead. */
   asset?: { symbol: string; address?: string; figure?: string };
+  /** A stat of two or more assets: `value` and the assets' icons become one
+   *  button (C19) that opens this breakdown over the card. */
+  breakdown?: PanelRowBreakdown;
 }
 
 /** A figure inside a stat value that words surround ("74.4% reached"): it
@@ -65,7 +72,9 @@ function Stat({ r }: { r: PositionPanelRow }) {
         {r.sub != null && <span className="block font-normal">{r.sub}</span>}
       </dt>
       <dd className={VALUE_TYPE}>
-        {r.asset && r.value != null ? (
+        {r.breakdown ? (
+          <StatBreakdown id={r.id} label={r.label} figure={r.value} breakdown={r.breakdown} />
+        ) : r.asset && r.value != null ? (
           <TokenFigure symbol={r.asset.symbol} address={r.asset.address} figure={r.asset.figure}>
             {r.value}
           </TokenFigure>

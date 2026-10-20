@@ -24,6 +24,7 @@
 // stream in when the read lands, and a chainStale response simply leaves them
 // unrendered (the index-derived surfaces are already on screen).
 
+import { aaveV3CardNotCollateral } from "@/lib/aave-v3/collateral-split";
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -686,8 +687,12 @@ export default function AaveV3PositionDetail({
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
   const captions = liveView
-    ? computeAaveV3CardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, aaveEvents)
+    ? computeAaveV3CardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, aaveEvents, servedFolders)
     : null;
+
+  // The supplies that back no borrowing, which the card states apart
+  // (lib/aave-v3/collateral-split.ts).
+  const notCollateral = useMemo(() => aaveV3CardNotCollateral(liveView, chain, switches), [liveView, chain, switches]);
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
@@ -821,6 +826,7 @@ export default function AaveV3PositionDetail({
                   // until the read answers.
                   chain={chain}
                   hfPending={!chainSettled}
+                  notCollateral={notCollateral}
                   exports={exports}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The LTV strip is absorbed

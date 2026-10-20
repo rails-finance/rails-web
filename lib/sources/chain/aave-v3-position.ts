@@ -20,6 +20,7 @@ import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { AAVE_V3_POOL, V3_LT_BY_ADDR } from "@/lib/aave-v3/asset-catalog";
 import { resolveV3Tokens } from "./aave-v3-tokens";
+import { notCollateralReserves } from "@/lib/aave-v3/collateral-split";
 import { assertDecimalsRead } from "./erc20-meta";
 import type { AaveV3ChainReserve, AaveV3EMode, AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 
@@ -354,6 +355,7 @@ export async function loadAaveV3PositionFromChain(
         reserveFactor,
         utilization,
         emodeCollateral,
+        ...(ltBps === 0 ? { ltZero: true as const } : {}),
       });
     });
 
@@ -384,4 +386,135 @@ export async function loadAaveV3PositionFromChain(
   } catch {
     return stub(wallet.toLowerCase(), poolAddr.toLowerCase(), atBlock ?? 0);
   }
+}
+
+/**
+ * The listing's collateral split: for each open account, the lowercased
+ * supplied reserves that back no borrowing (`notCollateralReserves`, the rule
+ * the position page reads from `loadAaveV3PositionFromChain`). Per Pool, one
+ * multicall for the accounts' collateral bitmaps and e-mode categories and the
+ * reserves' configurations, then one for the categories' thresholds and
+ * membership, read in the Pool's own e-mode generation. An account any of
+ * whose reads failed is absent from the answer, and its row keeps no split.
+ */
+export async function readAaveV3NotCollateral(
+  accounts: readonly { wallet: string; pool: string; supplied: readonly string[] }[],
+  chainId: ChainId = MAINNET_CHAIN_ID,
+): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  const byPool = new Map<string, { wallet: string; supplied: string[] }[]>();
+  for (const a of accounts) {
+    if (a.supplied.length === 0) continue;
+    const key = a.pool.toLowerCase();
+    byPool.set(key, [
+      ...(byPool.get(key) ?? []),
+      { wallet: a.wallet, supplied: a.supplied.map((r) => r.toLowerCase()) },
+    ]);
+  }
+  if (byPool.size === 0) return out;
+  const client = chainClient(chainId);
+  await Promise.all(
+    [...byPool].map(async ([pool, asked]) => {
+      try {
+        const poolAddr = getAddress(pool);
+        const reserves = [...new Set(asked.flatMap((a) => a.supplied))];
+        const results = await client.multicall({
+          allowFailure: true,
+          contracts: [
+            ...asked.flatMap(
+              (a) =>
+                [
+                  {
+                    address: poolAddr,
+                    abi: POOL_ABI,
+                    functionName: "getUserConfiguration",
+                    args: [getAddress(a.wallet)],
+                  },
+                  { address: poolAddr, abi: EMODE_ABI, functionName: "getUserEMode", args: [getAddress(a.wallet)] },
+                ] as const,
+            ),
+            ...reserves.map(
+              (r) =>
+                ({
+                  address: poolAddr,
+                  abi: POOL_ABI,
+                  functionName: "getReserveData",
+                  args: [r as `0x${string}`],
+                }) as const,
+            ),
+          ],
+        });
+        const reserveData = new Map<string, ReserveData>();
+        reserves.forEach((r, i) => {
+          const got = results[asked.length * 2 + i];
+          if (got.status === "success") reserveData.set(r, got.result as unknown as ReserveData);
+        });
+        const userOf = (i: number) => {
+          const cfg = results[i * 2];
+          const em = results[i * 2 + 1];
+          return cfg.status === "success" && em.status === "success"
+            ? { config: cfg.result as bigint, emodeId: Number(em.result as bigint) }
+            : null;
+        };
+        // Each category's threshold and which reserves it counts as
+        // collateral: a liquid-eMode Pool (V3.2+) answers with a bitmap, a
+        // pre-3.2 Pool names the category in the reserve's own config word.
+        const emodeIds = [...new Set(asked.map((_, i) => userOf(i)?.emodeId ?? 0).filter((id) => id > 0))];
+        const emodeOf = new Map<number, { lt: number; bitmap: bigint | null }>();
+        if (emodeIds.length > 0) {
+          const cats = await client.multicall({
+            allowFailure: true,
+            contracts: emodeIds.flatMap(
+              (id) =>
+                [
+                  { address: poolAddr, abi: EMODE_ABI, functionName: "getEModeCategoryCollateralBitmap", args: [id] },
+                  { address: poolAddr, abi: EMODE_ABI, functionName: "getEModeCategoryCollateralConfig", args: [id] },
+                  { address: poolAddr, abi: EMODE_ABI, functionName: "getEModeCategoryData", args: [id] },
+                ] as const,
+            ),
+          });
+          emodeIds.forEach((id, i) => {
+            const [bitmap, cfg, legacy] = [cats[i * 3], cats[i * 3 + 1], cats[i * 3 + 2]];
+            if (bitmap.status === "success" && cfg.status === "success")
+              emodeOf.set(id, {
+                lt: (cfg.result as { liquidationThreshold: number }).liquidationThreshold / PRECISION_BPS,
+                bitmap: bitmap.result as bigint,
+              });
+            else if (legacy.status === "success")
+              emodeOf.set(id, {
+                lt: (legacy.result as { liquidationThreshold: number }).liquidationThreshold / PRECISION_BPS,
+                bitmap: null,
+              });
+          });
+        }
+        asked.forEach((a, i) => {
+          const user = userOf(i);
+          if (!user) return;
+          const emode = user.emodeId > 0 ? emodeOf.get(user.emodeId) : undefined;
+          if (user.emodeId > 0 && !emode) return;
+          const reads = [];
+          for (const addr of a.supplied) {
+            const data = reserveData.get(addr);
+            if (!data) return;
+            const inEmode =
+              emode == null
+                ? false
+                : emode.bitmap != null
+                  ? ((emode.bitmap >> BigInt(data.id)) & BigInt(1)) === BigInt(1)
+                  : Number((data.configuration >> BigInt(168)) & BigInt(0xff)) === user.emodeId;
+            reads.push({
+              address: addr,
+              isCollateral: ((user.config >> BigInt(2 * data.id + 1)) & BigInt(1)) === BigInt(1),
+              lt: Number((data.configuration >> BigInt(16)) & BigInt(0xffff)) / PRECISION_BPS,
+              inEmode,
+            });
+          }
+          out.set(`${pool}:${a.wallet.toLowerCase()}`, notCollateralReserves(reads, emode?.lt));
+        });
+      } catch {
+        // The RPC is down: no row on this Pool keeps a split.
+      }
+    }),
+  );
+  return out;
 }

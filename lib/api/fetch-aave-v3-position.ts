@@ -26,6 +26,9 @@ export interface AaveV3ChainReserve {
   /** Liquidation threshold (0..1) — chain-read from the reserve configuration at
    *  T (falls back to the curated catalog LT, then null). */
   lt: number | null;
+  /** The reserve's own configuration reads a liquidation threshold of 0, where
+   *  `lt` may carry the catalog's figure: the collateral split reads this. */
+  ltZero?: true;
   // ── Reserve economics, read from getReserveData @ T (all 0..1 fractions) ──
   /** Supply APR (currentLiquidityRate, ray → fraction). */
   supplyApr?: number;

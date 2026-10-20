@@ -44,6 +44,7 @@
 // so it is stated under the last event rather than on a coverage page — see
 // <TimelineCoverageFooter>.
 
+import { aaveV3CardNotCollateral } from "@/lib/aave-v3/collateral-split";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
@@ -527,10 +528,14 @@ export function AaveV3PoolPositionView({
   const captions = useMemo(
     () =>
       view && data
-        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents)
+        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents, servedFolders)
         : null,
-    [view, data, sweptClean, lifetime, aaveEvents],
+    [view, data, sweptClean, lifetime, aaveEvents, servedFolders],
   );
+
+  // The supplies that back no borrowing, which the card states apart
+  // (lib/aave-v3/collateral-split.ts).
+  const notCollateral = useMemo(() => aaveV3CardNotCollateral(view, data, switches), [view, data, switches]);
 
   // An address that has never touched the Pool answers successfully with zeros,
   // which is a true answer and a different one from a failed read. Say which.
@@ -694,6 +699,7 @@ export function AaveV3PoolPositionView({
                     // inside the card's receipts scope.
                     chain={data}
                     exports={exports}
+                    notCollateral={notCollateral}
                     // The Explanation is layman prose about the face figures,
                     // plus the two facts about THIS Pool that change how they
                     // read — eMode and a supply that backs nothing — which the

@@ -28,6 +28,7 @@
 // history's completeness is a property of the request rather than of the
 // explorer, so it is stated under the last event.
 
+import { aaveV3CardNotCollateral } from "@/lib/aave-v3/collateral-split";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
@@ -493,10 +494,14 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   const captions = useMemo(
     () =>
       view && data
-        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents)
+        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents, servedFolders)
         : null,
-    [view, data, sweptClean, lifetime, aaveEvents],
+    [view, data, sweptClean, lifetime, aaveEvents, servedFolders],
   );
+
+  // The supplies that back no borrowing, which the card states apart
+  // (lib/aave-v3/collateral-split.ts).
+  const notCollateral = useMemo(() => aaveV3CardNotCollateral(view, data, switches), [view, data, switches]);
 
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view) return [];
@@ -646,6 +651,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                     // inside the card's receipts scope.
                     chain={data}
                     exports={exports}
+                    notCollateral={notCollateral}
                     // The Explanation: the L1 prose about the face figures, then
                     // what is particular to THIS Pool — eMode, a supply that
                     // backs nothing (pre-3.2 accounting here), and the freeze.

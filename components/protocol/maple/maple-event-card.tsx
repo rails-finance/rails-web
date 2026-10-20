@@ -11,7 +11,7 @@ import { ownerPaidGas } from "@/components/shared/event-price-row";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { formatNumber } from "@/lib/utils/format";
+import { formatHeadlineAmount } from "@/lib/shared/format-compact";
 import { flankedLegProv, sharesLegProv, type MapleCoords } from "@/lib/maple/event-provenance";
 import { mapleExplainerTeaser } from "@/lib/maple/explainer-clauses";
 import { useMapleHeadSpec } from "./maple-event-header";
@@ -97,7 +97,7 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
               badge: "send" as const,
               direction: kind === "transfer_out" ? ("left" as const) : ("right" as const),
               value: mag,
-              display: formatNumber(mag),
+              display: formatHeadlineAmount(mag, symbol),
               unit: symbol,
               verb: kind === "transfer_out" ? MAPLE_T1.legSent : MAPLE_T1.legReceived,
             },
@@ -108,7 +108,7 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
               address: soleFlowAddress(event.flows, symbol),
               direction: DIRECTION[kind],
               value: mag,
-              display: formatNumber(mag),
+              display: formatHeadlineAmount(mag, symbol),
               // The token named beside every amount: a request moves shares,
               // a fill pays the asset, and the icons alone look alike.
               unit: symbol,
@@ -120,7 +120,7 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
                     address: soleFlowAddress(event.flows, shares.symbol),
                     direction: (shares.value < 0 ? "right" : "left") as "left" | "right",
                     value: Math.abs(shares.value),
-                    display: formatNumber(Math.abs(shares.value)),
+                    display: formatHeadlineAmount(Math.abs(shares.value), shares.symbol),
                     unit: shares.symbol,
                   },
                 ]

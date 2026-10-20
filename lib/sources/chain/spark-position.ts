@@ -16,7 +16,7 @@ import { alchemyClient } from "./rpc";
 import { SPARK_ADDRESSES, SPARK_LT_BY_ADDR } from "@/lib/spark/asset-catalog";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { SparkChainReserve, SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
-import { sparkNotCollateral } from "@/lib/spark/collateral-split";
+import { notCollateralReserves } from "@/lib/aave-v3/collateral-split";
 
 const SPARK_POOL = SPARK_ADDRESSES.POOL as `0x${string}`;
 
@@ -310,7 +310,7 @@ export async function loadSparkPositionFromChain(
 
 /**
  * The listing's collateral split: for each account, the lowercased supplied
- * reserves that back no borrowing (`sparkNotCollateral`, the rule the position
+ * reserves that back no borrowing (`notCollateralReserves`, the rule the position
  * page reads from `loadSparkPositionFromChain`). One multicall for the
  * accounts' collateral bitmaps and e-mode categories and the reserves'
  * configurations, one for the categories' thresholds. An account any of whose
@@ -392,7 +392,7 @@ export async function readSparkNotCollateral(
           inEmode: user.emodeId > 0 && sparkReserveEmodeId(data.configuration) === user.emodeId,
         });
       }
-      out.set(a.wallet.toLowerCase(), sparkNotCollateral(reads, emodeLt.get(user.emodeId)));
+      out.set(a.wallet.toLowerCase(), notCollateralReserves(reads, emodeLt.get(user.emodeId)));
     });
   } catch {
     // The RPC is down: no row keeps a split.

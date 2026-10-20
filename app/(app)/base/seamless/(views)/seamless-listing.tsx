@@ -8,7 +8,11 @@
 import { aaveV3RestingCountLine } from "@/lib/aave-v3/listing-visibility";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
-import { AaveV3PositionCard, viewFromSummary } from "@/components/protocol/aave-v3/aave-v3-position-card";
+import {
+  AaveV3PositionCard,
+  notCollateralOf,
+  viewFromSummary,
+} from "@/components/protocol/aave-v3/aave-v3-position-card";
 import { SEAMLESS_FREEZE_BLOCK, SEAMLESS_FREEZE_DATE, SEAMLESS_FREEZE_TX } from "@/lib/seamless/asset-catalog";
 import { SEAMLESS_CARD_DEPLOYMENT } from "@/lib/seamless/position-provenance";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
@@ -52,6 +56,7 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
           v={{ ...viewFromSummary(p), countRule: LISTING_COUNT_RULE, liquidationRule: LIQUIDATION_RULE }}
           deployment={SEAMLESS_CARD_DEPLOYMENT}
           peaks={false}
+          notCollateral={notCollateralOf(p)}
         />
       )}
       hrefFor={(p) => `/base/seamless/${p.wallet}`}

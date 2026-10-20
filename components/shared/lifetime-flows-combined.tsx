@@ -1711,7 +1711,7 @@ function LevelMark({ health, isLive }: { health: boolean; isLive: boolean }) {
       className="focus-ring rounded-sm"
     >
       <span
-        className={`inline-flex border-b border-dotted border-current/40 pb-px align-[-1px] ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
+        className={`inline-flex border-b border-dotted border-[color:var(--tip-underline-color)] pb-px align-[-1px] ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
         data-heading-tip=""
         data-liq-mark=""
       >

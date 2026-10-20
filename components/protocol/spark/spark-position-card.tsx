@@ -15,9 +15,9 @@
 // carries no health factor (rails-ops decision 0018): the position page's
 // Pool.getUserAccountData read is the only health factor the card shows.
 
-import { QuietTipsContext, TitleTip } from "@/components/shared/reveal-tip";
+import { TitleTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
-import { useId, useRef, useState } from "react";
+import { useState } from "react";
 import { Link2 } from "lucide-react";
 import {
   PositionCard,
@@ -36,16 +36,13 @@ import type { SparkLife } from "@/lib/spark/lives";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { AnchoredPanel } from "@/components/shared/asset-popover";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import { Prov, ProvInert } from "@/components/shared/provenance";
-import type { Provenance } from "@/components/shared/provenance";
+import { Prov } from "@/components/shared/provenance";
 import {
   positionSupplyProv,
   positionDebtProv,
@@ -297,99 +294,6 @@ function PeakLines({
   );
 }
 
-/** A stat of two or more assets (C18), read as the headline's multi-asset
- *  side reads (C19): its figure and icon cluster are one button that opens
- *  the assets in a dropdown under it (the bottom sheet on a phone), so the
- *  cell holds one line whatever the count. */
-function StatBreakdown({
-  id,
-  label,
-  figure,
-  symbols,
-  total,
-  children,
-}: {
-  /** The button's `data-spark-breakdown-toggle`. */
-  id: string;
-  label: string;
-  /** The figure on the button: the side's USD total, or its count. */
-  figure: ReactNode;
-  symbols: string[];
-  /** The overlay heading's exact total and its receipt, where the side is priced. */
-  total?: { usd: number; info: Provenance };
-  /** The overlay's body. */
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const button = useRef<HTMLButtonElement | null>(null);
-  const panelId = useId();
-  const close = () => {
-    setOpen(false);
-    button.current?.focus();
-  };
-  return (
-    <>
-      <button
-        ref={button}
-        type="button"
-        onClick={(e) => {
-          // The card can be a link: the press is the button's alone.
-          e.preventDefault();
-          e.stopPropagation();
-          setOpen((o) => !o);
-        }}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-label={[
-          total ? `${label} ${formatUsdValue(total.usd)}` : label,
-          `${symbols.length} assets`,
-          "show breakdown",
-        ].join(", ")}
-        className={`-mx-1.5 -my-1 inline-flex max-w-full cursor-pointer flex-wrap items-center gap-x-1.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-rb-200/70 focus-ring dark:hover:bg-rb-700/60 ${open ? "bg-rb-200/70 dark:bg-rb-700/60" : ""}`}
-        data-spark-breakdown-toggle={id}
-        data-anatomy="C19"
-      >
-        <QuietTipsContext.Provider value={true}>
-          <ProvInert>{figure}</ProvInert>
-          <span className="inline-flex shrink-0 items-center">
-            <InlineAssetCluster symbols={symbols} size={16} overlap={5} />
-          </span>
-        </QuietTipsContext.Provider>
-      </button>
-      {open && (
-        // The overlay renders in a portal, but its events still pass through
-        // the card's React handlers: this stops them here.
-        <span className="contents" onClick={(e) => e.stopPropagation()}>
-          <AnchoredPanel
-            id={panelId}
-            label={total ? `${label} ${formatUsdValue(total.usd)}` : label}
-            anchor={() => button.current}
-            onClose={close}
-            fit={420}
-            drop
-            name="breakdown-panel"
-            surface="overlay"
-            className="[--donut-ground:var(--surface-overlay)] max-sm:[--donut-ground:var(--surface-raised)] dark:[--donut-ground:var(--color-rb-900)]"
-          >
-            <p className="mb-3 flex items-baseline gap-2 pr-8 sm:pr-0" data-breakdown-heading="">
-              <span className={OVERLAY_HEADING}>{label}</span>
-              {total && (
-                <Prov info={total.info} echo>
-                  <span className="text-sm font-semibold tabular-nums text-foreground">
-                    {formatUsdValue(total.usd)}
-                  </span>
-                </Prov>
-              )}
-            </p>
-            {children}
-          </AnchoredPanel>
-        </span>
-      )}
-    </>
-  );
-}
-
 /** A closed side the account never held: no supply backed borrowing, or
  *  nothing was borrowed. */
 function PeakNone() {
@@ -568,26 +472,26 @@ export function useSparkCardSlots({
             value: (
               <span data-spark-not-collateral="">
                 {peakOthers.length > 1 ? (
-                  // Many assets: their count opens the peaks, so the cell
-                  // holds one line. The peaks carry no USD (PeakLines).
-                  <StatBreakdown
-                    id="peak-not-collateral"
-                    label="Supplied, not collateral"
-                    figure={
-                      // A count of the peaks the overlay lists, each with its receipt.
-                      <span data-prov-exempt="">{peakOthers.length} assets</span>
-                    }
-                    symbols={loadedSymbols(peakOthers)}
-                  >
-                    <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
-                      <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
-                    </span>
-                  </StatBreakdown>
+                  // A count of the peaks the overlay lists, each with its receipt.
+                  <span data-prov-exempt="">{peakOthers.length} assets</span>
                 ) : (
                   <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
                 )}
               </span>
             ),
+            // Many assets: their count opens the peaks, so the cell holds one
+            // line. The peaks carry no USD (PeakLines).
+            breakdown:
+              peakOthers.length > 1
+                ? {
+                    symbols: loadedSymbols(peakOthers),
+                    panel: (
+                      <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
+                        <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
+                      </span>
+                    ),
+                  }
+                : undefined,
           },
         ],
         [],
@@ -760,22 +664,21 @@ export function useSparkCardSlots({
       label: "Supplied, not collateral",
       value: (
         <span data-spark-not-collateral="">
-          <StatBreakdown
-            id="not-collateral"
-            label="Supplied, not collateral"
-            figure={<Prov info={total.info}>{formatCompactUsd(otherUsd)}</Prov>}
-            symbols={loadedSymbols(splitDust(othersRanked, usdOf).shown)}
-            total={total}
-          >
-            <AssetBreakdownPanel
-              id="spark-not-collateral-breakdown"
-              name="Supplied, not collateral"
-              side="collateral"
-              breakdown={breakdownOf(otherLines, "supply")}
-            />
-          </StatBreakdown>
+          <Prov info={total.info}>{formatCompactUsd(otherUsd)}</Prov>
         </span>
       ),
+      breakdown: {
+        symbols: loadedSymbols(splitDust(othersRanked, usdOf).shown),
+        total,
+        panel: (
+          <AssetBreakdownPanel
+            id="spark-not-collateral-breakdown"
+            name="Supplied, not collateral"
+            side="collateral"
+            breakdown={breakdownOf(otherLines, "supply")}
+          />
+        ),
+      },
       tip: NOT_COLLATERAL_TIP,
     });
   } else if (otherSupplies.length > 0) {
