@@ -46,14 +46,6 @@ export interface ChainMeta {
    *  (`rails-base-backfill` for history, the site's own app for state). A chain
    *  whose one app serves both simply names the same var twice. */
   logsRpcEnv: string;
-  /** Where this chain sits — "L1" for a settlement layer, "L2" for a rollup on
-   *  one. It exists for the one sentence that says it: the home page's scope
-   *  phrase ("positions across Ethereum L1 and Base L2 DeFi"), which is built
-   *  from the chains the site actually offers rather than written out, so it
-   *  cannot name a chain the nav has stopped linking. A testnet takes its
-   *  parent's layer — Sepolia is an L1 — and is left out of that phrase by
-   *  `testnet`, not by this. */
-  layer: "L1" | "L2";
   /** A test network. Absent (false) on every production chain. Surfaces that
    *  state figures as money read this to say "testnet" once, where a reader
    *  would otherwise take a Sepolia balance for a real one. */
@@ -65,7 +57,6 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     id: 1,
     name: "Ethereum",
     slug: "ethereum",
-    layer: "L1",
     explorerName: "Etherscan",
     explorerBase: "https://etherscan.io",
     rpcEnv: "ALCHEMY_URL",
@@ -75,7 +66,6 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     id: 8453,
     name: "Base",
     slug: "base",
-    layer: "L2",
     explorerName: "Basescan",
     explorerBase: "https://basescan.org",
     rpcEnv: "BASE_RPC_URL",
@@ -89,7 +79,6 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     id: 42161,
     name: "Arbitrum",
     slug: "arbitrum",
-    layer: "L2",
     explorerName: "Arbiscan",
     // Etherscan-family, so the PATHS below and the #eventlog anchor hold.
     explorerBase: "https://arbiscan.io",
@@ -100,7 +89,6 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     id: 11155111,
     name: "Sepolia",
     slug: "sepolia",
-    layer: "L1",
     // Etherscan runs the Sepolia explorer under its own brand, on a subdomain.
     explorerName: "Etherscan",
     explorerBase: "https://sepolia.etherscan.io",

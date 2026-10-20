@@ -26,9 +26,15 @@
 // Base timeline pages follow, applied to the headline: an index that cannot
 // vouch for the whole history is not what the reader is shown.
 //
-// Each explorer is asked twice — `status=open`, and all-time — and its closed
-// count is the difference (see CoveredPositions.closedPositions for why the
-// subtraction, and not `status=closed`, is the correct question).
+// Each listed explorer is asked twice — `status=open`, and all-time — and its
+// closed count is the difference (see CoveredPositions.closedPositions for why
+// the subtraction, and not `status=closed`, is the correct question).
+//
+// The Arbitrum explorers have no listing with a total. They are counted from
+// the census their coverage route states (CENSUS_ENDPOINT, read in
+// census-leg.ts; rails-ops reference/arbitrum-position-first-lane.md, "The
+// census"), one question that answers both figures, and are pending until the
+// census is complete, as a backfilling Base listing is.
 //
 // Three seams in the backend the tables below have to absorb:
 //
@@ -64,6 +70,7 @@ import { fetchWithRetry } from "@/lib/api/resilient-fetch";
 import { CHAINS } from "@/lib/shared/chains";
 import { LAUNCHED_PROTOCOLS } from "@/lib/shared/protocols";
 import type { CoveredPositions } from "./covered-positions";
+import { fetchCensusCount, type RosterCount, type RosterState } from "./census-leg";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
@@ -71,10 +78,11 @@ const RAILS_API_URL = process.env.RAILS_API_URL;
 const REVALIDATE_SECONDS = 3600;
 
 /**
- * Every explorer's discovery listing, keyed by `ProtocolEntry.id`. Keys are
- * asserted against the counted roster at load (see `assertRosterCovered`) so adding an
- * explorer without listing it here fails loudly rather than quietly shrinking
- * the count — the headline names the roster, so the roster defines this map.
+ * Every listed explorer's discovery listing, keyed by `ProtocolEntry.id`. Each
+ * counted explorer has an entry here or in CENSUS_ENDPOINT, asserted at load
+ * (see `assertRosterCovered`) so adding an explorer without either fails loudly
+ * rather than quietly shrinking the count — the headline names the roster, so
+ * the roster defines these maps.
  */
 const LISTING_ENDPOINT: Record<string, string> = {
   "aave-v3": "/api/aave-v3/positions",
@@ -108,6 +116,19 @@ const LISTING_ENDPOINT: Record<string, string> = {
   pwn: "/api/pwn/positions",
   seamless: "/api/seamless/positions",
   spark: "/api/spark/positions",
+};
+
+/**
+ * The explorers counted from a census rather than a listing, keyed by
+ * `ProtocolEntry.id`: the position-first Arbitrum families, whose coverage
+ * route states `census: { wallets, open, complete, … } | null` (census-leg.ts).
+ * The route key is the server's family key, which differs from the explorer id
+ * for Morpho.
+ */
+const CENSUS_ENDPOINT: Record<string, string> = {
+  "aave-v3-arbitrum": "/api/aave-v3-arbitrum/coverage",
+  "compound-v3-arbitrum": "/api/compound-v3-arbitrum/coverage",
+  "morpho-arbitrum": "/api/morpho-blue-arbitrum/coverage",
 };
 
 /**
@@ -172,9 +193,6 @@ function readTotal(json: TotalEnvelope): number | null {
   return typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? raw : null;
 }
 
-/** One explorer's roster, counted. `closed` is derived, never fetched. */
-type RosterCount = { open: number; closed: number };
-
 /**
  * One leg of a listing: its filtered total, and — where the listing states a
  * `coverage` — whether the history behind it is complete. `pending` carries
@@ -238,7 +256,7 @@ async function fetchTotal(id: string, path: string, status: string | null): Prom
  * suppresses the figure instead of publishing a negative or nonsense closed
  * count.
  */
-async function fetchRosterCount(id: string, path: string): Promise<RosterCount | { pending: string } | null> {
+async function fetchRosterCount(id: string, path: string): Promise<RosterState> {
   const [open, allTime] = await Promise.all([
     fetchTotal(id, path, "open"),
     fetchTotal(id, path, ALL_TIME_STATUS[id] ?? null),
@@ -261,7 +279,7 @@ async function fetchRosterCount(id: string, path: string): Promise<RosterCount |
  * position explorer landed (2026-07-16; the exclusion was always "no position
  * roster exists to count YET", never "this subject has no positions"). The set
  * stays because the concept is real: an explorer listed here is exempt from the
- * LISTING_ENDPOINT requirement below and contributes nothing to the headline,
+ * LISTING_ENDPOINT / CENSUS_ENDPOINT requirement below and contributes nothing to the headline,
  * keeping the headline a claim about positions, which is what it says it is.
  *
  * ⚠️ If a future entry lands here alongside a LISTING_ENDPOINT for the same id,
@@ -283,16 +301,9 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.
   "sky-savings",
-  // Aave V3 on Arbitrum, position-first (rails-ops TO-DO-arbitrum-scoping.md):
-  // any wallet's position reads from the chain, and there is no roster of
-  // accounts to count until the listing step. It leaves this set in the change
-  // that adds its LISTING_ENDPOINT.
-  "aave-v3-arbitrum",
-  // Morpho Blue on Arbitrum, position-first on the same terms (item 13).
-  "morpho-arbitrum",
-  // Compound V3 on Arbitrum, position-first on the same terms (item 12).
-  "compound-v3-arbitrum",
-  // Otherwise empty since 2026-08-26. The five Base explorers (Aave V3 Base,
+  // Otherwise empty since 2026-08-26. The three Arbitrum explorers sat here
+  // until their census landed and left in the change that added their
+  // CENSUS_ENDPOINT. The five Base explorers (Aave V3 Base,
   // Moonwell Base, Morpho Blue Base, Compound V3 Base, Seamless) sat here from
   // 2026-08-23 for the same reason Compound V2 once did — they had positions
   // to show but no listing to count them from, Base's history not being
@@ -321,19 +332,32 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
  *    a position in that claim, and the rule reads off the chain axis so the
  *    next testnet explorer needs no change here either.
  *  - Explorer. What is excluded beyond that is the explorers that have no
- *    listing to count (`NOT_POSITION_EXPLORERS`), which is decision 0014's
+ *    roster to count (`NOT_POSITION_EXPLORERS`), which is decision 0014's
  *    rule: the headline names what the reader can actually reach. An explorer
- *    whose listing exists but whose history is still backfilling is asked,
- *    and answers "not yet" — see fetchRosterCount.
+ *    whose listing or census exists but whose history is still incomplete is
+ *    asked, and answers "not yet" — see fetchRosterCount and census-leg.ts.
  */
 const COUNTED_PROTOCOLS = LAUNCHED_PROTOCOLS.filter(
   (p) => !CHAINS[p.chainId].testnet && !NOT_POSITION_EXPLORERS.has(p.id),
 );
 
-/** Guards the map against roster drift — see LISTING_ENDPOINT. */
+/** Guards both maps against roster drift — see LISTING_ENDPOINT. An explorer
+ *  with neither, or with both (which one would count is then ambiguous),
+ *  trips it. */
 function assertRosterCovered(): string[] | null {
-  const missing = COUNTED_PROTOCOLS.filter((p) => !LISTING_ENDPOINT[p.id]).map((p) => p.id);
+  const missing = COUNTED_PROTOCOLS.filter((p) => !LISTING_ENDPOINT[p.id] === !CENSUS_ENDPOINT[p.id]).map((p) => p.id);
   return missing.length > 0 ? missing : null;
+}
+
+/** One counted explorer's roster, by whichever kind of endpoint it has. */
+function fetchExplorerCount(id: string): Promise<RosterState> {
+  const census = CENSUS_ENDPOINT[id];
+  if (census) {
+    return fetchCensusCount(id, `${RAILS_API_URL}${census}`, (url) =>
+      fetchWithRetry(url, createAuthFetchOptions({ next: { revalidate: REVALIDATE_SECONDS } })),
+    );
+  }
+  return fetchRosterCount(id, LISTING_ENDPOINT[id]);
 }
 
 /**
@@ -341,9 +365,10 @@ function assertRosterCovered(): string[] | null {
  * rosters are unavailable (see the all-or-nothing note above). Fetches every
  * explorer concurrently; each leg retries transient failures with a per-attempt
  * timeout (fetchWithRetry), and failures are not cached, so the next
- * regeneration retries from scratch. A Base explorer still backfilling its history is not a failure: it
- * is left out of this hour's sum, logged by name, and joins the hour its
- * listing says the history is complete.
+ * regeneration retries from scratch. A Base explorer still backfilling its
+ * history, or an Arbitrum explorer whose census is incomplete, is not a
+ * failure: it is left out of this hour's sum, logged by name, and joins the
+ * hour its listing or census says the history is complete.
  */
 export async function getCoveredPositions(): Promise<CoveredPositions | null> {
   if (!RAILS_API_URL) {
@@ -353,11 +378,13 @@ export async function getCoveredPositions(): Promise<CoveredPositions | null> {
 
   const missing = assertRosterCovered();
   if (missing) {
-    console.error(`covered-positions: no listing endpoint for ${missing.join(", ")} — count suppressed`);
+    console.error(
+      `covered-positions: not exactly one listing or census endpoint for ${missing.join(", ")} — count suppressed`,
+    );
     return null;
   }
 
-  const counts = await Promise.all(COUNTED_PROTOCOLS.map((p) => fetchRosterCount(p.id, LISTING_ENDPOINT[p.id])));
+  const counts = await Promise.all(COUNTED_PROTOCOLS.map((p) => fetchExplorerCount(p.id)));
 
   const rosters: RosterCount[] = [];
   for (const [i, c] of counts.entries()) {

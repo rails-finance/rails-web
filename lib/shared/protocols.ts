@@ -719,24 +719,15 @@ export function launchedProductionChains(): ChainMeta[] {
   return launchedChains().filter((c) => !c.testnet);
 }
 
-/** "Ethereum L1 and Base L2" — the home page's scope phrase, built from the
- *  chains above rather than written out, so a sentence about what Rails covers
- *  cannot name a chain the nav has stopped linking. Three or more chains take
- *  an Oxford comma. */
-export function launchedChainScope(): string {
-  const names = launchedProductionChains().map((c) => `${c.name} ${c.layer}`);
-  return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
-}
-
-/** "Ethereum and Base" — the production chains a protocol-COUNT claim names
- *  ("N DeFi protocols on Ethereum and Base"), built from the roster rather
- *  than written out for the reason `launchedChainScope` is. Bare chain names,
- *  no `L1`/`L2` suffix: unlike `launchedChainScope`'s sentence, which is about
- *  how deep Rails goes, this one is a headcount, and the layer marker would
- *  just be noise on it. A testnet (Sepolia, Polaris) is left out here too —
+/** "Ethereum, Base, and Arbitrum" — the production chains Rails names in a
+ *  coverage or count claim: the home page's scope phrase ("positions across
+ *  Ethereum, Base, and Arbitrum DeFi"), the hero's terms, the site metadata.
+ *  Built from the roster rather than written out, so a sentence about what
+ *  Rails covers cannot name a chain the nav has stopped linking. Three or more
+ *  chains take an Oxford comma. A testnet (Sepolia, Polaris) is left out —
  *  the copy sites that count it name it on their own, in words, where they
- *  have room ("…on Ethereum and Base, plus Polaris on Sepolia"), because it is
- *  one explorer on one chain, not a third production chain the site offers. */
+ *  have room ("…on Ethereum, Base, and Arbitrum, plus Polaris on Sepolia"), because it is
+ *  one explorer on one chain, outside the production chains the site offers. */
 export function launchedProductionChainNames(): string {
   const names = launchedProductionChains().map((c) => c.name);
   return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect } from "react";
 import { Check } from "lucide-react";
-import { launchedChainScope } from "@/lib/shared/protocols";
+import { launchedProductionChainNames } from "@/lib/shared/protocols";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -81,5 +81,5 @@ export function HomeHero() {
 
 // The last term is a coverage claim, so it names the chains a reader can
 // actually reach from the nav rather than writing them out — see
-// `launchedChainScope`.
-const TERMS = ["read-only", "no wallet connection", launchedChainScope()];
+// `launchedProductionChainNames`.
+const TERMS = ["read-only", "no wallet connection", launchedProductionChainNames()];

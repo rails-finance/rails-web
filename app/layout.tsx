@@ -67,9 +67,9 @@ export const viewport: Viewport = {
 // or a coverage page a reader cannot get to, would advertise a door that is
 // not open. Both come back on their own when the flags come off.
 const PROTOCOL_COUNT = LAUNCHED_PROTOCOL_VERSION_COUNT;
-/** "Ethereum and Base" — see `launchedProductionChainNames`. Polaris is named
+/** "Ethereum, Base, and Arbitrum" — see `launchedProductionChainNames`. Polaris is named
  *  separately, in words, where the sentence has room for it: it is one
- *  explorer on Sepolia, not a third production chain. */
+ *  explorer on Sepolia, outside the production chains. */
 const PRODUCTION_CHAIN_NAMES = launchedProductionChainNames();
 /** "/coverage/ethereum" — the coverage doors this description points a reader
  *  at, named off the roster rather than written out, so the sentence cannot

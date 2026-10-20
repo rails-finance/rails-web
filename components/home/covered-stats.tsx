@@ -1,12 +1,12 @@
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { CoveredStatsNote } from "@/components/home/covered-stats-note";
-import { launchedChainScope } from "@/lib/shared/protocols";
+import { launchedProductionChainNames } from "@/lib/shared/protocols";
 import { formatMonthDay } from "@/lib/date";
 
 /** The production chains the count is drawn from — the same set the loader
- *  sums over, named with their layer. */
-const COUNTED_SCOPE = launchedChainScope();
+ *  sums over. */
+const COUNTED_SCOPE = launchedProductionChainNames();
 
 /**
  * Covered stats — the roster, counted, stated at display scale between the live

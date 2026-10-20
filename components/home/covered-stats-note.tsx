@@ -28,7 +28,7 @@ import { MobileSheet } from "@/components/shared/mobile-sheet";
  *
  * The text states the rule the loader applies (covered-positions-data.ts):
  * each explorer's own listing total, all-time, summed hourly; the grain each
- * protocol counts in; that "closed" absorbs every protocol's own ending; and
+ * protocol counts in, and the Arbitrum census grain (census-leg.ts); that "closed" absorbs every protocol's own ending; and
  * that the wallet figure is distinct across explorers (stats.ts counts
  * DISTINCT lower(wallet) over every listing). Nothing about Base backfill
  * completeness on purpose: that gate closes the day Morpho Base's history
@@ -40,7 +40,8 @@ function NoteText() {
       Positions are the sum of each explorer&rsquo;s own listing total, counted all-time and refreshed hourly. A
       position is whatever the protocol&rsquo;s listing counts: a trove for Liquity and its forks, a vault for MakerDAO,
       one entry per wallet and market for Aave V3 and Morpho, one per wallet for Spark, Moonwell, Maple and Compound V2.
-      Closed includes liquidated, repaid and defaulted. Wallets are counted once across every explorer.
+      On Arbitrum a position is a wallet that has ever supplied or borrowed on the protocol, read from the chain once a
+      day. Closed includes liquidated, repaid and defaulted. Wallets are counted once across every explorer.
     </>
   );
 }
