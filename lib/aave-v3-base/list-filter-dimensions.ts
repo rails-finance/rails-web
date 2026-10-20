@@ -1,15 +1,16 @@
 // Aave V3 Base listing — the Aave V3 filter dimensions minus the market facet.
 // ----------------------------------------------------------------------------
 // The Base deployment is one Pool, so the Ethereum explorer's Core / Prime /
-// EtherFi facet has nothing to select. Everything else — status, position
-// side, liquidation history — is the same question asked of the same Pool
-// interface, so the dimensions are the Aave V3 ones with that one removed,
-// and the fetch params are the Aave V3 ones pointed at the Base route.
+// EtherFi facet has nothing to select. Everything else (status, debt and
+// collateral size, liquidation history) is the same question asked of the
+// same Pool interface, so the dimensions are the Aave V3 ones with that one
+// removed, and the fetch params are the Aave V3 ones pointed at the Base route.
 
 import {
   aaveV3ListDimensions,
   aaveV3FiltersToFetchParams,
   AAVE_V3_LIST_DEFAULTS,
+  BASE_LENDING_SIZE_NOTE,
   type AaveV3ListFilters,
 } from "@/lib/aave-v3/list-filter-dimensions";
 import type { FetchAaveV3PositionsParams, AaveV3PositionSort } from "@/lib/api/fetch-aave-v3-positions";
@@ -22,7 +23,7 @@ export const AAVE_V3_BASE_POSITIONS_ROUTE = "/api/aave-v3-base/positions";
 const AAVE_V3_BASE_TX_TOP = 2000000;
 
 export function aaveV3BaseListDimensions() {
-  return aaveV3ListDimensions(AAVE_V3_BASE_TX_TOP).filter((d) => d.id !== "market");
+  return aaveV3ListDimensions(AAVE_V3_BASE_TX_TOP, BASE_LENDING_SIZE_NOTE).filter((d) => d.id !== "market");
 }
 
 export const AAVE_V3_BASE_LIST_DEFAULTS: AaveV3ListFilters = { ...AAVE_V3_LIST_DEFAULTS, market: [] };

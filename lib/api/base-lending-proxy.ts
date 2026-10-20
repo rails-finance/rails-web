@@ -65,6 +65,11 @@ export async function proxyBaseLendingPositions(request: NextRequest, t: BaseLen
       const v = sp.get(k);
       if (v != null && /^\d+$/.test(v)) qs.set(k, v);
     }
+    // So is a USD bound on the debt or the collateral.
+    for (const k of ["minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
+      const v = sp.get(k);
+      if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+    }
     if (sp.get("status")) qs.set("status", sp.get("status")!);
     // Asset facets arrive as ADDRESSES on this lane (no curated Base catalog to
     // map symbols through); pass them straight down.

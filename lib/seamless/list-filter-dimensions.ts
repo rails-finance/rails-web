@@ -1,8 +1,8 @@
 // Seamless listing — the Aave V3 filter dimensions minus the market facet.
 // ----------------------------------------------------------------------------
 // Seamless is one Pool, so the Ethereum explorer's Core / Prime / EtherFi
-// facet has nothing to select. Everything else — status, position side,
-// liquidation history — is the same question asked of the same Pool
+// facet has nothing to select. Everything else (status, debt and collateral
+// size, liquidation history) is the same question asked of the same Pool
 // interface, so the dimensions are the Aave V3 ones with that one removed,
 // and the fetch params are the Aave V3 ones pointed at the Seamless route.
 
@@ -10,6 +10,7 @@ import {
   aaveV3ListDimensions,
   aaveV3FiltersToFetchParams,
   AAVE_V3_LIST_DEFAULTS,
+  BASE_LENDING_SIZE_NOTE,
   type AaveV3ListFilters,
 } from "@/lib/aave-v3/list-filter-dimensions";
 import type { FetchAaveV3PositionsParams, AaveV3PositionSort } from "@/lib/api/fetch-aave-v3-positions";
@@ -18,7 +19,7 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 export const SEAMLESS_POSITIONS_ROUTE = "/api/seamless/positions";
 
 export function seamlessListDimensions() {
-  return aaveV3ListDimensions().filter((d) => d.id !== "market" && d.id !== "tx");
+  return aaveV3ListDimensions(undefined, BASE_LENDING_SIZE_NOTE).filter((d) => d.id !== "market" && d.id !== "tx");
 }
 
 export const SEAMLESS_LIST_DEFAULTS: AaveV3ListFilters = { ...AAVE_V3_LIST_DEFAULTS, market: [] };
