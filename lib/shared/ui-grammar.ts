@@ -31,6 +31,10 @@
 export const NAV_BUTTON =
   "inline-flex items-center gap-1.5 rounded-lg border border-rb-100 dark:border-rb-800 bg-rb-100 dark:bg-rb-800 px-3 py-1.5 text-sm text-rb-500 hover:text-foreground hover:bg-rb-200/60 dark:hover:bg-rb-700/50 hover:border-blue-500 transition-colors cursor-pointer";
 
+/** NAV_BUTTON with fully rounded ends: the quiet pill links under a
+ *  position-first explorer's search field (components/shared/protocol-front-door.tsx). */
+export const NAV_PILL = NAV_BUTTON.replace("rounded-lg", "rounded-full");
+
 /** Text/inline link that navigates to another page. Turns blue on hover. */
 export const NAV_LINK = "text-rb-500 hover:text-blue-500 transition-colors";
 

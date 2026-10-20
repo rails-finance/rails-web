@@ -1,9 +1,9 @@
-// Morpho Blue on Arbitrum — the protocol page: a wallet input over the
-// census's markets read live. The client half is protocol-page.tsx beside
-// this file.
+// Morpho Blue on Arbitrum — the front door: the protocol's mark, a wallet
+// field and the links to the market overview, the positions read and the info
+// page (components/shared/protocol-front-door.tsx).
 
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { MorphoArbitrumProtocolPage } from "./protocol-page";
+import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
 
 export const metadata = listingMetadata({
   title: "Morpho Blue on Arbitrum",
@@ -11,5 +11,5 @@ export const metadata = listingMetadata({
 });
 
 export default function Page() {
-  return <MorphoArbitrumProtocolPage />;
+  return <ProtocolFrontDoor session="morpho-arbitrum" positions={process.env.VERCEL_ENV !== "production"} />;
 }

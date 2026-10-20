@@ -70,8 +70,8 @@ type ProtocolSpec = {
    *  whole product is vaults has no position listing to draw — a share in a
    *  vault is not a position in the roster's sense (rails-ops decision 0027
    *  call 2) — so its rail drops that tab and its own route opens on the first
-   *  sub-page. A position-first explorer (no sub-pages) keeps its own route as
-   *  the protocol page: a wallet input over the market overview. Omitted means
+   *  sub-page. A position-first explorer keeps its own route as its front
+   *  door: a wallet field and links to its sub-pages. Omitted means
    *  it has one; `false` is the only other value, because "has a listing"
    *  needs no declaring. */
   positionListing?: false;
@@ -112,8 +112,7 @@ type ProtocolSpec = {
    *  that read it: the rail header's tabs (`RailHeader`, which the sub-page's
    *  own `SubPageHeader` draws), the route loading boundary, and the sitemap —
    *  so moving a sub-page is one edit here rather than a hunt through them.
-   *  Empty only on a position-first explorer, whose overview sits on its own
-   *  route under the wallet input. */
+   *  The type still admits an empty list; no entry uses it. */
   subPages: SubPageSpecs;
 };
 
@@ -194,8 +193,8 @@ const SPECS: ProtocolSpec[] = [
   {
     // Aave V3 on Arbitrum One, position-first (rails-ops
     // TO-DO-arbitrum-scoping.md): no listing, so the explorer's own route is
-    // the protocol page — a wallet input over the market overview — and it has
-    // no sub-pages.
+    // the front door — a wallet field and links to the market overview, the
+    // positions read and the info page (item 18).
     id: "aave-v3-arbitrum",
     session: "aave-v3-arbitrum",
     label: "Aave V3",
@@ -205,7 +204,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Arbitrum deployment — a separate Pool with its own reserves and risk parameters, any wallet's account read whole from the contracts, no modeled state",
     positionListing: false,
-    subPages: [],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     id: "aave-v4",
@@ -334,9 +333,9 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Compound V3 on Arbitrum One, position-first (rails-ops
-    // TO-DO-arbitrum-scoping.md item 12): no listing and no sub-pages, so the
-    // explorer's own route is the protocol page, a wallet input over the four
-    // Comets' market overview.
+    // TO-DO-arbitrum-scoping.md item 12): no listing, so the explorer's own
+    // route is the front door (item 18) and the four Comets' overview is the
+    // markets sub-page.
     id: "compound-v3-arbitrum",
     session: "compound-v3-arbitrum",
     label: "Compound V3",
@@ -346,7 +345,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Arbitrum deployment — four Comets read live, and any wallet's standing in each one read from the contracts at one block",
     positionListing: false,
-    subPages: [],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     id: "dolomite",
@@ -519,9 +518,9 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Morpho Blue on Arbitrum One, position-first (rails-ops
-    // TO-DO-arbitrum-scoping.md item 13): no listing and no sub-pages, so the
-    // explorer's own route is the protocol page, a wallet input over the
-    // census's markets read live.
+    // TO-DO-arbitrum-scoping.md item 13): no listing, so the explorer's own
+    // route is the front door (item 18) and the census's markets read live
+    // are the markets sub-page.
     id: "morpho-arbitrum",
     session: "morpho-arbitrum",
     label: "Morpho Blue",
@@ -531,7 +530,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue's Arbitrum deployment — 258 isolated markets censused from the singleton, any wallet's positions read from the contract at one block",
     positionListing: false,
-    subPages: [],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // The first testnet explorer. A Sepolia figure is a test figure, and the

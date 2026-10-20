@@ -40,10 +40,6 @@ export interface AaveMarketPageProps {
   learnMore: LearnMoreContent;
   /** Listing URL filtered to one asset/side, where the listing supports it. */
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
-  /** "section": the overview sits under another page's header (a
-   *  position-first explorer's protocol page), so it draws a section heading
-   *  in place of the rail header and the h1. */
-  header?: "page" | "section";
 }
 
 export function AaveMarketPage(props: AaveMarketPageProps) {
@@ -110,22 +106,6 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
         Chain snapshot · <BlockRef block={data.blockNumber} chainId={props.chainId ?? MAINNET_CHAIN_ID} />
       </p>
     ) : undefined;
-
-  if (props.header === "section")
-    return (
-      <section aria-labelledby="market-overview-heading">
-        <header className="mb-6" data-skel-section="page-header">
-          <div className="flex items-center gap-2">
-            <h2 id="market-overview-heading" className="text-lg font-semibold text-foreground">
-              Market overview
-            </h2>
-            <LearnMore content={props.learnMore} inline />
-          </div>
-          {stamp}
-        </header>
-        {body}
-      </section>
-    );
 
   return (
     <div className="min-h-screen">

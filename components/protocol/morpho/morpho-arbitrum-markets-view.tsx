@@ -1,7 +1,7 @@
 "use client";
 
-// Morpho Blue on Arbitrum — the protocol page's markets table, under the
-// wallet input. The census's markets read at one block
+// Morpho Blue on Arbitrum — the markets sub-page's table
+// (/arbitrum/morpho/markets). The census's markets read at one block
 // (GET /api/chain/morpho-arbitrum/markets, lib/sources/chain/
 // morpho-arbitrum-markets.ts): the funded markets whose loan token is a dollar
 // stable or WETH ranked by supply in dollars, every other funded market listed
