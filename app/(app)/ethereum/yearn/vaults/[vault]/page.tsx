@@ -28,7 +28,7 @@ import { yearnVaultHref } from "@/lib/vaults/routes";
 import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault";
 import { isYearnRosterVault } from "@/lib/yearn/vault-roster";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
-import { loadVaultYields } from "@/lib/vaults/yield-read";
+import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
 
 // Every figure is a slot read at the head — nothing about this is cacheable
 // across requests.
@@ -70,7 +70,7 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
   const typed = firstParam((await searchParams).holder)?.trim();
   if (typed) redirect(yearnVaultHref(address, typed));
 
-  const [data, yields] = await Promise.all([load(address), loadVaultYields(YEARN_CHAIN_ID, [address])]);
+  const [data, series] = await Promise.all([load(address), loadVaultPageSeries(YEARN_CHAIN_ID, address)]);
 
   return (
     <div className="min-h-screen">
@@ -84,7 +84,7 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
             This vault could not be read from chain just now, so no figure is stated for it.
           </p>
         ) : (
-          <YearnVaultPage data={data} yieldFigure={yields[address]} />
+          <YearnVaultPage data={data} yieldFigure={series.yieldFigure} strip={series.strip} />
         )}
 
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />

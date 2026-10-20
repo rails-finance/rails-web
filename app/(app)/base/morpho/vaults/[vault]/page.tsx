@@ -45,7 +45,7 @@ import { isMorphoBaseRosterVault } from "@/lib/morpho-base/vault-roster";
 import { baseVaultHref } from "@/lib/vaults/routes";
 import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
-import { loadVaultYields } from "@/lib/vaults/yield-read";
+import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
 
 // Every figure is a slot read at the head, and the holder rides in the query —
 // nothing about this is cacheable across requests.
@@ -94,10 +94,10 @@ export default async function MorphoBaseVaultPage({ params, searchParams }: Prop
   const holderParam = firstParam((await searchParams).holder);
   if (holderParam && holderParam.trim()) redirect(baseVaultHref(address, holderParam.trim()));
 
-  const [data, census, yields] = await Promise.all([
+  const [data, census, series] = await Promise.all([
     load(address, undefined),
     loadVaultCensusRow(MORPHO_BASE_CHAIN_ID, address),
-    loadVaultYields(MORPHO_BASE_CHAIN_ID, [address]),
+    loadVaultPageSeries(MORPHO_BASE_CHAIN_ID, address),
   ]);
   const factory = MORPHO_BASE_METAMORPHO_FACTORIES.find((f) => f.version === data.vault.factory);
 
@@ -116,7 +116,8 @@ export default async function MorphoBaseVaultPage({ params, searchParams }: Prop
           <MorphoBaseVaultPageView
             data={data}
             census={census}
-            yieldFigure={yields[address]}
+            yieldFigure={series.yieldFigure}
+            strip={series.strip}
             factory={factory?.address ?? null}
           />
         )}

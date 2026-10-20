@@ -1,7 +1,7 @@
 "use client";
 
 // One Yearn V3 vault's page on Ethereum (rails-ops ui-jobs 407): the vault card
-// (V2), where the assets are (V3) and the holder finder (V4). One block's read
+// (V2), the last 30 days (V5), where the assets are (V3) and the holder finder (V4). One block's read
 // of the vault and of the Yearn V3 Registry (lib/sources/chain/
 // yearn-ethereum-vault.ts); Yield is the daily store's. There is no census, so
 // Holders is empty.
@@ -14,6 +14,8 @@ import { NotLoaded } from "@/components/shared/not-loaded";
 import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
+import { VaultStrip } from "@/components/vaults/vault-strip";
+import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import { assetText, pctText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
 import { yearnVaultPageSummary } from "@/lib/vaults/summary";
@@ -64,7 +66,16 @@ const fraction = (part: RawAmount | null, total: RawAmount | null): number | nul
     ? Number((BigInt(part.raw) * BigInt(1e9)) / BigInt(total.raw)) / 1e9
     : null;
 
-export function YearnVaultPage({ data, yieldFigure }: { data: YearnVaultResponse; yieldFigure?: VaultYield }) {
+export function YearnVaultPage({
+  data,
+  yieldFigure,
+  strip,
+}: {
+  data: YearnVaultResponse;
+  yieldFigure?: VaultYield;
+  /** The store's three daily series for the strip (V5); null where it did not answer. */
+  strip: VaultStripSeries | null;
+}) {
   const registry = useReceiptRegistry();
   const y = data.vault;
   const v = yearnVaultPageSummary(data);
@@ -352,6 +363,7 @@ export function YearnVaultPage({ data, yieldFigure }: { data: YearnVaultResponse
           ],
         }}
       />
+      <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
       <VaultAssets
         rows={rows}
         assetSymbol={unit}

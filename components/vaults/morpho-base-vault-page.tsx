@@ -1,7 +1,8 @@
 "use client";
 
 // One MetaMorpho vault's page on Base (rails-ops ui-jobs 407): the vault card
-// (V2), where the assets are (V3) and the holder finder (V4). One block's read
+// (V2), the last 30 days (V5), where the assets are (V3) and the holder
+// finder (V4). One block's read
 // of the vault and of Morpho Blue (lib/sources/chain/morpho-base-vault.ts);
 // Holders is the census's, Yield the daily store's.
 
@@ -13,6 +14,8 @@ import { PanelFigure, type PositionPanelRow } from "@/components/shared/position
 import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
+import { VaultStrip } from "@/components/vaults/vault-strip";
+import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { assetText, pctText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
@@ -51,11 +54,14 @@ export function MorphoBaseVaultPage({
   data,
   census,
   yieldFigure,
+  strip,
   factory,
 }: {
   data: MorphoBaseVaultResponse;
   census: VaultCensusRow | null;
   yieldFigure?: VaultYield;
+  /** The store's three daily series for the strip (V5); null where it did not answer. */
+  strip: VaultStripSeries | null;
   /** The factory that made this vault, from the catalogue. */
   factory: string | null;
 }) {
@@ -310,6 +316,7 @@ export function MorphoBaseVaultPage({
           ]),
         }}
       />
+      <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
       <VaultAssets
         rows={rows}
         assetSymbol={unit}

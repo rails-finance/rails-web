@@ -42,7 +42,7 @@ import { ethereumVaultHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
 import { RailHeader } from "@/components/shared/rail-header";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
-import { loadVaultYields } from "@/lib/vaults/yield-read";
+import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
 
 // Every figure is a call at the head — nothing about this is cacheable across
 // requests.
@@ -96,9 +96,9 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
   if (!data.served) notFound();
 
   const attestation = aaveVaultAttestation(address, data.vault.family);
-  const [census, yields] = await Promise.all([
+  const [census, series] = await Promise.all([
     loadVaultCensusRow(MAINNET_CHAIN_ID, address),
-    loadVaultYields(MAINNET_CHAIN_ID, [address]),
+    loadVaultPageSeries(MAINNET_CHAIN_ID, address),
   ]);
 
   return (
@@ -113,7 +113,13 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
             This vault could not be read from chain just now, so no figure is stated for it.
           </p>
         ) : (
-          <AaveEthereumVaultPage data={data} census={census} yieldFigure={yields[address]} attestation={attestation} />
+          <AaveEthereumVaultPage
+            data={data}
+            census={census}
+            yieldFigure={series.yieldFigure}
+            strip={series.strip}
+            attestation={attestation}
+          />
         )}
 
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />

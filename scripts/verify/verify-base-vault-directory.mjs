@@ -103,6 +103,7 @@ import { base } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readStoreSeries, readVaultStrip, vaultStripChecks } from "./lib/vault-strip.mjs";
 import { expectedRoster } from "./lib/served-vault-roster.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -593,6 +594,18 @@ check(
   priceTextBad.length === 0,
   priceTextBad.join("; ") || `${priceSample.length} sampled`,
 );
+
+// ── 17: the last 30 days (V5, ui-jobs 413) on Gauntlet USDC Prime's page ─────────────
+// Each tile's change against the two reads the daily store answers this
+// script directly, the line's days against the store's, no absolute figure.
+{
+  const stripVault = "0xee8f4ec5672f09119b96ab6fb59c27e1b7e44b61";
+  await page.goto(`${BASE}/base/morpho/vaults/${stripVault}`, { waitUntil: "networkidle", timeout: 240_000 });
+  await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
+  const strip = await readVaultStrip(page);
+  const store = await readStoreSeries(BASE, 8453, stripVault);
+  vaultStripChecks(check, "17", strip, store, { chain: 8453, vault: stripVault, censusFamily: true });
+}
 
 await browser.close();
 console.log(`\n${passes} passed, ${failures} failed${skipped ? `, ${skipped} skipped` : ""}`);

@@ -202,6 +202,7 @@ import { mainnet } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readStoreSeries, readVaultStrip, vaultStripChecks } from "./lib/vault-strip.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3611";
@@ -958,6 +959,18 @@ check(
   citationDrawn && tilesInside === 0 && namedInside.length === 0 && aaveTile.length === 0,
   `${tilesInside} tiles inside; names inside ${namedInside.join(", ") || "none"}; aave tiles ${aaveTile.join(", ") || "none"}`,
 );
+
+// ── 17: the last 30 days (V5, ui-jobs 413) on sGHO's page ─────────────
+// Each tile's change against the two reads the daily store answers this
+// script directly, the line's days against the store's, no absolute figure.
+{
+  const stripVault = SGHO;
+  await page.goto(`${BASE}/ethereum/aave/vaults/${stripVault}`, { waitUntil: "networkidle", timeout: 240_000 });
+  await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
+  const strip = await readVaultStrip(page);
+  const store = await readStoreSeries(BASE, 1, stripVault);
+  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault, censusFamily: true });
+}
 
 await browser.close();
 console.log(`\n${passes}/${passes + failures} checks passed${skipped ? ` · ${skipped} SKIP` : ""}`);

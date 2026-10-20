@@ -94,6 +94,7 @@ import { mainnet } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readStoreSeries, readVaultStrip, vaultStripChecks } from "./lib/vault-strip.mjs";
 import { expectedRoster } from "./lib/served-vault-roster.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -866,6 +867,18 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
   );
 } else {
   skip("16 the dev provenance tripwire", "no tripwire bookends on this build (production renders none)");
+}
+
+// ── 17: the last 30 days (V5, ui-jobs 413) on USDC-1 yVault's page ─────────────
+// Each tile's change against the two reads the daily store answers this
+// script directly, the line's days against the store's, no absolute figure.
+{
+  const stripVault = "0xbe53a109b494e5c9f97b9cd39fe969be68bf6204";
+  await page.goto(`${BASE}/ethereum/yearn/vaults/${stripVault}`, { waitUntil: "networkidle", timeout: 240_000 });
+  await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
+  const strip = await readVaultStrip(page);
+  const store = await readStoreSeries(BASE, 1, stripVault);
+  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault, censusFamily: false });
 }
 
 await browser.close();
