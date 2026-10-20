@@ -493,9 +493,9 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   const captions = useMemo(
     () =>
       view && data
-        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents)
+        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents, servedFolders)
         : null,
-    [view, data, sweptClean, lifetime, aaveEvents],
+    [view, data, sweptClean, lifetime, aaveEvents, servedFolders],
   );
 
   const stripAssets = useMemo<PriceStripAsset[]>(() => {

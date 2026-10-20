@@ -527,9 +527,9 @@ export function AaveV3PoolPositionView({
   const captions = useMemo(
     () =>
       view && data
-        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents)
+        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents, servedFolders)
         : null,
-    [view, data, sweptClean, lifetime, aaveEvents],
+    [view, data, sweptClean, lifetime, aaveEvents, servedFolders],
   );
 
   // An address that has never touched the Pool answers successfully with zeros,

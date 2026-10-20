@@ -686,7 +686,7 @@ export default function AaveV3PositionDetail({
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
   const captions = liveView
-    ? computeAaveV3CardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, aaveEvents)
+    ? computeAaveV3CardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, aaveEvents, servedFolders)
     : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
