@@ -894,7 +894,9 @@ function WarningLegNodes({
                 size={scale.tokenSize - 2 * (RING_WIDTH + RING_GAP)}
                 filterable={filterable}
               />
-              <ActorBadge size={scale.tokenSize} actor={actor} />
+              {/* One actor badge per event, on its top leg (rails-ops
+                  TO-DO-ui-jobs.md item 408). */}
+              {i === 0 && <ActorBadge size={scale.tokenSize} actor={actor} />}
             </span>
             <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
             {txt ? (
@@ -1221,7 +1223,14 @@ export function SpineColumn({
   // the diamond above them.
   const rowActor: SpineActor = effectiveIcon ? "owner" : shownActor;
   const hasBadge = rows.some((r) => r.badge);
+  // A multi-leg event carries one actor badge, on its top node (rails-ops
+  // TO-DO-ui-jobs.md item 408): the first row drawn, the spine running
+  // collateral, debt, held from the bottom up (standards/detail-page-anatomy.md).
+  // The % leg under the rows wears the rate's actor unless the top row already
+  // wears that badge.
+  const rateLegBadged = !(rows.length && rowActor !== "owner" && rowActor === rateActor);
   const tokenRows = bottomUp(rows).map((row, i) => {
+    const rowBadge: SpineActor = i === 0 ? rowActor : "owner";
     const chip = (
       <TokenChipIcon
         symbol={row.symbol}
@@ -1251,8 +1260,9 @@ export function SpineColumn({
         }
         glyph={
           // The row's own badge (Aave V4's collateral toggle, an order, a
-          // transfer) bottom-right; who acted top-left, on every row.
-          row.badge || rowActor !== "owner" ? (
+          // transfer) bottom-right, on every row it belongs to; who acted
+          // top-left, on the top row alone.
+          row.badge || rowBadge !== "owner" ? (
             <div className="relative">
               {chip}
               {row.badge === "check" ? (
@@ -1264,7 +1274,7 @@ export function SpineColumn({
               ) : row.badge ? (
                 <SendBadge size={T} />
               ) : null}
-              <ActorBadge size={T} actor={rowActor} />
+              <ActorBadge size={T} actor={rowBadge} />
             </div>
           ) : (
             chip
@@ -1311,7 +1321,7 @@ export function SpineColumn({
             glyph={
               <div className="relative" data-spine-rate-leg={rateActor}>
                 <RateIcon size={T} />
-                <ActorBadge size={T} actor={rateActor} />
+                {rateLegBadged && <ActorBadge size={T} actor={rateActor} />}
               </div>
             }
             right={rateFlank(rateSpan)}
