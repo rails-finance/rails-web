@@ -836,7 +836,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
       return (
         <>
           now: the cdpManager&rsquo;s own primary rate, read live at block {p.block.toLocaleString("en-US")} — not a
-          touch of this CDP&rsquo;s
+          touch of this position&rsquo;s
         </>
       );
     }
@@ -844,7 +844,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     if (!o) {
       return (
         <>
-          {polarisEndLabel(p)}: this CDP&rsquo;s own touch at block {p.block.toLocaleString("en-US")}
+          {polarisEndLabel(p)}: this position&rsquo;s own touch at block {p.block.toLocaleString("en-US")}
           {observationLinks(p, links)}
         </>
       );
@@ -861,7 +861,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     return (
       <>
         {polarisEndLabel(p)}: the market&rsquo;s PrimaryRateSet at block {o.block.toLocaleString("en-US")}, fired by a
-        PSM user unrelated to this CDP{observationLinks(setPoint, links)}
+        PSM user unrelated to this position{observationLinks(setPoint, links)}
       </>
     );
   };
@@ -897,7 +897,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     stats.push({
       label: "Stated over",
       figure: {
-        text: `${f.steps} of the CDP's touches`,
+        text: `${f.steps} of the position's touches`,
         prov: rateStepProv(note, "steps"),
         exact: String(note.steps),
       },
@@ -953,20 +953,20 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     derivation: note.live ? (
       <>
         This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the
-        market&rsquo;s PSM mints and redemptions. The earlier value is the rate in force at this CDP&rsquo;s own last
+        market&rsquo;s PSM mints and redemptions. The earlier value is the rate in force at this position&rsquo;s own last
         touch; the later is the cdpManager&rsquo;s own rate read now — {observation("from")}, {observation("to")}. Shown
-        whenever this CDP is open, whatever the move — nothing having moved is itself the fact this note states.
+        whenever this position is open, whatever the move — nothing having moved is itself the fact this note states.
         {note.setsBetween != null && (
           <>
             {" "}
-            The market has re-set the rate {f.sets} times since this CDP&rsquo;s last touch: the primary rate is re-set
+            The market has re-set the rate {f.sets} times since this position&rsquo;s last touch: the primary rate is re-set
             at every PSM mint or redemption in the market.
           </>
         )}
         {note.interest && (
           <>
             {" "}
-            The interest figures hold this CDP&rsquo;s own debt at that touch fixed and move only the rate; the
+            The interest figures hold this position&rsquo;s own debt at that touch fixed and move only the rate; the
             secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
             and is not on this log.
           </>
@@ -979,7 +979,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         {observation("from")}, {observation("to")}.{" "}
         {note.steps != null && (
           <>
-            Those two ends are {f.steps} of this CDP&rsquo;s touches apart: the rate moved the same way at every step in
+            Those two ends are {f.steps} of this position&rsquo;s touches apart: the rate moved the same way at every step in
             between, and a run of steps one after another in one direction is one thing happening to this position — so
             it is stated as one stretch, and the receipt lists each step it took in. A step the other way ends the run
             and begins the next note.{" "}
@@ -989,7 +989,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
           <>
             The market re-set the rate {f.sets} times in between: the primary rate is re-set at every PSM mint or
             redemption in the market, and {f.sets} of them fell between these two touches. Nothing between the two
-            touches is drawn, because nothing between them was observed on this CDP.{" "}
+            touches is drawn, because nothing between them was observed on this position.{" "}
           </>
         )}
         A stretch is stated only where the primary rate moved at least one percentage point, and consecutive stretches
@@ -997,7 +997,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         {note.interest && (
           <>
             {" "}
-            The interest figures hold this CDP&rsquo;s own debt at the earlier touch fixed and move only the rate; the
+            The interest figures hold this position&rsquo;s own debt at the earlier touch fixed and move only the rate; the
             secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
             and is not on this log.
           </>

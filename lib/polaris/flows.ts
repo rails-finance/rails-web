@@ -168,7 +168,7 @@ const ALL_BUCKETS: FlowBucket[] = [
   // A liquidation's part the pool did not absorb, passed on to the other CDPs.
   {
     key: PF.collRedistOut,
-    label: "Redistributed to other CDPs",
+    label: "Redistributed to other positions",
     event: "Liquidation",
     side: "collateral",
     dir: "out",
@@ -225,7 +225,7 @@ const ALL_BUCKETS: FlowBucket[] = [
   },
   {
     key: PF.debtRedistOut,
-    label: "Redistributed to other CDPs",
+    label: "Redistributed to other positions",
     event: "Liquidation",
     side: "debt",
     dir: "out",
@@ -759,8 +759,8 @@ export function polarisFlowWords(stable: string, daily = false): NonNullable<Flo
       debt: "Built up since the last event",
     },
     restNote: {
-      collateral: `the change in pETH's price, in ${stable}, since each flow, and the reward pETH and PSM shares built up since the CDP's last event, ${built}`,
-      debt: `the interest, stability gains and PSM shares built up on the debt since the CDP's last event, ${built}`,
+      collateral: `the change in pETH's price, in ${stable}, since each flow, and the reward pETH and PSM shares built up since the position's last event, ${built}`,
+      debt: `the interest, stability gains and PSM shares built up on the debt since the position's last event, ${built}`,
     },
     basis: {
       collateral: `Every figure is in ${stable}, the market's stablecoin; each pETH flow is converted at the market's price feed at its block.`,
@@ -768,9 +768,9 @@ export function polarisFlowWords(stable: string, daily = false): NonNullable<Flo
     },
     heldBasis: {
       collateral: daily
-        ? `the pETH the CDP held after its last event by then, with the reward pETH and PSM shares built up since, ${built}, at the feed's price at the close of that day, in ${stable}; at the latest block, the feed's price.`
-        : `the pETH the CDP held after its last event by then, with the reward pETH and PSM shares built up since, ${built}, at the feed's price at that event, in ${stable}; at the latest block, the feed's price.`,
-      debt: `the ${stable} the CDP's last event recorded by then, with the interest, stability gains and PSM shares built up since, ${built}, to the end of that day.`,
+        ? `the pETH the position held after its last event by then, with the reward pETH and PSM shares built up since, ${built}, at the feed's price at the close of that day, in ${stable}; at the latest block, the feed's price.`
+        : `the pETH the position held after its last event by then, with the reward pETH and PSM shares built up since, ${built}, at the feed's price at that event, in ${stable}; at the latest block, the feed's price.`,
+      debt: `the ${stable} the position's last event recorded by then, with the interest, stability gains and PSM shares built up since, ${built}, to the end of that day.`,
     },
     linePrices: daily
       ? `in ${stable}, with the collateral at the feed's price at each day's close and both sides running from each event to what the next one wrote in`

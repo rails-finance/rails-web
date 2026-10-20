@@ -50,8 +50,8 @@ export function liveEntireProv(what: "coll" | "debt", market: PolarisMarket): Pr
     verify: recompute(what === "coll" ? "getCDPEntireColl(id)" : "getCDPEntireDebt(id)"),
     summary:
       what === "coll"
-        ? "pETH the CDP holds NOW — the cdpManager's own getCDPEntireColl(id) at the latest block: the recorded collateral plus every pending leg (the PSM share and reward pETH accrued since the last touch). The identity the contract keeps, and the verifier asserts: entireColl = coll + mintRedeemCollChange + bcTokenGain."
-        : `${stable} the CDP owes NOW — the cdpManager's own getCDPEntireDebt(id) at the latest block: the recorded debt with interest accrued since the last touch, the pending PSM share, and the pending stability gain netted off. The identity the contract keeps: entireDebt = debt + accruedInterest + mintRedeemDebtChange − accruedStables. The getter is signed: when the pending legs clear more than the recorded debt it answers zero or below, the CDP owes nothing, and its next touch mints the difference so the debt lands on zero.`,
+        ? "pETH the position holds NOW — the cdpManager's own getCDPEntireColl(id) at the latest block: the recorded collateral plus every pending leg (the PSM share and reward pETH accrued since the last touch). The identity the contract keeps, and the verifier asserts: entireColl = coll + mintRedeemCollChange + bcTokenGain."
+        : `${stable} the position owes NOW — the cdpManager's own getCDPEntireDebt(id) at the latest block: the recorded debt with interest accrued since the last touch, the pending PSM share, and the pending stability gain netted off. The identity the contract keeps: entireDebt = debt + accruedInterest + mintRedeemDebtChange − accruedStables. The getter is signed: when the pending legs clear more than the recorded debt it answers zero or below, the position owes nothing, and its next touch mints the difference so the debt lands on zero.`,
     contract: manager(market),
     via: `${LANE_VIA} · ${what === "coll" ? "getCDPEntireColl" : "getCDPEntireDebt"}(id) @ head`,
   };
@@ -68,27 +68,27 @@ const PENDING: Record<PolarisPendingLeg, { method: string; summary: (stable: str
   accruedInterest: {
     method: "getCDPAccruedInterest(id)",
     summary: (s) =>
-      `Interest accrued since the last touch — the cdpManager's own getCDPAccruedInterest(id) at the latest block: simple accrual at the market's rate on the recorded debt, in ${s}. Pending: it is written into the debt at the CDP's next touch, where it becomes the CDPUpdated's _accruedInterest.`,
+      `Interest accrued since the last touch — the cdpManager's own getCDPAccruedInterest(id) at the latest block: simple accrual at the market's rate on the recorded debt, in ${s}. Pending: it is written into the debt at the position's next touch, where it becomes the CDPUpdated's _accruedInterest.`,
   },
   accruedStables: {
     method: "getCDPAccruedStables(id)",
     summary: (s) =>
-      `${s} gain pending against the debt — the cdpManager's own getCDPAccruedStables(id) at the latest block: the CDP's share of the secondary-rate (Protocol Safety Rate) interest the market's CDPs pay, in proportion to its collateral, not yet credited. Applied as a debt reduction at the next touch (the CDPUpdated's _stableGain).`,
+      `${s} gain pending against the debt — the cdpManager's own getCDPAccruedStables(id) at the latest block: the position's share of the secondary-rate (Protocol Safety Rate) interest the market's positions pay, in proportion to its collateral, not yet credited. Applied as a debt reduction at the next touch (the CDPUpdated's _stableGain).`,
   },
   bcTokenGain: {
     method: "getCDPBcTokenGain(id)",
     summary: () =>
-      "Reward pETH pending into the collateral — the cdpManager's own getCDPBcTokenGain(id) at the latest block: the CDP's share, in proportion to its debt, of the pETH the protocol pays out of its fees (bonding-curve swap fees, reserve-loan fees and pETH-to-POLAR conversions, per the Polaris docs), not yet settled. Added to the collateral at the next touch (the CDPUpdated's _bcTokenGain).",
+      "Reward pETH pending into the collateral — the cdpManager's own getCDPBcTokenGain(id) at the latest block: the position's share, in proportion to its debt, of the pETH the protocol pays out of its fees (bonding-curve swap fees, reserve-loan fees and pETH-to-POLAR conversions, per the Polaris docs), not yet settled. Added to the collateral at the next touch (the CDPUpdated's _bcTokenGain).",
   },
   mintRedeemColl: {
     method: "getCDPMintRedeemCollChange(id)",
     summary: () =>
-      "pETH pending from the PSM's activity — the cdpManager's own getCDPMintRedeemCollChange(id) at the latest block: the CDP's pro-rata share of collateral the PSM's mints (positive) and redemptions (negative) moved since the last touch.",
+      "pETH pending from the PSM's activity — the cdpManager's own getCDPMintRedeemCollChange(id) at the latest block: the position's pro-rata share of collateral the PSM's mints (positive) and redemptions (negative) moved since the last touch.",
   },
   mintRedeemDebt: {
     method: "getCDPMintRedeemDebtChange(id)",
     summary: (s) =>
-      `${s} of debt pending from the PSM's activity — the cdpManager's own getCDPMintRedeemDebtChange(id) at the latest block: the CDP's pro-rata share of debt the PSM's mints (positive) and redemptions (negative) moved since the last touch.`,
+      `${s} of debt pending from the PSM's activity — the cdpManager's own getCDPMintRedeemDebtChange(id) at the latest block: the position's pro-rata share of debt the PSM's mints (positive) and redemptions (negative) moved since the last touch.`,
   },
 };
 
@@ -99,7 +99,7 @@ export function liveRecordedDebtProv(market: PolarisMarket): Provenance {
     kind: "chain",
     pclass: "state",
     verify: recompute("getCDP(id).debt"),
-    summary: `${stableOf(market)} debt as the CDP's last touch recorded it — the cdpManager's own getCDP(id).debt at the latest block, before the pending legs. Interest accrues on this figure, so the yearly cost is stated on it.`,
+    summary: `${stableOf(market)} debt as the position's last touch recorded it — the cdpManager's own getCDP(id).debt at the latest block, before the pending legs. Interest accrues on this figure, so the yearly cost is stated on it.`,
     contract: manager(market),
     via: `${LANE_VIA} · getCDP(id).debt @ head`,
   };
@@ -143,7 +143,7 @@ export function livePendingToSettleProv(
     kind: "chain-derived",
     pclass: "oracle",
     verify: recompute("the five pending getters and previewPrice()"),
-    summary: `What settles into the CDP at its next touch, as one figure in ${stable} at the latest block: the pending stability gain less the pending interest, plus the pending PSM share (its pETH at the feed less its debt) and the pending reward pETH at the feed. Each leg is the cdpManager's own getter; the netting is computed in the browser.`,
+    summary: `What settles into the position at its next touch, as one figure in ${stable} at the latest block: the pending stability gain less the pending interest, plus the pending PSM share (its pETH at the feed less its debt) and the pending reward pETH at the feed. Each leg is the cdpManager's own getter; the netting is computed in the browser.`,
     contract: manager(market),
     via: `${LANE_VIA} · pending getters × previewPrice() @ head`,
     formula:
@@ -171,7 +171,7 @@ export function liveIcrProv(market: PolarisMarket): Provenance {
     kind: "chain",
     pclass: "state",
     verify: recompute("getICR(id)"),
-    summary: `Collateral ratio — the cdpManager's own getICR(id) at the latest block: entire collateral × the market's price feed ÷ entire debt, computed by the contract. The protocol judging its own CDP against MCR (or the defensive-mode MCR when that mode is on); the verifier asserts the identity entireColl × price ÷ entireDebt.`,
+    summary: `Collateral ratio — the cdpManager's own getICR(id) at the latest block: entire collateral × the market's price feed ÷ entire debt, computed by the contract. The protocol judging its own position against MCR (or the defensive-mode MCR when that mode is on); the verifier asserts the identity entireColl × price ÷ entireDebt.`,
     contract: manager(market),
     via: `${LANE_VIA} · getICR(id) @ head (÷ 1e18)`,
     formula: "entireColl × price ÷ entireDebt",
@@ -194,7 +194,7 @@ export function liveEquityProv(market: PolarisMarket): Provenance {
     kind: "chain",
     pclass: "oracle",
     verify: recompute("getCDPEntireColl(id) × priceFeed.previewPrice() − getCDPEntireDebt(id)"),
-    summary: `The CDP's equity at the feed — entire collateral (getCDPEntireColl(id)) times the market's own price for pETH in ${stable} (the PriceFeed's previewPrice()), minus entire debt (getCDPEntireDebt(id)), all three read at the latest block. An entire debt at or below zero counts as zero: the CDP owes nothing, and its next touch settles the debt to zero rather than paying the difference out. A valuation at this block, not a profit: it moves with the feed's price and with the interest and PSM share still pending, and it can be negative when the debt is worth more than the collateral. Turning it into a realised profit or loss needs a price for each of the holder's own deposits — a decision about basis, not a fact of the chain.`,
+    summary: `The position's equity at the feed — entire collateral (getCDPEntireColl(id)) times the market's own price for pETH in ${stable} (the PriceFeed's previewPrice()), minus entire debt (getCDPEntireDebt(id)), all three read at the latest block. An entire debt at or below zero counts as zero: the position owes nothing, and its next touch settles the debt to zero rather than paying the difference out. A valuation at this block, not a profit: it moves with the feed's price and with the interest and PSM share still pending, and it can be negative when the debt is worth more than the collateral. Turning it into a realised profit or loss needs a price for each of the holder's own deposits — a decision about basis, not a fact of the chain.`,
     contract: manager(market),
     via: `${LANE_VIA} · getCDPEntireColl(id) × previewPrice() − getCDPEntireDebt(id) @ head`,
     formula: "entireColl × pethInDebt − max(0, entireDebt)",
@@ -224,7 +224,7 @@ export function liveRateProv(
     verify: recompute(method),
     summary:
       which === "combined"
-        ? "The interest rate in force on this market's debt — the cdpManager's own getInterestRate() at the latest block, primary + secondary, 1e18 = 100% per year. Algorithmic: nobody chose it. Simple accrual on each CDP's recorded debt since its last touch."
+        ? "The interest rate in force on this market's debt — the cdpManager's own getInterestRate() at the latest block, primary + secondary, 1e18 = 100% per year. Algorithmic: nobody chose it. Simple accrual on each position's recorded debt since its last touch."
         : which === "primary"
           ? "The primary rate — the cdpManager's own primaryRate() at the latest block: the market's set rate, moved by PrimaryRateSet on the PSM's mints and redemptions."
           : "The secondary rate — the cdpManager's own secondaryRate() at the latest block: the Protocol Safety Rate, a kinked function of the market's debt-to-reserve ratio: 0.02667 × debt ÷ reserve below the 0.75 kink, steeper above it.",
@@ -262,7 +262,7 @@ export function polarisAnnualCostProv(market: PolarisMarket): Provenance {
   const stable = stableOf(market);
   return {
     kind: "derived",
-    summary: `Estimated interest for a year at the rate in force — the CDP's recorded debt times the market's current rate, in ${stable}. A projection at today's rate, computed in the browser: the contract accrues on the recorded debt since the last touch and writes the interest in at the next one, the pending PSM share joins the recorded debt then, and the rate is algorithmic and moves.`,
+    summary: `Estimated interest for a year at the rate in force — the position's recorded debt times the market's current rate, in ${stable}. A projection at today's rate, computed in the browser: the contract accrues on the recorded debt since the last touch and writes the interest in at the next one, the pending PSM share joins the recorded debt then, and the rate is algorithmic and moves.`,
     formula: "recorded debt × rate",
     inputs: [
       {
@@ -289,7 +289,7 @@ export function liveMcrProv(defensive: boolean, market: PolarisMarket, board = f
     verify: recompute(defensive ? "DEFENSIVE_MODE_MCR()" : "MCR()"),
     summary: defensive
       ? "The minimum collateral ratio in force — the cdpManager's own DEFENSIVE_MODE_MCR() (150%) at the latest block, because isDefensiveMode() is true: the market's reserve-to-debt ratio has fallen below its threshold and the floor rises until it recovers."
-      : "The minimum collateral ratio in force — the cdpManager's own MCR() (115%) at the latest block. A CDP below it can be liquidated; the floor rises to DEFENSIVE_MODE_MCR() (150%) when the market enters defensive mode.",
+      : "The minimum collateral ratio in force — the cdpManager's own MCR() (115%) at the latest block. A position below it can be liquidated; the floor rises to DEFENSIVE_MODE_MCR() (150%) when the market enters defensive mode.",
     contract: manager(market),
     via: `${board ? BOARD_VIA : LANE_VIA} · ${defensive ? "DEFENSIVE_MODE_MCR" : "MCR"}() @ head (÷ 1e18)`,
   };
@@ -328,7 +328,7 @@ export function liveOwnerProv(market: PolarisMarket): Provenance {
     pclass: "state",
     verify: recompute("cdpNft.ownerOf(id)"),
     summary:
-      "The CDP's current holder — the cdpNft's own ownerOf(id) at the latest block. The CDP is an NFT, so this is who may act on it now; the index's owner is the last Transfer's recipient, and the two agree on every open CDP (the verifier asserts it). Reverts once the NFT is burned.",
+      "The position's current holder — the cdpNft's own ownerOf(id) at the latest block. The position is an NFT, so this is who may act on it now; the index's owner is the last Transfer's recipient, and the two agree on every open position (the verifier asserts it). Reverts once the NFT is burned.",
     contract: { name: `Polaris ${stableOf(market)} CDP NFT`, address: POLARIS_MARKET_CONFIG[market].cdpNft },
     via: `${LANE_VIA} · ownerOf(id) @ head`,
   };
@@ -342,8 +342,8 @@ export function liveTotalProv(what: "coll" | "debt", market: PolarisMarket): Pro
     verify: recompute(what === "coll" ? "getTotalColl()" : "getTotalDebt()"),
     summary:
       what === "coll"
-        ? "All pETH in the market's CDPs — the cdpManager's own getTotalColl() at the latest block: the active collateral the manager accounts for, the chain's own figure."
-        : `All ${stableOf(market)} owed across the market's CDPs — the cdpManager's own getTotalDebt() at the latest block: the recorded debt the manager accounts for, before interest pending on each CDP since its last touch.`,
+        ? "All pETH in the market's positions — the cdpManager's own getTotalColl() at the latest block: the active collateral the manager accounts for, the chain's own figure."
+        : `All ${stableOf(market)} owed across the market's positions — the cdpManager's own getTotalDebt() at the latest block: the recorded debt the manager accounts for, before interest pending on each position since its last touch.`,
     contract: manager(market),
     via: `${BOARD_VIA} · ${what === "coll" ? "getTotalColl" : "getTotalDebt"}() @ head`,
   };
@@ -520,17 +520,17 @@ export function listingIcrProv(market: PolarisMarket): Provenance {
     pclass: "oracle",
     verify: {
       kind: "recompute",
-      text: "Re-run the market's priceFeed.previewPrice() at the stamped block, multiply the CDP's last emitted collateral by it and divide by its last emitted debt.",
+      text: "Re-run the market's priceFeed.previewPrice() at the stamped block, multiply the position's last emitted collateral by it and divide by its last emitted debt.",
     },
     summary:
-      "Collateral ratio, approximate — the CDP's last emitted collateral × the market's price feed at the time of the listing read ÷ its last emitted debt. The same formula the cdpManager's getICR computes, but on the last stated figures: interest accrued since the last touch and the PSM's pending share are settled only at the CDP's next touch, so the contract's own figure can differ. The CDP's page states getICR(id).",
+      "Collateral ratio, approximate — the position's last emitted collateral × the market's price feed at the time of the listing read ÷ its last emitted debt. The same formula the cdpManager's getICR computes, but on the last stated figures: interest accrued since the last touch and the PSM's pending share are settled only at the position's next touch, so the contract's own figure can differ. The position's page states getICR(id).",
     contract: feed(market),
     via: `${BOARD_VIA} · last emitted coll × previewPrice() ÷ last emitted debt`,
     formula: "coll × price ÷ debt",
     inputs: [
-      { label: "collateral", kind: "chain", pclass: "emitted", note: "the CDP's last emitted coll, from the index" },
+      { label: "collateral", kind: "chain", pclass: "emitted", note: "the position's last emitted coll, from the index" },
       { label: "price", kind: "chain", pclass: "oracle", note: `the market's PriceFeed — pETH in ${stable}` },
-      { label: "debt", kind: "chain", pclass: "emitted", note: "the CDP's last emitted debt, from the index" },
+      { label: "debt", kind: "chain", pclass: "emitted", note: "the position's last emitted debt, from the index" },
     ],
   };
 }
@@ -551,18 +551,18 @@ export function holderCollProv(): Provenance {
     pclass: "emitted",
     verify: {
       kind: "recompute",
-      text: "Add the last emitted collateral of each open CDP the wallet holds — every one of them is on the page under this strip.",
+      text: "Add the last emitted collateral of each open position the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the pETH the wallet's open CDPs hold — the sum of each CDP's last emitted collateral, from the index. pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. Reward pETH accrued since each CDP's last touch is not in it; it lands on the CDP at its next touch.",
+      "All the pETH the wallet's open positions hold — the sum of each position's last emitted collateral, from the index. pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. Reward pETH accrued since each position's last touch is not in it; it lands on the position at its next touch.",
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted coll over the open rows",
-    formula: "Σ coll over the wallet's open CDPs",
+    formula: "Σ coll over the wallet's open positions",
     inputs: [
       {
         label: "collateral",
         kind: "chain",
         pclass: "emitted",
-        note: "each open CDP's last emitted coll, from the index",
+        note: "each open position's last emitted coll, from the index",
       },
     ],
   };
@@ -577,14 +577,14 @@ export function holderDebtSumProv(market: PolarisMarket): Provenance {
     pclass: "emitted",
     verify: {
       kind: "recompute",
-      text: `Add the last emitted debt of each open CDP the wallet holds in the ${stable} market — every one of them is on the page under this strip.`,
+      text: `Add the last emitted debt of each open position the wallet holds in the ${stable} market — every one of them is on the page under this strip.`,
     },
-    summary: `${stable} the wallet's open CDPs owe — the sum of each CDP's last emitted debt, from the index. The wallet borrows in this market only, so the sum is a quantity of one token and nothing was converted to reach it. Interest since each CDP's last touch and any pending PSM share are not in it; both settle at that CDP's next touch.`,
+    summary: `${stable} the wallet's open positions owe — the sum of each position's last emitted debt, from the index. The wallet borrows in this market only, so the sum is a quantity of one token and nothing was converted to reach it. Interest since each position's last touch and any pending PSM share are not in it; both settle at that position's next touch.`,
     contract: manager(market),
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted debt over the open rows",
-    formula: `Σ debt over the wallet's open ${stable} CDPs`,
+    formula: `Σ debt over the wallet's open ${stable} positions`,
     inputs: [
-      { label: "debt", kind: "chain", pclass: "emitted", note: "each open CDP's last emitted debt, from the index" },
+      { label: "debt", kind: "chain", pclass: "emitted", note: "each open position's last emitted debt, from the index" },
     ],
   };
 }
@@ -597,10 +597,10 @@ export function holderDebtValueProv(): Provenance {
     pclass: "oracle",
     verify: {
       kind: "recompute",
-      text: "Add the last emitted debt of each open CDP the wallet holds, market by market; take USDp at one dollar and GOLDp at the XAU/USD medianiser's price at the stamped block.",
+      text: "Add the last emitted debt of each open position the wallet holds, market by market; take USDp at one dollar and GOLDp at the XAU/USD medianiser's price at the stamped block.",
     },
     summary:
-      "What the wallet's open CDPs owe, in dollars — each CDP's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each CDP's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
+      "What the wallet's open positions owe, in dollars — each position's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each position's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
     contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
     via: `${BOARD_VIA} · Σ last emitted debt × the market's own unit price @ head`,
     formula: "Σ debt × the market's unit in USD",

@@ -180,7 +180,7 @@ const pct2 = (f: number): string => `${(f * 100).toFixed(2)}%`;
 const pctShort = (f: number): string => `${Number((f * 100).toFixed(1))}%`;
 
 /** What the Debt label says on a CDP that owes nothing. */
-const COLLATERAL_ONLY_TIP = "Owes nothing at this block. A Polaris CDP can hold collateral with no debt.";
+const COLLATERAL_ONLY_TIP = "Owes nothing at this block. A Polaris position can hold collateral with no debt.";
 
 /** A pETH price in the market's own stablecoin, at a readable grain: three
  *  decimals under 1, two under 100, whole numbers above (USDp's feed runs in
@@ -332,19 +332,19 @@ function CdpMenuRows({ v }: { v: PolarisPositionView }) {
     <>
       <ToolsMenuItem
         icon={copied === "id" ? <Check size={16} /> : <Copy size={16} />}
-        title={`CDP #${v.cdpId}`}
-        subtitle={copied === "id" ? "Copied" : "Copy the CDP number"}
+        title={`Position #${v.cdpId}`}
+        subtitle={copied === "id" ? "Copied" : "Copy the position number"}
         onClick={() => copy("id", v.cdpId)}
       />
       <ToolsMenuItem
         icon={<ImageIcon size={16} />}
-        title="CDP NFT"
+        title="Position NFT"
         subtitle="Open it on Etherscan"
         onClick={() => window.open(polarisCdpNftUrl(v.market, v.cdpId), "_blank", "noopener,noreferrer")}
       />
       <ToolsMenuItem
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
-        title="Link to this CDP"
+        title="Link to this position"
         subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
         onClick={() => copy("link", `${window.location.origin}${polarisPositionHref(v.market, v.cdpId)}`)}
       />
@@ -436,7 +436,7 @@ export function polarisCardSlots({
     // One sentence each (Miles, 16 Oct 2026); why a peak can exceed the
     // deposits, and what a liquidation writes in, is the receipt's to say.
     const peakTip = (what: "coll" | "debt") =>
-      `The most ${what === "coll" ? `pETH the CDP held` : `${stable} the CDP owed`} after any transaction on it${
+      `The most ${what === "coll" ? `pETH the position held` : `${stable} the position owed`} after any transaction on it${
         v.peaksCountLiquidation ? ", its liquidation included" : ""
       }.`;
     heads = [
@@ -728,7 +728,7 @@ export function polarisCardSlots({
     left.push({
       id: "psm-outcome",
       label: "PSM outcome at the feed",
-      tip: `Every PSM share the CDP has settled ${POLARIS_WORDS.docs_psm}, its pETH at the latest feed less the debt it moved, in ${stable}.`,
+      tip: `Every PSM share the position has settled ${POLARIS_WORDS.docs_psm}, its pETH at the latest feed less the debt it moved, in ${stable}.`,
       value: (
         <TokenFigure symbol={stable} address={stableAddress}>
           <Prov info={psmAtFeedProv}>

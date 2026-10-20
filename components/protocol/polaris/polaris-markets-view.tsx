@@ -93,7 +93,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         <>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
             <Stat
-              label="Collateral in CDPs, now"
+              label="Collateral in positions, now"
               note={
                 <>
                   <Prov
@@ -110,7 +110,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 <AmountText value={chain.totalColl} format="compact" /> pETH
               </Prov>
             </Stat>
-            <Stat label="Debt across CDPs, now" note="the market's own total, PSM shares included">
+            <Stat label="Debt across positions, now" note="the market's own total, PSM shares included">
               <Prov info={liveTotalProv("debt", market)} value={formatExact(chain.totalDebt)}>
                 <AmountText value={chain.totalDebt} format="compact" /> {stable}
               </Prov>
@@ -210,10 +210,10 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         </div>
         {book ? (
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-            <Stat label="CDPs">
+            <Stat label="Positions">
               <Prov
                 info={bookCountProv(
-                  "CDPs ever opened",
+                  "Positions ever opened",
                   market,
                   "Open, closed and liquidated, by the last CDPUpdated's operation.",
                 )}
@@ -225,8 +225,8 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               </span>
             </Stat>
             <Stat
-              label="Open CDPs, at their last touch"
-              note="each CDP as its last touch wrote it; the market's totals above add what is pending since"
+              label="Open positions, at their last touch"
+              note="each position as its last touch wrote it; the market's totals above add what is pending since"
             >
               <Prov info={openBookProv("coll", market)} value={formatExact(book.openColl)}>
                 <AmountText value={book.openColl} format="compact" /> pETH
@@ -237,7 +237,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               </Prov>
             </Stat>
             {book.psmMintCount != null && (
-              <Stat label="PSM" note={`direct ${stable} mints and redemptions against pETH, shared by every open CDP`}>
+              <Stat label="PSM" note={`direct ${stable} mints and redemptions against pETH, shared by every open position`}>
                 <Prov
                   info={bookCountProv(
                     "PSM mints and redemptions",
@@ -278,7 +278,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         )}
         <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
           <Link href={`${POLARIS_BASE_PATH}?market=${market}`} className="text-blue-500 hover:underline">
-            Browse the {stable} CDPs
+            Browse the {stable} positions
           </Link>
           .
         </p>

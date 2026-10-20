@@ -19,7 +19,7 @@ export function polarisUsdSourceNote(usd: PolarisUsdValuation | null): string | 
   else if (blocks.length === 1) line = `At the Polaris oracle, block ${n(blocks[0])}.`;
   else line = `At the Polaris oracle: ${usd.prices.map((p) => `${symbol(p.market)} block ${n(p.block)}`).join(", ")}.`;
   for (const m of usd.unpricedMarkets) {
-    if (usd.prices.length > 0) line += ` ${symbol(m)} has no price yet, so a range leaves its CDPs out.`;
+    if (usd.prices.length > 0) line += ` ${symbol(m)} has no price yet, so a range leaves its positions out.`;
   }
   return line;
 }

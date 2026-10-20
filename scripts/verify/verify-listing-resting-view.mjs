@@ -449,7 +449,7 @@ if (wants("Polaris")) {
   const openTotal = openApi.pagination?.total;
   info(label("fixtures"), `open total ${openTotal}, every status ${allApi.pagination?.total}`);
 
-  /** A holder to prove the search rule on: one whose CDPs include an ended one
+  /** A holder to prove the search rule on: one whose positions include an ended one
    *  and whose whole set fits on the first page, so the rendered rows ARE the
    *  answer. Candidates come from the index (never from the page under test);
    *  a closed CDP keeps its owner here, but `lastOwner` is the fallback. */
@@ -504,7 +504,7 @@ if (wants("Polaris")) {
   if (closedHolder) {
     info(
       label("fixtures"),
-      `holder ${closedHolder.addr} holds ${closedHolder.total} CDP(s), ${closedHolder.ended.length} of them ended`,
+      `holder ${closedHolder.addr} holds ${closedHolder.total} position(s), ${closedHolder.ended.length} of them ended`,
     );
     await search(bare, closedHolder.addr, ROWS);
     const searchUrl = await bare.evaluate(() => window.location.search);
@@ -517,7 +517,7 @@ if (wants("Polaris")) {
     // (lib/shared/list-filter.ts:99-110) is deliberately page-level.
     info(label("5. after typing the holder"), `location.search "${searchUrl}"`);
     check(
-      label("5a. the holder's ended CDP renders"),
+      label("5a. the holder's ended position renders"),
       searchPills.filter((p) => ENDED_PILLS.has(p)).length === closedHolder.ended.length,
       `${searchPills.filter((p) => ENDED_PILLS.has(p)).length} ended of ${searchPills.length} rows vs API ${closedHolder.ended.length}`,
     );
@@ -537,7 +537,7 @@ if (wants("Polaris")) {
       [...new Set(searchPills)].join(", ") || "none",
     );
   } else {
-    check(label("5. holder fixture"), false, "no closed CDP with a single-page holder in the API answer");
+    check(label("5. holder fixture"), false, "no closed position with a single-page holder in the API answer");
   }
 
   // ── 5e-g. a CDP-number search relaxes it too ─────────────────────────────
@@ -554,13 +554,13 @@ if (wants("Polaris")) {
     // number, and the closed one among them carries the ended pill.
     info(label("5e. id fixtures"), `id ${closedId} → API ${idTotal} row(s) across the markets`);
     check(
-      label("5e. a CDP-number search answers the index's own row set"),
+      label("5e. a position-number search answers the index's own row set"),
       idRows.length === idTotal && idTotal > 0,
       `${idRows.length} row(s) rendered vs API ${idTotal}: ${idRows.map((r) => r.href).join(", ") || "none"}`,
     );
     const endedIdx = idRows.findIndex((r) => r.href === `/sepolia/polaris/usdp/${closedId}`);
     check(
-      label("5f. the closed CDP of that number renders, ended"),
+      label("5f. the closed position of that number renders, ended"),
       endedIdx >= 0 && ENDED_PILLS.has(idPills[endedIdx]),
       `usdp/${closedId} pill ${idPills[endedIdx] ?? "not rendered"}`,
     );
@@ -571,7 +571,7 @@ if (wants("Polaris")) {
     );
     await byId.close();
   } else {
-    check(label("5e. CDP-number fixture"), false, "no closed CDP id in the API answer");
+    check(label("5e. position-number fixture"), false, "no closed position id in the API answer");
   }
 
   // ── 5h. a liquidation reaches its holder's search, named as one ──────────
@@ -584,10 +584,10 @@ if (wants("Polaris")) {
     const named = rows.filter((r) => /Outcome\s+Liquidated\b/.test(r.text)).length;
     info(
       label("fixtures"),
-      `liquidated holder ${liqHolder.addr} holds ${liqHolder.total} CDP(s), ${liq.length} liquidated`,
+      `liquidated holder ${liqHolder.addr} holds ${liqHolder.total} position(s), ${liq.length} liquidated`,
     );
     check(
-      label("5h. the holder's liquidated CDP renders and says so"),
+      label("5h. the holder's liquidated position renders and says so"),
       rows.length === liqHolder.total && named === liq.length && liq.length > 0,
       `${rows.length} rows vs API ${liqHolder.total}; ${named} say Liquidated vs API ${liq.length}`,
     );
@@ -596,7 +596,7 @@ if (wants("Polaris")) {
     check(
       label("5h. liquidated-holder fixture"),
       false,
-      "no liquidated CDP with a single-page holder in the API answer",
+      "no liquidated position with a single-page holder in the API answer",
     );
   }
 

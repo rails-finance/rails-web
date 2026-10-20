@@ -11,9 +11,9 @@ import { POLARIS_BASE_PATH } from "@/lib/polaris/routes";
 
 export default function PolarisPositionNotFound() {
   return (
-    <RouteNotFound session="polaris" heading="Not a CDP" backHref={POLARIS_BASE_PATH} backLabel="Browse Polaris CDPs">
-      A Polaris CDP is named by its market (usdp or goldp) and its number. Either the URL does not carry that pair, or
-      no CDP with that number has been minted on that market.
+    <RouteNotFound session="polaris" heading="Not a position" backHref={POLARIS_BASE_PATH} backLabel="Browse Polaris positions">
+      A Polaris position is named by its market (usdp or goldp) and its number. Either the URL does not carry that pair, or
+      no position with that number has been minted on that market.
     </RouteNotFound>
   );
 }

@@ -34,7 +34,7 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<RawSearchParams>;
 }): Promise<Metadata> {
-  const directory = listingMetadata({ title: "Explore Polaris CDPs", canonicalPath: POLARIS_BASE_PATH });
+  const directory = listingMetadata({ title: "Explore Polaris positions", canonicalPath: POLARIS_BASE_PATH });
   const { ownerAddress, ownerEns } = parsePolarisSearch(toURLSearchParams(await searchParams).get("q") ?? "");
   // An address is lowercased (one wallet, one URL, whatever case it was typed
   // in); an ENS name stays as typed, which is how it resolves.

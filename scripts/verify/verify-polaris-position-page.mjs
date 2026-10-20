@@ -138,8 +138,8 @@ const context = await browser.newContext({
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
 
-  const copyBtn = card(page).getByRole("button", { name: "Copy CDP number" }).first();
-  check("a1. usdp/8 detail card — a 'Copy CDP number' button sits in the identity row", (await copyBtn.count()) > 0);
+  const copyBtn = card(page).getByRole("button", { name: "Copy position number" }).first();
+  check("a1. usdp/8 detail card — a 'Copy position number' button sits in the identity row", (await copyBtn.count()) > 0);
   if ((await copyBtn.count()) > 0) {
     await copyBtn.click();
     await page.waitForTimeout(200);
@@ -154,12 +154,12 @@ const context = await browser.newContext({
     await page.waitForTimeout(1800);
     check(
       "a3. the 'Copied' state expires and the copy button returns",
-      (await card(page).getByRole("button", { name: "Copy CDP number" }).count()) > 0,
+      (await card(page).getByRole("button", { name: "Copy position number" }).count()) > 0,
     );
   }
 
-  const nftBtn = card(page).getByRole("button", { name: "View the CDP NFT on Etherscan" }).first();
-  check("a4. usdp/8 detail card — a 'View the CDP NFT on Etherscan' button sits beside it", (await nftBtn.count()) > 0);
+  const nftBtn = card(page).getByRole("button", { name: "View the position NFT on Etherscan" }).first();
+  check("a4. usdp/8 detail card — a 'View the position NFT on Etherscan' button sits beside it", (await nftBtn.count()) > 0);
   if ((await nftBtn.count()) > 0) {
     await nftBtn.click();
     await page.waitForTimeout(300);
@@ -197,8 +197,8 @@ const context = await browser.newContext({
   await page.waitForLoadState("load").catch(() => {});
   await page.waitForTimeout(3000);
   const urlBefore = page.url();
-  const listCopy = row.getByRole("button", { name: "Copy CDP number" }).first();
-  const listNft = row.getByRole("button", { name: "View the CDP NFT on Etherscan" }).first();
+  const listCopy = row.getByRole("button", { name: "Copy position number" }).first();
+  const listNft = row.getByRole("button", { name: "View the position NFT on Etherscan" }).first();
   check("a6. the listing card carries both buttons too", (await listCopy.count()) > 0 && (await listNft.count()) > 0);
   if ((await listCopy.count()) > 0) {
     await listCopy.click();
@@ -381,15 +381,15 @@ for (const [market, id] of [
   // The not-found body is client-rendered, so the status arrives before the
   // words do — read it once the heading has attached, not at DOM ready.
   await page
-    .getByText("Not a CDP")
+    .getByText("Not a position")
     .first()
     .waitFor({ state: "visible", timeout: 30000 })
     .catch(() => {});
   const body = (await page.locator("body").innerText()).replace(/\s+/g, " ");
   check("f1. /usdp/999999 answers a real 404 status", res?.status() === 404, String(res?.status()));
   check(
-    "f2. and its body says it is not a CDP",
-    /Not a CDP/.test(body) && /has been minted on that market/.test(body),
+    "f2. and its body says it is not a position",
+    /Not a position/.test(body) && /has been minted on that market/.test(body),
     body.slice(0, 200),
   );
   await page.close();
@@ -431,7 +431,7 @@ for (const [path, want, what] of [
   // explanation pane behind it carries a holder bullet whose first six words
   // are the same, and matching that would pass with the modal shut.
   await page.getByRole("button", { name: "Learn more" }).first().click();
-  const heading = page.getByText("About This CDP").first();
+  const heading = page.getByText("About This Position").first();
   await heading.waitFor({ state: "visible", timeout: 10000 });
   const modal = (await heading.locator("xpath=ancestor::div[contains(@class,'rounded-2xl')][1]").innerText()).replace(
     /\s+/g,
@@ -439,8 +439,8 @@ for (const [path, want, what] of [
   );
   check(
     "g. the '?' modal says the CDP is an ERC-721 whose holder holds the position",
-    /The CDP is an NFT/.test(modal) && /ERC-721/.test(modal) && /never reused/.test(modal),
-    modal.slice(modal.indexOf("The CDP is an NFT"), modal.indexOf("The CDP is an NFT") + 200),
+    /The position is an NFT/.test(modal) && /ERC-721/.test(modal) && /never reused/.test(modal),
+    modal.slice(modal.indexOf("The position is an NFT"), modal.indexOf("The position is an NFT") + 200),
   );
   await page.close();
 }

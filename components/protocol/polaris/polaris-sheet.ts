@@ -536,7 +536,7 @@ export function polarisSheet(
   const liqProv = (what: string, coll: number, debt: number): Provenance => ({
     kind: "chain-derived",
     pclass: "state",
-    summary: `${what} — the price of pETH, in ${stable}, at which this CDP's collateral ratio meets the market's normal-mode minimum, ${mcr.label}: the debt times the minimum ratio, divided by the collateral. A defensive-mode minimum (150%) in force at a past block is not indexed.`,
+    summary: `${what} — the price of pETH, in ${stable}, at which this position's collateral ratio meets the market's normal-mode minimum, ${mcr.label}: the debt times the minimum ratio, divided by the collateral. A defensive-mode minimum (150%) in force at a past block is not indexed.`,
     formula: "debt × minimum ratio ÷ collateral",
     contract: manager,
     inputs: [

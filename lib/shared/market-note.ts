@@ -1198,7 +1198,7 @@ export function psmGapSentence(note: PsmGapNote): string {
       : "PSM mints and redemptions";
   return (
     `Between blocks ${formatBlock(note.from.block)} and ${formatBlock(note.to.block)}, ${trades} moved the market; ` +
-    `the touch at block ${formatBlock(note.to.block)} wrote this CDP's share, ${signedShare(note.collShare, 4)} pETH ` +
+    `the touch at block ${formatBlock(note.to.block)} wrote this position's share, ${signedShare(note.collShare, 4)} pETH ` +
     `to the collateral and ${signedShare(note.debtShare, 2)} ${stable} to the debt`
   );
 }
@@ -1256,7 +1256,7 @@ export function marketNoteSentence(note: MarketNote): string {
   }
   if (note.live) {
     let sentence =
-      `Since this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} market's ` +
+      `Since this position's ${polarisEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} market's ` +
       `primary rate has moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, at the latest block ${f.toBlock}`;
     sentence += f.sets
       ? `; the market re-set the primary rate ${f.sets} times since, once per PSM mint or redemption.`
@@ -1272,12 +1272,12 @@ export function marketNoteSentence(note: MarketNote): string {
   // because that is the thing the reader cannot see any other way: the run's
   // ends are two touches with more of the CDP's own touches between them.
   let sentence = f.steps
-    ? `Over ${f.steps} of this CDP's own touches the ${note.marketSymbol} market's primary rate moved ` +
+    ? `Over ${f.steps} of this position's own touches the ${note.marketSymbol} market's primary rate moved ` +
       `${f.fromRate} → ${f.toRate} per year, ${f.delta}, from its ${polarisEndLabel(note.from)} at block ` +
       `${f.fromBlock} to its ${polarisEndLabel(note.to)} at block ${f.toBlock} — each step in between moved it ` +
       `the same way, so they are stated as one stretch`
     : `The ${note.marketSymbol} market's primary rate moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, ` +
-      `between this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
+      `between this position's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
       `${polarisEndLabel(note.to)} at block ${f.toBlock}`;
   sentence += f.sets
     ? `; the market re-set the primary rate ${f.sets} times in between, once per PSM mint or redemption.`
@@ -1341,7 +1341,7 @@ export function marketNoteRowAnnotation(note: MarketNote): string {
   }
   return note.live
     ? `market note: the ${note.marketSymbol} market's primary rate is ${f.toRate} per year at the latest block ${f.toBlock}, ${f.delta} since block ${f.fromBlock}`
-    : `market note: the ${note.marketSymbol} market's primary rate was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}${f.steps ? `, over ${f.steps} of this CDP's touches` : ""}`;
+    : `market note: the ${note.marketSymbol} market's primary rate was ${f.toRate} per year by block ${f.toBlock}, ${f.delta}${f.steps ? `, over ${f.steps} of this position's touches` : ""}`;
 }
 
 /** Where each end was read, and (for a price gap) why the stretch is stated at
@@ -1433,7 +1433,7 @@ export function marketNoteReceiptLine(note: MarketNote): string {
     const p = end === "from" ? note.from : note.to;
     return o
       ? `its PrimaryRateSet at block ${o.block}, tx ${o.txHash} log ${o.logIndex}`
-      : `this CDP's ${polarisEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
+      : `this position's ${polarisEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
   };
   return `- Receipt: rate before — ${named("from")}; rate after — ${named("to")}.${mergedStepsClause(note)}`;
 }

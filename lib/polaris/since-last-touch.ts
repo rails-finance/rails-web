@@ -292,7 +292,7 @@ export function polarisSinceLastTouchSentence(w: PolarisSinceLastTouch, stable: 
   return (
     `${polarisSinceLabel(w)} at block ${w.from.block.toLocaleString("en-US")}, the feed moved pETH from ` +
     `${formatPrice(w.from.pethInDebt)} to ${formatPrice(w.to.pethInDebt)} ${stable}, worth ` +
-    `${signedFigure(w.feed, stable)} on the collateral the CDP stated then, and the protocol added ` +
+    `${signedFigure(w.feed, stable)} on the collateral the position stated then, and the protocol added ` +
     `${signedFigure(w.protocol, stable)}${made} — together ${signedFigure(w.total, stable)}, the whole ` +
     `change in its equity at the feed.`
   );

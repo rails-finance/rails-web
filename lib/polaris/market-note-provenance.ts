@@ -31,7 +31,7 @@ const contractOf = (note: RateStepNote) => ({
 });
 
 /** One end of the step in prose: which of the CDP's own touches it is. */
-const touchClause = (point: MarketNotePoint): string => `this CDP's ${polarisEndLabel(point)} at block ${point.block}`;
+const touchClause = (point: MarketNotePoint): string => `this position's ${polarisEndLabel(point)} at block ${point.block}`;
 
 const observedOf = (note: RateStepNote, which: "earlier" | "later"): RateSetLog | null =>
   which === "earlier" ? note.observed.from : note.observed.to;
@@ -55,7 +55,7 @@ const rateLeafNote = (note: RateStepNote, which: "earlier" | "later"): string =>
   return (
     `${clause} — the cdpManager's PrimaryRateSet at block ${observed.block} (tx ${shortHex(observed.txHash)}, log ` +
     `${observed.logIndex}), newPrimaryRate ÷ 1e18, fired by ${shortHex(observed.txFrom)} — a PSM user, unrelated ` +
-    `to this CDP — inside that PSM mint or redemption, never inside a CDP touch`
+    `to this position — inside that PSM mint or redemption, never inside a position touch`
   );
 };
 
@@ -84,31 +84,31 @@ export const rateStepProv = (
   const pair = `${note.marketSymbol} market's primary rate`;
   const summaryBase = note.live
     ? part === "rate"
-      ? `The ${pair} at each end of the stretch — the earlier one is its last PrimaryRateSet at or before this CDP's ` +
+      ? `The ${pair} at each end of the stretch — the earlier one is its last PrimaryRateSet at or before this position's ` +
         `own last touch, the same as-of figure already on that touch's row; the later one is the cdpManager's own ` +
         `rate read live, at the chain head. Algorithmic: the market sets it on the PSM's mints and redemptions, ` +
-        `never chosen by the holder. Nothing between the two is drawn, because this CDP has transacted nothing ` +
+        `never chosen by the holder. Nothing between the two is drawn, because this position has transacted nothing ` +
         `since its own last touch.`
       : part === "delta"
-        ? `How far the ${pair} has moved since this CDP's own last touch — its own as-of figure against the ` +
-          `cdpManager's rate read live just now. It is the move in the rate alone: nothing about this CDP's own ` +
+        ? `How far the ${pair} has moved since this position's own last touch — its own as-of figure against the ` +
+          `cdpManager's rate read live just now. It is the move in the rate alone: nothing about this position's own ` +
           `debt or collateral enters it.`
-        : `The block the stretch runs from, and the chain head it runs TO — this CDP's own last touch, and the ` +
-          `block the live read answered at. The later block is not one the CDP transacted in; it is simply the ` +
+        : `The block the stretch runs from, and the chain head it runs TO — this position's own last touch, and the ` +
+          `block the live read answered at. The later block is not one the position transacted in; it is simply the ` +
           `latest one Rails could read the rate against.`
     : part === "rate"
-      ? `The ${pair} at each end of the stretch — its last PrimaryRateSet at or before this CDP's own two touches, ` +
+      ? `The ${pair} at each end of the stretch — its last PrimaryRateSet at or before this position's own two touches, ` +
         `the same as-of figure already on each touch's own row. Algorithmic: the market sets it on the PSM's mints ` +
-        `and redemptions, never chosen by the holder — the wallet that fired either log did nothing to this CDP. ` +
+        `and redemptions, never chosen by the holder — the wallet that fired either log did nothing to this position. ` +
         `The secondary rate, a kinked function of the market's debt-to-reserve ratio, is added on top and is not on this log. Nothing between the two ` +
-        `touches is drawn, because this CDP transacted nothing between them.`
+        `touches is drawn, because this position transacted nothing between them.`
       : part === "delta"
         ? `How far the ${pair} moved across the stretch — the later reading against the earlier one, both the ` +
-          `as-of figure already on this CDP's own two touches. It is the move in the rate alone: nothing about ` +
-          `this CDP's own debt or collateral enters it.`
-        : `The two blocks the stretch runs between — this CDP's own ${polarisEndLabel(note.from)} and ` +
-          `${polarisEndLabel(note.to)}. The stretch is bounded by the CDP's own activity: the ` +
-          `rate is known at these two blocks because the CDP was touched at each, and Rails states nothing about ` +
+          `as-of figure already on this position's own two touches. It is the move in the rate alone: nothing about ` +
+          `this position's own debt or collateral enters it.`
+        : `The two blocks the stretch runs between — this position's own ${polarisEndLabel(note.from)} and ` +
+          `${polarisEndLabel(note.to)}. The stretch is bounded by the position's own activity: the ` +
+          `rate is known at these two blocks because the position was touched at each, and Rails states nothing about ` +
           `the rate's path in between.`;
   // A merged note's every face says so: the two ends are two touches with more
   // of this CDP's own touches between them, and the receipt names each stretch
@@ -132,7 +132,7 @@ export const rateStepProv = (
     summary,
     ...contractOf(note),
     via: note.live
-      ? "the CDP's own last PrimaryRateSet as-of figure · cdpManager.getInterestRate() at read time"
+      ? "the position's own last PrimaryRateSet as-of figure · cdpManager.getInterestRate() at read time"
       : "PrimaryRateSet · newPrimaryRate ÷ 1e18, as-of each touch's block",
     ...(part === "delta" ? { formula: "(rate after − rate before) × 100" } : {}),
     verify: {
@@ -152,8 +152,8 @@ export const rateStepProv = (
         kind: "chain",
         pclass: "emitted",
         note: note.live
-          ? `this CDP's own last touch (${note.from.block}) and the block the live read answered at (${note.to.block})`
-          : `this CDP's own two touches — ${note.from.block} and ${note.to.block}`,
+          ? `this position's own last touch (${note.from.block}) and the block the live read answered at (${note.to.block})`
+          : `this position's own two touches — ${note.from.block} and ${note.to.block}`,
       },
     ],
   };
@@ -182,18 +182,18 @@ const stepsProv = (note: RateStepNote): Provenance => ({
   kind: "derived",
   pclass: "indexed",
   summary:
-    `How many of this CDP's own stretches this note states as one. Each of them moved the ${note.marketSymbol} ` +
+    `How many of this position's own stretches this note states as one. Each of them moved the ${note.marketSymbol} ` +
     `market's primary rate at least a percentage point the same way, one after another, so they are one run: the ` +
     `note runs from the first stretch's earlier touch to the last stretch's later one, and the rate it states is ` +
     `the rate at those two ends. A stretch that moved the rate the other way ends the run and begins the next ` +
     `note; a move too small to be stated at all never breaks one. The steps themselves are listed below.`,
   ...contractOf(note),
-  via: "consecutive same-direction stretches between this CDP's own touches",
+  via: "consecutive same-direction stretches between this position's own touches",
   formula: "one note per run of stretches whose move shares a sign",
   verify: {
     kind: "recompute",
     text:
-      `Read this CDP's own touches in block order, take the primary rate on each, and mark every consecutive pair ` +
+      `Read this position's own touches in block order, take the primary rate on each, and mark every consecutive pair ` +
       `whose rate moved at least one percentage point; the ${note.steps ?? 0} marked pairs listed below run ` +
       `${note.deltaPp < 0 ? "down" : "up"} without interruption, and this note is that run.`,
   },
@@ -229,7 +229,7 @@ const setsProv = (note: RateStepNote): Provenance => {
     kind: "derived",
     pclass: "indexed",
     summary:
-      `How many times the ${note.marketSymbol} market reset its primary rate between the CDP's two touches — the ` +
+      `How many times the ${note.marketSymbol} market reset its primary rate between the position's two touches — the ` +
       `difference of each observed PrimaryRateSet's own ordinal (the count of the market's PrimaryRateSet rows at ` +
       `or before it, rails-server's per-row join). Nothing about any of those resets is drawn on this page; only ` +
       `the count is stated.`,
@@ -241,7 +241,7 @@ const setsProv = (note: RateStepNote): Provenance => {
       text:
         from && to
           ? `Count the cdpManager's PrimaryRateSet logs strictly after block ${from.block} log ${from.logIndex} and at or before block ${to.block} log ${to.logIndex} — the count is this figure.`
-          : `Count the cdpManager's PrimaryRateSet logs between the rate observed at each of this CDP's two touches.`,
+          : `Count the cdpManager's PrimaryRateSet logs between the rate observed at each of this position's two touches.`,
     },
     inputs: [
       {
@@ -273,19 +273,19 @@ const elapsedProv = (note: RateStepNote): Provenance => ({
   pclass: "emitted",
   summary: note.live
     ? `The time since the earlier touch — the chain head's own timestamp at read time less the block header of ` +
-      `this CDP's last touch. It grows on every reload.`
+      `this position's last touch. It grows on every reload.`
     : `The time between the two touches — the later block's timestamp less the earlier's, both read from the ` +
-      `headers of the blocks this CDP's two touches sit in. It bounds ` +
+      `headers of the blocks this position's two touches sit in. It bounds ` +
       `when the rate moved and says nothing about where inside the stretch it did.`,
   ...contractOf(note),
   via: note.live
-    ? "this CDP's own block header · the chain head's timestamp at read time"
+    ? "this position's own block header · the chain head's timestamp at read time"
     : "block headers · timestamp at each touch",
   formula: "timestamp after − timestamp before",
   verify: {
     kind: "recompute",
     text: note.live
-      ? `Open this CDP's own last touch on this page for block ${note.from.block}'s timestamp, and read the chain head's at read time; subtract the two.`
+      ? `Open this position's own last touch on this page for block ${note.from.block}'s timestamp, and read the chain head's at read time; subtract the two.`
       : `Open each block on the chain's explorer — ${note.from.block} and ${note.to.block} — and subtract the two timestamps; or read the two touches' own dates on this page.`,
   },
   inputs: [
@@ -313,15 +313,15 @@ export const rateStepInterestProv = (note: RateStepNote, part: "debt" | "before"
   const rate = part === "after" ? note.to.value : note.from.value;
   const summary =
     part === "debt"
-      ? `${note.marketSymbol} of debt this CDP recorded at the earlier touch (block ${note.from.block}) — the ` +
+      ? `${note.marketSymbol} of debt this position recorded at the earlier touch (block ${note.from.block}) — the ` +
         `same \`_newDebt\` that touch's own row states. Held fixed across the stretch: the interest figures beside ` +
         `it move only the rate.`
-      : `The yearly interest this CDP's debt at block ${note.from.block} would cost at the ${part === "before" ? "earlier" : "later"} ` +
+      : `The yearly interest this position's debt at block ${note.from.block} would cost at the ${part === "before" ? "earlier" : "later"} ` +
         `rate (${pct(rate)} per year) — debt × rate. The chain never stated this figure: it holds the earlier ` +
         `touch's own debt fixed and moves only the rate; interest actually charged is whatever ${
           part === "after" && note.live
-            ? "this CDP's own next touch will eventually state on its own `_accruedInterest` leg, once it happens"
-            : "the CDP's own next touch states on its own `_accruedInterest` leg"
+            ? "this position's own next touch will eventually state on its own `_accruedInterest` leg, once it happens"
+            : "the position's own next touch states on its own `_accruedInterest` leg"
         }.`;
   const derived = part !== "debt";
   return {
@@ -330,14 +330,14 @@ export const rateStepInterestProv = (note: RateStepNote, part: "debt" | "before"
     summary,
     ...contractOf(note),
     ...(derived
-      ? { via: "this CDP's own recorded debt × the rate at this end", formula: "debt at A × rate" }
+      ? { via: "this position's own recorded debt × the rate at this end", formula: "debt at A × rate" }
       : { via: "CDPUpdated · _newDebt" }),
     verify: {
       kind: "recompute",
       text:
         part === "debt"
-          ? `Open this CDP's own touch at block ${note.from.block} on this page: the debt it states is the figure the interest leaves are built from.`
-          : `Take the debt this CDP's touch at block ${note.from.block} states, multiply by ${pct(rate)}. The chain never asked this question; the CDP's own next touch is what actually happened.`,
+          ? `Open this position's own touch at block ${note.from.block} on this page: the debt it states is the figure the interest leaves are built from.`
+          : `Take the debt this position's touch at block ${note.from.block} states, multiply by ${pct(rate)}. The chain never asked this question; the position's own next touch is what actually happened.`,
     },
     inputs: [
       {
@@ -345,7 +345,7 @@ export const rateStepInterestProv = (note: RateStepNote, part: "debt" | "before"
         value: interest ? String(interest.debt) : undefined,
         kind: "chain",
         pclass: "emitted",
-        note: `this CDP's own \`_newDebt\` at block ${note.from.block}`,
+        note: `this position's own \`_newDebt\` at block ${note.from.block}`,
       },
       ...(part === "debt"
         ? []

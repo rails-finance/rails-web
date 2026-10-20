@@ -39,11 +39,11 @@ import {
 /** The ≈ on the wallet's debt, in one sentence — the same gesture the listing
  *  card's ratio wears, saying what the figure is and what is not in it. */
 const DEBT_TIP =
-  "An estimate: the wallet's open CDPs' last stated debts, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. Interest since each CDP's last touch and any PSM share are not in it.";
+  "An estimate: the wallet's open positions' last stated debts, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. Interest since each position's last touch and any PSM share are not in it.";
 
 /** Why a wallet has no ratio of its own. */
 const NEAREST_TIP =
-  "Each CDP is liquidated on its own ratio; the wallet has no ratio of its own. This is the open CDP closest to its market's minimum.";
+  "Each position is liquidated on its own ratio; the wallet has no ratio of its own. This is the open position closest to its market's minimum.";
 
 const plural = (n: number, one: string, many: string): string => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -62,8 +62,8 @@ function countsLine(
         : "";
   const head =
     counts.open > 0
-      ? `This wallet holds ${plural(counts.open, "open CDP", "open CDPs")}${spread}`
-      : "This wallet holds no open CDPs";
+      ? `This wallet holds ${plural(counts.open, "open position", "open positions")}${spread}`
+      : "This wallet holds no open positions";
   const closed = counts.closed > 0 ? ` and has closed ${counts.closed.toLocaleString("en-US")}` : "";
   const liq =
     counts.liquidated > 0
@@ -95,7 +95,7 @@ export function polarisHolderStrip(
     // any sum over them is a statement about the wallet. State the one figure
     // that is — how many it holds — and say why the rest is absent.
     return {
-      countsLine: `This wallet holds ${plural(total, "CDP", "CDPs")}.`,
+      countsLine: `This wallet holds ${plural(total, "position", "positions")}.`,
       counts: { open: 0, closed: 0, liquidated: 0 },
       legs: [],
       truncated: true,

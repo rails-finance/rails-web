@@ -74,12 +74,12 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   const stable = view.stableSymbol;
   const lines: string[] = [];
 
-  lines.push(`# Polaris (Sepolia testnet) ${stable} CDP #${view.cdpId}`);
+  lines.push(`# Polaris (Sepolia testnet) ${stable} position #${view.cdpId}`);
   lines.push("");
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
       `SEPOLIA TESTNET: every figure here is a test figure — the tokens are test tokens and the prices come from ` +
-      `the protocol's own testnet oracles. The position is a CDP NFT in the ${stable} market; the holder is whoever ` +
+      `the protocol's own testnet oracles. The position is an NFT in the ${stable} market; the holder is whoever ` +
       `holds the NFT. ALL UNITS ARE NATIVE: collateral in pETH (the protocol's own collateral token, bought with ETH from its bonding curve), debt in ` +
       `${stable}. Rates are algorithmic, set by the market. Interest accrues continuously ` +
       `and is written into the debt at each touch; stability gains, reward pETH and the PSM's pro-rata shares are ` +
@@ -95,7 +95,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   const allNotes = [...noteList, ...(args.liveNotes ?? [])];
 
   lines.push(`- **Market:** ${stable}`);
-  lines.push(`- **CDP id:** ${view.cdpId}`);
+  lines.push(`- **Position id:** ${view.cdpId}`);
   if (view.owner) lines.push(`- **Holder:** ${view.owner}`);
   lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
   // The PSM's trades between touches (ui-jobs 402) are counted on their own
@@ -105,7 +105,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
   if (notesLine) lines.push(notesLine);
   if (psmGaps.length > 0)
     lines.push(
-      `- **PSM trades between touches:** ${psmGaps.length} — gaps whose closing touch wrote this CDP's PSM share (see below)`,
+      `- **PSM trades between touches:** ${psmGaps.length} — gaps whose closing touch wrote this position's PSM share (see below)`,
     );
   lines.push("");
 
@@ -194,7 +194,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
 
   const lifetime = events.length > 0 ? polarisLifetime(events) : null;
   if (lifetime && lifetime.rows > 0) {
-    lines.push("## Lifetime (summed from the CDP's own touches)");
+    lines.push("## Lifetime (summed from the position's own touches)");
     lines.push("");
     lines.push(`- **Deposited / withdrawn:** ${amt(lifetime.deposited)} / ${amt(lifetime.withdrawn)} pETH`);
     lines.push(`- **Borrowed / repaid:** ${amt(lifetime.borrowed)} / ${amt(lifetime.repaid)} ${stable}`);
@@ -252,7 +252,7 @@ function liquidationForensicsSection(events: BaseActivityEvent[], market: Polari
     const f = polarisLiquidationFigures(d);
     if (!f) continue;
     const constant = POLARIS_LIQ_CONSTANTS[f.path];
-    const holder = f.path === "sp" ? "stability pool" : "market's other CDPs";
+    const holder = f.path === "sp" ? "stability pool" : "market's other positions";
     rows.push(`### Block ${e.blockNumber} — ${fmtUtc(e.timestamp)}`);
     rows.push("");
     rows.push(`- **Collateral seized (entire):** ${amt(parseFloat(d.collLiquidated ?? "0"))} pETH`);
@@ -290,7 +290,7 @@ function liquidationForensicsSection(events: BaseActivityEvent[], market: Polari
 function marketNotesLine(notes: MarketNote[]): string | null {
   if (notes.length === 0) return null;
   if (notes.length === 1) return `- **Market notes:** 1 — ${marketNoteHeadline(notes[0])} (see below)`;
-  return `- **Market notes:** ${notes.length} — stretches where the market's primary rate moved between two of this CDP's touches, and the live reading since its last touch (see below)`;
+  return `- **Market notes:** ${notes.length} — stretches where the market's primary rate moved between two of this position's touches, and the live reading since its last touch (see below)`;
 }
 
 /** The notes' own section: one paragraph each, with the two touches (and, when
@@ -300,10 +300,10 @@ function marketNotesSection(notes: MarketNote[]): string[] {
   if (notes.length === 0) return [];
   const out: string[] = ["## Market notes", ""];
   out.push(
-    "Each note is a receipted fact about the market this CDP borrows in, observed between two of the CDP's own " +
+    "Each note is a receipted fact about the market this position borrows in, observed between two of the position's own " +
       "touches and stated between them, or between its last touch and the chain head for a live note. A note is " +
       "not an event: it is counted in no total in this snapshot, and the timeline table below reads exactly as it " +
-      "would without any of them. The rate is not fetched for a historical note — every touch on this CDP " +
+      "would without any of them. The rate is not fetched for a historical note — every touch on this position " +
       "already carries the market's primary rate in force at its block; a live note's later end is read from the " +
       "market's own contracts at the head. The derived figures hold the earlier touch's debt fixed and move " +
       "only the rate, so the later one is what that debt came to cost. A note " +
@@ -377,7 +377,7 @@ function timelineTable(
   });
   out.push("");
   out.push(
-    "_Collateral after / Debt after are the CDP's resulting figures on each touch, as the cdpManager emitted them. A transfer row moves custody only. A liquidation row's debt and collateral went to the stability pool or were redistributed. pETH price at block is the market's own price feed at the END of that block, from the oracle-at-block lane — not necessarily the price the row's own transaction saw. PSM share at block price is the pETH leg at that price less the debt leg, the one figure the row's face states. Collateral ratio at block is the resulting collateral at that price over the resulting debt; on a liquidation row it is the ratio at the moment the liquidation fired, the entire seized collateral over the debt cleared; a row without a price, or without debt after it, carries none._",
+    "_Collateral after / Debt after are the position's resulting figures on each touch, as the cdpManager emitted them. A transfer row moves custody only. A liquidation row's debt and collateral went to the stability pool or were redistributed. pETH price at block is the market's own price feed at the END of that block, from the oracle-at-block lane — not necessarily the price the row's own transaction saw. PSM share at block price is the pETH leg at that price less the debt leg, the one figure the row's face states. Collateral ratio at block is the resulting collateral at that price over the resulting debt; on a liquidation row it is the ratio at the moment the liquidation fired, the entire seized collateral over the debt cleared; a row without a price, or without debt after it, carries none._",
   );
   out.push("");
   return out;

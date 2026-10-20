@@ -118,7 +118,7 @@ export function PolarisSinceLastTouchRow({
     kind: "chain-derived",
     pclass: "oracle",
     summary:
-      `What the market's own price feed did to the collateral — the figure this CDP stated at its last touch. The CDP's stated ` +
+      `What the market's own price feed did to the collateral — the figure this position stated at its last touch. The position's stated ` +
       `collateral does not change between touches, so this is the whole of the feed's effect: the pETH price in ` +
       `${stable} at the end of the touch's block (the oracle-at-block lane's previewPrice()) against the same feed ` +
       `read at the head block, times the collateral the chain recorded at that touch.`,
@@ -156,7 +156,7 @@ export function PolarisSinceLastTouchRow({
     pclass: "oracle" as const,
     note: "the feed the pETH legs are valued at",
   };
-  const pendingNote = "pending until the CDP's next touch settles it into the stated figures";
+  const pendingNote = "pending until the position's next touch settles it into the stated figures";
   /** One receipt per protocol leg: its getter, valued at the feed now. */
   const legProv = (key: PolarisProtocolLegKey): Provenance => {
     switch (key) {
@@ -165,7 +165,7 @@ export function PolarisSinceLastTouchRow({
           kind: "chain-derived",
           pclass: "state",
           summary:
-            `This CDP's net PSM share — its pro-rata share of every PSM mint and redemption since that touch, valued ` +
+            `This position's net PSM share — its pro-rata share of every PSM mint and redemption since that touch, valued ` +
             `at the feed now; its two sides can move in opposite directions. The docs call these the peg-defence fees. ` +
             `It is ${pendingNote}.`,
           formula: "mintRedeemCollChange × price − mintRedeemDebtChange",
@@ -192,7 +192,7 @@ export function PolarisSinceLastTouchRow({
           kind: "chain-derived",
           pclass: "state",
           summary:
-            `This CDP's pETH reward — the pETH the protocol has distributed to it in proportion to its debt since ` +
+            `This position's pETH reward — the pETH the protocol has distributed to it in proportion to its debt since ` +
             `that touch, valued at the feed now. The docs call it the pETH yield to minters. It is ${pendingNote}.`,
           formula: "bcTokenGain × price",
           inputs: [
@@ -261,7 +261,7 @@ export function PolarisSinceLastTouchRow({
   const totalProv: Provenance = {
     kind: "derived",
     summary:
-      `The whole change in this CDP's equity at the feed since its ${w.sinceOpen ? "open" : "last touch"}: the feed's ` +
+      `The whole change in this position's equity at the feed since its ${w.sinceOpen ? "open" : "last touch"}: the feed's ` +
       `effect plus the protocol's legs. The holder did nothing inside this window, so no other cause exists. Equity ` +
       `here is a valuation at a block.`,
     formula: "(entireColl × price now − max(0, entireDebt)) − (coll × price at the touch − debt)",
@@ -513,7 +513,7 @@ function polarisLiveSheet(
         amount: pethFig(
           formatPeth(w.collAtTouch),
           view(
-            `The collateral the CDP's last touch wrote, the slot nothing rewrites until the next touch.`,
+            `The collateral the position's last touch wrote, the slot nothing rewrites until the next touch.`,
             "getCDP(id).coll",
             w.collAtTouch,
             "pETH",
@@ -533,7 +533,7 @@ function polarisLiveSheet(
                 {
                   kind: "chain",
                   pclass: "state",
-                  summary: `The pETH pending since the last touch: the CDP's net PSM collateral share and its pETH reward, two view calls on the cdpManager ${atHead}. The next touch writes them into the collateral.`,
+                  summary: `The pETH pending since the last touch: the position's net PSM collateral share and its pETH reward, two view calls on the cdpManager ${atHead}. The next touch writes them into the collateral.`,
                   formula: "getCDPMintRedeemCollChange(id) + getCDPBcTokenGain(id)",
                   contract: manager,
                   inputs: [
@@ -559,7 +559,7 @@ function polarisLiveSheet(
     totalAmount: pethFig(
       formatPeth(w.atFeed.coll),
       view(
-        "The CDP's collateral at the feed: the stated pETH with the pending PSM share and reward.",
+        "The position's collateral at the feed: the stated pETH with the pending PSM share and reward.",
         "getCDPEntireColl(id)",
         w.atFeed.coll,
         "pETH",
@@ -589,7 +589,7 @@ function polarisLiveSheet(
         amount: stableFig(
           formatNumber(w.debtAtTouch),
           view(
-            `The debt the CDP's last touch wrote, the slot nothing rewrites until the next touch.`,
+            `The debt the position's last touch wrote, the slot nothing rewrites until the next touch.`,
             "getCDP(id).debt",
             w.debtAtTouch,
             stable,
@@ -646,7 +646,7 @@ function polarisLiveSheet(
     totalAmount: stableFig(
       formatNumber(w.atFeed.debt),
       view(
-        "The CDP's debt at the feed: the stated debt with the pending legs.",
+        "The position's debt at the feed: the stated debt with the pending legs.",
         "getCDPEntireDebt(id)",
         w.atFeed.debt,
         stable,

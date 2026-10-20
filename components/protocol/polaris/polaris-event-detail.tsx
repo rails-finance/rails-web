@@ -59,7 +59,7 @@ import { POLARIS_WORDS } from "@/lib/polaris/event-templates";
 
 /** The primary rate, glossed where a row first states it. */
 const PRIMARY_RATE_TIP =
-  "The primary rate is the part of the market's interest rate that moves with its stablecoin's peg: it rises when traders redeem through the PSM and falls when they mint. The market adds a secondary rate, which rises with its debt-to-reserve ratio, and a CDP pays both on its debt.";
+  "The primary rate is the part of the market's interest rate that moves with its stablecoin's peg: it rises when traders redeem through the PSM and falls when they mint. The market adds a secondary rate, which rises with its debt-to-reserve ratio, and a position pays both on its debt.";
 
 /** The market's own unit — USDp to 2dp, GOLDp to 4dp (the finer precision an
  *  ounce of gold's own price needs). Stated once, beside the forensics that
@@ -166,7 +166,7 @@ export function polarisEventBody(
                   to <LinkedAddress address={ctx.toAddr} />
                 </>
               ) : null}{" "}
-              — the CDP&rsquo;s collateral and debt did not change.
+              — the position&rsquo;s collateral and debt did not change.
             </span>
           </Prov>
         </div>
@@ -284,7 +284,7 @@ export function polarisEventBody(
         address: PETH.address,
         prov: polarisPoolLegProv(ctx, coords),
       });
-    liq("collRedistributed", "Of which redistributed to other CDPs", PETH.symbol, PETH.address);
+    liq("collRedistributed", "Of which redistributed to other positions", PETH.symbol, PETH.address);
     liq("collateralComp", "Of which to the liquidator (0.5%)", PETH.symbol, PETH.address);
     liq("collSurplus", "Of which surplus for the owner to claim", PETH.symbol, PETH.address);
     liq("debtLiquidated", "Debt absorbed by the pool", stable, stableAddr);
@@ -389,7 +389,7 @@ export function polarisEventBody(
             stats.map((st) => (st.symbol && st.display == null ? { ...st, display: st.value } : st)),
             { symbolText: true, inputs: { "Collateral ratio": ["collateral", "debt"] } },
           )
-        : { none: "the event carries no figure of the CDP" },
+        : { none: "the event carries no figure of the position" },
     sheet,
     notes,
     price,

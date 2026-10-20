@@ -12,7 +12,7 @@ const BOOK_VIA = "live index · the same rows the listing pages";
 export const bookCountProv = (what: string, market: PolarisMarket, how: string): Provenance => ({
   kind: "derived",
   pclass: "indexed",
-  summary: `${what} — counted over the full indexed roster of the ${POLARIS_MARKET_CONFIG[market].stable.symbol} market's CDPs (every CDPUpdated the cdpManager ever emitted, reduced to each CDP's current state), stated as the index holds it. ${how}`,
+  summary: `${what} — counted over the full indexed roster of the ${POLARIS_MARKET_CONFIG[market].stable.symbol} market's positions (every CDPUpdated the cdpManager ever emitted, reduced to each position's current state), stated as the index holds it. ${how}`,
   contract: { name: "Rails index · polaris positions" },
   via: BOOK_VIA,
 });
@@ -23,8 +23,8 @@ export const openBookProv = (what: "coll" | "debt", market: PolarisMarket): Prov
   pclass: "indexed",
   summary:
     what === "coll"
-      ? "pETH held by the open CDPs as the ledger last wrote it — the sum of every open CDP's last CDPUpdated `_newColl`. The chain's own getTotalColl beside it includes the pending legs the next touches will write in, so the two differ by exactly those."
-      : `${POLARIS_MARKET_CONFIG[market].stable.symbol} owed by the open CDPs as the ledger last wrote it — the sum of every open CDP's last CDPUpdated \`_newDebt\`. The chain's getTotalDebt beside it is the manager's own accounting of the same book.`,
+      ? "pETH held by the open positions as the ledger last wrote it — the sum of every open position's last CDPUpdated `_newColl`. The chain's own getTotalColl beside it includes the pending legs the next touches will write in, so the two differ by exactly those."
+      : `${POLARIS_MARKET_CONFIG[market].stable.symbol} owed by the open positions as the ledger last wrote it — the sum of every open position's last CDPUpdated \`_newDebt\`. The chain's getTotalDebt beside it is the manager's own accounting of the same book.`,
   contract: { name: "Rails index · polaris positions" },
   via: `${BOOK_VIA} · Σ last ${what === "coll" ? "_newColl" : "_newDebt"} over status=open`,
 });

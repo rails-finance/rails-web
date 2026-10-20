@@ -605,16 +605,16 @@ for (const key of ["usdp/296"]) {
     `"${text}"`,
   );
   check(
-    `5b. ${key}'s note says it stands for ${run.steps} of the CDP's touches, once opened`,
+    `5b. ${key}'s note says it stands for ${run.steps} of the position's touches, once opened`,
     await (async () => {
       if (historical.length !== 1) return false;
       const row = page.locator(`[data-market-note="${historical[0]}"]`);
       await row.getByRole("button", { expanded: false }).first().click();
       await page.waitForTimeout(300);
       const opened = await rowText(page, historical[0]);
-      return opened.includes(`${run.steps} of the CDP's touches`);
+      return opened.includes(`${run.steps} of the position's touches`);
     })(),
-    `wanted "${run.steps} of the CDP's touches" in the panel`,
+    `wanted "${run.steps} of the position's touches" in the panel`,
   );
   await page.close();
 }
@@ -663,7 +663,7 @@ for (const key of ["usdp/296"]) {
       opened.includes(pointsSigned(CLOSED_FIXTURE.deltaPoints)) &&
       opened.includes(blk(11_634_933)) &&
       opened.includes(blk(11_662_377)) &&
-      !opened.includes("of the CDP's touches"),
+      !opened.includes("of the position's touches"),
     opened.slice(0, 220),
   );
   await page.close();

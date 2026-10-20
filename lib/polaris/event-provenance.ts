@@ -109,25 +109,25 @@ const LOG_FIELD: Record<PolarisLedgerField, string> = {
 function ledgerSummary(field: PolarisLedgerField, stable: string): string {
   switch (field) {
     case "newColl":
-      return `pETH the CDP holds AFTER this touch — the CDPUpdated log's own \`_newColl\` field, the resulting collateral the cdpManager wrote. It equals the manager's stored getCDP(id).coll at that block, and every leg that produced it (the holder's change, the PSM share, reward pETH) is on the same log.`;
+      return `pETH the position holds AFTER this touch — the CDPUpdated log's own \`_newColl\` field, the resulting collateral the cdpManager wrote. It equals the manager's stored getCDP(id).coll at that block, and every leg that produced it (the holder's change, the PSM share, reward pETH) is on the same log.`;
     case "newDebt":
-      return `${stable} the CDP owes AFTER this touch — the CDPUpdated log's own \`_newDebt\` field, the resulting debt the cdpManager wrote. It equals the manager's stored getCDP(id).debt at that block: recorded debt with this touch's interest charged in and its gains credited.`;
+      return `${stable} the position owes AFTER this touch — the CDPUpdated log's own \`_newDebt\` field, the resulting debt the cdpManager wrote. It equals the manager's stored getCDP(id).debt at that block: recorded debt with this touch's interest charged in and its gains credited.`;
     case "collChange":
       return `pETH the holder moved in this touch — the CDPUpdated log's own \`_collChange\` field: positive for a deposit, negative for a withdrawal. The one collateral leg the holder chose; the others on the same log are the protocol's.`;
     case "debtChange":
       return `${stable} the holder borrowed or repaid in this touch — the CDPUpdated log's own \`_debtChange\` field: positive for a borrow, negative for a repayment. The one debt leg the holder chose.`;
     case "mintRedeemCollGain":
-      return `pETH credited or debited by the market's PSM activity — the CDPUpdated log's own \`_mintRedeemCollGain\` field. When the PSM mints or redeems, every CDP takes a pro-rata share of the collateral that moved, settled onto the CDP at its next touch.`;
+      return `pETH credited or debited by the market's PSM activity — the CDPUpdated log's own \`_mintRedeemCollGain\` field. When the PSM mints or redeems, every position takes a pro-rata share of the collateral that moved, settled onto the position at its next touch.`;
     case "mintRedeemDebtGain":
-      return `${stable} of debt added or removed by the market's PSM activity — the CDPUpdated log's own \`_mintRedeemDebtGain\` field: the CDP's pro-rata share of the debt the PSM's mints and redemptions moved, settled at this touch.`;
+      return `${stable} of debt added or removed by the market's PSM activity — the CDPUpdated log's own \`_mintRedeemDebtGain\` field: the position's pro-rata share of the debt the PSM's mints and redemptions moved, settled at this touch.`;
     case "accruedInterest":
       return `Interest charged into the debt at this touch — the CDPUpdated log's own \`_accruedInterest\` field: simple accrual at the market's rate since the previous touch, written into the debt here. Realised, not pending.`;
     case "stableGain":
-      return `${stable} credited against the debt at this touch — the CDPUpdated log's own \`_stableGain\` field: the CDP's share of the market revenue the stability pool distributes, applied as a debt reduction.`;
+      return `${stable} credited against the debt at this touch — the CDPUpdated log's own \`_stableGain\` field: the position's share of the market revenue the stability pool distributes, applied as a debt reduction.`;
     case "stablesMintedToEnsureZeroDebt":
       return `${stable} added to settle the debt to zero — the CDPUpdated log's own \`_stablesMintedToEnsureZeroDebt\` field: on a touch whose net PSM share and gains clear more than the debt owed, the manager adds the difference to the debt so it lands on zero rather than below.`;
     case "bcTokenGain":
-      return `Reward pETH added to the collateral at this touch — the CDPUpdated log's own \`_bcTokenGain\` field: the CDP's share of bonding-curve token rewards, settled into the collateral here.`;
+      return `Reward pETH added to the collateral at this touch — the CDPUpdated log's own \`_bcTokenGain\` field: the position's share of bonding-curve token rewards, settled into the collateral here.`;
   }
 }
 
@@ -154,7 +154,7 @@ export const psmShareNetProv = (
     kind: "chain-derived",
     pclass: "oracle",
     verify: txVerify(coords),
-    summary: `The PSM share this touch settled, as one figure in ${stable}${atBlock(coords)}: the pETH it ${vals.coll < 0 ? "took" : "added"} (\`_mintRedeemCollGain\`) at the feed's \`previewPrice()\` for this block, less the debt it ${vals.debt < 0 ? "cleared" : "added"} (\`_mintRedeemDebtGain\`). The share is the net of every PSM mint and redemption since the CDP's previous touch; at the price the PSM used it is close to even, so the figure is what the price moved in between. The two legs stand on the event's sheet.`,
+    summary: `The PSM share this touch settled, as one figure in ${stable}${atBlock(coords)}: the pETH it ${vals.coll < 0 ? "took" : "added"} (\`_mintRedeemCollGain\`) at the feed's \`previewPrice()\` for this block, less the debt it ${vals.debt < 0 ? "cleared" : "added"} (\`_mintRedeemDebtGain\`). The share is the net of every PSM mint and redemption since the position's previous touch; at the price the PSM used it is close to even, so the figure is what the price moved in between. The two legs stand on the event's sheet.`,
     contract: managerContract(coords),
     via: `${POLARIS_VIA} · CDPUpdated · ${fieldSeg(LOG_FIELD.mintRedeemCollGain, vals.collRaw)} × polaris_oracle_at_block · ${fieldSeg("previewPrice()", vals.priceRaw)} − ${fieldSeg(LOG_FIELD.mintRedeemDebtGain, vals.debtRaw)}`,
     formula: "_mintRedeemCollGain × previewPrice() at block − _mintRedeemDebtGain",
@@ -192,9 +192,9 @@ export const beforeProv = (what: "coll" | "debt", coords: PolarisCoords, raw?: s
   kind: "derived",
   pclass: "indexed",
   verify: { kind: "rollup", text: "Rolls up to the previous CDPUpdated's own emitted resulting figure" },
-  summary: `${what === "coll" ? "pETH held" : `${stableOf(coords.market)} owed`} BEFORE this touch — the previous CDPUpdated's own \`${what === "coll" ? "_newColl" : "_newDebt"}\` at this CDP, carried forward by the index as a lag over the ledger (0 on the open). Anchored to a figure the cdpManager itself emitted.`,
+  summary: `${what === "coll" ? "pETH held" : `${stableOf(coords.market)} owed`} BEFORE this touch — the previous CDPUpdated's own \`${what === "coll" ? "_newColl" : "_newDebt"}\` at this position, carried forward by the index as a lag over the ledger (0 on the open). Anchored to a figure the cdpManager itself emitted.`,
   contract: managerContract(coords),
-  via: `${POLARIS_VIA} · lag(${what === "coll" ? "_newColl" : "_newDebt"}) at this CDP${raw ? ` = ${raw}` : ""}`,
+  via: `${POLARIS_VIA} · lag(${what === "coll" ? "_newColl" : "_newDebt"}) at this position${raw ? ` = ${raw}` : ""}`,
   inputs: eventInputs(coords, [
     { label: `previous ${what}`, kind: "chain", pclass: "emitted", note: "the prior CDPUpdated's resulting figure" },
   ]),
@@ -246,17 +246,17 @@ const LIQ_FIELD: Record<PolarisLiquidationField, { log: string; field: string }>
 function liquidationSummary(field: PolarisLiquidationField, stable: string): string {
   switch (field) {
     case "collLiquidated":
-      return "The ENTIRE pETH seized from the CDP — the Liquidation log's own `_collLiquidated` field. It is the whole collateral the manager took, not the pool's share of it: the owner's surplus and the liquidator's collateral compensation are both carved out of this figure, so the pool receives `_collLiquidated` minus `_collSurplus` minus `_collateralComp`.";
+      return "The ENTIRE pETH seized from the position — the Liquidation log's own `_collLiquidated` field. It is the whole collateral the manager took, not the pool's share of it: the owner's surplus and the liquidator's collateral compensation are both carved out of this figure, so the pool receives `_collLiquidated` minus `_collSurplus` minus `_collateralComp`.";
     case "debtLiquidated":
-      return `${stable} the stability pool absorbed — the Liquidation log's own \`_debtLiquidated\` field: the debt the pool's deposits repaid on the CDP's behalf.`;
+      return `${stable} the stability pool absorbed — the Liquidation log's own \`_debtLiquidated\` field: the debt the pool's deposits repaid on the position's behalf.`;
     case "debtRedistributed":
-      return `${stable} spread across the other CDPs — the Liquidation log's own \`_debtRedistributed\` field: debt the pool could not absorb, redistributed pro rata across the market's other CDPs. Zero means the pool absorbed all of it.`;
+      return `${stable} spread across the other positions — the Liquidation log's own \`_debtRedistributed\` field: debt the pool could not absorb, redistributed pro rata across the market's other positions. Zero means the pool absorbed all of it.`;
     case "collRedistributed":
-      return "pETH spread across the other CDPs — the Liquidation log's own `_collRedistributed` field: the collateral that went with the redistributed debt.";
+      return "pETH spread across the other positions — the Liquidation log's own `_collRedistributed` field: the collateral that went with the redistributed debt.";
     case "collSurplus":
       return "pETH left for the owner to claim — the Liquidation log's own `_collSurplus` field: collateral beyond what the debt needed, set aside in the surplus pool.";
     case "flatComp":
-      return "pETH gas compensation paid to the liquidator — the LiquidationGasComp log's own `_flatComp` field: the fixed amount the CDP escrowed at open.";
+      return "pETH gas compensation paid to the liquidator — the LiquidationGasComp log's own `_flatComp` field: the fixed amount the position escrowed at open.";
     case "collateralComp":
       return "pETH collateral compensation paid to the liquidator — the LiquidationGasComp log's own `_collateralComp` field: the share of the collateral the liquidator keeps.";
   }
@@ -281,7 +281,7 @@ export const liquidatorProv = (coords: PolarisCoords): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The liquidator — the Liquidation log's own \`_liquidator\` topic${atBlock(coords)}: the address that called the liquidation, paid in the gas compensation the CDP escrowed at open.`,
+  summary: `The liquidator — the Liquidation log's own \`_liquidator\` topic${atBlock(coords)}: the address that called the liquidation, paid in the gas compensation the position escrowed at open.`,
   contract: managerContract(coords),
   via: `${POLARIS_VIA} · Liquidation · _liquidator`,
   inputs: eventInputs(coords),
@@ -343,7 +343,7 @@ export const liqLegValueProv = (
     formula: collateral ? `${leg} × previewPrice() at block` : `debt at the protocol's own ICR face`,
     verify: txVerify(coords),
     summary: collateral
-      ? `What the ${leg} was worth in ${stable} when the CDP was liquidated${atBlock(coords)} — the leg times the market's own price feed \`previewPrice()\` read at this event's block by the oracle-at-block lane. Both factors are chain values pinned to this block, and the figure is in ${stable}, not dollars: the market prices pETH in its own stablecoin and nothing here converts it further.`
+      ? `What the ${leg} was worth in ${stable} when the position was liquidated${atBlock(coords)} — the leg times the market's own price feed \`previewPrice()\` read at this event's block by the oracle-at-block lane. Both factors are chain values pinned to this block, and the figure is in ${stable}, not dollars: the market prices pETH in its own stablecoin and nothing here converts it further.`
       : `What the cleared debt counts as${atBlock(coords)} — the Liquidation log's own \`_debtLiquidated\` at face. The ICR math that judged this liquidation (collateral × price ÷ debt) counts each ${stable} as one unit of debt, so the leg is the emitted figure itself and no market price for ${stable} is asserted.`,
     contract: collateral ? priceFeedContract(coords.market) : managerContract(coords),
     via: collateral
@@ -396,7 +396,7 @@ export const gasCompEscrowProv = (coords: PolarisCoords): Provenance => ({
   pclass: "state",
   verify: txVerify(coords),
   summary:
-    "Gas compensation escrow sent at the open — the fixed amount every Polaris CDP holds apart from its collateral, sent by the holder in the same transaction: returned on close, paid to the liquidator on a liquidation. It enters neither the collateral nor the collateral ratio. The amount is the protocol constant fixedGasComp, 0.0375 pETH. The CDPUpdated log carries only the collateral; the open transaction's one pETH transfer to the cdpManager carries both (collateral + 0.0375 pETH), and getCDP(id).gasCompDeposit reads 0.0375 on an open CDP.",
+    "Gas compensation escrow sent at the open — the fixed amount every Polaris position holds apart from its collateral, sent by the holder in the same transaction: returned on close, paid to the liquidator on a liquidation. It enters neither the collateral nor the collateral ratio. The amount is the protocol constant fixedGasComp, 0.0375 pETH. The CDPUpdated log carries only the collateral; the open transaction's one pETH transfer to the cdpManager carries both (collateral + 0.0375 pETH), and getCDP(id).gasCompDeposit reads 0.0375 on an open position.",
   contract: managerContract(coords),
   via: "the protocol constant fixedGasComp (0.0375 pETH) · the open transaction's pETH transfer to the cdpManager",
   inputs: eventInputs(coords, [
@@ -411,7 +411,7 @@ export const gasCompReturnProv = (coords: PolarisCoords): Provenance => ({
   pclass: "state",
   verify: txVerify(coords),
   summary:
-    "Gas compensation escrow returned at the close — the fixed amount the CDP held apart from its collateral since its open, sent back to the holder. The amount is the protocol constant fixedGasComp, 0.0375 pETH. The CDPUpdated log carries only the collateral; the close transaction's pETH transfer from the cdpManager to the holder carries both (collateral + 0.0375 pETH). A liquidated CDP's escrow goes to the liquidator instead, as the LiquidationGasComp log's _flatComp.",
+    "Gas compensation escrow returned at the close — the fixed amount the position held apart from its collateral since its open, sent back to the holder. The amount is the protocol constant fixedGasComp, 0.0375 pETH. The CDPUpdated log carries only the collateral; the close transaction's pETH transfer from the cdpManager to the holder carries both (collateral + 0.0375 pETH). A liquidated position's escrow goes to the liquidator instead, as the LiquidationGasComp log's _flatComp.",
   contract: managerContract(coords),
   via: "the protocol constant fixedGasComp (0.0375 pETH) · the close transaction's pETH transfer to the holder",
   inputs: eventInputs(coords, [
@@ -428,9 +428,9 @@ export const gasCompHeldProv = (coords: PolarisCoords): Provenance => ({
   pclass: "state",
   verify: {
     kind: "recompute",
-    text: "Read getCDP(id).gasCompDeposit on the cdpManager while the CDP is open — it returns 0.0375 pETH.",
+    text: "Read getCDP(id).gasCompDeposit on the cdpManager while the position is open — it returns 0.0375 pETH.",
   },
-  summary: `Gas compensation escrow held by the cdpManager${atBlock(coords)} — the fixed amount the CDP sent beside its collateral at its open and has held apart from it since: returned on close, paid to the liquidator on a liquidation. No event between the open and the close moves it. The amount is the protocol constant fixedGasComp, 0.0375 pETH. It enters neither the collateral nor the collateral ratio.`,
+  summary: `Gas compensation escrow held by the cdpManager${atBlock(coords)} — the fixed amount the position sent beside its collateral at its open and has held apart from it since: returned on close, paid to the liquidator on a liquidation. No event between the open and the close moves it. The amount is the protocol constant fixedGasComp, 0.0375 pETH. It enters neither the collateral nor the collateral ratio.`,
   contract: managerContract(coords),
   via: "the protocol constant fixedGasComp (0.0375 pETH) · held since the open",
   inputs: eventInputs(coords, [
@@ -451,7 +451,7 @@ export const liqIcrAtFireProv = (
     pclass: "oracle",
     formula: "_collLiquidated × previewPrice() ÷ _debtLiquidated",
     verify: txVerify(coords),
-    summary: `The CDP's collateral ratio at the moment the liquidation fired — the ENTIRE collateral seized, valued at the market's own feed price at this block, over the entire ${stable} debt cleared. This is the quantity the market's minimum applies to; the premium above is measured on the pool's leg alone, which is smaller by the owner's surplus and the liquidator's compensation. The market's normal-mode minimum is ${vals.mcrPct}; a defensive-mode minimum in force at a past block is not indexed, so the comparison names the normal-mode figure.`,
+    summary: `The position's collateral ratio at the moment the liquidation fired — the ENTIRE collateral seized, valued at the market's own feed price at this block, over the entire ${stable} debt cleared. This is the quantity the market's minimum applies to; the premium above is measured on the pool's leg alone, which is smaller by the owner's surplus and the liquidator's compensation. The market's normal-mode minimum is ${vals.mcrPct}; a defensive-mode minimum in force at a past block is not indexed, so the comparison names the normal-mode figure.`,
     contract: managerContract(coords),
     via: `Liquidation._collLiquidated × polaris_oracle_at_block.previewPrice() ÷ Liquidation._debtLiquidated`,
     inputs: eventInputs(coords, [
@@ -483,7 +483,7 @@ export const crAtEventProv = (
     pclass: "oracle",
     formula: "_newColl × previewPrice() ÷ _newDebt",
     verify: txVerify(coords),
-    summary: `Collateral ratio at this event — the CDP's resulting collateral, valued at the market's own feed price as this block closed, over its resulting debt. The touch has just written the pending interest and PSM share in, so the two figures are the CDP's own at that moment; the price is the feed's end-of-block value, which can differ slightly from the one this transaction saw. The market's normal-mode minimum is ${vals.mcrPct}; a defensive-mode minimum in force at a past block is not indexed.`,
+    summary: `Collateral ratio at this event — the position's resulting collateral, valued at the market's own feed price as this block closed, over its resulting debt. The touch has just written the pending interest and PSM share in, so the two figures are the position's own at that moment; the price is the feed's end-of-block value, which can differ slightly from the one this transaction saw. The market's normal-mode minimum is ${vals.mcrPct}; a defensive-mode minimum in force at a past block is not indexed.`,
     contract: managerContract(coords),
     via: `CDPUpdated._newColl × polaris_oracle_at_block.previewPrice() ÷ CDPUpdated._newDebt${atBlock(coords)}`,
     inputs: eventInputs(coords, [
@@ -512,7 +512,7 @@ export const crBeforeAtEventProv = (
     pclass: "oracle",
     formula: "collBefore × previewPrice() ÷ debtBefore",
     verify: txVerify(coords),
-    summary: `Collateral ratio before this touch — the same ratio on the CDP's figures before this touch, at this block's price: the position as it stood, valued as this event valued it. Not a reading from the chain: nothing recorded the ratio between the previous touch and this one.`,
+    summary: `Collateral ratio before this touch — the same ratio on the position's figures before this touch, at this block's price: the position as it stood, valued as this event valued it. Not a reading from the chain: nothing recorded the ratio between the previous touch and this one.`,
     contract: managerContract(coords),
     via: `lag(_newColl) × polaris_oracle_at_block.previewPrice() ÷ lag(_newDebt)${atBlock(coords)}`,
     inputs: eventInputs(coords, [
@@ -584,7 +584,7 @@ export const transferProv = (coords: PolarisCoords): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The CDP changed hands — the cdpNft's own ERC-721 Transfer log${atBlock(coords)}. The CDP is an NFT, so its owner is a mutable fact the index carries from these logs; nothing about the collateral or the debt moved. The mint (from the zero address) is the open and the burn is the close, so neither is a row of its own.`,
+  summary: `The position changed hands — the cdpNft's own ERC-721 Transfer log${atBlock(coords)}. The position is an NFT, so its owner is a mutable fact the index carries from these logs; nothing about the collateral or the debt moved. The mint (from the zero address) is the open and the burn is the close, so neither is a row of its own.`,
   contract: nftContract(coords),
   via: `${POLARIS_VIA} · Transfer(from, to, tokenId)`,
   inputs: eventInputs(coords),
@@ -597,7 +597,7 @@ export const touchSenderProv = (coords: PolarisCoords, holder: string): Provenan
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Sender of this touch — the account that sent the transaction${atBlock(coords)}, which is not the CDP's holder then (${holder}). Anyone may touch a CDP; the touch writes the pending legs into its figures and moves nothing the holder chose.`,
+  summary: `Sender of this touch — the account that sent the transaction${atBlock(coords)}, which is not the position's holder then (${holder}). Anyone may touch a position; the touch writes the pending legs into its figures and moves nothing the holder chose.`,
   contract: managerContract(coords),
   via: `${POLARIS_VIA} · the transaction's from`,
   inputs: eventInputs(coords, [{ label: "holder at this touch", value: holder, kind: "chain", pclass: "indexed" }]),
@@ -614,7 +614,7 @@ export const rateInForceProv = (coords: PolarisCoords, raw?: string | null): Pro
     kind: "recompute",
     text: "Find the cdpManager's last PrimaryRateSet log at or before this block — its newPrimaryRate (1e18 = 100%/yr) is this figure.",
   },
-  summary: `The market's primary rate in force at this touch — the cdpManager's last PrimaryRateSet log at or before this row, newPrimaryRate ÷ 1e18 per year. Algorithmic: the market sets it (the event fires on the PSM's mints and redemptions, never inside a CDP touch), so it is a fact of the market at that moment. The secondary rate, a kinked function of the market's debt-to-reserve ratio, is added on top and is not on this log.`,
+  summary: `The market's primary rate in force at this touch — the cdpManager's last PrimaryRateSet log at or before this row, newPrimaryRate ÷ 1e18 per year. Algorithmic: the market sets it (the event fires on the PSM's mints and redemptions, never inside a position touch), so it is a fact of the market at that moment. The secondary rate, a kinked function of the market's debt-to-reserve ratio, is added on top and is not on this log.`,
   contract: managerContract(coords),
   via: `${POLARIS_VIA} · last PrimaryRateSet ≤ block · ${fieldSeg("newPrimaryRate", raw)} ÷ 1e18`,
   inputs: eventInputs(coords),
@@ -632,8 +632,8 @@ export const latestStateProv = (what: "coll" | "debt", market: PolarisMarket): P
   },
   summary:
     what === "coll"
-      ? "pETH the CDP holds as of its last touch — the last CDPUpdated's own `_newColl`, which equals the cdpManager's stored getCDP(id).coll at that block. Pending legs since (reward pETH, a PSM share) are not in it; the live overlay adds them."
-      : `${stableOf(market)} the CDP owes as of its last touch — the last CDPUpdated's own \`_newDebt\`, which equals the cdpManager's stored getCDP(id).debt at that block. Interest since that touch is not in it; the live overlay adds it.`,
+      ? "pETH the position holds as of its last touch — the last CDPUpdated's own `_newColl`, which equals the cdpManager's stored getCDP(id).coll at that block. Pending legs since (reward pETH, a PSM share) are not in it; the live overlay adds them."
+      : `${stableOf(market)} the position owes as of its last touch — the last CDPUpdated's own \`_newDebt\`, which equals the cdpManager's stored getCDP(id).debt at that block. Interest since that touch is not in it; the live overlay adds it.`,
   contract: { name: `Polaris ${stableOf(market)} CDPManager`, address: POLARIS_MARKET_CONFIG[market].cdpManager },
   via: `${POLARIS_VIA} · last CDPUpdated ${what === "coll" ? "_newColl" : "_newDebt"} (= getCDP(id).${what})`,
 });
@@ -645,15 +645,15 @@ export const peakProv = (what: "coll" | "debt", market: PolarisMarket, liquidati
   const liqField = what === "coll" ? "_collLiquidated" : "_debtLiquidated";
   const lead =
     what === "coll"
-      ? "The most pETH the CDP ever held at once"
-      : `The most ${stableOf(market)} the CDP ever owed at once`;
+      ? "The most pETH the position ever held at once"
+      : `The most ${stableOf(market)} the position ever owed at once`;
   return {
     kind: "derived",
     pclass: "indexed",
     verify: { kind: "rollup", text: "Rolls up to the CDPUpdated rows the maximum was taken over" },
     summary: liquidationCounted
-      ? `${lead} — the maximum over its own CDPUpdated \`${field}\` figures across its whole life and the Liquidation log's \`${liqField}\` (its state once the pending legs settled). A liquidated CDP's latest figures are zero, so the headline states the ledger's height instead.`
-      : `${lead} — the maximum over its own CDPUpdated \`${field}\` figures across its whole life. A closed or liquidated CDP's latest figures are zero, so the headline states the ledger's height instead. A liquidation's own state is not in it here; the CDP's page counts it.`,
+      ? `${lead} — the maximum over its own CDPUpdated \`${field}\` figures across its whole life and the Liquidation log's \`${liqField}\` (its state once the pending legs settled). A liquidated position's latest figures are zero, so the headline states the ledger's height instead.`
+      : `${lead} — the maximum over its own CDPUpdated \`${field}\` figures across its whole life. A closed or liquidated position's latest figures are zero, so the headline states the ledger's height instead. A liquidation's own state is not in it here; the position's page counts it.`,
     contract: { name: `Polaris ${stableOf(market)} CDPManager`, address: POLARIS_MARKET_CONFIG[market].cdpManager },
     via: `${POLARIS_VIA} · max(${field}) over all CDPUpdated${liquidationCounted ? ` and ${liqField}` : ""}`,
   };
@@ -711,7 +711,7 @@ const LEG_VIA: Record<PolarisLifetimeLeg, string> = {
 // values every one of these same rows at the feed each settled at (never
 // this leg's own raw amount) and states the CDP's net equity effect.
 const PSM_OUTCOME_POINTER =
-  "This leg feeds the PSM-outcome figure on the Lifetime flows panel's heading row, which values every priced PSM-share row at the feed it settled at and states the CDP's net equity effect there.";
+  "This leg feeds the PSM-outcome figure on the Lifetime flows panel's heading row, which values every priced PSM-share row at the feed it settled at and states the position's net equity effect there.";
 
 // Two legs need a summary that does NOT read as if this CDP was redeemed by
 // an event of its own: it is the CDP's pro-rata share of the MARKET's PSM
@@ -719,13 +719,13 @@ const PSM_OUTCOME_POINTER =
 // CDP experienced directly.
 const LEG_SUMMARY_OVERRIDE: Partial<Record<PolarisLifetimeLeg, (unit: string) => string>> = {
   "pETH from PSM mints": (unit) =>
-    `Lifetime pETH from the market's PSM mints (${unit}) — the sum of this CDP's pro-rata share of every PSM mint, settled onto it at each of its own touches (\`_mintRedeemCollGain\` > 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
+    `Lifetime pETH from the market's PSM mints (${unit}) — the sum of this position's pro-rata share of every PSM mint, settled onto it at each of its own touches (\`_mintRedeemCollGain\` > 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
   "pETH to PSM redemptions": (unit) =>
-    `Lifetime pETH to the market's PSM redemptions (${unit}) — this CDP was never redeemed by an event of its own; the sum is its pro-rata share of the market's PSM redemptions, settled onto it at each of its own touches (\`_mintRedeemCollGain\` < 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
+    `Lifetime pETH to the market's PSM redemptions (${unit}) — this position was never redeemed by an event of its own; the sum is its pro-rata share of the market's PSM redemptions, settled onto it at each of its own touches (\`_mintRedeemCollGain\` < 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
   "debt from PSM mints": (unit) =>
-    `Lifetime debt from the market's PSM mints (${unit}) — the sum of this CDP's pro-rata share of the debt every PSM mint added, settled onto it at each of its own touches (\`_mintRedeemDebtGain\` > 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
+    `Lifetime debt from the market's PSM mints (${unit}) — the sum of this position's pro-rata share of the debt every PSM mint added, settled onto it at each of its own touches (\`_mintRedeemDebtGain\` > 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
   "debt cleared by PSM redemptions": (unit) =>
-    `Lifetime debt cleared by the market's PSM redemptions (${unit}) — this CDP was never redeemed by an event of its own; the sum is its pro-rata share of the debt the market's PSM redemptions cleared, settled onto it at each of its own touches (\`_mintRedeemDebtGain\` < 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
+    `Lifetime debt cleared by the market's PSM redemptions (${unit}) — this position was never redeemed by an event of its own; the sum is its pro-rata share of the debt the market's PSM redemptions cleared, settled onto it at each of its own touches (\`_mintRedeemDebtGain\` < 0). Each term is a field the cdpManager itself emitted; the sum is the index's, and the replay identity ties every side's sums back to the last resulting figure exactly. ${PSM_OUTCOME_POINTER}`,
 };
 
 /** A lifetime sum of one ledger leg over the CDP's whole history. */

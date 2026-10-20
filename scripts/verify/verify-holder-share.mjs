@@ -193,8 +193,8 @@ check("A2. …and twitter:image is the same URL", rel(pMeta.twitterImage) === pS
 }
 check(
   "A4. the title names the holder in the explorer's own plural noun",
-  pMeta.ogTitle === `Rails | Polaris CDPs held by ${short(POLARIS_WALLET)}` &&
-    pMeta.ogImageAlt === "This wallet's Polaris CDPs at a glance",
+  pMeta.ogTitle === `Rails | Polaris positions held by ${short(POLARIS_WALLET)}` &&
+    pMeta.ogImageAlt === "This wallet's Polaris positions at a glance",
   `"${pMeta.ogTitle}" / alt "${pMeta.ogImageAlt}"`,
 );
 
@@ -440,7 +440,7 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
   // ── Polaris ──────────────────────────────────────────────────────────────
   check(
     "D2. Polaris: the card's headline and status word are the wallet and its restated counts",
-    got.polaris?.headline === `CDPs held by ${short(POLARIS_WALLET)}` && got.polaris?.status === pStatus,
+    got.polaris?.headline === `Positions held by ${short(POLARIS_WALLET)}` && got.polaris?.status === pStatus,
     `"${got.polaris?.headline}" / "${got.polaris?.status}" vs restated "${pStatus}"`,
   );
   check(
@@ -461,7 +461,7 @@ if (!check("D1. the card-model probe runs", Boolean(probeLine), probeLine ? "" :
   );
   check(
     "D6. Polaris: a wallet stated as holding 21 CDPs states the count and NO totals — a slice is not an aggregate",
-    got.polarisTruncated?.status === "21 CDPs" && got.polarisTruncated?.stats.length === 0,
+    got.polarisTruncated?.status === "21 Positions" && got.polarisTruncated?.stats.length === 0,
     JSON.stringify(got.polarisTruncated),
   );
   check(
