@@ -385,33 +385,7 @@ words:
   tip_liq_coll_surplus: |-
     The pETH left over the debt's value and the penalty, set aside for the owner to claim, from the CDPManager's log.
   # The gas-compensation escrow: its own spine row, held apart from the
-  # collateral (rails-ops TO-DO-ui-jobs 363), and its own panel on every event
-  # from the open to the close or the liquidation (TO-DO-ui-jobs 366).
-  sheet_escrow: |-
-    Gas compensation escrow
-  sheet_escrow_sent: |-
-    Sent with the collateral
-  sheet_escrow_returned: |-
-    Returned to the holder
-  tip_escrow: |-
-    A fixed pETH amount every CDP sends at its open and holds apart from its collateral. It returns on close and goes to the liquidator on a liquidation.
-  tip_escrow_sent: |-
-    The escrow the holder sent in the open's one pETH transfer, beside the collateral. It counts toward neither the collateral nor the collateral ratio.
-  tip_escrow_returned: |-
-    The escrow the close sent back to the holder, in the same pETH transfer as the collateral.
-  sheet_escrow_paid: |-
-    Paid to the liquidator
-  tip_escrow_paid: |-
-    The escrow paid to the liquidator, from the LiquidationGasComp log. It sits apart from the collateral, so it is not part of the seizure.
-  tip_escrow_last: |-
-    The escrow the CDP held after its previous event, the protocol's fixed amount since the open, in dollars at that event's pETH price.
-  tip_escrow_market: |-
-    The change the pETH price made to the dollar value of the escrow between the CDP's previous event and this one.
-  tip_escrow_before: |-
-    The escrow just before this event, at this block's pETH price.
-  tip_escrow_total: |-
-    The escrow the CDP holds after this event in pETH, and in dollars at this block's pETH price.
-  # The escrow's footnote under Risk and Limits (TO-DO-ui-jobs 388).
+  # collateral (rails-ops TO-DO-ui-jobs 363). Its footnote under Risk and Limits (TO-DO-ui-jobs 388).
   tip_escrow_note: |-
     The gas compensation escrow: the 0.0375 pETH every CDP sends at its open, held apart from its collateral and outside the collateral ratio. It returns on close and goes to the liquidator on a liquidation.
   spine_escrow_sent: |-
