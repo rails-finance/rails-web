@@ -720,8 +720,8 @@ check(
 );
 // NO chain has a Vaults row any more: rails-ops decision 0028 moved every vault
 // inside the explorer whose factory deployed it, so the switcher's rows are
-// roster entries and nothing else. Check 11b holds Aave's vault layer to what
-// an UNLAUNCHED roster entry gets, which is no row at all.
+// roster entries and nothing else. Check 11b reads Aave's vault layer as one
+// of them.
 const vaultsRowAny = await page
   .locator("[data-switcher-vaults]")
   .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
@@ -734,12 +734,12 @@ await page.locator("[role='menu'] button", { hasText: "Ethereum" }).click();
 const aaveVaultsRow = await page
   .locator("[role='menu'] a[href='/ethereum/aave']")
   .evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()));
-// Aave's vault layer is UNLAUNCHED (lib/shared/protocols.ts `unlaunched`): it
-// serves at /ethereum/aave/vaults and nothing on the site points at it, the
-// switcher included. It becomes an ordinary row again when the flag comes off.
+// Aave's vault layer launched on 20 Oct 2026 (ui-jobs 412; `unlaunched` left
+// its entry in lib/shared/protocols.ts), so the switcher's Ethereum column
+// carries it as an ordinary row, "Aave vaults".
 check(
-  "11b …and Aave's vault layer is NOT a switcher row while it is unlaunched",
-  aaveVaultsRow.length === 0,
+  "11b …and Aave's vault layer is a switcher row, launched",
+  aaveVaultsRow.length === 1 && /^Aave vaults/.test(aaveVaultsRow[0]),
   JSON.stringify(aaveVaultsRow),
 );
 await page.keyboard.press("Escape");
@@ -768,8 +768,8 @@ check(
   `ethereum ${covEth.count}, sepolia ${covSep.count}`,
 );
 check(
-  "12b /coverage/ethereum carries no Aave vault-layer row while it is unlaunched",
-  covEthRow === 0,
+  "12b /coverage/ethereum carries the Aave vault-layer row, launched",
+  covEthRow >= 1,
   `${covEthRow} link(s) to /ethereum/aave`,
 );
 

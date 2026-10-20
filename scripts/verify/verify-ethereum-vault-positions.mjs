@@ -738,7 +738,15 @@ async function readListingDom(qs = "") {
   // section's prose is no longer on this page at all; it is read off
   // /ethereum/aave/vaults/info by `readInfoDom` below and the two are judged
   // together at L9.
-  const bodyText = (await page.locator("body").innerText()).replace(/\s+/g, " ").trim();
+  // The beta strip (H14, "Tell us what you think.") is site chrome above every
+  // launched page, not the section's copy, so the register rules read the body
+  // without it.
+  const betaText = await page
+    .locator('[data-anatomy="H14"]')
+    .first()
+    .innerText({ timeout: 1000 })
+    .catch(() => "");
+  const bodyText = (await page.locator("body").innerText()).replace(betaText, "").replace(/\s+/g, " ").trim();
   // The face's one line — the census line under the section rail
   // (components/vaults/vault-census-line.tsx). It is VISIBLE, so innerText
   // would do; textContent is kept because it is the whole node either way and

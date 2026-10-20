@@ -650,6 +650,10 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false, 
       await more.first().click({ force: true });
       await page.waitForTimeout(500);
     }
+  // The count before any run opens, read in this document: two visits paint two
+  // windows (the first run stands at a different depth once new rows arrive), so
+  // T9d compares a visit with itself.
+  const paintedAtRun = expandRuns ? await page.locator("[data-vault-timeline-rows] [data-event-id]").count() : null;
   if (expandRuns)
     for (let guard = 0; guard < 40; guard++) {
       // A group opens from its ⋮ since ui-jobs 250 (lib/group-rows.mjs).
@@ -759,6 +763,7 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false, 
   out.proseWords = proseWords;
   out.towerBefore = towerBefore;
   out.paintedBefore = paintedBefore;
+  out.paintedAtRun = paintedAtRun;
   out.towerAll = towerAll;
   out.ms = ms;
   out.status = status;
@@ -1572,8 +1577,8 @@ check(
 const f1Expanded = await pageRead(browser, pageUrl(F_B1), { growToRun: true, expandRuns: true });
 check(
   "T9d expanding every run restores its member rows",
-  f1Expanded.paintedEvents > f1RunWin.paintedEvents,
-  `${f1RunWin.paintedEvents} cards collapsed → ${f1Expanded.paintedEvents} expanded`,
+  f1Expanded.paintedEvents > f1Expanded.paintedAtRun,
+  `${f1Expanded.paintedAtRun} cards collapsed → ${f1Expanded.paintedEvents} expanded, one visit`,
 );
 
 // ═══ T10 — the card is the listing's card ═════════════════════════════════
