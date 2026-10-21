@@ -15,6 +15,12 @@
 //   • Status — open / closed / liquidated. Open/closed come off the settled
 //     sweep (chain_closed); liquidated = ever liquidated (n_liquidations > 0).
 //   • Pool   — wstETH pool / WBTC pool (multi, OR).
+//   • Size   — Debt in fxUSD (minDebt / maxDebt, the settled debt as a token
+//     amount: the listing reads no USD price for fxUSD) and Collateral in USD
+//     (minCollUsd / maxCollUsd, the settled collateral at the pool oracle's
+//     minimum price on fx_pool_state); lib/shared/size-dimensions.ts.
+//   • Transactions — a range over the position's distinct transactions in
+//     mv_fx_events (minTx / maxTx; lib/shared/transactions-dimension.ts).
 //   • Search — a position id, a `<pool>-<id>` slug, or an owner address; the
 //     proxy gets the disambiguated param.
 //   • Sort   — settled collateral / debt / debt ratio, event count, recency,
@@ -34,15 +40,36 @@ import {
   isAllStatuses,
   sameStatusSet,
 } from "@/lib/fx/listing-visibility";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
 /** Backend caps `limit` at 100; 20 keeps the page light and the grid familiar. */
 export const FX_ITEMS_PER_PAGE = 20;
+
+/** The Size sliders' top: the round number above the larger of the biggest
+ *  position's settled debt (35,271,292 fxUSD) and collateral ($43,344,381 at
+ *  the pool oracle price) in fx_position_chain, 21 Oct 2026. */
+const FX_SIZE_TOP = 50_000_000;
+
+/** The Transactions slider's top: the round number above the busiest position
+ *  (236 distinct transactions in mv_fx_events, 21 Oct 2026). */
+const FX_TX_TOP = 300;
+
+/** The Size panel's unit and price line. */
+const FX_SIZE_NOTE = "Debt in fxUSD; collateral at the pool oracle's minimum price.";
 
 export interface FxListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). Lifecycle over the settled sweep. */
   status: string[];
   /** Pool keys the position must belong to (multi, OR). */
   pools: string[];
+  /** Debt range in fxUSD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -56,6 +83,9 @@ export const FX_LIST_DEFAULTS: FxListFilters = {
   sortOrder: "desc",
   status: [],
   pools: [],
+  debt: [],
+  coll: [],
+  tx: [],
 };
 
 // Values are the FxPositionSort vocabulary — the backend sorts, so these must
@@ -113,6 +143,20 @@ export function fxListDimensions(): SerializableDimension<FxListFilters>[] {
       get: (f) => f.pools,
       set: (f, v) => ({ ...f, pools: v }),
     },
+    ...sizeDimensions<FxListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: FX_SIZE_NOTE,
+      top: FX_SIZE_TOP,
+      debtUnit: "fxUSD",
+    }),
+    transactionsDimension<FxListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: FX_TX_TOP,
+    }),
   ];
 }
 
@@ -140,6 +184,8 @@ export function fxFiltersToFetchParams(filters: FxListFilters, page: number): Fe
     pools: pools.length > 0 ? pools : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    ...sizeBounds(filters, { debt: "unit", coll: "usd" }),
+    ...transactionBounds(filters.tx),
     sortBy,
     sortOrder: filters.sortOrder,
     limit: FX_ITEMS_PER_PAGE,

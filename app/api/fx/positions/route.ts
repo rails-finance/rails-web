@@ -38,6 +38,12 @@ export async function GET(request: NextRequest) {
     if (sp.get("owner")) qs.set("owner", sp.get("owner")!);
     if (sp.get("pools")) qs.set("pools", sp.get("pools")!);
     if (sp.get("status")) qs.set("status", sp.get("status")!);
+    // A debt, collateral or transaction-count bound is forwarded only as a
+    // whole number.
+    for (const k of ["minDebt", "maxDebt", "minCollUsd", "maxCollUsd", "minTx", "maxTx"]) {
+      const v = sp.get(k);
+      if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+    }
     if (sp.get("sortBy")) qs.set("sortBy", sp.get("sortBy")!);
     qs.set("sortOrder", sp.get("sortOrder") === "asc" ? "asc" : "desc");
     if (sp.get("limit") != null) qs.set("limit", sp.get("limit")!);

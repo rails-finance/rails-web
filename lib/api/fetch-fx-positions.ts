@@ -15,6 +15,15 @@ export interface FetchFxPositionsParams {
   owner?: string;
   pools?: FxPoolKey[];
   status?: (FxPositionStatus | "liquidated")[];
+  /** Inclusive bounds on the position's settled debt in fxUSD and its
+   *  collateral in USD; any one alone. */
+  minDebt?: number;
+  maxDebt?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
+  /** Inclusive bounds on the position's transaction count; either alone. */
+  minTx?: number;
+  maxTx?: number;
   sortBy?: FxPositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -37,6 +46,9 @@ export async function fetchFxPositions(p: FetchFxPositionsParams): Promise<FxPos
   if (p.owner) qs.set("owner", p.owner);
   if (p.pools && p.pools.length > 0) qs.set("pools", p.pools.join(","));
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
+  for (const k of ["minDebt", "maxDebt", "minCollUsd", "maxCollUsd", "minTx", "maxTx"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));
