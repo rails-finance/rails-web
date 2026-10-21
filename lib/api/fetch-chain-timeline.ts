@@ -84,6 +84,9 @@ export interface ChainTimelineCoverage {
   /** Whether a second chain witness has confirmed the rows, on a store that
    *  says so (Arbitrum). Absent everywhere else. */
   confirmation?: TimelineConfirmation;
+  /** The block the Arbitrum store's history is current to. Absent on a sweep
+   *  and from an api that predates the field. */
+  throughBlock?: number;
   /** The lane's oracle-at-block walk, when one prices this family's rows
    *  (rails-server api/src/services/price-walk-fill.ts). Absent on a sweep,
    *  on a lane with no walk, and from a server before the field. */

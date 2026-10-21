@@ -93,6 +93,7 @@ export async function loadAaveV3ArbitrumTimeline(
     ...result,
     coverage: {
       ...result.coverage,
+      ...(cov.throughBlock != null ? { throughBlock: cov.throughBlock } : {}),
       confirmation: {
         status: cov.status,
         confirmedThroughBlock: cov.confirmedThroughBlock,

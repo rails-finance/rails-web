@@ -44,6 +44,7 @@ const { parseRetryAfter, ApiOverBudget } = await import(ROOT + "lib/api/api-over
 const { fetchChainTimeline, ChainTimelineOverBudget, ChainTimelineUnavailable } = await import(
   ROOT + "lib/api/fetch-chain-timeline.ts"
 );
+const { readTimelineAnswer } = await import(ROOT + "lib/aave-v3-arbitrum/api-contract.ts");
 const { readerHopHeaders } = await import(ROOT + "lib/api/reader-ip.ts");
 const { loadAaveV3ArbitrumTimeline } = await import(ROOT + "lib/sources/api/aave-v3-arbitrum-timeline.ts");
 const { loadCompoundArbitrumTimeline } = await import(ROOT + "lib/sources/api/compound-arbitrum-timeline.ts");
@@ -179,3 +180,17 @@ for (const [family, route] of ROUTES) {
     assert.equal((await res.json()).unavailable, true);
   });
 }
+
+test("readTimelineAnswer: coverage.throughBlock parses when present and is absent when the api omits it", () => {
+  const body = (extra) => ({
+    rows: [],
+    coverage: { source: "etherscan", status: "unconfirmed", gaps: [], dropped: [], ...extra },
+  });
+  const withIt = readTimelineAnswer(body({ throughBlock: 250000000 }));
+  assert.equal(withIt.coverage.throughBlock, 250000000);
+  const asString = readTimelineAnswer(body({ throughBlock: "250000001" }));
+  assert.equal(asString.coverage.throughBlock, 250000001);
+  const without = readTimelineAnswer(body({}));
+  assert.ok(without);
+  assert.equal("throughBlock" in without.coverage, false);
+});

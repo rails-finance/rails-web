@@ -97,7 +97,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
   // A capped list is not "missing" here: the boundary card on the spine
   // states it (rails-ops decision 0019), and one statement is enough.
   const confirmation = coverage.confirmation;
-  if (!holed && coverage.fromDeployment && undated === 0 && !confirmation) return null;
+  if (!holed && coverage.fromDeployment && undated === 0 && !confirmation && coverage.throughBlock == null) return null;
 
   return (
     <div className={`mt-2 pt-3 ${NOTE}`} data-anatomy="L10">
@@ -109,6 +109,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
           txLink={(h) => explorerUrl(chainId, "tx-logs", h)}
         />
       )}
+      {coverage.throughBlock != null && <ThroughBlockLine block={blockLink(coverage.throughBlock)} />}
       {holed ? (
         <p>
           <span className="text-foreground">This history has holes in it.</span> Rails swept {sourceLabel} from block{" "}
@@ -168,25 +169,33 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
  *  coverage carries no confirmation. */
 export function TimelineConfirmationFooter({ coverage }: { coverage: ChainTimelineCoverage }) {
   const chainId = useChainId();
-  if (!coverage.confirmation) return null;
+  if (!coverage.confirmation && coverage.throughBlock == null) return null;
+  const blockLink = (b: number) => (
+    <a href={explorerUrl(chainId, "block", b)} target="_blank" rel="noopener noreferrer" className="link-external">
+      {b.toLocaleString("en-US")}
+    </a>
+  );
   return (
     <div className={`mt-2 pt-3 ${NOTE}`} data-anatomy="L10">
-      <ConfirmationLine
-        confirmation={coverage.confirmation}
-        source={coverage.source}
-        blockLink={(b) => (
-          <a
-            href={explorerUrl(chainId, "block", b)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="link-external"
-          >
-            {b.toLocaleString("en-US")}
-          </a>
-        )}
-        txLink={(h) => explorerUrl(chainId, "tx-logs", h)}
-      />
+      {coverage.confirmation && (
+        <ConfirmationLine
+          confirmation={coverage.confirmation}
+          source={coverage.source}
+          blockLink={blockLink}
+          txLink={(h) => explorerUrl(chainId, "tx-logs", h)}
+        />
+      )}
+      {coverage.throughBlock != null && <ThroughBlockLine block={blockLink(coverage.throughBlock)} />}
     </div>
+  );
+}
+
+/** The block the Arbitrum store's history is current to. */
+function ThroughBlockLine({ block }: { block: React.ReactNode }) {
+  return (
+    <p className="mb-1.5" data-history-through-block>
+      History through block {block}.
+    </p>
   );
 }
 

@@ -123,6 +123,7 @@ export async function loadCompoundArbitrumTimeline(
     ...result,
     coverage: {
       ...result.coverage,
+      ...(cov.throughBlock != null ? { throughBlock: cov.throughBlock } : {}),
       confirmation: {
         status: cov.status,
         confirmedThroughBlock: cov.confirmedThroughBlock,

@@ -75,6 +75,9 @@ export interface AaveV3ArbitrumTimelineCoverage {
   tailThroughBlock: number | null;
   /** The newest block the validator agrees through. */
   confirmedThroughBlock: number | null;
+  /** The block the stored history is current to; absent from an api that
+   *  predates the field. */
+  throughBlock?: number;
   /** The newest block the keyless arb1 walk has sampled. */
   arb1ThroughBlock: number | null;
   /** When the validator last ran; null before it has. */
@@ -153,6 +156,7 @@ export function readTimelineAnswer<Row = AaveV3ArbitrumTimelineRow>(
       tailThroughBlock: block(c.tailThroughBlock),
       confirmedThroughBlock: block(c.confirmedThroughBlock),
       arb1ThroughBlock: block(c.arb1ThroughBlock),
+      ...(block(c.throughBlock) != null ? { throughBlock: block(c.throughBlock) as number } : {}),
       validatedAt: typeof c.validatedAt === "string" ? c.validatedAt : null,
       droppedCount: block(c.droppedCount) ?? dropped.length,
       dropped,
