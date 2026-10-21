@@ -51,6 +51,11 @@ export async function readMorphoPositions(
     const v = sp.get(k);
     if (v != null && /^\d+$/.test(v)) qs.set(k, v);
   }
+  // So is a debt bound in the loan token.
+  for (const k of ["minDebt", "maxDebt"]) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+  }
   if (sp.get("sortBy")) qs.set("sortBy", sp.get("sortBy")!);
   qs.set("sortOrder", sp.get("sortOrder") === "asc" ? "asc" : "desc");
   if (sp.get("limit") != null) qs.set("limit", sp.get("limit")!);
