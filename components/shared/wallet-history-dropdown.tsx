@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type RefObject } from "react";
 
 import { Facehash } from "@/components/shared/facehash";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { protocolForSession } from "@/lib/shared/protocols";
+import { LAUNCHED_PROTOCOLS, protocolForSession } from "@/lib/shared/protocols";
 import {
   loadBookmarks,
   renameSession,
@@ -25,19 +25,41 @@ interface Props {
   /** Which scope's bookmarks to render — a protocol's rail, or a chain's
    *  vault SECTION. Each keeps its own — a wallet bookmarked on /liquity-v2 is
    *  not a bookmark on /aave-v4, and neither is one on /ethereum/aave.
-   *  The panel header names the scope so it is explicit. */
-  protocol: BookmarkScope;
+   *  The panel header names the scope so it is explicit. `"all"` is every
+   *  launched explorer's bookmarks, one row per wallet: the front-door search
+   *  (components/shared/front-door-search.tsx) opens a wallet's whole view, so
+   *  a wallet bookmarked on any explorer is one press away. Rename and remove
+   *  stay with the per-explorer lists and the bookmarks modal. */
+  protocol: BookmarkScope | "all";
+  /** Draw nothing while there are no bookmarks (the home hero's search). */
+  hideWhenEmpty?: boolean;
+}
+
+/** Every launched explorer's bookmarks, one per primary address, the most
+ *  recently bookmarked first. */
+function loadAllBookmarks(): WalletSession[] {
+  const byAddress = new Map<string, WalletSession>();
+  for (const entry of LAUNCHED_PROTOCOLS) {
+    for (const s of loadBookmarks(entry.session)) {
+      const primary = s.addresses[0]?.toLowerCase();
+      if (!primary) continue;
+      const held = byAddress.get(primary);
+      if (!held || s.lastVisited > held.lastVisited) byAddress.set(primary, s);
+    }
+  }
+  return [...byAddress.values()].sort((a, b) => b.lastVisited - a.lastVisited);
 }
 
 /** Floating panel of a protocol's bookmarked wallets, anchored beneath the
  *  wallet search input. Bookmarks are per-protocol; the header names which
  *  rail these belong to. (Recents were retired — this is bookmarks only.) */
-export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, protocol }: Props) {
+export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, protocol, hideWhenEmpty }: Props) {
   const [sessions, setSessions] = useState<WalletSession[]>([]);
-  const meta = protocolForSession(protocol);
+  const all = protocol === "all";
+  const meta = all ? null : protocolForSession(protocol);
 
   useEffect(() => {
-    const sync = () => setSessions(loadBookmarks(protocol));
+    const sync = () => setSessions(protocol === "all" ? loadAllBookmarks() : loadBookmarks(protocol));
     sync();
     window.addEventListener("storage", sync);
     window.addEventListener(SESSIONS_CHANGED_EVENT, sync);
@@ -77,6 +99,7 @@ export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, pro
   // update HeaderBar while rendering WalletHistoryDropdown" warning.
   const removeSessionLocal = useCallback(
     (key: string) => {
+      if (protocol === "all") return;
       const next = sessions.filter((s) => s.key !== key);
       setSessions(next);
       saveSessions(next, protocol);
@@ -86,6 +109,7 @@ export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, pro
 
   const renameSessionLocal = useCallback(
     (key: string, customName: string) => {
+      if (protocol === "all") return;
       renameSession(key, customName, protocol);
       setSessions(loadBookmarks(protocol));
     },
@@ -95,6 +119,7 @@ export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, pro
   if (!show) return null;
 
   const hasAny = sessions.length > 0;
+  if (!hasAny && hideWhenEmpty) return null;
 
   return (
     <div className="absolute left-0 right-0 top-full mt-2 z-[var(--z-dropdown)] rounded-xl border border-rb-200 dark:border-rb-800 bg-white dark:bg-rb-900 shadow-lg overflow-hidden">
@@ -103,6 +128,11 @@ export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, pro
         <div className="flex items-center gap-1.5 px-1 pb-2 border-b border-rb-200 dark:border-rb-800">
           <BookmarkIcon />
           <span className="text-xs font-semibold text-foreground">Bookmarks</span>
+          {all && (
+            <span className="ml-auto text-[10px] uppercase tracking-[0.1em] font-semibold text-rb-500">
+              Every explorer
+            </span>
+          )}
           {meta && (
             <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] font-semibold text-rb-500">
               <ProtocolIcon id={meta.id} className="h-3 w-3 shrink-0" />
@@ -119,6 +149,7 @@ export function WalletHistoryDropdown({ show, containerRef, onClose, onPick, pro
                 onRemove={removeSessionLocal}
                 onRename={renameSessionLocal}
                 onPick={onPick}
+                manage={!all}
               />
             ))}
           </div>
@@ -236,11 +267,15 @@ function SessionRow({
   onRemove,
   onRename,
   onPick,
+  manage = true,
 }: {
   session: WalletSession;
   onRemove: (key: string) => void;
   onRename: (key: string, customName: string) => void;
   onPick: (address: string) => void;
+  /** Rename and remove; off on the every-explorer list, where a row stands
+   *  for one wallet bookmarked under several scopes. */
+  manage?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -339,6 +374,10 @@ function SessionRow({
           </svg>
         }
       />
+    </div>
+  ) : !manage ? (
+    <div className="flex items-center gap-0.5 shrink-0">
+      <CopyButton text={primary} />
     </div>
   ) : (
     <div className="flex items-center gap-0.5 shrink-0">

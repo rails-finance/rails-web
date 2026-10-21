@@ -1,8 +1,9 @@
 "use client";
 
 // BrandRail — the narrow vertical strip down the left edge of every app/(app)
-// surface (rails-ops TO-DO-ui-jobs 67, 68). The Rails mark sits at the top; the
-// theme toggle, the bookmarks control and the beta pill share the foot.
+// surface (rails-ops TO-DO-ui-jobs 67, 68). The Rails mark sits at the top with
+// the search's glyph under it (H15.1, decision 0051); the theme toggle, the
+// bookmarks control and the beta pill share the foot.
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -26,6 +27,7 @@ import Link from "next/link";
 
 import { BookmarksModal } from "@/components/nav/bookmarks-modal";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
+import { SearchLauncher } from "@/components/shared/front-door-search";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
  *  carried, without the wordmark, which will not fit at icon width. */
@@ -113,7 +115,10 @@ export function BrandRail() {
         data-anatomy="H1"
         className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised pt-4 md:flex"
       >
-        <RailsGlyph />
+        <div className="flex flex-col items-center gap-3">
+          <RailsGlyph />
+          <SearchLauncher placement="rail" />
+        </div>
         {/* Toggle, bookmark, then the pill flush to the left edge. `w-full`
             is what lets the pill sit at x=0 while the two icons stay centred
             in the 56px. */}

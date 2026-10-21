@@ -83,9 +83,11 @@ const COVERAGE_PATHS = launchedProductionChains()
 // No chain is named in the title. Rails spans chains, and marking one would
 // either date the copy or under-claim the rest; the per-chain coverage pages
 // are where that distinction is drawn.
-const SITE_TITLE = "Rails - DeFi Protocol Explorers";
-const OG_DESCRIPTION = `${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — every position replayed from the protocol's own on-chain events, with a receipt on every number.`;
-const SITE_DESCRIPTION = `Rails builds a dedicated explorer for each of ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — browse every open position, not just your own. Every number is replayed from the protocol's own on-chain events, with a receipt showing where it came from. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;
+// The home page is the front door, one search (decision 0051), so the title and
+// the share card say the door; the brand leads.
+const SITE_TITLE = "Rails - Look up a wallet";
+const OG_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails explores ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — every position replayed from the protocol's own on-chain events, with a receipt on every number.`;
+const SITE_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails builds a dedicated explorer for each of ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — browse every open position, not just your own. Every number is replayed from the protocol's own on-chain events, with a receipt showing where it came from. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -127,10 +129,10 @@ export const metadata: Metadata = {
         // fresh rather than served stale from their cache. Bump the hash
         // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
         // `node scripts/generate-og.mjs` changes this file's bytes.
-        url: "/og/home-9ddcd38b.png",
+        url: "/og/home-eaad142d.png",
         width: 1200,
         height: 630,
-        alt: `Explore ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
+        alt: `Look up a wallet on Rails: ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
       },
     ],
   },
@@ -138,7 +140,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home-9ddcd38b.png"],
+    images: ["/og/home-eaad142d.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },

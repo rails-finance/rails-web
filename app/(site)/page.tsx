@@ -9,19 +9,23 @@ import { TeamSection } from "@/components/shared/team-section";
 import { getLiveExampleData } from "@/lib/home/live-example-data";
 import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
+import { getFrontDoorStrip } from "@/lib/home/front-door-strip-data";
 
-// ISR — the page (and the live-example trove data fetched below) regenerates
-// in the background at most hourly; every visitor gets the static render.
-export const revalidate = 3600;
+// ISR — the page regenerates in the background at most every five minutes,
+// the hero strip's read (lib/home/front-door-strip-data.ts); the live example,
+// the covered count and the stats keep their own hourly data cache. Every
+// visitor gets the static render.
+export const revalidate = 300;
 
 export default async function Home() {
   // Independent legs — the hero count, the live-example trove, and the
   // overview stats each hit a different roster/endpoint, so fetch them
   // concurrently rather than stacking their latency.
-  const [liveExample, covered, stats] = await Promise.all([
+  const [liveExample, covered, stats, strip] = await Promise.all([
     getLiveExampleData(),
     getCoveredPositions(),
     getHomeStats(),
+    getFrontDoorStrip(),
   ]);
   return (
     <div className="min-h-screen">
@@ -42,7 +46,7 @@ export default async function Home() {
           the content column; clip it at the section edge instead of letting
           it mint a horizontal scrollbar on narrow viewports. */}
       <div className="overflow-x-clip bg-gradient-to-b from-rb-50 via-background to-background dark:from-rb-600 dark:via-rb-800 dark:to-rb-800">
-        <HomeHero />
+        <HomeHero strip={strip} />
 
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
