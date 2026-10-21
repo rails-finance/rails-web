@@ -12,6 +12,14 @@
 //     read-grade line with no current reading, and both are kept selectable:
 //     hiding them would make the listing quietly claim a completeness the data
 //     does not have.
+//   • Size   — Debt and Collateral in USD (lib/shared/size-dimensions.ts), sent
+//     as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd and valued on the
+//     server through the price book the rows already carry (DefiLlama's price
+//     for the line's underlying), so one range spans alUSD and alETH lines.
+//   • Transactions — the position's distinct transactions, sent as minTx /
+//     maxTx (lib/shared/transactions-dimension.ts).
+// Both chains share this registry, so the Ethereum and Base listings draw the
+// same Size panel and Transactions facet.
 //
 // THERE IS NO GRADE FACET, although the API takes one. The grade is a property
 // of the LINE, not of the position (rails-ops decisions/0032), so filtering by
@@ -37,14 +45,31 @@ import type { ChainId } from "@/lib/shared/chains";
 import { isLineOnChain, linesForChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { FetchAlchemixPositionsParams } from "@/lib/api/fetch-alchemix-positions";
 import { parseAlchemixSearch } from "@/lib/alchemix/search";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
 export const ALCHEMIX_ITEMS_PER_PAGE = 20;
+
+/** The Transactions slider's top: the round number above the busiest position
+ *  (567 transactions, eth-aleth #122, 21 Oct 2026). */
+const ALCHEMIX_TX_TOP = 1000;
+
+/** The Size panel's price line: the server values both sides at the price book
+ *  the listing rows carry (`priceBookFor` / `usdFor`, DefiLlama). */
+const ALCHEMIX_SIZE_NOTE =
+  "At the DefiLlama price book the rows carry: stablecoins at their quoted price, alETH at the ETH price.";
 
 export interface AlchemixListFilters extends BaseListFilters {
   /** Line keys on this explorer's chain. */
   line: string[];
   /** open / closed / refused / unknown — multi (OR). */
   status: string[];
+  /** Debt range in USD, one encodeRange value or [] for no bound. */
+  debt: string[];
+  /** Collateral range in USD. */
+  coll: string[];
+  /** Transaction-count range. */
+  tx: string[];
 }
 
 export const ALCHEMIX_LIST_DEFAULTS: AlchemixListFilters = {
@@ -53,6 +78,9 @@ export const ALCHEMIX_LIST_DEFAULTS: AlchemixListFilters = {
   sortOrder: "desc",
   line: [],
   status: [],
+  debt: [],
+  coll: [],
+  tx: [],
 };
 
 const STATUS_OPTIONS: FilterOptionDef[] = [
@@ -99,7 +127,19 @@ export function alchemixListDimensions(chainId: ChainId): SerializableDimension<
     get: (f) => f.status,
     set: (f, v) => ({ ...f, status: v }),
   };
-  if (soleLine(chainId) != null) return [status];
+  const size = sizeDimensions<AlchemixListFilters>({
+    getDebt: (f) => f.debt,
+    setDebt: (f, debt) => ({ ...f, debt }),
+    getColl: (f) => f.coll,
+    setColl: (f, coll) => ({ ...f, coll }),
+    panelNote: ALCHEMIX_SIZE_NOTE,
+  });
+  const transactions = transactionsDimension<AlchemixListFilters>({
+    get: (f) => f.tx,
+    set: (f, tx) => ({ ...f, tx }),
+    top: ALCHEMIX_TX_TOP,
+  });
+  if (soleLine(chainId) != null) return [status, ...size, transactions];
   return [
     {
       id: "line",
@@ -117,6 +157,8 @@ export function alchemixListDimensions(chainId: ChainId): SerializableDimension<
       set: (f, v) => ({ ...f, line: v.filter((key) => isLineOnChain(chainId, key)) }),
     },
     status,
+    ...size,
+    transactions,
   ];
 }
 
@@ -153,6 +195,8 @@ export function alchemixFiltersToFetchParams(
     owner: q.kind === "address" ? q.address : undefined,
     tokenId: q.kind === "id" ? q.id : undefined,
     status: filters.status,
+    ...sizeBounds(filters, { debt: "usd", coll: "usd" }),
+    ...transactionBounds(filters.tx),
     sortBy,
     sortOrder: filters.sortOrder,
     limit: ALCHEMIX_ITEMS_PER_PAGE,

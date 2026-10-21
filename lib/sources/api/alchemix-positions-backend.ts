@@ -40,6 +40,12 @@ export interface FetchAlchemixPositionsParams {
   tokenId?: string;
   status?: string[];
   grade?: string[];
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
+  minTx?: number;
+  maxTx?: number;
   sortBy?: AlchemixPositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -53,6 +59,44 @@ export interface FetchAlchemixPositionsParams {
 export type AlchemixPositionsRead =
   | { ok: true; result: AlchemixPositionsResponse; upstream: Response }
   | { ok: false; status: number; statusText: string };
+
+/** The Size and Transactions bounds an Alchemix listing may carry. */
+export type AlchemixBoundKey = "minDebtUsd" | "maxDebtUsd" | "minCollUsd" | "maxCollUsd" | "minTx" | "maxTx";
+
+const POSITION_BOUNDS: readonly AlchemixBoundKey[] = [
+  "minDebtUsd",
+  "maxDebtUsd",
+  "minCollUsd",
+  "maxCollUsd",
+  "minTx",
+  "maxTx",
+];
+
+/** The named bounds from the proxy's query string, each only as a whole
+ *  number; anything else is dropped. */
+export function parseWholeBounds(
+  sp: URLSearchParams,
+  keys: readonly AlchemixBoundKey[],
+): Partial<Record<AlchemixBoundKey, number>> {
+  const out: Partial<Record<AlchemixBoundKey, number>> = {};
+  for (const k of keys) {
+    const v = sp.get(k);
+    if (v != null && /^\d+$/.test(v)) out[k] = Number(v);
+  }
+  return out;
+}
+
+/** Write the named bounds that are set onto the backend's query string. */
+export function setBounds(
+  qs: URLSearchParams,
+  p: Partial<Record<AlchemixBoundKey, number>>,
+  keys: readonly AlchemixBoundKey[],
+): void {
+  for (const k of keys) {
+    const v = p[k];
+    if (v != null) qs.set(k, String(v));
+  }
+}
 
 const keep = (values: string[] | undefined, allowed: readonly string[]): string[] =>
   (values ?? []).filter((v) => allowed.includes(v));
@@ -81,6 +125,7 @@ export function parseAlchemixPositionsQuery(sp: URLSearchParams): FetchAlchemixP
     tokenId: tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined,
     status: keep(list("status"), STATUSES),
     grade: keep(list("grade"), GRADES),
+    ...parseWholeBounds(sp, POSITION_BOUNDS),
     sortBy: SORTS.includes(sortBy as AlchemixPositionSort) ? (sortBy as AlchemixPositionSort) : undefined,
     sortOrder: sp.get("sortOrder") === "asc" ? "asc" : "desc",
     limit: num("limit"),
@@ -96,6 +141,7 @@ export function alchemixPositionsQuery(p: FetchAlchemixPositionsParams): URLSear
   if (p.tokenId) qs.set("tokenId", p.tokenId);
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.grade && p.grade.length > 0) qs.set("grade", p.grade.join(","));
+  setBounds(qs, p, POSITION_BOUNDS);
   // `lastActivity` is the backend's own default and is never sent by name.
   if (p.sortBy && p.sortBy !== "lastActivity") qs.set("sortBy", p.sortBy);
   qs.set("sortOrder", p.sortOrder === "asc" ? "asc" : "desc");
