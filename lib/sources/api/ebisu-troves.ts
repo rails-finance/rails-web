@@ -5,7 +5,7 @@
 // shaped as the canonical TroveSummary (per-branch decimals applied server-side,
 // USD/CR = 0). This builder narrows each backend row to the fields the Ebisu
 // card consumes (branch symbol, scaled collateral + ebUSD debt, interest rate,
-// batched flag, status), keeps the raw strings for provenance, and — since the
+// batched flag, status, zombie flag), keeps the raw strings for provenance, and — since the
 // 2026-07 depth pass — values each row at its branch's OWN PriceFeed (the
 // resolved price map the route passes in): oracle USD on the collateral, the
 // $1 redemption face on the debt, and the collateral ratio. An unpriced branch
@@ -23,6 +23,10 @@ export interface EbisuTroveSummary {
   /** Trove NFT id (uint256 string) — unique WITHIN its branch. */
   id: string;
   status: EbisuTroveStatus;
+  /** The server's zombie state for an open Trove (the backend row's
+   *  `isZombie`). The listing's Status bucket and the card's Zombie pill read
+   *  it; the web does not derive it from debt. */
+  isZombie: boolean;
   /** Branch display symbol (weETH | sUSDe | WBTC | LBTC | stcUSD). */
   collateralType: string;
   /** Collateral the Trove currently holds (display units). */
@@ -72,6 +76,7 @@ export interface EbisuTroveSummary {
 export interface RawEbisuTroveRow {
   id: string;
   status: EbisuTroveStatus;
+  isZombie?: boolean;
   collateralType: string;
   /** Ownership, flat on the backend row (ebisu route, mig 150). */
   owner: string | null;
@@ -103,6 +108,7 @@ export function buildEbisuTroveRows(raw: RawEbisuTroveRow[], prices?: LiquityFor
     return {
       id: r.id,
       status: r.status,
+      isZombie: r.status === "open" && r.isZombie === true,
       collateralType: r.collateralType,
       collateral,
       collateralRaw: r.collateral.amountRaw,
