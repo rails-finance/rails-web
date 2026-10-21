@@ -7,6 +7,9 @@
 //     ask this one for a line it does not serve.
 //   • Status — maturing / matured / claimed. The backend splits outstanding in
 //     two against the line's indexed frontier, so the three never overlap.
+//   • Size   — one range, the staked amount in USD (minCollUsd / maxCollUsd),
+//     valued on the server at the price book. No Transactions facet: the
+//     busiest position has 2 transactions (21 Oct 2026).
 //
 // THE AMOUNT SORT NEEDS ONE LINE, for the reason the Alchemist debt sort does:
 // alUSD and alETH are different tokens, and ranking a page of both by "amount"
@@ -23,12 +26,18 @@ import type {
   FetchAlchemixTransmuterPositionsParams,
 } from "@/lib/sources/api/alchemix-transmuter-backend";
 import { parseAlchemixSearch } from "@/lib/alchemix/search";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 
 export const TRANSMUTER_ITEMS_PER_PAGE = 20;
+
+const TRANSMUTER_SIZE_NOTE =
+  "At the DefiLlama price book the rows carry: stablecoins at their quoted price, alETH at the ETH price.";
 
 export interface TransmuterListFilters extends BaseListFilters {
   line: string[];
   status: string[];
+  /** Staked range in USD, one encodeRange value or [] for no bound. */
+  coll: string[];
 }
 
 export const TRANSMUTER_LIST_DEFAULTS: TransmuterListFilters = {
@@ -37,6 +46,7 @@ export const TRANSMUTER_LIST_DEFAULTS: TransmuterListFilters = {
   sortOrder: "desc",
   line: [],
   status: [],
+  coll: [],
 };
 
 const STATUS_OPTIONS: FilterOptionDef[] = [
@@ -78,6 +88,15 @@ export function transmuterListDimensions(chainId: ChainId): SerializableDimensio
       get: (f) => f.status,
       set: (f, v) => ({ ...f, status: v }),
     },
+    ...sizeDimensions<TransmuterListFilters>({
+      getDebt: () => [],
+      setDebt: (f) => f,
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      sides: ["coll"],
+      collLabel: "Staked",
+      panelNote: TRANSMUTER_SIZE_NOTE,
+    }),
   ];
 }
 
@@ -105,6 +124,7 @@ export function transmuterFiltersToFetchParams(
     owner: q.kind === "address" ? q.address : undefined,
     nftId: q.kind === "id" ? q.id : undefined,
     status: filters.status,
+    ...sizeBounds(filters, { coll: "usd" }),
     sortBy,
     sortOrder: filters.sortOrder,
     limit: TRANSMUTER_ITEMS_PER_PAGE,

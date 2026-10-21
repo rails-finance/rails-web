@@ -22,6 +22,8 @@ export interface SkyPositionsQuery {
   sortBy?: SkySort;
   sortOrder?: "asc" | "desc";
   owner?: string;
+  minTx?: number;
+  maxTx?: number;
   limit?: number;
   offset?: number;
 }
@@ -54,6 +56,11 @@ export function parseSkyPositionsQuery(sp: URLSearchParams): SkyPositionsQuery {
   const owner = sp.get("owner");
   const limit = Number(sp.get("limit"));
   const offset = Number(sp.get("offset"));
+  // A transaction bound is forwarded only as a whole number.
+  const whole = (key: string) => {
+    const v = sp.get(key);
+    return v != null && /^\d+$/.test(v) ? Number(v) : undefined;
+  };
   return {
     status: status === "open" || status === "closed" || status === "all" ? status : undefined,
     sortBy:
@@ -62,6 +69,8 @@ export function parseSkyPositionsQuery(sp: URLSearchParams): SkyPositionsQuery {
         : undefined,
     sortOrder: sp.get("sortOrder") === "asc" ? "asc" : "desc",
     owner: owner && /^0x[0-9a-fA-F]{40}$/.test(owner) ? owner.toLowerCase() : undefined,
+    minTx: whole("minTx"),
+    maxTx: whole("maxTx"),
     limit: sp.get("limit") != null && Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 100) : undefined,
     offset: sp.get("offset") != null && Number.isFinite(offset) ? Math.max(offset, 0) : undefined,
   };
@@ -77,6 +86,8 @@ export async function readSkyPositions(
   if (q.sortBy) qs.set("sortBy", q.sortBy);
   qs.set("sortOrder", q.sortOrder === "asc" ? "asc" : "desc");
   if (q.owner) qs.set("owner", q.owner);
+  if (q.minTx != null) qs.set("minTx", String(q.minTx));
+  if (q.maxTx != null) qs.set("maxTx", String(q.maxTx));
   if (q.limit != null) qs.set("limit", String(q.limit));
   if (q.offset != null) qs.set("offset", String(q.offset));
   const raw = await read<SkyPositionsPage & { success: boolean }>(`/positions?${qs.toString()}`, readerIp, signal);
