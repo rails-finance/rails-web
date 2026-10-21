@@ -45,6 +45,10 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
  *     read 2026-10-21); Arbiscan labels it "Aave: Wrapped Token Gateway V3 2"
  *     (Miles, 2026-10-21). It answers no `name()` or `symbol()`, so the
  *     address-kind read cannot name it and this entry is the only source.
+ *   • Zerion's router on Base: Basescan labels it "Zerion: Router" (Miles,
+ *     2026-10-21) and its verified source name is `Router`, read through the
+ *     Etherscan V2 API for chain 8453 the same day (not a proxy). It answers
+ *     no `name()` or `symbol()`.
  *   • Maple's two SyrupRouters (Etherscan `SyrupRouter`, 2026-10-02) answer
  *     `pool()` with syrupUSDC and syrupUSDT. Every deposit entry point calls
  *     `_deposit(msg.sender, …)`, which deposits into the pool for the router
@@ -248,6 +252,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
     "0x6a000f20005980200259b80c5102003040001068",
     router("ParaSwap router", "AugustusV6", "ParaSwap’s Augustus"),
   ],
+  [BASE_CHAIN_ID, "0xd7f1dd5d49206349cae8b585fcb0ce3d96f1696f", router("Zerion router", "Router", "Zerion’s")],
   [BASE_CHAIN_ID, "0x7d585b0e27bbb3d981b7757115ec11f47c476994", ENSO],
   [BASE_CHAIN_ID, "0x4fe93ebc4ce6ae4f81601cc7ce7139023919e003", ENSO],
   [
