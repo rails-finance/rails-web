@@ -99,7 +99,6 @@ import {
   DEBT_ADDRESS as ASYMMETRY_DEBT_ADDRESS,
 } from "@/lib/asymmetry/asset-catalog";
 import {
-  indexZombie as ebisuIndexZombie,
   shortId as ebisuShortId,
   resolveBranch as ebisuResolveBranch,
   getEbisuTroveNftUrl,
@@ -385,10 +384,14 @@ const OPS: Record<LiquityFamilyId, LiquityFamilyCardOps> = {
   }),
 };
 
-const FORK_INDEX_ZOMBIE: Record<ForkProtocol, (status: string, debt: number) => boolean> = {
-  asymmetry: asymmetryIndexZombie,
-  ebisu: ebisuIndexZombie,
-  basedollar: basedollarIndexZombie,
+/** Each fork's zombie state for a listing row. Ebisu reads the server's
+ *  served flag (ui-jobs 420: a redemption there can leave a Trove below
+ *  MIN_DEBT that the chain still reads Active); Asymmetry and Basedollar
+ *  still derive it from debt under MIN_DEBT. */
+const FORK_ROW_ZOMBIE: Record<ForkProtocol, (s: LiquityForkTroveSummaryLike) => boolean> = {
+  asymmetry: (s) => asymmetryIndexZombie(s.status, s.debt),
+  ebisu: (s) => s.status === "open" && s.isZombie === true,
+  basedollar: (s) => basedollarIndexZombie(s.status, s.debt),
 };
 
 /** Each fork's OpenSea link for a Trove NFT, built from that fork's own
@@ -405,6 +408,8 @@ const FORK_TROVE_NFT_URL: Record<ForkProtocol, (collateralType: string, troveId:
 interface LiquityForkTroveSummaryLike {
   id: string;
   status: "open" | "closed" | "liquidated";
+  /** The served zombie flag, where the fork's route serves one (Ebisu). */
+  isZombie?: boolean;
   collateralType: string;
   collateral: number;
   debt: number;
@@ -430,7 +435,7 @@ export function viewFromForkSummary(protocol: ForkProtocol, s: LiquityForkTroveS
   return {
     id: s.id,
     status: s.status,
-    isZombie: FORK_INDEX_ZOMBIE[protocol](s.status, s.debt),
+    isZombie: FORK_ROW_ZOMBIE[protocol](s),
     collateralType: s.collateralType,
     collateral: s.collateral,
     debt: s.debt,
@@ -532,8 +537,9 @@ export function useLiquityCardSlots({
   const lv = live && v.status === "open" ? live : null;
   // V2-family zombie: a redemption left the Trove below the branch's MIN_DEBT
   // floor — the only path below it, since owner operations enforce the floor.
-  // The live read's own status wins once it lands; the index-derived flag
-  // covers the listing, where per-row chain reads are off the table.
+  // The live read's own status wins once it lands; the row's flag (served on
+  // Ebisu, index-derived on the other forks) covers the listing, where per-row
+  // chain reads are off the table.
   const zombie = lv ? lv.status === "zombie" : v.isZombie;
   const coll = lv?.entireColl ?? v.collateral;
   const debt = lv?.entireDebt ?? v.debt;

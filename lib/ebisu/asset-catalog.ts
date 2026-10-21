@@ -156,9 +156,10 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
 export const DEBT_SYMBOL = "ebUSD";
 /** Minimum Trove debt (display units) — `MIN_DEBT = 2000e18` in the verified
  *  BorrowerOperations source (Etherscan, 2026-08-11). Owner operations enforce
- *  the floor, so only a redemption can leave an open Trove below it — an open
- *  Trove under this floor is a ZOMBIE (V2 status 4, outside the rate-ordered
- *  redemption queue, redeemed first). */
+ *  the floor, so only a redemption can leave an open Trove below it. Below it
+ *  does not make a zombie: a Trove the chain reads Active sits at 932 ebUSD on
+ *  sUSDe (ui-jobs 420), so the zombie state is read from the chain or the
+ *  served row. */
 export const MIN_DEBT = 2000;
 export const DEBT_ADDRESS = "0x09fd37d9aa613789c517e76df1c53aece2b60df4";
 export const DEBT_DECIMALS = 18;
@@ -187,15 +188,6 @@ export const EBISU_DOCS = {
   ],
   batch: [{ label: "How rate delegation works", url: DELEGATION }],
 };
-
-/** The index derivation of the zombie state, for surfaces with no per-row
- *  chain read (listing pills, filter buckets): an OPEN Trove below the
- *  MIN_DEBT floor. The detail page's live getTroveStatus wins where it runs.
- *  The index can miss a zombie whose redemption emitted no captured event —
- *  such a row keeps reading Open (incomplete, never false). */
-export function indexZombie(status: string, debt: number): boolean {
-  return status === "open" && debt < MIN_DEBT;
-}
 
 /** Lowercased display symbol → branch key. */
 const SYMBOL_TO_KEY: Record<string, string> = Object.fromEntries(

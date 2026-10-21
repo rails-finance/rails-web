@@ -13,7 +13,6 @@
 // (lib/shared/transactions-dimension.ts).
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { indexZombie } from "@/lib/ebisu/asset-catalog";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
@@ -57,11 +56,11 @@ export const EBISU_SORT_OPTIONS: SortOption[] = [
   { value: "rate", label: "Interest rate" },
 ];
 
-// Zombie is a first-class bucket (V2-reference parity): the index derivation
-// — an open Trove below the MIN_DEBT floor — is the same predicate the row
-// pill renders, so the buckets are disjoint: a zombie row does not answer
-// "Open". A zombie whose redemption escaped the captured record still reads
-// Open (the index can't see it; incomplete, never false).
+// Zombie is a first-class bucket (Liquity V2 parity): an open Trove the server
+// marks zombie (`isZombie` on the served row) answers "Zombie" and not "Open",
+// the predicate the card's pill reads, so the buckets are disjoint. The web does
+// not derive the state from debt: an Ebisu redemption can leave a Trove below
+// MIN_DEBT that the chain still reads Active (ui-jobs 420).
 const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
   { value: "zombie", label: "Zombie" },
@@ -69,7 +68,7 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "liquidated", label: "Liquidated" },
 ];
 
-const lifecycleOf = (row: EbisuTroveSummary): string => (indexZombie(row.status, row.debt) ? "zombie" : row.status);
+const lifecycleOf = (row: EbisuTroveSummary): string => (row.status === "open" && row.isZombie ? "zombie" : row.status);
 
 /** Collateral in USD: $0 once the trove holds none, null while its branch is
  *  unpriced. */
