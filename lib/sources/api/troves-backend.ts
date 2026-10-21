@@ -104,8 +104,9 @@ export async function readTrovesFromBackend(
   if (showZombieParam === "true" || showZombieParam === "false") {
     backendParams.set("showZombie", showZombieParam);
   }
-  // A transaction-count bound passes only as a whole number.
-  for (const k of ["minTx", "maxTx"]) {
+  // A transaction-count bound, a BOLD debt bound or a USD collateral bound
+  // passes only as a whole number.
+  for (const k of ["minTx", "maxTx", "minDebt", "maxDebt", "minCollUsd", "maxCollUsd"]) {
     const v = searchParams.get(k);
     if (v != null && /^\d+$/.test(v)) backendParams.set(k, v);
   }

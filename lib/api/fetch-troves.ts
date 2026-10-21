@@ -26,6 +26,12 @@ export interface FetchTrovesParams {
   /** Inclusive bounds on the trove's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
+  /** Inclusive bounds on the trove's debt in BOLD and its collateral in USD;
+   *  any one alone. */
+  minDebt?: number;
+  maxDebt?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -58,6 +64,9 @@ export function trovesQuery(p: FetchTrovesParams): URLSearchParams {
   if (p.individualOnly) qs.set("individualOnly", "true");
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
+  for (const k of ["minDebt", "maxDebt", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

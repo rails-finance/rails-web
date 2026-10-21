@@ -12,6 +12,11 @@
 // wallet view), now expressed as SerializableDimension so the one shared driver
 // owns the toolbar / URL / pagination.
 //
+// Size is the Debt range in BOLD and the Collateral range in USD
+// (lib/shared/size-dimensions.ts): the listing reads no USD price for BOLD, so
+// debt is the token amount (minDebt / maxDebt), and collateral is valued at the
+// Liquity oracle's latest read, the trove's coll_usd (minCollUsd / maxCollUsd).
+//
 // Transactions is a range over the trove's distinct transactions
 // (activity.transactionCount), sent as minTx / maxTx
 // (lib/shared/transactions-dimension.ts).
@@ -38,10 +43,19 @@ import {
 import { parseTroveSearch } from "@/lib/liquity-v2/search";
 import type { FetchTrovesParams } from "@/lib/api/fetch-troves";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 
 /** The Transactions slider's top: the round number above the busiest trove
  *  (937 transactions, 20 Oct 2026). */
 const LIQUITY_V2_TX_TOP = 1000;
+
+/** The Size sliders' top: the round number above the larger of the biggest
+ *  trove's debt (6,759,911 BOLD) and collateral ($21,379,625) in
+ *  trove_current_state_mv, 21 Oct 2026. */
+const LIQUITY_V2_SIZE_TOP = 25_000_000;
+
+/** The Size panel's unit and price line. */
+const LIQUITY_V2_SIZE_NOTE = "Debt in BOLD; collateral at the Liquity oracle's latest read.";
 
 /** Backend caps `limit` at 1000; 20 keeps the page light and the grid familiar. */
 export const LIQUITY_V2_ITEMS_PER_PAGE = 20;
@@ -59,6 +73,11 @@ export interface LiquityV2ListFilters extends BaseListFilters {
   hasRedemptions?: boolean;
   batchOnly?: boolean;
   individualOnly?: boolean;
+  /** Debt range in BOLD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
 }
@@ -73,6 +92,8 @@ export const LIQUITY_V2_LIST_DEFAULTS: LiquityV2ListFilters = {
   q: "",
   sortBy: "lastActivity",
   sortOrder: "desc",
+  debt: [],
+  coll: [],
   tx: [],
 };
 
@@ -197,7 +218,17 @@ export function liquityV2ListDimensions(
     top: LIQUITY_V2_TX_TOP,
   });
 
-  return [status, collateral, redemptions, delegation, transactions];
+  const size = sizeDimensions<LiquityV2ListFilters>({
+    getDebt: (f) => f.debt,
+    setDebt: (f, debt) => ({ ...f, debt }),
+    getColl: (f) => f.coll,
+    setColl: (f, coll) => ({ ...f, coll }),
+    panelNote: LIQUITY_V2_SIZE_NOTE,
+    top: LIQUITY_V2_SIZE_TOP,
+    debtUnit: "BOLD",
+  });
+
+  return [status, collateral, ...size, redemptions, delegation, transactions];
 }
 
 /** Map the decoded selection + page onto the /api/troves fetch params — the
@@ -212,6 +243,7 @@ export function liquityV2FiltersToFetchParams(filters: LiquityV2ListFilters, pag
     hasRedemptions: filters.hasRedemptions,
     batchOnly: filters.batchOnly || undefined,
     individualOnly: filters.individualOnly || undefined,
+    ...sizeBounds(filters, { debt: "unit", coll: "usd" }),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy,
     sortOrder: filters.sortOrder,
