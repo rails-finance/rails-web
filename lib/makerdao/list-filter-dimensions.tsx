@@ -21,9 +21,12 @@
 //   • A wallet address    → `owner`, with a `urn` retry — see list-fetch.ts.
 //   • Digits              → `cdpId`.
 //   • Size                → `minDebtUsd` / `maxDebtUsd` / `minCollUsd` /
-//                           `maxCollUsd` (lib/shared/size-dimensions.ts): debt
-//                           in DAI at face value, collateral at the ilk's
-//                           latest spot price.
+//                           `maxCollUsd` (lib/shared/size-dimensions.ts). The
+//                           Debt range is in DAI: the server's `minDebtUsd` /
+//                           `maxDebtUsd` compare the vault's DAI owed (art x
+//                           the ilk's rate, the Vat unit LockStake urns owe
+//                           USDS in) with no price applied. Collateral is in
+//                           USD at the ilk's latest indexed spot price.
 //   • Transactions        → `minTx` / `maxTx`, inclusive, over the vault's
 //                           distinct transactions
 //                           (lib/shared/transactions-dimension.ts).
@@ -60,13 +63,13 @@ export const MAKER_ITEMS_PER_PAGE = 20;
  *  vault (2,566 transactions, 20 Oct 2026). */
 const MAKER_TX_TOP = 3000;
 
-/** The Size panel's price line. */
-const MAKER_SIZE_NOTE = "Collateral at the ilk's latest spot price; debt in DAI at face value.";
+/** The Size panel's unit and price line. */
+const MAKER_SIZE_NOTE = "Debt in DAI; collateral at the latest indexed price.";
 
 export interface MakerListFilters extends BaseListFilters {
   status: string[];
   ilks: string[];
-  /** Debt range in USD, one encodeRange value (`1000-50000`, `-0` for no
+  /** Debt range in DAI, one encodeRange value (`1000-50000`, `-0` for no
    *  debt) or [] for no bound. URL param `debt`. */
   debt: string[];
   /** Collateral range in USD, as `debt`. URL param `coll`. */
@@ -196,6 +199,7 @@ export function makerListDimensions(
       getColl: (f) => f.coll,
       setColl: (f, coll) => ({ ...f, coll }),
       panelNote: MAKER_SIZE_NOTE,
+      debtUnit: "DAI",
     }),
     transactionsDimension<MakerListFilters>({
       get: (f) => f.tx,

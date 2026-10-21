@@ -5,15 +5,15 @@
 // the non-categorical controls. All values are read from the chain (replayed status, raw
 // collateral / BD debt, user-set interest rate).
 //
-// Size is the Debt and Collateral ranges in USD (lib/shared/size-dimensions.ts):
-// debt is BD at face value, a dollar a coin for this facet, and collateral is
-// the row's collateralUsd at the branch's last indexed price, so an unpriced
+// Size is the Debt range in BD and the Collateral range in USD
+// (lib/shared/size-dimensions.ts): debt is the row's BD amount, since the
+// listing reads no USD price for BD, and collateral is the row's collateralUsd at the branch's last indexed price, so an unpriced
 // branch falls out of any Collateral bound (an emptied trove reads $0).
 // Transactions is a range over the row's txCount
 // (lib/shared/transactions-dimension.ts).
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { indexZombie } from "@/lib/basedollar/asset-catalog";
+import { DEBT_SYMBOL, indexZombie } from "@/lib/basedollar/asset-catalog";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
@@ -24,7 +24,7 @@ import { transactionsDimension } from "@/lib/shared/transactions-dimension";
 export interface BasedollarListFilters extends BaseListFilters {
   status: string[];
   branches: string[];
-  /** Debt range in USD, one encodeRange value or [] for no bound. */
+  /** Debt range in BD, one encodeRange value or [] for no bound. */
   debt: string[];
   /** Collateral range in USD, as `debt`. */
   coll: string[];
@@ -48,7 +48,7 @@ export const BASEDOLLAR_LIST_DEFAULTS: BasedollarListFilters = {
 const BASEDOLLAR_TX_TOP = 50;
 
 /** The Size panel's price line. */
-const BASEDOLLAR_SIZE_NOTE = "Collateral at the branch's last indexed price; debt in BD at face value.";
+const BASEDOLLAR_SIZE_NOTE = `Debt in ${DEBT_SYMBOL}; collateral at the branch's last indexed price.`;
 
 export const BASEDOLLAR_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },
@@ -119,6 +119,7 @@ export function basedollarListDimensions(
       getColl: (f) => f.coll,
       setColl: (f, coll) => ({ ...f, coll }),
       panelNote: BASEDOLLAR_SIZE_NOTE,
+      debtUnit: DEBT_SYMBOL,
     }).map((d) => ({
       ...d,
       matches: (row: BasedollarTroveSummary, v: string[]) =>
