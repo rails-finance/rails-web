@@ -930,7 +930,6 @@ export function ProvReceipt({
             )}
           </div>
         )}
-        {info.verify && !viaVerify && <VerifyRow v={info.verify} />}
         {note && <p className="prov-note">{note}</p>}
         {info.scaling && /^-?\d+$/.test(info.scaling.raw) && (
           <p className="prov-note prov-scaling">
@@ -940,6 +939,9 @@ export function ProvReceipt({
             {info.scaling.unit ?? ""}.
           </p>
         )}
+        {/* The check line follows the summary: what the figure means first, how to
+            reproduce it second (receipts grammar §2). */}
+        {info.verify && !viaVerify && <VerifyRow v={info.verify} />}
         {(info.via || viaVerify) && (
           <p className="prov-via">
             {info.via && "via "}

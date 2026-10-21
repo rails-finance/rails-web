@@ -644,7 +644,10 @@ export function polarisParamStats(coords: PolarisCoords): SheetStat[] {
   const mcrProv: Provenance = {
     kind: "chain",
     pclass: "state",
-    verify: { kind: "recompute", text: `Re-run ${mcr.fn} on the cdpManager — it returns ${mcr.raw} (1e18 = 100%).` },
+    verify: {
+      kind: "recompute",
+      text: `To check: ask any Sepolia node for the cdpManager's ${mcr.fn}; it returns ${mcr.raw} (1e18 = 100%).`,
+    },
     summary: `The market's minimum collateral ratio in normal mode — the cdpManager's \`${mcr.fn}\`, ${mcr.label}. A constant of the deployment; a defensive-mode minimum (150%) in force at a past block is not indexed, so every row compares against this one.`,
     contract: manager,
     via: `${mcr.fn} ÷ 1e18 (read at block ${POLARIS_LIQ_CONSTANTS.readAtBlock}, identical on both markets)`,

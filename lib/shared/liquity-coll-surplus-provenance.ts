@@ -133,7 +133,7 @@ export function claimPriceProv(d: CollSurplusClaimContext, at: ClaimCoords): Pro
     pclass: "oracle",
     verify: {
       kind: "recompute",
-      text: `Re-run the PriceFeed.lastGoodPrice eth_call at block ${at.blockNumber} against an archive node`,
+      text: `To check: ask an archive node for the branch PriceFeed's lastGoodPrice at block ${at.blockNumber}.`,
     },
     summary: `${d.symbol} price at the claim's block — the US-dollar price the branch's PriceFeed held at the end of this block: the price its last liquidation, redemption or borrower operation fetched.`,
     ...(d.priceFeed ? { contract: { name: `${d.symbol} PriceFeed`, address: d.priceFeed } } : {}),

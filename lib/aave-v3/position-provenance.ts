@@ -7,11 +7,11 @@
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { AAVE_V3_MARKETS } from "@/lib/aave-v3/asset-catalog";
 
-/** A state read's proof: re-run the eth_call yourself against any node. No third-party
- *  deep link (explorers only read current head) — the verification is the re-run. */
+/** A state read's proof: the reader makes the same call against any node. No third-party
+ *  deep link (explorers only read current head). */
 const STATE_VERIFY: ProvVerify = {
   kind: "recompute",
-  text: "Re-run the eth_call against any node",
+  text: "To check: make the same call to the Pool contract on any node.",
 };
 
 const ETHEREUM_POSITION_ROUTE = "/api/chain/aave-v3/position";

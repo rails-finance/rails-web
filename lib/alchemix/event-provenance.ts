@@ -128,7 +128,7 @@ export function resolvedAtCaptureProv(
       : "the protocol fee leg of the same transaction's share transfer",
     verify: {
       kind: "recompute",
-      text: "Recompute it from this transaction's own transfers",
+      text: "To check: add up the transfers in this transaction.",
     },
     source: { block: coords.blockNumber, txHash: coords.txHash },
     inputs: coordInputs(coords, [
@@ -208,7 +208,7 @@ export function clearedRunProv(
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) either side of each redemption in the run`,
     formula: `Σ (debt before − debt at) over ${stated} redemption${stated === 1 ? "" : "s"}`,
-    verify: { kind: "rollup", text: "It rolls up the redemptions in this run, each with its own receipt" },
+    verify: { kind: "rollup", text: "It rolls up the redemptions in this run; each carries a receipt." },
     inputs: coordInputs(coords, [
       { label: "redemptions in the run", value: `${count}, ${range}`, kind: "chain" },
       {
@@ -276,7 +276,7 @@ export function takenRunProv(
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) either side of each redemption in the run`,
     formula: `Σ (collateral before − collateral at) over ${stated} redemption${stated === 1 ? "" : "s"}`,
-    verify: { kind: "rollup", text: "It rolls up the redemptions in this run, each with its own receipt" },
+    verify: { kind: "rollup", text: "It rolls up the redemptions in this run; each carries a receipt." },
     inputs: coordInputs(coords, [
       { label: "redemptions in the run", value: `${count}, ${range}`, kind: "chain" },
       {
@@ -419,7 +419,7 @@ export function eventsAloneDebtProv(
     contract: alchemistContract(coords),
     via: `${ALCHEMIX_VIA} · replayed per position`,
     formula: "Σ debt added by the position's own events − Σ debt they cleared",
-    verify: { kind: "recompute", text: "Add up the debt moves on this position's own event cards" },
+    verify: { kind: "recompute", text: "To check: add up the debt moves on this position's event cards." },
     source: { block: reducedToBlock },
     inputs: coordInputs(coords, [
       { label: "replayed to", value: `block ${reducedToBlock}`, kind: "chain" },
@@ -780,7 +780,7 @@ export function redemptionNetTotalProv(
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) either side of each redemption, and the share price at each redemption's block`,
     formula: `Σ (debt cleared × 1 − shares taken × share price) over ${counted} redemption${counted === 1 ? "" : "s"} = ${fmtUnits(netRaw, 18)} ${underlyingSymbol}${fee ? `, of which the ${fee.bps / 100}% redemption fee is −${fmtUnits(fee.valueRaw, 18)} ${underlyingSymbol}` : ""}`,
-    verify: { kind: "rollup", text: "It rolls up the redemptions on the timeline, each with its own receipt" },
+    verify: { kind: "rollup", text: "It rolls up the redemptions on the timeline; each carries a receipt." },
     inputs: coordInputs(coords, [{ label: "redemptions summed", value: String(counted), kind: "chain" }]),
   };
 }

@@ -28,7 +28,7 @@ const vaultContract = (c: HoldingCoords): Provenance["contract"] => ({
 });
 const recompute = (call: string, c: HoldingCoords, block = c.blockNumber): Provenance["verify"] => ({
   kind: "recompute",
-  text: `Re-run ${call} at block ${n(block)} against any ${chainWord(c)} archive node`,
+  text: `To check: ask any ${chainWord(c)} archive node for ${call} at block ${n(block)}.`,
 });
 
 /** `balanceOf(holder)`. */

@@ -38,7 +38,10 @@ export function CTokenMembershipLine(p: {
     summary: `Collateral membership — ${p.brand}'s Comptroller listed the markets this account had entered (getAssetsIn) at block ${m.block.toLocaleString("en-US")}; the collateral factor is markets(${p.symbol}) at the same block.`,
     contract: p.comptroller,
     via: `getAssetsIn @ block ${m.block}`,
-    verify: { kind: "recompute" as const, text: `Re-run getAssetsIn at block ${m.block} against an archive node` },
+    verify: {
+      kind: "recompute" as const,
+      text: `To check: ask an archive node for the Comptroller's getAssetsIn at block ${m.block}.`,
+    },
   };
   return (
     <p className="px-5 pb-2 text-xs text-rb-500" data-ctoken-membership="">

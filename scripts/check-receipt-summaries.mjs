@@ -16,6 +16,9 @@
 //       tail (", not a …", "rather than …") and no filler word. Enforced on
 //       every file outside scripts/plain-words-pending.mjs; a negative that
 //       carries a fact is kept by naming its sentence in C_KEEP below.
+//       The check line (`verify.text`, grammar §3) is read under the same rule,
+//       plus one of its own: it is an instruction the reader can follow ("To
+//       check: ask any archive node for …"), never "Re-run the … eth_call".
 //
 // Name clauses behind a ${…} interpolation resolve at runtime and are
 // unjudgeable statically — they are SKIPPED and the count reported out loud,
@@ -25,9 +28,10 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import { PLAIN_WORDS_PENDING } from "./plain-words-pending.mjs";
 
-const files = execSync(`grep -rlE "summary( =|:)" --include="*.ts" --include="*.tsx" lib components app`, {
-  encoding: "utf8",
-})
+const files = execSync(
+  `grep -rlE 'summary( =|:)|kind: "(recompute|etherscan|rollup|none)"' --include="*.ts" --include="*.tsx" lib components app`,
+  { encoding: "utf8" },
+)
   .trim()
   .split("\n")
   .filter(Boolean);
@@ -65,6 +69,12 @@ const A_ALLOW = [
 // through a helper's argument is outside this net; write it as `summary:`.
 const CONTRAST = [/[,;—–]\s+not\s+(?:a|an|the)\b/gi, /\brather than\b/gi];
 const FILLER = /\b(?:itself|own|exactly|straight|actually)\b/gi;
+// The check line's own register: the old form opened on the tool ("Re-run the
+// totalAssets() eth_call at block N against any archive node"); the plain form is
+// an instruction ("To check: ask any Ethereum archive node for the vault's
+// totalAssets() at block N.").
+const OLD_CHECK_LINE = [/^Re-run\b/i, /\beth_call\b/g];
+const VERIFY_KIND = /\bkind:\s*"(?:recompute|etherscan|rollup|none)"/;
 
 // A negative or a flagged word that carries a fact. Keyed on content like
 // A_ALLOW: `phrase` is a run of the summary's words around the hit, `why` is
@@ -149,16 +159,40 @@ const plain = []; // rule C hits in enforced files
 const pendingHits = new Map(); // pending file -> hit count
 const keepUsed = new Set();
 let plainScanned = 0;
+let checkLinesScanned = 0;
+
+/** The `text:` of every verify object in `src` — a `{ kind: "<verify kind>", … }`
+ *  literal, which every vocabulary writes flat. A text passed through a helper's
+ *  argument (`recompute("…")`) is outside this net, as a summary's is. */
+function* checkLineSites(src) {
+  for (const m of src.matchAll(/\btext\s*:\s*/g)) {
+    let open = src.lastIndexOf("{", m.index);
+    while (open > 0 && src[open - 1] === "$") open = src.lastIndexOf("{", open - 1);
+    if (open < 0) continue;
+    const close = src.indexOf("}", m.index);
+    if (close < 0) continue;
+    if (VERIFY_KIND.test(src.slice(open, close))) yield m.index + m[0].length;
+  }
+}
 
 function scanPlainWords(f, src) {
-  for (const m of src.matchAll(/\bsummary\s*(?::|=(?!=))\s*/g)) {
-    for (const run of literalRuns(src, m.index + m[0].length)) {
+  const sites = [
+    ...[...src.matchAll(/\bsummary\s*(?::|=(?!=))\s*/g)].map((m) => ({
+      from: m.index + m[0].length,
+      rules: [...CONTRAST, FILLER],
+      check: false,
+    })),
+    ...[...checkLineSites(src)].map((from) => ({ from, rules: [...CONTRAST, FILLER, ...OLD_CHECK_LINE], check: true })),
+  ];
+  for (const site of sites) {
+    for (const run of literalRuns(src, site.from)) {
       const text = run.text.replace(/\s+/g, " ");
       if (!text.includes(" ")) continue;
-      plainScanned++;
+      if (site.check) checkLinesScanned++;
+      else plainScanned++;
       const line = src.slice(0, run.index).split("\n").length;
-      for (const re of [...CONTRAST, FILLER]) {
-        for (const hit of text.matchAll(re)) {
+      for (const re of site.rules) {
+        for (const hit of text.matchAll(re.global ? re : new RegExp(re.source, re.flags + "g"))) {
           const kept = C_KEEP.findIndex((k) => {
             if (k.file !== f) return false;
             const at = text.indexOf(k.phrase);
@@ -221,7 +255,11 @@ const show = (title, rows, fmt) => {
 };
 show("A — body repeats header (no separator)", repeat, (r) => r.text.slice(0, 120));
 show("B — name clause > 72 chars (header truncates)", truncate, (r) => `[${r.n}] ${r.h}`);
-show("C — said once, in plain words (contrast tail or filler word)", plain, (r) => `"${r.word}" in: …${r.near}…`);
+show(
+  "C — said once, in plain words (contrast tail, filler word, or a check line in the old register)",
+  plain,
+  (r) => `"${r.word}" in: …${r.near}…`,
+);
 
 // The ratchet shrinks only: a pending file with nothing left to flag, or one
 // that is gone, must leave the list.
@@ -241,6 +279,6 @@ show(
 console.log(`\nscanned ${total} summaries; ${skipped} name clauses skipped (behind \${…} interpolation)`);
 const left = [...pendingHits.values()].reduce((a, b) => a + b, 0);
 console.log(
-  `rule C read ${plainScanned} summary texts; ${C_KEEP.length} kept by name; ${PLAIN_WORDS_PENDING.length} files pending with ${left} phrases left to rewrite`,
+  `rule C read ${plainScanned} summary texts and ${checkLinesScanned} check lines; ${C_KEEP.length} kept by name; ${PLAIN_WORDS_PENDING.length} files pending with ${left} phrases left to rewrite`,
 );
 if (repeat.length || truncate.length || plain.length || stalePending.length || staleKeep.length) process.exit(1);

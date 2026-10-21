@@ -65,7 +65,7 @@ function legProv(what: string, figure: string, block: number, comets: string[], 
     pclass: "oracle",
     verify: {
       kind: "recompute",
-      text: `Re-run each Comet's ${figure} and getPrice at block ${block.toLocaleString("en-US")}, scale each by the asset's decimals, multiply by that Comet's price (the ETH-quoted Comet also by WETH in dollars) and add the Comets.`,
+      text: `To check: ask any Arbitrum archive node for each Comet's ${figure} and getPrice at block ${block.toLocaleString("en-US")}, scale each by the asset's decimals, multiply by that Comet's price (the ETH-quoted Comet also by WETH in dollars) and add the Comets.`,
     },
     summary: `${what}, in USD: each Comet's figure (${comets.join(", ")}) at that Comet's getPrice, read in one batched call at block ${block.toLocaleString("en-US")}; cWETHv3 quotes in ETH and converts at WETH in dollars ${src.ethUsdFrom}. An estimate: the Comets hold different tokens and a sum of them exists only at a price, and each price moves every block.`,
     via: `${src.via} at block ${block.toLocaleString("en-US")} · Σ over the Comets of amount × the Comet's price`,

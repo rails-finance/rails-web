@@ -87,8 +87,8 @@ const recompute = (call: string, c: AaveVaultCoords): Provenance["verify"] => ({
   kind: "recompute",
   text:
     c.blockNumber != null
-      ? `Re-run the ${call} eth_call at block ${c.blockNumber} against any Ethereum archive node`
-      : `Re-run the ${call} eth_call against any Ethereum archive node`,
+      ? `To check: ask any Ethereum archive node for the vault's ${call} at block ${c.blockNumber}.`
+      : `To check: ask any Ethereum node for the vault's ${call}.`,
 });
 
 const asset = (c: AaveVaultCoords) => c.assetSymbol ?? "the vault's asset";

@@ -9,11 +9,11 @@ import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
 
 const POOL_CONTRACT: Provenance["contract"] = { name: "SparkLend Pool", address: SPARK_ADDRESSES.POOL };
 
-/** A state read's proof: re-run the eth_call yourself against any node. No third-party
- *  deep link (explorers only read current head) — the verification is the re-run. */
+/** A state read's proof: the reader makes the same call against any node. No third-party
+ *  deep link (explorers only read current head). */
 const STATE_VERIFY: ProvVerify = {
   kind: "recompute",
-  text: "Re-run the eth_call against any node",
+  text: "To check: make the same call to the Pool contract on any node.",
 };
 
 const ACCOUNT_VIA = "GET /api/chain/spark/position · Pool.getUserAccountData @ head";

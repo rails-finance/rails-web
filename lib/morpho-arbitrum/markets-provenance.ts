@@ -20,7 +20,7 @@ export interface MorphoArbitrumMarketCoords {
 
 const recompute = (call: string, block: number): Provenance["verify"] => ({
   kind: "recompute",
-  text: `Re-run the ${call} eth_call at block ${block} against any Arbitrum node`,
+  text: `To check: ask any Arbitrum node for ${call} at block ${block}.`,
 });
 
 /** The market's loan-to-value, from the census's CreateMarket params. */

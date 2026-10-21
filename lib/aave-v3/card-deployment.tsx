@@ -90,7 +90,7 @@ export function useAaveV3CardDeployment(): AaveV3CardDeployment {
 }
 
 const at = (block?: number): string => (block != null ? ` at block ${block.toLocaleString("en-US")}` : "");
-const RECOMPUTE = { kind: "recompute" as const, text: "Re-run the eth_call against any node" };
+const RECOMPUTE = { kind: "recompute" as const, text: "To check: make the same call to the contract on any node." };
 
 /** A Base lender's LISTING card receipts: every current figure is a read of
  *  this deployment's contracts at the block the row names, taken after the

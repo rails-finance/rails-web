@@ -88,7 +88,7 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
     summary: `${what} — ${p.brand}'s Comptroller answered \`${fn}\` for this account at block ${block.toLocaleString("en-US")}.${note ? ` ${note}` : ""}`,
     contract: p.comptroller,
     via: `${fn} @ block ${block}`,
-    verify: { kind: "recompute", text: `Re-run ${fn} at block ${block} against an archive node` },
+    verify: { kind: "recompute", text: `To check: ask an archive node for the Comptroller's ${fn} at block ${block}.` },
   });
 
   const lines: React.ReactNode[] = [];

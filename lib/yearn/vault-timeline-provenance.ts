@@ -72,7 +72,7 @@ export const yearnVaultTimelineGateProv = (c: VaultTimelineCoords, r: VaultHolde
   source: { block: c.blockNumber },
   verify: {
     kind: "recompute",
-    text: `Re-run both eth_getLogs on the vault for the Transfer topic with this address in topic1 and then in topic2, blocks ${r.fromBlock}–${r.toBlock}, sum the values signed, and compare against balanceOf(${c.holder ?? "the address"}) at block ${r.toBlock}`,
+    text: `To check: ask the vault for its Transfer logs with this address in topic1 and then in topic2 over blocks ${r.fromBlock}–${r.toBlock}, sum the values signed, and compare the sum with balanceOf(${c.holder ?? "the address"}) at block ${r.toBlock}.`,
   },
   summary: `The history check — every \`Transfer\` this address sent or received on this vault, replayed into a balance and compared against the vault's \`balanceOf\` at block ${r.toBlock}. Two \`eth_getLogs\` answered ${r.logsOut} outgoing and ${r.logsIn} incoming logs over blocks ${r.fromBlock}–${r.toBlock} — the range starts at the block the vault's creation log sits in, because the vault emitted nothing before it existed. Their signed sum is ${r.replayed} and \`balanceOf\` reads ${r.onChain}. ${r.reconciled ? "The two agree wei-exact, which is why the rows below are drawn at all." : "The two do not agree, so no history is drawn: a lane that answers part of a question with an HTTP 200 has been observed on this chain, and no status code, timing or count tells that apart from a genuinely empty history."}${r.refetched ? ` Both sweeps were run a second time on the same lane after a pause, and the second answer ${r.refetchDiffered ? "returned a DIFFERENT log count from the first — direct evidence of a lane answering one question two ways" : "returned the same log count"}.` : ""} The sweeps ran on the endpoint named by \`${r.lane}\`; the URL is not stated because it carries a key.`,
   contract: vaultContract(c),
@@ -166,7 +166,7 @@ export const yearnVaultTimelineSharePriceProv = (c: VaultTimelineCoords, shareDe
   source: { block: c.blockNumber, txHash: c.txHash },
   verify: {
     kind: "recompute",
-    text: `Re-run the convertToAssets(10^${shareDecimals}) eth_call at block ${c.blockNumber ?? "this row's block"} against any Ethereum archive node`,
+    text: `To check: ask any Ethereum archive node for the vault's convertToAssets(10^${shareDecimals}) at block ${c.blockNumber ?? "this row's block"}.`,
   },
   summary: `Share price at this event — \`convertToAssets(10^${shareDecimals})\` answered${atBlock(c)}, which is the block this address's transaction landed in — a block the holder chose by transacting. What ONE whole share converted to in ${asset(c)} at that moment, answered by the vault. The exponent is the \`decimals()\` this vault reported at the page's block: a Yearn V3 vault mirrors its asset's decimals and adds no offset, so on the 6-decimal assets that make up most of this roster a fixed 10^18 would ask a question a trillion times too large and print the answer as a price. This figure says nothing about any block between this row and the next — nothing was read there, and this page draws no line through it.`,
   contract: vaultContract(c),

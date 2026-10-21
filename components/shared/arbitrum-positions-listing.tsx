@@ -150,7 +150,10 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
       via: `GET /api/chain/morpho-arbitrum/wallet at block ${blockOf(row)}, ${RECORDED}`,
       formula: "Σ market figure × loan token price",
       summary: `${what} in dollars — each held market's figure in its loan token, read from the singleton at block ${blockOf(row)}, times the loan token's price on the Aave V3 Arbitrum oracle at that block, summed over the markets that oracle prices.`,
-      verify: { kind: "recompute", text: `Re-run Morpho.position and Morpho.market at block ${blockOf(row)}` },
+      verify: {
+        kind: "recompute",
+        text: `To check: ask any Arbitrum archive node for Morpho.position and Morpho.market at block ${blockOf(row)}.`,
+      },
     }),
   },
 };

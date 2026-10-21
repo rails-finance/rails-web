@@ -1492,6 +1492,7 @@ label[for] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-top: 0.4rem;
   font-size: 12.5px;
   text-decoration: none;
 }

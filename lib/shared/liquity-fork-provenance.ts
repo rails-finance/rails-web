@@ -437,8 +437,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
         kind: "recompute",
         text:
           coords.blockNumber != null
-            ? `Re-run the PriceFeed.lastGoodPrice eth_call at block ${coords.blockNumber} against an archive node`
-            : "Re-run the PriceFeed.lastGoodPrice eth_call against an archive node",
+            ? `To check: ask an archive node for the branch PriceFeed's lastGoodPrice at block ${coords.blockNumber}.`
+            : "To check: ask any node for the branch PriceFeed's lastGoodPrice.",
       },
       summary: `${collSym(coords)} price at this block — the US-dollar price the branch's PriceFeed contract held at the end of this block. A liquidation or a redemption updates that price before it acts, so this is the price the branch last used in the block. ${priceScaleSentence(coords)}`,
       contract: { name: pf.name, address: pf.address },
