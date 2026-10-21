@@ -9,13 +9,18 @@
 // raw liquidation / redemption event counts. The two History axes are ORTHOGONAL to
 // current status (a Trove liquidated or redeemed against can be reopened), so they
 // map to the backend's ever-liquidated / ever-redeemed filters, not the status enum.
-// No USD facet — the listing tier reads no price, so a valued axis can't (and
-// mustn't) be offered here. The Ratio sort is not one: coll/debt is the quotient of
-// two emitted balances, and it is the PROTOCOL'S ordering key — V1 sorts its
+// Size is the Debt range in LUSD and the Collateral range in USD
+// (lib/shared/size-dimensions.ts). Debt is the token amount (minDebt /
+// maxDebt), since the listing reads no USD price for LUSD. Collateral is valued
+// on the server at the latest PriceFeed row the index stores
+// (liquity_v1_historic_prices, PriceFeed.lastGoodPrice), sent as minCollUsd /
+// maxCollUsd; that row is the last price the filler indexed. The Ratio sort
+// reads no price: coll/debt is the quotient of two emitted balances, and it is the PROTOCOL'S ordering key — V1 sorts its
 // redemption queue by nominal ICR (price-free by construction), which with one
 // collateral asset is the same order a collateral ratio would give. Facets + sorts
 // that ship LIVE:
 //   • Status  — open / closed / liquidated (mv_liquity_v1_positions.status).
+//   • Size    — Debt (LUSD) and Collateral (USD), as above.
 //   • History — Liquidated before / Redeemed before (ever, from the event stream).
 //   • Transactions — a range over the Trove's distinct transactions (`minTx` /
 //     `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
@@ -23,6 +28,7 @@
 //     (all chain-direct).
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -36,12 +42,25 @@ export const LIQUITY_V1_ITEMS_PER_PAGE = 20;
  *  (1,019 transactions, 20 Oct 2026). */
 const LIQUITY_V1_TX_TOP = 2000;
 
+/** The Size sliders' top: the round number above the larger of the biggest
+ *  Trove's debt (7,176,480 LUSD) and collateral ($41,213,327 at the latest
+ *  stored PriceFeed row, $2,388.50) in mv_liquity_v1_positions, 21 Oct 2026. */
+const LIQUITY_V1_SIZE_TOP = 50_000_000;
+
+/** The Size panel's unit and price line. */
+const LIQUITY_V1_SIZE_NOTE = "Debt in LUSD; collateral at the Liquity PriceFeed's latest indexed price.";
+
 export interface LiquityV1ListFilters extends BaseListFilters {
   status: string[];
   /** ["with"] = Troves liquidated at least once (orthogonal to current status). */
   liquidations: string[];
   /** ["with"] = Troves redeemed against at least once. */
   redemptions: string[];
+  /** Debt range in LUSD, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`. */
+  debt: string[];
+  /** Collateral range in USD, as `debt`. URL param `coll`. */
+  coll: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
 }
@@ -56,6 +75,8 @@ const LIQUITY_V1_LIST_DEFAULTS: LiquityV1ListFilters = {
   status: ["open"],
   liquidations: [],
   redemptions: [],
+  debt: [],
+  coll: [],
   tx: [],
 };
 
@@ -98,6 +119,15 @@ export function liquityV1ListDimensions(): SerializableDimension<LiquityV1ListFi
       get: (f) => f.status,
       set: (f, v) => ({ ...f, status: v }),
     },
+    ...sizeDimensions<LiquityV1ListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.coll,
+      setColl: (f, coll) => ({ ...f, coll }),
+      panelNote: LIQUITY_V1_SIZE_NOTE,
+      top: LIQUITY_V1_SIZE_TOP,
+      debtUnit: "LUSD",
+    }),
     {
       id: "liquidations",
       label: "Liquidations",
@@ -140,6 +170,7 @@ export function liquityV1FiltersToFetchParams(
     status: filters.status.length > 0 ? (filters.status as LiquityV1PositionStatus[]) : undefined,
     hasLiquidations: filters.liquidations.includes("with") ? true : undefined,
     hasRedemptions: filters.redemptions.includes("with") ? true : undefined,
+    ...sizeBounds(filters, { debt: "unit", coll: "usd" }),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as LiquityV1PositionSort,
     sortOrder: filters.sortOrder,

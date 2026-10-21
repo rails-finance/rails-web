@@ -25,6 +25,12 @@ export interface FetchLiquityV1PositionsParams {
   /** Inclusive bounds on the Trove's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
+  /** Inclusive bounds on the Trove's debt in LUSD and its collateral in USD;
+   *  any one alone. */
+  minDebt?: number;
+  maxDebt?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
   sortBy?: LiquityV1PositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -51,6 +57,9 @@ export async function fetchLiquityV1Positions(p: FetchLiquityV1PositionsParams):
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
+  for (const k of ["minDebt", "maxDebt", "minCollUsd", "maxCollUsd"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

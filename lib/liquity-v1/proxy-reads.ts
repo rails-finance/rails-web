@@ -48,8 +48,9 @@ export async function readLiquityV1Positions(
   if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
   if (sp.get("hasRedemptions")) qs.set("hasRedemptions", sp.get("hasRedemptions")!);
   if (sp.get("status")) qs.set("status", sp.get("status")!);
-  // A transaction-count bound is forwarded only as a whole number.
-  for (const k of ["minTx", "maxTx"]) {
+  // A transaction-count bound, an LUSD debt bound or a USD collateral bound is
+  // forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx", "minDebt", "maxDebt", "minCollUsd", "maxCollUsd"]) {
     const v = sp.get(k);
     if (v != null && /^\d+$/.test(v)) qs.set(k, v);
   }
