@@ -5,6 +5,10 @@
 //   • Line: the two V2 lines, gated against the chain.
 //   • Debt: the sign of the frozen debt: debt, credit, none. A credit is a
 //     negative debt, and the facet keeps the two apart rather than netting.
+//   • Size: the Debt range alone, in USD (minDebtUsd / maxDebtUsd), the frozen
+//     debt valued on the server at the price book. The collateral is not
+//     drawn: the DAO swept it.
+//   • Transactions: the account's distinct transactions (minTx / maxTx).
 //
 // THE DEBT SORT NEEDS ONE LINE, for the reason the V3 debt sort does: alUSD and
 // alETH are different tokens.
@@ -16,12 +20,25 @@ import type { ChainId } from "@/lib/shared/chains";
 import { isV2LineOnChain, v2LinesForChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixV2Sort, FetchAlchemixV2PositionsParams } from "@/lib/sources/api/alchemix-v2-backend";
 import { parseAlchemixSearch } from "@/lib/alchemix/search";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
 export const V2_ITEMS_PER_PAGE = 20;
+
+/** The Transactions slider's top: the round number above the busiest account
+ *  (602 transactions, eth-aleth-v2, 21 Oct 2026). */
+const V2_TX_TOP = 1000;
+
+const V2_SIZE_NOTE =
+  "Debt as the frozen record values it at the price book; the collateral is not drawn (the DAO swept it).";
 
 export interface V2ListFilters extends BaseListFilters {
   line: string[];
   status: string[];
+  /** Debt range in USD, one encodeRange value or [] for no bound. */
+  debt: string[];
+  /** Transaction-count range. */
+  tx: string[];
 }
 
 export const V2_LIST_DEFAULTS: V2ListFilters = {
@@ -30,6 +47,8 @@ export const V2_LIST_DEFAULTS: V2ListFilters = {
   sortOrder: "desc",
   line: [],
   status: [],
+  debt: [],
+  tx: [],
 };
 
 const STATUS_OPTIONS: FilterOptionDef[] = [
@@ -71,6 +90,19 @@ export function v2ListDimensions(chainId: ChainId): SerializableDimension<V2List
       get: (f) => f.status,
       set: (f, v) => ({ ...f, status: v }),
     },
+    ...sizeDimensions<V2ListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: () => [],
+      setColl: (f) => f,
+      sides: ["debt"],
+      panelNote: V2_SIZE_NOTE,
+    }),
+    transactionsDimension<V2ListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: V2_TX_TOP,
+    }),
   ];
 }
 
@@ -96,6 +128,8 @@ export function v2FiltersToFetchParams(
     lines,
     owner: q.kind === "address" ? q.address : undefined,
     status: filters.status,
+    ...sizeBounds(filters, { debt: "usd" }),
+    ...transactionBounds(filters.tx),
     sortBy,
     sortOrder: filters.sortOrder,
     limit: V2_ITEMS_PER_PAGE,

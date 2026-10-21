@@ -11,6 +11,7 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import type { AlchemixV2PositionResponse, AlchemixV2PositionsResponse } from "@/types/api/alchemix";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AlchemixRead } from "@/lib/sources/api/alchemix-position-backend";
+import { parseWholeBounds, setBounds, type AlchemixBoundKey } from "@/lib/sources/api/alchemix-positions-backend";
 
 export type AlchemixV2PositionFullResponse = AlchemixV2PositionResponse<BaseActivityEvent>;
 
@@ -24,10 +25,17 @@ const STATUSES = ["debt", "credit", "none"] as const;
 /** An account is an address. Anything else costs no request. */
 export const ALCHEMIX_V2_ACCOUNT = /^0x[a-fA-F0-9]{40}$/;
 
+/** Debt alone: the collateral was swept, so no collateral bound is sent. */
+const V2_BOUNDS: readonly AlchemixBoundKey[] = ["minDebtUsd", "maxDebtUsd", "minTx", "maxTx"];
+
 export interface FetchAlchemixV2PositionsParams {
   lines?: string[];
   owner?: string;
   status?: string[];
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minTx?: number;
+  maxTx?: number;
   sortBy?: AlchemixV2Sort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -56,6 +64,7 @@ export function parseAlchemixV2Query(sp: URLSearchParams): FetchAlchemixV2Positi
     lines: list("line"),
     owner: owner && ALCHEMIX_V2_ACCOUNT.test(owner) ? owner.toLowerCase() : undefined,
     status: list("status").filter((s) => (STATUSES as readonly string[]).includes(s)),
+    ...parseWholeBounds(sp, V2_BOUNDS),
     sortBy: SORTS.includes(sortBy as AlchemixV2Sort) ? (sortBy as AlchemixV2Sort) : undefined,
     sortOrder: sp.get("sortOrder") === "asc" ? "asc" : "desc",
     limit: num("limit"),
@@ -68,6 +77,7 @@ export function alchemixV2Query(p: FetchAlchemixV2PositionsParams): URLSearchPar
   if (p.lines && p.lines.length > 0) qs.set("line", p.lines.join(","));
   if (p.owner) qs.set("owner", p.owner);
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
+  setBounds(qs, p, V2_BOUNDS);
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   qs.set("sortOrder", p.sortOrder === "asc" ? "asc" : "desc");
   if (p.limit != null) qs.set("limit", String(p.limit));
