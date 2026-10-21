@@ -25,14 +25,14 @@
 // dev.rails.finance reports the 302 it gets.
 //
 // THE TIMELINE FIREWALL RULE. Since 2026-09-24 the Vercel Firewall on this
-// project denies (403, `x-vercel-mitigated: deny`) a 61st request in a fixed
+// project refuses (429, `x-vercel-mitigated: deny`) a 301st request in a fixed
 // 60 s window, per IP, to any path containing `/timeline` without a `recent`
-// parameter (rails-ops playbooks/deployment.md, "Vercel Firewall rules";
+// parameter (300 a minute since 2026-10-21, 60 and a 403 before; rails-ops playbooks/deployment.md, "Vercel Firewall rules";
 // verify-timeline-abuse.mjs checks it). `/timeline?group=1` and
 // `/timeline/folder` both match, so a verifier that opens every folder of
 // two positions meets the rule mid-run and reads its 403s as the route
 // refusing. hostFetch keeps such requests to TIMELINE_BUDGET in any rolling
-// minute, and a Deny that still arrives (a browser context's requests
+// minute, and a refusal that still arrives (a browser context's requests
 // count too, and they do not pass through here) is waited out and retried
 // once. `reserveTimeline(n)` books n slots before a page load for that reason.
 // A local dev server has no firewall, so none of this applies to it.
@@ -87,10 +87,10 @@ export function bypassHeaders(url = BASE) {
   return OWN_HOST.test(host) ? { [HEADER]: s } : {};
 }
 
-/** The rule allows 60 requests per fixed window; 50 in any rolling minute
+/** The rule allows 300 requests per fixed window; 250 in any rolling minute
  *  stays under it wherever Vercel's window boundary falls, with room for a
  *  browser context's requests. */
-const TIMELINE_BUDGET = 50;
+const TIMELINE_BUDGET = 250;
 const WINDOW_MS = 60_000;
 const stamps = [];
 let queue = Promise.resolve();
@@ -144,8 +144,9 @@ export async function hostFetch(input, init = {}) {
   if (!countedByTimelineRule(url)) return fetch(input, sent);
   await reserveTimeline();
   const res = await fetch(input, sent);
-  if (res.status !== 403 || res.headers.get("x-vercel-mitigated") !== "deny") return res;
-  console.error(`(the Vercel Firewall denied a /timeline request; waiting ${WINDOW_MS / 1000 + 1} s to retry)`);
+  // The timeline rule answers 429; the share-image rule still answers 403.
+  if ((res.status !== 429 && res.status !== 403) || !res.headers.get("x-vercel-mitigated")) return res;
+  console.error(`(the Vercel Firewall refused a /timeline request; waiting ${WINDOW_MS / 1000 + 1} s to retry)`);
   await sleep(WINDOW_MS + 1000);
   stamps.length = 0;
   await reserveTimeline();

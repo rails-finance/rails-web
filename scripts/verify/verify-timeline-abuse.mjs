@@ -10,29 +10,29 @@
 //
 //   IF   request path contains `/timeline`
 //   AND  query parameter `recent` does not exist
-//   →    rate limit, fixed window 60 s, 60 requests, keyed on IP → Deny (403)
+//   →    rate limit, fixed window 60 s, 300 requests, keyed on IP → 429 (Too Many Requests)
 //
 // It sits beside the "Share image rate limit" rule that
 // verify-share-abuse.mjs D3 checks. This asserts the rule is live and scoped
 // as written, against the deployed preview only:
 //
-//   T1  THE BURST — 70 distinct requests (`?n=<i>`) inside one minute to a
-//       cheap `/timeline` path with NO `recent` meet at least one 403. The
+//   T1  THE BURST — 310 distinct requests (`?n=<i>`) inside one minute to a
+//       cheap `/timeline` path with NO `recent` meet at least one 429. The
 //       path is `/api/ebisu/sUSDe/hello/timeline`: it passes the edge like any
 //       timeline request, and the backend rejects `hello` at its trove-id
 //       check with a 400 before any query, so the burst costs it nothing.
-//   T3  THE SCOPE — while the runner's IP is still denied on `/timeline`, one
+//   T3  THE SCOPE — while the runner's IP is still refused on `/timeline`, one
 //       request to a non-timeline path with no `recent`
-//       (`/api/ebisu/sUSDe/hello`) is NOT 403. Run straight after T1 because
+//       (`/api/ebisu/sUSDe/hello`) is NOT 429. Run straight after T1 because
 //       that is when a rule matching too widely would show.
 //   T2  THE EXEMPTION — after the window has cleared (61 s past T1's last
 //       request; the window's alignment is Vercel's, so it is measured from
-//       the end), the same 70 requests WITH `recent=100` meet ZERO 403s.
+//       the end), the same 310 requests WITH `recent=100` meet ZERO 429s.
 //
 // All three are live only: without BASE pointing at the preview they print
 // SKIPPED, and T1/T2 also need BURST=1 because the burst blocks the runner's
 // own IP on every `/timeline` path for the rest of the window. Never a
-// vacuous green. Requests run five at a time; nothing secret is involved and
+// vacuous green. Requests run twenty at a time; nothing secret is involved and
 // no URL or header value beyond the status is printed.
 //
 // Run:  BASE=https://rails.finance BURST=1 node scripts/verify/verify-timeline-abuse.mjs
@@ -43,8 +43,8 @@ const BURST = process.env.BURST === "1";
 
 const TIMELINE_PATH = "/api/ebisu/sUSDe/hello/timeline";
 const NON_TIMELINE_PATH = "/api/ebisu/sUSDe/hello";
-const REQUESTS = 70;
-const CONCURRENCY = 5;
+const REQUESTS = 310;
+const CONCURRENCY = 20;
 const WINDOW_MS = 60_000;
 
 let checked = 0;
@@ -96,7 +96,7 @@ const tally = (statuses) => {
     .map(([s, n]) => `${n} × ${s === -1 ? "error" : s}`)
     .join(", ");
 };
-const count403 = (statuses) => statuses.filter((s) => s === 403).length;
+const count429 = (statuses) => statuses.filter((s) => s === 429).length;
 
 if (!LIVE) {
   skipped("T1–T3. live checks", `BASE is ${BASE}; run with BASE=https://rails.finance BURST=1`);
@@ -110,15 +110,15 @@ if (!LIVE) {
 
   const t1 = await burst(TIMELINE_PATH, REQUESTS);
   check(
-    "T1. live burst: 70 distinct /timeline requests with NO recent inside one minute → at least one 403 (Deny) from the edge",
-    t1.elapsed < WINDOW_MS && count403(t1.statuses) >= 1,
+    "T1. live burst: 310 distinct /timeline requests with NO recent inside one minute → at least one 429 from the edge",
+    t1.elapsed < WINDOW_MS && count429(t1.statuses) >= 1,
     `${tally(t1.statuses)}, in ${secs(t1.elapsed)}`,
   );
 
   const t3 = await get(NON_TIMELINE_PATH);
   check(
-    "T3. live scope: while the IP is denied on /timeline, one non-timeline request with no recent is not 403",
-    t3 !== 403 && t3 !== -1,
+    "T3. live scope: while the IP is refused on /timeline, one non-timeline request with no recent is not 429",
+    t3 !== 429 && t3 !== -1,
     `${t3 === -1 ? "error" : t3}`,
   );
 
@@ -128,8 +128,8 @@ if (!LIVE) {
 
   const t2 = await burst(`${TIMELINE_PATH}?recent=100`, REQUESTS);
   check(
-    "T2. live exemption: 70 distinct /timeline requests WITH recent=100 inside one minute → zero 403s",
-    t2.elapsed < WINDOW_MS && count403(t2.statuses) === 0 && t2.statuses.every((s) => s !== -1),
+    "T2. live exemption: 310 distinct /timeline requests WITH recent=100 inside one minute → zero 429s",
+    t2.elapsed < WINDOW_MS && count429(t2.statuses) === 0 && t2.statuses.every((s) => s !== -1),
     `${tally(t2.statuses)}, in ${secs(t2.elapsed)}`,
   );
 }
