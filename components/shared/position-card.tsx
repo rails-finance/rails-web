@@ -32,7 +32,7 @@
 // `data-card-row=<i>` and adds `data-card-head=<id>`; the counters carry
 // `data-card-counters`, inside a listing card's `data-card-foot`.
 
-import { useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { QuietTipsContext } from "@/components/shared/reveal-tip";
@@ -327,9 +327,30 @@ function StatusTag({ status }: { status: PositionCardStatus }) {
 
 const OPEN_PILL = "bg-positive/20 text-positive";
 
+/** What a page that gathers positions from several chains adds at a listing
+ *  card's edge without the family's builder knowing (the wallet view, rails-ops
+ *  decision 0050): the chain's name at the right end of the heading row, as the
+ *  vault row (V1) carries it, and AT RISK on the pill of an open position past
+ *  its family's liquidation line. Absent everywhere else. */
+export interface PositionCardEdge {
+  chain?: string;
+  atRisk?: boolean;
+}
+export const PositionCardEdgeContext = createContext<PositionCardEdge | null>(null);
+
+const EDGE_PILL =
+  "rounded-sm bg-rb-300 px-1.5 py-0.5 text-[11px] text-foreground/80 dark:bg-rb-700 dark:text-foreground/60";
+
 /** The listing's lifecycle pill: OPEN for a live position, else the status
  *  word in capitals. */
 function ListingPill({ status }: { status: PositionCardStatus | null }) {
+  const edge = useContext(PositionCardEdgeContext);
+  if (!status && edge?.atRisk)
+    return (
+      <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${TAG_TONE.caution}`} data-anatomy="C6">
+        AT RISK
+      </span>
+    );
   return (
     <span
       className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? TAG_TONE[status.tone] : OPEN_PILL}`}
@@ -610,6 +631,13 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
     </span>
   ) : null;
   const menu = detail ? slots.menu && <DetailMenu menu={slots.menu} /> : slots.menu;
+  const edge = useContext(PositionCardEdgeContext);
+  const chainPill =
+    !detail && edge?.chain ? (
+      <span className={EDGE_PILL} data-pill="chain">
+        {edge.chain}
+      </span>
+    ) : null;
   const panel = detail ? slots.panel : undefined;
   const over = overCap(slots);
 
@@ -633,10 +661,13 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
         </span>
         {detail
           ? slots.identity
-          : slots.tag && (
+          : (slots.tag || chainPill) && (
               // Quiet like the figures: the listing card is one link.
               <QuietTipsContext.Provider value={true}>
-                <span className="ml-auto flex items-center">{slots.tag}</span>
+                <span className="ml-auto flex items-center gap-2">
+                  {slots.tag}
+                  {chainPill}
+                </span>
               </QuietTipsContext.Provider>
             )}
       </div>
