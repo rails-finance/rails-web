@@ -51,8 +51,9 @@ import { transactionBounds, transactionsDimension } from "@/lib/shared/transacti
 export const ALCHEMIX_ITEMS_PER_PAGE = 20;
 
 /** The Transactions slider's top: the round number above the busiest position
- *  (567 transactions, eth-aleth #122, 21 Oct 2026). */
-const ALCHEMIX_TX_TOP = 1000;
+ *  (566 transactions over the ten position-scope event tables, eth-aleth #122,
+ *  21 Oct 2026). */
+const ALCHEMIX_TX_TOP = 600;
 
 /** The Size panel's price line: the server values both sides at the price book
  *  the listing rows carry (`priceBookFor` / `usdFor`, DefiLlama). */
