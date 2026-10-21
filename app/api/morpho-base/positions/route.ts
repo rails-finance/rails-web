@@ -57,6 +57,11 @@ export async function GET(request: NextRequest) {
       const v = sp.get(k);
       if (v != null && /^\d+$/.test(v)) qs.set(k, v);
     }
+    // So is a debt or collateral bound in the loan token.
+    for (const k of ["minDebt", "maxDebt", "minColl", "maxColl"]) {
+      const v = sp.get(k);
+      if (v != null && /^\d+$/.test(v)) qs.set(k, v);
+    }
     // The shared fetch client says `loan` / `coll` (the Ethereum route's
     // words, lib/api/fetch-morpho-positions.ts); the Base route says
     // `loanTokens` / `collateralTokens`. Both spellings land on the same CSV

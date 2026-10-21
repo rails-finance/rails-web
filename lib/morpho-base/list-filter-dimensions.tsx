@@ -11,7 +11,16 @@
 //   • Status   — open / closed / liquidated, the route's own derivation from
 //                the chain read (anything held → open) and the liquidation
 //                record.
-//   • Position — Borrowing (hasDebt) / Collateral only (noDebt).
+//   • Size     — Debt and Collateral ranges in the market's loan token
+//                (lib/shared/size-dimensions.ts), sent as minDebt / maxDebt /
+//                minColl / maxColl; collateral is valued at the market's stored
+//                oracle price, the one price this lane reads. The Collateral
+//                range's id and param are `collvalue`, since `coll` is the
+//                collateral-token facet. The Debt range replaces the old
+//                Position dropdown: `?state=borrowing` reads as at least 1 and
+//                `?state=collateral-only` as 0, and those two exact ranges also
+//                send the old hasDebt / noDebt flags, which say the same thing
+//                to a server that predates the unit bounds.
 //   • History  — Liquidated before (hasLiquidations).
 //   • Search   — a wallet address restricts to that borrower; a 64-hex market
 //                id restricts to that market.
@@ -42,6 +51,7 @@
 //                token alone. Combines with the loan token as AND.
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -65,11 +75,25 @@ export const MORPHO_BASE_ITEMS_PER_PAGE = 20;
  *  (8,207 transactions, 16 Oct 2026). */
 const MORPHO_BASE_TX_TOP = 10000;
 
+/** The Size sliders' top, in loan-token units. Decimals sit in no table beside
+ *  morpho_base_position_chain, so the figure is the largest stable's: a USDC
+ *  position owing 126,664,100 against 140,782,927 of collateral at the
+ *  market's oracle, 21 Oct 2026. 29 USDC positions read past 10B at their
+ *  market's oracle (spam markets) and were left out of that read. */
+const MORPHO_BASE_SIZE_TOP = 150_000_000;
+
+const MORPHO_BASE_SIZE_NOTE =
+  "Debt and collateral in the market's loan token, collateral at the market's stored oracle price.";
+
 export interface MorphoBaseListFilters extends BaseListFilters {
   /** open / closed / liquidated — multi (OR). */
   status: string[];
-  /** "" | "borrowing" | "collateral-only" — the debt side of the position. */
-  state: string[];
+  /** Debt range in the loan token, one encodeRange value or [] for no bound.
+   *  URL param `debt`, read from the old `state` too. */
+  debt: string[];
+  /** Collateral range in the loan token at the market's oracle. URL param
+   *  `collvalue`. */
+  collValue: string[];
   /** "" | "liquidated" — positions liquidated at least once. */
   liquidations: string[];
   /** Loan-token ERC-20 addresses (CSV on the wire, `loan`). Headless — see the
@@ -91,7 +115,8 @@ export const MORPHO_BASE_LIST_DEFAULTS: MorphoBaseListFilters = {
   sortBy: "recent",
   sortOrder: "desc",
   status: [],
-  state: [],
+  debt: [],
+  collValue: [],
   liquidations: [],
   loanTokens: [],
   collateralTokens: [],
@@ -181,11 +206,6 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "liquidated", label: "Liquidated" },
 ];
 
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "collateral-only", label: "Collateral only" },
-];
-
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
 export function morphoBaseListDimensions(
@@ -230,16 +250,18 @@ export function morphoBaseListDimensions(
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<MorphoBaseListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: (f) => f.collValue,
+      setColl: (f, collValue) => ({ ...f, collValue }),
+      debtUnit: "loan token",
+      collUnit: "loan token",
+      collId: "collvalue",
+      debtAliases: ["state"],
+      top: MORPHO_BASE_SIZE_TOP,
+      panelNote: MORPHO_BASE_SIZE_NOTE,
+    }),
     {
       id: "liquidations",
       label: "History",
@@ -276,7 +298,6 @@ export function morphoBaseFiltersToFetchParams(
   filters: MorphoBaseListFilters,
   page: number,
 ): FetchMorphoPositionsParams {
-  const state = filters.state[0];
   const target = morphoBaseSearchTarget(filters.q);
   return {
     user: target.wallet,
@@ -285,8 +306,10 @@ export function morphoBaseFiltersToFetchParams(
     coll: filters.collateralTokens.length > 0 ? filters.collateralTokens.join(",") : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: state === "borrowing" ? true : undefined,
-    noDebt: state === "collateral-only" ? true : undefined,
+    // The old Position dropdown's flags for the two Debt ranges it maps to.
+    hasDebt: filters.debt[0] === "1-" ? true : undefined,
+    noDebt: filters.debt[0] === "-0" ? true : undefined,
+    ...sizeBounds({ debt: filters.debt, coll: filters.collValue }, { debt: "unit", coll: "unit" }),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
     ...transactionBounds(filters.tx),
     // Sent as-is (recent/debt/coll) — the reconcile hook on the listing keeps
@@ -307,7 +330,7 @@ export function morphoBaseFiltersToFetchParams(
 // `market`, and the two token facets are not offered, because the market names
 // both. Its loan token is fixed with it in the defaults, so the Debt/Collateral
 // sort — gated on exactly one loan token — is offered as it is on a listing
-// narrowed to that token. Status, Position and History work as they do here.
+// narrowed to that token. Status, Size and History work as they do here.
 
 /** The resting selection on a market's page. */
 export function morphoBaseMarketDefaults(loanToken: string): MorphoBaseListFilters {
