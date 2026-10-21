@@ -25,6 +25,7 @@
 // captured pair names only the address it was signed for, so it mints no
 // fresh budget key.
 
+import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const MAX_LENGTH = 64;

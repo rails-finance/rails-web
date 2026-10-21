@@ -31,6 +31,8 @@ export async function resolve(spec, ctx, next) {
     return next(url, ctx);
   }
   if (spec === "next/server") return next("next/server.js", ctx);
+  // next build resolves \`server-only\` to its own guard; under plain node it is a no-op.
+  if (spec === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
   return next(spec, ctx);
 }
 `;
@@ -130,8 +132,8 @@ for (const [family, load] of READERS) {
 
   test(`${family} reader: a render's read carries the signed hop pair, a route's read does not`, async () => {
     let seen = stubFetch(500);
-    await load(WALLET, IP, { render: true });
     const hop = readerHopHeaders(IP);
+    await load(WALLET, IP, { hopHeaders: hop });
     assert.equal(seen[0].headers.get("x-rails-reader-ip"), IP);
     assert.equal(seen[0].headers.get("x-rails-ssr-reader-ip"), IP);
     assert.equal(seen[0].headers.get("x-rails-ssr-reader-sig"), hop["x-rails-ssr-reader-sig"]);

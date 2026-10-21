@@ -8,7 +8,9 @@
 // second read once the history has answered, so the present and the visit's
 // market list cover every market the wallet ever touched.
 
+import "server-only";
 import { cache } from "react";
+import { readerHopHeaders } from "@/lib/api/reader-ip";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { toGroupedTimelineWire } from "@/lib/shared/timeline-wire";
 import { loadMorphoArbitrumWallet } from "@/lib/sources/chain/morpho-arbitrum-wallet";
@@ -62,7 +64,7 @@ export const loadMorphoArbitrumTail = cache(async (wallet: string): Promise<Morp
     const [slots, history] = await Promise.all([
       withTimeout(loadMorphoArbitrumWallet(wallet), "morpho-arbitrum position page: slot read"),
       withTimeout(
-        loadMorphoArbitrumTimeline(wallet, readerIp, { render: true }).catch((e: unknown) => {
+        loadMorphoArbitrumTimeline(wallet, readerIp, { hopHeaders: readerHopHeaders(readerIp) }).catch((e: unknown) => {
           console.error("morpho-arbitrum position page: history read failed", e);
           return null;
         }),

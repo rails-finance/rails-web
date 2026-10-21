@@ -3,7 +3,9 @@
 // from rails-server's store, in parallel under one bounded wait. Either leg
 // that does not answer leaves the client half to ask its own route.
 
+import "server-only";
 import { cache } from "react";
+import { readerHopHeaders } from "@/lib/api/reader-ip";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { loadCompoundWalletFromChain } from "@/lib/sources/chain/compound-position";
@@ -57,10 +59,12 @@ export const loadCompoundArbitrumTail = cache(async (wallet: string): Promise<Co
         "compound-arbitrum position page: Comet read",
       ),
       withTimeout(
-        loadCompoundArbitrumTimeline(wallet, readerIp, { render: true }).catch((e: unknown) => {
-          console.error("compound-arbitrum position page: history read failed", e);
-          return null;
-        }),
+        loadCompoundArbitrumTimeline(wallet, readerIp, { hopHeaders: readerHopHeaders(readerIp) }).catch(
+          (e: unknown) => {
+            console.error("compound-arbitrum position page: history read failed", e);
+            return null;
+          },
+        ),
         "compound-arbitrum position page: history read",
       ),
     ]);

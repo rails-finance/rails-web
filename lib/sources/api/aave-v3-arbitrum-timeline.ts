@@ -31,8 +31,8 @@ const TIMEOUT_MS = 20_000;
  * The history, replayed. Null when the store could not be asked or did not
  * answer with the contract's shape — "could not look", which the caller never
  * turns into an empty history. Throws ApiOverBudget when the store answers
- * 429 (this reader's whole-history budget is spent). `call.render` marks a
- * server render's read, which carries the signed hop pair.
+ * 429 (this reader's whole-history budget is spent). `call.hopHeaders` is
+ * a server render's signed hop pair, sent when given.
  */
 export async function loadAaveV3ArbitrumTimeline(
   wallet: string,

@@ -1,13 +1,13 @@
-import { readerHopHeaders } from "@/lib/api/reader-ip";
-
 const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN;
 
-/** How a call reaches the box. `render`: a server render's read, which also
- *  sends the signed hop pair (`readerHopHeaders`) so the box budgets it on
- *  the render bucket; a route handler serving a browser or a script leaves it
- *  unset and sends the reader header alone. */
+/** How a call reaches the box. `hopHeaders`: a server render's read passes
+ *  the signed hop pair it computed with lib/api/reader-ip.ts
+ *  `readerHopHeaders`, so the box budgets it on the render bucket; a route
+ *  handler serving a browser or a script leaves it unset and sends the reader
+ *  header alone. The caller signs because this module is reachable from
+ *  client components and must not import node:crypto. */
 export interface AuthCallOptions {
-  render?: boolean;
+  hopHeaders?: Record<string, string>;
 }
 
 /**
@@ -21,7 +21,7 @@ export interface AuthCallOptions {
  * request can't claim an arbitrary reader. See lib/api/reader-ip.ts /
  * reader-ip-server.ts for how callers resolve the value.
  *
- * With `call.render`, the same reader is also named in the signed pair
+ * With `call.hopHeaders`, the same reader is also named in the signed pair
  * `x-rails-ssr-reader-ip` / `x-rails-ssr-reader-sig`, the HMAC under the
  * bearer token that lib/api/reader-ip.ts `readerHopHeaders` produces.
  */
@@ -34,7 +34,7 @@ export function createAuthHeaders(readerIp?: string, call?: AuthCallOptions): Re
   return {
     Authorization: `Bearer ${API_BEARER_TOKEN}`,
     ...(readerIp ? { "X-Rails-Reader-IP": readerIp } : {}),
-    ...(call?.render ? readerHopHeaders(readerIp) : {}),
+    ...call?.hopHeaders,
   };
 }
 

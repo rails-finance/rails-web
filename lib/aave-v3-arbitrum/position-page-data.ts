@@ -3,7 +3,9 @@
 // the bounded wait of lib/shared/swept-position-page-data.ts. Either leg that
 // does not answer leaves the client half to ask its own route.
 
+import "server-only";
 import { cache } from "react";
+import { readerHopHeaders } from "@/lib/api/reader-ip";
 import { sweptPositionLoader, type V3PoolPositionTail } from "@/lib/shared/swept-position-page-data";
 import { loadAaveV3PositionFromChain } from "@/lib/sources/chain/aave-v3-position";
 import { loadAaveV3ArbitrumTimeline } from "@/lib/sources/api/aave-v3-arbitrum-timeline";
@@ -18,7 +20,9 @@ const load = sweptPositionLoader({
     return read.chainStale ? null : read;
   },
   readWholeIndexedHistory: async (wallet, readerIp) => {
-    const history = await loadAaveV3ArbitrumTimeline(wallet, readerIp, { render: true }).catch((e: unknown) => {
+    const history = await loadAaveV3ArbitrumTimeline(wallet, readerIp, {
+      hopHeaders: readerHopHeaders(readerIp),
+    }).catch((e: unknown) => {
       console.error("aave-v3-arbitrum position page: history read failed", e);
       return null;
     });
