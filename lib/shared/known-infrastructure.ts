@@ -1,5 +1,5 @@
 import { isAddress } from "viem";
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 /**
  * Known contracts that are not positions, keyed by CHAIN and address. Two
@@ -40,6 +40,11 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chai
  *   • A WETH gateway is named for what it does, not for whose deployment it
  *     is: Aave and Seamless both run `WrappedTokenGatewayV3`, and the source
  *     name does not say which.
+ *   • Aave's Arbitrum gateway is the `WETH_GATEWAY` constant of Aave's own
+ *     address book (`bgd-labs/aave-address-book`, `src/AaveV3Arbitrum.sol`,
+ *     read 2026-10-21); Arbiscan labels it "Aave: Wrapped Token Gateway V3 2"
+ *     (Miles, 2026-10-21). It answers no `name()` or `symbol()`, so the
+ *     address-kind read cannot name it and this entry is the only source.
  *   • Maple's two SyrupRouters (Etherscan `SyrupRouter`, 2026-10-02) answer
  *     `pool()` with syrupUSDC and syrupUSDT. Every deposit entry point calls
  *     `_deposit(msg.sender, …)`, which deposits into the pool for the router
@@ -255,6 +260,8 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
       role: "a multicall contract, which bundles several calls into one transaction",
     },
   ],
+  // ── Arbitrum ──
+  [ARBITRUM_CHAIN_ID, "0x5283beced7adf6d003225c13896e536f2d4264ff", WETH_GATEWAY],
 ];
 
 const keyOf = (chainId: ChainId, address: string) => `${chainId}:${address.toLowerCase()}`;

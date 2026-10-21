@@ -49,11 +49,13 @@ import { laneFor, splitHeld, type AaveLaneInterest } from "./lane-interest";
 import { laneInterestProv, laneNetProv } from "@/lib/aave-v3/event-provenance";
 import { isAaveCollector } from "./liquidation-fee";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
-/** A WETH gateway on either chain the Aave V3 family runs on here. */
+/** A WETH gateway on any chain the Aave V3 family runs on here. */
 export const isWethGateway = (address: string | undefined): boolean =>
-  ([MAINNET_CHAIN_ID, BASE_CHAIN_ID] as ChainId[]).some((c) => getProtocolContract(address, c)?.kind === "gateway");
+  ([MAINNET_CHAIN_ID, BASE_CHAIN_ID, ARBITRUM_CHAIN_ID] as ChainId[]).some(
+    (c) => getProtocolContract(address, c)?.kind === "gateway",
+  );
 
 /** What the tower reads of a position: its reserves and their oracle prices.
  *  Aave V3 and SparkLend views both carry it. */
