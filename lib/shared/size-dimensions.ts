@@ -1,27 +1,35 @@
-// The Size panel every listing shares (ui-jobs 354): two USD ranges, Debt and
-// Collateral, over a position's current balances valued on the server. One
-// range value each in the URL (`?debt=1000-50000`, `?coll=10000-`), the chips
-// "Debt: $1K–$50K" / "Collateral: ≥ $10K", and the bounds sent to the backend
-// as minDebtUsd / maxDebtUsd / minCollUsd / maxCollUsd (`usdBounds`). A
-// registry passes how to read and write its filters' `debt` and `coll` fields
-// and the panel's one line naming the price the figures are valued at.
+// The Size panel every listing shares (ui-jobs 354): two ranges, Debt and
+// Collateral, over a position's current balances. On most explorers both are
+// valued in USD on the server: one range value each in the URL
+// (`?debt=1000-50000`, `?coll=10000-`), the chips "Debt: $1K–$50K" /
+// "Collateral: ≥ $10K", and the bounds sent to the backend as minDebtUsd /
+// maxDebtUsd / minCollUsd / maxCollUsd. Where the explorer reads no USD price
+// for a side, the range is in the protocol's own unit instead (`debtUnit`,
+// `collUnit`): the loan token for debt (BOLD, LUSD, fxUSD, ZCHF, a Morpho
+// market's loan token), labelled "Debt (BOLD)", the chip "Debt: ≥ 1K BOLD",
+// and the bounds sent as minDebt / maxDebt / minColl / maxColl. `sizeBounds`
+// writes whichever four a registry's sides take. A registry passes how to
+// read and write its filters' `debt` and `coll` fields and the panel's one
+// line naming the price or the unit the figures are read in.
 //
-// Debt with a maximum of $0 is the no-debt set (supply or collateral only),
-// and at least $1 is the borrowing set, so the Debt range replaces a
+// Debt with a maximum of 0 is the no-debt set (supply or collateral only),
+// and at least 1 is the borrowing set, so the Debt range replaces a
 // Borrowing / Supply only dropdown. `debtRangeFromUrl` reads that dropdown's
-// old values, so a shared link keeps its meaning: `borrowing` is at least $1,
+// old values, so a shared link keeps its meaning: `borrowing` is at least 1,
 // `supply-only` (Aave V4's `supplyOnly`), `collateral-only` and `lending-only`
-// are $0. A registry that had the dropdown on another param names it in the
+// are 0. A registry that had the dropdown on another param names it in the
 // Debt dimension's `aliases`.
 // A listing with one side (a lender's deposits, a spoke's supply) passes
-// `sides` and `collLabel`; the note sits on the last range drawn. An in-memory
-// listing filters its rows with `rangeAdmits`.
+// `sides` and `collLabel`; the note sits on the last range drawn. A registry
+// whose `coll` param is taken (the collateral-asset facet on Morpho) passes
+// `collId`. An in-memory listing filters its rows with `rangeAdmits`.
 
 import type { ReactNode } from "react";
 import { decodeRange, normalizeRange, rangeChipLabel } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension } from "@/lib/shared/list-filter";
 
-/** The sliders' default top: $1M. A typed bound past it is still honoured. */
+/** The sliders' default top: $1M, or 1M of the unit. A typed bound past it is
+ *  still honoured. */
 export const SIZE_USD_TOP = 1_000_000;
 
 /** A Debt selection from the URL: the old dropdown's values as their range,
@@ -38,9 +46,9 @@ export function sizeDimensions<F>(opts: {
   setDebt: (f: F, debt: string[]) => F;
   getColl: (f: F) => string[];
   setColl: (f: F, coll: string[]) => F;
-  /** One line at the foot of the panel naming the price source. */
+  /** One line at the foot of the panel naming the price source, or the unit. */
   panelNote?: ReactNode;
-  /** The sliders' top, in dollars. */
+  /** The sliders' top, in dollars or in the unit. */
   top?: number;
   /** Older params the Debt range reads when `debt` is absent (Aave V3's
    *  `state`). */
@@ -48,38 +56,48 @@ export function sizeDimensions<F>(opts: {
   /** Which ranges to draw; both by default. */
   sides?: readonly ("debt" | "coll")[];
   /** The second range's word where "Collateral" is wrong: "Deposited",
-   *  "Supply". The label adds "(USD)"; the chip reads "Deposited: ≥ $1K". */
+   *  "Supply". The label adds the unit; the chip reads "Deposited: ≥ $1K". */
   collLabel?: string;
+  /** The Debt range in the loan token rather than USD: "BOLD" draws
+   *  "Debt (BOLD)" and "Debt: ≥ 1K BOLD"; a phrase ("loan token") reads the
+   *  same way. */
+  debtUnit?: string;
+  /** The Collateral range in the protocol's own unit rather than USD. */
+  collUnit?: string;
+  /** The Collateral range's id and URL param where `coll` is taken. */
+  collId?: string;
 }): SerializableDimension<F>[] {
-  const range = { min: 0, max: opts.top ?? SIZE_USD_TOP, usd: true };
+  const top = opts.top ?? SIZE_USD_TOP;
+  const spec = (unit?: string) => (unit ? { min: 0, max: top, unit } : { min: 0, max: top, usd: true });
   const sides = opts.sides ?? ["debt", "coll"];
   const collWord = opts.collLabel ?? "Collateral";
+  const collId = opts.collId ?? "coll";
   const debt: SerializableDimension<F> = {
     id: "debt",
-    label: "Debt (USD)",
+    label: `Debt (${opts.debtUnit ?? "USD"})`,
     group: "Size",
     cardinality: "range",
-    range,
+    range: spec(opts.debtUnit),
     param: "debt",
     ...(opts.debtAliases ? { aliases: opts.debtAliases } : {}),
     options: [],
     get: opts.getDebt,
     set: (f, v) => opts.setDebt(f, debtRangeFromUrl(v)),
-    chipLabel: (v) => rangeChipLabel("Debt", v, true),
+    chipLabel: (v) => rangeChipLabel("Debt", v, !opts.debtUnit, opts.debtUnit),
   };
   const coll: SerializableDimension<F> = {
-    id: "coll",
-    label: `${collWord} (USD)`,
+    id: collId,
+    label: `${collWord} (${opts.collUnit ?? "USD"})`,
     group: "Size",
     cardinality: "range",
-    range,
-    param: "coll",
+    range: spec(opts.collUnit),
+    param: collId,
     options: [],
     get: opts.getColl,
     set: (f, v) => opts.setColl(f, normalizeRange(v)),
-    chipLabel: (v) => rangeChipLabel(collWord, v, true),
+    chipLabel: (v) => rangeChipLabel(collWord, v, !opts.collUnit, opts.collUnit),
   };
-  const dims = [debt, coll].filter((d) => sides.includes(d.id as "debt" | "coll"));
+  const dims = [...(sides.includes("debt") ? [debt] : []), ...(sides.includes("coll") ? [coll] : [])];
   const last = dims[dims.length - 1];
   if (last) last.panelNote = opts.panelNote;
   return dims;
@@ -103,6 +121,46 @@ export function usdBounds(filters: { debt: string[]; coll: string[] }): UsdBound
     minCollUsd: coll.min ?? undefined,
     maxCollUsd: coll.max ?? undefined,
   };
+}
+
+export interface SizeBounds {
+  minDebtUsd?: number;
+  maxDebtUsd?: number;
+  minCollUsd?: number;
+  maxCollUsd?: number;
+  minDebt?: number;
+  maxDebt?: number;
+  minColl?: number;
+  maxColl?: number;
+}
+
+/**
+ * The selection as the backend's inclusive bounds, each side under the four
+ * names its measure takes: `usd` → minDebtUsd / maxDebtUsd (minCollUsd /
+ * maxCollUsd), `unit` → minDebt / maxDebt (minColl / maxColl). A side the
+ * registry does not draw is left out. Only set bounds are present, so the
+ * result spreads into a fetch params object as is.
+ */
+export function sizeBounds(
+  filters: { debt?: string[]; coll?: string[] },
+  measure: { debt?: "usd" | "unit"; coll?: "usd" | "unit" },
+): SizeBounds {
+  const out: SizeBounds = {};
+  if (measure.debt) {
+    const { min, max } = decodeRange(filters.debt ?? []);
+    const [lo, hi] =
+      measure.debt === "usd" ? (["minDebtUsd", "maxDebtUsd"] as const) : (["minDebt", "maxDebt"] as const);
+    if (min != null) out[lo] = min;
+    if (max != null) out[hi] = max;
+  }
+  if (measure.coll) {
+    const { min, max } = decodeRange(filters.coll ?? []);
+    const [lo, hi] =
+      measure.coll === "usd" ? (["minCollUsd", "maxCollUsd"] as const) : (["minColl", "maxColl"] as const);
+    if (min != null) out[lo] = min;
+    if (max != null) out[hi] = max;
+  }
+  return out;
 }
 
 /** An in-memory listing's predicate for one range selection: does `figure`

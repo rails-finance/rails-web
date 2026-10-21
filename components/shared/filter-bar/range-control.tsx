@@ -98,7 +98,7 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
   const last = stops.length - 1;
   const noun = dim.label.toLowerCase();
   const usd = spec.usd;
-  const fmt = (v: number) => formatRangeValue(v, usd);
+  const fmt = (v: number) => formatRangeValue(v, usd, spec.unit);
 
   const committedKey = dim.get(filters).join(",");
   const [draft, setDraft] = useState<RangeBounds>(() => decodeRange(dim.get(filters)));

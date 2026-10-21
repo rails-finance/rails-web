@@ -103,13 +103,20 @@ export interface RangeSpec {
   max: number;
   /** Values are US dollars: the ends, the chip and the inputs read `$1.5K`. */
   usd?: boolean;
+  /** Values are in a protocol's own unit, written after the figure: `1.5K BOLD`.
+   *  The inputs take the bare number. */
+  unit?: string;
 }
 
-/** A range value for display: `1,500`, or `$1.5K` on a USD range. */
-export function formatRangeValue(v: number, usd?: boolean): string {
-  if (!usd) return v.toLocaleString("en-US");
-  if (v < 1000) return `$${v.toLocaleString("en-US")}`;
-  return `$${Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)}`;
+/** A range value for display: `1,500`; `$1.5K` on a USD range; `1.5K BOLD`
+ *  on a range in a unit. */
+export function formatRangeValue(v: number, usd?: boolean, unit?: string): string {
+  if (!usd && !unit) return v.toLocaleString("en-US");
+  const n =
+    v < 1000
+      ? v.toLocaleString("en-US")
+      : Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v);
+  return usd ? `$${n}` : `${n} ${unit}`;
 }
 
 /** A range selection; null is no bound on that side. */
@@ -145,9 +152,9 @@ export function normalizeRange(values: string[]): string[] {
 /** Chip text for a range: `Transactions: 10–500`, `Transactions: ≥ 10`,
  *  `Transactions: ≤ 500`; `Debt: $1K–$50K` on a USD range. A maximum of 0
  *  alone reads as the one value it allows. */
-export function rangeChipLabel(label: string, values: string[], usd?: boolean): string {
+export function rangeChipLabel(label: string, values: string[], usd?: boolean, unit?: string): string {
   const { min, max } = decodeRange(values);
-  const n = (v: number) => formatRangeValue(v, usd);
+  const n = (v: number) => formatRangeValue(v, usd, unit);
   if (min != null && max != null) return min === max ? `${label}: ${n(min)}` : `${label}: ${n(min)}–${n(max)}`;
   if (max === 0) return `${label}: ${n(0)}`;
   if (min != null) return `${label}: ≥ ${n(min)}`;

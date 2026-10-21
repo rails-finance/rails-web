@@ -41,7 +41,7 @@ export function FilterChips<F>({ dimensions, filters, onChange, count }: FilterC
     const vals = dim.get(filters);
     if (dim.chipLabel) return dim.chipLabel(vals, dim.options);
     return dim.cardinality === "range"
-      ? rangeChipLabel(dim.label, vals, dim.range?.usd)
+      ? rangeChipLabel(dim.label, vals, dim.range?.usd, dim.range?.unit)
       : defaultChipLabel(dim.label, vals, dim.options);
   };
 

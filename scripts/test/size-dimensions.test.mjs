@@ -109,3 +109,36 @@ test("rangeAdmits: inclusive bounds over an in-memory figure; null falls out", (
   assert.equal(rangeAdmits([], null), true);
   assert.equal(rangeAdmits(["junk"], 5), true);
 });
+
+test("a side in the protocol's own unit: label, chip, range spec and param", () => {
+  const dims = sizeDimensions({
+    getDebt: (f) => f.debt,
+    setDebt: (f, debt) => ({ ...f, debt }),
+    getColl: (f) => f.coll,
+    setColl: (f, coll) => ({ ...f, coll }),
+    debtUnit: "BOLD",
+    collId: "collvalue",
+    top: 50_000,
+  });
+  const [debt, coll] = dims;
+  assert.equal(debt.label, "Debt (BOLD)");
+  assert.deepEqual(debt.range, { min: 0, max: 50_000, unit: "BOLD" });
+  assert.equal(debt.chipLabel(["1000-"]), "Debt: ≥ 1K BOLD");
+  assert.equal(debt.chipLabel(["-0"]), "Debt: 0 BOLD");
+  assert.equal(coll.label, "Collateral (USD)");
+  assert.deepEqual(coll.range, { min: 0, max: 50_000, usd: true });
+  assert.equal(coll.id, "collvalue");
+  assert.equal(coll.param, "collvalue");
+  assert.equal(coll.chipLabel(["10000-"]), "Collateral: ≥ $10K");
+});
+
+test("sizeBounds names each side's bounds after its measure", async () => {
+  const { sizeBounds } = await import("../../lib/shared/size-dimensions.ts");
+  assert.deepEqual(sizeBounds({ debt: ["1000-50000"], coll: ["-0"] }, { debt: "unit", coll: "usd" }), {
+    minDebt: 1000,
+    maxDebt: 50000,
+    maxCollUsd: 0,
+  });
+  assert.deepEqual(sizeBounds({ debt: ["1-"], coll: ["5-"] }, { debt: "usd" }), { minDebtUsd: 1 });
+  assert.deepEqual(sizeBounds({ debt: [], coll: [] }, { debt: "unit", coll: "unit" }), {});
+});
