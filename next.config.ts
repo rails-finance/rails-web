@@ -295,14 +295,6 @@ const nextConfig: NextConfig = {
         destination: "/ethereum/fx/:slug",
         permanent: false,
       },
-      // The cross-protocol /wallet/[address] umbrella is gone — each rail
-      // stands alone. Preserve inbound bookmarks by sending stale links to
-      // the platform home, which surfaces the protocol cards.
-      {
-        source: "/wallet/:slug*",
-        destination: "/",
-        permanent: true,
-      },
       // ── The chain moved into the path (rails-ops decision 0016) ──
       // Every explorer used to sit at `/<id>`; it now sits at `/<chain>/<slug>`.
       // preview.rails.finance is a demo, so breaking its URLs was accepted —

@@ -319,7 +319,7 @@ function cometReceipt(what: string, row: ArbitrumReadRow, c: CometCard): Provena
 }
 
 /** One Comet of a wallet: its collateral, debt and lent base in dollars. */
-function CometReadCard({ row, comet }: { row: ArbitrumReadRow; comet: CometCard }) {
+export function CometReadCard({ row, comet }: { row: ArbitrumReadRow; comet: CometCard }) {
   const session = FAMILIES["compound-v3"].session;
   const m = comet.market;
   const r = (what: string) => cometReceipt(what, row, comet);
@@ -359,7 +359,7 @@ function CometReadCard({ row, comet }: { row: ArbitrumReadRow; comet: CometCard 
   );
 }
 
-function ArbitrumReadCard({ row, family }: { row: ArbitrumReadRow; family: ArbitrumPositionsFamily }) {
+export function ArbitrumReadCard({ row, family }: { row: ArbitrumReadRow; family: ArbitrumPositionsFamily }) {
   const cfg = FAMILIES[family];
   const r = (what: string) => cfg.receipt(what, row);
   const heads: PositionCardHead[] =
