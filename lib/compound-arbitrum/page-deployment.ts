@@ -42,6 +42,8 @@ export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
       "The history store isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Comet and is unaffected.",
     failed:
       "The history read failed. Reload to try again — the position above is read live from the Comet and is unaffected.",
+    overBudget: (when) =>
+      `This reader has asked for more histories than Rails’ store answers in a minute, so the timeline and the lifetime economics wait. The page asks again ${when}. The position above is read live from the Comet and is unaffected.`,
     emptyNotWhole: "No events in the history read so far; the footer says what it rests on.",
     heldNoEvent: () =>
       "The store's history is confirmed and has no Comet event naming this account in this market — the balance arrived by a route the Comet logs without naming the account.",
@@ -56,6 +58,8 @@ export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
       notWhole:
         "Whether it ever did waits on the history: what the store holds is not yet confirmed against the chain.",
       failed: "Whether it ever did is unknown: the history store did not answer.",
+      overBudget: (when) =>
+        `Whether it ever did waits on the history: this reader has asked for more histories than Rails’ store answers in a minute, and the page asks again ${when}.`,
     },
     chainPossessive: "Arbitrum’s",
     firstRead: {

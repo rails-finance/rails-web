@@ -24,6 +24,7 @@
 import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
 
+import { retryWhen } from "@/hooks/useOverBudgetRetry";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
 import { LenderClosedCard, MorphoLenderOpenCard } from "@/components/protocol/morpho-base/position-section";
 import { VaultHoldingsNote } from "@/components/protocol/morpho-base/vault-holdings-note";
@@ -102,6 +103,7 @@ export function MorphoWalletView({
     timeline,
     timelineState,
     firstReadStalled,
+    retryIn,
     sweptClean,
     captureSource,
     chainByMarket,
@@ -281,8 +283,15 @@ export function MorphoWalletView({
             ) : timelineState === "first-read" ? (
               <StoreFirstRead words={w.firstRead} stalled={firstReadStalled} />
             ) : (
-              <p className="py-6 text-center text-sm text-rb-500">
-                {timelineState === "unavailable" ? w.unavailableWallet : w.failedWallet}
+              <p
+                className="py-6 text-center text-sm text-rb-500"
+                data-history-over-budget={timelineState === "overBudget" ? "" : undefined}
+              >
+                {timelineState === "overBudget"
+                  ? (w.overBudgetWallet?.(retryWhen(retryIn)) ?? w.unavailableWallet)
+                  : timelineState === "unavailable"
+                    ? w.unavailableWallet
+                    : w.failedWallet}
               </p>
             )}
           </>

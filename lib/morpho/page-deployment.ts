@@ -25,6 +25,10 @@ export interface MorphoPageWords {
   wholeCount: string;
   unavailableWallet: string;
   failedWallet: string;
+  /** A store that budgets a reader's whole-history reads (the Arbitrum
+   *  lane) answered 429; the page asks again on a timer. `when` is "in 23
+   *  seconds", or "shortly" once the count is out. */
+  overBudgetWallet?: (when: string) => string;
   /** The position page's note above a history that is not a whole life. */
   notWholePosition: string;
   heldNoEvent: string;
@@ -33,6 +37,8 @@ export interface MorphoPageWords {
   noPositionPartial: string;
   unavailablePosition: string;
   failedPosition: string;
+  /** The position page's twin of `overBudgetWallet`. */
+  overBudgetPosition?: (when: string) => string;
   /** The timeline's empty line when the history is not a whole life. */
   emptyNotWhole: string;
   /** A store that reads a wallet's history on its first request: while it

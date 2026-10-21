@@ -19,6 +19,7 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 
+import { retryWhen } from "@/hooks/useOverBudgetRetry";
 import { MorphoBasePositionSection, MorphoLenderOpenCard } from "@/components/protocol/morpho-base/position-section";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
 import { morphoExports } from "@/components/protocol/morpho/morpho-export-menu";
@@ -85,14 +86,24 @@ export function MorphoMarketPositionView({
   // among the served events, and a folder's members arrive only when opened.
   const routeParams = useParams<{ eventId?: string | string[] }>();
   const pinnedRoute = routeParams?.eventId != null;
-  const { data, loading, error, timeline, timelineState, firstReadStalled, sweptClean, captureSource, chainByMarket } =
-    useMorphoBaseWalletReads(
-      wallet,
-      initialSlots,
-      initialTimeline,
-      grouped && d.grouped && !pinnedRoute ? market : undefined,
-      d,
-    );
+  const {
+    data,
+    loading,
+    error,
+    timeline,
+    timelineState,
+    firstReadStalled,
+    retryIn,
+    sweptClean,
+    captureSource,
+    chainByMarket,
+  } = useMorphoBaseWalletReads(
+    wallet,
+    initialSlots,
+    initialTimeline,
+    grouped && d.grouped && !pinnedRoute ? market : undefined,
+    d,
+  );
 
   const live = chainByMarket.get(market) ?? null;
   const liveClean = live && !live.chainStale ? live : null;
@@ -302,8 +313,15 @@ export function MorphoMarketPositionView({
             ) : (
               <div className="space-y-6">
                 {liveCard}
-                <p className="py-6 text-center text-sm text-rb-500">
-                  {timelineState === "unavailable" ? w.unavailablePosition : w.failedPosition}
+                <p
+                  className="py-6 text-center text-sm text-rb-500"
+                  data-history-over-budget={timelineState === "overBudget" ? "" : undefined}
+                >
+                  {timelineState === "overBudget"
+                    ? (w.overBudgetPosition?.(retryWhen(retryIn)) ?? w.unavailablePosition)
+                    : timelineState === "unavailable"
+                      ? w.unavailablePosition
+                      : w.failedPosition}
                 </p>
                 {!liveClean && data && (
                   <p className="text-center text-sm text-rb-500">

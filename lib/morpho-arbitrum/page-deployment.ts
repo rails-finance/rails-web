@@ -48,6 +48,8 @@ export const MORPHO_ARBITRUM_PAGE: MorphoPageDeployment = {
       "The history store isn't answering, so the timelines and the lifetime economics are unavailable. The positions above are read live from the singleton and are unaffected.",
     failedWallet:
       "The history read failed. Reload to try again — the positions above are read live from the singleton and are unaffected.",
+    overBudgetWallet: (when) =>
+      `This reader has asked for more histories than Rails’ store answers in a minute, so the timelines and the lifetime economics wait. The page asks again ${when}. The positions above are read live from the singleton and are unaffected.`,
     notWholePosition:
       "The history below is what Rails’ store holds, not yet confirmed against the chain; the line under the list says how far the check has reached. The position card and the lifetime economics wait for it. The card above, where there is one, is read live from the singleton and is unaffected.",
     heldNoEvent:
@@ -58,6 +60,8 @@ export const MORPHO_ARBITRUM_PAGE: MorphoPageDeployment = {
       "The history store isn't answering, so the timeline and the lifetime economics are unavailable. The card, where there is one, is read live from the singleton and is unaffected.",
     failedPosition:
       "The history read failed. Reload to try again — the card, where there is one, is read live from the singleton and is unaffected.",
+    overBudgetPosition: (when) =>
+      `This reader has asked for more histories than Rails’ store answers in a minute, so the timeline and the lifetime economics wait. The page asks again ${when}. The card, where there is one, is read live from the singleton and is unaffected.`,
     emptyNotWhole: "No events in the history read so far; the line under the list says what it rests on.",
     firstRead: {
       reading:

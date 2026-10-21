@@ -18,6 +18,7 @@ import { settleFetchMark } from "@/lib/perf/settle-marks";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { TimelineCutSummary } from "@/lib/shared/timeline-boundary";
 import type { CaptureSource } from "@/lib/shared/capture-source";
+import { parseRetryAfter } from "@/lib/api/api-over-budget";
 
 /** An inclusive block range the sweep could not read. */
 export interface CoverageGap {
@@ -227,6 +228,19 @@ export class ChainTimelineUnavailable extends Error {}
  *  throws it too, when its wait for the store runs out. */
 export class ChainTimelinePending extends Error {}
 
+/** The route answered 429: this reader has asked the store for more
+ *  histories than it answers in a minute (lib/api/api-over-budget.ts). The
+ *  page asks again after `retryAfterSeconds`. Distinct from
+ *  `ChainTimelineUnavailable`, the store being down. */
+export class ChainTimelineOverBudget extends Error {
+  readonly retryAfterSeconds: number;
+  constructor(message: string, retryAfterSeconds: number) {
+    super(message);
+    this.name = "ChainTimelineOverBudget";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 export async function fetchChainTimeline<T extends ChainTimelineEnvelope = ChainTimelineResponse>(p: {
   wallet: string;
   /** The sweep route for this explorer, e.g. `/api/chain/aave-v3-base/timeline`. */
@@ -250,6 +264,11 @@ export async function fetchChainTimeline<T extends ChainTimelineEnvelope = Chain
   if (!res.ok) {
     done(false);
     if (res.status === 503) throw new ChainTimelineUnavailable("The history endpoint did not answer.");
+    if (res.status === 429)
+      throw new ChainTimelineOverBudget(
+        "The history endpoint answered 429.",
+        parseRetryAfter(res.headers.get("retry-after")),
+      );
     throw new Error(`fetchChainTimeline failed: ${res.status} ${res.statusText}`);
   }
   // The route ships the lean wire shape (lib/shared/timeline-wire.ts). This is

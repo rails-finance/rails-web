@@ -99,7 +99,13 @@ import type { CometMarket } from "@/lib/compound/asset-catalog";
 import type { CompoundPageDeployment } from "@/lib/compound/page-deployment";
 import { fetchCompoundWallet, type CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
-import { ChainTimelinePending, ChainTimelineUnavailable, fetchChainTimeline } from "@/lib/api/fetch-chain-timeline";
+import {
+  ChainTimelineOverBudget,
+  ChainTimelinePending,
+  ChainTimelineUnavailable,
+  fetchChainTimeline,
+} from "@/lib/api/fetch-chain-timeline";
+import { retryWhen, useOverBudgetRetry } from "@/hooks/useOverBudgetRetry";
 import { FIRST_READ_ASKS, FIRST_READ_GAP_MS, WHOLE_ASKS, WHOLE_GAP_MS } from "@/lib/shared/store-history-asks";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { CometChainTimelineResult, CometMarketReplay } from "@/lib/sources/chain/compound-v3-events";
@@ -122,7 +128,7 @@ type CompoundBaseTimeline = CometChainTimelineResult & {
 };
 /** `first-read`: the store is reading this wallet's history for the first
  *  time, and the page asks again. */
-type TimelineState = "loading" | "first-read" | "ready" | "unavailable" | "failed";
+type TimelineState = "loading" | "first-read" | "ready" | "unavailable" | "overBudget" | "failed";
 
 /** Prices keyed `${marketKey}:${token}` — each Comet reads its own feeds, so a
  *  token has one price PER MARKET, not one price. */
@@ -161,6 +167,7 @@ function MarketSection({
   timeline,
   timelineState,
   firstReadStalled,
+  retryIn,
   sweptClean,
   captureSource,
 }: {
@@ -174,6 +181,8 @@ function MarketSection({
   timelineState: TimelineState;
   /** The page has stopped asking a store that is still on its first read. */
   firstReadStalled: boolean;
+  /** Seconds until the page asks an over-budget store again. */
+  retryIn: number | null;
   sweptClean: boolean;
   /** Which capture answered — the index or the sweep. Words below differ. */
   captureSource: CaptureSource;
@@ -457,8 +466,15 @@ function MarketSection({
           ) : timelineState === "first-read" ? (
             <StoreFirstRead words={d.words.firstRead} stalled={firstReadStalled} />
           ) : (
-            <p className="py-6 text-center text-sm text-rb-500">
-              {timelineState === "unavailable" ? d.words.unavailable : d.words.failed}
+            <p
+              className="py-6 text-center text-sm text-rb-500"
+              data-history-over-budget={timelineState === "overBudget" ? "" : undefined}
+            >
+              {timelineState === "overBudget"
+                ? (d.words.overBudget?.(retryWhen(retryIn)) ?? d.words.unavailable)
+                : timelineState === "unavailable"
+                  ? d.words.unavailable
+                  : d.words.failed}
             </p>
           )}
         </section>
@@ -540,6 +556,8 @@ export function CompoundWalletView({
   // A store on its first read of this wallet answers "pending"; the page asks
   // again a few times, then states that the read goes on.
   const [firstReadStalled, setFirstReadStalled] = useState(false);
+  // A 429 from the store: the page waits out its Retry-After and asks again.
+  const { asks: overBudgetAsks, retryIn, wait: waitOverBudget } = useOverBudgetRetry();
   useEffect(() => {
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
@@ -569,6 +587,11 @@ export function CompoundWalletView({
             else timer = setTimeout(ask, FIRST_READ_GAP_MS);
             return;
           }
+          if (e instanceof ChainTimelineOverBudget) {
+            waitOverBudget(e.retryAfterSeconds);
+            setTimelineState("overBudget");
+            return;
+          }
           setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
         });
     ask();
@@ -576,7 +599,7 @@ export function CompoundWalletView({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [wallet, timelineSeeded, pinnedRoute, d]);
+  }, [wallet, timelineSeeded, pinnedRoute, d, overBudgetAsks, waitOverBudget]);
 
   // A history the store has not yet confirmed is asked again for a while, and
   // taken once it is the whole life.
@@ -690,7 +713,13 @@ export function CompoundWalletView({
   // driving a retry loop.
   const pricedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (sections.length === 0 || timelineState === "loading" || timelineState === "first-read") return;
+    if (
+      sections.length === 0 ||
+      timelineState === "loading" ||
+      timelineState === "first-read" ||
+      timelineState === "overBudget"
+    )
+      return;
     if (pricedRef.current === wallet) return;
     const pairs = new Set<string>();
     for (const s of sections) {
@@ -896,7 +925,9 @@ export function CompoundWalletView({
                       ? d.words.emptyNowHistory.loading
                       : timelineState === "ready"
                         ? d.words.emptyNowHistory.notWhole
-                        : d.words.emptyNowHistory.failed}
+                        : timelineState === "overBudget" && d.words.emptyNowHistory.overBudget
+                          ? d.words.emptyNowHistory.overBudget(retryWhen(retryIn))
+                          : d.words.emptyNowHistory.failed}
                   </p>
                 )}
                 <p className="mt-3 text-sm">
@@ -917,7 +948,9 @@ export function CompoundWalletView({
                     ? d.words.emptyNowHistory.loading
                     : timelineState === "ready"
                       ? d.words.emptyNowHistory.notWhole
-                      : d.words.emptyNowHistory.failed}
+                      : timelineState === "overBudget" && d.words.emptyNowHistory.overBudget
+                        ? d.words.emptyNowHistory.overBudget(retryWhen(retryIn))
+                        : d.words.emptyNowHistory.failed}
                 </p>
               </div>
             ) : (
@@ -945,6 +978,7 @@ export function CompoundWalletView({
                     timeline={timeline}
                     timelineState={timelineState}
                     firstReadStalled={firstReadStalled}
+                    retryIn={retryIn}
                     sweptClean={sweptClean}
                     captureSource={captureSource}
                   />

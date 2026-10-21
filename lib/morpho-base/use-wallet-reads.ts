@@ -29,7 +29,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ChainTimelinePending, ChainTimelineUnavailable } from "@/lib/api/fetch-chain-timeline";
+import {
+  ChainTimelineOverBudget,
+  ChainTimelinePending,
+  ChainTimelineUnavailable,
+} from "@/lib/api/fetch-chain-timeline";
+import { useOverBudgetRetry } from "@/hooks/useOverBudgetRetry";
 import { FIRST_READ_ASKS, FIRST_READ_GAP_MS, WHOLE_ASKS, WHOLE_GAP_MS } from "@/lib/shared/store-history-asks";
 import { fetchMorphoBaseTimeline, type MorphoChainTimelineResponse } from "@/lib/api/fetch-morpho-base-timeline";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
@@ -40,8 +45,9 @@ import type { MorphoPageDeployment } from "@/lib/morpho/page-deployment";
 import { MORPHO_BASE_PAGE } from "@/lib/morpho-base/page-deployment";
 
 /** `first-read`: the store is reading this wallet's history for the first
- *  time, and the hook asks again. */
-export type MorphoBaseTimelineState = "loading" | "first-read" | "ready" | "unavailable" | "failed";
+ *  time, and the hook asks again. `overBudget`: the store answered 429, and
+ *  the hook asks again after its Retry-After. */
+export type MorphoBaseTimelineState = "loading" | "first-read" | "ready" | "unavailable" | "overBudget" | "failed";
 
 export interface MorphoBaseWalletReads {
   /** The slot read; null until it answers. */
@@ -54,6 +60,8 @@ export interface MorphoBaseWalletReads {
   timelineState: MorphoBaseTimelineState;
   /** The hook has stopped asking a store that is still on its first read. */
   firstReadStalled: boolean;
+  /** Seconds until the hook asks an over-budget store again. */
+  retryIn: number | null;
   /** The sweep read every block from the singleton's first — the only case
    *  the shared card and the tower's "all time" are entitled to. */
   sweptClean: boolean;
@@ -140,6 +148,7 @@ export function useMorphoBaseWalletReads(
   // again a few times (lib/shared/store-history-asks.ts), then states that
   // the read goes on.
   const [firstReadStalled, setFirstReadStalled] = useState(false);
+  const { asks: overBudgetAsks, retryIn, wait: waitOverBudget } = useOverBudgetRetry();
   useEffect(() => {
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
@@ -162,6 +171,11 @@ export function useMorphoBaseWalletReads(
             else timer = setTimeout(ask, FIRST_READ_GAP_MS);
             return;
           }
+          if (e instanceof ChainTimelineOverBudget) {
+            waitOverBudget(e.retryAfterSeconds);
+            setTimelineState("overBudget");
+            return;
+          }
           setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
         });
     ask();
@@ -169,7 +183,7 @@ export function useMorphoBaseWalletReads(
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [wallet, timelineSeeded, groupedMarket, timelineRoute]);
+  }, [wallet, timelineSeeded, groupedMarket, timelineRoute, overBudgetAsks, waitOverBudget]);
 
   // A history the store has not yet confirmed is asked again for a while, and
   // taken once it is the whole life.
@@ -247,6 +261,7 @@ export function useMorphoBaseWalletReads(
     timeline,
     timelineState,
     firstReadStalled,
+    retryIn,
     sweptClean,
     captureSource,
     chainByMarket,

@@ -14,16 +14,21 @@
 // SERVER-ONLY.
 
 import { after } from "next/server";
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { createAuthFetchOptions, type AuthCallOptions } from "@/lib/api/fetch-with-auth";
 import { ChainTimelinePending } from "@/lib/api/fetch-chain-timeline";
 
 /** How long a first read may keep the request open after the page has been
  *  told it is pending. */
 const HOLD_MS = 180_000;
 
-export async function fetchStore(url: string, readerIp: string | undefined, timeoutMs: number): Promise<Response> {
+export async function fetchStore(
+  url: string,
+  readerIp: string | undefined,
+  timeoutMs: number,
+  call?: AuthCallOptions,
+): Promise<Response> {
   const request = fetch(url, {
-    ...createAuthFetchOptions(undefined, readerIp),
+    ...createAuthFetchOptions(undefined, readerIp, call),
     cache: "no-store",
     signal: AbortSignal.timeout(HOLD_MS),
   });

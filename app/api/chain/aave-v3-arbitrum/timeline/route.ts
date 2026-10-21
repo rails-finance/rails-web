@@ -4,6 +4,7 @@ import { loadAaveV3ArbitrumTimeline } from "@/lib/sources/api/aave-v3-arbitrum-t
 import { AAVE_V3_ARBITRUM_CHAIN_ID } from "@/lib/aave-v3-arbitrum/asset-catalog";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { ApiOverBudget, overBudgetResponse } from "@/lib/api/api-over-budget";
 
 // A wallet's history on Aave V3 Arbitrum: one read of rails-server's store
 // (lib/sources/api/aave-v3-arbitrum-timeline), replayed into the shared cards.
@@ -31,6 +32,9 @@ export async function GET(request: NextRequest) {
       headers: timelineCacheHeaders(data.events, { "Cache-Control": CACHE_CONTROL }, unread),
     });
   } catch (error) {
+    // The reader is over the store's per-minute budget: a 429 the page waits
+    // out, kept apart from the 503 of a store that is down.
+    if (error instanceof ApiOverBudget) return overBudgetResponse(error);
     console.error("Error reading Aave V3 Arbitrum history:", error);
     return NextResponse.json({ error: "The history store did not answer", unavailable: true }, { status: 503 });
   }

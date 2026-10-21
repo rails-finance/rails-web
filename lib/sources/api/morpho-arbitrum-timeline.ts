@@ -16,6 +16,8 @@
 // SERVER-ONLY.
 
 import { fetchStore } from "@/lib/sources/api/arbitrum-store-read";
+import { throwIfOverBudget } from "@/lib/api/api-over-budget";
+import type { AuthCallOptions } from "@/lib/api/fetch-with-auth";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import { replayMorphoRows, type MorphoChainTimelineResult } from "@/lib/sources/chain/morpho-blue-events";
 import { decodeMorphoIndexRows } from "@/lib/sources/api/morpho-base-timeline";
@@ -32,16 +34,20 @@ const TIMEOUT_MS = 45_000;
 /**
  * The history, replayed. Null when the store could not be asked or did not
  * answer with the contract's shape — "could not look", which the caller never
- * turns into an empty history.
+ * turns into an empty history. Throws ApiOverBudget when the store answers
+ * 429 (this reader's whole-history budget is spent). `call.render` marks a
+ * server render's read, which carries the signed hop pair.
  */
 export async function loadMorphoArbitrumTimeline(
   wallet: string,
   readerIp?: string,
+  call?: AuthCallOptions,
 ): Promise<MorphoChainTimelineResult | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const w = wallet.toLowerCase();
-  const res = await fetchStore(`${base}${MORPHO_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, readerIp, TIMEOUT_MS);
+  const res = await fetchStore(`${base}${MORPHO_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, readerIp, TIMEOUT_MS, call);
+  throwIfOverBudget(res, `${MORPHO_ARBITRUM_API_PREFIX}/timeline`);
   if (!res.ok) {
     console.error(`${MORPHO_ARBITRUM_API_PREFIX}/timeline answered ${res.status} ${res.statusText}`);
     return null;

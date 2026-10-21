@@ -62,7 +62,7 @@ export const loadMorphoArbitrumTail = cache(async (wallet: string): Promise<Morp
     const [slots, history] = await Promise.all([
       withTimeout(loadMorphoArbitrumWallet(wallet), "morpho-arbitrum position page: slot read"),
       withTimeout(
-        loadMorphoArbitrumTimeline(wallet, readerIp).catch((e: unknown) => {
+        loadMorphoArbitrumTimeline(wallet, readerIp, { render: true }).catch((e: unknown) => {
           console.error("morpho-arbitrum position page: history read failed", e);
           return null;
         }),

@@ -18,7 +18,7 @@ const load = sweptPositionLoader({
     return read.chainStale ? null : read;
   },
   readWholeIndexedHistory: async (wallet, readerIp) => {
-    const history = await loadAaveV3ArbitrumTimeline(wallet, readerIp).catch((e: unknown) => {
+    const history = await loadAaveV3ArbitrumTimeline(wallet, readerIp, { render: true }).catch((e: unknown) => {
       console.error("aave-v3-arbitrum position page: history read failed", e);
       return null;
     });

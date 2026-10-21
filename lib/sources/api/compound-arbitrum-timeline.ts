@@ -19,6 +19,8 @@
 // SERVER-ONLY.
 
 import { fetchStore } from "@/lib/sources/api/arbitrum-store-read";
+import { throwIfOverBudget } from "@/lib/api/api-over-budget";
+import type { AuthCallOptions } from "@/lib/api/fetch-with-auth";
 import {
   attachCometEthUsd,
   replayCometRows,
@@ -50,16 +52,25 @@ const BASE_KINDS = new Set(["supply", "withdraw", "absorb_debt", "transfer_in", 
 /**
  * The history, replayed. Null when the store could not be asked or did not
  * answer with the contract's shape — "could not look", which the caller never
- * turns into an empty history.
+ * turns into an empty history. Throws ApiOverBudget when the store answers
+ * 429 (this reader's whole-history budget is spent). `call.render` marks a
+ * server render's read, which carries the signed hop pair.
  */
 export async function loadCompoundArbitrumTimeline(
   wallet: string,
   readerIp?: string,
+  call?: AuthCallOptions,
 ): Promise<CometChainTimelineResult | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const w = wallet.toLowerCase();
-  const res = await fetchStore(`${base}${COMPOUND_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, readerIp, TIMEOUT_MS);
+  const res = await fetchStore(
+    `${base}${COMPOUND_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`,
+    readerIp,
+    TIMEOUT_MS,
+    call,
+  );
+  throwIfOverBudget(res, `${COMPOUND_ARBITRUM_API_PREFIX}/timeline`);
   if (!res.ok) {
     console.error(`${COMPOUND_ARBITRUM_API_PREFIX}/timeline answered ${res.status} ${res.statusText}`);
     return null;

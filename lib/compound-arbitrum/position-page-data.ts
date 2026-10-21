@@ -57,7 +57,7 @@ export const loadCompoundArbitrumTail = cache(async (wallet: string): Promise<Co
         "compound-arbitrum position page: Comet read",
       ),
       withTimeout(
-        loadCompoundArbitrumTimeline(wallet, readerIp).catch((e: unknown) => {
+        loadCompoundArbitrumTimeline(wallet, readerIp, { render: true }).catch((e: unknown) => {
           console.error("compound-arbitrum position page: history read failed", e);
           return null;
         }),

@@ -4,6 +4,7 @@ import { loadMorphoArbitrumTimeline } from "@/lib/sources/api/morpho-arbitrum-ti
 import { MORPHO_ARBITRUM_CHAIN_ID } from "@/lib/morpho-arbitrum/asset-catalog";
 import { toGroupedTimelineWire } from "@/lib/shared/timeline-wire";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { ApiOverBudget, overBudgetResponse } from "@/lib/api/api-over-budget";
 import { ChainTimelinePending } from "@/lib/api/fetch-chain-timeline";
 
 // A wallet's history on Morpho Blue Arbitrum: one read of rails-server's store
@@ -43,6 +44,9 @@ export async function GET(request: NextRequest) {
       ),
     });
   } catch (error) {
+    // The reader is over the store's per-minute budget: a 429 the page waits
+    // out, kept apart from the 503 of a store that is down.
+    if (error instanceof ApiOverBudget) return overBudgetResponse(error);
     if (error instanceof ChainTimelinePending)
       return NextResponse.json({ pending: true }, { status: 202, headers: { "Cache-Control": "no-store" } });
     console.error("Error reading Morpho Blue Arbitrum history:", error);

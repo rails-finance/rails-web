@@ -51,6 +51,8 @@ export const AAVE_V3_ARBITRUM_PAGE: AaveV3PoolPageDeployment = {
       "The history store isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Pool and is unaffected.",
     failed:
       "The history read failed. Reload to try again — the position above is read live from the Pool and is unaffected.",
+    overBudget: (when) =>
+      `This reader has asked for more histories than Rails’ store answers in a minute, so the timeline and the lifetime economics wait. The page asks again ${when}. The position above is read live from the Pool and is unaffected.`,
     emptyNotWholeState: {
       title: "Nothing is supplied or borrowed on this Pool.",
       body: "The history read so far holds no events for this wallet, and it is not yet confirmed against the chain, so Rails does not yet say whether this account was ever opened.",

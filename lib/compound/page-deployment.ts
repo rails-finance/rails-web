@@ -18,6 +18,10 @@ export interface CompoundPageWords {
   /** Under a market's timeline while the history did not answer. */
   unavailable: string;
   failed: string;
+  /** A store that budgets a reader's whole-history reads (the Arbitrum
+   *  lane) answered 429; the page asks again on a timer. `when` is "in 23
+   *  seconds", or "shortly" once the count is out. */
+  overBudget?: (when: string) => string;
   /** A market's timeline with no events, by what the history rests on. */
   emptyNotWhole: string;
   /** The wallet holds something in the market and a whole history names it
@@ -32,7 +36,7 @@ export interface CompoundPageWords {
   untouchedBody: (n: number | undefined) => string;
   emptyNowTitle: string;
   /** After "All N markets were asked, and none holds…": whether it ever did. */
-  emptyNowHistory: { loading: string; notWhole: string; failed: string };
+  emptyNowHistory: { loading: string; notWhole: string; failed: string; overBudget?: (when: string) => string };
   /** "Base’s" in the line above the sections. */
   chainPossessive: string;
   /** A store that reads a wallet's history on its first request: while it

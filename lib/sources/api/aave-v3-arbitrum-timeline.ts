@@ -14,7 +14,8 @@
 //
 // SERVER-ONLY.
 
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { createAuthFetchOptions, type AuthCallOptions } from "@/lib/api/fetch-with-auth";
+import { throwIfOverBudget } from "@/lib/api/api-over-budget";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { replayAaveV3Rows, type AaveV3ChainTimelineResult } from "@/lib/sources/chain/aave-v3-events";
 import { resolveV3Tokens } from "@/lib/sources/chain/aave-v3-tokens";
@@ -29,20 +30,24 @@ const TIMEOUT_MS = 20_000;
 /**
  * The history, replayed. Null when the store could not be asked or did not
  * answer with the contract's shape — "could not look", which the caller never
- * turns into an empty history.
+ * turns into an empty history. Throws ApiOverBudget when the store answers
+ * 429 (this reader's whole-history budget is spent). `call.render` marks a
+ * server render's read, which carries the signed hop pair.
  */
 export async function loadAaveV3ArbitrumTimeline(
   wallet: string,
   readerIp?: string,
+  call?: AuthCallOptions,
 ): Promise<AaveV3ChainTimelineResult | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const w = wallet.toLowerCase();
   const res = await fetch(`${base}${AAVE_V3_ARBITRUM_API_PREFIX}/timeline?wallet=${w}`, {
-    ...createAuthFetchOptions(undefined, readerIp),
+    ...createAuthFetchOptions(undefined, readerIp, call),
     cache: "no-store",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
+  throwIfOverBudget(res, `${AAVE_V3_ARBITRUM_API_PREFIX}/timeline`);
   if (!res.ok) {
     console.error(`${AAVE_V3_ARBITRUM_API_PREFIX}/timeline answered ${res.status} ${res.statusText}`);
     return null;

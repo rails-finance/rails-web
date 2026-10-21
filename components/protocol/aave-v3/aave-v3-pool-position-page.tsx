@@ -104,7 +104,9 @@ import type { AaveV3BaseFlowsInput } from "@/hooks/useAaveV3BaseFlows";
 import { v3ViewFromChain, type V3SweptHistory } from "@/lib/aave-v3/chain-position-view";
 import { V3PoolProvider, type V3PoolIdentity } from "@/lib/aave-v3/pool-context";
 import { fetchAaveV3Position, type AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
+import { retryWhen, useOverBudgetRetry } from "@/hooks/useOverBudgetRetry";
 import {
+  ChainTimelineOverBudget,
   ChainTimelineUnavailable,
   fetchChainTimeline,
   type ChainTimelineCoverage,
@@ -171,6 +173,10 @@ export interface AaveV3PoolPageDeployment {
     emptyNotWhole: string;
     unavailable: string;
     failed: string;
+    /** A store that budgets a reader's whole-history reads (the Arbitrum
+     *  lane) answered 429; the page asks again on a timer. `when` is "in 23
+     *  seconds", or "shortly" once the count is out. */
+    overBudget?: (when: string) => string;
     /** The Pool holds nothing and the history answered empty without being
      *  whole; absent where that state draws the closed card. */
     emptyNotWholeState?: { title: string; body: string };
@@ -225,9 +231,12 @@ export function AaveV3PoolPositionView({
   // among the served events, and a folder's members arrive only when opened.
   const routeParams = useParams<{ eventId?: string | string[] }>();
   const pinnedRoute = routeParams?.eventId != null;
-  const [timelineState, setTimelineState] = useState<"loading" | "ready" | "unavailable" | "failed">(
+  const [timelineState, setTimelineState] = useState<"loading" | "ready" | "unavailable" | "overBudget" | "failed">(
     timelineSeeded ? "ready" : "loading",
   );
+  // A 429 from the store: the page waits out its Retry-After and asks again.
+  const overBudget = useOverBudgetRetry();
+  const { asks: overBudgetAsks, wait: waitOverBudget } = overBudget;
   const [prices, setPrices] = useState<Record<string, number>>({});
   // The card holds its USD headlines' space until the oracle has answered.
   const [pricesSettled, setPricesSettled] = useState(false);
@@ -279,12 +288,17 @@ export function AaveV3PoolPositionView({
       })
       .catch((e) => {
         if (cancelled) return;
+        if (e instanceof ChainTimelineOverBudget) {
+          waitOverBudget(e.retryAfterSeconds);
+          setTimelineState("overBudget");
+          return;
+        }
         setTimelineState(e instanceof ChainTimelineUnavailable ? "unavailable" : "failed");
       });
     return () => {
       cancelled = true;
     };
-  }, [wallet, timelineSeeded, pinnedRoute, d]);
+  }, [wallet, timelineSeeded, pinnedRoute, d, overBudgetAsks, waitOverBudget]);
 
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
   const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
@@ -577,7 +591,8 @@ export function AaveV3PoolPositionView({
     !sweptClean &&
     (timeline?.grouped ? (timeline.eventsServed ?? 0) : events.length) === 0 &&
     (timeline?.coverage.omitted?.count ?? 0) === 0;
-  const historyUnread = nothingOnChain && (timelineState === "failed" || timelineState === "unavailable");
+  const historyUnread =
+    nothingOnChain && (timelineState === "failed" || timelineState === "unavailable" || timelineState === "overBudget");
 
   // The Lifetime flows panel replays the account's whole history
   // (lib/aave-v3-base/flows.ts): the page's rows where they are all of it,
@@ -671,8 +686,9 @@ export function AaveV3PoolPositionView({
               <div className="py-12 text-center text-rb-500">
                 <p className="mb-1">Nothing is supplied or borrowed on this Pool.</p>
                 <p className="text-sm">
-                  Whether this account ever held a position is a question only its history answers, and that read
-                  failed. Reload to try again.
+                  {timelineState === "overBudget"
+                    ? `Whether this account ever held a position is a question only its history answers, and this reader has asked for more histories than Rails’ store answers in a minute. The page asks again ${retryWhen(overBudget.retryIn)}.`
+                    : "Whether this account ever held a position is a question only its history answers, and that read failed. Reload to try again."}
                 </p>
               </div>
             ) : untouched ? (
@@ -817,8 +833,15 @@ export function AaveV3PoolPositionView({
                 ) : timelineState === "loading" ? (
                   <SweepInFlight>{d.words.reading}</SweepInFlight>
                 ) : (
-                  <p className="py-6 text-center text-sm text-rb-500">
-                    {timelineState === "unavailable" ? d.words.unavailable : d.words.failed}
+                  <p
+                    className="py-6 text-center text-sm text-rb-500"
+                    data-history-over-budget={timelineState === "overBudget" ? "" : undefined}
+                  >
+                    {timelineState === "overBudget"
+                      ? (d.words.overBudget?.(retryWhen(overBudget.retryIn)) ?? d.words.unavailable)
+                      : timelineState === "unavailable"
+                        ? d.words.unavailable
+                        : d.words.failed}
                   </p>
                 )}
               </>
