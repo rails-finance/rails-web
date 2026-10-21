@@ -16,7 +16,7 @@
 // module is imported only from /api/* route handlers (Node runtime), never from
 // a client component — the keys must not reach the browser bundle.
 
-import { createPublicClient, http, type Chain, type PublicClient, type Transport } from "viem";
+import { createPublicClient, fallback, http, type Chain, type PublicClient, type Transport } from "viem";
 import { arbitrum, base, mainnet, sepolia } from "viem/chains";
 import {
   ARBITRUM_CHAIN_ID,
@@ -55,6 +55,18 @@ function stateRpcUrl(meta: ChainMeta): string | undefined {
   return mainnetUrl.replace("eth-mainnet.g.alchemy.com", "eth-sepolia.g.alchemy.com");
 }
 
+/** The state-read transport for a chain. One URL: a plain `http`. A chain that
+ *  declares `fallbackRpcEnv` with the var set: `fallback([primary, second])`,
+ *  primary first, ranking off. Each URL is tried once (`retryCount: 0`) so a
+ *  429, 5xx, timeout or network error on the primary passes to the second for
+ *  that call; viem's `fallback` moves on for any transport error. When the var
+ *  is unset the chain keeps its single transport. */
+export function stateTransport(meta: ChainMeta, url: string): Transport {
+  const second = meta.fallbackRpcEnv ? process.env[meta.fallbackRpcEnv] : undefined;
+  if (!second) return http(url);
+  return fallback([http(url, { retryCount: 0 }), http(second, { retryCount: 0 })], { rank: false });
+}
+
 const cache = new Map<ChainId, PublicClient>();
 
 /** Lazily-built public client for `chainId`. Throws if that chain's RPC env
@@ -65,7 +77,7 @@ export function chainClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
   if (!url) throw new Error(`${meta.rpcEnv} not set — ${meta.name} live-state reads need it for eth_call`);
   let client = cache.get(meta.id);
   if (!client) {
-    client = createPublicClient({ chain: VIEM_CHAINS[meta.id], transport: http(url) });
+    client = createPublicClient({ chain: VIEM_CHAINS[meta.id], transport: stateTransport(meta, url) });
     cache.set(meta.id, client);
   }
   return client;

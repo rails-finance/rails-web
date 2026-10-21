@@ -67,7 +67,7 @@ export type AaveV3ArbitrumTimelineRow = AaveV3IndexRow;
  *  fields are null where the server has not reached them. */
 export interface AaveV3ArbitrumTimelineCoverage {
   /** Where the body of the history came from. */
-  source: "etherscan" | "tenderly";
+  source: "etherscan" | "tenderly" | "alchemy";
   status: "unconfirmed" | "confirmed" | "disputed";
   /** The newest block the body covers. */
   bodyThroughBlock: number | null;
@@ -125,7 +125,7 @@ export function readTimelineAnswer<Row = AaveV3ArbitrumTimelineRow>(
   const r = raw as Record<string, unknown>;
   const c = r.coverage as Record<string, unknown> | undefined;
   if (!Array.isArray(r.rows) || !c || typeof c !== "object") return null;
-  if (c.source !== "etherscan" && c.source !== "tenderly") return null;
+  if (c.source !== "etherscan" && c.source !== "tenderly" && c.source !== "alchemy") return null;
   if (c.status !== "unconfirmed" && c.status !== "confirmed" && c.status !== "disputed") return null;
   const gaps = Array.isArray(c.gaps)
     ? (c.gaps as { fromBlock?: unknown; toBlock?: unknown; reason?: unknown }[]).flatMap((g) => {
@@ -172,7 +172,7 @@ export function readTimelineAnswer<Row = AaveV3ArbitrumTimelineRow>(
  *  has queued one. */
 export interface AaveV3ArbitrumPositionHistory {
   status: "unconfirmed" | "confirmed" | "disputed";
-  bodySource: "etherscan" | "tenderly" | null;
+  bodySource: "etherscan" | "tenderly" | "alchemy" | null;
   confirmedThroughBlock: number | null;
   validatedAt: string | null;
   droppedCount: number;
@@ -234,7 +234,10 @@ export function readPositionsAnswer(raw: unknown): AaveV3ArbitrumPositionsRespon
       h && (status === "unconfirmed" || status === "confirmed" || status === "disputed")
         ? {
             status,
-            bodySource: h.bodySource === "etherscan" || h.bodySource === "tenderly" ? h.bodySource : null,
+            bodySource:
+              h.bodySource === "etherscan" || h.bodySource === "tenderly" || h.bodySource === "alchemy"
+                ? h.bodySource
+                : null,
             confirmedThroughBlock: block(h.confirmedThroughBlock),
             validatedAt: str(h.validatedAt),
             droppedCount: block(h.droppedCount) ?? 0,

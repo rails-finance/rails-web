@@ -46,6 +46,11 @@ export interface ChainMeta {
    *  (`rails-base-backfill` for history, the site's own app for state). A chain
    *  whose one app serves both simply names the same var twice. */
   logsRpcEnv: string;
+  /** Optional server env var holding a second JSON-RPC URL for the state reads.
+   *  When set, `chainClient` tries `rpcEnv` first and falls to this URL for a
+   *  call the first one refused or did not answer. Absent on every chain but
+   *  Arbitrum. */
+  fallbackRpcEnv?: string;
   /** A test network. Absent (false) on every production chain. Surfaces that
    *  state figures as money read this to say "testnet" once, where a reader
    *  would otherwise take a Sepolia balance for a real one. */
@@ -84,6 +89,8 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     explorerBase: "https://arbiscan.io",
     rpcEnv: "ARBITRUM_RPC_URL",
     logsRpcEnv: "ARBITRUM_LOGS_RPC_URL",
+    // The Alchemy Arbitrum app; the Tenderly gateway in `rpcEnv` answers first.
+    fallbackRpcEnv: "ARBITRUM_FALLBACK_RPC_URL",
   },
   11155111: {
     id: 11155111,

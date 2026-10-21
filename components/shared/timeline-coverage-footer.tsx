@@ -214,7 +214,7 @@ function ConfirmationLine({
   blockLink: (b: number) => React.ReactNode;
   txLink: (hash: string) => string;
 }) {
-  const body = source === "tenderly" ? "Tenderly" : "Etherscan";
+  const body = source === "tenderly" ? "Tenderly" : source === "alchemy" ? "Alchemy" : "Etherscan";
   const withheld = "The highest balances, the lifetime flows and the interest figures wait for that check.";
   if (confirmation.status === "confirmed")
     return (
@@ -230,7 +230,7 @@ function ConfirmationLine({
     const n = confirmation.droppedCount;
     return (
       <p className="mb-1.5" data-history-confirmation="disputed">
-        <span className="text-foreground">History body from {body}, disputed.</span> Etherscan returned{" "}
+        <span className="text-foreground">History body from {body}, disputed.</span> {body} returned{" "}
         {n.toLocaleString("en-US")} {n === 1 ? "log" : "logs"} that no chain witness did, and{" "}
         {n === 1 ? "it is" : "they are"} left off this list
         {confirmation.dropped.length > 0 && (

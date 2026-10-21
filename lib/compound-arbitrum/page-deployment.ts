@@ -32,7 +32,8 @@ export const COMPOUND_ARBITRUM_PAGE: CompoundPageDeployment = {
   askIndexAgain: false,
   askUntilWhole: true,
   balanceRead: "absent",
-  captureSourceOf: (coverage) => (coverage?.source === "tenderly" ? "tenderly" : "etherscan"),
+  captureSourceOf: (coverage) =>
+    coverage?.source === "tenderly" || coverage?.source === "alchemy" ? coverage.source : "etherscan",
   wholeOf: compoundArbitrumWholeLife,
   vocab: () => COMPOUND_ARBITRUM_VOCABULARY,
   lane: { chainId: COMPOUND_ARBITRUM_CHAIN_ID },

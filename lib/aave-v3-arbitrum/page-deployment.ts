@@ -38,7 +38,8 @@ export const AAVE_V3_ARBITRUM_PAGE: AaveV3PoolPageDeployment = {
   key: "aave-v3-arbitrum",
   flows: { family: "aave-v3-arbitrum", chainId: AAVE_V3_ARBITRUM_CHAIN_ID, routeless: true, noDailyStore: true },
   writeOff: { firstBlock: AAVE_V3_ARBITRUM_FIRST_WRITE_OFF_BLOCK, chain: "Arbitrum" },
-  captureSourceOf: (coverage) => (coverage?.source === "tenderly" ? "tenderly" : "etherscan"),
+  captureSourceOf: (coverage) =>
+    coverage?.source === "tenderly" || coverage?.source === "alchemy" ? coverage.source : "etherscan",
   wholeOf: aaveV3ArbitrumWholeLife,
   flowsNeedWhole: true,
   words: {

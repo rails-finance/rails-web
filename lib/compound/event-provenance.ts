@@ -35,6 +35,7 @@ const COMET_SWEEP_VIA = "live chunked eth_getLogs sweep of the Comet's own logs"
 // witness has confirmed it.
 const COMET_ETHERSCAN_VIA = "rails-server store of the Comets' logs, body from Etherscan's log index";
 const COMET_TENDERLY_VIA = "rails-server store of the Comets' logs, body from Tenderly's archive";
+const COMET_ALCHEMY_VIA = "rails-server store of the Comets' logs, body from Alchemy's archive";
 const captureVia = (coords?: CompoundCoords): string =>
   coords?.source === "sweep"
     ? COMET_SWEEP_VIA
@@ -42,7 +43,9 @@ const captureVia = (coords?: CompoundCoords): string =>
       ? COMET_ETHERSCAN_VIA
       : coords?.source === "tenderly"
         ? COMET_TENDERLY_VIA
-        : COMET_INDEX_VIA;
+        : coords?.source === "alchemy"
+          ? COMET_ALCHEMY_VIA
+          : COMET_INDEX_VIA;
 
 export interface CompoundCoords {
   txHash?: string;
@@ -52,7 +55,7 @@ export interface CompoundCoords {
   chainId?: ChainId;
   /** How the decoded log reached the page: the rails-server index (default),
    *  a live sweep of the Comet's logs run for this request (the Base lane), or
-   *  the Arbitrum lane's per-wallet store ("etherscan" | "tenderly"). */
+   *  the Arbitrum lane's per-wallet store ("etherscan" | "tenderly" | "alchemy"). */
   source?: CaptureSource;
   /** The Comet proxy address for this market — the contract every value cites. */
   comet?: string;

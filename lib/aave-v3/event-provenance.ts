@@ -60,6 +60,7 @@ const V3_SWEEP_VIA = "live chunked eth_getLogs sweep of the Pool's own logs";
 // witness has confirmed it.
 const V3_ETHERSCAN_VIA = "rails-server store of the Pool's logs, body from Etherscan's log index";
 const V3_TENDERLY_VIA = "rails-server store of the Pool's logs, body from Tenderly's archive";
+const V3_ALCHEMY_VIA = "rails-server store of the Pool's logs, body from Alchemy's archive";
 
 const captureVia = (coords?: V3Coords): string =>
   coords?.source === "sweep"
@@ -68,7 +69,9 @@ const captureVia = (coords?: V3Coords): string =>
       ? V3_ETHERSCAN_VIA
       : coords?.source === "tenderly"
         ? V3_TENDERLY_VIA
-        : V3_INDEX_VIA;
+        : coords?.source === "alchemy"
+          ? V3_ALCHEMY_VIA
+          : V3_INDEX_VIA;
 
 export interface V3Coords {
   txHash?: string;

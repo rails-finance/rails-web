@@ -45,6 +45,8 @@ const { fetchChainTimeline, ChainTimelineOverBudget, ChainTimelineUnavailable } 
   ROOT + "lib/api/fetch-chain-timeline.ts"
 );
 const { readTimelineAnswer } = await import(ROOT + "lib/aave-v3-arbitrum/api-contract.ts");
+const { chainClient } = await import(ROOT + "lib/sources/chain/rpc.ts");
+const { CHAINS } = await import(ROOT + "lib/shared/chains.ts");
 const { readerHopHeaders } = await import(ROOT + "lib/api/reader-ip.ts");
 const { loadAaveV3ArbitrumTimeline } = await import(ROOT + "lib/sources/api/aave-v3-arbitrum-timeline.ts");
 const { loadCompoundArbitrumTimeline } = await import(ROOT + "lib/sources/api/compound-arbitrum-timeline.ts");
@@ -193,4 +195,69 @@ test("readTimelineAnswer: coverage.throughBlock parses when present and is absen
   const without = readTimelineAnswer(body({}));
   assert.ok(without);
   assert.equal("throughBlock" in without.coverage, false);
+});
+
+// ── item 29: the Alchemy fallback, and the third body source ─────────────────
+
+const BASE_COVERAGE = { status: "unconfirmed", gaps: [] };
+
+test("readTimelineAnswer: accepts source alchemy, still rejects an unknown source", () => {
+  const answer = (source) => ({ rows: [], coverage: { ...BASE_COVERAGE, source } });
+  for (const source of ["etherscan", "tenderly", "alchemy"]) {
+    const got = readTimelineAnswer(answer(source));
+    assert.ok(got, `${source} is read`);
+    assert.equal(got.coverage.source, source);
+  }
+  assert.equal(readTimelineAnswer(answer("infura")), null);
+});
+
+test("chains: only Arbitrum declares a fallback endpoint", () => {
+  assert.equal(CHAINS[42161].fallbackRpcEnv, "ARBITRUM_FALLBACK_RPC_URL");
+  for (const id of [1, 8453, 11155111]) assert.equal(CHAINS[id].fallbackRpcEnv, undefined);
+});
+
+/** Answers each URL by table: a status code, or a JSON-RPC result. Returns the
+ *  URLs hit, in order. */
+function stubRpc(table) {
+  const hits = [];
+  test.mock.method(globalThis, "fetch", async (url) => {
+    hits.push(String(url));
+    const a = table[String(url)];
+    if (a instanceof Error) throw a;
+    if (typeof a === "number") return new Response("no", { status: a });
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: a }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  return hits;
+}
+
+test("chainClient(42161): a primary refusal falls to the fallback for that call", async () => {
+  process.env.ARBITRUM_RPC_URL = "https://primary.example/arb";
+  process.env.ARBITRUM_FALLBACK_RPC_URL = "https://fallback.example/arb";
+  for (const failure of [429, 503, new TypeError("fetch failed")]) {
+    const hits = stubRpc({
+      "https://primary.example/arb": failure,
+      "https://fallback.example/arb": "0x2a",
+    });
+    const n = await chainClient(42161).request({ method: "eth_chainId" });
+    assert.equal(n, "0x2a");
+    assert.deepEqual(hits, ["https://primary.example/arb", "https://fallback.example/arb"]);
+    test.mock.restoreAll();
+    test.mock.method(console, "error", () => {});
+  }
+});
+
+test("chainClient(42161): a healthy primary is the only endpoint asked", async () => {
+  const hits = stubRpc({ "https://primary.example/arb": "0x2b", "https://fallback.example/arb": "0x2a" });
+  assert.equal(await chainClient(42161).request({ method: "eth_chainId" }), "0x2b");
+  assert.deepEqual(hits, ["https://primary.example/arb"]);
+});
+
+test("chainClient(1): no fallback, the one endpoint only", async () => {
+  process.env.ALCHEMY_URL = "https://eth.example/key";
+  const hits = stubRpc({ "https://eth.example/key": 503 });
+  await assert.rejects(chainClient(1).request({ method: "eth_chainId" }));
+  assert.ok(hits.length >= 1 && hits.every((u) => u === "https://eth.example/key"));
 });

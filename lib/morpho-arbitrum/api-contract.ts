@@ -100,7 +100,7 @@ export type MorphoArbitrumTimelineRow = MorphoIndexRow & { receiver?: string | n
 /** A visited wallet's history state; null before a visit has queued one. */
 export interface MorphoArbitrumPositionHistory {
   status: "unconfirmed" | "confirmed" | "disputed";
-  bodySource: "etherscan" | "tenderly" | null;
+  bodySource: "etherscan" | "tenderly" | "alchemy" | null;
   confirmedThroughBlock: number | null;
   validatedAt: string | null;
   droppedCount: number;
@@ -163,7 +163,10 @@ export function readPositionsAnswer(raw: unknown): MorphoArbitrumPositionsRespon
       h && (status === "unconfirmed" || status === "confirmed" || status === "disputed")
         ? {
             status,
-            bodySource: h.bodySource === "etherscan" || h.bodySource === "tenderly" ? h.bodySource : null,
+            bodySource:
+              h.bodySource === "etherscan" || h.bodySource === "tenderly" || h.bodySource === "alchemy"
+                ? h.bodySource
+                : null,
             confirmedThroughBlock: num(h.confirmedThroughBlock),
             validatedAt: str(h.validatedAt),
             droppedCount: num(h.droppedCount) ?? 0,

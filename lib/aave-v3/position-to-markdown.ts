@@ -119,7 +119,7 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
   const { wallet, marketName, view, chain, captions, events, generatedAt } = args;
   // The Arbitrum store's rows replay the same way a sweep's do, over balances
   // read live from the tokens; only where the logs came from differs.
-  const stored = args.source === "etherscan" || args.source === "tenderly";
+  const stored = args.source === "etherscan" || args.source === "tenderly" || args.source === "alchemy";
   const swept = args.source === "sweep" || stored;
   const protocolName = args.protocolName ?? "Aave V3";
   const lines: string[] = [];
