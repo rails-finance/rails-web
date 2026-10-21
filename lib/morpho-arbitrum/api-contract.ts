@@ -129,6 +129,9 @@ export interface MorphoArbitrumPositionRow {
    *  wallet no discovery named. Optional on the wire until rails-server
    *  sends it (rails-ops TO-DO-arbitrum-scoping.md item 16). */
   lastActivityBlock: number | null;
+  /** The wallet's distinct transactions over its recorded history; null
+   *  until rails-server sends it. */
+  txCount?: number | null;
   history: MorphoArbitrumPositionHistory | null;
 }
 
@@ -185,6 +188,7 @@ export function readPositionsAnswer(raw: unknown): MorphoArbitrumPositionsRespon
         lastVisitedAt: str(p.lastVisitedAt),
         visitCount: num(p.visitCount) ?? 0,
         lastActivityBlock: num(p.lastActivityBlock),
+        txCount: num(p.txCount),
         history,
       },
     ];
