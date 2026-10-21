@@ -21,6 +21,10 @@
 //   • History — Challenged before / Challenge succeeded (the orthogonal
 //     flags): open SURVIVORS match too — a challenged position can survive
 //     its auction.
+//   • Size    — the Debt range alone, in ZCHF (`minDebt` / `maxDebt` over
+//     the position's minted amount; lib/shared/size-dimensions.ts).
+//     Frankencoin states no market price for collateral, so the panel draws
+//     no Collateral range.
 //   • Transactions — a range over the position's distinct transactions
 //     (`minTx` / `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
 //   • Owner search (the `q` box → the `owner` param — "this owner's
@@ -33,6 +37,7 @@
 // chips from.
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -53,6 +58,13 @@ export const FRANKENCOIN_ITEMS_PER_PAGE = 20;
  *  (64 transactions, 20 Oct 2026). */
 const FRANKENCOIN_TX_TOP = 100;
 
+/** The Debt slider's top: the round number above the biggest position's
+ *  minted amount (6,000,000 ZCHF in mv_frankencoin_positions, 21 Oct 2026). */
+const FRANKENCOIN_SIZE_TOP = 10_000_000;
+
+/** The Size panel's unit line. */
+const FRANKENCOIN_SIZE_NOTE = "Debt in ZCHF; Frankencoin states no market price for collateral.";
+
 export interface FrankencoinListFilters extends BaseListFilters {
   /** open / closed / denied — multi (OR); the API's whole vocabulary. */
   status: string[];
@@ -61,6 +73,9 @@ export interface FrankencoinListFilters extends BaseListFilters {
   /** "" | "challenged" | "challenge-succeeded" — the orthogonal challenge
    *  axis (open survivors included). */
   challenges: string[];
+  /** Debt range in ZCHF, one encodeRange value (`1000-50000`, `-0` for no
+   *  debt) or [] for no bound. URL param `debt`. */
+  debt: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
 }
@@ -77,6 +92,7 @@ export const FRANKENCOIN_LIST_DEFAULTS: FrankencoinListFilters = {
   status: [],
   hub: [],
   challenges: [],
+  debt: [],
   tx: [],
 };
 
@@ -143,6 +159,16 @@ export function frankencoinListDimensions(): SerializableDimension<FrankencoinLi
       get: (f) => f.challenges,
       set: (f, v) => ({ ...f, challenges: v }),
     },
+    ...sizeDimensions<FrankencoinListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: () => [],
+      setColl: (f) => f,
+      panelNote: FRANKENCOIN_SIZE_NOTE,
+      top: FRANKENCOIN_SIZE_TOP,
+      sides: ["debt"],
+      debtUnit: "ZCHF",
+    }),
     transactionsDimension<FrankencoinListFilters>({
       get: (f) => f.tx,
       set: (f, tx) => ({ ...f, tx }),
@@ -170,6 +196,7 @@ export function frankencoinFiltersToFetchParams(
     hub: hub === "v1" || hub === "v2" ? hub : undefined,
     everChallenged: filters.challenges.includes("challenged") ? true : undefined,
     challengeSucceeded: filters.challenges.includes("challenge-succeeded") ? true : undefined,
+    ...sizeBounds(filters, { debt: "unit" }),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as FrankencoinPositionSort,
     sortOrder: filters.sortOrder,

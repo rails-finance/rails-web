@@ -52,8 +52,8 @@ export async function readFrankencoinPositions(
   if (sp.get("hub")) qs.set("hub", sp.get("hub")!);
   if (sp.get("everChallenged")) qs.set("everChallenged", sp.get("everChallenged")!);
   if (sp.get("challengeSucceeded")) qs.set("challengeSucceeded", sp.get("challengeSucceeded")!);
-  // A transaction-count bound is forwarded only as a whole number.
-  for (const k of ["minTx", "maxTx"]) {
+  // A transaction-count or ZCHF debt bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx", "minDebt", "maxDebt"]) {
     const v = sp.get(k);
     if (v != null && /^\d+$/.test(v)) qs.set(k, v);
   }

@@ -32,6 +32,9 @@ export interface FetchFrankencoinPositionsParams {
   /** Inclusive bounds on the position's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
+  /** Inclusive bounds on the position's minted amount in ZCHF; either alone. */
+  minDebt?: number;
+  maxDebt?: number;
   sortBy?: FrankencoinPositionSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -60,6 +63,8 @@ export async function fetchFrankencoinPositions(
   if (p.challengeSucceeded != null) qs.set("challengeSucceeded", String(p.challengeSucceeded));
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
+  if (p.minDebt != null) qs.set("minDebt", String(p.minDebt));
+  if (p.maxDebt != null) qs.set("maxDebt", String(p.maxDebt));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));
