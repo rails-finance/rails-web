@@ -5,7 +5,10 @@
 // and the two asset sides (Credit advanced, Collateral locked),
 // their option lists derived from the loans actually present. All chain-state — the
 // replayed status and the named loan assets. No CR/USD facet: a fixed-term P2P loan
-// has no health factor or oracle price. Transactions is a range over the loan's
+// has no health factor or oracle price. Size is one Debt range in the loan's
+// credit asset (lib/shared/size-dimensions.ts), matched against the credit
+// amount scaled by the asset's decimals; a loan whose credit decimals did not
+// load has no figure and falls out of any bound. Transactions is a range over the loan's
 // distinct transactions (lib/shared/transactions-dimension.ts), matched here
 // against `txCount`. The shared ListToolbar / applyListFilter
 // render and run this. Twin patterns in lib/morpho + lib/liquity-v1.
@@ -13,6 +16,7 @@
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { decodeRange, defaultChipLabel, type FilterOptionDef } from "@/components/shared/filter-bar/types";
 import { transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { rangeAdmits, sizeDimensions } from "@/lib/shared/size-dimensions";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -30,6 +34,8 @@ export interface PwnListFilters extends BaseListFilters {
   status: string[];
   credit: string[];
   collateral: string[];
+  /** Debt range in the credit asset, one encodeRange value or [] for no bound. */
+  debt: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
 }
@@ -37,6 +43,20 @@ export interface PwnListFilters extends BaseListFilters {
 /** The Transactions slider's top: the round number above the busiest loan
  *  (7 transactions, 20 Oct 2026). */
 const PWN_TX_TOP = 10;
+
+/** The Debt slider's top, in credit-asset units: the round number above the
+ *  largest loan (49,999 OLAS, 21 Oct 2026). */
+const PWN_DEBT_TOP = 50_000;
+
+const PWN_SIZE_NOTE = "Debt in the loan's credit asset.";
+
+/** The credit advanced, in whole units of the credit asset; null for an
+ *  asset that is not an ERC-20 or whose decimals did not load. */
+function creditFigure(row: PwnPositionSummary): number | null {
+  const c = row.credit;
+  if (!c || c.category !== "ERC20" || c.decimalsUnread) return null;
+  return c.amount;
+}
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
 // listing-visibility.ts resolves it per context — the open loans on the bare directory, every
@@ -50,6 +70,7 @@ export const PWN_LIST_DEFAULTS: PwnListFilters = {
   status: [],
   credit: [],
   collateral: [],
+  debt: [],
   tx: [],
 };
 
@@ -167,6 +188,16 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
       set: (f, v) => ({ ...f, collateral: v }),
       matches: (row, v) => (row.collateral ? v.includes(row.collateral.symbol) : false),
     },
+    ...sizeDimensions<PwnListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: () => [],
+      setColl: (f) => f,
+      sides: ["debt"],
+      debtUnit: "credit asset",
+      top: PWN_DEBT_TOP,
+      panelNote: PWN_SIZE_NOTE,
+    }).map((d) => ({ ...d, matches: (row: PwnPositionSummary, v: string[]) => rangeAdmits(v, creditFigure(row)) })),
     {
       ...transactionsDimension<PwnListFilters>({
         get: (f) => f.tx,

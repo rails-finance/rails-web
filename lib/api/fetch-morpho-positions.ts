@@ -32,6 +32,12 @@ export interface FetchMorphoPositionsParams {
   hasDebt?: boolean;
   noDebt?: boolean;
   hasLiquidations?: boolean;
+  /** Inclusive bounds on the position's debt (and, on Base, collateral) in
+   *  whole units of the market's loan token; either alone. */
+  minDebt?: number;
+  maxDebt?: number;
+  minColl?: number;
+  maxColl?: number;
   /** Inclusive bounds on the position's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
@@ -67,6 +73,9 @@ export async function fetchMorphoPositions(p: FetchMorphoPositionsParams): Promi
   if (p.hasDebt) qs.set("hasDebt", "true");
   if (p.noDebt) qs.set("noDebt", "true");
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
+  for (const k of ["minDebt", "maxDebt", "minColl", "maxColl"] as const) {
+    if (p[k] != null) qs.set(k, String(p[k]));
+  }
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.sortBy) qs.set("sortBy", p.sortBy);

@@ -7,7 +7,14 @@
 //
 // Facets that ship LIVE (backend + proxy honor the params):
 //   • Status     — open / closed (lifecycle over mv_fluid_positions).
-//   • Position   — Borrowing (hasDebt) / Collateral only (noDebt).
+//   • Size       — a Debt range in the vault's borrow token
+//     (lib/shared/size-dimensions.ts), sent as minDebt / maxDebt. A smart
+//     vault with no single borrow token has no figure and sits outside any
+//     bound. There is no Collateral range: the listing reads no price for it.
+//     The Debt range replaces the old Position dropdown: `?state=borrowing`
+//     reads as at least 1 and `?state=collateral-only` as 0, and those two
+//     exact ranges also send the old hasDebt / noDebt flags, which say the same
+//     thing to a server that predates the unit bounds.
 //   • History    — Liquidated before / Never liquidated (wasLiquidated).
 //   • Vault kind — Standard pairs (T1) / Smart vaults (DEX-share legs).
 //   • Transactions — a range over the position's distinct transactions
@@ -16,6 +23,7 @@
 //     param — positions are NFTs) and the four sort orders.
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -36,11 +44,19 @@ export const FLUID_ITEMS_PER_PAGE = 20;
  *  (1,468 events, 20 Oct 2026). */
 const FLUID_TX_TOP = 2000;
 
+/** The Debt slider's top, in borrow-token units: the round number above the
+ *  largest debt (19,768,582 USDT, 21 Oct 2026). */
+const FLUID_DEBT_TOP = 20_000_000;
+
+const FLUID_SIZE_NOTE =
+  "Debt in the vault's borrow token; smart vaults with no single borrow token sit outside any bound.";
+
 export interface FluidListFilters extends BaseListFilters {
   /** open / closed — multi (OR). Lifecycle over mv_fluid_positions. */
   status: string[];
-  /** "" | "borrowing" | "collateral-only" — the debt-side of the position. */
-  state: string[];
+  /** Debt range in the borrow token, one encodeRange value or [] for no
+   *  bound. URL param `debt`, read from the old `state` too. */
+  debt: string[];
   /** "" | "liquidated" | "never" — the wasLiquidated flag (orthogonal history). */
   liquidations: string[];
   /** "" | "t1" | "smart" — plain token pairs vs DEX-share-legged smart vaults. */
@@ -59,7 +75,7 @@ export const FLUID_LIST_DEFAULTS: FluidListFilters = {
   sortBy: "lastActivity",
   sortOrder: "desc",
   status: [],
-  state: [],
+  debt: [],
   liquidations: [],
   vaultKind: [],
   tx: [],
@@ -75,11 +91,6 @@ export const FLUID_SORT_OPTIONS: SortOption[] = [
 const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
-];
-
-const STATE_OPTIONS: FilterOptionDef[] = [
-  { value: "borrowing", label: "Borrowing" },
-  { value: "collateral-only", label: "Collateral only" },
 ];
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [
@@ -110,16 +121,17 @@ export function fluidListDimensions(): SerializableDimension<FluidListFilters>[]
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
     },
-    {
-      id: "state",
-      label: "Position",
-      group: "Position",
-      cardinality: "single",
-      param: "state",
-      options: STATE_OPTIONS,
-      get: (f) => f.state,
-      set: (f, v) => ({ ...f, state: v }),
-    },
+    ...sizeDimensions<FluidListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: () => [],
+      setColl: (f) => f,
+      sides: ["debt"],
+      debtUnit: "borrow token",
+      debtAliases: ["state"],
+      top: FLUID_DEBT_TOP,
+      panelNote: FLUID_SIZE_NOTE,
+    }),
     {
       id: "vaultKind",
       label: "Vault kind",
@@ -153,7 +165,6 @@ const SORT_VALUES = new Set(FLUID_SORT_OPTIONS.map((o) => o.value));
 /** Map the decoded selection + page onto the fetch params — the server-driven
  *  counterpart of the in-memory tier's ApplyConfig. */
 export function fluidFiltersToFetchParams(filters: FluidListFilters, page: number): FetchFluidPositionsParams {
-  const state = filters.state[0];
   const liq = filters.liquidations[0];
   const kind = filters.vaultKind[0];
   // Positions are NFTs: a bare integer looks up the NFT id, anything else the
@@ -164,8 +175,10 @@ export function fluidFiltersToFetchParams(filters: FluidListFilters, page: numbe
     nft: q && /^\d+$/.test(q) ? q : undefined,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
-    hasDebt: state === "borrowing" ? true : undefined,
-    noDebt: state === "collateral-only" ? true : undefined,
+    // The old Position dropdown's flags for the two Debt ranges it maps to.
+    hasDebt: filters.debt[0] === "1-" ? true : undefined,
+    noDebt: filters.debt[0] === "-0" ? true : undefined,
+    ...sizeBounds(filters, { debt: "unit" }),
     wasLiquidated: liq === "liquidated" ? true : liq === "never" ? false : undefined,
     vaultKind: kind === "t1" || kind === "smart" ? kind : undefined,
     ...transactionBounds(filters.tx),

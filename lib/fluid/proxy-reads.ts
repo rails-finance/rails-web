@@ -62,8 +62,8 @@ export async function readFluidPositions(
     const v = sp.get(key);
     if (v != null && v !== "") qs.set(key, v);
   }
-  // A transaction-count bound is forwarded only as a whole number.
-  for (const k of ["minTx", "maxTx"]) {
+  // A transaction-count or debt bound is forwarded only as a whole number.
+  for (const k of ["minTx", "maxTx", "minDebt", "maxDebt"]) {
     const v = sp.get(k);
     if (v != null && /^\d+$/.test(v)) qs.set(k, v);
   }

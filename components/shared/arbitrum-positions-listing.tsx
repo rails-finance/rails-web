@@ -36,6 +36,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { BaseListFilters, ListDimension } from "@/lib/shared/list-filter";
 import { rangeAdmits, sizeDimensions } from "@/lib/shared/size-dimensions";
+import { transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import type { CensusFigures } from "@/lib/home/census-leg";
@@ -80,6 +81,10 @@ export interface ArbitrumReadRow {
   lastActivityBlock?: number | null;
   /** Compound only: the stored visit's Comets; absent until the server sends it. */
   markets?: CompoundArbitrumVisitMarket[];
+  /** The wallet's distinct transactions on the protocol, over its recorded
+   *  history; absent or null until the server sends it, and such a row falls
+   *  out of any Transactions bound. */
+  txCount?: number | null;
 }
 
 type Card = ListingCard<ArbitrumReadRow>;
@@ -88,6 +93,9 @@ export type ArbitrumPositionsFamily = "aave-v3" | "compound-v3" | "morpho";
 
 interface FamilyConfig {
   session: SessionProtocol;
+  /** The Transactions slider's top: the round number above the busiest
+   *  wallet's distinct transactions over its `<family>_arbitrum_history`. */
+  txTop: number;
   /** The receipt for a stored dollar total, or the health factor. */
   receipt: (what: string, row: ArbitrumReadRow) => Provenance;
 }
@@ -98,6 +106,8 @@ const RECORDED = "recorded by rails-server when the wallet's page was opened";
 const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   "aave-v3": {
     session: "aave-v3-arbitrum",
+    // 8,707 transactions, 21 Oct 2026.
+    txTop: 10000,
     receipt: (what, row) => ({
       kind: "chain",
       pclass: "state",
@@ -116,6 +126,8 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   },
   "compound-v3": {
     session: "compound-v3-arbitrum",
+    // 5,033 transactions, 21 Oct 2026.
+    txTop: 10000,
     receipt: (what, row) => ({
       kind: "chain-derived",
       pclass: "state",
@@ -128,6 +140,8 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
   },
   morpho: {
     session: "morpho-arbitrum",
+    // 10,361 transactions, 21 Oct 2026.
+    txTop: 20000,
     receipt: (what, row) => ({
       kind: "chain-derived",
       pclass: "state",
@@ -149,9 +163,18 @@ interface ArbitrumPositionsFilters extends BaseListFilters {
   /** Collateral-plus-supply range in USD, as `debt`; read from the old
    *  `size` bracket too. */
   coll: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
-const DEFAULTS: ArbitrumPositionsFilters = { q: "", sortBy: "activity", sortOrder: "desc", debt: [], coll: [] };
+const DEFAULTS: ArbitrumPositionsFilters = {
+  q: "",
+  sortBy: "activity",
+  sortOrder: "desc",
+  debt: [],
+  coll: [],
+  tx: [],
+};
 
 const SORTS: SortOption[] = [
   { value: "activity", label: "Last activity" },
@@ -178,8 +201,10 @@ const collateralRangeOf = (c: Card): number | null => {
 const SIZE_NOTE = "At each protocol's own oracle at the row's read block.";
 
 /** The Size panel over the cards: Debt, and Collateral as collateral plus
- *  supply. The old `?size=1000` bracket reads as `coll=1000-`. */
-function dimensions(): ListDimension<ArbitrumPositionsFilters, Card>[] {
+ *  supply. The old `?size=1000` bracket reads as `coll=1000-`. Then the
+ *  Transactions range over the wallet's `txCount`; a wallet's Comet cards
+ *  share its count. */
+function dimensions(txTop: number): ListDimension<ArbitrumPositionsFilters, Card>[] {
   const [debt, coll] = sizeDimensions<ArbitrumPositionsFilters>({
     getDebt: (f) => f.debt,
     setDebt: (f, d) => ({ ...f, debt: d }),
@@ -199,8 +224,23 @@ function dimensions(): ListDimension<ArbitrumPositionsFilters, Card>[] {
         ),
       matches: (c, v) => rangeAdmits(v, collateralRangeOf(c)),
     },
+    {
+      ...transactionsDimension<ArbitrumPositionsFilters>({
+        get: (f) => f.tx,
+        set: (f, tx) => ({ ...f, tx }),
+        top: txTop,
+      }),
+      matches: (c, v) => rangeAdmits(v, c.row.txCount),
+    },
   ];
 }
+
+/** One registry per family, so each keeps one function across renders. */
+const DIMENSIONS: Record<ArbitrumPositionsFamily, () => ListDimension<ArbitrumPositionsFilters, Card>[]> = {
+  "aave-v3": () => dimensions(FAMILIES["aave-v3"].txTop),
+  "compound-v3": () => dimensions(FAMILIES["compound-v3"].txTop),
+  morpho: () => dimensions(FAMILIES.morpho.txTop),
+};
 
 const APPLY = {
   search: (c: Card, q: string) => c.row.wallet.includes(q),
@@ -467,7 +507,7 @@ export function ArbitrumPositionsListing({
         strategy={memoryStrategy<Card, ArbitrumPositionsFilters>({
           // The server page reads the store; the rows arrive with the render.
           fetchAll: async () => cards,
-          dimensions,
+          dimensions: DIMENSIONS[family],
           apply: APPLY,
         })}
         initialItems={cards}

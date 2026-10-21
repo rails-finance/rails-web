@@ -199,6 +199,9 @@ export interface AaveV3ArbitrumPositionRow {
    *  wallet no discovery named. Optional on the wire until rails-server
    *  sends it (rails-ops TO-DO-arbitrum-scoping.md item 16). */
   lastActivityBlock: number | null;
+  /** The wallet's distinct transactions over its recorded history; null
+   *  until rails-server sends it. */
+  txCount?: number | null;
   history: AaveV3ArbitrumPositionHistory | null;
 }
 
@@ -253,6 +256,7 @@ export function readPositionsAnswer(raw: unknown): AaveV3ArbitrumPositionsRespon
         lastVisitedAt: str(p.lastVisitedAt),
         visitCount: block(p.visitCount) ?? 0,
         lastActivityBlock: block(p.lastActivityBlock),
+        txCount: block(p.txCount),
         history,
       },
     ];

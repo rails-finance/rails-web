@@ -24,6 +24,11 @@
 //     ids: USDC alone is the loan token of ~503 markets, and a market-id CSV for
 //     it would be a 33 KB query string. A symbol can name more than one
 //     contract, so every address under it is sent.
+//   • Size: Debt        → `minDebt` / `maxDebt`, inclusive bounds on the
+//     position's debt in whole units of its market's loan token
+//     (lib/shared/size-dimensions.ts). There is no Collateral range: the `coll`
+//     param is the collateral-asset facet, and the listing reads no price to
+//     put collateral in the loan token.
 //   • Transactions      → `minTx` / `maxTx`, inclusive bounds on the position's
 //     distinct transactions (lib/shared/transactions-dimension.ts).
 //   • A wallet address in the search box → `user`; a 64-hex id → `market`.
@@ -44,6 +49,7 @@ import type { FetchMorphoPositionsParams } from "@/lib/api/fetch-morpho-position
 import type { MorphoMarketRosterEntry, MorphoMarketRosterResponse } from "@/lib/api/fetch-morpho-market-roster";
 import { shortMarketId } from "@/lib/morpho/asset-catalog";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import {
   canonicalStatuses,
   defaultStatuses,
@@ -68,6 +74,13 @@ export const MORPHO_MARKET_CSV_CAP = 150;
  *  (3,076 transactions, 16 Oct 2026). */
 const MORPHO_TX_TOP = 5000;
 
+/** The Debt slider's top, in loan-token units. Decimals sit in no table beside
+ *  mv_morpho_positions, so the figure is the largest stable's: 213,755,666 USR
+ *  borrowed in one position (USDC's largest is 164,575,288), 21 Oct 2026. */
+const MORPHO_DEBT_TOP = 250_000_000;
+
+const MORPHO_SIZE_NOTE = "Debt in the market's loan token; pick a loan token to compare like with like.";
+
 export interface MorphoListFilters extends BaseListFilters {
   status: string[];
   /** 0x-prefixed market ids, as a position row carries them. */
@@ -76,6 +89,8 @@ export interface MorphoListFilters extends BaseListFilters {
   loanAssets: string[];
   /** Collateral token symbols; mapped the same way. */
   collateralAssets: string[];
+  /** Debt range in the loan token, one encodeRange value or [] for no bound. */
+  debt: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
 }
@@ -93,6 +108,7 @@ export const MORPHO_LIST_DEFAULTS: MorphoListFilters = {
   markets: [],
   loanAssets: [],
   collateralAssets: [],
+  debt: [],
   tx: [],
 };
 
@@ -219,6 +235,16 @@ export function morphoListDimensions(
       set: (f, v) => ({ ...f, collateralAssets: v }),
       available: (f) => offered || f.collateralAssets.length > 0,
     },
+    ...sizeDimensions<MorphoListFilters>({
+      getDebt: (f) => f.debt,
+      setDebt: (f, debt) => ({ ...f, debt }),
+      getColl: () => [],
+      setColl: (f) => f,
+      sides: ["debt"],
+      debtUnit: "loan token",
+      top: MORPHO_DEBT_TOP,
+      panelNote: MORPHO_SIZE_NOTE,
+    }),
     transactionsDimension<MorphoListFilters>({
       get: (f) => f.tx,
       set: (f, tx) => ({ ...f, tx }),
@@ -350,6 +376,7 @@ export function morphoFiltersToFetchParams(
     user: target.wallet,
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
+    ...sizeBounds(filters, { debt: "unit" }),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as MorphoPositionSort,
     sortOrder: filters.sortOrder,
