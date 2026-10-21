@@ -3,7 +3,8 @@
 // sorts and pages the holders; the dimensions here carry a URL param and no
 // in-memory predicate.
 //
-// Facets: Status (open / closed, multi). The resting default is the open
+// Facets: Status (open / closed, multi) and Transactions (the holder's distinct
+// transactions, sent as minTx / maxTx). The resting default is the open
 // positions while browsing and both once the search names a wallet, so a
 // holder that has left still answers a lookup. Sorts: value (the default),
 // interest earned, last activity, events. Search: an address, or an ENS name
@@ -14,6 +15,13 @@ import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import { RECENT_ACTIVITY_LABEL } from "@/components/shared/filter-bar/sort-control";
 import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-filter";
 import type { SkyAsOf, SkyPosition, SkyPositionsPage } from "@/lib/sky-savings/types";
+import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
+
+/** The Transactions slider's top. The busiest holder is a router with 164,075
+ *  transactions and the 99th percentile is 279 (21 Oct 2026), so a top at the
+ *  busiest would leave every ordinary holder in the slider's first pixel. The
+ *  slider tops at 1,000 and a typed Max above it is honoured. */
+const SKY_TX_TOP = 1000;
 
 /** What the listing states about its counts: the last check and the
  *  contracts left out of the list. */
@@ -44,9 +52,11 @@ export const SKY_ITEMS_PER_PAGE = 20;
 
 export interface SkyListFilters extends BaseListFilters {
   status: string[];
+  /** Transaction-count range, one encodeRange value or [] for no bound. */
+  tx: string[];
 }
 
-export const SKY_LIST_DEFAULTS: SkyListFilters = { q: "", sortBy: "value", sortOrder: "desc", status: [] };
+export const SKY_LIST_DEFAULTS: SkyListFilters = { q: "", sortBy: "value", sortOrder: "desc", status: [], tx: [] };
 
 export const skySortOptions: SortOption[] = [
   { value: "value", label: "Value" },
@@ -101,6 +111,11 @@ export function skyListDimensions(): SerializableDimension<SkyListFilters>[] {
         return { ...f, status: sel.length === 0 || same ? [] : sel };
       },
     },
+    transactionsDimension<SkyListFilters>({
+      get: (f) => f.tx,
+      set: (f, tx) => ({ ...f, tx }),
+      top: SKY_TX_TOP,
+    }),
   ];
 }
 
@@ -142,6 +157,9 @@ export async function fetchSkyListingPage(
   qs.set("sortOrder", filters.sortOrder);
   qs.set("limit", String(SKY_ITEMS_PER_PAGE));
   qs.set("offset", String((page - 1) * SKY_ITEMS_PER_PAGE));
+  const { minTx, maxTx } = transactionBounds(filters.tx);
+  if (minTx != null) qs.set("minTx", String(minTx));
+  if (maxTx != null) qs.set("maxTx", String(maxTx));
   const search = parseSkySearch(filters.q);
   if (search.ens) {
     const address = await resolveEns(search.ens, baseUrl, signal);
