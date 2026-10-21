@@ -1,6 +1,6 @@
 "use client";
 
-// One open position on the wallet view (rails-ops decision 0050, step 2): the
+// One open position on the wallet view (rails-ops decision 0050, steps 2 and 3): the
 // family's listing card, drawn by the family's own listing component from its
 // listing row exactly as its listing draws it, inside one link to the
 // position's page (N2). The page adds the chain's name at the card's edge and
@@ -102,7 +102,12 @@ export const atRisk = (p: WalletPosition): boolean => (p.buffer != null && p.buf
 export function WalletPositionCard({ position: p }: { position: WalletPosition }) {
   const chain = chainMeta(p.chain).name;
   return (
-    <div data-wallet-position={p.positionId} data-family={p.family} data-chain={chain.toLowerCase()}>
+    <div
+      data-wallet-position={p.positionId}
+      data-family={p.family}
+      data-chain={chain.toLowerCase()}
+      data-head-read={p.headRead}
+    >
       <PositionCardEdgeContext.Provider value={{ chain, atRisk: atRisk(p) }}>
         <Link
           href={p.href}
@@ -114,11 +119,21 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
           <FamilyCard card={p.card} />
         </Link>
       </PositionCardEdgeContext.Provider>
-      {/* The Arbitrum cards carry their stored read's block in the card. */}
-      {!p.card.kind.endsWith("-arbitrum") && (p.readAtBlock != null || p.readAt != null) && (
+      {/* An Aave V3 Base account the chain has not been read for (open point 8). */}
+      {p.notRead ? (
         <div className="mt-1 flex justify-end pr-2">
-          <ReadStamp block={p.readAtBlock} at={p.readAt} />
+          <span className="text-[11px] font-medium text-rb-500" data-wallet-not-read="">
+            Not read
+          </span>
         </div>
+      ) : (
+        /* The Arbitrum cards carry their stored read's block in the card. */
+        !p.card.kind.endsWith("-arbitrum") &&
+        (p.readAtBlock != null || p.readAt != null) && (
+          <div className="mt-1 flex justify-end pr-2">
+            <ReadStamp block={p.readAtBlock} at={p.readAt} />
+          </div>
+        )
       )}
     </div>
   );

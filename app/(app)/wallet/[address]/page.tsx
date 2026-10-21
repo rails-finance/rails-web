@@ -1,18 +1,20 @@
 // One wallet's positions across the protocols and chains Rails reads —
 // /wallet/<address> (rails-ops decisions/0050-one-wallet-across-protocols-and-chains.md,
-// step 2: the page on preview, fanned out to each family's existing wallet
-// read). It spans chains, so it sits under no chain and no explorer rail.
+// step 3: one read, the read behind /api/chain/wallet/<address>,
+// lib/wallet/read-wallet.ts). It spans chains, so it sits under no chain and
+// no explorer rail.
 // `[address]` is a 0x address or an ENS name; a name, or an address in mixed
 // case, redirects to the lower-cased address.
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { WalletView } from "@/components/wallet/wallet-view";
-import { readWallet } from "@/lib/wallet/adapters";
+import { readWallet } from "@/lib/wallet/read-wallet";
+import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { resolveEnsAddress, resolveEnsNames } from "@/lib/ens/resolve-ens";
 
 export const dynamic = "force-dynamic";
-// The family timeout (8 s) sits under it.
+// The read's budget (8 s) sits under it.
 export const maxDuration = 30;
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -44,9 +46,9 @@ export default async function WalletPage({ params }: Props) {
   const address = typed.toLowerCase();
   if (address !== typed) redirect(`/wallet/${address}`);
 
-  const [results, names] = await Promise.all([
-    readWallet(address),
+  const [read, names] = await Promise.all([
+    readWallet(address, await readerIpFromHeaders()),
     resolveEnsNames([address]).catch(() => ({}) as Record<string, string | null>),
   ]);
-  return <WalletView address={address} ensName={names[address] ?? null} results={results} />;
+  return <WalletView address={address} ensName={names[address] ?? null} read={read} />;
 }
