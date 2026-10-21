@@ -12,6 +12,7 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import type { AlchemixTransmuterPositionResponse, AlchemixTransmuterPositionsResponse } from "@/types/api/alchemix";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AlchemixRead } from "@/lib/sources/api/alchemix-position-backend";
+import { parseWholeBounds, setBounds, type AlchemixBoundKey } from "@/lib/sources/api/alchemix-positions-backend";
 
 export type AlchemixTransmuterPositionFullResponse = AlchemixTransmuterPositionResponse<BaseActivityEvent>;
 
@@ -23,12 +24,17 @@ const SORTS: readonly AlchemixTransmuterSort[] = ["maturity", "amount", "created
  *  frontier; the facet offers those two and `claimed`, which never overlap. */
 const STATUSES = ["maturing", "matured", "claimed", "outstanding"] as const;
 
+/** The staked amount in USD, the position's one side. */
+const TRANSMUTER_BOUNDS: readonly AlchemixBoundKey[] = ["minCollUsd", "maxCollUsd"];
+
 export interface FetchAlchemixTransmuterPositionsParams {
   lines?: string[];
   chainId?: number;
   owner?: string;
   nftId?: string;
   status?: string[];
+  minCollUsd?: number;
+  maxCollUsd?: number;
   sortBy?: AlchemixTransmuterSort;
   sortOrder?: "asc" | "desc";
   limit?: number;
@@ -63,6 +69,7 @@ export function parseAlchemixTransmuterQuery(sp: URLSearchParams): FetchAlchemix
     owner: owner && /^0x[a-fA-F0-9]{40}$/.test(owner) ? owner.toLowerCase() : undefined,
     nftId: nftId && /^\d+$/.test(nftId) ? nftId : undefined,
     status: keep(list("status"), STATUSES),
+    ...parseWholeBounds(sp, TRANSMUTER_BOUNDS),
     sortBy: SORTS.includes(sortBy as AlchemixTransmuterSort) ? (sortBy as AlchemixTransmuterSort) : undefined,
     sortOrder: sp.get("sortOrder") === "asc" ? "asc" : "desc",
     limit: num("limit"),
@@ -77,6 +84,7 @@ export function alchemixTransmuterQuery(p: FetchAlchemixTransmuterPositionsParam
   if (p.owner) qs.set("owner", p.owner);
   if (p.nftId) qs.set("nftId", p.nftId);
   if (p.status && p.status.length > 0) qs.set("status", p.status.join(","));
+  setBounds(qs, p, TRANSMUTER_BOUNDS);
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   qs.set("sortOrder", p.sortOrder === "asc" ? "asc" : "desc");
   if (p.limit != null) qs.set("limit", String(p.limit));
