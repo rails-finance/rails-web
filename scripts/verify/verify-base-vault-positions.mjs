@@ -826,7 +826,13 @@ async function readListingDom(qs = "") {
         stats,
         vaultSymbol: symbolEl?.getAttribute("data-card-vault-symbol") ?? null,
         symbolLeadsPill: symbolEl && pillEl ? (symbolEl.compareDocumentPosition(pillEl) & 4) === 4 : null,
-        text: e.innerText.replace(/\s+/g, " ").trim(),
+        // The card's sidebar (`data-card-sidebar`, TO-DO-position-card 427) names
+        // the protocol whose card it is; it is set aside from the text the copy
+        // rules read, as the family word is.
+        text: [...(e.querySelectorAll("[data-card-sidebar]") ?? [])]
+          .reduce((t, s) => t.split(s.innerText).join(" "), e.innerText)
+          .replace(/\s+/g, " ")
+          .trim(),
         href: e.closest("a")?.getAttribute("href") ?? null,
       });
     }

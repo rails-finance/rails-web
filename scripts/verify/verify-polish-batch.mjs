@@ -180,9 +180,14 @@ await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const SWITCHER_PANEL = 'div[role="menu"][aria-label="Blockchain switcher"]';
 // `:visible` — on an app route from `md` up the chooser sits on the protocol
 // title row and the bar's own copy is in the tree but hidden by a breakpoint
-// class (rails-ops TO-DO-ui-jobs 68), so a bare locator matches two.
-const switcherTrigger = page.locator('button[aria-label="Switch blockchain"]:visible');
-check("S trigger names the active chain", /Ethereum/.test((await switcherTrigger.textContent()) ?? ""));
+// class (rails-ops TO-DO-ui-jobs 68), so a bare locator matches two. Its label
+// names the chain first: "Ethereum, switch blockchain".
+const switcherTrigger = page.locator('button[aria-label$=", switch blockchain"]:visible').first();
+check(
+  "S trigger names the active chain",
+  /^Ethereum,/.test((await switcherTrigger.getAttribute("aria-label")) ?? ""),
+  (await switcherTrigger.getAttribute("aria-label")) ?? "",
+);
 // Pre-hydration clicks are lost, not replayed — poll the panel and re-click.
 let switcherOpen = false;
 for (let attempt = 0; attempt < 6 && !switcherOpen; attempt++) {
