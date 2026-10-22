@@ -14,13 +14,12 @@ import { ArrowLeft } from "lucide-react";
 import { NAV_BUTTON } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
-import { RailHeader } from "@/components/shared/rail-header";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { usePublishTodayPrices } from "@/components/shared/price-basis";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { PositionWalletRow, type PositionOwner } from "@/components/shared/position-wallet-row";
+import { PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
  *  + "Back". Smart-back: returns to the listing the viewer actually came from
@@ -92,17 +91,14 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
   return assets && assets.length > 0 ? { block: row.blockNumber, timestamp: row.timestamp, assets } : undefined;
 }
 
-/** The protocol's title, then one thin row of everything a position view says
- *  about "latest": back, the chain head and its age, and the position's assets
- *  at their current prices behind a dropdown — with the Tools menu (`children`)
- *  at the right end.
+/** The top of a position page: Back, then the wallet heading (rails-ops
+ *  decisions/0052; ui-jobs 429), which carries the page's h1, the protocol
+ *  line linking to the listing, the price strip, the chain's recency and the
+ *  Tools menu (`children`). A position page draws no protocol title and no
+ *  chain chooser; below md the header bar keeps the chain trigger.
  *
- *  The row is what replaced the fixed bottom price dock on these views
- *  (rails-ops TO-DO-ui-jobs 48): the prices had nowhere to go on a phone but
- *  sideways, and the page's instruments were split between a floating dock and
- *  a menu up here. The title keeps its link to the protocol's listing; the
- *  rail's sub-nav does not follow a reader into a position, which is why
- *  RailHeader draws no tabs at the `position` venue.
+ *  The strip is what replaced the fixed bottom price dock on these views
+ *  (rails-ops TO-DO-ui-jobs 48).
  *
  *  `showStamp={false}` is for routes with no chain overlay (PWN) — rendering a
  *  stamp there would assert a freshness the page doesn't have. A closed
@@ -116,9 +112,9 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *  coverage matrix's `oracleUsd: { why }` cell reads the same string. A view
  *  that has simply not been wired passes neither and keeps the generic line.
  *
- *  `owner` draws the wallet row under it (ui-jobs 228): the wallet the page
- *  belongs to, with Tools moved to that row's right. The row sits nearer the
- *  card than the back row; the card then leaves the wallet out of its header. */
+ *  `owner` draws the wallet heading under Back: the wallet the page belongs
+ *  to, with Tools at its right. The card then leaves the wallet out of its
+ *  header. Without `owner`, the strip and Tools share Back's row. */
 export function DetailTopRow({
   session,
   wallet,
@@ -143,10 +139,11 @@ export function DetailTopRow({
   closed?: boolean;
   /** The prices at the closing row's block (`closingPricesAt`). */
   closing?: ClosingPrices;
-  /** The wallet row (PositionWalletRow); omitted, Tools stays on this row. */
+  /** The wallet heading (PositionWalletHeading); omitted, Tools stays on
+   *  Back's row. */
   owner?: PositionOwner;
   /** False on a page whose position card carries the menu (ui-jobs 270): the
-   *  wallet row then draws no Tools. Only read with `owner`. */
+   *  heading then draws no Tools. Only read with `owner`. */
   tools?: boolean;
   /** Where Back lands on a fresh tab; see DetailBackButton. */
   fallbackHref?: string;
@@ -174,13 +171,10 @@ export function DetailTopRow({
       )
     );
   return (
-    // With the wallet row, the gap to the card (16px, in place of the page's
-    // space-y-6 margin) is smaller than the gap above the row (24px), so the
-    // row reads with the card.
+    // With the heading, the gap to the card (16px, in place of the page's
+    // space-y-6 margin) is smaller than the gap above the heading (24px), so
+    // the heading reads with the card.
     <div className={owner ? "mb-4" : undefined}>
-      <div className="mb-2.5">
-        <RailHeader session={session} venue="position" />
-      </div>
       <div
         className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2"
         data-anatomy="H7"
@@ -188,7 +182,7 @@ export function DetailTopRow({
       >
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact={!owner} />
-          {/* A page without a wallet row keeps the strip beside Back. */}
+          {/* A page without a heading keeps the strip beside Back. */}
           {!owner && (
             <>
               {showStamp && !closed && <RecencyStamp compact />}
@@ -207,10 +201,10 @@ export function DetailTopRow({
       {owner && (
         <div className="mt-6">
           {/* In the row's scope: a holder can carry a receipt (Polaris). The
-              price and the chain's recency ride the row's right end, price
-              first (ui-jobs 272); Back stays alone above. */}
+              price and the chain's recency ride the heading's right end,
+              price first (ui-jobs 272); Back stays alone above. */}
           <ProvReceiptsScope registry={registry}>
-            <PositionWalletRow
+            <PositionWalletHeading
               owner={owner}
               session={session}
               tools={tools ? children : false}

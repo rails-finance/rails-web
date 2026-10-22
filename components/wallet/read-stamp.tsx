@@ -5,6 +5,8 @@
 // cube, a press switching the two, the choice shared with H6 for the browser.
 // H6 states the chain head; this states one family read on the wallet view
 // (rails-ops decision 0050, point 8). With only a block, it shows the block.
+// The age reads "1 min" with no "ago": the glyph carries the meaning, and the
+// accessible name keeps the full words (ui-jobs 429).
 
 import { useEffect, useState } from "react";
 import { Box } from "lucide-react";
@@ -26,13 +28,11 @@ export function ReadStamp({
   block,
   at,
   label = "Read",
-  prefix = "",
 }: {
   block?: number;
   at?: number;
+  /** The accessible name's first word ("Updated 1 min ago"). */
   label?: string;
-  /** Words before the reading ("Updated "). */
-  prefix?: string;
 }) {
   const [reading, setReading] = useState<"age" | "block">("age");
   const [now, setNow] = useState<number | null>(null);
@@ -46,7 +46,7 @@ export function ReadStamp({
   }, []);
   const showAge = at != null && (reading === "age" || block == null);
   // The age waits for the mount: the server's clock is not the reader's.
-  const age = at != null && now != null ? `${compactAge(Math.max(0, now / 1000 - at))} ago` : null;
+  const age = at != null && now != null ? compactAge(Math.max(0, now / 1000 - at)) : null;
   const blockText = block != null ? block.toLocaleString("en-US") : null;
   const text = showAge ? age : blockText;
   if (text == null) return null;
@@ -65,14 +65,11 @@ export function ReadStamp({
       data-anatomy="H6"
       data-read-block={block}
       onClick={toggle}
-      aria-label={`${label} ${[age, blockText ? `at block ${blockText}` : null].filter(Boolean).join(", ")}`}
+      aria-label={`${label} ${[age ? `${age} ago` : null, blockText ? `at block ${blockText}` : null].filter(Boolean).join(", ")}`}
       className={`${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
     >
       <Icon size={12} aria-hidden />
-      <span aria-hidden>
-        {prefix}
-        {text}
-      </span>
+      <span aria-hidden>{text}</span>
     </button>
   );
 }

@@ -207,11 +207,10 @@ check(
   `cluster right edge hugs the container right (${geo.clusterRight} vs ${geo.contRight})`,
 );
 
-// ── A position view keeps the chooser (ui-jobs 68's one open question) ──
-// It draws no sub-nav and renders ProtocolIdentity alone, so if the chooser
-// did not follow the identity there, the deepest app surface would be the one
-// with no way to change chain above `md`.
-console.log("[position view keeps the chooser @1280]");
+// ── A position view draws the wallet heading and no chooser (decision 0052) ──
+// The chain switch stays on the home page, the listings, the info and markets
+// pages; the protocol line under the heading is the way back to the listing.
+console.log("[position view: no chooser, the protocol line @1280]");
 await page.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const trovePath = await page.evaluate(() => {
   const a = [...document.querySelectorAll('a[href^="/ethereum/liquity-v2/trove/"]')][0];
@@ -221,8 +220,15 @@ if (!trovePath) {
   check(false, "found a trove link on the Liquity V2 listing to open a position view with");
 } else {
   await page.goto(BASE + trovePath, { waitUntil: "networkidle" });
+  // Decision 0052: the wallet heading frames a position page; the protocol
+  // line under it links to the listing, and no chooser is drawn from md up.
   const posTrigger = await page.locator('button[aria-label$="switch blockchain"]:visible').count();
-  check(posTrigger === 1, `a position view carries the chain chooser (${posTrigger})`);
+  check(posTrigger === 0, `a position view draws no chain chooser at 1280 (${posTrigger})`);
+  const posLine = await page
+    .locator("[data-anatomy='H13.3'] a[data-rail-identity]")
+    .getAttribute("href")
+    .catch(() => null);
+  check(posLine === "/ethereum/liquity-v2", `a position view's protocol line links to the listing (${posLine})`);
   const posBar = await page.locator("header").first().isVisible();
   check(posBar === false, `a position view draws no top bar at 1280 (${posBar})`);
 }

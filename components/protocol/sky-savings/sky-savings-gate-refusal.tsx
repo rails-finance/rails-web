@@ -3,6 +3,8 @@
 // sUSDS contract for every holder (rails-ops reference/sky-savings-pipeline.md).
 
 import { RailHeader } from "@/components/shared/rail-header";
+import { DetailBackButton } from "@/components/shared/detail-back-row";
+import { PositionWalletHeading } from "@/components/shared/wallet-heading";
 import { BlockRef } from "@/components/shared/block-ref";
 import type { SkyGate } from "@/lib/sky-savings/types";
 import { SKY_CHAIN_ID } from "@/lib/sky-savings/constants";
@@ -45,8 +47,16 @@ export function SkyGateRefusal({
 }) {
   return (
     <div className="py-8 space-y-6">
-      <RailHeader session="sky-savings" venue={holder ? "position" : "listing"} />
-      {holder && <p className="font-mono text-sm text-rb-500">{holder}</p>}
+      {holder ? (
+        <div>
+          <DetailBackButton session="sky-savings" wallet={holder} />
+          <div className="mt-6">
+            <PositionWalletHeading owner={{ wallet: holder }} session="sky-savings" tools={false} />
+          </div>
+        </div>
+      ) : (
+        <RailHeader session="sky-savings" venue="listing" />
+      )}
       <SkyGateStatement reason={reason} gate={gate} />
     </div>
   );

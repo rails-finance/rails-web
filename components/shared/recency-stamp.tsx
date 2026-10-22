@@ -1,16 +1,18 @@
 "use client";
 
 // Recency stamp — decision 0006's freshness signal on the live/current surfaces.
-// "▣ 2 min ago": how long ago the latest block of the ROUTE'S OWN CHAIN was
+// "▣ 2 min": how long ago the latest block of the ROUTE'S OWN CHAIN was
 // minted, so staleness is legible and the user can judge whether a reload is
 // worth it (the reload IS the refresh — no button). The age ticks client-side
 // off the block timestamp; the head only re-pulls on focus / reload.
 // Fail-soft: renders nothing when the chain head is unavailable.
 //
-// Two readings, switched by a press on the stamp: the age ("3 min ago", behind
+// Two readings, switched by a press on the stamp: the age ("3 min", behind
 // the block-and-clock icon) or the block number ("11,932,361", behind the
 // cube). The choice holds across pages for this browser. The copy-for-LLM exports carry the block
 // number from the page's own data (lib/<proto>/position-to-markdown.ts).
+// The age carries no "ago": the block-and-clock glyph says it, and the
+// accessible name keeps the full words (ui-jobs 429).
 
 import { useEffect, useState } from "react";
 import { Box } from "lucide-react";
@@ -83,7 +85,7 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
       className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
     >
       <Icon size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
-      <span aria-hidden>{showAge ? `${age} ago` : block}</span>
+      <span aria-hidden>{showAge ? age : block}</span>
     </button>
   );
 }

@@ -498,14 +498,17 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
           />
           {!onEventPage && (
             <>
-              <h1
+              <h2
                 className="text-2xl font-semibold text-foreground"
                 data-vault-page={address}
                 data-vault-family={data.vault.family}
               >
-                <span className="font-mono">{subject}</span>
-                <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>
-              </h1>
+                {/* The wallet heading above names a resolved holder. */}
+                {!lookup.address && <span className="font-mono">{subject}</span>}
+                <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>
+                  in {vaultName}
+                </span>
+              </h2>
               {/* How the subject was REACHED — a fact about the page rather than
               about the address, and stated here because the header is always
               drawn. The card below carries the identity itself; the census has

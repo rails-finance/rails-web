@@ -1,6 +1,6 @@
 "use client";
 
-// The line under the wallet row (H13.2; rails-ops decisions/0050 point 10,
+// The line under the wallet heading (H13.2; rails-ops decisions/0050 point 10,
 // decisions/0051 step 3): what else Rails holds for the address, linking to
 // the wallet view. Read after mount from /api/chain/wallet/<address>/summary,
 // so the page's render does not wait on it; nothing is drawn while it loads,
@@ -11,7 +11,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { rowIsPage, walletLineText, type WalletCounts } from "@/lib/wallet/summary-counts";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -55,11 +54,7 @@ export function WalletElsewhereLine({ wallet }: { wallet: string }) {
   }, [address, pathname]);
   if (!line) return null;
   return (
-    <p
-      className={`mt-1 text-xs text-rb-500 ${CARD_INSET_START}`}
-      data-anatomy="H13.2"
-      data-wallet-elsewhere={line.matched ? "others" : "all"}
-    >
+    <p className="text-xs text-rb-500" data-anatomy="H13.2" data-wallet-elsewhere={line.matched ? "others" : "all"}>
       <Link
         href={`/wallet/${address}`}
         prefetch={false}

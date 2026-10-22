@@ -15,19 +15,9 @@
 // whose route holds the pathname, so a sub-page's nested routes (Morpho's
 // markets/[loanToken]) light their parent.
 //
-// A POSITION VIEW DRAWS NO SECOND ROW, ONLY THE IDENTITY AND THE CHOOSER
-// (rails-ops TO-DO-ui-jobs 48, 68). The tabs and the (i) belong to the
-// protocol, not to one account's position, and nothing in them was ever lit
-// here; the identity keeps its link, which is the one door back to the rail.
-// The recency stamp left with them — a position states its chain head in the
-// row under this one. The identity now takes the title scale like every other
-// venue. The earlier justification for holding it at small caps here (the
-// subject of a position view is the account named in its h1) does not hold:
-// a position view has no h1. DetailBackRow and DetailTopRow, which mount this
-// row, add none. That left the position page with no large identity of any
-// kind, its biggest type being the collateral figure. Giving a position view
-// a heading that names its account is a separate gap, logged as an item. The
-// chooser stays, because it is the only one an app page has above `md`.
+// A POSITION PAGE DRAWS NO RAIL HEADER (rails-ops decisions/0052): the
+// wallet heading is its frame, with a line naming the protocol and linking
+// to its listing (components/shared/wallet-heading.tsx).
 //
 // THE CHOOSER IS `md` AND UP ONLY. Below `md` there is no brand rail and
 // HeaderBar keeps the chain trigger and the theme toggle, so drawing it here
@@ -59,7 +49,7 @@ export function TitleRowChooser() {
 }
 
 /** Which surface of the rail is being looked at — decides the lit slot. */
-export type RailVenue = "listing" | "subPage" | "position" | "info";
+export type RailVenue = "listing" | "subPage" | "info";
 
 // Same 11px small-caps register as ProtocolIdentity. Every slot carries the
 // bottom border so the active underline never shifts the baseline; the idle
@@ -87,24 +77,13 @@ export function RailHeader({
    *  reads no chain head (the info page) — rendering it there would assert a
    *  freshness the page doesn't have, and the second row then carries the
    *  sub-nav alone, right-aligned rather than left where the stamp would have
-   *  sat. Ignored at the `position` venue, where the stamp sits in the row
-   *  below (DetailTopRow). */
+   *  sat. */
   stamp?: boolean;
 }) {
   const pathname = usePathname();
   const entry = protocolForSession(session);
   if (!entry) return null;
   const litSubPage = venue === "subPage" ? subPageForPathname(entry, pathname) : undefined;
-  if (venue === "position") {
-    return (
-      <div className="flex min-h-9 items-center justify-between gap-3" data-anatomy="H3">
-        <div className="min-w-0">
-          <ProtocolIdentity session={session} scale="title" />
-        </div>
-        <TitleRowChooser />
-      </div>
-    );
-  }
   return (
     // Two rows at every width (rails-ops TO-DO-ui-jobs 66). Pinning the
     // sub-nav under the identity started as a fix for below `sm`: left to

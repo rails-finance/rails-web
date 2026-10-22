@@ -14,7 +14,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Copy } from "lucide-react";
-import { Facehash } from "@/components/shared/facehash";
+import { ChainMark, WalletHeading } from "@/components/shared/wallet-heading";
+import { WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
 import { WalletPositionCard, atRisk } from "@/components/wallet/wallet-position-card";
@@ -25,8 +26,6 @@ import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
-const CHIP =
-  "inline-flex h-8 items-center rounded-lg border border-rb-300/60 px-3 text-xs font-medium text-foreground/80 dark:border-rb-700/60";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -50,10 +49,6 @@ function byRisk(a: WalletPosition, b: WalletPosition): number {
   if (a.buffer != null) return -1;
   if (b.buffer != null) return 1;
   return (b.collateralUsd ?? -1) - (a.collateralUsd ?? -1);
-}
-
-function chainList(ids: ChainId[]): string {
-  return [...new Set(ids)].map((c) => chainMeta(c).name).join(", ");
 }
 
 function CopyAddress({ address }: { address: string }) {
@@ -330,7 +325,7 @@ export function WalletView({
   const unread = read.families.filter((r) => r.headRead === "failed");
   const stamps = open.map((p) => p.readAt).filter((t): t is number => t != null);
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
-  const chains = chainList(all.map((p) => p.chain));
+  const chains: ChainId[] = [...new Set(all.map((p) => p.chain))];
   const atRiskCount = open.filter(atRisk).length;
   const registry = useReceiptRegistry();
 
@@ -363,32 +358,46 @@ export function WalletView({
           }),
         )}
       >
-        <header className="flex flex-wrap items-center justify-between gap-4" data-anatomy="W1">
-          <div className="flex min-w-0 items-center gap-3">
-            <Facehash address={address} size={40} />
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2.5">
-                {ensName && <h1 className="truncate text-xl font-semibold text-foreground">{ensName}</h1>}
+        <header data-anatomy="W1">
+          <WalletHeading
+            address={address}
+            title={
+              <>
                 {ensName ? (
-                  <span className="font-mono text-sm text-rb-500">{short(address)}</span>
+                  <>
+                    <h1 className={`${WALLET_HEADING_NAME} min-w-0 truncate`}>{ensName}</h1>
+                    <span className={WALLET_HEADING_SHORT}>{short(address)}</span>
+                  </>
                 ) : (
-                  <h1 className="font-mono text-xl font-semibold text-foreground">{short(address)}</h1>
+                  <h1 className={`${WALLET_HEADING_NAME} font-mono`}>{short(address)}</h1>
                 )}
                 <CopyAddress address={address} />
-              </div>
-              {chains && <div className="text-xs text-rb-500">{chains}</div>}
-              {read.total > 0 && (
-                <div className="text-xs text-rb-500" data-wallet-count={read.total}>
-                  {plural(read.total, "position")} · {openAll.length} open · {closed.length} closed
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={CHIP}>All chains</span>
-            <span className={CHIP}>All protocols</span>
-            {oldest != null && <ReadStamp at={oldest} label="Updated" prefix="Updated " />}
-          </div>
+              </>
+            }
+            lines={
+              <>
+                {chains.length > 0 && (
+                  <div className="flex items-center gap-1.5" data-wallet-chains={chains.join(",")}>
+                    {chains.map((c) => (
+                      <ChainMark key={c} chainId={c} />
+                    ))}
+                  </div>
+                )}
+                {read.total > 0 && (
+                  <div className="text-xs text-rb-500" data-wallet-count={read.total}>
+                    {plural(read.total, "position")} · {openAll.length} open · {closed.length} closed
+                  </div>
+                )}
+              </>
+            }
+            end={
+              oldest != null && (
+                <span className="ml-auto flex shrink-0 items-center">
+                  <ReadStamp at={oldest} label="Updated" />
+                </span>
+              )
+            }
+          />
         </header>
 
         {read.error ? (

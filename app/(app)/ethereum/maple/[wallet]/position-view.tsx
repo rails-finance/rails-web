@@ -553,6 +553,8 @@ export default function MaplePositionView({
           {!onEventPage && protocolContract && (
             <ContractIdentityCard
               kicker="Protocol contract"
+              // The wallet heading above is the page's h1.
+              level={2}
               name={protocolContract.name}
               wallet={wallet}
               contractName={protocolContract.contractName}
@@ -680,18 +682,21 @@ function ContractIdentityCard({
   name,
   wallet,
   contractName,
+  level = 1,
   children,
 }: {
   kicker: string;
   name: string;
   wallet: string;
   contractName: string;
+  level?: 1 | 2;
   children: React.ReactNode;
 }) {
+  const H = level === 1 ? "h1" : "h2";
   return (
     <div className="rounded-2xl border border-line bg-surface p-6">
       <div className="text-[11px] uppercase tracking-wider text-rb-500">{kicker}</div>
-      <h1 className="mt-1.5 text-lg font-semibold text-foreground">{name}</h1>
+      <H className="mt-1.5 text-lg font-semibold text-foreground">{name}</H>
       {children}
       <p className="mt-3 text-sm text-rb-500">
         Contract{" "}

@@ -18,6 +18,7 @@ import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
+import { WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 
 function shortAddr(addr: string): string {
@@ -41,6 +42,7 @@ function WalletPillInner({
   vault,
   href: hrefOverride,
   hrefLabel,
+  heading = false,
 }: {
   wallet: string;
   ensName: string | null;
@@ -75,6 +77,9 @@ function WalletPillInner({
    *  party's side). A vault's href still wins. */
   href?: string;
   hrefLabel?: string;
+  /** The label as the page's h1 (the wallet heading, H13): heading type, no
+   *  facehash, and a name's short address beside it. */
+  heading?: boolean;
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -107,7 +112,13 @@ function WalletPillInner({
   // The alternative — suppressing sparse names for uniformity — would hide a
   // chain-verified fact because it is rare, and would make the same wallet
   // render differently depending on who else is on the page.
-  const labelClass = name ? "inline-block max-w-[15ch] truncate align-bottom text-rb-500" : "font-mono text-rb-500";
+  const labelClass = heading
+    ? name
+      ? "inline-block max-w-[24ch] truncate align-bottom"
+      : "font-mono"
+    : name
+      ? "inline-block max-w-[15ch] truncate align-bottom text-rb-500"
+      : "font-mono text-rb-500";
   const copy = () => {
     navigator.clipboard.writeText(wallet);
     setCopied(true);
@@ -156,16 +167,24 @@ function WalletPillInner({
       {label}
     </span>
   );
+  const tipped = labelTip ? (
+    <RevealTip tip={labelTip} wrap>
+      {labelEl}
+    </RevealTip>
+  ) : (
+    labelEl
+  );
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" data-anatomy="C7">
-      <Facehash address={wallet} size={16} />
-      <span className="inline-flex items-center gap-1 text-xs text-rb-500">
-        {labelTip ? (
-          <RevealTip tip={labelTip} wrap>
-            {labelEl}
-          </RevealTip>
+    <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap" data-anatomy="C7">
+      {!heading && <Facehash address={wallet} size={16} />}
+      <span className={`inline-flex min-w-0 items-center text-rb-500 ${heading ? "gap-2.5" : "gap-1 text-xs"}`}>
+        {heading ? (
+          <>
+            <h1 className={`${WALLET_HEADING_NAME} min-w-0`}>{tipped}</h1>
+            {name && <span className={WALLET_HEADING_SHORT}>{shortAddr(wallet)}</span>}
+          </>
         ) : (
-          labelEl
+          tipped
         )}
         <RevealTip tip={copied ? "Copied!" : "Copy"}>
           <button
@@ -181,7 +200,7 @@ function WalletPillInner({
             aria-label={copied ? "Copied address" : "Copy address"}
             className="text-rb-500 hover:text-foreground cursor-pointer"
           >
-            <Icon name={copied ? "check" : "copy"} size={12} />
+            <Icon name={copied ? "check" : "copy"} size={heading ? 14 : 12} />
           </button>
         </RevealTip>
         {bookmarkProtocol && (
@@ -190,7 +209,7 @@ function WalletPillInner({
             ensName={name}
             protocol={bookmarkProtocol}
             listing={bookmarkListing}
-            size={12}
+            size={heading ? 14 : 12}
           />
         )}
       </span>

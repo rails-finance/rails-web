@@ -18,7 +18,7 @@ import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { walletHref } from "@/components/shared/front-door-search";
 import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT, type BookmarkScope } from "@/lib/shared/sessions";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { OVERLAY_HEADING, WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -27,12 +27,17 @@ export function WalletMenu({
   ensName,
   bookmarkProtocol,
   bookmarkListing,
+  heading = false,
 }: {
   wallet: string;
   ensName: string | null;
   /** Where the bookmark goes; unset, the menu has no Bookmark row. */
   bookmarkProtocol?: BookmarkScope;
   bookmarkListing?: string;
+  /** The trigger as the page's h1 (the wallet heading, H13): the name or
+   *  address at heading type with no facehash, and a name's short address
+   *  beside the h1. */
+  heading?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -113,35 +118,61 @@ export function WalletMenu({
     </>
   );
 
+  const trigger = (
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      aria-expanded={open}
+      aria-haspopup="menu"
+      aria-label={`${name ? `${name} · ` : ""}${wallet}${fav ? ", bookmarked" : ""}: open the address menu`}
+      title={name ? `${name} · ${wallet}` : wallet}
+      // A 28px row with a 44px press area (after:).
+      className={`relative flex h-7 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
+        heading ? "text-foreground hover:text-blue-500" : "text-xs text-rb-500 hover:text-foreground"
+      }`}
+    >
+      {!heading && <Facehash address={wallet} size={16} />}
+      <span
+        data-wallet-label={name ? "name" : "address"}
+        className={
+          name ? `min-w-0 truncate ${heading ? "max-w-[24ch]" : "max-w-[15ch]"}` : "min-w-0 truncate font-mono"
+        }
+      >
+        {label}
+      </span>
+      {fav && (
+        <BookmarkCheck
+          data-wallet-bookmarked=""
+          className={`${heading ? "h-4 w-4 text-rb-500" : "h-3.5 w-3.5"} shrink-0`}
+          aria-hidden="true"
+        />
+      )}
+      <ChevronDown
+        className={`${heading ? "h-4 w-4 text-rb-500" : "h-3.5 w-3.5"} shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+        aria-hidden="true"
+      />
+    </button>
+  );
+
   return (
     // The address keeps its width (a name is capped at 15ch) while the address
     // kind beside it gives way (shrink-[100]); past that the name truncates, so
     // the bookmark glyph and chevron stay on the line. The row does not hide
     // overflow, so the dropdown below the address shows.
-    <div ref={ref} className="relative min-w-0" data-wallet-menu="" data-anatomy="C7">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={`${name ? `${name} · ` : ""}${wallet}${fav ? ", bookmarked" : ""}: open the address menu`}
-        title={name ? `${name} · ${wallet}` : wallet}
-        // A 28px row with a 44px press area (after:).
-        className="relative flex h-7 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md text-xs text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']"
-      >
-        <Facehash address={wallet} size={16} />
-        <span
-          data-wallet-label={name ? "name" : "address"}
-          className={name ? "min-w-0 max-w-[15ch] truncate" : "min-w-0 truncate font-mono"}
-        >
-          {label}
-        </span>
-        {fav && <BookmarkCheck data-wallet-bookmarked="" className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-          aria-hidden="true"
-        />
-      </button>
+    <div
+      ref={ref}
+      className={heading ? "relative flex min-w-0 items-center gap-x-2.5" : "relative min-w-0"}
+      data-wallet-menu=""
+      data-anatomy="C7"
+    >
+      {heading ? (
+        <>
+          <h1 className={`${WALLET_HEADING_NAME} min-w-0`}>{trigger}</h1>
+          {name && <span className={WALLET_HEADING_SHORT}>{short(wallet)}</span>}
+        </>
+      ) : (
+        trigger
+      )}
       {open &&
         (isPhone ? (
           <MobileSheet

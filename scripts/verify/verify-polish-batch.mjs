@@ -125,7 +125,7 @@ const stampPlacement = await page.evaluate(() => {
   if (!infoLink) return "no (i) link in sub-nav";
   if (!/\/info$/.test(infoLink.getAttribute("href") || "")) return "(i) href is not /info";
   const identity = document.querySelector("[data-rail-identity]");
-  // The stamp is a button that reads "3 min ago", the block number in
+  // The stamp is a button that reads "3 min", the block number in
   // its peek, so it is found by its accessible name.
   const stamp = document.querySelector("button[aria-label^='Chain head']");
   if (!identity) return "no identity link in rail header";
