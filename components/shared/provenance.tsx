@@ -61,7 +61,9 @@ export type ProvClass = "emitted" | "state" | "oracle" | "indexed" | "offchain";
  *  (recompute it yourself from the leaves; it rolls up its inputs; nothing to
  *  verify). Absent → the spine derives a sensible default from the class. */
 export interface ProvVerify {
-  kind: "etherscan" | "recompute" | "rollup" | "none";
+  /** `etherscan` and `link` render `href` as the leaf's proof link; `link` is a
+   *  third party that is not the chain's explorer (a label source). */
+  kind: "etherscan" | "link" | "recompute" | "rollup" | "none";
   href?: string;
   text: string;
 }
@@ -541,7 +543,7 @@ export function classifyValue(info: Provenance): { vcls: ProvClass; isComputed: 
 // carries a verify row when the vocabulary states one (or a tx link exists).
 
 function VerifyRow({ v }: { v: ProvVerify }) {
-  if (v.kind === "etherscan" && v.href)
+  if ((v.kind === "etherscan" || v.kind === "link") && v.href)
     return (
       <a className="prov-verify prov-verify-link" href={v.href} target="_blank" rel="noopener noreferrer">
         <ExternalLink aria-hidden />
@@ -974,7 +976,7 @@ export function ProvReceipt({
                     <span className="prov-row-cell">
                       {inp.value && <span className="prov-row-value">{inp.value}</span>}
                       {inp.contract && <ContractLink c={inp.contract} />}
-                      {inp.verify?.kind === "etherscan" && inp.verify.href && (
+                      {(inp.verify?.kind === "etherscan" || inp.verify?.kind === "link") && inp.verify.href && (
                         <a href={inp.verify.href} target="_blank" rel="noopener noreferrer">
                           {inp.verify.text}
                         </a>

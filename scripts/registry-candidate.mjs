@@ -11,22 +11,25 @@
 //   node scripts/registry-candidate.mjs <chainId> <address>
 //   node scripts/registry-candidate.mjs 8453 0xd7f1dd5d49206349cae8b585fcb0ce3d96f1696f
 //
-// Sources, each named in the output with what it answered:
-//   • the chain, through the site's own address-kind route (keyless): code at
-//     head, a Safe, an EIP-7702 delegation, or a contract with its `name()`
-//     and `symbol()`. RAILS_SITE overrides the host (a local server).
-//   • the verified source name, through the Etherscan V2 API for the chain
-//     (ETHERSCAN_API_KEY in .env.local; skipped without it): the contract's
-//     name, whether it is a proxy and what it points to.
-//   • growthepie's public labels file (keyless, CC BY 4.0): the ten thousand
-//     most active contracts on its chains with the owning project, a name
-//     and a usage category. A busy contract is here with a curated name; a
-//     quiet one is not.
-//   • the Open Labels Initiative pool (keyless attestation listing): every
-//     attestation on the address, filtered to the chain, with its attester.
-//     Verified-source attestations carry `contract_name`; a project's own
-//     attestation may carry `owner_project`. The keyed endpoints (bulk, search
-//     by tag, trusted labels) are not used here.
+// Sources, in the order the registry consults them (its header), each named in
+// the output with what it answered:
+//   1. growthepie's public labels file (keyless, CC BY 4.0, "Source:
+//      growthepie, https://www.growthepie.com"): the ten thousand most active
+//      contracts on its chains with the owning project, a name and a usage
+//      category. A busy contract is here with a curated name; a quiet one is
+//      not. Then the Open Labels Initiative pool growthepie runs (keyless
+//      attestation listing): every attestation on the address, filtered to
+//      the chain, with its attester. The Sourcify-backed attestations carry
+//      `contract_name`; a project's own attestation may carry `owner_project`.
+//      The keyed endpoints (bulk, search by tag, trusted labels) are not used.
+//      What these two say is the draft's GROWTHEPIE_LABELS row.
+//   2. The fallback, where growthepie has no label or names no owner: the
+//      verified source name through the Etherscan V2 API for the chain
+//      (ETHERSCAN_API_KEY in .env.local; skipped without it), with whether it
+//      is a proxy and what it points to; and the chain, through the site's own
+//      address-kind route (keyless): code at head, a Safe, an EIP-7702
+//      delegation, or a contract with its `name()` and `symbol()`. RAILS_SITE
+//      overrides the host (a local server).
 //
 // Explorer name tags ("Zerion: Router") are not in any open source read here:
 // Etherscan serves them on a paid plan only. Where one is known, it goes in
@@ -208,16 +211,16 @@ async function readRegistry() {
   };
 }
 
-const settled = await Promise.allSettled([readChain(), readEtherscan(), readGrowthepie(), readOli(), readRegistry()]);
+const settled = await Promise.allSettled([readGrowthepie(), readOli(), readEtherscan(), readChain(), readRegistry()]);
 const results = settled.map((s, i) =>
   s.status === "fulfilled"
     ? s.value
     : {
         source: [
-          "chain (address-kind)",
-          "Etherscan V2 (verified source)",
           "growthepie labels",
           "Open Labels Initiative",
+          "Etherscan V2 (verified source)",
+          "chain (address-kind)",
           "the registry",
         ][i],
         ok: false,
@@ -232,10 +235,13 @@ for (const r of results) {
   for (const l of r.lines) console.log(`    ${l}`);
 }
 
-const [chainR, ethR, gtpR, oliR, regR] = results;
-const verified = ethR.facts.contractName ?? [...(oliR.facts.names ?? [])][0] ?? null;
+const [gtpR, oliR, ethR, chainR, regR] = results;
+// growthepie first; the explorer and the chain where it is silent.
+const oliName = [...(oliR.facts.names ?? [])][0] ?? null;
+const verified = oliName ?? ethR.facts.contractName ?? null;
 const owner = gtpR.facts.ownerProjectClear ?? [...(oliR.facts.owners ?? [])][0] ?? null;
 const tokenName = chainR.facts.name ?? null;
+const today = new Date().toISOString().slice(0, 10);
 
 console.log("\nDraft (the kind and the role are yours to choose; the evidence line goes in the file's header):");
 if (regR.facts.entered) {
@@ -247,28 +253,36 @@ if (regR.facts.entered) {
   console.log(
     `    [${chain.constant}, "${address}", { name: "${display}", kind: "<router|gateway|adapter|settlement|multicall|amm-pool|lending-pool>", contractName: "${verified ?? "<verified source name>"}", role: "<what it does, completing 'The recipient is …'>" }],`,
   );
+  if (gtpR.facts.ownerProjectClear || oliName)
+    console.log(
+      `    GROWTHEPIE_LABELS row: [${chain.constant}, "${address}", ${JSON.stringify(gtpR.facts.ownerProjectClear ?? null)}, ${JSON.stringify(oliName)}],  (GROWTHEPIE_READ ${today})`,
+    );
+  if (ethR.facts.contractName && oliName && ethR.facts.contractName !== oliName)
+    console.log(
+      `    the OLI name \`${oliName}\` and Etherscan's \`${ethR.facts.contractName}\` differ; the build refuses a row whose name differs from the entry's, so settle which is the source name`,
+    );
   const ev = [];
-  if (ethR.facts.contractName)
-    ev.push(
-      `Etherscan V2 for chain ${chainId} gives the verified source name \`${ethR.facts.contractName}\`${ethR.facts.proxy ? ` (a proxy to ${ethR.facts.implementation})` : ""}`,
-    );
-  if (oliR.facts.names?.size)
-    ev.push(
-      `OLI attestation(s) by ${[...oliR.facts.attesters].join(", ")} name it \`${[...oliR.facts.names].join("`, `")}\``,
-    );
   if (gtpR.facts.ownerProject)
     ev.push(
       `growthepie's labels file has it as ${gtpR.facts.ownerProjectClear} (${gtpR.facts.ownerProject}), usage ${gtpR.facts.usageCategory ?? "-"}`,
+    );
+  if (oliR.facts.names?.size)
+    ev.push(
+      `the OLI pool's attestation(s) by ${[...oliR.facts.attesters].join(", ")} name it \`${[...oliR.facts.names].join("`, `")}\``,
+    );
+  if (ethR.facts.contractName)
+    ev.push(
+      `Etherscan V2 for chain ${chainId} gives the verified source name \`${ethR.facts.contractName}\`${ethR.facts.proxy ? ` (a proxy to ${ethR.facts.implementation})` : ""}`,
     );
   if (tokenName)
     ev.push(
       `it answers name() ${JSON.stringify(tokenName)}${chainR.facts.symbol ? ` and symbol() ${JSON.stringify(chainR.facts.symbol)}` : ""}`,
     );
   console.log(
-    `    evidence (${new Date().toISOString().slice(0, 10)}): ${ev.length ? ev.join("; ") : "none of the open sources names it; the protocol's own publication or an explorer read is needed"}`,
+    `    evidence (${today}): ${ev.length ? ev.join("; ") : "none of the open sources names it; the protocol's own publication or an explorer read is needed"}`,
   );
   if (!owner)
     console.log(
-      "    the owning project is not stated by any open source read here: name it from the protocol's own publication",
+      "    the owning project is not stated by growthepie or the pool: name it from the protocol's own publication or the explorer's label (the fallback)",
     );
 }

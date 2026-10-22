@@ -26,7 +26,19 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
  * ── Evidence ────────────────────────────────────────────────────────────────
  * An entry is a claim about the on-chain record, so it carries verifiable
  * evidence or it does not exist. Do not add one from a naming pattern, a vanity
- * prefix or a hunch.
+ * prefix or a hunch. The sources, in the order consulted (Miles, 2026-10-22):
+ *   1. growthepie: its labels file (`api.growthepie.com/v1/labels/full.json`,
+ *      the owning project of the busiest 10,000 contracts on its chains) and
+ *      the Sourcify attestation in the Open Labels Initiative pool it runs
+ *      (`api.openlabelsinitiative.org/attestations?recipient=`, the verified
+ *      source name). What it says is GROWTHEPIE_LABELS below, read on
+ *      GROWTHEPIE_READ; the receipts credit it as CC BY 4.0 asks ("Source:
+ *      growthepie, https://www.growthepie.com"). `scripts/registry-candidate.mjs`
+ *      reads it for a new address.
+ *   2. Where growthepie has no label, or names no owner: the protocol's own
+ *      publication (Aave's address book) and the explorer's verified source
+ *      (Etherscan V2 `getsourcecode`). Every entry's `contractName` is that
+ *      verified source name, and the build checks growthepie's against it.
  *   • The CCIP escrows: Chainlink's TokenAdminRegistry
  *     (0xb22764f98dD05c789929716D677382Df22C05Cb6, `getPool(token)`) returns
  *     exactly these addresses for syrupUSDC and syrupUSDT, and Etherscan
@@ -40,15 +52,16 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
  *   • A WETH gateway is named for what it does, not for whose deployment it
  *     is: Aave and Seamless both run `WrappedTokenGatewayV3`, and the source
  *     name does not say which.
- *   • Aave's Arbitrum gateway is the `WETH_GATEWAY` constant of Aave's own
+ *   • Aave's Arbitrum gateway: growthepie labels it `WrappedTokenGatewayV3`,
+ *     owner Aave (2026-10-22). It is also the `WETH_GATEWAY` constant of Aave's
  *     address book (`bgd-labs/aave-address-book`, `src/AaveV3Arbitrum.sol`,
- *     read 2026-10-21); Arbiscan labels it "Aave: Wrapped Token Gateway V3 2"
- *     (Miles, 2026-10-21). It answers no `name()` or `symbol()`, so the
- *     address-kind read cannot name it and this entry is the only source.
- *   • Zerion's router on Base: Basescan labels it "Zerion: Router" (Miles,
- *     2026-10-21) and its verified source name is `Router`, read through the
- *     Etherscan V2 API for chain 8453 the same day (not a proxy). It answers
- *     no `name()` or `symbol()`.
+ *     2026-10-21) and Arbiscan's "Aave: Wrapped Token Gateway V3 2" (Miles,
+ *     2026-10-21). It answers no `name()` or `symbol()`.
+ *   • Zerion's router on Base: the OLI pool's Sourcify attestation names it
+ *     `Router` (2026-10-22), as does Etherscan V2 for chain 8453 (2026-10-21,
+ *     not a proxy). growthepie's labels file names no owner for it, so the
+ *     owner rests on Basescan's "Zerion: Router" (Miles, 2026-10-21). It
+ *     answers no `name()` or `symbol()`.
  *   • Maple's two SyrupRouters (Etherscan `SyrupRouter`, 2026-10-02) answer
  *     `pool()` with syrupUSDC and syrupUSDT. Every deposit entry point calls
  *     `_deposit(msg.sender, …)`, which deposits into the pool for the router
@@ -58,11 +71,29 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
  *     2026-10-02) hold their markets' collateral and loans for every user at
  *     once, so they are busy open Maple holders that are nobody's position.
  */
+/** growthepie's label for an address, as read on GROWTHEPIE_READ: the owning
+ *  project from its labels file (`owner_project_clear`, the project as
+ *  growthepie names it) and the verified source name from the Sourcify
+ *  attestation in the Open Labels Initiative pool. Either may be absent: the
+ *  file holds the busiest contracts only, and a pool with no attestation on
+ *  the chain says nothing. */
+export interface GrowthepieLabel {
+  owner?: string;
+  contractName?: string;
+}
+
+/** The day GROWTHEPIE_LABELS was read, and the credit CC BY 4.0 asks for. */
+export const GROWTHEPIE_READ = "2026-10-22";
+export const GROWTHEPIE_ATTRIBUTION = { text: "Source: growthepie", href: "https://www.growthepie.com" };
+
 interface KnownContractBase {
   /** Short display name for party chips, e.g. "CoW Protocol". */
   name: string;
   /** The explorer-verified contract name. */
   contractName: string;
+  /** growthepie's label, the registry's first source; absent where it has none.
+   *  Attached from GROWTHEPIE_LABELS when the map is built, never set here. */
+  growthepie?: GrowthepieLabel;
 }
 
 export interface CcipEscrow extends KnownContractBase {
@@ -269,7 +300,69 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [ARBITRUM_CHAIN_ID, "0x5283beced7adf6d003225c13896e536f2d4264ff", WETH_GATEWAY],
 ];
 
+// What growthepie says about each entry, read on GROWTHEPIE_READ:
+// [chain, address, owner from the labels file, contract name from the OLI
+// pool's Sourcify attestation]. `null` where that source has nothing. The nine
+// entries absent here (the syrupUSDT escrow, the five Uniswap V3 pools, the
+// PancakeSwap pair, Magpie's MagpieRouterCore, Enso 0x7d58…6994 and the
+// multicall) rest on the fallback sources alone.
+const GROWTHEPIE_LABELS: [ChainId, string, string | null, string | null][] = [
+  // ── Ethereum ──
+  [MAINNET_CHAIN_ID, "0x20b79d39bd44deee4f89b1e9d0e3b945fde06491", null, "LockReleaseTokenPool"],
+  [MAINNET_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", "CowSwap", "GPv2Settlement"],
+  [MAINNET_CHAIN_ID, "0xd01607c3c5ecaba394d8be377a08590149325722", "Aave", "WrappedTokenGatewayV3"],
+  [MAINNET_CHAIN_ID, "0x893411580e590d62ddbca8a703d61cc4a8c7b2b9", null, "WrappedTokenGatewayV3"],
+  [MAINNET_CHAIN_ID, "0xa434d495249abe33e031fe71a969b81f3c07950d", null, "WrappedTokenGatewayV3"],
+  [MAINNET_CHAIN_ID, "0xd322a49006fc828f9b5b37ab215f99b4e5cab19c", null, "WrappedTokenGatewayV3"],
+  [MAINNET_CHAIN_ID, "0x35bb522b102326ea3f1141661df4626c87000e3e", null, "ParaSwapRepayAdapter"],
+  [MAINNET_CHAIN_ID, "0x02e7b8511831b1b02d9018215a0f8f500ea5c6b3", null, "ParaSwapRepayAdapter"],
+  [MAINNET_CHAIN_ID, "0xadc0a53095a0af87f3aa29fe0715b5c28016364e", null, "ParaSwapLiquiditySwapAdapter"],
+  [MAINNET_CHAIN_ID, "0x872fbcb1b582e8cd0d0dd4327fbfa0b4c2730995", null, "ParaSwapLiquiditySwapAdapter"],
+  [MAINNET_CHAIN_ID, "0x78f8bd884c3d738b74b420540659c82f392820e0", null, "ParaSwapWithdrawSwapAdapter"],
+  [MAINNET_CHAIN_ID, "0x1809f186d680f239420b56948c58f8dbbcdf1e18", null, "ParaSwapRepayAdapter"],
+  [MAINNET_CHAIN_ID, "0x66e1abdb06e7363a618d65a910c540dfed23754f", null, "ParaSwapRepayAdapter"],
+  [MAINNET_CHAIN_ID, "0xd0eae3b730ae736614c66cb40afd1e0063f74286", null, "ParaSwapRepayAdapter"],
+  [MAINNET_CHAIN_ID, "0xd0887aa7febc8962c622493646195e7c76d94fce", null, "ParaSwapLiquiditySwapAdapter"],
+  [MAINNET_CHAIN_ID, "0xd7852e139a7097e119623de0751ae53a61efb442", null, "ParaSwapDebtSwapAdapterV3GHO"],
+  [MAINNET_CHAIN_ID, "0x8761e0370f94f68db8eaa731f4fc581f6ad0bd68", null, "ParaSwapDebtSwapAdapterV3GHO"],
+  [MAINNET_CHAIN_ID, "0x8f30adaa6950b31f675bf8a709bc23f55aa24735", null, "ParaSwapDebtSwapAdapterV3GHO"],
+  [MAINNET_CHAIN_ID, "0xd1b2dec98a95b773c4909b5cd8fb455f467a527f", null, "ParaSwapDebtSwapAdapterV3"],
+  [MAINNET_CHAIN_ID, "0x000000000004444c5dc75cb358380d2e3de08a90", "Uniswap", "PoolManager"],
+  [MAINNET_CHAIN_ID, "0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76", null, "SyrupRouter"],
+  [MAINNET_CHAIN_ID, "0xf007476bb27430795138c511f18f821e8d1e5ee2", null, "SyrupRouter"],
+  [MAINNET_CHAIN_ID, "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb", "Morpho", "Morpho"],
+  [MAINNET_CHAIN_ID, "0x52aa899454998be5b000ad077a46bbe360f4e497", null, "FluidLiquidityProxy"],
+  // ── Base ──
+  [BASE_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", "CowSwap", "GPv2Settlement"],
+  [BASE_CHAIN_ID, "0xa0d9c1e9e48ca30c8d8c3b5d69ff5dc1f6dffc24", "Aave", "WrappedTokenGatewayV3"],
+  [BASE_CHAIN_ID, "0x18cd499e3d7ed42feba981ac9236a278e4cdc2ee", null, "WrappedTokenGatewayV3"],
+  [BASE_CHAIN_ID, "0x8be473dcfa93132658821e67cbeb684ec8ea2e74", null, "WrappedTokenGatewayV3"],
+  [BASE_CHAIN_ID, "0x729b3ea8c005abc58c9150fb57ec161296f06766", null, "WrappedTokenGatewayV3"],
+  [BASE_CHAIN_ID, "0xaeeb3898ede6a6e86864688383e211132baa1af3", null, "WrappedTokenGatewayV3"],
+  [BASE_CHAIN_ID, "0x2e549104c516b8657a7d888494dfbabd7c70b464", null, "ParaSwapLiquiditySwapAdapter"],
+  [BASE_CHAIN_ID, "0x63dfa7c09dc2ff4030d6b8dc2ce6262bf898c8a4", null, "ParaSwapRepayAdapter"],
+  [BASE_CHAIN_ID, "0x5598bbfa2f4fe8151f45bba0a3ede1b54b51a0a9", null, "ParaSwapWithdrawSwapAdapter"],
+  [BASE_CHAIN_ID, "0x111111125421ca6dc452d289314280a0f8842a65", "1Inch", "AggregationRouterV6"],
+  [BASE_CHAIN_ID, "0x19ceead7105607cd444f5ad10dd51356436095a1", null, "OdosRouterV2"],
+  [BASE_CHAIN_ID, "0x9ee06954418687c6fb3a9966f7c46e0a245f0183", null, "MagpieRouterV2"],
+  [BASE_CHAIN_ID, "0x6a000f20005980200259b80c5102003040001068", "Velora (Formerly Paraswap)", "AugustusV6"],
+  [BASE_CHAIN_ID, "0xd7f1dd5d49206349cae8b585fcb0ce3d96f1696f", null, "Router"],
+  [BASE_CHAIN_ID, "0x4fe93ebc4ce6ae4f81601cc7ce7139023919e003", null, "EnsoShortcuts"],
+  // ── Arbitrum ──
+  [ARBITRUM_CHAIN_ID, "0x5283beced7adf6d003225c13896e536f2d4264ff", "Aave", "WrappedTokenGatewayV3"],
+];
+
 const keyOf = (chainId: ChainId, address: string) => `${chainId}:${address.toLowerCase()}`;
+
+const GROWTHEPIE = new Map<string, GrowthepieLabel>();
+for (const [chainId, address, owner, contractName] of GROWTHEPIE_LABELS) {
+  if (GROWTHEPIE.has(keyOf(chainId, address)))
+    throw new Error(`known-infrastructure: duplicate growthepie label ${chainId}:${address}`);
+  GROWTHEPIE.set(keyOf(chainId, address), {
+    ...(owner ? { owner } : {}),
+    ...(contractName ? { contractName } : {}),
+  });
+}
 
 // A malformed or mixed-case key would silently never match, leaving the
 // contract as bare hex (or an escrow rendering as a position) with no sign
@@ -278,10 +371,20 @@ const KNOWN_INFRASTRUCTURE = new Map<string, KnownInfrastructure>();
 for (const [chainId, address, entry] of ENTRIES) {
   if (!isAddress(address, { strict: false }) || address !== address.toLowerCase())
     throw new Error(`known-infrastructure: malformed address key ${address}`);
-  if (KNOWN_INFRASTRUCTURE.has(keyOf(chainId, address)))
-    throw new Error(`known-infrastructure: duplicate entry ${chainId}:${address}`);
-  KNOWN_INFRASTRUCTURE.set(keyOf(chainId, address), entry);
+  const key = keyOf(chainId, address);
+  if (KNOWN_INFRASTRUCTURE.has(key)) throw new Error(`known-infrastructure: duplicate entry ${key}`);
+  const label = GROWTHEPIE.get(key);
+  // growthepie's verified source name and the explorer's must agree: a
+  // disagreement is a wrong entry or a changed label, and either needs a look.
+  if (label?.contractName && label.contractName !== entry.contractName)
+    throw new Error(
+      `known-infrastructure: growthepie names ${key} ${label.contractName}, the entry ${entry.contractName}`,
+    );
+  KNOWN_INFRASTRUCTURE.set(key, label ? { ...entry, growthepie: label } : entry);
 }
+// A label for an address the registry has not entered is a lead, not an entry.
+for (const key of GROWTHEPIE.keys())
+  if (!KNOWN_INFRASTRUCTURE.has(key)) throw new Error(`known-infrastructure: growthepie label without an entry ${key}`);
 
 /**
  * The registry entry for an address on a chain, or `undefined` for every real

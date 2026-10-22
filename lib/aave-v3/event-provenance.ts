@@ -33,7 +33,12 @@ import type {
 } from "@/lib/shared/types/event-shape";
 import { AAVE_V3_POOL, AAVE_V3_ORACLE } from "./asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { getProtocolContract, type ProtocolContract } from "@/lib/shared/known-infrastructure";
+import {
+  getProtocolContract,
+  GROWTHEPIE_ATTRIBUTION,
+  GROWTHEPIE_READ,
+  type ProtocolContract,
+} from "@/lib/shared/known-infrastructure";
 
 // The DEFAULT Pool a receipt names. Event-level receipts override it from the
 // coords (see `poolOf`), because the same cards render Core, Prime, EtherFi,
@@ -290,12 +295,12 @@ export const transferCounterpartyProv = (dir: "in" | "out", coords: V3Coords, co
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this transfer — the address the aToken's transfer log names as the ${dir === "in" ? "sender" : "recipient"}. It is the other side of the move; who signed the transaction is a separate question.${named ? ` Rails names the address ${named.name}: its verified contract source is \`${named.contractName}\`, ${named.role}.` : ""}`,
+    summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this transfer — the address the aToken's transfer log names as the ${dir === "in" ? "sender" : "recipient"}. It is the other side of the move; who signed the transaction is a separate question.${named ? knownContractSentence(named) : ""}`,
     contract: poolOf(coords),
     via: `${captureVia(coords)} · BalanceTransfer log · ${dir === "in" ? "from" : "to"}`,
     inputs: eventInputs(
       coords,
-      named && counterparty ? [counterpartyNameInput(named, explorerUrl(chainId, "address", counterparty))] : [],
+      named && counterparty ? counterpartyNameInputs(named, explorerUrl(chainId, "address", counterparty)) : [],
     ),
   };
 };
@@ -564,7 +569,7 @@ const PARASWAP_LEFTOVER: Partial<Record<AaveV3SwapDetail["kind"], string>> = {
 const paraswapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail, adapter: string): Provenance => {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
   const named = getProtocolContract(adapter, chainId);
-  const nameInput = named ? [counterpartyNameInput(named, explorerUrl(chainId, "address", adapter))] : [];
+  const nameInput = named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", adapter)) : [];
   // The withdraw swap adapter does emit a log: its row pairs to that (mig 254).
   if (swap.kind === "withdraw_and_swap")
     return {
@@ -584,7 +589,7 @@ const paraswapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail, adapter: st
     summary: `The ParaSwap adapter that carried this swap — the adapter writes no trade log, so this position's rows are paired by what the adapter did: ${PARASWAP_SHAPE[swap.kind]}, for this account in one transaction, and made no other call for it there.${leftover ? ` ${leftover}` : ""} A shared transaction alone does not make the pairing.`,
     contract: { name: named?.name ?? "ParaSwap adapter", address: adapter },
     via: `${captureVia(coords)} · paired by the adapter that made every leg's call`,
-    inputs: eventInputs(coords, named ? [counterpartyNameInput(named, explorerUrl(chainId, "address", adapter))] : []),
+    inputs: eventInputs(coords, named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", adapter)) : []),
   };
 };
 
@@ -613,21 +618,44 @@ export const swapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail): Provena
       ...trade("orderUid", swap.orderUid, "orderUid"),
       ...trade("sellAmount", swap.raw.tradeSellAmount, "sellAmount"),
       ...trade("buyAmount", swap.raw.tradeBuyAmount, "buyAmount"),
-      ...(named ? [counterpartyNameInput(named, explorerUrl(chainId, "address", GPV2_SETTLEMENT))] : []),
+      ...(named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", GPV2_SETTLEMENT)) : []),
     ]),
   };
 };
 
-/** The receipt leaf for a registry name: off-chain (Rails' registry), with the
- *  explorer's verified-source page as the reader's check. */
-export const counterpartyNameInput = (named: ProtocolContract, addressHref: string): ProvInput => ({
-  label: "name",
-  value: named.name,
-  kind: "offchain",
-  pclass: "offchain",
-  note: `Rails' registry of known contracts · verified source \`${named.contractName}\``,
-  verify: { kind: "etherscan", href: `${addressHref}#code`, text: "Confirm the verified contract source" },
-});
+/** The sentence a receipt's summary adds for a named contract: growthepie's
+ *  owner where it labels one, the verified source behind it. */
+export const knownContractSentence = (named: ProtocolContract): string =>
+  ` Rails names the address ${named.name}${named.growthepie?.owner ? `, which growthepie labels ${named.growthepie.owner}` : ""}: its verified contract source is \`${named.contractName}\`, ${named.role}.`;
+
+/** The receipt leaves for a registry name, in the order the registry consults
+ *  its sources (its header): growthepie's label where it has one, credited as
+ *  CC BY 4.0 asks, then the name from Rails' registry with the explorer's
+ *  verified-source page as the reader's check. */
+export const counterpartyNameInputs = (named: ProtocolContract, addressHref: string): ProvInput[] => [
+  ...(named.growthepie
+    ? [
+        {
+          label: "label",
+          value: [named.growthepie.owner, named.growthepie.contractName && `\`${named.growthepie.contractName}\``]
+            .filter(Boolean)
+            .join(" · "),
+          kind: "offchain" as const,
+          pclass: "offchain" as const,
+          note: `growthepie's contract labels (CC BY 4.0) · read ${GROWTHEPIE_READ}`,
+          verify: { kind: "link" as const, ...GROWTHEPIE_ATTRIBUTION },
+        },
+      ]
+    : []),
+  {
+    label: "name",
+    value: named.name,
+    kind: "offchain",
+    pclass: "offchain",
+    note: `Rails' registry of known contracts · verified source \`${named.contractName}\``,
+    verify: { kind: "etherscan", href: `${addressHref}#code`, text: "Confirm the verified contract source" },
+  },
+];
 
 /** Supplied balance of a reserve AFTER this event = Σ supply/withdraw/transfer/seizure deltas.
  *  `raw` is the MV's integer-valued running sum (ctx.raw.supplyAfter). */

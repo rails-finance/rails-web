@@ -113,7 +113,10 @@ export function SearchBox({
         autoCapitalize="off"
         autoFocus={autoFocus}
         {...{ [SLASH_TARGET]: "" }}
-        className={`w-full rounded-md bg-raised ${FIELD[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        // A hairline in light mode: on the white canvas the raised field is a
+        // shade off the page and needs an edge to read as a field; the dark
+        // canvas lifts it on its own.
+        className={`w-full rounded-md border border-rb-300 bg-raised dark:border-transparent ${FIELD[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
       />
       {children}
     </div>
