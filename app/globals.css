@@ -140,7 +140,9 @@
      near-white panels read as elevated sheets on it. Surface overlays darken
      on hover (warm-black alphas) because the panels they ride are near-white —
      a white-alpha lift would be invisible on a white panel. */
-  --background: oklch(1 0 0); /* #ffffff: the canvas is white and the panels sit a shade below it (Miles, 22 Oct 2026) */
+  --background: oklch(
+    1 0 0
+  ); /* #ffffff: the canvas is white and the panels sit a shade below it (Miles, 22 Oct 2026) */
 
   /* Tinted with the paper hue (at low chroma) rather than pure black, so
      hover/active fills on the panels read as deeper paper, not neutral grey —
