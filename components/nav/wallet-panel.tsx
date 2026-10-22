@@ -204,6 +204,7 @@ export function WalletPanel() {
       <div
         aria-hidden="true"
         onClick={close}
+        data-anatomy="H16.1"
         className="absolute inset-0 bg-white/60 backdrop-blur-[4px] dark:bg-black/60"
         style={{ opacity: isOpen ? 1 : 0, transition: still ? "none" : `opacity ${isOpen ? EASE_IN : EASE_OUT}` }}
       />
@@ -215,6 +216,7 @@ export function WalletPanel() {
         aria-hidden={!isOpen}
         inert={!isOpen}
         data-search-launcher-panel=""
+        data-anatomy="H16"
         className="absolute inset-y-0 left-0 flex w-full flex-col border-r border-rb-200 bg-raised shadow-xl md:w-[400px] dark:border-rb-800"
         style={{
           transform: isOpen ? "translateX(0)" : "translateX(-100%)",
