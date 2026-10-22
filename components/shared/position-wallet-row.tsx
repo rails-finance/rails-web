@@ -18,6 +18,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ToolsMenu } from "@/components/shared/tools-menu";
+import { WalletElsewhereLine } from "@/components/shared/wallet-elsewhere-line";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
@@ -156,27 +157,33 @@ export function PositionWalletRow({
     // strip sits before Tools on the address line, and wraps right-aligned
     // when the row is too narrow for both. DOM order is address, strip,
     // Tools. The wallet starts CARD_INSET_START in;
-    // Tools stays at the page edge.
-    <div
-      className={`flex min-h-7 flex-wrap items-start gap-x-2 gap-y-1.5 ${CARD_INSET_START}`}
-      data-position-wallet-row=""
-      data-anatomy="H13"
-    >
-      <span className="flex min-h-7 min-w-0 flex-auto basis-0 items-center gap-2 text-xs sm:basis-auto text-rb-500">
-        {pill && owner.prefix}
-        {pill && (owner.wrap ? owner.wrap(pill) : pill)}
-        {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
-        {owner.extra}
-      </span>
-      {strip && (
-        <span
-          className="order-last flex min-h-7 basis-full shrink-0 items-center justify-end gap-1 sm:order-none sm:ml-auto sm:basis-auto sm:gap-2"
-          data-position-strip=""
-        >
-          {strip}
+    // Tools stays at the page edge. The line under it (H13.2) names what else
+    // Rails holds for the wallet.
+    <>
+      <div
+        className={`flex min-h-7 flex-wrap items-start gap-x-2 gap-y-1.5 ${CARD_INSET_START}`}
+        data-position-wallet-row=""
+        data-anatomy="H13"
+      >
+        <span className="flex min-h-7 min-w-0 flex-auto basis-0 items-center gap-2 text-xs sm:basis-auto text-rb-500">
+          {pill && owner.prefix}
+          {pill && (owner.wrap ? owner.wrap(pill) : pill)}
+          {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
+          {owner.extra}
         </span>
-      )}
-      {tools !== false && <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>}
-    </div>
+        {strip && (
+          <span
+            className="order-last flex min-h-7 basis-full shrink-0 items-center justify-end gap-1 sm:order-none sm:ml-auto sm:basis-auto sm:gap-2"
+            data-position-strip=""
+          >
+            {strip}
+          </span>
+        )}
+        {tools !== false && (
+          <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>
+        )}
+      </div>
+      {owner.wallet && <WalletElsewhereLine wallet={owner.wallet} />}
+    </>
   );
 }

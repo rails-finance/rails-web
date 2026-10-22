@@ -15,6 +15,7 @@ import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/familie
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
 import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
+import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
 
 /** The whole read's budget, the summary route's time included. */
 export const WALLET_BUDGET_MS = 8000;
@@ -177,6 +178,84 @@ export function readWallet(address: string, readerIp?: string): Promise<WalletRe
   });
   if (cache.size > 500) {
     for (const [k, v] of cache) if (Date.now() - v.at >= WALLET_CACHE_MS) cache.delete(k);
+  }
+  return read;
+}
+
+// The counts alone, for the line under every explorer's wallet row (decision
+// 0050 point 10): the summary route's rows and no head read. A family whose
+// figures are stored (no `head`, the Arbitrum lane) is shaped as the wallet
+// view shapes it, which makes no read and splits a Compound V3 row into one
+// position per Comet; every other row is one position. Kept 60 s per address.
+const countsCache = new Map<string, { at: number; read: Promise<WalletCounts> }>();
+
+export function readWalletCounts(address: string, readerIp?: string): Promise<WalletCounts> {
+  const key = address.toLowerCase();
+  const hit = countsCache.get(key);
+  if (hit && Date.now() - hit.at < WALLET_CACHE_MS) return hit.read;
+  const read = (async (): Promise<WalletCounts> => {
+    const t0 = Date.now();
+    const empty = { address: key, positions: [], families: [], total: 0, open: 0, closed: 0, chains: [] };
+    let summary: WalletSummaryAnswer;
+    try {
+      summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(key, signal, readerIp));
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      return { ...empty, readAt: Math.floor(Date.now() / 1000), ms: Date.now() - t0, error };
+    }
+    const positions: WalletCountsPosition[] = [];
+    const taken = new Set<WalletSummaryRow>();
+    for (const f of WALLET_FAMILIES) {
+      if (f.head) continue;
+      const rows = summary.rows.filter((r) => r.chain === f.summaryChain && r.family === f.summaryFamily);
+      if (rows.length === 0) continue;
+      try {
+        for (const p of await f.shape(rows)) {
+          positions.push({
+            chain: f.summaryChain,
+            family: f.summaryFamily,
+            positionId: p.positionId,
+            status: p.status,
+            href: p.href,
+          });
+        }
+        rows.forEach((r) => taken.add(r));
+      } catch {
+        // The rows count one each below.
+      }
+    }
+    for (const r of summary.rows) {
+      if (!taken.has(r))
+        positions.push({ chain: r.chain, family: r.family, positionId: r.positionId, status: r.status, href: r.href });
+    }
+    const families = new Map<string, WalletCountsFamily>();
+    for (const p of positions) {
+      const k = `${p.chain}:${p.family}`;
+      const fam = families.get(k) ?? { chain: p.chain, family: p.family, positions: 0, open: 0, closed: 0 };
+      fam.positions += 1;
+      if (p.status === "open") fam.open += 1;
+      else fam.closed += 1;
+      families.set(k, fam);
+    }
+    const open = positions.filter((p) => p.status === "open").length;
+    return {
+      address: key,
+      positions,
+      families: [...families.values()],
+      total: positions.length,
+      open,
+      closed: positions.length - open,
+      chains: [...new Set(positions.map((p) => p.chain))],
+      readAt: Math.floor(Date.now() / 1000),
+      ms: Date.now() - t0,
+    };
+  })();
+  countsCache.set(key, { at: Date.now(), read });
+  void read.then((r) => {
+    if (r.error) countsCache.delete(key);
+  });
+  if (countsCache.size > 500) {
+    for (const [k, v] of countsCache) if (Date.now() - v.at >= WALLET_CACHE_MS) countsCache.delete(k);
   }
   return read;
 }
