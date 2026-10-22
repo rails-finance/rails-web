@@ -113,7 +113,7 @@ function FamilyCard({ card }: { card: WalletCard }) {
 export const atRisk = (p: WalletPosition): boolean => (p.buffer != null && p.buffer < 0) || p.liquidatable === true;
 
 /** The roster id of a position's explorer, the glyph key. */
-const protocolId = (p: WalletPosition): string =>
+export const protocolId = (p: WalletPosition): string =>
   PROTOCOLS.find((e) => e.chainId === p.chain && e.slug === p.family)?.id ?? p.family;
 
 export function WalletPositionCard({ position: p }: { position: WalletPosition }) {
@@ -123,6 +123,16 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
     protocol: { id: protocolId(p), name: p.familyName },
     chain: { id: p.chain, name: chain },
     atRisk: atRisk(p),
+    // The Arbitrum cards carry their stored read's block in the card.
+    stamp: p.notRead ? (
+      // An Aave V3 Base account the chain has not been read for (open point 8).
+      <span className="text-[11px] font-medium text-rb-500" data-wallet-not-read="">
+        Not read
+      </span>
+    ) : (
+      !p.card.kind.endsWith("-arbitrum") &&
+      (p.readAtBlock != null || p.readAt != null) && <ReadStamp block={p.readAtBlock} at={p.readAt} inLink />
+    ),
   };
   return (
     <div
@@ -142,22 +152,6 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
           <FamilyCard card={p.card} />
         </Link>
       </PositionCardEdgeContext.Provider>
-      {/* An Aave V3 Base account the chain has not been read for (open point 8). */}
-      {p.notRead ? (
-        <div className="mt-1 flex justify-end pr-2">
-          <span className="text-[11px] font-medium text-rb-500" data-wallet-not-read="">
-            Not read
-          </span>
-        </div>
-      ) : (
-        /* The Arbitrum cards carry their stored read's block in the card. */
-        !p.card.kind.endsWith("-arbitrum") &&
-        (p.readAtBlock != null || p.readAt != null) && (
-          <div className="mt-1 flex justify-end pr-2">
-            <ReadStamp block={p.readAtBlock} at={p.readAt} />
-          </div>
-        )
-      )}
     </div>
   );
 }

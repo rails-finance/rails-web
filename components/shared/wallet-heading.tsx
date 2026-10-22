@@ -26,10 +26,9 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { WalletElsewhereLine } from "@/components/shared/wallet-elsewhere-line";
-import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
-import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import type { ChainId } from "@/lib/shared/chains";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
 
 /** The shell both surfaces draw. `title` is the name line (the h1 and what
@@ -66,16 +65,6 @@ export function WalletHeading({
       </div>
       {end}
     </div>
-  );
-}
-
-/** A chain's glyph, muted, its name as the accessible name and the tip. */
-export function ChainMark({ chainId }: { chainId: ChainId }) {
-  const name = chainMeta(chainId).name;
-  return (
-    <RevealTip tip={name} label={name} focusable className="inline-flex rounded-sm focus-ring">
-      <ChainGlyph id={chainId} className="size-3.5 text-rb-500" />
-    </RevealTip>
   );
 }
 

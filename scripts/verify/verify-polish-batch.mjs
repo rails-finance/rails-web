@@ -44,10 +44,9 @@ check(
 const nestedSpanCount = await bar.locator("span").count();
 check("3 URL text is one unit (no nested staged span)", nestedSpanCount === 0, `nested spans: ${nestedSpanCount}`);
 
-// 4. Caption pill rounded-sm
-const cap = page.locator("p", { hasText: "Live position, shared with permission." }).first();
-const capClass = (await cap.getAttribute("class")) || "";
-check("4 caption pill rounded-sm", capClass.includes("rounded-sm") && !capClass.includes("rounded-full"));
+// 4. The attribution caption is gone (Miles, 22 Oct 2026)
+const capCount = await page.getByText("Live position, shared with permission.").count();
+check("4 no attribution caption", capCount === 0, `count: ${capCount}`);
 
 // 9. View-live pill: blue border wins (computed style, not class list)
 const pill = page.locator("a >> span", { hasText: "View live position" }).first();

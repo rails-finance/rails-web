@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { protocolBrand, protocolForPathname } from "@/lib/shared/protocols";
@@ -20,6 +20,8 @@ export interface PositionCardEdge {
   protocol?: { id: string; name: string };
   chain?: { id: ChainId; name: string };
   atRisk?: boolean;
+  /** The read's recency (H6), at the top right of the card's heading row. */
+  stamp?: ReactNode;
 }
 export const PositionCardEdgeContext = createContext<PositionCardEdge | null>(null);
 

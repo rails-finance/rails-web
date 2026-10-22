@@ -50,6 +50,13 @@ const FIELD: Record<Size, string> = {
   md: "h-9 pl-8 pr-3 text-base sm:text-sm",
   lg: "h-12 pl-10 pr-3 text-base",
 };
+// The home page's field (the one lg search): a full pill whose placeholder
+// shows on hover and focus only, with a blue glow behind it in dark. The field
+// keeps its accessible name at rest.
+const HERO_FIELD =
+  "relative rounded-full placeholder:opacity-0 placeholder:transition-opacity hover:placeholder:opacity-100 focus:placeholder:opacity-100";
+const HERO_BUTTON =
+  "inline-flex h-12 shrink-0 cursor-pointer items-center rounded-full bg-blue-500 px-6 text-base font-medium text-white transition-colors hover:bg-blue-600 focus-ring disabled:opacity-60";
 const GLYPH: Record<Size, { size: number; left: string }> = {
   sm: { size: 14, left: "left-3" },
   md: { size: 14, left: "left-3" },
@@ -93,6 +100,12 @@ export function SearchBox({
   const glyph = GLYPH[size];
   return (
     <div className={`relative ${className}`} ref={containerRef} data-anatomy={anatomy || undefined}>
+      {size === "lg" && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-x-2 -inset-y-1 hidden rounded-full bg-blue-500/25 blur-2xl dark:block"
+        />
+      )}
       <Search
         size={glyph.size}
         className={`pointer-events-none absolute ${glyph.left} top-1/2 -translate-y-1/2 text-rb-500`}
@@ -116,7 +129,7 @@ export function SearchBox({
         // A hairline in light mode: on the white canvas the raised field is a
         // shade off the page and needs an edge to read as a field; the dark
         // canvas lifts it on its own.
-        className={`w-full rounded-md border border-rb-300 bg-raised dark:border-transparent ${FIELD[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        className={`w-full ${size === "lg" ? HERO_FIELD : "rounded-md"} border border-rb-300 bg-raised dark:border-transparent ${FIELD[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
       />
       {children}
     </div>
@@ -179,6 +192,9 @@ export interface FrontDoorSearchProps {
   onDone?: () => void;
   anatomy?: string;
   className?: string;
+  /** Drawn to the right of "Look up" on the same line (the home page's sample
+   *  wallet); below sm it wraps under the row, right-aligned. */
+  after?: ReactNode;
 }
 
 /** The search as a form: field, "Look up", the bookmarks, and the reason a
@@ -193,6 +209,7 @@ export function FrontDoorSearch({
   onDone,
   anatomy = "H15",
   className = "",
+  after,
 }: FrontDoorSearchProps) {
   const hydrated = useHydrated();
   const problemId = useId();
@@ -215,44 +232,43 @@ export function FrontDoorSearch({
       role="search"
       {...ctrlWaking(hydrated)}
     >
-      <div className="flex items-center gap-2">
-        <SearchBox
-          value={value}
-          onChange={(v) => {
-            setValue(v);
-            if (problem) setProblem(null);
-          }}
-          onFocus={() => setFocused(true)}
-          placeholder={placeholder}
-          size={size}
-          anatomy=""
-          className="min-w-0 flex-1"
-          containerRef={containerRef}
-          autoFocus={autoFocus}
-          invalid={problem != null}
-          describedBy={problem ? problemId : undefined}
-        >
-          {bookmarks && (
-            <WalletHistoryDropdown
-              show={showBookmarks}
-              containerRef={containerRef}
-              onClose={() => setFocused(false)}
-              onPick={(address) => {
-                setFocused(false);
-                go(address);
-              }}
-              protocol={bookmarks}
-              hideWhenEmpty={hideEmptyBookmarks}
-            />
-          )}
-        </SearchBox>
-        <button
-          type="submit"
-          className={`${NAV_BUTTON} shrink-0 ${size === "lg" ? "h-12 px-5 text-base" : ""}`}
-          disabled={resolving}
-        >
-          {resolving ? "Looking up…" : LOOK_UP}
-        </button>
+      <div className={after ? "flex flex-wrap items-center justify-end gap-2" : "flex items-center gap-2"}>
+        <div className={after ? "flex min-w-0 flex-1 items-center gap-2 max-sm:basis-full" : "contents"}>
+          <SearchBox
+            value={value}
+            onChange={(v) => {
+              setValue(v);
+              if (problem) setProblem(null);
+            }}
+            onFocus={() => setFocused(true)}
+            placeholder={placeholder}
+            size={size}
+            anatomy=""
+            className="min-w-0 flex-1"
+            containerRef={containerRef}
+            autoFocus={autoFocus}
+            invalid={problem != null}
+            describedBy={problem ? problemId : undefined}
+          >
+            {bookmarks && (
+              <WalletHistoryDropdown
+                show={showBookmarks}
+                containerRef={containerRef}
+                onClose={() => setFocused(false)}
+                onPick={(address) => {
+                  setFocused(false);
+                  go(address);
+                }}
+                protocol={bookmarks}
+                hideWhenEmpty={hideEmptyBookmarks}
+              />
+            )}
+          </SearchBox>
+          <button type="submit" className={size === "lg" ? HERO_BUTTON : `${NAV_BUTTON} shrink-0`} disabled={resolving}>
+            {resolving ? "Looking up…" : LOOK_UP}
+          </button>
+        </div>
+        {after}
       </div>
       {problem && (
         <p id={problemId} role="alert" className="text-xs text-rb-500" data-wallet-lookup-problem="">

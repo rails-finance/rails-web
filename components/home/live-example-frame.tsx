@@ -8,6 +8,13 @@ import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PILL_CTA } from "@/lib/shared/ui-grammar";
 import { LIVE_EXAMPLE_TROVE_ID, LIVE_EXAMPLE_TROVE_PATH, type LiveExampleData } from "@/lib/home/live-example";
+import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
+import { PositionCardStripProvider, usePublishPositionCardStrip } from "@/components/shared/position-card-strip";
+import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
+import { RecencyStamp } from "@/components/shared/recency-stamp";
+import { collateralPriceInfo } from "@/lib/liquity/trove-page-words";
+import { chainMeta } from "@/lib/shared/chains";
+import { protocolForPathname } from "@/lib/shared/protocols";
 
 /**
  * Live example frame — the hero's proof-by-showing: the Trove page's body
@@ -40,6 +47,41 @@ const SCALE = 0.65;
  *  with the fade swallowing the rest. A phone's stacked layout reaches the
  *  rows only past a screen's height, so it stops at the flows panel. */
 const VISIBLE_H = "h-[600px] sm:h-[720px]";
+
+/** The example's explorer, for the card's sidebar and the sections' bars: off
+ *  the explorers the roster entry is not found from the page's path. */
+const EXAMPLE_ENTRY = protocolForPathname(LIVE_EXAMPLE_TROVE_PATH);
+const EXAMPLE_EDGE: PositionCardEdge | null = EXAMPLE_ENTRY
+  ? {
+      protocol: { id: EXAMPLE_ENTRY.id, name: EXAMPLE_ENTRY.label },
+      chain: { id: EXAMPLE_ENTRY.chainId, name: chainMeta(EXAMPLE_ENTRY.chainId).name },
+    }
+  : null;
+
+/** The address bar's path: the example's href with the Trove id shortened. */
+const EXAMPLE_URL = `rails.finance${LIVE_EXAMPLE_TROVE_PATH.replace(
+  LIVE_EXAMPLE_TROVE_ID,
+  `${LIVE_EXAMPLE_TROVE_ID.slice(0, 4)}…${LIVE_EXAMPLE_TROVE_ID.slice(-4)}`,
+)}`;
+
+/** The strip the Trove page's top row hands the card's heading row: the
+ *  recency stamp, then the collateral's price and BOLD's. */
+function HeroStrip({ data }: { data: LiveExampleData }) {
+  const collSymbol = data.trove.collateralType;
+  const price = data.prices?.[collSymbol.toLowerCase() as keyof OraclePricesData];
+  const assets: LatestPriceAsset[] = [
+    ...(price ? [{ symbol: collSymbol, price, info: collateralPriceInfo(collSymbol) }] : []),
+    { symbol: "BOLD", price: 1 },
+  ];
+  const open = data.trove.status === "open";
+  usePublishPositionCardStrip(
+    <>
+      {open && <RecencyStamp />}
+      <LatestPrices assets={assets} bare />
+    </>,
+  );
+  return null;
+}
 
 /** The Trove page's body, fed from the home page's data. */
 function HeroTroveComposition({ data }: { data: LiveExampleData }) {
@@ -84,32 +126,37 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
   const troveMeta = useMemo(() => ({ owner: trove.owner ?? null, total: totalEvents }), [trove.owner, totalEvents]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 md:px-6">
-      <TroveBody
-        still
-        trove={trove}
-        liveState={liveState}
-        prices={prices}
-        debtInFront={debtInFront}
-        trovesAhead={trovesAhead}
-        debtInFrontLoading={false}
-        exports={null}
-        loadingMessage={null}
-        liquityEvents={rowEvents}
-        tl={tl}
-        boundary={null}
-        economicsEvents={towerEvents}
-        chronoEvents={chronoEvents}
-        flowEvents={flowEvents}
-        flowTimeline={flowTimeline}
-        flowFocus={flowFocus}
-        flowsRead="done"
-        now={now}
-        daily={dailyObs != null}
-        surplusState={null}
-        troveMeta={troveMeta}
-      />
-    </div>
+    <PositionCardStripProvider>
+      <PositionCardEdgeContext.Provider value={EXAMPLE_EDGE}>
+        <div className="mx-auto max-w-7xl px-4 md:px-6">
+          <HeroStrip data={data} />
+          <TroveBody
+            still
+            trove={trove}
+            liveState={liveState}
+            prices={prices}
+            debtInFront={debtInFront}
+            trovesAhead={trovesAhead}
+            debtInFrontLoading={false}
+            exports={null}
+            loadingMessage={null}
+            liquityEvents={rowEvents}
+            tl={tl}
+            boundary={null}
+            economicsEvents={towerEvents}
+            chronoEvents={chronoEvents}
+            flowEvents={flowEvents}
+            flowTimeline={flowTimeline}
+            flowFocus={flowFocus}
+            flowsRead="done"
+            now={now}
+            daily={dailyObs != null}
+            surplusState={null}
+            troveMeta={troveMeta}
+          />
+        </div>
+      </PositionCardEdgeContext.Provider>
+    </PositionCardStripProvider>
   );
 }
 
@@ -175,7 +222,7 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
             <span className="w-2.5 h-2.5 rounded-full bg-[#f4bf4f]" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#61c554]" />
             <span className="absolute left-1/2 -translate-x-1/2 max-w-[65%] truncate font-sans text-xs text-rb-500/40 bg-rb-100 dark:bg-rb-900 group-hover:text-foreground group-hover:bg-background transition-colors duration-300 rounded-md px-3 py-1">
-              rails.finance/liquity-v2/trove/WETH/{LIVE_EXAMPLE_TROVE_ID.slice(0, 4)}…{LIVE_EXAMPLE_TROVE_ID.slice(-4)}
+              {EXAMPLE_URL}
             </span>
             {/* Liveness marker — a solid green pill owned by the chrome bar
                 rather than pasted over the render. */}
@@ -246,18 +293,16 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
           </Link>
         </div>
 
-        {/* Attribution — the position is a real user's; the caption keeps the
-            claim of realness credible without a receipt-sized footnote. On
-            hover-less pointers it also carries the frame's link, since the
-            hover-revealed pill never shows there. Set as a right-aligned pill
-            in the chrome bar's own surface pairing. */}
-        <div className="relative mt-4 flex justify-end">
-          <p className="inline-flex items-center gap-1 rounded-sm bg-rb-100 dark:bg-rb-900 px-3 py-1 text-xs text-rb-500">
-            Live position, shared with permission.{" "}
-            <Link href={LIVE_EXAMPLE_TROVE_PATH} className="text-foreground [@media(hover:hover)]:hidden">
-              View this position live <span className="text-blue-500">→</span>
-            </Link>
-          </p>
+        {/* On hover-less pointers the frame's link, since the hover-revealed
+            pill never shows there: a right-aligned pill in the chrome bar's
+            surface pairing. */}
+        <div className="relative mt-4 flex justify-end [@media(hover:hover)]:hidden">
+          <Link
+            href={LIVE_EXAMPLE_TROVE_PATH}
+            className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
+          >
+            View this position live <span className="text-blue-500">→</span>
+          </Link>
         </div>
       </div>
     </div>

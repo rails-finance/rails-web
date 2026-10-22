@@ -270,12 +270,13 @@
      the card's frame from the roster) at a fixed lightness and chroma per
      theme, so every protocol's zone is the same weight of tint. `zone` is the
      wide panel, `edge` the narrow border. The text and mark on the panel are
-     neutral. `--brand-strength: 0` on a card with no hue draws a grey zone. */
+     neutral, the name and chain glyph (text) a step quieter than the mark.
+     `--brand-strength: 0` on a card with no hue draws a grey zone. */
   --brand-zone-l: 0.93;
   --brand-zone-c: 0.035;
   --brand-edge-l: 0.8;
   --brand-edge-c: 0.08;
-  --brand-zone-text: oklch(0.47 0.012 var(--paper-hue));
+  --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
   --brand-zone-mark: oklch(0.36 0.012 var(--paper-hue));
 }
 
@@ -289,7 +290,7 @@
   --brand-zone-c: 0.075;
   --brand-edge-l: 0.45;
   --brand-edge-c: 0.1;
-  --brand-zone-text: oklch(0.75 0.015 260);
+  --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
   --brand-zone-mark: oklch(0.9 0.01 260);
 
   /* Dark mode specific colors */

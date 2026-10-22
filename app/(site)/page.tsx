@@ -46,7 +46,7 @@ export default async function Home() {
 
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
-        <section className="pt-10 pb-12" data-anatomy="S2">
+        <section className="pb-12" data-anatomy="S2">
           <LiveExampleFrame data={liveExample} />
         </section>
 

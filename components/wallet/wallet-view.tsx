@@ -12,19 +12,29 @@
 // a sink included, is drawn the same with one line naming its count.
 
 import Link from "next/link";
-import { ChainMark, WalletHeading } from "@/components/shared/wallet-heading";
+import type { CSSProperties } from "react";
+import { WalletHeading } from "@/components/shared/wallet-heading";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { protocolForPathname } from "@/lib/shared/protocols";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
-import { WalletPositionCard, atRisk } from "@/components/wallet/wallet-position-card";
+import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wallet-position-card";
+import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import { Icon } from "@/components/icons/icon";
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import { protocolBrand } from "@/lib/shared/protocols";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatDate } from "@/lib/date";
-import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { chainMeta } from "@/lib/shared/chains";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
+/** A closed row's panel, and the closed table header's. */
+const ROW_PANEL = "rounded-2xl border border-rb-300/40 bg-raised dark:border-rb-700/40";
+/** A closed row's link: the panel with the open cards' blue border on hover
+ *  (POSITION_CARD_FRAME_BOX) and on keyboard focus. */
+const ROW_LINK = `${ROW_PANEL} transition-colors hover:border-blue-500 focus-visible:border-blue-500 dark:hover:border-blue-500 dark:focus-visible:border-blue-500`;
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -139,7 +149,45 @@ function lifetime(from?: number, to?: number): string | null {
   return m ? `${y} yr ${m} mo` : `${y} yr`;
 }
 
-const HISTORY_GRID = "grid grid-cols-[110px_170px_120px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-4";
+const HISTORY_GRID = "grid grid-cols-[95px_110px_170px_120px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-4";
+
+/** A closed row's transaction count behind the card foot's ⇄ glyph. */
+function TxCount({ n }: { n: number }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Icon name="arrow-left-right" size={12} />
+      {n.toLocaleString("en-US")}
+      <span className="sr-only">{n === 1 ? " transaction" : " transactions"}</span>
+    </span>
+  );
+}
+
+/** The protocol's brand hue for the zone and edge tokens; a grey zone where
+ *  the roster has none. */
+function hueStyle(id: string): CSSProperties {
+  const hue = protocolBrand(id)?.hue ?? null;
+  return { "--brand-hue": hue ?? 0, ...(hue == null ? { "--brand-strength": 0 } : {}) } as CSSProperties;
+}
+
+/** A closed row's lead: the protocol's mark and the chain's glyph on the
+ *  protocol's tint, as the card's sidebar draws them (C20). Spans the row's
+ *  height from its left edge. */
+function ClosedZone({ p }: { p: WalletPosition }) {
+  const id = protocolId(p);
+  return (
+    <span
+      className="flex w-[95px] shrink-0 items-center justify-evenly self-stretch rounded-l-[15px] bg-brand-zone"
+      style={hueStyle(id)}
+      data-closed-zone={id}
+    >
+      <ProtocolIcon id={id} className="h-[18px] w-[18px] shrink-0 text-brand-mark [&:is(img)]:grayscale" />
+      <span className="flex items-center text-brand-zone">
+        <ChainGlyph id={p.chain} className="h-[18px] w-[18px] shrink-0" />
+        <span className="sr-only">{chainMeta(p.chain).name}</span>
+      </span>
+    </span>
+  );
+}
 
 function History({ closed }: { closed: WalletPosition[] }) {
   const rows = [...closed].sort((a, b) => (b.history?.closedAt ?? 0) - (a.history?.closedAt ?? 0));
@@ -169,53 +217,66 @@ function History({ closed }: { closed: WalletPosition[] }) {
         has stored.
       </p>
       {/* Below sm each closed position is a short block; the table from sm up. */}
-      <ul className={`${TILE} !px-0 !py-0 sm:hidden`} aria-label="Closed positions">
+      <ul className="flex flex-col gap-3 sm:hidden" aria-label="Closed positions">
         {rows.map((p) => {
           const h = p.history ?? {};
           const life = lifetime(h.openedAt, h.closedAt);
           return (
-            <li
-              key={`${p.chain}:${p.family}:${p.positionId}`}
-              className="border-b border-rb-300/40 last:border-b-0 dark:border-rb-700/40"
-            >
-              <Link href={p.href} prefetch={false} className="flex flex-col gap-1 px-4 py-3 text-sm">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-foreground">{p.familyName}</span>
-                  <span
-                    className={`rounded-xs px-2 py-0.5 text-xs font-bold tracking-wider ${OUTCOME_TONE[p.status] ?? OUTCOME_TONE.closed}`}
-                  >
-                    {p.status.toUpperCase()}
+            <li key={`${p.chain}:${p.family}:${p.positionId}`}>
+              {/* The open cards' phone form (C20.1): the hue's 6px edge, the
+                  mark and name at the left of the first line, the chain's
+                  glyph at its right. */}
+              <Link href={p.href} prefetch={false} className={`${ROW_LINK} flex overflow-hidden text-sm`}>
+                <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" style={hueStyle(protocolId(p))} />
+                <span className="flex min-w-0 flex-1 flex-col gap-1 py-3 pl-5 pr-4">
+                  <span className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone">
+                      <ProtocolIcon id={protocolId(p)} className="h-4 w-4 shrink-0 text-rb-500" />
+                      {p.familyName}
+                    </span>
+                    <span
+                      className={`ml-auto rounded-xs px-2 py-0.5 text-xs font-bold tracking-wider ${OUTCOME_TONE[p.status] ?? OUTCOME_TONE.closed}`}
+                    >
+                      {p.status.toUpperCase()}
+                    </span>
+                    <span className="flex items-center text-brand-zone">
+                      <ChainGlyph id={p.chain} className="h-4 w-4 shrink-0" />
+                      <span className="sr-only">{chainMeta(p.chain).name}</span>
+                    </span>
                   </span>
-                </span>
-                <span className="text-xs text-rb-500">
-                  {[p.market, chainMeta(p.chain).name, h.closedAt != null ? `closed ${formatDate(h.closedAt)}` : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-                {(h.size || h.result) && (
-                  <span className="text-xs text-foreground/80">
-                    {[h.size ? `${h.size}${h.sizeNote ? ` (${h.sizeNote})` : ""}` : null, h.result]
+                  <span className="text-xs text-rb-500">
+                    {[p.market, h.closedAt != null ? `closed ${formatDate(h.closedAt)}` : null]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
-                )}
-                {(life || h.txCount != null) && (
-                  <span className="text-xs text-rb-500">
-                    {[life, h.txCount != null ? plural(h.txCount, "txn") : null].filter(Boolean).join(" · ")}
-                  </span>
-                )}
+                  {(h.size || h.result) && (
+                    <span className="text-xs text-foreground/80">
+                      {[h.size ? `${h.size}${h.sizeNote ? ` (${h.sizeNote})` : ""}` : null, h.result]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  )}
+                  {(life || h.txCount != null) && (
+                    <span className="text-xs text-rb-500">
+                      {life}
+                      {life && h.txCount != null && " · "}
+                      {h.txCount != null && <TxCount n={h.txCount} />}
+                    </span>
+                  )}
+                </span>
               </Link>
             </li>
           );
         })}
       </ul>
-      <div className={`${TILE} hidden overflow-hidden !px-0 !py-0 sm:block`}>
+      <div className="hidden sm:block">
         <div className="overflow-x-auto">
-          <div className="min-w-[860px]" role="table" aria-label="Closed positions">
+          <div className="flex min-w-[860px] flex-col gap-3" role="table" aria-label="Closed positions">
             <div
               role="row"
-              className={`${HISTORY_GRID} border-b border-rb-300/40 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-rb-500 dark:border-rb-700/40`}
+              className={`${HISTORY_GRID} ${ROW_PANEL} py-3 pr-5 text-xs font-semibold uppercase tracking-wide text-rb-500`}
             >
+              <div role="columnheader" aria-hidden="true" />
               <div role="columnheader">Closed</div>
               <div role="columnheader">Protocol</div>
               <div role="columnheader">Outcome</div>
@@ -234,18 +295,21 @@ function History({ closed }: { closed: WalletPosition[] }) {
                   href={p.href}
                   prefetch={false}
                   role="row"
-                  className={`${HISTORY_GRID} items-center border-b border-rb-300/40 px-5 py-3 text-sm transition-colors last:border-b-0 hover:bg-rb-100 dark:border-rb-700/40 dark:hover:bg-rb-800`}
+                  className={`${HISTORY_GRID} items-center ${ROW_LINK} py-3 pr-5 text-sm`}
                   data-history-row={p.positionId}
                   data-family={p.family}
                 >
+                  <div role="cell" className="-my-3 flex self-stretch">
+                    <ClosedZone p={p} />
+                  </div>
                   <div role="cell" className="text-foreground/80">
                     {h.closedAt != null ? formatDate(h.closedAt) : "—"}
                   </div>
                   <div role="cell" className="flex min-w-0 flex-col">
                     <span className="font-medium text-foreground">{p.familyName}</span>
-                    <span className="truncate text-xs text-rb-500">
-                      {[p.market, chainMeta(p.chain).name].filter(Boolean).join(" · ")}
-                    </span>
+                    {p.market && (
+                      <span className="truncate text-xs uppercase tracking-wide text-rb-500">{p.market}</span>
+                    )}
                   </div>
                   <div role="cell">
                     <span
@@ -264,7 +328,11 @@ function History({ closed }: { closed: WalletPosition[] }) {
                   </div>
                   <div role="cell" className="flex flex-col text-right">
                     <span>{life ?? ""}</span>
-                    {h.txCount != null && <span className="text-xs text-rb-500">{plural(h.txCount, "txn")}</span>}
+                    {h.txCount != null && (
+                      <span className="text-xs text-rb-500">
+                        <TxCount n={h.txCount} />
+                      </span>
+                    )}
                   </div>
                 </Link>
               );
@@ -304,7 +372,6 @@ export function WalletView({
   const unread = read.families.filter((r) => r.headRead === "failed");
   const stamps = open.map((p) => p.readAt).filter((t): t is number => t != null);
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
-  const chains: ChainId[] = [...new Set(all.map((p) => p.chain))];
   const atRiskCount = open.filter(atRisk).length;
   const registry = useReceiptRegistry();
   const bookmarkScope = open[0] ? protocolForPathname(open[0].href)?.session : undefined;
@@ -349,13 +416,6 @@ export function WalletView({
             }
             lines={
               <>
-                {chains.length > 0 && (
-                  <div className="flex items-center gap-1.5" data-wallet-chains={chains.join(",")}>
-                    {chains.map((c) => (
-                      <ChainMark key={c} chainId={c} />
-                    ))}
-                  </div>
-                )}
                 {read.total > 0 && (
                   <div className="text-xs text-rb-500" data-wallet-count={read.total}>
                     {plural(read.total, "position")} · {openAll.length} open · {closed.length} closed

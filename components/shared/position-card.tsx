@@ -753,7 +753,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           <span
             role="img"
             aria-label={identity.chain.name}
-            className="flex h-4 items-center text-rb-500"
+            className="flex h-4 items-center text-brand-zone"
             data-pill="chain"
             data-anatomy="C20.2"
           >
@@ -767,11 +767,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const markHref = detail ? identity?.protocol.href : undefined;
   const protocolMark = identity ? (
     <span
-      className="inline-flex items-center gap-1.5 text-xs font-semibold text-rb-500 md:hidden"
+      className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone md:hidden"
       data-card-protocol={identity.protocol.id}
       data-anatomy="C20.1"
     >
-      <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0" />
+      <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500" />
       {markHref ? (
         <Link
           href={markHref}
@@ -795,54 +795,56 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             beside a squeezed label. */}
         {/* On the wallet view an identity left empty by its dropped wallet pill
             takes no gap. */}
-        {/* Below md a detail card's left group dissolves into the row, so the
-            strip can take a line of its own under the mark, the identity and
-            the chain (ui-jobs 430). */}
-        <span
-          className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${wallet ? "[&>:empty]:hidden" : ""} ${detail ? "max-md:contents" : ""}`}
-        >
+        {/* A detail card reads market or ID (and the status tag) at the left,
+            then the recency stamp, the price strip and the ⋮ at the right.
+            Below md the right group dissolves into the row, so the strip
+            takes a line of its own under the mark and the identity, right-
+            aligned (ui-jobs 430). */}
+        <span className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${wallet ? "[&>:empty]:hidden" : ""}`}>
           {protocolMark}
           {detail ? (
             <>
-              {/* The page's price strip and recency stamp (H7.2, H6; ui-jobs
-                  430), handed over by DetailTopRow. The negative margins keep
-                  the row at its text height and the price trigger's label on
-                  the headlines' left edge. */}
-              <PositionCardStripSlot>
-                {(strip) => (
-                  <span
-                    className="-my-1.5 -ml-1.5 flex shrink-0 items-center gap-1 max-md:order-last max-md:basis-full sm:-ml-2 sm:gap-2"
-                    data-position-strip=""
-                  >
-                    {strip}
-                  </span>
-                )}
-              </PositionCardStripSlot>
+              {slots.identity}
               {slots.status && <StatusTag status={slots.status} />}
             </>
           ) : (
             <>
               {slots.lead ?? <ListingPill status={slots.status} />}
               {slots.identity}
+              {/* The wallet view draws the market and ID at the left, the
+                  read's stamp at the right. */}
+              {wallet && slots.tag && <QuietTipsContext.Provider value={true}>{slots.tag}</QuietTipsContext.Provider>}
             </>
           )}
         </span>
-        {detail
-          ? (slots.identity || chainPill) && (
+        {detail ? (
+          <span className="ml-auto flex items-center gap-2 max-md:contents">
+            {/* The page's price strip and recency stamp (H7.2, H6; ui-jobs
+                    430), handed over by DetailTopRow. The negative margin keeps
+                    the row at its text height. */}
+            <PositionCardStripSlot>
+              {(strip) => (
+                <span
+                  className="-my-1.5 flex shrink-0 items-center gap-1 max-md:order-last max-md:basis-full max-md:justify-end sm:gap-2"
+                  data-position-strip=""
+                >
+                  {strip}
+                </span>
+              )}
+            </PositionCardStripSlot>
+            {chainPill && <span className="max-md:ml-auto md:hidden">{chainPill}</span>}
+          </span>
+        ) : (
+          ((!wallet && slots.tag) || (wallet && edge?.stamp) || chainPill) && (
+            // Quiet like the figures: the listing card is one link.
+            <QuietTipsContext.Provider value={true}>
               <span className="ml-auto flex items-center gap-2">
-                {slots.identity}
+                {wallet ? edge?.stamp && <span className="-my-1.5 flex items-center">{edge.stamp}</span> : slots.tag}
                 {chainPill}
               </span>
-            )
-          : (slots.tag || chainPill) && (
-              // Quiet like the figures: the listing card is one link.
-              <QuietTipsContext.Provider value={true}>
-                <span className="ml-auto flex items-center gap-2">
-                  {slots.tag}
-                  {chainPill}
-                </span>
-              </QuietTipsContext.Provider>
-            )}
+            </QuietTipsContext.Provider>
+          )
+        )}
       </div>
       {/* The card's ⋮ at the top right of the header, whatever wraps beside it,
           centred on the heading's first line. */}

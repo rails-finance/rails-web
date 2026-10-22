@@ -178,10 +178,11 @@ export function DetailTopRow({
   const priced = prices(true);
   const stamped = showStamp && !closed;
   const inCard = usePublishPositionCardStrip(
+    // In the card the stamp stands before the price, next to the ⋮.
     owner && (priced || stamped) ? (
       <>
-        {priced}
         {stamped && <RecencyStamp />}
+        {priced}
       </>
     ) : null,
   );

@@ -15,7 +15,7 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 
 /**
  * Home hero — the site's front door (rails-ops decision 0051): the headline
- * says the door ("Look up a wallet"), the Rails line states the promise, then
+ * names the place ("Destination DeFi"), the Rails line states the promise, then
  * the search (H15) landing on the wallet view, a sample wallet to try
  * (`SAMPLE_WALLETS`), and the ticked terms (read-only / no wallet connection /
  * the chains). The explorer directory lives further down the page
@@ -55,16 +55,19 @@ export function HomeHero() {
     // overflow-x-clip: the glow is clipped at the sides, and the search's
     // bookmarks dropdown is free to run below the section over the live
     // example (Miles, 22 Oct 2026: it was cut at the section's foot).
-    <section className="flex flex-col items-center text-center pt-24 pb-4 overflow-x-clip relative" data-anatomy="S1">
+    <section
+      className="flex flex-col items-center text-center pt-24 pb-10 sm:pb-15 overflow-x-clip relative"
+      data-anatomy="S1"
+    >
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
       <h1
-        className="relative font-semibold leading-none tracking-tighter mb-4 px-4 text-5xl sm:text-6xl lg:text-7xl animate-hero-fade-up"
+        className="relative font-semibold leading-none tracking-tighter mb-4 px-4 text-6xl sm:text-7xl lg:text-8xl animate-hero-fade-up"
         style={{ animationDelay: "0.1s" }}
       >
-        Look up a <span className="marketing">wallet</span>
+        Destination <span className="marketing">DeFi</span>
       </h1>
       <p
-        className="relative font-sans font-light text-rb-500 tracking-tight mb-8 px-4 text-xl sm:text-2xl lg:text-3xl animate-hero-fade-up"
+        className="relative font-sans font-light text-rb-500 tracking-tight mb-12 px-4 text-lg sm:mb-20 sm:text-xl animate-hero-fade-up"
         style={{ animationDelay: "0.2s" }}
       >
         Explore any DeFi position, verified directly from the chain.
@@ -73,20 +76,25 @@ export function HomeHero() {
         className="relative w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
       >
-        <FrontDoorSearch size="lg" bookmarks="all" hideEmptyBookmarks />
-        <p className="mt-1.5 text-sm">
-          <Link
-            href={walletHref(SAMPLE_WALLETS[0].address)}
-            className="text-blue-500 hover:text-blue-600 hover:underline"
-            data-sample-wallet={SAMPLE_WALLETS[0].address}
-          >
-            Try a sample wallet
-          </Link>
-        </p>
+        <FrontDoorSearch
+          size="lg"
+          bookmarks="all"
+          hideEmptyBookmarks
+          after={
+            <Link
+              href={walletHref(SAMPLE_WALLETS[0].address)}
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm px-1 text-sm font-medium text-blue-500 hover:text-blue-600 focus-ring"
+              data-sample-wallet={SAMPLE_WALLETS[0].address}
+              aria-label="Try a sample wallet"
+            >
+              Sample <span aria-hidden="true">→</span>
+            </Link>
+          }
+        />
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
-        className="relative mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
+        className="relative mt-16 flex flex-wrap sm:mt-[120px] items-center justify-center gap-x-5 gap-y-1 px-4 text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
         style={{ animationDelay: "0.3s" }}
       >
         {TERMS.map((term) => (

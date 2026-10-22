@@ -8,7 +8,7 @@
 // The age reads "1 min" with no "ago": the glyph carries the meaning, and the
 // accessible name keeps the full words (ui-jobs 429).
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { Box } from "lucide-react";
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
@@ -28,11 +28,14 @@ export function ReadStamp({
   block,
   at,
   label = "Read",
+  inLink = false,
 }: {
   block?: number;
   at?: number;
   /** The accessible name's first word ("Updated 1 min ago"). */
   label?: string;
+  /** Inside a card's link: a press toggles the reading and does not open the card. */
+  inLink?: boolean;
 }) {
   const [reading, setReading] = useState<"age" | "block">("age");
   const [now, setNow] = useState<number | null>(null);
@@ -51,7 +54,11 @@ export function ReadStamp({
   const text = showAge ? age : blockText;
   if (text == null) return null;
   const Icon = showAge ? BlockClockIcon : Box;
-  const toggle = () => {
+  const toggle = (e: MouseEvent) => {
+    if (inLink) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (at == null || block == null) return;
     const next = reading === "age" ? "block" : "age";
     setReading(next);

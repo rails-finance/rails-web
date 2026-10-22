@@ -10,7 +10,9 @@ import type { Glyph } from "@/components/icons/protocol-glyphs";
  *
  *   Ethereum: the two halves of the octahedron (ethereum.org brand assets),
  *     the facet shading dropped.
- *   Base: the circle with its left-hand bar cut out (base.org brand kit).
+ *   Base: the rounded-corner square of the 2025 brand (corner radius 7.9% of
+ *     the side), the shape `ChainMark` in `components/shared/explorer-mark.tsx`
+ *     draws in Base blue on the home page and the explorer headers.
  *   Arbitrum: the hexagon's ring with the "A" inside (arbitrum.io brand kit),
  *     the two-tone strokes drawn as one stroke per leg.
  *
@@ -26,7 +28,7 @@ const BASE_MARK: Glyph = {
   viewBox: "-8 -8 127 127",
   paths: [
     {
-      d: "M54.9 110C85.4 110 110 85.4 110 55S85.4 0 54.9 0C26 0 2.4 22.2 0 50.4h72.8v9.2H0C2.4 87.9 26 110 54.9 110z",
+      d: "M12.9 5H97.1A7.9 7.9 0 0 1 105 12.9V97.1A7.9 7.9 0 0 1 97.1 105H12.9A7.9 7.9 0 0 1 5 97.1V12.9A7.9 7.9 0 0 1 12.9 5Z",
     },
   ],
 };
