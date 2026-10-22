@@ -204,4 +204,8 @@ export const CARD_INSET_START = "pl-2";
 
 /** The position card's frame: the raised rounded box, with the listing row's
  *  blue hover border (the row <Link> declares the group). */
-export const POSITION_CARD_FRAME = `rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised ${CARD_PAD_X} py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500`;
+export const POSITION_CARD_FRAME_BOX =
+  "rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500";
+/** The card's content inset inside the frame. */
+export const POSITION_CARD_PAD = `${CARD_PAD_X} py-4`;
+export const POSITION_CARD_FRAME = `${POSITION_CARD_FRAME_BOX} ${POSITION_CARD_PAD}`;

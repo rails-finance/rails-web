@@ -262,11 +262,33 @@
   /* The faintest slice's strength, in percent. */
   --donut-floor: 25;
   --donut-other: var(--color-rb-300);
+
+  /* The position card's sidebar (C20, rails-ops TO-DO-position-card 427;
+     color-grammar, Identity): the protocol's brand hue (`--brand-hue`, set on
+     the card's frame from the roster) at a fixed lightness and chroma per
+     theme, so every protocol's zone is the same weight of tint. `zone` is the
+     wide panel, `edge` the narrow border. The text and mark on the panel are
+     neutral. `--brand-strength: 0` on a card with no hue draws a grey zone. */
+  --brand-zone-l: 0.93;
+  --brand-zone-c: 0.035;
+  --brand-edge-l: 0.8;
+  --brand-edge-c: 0.08;
+  --brand-zone-text: oklch(0.47 0.012 var(--paper-hue));
+  --brand-zone-mark: oklch(0.36 0.012 var(--paper-hue));
 }
 
 .dark {
   /* Dark mode colors (current theme as dark) */
   --foreground: #ffffff;
+
+  /* The sidebar's tint on the dark card (C20): Aave's panel near #3f2238 and
+     Morpho's near #1e3a7a, the 22 Oct 2026 mock-ups. */
+  --brand-zone-l: 0.31;
+  --brand-zone-c: 0.075;
+  --brand-edge-l: 0.45;
+  --brand-edge-c: 0.1;
+  --brand-zone-text: oklch(0.75 0.015 260);
+  --brand-zone-mark: oklch(0.9 0.01 260);
 
   /* Dark mode specific colors */
   --card-background: #12151e;
@@ -420,6 +442,20 @@ html.dark {
 }
 @utility bg-raised {
   background-color: var(--surface-raised);
+}
+/* The sidebar's tint (C20): `--brand-hue` resolves on the element that draws
+   it, inherited from the card's frame. */
+@utility bg-brand-zone {
+  background-color: oklch(var(--brand-zone-l) calc(var(--brand-zone-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
+}
+@utility bg-brand-edge {
+  background-color: oklch(var(--brand-edge-l) calc(var(--brand-edge-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
+}
+@utility text-brand-zone {
+  color: var(--brand-zone-text);
+}
+@utility text-brand-mark {
+  color: var(--brand-zone-mark);
 }
 @utility border-raised {
   border-color: var(--surface-raised);

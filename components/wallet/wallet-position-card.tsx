@@ -3,10 +3,10 @@
 // One open position on the wallet view (rails-ops decision 0050, steps 2 and 3): the
 // family's listing card, drawn by the family's own listing component from its
 // listing row exactly as its listing draws it, inside one link to the
-// position's page (N2). Through `PositionCardEdgeContext` the page leads the
-// heading row with the protocol's mark and name, ends it with the chain's
-// glyph, drops the wallet pill and the OPEN pill, and keeps AT RISK; under the
-// card, the read's freshness (H6's form). Nothing inside the card changes.
+// position's page (N2). Through `PositionCardEdgeContext` the page names the
+// card's protocol and chain for its sidebar (C20), drops the wallet pill and
+// the OPEN pill, and keeps AT RISK; under the card, the read's freshness (H6's
+// form). Nothing inside the card changes.
 
 import Link from "next/link";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";

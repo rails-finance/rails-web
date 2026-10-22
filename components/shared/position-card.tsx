@@ -31,16 +31,33 @@
 // `data-card-over-cap` on a card past the caps); each headline keeps
 // `data-card-row=<i>` and adds `data-card-head=<id>`; the counters carry
 // `data-card-counters`, inside a listing card's `data-card-foot`.
+//
+// The sidebar (C20, rails-ops TO-DO-position-card 427): on every surface the
+// frame draws the card's protocol and chain in a zone tinted with the
+// protocol's brand hue. From md, a panel at the left (the mark, the name, the
+// chain at its foot) with the body beside it; below md, a border at the left,
+// the mark and name leading the heading row and the chain glyph at its right
+// end. The zone is static and carries no text, control or figure in the hue.
 
 import { useContext, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
-import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
+import {
+  PositionCardEdgeContext,
+  usePositionCardIdentity,
+  type PositionCardIdentity,
+} from "@/components/shared/position-card-edge";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { formatUsdValue } from "@/lib/utils/format";
-import { OVERLAY_HEADING, POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
+import {
+  OVERLAY_HEADING,
+  POSITION_CARD_FRAME,
+  POSITION_CARD_FRAME_BOX,
+  POSITION_CARD_PAD,
+  SECTION_HEADING,
+} from "@/lib/shared/ui-grammar";
 import {
   POSITION_CARD_SCOPE,
   Prov,
@@ -262,11 +279,36 @@ const OPEN_GRID = "grid grid-cols-2 lg:grid-cols-4 gap-4";
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
 
 /** The "Position summary" heading at the left of a detail card's heading row. */
-function PositionSummaryTitle({ text = "Position summary" }: { text?: string }) {
+function PositionSummaryTitle({ text = "Position summary", wideOnly }: { text?: string; wideOnly?: boolean }) {
+  // Below md a card with a sidebar draws the protocol in the heading's place.
   return (
-    <h2 className={`${SECTION_HEADING} text-rb-500`} data-position-summary="">
+    <h2 className={`${SECTION_HEADING} text-rb-500 ${wideOnly ? "max-md:hidden" : ""}`} data-position-summary="">
       {text}
     </h2>
+  );
+}
+
+/** The sidebar's panel from md (C20): the protocol's mark and name at the top,
+ *  the chain at the foot. Its tint is the frame's backdrop. */
+function SidebarPanel({ identity, detail }: { identity: PositionCardIdentity; detail: boolean }) {
+  return (
+    <div
+      className={`relative hidden w-[150px] shrink-0 flex-col items-center px-3 pb-4 text-center md:flex ${detail ? "pt-10" : "pt-5"}`}
+      data-anatomy="C20"
+      data-card-sidebar={identity.protocol.id}
+    >
+      <ProtocolIcon
+        id={identity.protocol.id}
+        className={`${detail ? "h-[72px] w-[72px]" : "h-10 w-10"} shrink-0 text-brand-mark [&:is(img)]:grayscale`}
+      />
+      <span className={`${detail ? "mt-3" : "mt-2"} text-sm leading-snug text-brand-zone`}>
+        {identity.protocol.name}
+      </span>
+      <span className="mt-auto flex items-center gap-1.5 pt-4 text-xs text-brand-zone" data-card-sidebar-chain="">
+        <ChainGlyph id={identity.chain.id} className="h-4 w-4 shrink-0" />
+        {identity.chain.name}
+      </span>
+    </div>
   );
 }
 
@@ -624,34 +666,37 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const menu = detail ? slots.menu && <DetailMenu menu={slots.menu} /> : slots.menu;
   const edge = useContext(PositionCardEdgeContext);
   const wallet = !detail && edge?.surface === "wallet";
-  const chainPill =
-    !detail && edge?.chain ? (
-      // Outside the row's quiet tips: the glyph's tip names the chain.
+  const identity = usePositionCardIdentity();
+  // Below md the sidebar's protocol and chain stand in the heading row (C20.1,
+  // C20.2); from md the panel carries them.
+  const chainPill = identity ? (
+    <span className="flex items-center md:hidden">
+      {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
       <QuietTipsContext.Provider value={false}>
-        <RevealTip tip={edge.chain.name} focusable align="end" className="rounded-sm focus-ring">
+        <RevealTip tip={identity.chain.name} focusable align="end" className="rounded-sm focus-ring">
           <span
             role="img"
-            aria-label={edge.chain.name}
+            aria-label={identity.chain.name}
             className="flex h-4 items-center text-rb-500"
             data-pill="chain"
-            data-anatomy="W6"
+            data-anatomy="C20.2"
           >
-            <ChainGlyph id={edge.chain.id} className="h-4 w-4" />
+            <ChainGlyph id={identity.chain.id} className="h-4 w-4" />
           </span>
         </RevealTip>
       </QuietTipsContext.Provider>
-    ) : null;
-  const protocolMark =
-    wallet && edge?.protocol ? (
-      <span
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/80 dark:text-foreground/70"
-        data-wallet-protocol={edge.protocol.id}
-        data-anatomy="W5"
-      >
-        <ProtocolIcon id={edge.protocol.id} className="h-4 w-4 shrink-0" />
-        {edge.protocol.name}
-      </span>
-    ) : null;
+    </span>
+  ) : null;
+  const protocolMark = identity ? (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-semibold text-rb-500 md:hidden"
+      data-card-protocol={identity.protocol.id}
+      data-anatomy="C20.1"
+    >
+      <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0" />
+      {identity.protocol.name}
+    </span>
+  ) : null;
   const panel = detail ? slots.panel : undefined;
   const over = overCap(slots);
 
@@ -666,7 +711,10 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           {protocolMark}
           {detail ? (
             <>
-              <PositionSummaryTitle text={slots.surface === "detail" ? slots.heading : undefined} />
+              <PositionSummaryTitle
+                text={slots.surface === "detail" ? slots.heading : undefined}
+                wideOnly={identity != null}
+              />
               {slots.status && <StatusTag status={slots.status} />}
             </>
           ) : (
@@ -677,7 +725,12 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           )}
         </span>
         {detail
-          ? slots.identity
+          ? (slots.identity || chainPill) && (
+              <span className="ml-auto flex items-center gap-2">
+                {slots.identity}
+                {chainPill}
+              </span>
+            )
           : (slots.tag || chainPill) && (
               // Quiet like the figures: the listing card is one link.
               <QuietTipsContext.Provider value={true}>
@@ -730,29 +783,57 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
       data-prov-lit={lit ? "" : undefined}
       data-card-over-cap={over ?? undefined}
-      className={POSITION_CARD_FRAME}
+      className={identity ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
+      style={
+        identity
+          ? ({
+              "--brand-hue": identity.hue ?? 0,
+              ...(identity.hue == null ? { "--brand-strength": 0 } : {}),
+            } as CSSProperties)
+          : undefined
+      }
     >
-      {slots.notice}
-      {body}
-      {detail && (
+      {identity && (
         <>
-          {slots.band}
-          {slots.foot}
-          <ProvenanceInfoTabs
-            className="mt-3"
-            rowExtra={
-              counters ? <span className="ml-auto flex items-center gap-2 self-center">{counters}</span> : undefined
-            }
-            explanation={slots.explainer.body ?? undefined}
-            learnMore={slots.learnMore}
-            viewHref={slots.explainer.viewHref}
-            explanationDefaultOpen={slots.explainer.defaultOpen}
-            onExplanationToggle={slots.explainer.onToggle}
-            anatomy={CARD_ANATOMY}
-            label={explanationLabel(slots.heading)}
+          {/* The zone's tint: the card's shape clipped to its left edge, a
+              border below md and the panel (with the body's rounded corners
+              over it) from md. */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-[15px] bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone md:[clip-path:inset(0_calc(100%_-_166px)_0_0)]"
           />
+          <SidebarPanel identity={identity} detail={detail} />
         </>
       )}
+      <div
+        className={
+          identity
+            ? `relative min-w-0 flex-1 md:rounded-[15px] md:bg-raised ${POSITION_CARD_PAD} max-md:pl-[26px]`
+            : "contents"
+        }
+      >
+        {slots.notice}
+        {body}
+        {detail && (
+          <>
+            {slots.band}
+            {slots.foot}
+            <ProvenanceInfoTabs
+              className="mt-3"
+              rowExtra={
+                counters ? <span className="ml-auto flex items-center gap-2 self-center">{counters}</span> : undefined
+              }
+              explanation={slots.explainer.body ?? undefined}
+              learnMore={slots.learnMore}
+              viewHref={slots.explainer.viewHref}
+              explanationDefaultOpen={slots.explainer.defaultOpen}
+              onExplanationToggle={slots.explainer.onToggle}
+              anatomy={CARD_ANATOMY}
+              label={explanationLabel(slots.heading)}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 
