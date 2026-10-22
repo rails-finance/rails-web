@@ -2,7 +2,7 @@
 
 // The position card's sidebar carried through a detail page's sections (rails-ops
 // TO-DO-position-card 427; anatomy P2.1, P3.1): from md a bar the card's width
-// (80px) in the protocol's brand hue at the section's left, bare (no mark, name
+// (40px) in the protocol's brand hue at the section's left, bare (no mark, name
 // or glyph); below md the 6px border the card takes. The section keeps its box
 // and content; from md it stands beside the bar, and below md the bare
 // timeline steps 6px in beside its border as the boxes' content does. Off the explorers (no roster
@@ -44,7 +44,7 @@ export function SectionSidebar({
   const boxed = section === "flows";
   return (
     <div
-      className={`relative md:pl-20 ${boxed ? "" : "max-md:pl-1.5"}`}
+      className={`relative md:pl-10 ${boxed ? "" : "max-md:pl-1.5"}`}
       style={style}
       data-card-sidebar-frame={section}
       hidden={hidden}
@@ -55,7 +55,7 @@ export function SectionSidebar({
               in the box's rounded corners (`mask-sidebar-corners`). */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-0 hidden w-24 rounded-2xl bg-brand-zone mask-sidebar-corners md:block"
+            className="pointer-events-none absolute inset-y-0 left-0 hidden w-14 rounded-2xl bg-brand-zone mask-sidebar-corners md:block"
             data-anatomy={ANATOMY[section]}
             data-card-sidebar={section}
           />
@@ -67,7 +67,7 @@ export function SectionSidebar({
         <>
           <span
             aria-hidden="true"
-            className={`pointer-events-none absolute inset-y-0 left-0 w-full ${EDGE} md:w-20 md:rounded-r-none md:bg-brand-zone md:[clip-path:none]`}
+            className={`pointer-events-none absolute inset-y-0 left-0 w-full ${EDGE} md:w-10 md:rounded-r-none md:bg-brand-zone md:[clip-path:none]`}
             data-anatomy={ANATOMY[section]}
             data-card-sidebar={section}
           />

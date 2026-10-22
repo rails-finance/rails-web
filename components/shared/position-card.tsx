@@ -34,7 +34,7 @@
 //
 // The sidebar (C20, rails-ops TO-DO-position-card 427): on every surface the
 // frame draws the card's protocol and chain in a zone tinted with the
-// protocol's brand hue. From md, an 80px bar at the left (the mark, the name
+// protocol's brand hue. From md, a 40px bar at the left (the mark, the name
 // reading upward, the chain's glyph at its foot) with the body beside it as its
 // own rounded box; a detail page's sections carry the bar on
 // (`SectionSidebar`); below md, a border at the left,
@@ -293,8 +293,8 @@ function PositionSummaryTitle({ text = "Position summary", wideOnly }: { text?: 
 /** The bar's width from md (C20), and how far its tint runs on under the
  *  body's rounded corners. The page's sections draw theirs at the same width
  *  (`SectionSidebar`). */
-export const SIDEBAR_BAR_W = "md:w-20";
-const SIDEBAR_TINT_CLIP = "md:[clip-path:inset(0_calc(100%_-_96px)_0_0)]";
+export const SIDEBAR_BAR_W = "md:w-10";
+const SIDEBAR_TINT_CLIP = "md:[clip-path:inset(0_calc(100%_-_56px)_0_0)]";
 
 /** The name's short form where the bar is too short for the whole name: the
  *  version alone for a protocol that has one ("Aave V3" → "V3"), else the
@@ -304,8 +304,8 @@ export function shortProtocolName(name: string): string {
   return version ? version[0] : name.split(/\s+/)[0];
 }
 
-/** The bar's name, rotated to read upward between the mark and the chain. The
- *  whole name stands where its length fits the space the bar leaves it;
+/** The bar's name, rotated to read upward, standing on the chain's glyph with
+ *  the bar's empty run above it, under the mark. The whole name stands where its length fits the space the bar leaves it;
  *  otherwise the short form. Measured, so a card of any height picks its own. */
 function SidebarName({ name }: { name: string }) {
   const slotRef = useRef<HTMLSpanElement>(null);
@@ -329,13 +329,13 @@ function SidebarName({ name }: { name: string }) {
   const shown = full ? name : shortProtocolName(name);
   const vertical = "whitespace-nowrap [writing-mode:vertical-rl] rotate-180";
   return (
-    <span ref={slotRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden py-3">
-      <span ref={fullRef} aria-hidden="true" className={`invisible absolute text-xs leading-none ${vertical}`}>
+    <span ref={slotRef} className="relative flex min-h-0 flex-1 flex-col items-center justify-end overflow-hidden py-2">
+      <span ref={fullRef} aria-hidden="true" className={`invisible absolute text-[11px] leading-none ${vertical}`}>
         {name}
       </span>
       <span
         aria-hidden="true"
-        className={`text-xs leading-none text-brand-zone ${vertical}`}
+        className={`text-[11px] leading-none text-brand-zone ${vertical}`}
         data-card-sidebar-name={full ? "full" : "short"}
       >
         {shown}
@@ -351,11 +351,11 @@ function SidebarName({ name }: { name: string }) {
 function SidebarPanel({ identity }: { identity: PositionCardIdentity }) {
   return (
     <div
-      className={`relative hidden shrink-0 flex-col items-center py-4 ${SIDEBAR_BAR_W} md:flex`}
+      className={`relative hidden shrink-0 flex-col items-center py-3 ${SIDEBAR_BAR_W} md:flex`}
       data-anatomy="C20"
       data-card-sidebar={identity.protocol.id}
     >
-      <ProtocolIcon id={identity.protocol.id} className="h-8 w-8 shrink-0 text-brand-mark [&:is(img)]:grayscale" />
+      <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-brand-mark [&:is(img)]:grayscale" />
       <SidebarName name={identity.protocol.name} />
       {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
       <QuietTipsContext.Provider value={false}>
