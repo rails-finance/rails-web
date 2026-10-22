@@ -17,6 +17,7 @@ import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { usePublishTodayPrices } from "@/components/shared/price-basis";
+import { usePublishPositionCardStrip } from "@/components/shared/position-card-strip";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
@@ -92,10 +93,14 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
 }
 
 /** The top of a position page: Back, then the wallet heading (rails-ops
- *  decisions/0052; ui-jobs 429), which carries the page's h1, the protocol
- *  line linking to the listing, the price strip, the chain's recency and the
- *  Tools menu (`children`). A position page draws no protocol title and no
- *  chain chooser; below md the header bar keeps the chain trigger.
+ *  decisions/0052; ui-jobs 429), which carries the page's h1 and the Tools
+ *  menu (`children`). A position page draws no protocol title and no chain
+ *  chooser; below md the header bar keeps the chain trigger.
+ *
+ *  The price strip and the chain's recency stand at the left of the detail
+ *  card's heading row where the page draws one (ui-jobs 430,
+ *  `position-card-strip.tsx`), and at the heading's right end where it draws
+ *  none (an event page, a loading branch).
  *
  *  The strip is what replaced the fixed bottom price dock on these views
  *  (rails-ops TO-DO-ui-jobs 48).
@@ -150,10 +155,10 @@ export function DetailTopRow({
   children?: ReactNode;
 }) {
   const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
-  // Its own scope (the towers' and panels' convention): the row sits ahead of
-  // — a sibling of — the position card, so a route whose card is the only
-  // opened scope leaves this trigger's price tracing nothing (rails-ops
-  // provenance-receipts-grammar.md §7, the unscoped-sibling gap).
+  // Its own scope (the towers' and panels' convention) for the strip while it
+  // stands in the row: the row is a sibling of the position card (rails-ops
+  // provenance-receipts-grammar.md §7, the unscoped-sibling gap). In the
+  // card's heading row the strip is in the card's scope.
   const registry = useReceiptRegistry();
   // The event cards' "today" side reads the prices this chip states.
   usePublishTodayPrices(assets);
@@ -170,6 +175,16 @@ export function DetailTopRow({
         />
       )
     );
+  const priced = prices(true);
+  const stamped = showStamp && !closed;
+  const inCard = usePublishPositionCardStrip(
+    owner && (priced || stamped) ? (
+      <>
+        {priced}
+        {stamped && <RecencyStamp />}
+      </>
+    ) : null,
+  );
   return (
     // With the heading, the gap to the card (16px, in place of the page's
     // space-y-6 margin) is smaller than the gap above the heading (24px), so
@@ -200,19 +215,22 @@ export function DetailTopRow({
       </div>
       {owner && (
         <div className="mt-6">
-          {/* In the row's scope: a holder can carry a receipt (Polaris). The
-              price and the chain's recency ride the heading's right end,
-              price first (ui-jobs 272); Back stays alone above. */}
+          {/* In the row's scope: a holder can carry a receipt (Polaris). With
+              no card to hold them, the price and the chain's recency ride the
+              heading's right end, price first (ui-jobs 272); Back stays alone
+              above. */}
           <ProvReceiptsScope registry={registry}>
             <PositionWalletHeading
               owner={owner}
               session={session}
               tools={tools ? children : false}
               strip={
-                <>
-                  {prices(true)}
-                  {showStamp && !closed && <RecencyStamp />}
-                </>
+                !inCard && (priced || stamped) ? (
+                  <>
+                    {priced}
+                    {stamped && <RecencyStamp />}
+                  </>
+                ) : undefined
               }
             />
           </ProvReceiptsScope>

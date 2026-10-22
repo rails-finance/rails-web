@@ -2,8 +2,9 @@
 
 // The position card: one shell every family's card renders through (rails-ops
 // TO-DO-position-card 322, ui-jobs 307), on the pattern of the event card's
-// `EventCardSlots` (309). The shell owns the frame, the "Position summary"
-// heading, the status tag, the ⋮ and its rows, the headline grid, the panel,
+// `EventCardSlots` (309). The shell owns the frame, the heading row (the
+// page's price strip and recency stamp, ui-jobs 430), the status tag, the ⋮
+// and its rows, the headline grid, the panel,
 // the (i) row with its "?" and the counters, and the receipts scope. A family
 // builds one `PositionCardSlots` object (Liquity's `useLiquityCardSlots` in
 // components/protocol/liquity-family/liquity-position-card.tsx) and nothing
@@ -11,9 +12,9 @@
 // sit.
 //
 // Two surfaces. `detail` (the position page) is a receipts scope with the
-// heading, the ⋮, the panel, the (i), the "?" and the counters at the foot.
+// heading row, the ⋮, the panel, the (i), the "?" and the counters at the foot.
 // `listing` is inert content inside a row <Link>: the headlines, the lifecycle
-// pill and the family's listing ⋮, with no heading, panel or (i) (324), and
+// pill and the family's listing ⋮, with no strip, panel or (i) (324), and
 // the counters (recency, counts) together at the card's bottom right.
 //
 // A card is open or closed by its slots: a closed card carries `outcome` (its
@@ -39,9 +40,13 @@
 // own rounded box; a detail page's sections carry the bar on
 // (`SectionSidebar`); below md, a border at the left,
 // the mark and name leading the heading row and the chain glyph at its right
-// end. The zone is static and carries no text, control or figure in the hue.
+// end. The zone carries no text, control or figure in the hue. On a detail
+// card the name links to the explorer's entry route (ui-jobs 430); a listing
+// card is one link, so its name stays text.
 
 import { useContext, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
+import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
@@ -58,7 +63,6 @@ import {
   POSITION_CARD_FRAME,
   POSITION_CARD_FRAME_BOX,
   POSITION_CARD_PAD,
-  SECTION_HEADING,
 } from "@/lib/shared/ui-grammar";
 import {
   POSITION_CARD_SCOPE,
@@ -209,8 +213,9 @@ interface PositionCardSlotsCommon {
 
 interface PositionCardDetailCommon extends PositionCardSlotsCommon {
   surface: "detail";
-  /** The heading's noun phrase; absent, "Position summary" (the vault card's
-   *  "Vault summary", survey 2026-10-20 §7.4). */
+  /** The card's noun phrase, which names the (i) toggle ("vault
+   *  explanation"); absent, "Position summary". The card draws no heading
+   *  (ui-jobs 430). */
   heading?: string;
   explainer: PositionCardExplainer;
   /** The "?" beside the (i) pane's foot, or `null`. */
@@ -280,16 +285,6 @@ const OPEN_GRID = "grid grid-cols-2 lg:grid-cols-4 gap-4";
 // a stack line up.
 const CLOSED_GRID = "grid grid-cols-2 sm:grid-cols-4 gap-4";
 
-/** The "Position summary" heading at the left of a detail card's heading row. */
-function PositionSummaryTitle({ text = "Position summary", wideOnly }: { text?: string; wideOnly?: boolean }) {
-  // Below md a card with a sidebar draws the protocol in the heading's place.
-  return (
-    <h2 className={`${SECTION_HEADING} text-rb-500 ${wideOnly ? "max-md:hidden" : ""}`} data-position-summary="">
-      {text}
-    </h2>
-  );
-}
-
 /** The bar's width from md (C20), and how far its tint runs on under the
  *  body's rounded corners. The page's sections draw theirs at the same width
  *  (`SectionSidebar`). */
@@ -306,8 +301,9 @@ export function shortProtocolName(name: string): string {
 
 /** The bar's name, rotated to read upward, standing on the chain's glyph with
  *  the bar's empty run above it, under the mark. The whole name stands where its length fits the space the bar leaves it;
- *  otherwise the short form. Measured, so a card of any height picks its own. */
-function SidebarName({ name }: { name: string }) {
+ *  otherwise the short form. Measured, so a card of any height picks its own.
+ *  With `href` (a detail card) the name is the link to the explorer. */
+function SidebarName({ name, id, href }: { name: string; id: string; href?: string }) {
   const slotRef = useRef<HTMLSpanElement>(null);
   const fullRef = useRef<HTMLSpanElement>(null);
   const [full, setFull] = useState(true);
@@ -333,14 +329,28 @@ function SidebarName({ name }: { name: string }) {
       <span ref={fullRef} aria-hidden="true" className={`invisible absolute text-[11px] leading-none ${vertical}`}>
         {name}
       </span>
-      <span
-        aria-hidden="true"
-        className={`text-[11px] leading-none text-brand-zone ${vertical}`}
-        data-card-sidebar-name={full ? "full" : "short"}
-      >
-        {shown}
-      </span>
-      <span className="sr-only">{name}</span>
+      {href ? (
+        <Link
+          href={href}
+          aria-label={`${name} explorer`}
+          data-rail-identity={id}
+          className={`rounded-sm text-[11px] leading-none text-brand-zone transition-colors hover:text-foreground focus-visible:text-foreground focus-ring ${vertical}`}
+          data-card-sidebar-name={full ? "full" : "short"}
+        >
+          {shown}
+        </Link>
+      ) : (
+        <>
+          <span
+            aria-hidden="true"
+            className={`text-[11px] leading-none text-brand-zone ${vertical}`}
+            data-card-sidebar-name={full ? "full" : "short"}
+          >
+            {shown}
+          </span>
+          <span className="sr-only">{name}</span>
+        </>
+      )}
     </span>
   );
 }
@@ -348,7 +358,7 @@ function SidebarName({ name }: { name: string }) {
 /** The sidebar's bar from md (C20): the protocol's mark at the top, its name
  *  reading upward, the chain's glyph at the foot. Its tint is the frame's
  *  backdrop. */
-function SidebarPanel({ identity }: { identity: PositionCardIdentity }) {
+function SidebarPanel({ identity, link }: { identity: PositionCardIdentity; link: boolean }) {
   return (
     <div
       className={`relative hidden shrink-0 flex-col items-center py-3 ${SIDEBAR_BAR_W} md:flex`}
@@ -356,7 +366,11 @@ function SidebarPanel({ identity }: { identity: PositionCardIdentity }) {
       data-card-sidebar={identity.protocol.id}
     >
       <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-brand-mark [&:is(img)]:grayscale" />
-      <SidebarName name={identity.protocol.name} />
+      <SidebarName
+        name={identity.protocol.name}
+        id={identity.protocol.id}
+        href={link ? identity.protocol.href : undefined}
+      />
       {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
       <QuietTipsContext.Provider value={false}>
         <RevealTip tip={identity.chain.name} focusable align="start" className="rounded-sm focus-ring">
@@ -749,6 +763,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       </QuietTipsContext.Provider>
     </span>
   ) : null;
+  // On a detail card the name is the link to the explorer (C20.1).
+  const markHref = detail ? identity?.protocol.href : undefined;
   const protocolMark = identity ? (
     <span
       className="inline-flex items-center gap-1.5 text-xs font-semibold text-rb-500 md:hidden"
@@ -756,7 +772,17 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-anatomy="C20.1"
     >
       <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0" />
-      {identity.protocol.name}
+      {markHref ? (
+        <Link
+          href={markHref}
+          aria-label={`${identity.protocol.name} explorer`}
+          className="whitespace-nowrap rounded-sm transition-colors hover:text-foreground focus-visible:text-foreground focus-ring"
+        >
+          {identity.protocol.name}
+        </Link>
+      ) : (
+        identity.protocol.name
+      )}
     </span>
   ) : null;
   const panel = detail ? slots.panel : undefined;
@@ -769,14 +795,29 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             beside a squeezed label. */}
         {/* On the wallet view an identity left empty by its dropped wallet pill
             takes no gap. */}
-        <span className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${wallet ? "[&>:empty]:hidden" : ""}`}>
+        {/* Below md a detail card's left group dissolves into the row, so the
+            strip can take a line of its own under the mark, the identity and
+            the chain (ui-jobs 430). */}
+        <span
+          className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${wallet ? "[&>:empty]:hidden" : ""} ${detail ? "max-md:contents" : ""}`}
+        >
           {protocolMark}
           {detail ? (
             <>
-              <PositionSummaryTitle
-                text={slots.surface === "detail" ? slots.heading : undefined}
-                wideOnly={identity != null}
-              />
+              {/* The page's price strip and recency stamp (H7.2, H6; ui-jobs
+                  430), handed over by DetailTopRow. The negative margins keep
+                  the row at its text height and the price trigger's label on
+                  the headlines' left edge. */}
+              <PositionCardStripSlot>
+                {(strip) => (
+                  <span
+                    className="-my-1.5 -ml-1.5 flex shrink-0 items-center gap-1 max-md:order-last max-md:basis-full sm:-ml-2 sm:gap-2"
+                    data-position-strip=""
+                  >
+                    {strip}
+                  </span>
+                )}
+              </PositionCardStripSlot>
               {slots.status && <StatusTag status={slots.status} />}
             </>
           ) : (
@@ -864,7 +905,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             aria-hidden="true"
             className={`pointer-events-none absolute inset-0 rounded-[15px] bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone ${SIDEBAR_TINT_CLIP}`}
           />
-          <SidebarPanel identity={identity} />
+          <SidebarPanel identity={identity} link={detail} />
         </>
       )}
       <div

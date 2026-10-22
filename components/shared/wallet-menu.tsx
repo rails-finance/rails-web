@@ -2,7 +2,8 @@
 
 // The owner's address on a position page, as the trigger of a menu (ui-jobs
 // 271): Copy the address, Bookmark it (the row reads as set or not), View the
-// wallet (its wallet view, rails-ops decision 0051). A dropdown on desktop, a sheet below sm. The copy and bookmark
+// wallet (its wallet view, rails-ops decision 0051). The wallet view's heading
+// draws the same menu without View the wallet (ui-jobs 430). A dropdown on desktop, a sheet below sm. The copy and bookmark
 // icons that sat beside the address on the wallet row are these rows now; a
 // bookmarked address shows a small BookmarkCheck between its label and the
 // chevron.
@@ -28,6 +29,7 @@ export function WalletMenu({
   bookmarkProtocol,
   bookmarkListing,
   heading = false,
+  view = true,
 }: {
   wallet: string;
   ensName: string | null;
@@ -38,6 +40,8 @@ export function WalletMenu({
    *  address at heading type with no facehash, and a name's short address
    *  beside the h1. */
   heading?: boolean;
+  /** The View the wallet row; false on the wallet view. */
+  view?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -105,16 +109,18 @@ export function WalletMenu({
           onClick={() => setFav(toggleBookmark(wallet, name, bookmarkProtocol, bookmarkListing))}
         />
       )}
-      <ToolsMenuItem
-        icon={<Wallet size={16} />}
-        title="View the wallet"
-        subtitle="Its positions on every chain Rails reads"
-        onClick={() => {
-          close();
-          startNavigationProgress(href);
-          router.push(href);
-        }}
-      />
+      {view && (
+        <ToolsMenuItem
+          icon={<Wallet size={16} />}
+          title="View the wallet"
+          subtitle="Its positions on every chain Rails reads"
+          onClick={() => {
+            close();
+            startNavigationProgress(href);
+            router.push(href);
+          }}
+        />
+      )}
     </>
   );
 
