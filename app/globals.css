@@ -140,7 +140,7 @@
      near-white panels read as elevated sheets on it. Surface overlays darken
      on hover (warm-black alphas) because the panels they ride are near-white —
      a white-alpha lift would be invisible on a white panel. */
-  --background: oklch(0.9347 calc(0.0128 * var(--paper-chroma)) var(--paper-hue));
+  --background: oklch(0.9491 calc(0.0128 * var(--paper-chroma)) var(--paper-hue)); /* #eeeeee at chroma 0 (Miles, 22 Oct 2026) */
 
   /* Tinted with the paper hue (at low chroma) rather than pure black, so
      hover/active fills on the panels read as deeper paper, not neutral grey —
@@ -174,7 +174,7 @@
      elevation role: bands are flat page furniture, not lifted panels. Its
      lightness is the hand-measured midpoint; the hue/chroma still track the
      knobs so it stays inside the paper family. */
-  --surface-band: oklch(0.9618 calc(0.0086 * var(--paper-chroma)) var(--paper-hue));
+  --surface-band: oklch(0.9684 calc(0.0086 * var(--paper-chroma)) var(--paper-hue));
 
   /* The market-note row's own ground (components/shared/market-note-row.tsx) */
   --color-note: #f0f0f0;
