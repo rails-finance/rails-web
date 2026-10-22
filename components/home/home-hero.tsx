@@ -52,7 +52,10 @@ export function HomeHero() {
   return (
     // pt-32: the header floats absolutely over the home gradient (see
     // HeaderBar's isHome branch), so the hero reserves its band here.
-    <section className="flex flex-col items-center text-center pt-24 pb-4 overflow-hidden relative" data-anatomy="S1">
+    // overflow-x-clip: the glow is clipped at the sides, and the search's
+    // bookmarks dropdown is free to run below the section over the live
+    // example (Miles, 22 Oct 2026: it was cut at the section's foot).
+    <section className="flex flex-col items-center text-center pt-24 pb-4 overflow-x-clip relative" data-anatomy="S1">
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
       <h1
         className="relative font-semibold leading-none tracking-tighter mb-4 px-4 text-5xl sm:text-6xl lg:text-7xl animate-hero-fade-up"
