@@ -27,7 +27,7 @@ import { MorphoPositionCard, viewFromSummary as morphoView } from "@/components/
 import { SparkPositionCard, viewFromSummary as sparkView } from "@/components/protocol/spark/spark-position-card";
 import { FluidPositionCard, viewFromSummary as fluidView } from "@/components/protocol/fluid/fluid-position-card";
 import { MakerVaultCard, viewFromSummary as makerView } from "@/components/protocol/makerdao/makerdao-vault-card";
-import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
+import { LiquityPositionCard, viewFromForkSummary } from "@/components/protocol/liquity-family/liquity-position-card";
 import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
 import { ArbitrumReadCard, CometReadCard } from "@/components/shared/arbitrum-positions-listing";
 import { ReadStamp } from "@/components/wallet/read-stamp";
@@ -91,6 +91,17 @@ function FamilyCard({ card }: { card: WalletCard }) {
           protocol="liquity-v2"
           surface="listing"
           v={viewFromTroveSummary(card.row, card.prices)}
+          compact
+        />
+      );
+    case "ebisu":
+    case "asymmetry":
+    case "basedollar":
+      return (
+        <LiquityPositionCard
+          protocol={card.kind}
+          surface="listing"
+          v={viewFromForkSummary(card.kind, card.row)}
           compact
         />
       );

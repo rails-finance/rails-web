@@ -8,7 +8,7 @@
 // chevron.
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bookmark, BookmarkCheck, Check, ChevronDown, Copy, Wallet } from "lucide-react";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { Facehash } from "@/components/shared/facehash";
@@ -43,7 +43,10 @@ export function WalletMenu({
   const resolved = useEnsName(ensName ? null : wallet);
   const name = ensName ?? resolved;
   const label = name ?? short(wallet);
-  const href = walletHref(wallet);
+  // The page the reader is on rides along, so the wallet view can link back
+  // to its explorer.
+  const pathname = usePathname();
+  const href = pathname ? `${walletHref(wallet)}?from=${encodeURIComponent(pathname)}` : walletHref(wallet);
   const close = () => setOpen(false);
 
   useEffect(() => {

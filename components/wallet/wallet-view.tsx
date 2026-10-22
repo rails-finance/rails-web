@@ -304,7 +304,21 @@ function History({ closed }: { closed: WalletPosition[] }) {
 
 const familyChain = (r: WalletFamilyRead) => `${r.name} on ${chainMeta(r.chain).name}`;
 
-export function WalletView({ address, ensName, read }: { address: string; ensName: string | null; read: WalletRead }) {
+export function WalletView({
+  address,
+  ensName,
+  read,
+  reads,
+  back,
+}: {
+  address: string;
+  ensName: string | null;
+  read: WalletRead;
+  /** The families the page reads, by chain (`walletFamiliesLine`). */
+  reads: string;
+  /** The explorer the reader came from, for the empty state's link back. */
+  back: { href: string; name: string } | null;
+}) {
   const all = read.positions;
   const openAll = all.filter((p) => p.status === "open");
   // The sorted set, then the dust under the floor, then the accounts not read.
@@ -385,9 +399,20 @@ export function WalletView({ address, ensName, read }: { address: string; ensNam
           </section>
         ) : all.length === 0 ? (
           <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
-            <p className="text-sm text-foreground/80">
-              Rails holds no position for this wallet in the protocols this page reads.
+            <p className="text-sm text-foreground/80" data-wallet-reads="">
+              Rails holds no position for this wallet. This page reads {reads}.
             </p>
+            {back && (
+              <p className="text-sm">
+                <Link
+                  href={back.href}
+                  className="text-foreground underline underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+                  data-wallet-back=""
+                >
+                  Back to {back.name}
+                </Link>
+              </p>
+            )}
             <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
           </section>
         ) : (

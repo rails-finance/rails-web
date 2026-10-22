@@ -13,6 +13,7 @@ import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
 import { aaveV3Arbitrum, compoundV3Arbitrum, morphoArbitrum } from "@/lib/wallet/families/arbitrum";
+import { asymmetry, basedollar, ebisu } from "@/lib/wallet/families/liquity-forks";
 import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
@@ -39,7 +40,29 @@ export const WALLET_FAMILIES: FamilyModule[] = [
   makerdao,
   spark,
   fluid,
+  ebisu,
+  asymmetry,
+  basedollar,
 ];
+
+/** The families the page reads, by chain, in one sentence for the empty
+ *  state: "Aave V3, … and Asymmetry on Ethereum; … on Base; …". The Arbitrum
+ *  rows are written when Rails reads the wallet there, which the sentence says. */
+export function walletFamiliesLine(): string {
+  const byChain = new Map<WalletSummaryRow["chain"], string[]>();
+  for (const f of WALLET_FAMILIES) {
+    const names = byChain.get(f.summaryChain) ?? [];
+    if (!names.includes(f.name)) names.push(f.name);
+    byChain.set(f.summaryChain, names);
+  }
+  const list = (n: string[]) => (n.length < 2 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`);
+  const where: Record<WalletSummaryRow["chain"], string> = {
+    ethereum: "on Ethereum",
+    base: "on Base",
+    arbitrum: "on Arbitrum where Rails has read the wallet",
+  };
+  return [...byChain].map(([chain, names]) => `${list(names)} ${where[chain]}`).join("; ");
+}
 
 async function readSummary(address: string, signal: AbortSignal, readerIp?: string): Promise<WalletSummaryAnswer> {
   const base = process.env.RAILS_API_URL?.replace(/\/$/, "");

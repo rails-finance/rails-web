@@ -18,6 +18,9 @@ import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import type { TroveSummary } from "@/types/api/trove";
+import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
+import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
+import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
 import type { OraclePricesData } from "@/types/api/oracle";
 import type { ArbitrumReadRow } from "@/components/shared/arbitrum-positions-listing";
 import type { CometCard } from "@/lib/compound-arbitrum/comet-cards";
@@ -40,7 +43,10 @@ export type WalletCard =
   | { kind: "spark"; row: SparkPositionSummary }
   | { kind: "fluid"; row: FluidPositionSummary }
   | { kind: "makerdao"; row: MakerVaultSummary }
-  | { kind: "liquity-v2"; row: TroveSummary; prices: OraclePricesData | null };
+  | { kind: "liquity-v2"; row: TroveSummary; prices: OraclePricesData | null }
+  | { kind: "ebisu"; row: EbisuTroveSummary }
+  | { kind: "asymmetry"; row: AsymmetryTroveSummary }
+  | { kind: "basedollar"; row: BasedollarTroveSummary };
 
 /** A closed position's row in the History table: what the store states, each
  *  field absent where it states nothing. */
