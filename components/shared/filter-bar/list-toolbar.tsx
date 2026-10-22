@@ -9,7 +9,7 @@
 
 import { useRef, useState } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
-import { Search } from "lucide-react";
+import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
 import { FilterChips } from "@/components/shared/filter-bar/filter-chips";
 import { SortControl, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -61,21 +61,18 @@ export function ListToolbar<F extends BaseListFilters>({
       {...ctrlWaking(hydrated)}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]" ref={searchRef} data-anatomy="N1.1">
-          <Search
-            size={14}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-rb-500"
-            aria-hidden="true"
-          />
-          <input
-            value={filters.q}
-            onChange={(e) => onChange({ ...filters, q: e.target.value })}
-            onFocus={() => setFocused(true)}
-            placeholder={searchPlaceholder}
-            spellCheck={false}
-            autoComplete="off"
-            className="h-8 w-full rounded-md bg-raised pl-8 pr-3 text-xs text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        {/* The shared search's look (H15); the listing's own behaviour: the
+            query filters this explorer, family identifiers included. */}
+        <SearchBox
+          value={filters.q}
+          onChange={(q) => onChange({ ...filters, q })}
+          onFocus={() => setFocused(true)}
+          placeholder={searchPlaceholder}
+          size="sm"
+          anatomy="N1.1 H15"
+          className="flex-1 min-w-[200px]"
+          containerRef={searchRef}
+        >
           {bookmarks && (
             <WalletHistoryDropdown
               show={showBookmarks}
@@ -88,7 +85,7 @@ export function ListToolbar<F extends BaseListFilters>({
               protocol={bookmarks.protocol}
             />
           )}
-        </div>
+        </SearchBox>
         <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
         <SortControl
           options={sortOptions}

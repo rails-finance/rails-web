@@ -79,7 +79,7 @@ const FIXTURES = [
 
 // Every registry display name the control must NOT show.
 const REGISTRY_NAMES =
-  /CoW Protocol|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Enso|Multicall|CCIP escrow/;
+  /CoW Protocol|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Zerion|Enso|Multicall|CCIP escrow/;
 
 const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
 let pass = 0;

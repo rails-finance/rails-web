@@ -418,8 +418,8 @@ function homeHtml(protocols, glyphs) {
   return shellHtml(`
     <div class="roster">${tiles + chip}</div>
 
-    <h1>Explore <em>${protocols.length} DeFi protocols</em> on Rails</h1>
-    <p class="sub">Every position replayed from the protocol&rsquo;s own on-chain events</p>`);
+    <h1>Look up a <em>wallet</em> on Rails</h1>
+    <p class="sub">${protocols.length} DeFi protocols, every position replayed from the protocol&rsquo;s own on-chain events</p>`);
 }
 
 function explorerHtml(p, glyphs) {

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { BookmarksModal } from "@/components/nav/bookmarks-modal";
+import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
 /** Marketing routes — everything under app/(site). Group names don't appear in
  *  the URL and the header sits above both group layouts, so the split has to be
@@ -101,6 +102,8 @@ function BookmarksButton({ onClick }: { onClick: () => void }) {
 export function HeaderBar() {
   const pathname = usePathname();
   const [showBookmarks, setShowBookmarks] = useState(false);
+  // `/` reaches the search from every page; the bar is mounted on all of them.
+  useSlashToSearch();
 
   // Home alone paints its own top-section gradient from the very top of the
   // viewport, so there the header floats over it (absolute, no reserved band)
@@ -153,6 +156,9 @@ export function HeaderBar() {
               nothing to bookmark. From `md` up the rail's foot carries it,
               along with the theme toggle — but this whole bar is gone by then
               on an app route, so each control is drawn once per width. */}
+          {/* The search's glyph (H15.1): everywhere but home, whose hero is
+              the search. A sheet from the top on a phone. */}
+          {!isHome && <SearchLauncher placement="header" />}
           {!isMarketing && <BookmarksButton onClick={() => setShowBookmarks(true)} />}
           <HeaderThemeToggle />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
