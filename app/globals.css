@@ -451,6 +451,23 @@ html.dark {
 @utility bg-brand-edge {
   background-color: oklch(var(--brand-edge-l) calc(var(--brand-edge-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
 }
+/* A section's bar (P2.1) beside its rounded box: the 80px bar, and in the
+   16px beyond it only the box's two left corners, so the bar meets the box
+   as the card's does without lying under it. */
+@utility mask-sidebar-corners {
+  mask-image:
+    linear-gradient(#000, #000), radial-gradient(circle at 100% 100%, transparent 16px, #000 16.5px),
+    radial-gradient(circle at 100% 0, transparent 16px, #000 16.5px);
+  mask-size:
+    80px 100%,
+    16px 16px,
+    16px 16px;
+  mask-position:
+    0 0,
+    80px 0,
+    80px 100%;
+  mask-repeat: no-repeat;
+}
 @utility text-brand-zone {
   color: var(--brand-zone-text);
 }

@@ -48,6 +48,8 @@ import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsBarsContent } from "@/lib/shared/learn-more-content";
+import { SectionSidebar } from "@/components/shared/section-sidebar";
+import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
@@ -180,6 +182,8 @@ export function LifetimeFlowsPanel({
       {label}
     </button>
   );
+  // Below md the sidebar's border takes the box's left 6px.
+  const sidebar = usePositionCardIdentity() != null;
   if (scrubber == null && (read === "done" || read === "withheld")) return null;
   const loading = scrubber == null && read !== "failed";
   const none = scrubber != null && life === "none";
@@ -187,136 +191,139 @@ export function LifetimeFlowsPanel({
   return (
     // Its own receipts scope: every traced figure in the panel registers here.
     <ProvReceiptsScope registry={registry} scopeId={FLOWS_SCOPE}>
-      <section
-        data-prov-scope={FLOWS_SCOPE}
-        data-prov-lit={lit ? "" : undefined}
-        data-skel-section="detail-economics"
-        {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
-        data-lifetime-flows-panel=""
-        data-flows-life={scrubber != null ? life : undefined}
-        hidden={none || undefined}
-        data-anatomy="P2"
-        {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
-        {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
-        suppressHydrationWarning
-        className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
-        style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
-      >
-        {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
-        {/* The chevron follows the heading; the ⋮ stands at the right end
-            (ui-jobs 295). */}
-        <div
-          className="disc-row pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
-          data-anatomy="F1"
+      {/* The card's sidebar carried on (P2.1, TO-DO-position-card 427). */}
+      <SectionSidebar section="flows" hidden={none || undefined}>
+        <section
+          data-prov-scope={FLOWS_SCOPE}
+          data-prov-lit={lit ? "" : undefined}
+          data-skel-section="detail-economics"
+          {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
+          data-lifetime-flows-panel=""
+          data-flows-life={scrubber != null ? life : undefined}
+          hidden={none || undefined}
+          data-anatomy="P2"
+          {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
+          {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
+          suppressHydrationWarning
+          className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4 ${sidebar ? "max-md:pl-[26px]" : ""}`}
+          style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
         >
-          {collapseKey ? (
-            <button
-              type="button"
-              onClick={() => {
-                const next = !collapsed;
-                setCollapsed(next);
-                setSettled(true);
-                setFlowsCollapsed(collapseKey, next);
-              }}
-              aria-expanded={!collapsed}
-              aria-controls={bodyId}
-              aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 justify-start rounded-md px-2`}
-              data-flows-toggle=""
-            >
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className={`${SECTION_HEADING} truncate`} data-flows-title="">
-                  {title}
+          {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
+          {/* The chevron follows the heading; the ⋮ stands at the right end
+            (ui-jobs 295). */}
+          <div
+            className="disc-row pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
+            data-anatomy="F1"
+          >
+            {collapseKey ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !collapsed;
+                  setCollapsed(next);
+                  setSettled(true);
+                  setFlowsCollapsed(collapseKey, next);
+                }}
+                aria-expanded={!collapsed}
+                aria-controls={bodyId}
+                aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
+                className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 justify-start rounded-md px-2`}
+                data-flows-toggle=""
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className={`${SECTION_HEADING} truncate`} data-flows-title="">
+                    {title}
+                  </span>
+                  <DiscChevron isOpen={!collapsed} />
                 </span>
-                <DiscChevron isOpen={!collapsed} />
-              </span>
-            </button>
-          ) : (
-            <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
-          )}
-          {!sections && scrubber != null && (
-            <div className="pointer-events-auto shrink-0 text-rb-500" data-flows-menu-slot="">
-              <HeaderHelp flowsKey={flowsKey} />
-            </div>
-          )}
-          {/* The ⋮ at the right end (ui-jobs 295): Inspect provenance on the
+              </button>
+            ) : (
+              <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+            )}
+            {!sections && scrubber != null && (
+              <div className="pointer-events-auto shrink-0 text-rb-500" data-flows-menu-slot="">
+                <HeaderHelp flowsKey={flowsKey} />
+              </div>
+            )}
+            {/* The ⋮ at the right end (ui-jobs 295): Inspect provenance on the
               panel alone (ui-jobs 284); each section's "?" carries the
               how-to-read. Collapsed, nothing stands to inspect: no ⋮. */}
-          <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
-            <ToolsMenu
-              variant="panel"
-              label={`${title} menu`}
-              heading={title}
-              provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
+            <div className="pointer-events-auto -mr-1 shrink-0" data-flows-menu-slot="">
+              <ToolsMenu
+                variant="panel"
+                label={`${title} menu`}
+                heading={title}
+                provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
+              />
+            </div>
+          </div>
+          <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
+            {scrubber != null ? (
+              <FlowsLifeContext.Provider value={setLife}>
+                <FlowsKeyContext.Provider value={setFlowsKey}>
+                  <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
+                    <FlowsSectionsContext.Provider value={setSections}>
+                      <FlowsCompactContext.Provider value={{ compact, toggle: viewButton }}>
+                        <div className="mt-2">{scrubber}</div>
+                      </FlowsCompactContext.Provider>
+                    </FlowsSectionsContext.Provider>
+                  </FlowsKeyNodeContext.Provider>
+                </FlowsKeyContext.Provider>
+              </FlowsLifeContext.Provider>
+            ) : read === "failed" ? (
+              <p
+                className="mt-2 flex h-24 items-center justify-center rounded-md bg-sunken px-3 text-center text-xs text-rb-500"
+                data-flows-read={read}
+              >
+                The flow history was not read. Reload to try again.
+              </p>
+            ) : (
+              <div className="relative" data-flows-read={read}>
+                <p className="sr-only" role="status">
+                  {flowsWaitingLine(lifeCount)}
+                </p>
+                <LifetimeFlowsSkeleton compact={compact} />
+                <LifetimeFlowsWaiting count={lifeCount} />
+              </div>
+            )}
+            <ProvenanceInfoTabs
+              className="mt-3"
+              explanation={
+                explanation == null && !outcome && !flowsKey ? undefined : (
+                  <>
+                    {explanation}
+                    {(flowsKey?.totals || outcome) && (
+                      <ExplainGroup title="Lifetime totals" data-flow-totals="">
+                        {flowsKey?.totals && <FlowsTotalsBullets t={flowsKey.totals} />}
+                        {outcome}
+                      </ExplainGroup>
+                    )}
+                    {scrubber != null && flowsKey && (
+                      <>
+                        {(flowsKey.basis || flowsKey.priceBasis || (flowsKey.chart && flowsKey.chart.length > 0)) && (
+                          <ExplainGroup title="Chart" data-flow-chart-words="">
+                            {flowsKey.basis && <ExplainBullet data-flow-basis="">{flowsKey.basis}</ExplainBullet>}
+                            {flowsKey.priceBasis && (
+                              <ExplainBullet data-flow-price-basis="">{flowsKey.priceBasis}</ExplainBullet>
+                            )}
+                            {flowsKey.chart?.map((t) => (
+                              <ExplainBullet key={t}>{t}</ExplainBullet>
+                            ))}
+                          </ExplainGroup>
+                        )}
+                      </>
+                    )}
+                  </>
+                )
+              }
+              learnMore={learnMore}
+              anatomy={FLOWS_ANATOMY}
+              label={`${title} explanation`}
+              onExplanationToggle={setInfoOpen}
             />
           </div>
-        </div>
-        <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
-          {scrubber != null ? (
-            <FlowsLifeContext.Provider value={setLife}>
-              <FlowsKeyContext.Provider value={setFlowsKey}>
-                <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
-                  <FlowsSectionsContext.Provider value={setSections}>
-                    <FlowsCompactContext.Provider value={{ compact, toggle: viewButton }}>
-                      <div className="mt-2">{scrubber}</div>
-                    </FlowsCompactContext.Provider>
-                  </FlowsSectionsContext.Provider>
-                </FlowsKeyNodeContext.Provider>
-              </FlowsKeyContext.Provider>
-            </FlowsLifeContext.Provider>
-          ) : read === "failed" ? (
-            <p
-              className="mt-2 flex h-24 items-center justify-center rounded-md bg-sunken px-3 text-center text-xs text-rb-500"
-              data-flows-read={read}
-            >
-              The flow history was not read. Reload to try again.
-            </p>
-          ) : (
-            <div className="relative" data-flows-read={read}>
-              <p className="sr-only" role="status">
-                {flowsWaitingLine(lifeCount)}
-              </p>
-              <LifetimeFlowsSkeleton compact={compact} />
-              <LifetimeFlowsWaiting count={lifeCount} />
-            </div>
-          )}
-          <ProvenanceInfoTabs
-            className="mt-3"
-            explanation={
-              explanation == null && !outcome && !flowsKey ? undefined : (
-                <>
-                  {explanation}
-                  {(flowsKey?.totals || outcome) && (
-                    <ExplainGroup title="Lifetime totals" data-flow-totals="">
-                      {flowsKey?.totals && <FlowsTotalsBullets t={flowsKey.totals} />}
-                      {outcome}
-                    </ExplainGroup>
-                  )}
-                  {scrubber != null && flowsKey && (
-                    <>
-                      {(flowsKey.basis || flowsKey.priceBasis || (flowsKey.chart && flowsKey.chart.length > 0)) && (
-                        <ExplainGroup title="Chart" data-flow-chart-words="">
-                          {flowsKey.basis && <ExplainBullet data-flow-basis="">{flowsKey.basis}</ExplainBullet>}
-                          {flowsKey.priceBasis && (
-                            <ExplainBullet data-flow-price-basis="">{flowsKey.priceBasis}</ExplainBullet>
-                          )}
-                          {flowsKey.chart?.map((t) => (
-                            <ExplainBullet key={t}>{t}</ExplainBullet>
-                          ))}
-                        </ExplainGroup>
-                      )}
-                    </>
-                  )}
-                </>
-              )
-            }
-            learnMore={learnMore}
-            anatomy={FLOWS_ANATOMY}
-            label={`${title} explanation`}
-            onExplanationToggle={setInfoOpen}
-          />
-        </div>
-      </section>
+        </section>
+      </SectionSidebar>
     </ProvReceiptsScope>
   );
 }

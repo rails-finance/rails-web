@@ -34,12 +34,14 @@
 //
 // The sidebar (C20, rails-ops TO-DO-position-card 427): on every surface the
 // frame draws the card's protocol and chain in a zone tinted with the
-// protocol's brand hue. From md, a panel at the left (the mark, the name, the
-// chain at its foot) with the body beside it; below md, a border at the left,
+// protocol's brand hue. From md, an 80px bar at the left (the mark, the name
+// reading upward, the chain's glyph at its foot) with the body beside it as its
+// own rounded box; a detail page's sections carry the bar on
+// (`SectionSidebar`); below md, a border at the left,
 // the mark and name leading the heading row and the chain glyph at its right
 // end. The zone is static and carries no text, control or figure in the hue.
 
-import { useContext, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useContext, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
@@ -288,26 +290,86 @@ function PositionSummaryTitle({ text = "Position summary", wideOnly }: { text?: 
   );
 }
 
-/** The sidebar's panel from md (C20): the protocol's mark and name at the top,
- *  the chain at the foot. Its tint is the frame's backdrop. */
-function SidebarPanel({ identity, detail }: { identity: PositionCardIdentity; detail: boolean }) {
+/** The bar's width from md (C20), and how far its tint runs on under the
+ *  body's rounded corners. The page's sections draw theirs at the same width
+ *  (`SectionSidebar`). */
+export const SIDEBAR_BAR_W = "md:w-20";
+const SIDEBAR_TINT_CLIP = "md:[clip-path:inset(0_calc(100%_-_96px)_0_0)]";
+
+/** The name's short form where the bar is too short for the whole name: the
+ *  version alone for a protocol that has one ("Aave V3" → "V3"), else the
+ *  name's first word ("Morpho Blue" → "Morpho"). */
+export function shortProtocolName(name: string): string {
+  const version = /\bV\d+(?:\.\d+)?$/i.exec(name);
+  return version ? version[0] : name.split(/\s+/)[0];
+}
+
+/** The bar's name, rotated to read upward between the mark and the chain. The
+ *  whole name stands where its length fits the space the bar leaves it;
+ *  otherwise the short form. Measured, so a card of any height picks its own. */
+function SidebarName({ name }: { name: string }) {
+  const slotRef = useRef<HTMLSpanElement>(null);
+  const fullRef = useRef<HTMLSpanElement>(null);
+  const [full, setFull] = useState(true);
+  useLayoutEffect(() => {
+    const slot = slotRef.current;
+    const measure = fullRef.current;
+    if (!slot || !measure) return;
+    const fit = () => {
+      // Hidden below md: nothing to choose.
+      if (slot.clientHeight === 0) return;
+      const pad = parseFloat(getComputedStyle(slot).paddingTop) + parseFloat(getComputedStyle(slot).paddingBottom);
+      setFull(measure.offsetHeight <= slot.clientHeight - pad);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(slot);
+    return () => ro.disconnect();
+  }, [name]);
+  const shown = full ? name : shortProtocolName(name);
+  const vertical = "whitespace-nowrap [writing-mode:vertical-rl] rotate-180";
+  return (
+    <span ref={slotRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden py-3">
+      <span ref={fullRef} aria-hidden="true" className={`invisible absolute text-xs leading-none ${vertical}`}>
+        {name}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`text-xs leading-none text-brand-zone ${vertical}`}
+        data-card-sidebar-name={full ? "full" : "short"}
+      >
+        {shown}
+      </span>
+      <span className="sr-only">{name}</span>
+    </span>
+  );
+}
+
+/** The sidebar's bar from md (C20): the protocol's mark at the top, its name
+ *  reading upward, the chain's glyph at the foot. Its tint is the frame's
+ *  backdrop. */
+function SidebarPanel({ identity }: { identity: PositionCardIdentity }) {
   return (
     <div
-      className={`relative hidden w-[150px] shrink-0 flex-col items-center px-3 pb-4 text-center md:flex ${detail ? "pt-10" : "pt-5"}`}
+      className={`relative hidden shrink-0 flex-col items-center py-4 ${SIDEBAR_BAR_W} md:flex`}
       data-anatomy="C20"
       data-card-sidebar={identity.protocol.id}
     >
-      <ProtocolIcon
-        id={identity.protocol.id}
-        className={`${detail ? "h-[72px] w-[72px]" : "h-10 w-10"} shrink-0 text-brand-mark [&:is(img)]:grayscale`}
-      />
-      <span className={`${detail ? "mt-3" : "mt-2"} text-sm leading-snug text-brand-zone`}>
-        {identity.protocol.name}
-      </span>
-      <span className="mt-auto flex items-center gap-1.5 pt-4 text-xs text-brand-zone" data-card-sidebar-chain="">
-        <ChainGlyph id={identity.chain.id} className="h-4 w-4 shrink-0" />
-        {identity.chain.name}
-      </span>
+      <ProtocolIcon id={identity.protocol.id} className="h-8 w-8 shrink-0 text-brand-mark [&:is(img)]:grayscale" />
+      <SidebarName name={identity.protocol.name} />
+      {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
+      <QuietTipsContext.Provider value={false}>
+        <RevealTip tip={identity.chain.name} focusable align="start" className="rounded-sm focus-ring">
+          <span
+            role="img"
+            aria-label={identity.chain.name}
+            className="flex h-4 items-center text-brand-zone"
+            data-card-sidebar-chain=""
+          >
+            <ChainGlyph id={identity.chain.id} className="h-4 w-4 shrink-0" />
+          </span>
+        </RevealTip>
+      </QuietTipsContext.Provider>
     </div>
   );
 }
@@ -800,9 +862,9 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
               over it) from md. */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-[15px] bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone md:[clip-path:inset(0_calc(100%_-_166px)_0_0)]"
+            className={`pointer-events-none absolute inset-0 rounded-[15px] bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone ${SIDEBAR_TINT_CLIP}`}
           />
-          <SidebarPanel identity={identity} detail={detail} />
+          <SidebarPanel identity={identity} />
         </>
       )}
       <div
