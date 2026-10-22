@@ -88,8 +88,9 @@ export interface PositionOwner {
   /** The wallet; null or undefined while the page has not read it. */
   wallet: string | null | undefined;
   ensName?: string | null;
-  /** The listing the address links to, filtered to this wallet. Defaults to
-   *  the page's session; null leaves the label unlinked. */
+  /** Where a pill (a vault, or a page passing `href`) filters its listing to
+   *  this wallet. Defaults to the page's session; null leaves the label
+   *  unlinked. The address menu opens the wallet view and ignores it. */
   filterProtocol?: SessionProtocol | null;
   /** Where the bookmark goes. Defaults to the page's session; null draws no
    *  bookmark. */
@@ -133,7 +134,6 @@ export function PositionWalletRow({
       <WalletMenu
         wallet={owner.wallet}
         ensName={owner.ensName ?? null}
-        filterProtocol={filterProtocol}
         bookmarkProtocol={bookmarkProtocol}
         bookmarkListing={owner.bookmarkListing}
       />

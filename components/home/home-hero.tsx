@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect } from "react";
+import Link from "next/link";
 import { Check } from "lucide-react";
 import { launchedProductionChainNames } from "@/lib/shared/protocols";
-import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { FrontDoorStrip } from "@/components/home/front-door-strip";
-import type { StripCard } from "@/lib/home/front-door-strip-data";
+import { FrontDoorSearch, walletHref } from "@/components/shared/front-door-search";
+import { SAMPLE_WALLETS } from "@/lib/home/sample-wallets";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -16,9 +16,9 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 /**
  * Home hero — the site's front door (rails-ops decision 0051): the headline
  * says the door ("Look up a wallet"), the Rails line states the promise, then
- * the search (H15) landing on the wallet view, a name to try, the ticked terms
- * (read-only / no wallet connection / the chains), and the strip of positions
- * Rails holds now (S10). The explorer directory lives further down the page
+ * the search (H15) landing on the wallet view, a sample wallet to try
+ * (`SAMPLE_WALLETS`), and the ticked terms (read-only / no wallet connection /
+ * the chains). The explorer directory lives further down the page
  * (ProtocolRow), and the header's "Open an explorer" menu reaches it too.
  *
  * Entrance animation runs once per browser via the `data-hero-seen` flag set
@@ -36,7 +36,7 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * The roster-wide position count is NOT here — it reads as evidence rather than
  * headline, so it lives in CoveredStats, below the live example.
  */
-export function HomeHero({ strip }: { strip: StripCard[] }) {
+export function HomeHero() {
   useIsomorphicLayoutEffect(() => {
     try {
       if (localStorage.getItem("rails-hero-seen")) {
@@ -70,7 +70,16 @@ export function HomeHero({ strip }: { strip: StripCard[] }) {
         className="relative w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
       >
-        <FrontDoorSearch size="lg" bookmarks="all" hideEmptyBookmarks tryName="milodon.eth" />
+        <FrontDoorSearch size="lg" bookmarks="all" hideEmptyBookmarks />
+        <p className="mt-1.5 text-sm">
+          <Link
+            href={walletHref(SAMPLE_WALLETS[0].address)}
+            className="text-blue-500 hover:text-blue-600 hover:underline"
+            data-sample-wallet={SAMPLE_WALLETS[0].address}
+          >
+            Try a sample wallet
+          </Link>
+        </p>
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
@@ -84,9 +93,6 @@ export function HomeHero({ strip }: { strip: StripCard[] }) {
           </span>
         ))}
       </p>
-      <div className="relative mt-12 w-full">
-        <FrontDoorStrip cards={strip} />
-      </div>
     </section>
   );
 }

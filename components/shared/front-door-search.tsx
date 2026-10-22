@@ -42,11 +42,13 @@ const OPEN_SEARCH_EVENT = "rails-open-search";
 
 type Size = "sm" | "md" | "lg";
 
+// Below sm every field is 16px: iOS Safari zooms the page on focus into any
+// field set smaller, and the zoom stays on the page the lookup lands on.
 const FIELD: Record<Size, string> = {
   // The listing toolbar's field, as it was drawn before it joined the kit.
-  sm: "h-8 pl-8 pr-3 text-xs",
-  md: "h-9 pl-8 pr-3 text-sm",
-  lg: "h-12 pl-10 pr-3 text-sm sm:text-base",
+  sm: "h-8 pl-8 pr-3 text-base sm:text-xs",
+  md: "h-9 pl-8 pr-3 text-base sm:text-sm",
+  lg: "h-12 pl-10 pr-3 text-base",
 };
 const GLYPH: Record<Size, { size: number; left: string }> = {
   sm: { size: 14, left: "left-3" },
@@ -169,8 +171,6 @@ export interface FrontDoorSearchProps {
   bookmarks?: BookmarkScope | "all";
   /** Keep the bookmarks dropdown closed while there are none. */
   hideEmptyBookmarks?: boolean;
-  /** A name to try, drawn as a link under the field that runs the lookup. */
-  tryName?: string;
   autoFocus?: boolean;
   /** Called as the lookup navigates (closes a popover or sheet). */
   onDone?: () => void;
@@ -178,15 +178,14 @@ export interface FrontDoorSearchProps {
   className?: string;
 }
 
-/** The search as a form: field, "Look up", the bookmarks, the reason a value
- *  was refused, and the name to try. */
+/** The search as a form: field, "Look up", the bookmarks, and the reason a
+ *  value was refused. */
 export function FrontDoorSearch({
   href = walletHref,
   placeholder = SEARCH_PLACEHOLDER,
   size = "md",
   bookmarks,
   hideEmptyBookmarks,
-  tryName,
   autoFocus,
   onDone,
   anatomy = "H15",
@@ -255,22 +254,6 @@ export function FrontDoorSearch({
       {problem && (
         <p id={problemId} role="alert" className="text-xs text-rb-500" data-wallet-lookup-problem="">
           {problem}
-        </p>
-      )}
-      {tryName && !problem && (
-        <p className={`text-rb-500 ${size === "lg" ? "text-sm" : "text-xs"}`}>
-          Try{" "}
-          <button
-            type="button"
-            className="cursor-pointer text-blue-500 hover:text-blue-600 hover:underline"
-            onClick={() => {
-              setValue(tryName);
-              void lookUp(tryName);
-            }}
-            data-try-name={tryName}
-          >
-            {tryName}
-          </button>
         </p>
       )}
     </form>

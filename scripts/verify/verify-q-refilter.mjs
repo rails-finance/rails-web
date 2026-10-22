@@ -21,9 +21,10 @@
 // that button. Liquity V2's trove detail page stopped rendering it with ui-jobs
 // 271 (5 Oct): the owner there is the address menu in
 // `components/shared/wallet-menu.tsx`, a `[data-wallet-menu]` wrapper around a
-// `button[aria-haspopup="menu"]` whose `[role=menu]` ends in a "View its
-// positions" row that calls `router.push(listingHref)`. The Liquity V2 arm opens
-// that menu and clicks the row.
+// `button[aria-haspopup="menu"]`, and since decision 0051 its last row opens the
+// wallet view rather than the listing. The Liquity V2 arm reads the owner from
+// that trigger and makes the same in-app transition with the App Router's
+// `window.next.router.push` to `/ethereum/liquity-v2?q=<owner>`.
 //
 // The counts. A listing selector that matches nothing reads as "zero wallets",
 // and "zero wallets, all of them the filtered one" is trivially true — the shape
@@ -174,7 +175,7 @@ const V4_ROW = "a[href*='/ethereum/aave-v4/spoke/']";
 
 // ---------------------------------------------------------------------------
 // Liquity V2: (3) fresh load + in-app nav FROM A DIFFERENT PAGE (a trove detail
-// page's owner address menu, via router.push) both filter correctly; (4) nav back clears.
+// page, its owner read off the address menu, via router.push) both filter correctly; (4) nav back clears.
 // ---------------------------------------------------------------------------
 const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
 {
@@ -213,9 +214,13 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
     const ownerDisplay = (await ownerTrigger.locator("[data-wallet-label]").first().innerText()).trim();
     const ownerLabel = ownerDisplay;
     const markerBefore = await page.evaluate(() => window.__verifyMarker || (window.__verifyMarker = Math.random()));
-    await ownerTrigger.click();
-    await page.locator("[role=menu]").first().waitFor({ state: "visible", timeout: 10_000 });
-    await page.locator('[role=menu] [role=menuitem]:has-text("View its positions")').first().click();
+    const ownerAddress = ((await ownerTrigger.getAttribute("title")) ?? "").match(/0x[0-9a-fA-F]{40}/)?.[0];
+    ok("liquity-v2: the address menu names the owner's address", !!ownerAddress, String(ownerAddress));
+    await page.evaluate(
+      (href) => window.next.router.push(href),
+      `/ethereum/liquity-v2?q=${(ownerAddress ?? "").toLowerCase()}`,
+    );
+    await page.waitForURL((u) => u.pathname === "/ethereum/liquity-v2", { timeout: 60_000 }).catch(() => {});
     await page.waitForTimeout(1500);
     const markerAfter = await page.evaluate(() => window.__verifyMarker);
     ok(

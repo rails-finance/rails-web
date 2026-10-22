@@ -46,11 +46,14 @@ const ROW = 'a[class~="group/listing-row"]';
 // cannot fail, so it was only ever noise.)
 const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"]';
 // On a position page the owner's wallet is its address menu (ui-jobs 271,
-// `components/shared/wallet-menu.tsx`): the pill became a trigger, and the
-// listing link is the menu's "View its positions" row. The listings that
-// draw a pill of their own (Liquity V2, Aave V4) keep the filter button.
+// `components/shared/wallet-menu.tsx`), whose "View the wallet" row opens the
+// wallet view, `/wallet/<address>` (rails-ops decision 0051). For those
+// explorers the run asserts that landing, then loads `<route>?q=<address>`
+// itself to prove the listing filters. The listings that draw a pill of their
+// own (Liquity V2, Aave V4) keep the filter button and its `?q=` link.
 const OWNER_MENU = '[data-wallet-menu] button[aria-haspopup="menu"]';
-const OWNER_MENU_LISTING = '[data-wallet-menu] [role="menuitem"]:has-text("View its positions")';
+const OWNER_MENU_WALLET = '[data-wallet-menu] [role="menuitem"]:has-text("View the wallet")';
+const WALLET_VIEW = /^\/wallet\/(0x[0-9a-f]{40})$/;
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -152,7 +155,7 @@ async function clickPillUntilNavigated(deadlineMs = 60000) {
         .click({ timeout: 5000 })
         .catch(() => {});
     } else if ((await page.locator(OWNER_MENU).count()) > 0) {
-      // The address menu: open it, then take its listing row.
+      // The address menu: open it, then take its wallet row.
       clicks++;
       await page
         .locator(OWNER_MENU)
@@ -160,7 +163,7 @@ async function clickPillUntilNavigated(deadlineMs = 60000) {
         .click({ timeout: 5000 })
         .catch(() => {});
       const took = await page
-        .locator(OWNER_MENU_LISTING)
+        .locator(OWNER_MENU_WALLET)
         .first()
         .click({ timeout: 3000 })
         .then(() => true)
@@ -265,7 +268,14 @@ for (const { slug, route, onListing } of subjects) {
     if (!navigated) continue;
     withPill++;
 
-    const url = navigated.url;
+    let url = navigated.url;
+    // The address menu lands on the wallet view; the listing's `?q=` form for
+    // that address is then built from `route` and loaded below.
+    const walletView = url.replace(BASE, "").match(WALLET_VIEW);
+    if (walletView) {
+      check(`${slug}: address menu → /wallet/0x… lowercased`, true, url.replace(BASE, ""));
+      url = `${BASE}${route}?q=${walletView[1]}`;
+    }
     const m = url.match(/\?q=([^&]+)/);
     const q = m ? decodeURIComponent(m[1]) : "";
 

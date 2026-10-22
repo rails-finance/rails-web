@@ -1,29 +1,23 @@
 "use client";
 
 // The owner's address on a position page, as the trigger of a menu (ui-jobs
-// 271): Copy the address, Bookmark it (the row reads as set or not), View its
-// positions. A dropdown on desktop, a sheet below sm. The copy and bookmark
+// 271): Copy the address, Bookmark it (the row reads as set or not), View the
+// wallet (its wallet view, rails-ops decision 0051). A dropdown on desktop, a sheet below sm. The copy and bookmark
 // icons that sat beside the address on the wallet row are these rows now; a
 // bookmarked address shows a small BookmarkCheck between its label and the
 // chevron.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, BookmarkCheck, Check, ChevronDown, Copy, List } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, ChevronDown, Copy, Wallet } from "lucide-react";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { Facehash } from "@/components/shared/facehash";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useEnsName } from "@/lib/ens/use-ens-names";
-import { listingHrefForWallet } from "@/lib/shared/protocols";
-import {
-  isBookmarked,
-  toggleBookmark,
-  SESSIONS_CHANGED_EVENT,
-  type BookmarkScope,
-  type SessionProtocol,
-} from "@/lib/shared/sessions";
+import { walletHref } from "@/components/shared/front-door-search";
+import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT, type BookmarkScope } from "@/lib/shared/sessions";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -31,14 +25,11 @@ const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 export function WalletMenu({
   wallet,
   ensName,
-  filterProtocol,
   bookmarkProtocol,
   bookmarkListing,
 }: {
   wallet: string;
   ensName: string | null;
-  /** The listing "View its positions" opens, filtered to this wallet. */
-  filterProtocol?: SessionProtocol;
   /** Where the bookmark goes; unset, the menu has no Bookmark row. */
   bookmarkProtocol?: BookmarkScope;
   bookmarkListing?: string;
@@ -52,7 +43,7 @@ export function WalletMenu({
   const resolved = useEnsName(ensName ? null : wallet);
   const name = ensName ?? resolved;
   const label = name ?? short(wallet);
-  const href = filterProtocol ? listingHrefForWallet(filterProtocol, wallet) : null;
+  const href = walletHref(wallet);
   const close = () => setOpen(false);
 
   useEffect(() => {
@@ -106,18 +97,16 @@ export function WalletMenu({
           onClick={() => setFav(toggleBookmark(wallet, name, bookmarkProtocol, bookmarkListing))}
         />
       )}
-      {href && (
-        <ToolsMenuItem
-          icon={<List size={16} />}
-          title="View its positions"
-          subtitle="Every position this address holds here"
-          onClick={() => {
-            close();
-            startNavigationProgress(href);
-            router.push(href);
-          }}
-        />
-      )}
+      <ToolsMenuItem
+        icon={<Wallet size={16} />}
+        title="View the wallet"
+        subtitle="Its positions on every chain Rails reads"
+        onClick={() => {
+          close();
+          startNavigationProgress(href);
+          router.push(href);
+        }}
+      />
     </>
   );
 
