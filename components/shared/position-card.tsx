@@ -32,10 +32,13 @@
 // `data-card-row=<i>` and adds `data-card-head=<id>`; the counters carry
 // `data-card-counters`, inside a listing card's `data-card-foot`.
 
-import { createContext, useContext, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useContext, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { QuietTipsContext } from "@/components/shared/reveal-tip";
+import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
+import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { formatUsdValue } from "@/lib/utils/format";
 import { OVERLAY_HEADING, POSITION_CARD_FRAME, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
@@ -327,22 +330,9 @@ function StatusTag({ status }: { status: PositionCardStatus }) {
 
 const OPEN_PILL = "bg-positive/20 text-positive";
 
-/** What a page that gathers positions from several chains adds at a listing
- *  card's edge without the family's builder knowing (the wallet view, rails-ops
- *  decision 0050): the chain's name at the right end of the heading row, as the
- *  vault row (V1) carries it, and AT RISK on the pill of an open position past
- *  its family's liquidation line. Absent everywhere else. */
-export interface PositionCardEdge {
-  chain?: string;
-  atRisk?: boolean;
-}
-export const PositionCardEdgeContext = createContext<PositionCardEdge | null>(null);
-
-const EDGE_PILL =
-  "rounded-sm bg-rb-300 px-1.5 py-0.5 text-[11px] text-foreground/80 dark:bg-rb-700 dark:text-foreground/60";
-
 /** The listing's lifecycle pill: OPEN for a live position, else the status
- *  word in capitals. */
+ *  word in capitals. On the wallet view an open position draws none, AT RISK
+ *  excepted (`PositionCardEdge`). */
 function ListingPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
   if (!status && edge?.atRisk)
@@ -351,6 +341,7 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
         AT RISK
       </span>
     );
+  if (!status && edge?.surface === "wallet") return null;
   return (
     <span
       className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? TAG_TONE[status.tone] : OPEN_PILL}`}
@@ -632,10 +623,33 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   ) : null;
   const menu = detail ? slots.menu && <DetailMenu menu={slots.menu} /> : slots.menu;
   const edge = useContext(PositionCardEdgeContext);
+  const wallet = !detail && edge?.surface === "wallet";
   const chainPill =
     !detail && edge?.chain ? (
-      <span className={EDGE_PILL} data-pill="chain">
-        {edge.chain}
+      // Outside the row's quiet tips: the glyph's tip names the chain.
+      <QuietTipsContext.Provider value={false}>
+        <RevealTip tip={edge.chain.name} focusable align="end" className="rounded-sm focus-ring">
+          <span
+            role="img"
+            aria-label={edge.chain.name}
+            className="flex h-4 items-center text-rb-500"
+            data-pill="chain"
+            data-anatomy="W6"
+          >
+            <ChainGlyph id={edge.chain.id} className="h-4 w-4" />
+          </span>
+        </RevealTip>
+      </QuietTipsContext.Provider>
+    ) : null;
+  const protocolMark =
+    wallet && edge?.protocol ? (
+      <span
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground/80 dark:text-foreground/70"
+        data-wallet-protocol={edge.protocol.id}
+        data-anatomy="W5"
+      >
+        <ProtocolIcon id={edge.protocol.id} className="h-4 w-4 shrink-0" />
+        {edge.protocol.name}
       </span>
     ) : null;
   const panel = detail ? slots.panel : undefined;
@@ -646,7 +660,10 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
         {/* Wraps between pieces: at 390px an owner address would break in two
             beside a squeezed label. */}
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+        {/* On the wallet view an identity left empty by its dropped wallet pill
+            takes no gap. */}
+        <span className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 ${wallet ? "[&>:empty]:hidden" : ""}`}>
+          {protocolMark}
           {detail ? (
             <>
               <PositionSummaryTitle text={slots.surface === "detail" ? slots.heading : undefined} />

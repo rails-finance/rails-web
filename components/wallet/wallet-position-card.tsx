@@ -3,12 +3,14 @@
 // One open position on the wallet view (rails-ops decision 0050, steps 2 and 3): the
 // family's listing card, drawn by the family's own listing component from its
 // listing row exactly as its listing draws it, inside one link to the
-// position's page (N2). The page adds the chain's name at the card's edge and
-// AT RISK on the pill through `PositionCardEdgeContext`, and the read's
-// freshness under the card (H6's form); nothing inside the card.
+// position's page (N2). Through `PositionCardEdgeContext` the page leads the
+// heading row with the protocol's mark and name, ends it with the chain's
+// glyph, drops the wallet pill and the OPEN pill, and keeps AT RISK; under the
+// card, the read's freshness (H6's form). Nothing inside the card changes.
 
 import Link from "next/link";
-import { PositionCardEdgeContext } from "@/components/shared/position-card";
+import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
+import { PROTOCOLS } from "@/lib/shared/protocols";
 import {
   AaveV3PositionCard,
   notCollateralOf,
@@ -99,8 +101,18 @@ function FamilyCard({ card }: { card: WalletCard }) {
  *  family says it can be liquidated. */
 export const atRisk = (p: WalletPosition): boolean => (p.buffer != null && p.buffer < 0) || p.liquidatable === true;
 
+/** The roster id of a position's explorer, the glyph key. */
+const protocolId = (p: WalletPosition): string =>
+  PROTOCOLS.find((e) => e.chainId === p.chain && e.slug === p.family)?.id ?? p.family;
+
 export function WalletPositionCard({ position: p }: { position: WalletPosition }) {
   const chain = chainMeta(p.chain).name;
+  const edge: PositionCardEdge = {
+    surface: "wallet",
+    protocol: { id: protocolId(p), name: p.familyName },
+    chain: { id: p.chain, name: chain },
+    atRisk: atRisk(p),
+  };
   return (
     <div
       data-wallet-position={p.positionId}
@@ -108,7 +120,7 @@ export function WalletPositionCard({ position: p }: { position: WalletPosition }
       data-chain={chain.toLowerCase()}
       data-head-read={p.headRead}
     >
-      <PositionCardEdgeContext.Provider value={{ chain, atRisk: atRisk(p) }}>
+      <PositionCardEdgeContext.Provider value={edge}>
         <Link
           href={p.href}
           prefetch={false}

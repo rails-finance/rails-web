@@ -8,7 +8,7 @@
 // resolving ENS, and links to its own exposure page instead of a
 // wallet-filtered listing.
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
@@ -17,13 +17,22 @@ import { Icon } from "@/components/icons/icon";
 import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
+import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 
 function shortAddr(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-export function WalletPill({
+/** On the wallet view (`PositionCardEdge`, surface "wallet") a card's pill
+ *  draws nothing: the page is the wallet's. */
+export function WalletPill(props: Parameters<typeof WalletPillInner>[0]) {
+  const edge = useContext(PositionCardEdgeContext);
+  if (edge?.surface === "wallet") return null;
+  return <WalletPillInner {...props} />;
+}
+
+function WalletPillInner({
   wallet,
   ensName,
   filterProtocol,
