@@ -15,7 +15,6 @@ export async function readHoldingCard(browser, url, headers = {}) {
       /explanation/i.test(b.getAttribute("aria-label") ?? ""),
     );
     return {
-      heading: card?.querySelector("[data-position-summary]")?.textContent?.trim() ?? null,
       heads: [...(card?.querySelectorAll("[data-card-head]") ?? [])].map((h) => h.getAttribute("data-card-head")),
       stats: [...(card?.querySelectorAll("[data-panel-row]") ?? [])].map((s) => s.getAttribute("data-panel-row")),
       earnedStatus: earned?.getAttribute("data-earned-status") ?? null,

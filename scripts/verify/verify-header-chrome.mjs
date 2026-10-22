@@ -209,8 +209,9 @@ check(
 
 // ── A position view draws the wallet heading and no chooser (decision 0052) ──
 // The chain switch stays on the home page, the listings, the info and markets
-// pages; the protocol line under the heading is the way back to the listing.
-console.log("[position view: no chooser, the protocol line @1280]");
+// pages; the protocol's name in the card's sidebar is the way to the explorer
+// (ui-jobs 430), and no line under the heading names the protocol.
+console.log("[position view: no chooser, the sidebar link @1280]");
 await page.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const trovePath = await page.evaluate(() => {
   const a = [...document.querySelectorAll('a[href^="/ethereum/liquity-v2/trove/"]')][0];
@@ -220,15 +221,19 @@ if (!trovePath) {
   check(false, "found a trove link on the Liquity V2 listing to open a position view with");
 } else {
   await page.goto(BASE + trovePath, { waitUntil: "networkidle" });
-  // Decision 0052: the wallet heading frames a position page; the protocol
-  // line under it links to the listing, and no chooser is drawn from md up.
+  // Decision 0052: the wallet heading frames a position page; the card's
+  // sidebar name links to the explorer, and no chooser is drawn from md up.
   const posTrigger = await page.locator('button[aria-label$="switch blockchain"]:visible').count();
   check(posTrigger === 0, `a position view draws no chain chooser at 1280 (${posTrigger})`);
-  const posLine = await page
-    .locator("[data-anatomy='H13.3'] a[data-rail-identity]")
+  await page.waitForSelector("[data-anatomy='C20'] a[data-rail-identity]", { timeout: 15000 }).catch(() => {});
+  const posLink = await page
+    .locator("[data-anatomy='C20'] a[data-rail-identity]")
+    .first()
     .getAttribute("href")
     .catch(() => null);
-  check(posLine === "/ethereum/liquity-v2", `a position view's protocol line links to the listing (${posLine})`);
+  check(posLink === "/ethereum/liquity-v2", `a position view's sidebar name links to the explorer (${posLink})`);
+  const posLine = await page.locator("[data-position-wallet-row] [data-rail-identity]").count();
+  check(posLine === 0, `the wallet heading draws no protocol line (${posLine})`);
   const posBar = await page.locator("header").first().isVisible();
   check(posBar === false, `a position view draws no top bar at 1280 (${posBar})`);
 }

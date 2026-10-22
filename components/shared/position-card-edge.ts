@@ -28,7 +28,9 @@ export const PositionCardEdgeContext = createContext<PositionCardEdge | null>(nu
  *  a page gathers several protocols; everywhere else the roster entry whose
  *  route holds the page does. `null` off the explorers (the home hero). */
 export interface PositionCardIdentity {
-  protocol: { id: string; name: string };
+  /** `href`: the explorer's entry route, which the detail card's sidebar name
+   *  links to; set from the roster entry, absent on the wallet view. */
+  protocol: { id: string; name: string; href?: string };
   chain: { id: ChainId; name: string };
   hue: number | null;
 }
@@ -42,7 +44,7 @@ export function usePositionCardIdentity(): PositionCardIdentity | null {
   const entry = protocolForPathname(pathname);
   if (!entry) return null;
   return {
-    protocol: { id: entry.id, name: entry.label },
+    protocol: { id: entry.id, name: entry.label, href: entry.href },
     chain: { id: entry.chainId, name: chainMeta(entry.chainId).name },
     hue: protocolBrand(entry.id)?.hue ?? null,
   };

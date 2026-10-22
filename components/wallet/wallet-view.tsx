@@ -11,11 +11,10 @@
 // Aave V3 Base account is shown with a "not read" mark, and every wallet,
 // a sink included, is drawn the same with one line naming its count.
 
-import { useState } from "react";
 import Link from "next/link";
-import { Check, Copy } from "lucide-react";
 import { ChainMark, WalletHeading } from "@/components/shared/wallet-heading";
-import { WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
+import { WalletMenu } from "@/components/shared/wallet-menu";
+import { protocolForPathname } from "@/lib/shared/protocols";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
 import { WalletPositionCard, atRisk } from "@/components/wallet/wallet-position-card";
@@ -28,7 +27,6 @@ import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 
-const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -49,25 +47,6 @@ function byRisk(a: WalletPosition, b: WalletPosition): number {
   if (a.buffer != null) return -1;
   if (b.buffer != null) return 1;
   return (b.collateralUsd ?? -1) - (a.collateralUsd ?? -1);
-}
-
-function CopyAddress({ address }: { address: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      aria-label="Copy the address"
-      className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-colors hover:text-foreground focus-ring"
-      onClick={() =>
-        void navigator.clipboard.writeText(address).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        })
-      }
-    >
-      {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
-    </button>
-  );
 }
 
 function Tile({ label, value, sub, anatomy }: { label: string; value: string; sub?: string; anatomy: string }) {
@@ -328,6 +307,7 @@ export function WalletView({
   const chains: ChainId[] = [...new Set(all.map((p) => p.chain))];
   const atRiskCount = open.filter(atRisk).length;
   const registry = useReceiptRegistry();
+  const bookmarkScope = open[0] ? protocolForPathname(open[0].href)?.session : undefined;
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -361,18 +341,11 @@ export function WalletView({
         <header data-anatomy="W1">
           <WalletHeading
             address={address}
+            // The address menu a position page draws (ui-jobs 430): Copy the
+            // address and, under the explorer of the first open position,
+            // Bookmark it; no View the wallet on the wallet view.
             title={
-              <>
-                {ensName ? (
-                  <>
-                    <h1 className={`${WALLET_HEADING_NAME} min-w-0 truncate`}>{ensName}</h1>
-                    <span className={WALLET_HEADING_SHORT}>{short(address)}</span>
-                  </>
-                ) : (
-                  <h1 className={`${WALLET_HEADING_NAME} font-mono`}>{short(address)}</h1>
-                )}
-                <CopyAddress address={address} />
-              </>
+              <WalletMenu wallet={address} ensName={ensName} bookmarkProtocol={bookmarkScope} heading view={false} />
             }
             lines={
               <>

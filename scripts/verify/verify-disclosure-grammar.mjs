@@ -6,8 +6,8 @@
 // chevron is hidden until its row is hovered or focused; on a touch screen it
 // always shows, muted.
 //
-// Liquity V2 (the story Trove): the position card's "Position summary" heading
-// with the card menu (C17) at its right end, no card chevron, the Collateral,
+// Liquity V2 (the story Trove): the position card's heading row (the price
+// strip since ui-jobs 430) with the card menu (C17) at its right end, no card chevron, the Collateral,
 // Debt and Collateral ratio rows each on a chevron (the first two open
 // by default, the ratio closed, remembered per row, the card-wide key of 209
 // dropped on read); the Lifetime flows header's chevron after its heading and
@@ -150,18 +150,17 @@ const headerLayout = (card) =>
   check("1280 reports a pointer that hovers", await page.evaluate(() => matchMedia("(hover: hover)").matches));
   const card = page.locator('[data-anatomy~="P1"]').first();
   await card
-    .locator("[data-position-summary]")
+    .locator("[data-card-header]")
     .waitFor({ timeout: 120000 })
     .catch(() => {});
   await page
     .locator('[data-card-row-toggle="1"]')
     .waitFor({ timeout: 60000 })
     .catch(() => {});
-  const heading = await card
-    .locator("[data-position-summary]")
-    .textContent()
-    .catch(() => null);
-  check("1a. the position card's heading reads Position summary", heading === "Position summary", heading ?? "none");
+  // ui-jobs 430: the heading row carries the page's price strip in place of
+  // "Position summary".
+  const strip = await card.locator("[data-card-header] [data-position-strip] [data-latest-prices]").count();
+  check("1a. the position card's heading row carries the price strip", strip === 1, `${strip} strip`);
   const menuPlace = await card
     .evaluate((c) => {
       const header = c.querySelector("[data-card-header]");
@@ -499,11 +498,11 @@ const headerLayout = (card) =>
   const rows = await page.$$eval("[data-card-row-toggle]", (els) =>
     els.map((e) => [e.getAttribute("data-card-row-toggle"), e.getAttribute("aria-expanded")]),
   );
-  const summary = await page.locator("[data-position-summary]").count();
+  const summary = await page.locator("[data-card-header] [data-position-strip]").count();
   check(
-    "4f. the position card: Position summary, the asset rows open, the risk row closed",
+    "4f. the position card: the price strip in its heading row, the asset rows open, the risk row closed",
     summary === 1 && rows.every(([i, open]) => (Number(i) < 2 ? open === "true" : open === "false")),
-    `${summary} heading, ${JSON.stringify(rows)}`,
+    `${summary} strip, ${JSON.stringify(rows)}`,
   );
   check("4g. no page error", errors.length === 0, errors.join("; "));
   await ctx.close();

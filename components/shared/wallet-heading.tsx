@@ -7,17 +7,17 @@
 // controls take the right end.
 //
 // On a position page (`PositionWalletHeading`) the h1 is the address menu's
-// trigger, the address kind sits beside it, and the lines are the protocol
-// line (H13.3: the protocol's mark and name linking to its listing, then the
-// chain) and what else Rails holds for the wallet (H13.2). The price strip,
-// the recency stamp and Tools take the right end; below sm the strip wraps
-// under the name block, flush right. DOM order is address, strip, Tools.
+// trigger, the address kind sits beside it, and the line under it is what
+// else Rails holds for the wallet (H13.2). The protocol is named by the
+// card's sidebar (decision 0052 point 2). Tools takes the right end where the
+// page passes it; on a page that draws no detail card the price strip and
+// the recency stamp stand before it (ui-jobs 430), and below sm the strip
+// wraps under the name block, flush right. DOM order is address, strip, Tools.
 //
 // The heading draws before the position loads, with Tools in place, so the
 // inspector is reachable on a view that never resolves; the wallet joins it
 // when the page knows it (an id-keyed page learns its owner from the read).
 
-import Link from "next/link";
 import { FileCode2, KeyRound, UsersRound, type LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Facehash } from "@/components/shared/facehash";
@@ -26,7 +26,6 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { WalletElsewhereLine } from "@/components/shared/wallet-elsewhere-line";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
@@ -77,26 +76,6 @@ export function ChainMark({ chainId }: { chainId: ChainId }) {
     <RevealTip tip={name} label={name} focusable className="inline-flex rounded-sm focus-ring">
       <ChainGlyph id={chainId} className="size-3.5 text-rb-500" />
     </RevealTip>
-  );
-}
-
-/** H13.3: the protocol's mark and name, linking to its listing, then the
- *  chain. The explorer's way in from a position page (decision 0052 point 2). */
-function ProtocolLine({ session }: { session: SessionProtocol }) {
-  const entry = protocolForSession(session);
-  if (!entry) return null;
-  return (
-    <div className="flex min-w-0 items-center gap-2 text-xs text-rb-500" data-anatomy="H13.3">
-      <Link
-        href={entry.listingHref}
-        data-rail-identity={entry.id}
-        className="group inline-flex min-w-0 items-center gap-1.5 rounded-sm transition-colors hover:text-foreground focus-ring"
-      >
-        <ProtocolIcon id={entry.id} className="size-3.5 shrink-0 text-foreground/70 group-hover:text-foreground" />
-        <span className="truncate font-medium">{entry.label}</span>
-      </Link>
-      <ChainMark chainId={entry.chainId} />
-    </div>
   );
 }
 
@@ -190,13 +169,14 @@ export function PositionWalletHeading({
   strip,
 }: {
   owner: PositionOwner;
-  /** The page's explorer: the protocol line, and the default for the listing
-   *  link and bookmark. */
+  /** The page's explorer: the chain of the address kind, and the default for
+   *  the listing link and bookmark. */
   session: SessionProtocol;
   /** The Tools menu with the page's export shapes; a bare menu without;
    *  false for none, on a page whose card carries the menu (ui-jobs 270). */
   tools?: ReactNode | false;
-  /** The price and recency strip, before Tools (ui-jobs 272). */
+  /** The price and recency strip, before Tools (ui-jobs 272), on a page that
+   *  draws no detail card (ui-jobs 430). */
   strip?: ReactNode;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
@@ -241,12 +221,7 @@ export function PositionWalletHeading({
           {owner.extra}
         </>
       }
-      lines={
-        <>
-          <ProtocolLine session={session} />
-          {owner.wallet && <WalletElsewhereLine wallet={owner.wallet} />}
-        </>
-      }
+      lines={owner.wallet && <WalletElsewhereLine wallet={owner.wallet} />}
       end={
         <>
           {strip && (
