@@ -19,7 +19,7 @@ import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { SPARK_ADDRESSES } from "./asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
-import { counterpartyNameInput, type AaveV3LifetimeFlow } from "@/lib/aave-v3/event-provenance";
+import { counterpartyNameInputs, knownContractSentence, type AaveV3LifetimeFlow } from "@/lib/aave-v3/event-provenance";
 
 const SPARK = { name: "SparkLend Pool", address: SPARK_ADDRESSES.POOL };
 
@@ -187,13 +187,13 @@ export const transferCounterpartyProv = (dir: "in" | "out", coords: SparkCoords,
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this position transfer — the ${dir === "in" ? "from" : "to"} address the spToken's BalanceTransfer log carries${atBlock(coords)}. The counterparty of the move, not who signed the transaction.${named ? ` Rails names the address ${named.name}: its verified contract source is \`${named.contractName}\`, ${named.role}.` : ""}`,
+    summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this position transfer — the ${dir === "in" ? "from" : "to"} address the spToken's BalanceTransfer log carries${atBlock(coords)}. The counterparty of the move, not who signed the transaction.${named ? knownContractSentence(named) : ""}`,
     contract: SPARK,
     via: `${SPARK_VIA} · BalanceTransfer log · ${dir === "in" ? "from" : "to"}`,
     inputs: eventInputs(
       coords,
       named && counterparty
-        ? [counterpartyNameInput(named, explorerUrl(MAINNET_CHAIN_ID, "address", counterparty))]
+        ? counterpartyNameInputs(named, explorerUrl(MAINNET_CHAIN_ID, "address", counterparty))
         : [],
     ),
   };
@@ -210,12 +210,12 @@ export const gatewayCallerProv = (eventType: string, coords: SparkCoords, gatewa
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The contract that made this ${eventType} at the Pool — the ${param} param${atBlock(coords)}, the Pool's msg.sender. It is the Spark WETH gateway, which ${eventType === "borrow" ? "borrows WETH for the owner and sends it on as ETH" : "takes the owner's ETH and wraps it to WETH"}; the position is the owner's (onBehalfOf).${named ? ` Rails names the address ${named.name}: its verified contract source is \`${named.contractName}\`, ${named.role}.` : ""}`,
+    summary: `The contract that made this ${eventType} at the Pool — the ${param} param${atBlock(coords)}, the Pool's msg.sender. It is the Spark WETH gateway, which ${eventType === "borrow" ? "borrows WETH for the owner and sends it on as ETH" : "takes the owner's ETH and wraps it to WETH"}; the position is the owner's (onBehalfOf).${named ? knownContractSentence(named) : ""}`,
     contract: SPARK,
     via: `${SPARK_VIA} · ${eventType === "repay" ? "repayer" : "user"} param`,
     inputs: eventInputs(
       coords,
-      named ? [counterpartyNameInput(named, explorerUrl(MAINNET_CHAIN_ID, "address", gateway))] : [],
+      named ? counterpartyNameInputs(named, explorerUrl(MAINNET_CHAIN_ID, "address", gateway)) : [],
     ),
   };
 };

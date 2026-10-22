@@ -72,7 +72,7 @@ import { ToolsMenu } from "@/components/shared/tools-menu";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { getCcipEscrow, getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { getCcipEscrow, getProtocolContract, type GrowthepieLabel } from "@/lib/shared/known-infrastructure";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { MapleCustodyCard } from "@/components/protocol/maple/maple-custody-card";
 import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
@@ -516,6 +516,7 @@ export default function MaplePositionView({
           name={infra.name}
           wallet={wallet}
           contractName={infra.contractName}
+          label={infra.growthepie}
         >
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-rb-500">{infra.description}</p>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-rb-500">
@@ -558,6 +559,7 @@ export default function MaplePositionView({
               name={protocolContract.name}
               wallet={wallet}
               contractName={protocolContract.contractName}
+              label={protocolContract.growthepie}
             >
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-rb-500">
                 This address is {protocolContract.role}. It is not a lender position, so the Maple listing leaves it
@@ -682,6 +684,7 @@ function ContractIdentityCard({
   name,
   wallet,
   contractName,
+  label,
   level = 1,
   children,
 }: {
@@ -689,6 +692,8 @@ function ContractIdentityCard({
   name: string;
   wallet: string;
   contractName: string;
+  /** growthepie's label, the registry's first source, where it has one. */
+  label?: GrowthepieLabel;
   level?: 1 | 2;
   children: React.ReactNode;
 }) {
@@ -708,7 +713,8 @@ function ContractIdentityCard({
         >
           {wallet}
         </a>{" "}
-        — Etherscan-verified as <span className="font-mono text-[13px]">{contractName}</span>.
+        — {label?.owner ? <>labelled {label.owner} by growthepie, </> : null}Etherscan-verified as{" "}
+        <span className="font-mono text-[13px]">{contractName}</span>.
       </p>
     </div>
   );
