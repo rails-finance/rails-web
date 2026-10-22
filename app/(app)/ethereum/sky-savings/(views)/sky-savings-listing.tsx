@@ -63,7 +63,6 @@ export function SkySavingsListing({ initialItems, initialTotal, initialKey, init
       title="Sky Savings positions"
       noun="positions"
       basePath={SKY_BASE_PATH}
-      bookmarksProtocol="sky-savings"
       defaults={SKY_LIST_DEFAULTS}
       sortOptions={skySortOptions}
       searchPlaceholder="Address or ENS"

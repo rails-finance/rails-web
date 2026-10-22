@@ -343,9 +343,7 @@ export function useFrankencoinCardSlots({
     <PositionIdentity v={v} cloneParent={cloneParent} />
   ) : (
     <span className="flex flex-wrap items-center gap-2">
-      {v.owner && (
-        <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmarkProtocol="frankencoin" />
-      )}
+      {v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmark />}
       <PositionIdentity v={v} cloneParent={cloneParent} listing />
     </span>
   );

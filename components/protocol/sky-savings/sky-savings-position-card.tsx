@@ -158,9 +158,7 @@ export function skySavingsCardSlots({
       heads,
       counters,
       menu: null,
-      identity: (
-        <WalletPill wallet={p.holder} ensName={null} filterProtocol="sky-savings" bookmarkProtocol="sky-savings" />
-      ),
+      identity: <WalletPill wallet={p.holder} ensName={null} filterProtocol="sky-savings" bookmark />,
     };
   }
   const shares = units(p.shares.raw);

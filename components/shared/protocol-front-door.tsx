@@ -54,7 +54,7 @@ export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
           <span className="text-3xl font-semibold leading-none text-foreground">{entry.label}</span>
         </h1>
         <div className="w-full max-w-xl">
-          <FrontDoorSearch href={(wallet) => `${entry.href}/${wallet}`} bookmarks={entry.session} />
+          <FrontDoorSearch href={(wallet) => `${entry.href}/${wallet}`} />
         </div>
         <nav aria-label="Explorer sections" className="mt-6 flex flex-wrap justify-center gap-2">
           {links.map((l) => (

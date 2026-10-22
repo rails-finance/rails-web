@@ -26,8 +26,6 @@ import { VaultVenueMark } from "@/components/vaults/vault-venue-mark";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import type { BookmarkScope } from "@/lib/shared/sessions";
-import { holderListingSegment } from "@/lib/shared/protocols";
 import { attestedAddress, attestedShortName } from "@/lib/shared/attested-addresses";
 import {
   VAULT_SHAPE_WORD,
@@ -61,16 +59,6 @@ const n = (v: number) => v.toLocaleString("en-US");
 const FAMILY_SINGULAR: Record<VaultPositionFamily, string> = {
   ...AAVE_FAMILY_SINGULAR,
   morpho: "MetaMorpho vault",
-};
-
-/** Where a listing row's holder is bookmarked: the explorer whose factory
- *  deployed the vault (rails-ops decision 0028). The position page passes the
- *  same scope to its wallet row. */
-export const FAMILY_BOOKMARK_SCOPE: Record<VaultPositionFamily, BookmarkScope> = {
-  morpho: "morpho-base",
-  sgho: "aave-vaults",
-  stata: "aave-vaults",
-  "umbrella-stake": "aave-vaults",
 };
 
 /** Which chain a row was censused on, and the routes that follow from it. */
@@ -154,12 +142,7 @@ function vaultCardSlots({ row }: VaultPositionCardProps): PositionCardSlots {
       </span>
       {/* The listing names the holder; the toggle stops a click from reaching
           the row's <Link>, so bookmarking never navigates. */}
-      <WalletPill
-        wallet={row.holder}
-        ensName={null}
-        bookmarkProtocol={FAMILY_BOOKMARK_SCOPE[row.family]}
-        bookmarkListing={holderListingSegment(FAMILY_BOOKMARK_SCOPE[row.family])}
-      />
+      <WalletPill wallet={row.holder} ensName={null} bookmark />
       {nameOrShape}
     </span>
   );

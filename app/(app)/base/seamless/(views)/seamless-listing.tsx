@@ -45,7 +45,6 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
       noun="positions"
       countLine={aaveV3RestingCountLine}
       basePath="/base/seamless"
-      bookmarksProtocol="seamless"
       defaults={SEAMLESS_LIST_DEFAULTS}
       sortOptions={SEAMLESS_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

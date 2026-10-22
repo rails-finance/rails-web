@@ -1,45 +1,34 @@
 "use client";
 
 // Bookmark toggle for a wallet, designed to live beside the address it
-// bookmarks — a card's identity row, usually via WalletPill's
-// `bookmarkProtocol`, on listing and detail cards alike.
-// Bookmarking keys off the *wallet*, not the position — so
-// every card for the same owner (e.g. several Aave spokes) reflects the same
-// bookmarked state, and bookmarks surface in the search dropdown's Bookmarks
-// panel.
+// bookmarks — a card's identity row, usually via WalletPill's `bookmark`, on
+// listing and detail cards alike. A bookmark is the wallet's address, so every
+// card for the same owner on every explorer reflects the same state, and the
+// bookmarks are listed in the wallet panel.
 //
 // Colour: deliberately neutral (filled foreground when bookmarked, muted
 // outline when not). A bookmark is an affordance state, not a risk/value
 // signal — so it stays out of the valence palette (no green/red, no amber).
 
 import { useEffect, useState } from "react";
-import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT, type BookmarkScope } from "@/lib/shared/sessions";
+import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 
 export function BookmarkToggle({
   wallet,
   ensName,
-  protocol,
-  listing,
   size = 13,
 }: {
   wallet: string;
   ensName: string | null;
-  /** The rail this bookmark belongs to, or a chain's vault SECTION scope —
-   *  the storage namespace is the scope's own, either way. */
-  protocol: BookmarkScope;
-  /** The sub-page listing this bookmark is being taken on, recorded on the row
-   *  so the bookmarks modal reopens the listing it came from (§42 item 1).
-   *  Omitted on an explorer's own listing. */
-  listing?: string;
   size?: number;
 }) {
   const [fav, setFav] = useState(false);
 
   // Subscribe so every bookmark toggle for the same wallet stays in sync after a change
-  // anywhere (another card on the page, the dropdown's remove action, or a
+  // anywhere (another card on the page, the panel's remove action, or a
   // change in another tab via the native `storage` event).
   useEffect(() => {
-    const sync = () => setFav(isBookmarked(wallet, protocol));
+    const sync = () => setFav(isBookmarked(wallet));
     sync();
     window.addEventListener(SESSIONS_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
@@ -47,7 +36,7 @@ export function BookmarkToggle({
       window.removeEventListener(SESSIONS_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
-  }, [wallet, protocol]);
+  }, [wallet]);
 
   return (
     <button
@@ -57,7 +46,7 @@ export function BookmarkToggle({
         // bookmarking never navigates.
         e.preventDefault();
         e.stopPropagation();
-        setFav(toggleBookmark(wallet, ensName, protocol, listing));
+        setFav(toggleBookmark(wallet, ensName));
       }}
       aria-pressed={fav}
       aria-label={fav ? "Remove wallet bookmark" : "Bookmark this wallet"}

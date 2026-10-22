@@ -111,7 +111,6 @@ export function AaveV4Listing({ initialItems, initialTotal, initialKey, initialS
       title="Aave V4 Positions"
       noun="positions"
       basePath="/ethereum/aave-v4"
-      bookmarksProtocol="aave-v4"
       defaults={AAVE_V4_LIST_DEFAULTS}
       sortOptions={AAVE_V4_SORT_OPTIONS}
       searchPlaceholder="Address or ENS"

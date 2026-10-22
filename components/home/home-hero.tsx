@@ -52,9 +52,7 @@ export function HomeHero() {
   return (
     // pt-32: the header floats absolutely over the home gradient (see
     // HeaderBar's isHome branch), so the hero reserves its band here.
-    // overflow-x-clip: the glow is clipped at the sides, and the search's
-    // bookmarks dropdown is free to run below the section over the live
-    // example (Miles, 22 Oct 2026: it was cut at the section's foot).
+    // overflow-x-clip: the glow is clipped at the sides.
     <section
       className="flex flex-col items-center text-center pt-24 pb-10 sm:pb-15 overflow-x-clip relative"
       data-anatomy="S1"
@@ -78,8 +76,6 @@ export function HomeHero() {
       >
         <FrontDoorSearch
           size="lg"
-          bookmarks="all"
-          hideEmptyBookmarks
           after={
             <Link
               href={walletHref(SAMPLE_WALLETS[0].address)}

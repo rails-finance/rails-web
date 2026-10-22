@@ -228,7 +228,7 @@ export function morphoCardIdentity({
           wallet={listingOwner.wallet}
           ensName={null}
           filterProtocol={listingOwner.session}
-          bookmarkProtocol={listingOwner.session}
+          bookmark
           vault={listingOwner.vault ?? null}
         />
       )}

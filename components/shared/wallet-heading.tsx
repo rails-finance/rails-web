@@ -26,7 +26,7 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { WalletElsewhereLine } from "@/components/shared/wallet-elsewhere-line";
-import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { ChainId } from "@/lib/shared/chains";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
@@ -136,10 +136,8 @@ export interface PositionOwner {
    *  this wallet. Defaults to the page's session; null leaves the label
    *  unlinked. The address menu opens the wallet view and ignores it. */
   filterProtocol?: SessionProtocol | null;
-  /** Where the bookmark goes. Defaults to the page's session; null draws no
-   *  bookmark. */
-  bookmarkProtocol?: BookmarkScope | null;
-  bookmarkListing?: string;
+  /** The bookmark on the address; false draws none. */
+  bookmark?: boolean;
   vault?: { name: string; href: string } | null;
   href?: string;
   hrefLabel?: string;
@@ -159,7 +157,7 @@ export function PositionWalletHeading({
 }: {
   owner: PositionOwner;
   /** The page's explorer: the chain of the address kind, and the default for
-   *  the listing link and bookmark. */
+   *  the listing link. */
   session: SessionProtocol;
   /** The Tools menu with the page's export shapes; a bare menu without;
    *  false for none, on a page whose card carries the menu (ui-jobs 270). */
@@ -169,27 +167,20 @@ export function PositionWalletHeading({
   strip?: ReactNode;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
-  const bookmarkProtocol = owner.bookmarkProtocol === null ? undefined : (owner.bookmarkProtocol ?? session);
+  const bookmark = owner.bookmark !== false;
   const chainId = protocolForSession(session)?.chainId;
   // A wallet is its address menu (ui-jobs 271); a vault or a page that links
   // the address elsewhere (PWN's other side) keeps the pill.
   const plain = !owner.vault && !owner.href;
   const pill = owner.wallet ? (
     plain ? (
-      <WalletMenu
-        wallet={owner.wallet}
-        ensName={owner.ensName ?? null}
-        bookmarkProtocol={bookmarkProtocol}
-        bookmarkListing={owner.bookmarkListing}
-        heading
-      />
+      <WalletMenu wallet={owner.wallet} ensName={owner.ensName ?? null} bookmark={bookmark} heading />
     ) : (
       <WalletPill
         wallet={owner.wallet}
         ensName={owner.ensName ?? null}
         filterProtocol={filterProtocol}
-        bookmarkProtocol={bookmarkProtocol}
-        bookmarkListing={owner.bookmarkListing}
+        bookmark={bookmark}
         vault={owner.vault}
         href={owner.href}
         hrefLabel={owner.hrefLabel}

@@ -32,7 +32,6 @@ export function AaveV4BaseListing({ initialItems, initialTotal, initialKey, init
       title="Aave V4 Positions"
       noun="positions"
       basePath="/base/aave-v4"
-      bookmarksProtocol="aave-v4-base"
       defaults={AAVE_V4_BASE_LIST_DEFAULTS}
       sortOptions={AAVE_V4_BASE_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

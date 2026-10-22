@@ -31,7 +31,6 @@ export function SparkListing({ initialItems, initialTotal, initialKey, initialSe
       title="SparkLend Positions"
       noun="positions"
       basePath="/ethereum/spark"
-      bookmarksProtocol="spark"
       defaults={SPARK_LIST_DEFAULTS}
       sortOptions={SPARK_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

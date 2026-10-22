@@ -58,7 +58,6 @@ import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
 import { Prov } from "@/components/shared/provenance";
 import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { holderListingSegment } from "@/lib/shared/protocols";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { assetText, shortId } from "@/lib/shared/vault-amount-text";
@@ -449,8 +448,6 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
               filterProtocol: null,
               // The bookmark the card's wallet pill carried: the position page's
               // card leaves the wallet to this row.
-              bookmarkProtocol: "morpho-base",
-              bookmarkListing: holderListingSegment("morpho-base"),
             }}
             // The card's ⋮ carries the menu; the event route draws no card.
             tools={onEventPage}

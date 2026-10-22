@@ -317,9 +317,7 @@ export function mapleCardSlots({
   const live = v.pools.filter(heldIn);
 
   // The wallet is on the page's wallet row above a detail card.
-  const identity = detail ? undefined : (
-    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
-  );
+  const identity = detail ? undefined : <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmark />;
   const counters = {
     lastActivityAt: v.lastActivityAt,
     eventCount: v.txCount,

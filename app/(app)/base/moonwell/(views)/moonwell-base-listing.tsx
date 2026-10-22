@@ -123,7 +123,6 @@ export function MoonwellBaseListing({
         title="Moonwell Positions"
         noun="positions"
         basePath="/base/moonwell"
-        bookmarksProtocol="moonwell-base"
         defaults={MOONWELL_BASE_LIST_DEFAULTS}
         sortOptions={MOONWELL_BASE_SORT_OPTIONS}
         searchPlaceholder="Search wallet address"

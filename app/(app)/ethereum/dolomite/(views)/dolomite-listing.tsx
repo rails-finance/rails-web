@@ -35,7 +35,6 @@ export function DolomiteListing({ initialItems, initialTotal, initialKey, initia
       title="Dolomite Accounts"
       noun="accounts"
       basePath="/ethereum/dolomite"
-      bookmarksProtocol="dolomite"
       defaults={DOLOMITE_LIST_DEFAULTS}
       sortOptions={DOLOMITE_SORT_OPTIONS}
       searchPlaceholder="Search owner address"

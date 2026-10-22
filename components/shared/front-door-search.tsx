@@ -4,25 +4,24 @@
 // home hero, the brand rail, the header bar below 768px, a position-first
 // explorer's front door (N5) and the listing toolbar (N1.1).
 //
-// - `SearchBox` is the shared look: the glyph, the field, and a slot for the
-//   bookmarks dropdown under it. The listing toolbar draws its own search
-//   through it and keeps its own behaviour (that explorer's filter, its family
-//   identifiers, its bookmarks).
+// - `SearchBox` is the shared look: the glyph and the field. The listing
+//   toolbar draws its own search through it and keeps its own behaviour (that
+//   explorer's filter, its family identifiers).
 // - `FrontDoorSearch` is the lookup: an address or an ENS name, resolved
 //   through /api/ens/resolve, landing on the wallet view `/wallet/<address>`
 //   unless the surface names its own page (N5 opens that family's position).
-// - `SearchLauncher` is the glyph that opens it from the chrome (H15.1): a
-//   popover beside the brand rail, a sheet from the top of a phone.
+// - `SearchLauncher` is the glyph that opens it from the chrome (H15.1): the
+//   wallet panel (components/nav/wallet-panel.tsx), from the brand rail or the
+//   header bar.
 // - `useSlashToSearch` puts `/` on it from any page: the page's own search
-//   where one is drawn, else the launcher.
+//   where one is drawn, else the wallet panel.
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X } from "lucide-react";
-import { WalletHistoryDropdown } from "@/components/shared/wallet-history-dropdown";
+import { Search } from "lucide-react";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
-import type { BookmarkScope } from "@/lib/shared/sessions";
+import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-panel";
 
 /** What the field takes, said on the field (Arbitrum item 31). */
 export const SEARCH_PLACEHOLDER = "Wallet address or ENS name";
@@ -44,8 +43,8 @@ export const walletHref = (address: string): string => `/wallet/${address.toLowe
 
 /** The marker `/` looks for: a search field drawn on the page. */
 const SLASH_TARGET = "data-search-input";
-/** Asks the chrome's launcher to open when no search field is on the page. */
-const OPEN_SEARCH_EVENT = "rails-open-search";
+/** Asks the wallet panel to open when no search field is on the page. */
+export const OPEN_SEARCH_EVENT = "rails-open-search";
 
 type Size = "sm" | "md" | "lg";
 
@@ -85,12 +84,9 @@ export interface SearchBoxProps {
   anatomy?: string;
   className?: string;
   inputRef?: RefObject<HTMLInputElement | null>;
-  containerRef?: RefObject<HTMLDivElement | null>;
   autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
-  /** Under the field: the bookmarks dropdown. */
-  children?: ReactNode;
 }
 
 /** The shared look of the search field. */
@@ -103,15 +99,13 @@ export function SearchBox({
   anatomy = "H15",
   className = "",
   inputRef,
-  containerRef,
   autoFocus,
   invalid,
   describedBy,
-  children,
 }: SearchBoxProps) {
   const glyph = GLYPH[size];
   return (
-    <div className={`relative ${className}`} ref={containerRef} data-anatomy={anatomy || undefined}>
+    <div className={`relative ${className}`} data-anatomy={anatomy || undefined}>
       {size === "lg" && (
         <span
           aria-hidden="true"
@@ -143,7 +137,6 @@ export function SearchBox({
         // canvas lifts it on its own.
         className={`w-full ${size === "lg" ? HERO_FIELD : "rounded-md"} border border-rb-300 bg-raised dark:border-transparent ${FIELD[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
       />
-      {children}
     </div>
   );
 }
@@ -196,10 +189,6 @@ export interface FrontDoorSearchProps {
   href?: (address: string) => string;
   placeholder?: string;
   size?: Size;
-  /** The bookmarks under the field: one explorer's, or every explorer's. */
-  bookmarks?: BookmarkScope | "all";
-  /** Keep the bookmarks dropdown closed while there are none. */
-  hideEmptyBookmarks?: boolean;
   autoFocus?: boolean;
   /** Called as the lookup navigates (closes a popover or sheet). */
   onDone?: () => void;
@@ -210,14 +199,12 @@ export interface FrontDoorSearchProps {
   after?: ReactNode;
 }
 
-/** The search as a form: field, "Look up", the bookmarks, and the reason a
- *  value was refused. */
+/** The search as a form: field, "Look up", and the reason a value was
+ *  refused. */
 export function FrontDoorSearch({
   href = walletHref,
   placeholder = SEARCH_PLACEHOLDER,
   size = "md",
-  bookmarks,
-  hideEmptyBookmarks,
   autoFocus,
   onDone,
   anatomy = "H15",
@@ -226,11 +213,8 @@ export function FrontDoorSearch({
 }: FrontDoorSearchProps) {
   const hydrated = useHydrated();
   const problemId = useId();
-  const containerRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState("");
-  const [focused, setFocused] = useState(false);
-  const { lookUp, go, problem, setProblem, resolving } = useLookup(href, onDone);
-  const showBookmarks = !!bookmarks && focused && !value;
+  const { lookUp, problem, setProblem, resolving } = useLookup(href, onDone);
 
   return (
     <form
@@ -253,30 +237,14 @@ export function FrontDoorSearch({
               setValue(v);
               if (problem) setProblem(null);
             }}
-            onFocus={() => setFocused(true)}
             placeholder={placeholder}
             size={size}
             anatomy=""
             className="min-w-0 flex-1"
-            containerRef={containerRef}
             autoFocus={autoFocus}
             invalid={problem != null}
             describedBy={problem ? problemId : undefined}
-          >
-            {bookmarks && (
-              <WalletHistoryDropdown
-                show={showBookmarks}
-                containerRef={containerRef}
-                onClose={() => setFocused(false)}
-                onPick={(address) => {
-                  setFocused(false);
-                  go(address);
-                }}
-                protocol={bookmarks}
-                hideWhenEmpty={hideEmptyBookmarks}
-              />
-            )}
-          </SearchBox>
+          />
           <button
             type="submit"
             className={
@@ -330,96 +298,25 @@ export function useSlashToSearch() {
   }, []);
 }
 
-/** The glyph in the chrome that opens the search (H15.1): from the brand rail
- *  a popover beside it, from the header bar a sheet from the top on a phone and
- *  a popover under the glyph from 768px. Every explorer's bookmarks sit under
- *  its field. */
+/** The glyph in the chrome that opens the wallet panel (H15.1), from the
+ *  brand rail or the header bar. It reads as active while the panel is open. */
 export function SearchLauncher({ placement }: { placement: "rail" | "header" }) {
-  const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-
-  // `/` with no search on the page: the launcher a reader can see opens.
-  useEffect(() => {
-    const onOpen = () => {
-      if (buttonRef.current && buttonRef.current.getClientRects().length > 0) setOpen(true);
-    };
-    window.addEventListener(OPEN_SEARCH_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpen);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    const onPointer = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (panelRef.current?.contains(t) || buttonRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onPointer);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointer);
-    };
-  }, [open]);
-
-  const panelPlace =
-    placement === "rail"
-      ? // Beside the rail's glyph: the rail is 56px wide and fixed.
-        "fixed left-16 top-3 w-[26rem] max-w-[calc(100vw-5rem)] rounded-xl"
-      : // A sheet across the top of a phone; from md a popover under the glyph.
-        "fixed inset-x-0 top-0 rounded-b-xl md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-2 md:w-[26rem] md:rounded-xl";
-
+  const open = useWalletPanelOpen();
   return (
-    <div className={placement === "header" ? "relative" : undefined}>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="cursor-pointer rounded-lg p-2.5 text-rb-700 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-rb-300"
-        aria-label="Look up a wallet"
-        aria-expanded={open}
-        aria-keyshortcuts="/"
-        title="Look up a wallet (/)"
-        data-anatomy="H15.1"
-        data-search-launcher={placement}
-      >
-        <Search size={18} aria-hidden="true" />
-      </button>
-      {open && (
-        <>
-          {placement === "header" && (
-            <div className="fixed inset-0 z-[var(--z-modal)] bg-black/30 md:hidden" aria-hidden="true" />
-          )}
-          <div
-            ref={panelRef}
-            role="dialog"
-            aria-label="Look up a wallet"
-            data-search-launcher-panel=""
-            className={`${panelPlace} z-[var(--z-modal)] border border-rb-200 bg-background p-4 shadow-lg dark:border-rb-800`}
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-semibold text-foreground">Look up a wallet</p>
-              <button
-                type="button"
-                onClick={close}
-                className="cursor-pointer rounded-md p-1 text-rb-500 hover:text-foreground"
-                aria-label="Close"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-            <FrontDoorSearch bookmarks="all" autoFocus onDone={close} />
-          </div>
-        </>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={(e) => toggleWalletPanel(e.currentTarget)}
+      className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        open ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
+      }`}
+      aria-label="Look up a wallet"
+      aria-expanded={open}
+      aria-keyshortcuts="/"
+      title="Look up a wallet (/)"
+      data-anatomy="H15.1"
+      data-search-launcher={placement}
+    >
+      <Search size={18} aria-hidden="true" />
+    </button>
   );
 }

@@ -19,7 +19,6 @@ import { markNavStart } from "@/lib/perf/settle-marks";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
-import type { BookmarkScope } from "@/lib/shared/sessions";
 import type { ProtocolEntry } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
 
@@ -49,9 +48,6 @@ export interface ChainTruthListingFilter<F extends BaseListFilters> {
   onChange: (next: F) => void;
   sortOptions: SortOption[];
   searchPlaceholder?: string;
-  /** When set, the toolbar's search box gains this protocol's bookmarks
-   *  dropdown; picking a wallet runs `onPick` (used to filter the listing). */
-  bookmarks?: { protocol: BookmarkScope; onPick: (wallet: string) => void };
 }
 
 /** The default failure state — rendered when a listing fetch rejected and the
@@ -258,7 +254,6 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           onChange={filter.onChange}
           sortOptions={filter.sortOptions}
           searchPlaceholder={filter.searchPlaceholder}
-          bookmarks={filter.bookmarks}
           count={count}
         />
       ) : (

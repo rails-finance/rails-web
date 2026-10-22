@@ -90,7 +90,6 @@ export function MorphoBaseListing({
       titleAs={market ? "h2" : undefined}
       noun="positions"
       basePath={market ? market.path : "/base/morpho"}
-      bookmarksProtocol="morpho-base"
       defaults={market ? morphoBaseMarketDefaults(market.loanToken) : MORPHO_BASE_LIST_DEFAULTS}
       sortOptions={morphoBaseSortOptions}
       searchPlaceholder={market ? "Search wallet address" : "Search wallet address or market id"}

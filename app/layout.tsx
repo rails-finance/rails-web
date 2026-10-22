@@ -11,6 +11,7 @@ import {
 } from "@/lib/shared/protocols";
 import { IconSymbols } from "@/components/icons/iconSymbols";
 import { HeaderBar } from "@/components/nav/header-bar";
+import { WalletPanel } from "@/components/nav/wallet-panel";
 import { NavigationProgress } from "@/components/nav/navigation-progress";
 import { WalletContextProvider } from "@/components/nav/wallet-context";
 import { ThemeScript } from "@/components/ThemeScript";
@@ -198,6 +199,9 @@ export default function RootLayout({
                 routes (/ethereum, /base, /sepolia) and nothing on marketing. */}
             <BetaStrip />
             <HeaderBar />
+            {/* The wallet panel (search and bookmarks): one instance, opened
+                from the rail, the header bar and `/`. */}
+            <WalletPanel />
             {/* Renders only on a route inside an unlaunched explorer, or on an
                 unlaunched chain's coverage page — nothing at all elsewhere.
                 Mounted here so no such route can be missed. */}

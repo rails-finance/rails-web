@@ -87,7 +87,6 @@ export function VaultPositionsListing({
       // The section's own bookmark namespace, not a protocol's: the toolbar's
       // search box gains this scope's bookmarks, and picking one filters the
       // listing to that address the way every rail's does.
-      bookmarksProtocol="aave-vaults"
       renderCard={(row) => <VaultPositionCard row={row} />}
       // A card opens the vault's own page on this holder — the reading that
       // already exists, with the address's own timeline under it.

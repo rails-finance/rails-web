@@ -267,7 +267,7 @@ export function makerVaultCardSlots({
   ) : (
     <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
       {v.owner ? (
-        <WalletPill wallet={v.owner} ensName={null} filterProtocol="makerdao" bookmarkProtocol="makerdao" />
+        <WalletPill wallet={v.owner} ensName={null} filterProtocol="makerdao" bookmark />
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}

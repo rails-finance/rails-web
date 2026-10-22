@@ -347,9 +347,7 @@ export function CometReadCard({ row, comet }: { row: ArbitrumReadRow; comet: Com
           surface: "listing",
           status,
           heads,
-          identity: (
-            <WalletPill wallet={row.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
-          ),
+          identity: <WalletPill wallet={row.wallet} ensName={null} filterProtocol={session} bookmark />,
           counters: { extra: <ReadLine row={row} /> },
           menu: null,
           tag: <ListingTag market={comet.label} />,
@@ -408,14 +406,7 @@ export function ArbitrumReadCard({ row, family }: { row: ArbitrumReadRow; family
           surface: "listing",
           status,
           heads,
-          identity: (
-            <WalletPill
-              wallet={row.wallet}
-              ensName={null}
-              filterProtocol={cfg.session}
-              bookmarkProtocol={cfg.session}
-            />
-          ),
+          identity: <WalletPill wallet={row.wallet} ensName={null} filterProtocol={cfg.session} bookmark />,
           counters: { extra: <ReadLine row={row} /> },
           menu: null,
         }}
@@ -492,7 +483,6 @@ export function ArbitrumPositionsListing({
         title={`${entry.label} positions read`}
         noun="positions"
         basePath={`${entry.href}/positions`}
-        bookmarksProtocol={cfg.session}
         defaults={DEFAULTS}
         sortOptions={SORTS}
         searchPlaceholder="Search wallet address"

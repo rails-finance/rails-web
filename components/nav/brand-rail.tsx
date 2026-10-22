@@ -3,7 +3,9 @@
 // BrandRail — the narrow vertical strip down the left edge of every app/(app)
 // surface (rails-ops TO-DO-ui-jobs 67, 68). The Rails mark sits at the top with
 // the search's glyph under it (H15.1, decision 0051); the theme toggle, the
-// bookmarks control and the beta pill share the foot.
+// bookmarks control and the beta pill share the foot. The glyph and the
+// bookmarks control both open the wallet panel (ui-jobs 431), which glides out
+// from the rail's right edge.
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -22,10 +24,9 @@
 // sixth of the page. HeaderBar draws the mark, the bookmark, the theme toggle
 // and the chain trigger there, as it did before this rail existed.
 
-import { useState } from "react";
 import Link from "next/link";
 
-import { BookmarksModal } from "@/components/nav/bookmarks-modal";
+import { toggleWalletPanel } from "@/components/nav/wallet-panel";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher } from "@/components/shared/front-door-search";
 
@@ -69,14 +70,13 @@ function BetaPill() {
   );
 }
 
-/** Bookmark icon that opens the central bookmarks modal — the one surface that
- *  collects the per-protocol bookmark lists in one place. It acts on no part of
- *  the page under it, which is why it reads as rail furniture rather than page
- *  chrome. */
-function BookmarksButton({ onClick }: { onClick: () => void }) {
+/** Bookmark icon that opens the wallet panel, where the bookmarks are listed.
+ *  It acts on no part of the page under it, which is why it reads as rail
+ *  furniture rather than page chrome. */
+function BookmarksButton() {
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => toggleWalletPanel(e.currentTarget)}
       className="cursor-pointer rounded-lg p-2.5 text-rb-700 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-rb-300"
       aria-label="Bookmarks"
       data-anatomy="H11"
@@ -101,7 +101,6 @@ function BookmarksButton({ onClick }: { onClick: () => void }) {
 }
 
 export function BrandRail() {
-  const [showBookmarks, setShowBookmarks] = useState(false);
   return (
     <>
       {/* Fixed, so the mark holds the top of the viewport and the foot cluster
@@ -124,11 +123,10 @@ export function BrandRail() {
             in the 56px. */}
         <div className="flex w-full flex-col items-center gap-1">
           <HeaderThemeToggle />
-          <BookmarksButton onClick={() => setShowBookmarks(true)} />
+          <BookmarksButton />
           <BetaPill />
         </div>
       </aside>
-      {showBookmarks && <BookmarksModal onClose={() => setShowBookmarks(false)} />}
     </>
   );
 }

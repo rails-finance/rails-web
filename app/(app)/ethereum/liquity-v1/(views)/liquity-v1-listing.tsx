@@ -38,7 +38,6 @@ export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initi
       title="Liquity V1 Troves"
       noun="Troves"
       basePath="/ethereum/liquity-v1"
-      bookmarksProtocol="liquity-v1"
       defaults={defaults}
       sortOptions={LIQUITY_V1_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

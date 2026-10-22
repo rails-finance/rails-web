@@ -53,7 +53,6 @@ export function AlchemixListing({
       // The type tab: Alchemist positions here, Transmuter positions on their
       // own route beside it.
       headerExtra={<AlchemixTypeTabs deployment={deployment} active="alchemist" />}
-      bookmarksProtocol={deployment.session}
       defaults={ALCHEMIX_LIST_DEFAULTS}
       sortOptions={alchemixSortOptions(deployment.chainId)}
       searchPlaceholder="Address, ENS name or position id"

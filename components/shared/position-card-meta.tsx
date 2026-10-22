@@ -4,7 +4,7 @@
 // non-liquidation transaction count, a Liquity redemption indicator, and the
 // liquidation triangle. (The bookmark toggle used to ride this cluster too;
 // it bookmarks the WALLET, so it now lives beside the address —
-// WalletPill's `bookmarkProtocol`.)
+// WalletPill's `bookmark`.)
 //
 // Each segment renders ONLY when its datum is present, so a protocol that lacks
 // one simply omits it — e.g. MakerDAO carries no per-position timestamp, so it

@@ -348,7 +348,7 @@ export function useAaveV3CardSlots({
   const identity = detail ? (
     (marketBadge ?? undefined)
   ) : (
-    <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmarkProtocol={dep.session} />
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmark />
   );
   const tag = detail || !marketLabel ? undefined : <ListingTag market={marketLabel} />;
 

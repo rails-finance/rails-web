@@ -17,7 +17,7 @@ import type { LiquityFamilyId } from "./types";
  *
  * Generalised off Liquity V2's original (the retired
  * components/trove/trove-identity-row.tsx) to the whole family: `protocol` selects the
- * wallet pill's filter/bookmark scope, `nftUrl` is caller-supplied rather than
+ * wallet pill's filter, `nftUrl` is caller-supplied rather than
  * resolved internally (V2 knows a contract-address map; the forks currently
  * know none), and `shortId` lets a fork use its own asset-catalog formatter.
  */
@@ -82,7 +82,7 @@ export function TroveIdentityRow({
           wallet={ownerAddress}
           ensName={ownerEns ?? null}
           filterProtocol={protocol}
-          bookmarkProtocol={showBookmark ? protocol : undefined}
+          bookmark={showBookmark}
         />
       </span>
     );
@@ -98,7 +98,7 @@ export function TroveIdentityRow({
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
       {ownerAddress && (
         // WalletPill carries its own facehash, ENS-or-short-address label,
-        // copy button and (via bookmarkProtocol) bookmark star — the same
+        // copy button and (via bookmark) bookmark star — the same
         // identity chrome every other explorer's cards use. Routing to the
         // owner-filtered listing is its `filterProtocol` link.
         <span className={`inline-flex items-center gap-1 ${isLastOwner ? "opacity-70" : ""}`}>
@@ -111,7 +111,7 @@ export function TroveIdentityRow({
             wallet={ownerAddress}
             ensName={ownerEns ?? null}
             filterProtocol={protocol}
-            bookmarkProtocol={showBookmark ? protocol : undefined}
+            bookmark={showBookmark}
           />
         </span>
       )}

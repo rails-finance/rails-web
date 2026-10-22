@@ -232,7 +232,7 @@ function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean })
   // The listing keeps the wallet alone on the left; the account's name is the
   // card's right-end `tag`.
   if (!tip) {
-    return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />;
+    return <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmark />;
   }
   return (
     <span className="flex items-center gap-2">

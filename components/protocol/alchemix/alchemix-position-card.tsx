@@ -208,7 +208,7 @@ export function AlchemixIdentity({
       {wallet && session ? (
         <span className="inline-flex items-center gap-1.5 text-rb-500">
           {prefix}
-          <WalletPill wallet={wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+          <WalletPill wallet={wallet} ensName={null} filterProtocol={session} bookmark />
         </span>
       ) : null}
     </span>
@@ -234,7 +234,7 @@ export function AlchemixListingIdentity({
       {wallet && session ? (
         <span className="inline-flex items-center gap-1.5 text-rb-500">
           {prefix}
-          <WalletPill wallet={wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+          <WalletPill wallet={wallet} ensName={null} filterProtocol={session} bookmark />
         </span>
       ) : null}
       <span className="text-rb-500">{chain}</span>

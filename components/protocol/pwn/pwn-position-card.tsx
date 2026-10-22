@@ -514,7 +514,7 @@ export function pwnCardSlots({
               wallet={v.lender}
               ensName={null}
               filterProtocol="pwn"
-              bookmarkProtocol={v.borrower || side ? undefined : "pwn"}
+              bookmark={!(v.borrower || side)}
               {...sideHref(v.lender)}
             />
           </>
@@ -531,7 +531,7 @@ export function pwnCardSlots({
               wallet={v.borrower}
               ensName={null}
               filterProtocol="pwn"
-              bookmarkProtocol={side ? undefined : "pwn"}
+              bookmark={!side}
               {...sideHref(v.borrower)}
             />
           </>
@@ -553,7 +553,7 @@ export function pwnCardSlots({
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-rb-500 tabular-nums">
       <span className="font-semibold">Loan #{v.loanId}</span>
       <span className="text-foreground/80">{parties}</span>
-      {favWallet && <BookmarkToggle wallet={favWallet} ensName={null} protocol="pwn" />}
+      {favWallet && <BookmarkToggle wallet={favWallet} ensName={null} />}
     </span>
   );
 

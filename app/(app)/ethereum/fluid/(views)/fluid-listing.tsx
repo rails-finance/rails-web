@@ -31,7 +31,6 @@ export function FluidListing({ initialItems, initialTotal, initialKey, initialSe
       title="Fluid Positions"
       noun="positions"
       basePath="/ethereum/fluid"
-      bookmarksProtocol="fluid"
       defaults={FLUID_LIST_DEFAULTS}
       sortOptions={FLUID_SORT_OPTIONS}
       searchPlaceholder="Search owner wallet or NFT id"

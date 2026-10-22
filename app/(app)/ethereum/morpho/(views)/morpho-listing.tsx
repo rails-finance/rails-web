@@ -133,7 +133,6 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
       }
       noun="positions"
       basePath={market ? market.path : "/ethereum/morpho"}
-      bookmarksProtocol="morpho"
       defaults={MORPHO_LIST_DEFAULTS}
       sortOptions={MORPHO_SORT_OPTIONS}
       searchPlaceholder={market ? "Search wallet address" : "Search wallet, market name, or market id"}

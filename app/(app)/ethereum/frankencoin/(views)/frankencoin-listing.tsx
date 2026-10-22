@@ -35,7 +35,6 @@ export function FrankencoinListing({ initialItems, initialTotal, initialKey, ini
       title="Frankencoin Positions"
       noun="positions"
       basePath="/ethereum/frankencoin"
-      bookmarksProtocol="frankencoin"
       defaults={FRANKENCOIN_LIST_DEFAULTS}
       sortOptions={FRANKENCOIN_SORT_OPTIONS}
       searchPlaceholder="Search owner address"

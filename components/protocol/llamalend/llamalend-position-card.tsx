@@ -141,7 +141,7 @@ function PositionIdentity({
     const kinds = [kind, v.version === "v2" ? "V2 market" : null].filter(Boolean);
     return (
       <span className="flex items-center gap-2">
-        <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmarkProtocol="llamalend" />
+        <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmark />
         {kinds.length > 0 && (
           <span className="text-xs text-rb-500" data-llamalend-market-kind="">
             {kinds.join(" · ")}
@@ -152,7 +152,7 @@ function PositionIdentity({
   }
   return (
     <span className="flex items-center gap-2">
-      {wallet && <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmarkProtocol="llamalend" />}
+      {wallet && <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmark />}
       <span className="text-xs text-rb-500">
         {v.marketLabel}
         {kind && <span data-llamalend-market-kind=""> · {kind}</span>}

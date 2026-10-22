@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
-import { BookmarksModal } from "@/components/nav/bookmarks-modal";
+import { toggleWalletPanel } from "@/components/nav/wallet-panel";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
 /** Marketing routes — everything under app/(site). Group names don't appear in
@@ -70,12 +69,11 @@ function BetaPill() {
   );
 }
 
-/** Bookmark icon that opens the central bookmarks modal — the one surface that
- *  collects the per-protocol bookmark lists in one place. */
-function BookmarksButton({ onClick }: { onClick: () => void }) {
+/** Bookmark icon that opens the wallet panel, where the bookmarks are listed. */
+function BookmarksButton() {
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => toggleWalletPanel(e.currentTarget)}
       className="cursor-pointer rounded-lg p-2.5 text-rb-700 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-rb-300"
       aria-label="Bookmarks"
       data-anatomy="H11"
@@ -101,7 +99,6 @@ function BookmarksButton({ onClick }: { onClick: () => void }) {
 
 export function HeaderBar() {
   const pathname = usePathname();
-  const [showBookmarks, setShowBookmarks] = useState(false);
   // `/` reaches the search from every page; the bar is mounted on all of them.
   useSlashToSearch();
 
@@ -159,12 +156,11 @@ export function HeaderBar() {
           {/* The search's glyph (H15.1): everywhere but home, whose hero is
               the search. A sheet from the top on a phone. */}
           {!isHome && <SearchLauncher placement="header" />}
-          {!isMarketing && <BookmarksButton onClick={() => setShowBookmarks(true)} />}
+          {!isMarketing && <BookmarksButton />}
           <HeaderThemeToggle />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
         </div>
       </div>
-      {showBookmarks && <BookmarksModal onClose={() => setShowBookmarks(false)} />}
     </header>
   );
 }

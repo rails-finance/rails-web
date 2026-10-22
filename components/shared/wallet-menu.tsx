@@ -18,7 +18,7 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { walletHref } from "@/components/shared/front-door-search";
-import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT, type BookmarkScope } from "@/lib/shared/sessions";
+import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 import { OVERLAY_HEADING, WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -26,16 +26,14 @@ const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 export function WalletMenu({
   wallet,
   ensName,
-  bookmarkProtocol,
-  bookmarkListing,
+  bookmark = true,
   heading = false,
   view = true,
 }: {
   wallet: string;
   ensName: string | null;
-  /** Where the bookmark goes; unset, the menu has no Bookmark row. */
-  bookmarkProtocol?: BookmarkScope;
-  bookmarkListing?: string;
+  /** The Bookmark row; false for none. */
+  bookmark?: boolean;
   /** The trigger as the page's h1 (the wallet heading, H13): the name or
    *  address at heading type with no facehash, and a name's short address
    *  beside the h1. */
@@ -59,8 +57,8 @@ export function WalletMenu({
   const close = () => setOpen(false);
 
   useEffect(() => {
-    if (!bookmarkProtocol) return;
-    const sync = () => setFav(isBookmarked(wallet, bookmarkProtocol));
+    if (!bookmark) return;
+    const sync = () => setFav(isBookmarked(wallet));
     sync();
     window.addEventListener(SESSIONS_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
@@ -68,7 +66,7 @@ export function WalletMenu({
       window.removeEventListener(SESSIONS_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
-  }, [wallet, bookmarkProtocol]);
+  }, [wallet, bookmark]);
 
   // Outside press and Escape close the dropdown; the sheet closes from its
   // scrim and Escape, and its rows are portalled outside `ref`.
@@ -101,12 +99,12 @@ export function WalletMenu({
           });
         }}
       />
-      {bookmarkProtocol && (
+      {bookmark && (
         <ToolsMenuItem
           icon={fav ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
           title={fav ? "Bookmarked" : "Bookmark it"}
           subtitle={fav ? "Press to remove the bookmark" : "Keep it in your bookmarks"}
-          onClick={() => setFav(toggleBookmark(wallet, name, bookmarkProtocol, bookmarkListing))}
+          onClick={() => setFav(toggleBookmark(wallet, name))}
         />
       )}
       {view && (

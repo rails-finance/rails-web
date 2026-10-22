@@ -62,7 +62,6 @@ export function CompoundBaseListing({
       title="Compound V3 Positions"
       noun="positions"
       basePath="/base/compound-v3"
-      bookmarksProtocol="compound-base"
       defaults={COMPOUND_BASE_LIST_DEFAULTS}
       sortOptions={COMPOUND_BASE_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

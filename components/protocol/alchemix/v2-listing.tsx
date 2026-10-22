@@ -44,7 +44,6 @@ export function AlchemixV2Listing({
       identity={<RailHeader session={deployment.session} venue="listing" stamp />}
       titleHidden
       headerExtra={<AlchemixTypeTabs deployment={deployment} active="v2" />}
-      bookmarksProtocol={deployment.session}
       defaults={V2_LIST_DEFAULTS}
       sortOptions={v2SortOptions}
       searchPlaceholder="Address or ENS name"

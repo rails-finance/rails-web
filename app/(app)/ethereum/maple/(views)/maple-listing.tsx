@@ -35,7 +35,6 @@ export function MapleListing({ initialItems, initialTotal, initialKey, initialSe
       title="Maple Positions"
       noun="positions"
       basePath="/ethereum/maple"
-      bookmarksProtocol="maple"
       defaults={MAPLE_LIST_DEFAULTS}
       sortOptions={MAPLE_SORT_OPTIONS}
       headerExtra={

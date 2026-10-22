@@ -48,7 +48,6 @@ export function TransmuterListing({
       identity={<RailHeader session={deployment.session} venue="listing" stamp />}
       titleHidden
       headerExtra={<AlchemixTypeTabs deployment={deployment} active="transmuter" />}
-      bookmarksProtocol={deployment.session}
       defaults={TRANSMUTER_LIST_DEFAULTS}
       sortOptions={transmuterSortOptions}
       searchPlaceholder="Address, ENS name or position id"

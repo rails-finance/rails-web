@@ -328,9 +328,7 @@ export function useAaveV4SpokeCardSlots({
 
   const identity = (
     <span className="flex items-center gap-2">
-      {wallet && (
-        <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol={session} bookmarkProtocol={session} />
-      )}
+      {wallet && <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol={session} bookmark />}
       <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
     </span>
   );

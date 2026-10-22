@@ -122,7 +122,6 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
       title={troveWords("listing_title")}
       noun={troveWords("listing_noun")}
       basePath="/ethereum/liquity-v2"
-      bookmarksProtocol="liquity-v2"
       defaults={LIQUITY_V2_LIST_DEFAULTS}
       sortOptions={LIQUITY_V2_SORT_OPTIONS}
       searchPlaceholder={troveWords("listing_search")}

@@ -19,7 +19,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
 import { WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
-import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 
 function shortAddr(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -37,8 +37,7 @@ function WalletPillInner({
   wallet,
   ensName,
   filterProtocol,
-  bookmarkProtocol,
-  bookmarkListing,
+  bookmark = false,
   vault,
   href: hrefOverride,
   hrefLabel,
@@ -53,17 +52,10 @@ function WalletPillInner({
    *  card wraps the whole row in a Next <Link> — a nested anchor would be invalid
    *  HTML. Both the listing card and the detail card pass it. */
   filterProtocol?: SessionProtocol;
-  /** When set, a bookmark toggle renders after the copy button. The bookmark
-   *  keys off the WALLET (not the position), so the address pill is its one
-   *  home — listing and detail cards both pass it; the card's top-right meta
-   *  cluster never carries it. A chain's vault SECTION scope is accepted here
-   *  too: a vault position card bookmarks into `vaults` / `vaults-base`, which
-   *  is a namespace rather than a roster entry (rails-ops decision 0017). */
-  bookmarkProtocol?: BookmarkScope;
-  /** WHICH of that scope's listings this pill sits on — the sub-page segment,
-   *  recorded on the bookmark so it reopens where it was taken (§42 item 1).
-   *  Omitted on an explorer's own listing. */
-  bookmarkListing?: string;
+  /** A bookmark toggle after the copy button. The bookmark is the wallet's
+   *  address, so the address pill is its one home; the card's top-right meta
+   *  cluster never carries it. */
+  bookmark?: boolean;
   /** Set when this address is a catalogued MetaMorpho vault (Morpho Base
    *  only): its name at census (a label, not an identity claim — see
    *  lib/morpho-base/vault-catalog.ts) and its own exposure page. This wins
@@ -203,15 +195,7 @@ function WalletPillInner({
             <Icon name={copied ? "check" : "copy"} size={heading ? 14 : 12} />
           </button>
         </RevealTip>
-        {bookmarkProtocol && (
-          <BookmarkToggle
-            wallet={wallet}
-            ensName={name}
-            protocol={bookmarkProtocol}
-            listing={bookmarkListing}
-            size={heading ? 14 : 12}
-          />
-        )}
+        {bookmark && <BookmarkToggle wallet={wallet} ensName={name} size={heading ? 14 : 12} />}
       </span>
     </span>
   );

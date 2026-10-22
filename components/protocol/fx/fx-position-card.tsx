@@ -729,7 +729,7 @@ export function useFxCardSlots({
   const identity = detail ? (
     <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">{poolLabel}</span>
   ) : v.owner ? (
-    <WalletPill wallet={v.owner} ensName={null} filterProtocol="fx" bookmarkProtocol="fx" />
+    <WalletPill wallet={v.owner} ensName={null} filterProtocol="fx" bookmark />
   ) : (
     <span className="text-xs font-normal tabular-nums text-rb-400">{short(v.owner)}</span>
   );

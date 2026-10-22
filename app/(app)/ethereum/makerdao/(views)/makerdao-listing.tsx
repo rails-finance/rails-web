@@ -116,7 +116,6 @@ export function MakerDAOListing({ initialItems, initialTotal, initialKey, initia
       }
       noun="vaults"
       basePath="/ethereum/makerdao"
-      bookmarksProtocol="makerdao"
       defaults={MAKER_LIST_DEFAULTS}
       sortOptions={MAKER_SORT_OPTIONS}
       searchPlaceholder="Search wallet, vault #, or collateral type"

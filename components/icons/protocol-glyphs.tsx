@@ -531,7 +531,7 @@ export function protocolGlyph(id: string): Glyph | undefined {
 }
 
 /** The monochrome glyph when one exists, else the colour PNG — the glyph-or-img
- *  fallback pattern, packaged so surfaces (bookmarks dropdown, modal) don't
+ *  fallback pattern, packaged so surfaces don't
  *  each re-implement it. `id` is the `protocols.ts` id / glyph key. */
 export function ProtocolIcon({ id, className = "" }: { id: string; className?: string }): ReactNode {
   if (hasProtocolGlyph(id)) return <ProtocolGlyph id={id} className={className} />;

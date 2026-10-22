@@ -30,7 +30,6 @@ import {
   type ListDimension,
   type SerializableDimension,
 } from "@/lib/shared/list-filter";
-import type { BookmarkScope } from "@/lib/shared/sessions";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { useUrlSearchParams, notifyUrlChanged } from "@/lib/shared/use-url-search-params";
 
@@ -130,10 +129,6 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
    *  the first paint so SSR + hydration agree before the client syncs to the live
    *  URL. Omit for a client-only listing (first paint reads no filters). */
   initialSearch?: string;
-  /** When set, the search box gains this protocol's bookmarks dropdown; picking
-   *  a wallet sets the search query to that address (filters the listing). The
-   *  same protocol keys the star on each card. Omit to skip bookmarks. */
-  bookmarksProtocol?: BookmarkScope;
   /** Render a bespoke failure state for a fetch rejection that means something
    *  more than "unreachable" (a gate statement); the shell renders the returned
    *  node in place of the row column. Return null, or omit the prop, for the
@@ -193,7 +188,6 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   initialTotal,
   initialKey,
   initialSearch,
-  bookmarksProtocol,
   renderError,
   onFilters,
   headerExtra,
@@ -501,17 +495,6 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         onChange,
         sortOptions: typeof sortOptions === "function" ? sortOptions(filters) : sortOptions,
         searchPlaceholder,
-        bookmarks: bookmarksProtocol
-          ? {
-              protocol: bookmarksProtocol,
-              // Picking a bookmark filters the listing to that wallet — reuse
-              // the search path (set the draft + push q immediately on both tiers).
-              onPick: (address: string) => {
-                setQDraft(address);
-                pushFilters({ ...filters, q: address }, 1);
-              },
-            }
-          : undefined,
       }}
     />
   );

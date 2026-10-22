@@ -35,7 +35,6 @@ export function AaveV3Listing({ initialItems, initialTotal, initialKey, initialS
       noun="positions"
       countLine={aaveV3RestingCountLine}
       basePath="/ethereum/aave-v3"
-      bookmarksProtocol="aave-v3"
       defaults={AAVE_V3_LIST_DEFAULTS}
       sortOptions={AAVE_V3_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

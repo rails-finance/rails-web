@@ -44,21 +44,15 @@
 //       Vaults on Base" on Base) and names a Position; `og:image` points at THIS
 //       route's own `opengraph-image`, and a GET of it answers 200 `image/png`
 //       with a body over 10 KB. `twitter:image` likewise.
-//   S4  BOOKMARKS. The wallet menu's bookmark row writes the holder into the
-//       RAIL's namespace — `morpho-base-sessions` on Base, `aave-vaults-
-//       sessions` on Ethereum — together with the listing it was taken on
-//       (S4a/b, always). Whether the header's bookmarks modal then SHOWS that
-//       rail's group is read off `lib/shared/protocols.ts` (`LAUNCHED_
-//       SESSIONS` below, mirroring `LAUNCHED_PROTOCOLS`) rather than assumed:
-//       a launched rail's group row points back at `<vault root>/positions?
-//       q=<holder>` — the listing the reader bookmarked from, not whichever
-//       listing the rail happens to own first — and that listing's matching
-//       row reads `aria-pressed="true"`; an unlaunched rail (Aave's vault
-//       layer today) carries no group in the modal at all, though its
-//       bookmark still writes and still shows on the vault listing itself
-//       (S4e–g, both cases). A row stored without a recorded listing still
-//       opens a live page when launched, and toggling the bookmark off
-//       removes the key entirely either way.
+//   S4  BOOKMARKS. Bookmarks are one list per browser, keyed by address
+//       (rails-ops TO-DO-ui-jobs 431). The wallet menu's bookmark row writes the
+//       holder into `rails-bookmarks` (S4a/b); the rail's bookmark button opens
+//       the wallet panel, whose list carries a row opening `/wallet/<holder>`
+//       (S4c). A per-explorer list from before 431 (`<explorer>-sessions`) is
+//       merged into the one list on the first read, keeping its custom name,
+//       and the old key is left in place (S4d). The vault listing filtered to
+//       the holder shows its row bookmarked (S4e/f), and toggling it off
+//       removes the key (S4g).
 //   S5  THE SECTION RAIL. A position page draws the section's own header row
 //       (`nav[aria-label="Section surfaces"]`), whose four tabs are that
 //       chain's listing, roster page, find door and about page — and NO tab is
@@ -114,8 +108,9 @@
 //     FAIL S4c/S4d — and the modal has no Vaults group to show.
 //     🔑 S4e and S4f were not reached on those runs; S4b is the assertion that
 //     names the namespace, and it is the one that has to be red here.
-//     (Run when the namespace WAS the section's. The rail scopes replaced it
-//     since; the break and its reds stand as the record of that run.)
+//     (Run when the namespace WAS the section's. The rail scopes replaced it,
+//     and since 431 one list replaced the scopes; the break and its reds stand
+//     as the record of that run.)
 //
 //  E  THE RECORDED LISTING DROPPED — `bookmarkListing` removed from the
 //     WalletPill in components/vaults/vault-position-card.tsx, 2026-09-20.
@@ -125,7 +120,9 @@
 //     `positionListing: false`, so its bookmark reaches the vault listing
 //     through the older branch whichever way the listing was recorded, and
 //     S4d stays green on both Ethereum fixtures while the rule is broken. An
-//     Ethereum-only green says nothing about this rule at all.
+//     Ethereum-only green says nothing about this rule at all. (Since 431 a
+//     bookmark records no listing and opens the wallet view; the record of
+//     this run stands.)
 
 import { chromium } from "playwright";
 import { createPublicClient, http, parseAbi } from "viem";
@@ -239,29 +236,6 @@ const assetText = (raw, decimals) => {
  *  under the protocol whose factory deployed it: Base's MetaMorpho vaults are
  *  Morpho Blue's, Ethereum's are Aave's vault layer's. */
 const vaultRoot = (chain) => (chain === 8453 ? "/base/morpho/vaults" : "/ethereum/aave/vaults");
-
-// ── which explorer sessions the header's bookmarks modal groups, read from
-//    the roster itself ──────────────────────────────────────────────────────
-// lib/shared/protocols.ts exports `LAUNCHED_PROTOCOLS = PROTOCOLS.filter((p)
-// => !p.unlaunched)`, and components/nav/bookmarks-modal.tsx draws every group
-// from THAT array alone (its own comment: "EVERY GROUP IS A ROSTER ENTRY NOW
-// ... this reads the roster and nothing else"). An unlaunched protocol's
-// bookmark still writes and still shows on that protocol's own listing (S4e–g
-// below), but the modal carries no group for it. Restated here as a source
-// parse rather than imported (this script runs as plain Node, not through the
-// Next/TS toolchain that resolves the `@/` alias — the same reason
-// verify-coverage-note-rows.mjs and verify-ethereum-vaults.mjs read this file
-// as text): a hardcoded "aave-vaults is absent" would go stale the day the
-// flag comes off. Whichever sessions this parse calls launched decide S4c,
-// S4d and S4d2 below, so those checks flip to expecting a group — no edit
-// here — the day `unlaunched` leaves Aave's vault-layer entry.
-const protocolsSrc = fs.readFileSync(path.join(ROOT, "lib/shared/protocols.ts"), "utf8");
-const PROTOCOL_BLOCKS = protocolsSrc.split(/^ {4}id: "/gm).slice(1);
-const LAUNCHED_SESSIONS = new Set(
-  PROTOCOL_BLOCKS.filter((b) => !/^ {4}unlaunched: true,$/m.test(b))
-    .map((b) => b.match(/^ {4}session: "([^"]+)",$/m)?.[1])
-    .filter(Boolean),
-);
 
 /** components/vaults/aave-vault-format.ts `utcInstant` — en-GB, UTC, stated. */
 const utcInstant = (unixSeconds) =>
@@ -574,21 +548,32 @@ for (const f of fixtures) {
 }
 
 // ═══ S4 · bookmarks ═══════════════════════════════════════════════════════
+// One list per browser, keyed by the wallet's address (rails-ops TO-DO-ui-jobs
+// 431): a vault holder's bookmark is the holder's, whichever explorer the
+// vault belongs to.
+const KEY = "rails-bookmarks";
+const MIGRATED = "rails-bookmarks-migrated";
+
+/** Open the wallet panel from the rail's bookmark button and read its rows:
+ *  each row's link and its label. */
+async function panelRows(page) {
+  await page
+    .locator('aside[data-anatomy="H1"] button[aria-label="Bookmarks"]')
+    .first()
+    .evaluate((el) => el.click());
+  await page.waitForSelector("[data-bookmark-list] a", { timeout: 15_000 }).catch(() => {});
+  return page.evaluate(() =>
+    [...document.querySelectorAll("[data-bookmark-list] a")].map((a) => ({
+      href: a.getAttribute("href"),
+      label: (a.textContent || "").trim(),
+    })),
+  );
+}
+
 for (const f of fixtures) {
   if (!f) continue;
-  const isBase = f.chain === 8453;
-  // The EXPLORER's namespace, not a section's: a vault belongs to the protocol
-  // whose factory deployed it, so its holder is bookmarked on that protocol's
-  // rail (rails-ops decision 0028). `vaults-sessions` and `vaults-base-sessions`
-  // went with the sections, and nothing rewrote what was stored under them.
-  const scope = isBase ? "morpho-base" : "aave-vaults";
-  const key = `${scope}-sessions`;
-  const listingPath = `${vaultRoot(f.chain)}/positions`;
-  // Whether the header's bookmarks modal groups THIS scope at all — read off
-  // the roster above, not assumed per chain. Today that's true for Base
-  // (`morpho-base`, launched) and false for Ethereum (`aave-vaults`, still
-  // `unlaunched: true`); S4c/S4d/S4d2 below assert accordingly.
-  const shouldGroup = LAUNCHED_SESSIONS.has(scope);
+  const holder = f.holder.toLowerCase();
+  const wantedHref = `/wallet/${holder}`;
   const { context, page } = await openFixture(f);
 
   // The holder page's wallet row carries the bookmark, as the "Bookmark it" row
@@ -600,128 +585,83 @@ for (const f of fixtures) {
     .catch(() => {});
   const toggle = page.locator("[data-wallet-menu]").getByText("Bookmark it", { exact: true }).first();
   const found = (await toggle.count()) > 0;
-  check(`S4a·${f.label} the page's wallet menu carries a bookmark row`, found, `${listingPath}/${f.vault}/${f.holder}`);
+  check(
+    `S4a·${f.label} the page's wallet menu carries a bookmark row`,
+    found,
+    `${vaultRoot(f.chain)}/${f.vault}/${f.holder}`,
+  );
   if (!found) {
     await context.close();
     continue;
   }
   await toggle.click();
-  const stored = await page.evaluate((k) => window.localStorage.getItem(k), key);
+  const stored = await page.evaluate((k) => window.localStorage.getItem(k), KEY);
   check(
-    `S4b·${f.label} the bookmark lands in the RAIL's namespace ${key}, carrying the listing it was taken on`,
-    !!stored && stored.toLowerCase().includes(f.holder.toLowerCase()) && stored.includes('"listing":"vaults"'),
+    `S4b·${f.label} the bookmark lands in the one list ${KEY}`,
+    !!stored && stored.toLowerCase().includes(holder),
     String(stored).slice(0, 200),
   );
+  await page.keyboard.press("Escape");
 
-  // The header's own modal — the one surface that collects every scope.
-  // TWO `[aria-label="Bookmarks"]` buttons mount on an app page by design
-  // (root layout's HeaderBar, always mounted, and BrandRail on app/(app)
-  // routes — app/(app)/layout.tsx's own comment: "Below `md` the bar is
-  // still there"): each hides its own copy by breakpoint by CSS, so only one
-  // is ever on-screen. An unscoped click resolves the ambiguous locator to
-  // DOM order's first element, which is HeaderBar's — permanently
-  // `display:none` at this script's desktop-width viewport — and hangs on
-  // its own 30s actionability wait. `:visible` picks the one actually on
-  // screen.
-  await page
-    .locator('button[aria-label="Bookmarks"]:visible')
-    .first()
-    .evaluate((el) => el.click());
-  await page.waitForSelector(`[data-bookmark-group="${scope}"]`, { timeout: 15_000 }).catch(() => {});
-  const group = await page.evaluate((s) => {
-    const g = document.querySelector(`[data-bookmark-group="${s}"]`);
-    if (!g) return null;
-    const heading = g.querySelector("a");
-    const rows = [...g.querySelectorAll("a")].slice(1).map((a) => a.getAttribute("href"));
-    return { heading: (heading?.textContent || "").trim(), headingHref: heading?.getAttribute("href"), rows };
-  }, scope);
+  const rows = await panelRows(page);
   check(
-    `S4c·${f.label} the modal ${shouldGroup ? "shows this vault's own explorer as the group" : "carries no group — this vault's explorer is unlaunched"}`,
-    shouldGroup ? group != null && /\S/.test(group.heading) : group == null,
-    JSON.stringify(group),
+    `S4c·${f.label} the wallet panel lists the holder, opening the wallet view`,
+    rows.some((r) => r.href === wantedHref),
+    JSON.stringify({ rows, wanted: wantedHref }),
   );
-  // The bookmarks modal forms a rail's href through `bookmarkHref`, and since
-  // 2026-09-20 that reads the listing the bookmark was TAKEN on off the stored
-  // row. Both chains therefore land on the vault positions listing — the page
-  // the reader bookmarked from. Base landed on `/base/morpho`, Morpho Blue's
-  // own borrower listing, until then: a true and different page about the same
-  // address, which is what made it a wrong landing rather than a lost bookmark
-  // (TO-DO-ui-jobs §42 item 1).
-  //
-  // ⚠️ AN ETHEREUM-ONLY GREEN PROVES NOTHING HERE. Aave's rail is
-  // `positionListing: false`, so its bookmark reaches the vault listing through
-  // the older branch whether or not the listing was recorded; only Base
-  // exercises the new one. Break test D below is run on Base for that reason.
-  const wantedHref = `${vaultRoot(f.chain)}/positions?q=${f.holder.toLowerCase()}`;
-  check(
-    `S4d·${f.label} ${shouldGroup ? "the group's row opens the listing the bookmark was taken on" : "there is no group, so no row to open"}`,
-    shouldGroup ? !!group && group.rows.includes(wantedHref) : group == null,
-    JSON.stringify({ rows: group?.rows, wanted: wantedHref }),
-  );
+  await page.keyboard.press("Escape");
 
-  // BACK-COMPAT, and it is the half a reader's browser is already holding.
-  // Every bookmark written before 2026-09-20 has no recorded listing, so the
-  // row is stripped of one here and the modal read again: it must open the
-  // explorer's own listing — which is where such a bookmark opened before, and
-  // is a live page — rather than null, a 404, or nothing at all. This is the
-  // expectation S4d carried until the listing began to be recorded.
+  // THE MIGRATION, which is the half a reader's browser is already holding: a
+  // pre-431 per-explorer list, with a custom name, and no one list yet. The
+  // first read merges it by address, keeps the name and leaves the old key.
+  const legacyKey = f.chain === 8453 ? "morpho-base-sessions" : "aave-vaults-sessions";
+  const legacyName = "Seam legacy";
   await page.evaluate(
-    ([k, holder]) => {
-      const rows = JSON.parse(window.localStorage.getItem(k) ?? "[]");
-      for (const r of rows) if (r.addresses?.[0]?.toLowerCase() === holder.toLowerCase()) delete r.listing;
-      window.localStorage.setItem(k, JSON.stringify(rows));
+    ([k, legacy, done, addr, name]) => {
+      window.localStorage.removeItem(k);
+      window.localStorage.removeItem(done);
+      window.localStorage.setItem(
+        legacy,
+        JSON.stringify([
+          { key: addr, addresses: [addr], ensNames: { [addr]: null }, lastVisited: 1, pinned: true, customName: name },
+        ]),
+      );
     },
-    [key, f.holder],
+    [KEY, legacyKey, MIGRATED, holder, legacyName],
   );
   await page.reload({ waitUntil: "networkidle", timeout: 180_000 });
-  // Same ambiguous-locator fix as above: two mount, one hidden by breakpoint.
-  await page
-    .locator('button[aria-label="Bookmarks"]:visible')
-    .first()
-    .evaluate((el) => el.click());
-  await page.waitForSelector(`[data-bookmark-group="${scope}"]`, { timeout: 15_000 }).catch(() => {});
-  const legacyRows = await page.evaluate(
-    (sc) =>
-      [...(document.querySelector(`[data-bookmark-group="${sc}"]`)?.querySelectorAll("a") ?? [])]
-        .slice(1)
-        .map((a) => a.getAttribute("href")),
-    scope,
-  );
-  const legacyWant = `${isBase ? "/base/morpho" : `${vaultRoot(f.chain)}/positions`}?q=${f.holder.toLowerCase()}`;
-  const legacyStatus = legacyRows.includes(legacyWant)
-    ? await hostFetch(`${BASE_URL}${legacyWant}`).then((r) => r.status)
-    : 0;
+  const migrated = await panelRows(page);
+  const kept = await page.evaluate((k) => window.localStorage.getItem(k), legacyKey);
   check(
-    `S4d2·${f.label} ${shouldGroup ? "a bookmark stored with no listing still opens the explorer's own listing, and it answers 200" : "a bookmark stored with no listing still shows no group — the explorer is unlaunched"}`,
-    shouldGroup ? legacyRows.includes(legacyWant) && legacyStatus === 200 : legacyRows.length === 0,
-    JSON.stringify({ rows: legacyRows, wanted: legacyWant, status: legacyStatus }),
+    `S4d·${f.label} a pre-431 list is merged into the one list with its name, and its key is left in place`,
+    migrated.some((r) => r.href === wantedHref && r.label === legacyName) && kept != null,
+    JSON.stringify({ rows: migrated, legacyKeyKept: kept != null }),
   );
+  await page.keyboard.press("Escape");
 
   // …and the VAULT positions listing, filtered to the same address, shows the
-  // row already bookmarked. Read there rather than at the modal's href, which
-  // S4d2 has just pointed at the explorer's own listing — on Base that is
-  // Morpho Blue's, and a vault holder need hold no Blue position at all.
-  await page.goto(`${BASE_URL}${vaultRoot(f.chain)}/positions?q=${f.holder.toLowerCase()}`, {
+  // row bookmarked.
+  await page.goto(`${BASE_URL}${vaultRoot(f.chain)}/positions?q=${holder}`, {
     waitUntil: "networkidle",
     timeout: 180_000,
   });
-  const pressed = await page.evaluate((holder) => {
+  const pressed = await page.evaluate((addr) => {
     const card = [...document.querySelectorAll("[data-position-card]")].find(
-      (c) => (c.getAttribute("data-holder") || "").toLowerCase() === holder.toLowerCase(),
+      (c) => (c.getAttribute("data-holder") || "").toLowerCase() === addr,
     );
     if (!card) return { card: false };
     const b = card.querySelector(
       'button[aria-label="Remove wallet bookmark"], button[aria-label="Bookmark this wallet"]',
     );
     return { card: true, pressed: b?.getAttribute("aria-pressed") ?? null };
-  }, f.holder);
+  }, holder);
   check(`S4e·${f.label} the filtered listing carries this holder's row`, pressed.card, JSON.stringify(pressed));
   check(`S4f·${f.label} that row's toggle reads bookmarked`, pressed.pressed === "true", JSON.stringify(pressed));
 
   if (pressed.card) {
     await page.locator('[data-position-card] button[aria-label="Remove wallet bookmark"]').first().click();
-    const after = await page.evaluate((k) => window.localStorage.getItem(k), key);
-    check(`S4g·${f.label} toggling it off removes the key entirely`, after === null, `key ${key} now ${String(after)}`);
+    const after = await page.evaluate((k) => window.localStorage.getItem(k), KEY);
+    check(`S4g·${f.label} toggling it off removes the key entirely`, after === null, `key ${KEY} now ${String(after)}`);
   }
 
   await context.close();

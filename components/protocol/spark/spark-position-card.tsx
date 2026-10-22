@@ -416,9 +416,7 @@ export function useSparkCardSlots({
   // The protocol name is redundant inside the SparkLend explorer (one
   // market), so the listing row names the wallet; the position page names it
   // in the top row.
-  const identity = detail ? undefined : (
-    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="spark" bookmarkProtocol="spark" />
-  );
+  const identity = detail ? undefined : <WalletPill wallet={v.wallet} ensName={null} filterProtocol="spark" bookmark />;
   const ended = v.status === "closed" || v.status === "liquidated";
   const status: PositionCardStatus | null =
     v.status === "liquidated"

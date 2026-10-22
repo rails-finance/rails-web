@@ -31,7 +31,6 @@ export function CompoundV2Listing({ initialItems, initialTotal, initialKey, init
       title="Compound V2 Positions"
       noun="positions"
       basePath="/ethereum/compound-v2"
-      bookmarksProtocol="compound-v2"
       defaults={COMPOUND_V2_LIST_DEFAULTS}
       sortOptions={COMPOUND_V2_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

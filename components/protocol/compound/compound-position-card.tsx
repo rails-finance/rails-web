@@ -274,11 +274,11 @@ function CompoundIdentity({
   const market = <span className="text-xs font-semibold text-rb-500">{v.marketLabel}</span>;
   // The listing keeps the wallet on the left and the market in the card's `tag`.
   if (listing) {
-    return <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmarkProtocol={session} />;
+    return <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />;
   }
   return (
     <span className="flex items-center gap-2">
-      {wallet && <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmarkProtocol={session} />}
+      {wallet && <WalletPill wallet={v.account} ensName={null} filterProtocol={session} bookmark />}
       {market}
     </span>
   );

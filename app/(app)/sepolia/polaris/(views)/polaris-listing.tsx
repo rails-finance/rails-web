@@ -156,7 +156,6 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
       title="Polaris positions"
       noun="Positions"
       basePath={POLARIS_BASE_PATH}
-      bookmarksProtocol="polaris"
       defaults={POLARIS_LIST_DEFAULTS}
       sortOptions={polarisSortOptions}
       searchPlaceholder="Address, ENS, or position number"

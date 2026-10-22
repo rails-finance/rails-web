@@ -98,7 +98,6 @@ export function BaseVaultPositionsListing({
       // The explorer's own bookmark namespace: the toolbar's search box gains
       // Morpho Blue Base's bookmarks, and picking one filters the listing to
       // that address the way every rail's does.
-      bookmarksProtocol="morpho-base"
       renderCard={(row) => <VaultPositionCard row={row} />}
       // A card opens that pair's own page — the position, with its lifetime
       // flows and its own timeline under it.

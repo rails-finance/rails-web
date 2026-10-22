@@ -35,7 +35,6 @@ export function LlamalendListing({ initialItems, initialTotal, initialKey, initi
       title="LlamaLend Positions"
       noun="positions"
       basePath="/ethereum/llamalend"
-      bookmarksProtocol="llamalend"
       defaults={LLAMALEND_LIST_DEFAULTS}
       sortOptions={LLAMALEND_SORT_OPTIONS}
       searchPlaceholder="Search user address"

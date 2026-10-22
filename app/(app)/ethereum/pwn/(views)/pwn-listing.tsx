@@ -33,7 +33,6 @@ export function PwnListing({ initialItems, initialTotal, initialKey, initialSear
       }
       noun="loans"
       basePath="/ethereum/pwn"
-      bookmarksProtocol="pwn"
       defaults={PWN_LIST_DEFAULTS}
       sortOptions={PWN_SORT_OPTIONS}
       searchPlaceholder="Search loan #, lender, or borrower"

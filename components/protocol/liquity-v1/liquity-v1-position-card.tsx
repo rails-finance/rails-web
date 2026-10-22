@@ -180,7 +180,7 @@ export function liquityV1CardSlots({
   // all buttons, so it sits inside the row's <Link>). The detail page
   // draws it on the wallet row above the card (ui-jobs 228).
   const identity = detail ? undefined : (
-    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="liquity-v1" bookmarkProtocol="liquity-v1" />
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="liquity-v1" bookmark />
   );
   const counters = {
     lastActivityAt: v.lastActivityAt,

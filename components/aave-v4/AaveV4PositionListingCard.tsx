@@ -193,7 +193,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // the right end.
   const identity = (
     <>
-      <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol={session} bookmarkProtocol={session} />
+      <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol={session} bookmark />
       <span className="text-xs font-bold uppercase tracking-wide leading-none text-rb-500">
         {hubChipLabel(hubTier, debtHubs)}
       </span>

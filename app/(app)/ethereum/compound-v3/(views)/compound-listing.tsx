@@ -50,7 +50,6 @@ export function CompoundListing({ initialItems, initialTotal, initialKey, initia
       title="Compound V3 Positions"
       noun="positions"
       basePath="/ethereum/compound-v3"
-      bookmarksProtocol="compound"
       defaults={COMPOUND_LIST_DEFAULTS}
       sortOptions={COMPOUND_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

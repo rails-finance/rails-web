@@ -10,9 +10,8 @@ import type { Glyph } from "@/components/icons/protocol-glyphs";
  *
  *   Ethereum: the two halves of the octahedron (ethereum.org brand assets),
  *     the facet shading dropped.
- *   Base: the rounded-corner square of the 2025 brand (corner radius 7.9% of
- *     the side), the shape `ChainMark` in `components/shared/explorer-mark.tsx`
- *     draws in Base blue on the home page and the explorer headers.
+ *   Base: the rounded-corner square of the 2025 brand (base.org brand kit,
+ *     corner radius 7.9% of the side).
  *   Arbitrum: the hexagon's ring with the "A" inside (arbitrum.io brand kit),
  *     the two-tone strokes drawn as one stroke per leg.
  *

@@ -59,7 +59,6 @@ export function FxListing({ initialItems, initialTotal, initialKey, initialSearc
       title="f(x) Protocol Positions"
       noun="positions"
       basePath="/ethereum/fx"
-      bookmarksProtocol="fx"
       defaults={FX_LIST_DEFAULTS}
       sortOptions={FX_SORT_OPTIONS}
       headerExtra={

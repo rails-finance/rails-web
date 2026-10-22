@@ -946,21 +946,3 @@ export function listingHrefForWallet(session: SessionProtocol, wallet: string, t
   }
   return `${listing}?q=${encodeURIComponent(wallet.toLowerCase())}`;
 }
-
-/** The `segment` of the sub-page holding this rail's HOLDER listing, or
- *  undefined where it has none. A vault card asks for it as it bookmarks: the
- *  row is a holding, so the bookmark belongs on the listing of holdings,
- *  whatever segment that rail spells it under. */
-export function holderListingSegment(session: SessionProtocol): string | undefined {
-  return protocolForSession(session)?.subPages.find((s) => s.holderListing)?.segment;
-}
-
-/** Deep-link into an explorer's listing filtered to a wallet — used by the
- *  bookmarks modal. A thin wrapper over `listingHrefForWallet` so the URL is
- *  formed in exactly one place. `takenOn` is the sub-page segment the bookmark
- *  was taken on (`WalletSession.listing`); without one it opens the explorer's
- *  own listing, which is where every bookmark written before that was
- *  recorded opened. */
-export function bookmarkHref(entry: ProtocolEntry, wallet: string, takenOn?: string): string {
-  return listingHrefForWallet(entry.session, wallet, takenOn) ?? entry.href;
-}

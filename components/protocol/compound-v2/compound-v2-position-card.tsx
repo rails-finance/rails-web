@@ -343,7 +343,7 @@ export function useCompoundV2CardSlots({
 
   // The listing names the wallet; the detail page's wallet row does.
   const identity = detail ? undefined : (
-    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmark />
   );
 
   const ended = v.status === "closed" || v.status === "liquidated";

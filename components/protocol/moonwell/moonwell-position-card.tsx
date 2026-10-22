@@ -339,7 +339,7 @@ export function useMoonwellCardSlots({
   };
   // The listing names the account; the position page's wallet row does.
   const identity = detail ? undefined : (
-    <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmark />
   );
   const common = { status, identity, counters };
 

@@ -31,7 +31,6 @@ export function MoonwellListing({ initialItems, initialTotal, initialKey, initia
       title="Moonwell Positions"
       noun="positions"
       basePath="/ethereum/moonwell"
-      bookmarksProtocol="moonwell"
       defaults={MOONWELL_LIST_DEFAULTS}
       sortOptions={MOONWELL_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"

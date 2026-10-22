@@ -425,7 +425,7 @@ export function polarisCardSlots({
   const identity = detail ? (
     <span className="text-xs text-rb-500">{stable} market</span>
   ) : (
-    v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmarkProtocol="polaris" />
+    v.owner && <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmark />
   );
 
   const ended = v.status === "closed" || v.status === "liquidated";

@@ -15,7 +15,6 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { WalletMenu } from "@/components/shared/wallet-menu";
-import { protocolForPathname } from "@/lib/shared/protocols";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
 import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wallet-position-card";
@@ -374,7 +373,6 @@ export function WalletView({
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
   const atRiskCount = open.filter(atRisk).length;
   const registry = useReceiptRegistry();
-  const bookmarkScope = open[0] ? protocolForPathname(open[0].href)?.session : undefined;
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -409,11 +407,8 @@ export function WalletView({
           <WalletHeading
             address={address}
             // The address menu a position page draws (ui-jobs 430): Copy the
-            // address and, under the explorer of the first open position,
-            // Bookmark it; no View the wallet on the wallet view.
-            title={
-              <WalletMenu wallet={address} ensName={ensName} bookmarkProtocol={bookmarkScope} heading view={false} />
-            }
+            // address and Bookmark it; no View the wallet on the wallet view.
+            title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}
             lines={
               <>
                 {read.total > 0 && (

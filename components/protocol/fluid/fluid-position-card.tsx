@@ -246,7 +246,7 @@ export function fluidCardSlots({
   ) : (
     <span className="contents">
       {v.owner ? (
-        <WalletPill wallet={v.owner} ensName={null} filterProtocol="fluid" bookmarkProtocol="fluid" />
+        <WalletPill wallet={v.owner} ensName={null} filterProtocol="fluid" bookmark />
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}
