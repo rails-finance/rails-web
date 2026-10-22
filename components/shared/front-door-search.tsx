@@ -32,6 +32,13 @@ export const LOOK_UP = "Look up";
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ENS = /^[^\s]+\.eth$/i;
 
+/** What the lookup takes: an address as it is, or an ENS name to resolve. */
+const lookable = (raw: string): "address" | "ens" | null => {
+  const typed = raw.trim();
+  if (ADDRESS.test(typed)) return "address";
+  return ENS.test(typed) && typed.length >= 7 ? "ens" : null;
+};
+
 /** The wallet view for an address. */
 export const walletHref = (address: string): string => `/wallet/${address.toLowerCase()}`;
 
@@ -53,10 +60,15 @@ const FIELD: Record<Size, string> = {
 // The home page's field (the one lg search): a full pill whose placeholder
 // shows on hover and focus only, with a blue glow behind it in dark. The field
 // keeps its accessible name at rest.
+// The placeholder fades in over 400ms on hover or focus and out over 600ms.
 const HERO_FIELD =
-  "relative rounded-full placeholder:opacity-0 placeholder:transition-opacity hover:placeholder:opacity-100 focus:placeholder:opacity-100";
+  "relative rounded-full placeholder:opacity-0 placeholder:transition-opacity placeholder:duration-[600ms] placeholder:ease-in-out hover:placeholder:opacity-100 hover:placeholder:duration-[400ms] hover:placeholder:ease-out focus:placeholder:opacity-100 focus:placeholder:duration-[400ms] focus:placeholder:ease-out";
+// "Look up" stays muted until the field holds something it can look up; a
+// press on the muted button still answers with the problem line.
 const HERO_BUTTON =
-  "inline-flex h-12 shrink-0 cursor-pointer items-center rounded-full bg-blue-500 px-6 text-base font-medium text-white transition-colors hover:bg-blue-600 focus-ring disabled:opacity-60";
+  "inline-flex h-12 shrink-0 cursor-pointer items-center rounded-full border px-6 text-base font-medium transition-colors duration-200 focus-ring disabled:opacity-60";
+const HERO_BUTTON_IDLE = "border-rb-300 bg-raised text-rb-500 dark:border-transparent";
+const HERO_BUTTON_READY = "border-blue-500 bg-blue-500 text-white hover:bg-blue-600";
 const GLYPH: Record<Size, { size: number; left: string }> = {
   sm: { size: 14, left: "left-3" },
   md: { size: 14, left: "left-3" },
@@ -108,7 +120,7 @@ export function SearchBox({
       )}
       <Search
         size={glyph.size}
-        className={`pointer-events-none absolute ${glyph.left} top-1/2 -translate-y-1/2 text-rb-500`}
+        className={`pointer-events-none absolute z-10 ${glyph.left} top-1/2 -translate-y-1/2 text-rb-500`}
         aria-hidden="true"
       />
       <input
@@ -155,8 +167,9 @@ function useLookup(href: (address: string) => string, onDone?: () => void) {
   const lookUp = useCallback(
     async (raw: string) => {
       const typed = raw.trim();
-      if (ADDRESS.test(typed)) return go(typed);
-      if (!ENS.test(typed) || typed.length < 7) {
+      const kind = lookable(typed);
+      if (kind === "address") return go(typed);
+      if (kind == null) {
         setProblem("Enter a wallet address (0x and 40 hexadecimal characters) or an ENS name ending in .eth.");
         return;
       }
@@ -264,7 +277,15 @@ export function FrontDoorSearch({
               />
             )}
           </SearchBox>
-          <button type="submit" className={size === "lg" ? HERO_BUTTON : `${NAV_BUTTON} shrink-0`} disabled={resolving}>
+          <button
+            type="submit"
+            className={
+              size === "lg"
+                ? `${HERO_BUTTON} ${lookable(value) ? HERO_BUTTON_READY : HERO_BUTTON_IDLE}`
+                : `${NAV_BUTTON} shrink-0`
+            }
+            disabled={resolving}
+          >
             {resolving ? "Looking up…" : LOOK_UP}
           </button>
         </div>
