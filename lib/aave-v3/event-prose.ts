@@ -22,6 +22,7 @@ import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import type { ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { poolCallerContract } from "@/lib/aave-v3/event-label";
+import { legAmount } from "@/lib/shared/tx-legs";
 import { externalActor } from "@/lib/shared/external-actor";
 import { v3Brand, isSeamless, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { feeLiquidation, liquidationBonus, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
@@ -96,7 +97,8 @@ function pick(
       // The gateway pulls aWETH only to withdraw it as ETH: a withdrawal.
       if (getProtocolContract(ctx.counterparty, chainId)?.kind === "gateway")
         return { id: "aave3.withdraw", variant: "gateway" };
-      return { id: "aave3.transfer_out", variant: "default" };
+      // A router or settlement paid one leg back: a sale (ctx.sale).
+      return { id: "aave3.transfer_out", variant: ctx.sale ? "sold" : "default" };
     }
     case "swap": {
       const s = ctx.swap;
@@ -394,10 +396,18 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     case "aave3.transfer_out": {
       const named = getProtocolContract(ctx.counterparty, chainId);
       v.recipient = named?.name ?? V3_WORDS.another_account;
-      sp.say("tout.what", { amount: "transfer" });
-      if (named) {
+      if (variant === "sold" && ctx.sale && named) {
         v.role = named.role;
-        sp.say("tout.named");
+        v.received = Number(legAmount(ctx.sale.leg));
+        v.r_symbol = ctx.sale.leg.symbol;
+        sp.say("tout.sold", { amount: "transfer", received: "received" });
+        sp.say("tout.paired");
+      } else {
+        sp.say("tout.what", { amount: "transfer" });
+        if (named) {
+          v.role = named.role;
+          sp.say("tout.named");
+        }
       }
       if (switchedOff()) sp.say("off.switched");
       hfLine(true);

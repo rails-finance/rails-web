@@ -55,7 +55,9 @@ export function poolCallerContract(
  *  withdraws it from the Pool and sends ETH on in the same transaction
  *  (WrappedTokenGatewayV3 withdrawETH), and the lifetime flows count it as
  *  withdrawn. The row says so, and names the gateway as the route. A
- *  distributor's payout reads "Claimed" or "Received" (`distributorPayout`). */
+ *  distributor's payout reads "Claimed" or "Received" (`distributorPayout`).
+ *  A transfer out the receipt shows as a sale through a router names what was
+ *  sold and what came back ("Sold USDC → ETH", `ctx.sale`). */
 export function aaveV3CtLabel(
   ctx: AaveV3Context,
   isFee: boolean,
@@ -72,6 +74,8 @@ export function aaveV3CtLabel(
   const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
   const viaGateway = !isFee && ctx.eventType === "transfer_out" && named?.kind === "gateway";
   const payout = distributorPayout(ctx, owner, chainId);
+  if (!isFee && ctx.eventType === "transfer_out" && ctx.sale)
+    return `Sold${ctx.reserveSymbol ? ` ${ctx.reserveSymbol} → ${ctx.sale.leg.symbol}` : ""}`;
   return isFee
     ? "Liquidation fee"
     : viaGateway

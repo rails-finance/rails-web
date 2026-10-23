@@ -23,6 +23,9 @@ export interface AaveFamilyHeadTable {
   /** The lead before the known contract a supply, borrow or repay went
    *  through. A family without it reads no clause. */
   via?: string;
+  /** A transfer out to a router or settlement that the receipt shows as a
+   *  sale (lib/shared/tx-legs.ts). A family without it reads "Transferred". */
+  sold?: string;
   swap: Record<AaveV3SwapKind, string>;
   emode: string;
   emodeOff: string;
@@ -52,6 +55,8 @@ export interface AaveFamilyHeadRow {
   gateway?: boolean;
   payout?: "claimed" | "received";
   swapKind?: AaveV3SwapKind;
+  /** A transfer out the receipt shows as a sale through a router. */
+  sale?: boolean;
 }
 
 /** The row's past-participle kind. */
@@ -60,6 +65,7 @@ export function aaveFamilyT1Kind(row: AaveFamilyHeadRow, w: AaveFamilyHeadTable)
   if (row.gateway) return w.withdrew;
   if (row.payout && w[row.payout]) return w[row.payout]!;
   if (row.eventType === "swap" && row.swapKind) return w.swap[row.swapKind];
+  if (row.sale && w.sold) return w.sold;
   switch (row.eventType) {
     case "supply":
       return w.supplied;
