@@ -591,12 +591,12 @@ templates:
         when: |-
           via, the owner sent it
         text: |-
-          Supplied {amount} {symbol} to {protocol} through {caller}, {role}.
+          Supplied {amount} {symbol} to {protocol} through {role}.
       supply.by_via:
         when: |-
           via, another account sent it
         text: |-
-          {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf, through {caller}, {role}.
+          {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf, through {role}.
       coll.on:
         when: |-
           the Pool switched the asset on as collateral in this transaction
@@ -787,12 +787,12 @@ templates:
         when: |-
           via, the owner sent it
         text: |-
-          Borrowed {amount} {symbol} against the account's collateral through {caller}, {role}.
+          Borrowed {amount} {symbol} against the account's collateral through {role}.
       borrow.by_via:
         when: |-
           via, another account sent it, with credit the owner delegated
         text: |-
-          {actor} borrowed {amount} {symbol} on the owner's behalf through {caller}, {role}, with credit the owner delegated.
+          {actor} borrowed {amount} {symbol} on the owner's behalf through {role}, with credit the owner delegated.
     order:
       [
         borrow.what,
@@ -893,22 +893,22 @@ templates:
         when: |-
           via, the owner sent it, debt remains
         text: |-
-          Repaid {amount} {symbol} of the account's debt through {caller}, {role}.
+          Repaid {amount} {symbol} of the account's debt through {role}.
       repay.via_cleared:
         when: |-
           via, the owner sent it, the reserve's debt is gone
         text: |-
-          Repaid {amount} {symbol} through {caller}, {role}, clearing the account's {symbol} debt.
+          Repaid {amount} {symbol} through {role}, clearing the account's {symbol} debt.
       repay.by_via:
         when: |-
           via, another account sent it, debt remains
         text: |-
-          {actor} repaid {amount} {symbol} of the account's debt on the owner's behalf, through {caller}, {role}.
+          {actor} repaid {amount} {symbol} of the account's debt on the owner's behalf, through {role}.
       repay.by_via_cleared:
         when: |-
           via, another account sent it, the reserve's debt is gone
         text: |-
-          {actor} repaid {amount} {symbol} on the owner's behalf through {caller}, {role}, clearing the {symbol} debt.
+          {actor} repaid {amount} {symbol} on the owner's behalf through {role}, clearing the {symbol} debt.
       repay.funded:
         when: |-
           a withdraw and swap within the hour before sent this token to the wallet
