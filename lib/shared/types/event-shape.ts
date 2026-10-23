@@ -692,6 +692,9 @@ export interface AaveV3Context {
    *  poolCaller: routed flows (gateways, adapters) keep txFrom = owner;
    *  contract-owned positions (Safes) keep poolCaller = owner. */
   poolCaller?: string;
+  /** withdraw only — the Withdraw log's `to` where the Pool paid an account
+   *  other than the position, lowercased (rails-ops TO-DO-ui-jobs 433). */
+  recipient?: string;
   /** transfer_in/transfer_out only — the OTHER account in the position move
    *  (the sender on an inflow, the recipient on an outflow), lowercased. A
    *  true counterparty of the event, not a verdict about who acted (renders

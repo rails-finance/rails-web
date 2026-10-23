@@ -79,6 +79,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
+import { CARD_PAD_X } from "@/lib/shared/ui-grammar";
 import { TimelineConfirmationFooter, TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { formatNumber } from "@/lib/utils/format";
 import { aaveV3BaseWriteOffLeftovers, type WriteOffLeftover } from "@/lib/aave-v3-base/write-off-gap";
@@ -788,12 +789,10 @@ export function AaveV3PoolPositionView({
                       // Only claim absence when the sweep actually read the blocks;
                       // otherwise the footer beneath states what was missed.
                       emptyLabel={sweptClean ? d.words.emptyWhole : d.words.emptyNotWhole}
-                      footer={
-                        <>
-                          <TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={d.sourceLabel} />
-                          <WriteOffGapNote leftovers={writeOffLeftovers} chain={d.writeOff.chain} />
-                        </>
-                      }
+                      footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={d.sourceLabel} />}
+                      // The replay's closing debt against the Pool's: a frame for
+                      // the newest row, so it sits above it and is never paged out.
+                      notice={<WriteOffGapWell leftovers={writeOffLeftovers} chain={d.writeOff.chain} />}
                       footerWhileMore={<TimelineConfirmationFooter coverage={timeline.coverage} />}
                       // On a grouped answer the list covers `eventsServed`; a month
                       // read holds no card, the grid holding the other months.
@@ -855,21 +854,29 @@ export function AaveV3PoolPositionView({
   );
 }
 
-/** Under the last event, in the coverage footer's register: the write-off
- *  gap, where this wallet's history shows it (lib/aave-v3-base/write-off-gap). */
-function WriteOffGapNote({ leftovers, chain }: { leftovers: WriteOffLeftover[]; chain: string }) {
+/** Above the newest row, in the fill well's chrome: the write-off gap, where
+ *  this wallet's history shows it (lib/aave-v3-base/write-off-gap). */
+function WriteOffGapWell({ leftovers, chain }: { leftovers: WriteOffLeftover[]; chain: string }) {
   if (leftovers.length === 0) return null;
   // The formatter the event card's "debt after" figure uses, so the note
-  // matches the row above it (dust keeps its magnitude: 0.0004, not 0).
+  // matches the row beneath it (dust keeps its magnitude: 0.0004, not 0).
   const amounts = leftovers.map((l) => `${formatNumber(Number(l.amount))} ${l.symbol}`);
   const it = amounts.length === 1 ? "it" : "them";
   const listed =
     amounts.length === 1 ? amounts[0] : `${amounts.slice(0, -1).join(", ")} and ${amounts[amounts.length - 1]}`;
   return (
-    <p className="mt-2 pt-3 text-[11px] leading-relaxed text-rb-500">
-      <span className="text-foreground">This history ends with {listed} of debt that no longer exists on chain.</span> A
-      liquidation left no collateral to cover {it}, so Aave wrote {it} off (a <code>DeficitCreated</code> event), and
-      Rails does not show write-offs on {chain} yet.
-    </p>
+    <div
+      // The cards' horizontal padding, so its text starts on their content line.
+      className={`mb-3 rounded-xl bg-raised ${CARD_PAD_X} py-4 text-[13px] leading-relaxed`}
+      data-write-off-well=""
+    >
+      <p className="font-medium text-foreground">
+        This history ends with {listed} of debt that no longer exists on chain.
+      </p>
+      <p className="mt-1 text-rb-500">
+        A liquidation left no collateral to cover {it}, so Aave wrote {it} off (a <code>DeficitCreated</code> event),
+        and Rails does not show write-offs on {chain} yet.
+      </p>
+    </div>
   );
 }

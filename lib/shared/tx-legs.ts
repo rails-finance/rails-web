@@ -47,6 +47,10 @@ export interface TxLegs {
   hash: string;
   wallet: string;
   blockNumber: number;
+  /** The contract the transaction entered (the receipt's `to`), lowercase;
+   *  null for a contract creation. The timeline's side bar names its owner
+   *  where the registry gives it a `bar` (rails-ops TO-DO-ui-jobs 439). */
+  to: string | null;
   /** Tokens the wallet sent, from the receipt's Transfer logs. */
   sent: TxLeg[];
   /** Tokens paid to the wallet: Transfer logs to it, and native transfers to

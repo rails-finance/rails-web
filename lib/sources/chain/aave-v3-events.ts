@@ -318,6 +318,8 @@ export interface AaveV3DecodedRow {
   liquidatedCollateralAmount?: bigint;
   liquidator?: string;
   poolCaller?: string;
+  /** withdraw: the log's `to`, where it is not the position. */
+  recipient?: string;
   counterparty?: string;
   interestRateMode?: number;
   borrowRate?: string;
@@ -374,8 +376,16 @@ function decodePoolLog(log: RawLog, wallet: string): AaveV3DecodedRow | null {
     if (topic0 === TOPIC0.Withdraw) {
       const { args } = dec();
       // No poolCaller: Withdraw carries no msg.sender param (`to` is a
-      // destination, not an actor) — the same NULL the MV has.
-      return { ...base, kind: "withdraw", reserve: String(args.reserve).toLowerCase(), amount: args.amount as bigint };
+      // destination, not an actor) — the same NULL the MV has. The
+      // destination is the recipient where it is not the position.
+      const to = String(args.to).toLowerCase();
+      return {
+        ...base,
+        kind: "withdraw",
+        reserve: String(args.reserve).toLowerCase(),
+        amount: args.amount as bigint,
+        ...(to !== String(args.user).toLowerCase() ? { recipient: to } : {}),
+      };
     }
     if (topic0 === TOPIC0.Borrow) {
       const { args } = dec();
@@ -1320,6 +1330,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       ...(d.kind === "borrow" ? { interestRateMode: d.interestRateMode, borrowRate: d.borrowRate } : {}),
       ...(d.kind === "repay" ? { useATokens: d.useATokens } : {}),
       ...(isTransfer && d.counterparty ? { counterparty: d.counterparty } : {}),
+      ...(d.kind === "withdraw" && d.recipient ? { recipient: d.recipient } : {}),
       ...(txFrom && d.poolCaller ? { txFrom, poolCaller: d.poolCaller } : {}),
       // A transfer's sender alone: it tells a claimed payout from a received
       // one (lib/aave-v3/event-label.ts distributorPayout).
