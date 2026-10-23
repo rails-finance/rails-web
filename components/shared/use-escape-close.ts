@@ -10,9 +10,11 @@
 // order panels opened in is the order Escape closes them. It stands aside when
 // something above the panels owns Escape: a modal, menu or listbox that does
 // not contain the panel (a Learn more modal opened from the panel closes
-// first), or the armed provenance inspector. A press it handles is marked
-// `defaultPrevented`, which the phone card sheet (mobile-sheet.tsx) reads so a
-// panel inside the sheet closes without the sheet closing with it.
+// first), or the armed provenance inspector. A layer that is mounted closed
+// (`aria-hidden="true"`, `inert`, or `display: none`; the wallet panel stays
+// mounted so it can slide) owns nothing and is passed over. A press it handles
+// is marked `defaultPrevented`, which the phone card sheet (mobile-sheet.tsx)
+// reads so a panel inside the sheet closes without the sheet closing with it.
 
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { provInspector } from "@/components/shared/provenance";
@@ -27,6 +29,14 @@ let listening = false;
 
 const LAYER = '[aria-modal="true"], [role="dialog"], [role="menu"], [role="listbox"]';
 
+function isClosed(layer: Element): boolean {
+  return (
+    layer.getAttribute("aria-hidden") === "true" ||
+    layer.hasAttribute("inert") ||
+    getComputedStyle(layer).display === "none"
+  );
+}
+
 function onKeyDown(e: KeyboardEvent) {
   if (e.key !== "Escape" || e.defaultPrevented) return;
   const top = stack[stack.length - 1];
@@ -34,6 +44,7 @@ function onKeyDown(e: KeyboardEvent) {
   if (provInspector.getArmed()) return;
   const target = top.focusTarget();
   for (const layer of document.querySelectorAll(LAYER)) {
+    if (isClosed(layer)) continue;
     if (!target || !layer.contains(target)) return;
   }
   e.preventDefault();
