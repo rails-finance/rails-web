@@ -146,6 +146,11 @@ async function readPills(page, rowSel) {
       "DEFAULTED · UNCLAIMED",
       "REPAID",
       "DEFAULTED",
+      // An open position's caution words, drawn in place of OPEN: Maple's
+      // shares in the withdrawal queue, LlamaLend's loan in soft-liquidation
+      // (the shared card's status tag, maple- and llamalend-position-card.tsx).
+      "IN WITHDRAWAL QUEUE",
+      "IN SOFT-LIQUIDATION",
     ];
     const rows = [...document.querySelectorAll(sel)];
     return rows.map((row) => {
@@ -725,7 +730,8 @@ if (wants("Polaris")) {
 // narrowest separation on this roster is Compound V2's 283k open against 418k
 // all — so the slack cannot hide a broken default.
 
-const OPEN_PILLS_ROSTER = new Set(["OPEN", "NOT LOADED"]); // 0018: an open row not yet chain-read
+// 0018: an open row not yet chain-read. The two caution words are open positions.
+const OPEN_PILLS_ROSTER = new Set(["OPEN", "NOT LOADED", "IN WITHDRAWAL QUEUE", "IN SOFT-LIQUIDATION"]);
 const ENDED_PILLS_ROSTER = new Set(["CLOSED", "LIQUIDATED"]);
 const ALL_PILLS_ROSTER = new Set(["OPEN", "NOT LOADED", "CLOSED", "LIQUIDATED"]);
 
