@@ -172,13 +172,15 @@ import { barOwnerOf } from "@/lib/shared/bar-owners";
  *     Base row names no owner and relay-periphery's v3 addresses list another
  *     router, so Base 0xb92f…ff4f is a role.
  *   • Owner unstated, so the display is the role: FLAction, FLBalancer,
- *     OperationExecutor (its header's copyright is Oazo Apps Limited, which
- *     names no product), ZapperExecutor, MulticallRouter, VaultDepositooorV2,
+ *     OperationExecutor, ZapperExecutor, MulticallRouter, VaultDepositooorV2,
  *     AutoRepayingManager, Deposit, App, LeveragedPosition, AaveAdaptor,
  *     L1SenderV2, AaveCommissionContract, RosettaProxy,
  *     ConnectorDeleverageParaswap and two Base AaveV3Adapters. The Base name
  *     `AaveV3Adapter` covers four contracts: a swap adapter 0xa43f…0956
  *     (`sellBase`, `sellQuote`), Enzyme's 0xc16d…c099 and two app adapters.
+ *     The timeline's side bar states owners the display does not: DeFi
+ *     Saver's deployments name FLAction and FLBalancer, and Summer.fi's name
+ *     five of the seven OperationExecutors (`bar-owners.ts`, which cites each).
  *   • Pools of batch 2: the Equalizer pairs answer `factory()` with Equalizer's
  *     PairFactory on Base (0xed8d…ec04, its docs' Base contracts page), the two
  *     PancakeSwap pairs with PancakeSwap V2's (0x02a8…749E, its developer
@@ -275,6 +277,12 @@ export interface BarSubject {
   /** Many apps send transactions to this contract (an aggregator's router):
    *  the bar's receipt says so. */
   shared?: boolean;
+  /** The product has deactivated its app; its contracts stay on chain. Historic
+   *  rows keep the product's bar and mark, since the action was done there; the
+   *  bar's receipt says so in one sentence, and the header's manager chip reads
+   *  it (rails-ops TO-DO-ui-jobs 440). `since` is the date as precisely as the
+   *  source gives it, `source` the product's page that says so. */
+  closed?: { since: string; source: string };
 }
 
 /** Zerion's mark (zerion.io's `favicon-mark.png`, blue #2962EF). */

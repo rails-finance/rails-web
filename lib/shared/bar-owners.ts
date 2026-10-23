@@ -16,11 +16,50 @@
 // registry's FLAction and FLBalancer entries are the same deployments and take
 // the same bar here. Mark: defisaver.com's `apple-touch-icon.png` (180 px,
 // resized to 176), green #37AF6F, oklch hue 156.
+//
+// Summer.fi: its deployments, `OasisDEX/oasis-earn-sc` ("Summer Mono"),
+// `packages/deploy-configurations/configs/{mainnet,base,arbitrum}.conf.ts`
+// (read 23 Oct 2026), the `OperationExecutor` entry's `address` and `history`
+// on the default branch `dev` (Ethereum 0xca71…cdfc and 0xc1cd…0b0c, Base
+// 0xb65c…92d8, Arbitrum 0x90fe…9a49), and the same entry in the DMA
+// deployment commits on the repo's deployment branches: Ethereum 0xfff3…bc83
+// with history 0xd455…2b12 and 0x7d81…f1a7 (7a18fd18, #604), Base 0x2d43…8d8f
+// with history 0x0364…9314 (f91ce47e), Arbitrum 0xa784…a46c (902c762a, #602)
+// and 0x5024…9efe (e0d698b3, #621). Addresses named only on the Ajna
+// feature branches' working configs are left out. The registry's
+// OperationExecutor entries among these take the same bar here; its mainnet
+// executors 0x6e86…6070 and 0x661d…ef15 appear nowhere in the repo, so they
+// keep their role. Mark: summer.fi's `icon.svg` (its only site icon), drawn at
+// 176 px; the gradient runs pink #FF49A4 to purple #B049FF and the purple
+// covers most of the mark, oklch hue 306.
 
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { BarSubject } from "@/lib/shared/known-infrastructure";
 
 export const DEFI_SAVER_BAR: BarSubject = { name: "DeFi Saver", icon: "defisaver", hue: 156 };
+
+/** summer.fi, read 23 Oct 2026: "Summer.fi is winding down. The Summer.fi app
+ *  has now been deactivated." The page dates it no closer than its 2026 footer. */
+export const SUMMER_FI_BAR: BarSubject = {
+  name: "Summer.fi",
+  icon: "summerfi",
+  hue: 306,
+  closed: { since: "2026", source: "https://summer.fi/" },
+};
+
+const SUMMER_FI: [ChainId, string][] = [
+  [MAINNET_CHAIN_ID, "0xca71c36d26f515ad0cce1d806b231cbc1185cdfc"],
+  [MAINNET_CHAIN_ID, "0xc1cd3654ab3b37e0bc26bafb5ae4c096892d0b0c"],
+  [MAINNET_CHAIN_ID, "0xfff30c67eea809123596252e132d30e1eb75bc83"],
+  [MAINNET_CHAIN_ID, "0xd4554d1c818a99d23f29aa6dabb02fe810972b12"],
+  [MAINNET_CHAIN_ID, "0x7d81740b28ea699ee84031d3562a93f481b3f1a7"],
+  [BASE_CHAIN_ID, "0xb65cbf9689979e1749b38ba5d5155c70500292d8"],
+  [BASE_CHAIN_ID, "0x2d43e84567019d721f095cfd632291c3ee868d8f"],
+  [BASE_CHAIN_ID, "0x03644f489bf16b1eafa68f495955eb5a78189314"],
+  [ARBITRUM_CHAIN_ID, "0x90feaf7727a6ce75f518728d296877830fd39a49"],
+  [ARBITRUM_CHAIN_ID, "0xa7840fa682506117f4549e918930c80c1fc3a46c"],
+  [ARBITRUM_CHAIN_ID, "0x50241265f81a568a536a205f1f4bea8899df9efe"],
+];
 
 /** The role words the bar's receipt names a contract by, after the owner's name. */
 const DEFI_SAVER_ROLES: Record<string, string> = {
@@ -147,19 +186,32 @@ export interface BarOwner {
   role: string;
   /** Where the owner is stated, for the receipt's name leaf. */
   source: string;
+  /** The owner's deployments, the name leaf's link. */
+  href: string;
 }
 
 const OWNERS = new Map<string, BarOwner>();
-for (const [chainId, address, contractName] of DEFI_SAVER) {
+function add(chainId: ChainId, address: string, owner: BarOwner) {
   const key = `${chainId}:${address}`;
   if (OWNERS.has(key)) throw new Error(`bar-owners: duplicate ${key}`);
-  OWNERS.set(key, {
+  OWNERS.set(key, owner);
+}
+for (const [chainId, address, contractName] of DEFI_SAVER)
+  add(chainId, address, {
     subject: DEFI_SAVER_BAR,
     contractName,
     role: DEFI_SAVER_ROLES[contractName],
     source: "DeFi Saver's deployments (defisaver-v3-contracts, addresses/)",
+    href: "https://github.com/defisaver/defisaver-v3-contracts/tree/main/addresses",
   });
-}
+for (const [chainId, address] of SUMMER_FI)
+  add(chainId, address, {
+    subject: SUMMER_FI_BAR,
+    contractName: "OperationExecutor",
+    role: "operation executor",
+    source: "Summer.fi's deployments (oasis-earn-sc, packages/deploy-configurations/configs/)",
+    href: "https://github.com/OasisDEX/oasis-earn-sc/tree/dev/packages/deploy-configurations/configs",
+  });
 
 export function barOwnerOf(address: string | null | undefined, chainId: ChainId): BarOwner | undefined {
   return address ? OWNERS.get(`${chainId}:${address.toLowerCase()}`) : undefined;

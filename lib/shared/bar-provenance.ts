@@ -16,8 +16,6 @@ import type { TxEntry } from "@/lib/shared/tx-entry";
  *  this Safe". */
 export type BarAccountKind = "safe" | "account";
 
-const DEFI_SAVER_DEPLOYMENTS = "https://github.com/defisaver/defisaver-v3-contracts/tree/main/addresses";
-
 export function barSubjectProv(args: {
   address: string;
   entry?: TxEntry;
@@ -44,6 +42,10 @@ export function barSubjectProv(args: {
   const shared = subject.shared
     ? " Many apps send their transactions to this contract; the bar names the contract the transaction entered."
     : "";
+  // "Summer.fi deactivated its app in 2026; the contract stays on chain."
+  const closed = subject.closed
+    ? ` ${subject.name} deactivated its app in ${subject.closed.since}; the contract stays on chain.`
+    : "";
   const chainLeaves: ProvInput[] = [
     ...(entry
       ? [
@@ -68,24 +70,37 @@ export function barSubjectProv(args: {
         ]
       : []),
   ];
-  const nameLeaves: ProvInput[] = registry
-    ? counterpartyNameInputs(registry, explorerUrl(chainId, "address", a))
-    : owner
+  const nameLeaves: ProvInput[] = [
+    ...(registry ? counterpartyNameInputs(registry, explorerUrl(chainId, "address", a)) : []),
+    ...(owner
       ? [
           {
-            label: "name",
+            label: registry ? "owner" : "name",
             value: subject.name,
-            kind: "offchain",
-            pclass: "offchain",
+            kind: "offchain" as const,
+            pclass: "offchain" as const,
             note: `${owner.source} · \`${owner.contractName}\``,
-            verify: { kind: "link", href: DEFI_SAVER_DEPLOYMENTS, text: "Confirm in the owner's deployments" },
+            verify: { kind: "link" as const, href: owner.href, text: "Confirm in the owner's deployments" },
           },
         ]
-      : [];
+      : []),
+    ...(subject.closed
+      ? [
+          {
+            label: "closed",
+            value: subject.closed.since,
+            kind: "offchain" as const,
+            pclass: "offchain" as const,
+            note: `${subject.name}'s page says the app is deactivated`,
+            verify: { kind: "link" as const, href: subject.closed.source, text: `Read ${subject.name}'s page` },
+          },
+        ]
+      : []),
+  ];
   return {
     kind: "chain",
     pclass: "indexed",
-    summary: `The contract this transaction entered — the transaction was sent to ${role}${through}.${shared}`,
+    summary: `The contract this transaction entered — the transaction was sent to ${role}${through}.${closed}${shared}`,
     contract: { name: registry?.name ?? owner?.contractName ?? subject.name, address: a },
     via: inner ? `transaction · to ${entry!.to} · first call ${a}` : "transaction · to",
     ...(txHash
