@@ -4,7 +4,7 @@
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import { AAVE_V3_SWAP_LABELS } from "@/lib/aave-v3/swap-kinds";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { getProtocolContract, type ProtocolContract } from "@/lib/shared/known-infrastructure";
 
 const LABELS: Record<string, string> = {
   supply: "Supply",
@@ -32,6 +32,20 @@ export function distributorPayout(
   if (ctx.eventType !== "transfer_in") return undefined;
   if (getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID)?.kind !== "distributor") return undefined;
   return owner && ctx.txFrom === owner.toLowerCase() ? "claimed" : "received";
+}
+
+/** The known contract a supply, borrow or repay went through: the Pool's
+ *  caller (Supply/Borrow `user`, Repay `repayer`) where the registry names it
+ *  and it is not the position's wallet. The head reads "Supplied · via
+ *  <name>"; the "by" chip and the third-party test still read the signer. */
+export function poolCallerContract(
+  ctx: AaveV3Context,
+  owner: string | undefined,
+  chainId: ChainId | undefined | null,
+): ProtocolContract | undefined {
+  if (ctx.eventType !== "supply" && ctx.eventType !== "borrow" && ctx.eventType !== "repay") return undefined;
+  if (!ctx.poolCaller || (owner && ctx.poolCaller === owner.toLowerCase())) return undefined;
+  return getProtocolContract(ctx.poolCaller, chainId ?? MAINNET_CHAIN_ID);
 }
 
 /** The word T1 states for the row, which the phone spine view's caption

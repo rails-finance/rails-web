@@ -68,6 +68,10 @@ placeholders:
     rounding: text
     means: |-
       What a named contract is.
+  caller:
+    rounding: text
+    means: |-
+      The known contract that called the Pool for the wallet, by its registry name.
   sent_on:
     rounding: date
     means: |-
@@ -312,6 +316,9 @@ words:
     to
   t1_from: |-
     from
+  # A supply, borrow or repay a known contract made for the wallet.
+  t1_via: |-
+    via
   # A transfer in from a distributor: the wallet sent the claim, or the payout
   # was pushed to it.
   t1_claimed: |-
@@ -567,6 +574,8 @@ templates:
     variants:
       default: |-
         a supply to the Pool
+      via: |-
+        a supply a known contract made for the wallet
     sentences:
       supply.what:
         when: |-
@@ -578,6 +587,16 @@ templates:
           another account sent it
         text: |-
           {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf.
+      supply.via:
+        when: |-
+          via, the owner sent it
+        text: |-
+          Supplied {amount} {symbol} to {protocol} through {role}.
+      supply.by_via:
+        when: |-
+          via, another account sent it
+        text: |-
+          {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf, through {role}.
       coll.on:
         when: |-
           the Pool switched the asset on as collateral in this transaction
@@ -602,6 +621,8 @@ templates:
       [
         supply.what,
         supply.by,
+        supply.via,
+        supply.by_via,
         coll.on,
         coll.was_on,
         coll.zero_ltv,
@@ -625,7 +646,7 @@ templates:
         rate.held,
       ]
     groups:
-      happened: [supply.what, supply.by, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
+      happened: [supply.what, supply.by, supply.via, supply.by_via, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
       leaves:
         [
           hf.under,
@@ -647,7 +668,7 @@ templates:
           rate.held,
         ]
     alternates:
-      - [supply.what, supply.by]
+      - [supply.what, supply.by, supply.via, supply.by_via]
       - [coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
       - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
@@ -749,6 +770,8 @@ templates:
     variants:
       default: |-
         a borrow from the Pool
+      via: |-
+        a borrow a known contract made for the wallet
     sentences:
       borrow.what:
         when: |-
@@ -760,10 +783,22 @@ templates:
           another account sent it, with credit the owner delegated
         text: |-
           {actor} borrowed {amount} {symbol} on the owner's behalf, with credit the owner delegated.
+      borrow.via:
+        when: |-
+          via, the owner sent it
+        text: |-
+          Borrowed {amount} {symbol} against the account's collateral through {role}.
+      borrow.by_via:
+        when: |-
+          via, another account sent it, with credit the owner delegated
+        text: |-
+          {actor} borrowed {amount} {symbol} on the owner's behalf through {role}, with credit the owner delegated.
     order:
       [
         borrow.what,
         borrow.by,
+        borrow.via,
+        borrow.by_via,
         hf.under,
         hf.close,
         hf.close_basket,
@@ -784,7 +819,7 @@ templates:
         rate.at,
       ]
     groups:
-      happened: [borrow.what, borrow.by]
+      happened: [borrow.what, borrow.by, borrow.via, borrow.by_via]
       leaves:
         [
           hf.under,
@@ -807,7 +842,7 @@ templates:
           rate.at,
         ]
     alternates:
-      - [borrow.what, borrow.by]
+      - [borrow.what, borrow.by, borrow.via, borrow.by_via]
       - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
       - [rate.avg, rate.moved, rate.held, rate.at]
@@ -821,6 +856,8 @@ templates:
     variants:
       default: |-
         a repayment to the Pool
+      via: |-
+        a repayment a known contract made for the wallet
     sentences:
       repay.what:
         when: |-
@@ -852,6 +889,26 @@ templates:
           another account repaid, the reserve's debt is gone
         text: |-
           {actor} repaid {amount} {symbol} on the owner's behalf, clearing the {symbol} debt.
+      repay.via:
+        when: |-
+          via, the owner sent it, debt remains
+        text: |-
+          Repaid {amount} {symbol} of the account's debt through {role}.
+      repay.via_cleared:
+        when: |-
+          via, the owner sent it, the reserve's debt is gone
+        text: |-
+          Repaid {amount} {symbol} through {role}, clearing the account's {symbol} debt.
+      repay.by_via:
+        when: |-
+          via, another account sent it, debt remains
+        text: |-
+          {actor} repaid {amount} {symbol} of the account's debt on the owner's behalf, through {role}.
+      repay.by_via_cleared:
+        when: |-
+          via, another account sent it, the reserve's debt is gone
+        text: |-
+          {actor} repaid {amount} {symbol} on the owner's behalf through {role}, clearing the {symbol} debt.
       repay.funded:
         when: |-
           a withdraw and swap within the hour before sent this token to the wallet
@@ -865,6 +922,10 @@ templates:
         repay.atokens_cleared,
         repay.by,
         repay.by_cleared,
+        repay.via,
+        repay.via_cleared,
+        repay.by_via,
+        repay.by_via_cleared,
         repay.funded,
         hf.under,
         hf.close,
@@ -888,7 +949,19 @@ templates:
       ]
     groups:
       happened:
-        [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared, repay.funded]
+        [
+          repay.what,
+          repay.cleared,
+          repay.atokens,
+          repay.atokens_cleared,
+          repay.by,
+          repay.by_cleared,
+          repay.via,
+          repay.via_cleared,
+          repay.by_via,
+          repay.by_via_cleared,
+          repay.funded,
+        ]
       leaves:
         [
           hf.under,
@@ -912,7 +985,18 @@ templates:
           rate.held,
         ]
     alternates:
-      - [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared]
+      - [
+          repay.what,
+          repay.cleared,
+          repay.atokens,
+          repay.atokens_cleared,
+          repay.by,
+          repay.by_cleared,
+          repay.via,
+          repay.via_cleared,
+          repay.by_via,
+          repay.by_via_cleared,
+        ]
       - [
           hf.under,
           hf.close,

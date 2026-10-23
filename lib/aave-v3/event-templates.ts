@@ -62,6 +62,7 @@ export const V3_HEAD_WORDS: AaveFamilyHeadTable = {
   transferred: V3_WORDS.t1_transferred,
   to: V3_WORDS.t1_to,
   from: V3_WORDS.t1_from,
+  via: V3_WORDS.t1_via,
   claimed: V3_WORDS.t1_claimed,
   received: V3_WORDS.t1_received,
   swap: {
