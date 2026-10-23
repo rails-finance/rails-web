@@ -162,7 +162,8 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
  *     AggregationRouterV5 (EIP-712 domain "1inch Aggregation Router") and Odos
  *     (`@title V3 Routing contract for Odos SOR`). Contango, MagpieRouterV3,
  *     MagpieRouterCore, ElfomoFi, Clear's 0x2e61…a159 and DZap's 0x2c02…5ca8
- *     rest on the source name, as the earlier Magpie entries do.
+ *     rest on the source name, as the earlier Magpie entries do: a verified
+ *     source name that is the owner's name states the owner (Miles, 23 Oct).
  *   • Owners from the protocol's publication: Morpho's docs (addresses page)
  *     for GeneralAdapter1 and EthereumGeneralAdapter1; DZap's docs for
  *     DZapZapCore 0xce25…6ba4; LI.FI's `deployments/base.json` for LiFiDiamond.
@@ -790,7 +791,7 @@ const AAVE_MIGRATION_HELPER: ProtocolContract = {
     "adapter",
     "Aave migration helper",
     "MigrationHelperMainnet",
-    "Aave’s migration helper, which withdraws a position from Aave V2 and supplies it to Aave V3 in one transaction",
+    "Aave’s migration helper, which moves a position from Aave V2 to Aave V3 in one transaction, supplying its collateral here and borrowing here to repay its debt there",
     "aave-v3",
   ),
   migratesFrom: "Aave V2",
