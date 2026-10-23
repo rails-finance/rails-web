@@ -9,7 +9,7 @@
 // cannot show: a swap's venue, the WETH gateway, the treasury, the known
 // contract a supply, borrow or repay went through, the known contract a
 // withdrawal was paid to ("Withdrew · to Balancer V3"), the router a sale went
-// through ("Sold · via Zerion router", `ctx.sale`), the "by" party.
+// through ("Sold · via Zerion", `ctx.sale`), the "by" party.
 // The spine carries the figures.
 //
 // The event page's card (mode "title") maps the signed amount(s) this event
