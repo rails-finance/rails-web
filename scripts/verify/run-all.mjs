@@ -497,9 +497,18 @@ function runOne(job) {
     const [cmd, ...args] = file.endsWith(".ts")
       ? [TSX, ...tsFlags(file), join(HERE, file)]
       : [process.execPath, join(HERE, file)];
+    // The proxied URLs go to the verifier too: a script that builds its own
+    // viem client from the environment then reads through the cache like the
+    // server does. One that parses .env.local itself is outside it.
     const child = spawn(cmd, args, {
       cwd: ROOT,
-      env: { ...inherited, BASE, ...(FIXTURES ? { ONLY: FIXTURES } : {}), ...job.env },
+      env: {
+        ...inherited,
+        ...(proxied ? proxiedEnv() : {}),
+        BASE,
+        ...(FIXTURES ? { ONLY: FIXTURES } : {}),
+        ...job.env,
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let out = "";
