@@ -218,21 +218,13 @@ const errorLine = (lines) =>
     ?.trim()
     .slice(0, 120);
 
-const scripts = readdirSync(HERE)
-  .filter((f) => (f.endsWith(".mjs") || f.endsWith(".ts")) && f !== SELF)
-  .map((f) => {
-    if (!f.startsWith("verify-") && !SKIPS[f]) SKIPS[f] = NOT_A_VERIFIER;
-    else if (f.endsWith(".ts") && !existsSync(TSX))
-      SKIPS[f] = `needs tsx, which this checkout has not installed (pnpm install): ${tsCommand(f)}`;
-    return f;
-  })
-  .filter((f) => !process.env.ONLY || process.env.ONLY.split(",").some((s) => f.includes(s.trim())))
-  .sort();
-
 /** A `.ts` verifier under node:test runs as `tsx --test`; the two that are
  *  plain scripts run as `tsx <file>`. One that mocks a module gets node's flag
  *  for it and mocks `server-only` itself; the rest get the server-only hook
- *  (lib/server-only-hook.mjs), which a module mock does not tolerate. */
+ *  (lib/server-only-hook.mjs), which a module mock does not tolerate.
+ *  Declared before the roster below, which calls tsCommand for the SKIP line
+ *  when tsx is missing (a checkout that has not run `pnpm install` since tsx
+ *  entered the lockfile crashed here on 2026-10-23 instead of skipping). */
 const SERVER_ONLY_HOOK = join(HERE, "lib", "server-only-hook.mjs");
 function tsFlags(file) {
   const src = readFileSync(join(HERE, file), "utf8");
@@ -244,6 +236,17 @@ function tsFlags(file) {
 function tsCommand(file) {
   return `npx tsx ${tsFlags(file).join(" ").replace(SERVER_ONLY_HOOK, "scripts/verify/lib/server-only-hook.mjs")} scripts/verify/${file}`;
 }
+
+const scripts = readdirSync(HERE)
+  .filter((f) => (f.endsWith(".mjs") || f.endsWith(".ts")) && f !== SELF)
+  .map((f) => {
+    if (!f.startsWith("verify-") && !SKIPS[f]) SKIPS[f] = NOT_A_VERIFIER;
+    else if (f.endsWith(".ts") && !existsSync(TSX))
+      SKIPS[f] = `needs tsx, which this checkout has not installed (pnpm install): ${tsCommand(f)}`;
+    return f;
+  })
+  .filter((f) => !process.env.ONLY || process.env.ONLY.split(",").some((s) => f.includes(s.trim())))
+  .sort();
 
 /** The rows of the table: a script, or one part of a split script. A caller's
  *  `FIXTURES=` is its own part, so a split script then runs once with it. */
@@ -445,18 +448,43 @@ async function stopServerGracefully() {
   );
 }
 
+// The server's last lines, kept so that a death has a cause on record. On
+// 2026-10-23 the server this runner started died 123 scripts into a pass
+// (ERR_EMPTY_RESPONSE on a Base vault page, then refused connections) and the
+// remaining 60 rows were a table of 0.3 s CRASHes that said nothing; its
+// output had been discarded, so nothing said why.
+const SERVER_TAIL = 30;
+let serverTail = [];
+let serverDeaths = [];
+let serverRestarting = null;
+
+function keepTail(chunk) {
+  for (const line of String(chunk).split("\n")) {
+    if (!line.trim()) continue;
+    serverTail.push(line.trimEnd());
+    if (serverTail.length > SERVER_TAIL) serverTail.shift();
+  }
+}
+
 async function startServer() {
   const port = new URL(BASE).port || "3000";
   console.log(`· ${BASE} is not serving — starting next dev on :${port}`);
   const env = { ...process.env, ...proxiedEnv() };
-  server = spawn("npx", ["next", "dev", "--port", port], {
+  const child = spawn("npx", ["next", "dev", "--port", port], {
     cwd: ROOT,
     env,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  server.stdout.on("data", () => {});
-  server.stderr.on("data", () => {});
+  server = child;
+  serverTail = [];
+  child.stdout.on("data", keepTail);
+  child.stderr.on("data", keepTail);
+  child.on("exit", (code, signal) => {
+    // Stopped by this runner: `server` was cleared first. Anything else is a death.
+    if (server !== child) return;
+    serverDeaths.push({ code, signal, at: new Date().toISOString(), tail: serverTail.slice() });
+  });
 
   for (let i = 0; i < 120; i++) {
     if (server === null) throw new Error("server was stopped before it came up");
@@ -468,6 +496,38 @@ async function startServer() {
     await new Promise((r) => setTimeout(r, 1000));
   }
   throw new Error("next dev did not become ready within 120s");
+}
+
+/** True when the server this runner started is no longer running. A server
+ *  this runner did not start is nobody's to restart, so this is always false
+ *  for it. */
+function serverDied() {
+  // A process a signal ended has a null exitCode and a signalCode instead.
+  return server !== null && (server.exitCode !== null || server.signalCode !== null);
+}
+
+/** Called before each verifier: a dead server is restarted, with the death and
+ *  its last lines printed, so the rows after it are read against a server
+ *  rather than against a refused connection. One restart at a time under a
+ *  pool: workers that arrive during it wait for the same promise. */
+async function ensureServer(before) {
+  if (!serverDied()) return;
+  if (!serverRestarting) {
+    serverRestarting = (async () => {
+      const death = serverDeaths.at(-1);
+      const how = death?.signal ? `killed by ${death.signal}` : `exit code ${death?.code ?? server.exitCode}`;
+      console.log(`\n⚠ dev server DIED (${how}) before ${before} — its last lines:`);
+      console.log((death?.tail ?? serverTail).join("\n").replace(/^/gm, "       │ "));
+      server = null;
+      await startServer();
+      const unhealthy = await checkDevServer(BASE);
+      if (unhealthy) throw new Error(`restarted dev server is not healthy:\n${unhealthy}`);
+      console.log(`· dev server restarted (${serverDeaths.length} death(s) this run)\n`);
+    })().finally(() => {
+      serverRestarting = null;
+    });
+  }
+  await serverRestarting;
 }
 
 for (const sig of ["exit", "SIGINT", "SIGTERM", "uncaughtException"]) {
@@ -677,7 +737,14 @@ async function worker() {
       console.log(`       ${SKIPS[job.file]}`);
       continue;
     }
+    await ensureServer(job.label);
     const r = await runOne(job);
+    if (serverDied()) {
+      // The server went down under this script. Whatever it reported was read
+      // against a dying server, so the row says that instead of a verdict.
+      r.outcome = "CRASH";
+      r.detail = `the dev server died during this script — ${r.detail}`;
+    }
     results.push(r);
     report(r);
   }
@@ -695,7 +762,12 @@ for (const job of alone) {
     report(r);
     continue;
   }
+  await ensureServer(job.label);
   const r = await runOne(job);
+  if (serverDied()) {
+    r.outcome = "CRASH";
+    r.detail = `the dev server died during this script — ${r.detail}`;
+  }
   results.push(r);
   report(r);
 }
@@ -724,6 +796,13 @@ console.log("─".repeat(w + 26));
 
 const tally = (o) => results.filter((r) => r.outcome === o).length;
 console.log(`\nPASS ${tally("PASS")}   FAIL ${tally("FAIL")}   CRASH ${tally("CRASH")}   SKIP ${tally("SKIP")}`);
+if (serverDeaths.length) {
+  // On the pass line with the RPC count: a row read against a restarted
+  // server is a row to re-run alone before it is classed.
+  console.log(
+    `\n⚠ dev server died ${serverDeaths.length} time(s) and was restarted — at ${serverDeaths.map((d) => d.at).join(", ")}`,
+  );
+}
 console.log(`\n${rpcLines.join("\n")}`);
 
 const red = tally("FAIL") + tally("CRASH");
