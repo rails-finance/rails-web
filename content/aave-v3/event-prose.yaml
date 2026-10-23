@@ -323,6 +323,10 @@ words:
   # A supply, borrow or repay a known contract made for the wallet.
   t1_via: |-
     via
+  # A transfer out to a router or settlement whose receipt shows one leg back
+  # to the wallet in another token (lib/shared/tx-legs.ts).
+  t1_sold: |-
+    Sold
   # A transfer in from a distributor: the wallet sent the claim, or the payout
   # was pushed to it.
   t1_claimed: |-
@@ -1269,6 +1273,8 @@ templates:
         supply sent as an aToken transfer
       staking: |-
         supply staked through a staking contract
+      sold: |-
+        supply sold through a router or settlement contract, the payment read from the transaction's receipt
     sentences:
       tout.what:
         when: |-
@@ -1277,7 +1283,7 @@ templates:
           Sent {amount} {symbol} of supply to {recipient} as an aToken transfer.
       tout.named:
         when: |-
-          the recipient is a known contract other than a staking contract
+          default, and the recipient is a known contract
         text: |-
           The recipient is {role}.
       tout.staked:
@@ -1285,11 +1291,23 @@ templates:
           staking
         text: |-
           Staked {amount} {symbol} of supply through {role}.
+      tout.sold:
+        when: |-
+          sold
+        text: |-
+          Sold {amount} {symbol} of supply through {role}, and the wallet received {received} {r_symbol} in the same transaction.
+      tout.paired:
+        when: |-
+          sold
+        text: |-
+          Rails paired the two from the receipt; no protocol log joins them. The figures show {brand}'s side: one aToken transfer.
     order:
       [
         tout.what,
         tout.staked,
         tout.named,
+        tout.sold,
+        tout.paired,
         off.switched,
         hf.under,
         hf.close,
@@ -1309,7 +1327,7 @@ templates:
         prior.plain,
       ]
     groups:
-      happened: [tout.what, tout.staked, tout.named, off.switched]
+      happened: [tout.what, tout.staked, tout.named, tout.sold, tout.paired, off.switched]
       leaves:
         [
           hf.under,
@@ -1330,6 +1348,8 @@ templates:
           prior.plain,
         ]
     alternates:
+      - [tout.what, tout.sold]
+      - [tout.named, tout.paired]
       - [
           hf.under,
           hf.close,

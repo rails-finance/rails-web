@@ -68,7 +68,9 @@ export function poolCallerContract(
  *  withdrawn. The row says so, and names the gateway as the route. A
  *  distributor's payout reads "Claimed" or "Received" (`distributorPayout`),
  *  a stake "Staked" (`stakedVia`), and a supply or borrow a migration helper
- *  made "Migrated from Aave V2" (`migratesFrom` on the Pool caller). */
+ *  made "Migrated from Aave V2" (`migratesFrom` on the Pool caller). A
+ *  transfer out the receipt shows as a sale through a router names what was
+ *  sold and what came back ("Sold USDC → ETH", `ctx.sale`). */
 export function aaveV3CtLabel(
   ctx: AaveV3Context,
   isFee: boolean,
@@ -86,6 +88,8 @@ export function aaveV3CtLabel(
   const viaGateway = !isFee && ctx.eventType === "transfer_out" && named?.kind === "gateway";
   const payout = distributorPayout(ctx, owner, chainId);
   const migratedFrom = poolCallerContract(ctx, owner, chainId)?.migratesFrom;
+  if (!isFee && ctx.eventType === "transfer_out" && ctx.sale)
+    return `Sold${ctx.reserveSymbol ? ` ${ctx.reserveSymbol} → ${ctx.sale.leg.symbol}` : ""}`;
   return isFee
     ? "Liquidation fee"
     : viaGateway

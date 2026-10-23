@@ -103,10 +103,11 @@ export interface Provenance {
 export interface ProvScaling {
   /** The untouched integer, as the backend or the chain read serialized it. */
   raw: string;
-  /** Where the integer came from: an event log's field (the default), or a
-   *  contract call's return value. The sentence names it, and a log sentence
-   *  is false of a call (TO-DO-ui-jobs §34). */
-  from?: "log" | "call";
+  /** Where the integer came from: an event log's field (the default), a
+   *  contract call's return value, or a value transfer inside a transaction,
+   *  which writes no log (a native coin payment, TO-DO-ui-jobs 438). The
+   *  sentence names it, and a log sentence is false of a call (§34). */
+  from?: "log" | "call" | "transfer";
   /** The power of ten the raw is divided by (the via line's `÷10^n`). */
   places: number;
   /** Why that power — a clause the sentence continues with ", so dividing…". */
@@ -935,9 +936,13 @@ export function ProvReceipt({
         {note && <p className="prov-note">{note}</p>}
         {info.scaling && /^-?\d+$/.test(info.scaling.raw) && (
           <p className="prov-note prov-scaling">
-            {info.scaling.from === "call" ? "The contract returns" : "The log stores"} this as the whole number{" "}
-            {info.scaling.raw}. {info.scaling.why}, so dividing by {powerOfTen(info.scaling.places)} gives{" "}
-            {shiftDecimal(info.scaling.raw, info.scaling.places)}
+            {info.scaling.from === "call"
+              ? "The contract returns"
+              : info.scaling.from === "transfer"
+                ? "The transfer carries"
+                : "The log stores"}{" "}
+            this as the whole number {info.scaling.raw}. {info.scaling.why}, so dividing by{" "}
+            {powerOfTen(info.scaling.places)} gives {shiftDecimal(info.scaling.raw, info.scaling.places)}
             {info.scaling.unit ?? ""}.
           </p>
         )}

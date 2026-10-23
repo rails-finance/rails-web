@@ -7,7 +7,8 @@
 // past-participle kind (`aaveFamilyT1Kind`, lib/aave-v3/head-words.ts), a
 // transfer's counterparty as its clause, and the chips for what the spine
 // cannot show: a swap's venue, the WETH gateway, the treasury, the known
-// contract a supply, borrow or repay went through, the "by" party.
+// contract a supply, borrow or repay went through, the router a sale went
+// through ("Sold · via Zerion router", `ctx.sale`), the "by" party.
 // The spine carries the figures.
 //
 // The event page's card (mode "title") maps the signed amount(s) this event
@@ -34,6 +35,7 @@ import {
   swapLegNet,
   swapLegProv,
   swapLegSign,
+  saleLegProv,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
 import { aaveV3CtLabel, distributorPayout, poolCallerContract, stakedVia } from "@/lib/aave-v3/event-label";
@@ -43,6 +45,7 @@ import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
+import { legAmount } from "@/lib/shared/tx-legs";
 
 /** The primary reserve amount signed by direction: supply/borrow/transfer_in
  *  increase their side (+), withdraw/repay/transfer_out decrease it (−). A
@@ -110,7 +113,8 @@ export function aaveV3T1Caption(
 ): string {
   const gateway = viaGatewayOf(ctx, isFee, chainId);
   const payout = distributorPayout(ctx, owner, chainId);
-  const stake = stakedVia(ctx, isFee, chainId);
+  const sale = !isFee && ctx.eventType === "transfer_out" && !!ctx.sale;
+  const stake = !sale && stakedVia(ctx, isFee, chainId);
   const caller = poolCallerContract(ctx, owner, chainId);
   const kind = aaveFamilyT1Kind(
     {
@@ -118,6 +122,7 @@ export function aaveV3T1Caption(
       fee: isFee,
       gateway,
       payout,
+      sale,
       stake,
       migratedFrom: caller?.migratesFrom,
       swapKind: ctx.swap?.kind,
@@ -134,7 +139,14 @@ export function aaveV3T1Caption(
   if (!transfer || !ctx.counterparty) return kind;
   const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
   return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
-    lead: stake ? STAKE_LEAD : ctx.eventType === "transfer_out" ? V3_HEAD_WORDS.to : V3_HEAD_WORDS.from,
+    lead:
+      sale && V3_HEAD_WORDS.via
+        ? V3_HEAD_WORDS.via
+        : stake
+          ? STAKE_LEAD
+          : ctx.eventType === "transfer_out"
+            ? V3_HEAD_WORDS.to
+            : V3_HEAD_WORDS.from,
     address: ctx.counterparty,
     name: named?.name,
   });
@@ -162,9 +174,12 @@ export function useAaveV3HeadSpec({
   const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId, wallet);
   const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
   const viaGateway = viaGatewayOf(ctx, !!feeOf, coords.chainId);
-  const stake = stakedVia(ctx, !!feeOf, coords.chainId);
   // A liquidation's fee reads as an act with its verb, not as a custody move.
   const isTransferRow = !feeOf && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
+  // A transfer out the receipt shows as a sale through a router: the aToken
+  // out, the token paid back in, and the router as the venue.
+  const sale = !feeOf && ctx.eventType === "transfer_out" ? ctx.sale : undefined;
+  const stake = !sale && stakedVia(ctx, !!feeOf, coords.chainId);
 
   if (ctx.eventType === "liquidation") {
     const coll = Number(ctx.liquidatedCollateralAmount ?? "0") || 0;
@@ -256,6 +271,14 @@ export function useAaveV3HeadSpec({
         // header keeps it.
         ...(feeOf ? { noSpineCounterpart: true } : {}),
       });
+    const back = sale ? Number(legAmount(sale.leg)) : 0;
+    if (sale && back !== 0)
+      deltas.push({
+        value: back,
+        symbol: sale.leg.symbol,
+        address: sale.leg.token ?? undefined,
+        prov: saleLegProv(sale, ctx.reserveSymbol ?? "", coords),
+      });
   }
 
   // A transfer's counterparty is a named party of the event itself, not a
@@ -277,7 +300,7 @@ export function useAaveV3HeadSpec({
         }
       : ctx.counterparty != null
         ? {
-            prefix: viaGateway ? "via" : stake ? "in" : transferOut ? "to" : "from",
+            prefix: viaGateway || sale ? "via" : stake ? "in" : transferOut ? "to" : "from",
             address: ctx.counterparty,
             name: feeOf ? V3_HEAD_WORDS.treasury : named?.name,
             icon: feeOf
@@ -331,6 +354,7 @@ export function useAaveV3HeadSpec({
           stake,
           migratedFrom: caller?.migratesFrom,
           swapKind: ctx.swap?.kind,
+          sale: !!sale,
         },
         W,
       ),
@@ -352,7 +376,7 @@ export function useAaveV3HeadSpec({
     critical: isAaveV3LossRow(ctx),
     // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
-    custody: isTransferRow,
+    custody: isTransferRow && !sale,
     deltas,
     party: party ?? callerParty,
     externalActor,

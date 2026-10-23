@@ -39,6 +39,7 @@ import {
   GROWTHEPIE_READ,
   type ProtocolContract,
 } from "@/lib/shared/known-infrastructure";
+import type { RouterSale } from "@/lib/shared/tx-legs";
 
 // The DEFAULT Pool a receipt names. Event-level receipts override it from the
 // coords (see `poolOf`), because the same cards render Core, Prime, EtherFi,
@@ -321,6 +322,57 @@ export const poolCallerProv = (eventType: string, coords: V3Coords, caller: stri
     contract: poolOf(coords),
     via: `${captureVia(coords)} · ${eventType === "repay" ? "Repay" : eventType === "borrow" ? "Borrow" : "Supply"} log · ${param}`,
     inputs: eventInputs(coords, named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", caller)) : []),
+  };
+};
+
+/** What came back to the wallet on a transfer out read as a sale through a
+ *  router or settlement (lib/shared/tx-legs.ts, rails-ops TO-DO-ui-jobs 438):
+ *  the other leg, read from the transaction's receipt. An ERC-20 leg is its
+ *  Transfer log; the chain's native coin leaves no log, and its leg is the
+ *  value transfer Alchemy's asset-transfers index lists for the transaction.
+ *  The `paired` leaf states the pairing as Rails' inference. */
+export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coords): Provenance => {
+  const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
+  const { leg } = sale;
+  const venue = getProtocolContract(sale.via, chainId);
+  const venueName = venue?.name ?? "the contract";
+  const native = leg.source === "asset-transfers";
+  const txHref = coords.txHash ? explorerUrl(chainId, native ? "tx" : "tx-logs", coords.txHash) : undefined;
+  const legVerify: ProvVerify | undefined = txHref
+    ? native
+      ? { kind: "etherscan", href: txHref, text: "Confirm in the transaction's internal transfers" }
+      : { kind: "etherscan", href: txHref, text: "Confirm in the tx event logs" }
+    : undefined;
+  return {
+    kind: "chain",
+    pclass: native ? "indexed" : "emitted",
+    verify: legVerify,
+    summary: native
+      ? `The ${leg.symbol} paid to this wallet in the same transaction. A contract that pays out ${leg.symbol} writes no log for it: the payment is a value transfer inside the transaction, which the block explorer lists among the transaction's internal transfers. Rails paired it with the ${sentSymbol} this wallet sent to ${venueName}; no protocol log joins the two legs.`
+      : `The ${leg.symbol} paid to this wallet in the same transaction — the ${leg.symbol} token's transfer log names this wallet as the recipient and carries the amount. Rails paired it with the ${sentSymbol} this wallet sent to ${venueName}; no protocol log joins the two legs.`,
+    contract: native
+      ? { name: leg.counterparty === sale.via ? venueName : "payer", address: leg.counterparty }
+      : { name: leg.symbol, address: leg.token ?? undefined },
+    via: native
+      ? `the transaction's internal transfers · Alchemy's asset-transfers index · internal transfer to this wallet · value: ${leg.raw} · ÷10^${leg.decimals}`
+      : `transaction receipt · Transfer log #${leg.logIndex} · value: ${leg.raw} · ÷10^${leg.decimals}`,
+    scaling: {
+      raw: leg.raw,
+      from: native ? "transfer" : "log",
+      places: leg.decimals,
+      why: `${leg.symbol} amounts have ${leg.decimals} decimal places`,
+    },
+    source: { block: coords.blockNumber, txHash: coords.txHash },
+    inputs: eventInputs(coords, [
+      {
+        label: "paired",
+        value: "Rails paired it",
+        kind: "derived",
+        pclass: "indexed",
+        note: `Rails' inference: the one leg paid back to this wallet in this transaction, in a token other than the ${sentSymbol} it sent to ${venueName}. No protocol log joins the two legs.`,
+        ...(legVerify ? { verify: legVerify } : {}),
+      },
+    ]),
   };
 };
 

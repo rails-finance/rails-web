@@ -22,6 +22,7 @@ import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import type { ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { poolCallerContract } from "@/lib/aave-v3/event-label";
+import { legAmount } from "@/lib/shared/tx-legs";
 import { externalActor } from "@/lib/shared/external-actor";
 import { v3Brand, isSeamless, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { feeLiquidation, liquidationBonus, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
@@ -99,6 +100,8 @@ function pick(
       // The gateway pulls aWETH only to withdraw it as ETH: a withdrawal.
       if (getProtocolContract(ctx.counterparty, chainId)?.kind === "gateway")
         return { id: "aave3.withdraw", variant: "gateway" };
+      // A router or settlement paid one leg back: a sale (ctx.sale).
+      if (ctx.sale) return { id: "aave3.transfer_out", variant: "sold" };
       // A staking contract takes the aTokens into a stake.
       if (getProtocolContract(ctx.counterparty, chainId)?.kind === "staking")
         return { id: "aave3.transfer_out", variant: "staking" };
@@ -430,9 +433,15 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       const named = getProtocolContract(ctx.counterparty, chainId);
       v.recipient = named?.name ?? V3_WORDS.another_account;
       if (named) v.role = named.role;
-      // A stake's sentence names the staking contract by its role.
-      if (variant === "staking") sp.say("tout.staked", { amount: "transfer" });
-      else {
+      if (variant === "sold" && ctx.sale && named) {
+        v.received = Number(legAmount(ctx.sale.leg));
+        v.r_symbol = ctx.sale.leg.symbol;
+        sp.say("tout.sold", { amount: "transfer", received: "received" });
+        sp.say("tout.paired");
+      } else if (variant === "staking") {
+        // A stake's sentence names the staking contract by its role.
+        sp.say("tout.staked", { amount: "transfer" });
+      } else {
         sp.say("tout.what", { amount: "transfer" });
         if (named) sp.say("tout.named");
       }
