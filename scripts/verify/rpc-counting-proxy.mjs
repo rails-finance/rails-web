@@ -22,7 +22,8 @@
 //     chain per run: the first head read of a run goes upstream once, and from
 //     then on "latest" means that block, so the page's head, its recency stamp
 //     and its at-head state agree with each other and replay from disk.
-//     "pending", "safe" and "finalized" are not pinned and not cached.
+//     "finalized" and "safe" are pinned the same way, at or below the latest
+//     pin; "earliest" is genesis; "pending" is not pinned and not cached.
 //   · A miss is forwarded upstream and counted. The count is what a pass costs
 //     the key: GET /__count prints it as JSON, and the proxy prints it on exit.
 //
@@ -122,16 +123,30 @@ const NEVER_CACHE = new Set([
   "eth_hashrate",
 ]);
 
-const UNPINNED_TAGS = new Set(["pending", "safe", "finalized", "earliest"]);
+/** The tags pinned for the run. "finalized" and "safe" are pinned too, at or
+ *  below the latest pin: left live, a run older than the finality lag answers a
+ *  finalized block ABOVE the pinned head, and a reader that cuts its tail at
+ *  finalized then refuses the tail as being ahead of the head it is serving
+ *  (the vault timelines, 23 Oct 2026, every warm load swept the chain again).
+ *  "earliest" is the genesis block and needs no pin. "pending" is unpinned and
+ *  uncached. */
+const PINNED_TAGS = ["latest", "finalized", "safe"];
+const UNPINNED_TAGS = new Set(["pending"]);
 
-/** Replace "latest" wherever a block tag can sit — a positional string param,
- *  or a `blockTag` / `toBlock` / `fromBlock` / `blockNumber` key in an object —
- *  with the pinned hex. Returns [params, sawUnpinnedTag]. */
-function pinParams(params, pinHex) {
+function tagsIn(params) {
+  const s = stable(params);
+  return PINNED_TAGS.filter((t) => s.includes(`"${t}"`));
+}
+
+/** Replace each pinned tag wherever a block tag can sit — a positional string
+ *  param, or a `blockTag` / `toBlock` / `fromBlock` / `blockNumber` key in an
+ *  object — with its pinned hex. Returns [params, sawUnpinnedTag]. */
+function pinParams(params, pinHexByTag) {
   let unpinned = false;
   const walk = (v, key) => {
     if (typeof v === "string") {
-      if (v === "latest") return pinHex;
+      if (pinHexByTag[v] !== undefined) return pinHexByTag[v];
+      if (v === "earliest") return "0x0";
       if (UNPINNED_TAGS.has(v) && (key === undefined || /block/i.test(key))) unpinned = true;
       return v;
     }
@@ -199,31 +214,42 @@ function savePins() {
   }
 }
 
-const pinning = new Map(); // chain → Promise<hex>, so a burst of first reads pins once
+const pinning = new Map(); // pin key → Promise<hex>, so a burst of first reads pins once
 
-async function pinFor(lane) {
+/** The pin for a tag on a lane's chain: `pins[chain]` is the latest block,
+ *  `pins["<chain>:finalized"]` and `pins["<chain>:safe"]` the other two, each
+ *  taken once on first use and clamped to the latest pin. */
+async function pinFor(lane, tag = "latest") {
   const { chain, upstream } = lane;
-  if (pins[chain]) return pins[chain];
-  if (!pinning.has(chain)) {
+  const key = tag === "latest" ? chain : `${chain}:${tag}`;
+  if (pins[key]) return pins[key];
+  if (!pinning.has(key)) {
     pinning.set(
-      chain,
+      key,
       (async () => {
-        const body = { jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] };
-        count(lane, "upstream", "eth_blockNumber");
+        const latest = tag === "latest" ? null : await pinFor(lane, "latest");
+        const body =
+          tag === "latest"
+            ? { jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] }
+            : { jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: [tag, false] };
+        count(lane, "upstream", body.method);
         const { status, json } = await forward(upstream, body);
-        const hex = json?.result;
+        let hex = tag === "latest" ? json?.result : json?.result?.number;
         if (status !== 200 || typeof hex !== "string" || !/^0x[0-9a-f]+$/i.test(hex)) {
-          pinning.delete(chain);
-          throw new Error(`eth_blockNumber on ${chain} answered ${status}: ${JSON.stringify(json).slice(0, 200)}`);
+          pinning.delete(key);
+          throw new Error(
+            `${body.method} ${tag} on ${chain} answered ${status}: ${JSON.stringify(json).slice(0, 200)}`,
+          );
         }
-        pins[chain] = hex;
+        if (latest && parseInt(hex, 16) > parseInt(latest, 16)) hex = latest;
+        pins[key] = hex;
         savePins();
-        if (!QUIET) console.log(`· ${chain} pinned at ${hex} (${parseInt(hex, 16)})`);
+        if (!QUIET) console.log(`· ${chain} ${tag} pinned at ${hex} (${parseInt(hex, 16)})`);
         return hex;
       })(),
     );
   }
-  return pinning.get(chain);
+  return pinning.get(key);
 }
 
 // ── counting ────────────────────────────────────────────────────────────────
@@ -307,14 +333,9 @@ async function resolveOne(lane, call) {
     return { response: { jsonrpc, id, result: hex } };
   }
 
-  let pinnedParams = params;
-  let unpinned = false;
-  if (stable(params).includes('"latest"')) {
-    const hex = await pinFor(lane);
-    [pinnedParams, unpinned] = pinParams(params, hex);
-  } else {
-    [, unpinned] = pinParams(params, "");
-  }
+  const pinHexByTag = {};
+  for (const tag of tagsIn(params)) pinHexByTag[tag] = await pinFor(lane, tag);
+  const [pinnedParams, unpinned] = pinParams(params, pinHexByTag);
 
   if (NEVER_CACHE.has(method) || unpinned) return { upstream: { jsonrpc, id, method, params: pinnedParams } };
 

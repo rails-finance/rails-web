@@ -531,7 +531,10 @@ async function ensureServer(before) {
 }
 
 for (const sig of ["exit", "SIGINT", "SIGTERM", "uncaughtException"]) {
-  process.on(sig, () => {
+  process.on(sig, (arg) => {
+    // The handler exits before node would print the error, so print it here:
+    // a server that never came up left "exit 1" and nothing else (23 Oct 2026).
+    if (sig === "uncaughtException") console.error(`\n✗ run-all: ${arg?.stack ?? arg}`);
     stopServer();
     stopProxy();
     if (sig !== "exit") process.exit(1);
@@ -610,7 +613,11 @@ function runOne(job) {
       } else if (signal) {
         outcome = "CRASH";
         detail = `killed by ${signal} — no verdict reached`;
-      } else if (crashed(out)) {
+      } else if (crashed(out) && (code !== 0 || !lines.some((l) => VERDICT_RE.test(l)))) {
+        // A stack trace in the output of a script that exited 0 WITH a verdict is
+        // something it printed on purpose (verify-ethereum-vault-cold-build prints
+        // the error object its mocked-429 test provokes, then "14/14 checks
+        // passed"); without a verdict, or with a non-zero exit, it is a death.
         outcome = "CRASH";
         detail = `died on an uncaught throw (exit ${code}) — ${errorLine(lines) ?? last}`;
       } else if (!lines.length) {

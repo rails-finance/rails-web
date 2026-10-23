@@ -222,7 +222,9 @@ async function openReceiptFor(page, card, valueText, pick = (c) => c) {
   const id = await card.getAttribute("data-event-id");
   if (!id) return null;
   const at = new URL(page.url());
-  const ev = await page.context().newPage();
+  // A page from browser.newPage() owns a context that refuses a second page
+  // ("Please use browser.newContext()"), so the event page gets its own.
+  const ev = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   try {
     await ev.goto(`${at.origin}${at.pathname}/event/${encodeURIComponent(id)}`, {
       waitUntil: "domcontentloaded",
