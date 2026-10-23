@@ -531,7 +531,10 @@ async function ensureServer(before) {
 }
 
 for (const sig of ["exit", "SIGINT", "SIGTERM", "uncaughtException"]) {
-  process.on(sig, () => {
+  process.on(sig, (arg) => {
+    // The handler exits before node would print the error, so print it here:
+    // a server that never came up left "exit 1" and nothing else (23 Oct 2026).
+    if (sig === "uncaughtException") console.error(`\n✗ run-all: ${arg?.stack ?? arg}`);
     stopServer();
     stopProxy();
     if (sig !== "exit") process.exit(1);
