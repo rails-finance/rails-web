@@ -28,6 +28,7 @@ import { aaveFamilyEmodeWords } from "@/lib/aave-v3/head-words";
 import { V3_HEAD_WORDS } from "@/lib/aave-v3/event-templates";
 import { SPARK_HEAD_WORDS } from "@/lib/spark/event-templates";
 import { useContext } from "react";
+import { useTimelineEntry } from "@/components/shared/section-sidebar";
 
 type Switch = EmodeSwitchFields;
 
@@ -85,6 +86,9 @@ export function AaveFamilyEmodeSwitchCard({
    *  four decimals below 1.1); SparkLend's by default. */
   hfFormat?: (hf: number | null) => string;
 }) {
+  // The switch's log carries no entry of its own: the bar takes the entry its
+  // transaction's other rows declare (anatomy P3.1.1).
+  useTimelineEntry(event.id, { wallet: event.wallet, txHash: event.txHash });
   const here = useAaveV3PositionState({ wallet: event.wallet, market, block: event.blockNumber, txHash: event.txHash });
   const read =
     here?.status === "ready"

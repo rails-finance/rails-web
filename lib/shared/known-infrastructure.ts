@@ -1,5 +1,6 @@
 import { isAddress } from "viem";
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { barOwnerOf } from "@/lib/shared/bar-owners";
 
 /**
  * Known contracts that are not positions, keyed by CHAIN and address. Two
@@ -271,6 +272,9 @@ export interface BarSubject {
   /** Basename under public/icons/protocols/. */
   icon: string;
   hue: number;
+  /** Many apps send transactions to this contract (an aggregator's router):
+   *  the bar's receipt says so. */
+  shared?: boolean;
 }
 
 /** Zerion's mark (zerion.io's `favicon-mark.png`, blue #2962EF). */
@@ -1768,11 +1772,12 @@ export function getCcipEscrow(address: string | null | undefined): CcipEscrow | 
   return entry?.kind === "ccip-lock-release" ? entry : undefined;
 }
 
-/** The bar subject of a transaction sent to `to` (its receipt's `to`): the
- *  product whose entry contract it is, or `undefined`, where the row takes the
- *  protocol's bar. */
+/** The bar subject of the contract a transaction entered (its `to`, or past a
+ *  smart account the first contract it called): the product whose entry
+ *  contract it is, from the registry's `bar` or the product deployments in
+ *  `bar-owners.ts`, or `undefined`, where the row takes the protocol's bar. */
 export function barSubjectOf(to: string | null | undefined, chainId: ChainId): BarSubject | undefined {
-  return getProtocolContract(to, chainId)?.bar;
+  return getProtocolContract(to, chainId)?.bar ?? barOwnerOf(to, chainId)?.subject;
 }
 
 /** A protocol contract (settlement, router, adapter, gateway, multicall,

@@ -13,18 +13,29 @@
 // positioned frame (`data-card-sidebar-frame`), so a row's top measured against
 // the bar's places anything hung on the bar beside that row.
 //
-// ── Whose bar a row stands beside (rails-ops TO-DO-ui-jobs 439) ──────────────
+// ── Whose bar a row stands beside (anatomy P3.1.1, P3.1.2) ──────────────────
 // The bar beside a row is the owner of the contract the row's transaction
-// entered (its `to`). A card that knows its transaction's `to` declares it with
-// `useTimelineEntry`; where the registry gives that contract a `bar` (a
-// product's own entry contract: Zerion's router), the row's stretch of the bar
-// takes the product's hue and, from md, its mark at the stretch's top. Every
-// other row, and every row whose `to` is unknown, stands beside the protocol's
-// bar. Adjacent rows with the same subject join into one stretch; between a
-// stretch and the protocol's bar the page's background shows for 2px, so the
-// bar reads as broken there. Each stretch is measured against this frame: the
-// row's box (`data-event-id`) from its top to its bottom. Below md the stretch
-// is the 6px edge in the product's hue, with the same 2px breaks and no mark.
+// entered: its `to`, or where `to` is the position's own account or an account
+// kind (a Safe, a DSProxy, the ERC-4337 EntryPoint, an EIP-7702 self-call) the
+// first contract that account called (`entry.contract`, read by the server
+// from the transaction's input, lib/shared/tx-entry.ts). A card declares it
+// with `useTimelineEntry`; where the registry or `bar-owners.ts` names a
+// product for that contract (Zerion's router, DeFi Saver's recipe executor),
+// the row's stretch of the bar takes the product's hue and, from md, its mark
+// at the stretch's top, which carries the receipt (lib/shared/bar-provenance.ts).
+// Every other row, and every row whose entry is unknown, stands beside the
+// protocol's bar. Adjacent rows with the same subject join into one stretch;
+// between a stretch and the protocol's bar the page's background shows for
+// 2px, so the bar reads as broken there. Each stretch is measured against this
+// frame: the row's box (`data-event-id`) from its top to its bottom. Below md
+// the stretch is the 6px edge in the product's hue, with the same 2px breaks
+// and no mark.
+//
+// "Not yours" (P3.1.2): a row whose transaction the person did not send takes
+// a small pink dot on the bar level with its head, whatever the stretch. The
+// person sent it when the sender is the position, one of the account's owners
+// (the address-kind read: a Safe's owners, a DSProxy's owner), or the
+// transaction came in through the position's own account.
 //
 // Colour: a product has no roster entry, so its hue is the registry's
 // `bar.hue` (read off its mark), drawn through the same `--brand-zone-*` and
@@ -46,19 +57,60 @@ import {
 import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { barSubjectOf, type BarSubject } from "@/lib/shared/known-infrastructure";
+import { notTheirs, type TxEntry } from "@/lib/shared/tx-entry";
+import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
+import type { ChainId } from "@/lib/shared/chains";
+import { Prov, ProvReceiptsScope, provInspector, useReceiptRegistry } from "@/components/shared/provenance";
+import { barSubjectProv, type BarAccountKind } from "@/lib/shared/bar-provenance";
 
-type DeclareEntry = (eventId: string, to: string) => () => void;
+type Declared = TimelineEntryDeclaration & { wallet: string };
+
+/** What a row declares to the bar: the address whose owner names its stretch
+ *  (`entry.contract ?? entry.to`, or the receipt's `to`), and the facts the
+ *  "not yours" mark reads. */
+export interface TimelineEntryDeclaration {
+  address?: string;
+  entry?: TxEntry;
+  wallet?: string;
+  txHash?: string;
+}
+
+type DeclareEntry = (eventId: string, d: Declared) => () => void;
 const TimelineEntryContext = createContext<DeclareEntry | null>(null);
 
-/** Declares the contract an event row's transaction entered (its receipt's
- *  `to`) to the timeline's side bar. A no-op off the timeline (the event page,
- *  a page with no sidebar) and while `to` is unknown. */
-export function useTimelineEntry(eventId: string | undefined, to: string | undefined): void {
+/** Declares the contract an event row's transaction entered to the timeline's
+ *  side bar. A no-op off the timeline (the event page, a page with no
+ *  sidebar) and while nothing is known. */
+export function useTimelineEntry(eventId: string | undefined, d: TimelineEntryDeclaration): void {
   const declare = useContext(TimelineEntryContext);
+  const address = d.address?.toLowerCase();
+  const { to, contract, account, from } = d.entry ?? {};
+  const wallet = d.wallet?.toLowerCase();
+  const txHash = d.txHash;
   useEffect(() => {
-    if (!declare || !eventId || !to) return;
-    return declare(eventId, to.toLowerCase());
-  }, [declare, eventId, to]);
+    if (!declare || !eventId || !wallet || (!address && !from && !txHash)) return;
+    return declare(eventId, {
+      wallet,
+      ...(address ? { address } : {}),
+      ...(txHash ? { txHash } : {}),
+      ...(to
+        ? {
+            entry: {
+              to,
+              ...(contract ? { contract } : {}),
+              ...(account ? { account } : {}),
+              ...(from ? { from } : {}),
+            },
+          }
+        : {}),
+    });
+  }, [declare, eventId, address, to, contract, account, from, wallet, txHash]);
+}
+
+/** The bar subject a row's declaration names on a chain, or undefined (the
+ *  protocol's bar). */
+export function rowBarSubject(address: string | undefined, chainId: ChainId | undefined): BarSubject | undefined {
+  return address && chainId != null ? barSubjectOf(address, chainId) : undefined;
 }
 
 /** Two rows this close (the timeline's row gap is 8px) are adjacent. */
@@ -68,33 +120,62 @@ interface Stretch {
   top: number;
   bottom: number;
   subject: BarSubject;
+  /** The row at the stretch's head: its receipt sits on the mark. */
+  headId: string;
+  /** The head row's receipts scope (its card's `data-prov-scope`), so arming
+   *  that row's inspector reaches the bar's receipt too. */
+  headScope?: string;
 }
 
-/** The subject stretches over the timeline's bar, measured against the frame. */
+/** The subject stretches over the timeline's bar and the "not yours" marks,
+ *  measured against the frame. */
 function SubjectStretches({
   frameRef,
   subjects,
+  marked,
+  entries,
+  chainId,
+  accountKind,
 }: {
   frameRef: RefObject<HTMLDivElement | null>;
   subjects: Map<string, BarSubject>;
+  marked: ReadonlySet<string>;
+  entries: ReadonlyMap<string, Declared>;
+  chainId: ChainId | undefined;
+  accountKind: BarAccountKind | undefined;
 }) {
+  const registry = useReceiptRegistry();
   const [stretches, setStretches] = useState<Stretch[]>([]);
+  const [marks, setMarks] = useState<number[]>([]);
   useLayoutEffect(() => {
     const frame = frameRef.current;
-    if (!frame || subjects.size === 0) {
+    if (!frame || (subjects.size === 0 && marked.size === 0)) {
       setStretches((prev) => (prev.length ? [] : prev));
+      setMarks((prev) => (prev.length ? [] : prev));
       return;
     }
     const measure = () => {
       const origin = frame.getBoundingClientRect().top;
       const rows: Stretch[] = [];
+      const tops: number[] = [];
       for (const el of frame.querySelectorAll<HTMLElement>("[data-event-id]")) {
-        const subject = subjects.get(el.dataset.eventId ?? "");
-        if (!subject) continue;
+        const id = el.dataset.eventId ?? "";
+        const subject = subjects.get(id);
+        if (!subject && !marked.has(id)) continue;
         const r = el.getBoundingClientRect();
         if (r.height === 0) continue;
-        rows.push({ top: r.top - origin, bottom: r.bottom - origin, subject });
+        if (marked.has(id)) tops.push(r.top - origin);
+        if (subject)
+          rows.push({
+            top: r.top - origin,
+            bottom: r.bottom - origin,
+            subject,
+            headId: id,
+            headScope: el.querySelector<HTMLElement>("[data-prov-scope]")?.dataset.provScope,
+          });
       }
+      tops.sort((a, b) => a - b);
+      setMarks((prev) => (prev.length === tops.length && prev.every((p, i) => p === tops[i]) ? prev : tops));
       rows.sort((a, b) => a.top - b.top);
       const joined: Stretch[] = [];
       for (const row of rows) {
@@ -106,7 +187,12 @@ function SubjectStretches({
       setStretches((prev) =>
         prev.length === joined.length &&
         prev.every(
-          (p, i) => p.top === joined[i].top && p.bottom === joined[i].bottom && p.subject === joined[i].subject,
+          (p, i) =>
+            p.top === joined[i].top &&
+            p.bottom === joined[i].bottom &&
+            p.subject === joined[i].subject &&
+            p.headId === joined[i].headId &&
+            p.headScope === joined[i].headScope,
         )
           ? prev
           : joined,
@@ -129,34 +215,91 @@ function SubjectStretches({
       resize.disconnect();
       mutate.disconnect();
     };
-  }, [frameRef, subjects]);
-  if (stretches.length === 0) return null;
+  }, [frameRef, subjects, marked]);
+  if (stretches.length === 0 && marks.length === 0) return null;
   return (
-    <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1.5 overflow-hidden md:w-10">
-      {stretches.map((s) => (
-        <span key={`${s.top}:${s.subject.name}`}>
-          <span className="absolute inset-x-0 bg-background" style={{ top: s.top - 2, height: s.bottom - s.top + 4 }} />
-          <span
-            className="absolute inset-x-0 bg-brand-edge md:bg-brand-zone"
-            style={
-              {
-                top: s.top,
-                height: s.bottom - s.top,
-                "--brand-hue": s.subject.hue,
-                "--brand-strength": 1,
-              } as CSSProperties
-            }
-            data-anatomy="P3.1.1"
-            data-bar-subject={s.subject.name}
-          >
-            <ProtocolIcon
-              id={s.subject.icon}
-              className="absolute left-3 top-3 hidden h-4 w-4 text-brand-mark md:block [&:is(img)]:grayscale"
+    <>
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1.5 overflow-hidden md:w-10">
+        {stretches.map((s) => (
+          <span key={`${s.top}:${s.subject.name}`}>
+            <span
+              className="absolute inset-x-0 bg-background"
+              style={{ top: s.top - 2, height: s.bottom - s.top + 4 }}
             />
+            <span
+              className="absolute inset-x-0 bg-brand-edge md:bg-brand-zone"
+              style={
+                {
+                  top: s.top,
+                  height: s.bottom - s.top,
+                  "--brand-hue": s.subject.hue,
+                  "--brand-strength": 1,
+                } as CSSProperties
+              }
+              data-anatomy="P3.1.1"
+              data-bar-subject={s.subject.name}
+            >
+              <ProtocolIcon
+                id={s.subject.icon}
+                className="absolute left-3 top-3 hidden h-4 w-4 text-brand-mark md:block [&:is(img)]:grayscale"
+              />
+            </span>
           </span>
-        </span>
-      ))}
-    </span>
+        ))}
+        {/* "Not yours": a row whose transaction the person did not send, in the
+          external actor's pink, level with the row's head and its "by" chip. */}
+        {marks.map((top, i) => (
+          <span
+            key={i}
+            className="absolute left-0 h-1.5 w-1.5 rounded-full bg-[var(--color-pink-500)] md:left-[30px]"
+            style={{ top: top + 17 }}
+            data-anatomy="P3.1.2"
+            data-bar-not-yours=""
+          />
+        ))}
+      </span>
+      {/* The bar's receipt, on the mark at each stretch's head (from md, where
+          the mark is drawn): what the head row's transaction entered. */}
+      {stretches.map((s) => {
+        const d = entries.get(s.headId);
+        const info =
+          d?.address && chainId != null
+            ? barSubjectProv({
+                address: d.address,
+                entry: d.entry,
+                wallet: d.wallet,
+                txHash: d.txHash,
+                chainId,
+                accountKind,
+              })
+            : null;
+        if (!info) return null;
+        return (
+          <ProvReceiptsScope key={`r:${s.headId}`} registry={registry} scopeId={s.headScope ?? s.headId} bounds={false}>
+            {/* The mark opens its receipt as a head chip does: it arms the
+                row's scope and pins the receipt at the mark. */}
+            <button
+              type="button"
+              className="absolute left-3 hidden h-4 w-4 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] md:block"
+              style={{ top: s.top + 12 }}
+              data-bar-receipt={s.subject.name}
+              aria-label={`Where this transaction was sent: ${s.subject.name}`}
+              onClick={(e) => {
+                const scope = s.headScope ?? s.headId;
+                const el = e.currentTarget;
+                provInspector.setArmed(true, scope);
+                const entry = registry.getEntries().find((x) => !x.echo && x.el && el.contains(x.el));
+                if (entry?.el) provInspector.pin(entry, registry, entry.el);
+              }}
+            >
+              <Prov info={info} value={s.subject.name} className="block h-4 w-4">
+                <span className="sr-only">{s.subject.name}</span>
+              </Prov>
+            </button>
+          </ProvReceiptsScope>
+        );
+      })}
+    </>
   );
 }
 
@@ -181,32 +324,68 @@ export function SectionSidebar({
 }) {
   const identity = usePositionCardIdentity();
   const frameRef = useRef<HTMLDivElement>(null);
-  const [entries, setEntries] = useState<ReadonlyMap<string, string>>(() => new Map());
-  const declare = useCallback<DeclareEntry>((eventId, to) => {
+  const [entries, setEntries] = useState<ReadonlyMap<string, Declared>>(() => new Map());
+  const declare = useCallback<DeclareEntry>((eventId, d) => {
     setEntries((prev) => {
-      if (prev.get(eventId) === to) return prev;
       const next = new Map(prev);
-      next.set(eventId, to);
+      next.set(eventId, d);
       return next;
     });
     return () =>
       setEntries((prev) => {
-        if (prev.get(eventId) !== to) return prev;
+        if (prev.get(eventId) !== d) return prev;
         const next = new Map(prev);
         next.delete(eventId);
         return next;
       });
   }, []);
   const chainId = identity?.chain.id;
-  const subjects = useMemo(() => {
-    const out = new Map<string, BarSubject>();
-    if (chainId == null) return out;
-    for (const [eventId, to] of entries) {
-      const subject = barSubjectOf(to, chainId);
-      if (subject) out.set(eventId, subject);
+  const { subjects, resolved } = useMemo(() => {
+    const subjects = new Map<string, BarSubject>();
+    const resolved = new Map<string, Declared>();
+    // A row that declares only its transaction (an e-mode switch's log) takes
+    // the entry another row of that transaction declares.
+    const byTx = new Map<string, Declared>();
+    for (const d of entries.values()) if (d.address && d.txHash) byTx.set(d.txHash.toLowerCase(), d);
+    for (const [eventId, d] of entries) {
+      const r = d.address ? d : d.txHash ? byTx.get(d.txHash.toLowerCase()) : undefined;
+      if (!r) continue;
+      resolved.set(eventId, r);
+      const subject = rowBarSubject(r.address, chainId);
+      if (subject) subjects.set(eventId, subject);
     }
-    return out;
+    return { subjects, resolved };
   }, [entries, chainId]);
+  // The account's owners, read once per page with its kind (the wallet
+  // heading's read, cached): on a Safe the sender is never the position, so
+  // the "not yours" test reads the owners.
+  const wallet = entries.values().next().value?.wallet;
+  const [owners, setOwners] = useState<{
+    wallet: string;
+    list: string[] | null;
+    isContract: boolean;
+    kind: BarAccountKind;
+  } | null>(null);
+  useEffect(() => {
+    if (!wallet || chainId == null) return;
+    let live = true;
+    fetchAddressKind(wallet, chainId).then((k) => {
+      if (!live || !k) return;
+      const isContract = k.kind === "safe" || k.kind === "contract";
+      const list = (k.kind === "safe" || k.kind === "contract") && k.owners ? k.owners : null;
+      setOwners({ wallet, list, isContract, kind: k.kind === "safe" ? "safe" : "account" });
+    });
+    return () => {
+      live = false;
+    };
+  }, [wallet, chainId]);
+  const marked = useMemo(() => {
+    const out = new Set<string>();
+    if (!owners) return out;
+    for (const [eventId, d] of entries)
+      if (d.wallet === owners.wallet && notTheirs(d.entry, d.wallet, owners)) out.add(eventId);
+    return out;
+  }, [entries, owners]);
   if (!identity) return <>{children}</>;
   const style = {
     "--brand-hue": identity.hue ?? 0,
@@ -243,7 +422,14 @@ export function SectionSidebar({
             data-anatomy={ANATOMY[section]}
             data-card-sidebar={section}
           />
-          <SubjectStretches frameRef={frameRef} subjects={subjects} />
+          <SubjectStretches
+            frameRef={frameRef}
+            subjects={subjects}
+            marked={marked}
+            entries={resolved}
+            chainId={chainId}
+            accountKind={owners?.wallet === wallet ? owners?.kind : undefined}
+          />
           <TimelineEntryContext.Provider value={declare}>{children}</TimelineEntryContext.Provider>
         </>
       )}
