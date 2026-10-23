@@ -53,7 +53,9 @@ const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"]';
 // own (Liquity V2, Aave V4) keep the filter button and its `?q=` link.
 const OWNER_MENU = '[data-wallet-menu] button[aria-haspopup="menu"]';
 const OWNER_MENU_WALLET = '[data-wallet-menu] [role="menuitem"]:has-text("View the wallet")';
-const WALLET_VIEW = /^\/wallet\/(0x[0-9a-f]{40})$/;
+// Since fb80809a the menu carries the page it opened from as `?from=`, so
+// the wallet view can link back to its explorer.
+const WALLET_VIEW = /^\/wallet\/(0x[0-9a-f]{40})(?:\?from=([^&]*))?$/;
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -91,7 +93,15 @@ const PROTOCOLS = [
   { slug: "pwn", route: "/ethereum/pwn" },
 ];
 
-const only = new Set(process.argv.slice(2));
+// FAMILIES=liquity-v2,aave-v4 is run-all's way to run a part (its SPLIT table);
+// slugs on the command line do the same by hand.
+const only = new Set([
+  ...process.argv.slice(2),
+  ...(process.env.FAMILIES ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+]);
 const subjects = only.size ? PROTOCOLS.filter((p) => only.has(p.slug)) : PROTOCOLS;
 
 const browser = await chromium.launch();
@@ -140,7 +150,7 @@ async function countRows() {
 // for the box. A deadline tight enough to expire under load turns a busy
 // machine into a "the pill did not navigate" finding, which is the artefact
 // this file was just repaired for reporting.
-async function clickPillUntilNavigated(deadlineMs = 60000) {
+async function clickPillUntilNavigated(deadlineMs = 180000) {
   const before = page.url();
   const deadline = Date.now() + deadlineMs;
   let clicks = 0;
@@ -169,9 +179,13 @@ async function clickPillUntilNavigated(deadlineMs = 60000) {
         .then(() => true)
         .catch(() => false);
       // A row that took the click has pushed the route; a second push before
-      // the first lands restarts it, so give this one time to arrive (a cold
-      // dev listing takes seconds) before clicking again.
-      if (took) await page.waitForURL((u) => u.href !== before, { timeout: 15000 }).catch(() => {});
+      // the first lands restarts it, so wait for this one until the deadline.
+      // The wallet view reads the wallet on every chain before the URL moves:
+      // measured 67s for a morpho owner on a warm dev server (23 Oct 2026).
+      if (took)
+        await page
+          .waitForURL((u) => u.href !== before, { timeout: Math.max(1000, deadline - Date.now()) })
+          .catch(() => {});
     }
     await page.waitForTimeout(400);
   }
@@ -263,7 +277,7 @@ for (const { slug, route, onListing } of subjects) {
     check(
       `${slug}: the pill navigates`,
       navigated !== null,
-      navigated ? `${navigated.clicks} click(s)` : "URL unmoved for 60s — the pill did not navigate",
+      navigated ? `${navigated.clicks} click(s)` : "URL unmoved for 180s — the pill did not navigate",
     );
     if (!navigated) continue;
     withPill++;
@@ -273,7 +287,12 @@ for (const { slug, route, onListing } of subjects) {
     // that address is then built from `route` and loaded below.
     const walletView = url.replace(BASE, "").match(WALLET_VIEW);
     if (walletView) {
-      check(`${slug}: address menu → /wallet/0x… lowercased`, true, url.replace(BASE, ""));
+      const from = walletView[2] == null ? null : decodeURIComponent(walletView[2]);
+      check(
+        `${slug}: address menu → /wallet/0x… lowercased, ?from= the page it opened from`,
+        from !== null && from.startsWith(`${route}/`),
+        url.replace(BASE, ""),
+      );
       url = `${BASE}${route}?q=${walletView[1]}`;
     }
     const m = url.match(/\?q=([^&]+)/);

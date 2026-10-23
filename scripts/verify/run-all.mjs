@@ -131,6 +131,18 @@ const SPLIT = {
       ],
     ],
   },
+  // verify-wallet-links opens up to eight positions per explorer and then the
+  // wallet view, which reads the wallet on every chain before its URL moves
+  // (67s measured for one morpho owner, 23 Oct 2026); 17 explorers whole hit
+  // the cap on 23 Oct, so five or six a part.
+  "verify-wallet-links.mjs": {
+    env: "FAMILIES",
+    parts: [
+      ["liquity-v2", "aave-v4", "morpho", "compound", "compound-v2", "spark"],
+      ["aave-v3", "dolomite", "fluid", "maple", "makerdao", "moonwell"],
+      ["frankencoin", "fx", "llamalend", "liquity-v1", "pwn"],
+    ],
+  },
   "verify-anatomy-codes.mjs": {
     env: "ONLY",
     parts: [
