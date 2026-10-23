@@ -154,14 +154,19 @@ async function findSoftLiq(want = "soft", pages = 12, perPage = 100) {
 // move silently redirected it to scripts/verify/.env.local. Anchoring it to the
 // script means the verifier also runs correctly from any working directory.
 const env = readFileSync(new URL("../../.env.local", import.meta.url), "utf8");
-const RAILS = env
-  .match(/^RAILS_API_URL=(.*)$/m)[1]
-  .trim()
-  .replace(/^"|"$/g, "");
-const TOKEN = env
-  .match(/^API_BEARER_TOKEN=(.*)$/m)?.[1]
-  ?.trim()
-  .replace(/^"|"$/g, "");
+// A value already set in the environment wins; the file is the fallback.
+const RAILS =
+  process.env.RAILS_API_URL ||
+  env
+    .match(/^RAILS_API_URL=(.*)$/m)[1]
+    .trim()
+    .replace(/^"|"$/g, "");
+const TOKEN =
+  process.env.API_BEARER_TOKEN ||
+  env
+    .match(/^API_BEARER_TOKEN=(.*)$/m)?.[1]
+    ?.trim()
+    .replace(/^"|"$/g, "");
 const H = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {};
 // ⚠️ A transport failure must NOT be readable as a data failure. This was a
 // bare `.json()`, so an upstream 429 returned `{success:false,error:"Too many

@@ -111,6 +111,8 @@ const env = Object.fromEntries(
         .replace(/^"|"$/g, ""),
     ]),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 if (!env.BASE_RPC_URL) throw new Error("need BASE_RPC_URL in .env.local");
 if (!env.ALCHEMY_URL) throw new Error("need ALCHEMY_URL in .env.local");
 // ⚠️⚠️ NO LANE URL EVER REACHES THE OUTPUT (viem puts the endpoint into every

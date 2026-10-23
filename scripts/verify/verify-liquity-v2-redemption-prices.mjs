@@ -63,6 +63,8 @@ const env = Object.fromEntries(
       return [l.slice(0, i).trim(), v];
     }),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 if (!env.ALCHEMY_URL) throw new Error("need ALCHEMY_URL in .env.local");
 // A viem error message carries the transport URL; never let it reach output.
 const scrub = (s) =>

@@ -8,9 +8,12 @@
 // forwards only what it has not seen.
 //
 // ⇒ WHAT IT DOES
-//   · One lane per chain, at a path: /ethereum, /base, /sepolia, /ens. Each lane
-//     forwards to the real URL it was started with (ALCHEMY_URL, BASE_RPC_URL,
-//     SEPOLIA_RPC_URL, ENS_RPC_URL; the legacy single UPSTREAM serves `/`).
+//   · One lane per URL, at a path: /ethereum, /base, /sepolia, /ens, and the
+//     wide-range logs lanes /ethereum-logs and /base-logs. Each lane forwards to
+//     the real URL it was started with (ALCHEMY_URL, BASE_RPC_URL,
+//     SEPOLIA_RPC_URL, ENS_RPC_URL, ETHEREUM_LOGS_RPC_URL, BASE_BACKFILL_RPC_URL;
+//     the legacy single UPSTREAM serves `/`). Lanes on one chain share a cache
+//     and a pin.
 //   · A response is cached on disk by chain, method and params, and replayed
 //     on the next identical call. Only a clean result is cached: an error body,
 //     a null result (a block or receipt not yet there) and a non-200 upstream
@@ -42,7 +45,8 @@
 //
 // then start the server with the four variables pointed at it:
 //   ALCHEMY_URL=http://127.0.0.1:8899/ethereum BASE_RPC_URL=http://127.0.0.1:8899/base \
-//   ENS_RPC_URL=http://127.0.0.1:8899/ens SEPOLIA_RPC_URL=http://127.0.0.1:8899/sepolia npx next dev
+//   ENS_RPC_URL=http://127.0.0.1:8899/ens SEPOLIA_RPC_URL=http://127.0.0.1:8899/sepolia \
+//   ETHEREUM_LOGS_RPC_URL=http://127.0.0.1:8899/ethereum-logs BASE_BACKFILL_RPC_URL=http://127.0.0.1:8899/base-logs npx next dev
 //
 // GET /__count — the counters; GET /__reset — zero them; GET /__pins — the pins.
 // Not a verifier; run-all lists it as a SKIP.
@@ -82,6 +86,10 @@ const sepolia = sepoliaUrl();
 if (sepolia) LANES.sepolia = { upstream: sepolia, chain: "sepolia" };
 if (process.env.ENS_RPC_URL || process.env.ALCHEMY_URL)
   LANES.ens = { upstream: process.env.ENS_RPC_URL ?? process.env.ALCHEMY_URL, chain: "ethereum" };
+if (process.env.ETHEREUM_LOGS_RPC_URL)
+  LANES["ethereum-logs"] = { upstream: process.env.ETHEREUM_LOGS_RPC_URL, chain: "ethereum" };
+if (process.env.BASE_BACKFILL_RPC_URL)
+  LANES["base-logs"] = { upstream: process.env.BASE_BACKFILL_RPC_URL, chain: "base" };
 
 if (!Object.keys(LANES).length) {
   console.error(

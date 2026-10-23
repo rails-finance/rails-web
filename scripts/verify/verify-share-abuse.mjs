@@ -136,6 +136,7 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { parseEnv } from "node:util";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
@@ -149,7 +150,9 @@ const ROOT = pathToFileURL(REPO + "/").href;
 // The children read RAILS_API_URL / API_BEARER_TOKEN / ALCHEMY_URL from the
 // repo's own .env.local, as `next dev` does. Values are never printed.
 try {
-  process.loadEnvFile(path.join(REPO, ".env.local"));
+  // A key already set in the environment wins; an empty one counts as unset, which process.loadEnvFile would not do.
+  for (const [k, v] of Object.entries(parseEnv(readFileSync(path.join(REPO, ".env.local"), "utf8"))))
+    if (!process.env[k]) process.env[k] = v;
 } catch {
   /* no .env.local — the env must already carry the keys */
 }

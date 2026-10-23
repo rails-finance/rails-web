@@ -26,8 +26,9 @@
 // `next dev` on one checkout corrupt .next, so it never starts a second one.
 //
 // The RPC proxy: the run starts `rpc-counting-proxy.mjs` (record-and-replay,
-// one block pinned per chain for the run) and points the server it starts at
-// it — ALCHEMY_URL, BASE_RPC_URL, ENS_RPC_URL and SEPOLIA_RPC_URL — so a pass
+// one block pinned per chain for the run) and points the server it starts, and
+// every verifier, at it — ALCHEMY_URL, BASE_RPC_URL, ENS_RPC_URL, SEPOLIA_RPC_URL,
+// ETHEREUM_LOGS_RPC_URL and BASE_BACKFILL_RPC_URL — so a pass
 // replays yesterday's chain reads from disk and the Alchemy key pays only for
 // what the cache lacks. The count is printed at the end of the run and goes
 // into the known-faults file's pass line (ui-jobs 432). A server this runner
@@ -350,9 +351,9 @@ function envLocal() {
   return out;
 }
 
-/** The four variables the dev server reads its chain URLs from, pointed at the
- *  proxy's lanes — only the lanes the proxy has an upstream for, so a chain
- *  with no key keeps the app's own "not set" error. */
+/** The variables the dev server and the verifiers read their chain URLs from,
+ *  pointed at the proxy's lanes — only the lanes the proxy has an upstream
+ *  for, so a chain with no key keeps the app's own "not set" error. */
 function proxiedEnv() {
   const lane = (name) => (proxyLanes.includes(name) ? `${RPC_PROXY_URL}/${name}` : undefined);
   const env = {
@@ -360,6 +361,8 @@ function proxiedEnv() {
     BASE_RPC_URL: lane("base"),
     ENS_RPC_URL: lane("ens"),
     SEPOLIA_RPC_URL: lane("sepolia"),
+    ETHEREUM_LOGS_RPC_URL: lane("ethereum-logs"),
+    BASE_BACKFILL_RPC_URL: lane("base-logs"),
   };
   for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
   return env;

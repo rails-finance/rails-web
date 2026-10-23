@@ -56,6 +56,8 @@ const env = Object.fromEntries(
       return [l.slice(0, i).trim(), v];
     }),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 for (const k of ["ALCHEMY_URL", "RAILS_API_URL", "API_BEARER_TOKEN"])
   if (!env[k]) throw new Error(`need ${k} in .env.local`);
 const scrub = (e) =>
