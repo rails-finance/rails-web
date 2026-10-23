@@ -76,6 +76,7 @@ import {
 } from "@/lib/sources/chain/aave-v3-events";
 import { resolveV3Tokens, type V3TokenMeta } from "@/lib/sources/chain/aave-v3-tokens";
 import type { ChainId } from "@/lib/shared/chains";
+import { withEntry } from "@/lib/shared/tx-entry";
 
 /** One row as rails-server's /api/<protocol>/timeline returns it (api/src/
  *  routes/baseLending.ts TimelineRow). Numerics are decimal strings. The
@@ -95,6 +96,12 @@ export interface AaveV3IndexRow {
   /** withdraw: the log's `to` where the Pool paid another account
    *  (rails-server services/aave-base-row-indexes.ts). Absent from an older api. */
   recipient?: string | null;
+  /** The transaction's `to`, and the contract it entered past the account
+   *  (rails-server services/tx-entry.ts). Absent until read, and from an
+   *  older api. */
+  tx_to?: string | null;
+  entry_contract?: string | null;
+  entry_account?: string | null;
   collateral_asset?: string | null;
   liquidated_collateral_amount?: string | null;
   liquidator?: string | null;
@@ -520,6 +527,7 @@ export function decodeAaveV3IndexRows(wire: readonly AaveV3IndexRow[]): {
       ...(r.liquidator ? { liquidator: r.liquidator.toLowerCase() } : {}),
       ...(r.pool_caller ? { poolCaller: r.pool_caller.toLowerCase() } : {}),
       ...(r.kind === "withdraw" && r.recipient ? { recipient: r.recipient.toLowerCase() } : {}),
+      ...withEntry(r),
       ...(r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
       ...(r.interest_rate_mode != null ? { interestRateMode: Number(r.interest_rate_mode) } : {}),
       ...(r.borrow_rate != null ? { borrowRate: r.borrow_rate } : {}),

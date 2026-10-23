@@ -35,6 +35,7 @@
 // make. Promote both to a shared workspace package when consolidation lands.
 
 import type { RouterSale } from "@/lib/shared/tx-legs";
+import type { TxEntry } from "@/lib/shared/tx-entry";
 
 // ───────────────────────── Base primitives ─────────────────────────
 
@@ -736,6 +737,11 @@ export interface AaveV3Context {
    *  (hooks/useRouterSale.ts, rails-ops TO-DO-ui-jobs 438). The row reads
    *  "Sold"; the figures still read one transfer out. */
   sale?: RouterSale;
+  /** The contract the transaction entered (rails-server services/tx-entry.ts):
+   *  its `to`, and past a smart account the first contract it called. Names
+   *  the row's stretch of the timeline's side bar (anatomy P3.1.1). Absent
+   *  until the server has read the transaction. */
+  entry?: TxEntry;
   /** Raw log integers behind the scaled fields above. */
   raw?: AaveV3ContextRaw;
   /** Origin envelopes for the emitted raw fields (log + param + raw + scale).

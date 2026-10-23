@@ -34,6 +34,7 @@ import { feeLiquidation, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
 import type { AaveV3Neighbours, AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { useRouterSale } from "@/hooks/useRouterSale";
 import { useTimelineEntry } from "@/components/shared/section-sidebar";
+import { entryAddress } from "@/lib/shared/tx-entry";
 
 export interface AaveV3CtEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
@@ -101,9 +102,11 @@ export function AaveV3CtEventCard({
     wallet: event.wallet,
     counterparty: indexed.counterparty,
   });
-  // The receipt's `to` names the row's stretch of the timeline's side bar
-  // (rails-ops TO-DO-ui-jobs 439).
-  useTimelineEntry(event.id, to);
+  // The contract the transaction entered names the row's stretch of the
+  // timeline's side bar: the server's entry contract or `to`, else the sale
+  // read's receipt `to` (anatomy P3.1.1).
+  const entryTo = entryAddress(indexed.entry) ?? to;
+  useTimelineEntry(event.id, { address: entryTo, entry: indexed.entry, wallet: event.wallet, txHash: event.txHash });
   const ctx: AaveV3Context = sale ? { ...indexed, sale } : indexed;
   // Pointer-over or focus of the row starts the position reads the open card
   // makes (this transaction's and the previous one's), so the state is

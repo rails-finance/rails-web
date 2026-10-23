@@ -3,15 +3,19 @@
 
 import type { ChainId } from "@/lib/shared/chains";
 
+// `owners` is who may act for a contract account, read at the same block: a
+// Safe's `getOwners()`, or the `owner()` a DSProxy answers. The timeline's
+// "not yours" mark tests a row's sender against it (anatomy P3.1.1). The
+// variants stay open for what the account's manager is (rails-ops ui-jobs 440).
 export type AddressKind =
   /** No code: an account a key controls. */
   | { kind: "account"; block: number }
   /** EIP-7702: the code is `0xef0100` and the delegate's address. */
   | { kind: "delegated"; delegate: string; block: number }
   /** A Safe: its singleton is a released Safe deployment. */
-  | { kind: "safe"; version: string; block: number }
+  | { kind: "safe"; version: string; owners?: string[]; block: number }
   /** Any other code, with the name and symbol it answers. */
-  | { kind: "contract"; name: string | null; symbol: string | null; block: number };
+  | { kind: "contract"; name: string | null; symbol: string | null; owners?: string[]; block: number };
 
 const cache = new Map<string, Promise<AddressKind | null>>();
 

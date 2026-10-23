@@ -66,6 +66,7 @@ import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { aaveV3EventLegs, type FlowLeg } from "@/lib/aave-v3/chain-truth-tower";
 import { liquidationTransferRole } from "@/lib/aave-v3-base/flows";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
+import type { TxEntry } from "@/lib/shared/tx-entry";
 
 const POOL_EVENTS_ABI = parseAbi([
   "event Supply(address indexed reserve, address user, address indexed onBehalfOf, uint256 amount, uint16 indexed referralCode)",
@@ -320,6 +321,8 @@ export interface AaveV3DecodedRow {
   poolCaller?: string;
   /** withdraw: the log's `to`, where it is not the position. */
   recipient?: string;
+  /** The contract the transaction entered, where the index store read it. */
+  entry?: TxEntry;
   counterparty?: string;
   interestRateMode?: number;
   borrowRate?: string;
@@ -1331,6 +1334,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       ...(d.kind === "repay" ? { useATokens: d.useATokens } : {}),
       ...(isTransfer && d.counterparty ? { counterparty: d.counterparty } : {}),
       ...(d.kind === "withdraw" && d.recipient ? { recipient: d.recipient } : {}),
+      ...(d.entry ? { entry: d.entry } : {}),
       ...(txFrom && d.poolCaller ? { txFrom, poolCaller: d.poolCaller } : {}),
       // A transfer's sender alone: it tells a claimed payout from a received
       // one (lib/aave-v3/event-label.ts distributorPayout).

@@ -26,6 +26,7 @@ import { resolveV3Tokens, scaleV3, flowV3, type V3TokenMeta } from "@/lib/source
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { withEntry } from "@/lib/shared/tx-entry";
 
 export interface AaveV3TimelineResult {
   wallet: string;
@@ -91,6 +92,12 @@ export interface MvRow {
   /** withdraw only: the log's `to` where the Pool paid another account. Absent
    *  from an older api. See the route. */
   recipient?: string | null;
+  /** The transaction's `to`, and the contract it entered past the account
+   *  (rails-server services/tx-entry.ts). Absent until read, and from an
+   *  older api. */
+  tx_to?: string | null;
+  entry_contract?: string | null;
+  entry_account?: string | null;
   /** At-block USD from aave_v3_historic_prices (mig 092) — the event's own
    *  market's oracle read AT THE EVENT'S BLOCK by the oracle-price filler.
    *  NULL until the walk (or the --liq-only pass) reaches the block; the
@@ -606,6 +613,7 @@ export function aaveV3RowsToEvents(
       ...(isTransfer && r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
       // A withdrawal the Pool paid to another account.
       ...(kind === "withdraw" && r.recipient ? { recipient: r.recipient.toLowerCase() } : {}),
+      ...withEntry(r),
       // The acting parties, when this event type carries them (supply/borrow/
       // repay — pool_caller is NULL otherwise): the tx signer + the Pool's
       // msg.sender. The card derives third-party marking from these.
