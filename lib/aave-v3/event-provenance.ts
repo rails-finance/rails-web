@@ -376,6 +376,24 @@ export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coor
   };
 };
 
+/** The known contract a withdrawal was paid to — the Withdraw log's `to`.
+ *  The Pool burns the aTokens of the account that calls withdraw, so the
+ *  position's wallet made the call and named this recipient. The address is
+ *  the log's fact, the name is the registry's claim (`counterpartyNameInputs`). */
+export const withdrawRecipientProv = (coords: V3Coords, recipient: string): Provenance => {
+  const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
+  const named = getProtocolContract(recipient, chainId);
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `The contract the Pool paid this withdrawal to — the address the Pool wrote into the withdraw's log as \`to\`. The Pool burns the aTokens of the account that calls withdraw, so the wallet made the call and named this recipient.${named ? knownContractSentence(named) : ""}`,
+    contract: poolOf(coords),
+    via: `${captureVia(coords)} · Withdraw log · to`,
+    inputs: eventInputs(coords, named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", recipient)) : []),
+  };
+};
+
 /** A swap leg's sign on its own axis: aTokens sent and debt repaid shrink it;
  *  aTokens received, a supply and a borrow grow it. */
 export const swapLegSign = (action: AaveV3SwapLegAction, kind?: AaveV3SwapDetail["kind"]): 1 | -1 =>

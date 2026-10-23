@@ -88,6 +88,9 @@ export interface MvRow {
   /** msg.sender at the Pool (the raw event's own party param) — set for
    *  supply/borrow/repay, NULL for withdraw/liquidation. See the route. */
   pool_caller: string | null;
+  /** withdraw only: the log's `to` where the Pool paid another account. Absent
+   *  from an older api. See the route. */
+  recipient?: string | null;
   /** At-block USD from aave_v3_historic_prices (mig 092) — the event's own
    *  market's oracle read AT THE EVENT'S BLOCK by the oracle-price filler.
    *  NULL until the walk (or the --liq-only pass) reaches the block; the
@@ -601,6 +604,8 @@ export function aaveV3RowsToEvents(
       // event, not a verdict about who acted (renders as the neutral to/from
       // chip, not the external-actor pink).
       ...(isTransfer && r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
+      // A withdrawal the Pool paid to another account.
+      ...(kind === "withdraw" && r.recipient ? { recipient: r.recipient.toLowerCase() } : {}),
       // The acting parties, when this event type carries them (supply/borrow/
       // repay — pool_caller is NULL otherwise): the tx signer + the Pool's
       // msg.sender. The card derives third-party marking from these.

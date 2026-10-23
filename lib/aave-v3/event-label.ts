@@ -59,6 +59,26 @@ export function poolCallerContract(
   return getProtocolContract(ctx.poolCaller, chainId ?? MAINNET_CHAIN_ID);
 }
 
+/** The known contract a withdrawal was paid to: the Withdraw log's `to` where
+ *  the registry names it and it is not the position's wallet. The head reads
+ *  "Withdrew · to <name>". A WETH gateway is left out: the ETH came back to the
+ *  wallet, and the row reads as a plain withdrawal.
+ *
+ *  A withdrawal reads, in order: to a WETH gateway (plain), to a known contract
+ *  (this), plain. That is the transfer-out order (a liquidation's fee, the WETH
+ *  gateway, a sale, a stake, a plain transfer) less the readings a Withdraw log
+ *  cannot carry: the fee, the sale and the stake are aToken transfers. */
+export function withdrawRecipient(
+  ctx: AaveV3Context,
+  owner: string | undefined,
+  chainId: ChainId | undefined | null,
+): ProtocolContract | undefined {
+  if (ctx.eventType !== "withdraw" || !ctx.recipient) return undefined;
+  if (owner && ctx.recipient === owner.toLowerCase()) return undefined;
+  const named = getProtocolContract(ctx.recipient, chainId ?? MAINNET_CHAIN_ID);
+  return named && named.kind !== "gateway" ? named : undefined;
+}
+
 /** The word T1 states for the row, which the phone spine view's caption
  *  repeats. A swap names its direction, sold → bought ("Debt swap GHO →
  *  cbBTC"); a supply from a swap sold the received side for the given. An
