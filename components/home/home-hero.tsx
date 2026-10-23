@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect } from "react";
-import Link from "next/link";
 import { Check } from "lucide-react";
-import { launchedProductionChainNames } from "@/lib/shared/protocols";
-import { FrontDoorSearch, walletHref } from "@/components/shared/front-door-search";
-import { SAMPLE_WALLETS } from "@/lib/home/sample-wallets";
+import { FrontDoorSearch } from "@/components/shared/front-door-search";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -16,9 +13,9 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 /**
  * Home hero — the site's front door (rails-ops decision 0051): the headline
  * names the place ("Destination DeFi"), the Rails line states the promise, then
- * the search (H15) landing on the wallet view, a sample wallet to try
- * (`SAMPLE_WALLETS`), and the ticked terms (read-only / no wallet connection /
- * the chains). The explorer directory lives further down the page
+ * the search (H15) landing on the wallet view, and the ticked terms
+ * (independent / verifiable / read-only / no login) under it. The explorer
+ * directory lives further down the page
  * (ProtocolRow), and the header's "Open an explorer" menu reaches it too.
  *
  * Entrance animation runs once per browser via the `data-hero-seen` flag set
@@ -74,23 +71,11 @@ export function HomeHero() {
         className="relative w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
       >
-        <FrontDoorSearch
-          size="lg"
-          after={
-            <Link
-              href={walletHref(SAMPLE_WALLETS[0].address)}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm px-1 text-sm font-medium text-blue-500 hover:text-blue-600 focus-ring"
-              data-sample-wallet={SAMPLE_WALLETS[0].address}
-              aria-label="Try a sample wallet"
-            >
-              Sample <span aria-hidden="true">→</span>
-            </Link>
-          }
-        />
+        <FrontDoorSearch size="lg" />
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
-        className="relative mt-16 flex flex-wrap sm:mt-[120px] items-center justify-center gap-x-5 gap-y-1 px-4 text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
+        className="relative mb-12 mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
         style={{ animationDelay: "0.3s" }}
       >
         {TERMS.map((term) => (
@@ -104,7 +89,6 @@ export function HomeHero() {
   );
 }
 
-// The last term is a coverage claim, so it names the chains a reader can
-// actually reach from the nav rather than writing them out — see
-// `launchedProductionChainNames`.
-const TERMS = ["read-only", "no wallet connection", launchedProductionChainNames()];
+// Rendered uppercase by the class on the <p>; the Check icon before each one
+// is the separator.
+const TERMS = ["Independent", "Verifiable", "Read-only", "No login"];
