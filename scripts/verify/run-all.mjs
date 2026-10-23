@@ -109,7 +109,11 @@ const SPLIT = {
   "verify-timeline-boundary-card.mjs": {
     env: "ONLY",
     parts: [
-      ["aave-v3", "aave-v3-grouped", "spark", "maple", "compound-v3", "compound-v2", "morpho"],
+      // Split in three on 23 Oct 2026: the seven together ran past the cap,
+      // and each flat window fixture pages 2,500 rows (3 to 5 min apiece).
+      ["aave-v3", "aave-v3-grouped", "spark"],
+      ["maple", "compound-v3"],
+      ["compound-v2", "morpho"],
       [
         "aave-v3-base",
         "aave-v3-base-2000",
