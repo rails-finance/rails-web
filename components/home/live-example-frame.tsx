@@ -23,8 +23,10 @@ import { protocolForPathname } from "@/lib/shared/protocols";
  * The Trove page renders the same component, so the example draws what the
  * page draws; the data is a server-side fetch of the live position (ISR,
  * refreshed hourly). The whole frame is one link to the live position:
- * hovering lifts it and reveals the pill affordance; touch/small viewports get
- * a caption link under the frame instead. The render stays inert
+ * hovering draws a marketing-blue edge round its top and sides that dissolves
+ * toward the bottom fade, brightens the URL in step with it, and reveals the
+ * pill affordance;
+ * touch/small viewports get a caption link under the frame instead. The render stays inert
  * (pointer-events off, `inert`, aria-hidden) — it's a picture of the app, not a
  * second app — so the body draws without the page's top row, without export
  * shapes, and with a still timeline toolbar (its words and count, no
@@ -181,7 +183,7 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
             it and redraw the rectangle the fade erased. */}
         <div
           aria-hidden="true"
-          className="absolute -inset-x-40 -top-40 bottom-0 pointer-events-none transition-transform duration-300 group-hover:-translate-y-1"
+          className="absolute -inset-x-40 -top-40 bottom-0 pointer-events-none"
           style={{
             maskImage: "linear-gradient(to bottom, black 60%, transparent 96%)",
             WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 96%)",
@@ -209,10 +211,29 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
           />
         </div>
 
+        {/* Hover edge — a marketing-blue border hugging the OUTSIDE of the
+            frame on its top and sides: a box 2px larger than the frame on
+            those three edges, with a radius 2px wider so the ring stays
+            concentric with the frame's corners. Masked out toward the bottom
+            so it dissolves with the content fade instead of closing a
+            rectangle the fade erased. It fades over the same 300ms as the
+            URL pill's colour shift, so the two arrive together. Tailwind's
+            hover variants are gated on `@media (hover: hover)`, so
+            touch pointers never see it. Pointer-inert, so the click target is
+            unchanged. */}
+        <div
+          aria-hidden="true"
+          className="absolute -inset-x-0.5 -top-0.5 bottom-0 rounded-t-[18px] border-2 border-b-0 border-[var(--marketing)] opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
+          style={{
+            maskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
+          }}
+        />
+
         {/* No card shell (border/shadow/surface) — the section gradient runs
             behind, and the bottom fade dissolves the page into it. Only the
             chrome bar keeps a surface; the content below is the app's own. */}
-        <div className="relative rounded-t-2xl overflow-hidden transition-transform duration-300 group-hover:-translate-y-1">
+        <div className="relative rounded-t-2xl overflow-hidden">
           {/* Browser chrome — the real URL is part of the pitch. The bar keeps
               only the border-b separator; the URL pill is the single tinted
               shape (no competing band behind it), and its background + text
@@ -224,10 +245,11 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
             <span className="absolute left-1/2 -translate-x-1/2 max-w-[65%] truncate font-sans text-xs text-rb-500/40 bg-rb-100 dark:bg-rb-900 group-hover:text-foreground group-hover:bg-background transition-colors duration-300 rounded-md px-3 py-1">
               {EXAMPLE_URL}
             </span>
-            {/* Liveness marker — a solid green pill owned by the chrome bar
-                rather than pasted over the render. */}
-            <span className="ml-auto inline-flex items-center rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-semibold tracking-widest text-white">
-              LIVE
+            {/* Liveness marker — an outlined green pill (border, 20% tint,
+                green bold text) owned by the chrome bar rather than pasted
+                over the render. */}
+            <span className="ml-auto inline-flex items-center rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-500">
+              LIVE SAMPLE
             </span>
           </div>
 
