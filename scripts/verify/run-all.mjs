@@ -109,7 +109,11 @@ const SPLIT = {
   "verify-timeline-boundary-card.mjs": {
     env: "ONLY",
     parts: [
-      ["aave-v3", "aave-v3-grouped", "spark", "maple", "compound-v3", "compound-v2", "morpho"],
+      // Split in three on 23 Oct 2026: the seven together ran past the cap,
+      // and each flat window fixture pages 2,500 rows (3 to 5 min apiece).
+      ["aave-v3", "aave-v3-grouped", "spark"],
+      ["maple", "compound-v3"],
+      ["compound-v2", "morpho"],
       [
         "aave-v3-base",
         "aave-v3-base-2000",
@@ -129,6 +133,18 @@ const SPLIT = {
         "control-vault",
         "rewind",
       ],
+    ],
+  },
+  // verify-wallet-links opens up to eight positions per explorer and then the
+  // wallet view, which reads the wallet on every chain before its URL moves
+  // (67s measured for one morpho owner, 23 Oct 2026); 17 explorers whole hit
+  // the cap on 23 Oct, so five or six a part.
+  "verify-wallet-links.mjs": {
+    env: "FAMILIES",
+    parts: [
+      ["liquity-v2", "aave-v4", "morpho", "compound", "compound-v2", "spark"],
+      ["aave-v3", "dolomite", "fluid", "maple", "makerdao", "moonwell"],
+      ["frankencoin", "fx", "llamalend", "liquity-v1", "pwn"],
     ],
   },
   "verify-anatomy-codes.mjs": {
@@ -198,7 +214,7 @@ const SKIPS = {
 // than for the absence of a phrase. If nothing here matches, the run is still
 // classified correctly — the table just quotes the last line instead.
 const VERDICT_RE =
-  /(ALL(\s+\w+)*\s+CHECKS?\b|ALL ASSERTIONS|ALL PASS\b|All assertions passed|=== SUMMARY ===|\d+\s+(CHECK\(S\)|ASSERTION\(S\))\s+FAILED|\d+\s+FAILURES?\b|\d+\s+FAILED\b|check\(s\) failed|checks passed|validated \d+ actionLabels|distinct unscoped receipt label|ABORT — \d+ page|^# (pass|fail) \d+)/im;
+  /(ALL(\s+\w+)*\s+CHECKS?\b|ALL ASSERTIONS|ALL PASS\b|All assertions passed|=== SUMMARY ===|\d+\s+(CHECK\(S\)|ASSERTION\(S\))\s+FAILED|\d+\s+FAILURES?\b|\d+\s+FAILED\b|check\(s\) failed|checks passed|validated \d+ actionLabels|distinct unscoped receipt label|ABORT — \d+ page|^# (pass|fail) \d+|\bPASS=\d+ FAIL=\d+|^\s*[✗❌] )/im;
 
 // A verdict over zero checks. "0/0 checks passed" exits 0 and reads green in
 // every column, and it is what a verifier prints when its fixture filter, its
@@ -681,7 +697,9 @@ function report(r) {
   // evidence is the failing lines; for a CRASH it is the end of the output,
   // where the stack trace is.
   const lines = r.out.split("\n").map((l) => l.trimEnd());
-  const failing = r.outcome === "FAIL" ? lines.filter((l) => /\bFAIL(ED|URE|:)?\b/i.test(l)) : [];
+  // A red line is "FAIL …" in most scripts, "✗ …" or "❌ …" in the rest
+  // (verify-operator-denominator, verify-polish-batch).
+  const failing = r.outcome === "FAIL" ? lines.filter((l) => /\bFAIL(ED|URE|:)?\b|[✗❌]/i.test(l)) : [];
   const shown = failing.length ? failing.slice(0, 20) : lines.filter(Boolean).slice(-25);
   console.log(shown.join("\n").replace(/^/gm, "       │ "));
   if (failing.length > 20) console.log(`       │ … and ${failing.length - 20} more failing line(s)`);

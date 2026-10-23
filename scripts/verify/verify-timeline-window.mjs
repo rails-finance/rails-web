@@ -249,10 +249,20 @@ async function main() {
     // ⚠️ WAIT FOR THEM. The count line is server-rendered, so it can reach its
     // ready form before the rows draw. The wait swallows its timeout so a page
     // that never draws them is still a red check, not a crash.
+    //
+    // Like events always settle into groups since 81662167 (12 Oct 2026), and a
+    // closed group draws no member numbers: its bracket ends carry the range
+    // (`data-group-range` "hi" and "lo", group-frame.tsx). The newest event is
+    // often a group's top end, so those ends are read with the rows' numbers.
     await page.waitForSelector("[data-event-number]", { timeout: 30_000 }).catch(() => {});
-    const badges = await page.$$eval("[data-event-number]", (els) =>
-      els.map((el) => Number(el.getAttribute("data-event-number"))),
-    );
+    const badges = await page.evaluate(() => [
+      ...[...document.querySelectorAll("[data-event-number]")].map((el) =>
+        Number(el.getAttribute("data-event-number")),
+      ),
+      ...[...document.querySelectorAll("[data-group-range] .num-pill")].map((el) =>
+        Number((el.textContent ?? "").replace(/,/g, "")),
+      ),
+    ]);
     assert(badges.length > 0, "the chronological badges render", `${badges.length} found`);
     if (badges.length > 0) {
       const lowest = Math.min(...badges);

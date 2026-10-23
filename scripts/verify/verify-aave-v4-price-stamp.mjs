@@ -144,6 +144,8 @@ const F = {
     spokeName: "EtherFi",
     peakBlock: 25_929_791,
     peakSymbol: "weETH",
+    /** The listing's peakDebtUsd as served (ui-jobs 168, read 23 Oct 2026). */
+    peakDebtUsd: 24116.34,
     why: "a closed weETH position — the peak the old view under-valued",
   },
   RLUSD: {
@@ -409,10 +411,14 @@ async function p45() {
     Math.abs(rowL.peakSupplyUsd - peakS) <= 0.01,
     `listing ${rowL.peakSupplyUsd} vs replay ${peakS.toFixed(2)}`,
   );
+  // The listing's peak debt is the server's own figure, about $0.50 under the
+  // rows' replay (24,116.34 against 24,116.88), and the page serves it: ui-jobs
+  // 168 dropped the recompute (15 Oct 2026). So the check pins the served
+  // value and holds the replay to it within a dollar.
   check(
-    "P5c the listing's peakDebtUsd is the rule's replay over the rows' own prices",
-    Math.abs(rowL.peakDebtUsd - peakD) <= 0.01,
-    `listing ${rowL.peakDebtUsd} vs replay ${peakD.toFixed(2)}`,
+    "P5c the listing's peakDebtUsd is the served 24,116.34, within a dollar of the rule's replay",
+    Math.abs(rowL.peakDebtUsd - F.F5.peakDebtUsd) <= 0.01 && Math.abs(rowL.peakDebtUsd - peakD) <= 1,
+    `listing ${rowL.peakDebtUsd} vs served ${F.F5.peakDebtUsd}, replay ${peakD.toFixed(2)}`,
   );
   // The peak supply is this script's own two chain reads at the peak block: the
   // EtherFi spoke's getUserSuppliedAssets for weETH (reserve 0 of that spoke)

@@ -163,7 +163,14 @@ const headerLayout = (card) =>
     .waitFor({ timeout: 60000 })
     .catch(() => {});
   // ui-jobs 430: the heading row carries the page's price strip in place of
-  // "Position summary".
+  // "Position summary". The strip is handed to the card after it mounts
+  // (position-card-strip.tsx: the wallet heading draws it until a card's slot
+  // registers), so it is waited for.
+  await card
+    .locator("[data-card-header] [data-position-strip] [data-latest-prices]")
+    .first()
+    .waitFor({ state: "attached", timeout: 60000 })
+    .catch(() => {});
   const strip = await card.locator("[data-card-header] [data-position-strip] [data-latest-prices]").count();
   check("1a. the position card's heading row carries the price strip", strip === 1, `${strip} strip`);
   const menuPlace = await card
@@ -189,13 +196,20 @@ const headerLayout = (card) =>
   // ([data-card-row-toggle]); 322/330 made every card line a stat (C18) and
   // retired the toggle with the card chevron (C9, ui-jobs 295).
 
-  // The ⋮ opens its menu.
-  await card.locator("[data-card-menu] > button").click();
-  const menuOpen = await page
-    .locator('[data-card-menu] [role="menu"]')
-    .waitFor({ state: "visible", timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
+  // The ⋮ opens its menu. Pressed until it does: a press before hydration is
+  // lost with no trace.
+  let menuOpen = false;
+  for (let i = 0; i < 6 && !menuOpen; i++) {
+    await card
+      .locator("[data-card-menu] > button")
+      .click({ timeout: 10000 })
+      .catch(() => {});
+    menuOpen = await page
+      .locator('[data-card-menu] [role="menu"]')
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+  }
   check("1g. a press on the card ⋮ opens its menu", menuOpen);
   await page.keyboard.press("Escape");
 
@@ -391,19 +405,41 @@ const headerLayout = (card) =>
     !!layout && layout.chev && layout.menu && !layout.pillInHead,
     JSON.stringify(layout),
   );
-  await card.locator("[data-event-head-menu] [data-event-menu] > button").click();
+  // Pressed until the menu shows: a press before hydration is lost.
+  for (let i = 0; i < 6; i++) {
+    await card
+      .locator("[data-event-head-menu] [data-event-menu] > button")
+      .click({ timeout: 10000 })
+      .catch(() => {});
+    const shown = await card
+      .locator('[data-event-menu] [role="menu"]')
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (shown) break;
+  }
   const items = await card
     .locator('[data-event-menu] [role="menu"] [data-menu-item]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")))
     .catch(() => []);
+  // f98ff4ca (23 Oct 2026): where the row's head draws a party chip, Trace
+  // "<chip>" stands after Open event page.
+  const after = items.slice(1);
+  const order = ["trace-chip", "hide-type"];
   check(
-    "4b. a press on it opens the menu: Open event page (ui-jobs 308; provenance is on the event page), then Hide the row's type of event where the timeline has more than one",
-    items[0] === "view-page" && items.slice(1).every((i) => i === "hide-type") && items.length <= 2,
+    "4b. a press on it opens the menu: Open event page (ui-jobs 308; provenance is on the event page), then Trace the head's chip where it draws one, then Hide the row's type of event where the timeline has more than one",
+    items[0] === "view-page" &&
+      after.every((i) => order.includes(i)) &&
+      after.every((i, k) => k === 0 || order.indexOf(after[k - 1]) < order.indexOf(i)),
     JSON.stringify(items),
   );
   const closed = await card.locator('[data-anatomy="T2"]').count();
   check("4c. and leaves the card closed", closed === 0, `${closed} T2 found`);
   await page.keyboard.press("Escape");
+  await card
+    .locator('[data-event-menu] [role="menu"]')
+    .waitFor({ state: "hidden", timeout: 3000 })
+    .catch(() => {});
   await card.locator("[data-event-head-menu] [data-event-menu] > button").focus();
   await page.keyboard.press("Enter");
   const byKey = await card

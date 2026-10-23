@@ -293,7 +293,7 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   if (pos.data.status === "open")
     check(
       `${name} page: the scrubber's last stop is the header's block`,
-      words.live === `Position at block ${Number(pos.asOf.block).toLocaleString("en-US")}`,
+      words.live === `At block ${Number(pos.asOf.block).toLocaleString("en-US")}`,
       words.live,
     );
   check(
@@ -338,14 +338,16 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     unitless.length === 0 && inOut != null,
     unitless.map(([r]) => String(r)).join("; ") || prose.slice(0, 160),
   );
-  // The api's figures, at the two decimals of the compact form: a figure
-  // shown as 1.23M is within half a unit of its last place.
+  // The api's figures, at the decimals the compact form shows (one with K, M,
+  // B since ec1c6496, two below): a figure shown as 151.2M is within half a
+  // unit of its last shown place.
   const units = (raw) => Number(BigInt(raw)) / 1e18;
-  const near = (shown, v) => {
-    const x = num(shown);
+  const halfUnit = (shown) => {
     const place = /[KMBT]$/.test(shown) ? { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }[shown.slice(-1)] : 1;
-    return Math.abs(x - v) <= 0.005 * place + 1e-9;
+    const decimals = (/\.(\d+)/.exec(shown)?.[1] ?? "").length;
+    return 0.5 * 10 ** -decimals * place;
   };
+  const near = (shown, v) => Math.abs(num(shown) - v) <= halfUnit(shown) + 1e-9;
   if (inOut) {
     check(`${name} page: the Explanation's in is the api's`, near(inOut[1], units(pos.data.usdsIn.raw)), inOut[1]);
     check(`${name} page: the Explanation's out is the api's`, near(inOut[2], units(pos.data.usdsOut.raw)), inOut[2]);
@@ -360,9 +362,7 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     );
   if (inOut && held && earnedM) {
     // The shown figures add up within their rounding: worth + out − in = interest.
-    const slack = [inOut[1], inOut[2], held[1], earnedM[1]]
-      .map((t) => (/[KMBT]$/.test(t) ? { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }[t.slice(-1)] : 1) * 0.005)
-      .reduce((a, b) => a + b, 0);
+    const slack = [inOut[1], inOut[2], held[1], earnedM[1]].map(halfUnit).reduce((a, b) => a + b, 0);
     const gap = num(held[1]) + num(inOut[2]) - num(inOut[1]) - num(earnedM[1]);
     check(
       `${name} page: the Explanation adds up: worth + out − in = interest`,

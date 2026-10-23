@@ -19,10 +19,13 @@ await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
-  const kids = [...section.children].map((el) => el.tagName + ":" + (el.textContent || "").slice(0, 25));
-  const h1i = kids.findIndex((t) => t.includes("Destination DeFi"));
-  const subi = kids.findIndex((t) => t.includes("Explore any DeFi position"));
-  const badgei = kids.findIndex((t) => t.toLowerCase().includes("read-only"));
+  // Read on each child's whole text: the terms line opens "Independent
+  // Verifiable" since 6c9e16c3, so "Read-only" sits past a short prefix.
+  const texts = [...section.children].map((el) => el.textContent || "");
+  const kids = [...section.children].map((el, i) => el.tagName + ":" + texts[i].slice(0, 25));
+  const h1i = texts.findIndex((t) => t.includes("Destination DeFi"));
+  const subi = texts.findIndex((t) => t.includes("Explore any DeFi position"));
+  const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
   return h1i < subi && subi < badgei ? "ok" : kids.join(" | ");
 });
 check("8 hero: h1 → subheading → badges", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);

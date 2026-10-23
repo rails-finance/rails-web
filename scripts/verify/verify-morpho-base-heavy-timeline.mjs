@@ -1,70 +1,26 @@
-// A HEAVY wallet's seeded replay lands where a whole-history replay lands.
+// A HEAVY wallet's seeded replay accounts for every row it was not sent.
 // ----------------------------------------------------------------------------
 // /api/morpho-base/timeline sends a vault's newest rows plus `heavy.seeds` —
 // the replay's running state per market at the cut, aggregated in SQL over the
-// rows it did not send. This checks the only thing that claim rests on: a
-// replay started from those seeds over that tail reaches the same positions as
-// a replay over every row.
+// rows it did not send. A replay started from those seeds over that tail goes
+// through the real `replayMorphoRows`; the row decode here is this script's own
+// (the reader's is not imported).
 //
-// The two sides are built from ONE fetch each of the SAME deployed API:
+// WHAT IT ASSERTS:
+//   • the route answers the heavy shape, with a seed per market
+//   • per position, the omission arithmetic: `omitted.count + drawn ===
+//     eventCount`
+//   • per position, the seed carries the peaks (no `peaksPartial`)
 //
-//   heavy — GET /timeline?wallet=…            (tail + seeds)
-//   full  — GET /timeline?wallet=…&full=1     (every row; the route answers
-//           `full=1` only while the box sets TIMELINE_FULL_DEBUG=1, so this
-//           script needs that switch on and says so when it is off)
-//
-// Sieve keeps writing between the two reads, so the full list is TRUNCATED to
-// the heavy read's own newest row before it is replayed — the two then cover
-// exactly the same history, and `heavy.omittedBefore.count + rows.length ===
-// the truncated length` is asserted before anything else, so a mis-cut cannot
-// pass as a matching replay.
-//
-// Both sides go through the real `replayMorphoRows`; only the seeds differ.
-// The row decode here is this script's own (the reader's is not imported), so
-// a decode that drifted would show up as a red assertion rather than cancel
-// itself out on both sides.
-//
-// WHAT IT ASSERTS, per position, seeded vs full:
-//   • collateralRaw, borrowSharesRaw, supplySharesRaw — wei-exact
-//   • borrowed, supplied, badDebt — the replayed principals
-//   • eventCount, txCount, liquidationCount, everLiquidated
-//   • firstBlock / lastBlock / firstEventAt / lastTs
-//   • open|closed|liquidated, by the card's own predicate
-//   • omitted.count / omitted.upToBlock, and the drawn-row figures
-//     (assetsDelta, sharesDelta, collateralAfter, borrowedAfter,
-//     suppliedAfter, isOpen) for every row BOTH sides drew
-//   • the peaks, only on positions the seed did not mark `peaksPartial`
-//
-// A position whose newest `maxRendered / markets` rows sit BEFORE the cut is
-// drawn by the full replay and not by the seeded one — the seeded side states
-// them as omitted instead. That is the design, not a drift: the script reports
-// the per-position drawn-count difference and asserts the omission arithmetic
-// (`eventCount − drawn === omitted.count`) holds on both sides.
-//
-// TIMELINE_FULL_DEBUG needs no file edit: the compose file reads it as
-// `${TIMELINE_FULL_DEBUG:-}`, and Compose substitutes from the SHELL
-// environment before it falls back to `.env`. On the onboarding box, in the
-// server checkout:
-//
-//   TIMELINE_FULL_DEBUG=1 docker compose -f docker-compose.server.yml \
-//     up -d --no-deps --force-recreate api      # … run this … then:
-//   docker compose -f docker-compose.server.yml up -d --no-deps --force-recreate api
-//   docker exec api printenv TIMELINE_FULL_DEBUG   # must print an empty line
-//
-// `.env` is never opened, so there is nothing to back up, restore or prove by
-// sha256, and `--no-deps` leaves the other containers alone. Read the flag out
-// of the CONTAINER to prove it off. NEVER leave it set — a heavy wallet's
-// whole history is the response this route must not be askable for.
+// The comparison against a whole-history replay (`?full=1`, every position
+// field wei-exact, the drawn rows' running figures, `--perturb`) is retired:
+// `?full=1` answers only while the box sets TIMELINE_FULL_DEBUG=1, and the flag
+// stays off (ruled 15 Oct 2026; the Aave family's verifier did the same in
+// 25660add).
 //
 // Run:
 //   node scripts/verify/verify-morpho-base-heavy-timeline.mjs
 //   WALLET=0x… node scripts/verify/verify-morpho-base-heavy-timeline.mjs
-//   node scripts/verify/verify-morpho-base-heavy-timeline.mjs --perturb
-//
-// `--perturb` adds ONE WEI to the first seed's supplyShares and one to its
-// supplied assets before the seeded replay — the first shows in the final
-// state, the second in every drawn row's running figure. It must turn the run
-// red; it is how the check is shown to be able to fail at all.
 
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -129,7 +85,6 @@ const { MORPHO_BASE_DEPLOYMENT } = await import("../../lib/sources/chain/morpho-
 
 /** Steakhouse Prime USDC — the largest wallet on the Base singleton. */
 const WALLET = (process.env.WALLET ?? "0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2").toLowerCase();
-const PERTURB = process.argv.includes("--perturb");
 /** The web's own wallet-wide render budget (lib/sources/api/morpho-base-timeline.ts). */
 const MAX_RENDERED_EVENTS = 2_000;
 const ZERO = BigInt(0);
@@ -140,9 +95,6 @@ function check(name, cond, detail = "") {
   checked++;
   if (!cond) failures++;
   if (!cond || process.env.VERBOSE) console.log(`${cond ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-}
-function eq(name, a, b) {
-  check(name, a === b, a === b ? "" : `seeded ${a} · full ${b}`);
 }
 
 async function get(url) {
@@ -225,139 +177,41 @@ if (!base) {
 const t0 = Date.now();
 const heavy = await get(`${base}/api/morpho-base/timeline?wallet=${WALLET}&reach=1`);
 const tHeavy = Date.now() - t0;
-const t1 = Date.now();
-const full = await get(`${base}/api/morpho-base/timeline?wallet=${WALLET}&full=1`);
-const tFull = Date.now() - t1;
 
 console.log(`wallet ${WALLET}`);
 console.log(`heavy  ${heavy.rows.length} rows, ${JSON.stringify(heavy.heavy?.cut ?? null)}, ${tHeavy}ms`);
-console.log(`full   ${full.rows.length} rows, ${tFull}ms`);
 
 check("the route answered the heavy shape", heavy.heavy != null, "no `heavy` — is the wallet above HEAVY_ROWS?");
-check(
-  "the route answered the full history for ?full=1",
-  full.heavy == null && full.rows.length > heavy.rows.length,
-  full.heavy != null ? "still heavy — TIMELINE_FULL_DEBUG is not set on the box" : "",
-);
-if (!heavy.heavy || full.heavy != null) {
+if (!heavy.heavy) {
   console.log(`\n${failures} failed of ${checked}`);
   process.exit(1);
 }
-
-// One history on both sides: cut the full list at the heavy read's own newest
-// row, so rows Sieve wrote between the two reads are on neither side.
-const key = (r) => [Number(r.block_number), r.tx_index, r.log_index];
-const newest = key(heavy.rows[heavy.rows.length - 1]);
-const le = (a, b) => (a[0] !== b[0] ? a[0] < b[0] : a[1] !== b[1] ? a[1] < b[1] : a[2] <= b[2]);
-const fullRows = full.rows.filter((r) => le(key(r), newest));
-eq("the two reads cover one history", heavy.heavy.omittedBefore.count + heavy.rows.length, fullRows.length);
-
 const seeds = heavy.heavy.seeds.map(seedOf);
-if (PERTURB) {
-  // One wei on the shares slot AND one on the assets it stands for: the first
-  // shows in the final state, the second in every drawn row's running figure.
-  seeds[0].supplyShares += BigInt(1);
-  seeds[0].supplied += BigInt(1);
-  console.log(
-    `\n--perturb: ${seeds[0].marketId.slice(0, 10)} supplyShares +1 wei, supplied +1 wei. The run MUST go red.\n`,
-  );
-}
+check("the heavy answer carries seeds", seeds.length > 0, `${seeds.length}`);
 
-const common = {
+const newestBlock = Number(heavy.rows[heavy.rows.length - 1]?.block_number ?? 0);
+const seededResult = await replayMorphoRows({
   wallet: WALLET,
   deployment: MORPHO_BASE_DEPLOYMENT,
   maxRendered: MAX_RENDERED_EVENTS,
-  coverage: { fromBlock: 0, toBlock: newest[0], fromDeployment: true, deployBlock: 0, gaps: [], source: "index" },
-};
-const seededResult = await replayMorphoRows({
-  ...common,
+  coverage: { fromBlock: 0, toBlock: newestBlock, fromDeployment: true, deployBlock: 0, gaps: [], source: "index" },
   rows: heavy.rows.map(decode),
   seeds,
   metadata: metadataFrom(heavy.rows),
 });
-const fullResult = await replayMorphoRows({
-  ...common,
-  rows: fullRows.map(decode),
-  metadata: metadataFrom(fullRows),
-});
-
-eq("wallet-wide totalEvents", seededResult.totalEvents, fullResult.totalEvents);
-eq("wallet-wide first event", seededResult.coverage.firstEventAt, fullResult.coverage.firstEventAt);
-eq("positions", seededResult.positions.length, fullResult.positions.length);
-
-const status = (p) =>
-  p.collateral > 1e-6 || BigInt(p.borrowSharesRaw) > ZERO ? "open" : p.everLiquidated ? "liquidated" : "closed";
-const byId = new Map(fullResult.positions.map((p) => [p.marketId, p]));
-const drawnDelta = [];
+check("the seeded replay has positions", seededResult.positions.length > 0, `${seededResult.positions.length}`);
 
 for (const s of seededResult.positions) {
-  const f = byId.get(s.marketId);
   const id = s.marketId.slice(0, 10);
-  if (!f) {
-    check(`${id} exists in the full replay`, false);
-    continue;
-  }
-  eq(`${id} collateralRaw`, s.collateralRaw, f.collateralRaw);
-  eq(`${id} borrowSharesRaw`, s.borrowSharesRaw, f.borrowSharesRaw);
-  eq(`${id} supplySharesRaw`, s.supplySharesRaw, f.supplySharesRaw);
-  eq(`${id} borrowed`, s.borrowed, f.borrowed);
-  eq(`${id} supplied`, s.supplied, f.supplied);
-  eq(`${id} collateral`, s.collateral, f.collateral);
-  eq(`${id} badDebt`, s.badDebt, f.badDebt);
-  eq(`${id} eventCount`, s.eventCount, f.eventCount);
-  eq(`${id} txCount`, s.txCount, f.txCount);
-  eq(`${id} liquidationCount`, s.liquidationCount, f.liquidationCount);
-  eq(`${id} everLiquidated`, s.everLiquidated, f.everLiquidated);
-  eq(`${id} firstBlock`, s.firstBlock, f.firstBlock);
-  eq(`${id} lastBlock`, s.lastBlock, f.lastBlock);
-  eq(`${id} firstEventAt`, s.firstEventAt, f.firstEventAt);
-  eq(`${id} lastTs`, s.lastTs, f.lastTs);
-  eq(`${id} status`, status(s), status(f));
-  if (!s.peaksPartial) {
-    eq(`${id} peakCollateral`, s.peakCollateral, f.peakCollateral);
-    eq(`${id} peakBorrowed`, s.peakBorrowed, f.peakBorrowed);
-  }
-  // The omission arithmetic on each side separately: whatever a side did not
-  // draw, it counted.
-  eq(`${id} seeded omission adds up`, (s.omitted?.count ?? 0) + s.events.length, s.eventCount);
-  eq(`${id} full omission adds up`, (f.omitted?.count ?? 0) + f.events.length, f.eventCount);
-  if (s.events.length !== f.events.length) {
-    drawnDelta.push(`${id} drew ${s.events.length} of the ${f.events.length} the full replay drew`);
-  } else {
-    eq(`${id} omitted.count`, s.omitted?.count ?? 0, f.omitted?.count ?? 0);
-    eq(`${id} omitted.upToBlock`, s.omitted?.upToBlock ?? 0, f.omitted?.upToBlock ?? 0);
-  }
-
-  // Every row BOTH drew must carry the same running figures.
-  const fEv = new Map(f.events.map((e) => [e.id, e]));
-  let shared = 0;
-  for (const e of s.events) {
-    const g = fEv.get(e.id);
-    if (!g) continue;
-    shared++;
-    const a = e.context.data;
-    const b = g.context.data;
-    eq(`${id} ${e.id.slice(0, 12)} collateralAfter`, a.collateralAfter, b.collateralAfter);
-    eq(`${id} ${e.id.slice(0, 12)} borrowedAfter`, a.borrowedAfter, b.borrowedAfter);
-    eq(`${id} ${e.id.slice(0, 12)} suppliedAfter`, a.suppliedAfter, b.suppliedAfter);
-    eq(`${id} ${e.id.slice(0, 12)} assetsDelta`, a.assetsDelta, b.assetsDelta);
-    eq(`${id} ${e.id.slice(0, 12)} sharesDelta`, a.sharesDelta, b.sharesDelta);
-    eq(`${id} ${e.id.slice(0, 12)} isOpen`, a.isOpen, b.isOpen);
-  }
-  // Every row the seeded side drew is a row the full replay drew too — the
-  // seeded side can only draw FEWER (a position whose newest rows sit before
-  // the cut), never a row the whole-history replay left out.
-  eq(`${id} every seeded drawn row is in the full replay`, shared, s.events.length);
+  // Whatever the seeded side did not draw, it counted.
+  check(
+    `${id} seeded omission adds up`,
+    (s.omitted?.count ?? 0) + s.events.length === s.eventCount,
+    `${s.omitted?.count ?? 0} omitted + ${s.events.length} drawn vs ${s.eventCount}`,
+  );
   // The seed carries the peaks (a window over the elided rows, rails-server
-  // api/src/routes/baseMorpho.ts), so the seeded position states them and
-  // the `eq` above holds them to the full replay's.
+  // api/src/routes/baseMorpho.ts).
   check(`${id} the seed carries the peaks`, s.peaksPartial !== true);
-}
-
-if (drawnDelta.length) {
-  console.log("\nDrawn-row differences (by design — the tail is one cut, so a position");
-  console.log("whose newest drawn rows sit before it states them as omitted instead):");
-  for (const d of drawnDelta) console.log(`  ${d}`);
 }
 
 console.log(`\n${failures === 0 ? "PASS" : "FAIL"} — ${checked - failures} of ${checked} assertions held`);

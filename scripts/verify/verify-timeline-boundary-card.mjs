@@ -240,6 +240,7 @@
 import { chromium } from "playwright";
 import { RECENT_QS, TIMELINE_WINDOW_ROWS } from "./_timeline-window.mjs";
 import { parseCountLine, LOADED_SPAN, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
+import { CLOSED_GROUP, openGroup } from "./lib/group-rows.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",")) : null;
@@ -310,13 +311,18 @@ const FIXTURES = [
   {
     id: "maple",
     arm: "window",
-    path: "/ethereum/maple/0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76",
+    // `folders=0` PINNED as on aave-v3 and spark: the default page is served
+    // in folders now (one folder of 25,000 events on 23 Oct 2026), and this
+    // arm is checked against the FLAT route.
+    path: "/ethereum/maple/0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76?folders=0",
     route: `/api/maple/timeline?wallet=0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76&${RECENT_QS}`,
   },
   {
     id: "compound-v3",
     arm: "window",
-    path: "/ethereum/compound-v3/usdc/0xe7f525dd1bc6d748ae4d7f21d31e54741e05e110",
+    // `folders=0` PINNED, as on Maple: served in folders by default (2,500
+    // rows holding 3,682 events on 23 Oct 2026), checked against the flat route.
+    path: "/ethereum/compound-v3/usdc/0xe7f525dd1bc6d748ae4d7f21d31e54741e05e110?folders=0",
     route: `/api/compound/timeline?market=usdc&wallet=0xe7f525dd1bc6d748ae4d7f21d31e54741e05e110&${RECENT_QS}`,
     afterOnly: true,
   },
@@ -331,13 +337,15 @@ const FIXTURES = [
   {
     id: "compound-v2",
     arm: "window",
-    path: "/ethereum/compound-v2/0xa2b47e3d5c44877cca798226b7b8118f9bfb7a56",
+    // `folders=0` PINNED: served by rows on its default page (23 Oct 2026).
+    path: "/ethereum/compound-v2/0xa2b47e3d5c44877cca798226b7b8118f9bfb7a56?folders=0",
     route: `/api/compound-v2/timeline?wallet=0xa2b47e3d5c44877cca798226b7b8118f9bfb7a56&${RECENT_QS}`,
   },
   {
     id: "morpho",
     arm: "window",
-    path: "/ethereum/morpho/b8fc70e82bc5bb53e773626fcc6a23f7eefa036918d7ef216ecfb1950a94a85e-0xb8a451107a9f87fde481d4d686247d6e43ed715e",
+    // `folders=0` PINNED: served in folders on its default page (23 Oct 2026).
+    path: "/ethereum/morpho/b8fc70e82bc5bb53e773626fcc6a23f7eefa036918d7ef216ecfb1950a94a85e-0xb8a451107a9f87fde481d4d686247d6e43ed715e?folders=0",
     afterOnly: true,
   },
   // Base gated (whole-life replay, newest rows drawn). The Aave-family pages
@@ -444,6 +452,9 @@ const FIXTURES = [
     tail: true,
     path: "/base/compound-v3/aero/0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6?folders=0",
     route: "/api/chain/compound-base/timeline?wallet=0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6",
+    // The route is wallet-wide; the page draws one market since a94f4109, so
+    // the market cuts are read for aero alone (weth's 123,742 is not this page's).
+    view: (j) => ({ ...j, markets: (j.markets ?? []).filter((m) => m.market === "aero") }),
   },
   {
     id: "morpho-base",
@@ -547,14 +558,15 @@ const RETIRED = [
   "This list is capped",
 ];
 
-/** Light theme, run-collapsing off — set before any script of the page runs. */
+/** Light theme — set before any script of the page runs. */
 const INIT = `
   try {
     const k = "timeline-display-v3";
     const cur = JSON.parse(localStorage.getItem(k) || "{}");
-    // Run-collapsing off, so every row's pill is in the DOM (a collapsed run
-    // draws one row for its members and no member pills).
-    localStorage.setItem(k, JSON.stringify({ ...cur, collapseRuns: false }));
+    // No collapseRuns: 81662167 (12 Oct 2026) dropped the switch, and like
+    // events always settle into groups; the reads below take a group's
+    // numbers off its bracket ends.
+    localStorage.setItem(k, JSON.stringify(cur));
     localStorage.setItem("theme", "light");
   } catch {}
 `;
@@ -653,7 +665,7 @@ async function settle(page) {
  *  of rows the index grouped. The grammar of the line itself is
  *  `parseCountLine` in `scripts/lib/timeline-draw.mjs`, one copy for every
  *  verifier that reads it. */
-function readCounts(line, marker) {
+function readCounts(line, marker, servedRows = marker?.unit === "rows") {
   const parsed = parseCountLine(line ?? "");
   if (!parsed) return null;
   // A whole history states its total and stops; a page holding part of one
@@ -667,13 +679,20 @@ function readCounts(line, marker) {
   // span, which reads like a whole history and is the opposite of one. Falling
   // back to the total there made check 2 read a shortfall of nought and check
   // 6 read the cut as overshot by the length of the life.
-  const listed = marker?.loaded ?? parsed.listed ?? (whole ? parsed.total : null);
+  //
+  // Like events settle into groups since 81662167 (12 Oct 2026), and the
+  // marker then counts a group as one row. Where the unit is events, the
+  // events the page holds are read off the drawn rows instead: each loose
+  // card one, each closed group its member count (`marker.events`, taken once
+  // `settle()` has drawn every loaded row).
+  const eventsHeld = !servedRows && marker?.groups > 0 ? marker.events : null;
+  const listed = eventsHeld ?? marker?.loaded ?? parsed.listed ?? (whole ? parsed.total : null);
   return {
     listed,
     total: parsed.total,
     floor: parsed.totalIsFloor,
     span: parsed.span,
-    rows: marker?.unit === "rows",
+    rows: eventsHeld == null && marker?.unit === "rows",
     whole,
     cutForm: !whole,
   };
@@ -719,6 +738,39 @@ async function openSmallPrint(page) {
 
 async function readPage(page) {
   await openSmallPrint(page);
+  const r = await readPageTab(page);
+  // The card's state lines and Span box sit on its Figures tab (the
+  // Explanation tab, open at rest, holds the small print), so they are read
+  // after a press on it.
+  if (r.cardsOnPage > 0) {
+    const tab = page.locator('[data-figure="timeline-boundary"] [role="tab"]', { hasText: "Figures" }).first();
+    if ((await tab.count()) > 0) {
+      for (let i = 0; i < 3; i++) {
+        await tab.click().catch(() => {});
+        const on = await page
+          .waitForFunction(
+            () =>
+              document
+                .querySelector('[data-figure="timeline-boundary"] [role="tab"][aria-selected="true"]')
+                ?.textContent?.trim() === "Figures",
+            null,
+            { timeout: 5000 },
+          )
+          .then(() => true)
+          .catch(() => false);
+        if (on) break;
+      }
+      await page.waitForTimeout(300);
+      const fig = await readPageTab(page);
+      r.state = fig.state;
+      r.spanBox = fig.spanBox;
+      r.figText = fig.cardText;
+    }
+  }
+  return r;
+}
+
+async function readPageTab(page) {
   return page.evaluate(() => {
     // Scoped to the FIRST timeline on the page: a wallet on two Comets draws
     // one timeline per market, each with its own toolbar, pills and card.
@@ -759,6 +811,15 @@ async function readPage(page) {
     const rowsEl = anchor
       ? anchor.closest("[data-timeline-rows-loaded]")
       : document.querySelector("[data-timeline-rows-loaded]");
+    // A closed group draws no member cards: its count is its label's ("48
+    // supplies, …"), and its bracket ends carry its first and last numbers.
+    const closedGroups = [...root.querySelectorAll('[data-group-frame="closed"]')];
+    const groupSize = (g) => {
+      const label = g.querySelector('[role="button"][aria-expanded][aria-label]')?.getAttribute("aria-label") ?? "";
+      return Number((/^([\d,]+) /.exec(label)?.[1] ?? "0").replace(/,/g, ""));
+    };
+    const groupEvents = closedGroups.reduce((a, g) => a + groupSize(g), 0);
+    const looseCards = root.querySelectorAll("[data-event-id]").length;
     const stateEl = rowsEl?.querySelector("[data-timeline-total]") ?? null;
     const marker = rowsEl
       ? {
@@ -766,6 +827,8 @@ async function readPage(page) {
           drawn: Number(rowsEl.getAttribute("data-timeline-rows-drawn")),
           unit: stateEl?.getAttribute("data-timeline-unit") ?? null,
           total: stateEl?.getAttribute("data-timeline-total") ?? null,
+          groups: closedGroups.length,
+          events: looseCards + groupEvents,
         }
       : null;
     let label = null,
@@ -785,11 +848,18 @@ async function readPage(page) {
       position = kids.indexOf(anchor);
     }
     if (card) {
-      label = card.querySelector(".text-sm.font-medium")?.textContent?.trim() ?? null;
+      // The count stands in the card's number column (`data-boundary-count`,
+      // aria-label "+N earlier events"); the heading slot holds the tabs now.
+      label =
+        card.querySelector("[data-boundary-count]")?.getAttribute("aria-label")?.trim() ??
+        card.querySelector(".text-sm.font-medium")?.textContent?.trim() ??
+        null;
       rangePill = card.querySelector("[data-boundary-range]")?.getAttribute("data-boundary-range") ?? null;
-      state = [...card.querySelectorAll("dd[title]")].map((dd) => ({
+      // A state line's figure: the dd's title where it carries one, else its
+      // text (the tip opens on a press since aa0ea5ed).
+      state = [...card.querySelectorAll("dl dd")].map((dd) => ({
         label: dd.previousElementSibling?.textContent?.trim() ?? "",
-        title: dd.getAttribute("title") ?? "",
+        title: dd.getAttribute("title") ?? /[\d.,]+/.exec(dd.textContent ?? "")?.[0]?.replace(/,/g, "") ?? "",
       }));
       offerInCard = (card.textContent.match(/(?:complete timeline|produce it) on/g) ?? []).length;
       smallPrint = card.textContent ?? "";
@@ -807,7 +877,11 @@ async function readPage(page) {
       siblings = kids.length;
       position = kids.indexOf(card);
     }
-    const pills = [...root.querySelectorAll("[data-event-number]")].map((s) => Number(s.textContent));
+    const pills = [
+      ...[...root.querySelectorAll("[data-event-number]")].map((s) => Number(s.textContent)),
+      // A closed group's numbers stand on its bracket ends (group-frame.tsx).
+      ...[...root.querySelectorAll("[data-group-range] .num-pill")].map((s) => Number(s.textContent)),
+    ];
     const body = document.body.textContent ?? "";
     const wrap = document.querySelector("[data-vault-timeline-rows]");
     // Any control past the cut: the retired toolbar cloud (aria-labelled
@@ -822,11 +896,15 @@ async function readPage(page) {
         /^Load [\d,]+ earlier events?$/.test(t)
       );
     }).length;
-    const firstRow = root.querySelector("[data-event-id]");
+    const firstRow = root.querySelector('[data-event-id], [data-group-frame="closed"]');
     const tipDots = [...root.querySelectorAll("[data-spine-tip]")];
     // A note gap in the head slot (item 118's markers) draws the tip's dot
     // itself, so it counts as the list's first row.
-    const tipRows = [...root.querySelectorAll("[data-event-id], [data-market-note], [data-note-gap]")];
+    // A closed group is a row too, and the newest event is often one of its
+    // members: the dot then stands in the group's row.
+    const tipRows = [
+      ...root.querySelectorAll('[data-event-id], [data-group-frame="closed"], [data-market-note], [data-note-gap]'),
+    ];
     const tip = {
       dots: tipDots.length,
       rows: tipRows.length,
@@ -838,25 +916,40 @@ async function readPage(page) {
         tipDots[0].closest('[data-figure="timeline-boundary"], [data-figure="timeline-boundary-row"]') != null,
       side: tipDots[0]?.getAttribute("data-spine-tip") ?? null,
     };
-    const liqBadge = document.querySelector('[aria-label^="Liquidated "]')?.getAttribute("aria-label") ?? null;
+    // LiquidatedBadge names itself through RevealTip's label ("Liquidated 9
+    // times"), which is the tip's text now rather than an aria-label.
+    const liqBadge =
+      document.querySelector('[aria-label^="Liquidated "]')?.getAttribute("aria-label") ??
+      [...document.querySelectorAll("span")]
+        .map((e) => (e.textContent ?? "").trim())
+        .find((t) => /^Liquidated [\d,]+ times?$/.test(t)) ??
+      null;
     // OPEN OR CLOSED, in the page's own words. The tenure eyebrow reads
     // "Active since <date>" on a live position and "Opened <date>" on a closed
     // one (TimelineActivityHeader), and since 2026-09-11 the pulsing tip dot
     // is withheld from a closed position — a dot on a position that ended is a
     // claim that it is still running. Neither phrase found is not "open": it
     // is a page this check cannot read, and it is reported as one.
-    const eyebrow = [...document.querySelectorAll("span, button")]
-      .map((e) => (e.textContent ?? "").trim())
-      .find((t) => /^(Active since|Opened) /.test(t) || t === "Active since —" || t === "Opened —");
-    const tenure = eyebrow == null ? null : /^Opened/.test(eyebrow) ? "closed" : "open";
+    //
+    // A family can name its open state in place of "Active" (`labelTenure`:
+    // Maple's "In the pool since …"), so the heading is read off its own
+    // hook, `data-timeline-activity-head`, where it has one; a closed
+    // position's reads "Opened …" or "Open for …".
+    const headEl = document.querySelector("[data-timeline-activity-head]");
+    const eyebrow = headEl
+      ? (headEl.textContent ?? "").trim()
+      : [...document.querySelectorAll("span, button")]
+          .map((e) => (e.textContent ?? "").trim())
+          .find((t) => /^(Active since|Opened) /.test(t) || t === "Active since —" || t === "Opened —");
+    const tenure = eyebrow == null || eyebrow === "" ? null : /^(Opened|Open for)\b/.test(eyebrow) ? "closed" : "open";
     return {
       line,
       marker,
       cards: root === document ? cards.length : root.querySelectorAll('[data-figure="timeline-boundary"]').length,
       cardsOnPage: cards.length,
       cutRows: root === document ? cutRows.length : root.querySelectorAll('[data-boundary-row="cut"]').length,
-      /** Drawn event rows. Zero is the shape where the card still stands. */
-      rowCount: root.querySelectorAll("[data-event-id]").length,
+      /** Drawn rows, a closed group one. Zero is the shape where the card still stands. */
+      rowCount: looseCards + closedGroups.length,
       /** Served folders (a grouped page): one group frame each since ui-jobs 250. */
       folderRows: root.querySelectorAll("[data-group-frame]").length,
       label,
@@ -872,6 +965,7 @@ async function readPage(page) {
       pills,
       capControls,
       firstRowId: firstRow?.getAttribute("data-event-id") ?? null,
+      firstRowIsGroup: firstRow?.hasAttribute("data-group-frame") ?? false,
       tip,
       liqBadge,
       tenure,
@@ -949,8 +1043,9 @@ const routeCache = new Map();
 const NO_ANCHOR = { anchored: undefined, complete: undefined };
 async function anchoredOf(f, said) {
   if (!routeCache.has(f.route)) routeCache.set(f.route, await getJson(f.route));
-  const json = routeCache.get(f.route);
-  if (!json || json.error) return NO_ANCHOR;
+  const raw = routeCache.get(f.route);
+  if (!raw || raw.error) return NO_ANCHOR;
+  const json = f.view ? f.view(raw) : raw;
   const groups = f.grouped ? (json.positions ?? []) : json.markets?.length ? json.markets : [json];
   const om = groups.map((p) => p.omitted ?? p.coverage?.omitted).filter((o) => o && o.count > 0);
   const o = om.find((o) => o.count === said) ?? om[0];
@@ -1046,7 +1141,9 @@ for (const f of FIXTURES) {
     await page.goto(`${BASE}${f.path}`, { waitUntil: "domcontentloaded" });
     const presses = await settle(page);
     const r = await readPage(page);
-    const counts = readCounts(r.line, r.marker);
+    // The grouped arm counts the rows its route served (check 3); every other
+    // arm counts events, a client group's members included.
+    const counts = readCounts(r.line, r.marker, f.arm === "grouped");
     // A VAULT HOLDER PAGE HAS NO OPEN/CLOSED CONCEPT, so the tip rule that
     // withholds the dot from a closed position does not reach it — `f1027e1f`
     // left those two call sites unthreaded deliberately, because whether a
@@ -1403,6 +1500,7 @@ for (const f of FIXTURES) {
       }
     } else if (f.arm === "base" && f.route) {
       routeJson = routeCache.get(f.route) ?? (await getJson(f.route));
+      if (f.view && !routeJson.error) routeJson = f.view(routeJson);
       const json = routeJson;
       // 12 — the pills sum to the count, on every cut this route states.
       checkHistograms(f, json);
@@ -1498,10 +1596,26 @@ for (const f of FIXTURES) {
           hash.length > 0 && newest.hasHash(hash),
           `listing ${hash.slice(0, 12)}…, route id ${String(newest.id).slice(0, 20)}…`,
         );
+        // The first row can be a closed group holding the newest event (like
+        // events settle into groups since 81662167): open it and read its
+        // first member.
+        let firstId = r.firstRowId;
+        if (r.firstRowIsGroup) {
+          const frame = page.locator(CLOSED_GROUP).first();
+          const handle = await frame.elementHandle();
+          if (handle && (await openGroup(page, frame, { allMembers: false }))) {
+            await page
+              .waitForFunction((el) => el.querySelector("[data-event-id]") != null, handle, { timeout: 60_000 })
+              .catch(() => {});
+            firstId = await handle.evaluate(
+              (el) => el.querySelector("[data-event-id]")?.getAttribute("data-event-id") ?? null,
+            );
+          }
+        }
         check(
-          `8  ${f.id}: the page's first row is that event`,
-          r.firstRowId != null && r.firstRowId === newest.id,
-          `page ${r.firstRowId?.slice(0, 20) ?? "?"}…, route ${String(newest.id).slice(0, 20)}…`,
+          `8  ${f.id}: the page's first row is that event${r.firstRowIsGroup ? " (the first member of its newest group)" : ""}`,
+          firstId != null && firstId === newest.id,
+          `page ${firstId?.slice(0, 20) ?? "?"}…, route ${String(newest.id).slice(0, 20)}…`,
         );
       }
     }
@@ -1549,7 +1663,9 @@ for (const f of FIXTURES) {
       info(`13 ${f.id}: no span to read — the card is withdrawn from a drawn list`, `${r.cutRows} bare row(s)`);
     } else {
       const rowSpans = (r.cardText.match(/\d{1,2} \w{3,4} '\d{2} – \d{1,2} \w{3,4} '\d{2}/g) ?? []).length;
-      const longSpans = (r.cardText.match(/\d{1,2} \w{3,4} \d{4} – \d{1,2} \w{3,4} \d{4}/g) ?? []).length;
+      const longSpans = (
+        `${r.cardText}\n${r.figText ?? ""}`.match(/\d{1,2} \w{3,4} \d{4} – \d{1,2} \w{3,4} \d{4}/g) ?? []
+      ).length;
       const box = r.spanBox?.match(/^(\d[\d,]*) days?$/) ?? null;
       // A card that knows both dates draws the Span box; one that knows the
       // cut date alone draws neither the pair nor the box.
