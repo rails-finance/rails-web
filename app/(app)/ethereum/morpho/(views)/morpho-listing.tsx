@@ -103,7 +103,7 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
   const [filters, setFilters] = useState<MorphoListFilters>(MORPHO_LIST_DEFAULTS);
   const roster = useMorphoRoster(!market);
   const truncation = market ? null : morphoSearchTruncation(filters, roster);
-  // The roster route is absent until the backend half is deployed, and a name
+  // The roster can be unavailable (the backend failed to answer), and a name
   // search or a token facet cannot be expressed without it. Those selections
   // resolve to an empty result rather than to an unfiltered page — so the reason
   // is stated, else "No positions match these filters." would read as a fact

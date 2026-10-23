@@ -18,7 +18,7 @@
 import { fetchStore } from "@/lib/sources/api/arbitrum-store-read";
 import { throwIfOverBudget } from "@/lib/api/api-over-budget";
 import type { AuthCallOptions } from "@/lib/api/fetch-with-auth";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { replayMorphoRows, type MorphoChainTimelineResult } from "@/lib/sources/chain/morpho-blue-events";
 import { decodeMorphoIndexRows } from "@/lib/sources/api/morpho-base-timeline";
 import { MORPHO_ARBITRUM_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
@@ -63,7 +63,7 @@ export async function loadMorphoArbitrumTimeline(
     wallet: w,
     deployment: MORPHO_ARBITRUM_DEPLOYMENT,
     rows,
-    maxRendered: TIMELINE_WINDOW_EVENTS,
+    maxRendered: TIMELINE_WINDOW_ROWS,
     // The anchor draws every row the wallet signed from below the cut, and
     // decides that by the sender; while the validator has not filled every
     // `tx_from`, the cut is a plain depth cut instead.

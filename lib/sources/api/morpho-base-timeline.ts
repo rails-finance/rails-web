@@ -37,7 +37,7 @@
 // SERVER-ONLY.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
 import {
   replayMorphoRows,
@@ -146,7 +146,7 @@ const ZERO = BigInt(0);
  *  each drawn row costs it a timestamp and a sender read; the index pays
  *  neither, so this is a payload ceiling only. The replay still runs over
  *  every row and each position's coverage states its omission. */
-const MAX_RENDERED_EVENTS = TIMELINE_WINDOW_EVENTS;
+const MAX_RENDERED_EVENTS = TIMELINE_WINDOW_ROWS;
 
 export interface LoadMorphoIndexParams {
   wallet: string;

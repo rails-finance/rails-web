@@ -954,7 +954,7 @@ function ChainTruthTimelineBody({
   //
   // What neither path reaches is an event below the page's window: the
   // per-event reads are windowed like the position page (the aave family's
-  // pass `recent: TIMELINE_WINDOW_EVENTS`), and the folder route refuses a key
+  // pass `recent: TIMELINE_WINDOW_ROWS`), and the folder route refuses a key
   // below the window. That is a stated miss and the notice says so.
   const pinnedServed = pinnedId ? tl.sortedEvents.find((e) => e.id === pinnedId) : undefined;
   // undefined: not asked yet, or in flight. null: the route refused the key.

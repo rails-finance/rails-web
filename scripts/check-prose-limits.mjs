@@ -727,9 +727,9 @@ function contentFiles() {
     .map((e) => ({ family: e.name, rel: `content/${e.name}/event-prose.yaml` }));
 }
 
-/** FAQ id -> url, from components/transaction-timeline/explanation/shared/faqUrls.ts. */
+/** FAQ id -> url, from lib/shared/faq-urls.ts. */
 function faqTable() {
-  const rel = "components/transaction-timeline/explanation/shared/faqUrls.ts";
+  const rel = "lib/shared/faq-urls.ts";
   if (!existsSync(join(ROOT, rel))) return {};
   const src = read(rel);
   const out = {};
@@ -1008,7 +1008,7 @@ function linkChecks(parsed) {
   // of the nearest preceding official-docs link (heuristic).
   const files = [
     "lib/shared/learn-more-content.ts",
-    "components/transaction-timeline/explanation/shared/faqUrls.ts",
+    "lib/shared/faq-urls.ts",
     ...(existsSync(join(ROOT, "lib"))
       ? readdirSync(join(ROOT, "lib"), { withFileTypes: true })
           .filter((e) => e.isDirectory())

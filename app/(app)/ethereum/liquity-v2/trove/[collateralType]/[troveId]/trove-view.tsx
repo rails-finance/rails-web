@@ -39,7 +39,7 @@ import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state";
 import { troveExports } from "@/components/trove/TroveExportMenu";
 import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
@@ -158,7 +158,7 @@ export default function TroveView({
 
       const [troveResponse, timelineResult, pricesResult] = await Promise.all([
         fetch(trovesUrl),
-        fetchTroveTimeline({ collateralType, troveId, limit: TIMELINE_WINDOW_EVENTS }).catch((err) => {
+        fetchTroveTimeline({ collateralType, troveId, limit: TIMELINE_WINDOW_ROWS }).catch((err) => {
           console.error("Failed to fetch trove timeline:", err);
           return null;
         }),

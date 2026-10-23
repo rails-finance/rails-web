@@ -33,7 +33,7 @@ import {
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -144,7 +144,7 @@ export default function CompoundV2PositionView({
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
           fetchCompoundV2Positions({ wallet, limit: 1 }),
-          asked ? null : fetchCompoundV2Timeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchCompoundV2Timeline(wallet, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchCompoundV2GroupedTimeline(wallet) : null,
         ]);
         const tData = grouped ?? flat;

@@ -37,7 +37,7 @@ import { fetchAaveV3Timeline } from "@/lib/api/fetch-aave-v3-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -221,7 +221,7 @@ export default function AaveV3PositionDetail({
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
           fetchAaveV3Positions({ wallet, market, limit: 1 }),
-          asked ? null : fetchAaveV3Timeline({ wallet, market, recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchAaveV3Timeline({ wallet, market, recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchAaveV3GroupedTimeline({ wallet, market }) : null,
         ]);
         const tData = grouped ?? flat;

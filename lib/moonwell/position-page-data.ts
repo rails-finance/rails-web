@@ -12,7 +12,7 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
 import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
 import { readMoonwellOpeningBalance, readMoonwellPositions, readMoonwellTimeline } from "@/lib/moonwell/proxy-reads";
@@ -30,7 +30,7 @@ export const loadMoonwellPositionTail = cache(async (wallet: string) => {
       ),
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<MoonwellTimelineResult>(
-        await readMoonwellTimeline(new URLSearchParams({ wallet, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+        await readMoonwellTimeline(new URLSearchParams({ wallet, recent: String(TIMELINE_WINDOW_ROWS) }), {
           baseUrl,
           headers,
         }),

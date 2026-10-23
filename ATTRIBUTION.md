@@ -9,7 +9,7 @@ Logos of the tokens the site names, used to identify them in token chips.
 
 - 93 address-named files (`0x….png`) were fetched from CoinGecko's coin image endpoint by
   `scripts/audit-token-icons.mjs`.
-- 30 symbol-named files (`usdc.png`, `weth.png`, …) were added by hand.
+- 43 symbol-named files (`usdc.png`, `weth.png`, …) were added by hand.
 - At request time the chip (`components/shared/token-chip-icon.tsx`) falls back to Trust
   Wallet's assets repository and DefiLlama's icon service for marks not held here.
 

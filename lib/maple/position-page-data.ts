@@ -23,7 +23,7 @@ import { answerBody, answerTimeline } from "@/lib/shared/proxy-answer";
 import { readMapleOpeningBalance, readMaplePositions, readMapleTimeline } from "@/lib/maple/proxy-reads";
 import type { MaplePositionsResult } from "@/lib/api/fetch-maple-positions";
 import type { MapleGroupedTimelineResult, MapleTimelineResponse } from "@/lib/api/fetch-maple-timeline";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
 /**
  * ONE timeline read, whichever shape the URL asked for — the SparkLend and
@@ -51,7 +51,7 @@ export const loadMaplePositionTail = cache(async (wallet: string, grouped: boole
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<MapleTimelineResponse | MapleGroupedTimelineResult>(
         await readMapleTimeline(
-          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_EVENTS) }),
+          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_ROWS) }),
           { baseUrl, headers },
         ),
         "readMapleTimeline",

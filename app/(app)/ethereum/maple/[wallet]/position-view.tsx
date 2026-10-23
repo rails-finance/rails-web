@@ -25,7 +25,7 @@ import {
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -178,7 +178,7 @@ export default function MaplePositionView({
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
           fetchMaplePositions({ wallet, limit: 1, status: undefined }),
-          asked ? null : fetchMapleTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchMapleTimeline(wallet, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchMapleGroupedTimeline(wallet) : null,
         ]);
         const tData = grouped ?? flat;

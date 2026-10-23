@@ -30,7 +30,7 @@ import { readMakerOpeningBalance, readMakerTimeline, readMakerVaults } from "@/l
 import type { MakerGroupedTimelineResult } from "@/lib/api/fetch-makerdao-timeline";
 import type { MakerTimelineResult } from "@/lib/sources/api/makerdao-timeline";
 import { loadMakerVaultStateFromChain } from "@/lib/sources/chain/makerdao-position";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import type { MakerVaultState } from "@/lib/sources/chain/makerdao-position";
 
@@ -80,7 +80,7 @@ export const loadMakerVaultTail = cache(async (vault: string, grouped: boolean =
       answerTimeline<MakerTimelineResult | MakerGroupedTimelineResult>(
         await readMakerTimeline(
           vault,
-          new URLSearchParams(grouped ? { group: "1" } : { recent: String(TIMELINE_WINDOW_EVENTS) }),
+          new URLSearchParams(grouped ? { group: "1" } : { recent: String(TIMELINE_WINDOW_ROWS) }),
           { baseUrl, headers },
         ),
         "readMakerTimeline",

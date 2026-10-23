@@ -1,6 +1,6 @@
 "use client";
 
-import { useHover, ValueType, ValueState } from "../context/HoverContext";
+import { useHover, ValueType, ValueState } from "./hover-context";
 
 // Value types that are ALSO surfaced on the position card's main stat area
 // (the headline grid + identity row). Per the highlight rule — see <V> in

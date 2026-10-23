@@ -23,7 +23,7 @@ import {
 import type { CompoundPositionsResult } from "@/lib/api/fetch-compound-positions";
 import type { CompoundGroupedTimelineResult } from "@/lib/api/fetch-compound-timeline";
 import type { CompoundTimelineResult } from "@/lib/sources/api/compound-timeline";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
 /**
  * ONE timeline read, whichever shape the URL asked for — the SparkLend and
@@ -55,7 +55,7 @@ export const loadCompoundPositionTail = cache(async (wallet: string, market: str
       answerTimeline<CompoundTimelineResult | CompoundGroupedTimelineResult>(
         await readCompoundTimeline(
           new URLSearchParams(
-            grouped ? { wallet, market, group: "1" } : { wallet, market, recent: String(TIMELINE_WINDOW_EVENTS) },
+            grouped ? { wallet, market, group: "1" } : { wallet, market, recent: String(TIMELINE_WINDOW_ROWS) },
           ),
           { baseUrl, headers },
         ),

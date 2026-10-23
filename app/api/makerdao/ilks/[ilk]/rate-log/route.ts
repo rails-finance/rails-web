@@ -43,8 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       createAuthFetchOptions(undefined, readerIp),
     );
     if (!response.ok) {
-      // Includes the 400 an unknown collateral type answers with, and the 404
-      // this route answers with until the backend half is deployed. The vault
+      // Includes the 400 an unknown collateral type answers with. The vault
       // page treats any failure as "no rate log" and renders without notes —
       // never a note built on a guessed fee.
       console.error(`Backend API error: ${response.status} ${response.statusText}`);

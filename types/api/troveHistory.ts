@@ -233,11 +233,3 @@ export interface TransactionTimeline {
     hasMore: boolean;
   };
 }
-
-// ============================================
-// TYPE GUARDS
-// ============================================
-
-export function isTroveTransaction(tx: Transaction): tx is TroveTransaction {
-  return tx.type === "trove";
-}

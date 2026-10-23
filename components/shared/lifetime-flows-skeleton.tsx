@@ -18,7 +18,7 @@
 // to 10.5 s past 40,000 (Maple, Compound V2), where the browser reads the
 // whole history.
 
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import type { LifeCount } from "@/lib/shared/life-count-store";
 
 const BLOCK = "rounded-md bg-rb-300/70 dark:bg-rb-700/60";
@@ -33,7 +33,7 @@ export function flowsWaitingLine(count: LifeCount | null): string {
 /** The activity bar and the lines over the skeleton; aria-hidden, since the
  *  panel's status line says the same to a screen reader. */
 export function LifetimeFlowsWaiting({ count }: { count: LifeCount | null }) {
-  const large = count != null && count.n > TIMELINE_WINDOW_EVENTS;
+  const large = count != null && count.n > TIMELINE_WINDOW_ROWS;
   return (
     <div
       className="pointer-events-none absolute inset-x-0 top-[28%] flex justify-center px-4"

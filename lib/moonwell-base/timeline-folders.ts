@@ -20,7 +20,7 @@
 // register that draws it is `MOONWELL_FOLDER_REGISTER` beside the spec.
 //
 // THE CUT. Grouped, a position's whole replayed history is served as rows up to
-// the shared row cap (`TIMELINE_WINDOW_EVENTS`), trimmed from the oldest end at
+// the shared row cap (`TIMELINE_WINDOW_ROWS`), trimmed from the oldest end at
 // a block boundary; a month below it is sliced from the same replay
 // (`?from=&to=`, lib/shared/replay-grouped-answer.ts). Past the cap the replay runs a second time with the anchor
 // OFF and its render cut at the trim, so `coverage.omitted` — the boundary
@@ -40,7 +40,7 @@ import {
   replayGroupedBody,
   type ReplayGroupedAnswer,
 } from "@/lib/shared/replay-grouped-answer";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { externalActor } from "@/lib/shared/external-actor";
 import { getEventActionKey, getEventAssetKeys, getEventCounterpartyKeys } from "@/lib/shared/event-filter-helpers";
 import { isThirdParty } from "@/lib/moonwell/timeline-membership";
@@ -282,7 +282,7 @@ export function groupMoonwellReplay(
 function groupReplayed(
   r: MoonwellReplayed,
   span: { from: number; to: number } | null,
-  cap: number = TIMELINE_WINDOW_EVENTS,
+  cap: number = TIMELINE_WINDOW_ROWS,
 ): MoonwellGroupedAnswer {
   if (span)
     return groupReplaySpan({

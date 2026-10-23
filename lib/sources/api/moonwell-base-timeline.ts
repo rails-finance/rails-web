@@ -66,7 +66,7 @@
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { timelineFillFromApi } from "@/lib/api/fetch-chain-timeline";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
 import {
   marketMapFromRoster,
@@ -187,7 +187,7 @@ const SEED_VERSION = 1;
  *  lifetime flows, peaks and positions are already whole), so raising it is
  *  never a correctness fix — the per-event pages raise it to read a pinned
  *  card's row wherever it sits (`LoadMoonwellIndexParams.maxRendered`). */
-export const DEFAULT_MAX_RENDERED_EVENTS = TIMELINE_WINDOW_EVENTS;
+export const DEFAULT_MAX_RENDERED_EVENTS = TIMELINE_WINDOW_ROWS;
 
 export interface LoadMoonwellIndexParams {
   wallet: string;

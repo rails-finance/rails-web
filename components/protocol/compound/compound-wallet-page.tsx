@@ -78,7 +78,7 @@ import { CompoundBalanceReadProvider, type CompoundBalanceRead } from "@/compone
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { eventsBelowLife, replaySegmentReads } from "@/lib/api/fetch-replay-segment";
 import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
-import { TIMELINE_WINDOW_EVENTS, WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
 import {
   interleaveRowPlan,
   servedFoldersEnabled,
@@ -244,7 +244,7 @@ function MarketSection({
     // states its real total (rails-ops decision 0019).
     olderCount: replay?.omitted?.count ?? 0,
     historyWindow: WHOLE_HISTORY,
-    spanCap: rows ? TIMELINE_WINDOW_EVENTS : null,
+    spanCap: rows ? TIMELINE_WINDOW_ROWS : null,
     isEvent: isCompoundEvent,
     readGrouped: segmentReads.readGrouped,
     readFlat: segmentReads.readFlat,

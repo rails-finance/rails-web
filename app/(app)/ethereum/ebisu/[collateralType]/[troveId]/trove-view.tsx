@@ -49,7 +49,7 @@ import {
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -169,7 +169,7 @@ export default function EbisuTroveDetail({
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
           fetchEbisuTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
-          asked ? null : fetchEbisuTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchEbisuTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchEbisuGroupedTimeline(collateralType, troveId) : null,
         ]);
         const tData = grouped ?? flat;

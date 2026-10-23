@@ -30,7 +30,7 @@ import {
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -226,7 +226,7 @@ export default function MakerVaultDetailView({
         const [chainRes, vData, flat, grouped] = await Promise.all([
           fetch(`/api/chain/makerdao/vault/${encodeURIComponent(vault)}`).catch(() => null),
           fetchMakerVaults(isUrnAddr ? { urn: vault, limit: 1 } : { cdpId: vault, limit: 1 }),
-          asked ? null : fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchMakerGroupedTimeline(vault) : null,
         ]);
         const tData = grouped ?? flat;

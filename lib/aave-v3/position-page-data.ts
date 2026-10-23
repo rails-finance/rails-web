@@ -17,7 +17,7 @@ import { answerBody, answerTimeline } from "@/lib/shared/proxy-answer";
 import { readAaveV3OpeningBalance, readAaveV3Positions, readAaveV3Timeline } from "@/lib/aave-v3/proxy-reads";
 import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import type { AaveV3TimelineResponse, AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { AaveV3MarketKey } from "@/lib/aave-v3/asset-catalog";
 
 /**
@@ -59,7 +59,7 @@ export const loadAaveV3PositionTail = cache(
         answerTimeline<AaveV3TimelineResponse | AaveV3GroupedTimelineResponse>(
           await readAaveV3Timeline(
             new URLSearchParams(
-              grouped ? { wallet, market, group: "1" } : { wallet, market, recent: String(TIMELINE_WINDOW_EVENTS) },
+              grouped ? { wallet, market, group: "1" } : { wallet, market, recent: String(TIMELINE_WINDOW_ROWS) },
             ),
             { baseUrl, headers },
           ),

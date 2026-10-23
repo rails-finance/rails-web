@@ -32,7 +32,7 @@ import { fetchFrankencoinTimeline } from "@/lib/api/fetch-frankencoin-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -151,7 +151,7 @@ export default function FrankencoinPositionView({
       try {
         const [pData, tData] = await Promise.all([
           fetchFrankencoinPositions({ position, limit: 1 }),
-          fetchFrankencoinTimeline(position, { recent: TIMELINE_WINDOW_EVENTS }),
+          fetchFrankencoinTimeline(position, { recent: TIMELINE_WINDOW_ROWS }),
         ]);
         if (!cancelled) {
           setSummary(pData.data[0] ?? null);

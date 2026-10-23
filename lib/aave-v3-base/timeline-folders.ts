@@ -34,7 +34,7 @@ import {
   type GroupingNetLegEntry,
   type GroupingSpec,
 } from "@/lib/shared/timeline-grouping";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { externalActor } from "@/lib/shared/external-actor";
 import { getEventActionKey, getEventAssetKeys, getEventCounterpartyKeys } from "@/lib/shared/event-filter-helpers";
 import {
@@ -305,7 +305,7 @@ export function groupAaveV3BaseReplay(
   span: { from: number; to: number } | null,
   opts: { cap?: number } = {},
 ): AaveV3BaseGroupedAnswer {
-  const cap = opts.cap ?? TIMELINE_WINDOW_EVENTS;
+  const cap = opts.cap ?? TIMELINE_WINDOW_ROWS;
   if (span)
     return groupReplaySpan({
       full: r.full,

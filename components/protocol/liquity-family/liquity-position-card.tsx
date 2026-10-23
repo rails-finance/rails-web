@@ -47,7 +47,7 @@ import {
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { UserGlyph } from "@/components/shared/rate-pill";
-import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
+import { HighlightableValue } from "@/components/shared/highlightable-value";
 import { FadeNumber } from "@/components/ui/FadeNumber";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";

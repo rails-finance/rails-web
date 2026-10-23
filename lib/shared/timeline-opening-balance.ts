@@ -80,18 +80,11 @@
  *  below the line, which is exactly what a budget must never do
  *  (`rails-ops/reference/timeline-attention-budget.md`).
  *
- *  `TIMELINE_WINDOW_ROWS` is that name and is what new code takes.
- *  `TIMELINE_WINDOW_EVENTS` stays beside it, DEPRECATED, with its call sites
- *  untouched: the arms that still serve events read the same number, the
- *  rollout is one family at a time, and renaming a hundred call sites is a
- *  cosmetic sweep that belongs in its own change. The two are tied at compile
- *  time — the second's type is the first's literal — so they cannot drift
- *  apart without failing to build. */
+ *  `TIMELINE_WINDOW_ROWS` is that name, and every arm reads it, the ones that
+ *  still serve events included: they take the same number, and the rollout
+ *  to rows is one family at a time. (Its deprecated twin
+ *  `TIMELINE_WINDOW_EVENTS` went on 2026-10-23, ui-jobs 434.) */
 export const TIMELINE_WINDOW_ROWS = 2500;
-
-/** @deprecated The cut counts ROWS — use `TIMELINE_WINDOW_ROWS`. Kept for the
- *  arms that still serve events, and tied to it above. */
-export const TIMELINE_WINDOW_EVENTS: typeof TIMELINE_WINDOW_ROWS = 2500;
 
 /** ONE PAGE OF ROWS — how many of the preloaded rows the list draws at a time.
  *
