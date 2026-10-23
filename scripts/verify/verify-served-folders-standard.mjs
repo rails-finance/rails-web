@@ -25,7 +25,9 @@
 //       zero `/timeline/folder` reads through load and settle, and no folder
 //       drawn open
 //   S3  opening one folder by click makes exactly one folder read and draws
-//       that folder's members
+//       that folder's first window of members: min(count, GROUP_MEMBER_BATCH =
+//       50), the rest paged on scroll (decision 0039 rule 5, web 55e1919e), with
+//       the frame stating the whole count in `data-group-members`
 //   S4  the same wallet with `?folders=0` still offers the toggle
 // and once:
 //   C1  a client-grouped family page still offers the toggle
@@ -39,7 +41,9 @@
 //   E4  E1's wallet cut at 2023-05-17 (`?to=`, the Lifetime flows chart's
 //       "Sync to chart" button), a day inside its OLDEST folder: the list's ends read the
 //       folders' own dates, so the top carries the "tip" boundary row and no
-//       pulsing dot. Until 2026-10-01 this was a `?from=&to=` Dates filter,
+//       pulsing dot. The cut slices that folder to the one event on or before
+//       the day, which stands loose under the five-transaction rule (af40fed1),
+//       so the rows drawn are a folder or a loose card. Until 2026-10-01 this was a `?from=&to=` Dates filter,
 //       which also drew the "view" row at the bottom; a cut hides nothing
 //       older, so it draws none
 //
@@ -90,6 +94,9 @@ import {
   groupCount,
   openGroup,
 } from "./lib/group-rows.mjs";
+
+/** An open group's first window (components/shared/group-frame.tsx). */
+const GROUP_MEMBER_BATCH = 50;
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",").map((s) => s.trim())) : null;
@@ -287,17 +294,21 @@ async function runServed(f) {
     await page.waitForTimeout(SETTLE_MS);
     const before = reads.length;
     const frame = page.locator(CLOSED_GROUP).first();
+    const handle = await frame.elementHandle();
     const label = (await frame.locator(HEADER_IN_GROUP).first().getAttribute("aria-label")) ?? "";
     const count = groupCount(label);
     const cardsBefore = await page.locator("[data-event-id]").count();
     const answered = page.waitForResponse((r) => FOLDER_READ.test(r.url()), { timeout: 240_000 }).catch(() => null);
-    const expanded = await openGroup(page, frame);
+    // The first window only: the members arrive after the frame reads open,
+    // so openGroup's draw-all would find no next-batch button yet.
+    const expanded = await openGroup(page, frame, { allMembers: false });
     const response = expanded ? await answered : null;
+    const window = Math.min(count, GROUP_MEMBER_BATCH);
     const grew = response
       ? await page
           .waitForFunction(
             ([sel, n]) => document.querySelectorAll(sel).length >= n,
-            ["[data-event-id]", cardsBefore + count],
+            ["[data-event-id]", cardsBefore + window],
             { timeout: 120_000 },
           )
           .then(() => true)
@@ -305,11 +316,16 @@ async function runServed(f) {
       : false;
     await page.waitForTimeout(SETTLE_MS);
     const cardsAfter = await page.locator("[data-event-id]").count();
+    const stated = handle
+      ? await handle.evaluate((el) =>
+          Number(el.querySelector("[data-group-members]")?.getAttribute("data-group-members")),
+        )
+      : NaN;
     const clickReads = reads.length - before;
     check(
-      id("S3 opening one folder makes exactly one folder read and draws its members"),
-      before === 0 && expanded && clickReads === 1 && grew && cardsAfter - cardsBefore === count,
-      `${before} read(s) before the click, ${clickReads} on it; folder of ${count}, ${cardsAfter - cardsBefore} card(s) drawn${
+      id("S3 opening one folder makes exactly one folder read and draws its first window of members"),
+      before === 0 && expanded && clickReads === 1 && grew && cardsAfter - cardsBefore === window && stated === count,
+      `${before} read(s) before the click, ${clickReads} on it; folder of ${count}, ${cardsAfter - cardsBefore} card(s) drawn of a window of ${window}, the frame states ${stated}${
         expanded ? "" : "; the folder never opened"
       }`,
     );
@@ -361,14 +377,24 @@ async function runNeverEmpty(f, name) {
     // Read only once folders are drawn: an absent dot on an empty page says nothing.
     // The cut is applied after hydration, so the folders are counted again
     // here, after SETTLE_MS: the one straddling the cut stands.
+    // Since af40fed1 (decision 0039) a group is sliced to the chart's cut and
+    // stands only at five transactions: this cut keeps one member of the
+    // oldest folder (17 May '23), which draws as a loose card. Either is the
+    // list drawing the cut's events.
+    // The cut reads its month after hydration (chain-truth-timeline's
+    // segments.onPick), and the list stands empty while it does: read once
+    // the cut's end row is drawn.
+    await page.waitForSelector('[data-boundary-row="cut"]', { timeout: 120_000 }).catch(() => {});
+    await page.waitForTimeout(2000);
     const cutFolders = await page.locator(GROUP_FRAME).count();
+    const cutCards = await page.locator("[data-event-id]").count();
     const tipRows = await page.locator('[data-boundary-row="tip"]').count();
     const viewRows = await page.locator('[data-boundary-row="view"]').count();
     const dots = await page.locator("[data-spine-tip]").count();
     check(
-      `E4 a cut inside the oldest folder: tip row, no pulsing dot, no view row [${f.id}]`,
-      cutFolders > 0 && tipRows === 1 && dots === 0 && viewRows === 0,
-      `${cutFolders} folder row(s), ${tipRows} tip row(s), ${dots} pulsing dot(s), ${viewRows} view row(s)`,
+      `E4 a cut inside the oldest folder: its rows drawn, tip row, no pulsing dot, no view row [${f.id}]`,
+      cutFolders + cutCards > 0 && tipRows === 1 && dots === 0 && viewRows === 0,
+      `${cutFolders} folder row(s), ${cutCards} loose card(s), ${tipRows} tip row(s), ${dots} pulsing dot(s), ${viewRows} view row(s)`,
     );
   }
   await ctx.close();
