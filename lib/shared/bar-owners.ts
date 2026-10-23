@@ -32,6 +32,12 @@
 // keep their role. Mark: summer.fi's `icon.svg` (its only site icon), drawn at
 // 176 px; the gradient runs pink #FF49A4 to purple #B049FF and the purple
 // covers most of the mark, oklch hue 306.
+//
+// Instadapp: no entry contract here yet (a DSA's `cast` names connectors by
+// string); the subject is stated once for the wallet heading's manager chip
+// (lib/shared/account-managers.ts) and any later bar. Its deployments are
+// `Instadapp/dsa-contracts` `docs/addresses.json`. Mark: instadapp.io's
+// `apple-touch-icon.png` (180 px, resized to 176), blue #3F75FF, oklch hue 265.
 
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { BarSubject } from "@/lib/shared/known-infrastructure";
@@ -46,6 +52,8 @@ export const SUMMER_FI_BAR: BarSubject = {
   hue: 306,
   closed: { since: "2026", source: "https://summer.fi/" },
 };
+
+export const INSTADAPP_BAR: BarSubject = { name: "Instadapp", icon: "instadapp", hue: 265 };
 
 const SUMMER_FI: [ChainId, string][] = [
   [MAINNET_CHAIN_ID, "0xca71c36d26f515ad0cce1d806b231cbc1185cdfc"],

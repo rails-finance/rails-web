@@ -30,6 +30,9 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { ChainId } from "@/lib/shared/chains";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
+import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import { Prov, ProvReceiptsScope, provInspector, useReceiptRegistry } from "@/components/shared/provenance";
+import { managerProv } from "@/lib/shared/manager-provenance";
 
 /** The shell both surfaces draw. `title` is the name line (the h1 and what
  *  sits beside it), `lines` the text-xs lines under it, `end` the controls at
@@ -70,7 +73,9 @@ export function WalletHeading({
 
 /** The glyph and words for what the address is (ui-jobs 232), with a
  *  newcomer's one-line tip. A plain wallet (`account`) has none; a contract
- *  carries its name when it answers one. */
+ *  carries its name when it answers one. Where the chain names who runs the
+ *  account (ui-jobs 440), the label is the kind's word, a middle dot and the
+ *  product ("Safe · DeFi Saver"), and the tip says what the product can do. */
 function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
   Icon: LucideIcon;
   label: string | null;
@@ -84,8 +89,38 @@ function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
         tip: "A wallet someone holds a key to, set up to run extra code when it acts.",
       };
     case "safe":
-      return { Icon: UsersRound, label: "Safe", tip: "A shared wallet: several owners sign together before it acts." };
+      return k.manager
+        ? {
+            Icon: UsersRound,
+            label: `Safe · ${k.manager.name}`,
+            tip: `A shared wallet that ${k.manager.name}'s automation can act for.`,
+          }
+        : { Icon: UsersRound, label: "Safe", tip: "A shared wallet: several owners sign together before it acts." };
     case "contract": {
+      const m = k.manager;
+      const closed = m?.closed ? " (closed)" : "";
+      if (k.account === "dsa")
+        return {
+          Icon: FileCode2,
+          label: `DSA · ${m?.name ?? "Instadapp"}`,
+          tip: "An Instadapp account that its authorities act through.",
+        };
+      if (k.account === "dpm")
+        return {
+          Icon: FileCode2,
+          label: `DPM · ${m?.name ?? "Summer.fi"}${closed}`,
+          tip: m?.closed
+            ? `A Summer.fi position account. Summer.fi deactivated its app in ${m.closed.since}; the account and its position stay on chain.`
+            : "A Summer.fi position account.",
+        };
+      if (k.account === "dsproxy")
+        return m
+          ? {
+              Icon: FileCode2,
+              label: `DSProxy · ${m.name}`,
+              tip: `A proxy account that ${m.name}'s automation can act for.`,
+            }
+          : { Icon: FileCode2, label: "DSProxy", tip: "A proxy account: a contract its owner acts through." };
       const named = k.name && k.symbol ? `${k.name} (${k.symbol})` : (k.name ?? k.symbol);
       return {
         Icon: FileCode2,
@@ -100,6 +135,7 @@ function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
 
 function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainId }) {
   const [kind, setKind] = useState<AddressKind | null>(null);
+  const registry = useReceiptRegistry();
   useEffect(() => {
     let live = true;
     setKind(null);
@@ -112,19 +148,60 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
   }, [wallet, chainId]);
   if (!kind || kind.kind === "account") return null;
   const w = addressKindWords(kind);
-  return (
-    // Gives way before the address does (shrink-[100]).
+  const manager = kind.kind === "safe" || kind.kind === "contract" ? kind.manager : undefined;
+  const info = manager && (kind.kind === "safe" || kind.kind === "contract") ? managerProv(kind, chainId) : null;
+  const tip = (
     <RevealTip
       tip={<span className="block w-72 whitespace-normal">{w.tip}</span>}
       label={w.label ? `${w.label}. ${w.tip}` : w.tip}
       focusable
-      className="min-w-0 shrink-[100] focus-ring rounded-sm"
+      className="min-w-0 focus-ring rounded-sm"
     >
-      <span className="flex min-w-0 items-center gap-1" data-address-kind={kind.kind}>
+      <span
+        className="flex min-w-0 items-center gap-1"
+        data-address-kind={kind.kind}
+        data-account-manager={manager?.product}
+      >
         <w.Icon className="size-3.5 shrink-0" aria-hidden />
         {w.label && <span className="max-w-[40vw] truncate sm:max-w-xs">{w.label}</span>}
       </span>
     </RevealTip>
+  );
+  if (!manager) return <span className="flex min-w-0 shrink-[100]">{tip}</span>;
+  return (
+    // Gives way before the address does (shrink-[100]). The product's mark
+    // after the words opens the manager's receipt (anatomy H13), as the
+    // timeline bar's mark opens the bar's: it arms the heading's scope and
+    // pins the receipt at the mark.
+    <span className="flex min-w-0 shrink-[100] items-center gap-1">
+      {tip}
+      {info ? (
+        <ProvReceiptsScope registry={registry} scopeId="wallet-heading" bounds={false}>
+          <button
+            type="button"
+            className="flex shrink-0 cursor-pointer rounded-sm focus-ring"
+            data-account-manager-receipt={manager.product}
+            aria-label={`Who runs this account: ${manager.name}`}
+            onClick={(e) => {
+              const el = e.currentTarget;
+              provInspector.setArmed(true, "wallet-heading");
+              const entry = registry.getEntries().find((x) => !x.echo && x.el && el.contains(x.el));
+              if (entry?.el) provInspector.pin(entry, registry, entry.el);
+            }}
+          >
+            <Prov info={info} value={manager.name} className="flex shrink-0 items-center">
+              <ProtocolIcon
+                id={manager.icon}
+                className="size-3.5 shrink-0 [&:is(img)]:opacity-80 [&:is(img)]:grayscale"
+              />
+              <span className="sr-only">{manager.name}</span>
+            </Prov>
+          </button>
+        </ProvReceiptsScope>
+      ) : (
+        <ProtocolIcon id={manager.icon} className="size-3.5 shrink-0 [&:is(img)]:opacity-80 [&:is(img)]:grayscale" />
+      )}
+    </span>
   );
 }
 
