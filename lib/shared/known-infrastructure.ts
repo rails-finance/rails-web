@@ -133,6 +133,64 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
  *     (Etherscan reads its transformer as an implementation). Base
  *     0x78f8…20e0 is `ParaSwapRepayAdapter` on Base, where Ethereum's is the
  *     withdraw swap adapter.
+ *   • Batch 2 of item 430 (23 Oct 2026): the sweep's plumbing names whose rows
+ *     are all Pool-caller rows (a supply's caller, a withdrawal's recipient),
+ *     116 deployments read on growthepie's labels file, the OLI pool and
+ *     Etherscan V2, under Miles's rulings for the batch. Balancer V3's Vault on
+ *     Ethereum and Arbitrum is balancer-deployments v3 `20241204-v3-vault`
+ *     (mainnet.json, arbitrum.json); Etherscan reads its fallback to
+ *     VaultExtension as a proxy, and the source at the address is `Vault`.
+ *     Ethereum 0xba12…f2c8 is Balancer V2's Vault (v2 `20210418-vault`). The fee
+ *     burners are v3 `20250530-v3-erc4626-cow-swap-fee-burner-v2` (mainnet,
+ *     base); their source's `@author` is CoW Protocol's developers.
+ *   • Aave's address book: MIGRATION_HELPER 0xd417…c5e4 (AaveV2Ethereum),
+ *     POOL_EXPOSURE_STEWARD and COLLECTOR (AaveV3Ethereum), and Arbitrum's
+ *     REPAY_WITH_COLLATERAL_ADAPTER 0xe28e…2034. The second migration helper,
+ *     0xb748…abfc, is not in the book: its verified source is an earlier build
+ *     of the same BGD Labs contract (`MigrationHelperMainnet.sol` identical,
+ *     `@author BGD Labs`; `MigrationHelper.sol` before the withdrawn-balance fix
+ *     and the referral code), so it takes the same entry. Arbitrum's other
+ *     repay adapter 0x2820…f3ba and the WETH gateways `FlAaveV3WethGateway`
+ *     (both chains) and `AaveV3WethGateway` are not in the book.
+ *   • Owners named from the verified source: Superfluid (`@author Superfluid`,
+ *     the protocol-monorepo paths), Portals (`@author Portals.fi`), DCA.fun
+ *     (`@author DCA.fun Team`), Underscore (the Underscore Protocol License on
+ *     LegoAaveV3 and AaveV3), Synthereum (`@author Synthereum Protocol` on
+ *     LendingManager, where the sweep wrote Jarvis), Enzyme (`@author Enzyme
+ *     Council` on Ethereum 0x9cfb…6707, `Enzyme Foundation` on Base
+ *     0xc16d…c099), Clear (`@author Clear Protocol Team`), 1inch on
+ *     AggregationRouterV5 (EIP-712 domain "1inch Aggregation Router") and Odos
+ *     (`@title V3 Routing contract for Odos SOR`). Contango, MagpieRouterV3,
+ *     MagpieRouterCore, ElfomoFi, Clear's 0x2e61…a159 and DZap's 0x2c02…5ca8
+ *     rest on the source name, as the earlier Magpie entries do.
+ *   • Owners from the protocol's publication: Morpho's docs (addresses page)
+ *     for GeneralAdapter1 and EthereumGeneralAdapter1; DZap's docs for
+ *     DZapZapCore 0xce25…6ba4; LI.FI's `deployments/base.json` for LiFiDiamond.
+ *     growthepie names Relay for RelayRouterV3 on Ethereum and Arbitrum; its
+ *     Base row names no owner and relay-periphery's v3 addresses list another
+ *     router, so Base 0xb92f…ff4f is a role.
+ *   • Owner unstated, so the display is the role: FLAction, FLBalancer,
+ *     OperationExecutor (its header's copyright is Oazo Apps Limited, which
+ *     names no product), ZapperExecutor, MulticallRouter, VaultDepositooorV2,
+ *     AutoRepayingManager, Deposit, App, LeveragedPosition, AaveAdaptor,
+ *     L1SenderV2, AaveCommissionContract, RosettaProxy,
+ *     ConnectorDeleverageParaswap and two Base AaveV3Adapters. The Base name
+ *     `AaveV3Adapter` covers four contracts: a swap adapter 0xa43f…0956
+ *     (`sellBase`, `sellQuote`), Enzyme's 0xc16d…c099 and two app adapters.
+ *   • Pools of batch 2: the Equalizer pairs answer `factory()` with Equalizer's
+ *     PairFactory on Base (0xed8d…ec04, its docs' Base contracts page), the two
+ *     PancakeSwap pairs with PancakeSwap V2's (0x02a8…749E, its developer
+ *     docs). They hold WETH, USDC, USDbC, cbBTC and cbETH: a withdrawal paid to
+ *     one is the input of a swap. Uniswap V4's PoolManager on Base is
+ *     0x4985…2b2b, growthepie owner Uniswap.
+ *   • Left out of batch 2: the Base `Vault`s 0x238a…e6c4, 0xdd17…ecaa,
+ *     0xec8d…272c, 0x210b…d064 and 0x4f18…2f50 and Ethereum's 0xb543…1002,
+ *     none Balancer's; PoolManager 0x60b3…a314 (v4-core source, and no source
+ *     names its owner); eleven AlgebraPools (seven Algebra factories,
+ *     none a venue's published one); four Solidly `VolatileV1` pairs, whose
+ *     `factory()` reverts; five BaseSwap pairs (BaseSwap's docs list no
+ *     factory); DODO's two GSPs (in none of DODO's published Ethereum
+ *     factories); Ethereum AaveV3Adapter 0x6d1d…37dc (its proxy is unverified).
  */
 /** growthepie's label for an address, as read on GROWTHEPIE_READ: the owning
  *  project from its labels file (`owner_project_clear`, the project as
@@ -708,6 +766,249 @@ const POOL_LIQUIDITY_MANAGER = known(
   "a lending protocol’s liquidity manager, which holds the collateral its liquidity providers post for an asset pool",
 );
 
+// ── Batch 2 of item 430: the plumbing whose rows are Pool-caller rows only ──
+const SUPERFLUID_AAVE_BACKEND = known(
+  "adapter",
+  "Superfluid Aave backend",
+  "AaveETHYieldBackend",
+  "Superfluid’s Aave yield backend, which supplies the ETH behind a Superfluid super token to the Pool and withdraws it back",
+);
+const DCA_DOT_FUN = known(
+  "adapter",
+  "DCA.fun",
+  "DcaDotFun",
+  "DCA.fun’s order contract, which supplies each dollar-cost-averaging order’s funds to the Pool while the order waits",
+);
+const AAVE_MIGRATION_HELPER = known(
+  "adapter",
+  "Aave migration helper",
+  "MigrationHelperMainnet",
+  "Aave’s migration helper, which withdraws a position from Aave V2 and supplies it to Aave V3 in one transaction",
+  "aave-v3",
+);
+const AAVE_POOL_EXPOSURE_STEWARD = known(
+  "adapter",
+  "Aave Pool Exposure Steward",
+  "PoolExposureSteward",
+  "Aave’s Pool Exposure Steward, which moves the Aave DAO treasury’s funds into and out of Aave pools",
+  "aave-v3",
+);
+const AAVE_COLLECTOR: ProtocolContract = {
+  ...known(
+    "adapter",
+    "Aave Collector",
+    "CollectorWithCustomImpl",
+    "Aave’s Collector, the treasury that holds the Aave DAO’s funds",
+    "aave-v3",
+  ),
+  proxyContractName: "InitializableAdminUpgradeabilityProxy",
+};
+const flashLoanAction = (contractName: string) =>
+  known(
+    "adapter",
+    "Flash-loan action",
+    contractName,
+    "a flash-loan action, which borrows through a flash loan and runs a recipe of steps for a wallet in one transaction",
+  );
+const OPERATION_EXECUTOR = known(
+  "adapter",
+  "Operation executor",
+  "OperationExecutor",
+  "an operation executor, which runs a sequence of lending actions for a wallet in one transaction",
+);
+const SWAP_AAVE_V3_ADAPTER = known(
+  "adapter",
+  "Aave V3 swap adapter",
+  "AaveV3Adapter",
+  "a swap aggregator’s Aave V3 adapter, which supplies or withdraws aTokens as one step of a routed swap",
+);
+const ENZYME_AAVE_V3_ADAPTER = known(
+  "adapter",
+  "Enzyme Aave V3 adapter",
+  "AaveV3Adapter",
+  "Enzyme’s Aave V3 adapter, which supplies and withdraws for Enzyme vaults",
+);
+const AAVE_V3_ADAPTER_UNLABELLED = known(
+  "adapter",
+  "Aave V3 adapter",
+  "AaveV3Adapter",
+  "an Aave V3 adapter, which supplies to and withdraws from the Pool for its app’s users",
+);
+const underscoreAaveLego = (contractName: string) =>
+  known(
+    "adapter",
+    "Underscore Aave lego",
+    contractName,
+    "an Underscore lego, which supplies and withdraws for Underscore wallets at the Pool",
+  );
+const CONTANGO: ProtocolContract = {
+  ...known(
+    "adapter",
+    "Contango",
+    "Contango",
+    "Contango’s core contract, which opens and closes leveraged positions through lending markets and flash loans",
+  ),
+  proxyContractName: "ERC1967Proxy",
+};
+const SYNTHEREUM_LENDING_MANAGER = known(
+  "adapter",
+  "Synthereum lending manager",
+  "LendingManager",
+  "Synthereum’s lending manager, which lends the collateral of Synthereum synthetic-asset pools to money markets",
+);
+const AUTO_REPAYING_MANAGER = known(
+  "adapter",
+  "Auto-repaying manager",
+  "AutoRepayingManager",
+  "an auto-repaying manager, which pairs a Uniswap position with an Aave loan it repays from the position’s fees",
+);
+const morphoGeneralAdapter = (contractName: string) =>
+  known(
+    "adapter",
+    "Morpho bundler adapter",
+    contractName,
+    "Morpho’s bundler adapter, which runs the steps of a Morpho Bundler3 bundle for a wallet",
+    "morpho",
+  );
+const CLEAR_GSM_REBALANCE = known(
+  "adapter",
+  "Clear GSM rebalance adapter",
+  "ClearGHOGsm4626RebalanceAdapter",
+  "Clear’s GSM rebalance adapter, which rebalances between GHO and another asset through GHO’s stability module",
+);
+const USDC_DEPOSIT = known(
+  "adapter",
+  "Deposit contract",
+  "Deposit",
+  "a deposit contract, which supplies a wallet’s USDC to the Pool for it",
+);
+const APP_CONTRACT = known(
+  "adapter",
+  "App contract",
+  "App",
+  "an app contract, which supplies to and withdraws from the Pool for its users",
+);
+const LEVERAGED_POSITION = known(
+  "adapter",
+  "Leveraged position",
+  "LeveragedPosition",
+  "a leverage contract, which loops supply and borrow on lending protocols for a wallet",
+);
+const AAVE_ADAPTOR: ProtocolContract = {
+  ...known(
+    "adapter",
+    "Aave adapter",
+    "AaveAdaptor",
+    "an Aave adapter, which supplies to and withdraws from the Pool for its app’s users",
+  ),
+  proxyContractName: "ERC1967Proxy",
+};
+const L1_SENDER: ProtocolContract = {
+  ...known(
+    "adapter",
+    "L1 sender",
+    "L1SenderV2",
+    "a bridge sender, which supplies and withdraws funds before sending them to another chain",
+  ),
+  proxyContractName: "ERC1967Proxy",
+};
+const ELFOMOFI = known("adapter", "ElfomoFi", "ElfomoFi", "an app contract, which supplies to the Pool for its users");
+const AAVE_COMMISSION: ProtocolContract = {
+  ...known(
+    "adapter",
+    "Commission contract",
+    "AaveCommissionContract",
+    "a commission contract, which supplies and withdraws for its users and takes a fee on each",
+  ),
+  proxyContractName: "ERC1967Proxy",
+};
+const ROSETTA_PROXY = known(
+  "adapter",
+  "Rosetta proxy",
+  "RosettaProxy",
+  "a vault proxy, which supplies to and withdraws from whitelisted MetaMorpho vaults and Aave markets for its users",
+);
+const DELEVERAGE_CONNECTOR = known(
+  "adapter",
+  "Deleverage connector",
+  "ConnectorDeleverageParaswap",
+  "a deleverage connector, which flash-borrows and swaps through ParaSwap to unwind an Aave position",
+);
+const wethGateway = (contractName: string): ProtocolContract => ({ ...WETH_GATEWAY, contractName });
+
+const PORTALS_MULTICALL = known(
+  "multicall",
+  "Portals multicall",
+  "PortalsMulticall",
+  "Portals’ multicall contract, which bundles the calls of a Portals zap into one transaction",
+);
+const ZAP_EXECUTOR = known(
+  "multicall",
+  "Zap executor",
+  "ZapperExecutor",
+  "a zap executor, which runs a scripted batch of swaps and deposits in one transaction",
+);
+const CALL_CHAIN_MULTICALL = known(
+  "multicall",
+  "Multicall contract",
+  "MulticallRouter",
+  "a multicall router, which chains calls on several contracts in one transaction",
+);
+
+const LIFI_DIAMOND = known(
+  "router",
+  "LI.FI",
+  "LiFiDiamond",
+  "LI.FI’s diamond, which routes a swap or a bridge across other venues",
+);
+const RELAY_ROUTER_V3 = known(
+  "router",
+  "Relay router",
+  "RelayRouterV3",
+  "Relay’s router, which runs the calls of a Relay swap or bridge and passes the output on",
+);
+const VAULT_DEPOSIT_ROUTER = known(
+  "router",
+  "Vault deposit router",
+  "VaultDepositooorV2",
+  "a vault-deposit router, which deposits a wallet’s tokens into a registered vault in one call",
+);
+const DZAP_ZAP = known(
+  "router",
+  "DZap zap",
+  "DZapZapCore",
+  "DZap’s zap contract, which runs a swap-and-deposit across protocols in one transaction",
+);
+
+const BALANCER_FEE_BURNER = known(
+  "settlement",
+  "Balancer fee burner",
+  "ERC4626CowSwapFeeBurner",
+  "Balancer’s fee burner, which redeems protocol-fee vault shares and sells the proceeds through CoW Protocol",
+  "balancer",
+);
+
+const BALANCER_V2_VAULT = known(
+  "amm-pool",
+  "Balancer V2",
+  "Vault",
+  "Balancer V2’s Vault, the one contract that holds the tokens of every Balancer V2 pool",
+  "balancer",
+);
+// These pools trade the underlying tokens; their rows are withdrawals paid to the pool as a swap's input.
+const EQUALIZER_PAIR = known(
+  "amm-pool",
+  "Equalizer pool",
+  "Pair",
+  "an Equalizer pool, which trades two tokens against each other and holds both as its liquidity",
+);
+const PANCAKE_V2_PAIR = known(
+  "amm-pool",
+  "PancakeSwap pair",
+  "PancakePair",
+  "a PancakeSwap V2 pair, which trades two tokens against each other and holds both as its liquidity",
+);
+
 const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   // ── Ethereum ──
   [MAINNET_CHAIN_ID, "0x20b79d39bd44deee4f89b1e9d0e3b945fde06491", escrow("syrupUSDC")],
@@ -800,6 +1101,71 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
     "0x4296339b4ff8e67f07de40d97a49a680f2598e0f",
     swapExecutor("Executor", "trades through Uniswap pools as one step of a routed swap"),
   ],
+  // ── Ethereum, batch 2 (item 430) ──
+  [MAINNET_CHAIN_ID, "0xba1333333333a1ba1108e8412f11850a5c319ba9", BALANCER_V3_VAULT],
+  [MAINNET_CHAIN_ID, "0xb748952c7bc638f31775245964707bcc5ddfabfc", AAVE_MIGRATION_HELPER],
+  [MAINNET_CHAIN_ID, "0xca71c36d26f515ad0cce1d806b231cbc1185cdfc", OPERATION_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x5f1dc84ba060ea3f7429c6a7bbedd9243cf1209b", flashLoanAction("FLAction")],
+  [MAINNET_CHAIN_ID, "0x40b72bb73b1e9380629b205e7880fa409ae7fcc9", VAULT_DEPOSIT_ROUTER],
+  [
+    MAINNET_CHAIN_ID,
+    "0x3611b82c7b13e72b26eb0e9be0613bee7a45ac7c",
+    router("Magpie router", "MagpieRouterCore", "Magpie’s"),
+  ],
+  [
+    MAINNET_CHAIN_ID,
+    "0x111111125421ca6dc452d289314280a0f8842a65",
+    router("1inch router", "AggregationRouterV6", "1inch’s aggregation"),
+  ],
+  [MAINNET_CHAIN_ID, "0xe78c05c508405207ecc256781b9415e6de1c8336", flashLoanAction("FLAction")],
+  [MAINNET_CHAIN_ID, "0x6cae28b3d09d8f8fc74ccd496ac986fc84c0c24e", CONTANGO],
+  [MAINNET_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", RELAY_ROUTER_V3],
+  [MAINNET_CHAIN_ID, "0x16a5749d037c45652b31644b9cea6a7c4f7ec5b2", CLEAR_GSM_REBALANCE],
+  [
+    MAINNET_CHAIN_ID,
+    "0x1111111254eeb25477b68fb85ed929f73a960582",
+    router("1inch router", "AggregationRouterV5", "1inch’s aggregation"),
+  ],
+  [MAINNET_CHAIN_ID, "0x4a6c312ec70e8747a587ee860a0353cd42be0ae0", morphoGeneralAdapter("EthereumGeneralAdapter1")],
+  [MAINNET_CHAIN_ID, "0xc2b92b6c69e5c3b6b29385c1a17fee906e0ca910", flashLoanAction("FLAction")],
+  [MAINNET_CHAIN_ID, "0x726e3244e2a73405ce13d82862d81e1c5dd0004e", ZAP_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x816e90dc85bf016455017a76bc09cc0451eeb308", BALANCER_FEE_BURNER],
+  [
+    MAINNET_CHAIN_ID,
+    "0x15392211222b46a0ea85a9a800830486d144848d",
+    router("Magpie router", "MagpieRouterV3", "Magpie’s"),
+  ],
+  [MAINNET_CHAIN_ID, "0x7a0f3963c666d4549e5909a7162b560abf9f006d", flashLoanAction("FLAction")],
+  [MAINNET_CHAIN_ID, "0x9cfb64d91ce4eb821ff8edc1c2fda2e89e256707", ENZYME_AAVE_V3_ADAPTER],
+  [MAINNET_CHAIN_ID, "0x5953993370e135c2e917545c53e612e1995123b8", CLEAR_GSM_REBALANCE],
+  [MAINNET_CHAIN_ID, "0x2efd4430489e1a05a89c2f51811ac661b7e5ff84", L1_SENDER],
+  [MAINNET_CHAIN_ID, "0xba12222222228d8ba445958a75a0704d566bf2c8", BALANCER_V2_VAULT],
+  [
+    MAINNET_CHAIN_ID,
+    "0x6a000f20005980200259b80c5102003040001068",
+    router("ParaSwap router", "AugustusV6", "ParaSwap’s Augustus"),
+  ],
+  [MAINNET_CHAIN_ID, "0x22ac12a6937bbbc0a301af9154d08ead95673122", AAVE_POOL_EXPOSURE_STEWARD],
+  [MAINNET_CHAIN_ID, "0xc82e6bc89c64e627437a2caa475062694b8f4498", APP_CONTRACT],
+  [MAINNET_CHAIN_ID, "0x540a83e36e5e6aa916a6c591934d800e17115048", flashLoanAction("FLBalancer")],
+  [MAINNET_CHAIN_ID, "0xd417d34d7aaf70b24fbc6b36808e3396c991c5e4", AAVE_MIGRATION_HELPER],
+  [MAINNET_CHAIN_ID, "0x49d3fc00f3acf80fabcb42d7681667b20f60889a", CALL_CHAIN_MULTICALL],
+  [MAINNET_CHAIN_ID, "0xfff30c67eea809123596252e132d30e1eb75bc83", OPERATION_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x6a53f8b799be11a2a3264ef0bff183dcb12d9571", wethGateway("FlAaveV3WethGateway")],
+  [MAINNET_CHAIN_ID, "0x464c71f6c2f760dda6093dcb91c24c39e5d6e18c", AAVE_COLLECTOR],
+  [MAINNET_CHAIN_ID, "0x9f54e8eaa9658316bb8006e03fff1cb191aafbe6", DELEVERAGE_CONNECTOR],
+  [MAINNET_CHAIN_ID, "0xc5e159fdc179d3ce6d78880da5b8838b983a9714", APP_CONTRACT],
+  [MAINNET_CHAIN_ID, "0xc1cd3654ab3b37e0bc26bafb5ae4c096892d0b0c", OPERATION_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0xafd306005f5d1a8537be4960e6d23907b5b9383f", ZAP_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x2e61ac206de68c4a39a194d91c96c0185befa159", CLEAR_GSM_REBALANCE],
+  [MAINNET_CHAIN_ID, "0x2be65f12dcc55c8485030e306a1b01f47c437a8a", flashLoanAction("FLAction")],
+  [MAINNET_CHAIN_ID, "0x0adf6dde7971b273c87456064e99e10193292237", APP_CONTRACT],
+  [MAINNET_CHAIN_ID, "0xf9f968e5a7b7db8bb74c0ea287e2094e4f336f5c", ZAP_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x675d37489a7a64c051d0204e5c72a469f6558a47", ZAP_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0xb3805e5f44b97dab82bc00d63f7f8c5a56b96d8d", ZAP_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x6e867662e3378595e97279bcaa66d7a103bf6070", OPERATION_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x661d3c310bd58b3abc1caf671c372288149def15", OPERATION_EXECUTOR],
+  [MAINNET_CHAIN_ID, "0x8fce7852ab757899792863f3560d1274eb0e8821", ZAP_EXECUTOR],
   // ── Base ──
   [BASE_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", COW],
   [BASE_CHAIN_ID, "0xa0d9c1e9e48ca30c8d8c3b5d69ff5dc1f6dffc24", WETH_GATEWAY],
@@ -982,14 +1348,92 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [BASE_CHAIN_ID, "0x057896b3a29ae6eee458b65413f8b7e3ea984889", AERODROME_SLIPSTREAM_POOL],
   [BASE_CHAIN_ID, "0x0000000000bbf5c5fd284e657f01bd000933c96d", PORTIKUS_ADAPTER],
   [BASE_CHAIN_ID, "0xc894ba28451cd225a73bf704e6719c1cec9de791", PANCAKE_V3_POOL],
+  // ── Base, batch 2 (item 430) ──
+  [BASE_CHAIN_ID, "0x7652245d9666f9d1de2481695688162a4e050c5f", SUPERFLUID_AAVE_BACKEND],
+  [BASE_CHAIN_ID, "0xea49d02c248b357b99670d9e9741f54f72df9cb3", PORTALS_MULTICALL],
+  [BASE_CHAIN_ID, "0x344e4d19c851b317bb65d31bb5c4e3815b53d727", wethGateway("FlAaveV3WethGateway")],
+  [BASE_CHAIN_ID, "0xdca00000067413240aeab357a3a89ea352d013e8", DCA_DOT_FUN],
+  [BASE_CHAIN_ID, "0xc28eb3e9483fc89e76aa987a9116b815704d7f40", wethGateway("AaveV3WethGateway")],
+  [BASE_CHAIN_ID, "0xa43f2e6e8313b46ddcb9190ce856af0089320956", SWAP_AAVE_V3_ADAPTER],
+  [BASE_CHAIN_ID, "0x498581ff718922c3f8e6a244956af099b2652b2b", UNISWAP_V4],
+  [BASE_CHAIN_ID, "0x8c94cfc11a9340e45032e5021881cc312993bf15", underscoreAaveLego("LegoAaveV3")],
+  [BASE_CHAIN_ID, "0xef42f78d25f4c681dcad2597fa04877ff802ef4b", router("Magpie router", "MagpieRouterV3", "Magpie’s")],
+  [BASE_CHAIN_ID, "0x6cae28b3d09d8f8fc74ccd496ac986fc84c0c24e", CONTANGO],
+  [BASE_CHAIN_ID, "0x49bc51d8c140b7f64577ba01f5604014450645eb", SYNTHEREUM_LENDING_MANAGER],
+  [BASE_CHAIN_ID, "0xb98c948cfa24072e58935bc004a8a7b376ae746a", morphoGeneralAdapter("GeneralAdapter1")],
+  [BASE_CHAIN_ID, "0x5523e61fbef59825831ffbb1306abc3bb03bb3a4", flashLoanAction("FLAction")],
+  [BASE_CHAIN_ID, "0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae", LIFI_DIAMOND],
+  [BASE_CHAIN_ID, "0x3ae633826cef322b1dfd43e129a0639330982247", AUTO_REPAYING_MANAGER],
+  [BASE_CHAIN_ID, "0xb65cbf9689979e1749b38ba5d5155c70500292d8", OPERATION_EXECUTOR],
+  [BASE_CHAIN_ID, "0xb7401d91f1586474164b6c6df328e3c3a5f24649", underscoreAaveLego("AaveV3")],
+  [BASE_CHAIN_ID, "0x904ccd911533259c1d6b4c50d87de8130abeb55d", underscoreAaveLego("LegoAaveV3")],
+  [BASE_CHAIN_ID, "0xa4b275feaf3a1450fc57270ed863923261abfd05", ZAP_EXECUTOR],
+  [BASE_CHAIN_ID, "0x4b979ed48f982ba0baa946cb69c1083eb799729c", BALANCER_FEE_BURNER],
+  [BASE_CHAIN_ID, "0x2380f715c3a990c30a69ed871992b0b10187d4c4", USDC_DEPOSIT],
+  [BASE_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", multicallRouter("RelayRouterV3")],
+  [BASE_CHAIN_ID, "0x8b4fc1e68d4e1926cca5dd48f91156de94ea87d7", underscoreAaveLego("AaveV3")],
+  [
+    BASE_CHAIN_ID,
+    "0x1111111254eeb25477b68fb85ed929f73a960582",
+    router("1inch router", "AggregationRouterV5", "1inch’s aggregation"),
+  ],
+  [BASE_CHAIN_ID, "0x87af4769e4134379125a262408e1f3ec60d2ab52", flashLoanAction("FLAction")],
+  [BASE_CHAIN_ID, "0xeb7f1f4d0e57972df1ae73e3a76d6f7819588194", AUTO_REPAYING_MANAGER],
+  [BASE_CHAIN_ID, "0x560740052f380669c90811f711f80b21306d4713", ZAP_EXECUTOR],
+  [BASE_CHAIN_ID, "0x83240b049fa89b65be714aed68e5b074df6aac84", EQUALIZER_PAIR],
+  [BASE_CHAIN_ID, "0x580729527620ab496195465bffd15e89efb508b4", underscoreAaveLego("LegoAaveV3")],
+  [BASE_CHAIN_ID, "0xac80b9465d70aafbe492a08baea5c6e9d77b1478", underscoreAaveLego("AaveV3")],
+  [BASE_CHAIN_ID, "0x2b66a88ac79acb3b548066bc1cf2ff2ff445ab45", AAVE_ADAPTOR],
+  [BASE_CHAIN_ID, "0x37d4de0e45f6cb7f15b2f1b54c46687511043d50", LEVERAGED_POSITION],
+  [BASE_CHAIN_ID, "0xf0f0f0f0fb0d738452efd03a28e8be14c76d5f73", ELFOMOFI],
+  [BASE_CHAIN_ID, "0xda86b4c61a545a4b217746ba43c8157f0ec612c7", flashLoanAction("FLAction")],
+  [BASE_CHAIN_ID, "0xd9a463ce7bfff3574c7aa60c14b91a6b7f507b2d", underscoreAaveLego("AaveV3")],
+  [BASE_CHAIN_ID, "0x0d05a7d3448512b78fa8a9e46c4872c88c4a0d05", router("Odos router", "OdosRouterV3", "Odos’s")],
+  [BASE_CHAIN_ID, "0x4fbdd50fb2030e8439fc9a752d37e097def2fb07", SYNTHEREUM_LENDING_MANAGER],
+  [BASE_CHAIN_ID, "0x01a3c8e513b758ebb011f7afaf6c37616c9c24d9", CALL_CHAIN_MULTICALL],
+  [BASE_CHAIN_ID, "0x2d43e84567019d721f095cfd632291c3ee868d8f", OPERATION_EXECUTOR],
+  [BASE_CHAIN_ID, "0xaf49b5164832dfd3501fb8b56c9ecd1e548d730e", ROSETTA_PROXY],
+  [BASE_CHAIN_ID, "0xf3f1f5760a614b8146eec5d1c94658720c2425b9", EQUALIZER_PAIR],
+  [BASE_CHAIN_ID, "0x240b3f3bb05475998b3eadfd4caa4f0c6ffbe83b", AAVE_COMMISSION],
+  [BASE_CHAIN_ID, "0x256f0f254b44c69e431c5eafbb9a86f85da1d1d3", underscoreAaveLego("AaveV3")],
+  [BASE_CHAIN_ID, "0x24ab3e849b866c93079c2c74276918d73390e532", AUTO_REPAYING_MANAGER],
+  [BASE_CHAIN_ID, "0x0345aa92c7cb97e09b7cc0d55e730cd39c09fa43", EQUALIZER_PAIR],
+  [BASE_CHAIN_ID, "0xce2541ce645a1b232ff2fead53dcd9f369e86ba4", DZAP_ZAP],
+  [BASE_CHAIN_ID, "0xaabd4b0372240e319f9722c4fd1e2fe0c8d422d2", flashLoanAction("FLAction")],
+  [BASE_CHAIN_ID, "0xe4cfc10ee92bc52c873077e6de418ba0ba4e2609", LEVERAGED_POSITION],
+  [BASE_CHAIN_ID, "0xc57775a3e13c7941eccfbaf740392c650b51453d", ZAP_EXECUTOR],
+  [BASE_CHAIN_ID, "0x50974aac8ab56a40492767394e758549fe7e7526", AAVE_COMMISSION],
+  [BASE_CHAIN_ID, "0x8969d747abfbd389767d33774702f260da7c38b0", CONTANGO],
+  [BASE_CHAIN_ID, "0x826bd427d842e18d5fc60975983829f37f90f77b", underscoreAaveLego("AaveV3")],
+  [BASE_CHAIN_ID, "0xbcef436cb1b7608797f4eab00296cef2f01332c8", AAVE_ADAPTOR],
+  [BASE_CHAIN_ID, "0x21e890d3da79c78f1b149367cf01d06789f95d39", ZAP_EXECUTOR],
+  [BASE_CHAIN_ID, "0x2c02ff63318c7ae1c8be6825495b365da6335ca8", DZAP_ZAP],
+  [BASE_CHAIN_ID, "0xc16db2e93492e3ea512edc90787538652ec5c099", ENZYME_AAVE_V3_ADAPTER],
+  [BASE_CHAIN_ID, "0xba25a6bf94ceb977ca1b4823158369463e514802", LEVERAGED_POSITION],
+  [BASE_CHAIN_ID, "0x92363f9817f92a7ae0592a4cb29959a88d885cc8", PANCAKE_V2_PAIR],
+  [BASE_CHAIN_ID, "0x48eab07dc303ad02ddb9ff2733ba881f6a1b8d64", EQUALIZER_PAIR],
+  [BASE_CHAIN_ID, "0x275cce00b312ef583bb6e07a828c135896ee2a7d", AAVE_V3_ADAPTER_UNLABELLED],
+  [BASE_CHAIN_ID, "0xadfcf45412ac5aa452bcf597afa008669dbbb3bf", ZAP_EXECUTOR],
+  [BASE_CHAIN_ID, "0xd19b1204ee745fc540792f1feca3ae50ef71aa64", LEVERAGED_POSITION],
+  [BASE_CHAIN_ID, "0x85cfb6917da8cc7c4c3b63f2120d2f636cf317bc", CONTANGO],
+  [BASE_CHAIN_ID, "0x34d38344078d28e7f6326d38b6f8da13bd8e267b", AAVE_V3_ADAPTER_UNLABELLED],
+  [BASE_CHAIN_ID, "0x659908a3353c48aa92f9b0aeb6d3b473ac091b83", EQUALIZER_PAIR],
+  [BASE_CHAIN_ID, "0x79474223aedd0339780bacce75abda0be84dcbf9", PANCAKE_V2_PAIR],
+  [BASE_CHAIN_ID, "0x13b312fa5153088f71ef14b55953f72f7c0b25ea", LEVERAGED_POSITION],
+  [BASE_CHAIN_ID, "0xbdb49d8852e91c262dcd9ee6ace91828c0b2583a", DZAP_ZAP],
   // ── Arbitrum ──
   [ARBITRUM_CHAIN_ID, "0x5283beced7adf6d003225c13896e536f2d4264ff", WETH_GATEWAY],
+  // ── Arbitrum, batch 2 (item 430) ──
+  [ARBITRUM_CHAIN_ID, "0xba1333333333a1ba1108e8412f11850a5c319ba9", BALANCER_V3_VAULT],
+  [ARBITRUM_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", RELAY_ROUTER_V3],
+  [ARBITRUM_CHAIN_ID, "0xe28e2c8d240dd5ebd0adcab86fbd79df7a052034", PARASWAP_REPAY],
+  [ARBITRUM_CHAIN_ID, "0x28201c152dc5b69a86fa54fcfd21bca4c0eff3ba", PARASWAP_REPAY],
 ];
 
 // What growthepie says about each entry, read on GROWTHEPIE_READ:
 // [chain, address, owner from the labels file, contract name from the OLI
 // pool's Sourcify attestation]. `null` where that source has nothing. An entry
-// absent here (90 of them on 23 Oct 2026, among them the syrupUSDT escrow, the
+// absent here (116 of them on 23 Oct 2026, among them the syrupUSDT escrow, the
 // first five Uniswap V3 pools, the PancakeSwap pair, Magpie's MagpieRouterCore,
 // Enso 0x7d58…6994 and the multicall) rests on the fallback sources alone.
 const GROWTHEPIE_LABELS: [ChainId, string, string | null, string | null][] = [
@@ -1053,6 +1497,44 @@ const GROWTHEPIE_LABELS: [ChainId, string, string | null, string | null][] = [
   [MAINNET_CHAIN_ID, "0xeb8094c169bf5d365ec1ae76ab4a5fa61345caaf", null, "TransparentUpgradeableProxy"],
   [MAINNET_CHAIN_ID, "0x9ffdde9a1686870cf619869a225eb1d0e20b53e6", null, "TransparentUpgradeableProxy"],
   [MAINNET_CHAIN_ID, "0x2dfadab8266483bed9fd9a292ce56596a2d1378d", null, "Executor"],
+  // ── Ethereum, batch 2 (item 430) ──
+  [MAINNET_CHAIN_ID, "0xba1333333333a1ba1108e8412f11850a5c319ba9", null, "Vault"],
+  [MAINNET_CHAIN_ID, "0xb748952c7bc638f31775245964707bcc5ddfabfc", null, "MigrationHelperMainnet"],
+  [MAINNET_CHAIN_ID, "0xca71c36d26f515ad0cce1d806b231cbc1185cdfc", null, "OperationExecutor"],
+  [MAINNET_CHAIN_ID, "0x5f1dc84ba060ea3f7429c6a7bbedd9243cf1209b", null, "FLAction"],
+  [MAINNET_CHAIN_ID, "0x40b72bb73b1e9380629b205e7880fa409ae7fcc9", null, "VaultDepositooorV2"],
+  [MAINNET_CHAIN_ID, "0x111111125421ca6dc452d289314280a0f8842a65", "1Inch", "AggregationRouterV6"],
+  [MAINNET_CHAIN_ID, "0xe78c05c508405207ecc256781b9415e6de1c8336", null, "FLAction"],
+  [MAINNET_CHAIN_ID, "0x6cae28b3d09d8f8fc74ccd496ac986fc84c0c24e", null, "ERC1967Proxy"],
+  [MAINNET_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", "Relay", null],
+  [MAINNET_CHAIN_ID, "0x1111111254eeb25477b68fb85ed929f73a960582", null, "AggregationRouterV5"],
+  [MAINNET_CHAIN_ID, "0x4a6c312ec70e8747a587ee860a0353cd42be0ae0", null, "EthereumGeneralAdapter1"],
+  [MAINNET_CHAIN_ID, "0xc2b92b6c69e5c3b6b29385c1a17fee906e0ca910", null, "FLAction"],
+  [MAINNET_CHAIN_ID, "0x726e3244e2a73405ce13d82862d81e1c5dd0004e", null, "ZapperExecutor"],
+  [MAINNET_CHAIN_ID, "0x15392211222b46a0ea85a9a800830486d144848d", null, "MagpieRouterV3"],
+  [MAINNET_CHAIN_ID, "0x7a0f3963c666d4549e5909a7162b560abf9f006d", null, "FLAction"],
+  [MAINNET_CHAIN_ID, "0x9cfb64d91ce4eb821ff8edc1c2fda2e89e256707", null, "AaveV3Adapter"],
+  [MAINNET_CHAIN_ID, "0x2efd4430489e1a05a89c2f51811ac661b7e5ff84", null, "ERC1967Proxy"],
+  [MAINNET_CHAIN_ID, "0xba12222222228d8ba445958a75a0704d566bf2c8", null, "Vault"],
+  [MAINNET_CHAIN_ID, "0x6a000f20005980200259b80c5102003040001068", "Velora (Formerly Paraswap)", "AugustusV6"],
+  [MAINNET_CHAIN_ID, "0x22ac12a6937bbbc0a301af9154d08ead95673122", null, "PoolExposureSteward"],
+  [MAINNET_CHAIN_ID, "0xc82e6bc89c64e627437a2caa475062694b8f4498", null, "App"],
+  [MAINNET_CHAIN_ID, "0x540a83e36e5e6aa916a6c591934d800e17115048", null, "FLBalancer"],
+  [MAINNET_CHAIN_ID, "0xd417d34d7aaf70b24fbc6b36808e3396c991c5e4", null, "MigrationHelperMainnet"],
+  [MAINNET_CHAIN_ID, "0x49d3fc00f3acf80fabcb42d7681667b20f60889a", null, "MulticallRouter"],
+  [MAINNET_CHAIN_ID, "0x464c71f6c2f760dda6093dcb91c24c39e5d6e18c", null, "InitializableAdminUpgradeabilityProxy"],
+  [MAINNET_CHAIN_ID, "0x9f54e8eaa9658316bb8006e03fff1cb191aafbe6", null, "ConnectorDeleverageParaswap"],
+  [MAINNET_CHAIN_ID, "0xc5e159fdc179d3ce6d78880da5b8838b983a9714", null, "App"],
+  [MAINNET_CHAIN_ID, "0xc1cd3654ab3b37e0bc26bafb5ae4c096892d0b0c", null, "OperationExecutor"],
+  [MAINNET_CHAIN_ID, "0xafd306005f5d1a8537be4960e6d23907b5b9383f", null, "ZapperExecutor"],
+  [MAINNET_CHAIN_ID, "0x2e61ac206de68c4a39a194d91c96c0185befa159", null, "ClearGHOGsm4626RebalanceAdapter"],
+  [MAINNET_CHAIN_ID, "0x2be65f12dcc55c8485030e306a1b01f47c437a8a", null, "FLAction"],
+  [MAINNET_CHAIN_ID, "0x0adf6dde7971b273c87456064e99e10193292237", null, "App"],
+  [MAINNET_CHAIN_ID, "0x675d37489a7a64c051d0204e5c72a469f6558a47", null, "ZapperExecutor"],
+  [MAINNET_CHAIN_ID, "0xb3805e5f44b97dab82bc00d63f7f8c5a56b96d8d", null, "ZapperExecutor"],
+  [MAINNET_CHAIN_ID, "0x6e867662e3378595e97279bcaa66d7a103bf6070", null, "OperationExecutor"],
+  [MAINNET_CHAIN_ID, "0x661d3c310bd58b3abc1caf671c372288149def15", null, "OperationExecutor"],
+  [MAINNET_CHAIN_ID, "0x8fce7852ab757899792863f3560d1274eb0e8821", null, "ZapperExecutor"],
   // ── Base ──
   [BASE_CHAIN_ID, "0x9008d19f58aabd9ed0d60971565aa8510560ab41", "CowSwap", "GPv2Settlement"],
   [BASE_CHAIN_ID, "0xa0d9c1e9e48ca30c8d8c3b5d69ff5dc1f6dffc24", "Aave", "WrappedTokenGatewayV3"],
@@ -1129,8 +1611,63 @@ const GROWTHEPIE_LABELS: [ChainId, string, string | null, string | null][] = [
   [BASE_CHAIN_ID, "0x9aab4b24541af30fd72784ed98d8756ac0efb3c7", null, "FeeClaimer"],
   [BASE_CHAIN_ID, "0x9bd25e67bf390437c8faf480ac735a27bcf6168c", null, "TokenJar"],
   [BASE_CHAIN_ID, "0x0000000000bbf5c5fd284e657f01bd000933c96d", null, "Adapter"],
+  // ── Base, batch 2 (item 430) ──
+  [BASE_CHAIN_ID, "0xea49d02c248b357b99670d9e9741f54f72df9cb3", null, "PortalsMulticall"],
+  [BASE_CHAIN_ID, "0x344e4d19c851b317bb65d31bb5c4e3815b53d727", null, "FlAaveV3WethGateway"],
+  [BASE_CHAIN_ID, "0xdca00000067413240aeab357a3a89ea352d013e8", null, "DcaDotFun"],
+  [BASE_CHAIN_ID, "0xa43f2e6e8313b46ddcb9190ce856af0089320956", null, "AaveV3Adapter"],
+  [BASE_CHAIN_ID, "0x498581ff718922c3f8e6a244956af099b2652b2b", "Uniswap", "PoolManager"],
+  [BASE_CHAIN_ID, "0xef42f78d25f4c681dcad2597fa04877ff802ef4b", null, "MagpieRouterV3"],
+  [BASE_CHAIN_ID, "0x6cae28b3d09d8f8fc74ccd496ac986fc84c0c24e", null, "ERC1967Proxy"],
+  [BASE_CHAIN_ID, "0x49bc51d8c140b7f64577ba01f5604014450645eb", null, "LendingManager"],
+  [BASE_CHAIN_ID, "0xb98c948cfa24072e58935bc004a8a7b376ae746a", null, "GeneralAdapter1"],
+  [BASE_CHAIN_ID, "0x5523e61fbef59825831ffbb1306abc3bb03bb3a4", null, "FLAction"],
+  [BASE_CHAIN_ID, "0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae", "LI.FI", "LiFiDiamond"],
+  [BASE_CHAIN_ID, "0x3ae633826cef322b1dfd43e129a0639330982247", null, "AutoRepayingManager"],
+  [BASE_CHAIN_ID, "0xb65cbf9689979e1749b38ba5d5155c70500292d8", null, "OperationExecutor"],
+  [BASE_CHAIN_ID, "0xb7401d91f1586474164b6c6df328e3c3a5f24649", null, "AaveV3"],
+  [BASE_CHAIN_ID, "0xa4b275feaf3a1450fc57270ed863923261abfd05", null, "ZapperExecutor"],
+  [BASE_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", null, "RelayRouterV3"],
+  [BASE_CHAIN_ID, "0x8b4fc1e68d4e1926cca5dd48f91156de94ea87d7", null, "AaveV3"],
+  [BASE_CHAIN_ID, "0x1111111254eeb25477b68fb85ed929f73a960582", null, "AggregationRouterV5"],
+  [BASE_CHAIN_ID, "0x87af4769e4134379125a262408e1f3ec60d2ab52", null, "FLAction"],
+  [BASE_CHAIN_ID, "0x560740052f380669c90811f711f80b21306d4713", null, "ZapperExecutor"],
+  [BASE_CHAIN_ID, "0x83240b049fa89b65be714aed68e5b074df6aac84", null, "Pair"],
+  [BASE_CHAIN_ID, "0xac80b9465d70aafbe492a08baea5c6e9d77b1478", null, "AaveV3"],
+  [BASE_CHAIN_ID, "0x2b66a88ac79acb3b548066bc1cf2ff2ff445ab45", null, "ERC1967Proxy"],
+  [BASE_CHAIN_ID, "0xf0f0f0f0fb0d738452efd03a28e8be14c76d5f73", null, "ElfomoFi"],
+  [BASE_CHAIN_ID, "0xd9a463ce7bfff3574c7aa60c14b91a6b7f507b2d", null, "AaveV3"],
+  [BASE_CHAIN_ID, "0x0d05a7d3448512b78fa8a9e46c4872c88c4a0d05", null, "OdosRouterV3"],
+  [BASE_CHAIN_ID, "0x4fbdd50fb2030e8439fc9a752d37e097def2fb07", null, "LendingManager"],
+  [BASE_CHAIN_ID, "0x01a3c8e513b758ebb011f7afaf6c37616c9c24d9", null, "MulticallRouter"],
+  [BASE_CHAIN_ID, "0x2d43e84567019d721f095cfd632291c3ee868d8f", null, "OperationExecutor"],
+  [BASE_CHAIN_ID, "0xaf49b5164832dfd3501fb8b56c9ecd1e548d730e", null, "RosettaProxy"],
+  [BASE_CHAIN_ID, "0xf3f1f5760a614b8146eec5d1c94658720c2425b9", null, "Pair"],
+  [BASE_CHAIN_ID, "0x240b3f3bb05475998b3eadfd4caa4f0c6ffbe83b", null, "ERC1967Proxy"],
+  [BASE_CHAIN_ID, "0x256f0f254b44c69e431c5eafbb9a86f85da1d1d3", null, "AaveV3"],
+  [BASE_CHAIN_ID, "0x0345aa92c7cb97e09b7cc0d55e730cd39c09fa43", null, "Pair"],
+  [BASE_CHAIN_ID, "0xce2541ce645a1b232ff2fead53dcd9f369e86ba4", null, "DZapZapCore"],
+  [BASE_CHAIN_ID, "0xaabd4b0372240e319f9722c4fd1e2fe0c8d422d2", null, "FLAction"],
+  [BASE_CHAIN_ID, "0xe4cfc10ee92bc52c873077e6de418ba0ba4e2609", null, "LeveragedPosition"],
+  [BASE_CHAIN_ID, "0xc57775a3e13c7941eccfbaf740392c650b51453d", null, "ZapperExecutor"],
+  [BASE_CHAIN_ID, "0x50974aac8ab56a40492767394e758549fe7e7526", null, "ERC1967Proxy"],
+  [BASE_CHAIN_ID, "0x8969d747abfbd389767d33774702f260da7c38b0", null, "ERC1967Proxy"],
+  [BASE_CHAIN_ID, "0x826bd427d842e18d5fc60975983829f37f90f77b", null, "AaveV3"],
+  [BASE_CHAIN_ID, "0x21e890d3da79c78f1b149367cf01d06789f95d39", null, "ZapperExecutor"],
+  [BASE_CHAIN_ID, "0xc16db2e93492e3ea512edc90787538652ec5c099", null, "AaveV3Adapter"],
+  [BASE_CHAIN_ID, "0xba25a6bf94ceb977ca1b4823158369463e514802", null, "LeveragedPosition"],
+  [BASE_CHAIN_ID, "0x92363f9817f92a7ae0592a4cb29959a88d885cc8", null, "PancakePair"],
+  [BASE_CHAIN_ID, "0x48eab07dc303ad02ddb9ff2733ba881f6a1b8d64", null, "Pair"],
+  [BASE_CHAIN_ID, "0x275cce00b312ef583bb6e07a828c135896ee2a7d", null, "AaveV3Adapter"],
+  [BASE_CHAIN_ID, "0x85cfb6917da8cc7c4c3b63f2120d2f636cf317bc", null, "ERC1967Proxy"],
+  [BASE_CHAIN_ID, "0x79474223aedd0339780bacce75abda0be84dcbf9", null, "PancakePair"],
+  [BASE_CHAIN_ID, "0x13b312fa5153088f71ef14b55953f72f7c0b25ea", null, "LeveragedPosition"],
   // ── Arbitrum ──
   [ARBITRUM_CHAIN_ID, "0x5283beced7adf6d003225c13896e536f2d4264ff", "Aave", "WrappedTokenGatewayV3"],
+  // ── Arbitrum, batch 2 (item 430) ──
+  [ARBITRUM_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", "Relay", null],
+  [ARBITRUM_CHAIN_ID, "0xe28e2c8d240dd5ebd0adcab86fbd79df7a052034", null, "ParaSwapRepayAdapter"],
+  [ARBITRUM_CHAIN_ID, "0x28201c152dc5b69a86fa54fcfd21bca4c0eff3ba", null, "ParaSwapRepayAdapter"],
 ];
 
 const keyOf = (chainId: ChainId, address: string) => `${chainId}:${address.toLowerCase()}`;
