@@ -305,6 +305,25 @@ export const transferCounterpartyProv = (dir: "in" | "out", coords: V3Coords, co
   };
 };
 
+/** The known contract that called the Pool for the wallet on a supply, borrow
+ *  or repay — the log's own party param (Supply/Borrow `user`, Repay
+ *  `repayer` = msg.sender at the Pool). The address is the log's fact, the
+ *  name is the registry's claim (`counterpartyNameInputs`). */
+export const poolCallerProv = (eventType: string, coords: V3Coords, caller: string): Provenance => {
+  const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
+  const named = getProtocolContract(caller, chainId);
+  const param = eventType === "repay" ? "repayer" : "user";
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `The contract that called the Pool for this wallet — the address the Pool wrote into this ${eventType}'s log as \`${param}\`, the account that made the call. The position is the wallet's; who signed the transaction is a separate question.${named ? knownContractSentence(named) : ""}`,
+    contract: poolOf(coords),
+    via: `${captureVia(coords)} · ${eventType === "repay" ? "Repay" : eventType === "borrow" ? "Borrow" : "Supply"} log · ${param}`,
+    inputs: eventInputs(coords, named ? counterpartyNameInputs(named, explorerUrl(chainId, "address", caller)) : []),
+  };
+};
+
 /** A swap leg's sign on its own axis: aTokens sent and debt repaid shrink it;
  *  aTokens received, a supply and a borrow grow it. */
 export const swapLegSign = (action: AaveV3SwapLegAction, kind?: AaveV3SwapDetail["kind"]): 1 | -1 =>

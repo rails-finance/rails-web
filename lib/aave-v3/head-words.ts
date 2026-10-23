@@ -20,6 +20,9 @@ export interface AaveFamilyHeadTable {
   transferred: string;
   to: string;
   from: string;
+  /** The lead before the known contract a supply, borrow or repay went
+   *  through. A family without it reads no clause. */
+  via?: string;
   swap: Record<AaveV3SwapKind, string>;
   emode: string;
   emodeOff: string;

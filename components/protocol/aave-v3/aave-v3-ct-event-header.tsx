@@ -6,7 +6,8 @@
 // The timeline's head (mode "row", rails-ops decision 0045) is words: the
 // past-participle kind (`aaveFamilyT1Kind`, lib/aave-v3/head-words.ts), a
 // transfer's counterparty as its clause, and the chips for what the spine
-// cannot show: a swap's venue, the WETH gateway, the treasury, the "by" party.
+// cannot show: a swap's venue, the WETH gateway, the treasury, the known
+// contract a supply, borrow or repay went through, the "by" party.
 // The spine carries the figures.
 //
 // The event page's card (mode "title") maps the signed amount(s) this event
@@ -27,6 +28,7 @@ import {
   externalActorProv,
   transferDeltaProv,
   transferCounterpartyProv,
+  poolCallerProv,
   swapVenueParty,
   swapVenueProv,
   swapLegNet,
@@ -34,7 +36,7 @@ import {
   swapLegSign,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
-import { aaveV3CtLabel, distributorPayout } from "@/lib/aave-v3/event-label";
+import { aaveV3CtLabel, distributorPayout, poolCallerContract } from "@/lib/aave-v3/event-label";
 import { useChainId } from "@/lib/shared/chain-context";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
@@ -69,7 +71,8 @@ export interface AaveV3CtEventHeaderProps {
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
   /** The position owner, for the receipt's owner row (required with
-   *  externalBy), and to tell a claimed payout from a received one. */
+   *  externalBy), to tell a claimed payout from a received one, and to tell
+   *  a known contract's call from the wallet's. */
   wallet?: string;
   /** The event's own token movements, read here for one thing only: the moved
    *  reserve's contract address, which the icon chip needs and the context does
@@ -94,7 +97,7 @@ function viaGatewayOf(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | und
 
 /** The timeline head's words as one line: the phone caption and the row's
  *  accessible name. `owner`: the position's wallet, which tells a claimed
- *  payout from a received one. */
+ *  payout from a received one and a known contract's call from its own. */
 export function aaveV3T1Caption(
   ctx: AaveV3Context,
   isFee: boolean,
@@ -107,6 +110,13 @@ export function aaveV3T1Caption(
     { eventType: ctx.eventType, fee: isFee, gateway, payout, swapKind: ctx.swap?.kind },
     V3_HEAD_WORDS,
   );
+  const caller = poolCallerContract(ctx, owner, chainId);
+  if (caller && ctx.poolCaller && V3_HEAD_WORDS.via)
+    return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
+      lead: V3_HEAD_WORDS.via,
+      address: ctx.poolCaller,
+      name: caller.name,
+    });
   const transfer = !isFee && !gateway && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
   if (!transfer || !ctx.counterparty) return kind;
   const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
@@ -266,6 +276,20 @@ export function useAaveV3HeadSpec({
           }
         : undefined;
 
+  // A supply, borrow or repay a known contract made for the wallet: "via
+  // Zerion". The signer stays on the "by" chip.
+  const caller = poolCallerContract(ctx, wallet, coords.chainId);
+  const callerParty =
+    caller && ctx.poolCaller
+      ? {
+          prefix: "via",
+          address: ctx.poolCaller,
+          name: caller.name,
+          icon: caller.protocolIcon ? protocolIconSrc(caller.protocolIcon) : undefined,
+          prov: poolCallerProv(ctx.eventType, coords, ctx.poolCaller),
+        }
+      : undefined;
+
   const externalActor =
     externalBy && wallet && ctx.txFrom && ctx.poolCaller
       ? {
@@ -296,7 +320,12 @@ export function useAaveV3HeadSpec({
       ),
       critical: isAaveV3LossRow(ctx),
       deltas: [],
-      clauses: isTransferRow && rowParty ? [<PartyChip key="party" party={rowParty} />] : undefined,
+      clauses:
+        isTransferRow && rowParty
+          ? [<PartyChip key="party" party={rowParty} />]
+          : callerParty
+            ? [<PartyChip key="caller" party={callerParty} />]
+            : undefined,
       party: isTransferRow ? undefined : rowParty,
       externalActor,
     };
@@ -309,7 +338,7 @@ export function useAaveV3HeadSpec({
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: isTransferRow,
     deltas,
-    party,
+    party: party ?? callerParty,
     externalActor,
   };
 }

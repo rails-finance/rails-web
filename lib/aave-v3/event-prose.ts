@@ -21,6 +21,7 @@ import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import type { ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { poolCallerContract } from "@/lib/aave-v3/event-label";
 import { externalActor } from "@/lib/shared/external-actor";
 import { v3Brand, isSeamless, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { feeLiquidation, liquidationBonus, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
@@ -68,16 +69,19 @@ function pick(
   ctx: AaveV3Context,
   chainId: ChainId,
   siblings?: readonly AaveV3TimelineEvent[],
+  owner?: string,
 ): { id: string; variant: string } {
+  // A supply, borrow or repay a known contract made for the wallet.
+  const via = poolCallerContract(ctx, owner, chainId) ? "via" : "default";
   switch (ctx.eventType) {
     case "supply":
-      return { id: "aave3.supply", variant: "default" };
+      return { id: "aave3.supply", variant: via };
     case "withdraw":
       return { id: "aave3.withdraw", variant: "default" };
     case "borrow":
-      return { id: "aave3.borrow", variant: "default" };
+      return { id: "aave3.borrow", variant: via };
     case "repay":
-      return { id: "aave3.repay", variant: "default" };
+      return { id: "aave3.repay", variant: via };
     case "liquidation":
       return { id: "aave3.liquidation", variant: "default" };
     case "bad_debt_written_off":
@@ -153,7 +157,7 @@ function returnedFrom(ctx: AaveV3Context, prev: AaveV3TimelineEvent | undefined)
 /** One event's explanation and modal. */
 export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
   const { ctx, protocol, chainId, state, owner, siblings, previousEvent, timestamp } = input;
-  const sel = pick(ctx, chainId, siblings);
+  const sel = pick(ctx, chainId, siblings, owner);
   const variant = sel.variant;
   const run = PROSE.start(PROSE.template(sel.id));
   const { t, values, sp } = run;
@@ -169,6 +173,14 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       ? externalActor(ctx, owner)
       : null;
   if (actor) v.actor = actor;
+  // The known contract the row went through: its sentence takes the place of
+  // the plain one. A repay with aTokens never has one: repayWithATokens
+  // repays the caller's own debt, so the caller is the wallet.
+  const caller = variant === "via" ? poolCallerContract(ctx, owner, chainId) : undefined;
+  if (caller) {
+    v.caller = caller.name;
+    v.role = caller.role;
+  }
 
   // The health factor after the event, where it means something: past, close
   // to or near the liquidation line, cleared, or the account emptied.
@@ -251,7 +263,7 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
 
   switch (t.id) {
     case "aave3.supply": {
-      sp.say(actor ? "supply.by" : "supply.what", amount);
+      sp.say(caller ? (actor ? "supply.by_via" : "supply.via") : actor ? "supply.by" : "supply.what", amount);
       const coll = state?.collateral;
       if (coll && !coll.before && coll.after) sp.say("coll.on");
       else if (coll?.after) sp.say("coll.was_on");
@@ -272,7 +284,7 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       break;
     }
     case "aave3.borrow": {
-      sp.say(actor ? "borrow.by" : "borrow.what", amount);
+      sp.say(caller ? (actor ? "borrow.by_via" : "borrow.via") : actor ? "borrow.by" : "borrow.what", amount);
       hfLine(false);
       priorLine();
       if (!rateLine() && ctx.borrowRate && Number(ctx.borrowRate) > 0) {
@@ -284,17 +296,25 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     case "aave3.repay": {
       const cleared = (num(ctx.debtAfter) ?? 1) <= 0;
       sp.say(
-        actor
-          ? cleared
-            ? "repay.by_cleared"
-            : "repay.by"
-          : ctx.useATokens
+        caller
+          ? actor
             ? cleared
-              ? "repay.atokens_cleared"
-              : "repay.atokens"
+              ? "repay.by_via_cleared"
+              : "repay.by_via"
             : cleared
-              ? "repay.cleared"
-              : "repay.what",
+              ? "repay.via_cleared"
+              : "repay.via"
+          : actor
+            ? cleared
+              ? "repay.by_cleared"
+              : "repay.by"
+            : ctx.useATokens
+              ? cleared
+                ? "repay.atokens_cleared"
+                : "repay.atokens"
+              : cleared
+                ? "repay.cleared"
+                : "repay.what",
         amount,
       );
       // A repay of the token a withdraw and swap sent to the wallet within the hour.
