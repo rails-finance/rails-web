@@ -363,12 +363,16 @@ async function main() {
   } finally {
     await browser.close();
   }
-
-  console.log(`\n${pass} passed, ${fail} failed`);
-  process.exit(fail === 0 ? 0 : 1);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// The tally and the exit code are read here, after main settles, so a check
+// that fails and returns early still exits 1.
+main()
+  .then(() => {
+    console.log(`\n${pass} passed, ${fail} failed`);
+    process.exit(fail === 0 ? 0 : 1);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

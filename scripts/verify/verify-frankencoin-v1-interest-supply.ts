@@ -89,19 +89,21 @@ async function live(): Promise<void> {
     );
 
     await page.goto(`${BASE}/ethereum/frankencoin/${V1_POSITION}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
-    // The closed position's "?" modal carries the Hub V1 "Interest up front" entry.
-    await page.locator('button[aria-label="Learn more"]').first().waitFor({ state: "attached", timeout: 90_000 });
-    await page.waitForTimeout(5_000); // hydration: a click before it opens nothing
-    const buttons = page.locator('button[aria-label="Learn more"]');
+    // The closed position's "?" modal carries the Hub V1 "Interest up front"
+    // entry. The "?" (C4) sits at the foot of the position card's Explanation
+    // pane (C3), which mounts once the chain read lands: open the pane, then
+    // press its "?" (rails-ops reference/app-anatomy.md).
+    const paneToggle = page.locator('button[data-anatomy="C3"]').first();
+    await paneToggle.waitFor({ state: "attached", timeout: 90_000 });
+    const trigger = page.locator('[data-anatomy="C4"] button[aria-label="Learn more"]').first();
+    const dialog = page.locator('[role="dialog"][data-anatomy="C4"]').first();
     let text = "";
-    for (let i = 0; i < (await buttons.count()) && !text; i++) {
-      await buttons.nth(i).evaluate((el) => (el as HTMLElement).click()); // the buttons sit in the collapsed layer
-      const dialog = page.locator('[role="dialog"]').first();
-      await dialog.waitFor({ state: "attached", timeout: 10_000 }).catch(() => {});
-      await page.waitForTimeout(1_000);
-      const body = (await dialog.textContent().catch(() => "")) ?? "";
-      if (/About this position/.test(body)) text = body;
-      else await page.keyboard.press("Escape");
+    // A press before hydration is lost, so press until the pane and the modal open.
+    for (let i = 0; i < 6 && !text; i++) {
+      if ((await paneToggle.getAttribute("aria-expanded")) !== "true") await paneToggle.click().catch(() => {});
+      await trigger.click({ timeout: 5_000 }).catch(() => {});
+      await dialog.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
+      text = (await dialog.textContent().catch(() => "")) ?? "";
     }
     check(
       "V1 position: the ? modal's interest entry names the 4-week minimum and the rate fixed at opening",

@@ -18,6 +18,7 @@
 
 import { chromium } from "playwright";
 import { armScope } from "./lib/prov-inspector.mjs";
+import { showCardTab } from "./lib/card-tabs.mjs";
 
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
@@ -235,8 +236,10 @@ async function eventRowUsd(card, side) {
 
 /** An Aave V3 Ethereum card reads its balances when it opens (rails-ops
  *  TO-DO-ui-jobs §19), and its USD chips arrive with that answer: wait for it
- *  before reading them. */
+ *  before reading them. The sheet and the position state are drawn on the
+ *  card's Figures tab (ui-jobs 370), so that tab is shown first. */
 async function positionStateSettled(proto, card) {
+  await showCardTab(card, "figures");
   if (proto === "spark") {
     // Spark reads the account when the card first opens (ui-jobs 309 step 6,
     // `onOpen`); its sheet stands as a skeleton until the read lands.
