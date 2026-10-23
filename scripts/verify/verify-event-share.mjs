@@ -83,7 +83,6 @@
 
 import { chromium } from "playwright";
 import { CLOSED_GROUP, GROUP_FRAME, openGroup } from "./lib/group-rows.mjs";
-import { openPositionCards } from "./lib/position-card.mjs";
 import { showCardTab, waitOnFigures } from "./lib/card-tabs.mjs";
 import {
   exhaustPaging,
@@ -124,20 +123,12 @@ const FAMILIES_FILTER = process.env.FAMILIES
     )
   : null;
 
-/** Families whose pinned page must carry the Explanation pane's copy-view link
- *  (see `verifyPinnedPage`). */
-const EXPLANATION_FROM_FIRST_PAINT = new Set([
-  "aave-v3",
-  "spark",
-  "moonwell",
-  "compound-v2",
-  "dolomite",
-  "dolomite-closed",
-  "llamalend",
-  "llamalend-closed",
-  // Retired for liquity-v1 (ui-jobs 236): its event route is the event's page,
-  // which draws no position card, so no Explanation pane carries the link.
-]);
+// The pinned page's copy-view check (a family's position card carrying the
+// Explanation pane's "Copy a link to this view" on its event route) is
+// retired: since ui-jobs 307 (13 Oct 2026) every family's event route is the
+// shared event page, which draws no position card, so no Explanation pane
+// carries the link (read on Aave V3's 0xa09e…e421 event page, 23 Oct 2026). It
+// went the same way for liquity-v1 under ui-jobs 236.
 
 /** Families whose opened card's T2 is the event sheet (ui-jobs 330). A
  *  family's every label is listed; some of its event kinds keep the cells
@@ -319,27 +310,15 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
   check(`${label} @${width}: its data-event-id is the shared id`, ids[0] === expectedId, ids[0]);
   // The toolbar is named by its count line (`data-timeline-total`). Until
   // 2026-09-11 it was named by its copy-view-link, and `ec46e137` moved that
-  // control into the position card's Explanation pane, where a pinned page
-  // still draws it on most families — so that selector read the CARD and
-  // called the toolbar present. From then to 2026-10-01 it was the Date
+  // control into the position card's Explanation pane, which a pinned page
+  // drew on most families until ui-jobs 307 — so that selector read the CARD
+  // and called the toolbar present. From then to 2026-10-01 it was the Date
   // control, which the families tied to a Lifetime flows chart no longer
   // draw. Check 1 proves this selector finds the toolbar where there is one.
   const toolbarCount = await page.locator("[data-timeline-total]").count();
   check(`${label} @${width}: toolbar absent (no count line)`, toolbarCount === 0, `${toolbarCount} found`);
   const sortBtn = await page.locator('button[aria-label^="Currently"]').count();
   check(`${label} @${width}: toolbar sort control absent`, sortBtn === 0);
-  // These families pass the card an Explanation whatever the account's status
-  // and before the live chain read lands, so the pane's copy-view link is in
-  // the DOM (`keepMounted`, pane closed) as soon as the card is. The two
-  // `-closed` entries pin a closed account, which narrates nothing and still
-  // draws the control.
-  if (EXPLANATION_FROM_FIRST_PAINT.has(label)) {
-    // A closed position card (ui-jobs 209) draws its Explanation row once open.
-    await openPositionCards(page);
-    const copyView = page.locator('button[aria-label="Copy a link to this view"]').first();
-    await copyView.waitFor({ state: "attached", timeout: 5000 }).catch(() => {});
-    check(`${label} @${width}: the card's Explanation pane carries the copy-view link`, (await copyView.count()) > 0);
-  }
   // A cells family's opened card draws its cells and no sheet (ui-jobs 330);
   // the sheet families are read in THE EVENT SHEET below.
   if (!SHEET_FAMILIES.has(label)) {
