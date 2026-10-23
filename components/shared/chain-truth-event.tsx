@@ -28,7 +28,7 @@
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { createContext, Fragment, useContext, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useId, type ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-pill";
@@ -1030,6 +1030,13 @@ export function HeadSurplusChip({ surplus }: { surplus: NonNullable<ChainTruthRo
   );
 }
 
+/** The row's offer of its head chips to the event menu (rails-ops TO-DO-ui-jobs
+ *  433): each PartyChip mounted in a card offers its words under an id, which
+ *  its prefix span carries as `data-party-chip`, and withdraws them as it
+ *  unmounts. The card's ⋮ opens the first chip's receipt from there
+ *  (`EventCardMenu` `headChip`). */
+export const HeadChipContext = createContext<((id: string, words: string | null) => void) | null>(null);
+
 /** Neutral counterparty chip (a transfer's to/from, a give's new owner) — the
  *  same shape as the external-actor chip. `tone: "party"` tints it party-pink
  *  for a delegate the owner handed control to. A registry `name` renders over
@@ -1040,13 +1047,23 @@ export function HeadSurplusChip({ surplus }: { surplus: NonNullable<ChainTruthRo
 export function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }) {
   const ens = useEnsName(party.ens ? party.address : null);
   const shown = party.name ?? ens ?? `${party.address.slice(0, 6)}…${party.address.slice(-4)}`;
+  const chipId = useId();
+  const offer = useContext(HeadChipContext);
+  const words = `${party.prefix} ${shown}`;
+  useEffect(() => {
+    if (!offer) return;
+    offer(chipId, words);
+    return () => offer(chipId, null);
+  }, [offer, chipId, words]);
   return (
     <Prov
       info={party.prov}
       value={party.name ?? ens ?? party.address}
       className="inline-flex items-center gap-1 text-sm"
     >
-      <span className="text-rb-500">{party.prefix}</span>
+      <span className="text-rb-500" data-party-chip={chipId}>
+        {party.prefix}
+      </span>
       {party.name && party.icon && (
         <img
           src={party.icon}

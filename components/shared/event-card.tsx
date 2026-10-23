@@ -16,7 +16,7 @@ import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/eve
 import { CardTabStrip } from "@/components/shared/info-disclosure";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
-import { ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
+import { ProvReceiptsScope, provInspector, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } from "@/components/shared/mobile-spine";
@@ -30,7 +30,12 @@ import {
   type SpineColumnProps,
 } from "@/components/shared/spine-column";
 import { useRowTarget } from "@/components/shared/row-target";
-import { ChainTruthRow, HeadSurplusChip, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthRow,
+  HeadChipContext,
+  HeadSurplusChip,
+  type ChainTruthRowSpec,
+} from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
 import {
@@ -644,7 +649,33 @@ function EventCardView(props: EventCardProps) {
   // the header on desktop, at the caption's right on a phone. On the event
   // page it carries the event's "Inspect provenance". A press on it stays
   // with the menu (Escape still reaches the menu's document listener).
-  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu);
+  // The head chips the row draws (PartyChip offers each), and the ⋮'s Trace
+  // row for the first: it arms this event and pins the chip's receipt at the
+  // chip, as an armed click on it would.
+  const [chips, setChips] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const offerChip = useCallback((id: string, words: string | null) => {
+    setChips((prev) => {
+      if (words == null ? !prev.has(id) : prev.get(id) === words) return prev;
+      const next = new Map(prev);
+      if (words == null) next.delete(id);
+      else next.set(id, words);
+      return next;
+    });
+  }, []);
+  const firstChip = groupMenu ? undefined : chips.entries().next().value;
+  const headChip = firstChip
+    ? {
+        words: firstChip[1],
+        open: () => {
+          const marker = rowRef.current?.querySelector(`[data-party-chip="${CSS.escape(firstChip[0])}"]`);
+          if (!marker) return;
+          provInspector.setArmed(true, scopeId);
+          const entry = registry.getEntries().find((e) => !e.echo && e.el?.contains(marker));
+          if (entry?.el) provInspector.pin(entry, registry, entry.el);
+        },
+      }
+    : undefined;
+  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu, !!headChip);
   const headMenu =
     pageMode || menuRows ? (
       <span
@@ -659,6 +690,7 @@ function EventCardView(props: EventCardProps) {
           shareHref={groupMenu ? null : shareHref}
           groupShow={groupMenu}
           provScope={pageMode ? { id: scopeId, hint: EVENT_PAGE_WORDS.provenance_hint } : undefined}
+          headChip={headChip}
         />
       </span>
     ) : null;
@@ -853,81 +885,83 @@ function EventCardView(props: EventCardProps) {
     <SpineLegsContext.Provider value={spineLegs}>
       <PriceBasisProvider>
         <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-          {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
+          <HeadChipContext.Provider value={offerChip}>
+            {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
           the first event card stands for the spine's row height. One DOM at
           both widths (`.spine-row` in app/globals.css): from 640px the spine
           column holds 2/5 of the row beside the card; below it, a timeline
           row's column takes the width with the T1 row drawn as the caption
           under its node, and the body opens beneath. */}
-          <div
-            ref={rowRef}
-            data-skel-section="detail-event"
-            data-prov-scope={scopeId}
-            data-prov-lit={lit ? "" : undefined}
-            className={`${
-              pageMode
-                ? "flex w-full flex-col max-sm:!px-0 sm:flex-row sm:items-start"
-                : `spine-row evt-row${showChevron ? " evt-row-target" : ""}${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
-            } relative ${scale.cardRounded} ${
-              muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
-            }`}
-            style={pageMode ? { padding: scale.cardPad } : undefined}
-            {...(rowTarget ? rowClick : {})}
-            onPointerEnter={onIntent}
-            onFocus={onIntent}
-          >
-            {showAvatar && avatar}
-            {page ? (
-              // The event page: the column holds the shared side column,
-              // stacked above the card below sm, where the row drops its side
-              // padding so the paragraph and the card share one width.
-              <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
-                <EventPageAside
-                  page={page}
-                  sentence={pageSentence}
-                  beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
-                  learnMore={learnMore}
-                />
-              </div>
-            ) : (
-              <div className="spine-cell" data-anatomy="L3">
-                {inTimeline && (
-                  <span id={labelId} hidden>
-                    {spoken}
-                  </span>
-                )}
-                <SpineRowContext.Provider value={rowSlot}>{iconColumn}</SpineRowContext.Provider>
-                {phoneToggles && (
-                  // Under 640px the segment, its flank values and its caption
-                  // are one button, laid over the column; the glyphs under it
-                  // take no pointer.
-                  <button
-                    data-spine-toggle=""
-                    {...disclosureProps<HTMLButtonElement>(showDetail, panelId, () => toggleDetail())}
-                    {...nameProps}
-                    className="absolute inset-0 z-20 min-h-11 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:hidden"
+            <div
+              ref={rowRef}
+              data-skel-section="detail-event"
+              data-prov-scope={scopeId}
+              data-prov-lit={lit ? "" : undefined}
+              className={`${
+                pageMode
+                  ? "flex w-full flex-col max-sm:!px-0 sm:flex-row sm:items-start"
+                  : `spine-row evt-row${showChevron ? " evt-row-target" : ""}${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
+              } relative ${scale.cardRounded} ${
+                muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
+              }`}
+              style={pageMode ? { padding: scale.cardPad } : undefined}
+              {...(rowTarget ? rowClick : {})}
+              onPointerEnter={onIntent}
+              onFocus={onIntent}
+            >
+              {showAvatar && avatar}
+              {page ? (
+                // The event page: the column holds the shared side column,
+                // stacked above the card below sm, where the row drops its side
+                // padding so the paragraph and the card share one width.
+                <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
+                  <EventPageAside
+                    page={page}
+                    sentence={pageSentence}
+                    beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
+                    learnMore={learnMore}
                   />
-                )}
+                </div>
+              ) : (
+                <div className="spine-cell" data-anatomy="L3">
+                  {inTimeline && (
+                    <span id={labelId} hidden>
+                      {spoken}
+                    </span>
+                  )}
+                  <SpineRowContext.Provider value={rowSlot}>{iconColumn}</SpineRowContext.Provider>
+                  {phoneToggles && (
+                    // Under 640px the segment, its flank values and its caption
+                    // are one button, laid over the column; the glyphs under it
+                    // take no pointer.
+                    <button
+                      data-spine-toggle=""
+                      {...disclosureProps<HTMLButtonElement>(showDetail, panelId, () => toggleDetail())}
+                      {...nameProps}
+                      className="absolute inset-0 z-20 min-h-11 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:hidden"
+                    />
+                  )}
+                </div>
+              )}
+              <div className={pageMode ? "min-w-0 grow" : "spine-content"}>
+                <EventPageContext.Provider value={null}>
+                  {t1}
+                  {body}
+                </EventPageContext.Provider>
               </div>
-            )}
-            <div className={pageMode ? "min-w-0 grow" : "spine-content"}>
-              <EventPageContext.Provider value={null}>
-                {t1}
-                {body}
-              </EventPageContext.Provider>
-            </div>
-            {/* The number column, at the row's far left, level with the
+              {/* The number column, at the row's far left, level with the
                 first node: the event's number, or the boundary's count. After
                 the card in the DOM, so the keyboard reaches the header first. */}
-            {!pageMode && (
-              <div
-                className={`spine-num absolute z-20 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
-                data-number-column=""
-              >
-                {numberSlot ?? numberNode}
-              </div>
-            )}
-          </div>
+              {!pageMode && (
+                <div
+                  className={`spine-num absolute z-20 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
+                  data-number-column=""
+                >
+                  {numberSlot ?? numberNode}
+                </div>
+              )}
+            </div>
+          </HeadChipContext.Provider>
         </ProvReceiptsScope>
       </PriceBasisProvider>
     </SpineLegsContext.Provider>

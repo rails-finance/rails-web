@@ -7,8 +7,9 @@
 // past-participle kind (`aaveFamilyT1Kind`, lib/aave-v3/head-words.ts), a
 // transfer's counterparty as its clause, and the chips for what the spine
 // cannot show: a swap's venue, the WETH gateway, the treasury, the known
-// contract a supply, borrow or repay went through, the router a sale went
-// through ("Sold · via Zerion router", `ctx.sale`), the "by" party.
+// contract a supply, borrow or repay went through, the known contract a
+// withdrawal was paid to ("Withdrew · to Balancer V3"), the router a sale went
+// through ("Sold · via Zerion", `ctx.sale`), the "by" party.
 // The spine carries the figures.
 //
 // The event page's card (mode "title") maps the signed amount(s) this event
@@ -30,6 +31,7 @@ import {
   transferDeltaProv,
   transferCounterpartyProv,
   poolCallerProv,
+  withdrawRecipientProv,
   swapVenueParty,
   swapVenueProv,
   swapLegNet,
@@ -38,7 +40,13 @@ import {
   saleLegProv,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
-import { aaveV3CtLabel, distributorPayout, poolCallerContract, stakedVia } from "@/lib/aave-v3/event-label";
+import {
+  aaveV3CtLabel,
+  distributorPayout,
+  poolCallerContract,
+  stakedVia,
+  withdrawRecipient,
+} from "@/lib/aave-v3/event-label";
 import { useChainId } from "@/lib/shared/chain-context";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
@@ -134,6 +142,13 @@ export function aaveV3T1Caption(
       lead: V3_HEAD_WORDS.via,
       address: ctx.poolCaller,
       name: caller.name,
+    });
+  const recipient = withdrawRecipient(ctx, owner, chainId);
+  if (recipient && ctx.recipient)
+    return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
+      lead: V3_HEAD_WORDS.to,
+      address: ctx.recipient,
+      name: recipient.name,
     });
   const transfer = !isFee && !gateway && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
   if (!transfer || !ctx.counterparty) return kind;
@@ -326,6 +341,20 @@ export function useAaveV3HeadSpec({
           prov: poolCallerProv(ctx.eventType, coords, ctx.poolCaller),
         }
       : undefined;
+  // A withdrawal the Pool paid to a known contract: "to Balancer V3". The two
+  // never meet on one row: the caller reads on supply, borrow and repay.
+  const recipient = withdrawRecipient(ctx, wallet, coords.chainId);
+  const throughParty =
+    callerParty ??
+    (recipient && ctx.recipient
+      ? {
+          prefix: "to",
+          address: ctx.recipient,
+          name: recipient.name,
+          icon: recipient.protocolIcon ? protocolIconSrc(recipient.protocolIcon) : undefined,
+          prov: withdrawRecipientProv(coords, ctx.recipient),
+        }
+      : undefined);
 
   const externalActor =
     externalBy && wallet && ctx.txFrom && ctx.poolCaller
@@ -363,8 +392,8 @@ export function useAaveV3HeadSpec({
       clauses:
         isTransferRow && rowParty
           ? [<PartyChip key="party" party={rowParty} />]
-          : callerParty
-            ? [<PartyChip key="caller" party={callerParty} />]
+          : throughParty
+            ? [<PartyChip key="caller" party={throughParty} />]
             : undefined,
       party: isTransferRow ? undefined : rowParty,
       externalActor,
@@ -378,7 +407,7 @@ export function useAaveV3HeadSpec({
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
     custody: isTransferRow && !sale,
     deltas,
-    party: party ?? callerParty,
+    party: party ?? throughParty,
     externalActor,
   };
 }

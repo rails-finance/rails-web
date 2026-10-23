@@ -3,7 +3,9 @@
 // The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308), at the T1 row's
 // right end (ui-jobs 295), the same on every family: Open event page, inside
 // a group Show {n} grouped events or Group {n} events, and on a timeline Hide the row's
-// type of event, the Types of event filter's untick. On the event page it holds
+// type of event, the Types of event filter's untick, and where the row's head
+// names a party (a via, to/from or venue chip) Trace that chip, which opens its
+// receipt at the chip (`headChip`, ui-jobs 433). On the event page it holds
 // the event's Inspect provenance (`provScope`). The explorer link is the row's
 // hash under Display's Transaction hashes (ui-jobs 294); copy link is on the
 // event page's actions row (`components/shared/event-page-aside.tsx`), which
@@ -11,7 +13,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, ChevronDown, ChevronUp, EyeOff } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, Crosshair, EyeOff } from "lucide-react";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 
 /** The menu's words. */
@@ -21,6 +23,7 @@ const WORDS = {
   view_page: "Open event page",
   view_page_hint: "Open this event's page",
   hide_type_hint: "Tick it in Types of event to bring them back",
+  trace_chip_hint: "Open its receipt in the row",
 };
 
 /** The clipboard write for a text that arrives later (a fetch): a
@@ -83,19 +86,20 @@ export function hideTypeWords(label: string, suffix?: ReactNode): { title: React
 }
 
 /** Whether the ⋮ has a row: the event page from anywhere but that page,
- *  a group's show or hide, or the row's type to hide. */
-export function useEventMenuRows(shareHref: string | null, groupShow: boolean): boolean {
+ *  a group's show or hide, the row's type to hide, or a head chip to trace. */
+export function useEventMenuRows(shareHref: string | null, groupShow: boolean, headChip = false): boolean {
   const pathname = usePathname();
   const group = useContext(GroupHideContext);
   const hideType = useContext(EventTypeHideContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
-  return groupShow || group != null || hideType != null || (pagePath != null && pathname !== pagePath);
+  return groupShow || headChip || group != null || hideType != null || (pagePath != null && pathname !== pagePath);
 }
 
 export function EventCardMenu({
   shareHref,
   groupShow,
   provScope,
+  headChip,
 }: {
   /** A closed group's row: its one item, "Show 48 grouped events", the only
    *  way to open the group (ui-jobs 250, third revision). */
@@ -105,6 +109,10 @@ export function EventCardMenu({
   shareHref: string | null;
   /** The event page's row: Inspect provenance, armed on this event. */
   provScope?: { id: string; hint: string };
+  /** The row's head chip ("via WETH gateway", "to Balancer V3", "via CoW
+   *  Protocol"): its words, and the open that arms the row and pins the
+   *  chip's receipt. One mechanism for every PartyChip (HeadChipContext). */
+  headChip?: { words: string; open: () => void };
 }) {
   const pathname = usePathname();
   const group = useContext(GroupHideContext);
@@ -153,6 +161,18 @@ export function EventCardMenu({
                 subtitle={WORDS.view_page_hint}
                 href={shareHref}
                 onClick={close}
+              />
+            )}
+            {headChip && (
+              <ToolsMenuItem
+                item="trace-chip"
+                icon={<Crosshair size={16} />}
+                title={<>Trace “{headChip.words}”</>}
+                subtitle={WORDS.trace_chip_hint}
+                onClick={() => {
+                  close();
+                  headChip.open();
+                }}
               />
             )}
             {group && (

@@ -92,6 +92,9 @@ export interface AaveV3IndexRow {
   reserve: string;
   amount: string;
   pool_caller?: string | null;
+  /** withdraw: the log's `to` where the Pool paid another account
+   *  (rails-server services/aave-base-row-indexes.ts). Absent from an older api. */
+  recipient?: string | null;
   collateral_asset?: string | null;
   liquidated_collateral_amount?: string | null;
   liquidator?: string | null;
@@ -516,6 +519,7 @@ export function decodeAaveV3IndexRows(wire: readonly AaveV3IndexRow[]): {
         : {}),
       ...(r.liquidator ? { liquidator: r.liquidator.toLowerCase() } : {}),
       ...(r.pool_caller ? { poolCaller: r.pool_caller.toLowerCase() } : {}),
+      ...(r.kind === "withdraw" && r.recipient ? { recipient: r.recipient.toLowerCase() } : {}),
       ...(r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
       ...(r.interest_rate_mode != null ? { interestRateMode: Number(r.interest_rate_mode) } : {}),
       ...(r.borrow_rate != null ? { borrowRate: r.borrow_rate } : {}),

@@ -725,6 +725,8 @@ templates:
         a withdrawal from the Pool
       gateway: |-
         a withdrawal as ETH through the WETH gateway
+      to: |-
+        a withdrawal the Pool paid to a known contract
     sentences:
       withdraw.what:
         when: |-
@@ -736,10 +738,22 @@ templates:
           gateway
         text: |-
           Withdrew {amount} {symbol} as ETH through the WETH gateway.
+      withdraw.to:
+        when: |-
+          to, the Pool paid a known contract
+        text: |-
+          Withdrew {amount} {symbol} from {protocol} to {role}.
+      withdraw.elsewhere:
+        when: |-
+          default, the Pool paid an account the registry does not name
+        text: |-
+          Withdrew {amount} {symbol} from {protocol} to another account.
     order:
       [
         withdraw.what,
         withdraw.gateway,
+        withdraw.to,
+        withdraw.elsewhere,
         off.switched,
         hf.under,
         hf.close,
@@ -762,7 +776,7 @@ templates:
         rate.held,
       ]
     groups:
-      happened: [withdraw.what, withdraw.gateway, off.switched]
+      happened: [withdraw.what, withdraw.gateway, withdraw.to, withdraw.elsewhere, off.switched]
       leaves:
         [
           hf.under,
@@ -786,6 +800,7 @@ templates:
           rate.held,
         ]
     alternates:
+      - [withdraw.what, withdraw.gateway, withdraw.to, withdraw.elsewhere]
       - [
           hf.under,
           hf.close,

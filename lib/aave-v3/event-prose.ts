@@ -21,7 +21,7 @@ import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import type { ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
-import { poolCallerContract } from "@/lib/aave-v3/event-label";
+import { poolCallerContract, withdrawRecipient } from "@/lib/aave-v3/event-label";
 import { legAmount } from "@/lib/shared/tx-legs";
 import { externalActor } from "@/lib/shared/external-actor";
 import { v3Brand, isSeamless, type V3Protocol } from "@/lib/aave-v3/protocol-name";
@@ -81,7 +81,8 @@ function pick(
     case "supply":
       return { id: "aave3.supply", variant: moved };
     case "withdraw":
-      return { id: "aave3.withdraw", variant: "default" };
+      // A withdrawal the Pool paid to a known contract.
+      return { id: "aave3.withdraw", variant: withdrawRecipient(ctx, owner, chainId) ? "to" : "default" };
     case "borrow":
       return { id: "aave3.borrow", variant: moved };
     case "repay":
@@ -299,9 +300,26 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       break;
     }
     case "aave3.withdraw": {
-      sp.say(variant === "gateway" ? "withdraw.gateway" : "withdraw.what", {
-        amount: variant === "gateway" ? "transfer" : "amount",
-      });
+      // The recipient: a known contract, or an account the registry does not
+      // name (the sentence then leaves out "to the wallet").
+      const to = variant === "to" ? withdrawRecipient(ctx, owner, chainId) : undefined;
+      if (to) v.role = to.role;
+      const elsewhere =
+        !to &&
+        !!ctx.recipient &&
+        !!owner &&
+        ctx.recipient !== owner.toLowerCase() &&
+        !getProtocolContract(ctx.recipient, chainId);
+      sp.say(
+        variant === "gateway"
+          ? "withdraw.gateway"
+          : to
+            ? "withdraw.to"
+            : elsewhere
+              ? "withdraw.elsewhere"
+              : "withdraw.what",
+        { amount: variant === "gateway" ? "transfer" : "amount" },
+      );
       if (switchedOff()) sp.say("off.switched");
       hfLine(true);
       priorLine();
