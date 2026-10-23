@@ -611,6 +611,12 @@ for (const pg of PAGES) {
 
     // Three stops: the opening, the middle and the day before today; the
     // price strip focused, which shows its readout as the cursor's tip.
+    // The value line as the stops find it: read here, after the asset picks
+    // and the health view's late reads, so the check below is about the
+    // stops alone (on 0xfb93 the line read at load is not the line the stops
+    // find, 23 Oct 2026, so the load-time read tested the picks and the late
+    // reads along with them).
+    const lineBeforeStops = await valueLine();
     const sl = page.locator(PRICE).first();
     await sl.focus();
     const max = Number(await sl.getAttribute("aria-valuemax"));
@@ -664,7 +670,7 @@ for (const pg of PAGES) {
     await page.waitForTimeout(300);
     check(
       `${tag}: the value line is unchanged by the stops`,
-      (await valueLine()) === before.line && before.line.length > 0,
+      (await valueLine()) === lineBeforeStops && lineBeforeStops.length > 0,
     );
     check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
