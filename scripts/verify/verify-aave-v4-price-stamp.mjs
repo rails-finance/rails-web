@@ -51,6 +51,8 @@ const env = Object.fromEntries(
         .replace(/^"|"$/g, ""),
     ]),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 if (!env.ALCHEMY_URL) throw new Error("need ALCHEMY_URL in .env.local");
 const scrub = (text) => String(text).replace(/https?:\/\/[^\s"'`)}\]]+/g, "<lane URL redacted>");
 for (const signal of ["uncaughtException", "unhandledRejection"])

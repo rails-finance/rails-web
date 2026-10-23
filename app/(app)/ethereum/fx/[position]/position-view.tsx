@@ -24,7 +24,7 @@ import { fetchFxTimeline } from "@/lib/api/fetch-fx-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -110,7 +110,7 @@ export default function FxPositionView({
     (async () => {
       setLoading(true);
       try {
-        const tData = await fetchFxTimeline(parsed.pool, parsed.positionId, { recent: TIMELINE_WINDOW_EVENTS });
+        const tData = await fetchFxTimeline(parsed.pool, parsed.positionId, { recent: TIMELINE_WINDOW_ROWS });
         setView(tData.position ? viewFromSummary(tData.position) : null);
         setEvents(tData.events ?? []);
         setCutoffBlock(tData.cutoffBlock ?? null);

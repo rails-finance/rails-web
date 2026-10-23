@@ -79,7 +79,7 @@ const FIXTURES = [
 
 // Every registry display name the control must NOT show.
 const REGISTRY_NAMES =
-  /CoW Protocol|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Zerion|Enso|Multicall|CCIP escrow/;
+  /CoW Protocol|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Zerion|Enso|Multicall|CCIP escrow|0x Settler|0x flash wallet|0xbow zap|Aave Clinic Steward|Aave Umbrella|Aave adapter|Aerodrome|Asset pool|Balancer V3|Cross-chain order contract|Curve|DEX aggregator|DODO pool|DZap|Dynamic route|Eisen|Fee collector|Fee vault|Gaslite|Krystal|LI\.FI|Leftover exchanger|Mayan|Merkl|Morpho migration bundler|Oku router|OKX|Omni Exchange|Order fee taker|Pendle|Pool liquidity manager|Portikus|Rainbow|Rango|Revert auto-compound|Socket|Sushi|Swap callback|Swap executor|Swap helper|Swap router|SwapVM router|Underscore|V3 pool adaptor|V3 position utils|Vault rewards module/;
 
 const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
 let pass = 0;

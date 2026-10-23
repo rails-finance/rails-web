@@ -1,8 +1,6 @@
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
-import type { CurveEventType } from "@/lib/shared/types/protocols/curve";
-import type { UniswapEventType } from "@/lib/shared/types/protocols/uniswap";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
-import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
+import { FAQ_URLS, AAVE_FAQ_URLS } from "@/lib/shared/faq-urls";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
 import { indefiniteArticle } from "@/lib/utils/format";
 
@@ -331,10 +329,6 @@ export function aaveV4EconomicsContent(
     ],
   };
 }
-
-// ── Curve ────────────────────────────────────────────────────────────────────
-
-// ── Uniswap V3 ───────────────────────────────────────────────────────────────
 
 // ── Stability Pool ──────────────────────────────────────────────────────────
 

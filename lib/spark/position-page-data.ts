@@ -14,7 +14,7 @@ import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-a
 import { readSparkOpeningBalance, readSparkPositions, readSparkTimeline } from "@/lib/spark/proxy-reads";
 import type { SparkGroupedTimelineResult } from "@/lib/api/fetch-spark-timeline";
 import type { SparkTimelineResult } from "@/lib/sources/api/spark-timeline";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 
 /**
@@ -45,7 +45,7 @@ export const loadSparkPositionTail = cache(async (wallet: string, grouped: boole
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<SparkTimelineResult | SparkGroupedTimelineResult>(
         await readSparkTimeline(
-          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_EVENTS) }),
+          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_ROWS) }),
           { baseUrl, headers },
         ),
         "readSparkTimeline",

@@ -42,7 +42,8 @@
 
 import { gunzipSync } from "node:zlib";
 import { spawn, spawnSync } from "node:child_process";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { parseEnv } from "node:util";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,7 +51,9 @@ import { hostFetch } from "./lib/host.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 try {
-  process.loadEnvFile(path.join(REPO, ".env.local"));
+  // A key already set in the environment wins; an empty one counts as unset, which process.loadEnvFile would not do.
+  for (const [k, v] of Object.entries(parseEnv(readFileSync(path.join(REPO, ".env.local"), "utf8"))))
+    if (!process.env[k]) process.env[k] = v;
 } catch {
   /* the env must already carry RAILS_API_URL and API_BEARER_TOKEN */
 }

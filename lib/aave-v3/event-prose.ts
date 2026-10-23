@@ -83,6 +83,9 @@ function pick(
     case "bad_debt_written_off":
       return { id: "aave3.bad_debt", variant: "default" };
     case "transfer_in":
+      // A distributor pays tokens out to many accounts: a payout.
+      if (getProtocolContract(ctx.counterparty, chainId)?.kind === "distributor")
+        return { id: "aave3.transfer_in", variant: "distributor" };
       return { id: "aave3.transfer_in", variant: "default" };
     case "transfer_out": {
       if (feeLiquidation(ctx, siblings, chainId)) return { id: "aave3.liq_fee", variant: "default" };
@@ -355,10 +358,11 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     case "aave3.transfer_in": {
       const named = getProtocolContract(ctx.counterparty, chainId);
       v.sender = named?.name ?? V3_WORDS.another_account;
-      sp.say("tin.what", { amount: "transfer" });
-      if (named) {
-        v.role = named.role;
-        sp.say("tin.named");
+      if (named) v.role = named.role;
+      if (variant === "distributor") sp.say("tin.payout", { amount: "transfer" });
+      else {
+        sp.say("tin.what", { amount: "transfer" });
+        if (named) sp.say("tin.named");
       }
       const sentAt = returnedFrom(ctx, previousEvent);
       if (sentAt != null && timestamp != null) {

@@ -31,7 +31,7 @@ import { fetchLiquityV1Position, type LiquityV1PositionChainResponse } from "@/l
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -131,7 +131,7 @@ export default function LiquityV1TroveView({
         // one summary per (wallet, epoch); the timeline carries all lives' events.
         const [pData, tData] = await Promise.all([
           fetchLiquityV1Positions({ wallet, limit: 100 }),
-          fetchLiquityV1Timeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          fetchLiquityV1Timeline(wallet, { recent: TIMELINE_WINDOW_ROWS }),
         ]);
         setSummaries(pData.data);
 

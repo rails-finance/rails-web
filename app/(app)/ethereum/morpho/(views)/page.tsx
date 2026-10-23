@@ -29,8 +29,8 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore Morpho Blue Positions", canonicalPath: "/ethereum/morpho" });
 
-/** The roster for this request, or "unavailable" — the route 404s until the
- *  backend half is deployed, and the listing is built to work without it. */
+/** The roster for this request, or "unavailable" when the backend fails to
+ *  answer; the listing is built to work without it. */
 async function ssrRoster(): Promise<MorphoRosterState> {
   try {
     const hop = await ssrHop();

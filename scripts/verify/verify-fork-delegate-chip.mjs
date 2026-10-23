@@ -29,13 +29,17 @@
 // not through BASE, and carries no bypass header.
 
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+import { parseEnv } from "node:util";
 import { fileURLToPath } from "node:url";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 try {
-  process.loadEnvFile(path.join(REPO, ".env.local"));
+  // A key already set in the environment wins; an empty one counts as unset, which process.loadEnvFile would not do.
+  for (const [k, v] of Object.entries(parseEnv(readFileSync(path.join(REPO, ".env.local"), "utf8"))))
+    if (!process.env[k]) process.env[k] = v;
 } catch {
   /* the env must already carry RAILS_API_URL and API_BEARER_TOKEN */
 }

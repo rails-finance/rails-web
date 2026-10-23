@@ -11,7 +11,7 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
 import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
 import { readFluidOpeningBalance, readFluidPositions, readFluidTimeline } from "@/lib/fluid/proxy-reads";
@@ -29,7 +29,7 @@ export const loadFluidPositionTail = cache(async (nftId: string) => {
       ),
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<FluidTimelineResponse>(
-        await readFluidTimeline(new URLSearchParams({ nft: nftId, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+        await readFluidTimeline(new URLSearchParams({ nft: nftId, recent: String(TIMELINE_WINDOW_ROWS) }), {
           baseUrl,
           headers,
         }),

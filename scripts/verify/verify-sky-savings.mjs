@@ -27,6 +27,9 @@
 //      power of ten as 10¹⁸, and the Sent and Received explanations say who
 //      keeps the interest earned before the transfer.
 //
+// Repointed 2026-10-23 (ui-jobs 432): a rate run row's spoken name opens with
+// "Market note, " since 403.
+//
 // Run: BASE=http://localhost:3916 node scripts/verify/verify-sky-savings.mjs
 // Needs ALCHEMY_URL, RAILS_API_URL and API_BEARER_TOKEN in .env.local (read,
 // never printed).
@@ -53,6 +56,8 @@ const env = Object.fromEntries(
       return [l.slice(0, i).trim(), v];
     }),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 for (const k of ["ALCHEMY_URL", "RAILS_API_URL", "API_BEARER_TOKEN"])
   if (!env[k]) throw new Error(`need ${k} in .env.local`);
 const scrub = (e) =>
@@ -421,7 +426,9 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   check(
     "small page at 390: each run row names its count",
     got.runs.every(
-      (r) => r.n >= 2 && new RegExp(`^Savings rate (increased|decreased|adjusted), ${r.n} changes, `).test(r.text),
+      (r) =>
+        r.n >= 2 &&
+        new RegExp(`^Market note, Savings rate (increased|decreased|adjusted), ${r.n} changes, `).test(r.text),
     ),
     JSON.stringify(got.runs),
   );

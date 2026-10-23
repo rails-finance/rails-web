@@ -10,6 +10,7 @@
 //
 //   node scripts/registry-candidate.mjs <chainId> <address>
 //   node scripts/registry-candidate.mjs 8453 0xd7f1dd5d49206349cae8b585fcb0ce3d96f1696f
+//   GROWTHEPIE_FILE=/path/full.json node scripts/registry-candidate.mjs …   (a saved labels file)
 //
 // Sources, in the order the registry consults them (its header), each named in
 // the output with what it answered:
@@ -139,7 +140,11 @@ async function readEtherscan() {
 }
 
 async function readGrowthepie() {
-  const r = await getJson("https://api.growthepie.com/v1/labels/full.json");
+  // GROWTHEPIE_FILE names a local copy of the labels file, so a batch of
+  // addresses reads one download.
+  const r = env.GROWTHEPIE_FILE
+    ? JSON.parse(readFileSync(env.GROWTHEPIE_FILE, "utf8"))
+    : await getJson("https://api.growthepie.com/v1/labels/full.json");
   const types = r.data.types;
   const col = (name) => types.indexOf(name);
   const row = r.data.data.find(
@@ -251,7 +256,7 @@ if (regR.facts.entered) {
 } else {
   const display = owner && verified ? `${owner} ${verified.toLowerCase()}` : (tokenName ?? verified ?? "<name>");
   console.log(
-    `    [${chain.constant}, "${address}", { name: "${display}", kind: "<router|gateway|adapter|settlement|multicall|amm-pool|lending-pool>", contractName: "${verified ?? "<verified source name>"}", role: "<what it does, completing 'The recipient is …'>" }],`,
+    `    [${chain.constant}, "${address}", { name: "${display}", kind: "<router|gateway|adapter|settlement|multicall|amm-pool|lending-pool|distributor>", contractName: "${verified ?? "<verified source name>"}", role: "<what it does, completing 'The recipient is …'>" }],`,
   );
   if (gtpR.facts.ownerProjectClear || oliName)
     console.log(

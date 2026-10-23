@@ -15,7 +15,7 @@ import { readMorphoOpeningBalance, readMorphoPositions, readMorphoTimeline } fro
 import type { MorphoPositionsResult } from "@/lib/api/fetch-morpho-positions";
 import type { MorphoGroupedTimelineResult } from "@/lib/api/fetch-morpho-timeline";
 import type { MorphoTimelineResult } from "@/lib/sources/api/morpho-timeline";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { splitMorphoPositionId } from "@/lib/morpho/position-id";
 
 /**
@@ -41,7 +41,7 @@ export const loadMorphoPositionTail = cache(async (positionId: string, grouped: 
       answerTimeline<MorphoTimelineResult | MorphoGroupedTimelineResult>(
         await readMorphoTimeline(
           positionId,
-          new URLSearchParams(grouped ? { group: "1" } : { recent: String(TIMELINE_WINDOW_EVENTS) }),
+          new URLSearchParams(grouped ? { group: "1" } : { recent: String(TIMELINE_WINDOW_ROWS) }),
           { baseUrl, headers },
         ),
         "readMorphoTimeline",

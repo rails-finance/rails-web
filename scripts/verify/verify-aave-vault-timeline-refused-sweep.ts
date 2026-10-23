@@ -122,6 +122,10 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  // A viem error carries the transport URL, and the URL carries the key:
+  // print the message with the URL cut out, never the object.
+  const url = process.env.ALCHEMY_URL;
+  const text = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
+  console.error(url ? text.split(url).join("<ALCHEMY_URL>") : text);
   process.exit(1);
 });

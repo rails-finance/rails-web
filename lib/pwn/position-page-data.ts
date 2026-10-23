@@ -22,7 +22,7 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
 import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
 import { readPwnOpeningBalance, readPwnPositions, readPwnTimeline } from "@/lib/pwn/proxy-reads";
@@ -47,7 +47,7 @@ export const loadPwnPositionTail = cache(async (wallet: string) => {
       ),
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<FetchPwnTimelineResult>(
-        await readPwnTimeline(new URLSearchParams({ wallet, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+        await readPwnTimeline(new URLSearchParams({ wallet, recent: String(TIMELINE_WINDOW_ROWS) }), {
           baseUrl,
           headers,
         }),

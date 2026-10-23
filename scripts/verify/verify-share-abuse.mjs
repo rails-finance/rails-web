@@ -136,6 +136,7 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { parseEnv } from "node:util";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
@@ -149,7 +150,9 @@ const ROOT = pathToFileURL(REPO + "/").href;
 // The children read RAILS_API_URL / API_BEARER_TOKEN / ALCHEMY_URL from the
 // repo's own .env.local, as `next dev` does. Values are never printed.
 try {
-  process.loadEnvFile(path.join(REPO, ".env.local"));
+  // A key already set in the environment wins; an empty one counts as unset, which process.loadEnvFile would not do.
+  for (const [k, v] of Object.entries(parseEnv(readFileSync(path.join(REPO, ".env.local"), "utf8"))))
+    if (!process.env[k]) process.env[k] = v;
 } catch {
   /* no .env.local — the env must already carry the keys */
 }
@@ -746,6 +749,9 @@ const ts = require("typescript");
 const STUBS = {
   "next/headers": 'export async function headers(){ return new Headers({ host: "share-probe.invalid", "x-forwarded-proto": "http", "x-real-ip": "198.51.100.7" }); } export async function cookies(){ return { get(){ return undefined; } }; }',
   "next/navigation": 'export function notFound(){ throw new Error("notFound"); }',
+  // server-only (lib/api/reader-ip.ts) throws under plain node; Next maps it to
+  // an empty module, and so does this.
+  "server-only": "",
   // A child may stub more modules by specifier (runChild's third argument).
   ...JSON.parse(process.env.PROBE_STUBS || "{}"),
 };

@@ -967,7 +967,9 @@ async function mobile(theme) {
   // (components/coverage/capability-sheet.tsx), the mobile-only equivalent of
   // desktop's header popovers.
   assert((await page.locator("dl").count()) === 0, "the old capability-definitions <dl> is gone from the DOM");
-  const dialog = page.locator('div[role="dialog"][aria-modal="true"]');
+  // `:visible`: the wallet panel (rails-ops TO-DO-ui-jobs 431) is a second
+  // modal dialog, mounted hidden on every page.
+  const dialog = page.locator('div[role="dialog"][aria-modal="true"]:visible');
   assert(!(await dialog.isVisible().catch(() => false)), "no capability sheet is open by default");
 
   const firstPill = cards.first().locator("button[aria-haspopup='dialog']").first();
@@ -993,7 +995,7 @@ async function mobile(theme) {
   }
 
   // Backdrop tap closes it.
-  const backdrop = page.locator('div[role="dialog"][aria-modal="true"]').locator("xpath=preceding-sibling::div[1]");
+  const backdrop = dialog.locator("xpath=preceding-sibling::div[1]");
   await backdrop.click({ position: { x: 5, y: 5 } });
   await page.waitForTimeout(400);
   assert(!(await dialog.isVisible().catch(() => false)), "backdrop tap closes the capability sheet");

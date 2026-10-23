@@ -118,6 +118,8 @@ const env = Object.fromEntries(
       return [l.slice(0, i).trim(), v];
     }),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 if (!env.ALCHEMY_URL) throw new Error("need ALCHEMY_URL in .env.local");
 
 // ⚠️ NEVER PRINT A LANE'S URL. viem attaches the whole endpoint — key and all —

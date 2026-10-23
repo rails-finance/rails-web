@@ -7,7 +7,7 @@
 // per-reserve caps and the USDC drawn rate, both exposed cleanly on this
 // deployment's hub (`getSpokeConfig` / `getSpokeAddedAssets` /
 // `getSpokeTotalOwed` / `getAssetDrawnRate`, read the same way
-// rails-server-onboarding's workers/base-lending-copy/src/snapshot-aave-v4.mjs
+// rails-server's workers/base-lending-copy/src/snapshot-aave-v4.mjs
 // reads them — that file is the ABI's source, since the struct shapes are not
 // published: `getReserve`/`getReserveConfig`/`getDynamicReserveConfig`/
 // `getLiquidationConfig` were checked against it by hand, 2026-09-27).
@@ -15,7 +15,7 @@
 // Deliberately NOT checked, and why:
 //   • Coinbase's tokenized-stock registry pause flag. The spoke does not read
 //     it (rails-ops/reference/aave-v4-base.md §6) and it has its own verifier,
-//     rails-server-onboarding/scripts/verify-aave-v4-base-registry-pause.mjs.
+//     rails-server/scripts/verify-aave-v4-base-registry-pause.mjs.
 //   • Liquidation events, for the same reason as the Ethereum verifier: V4
 //     liquidation event coverage has known gaps, so no check depends on
 //     events the protocol may not have emitted.

@@ -106,7 +106,7 @@ const FAMILIES = {
         "lib/liquity/trove-card-tips.ts",
       ],
     },
-    faq: { file: "components/transaction-timeline/explanation/shared/faqUrls.ts", table: "export const FAQ_URLS" },
+    faq: { file: "lib/shared/faq-urls.ts", table: "export const FAQ_URLS" },
     /** Files that may hold no prose (the node readers too). */
     noProse: [
       "lib/liquity/trove-nodes.tsx",

@@ -55,8 +55,9 @@
 //   2. Pinned page, fresh context — `/event/DEEP_ID` renders the card
 //      (`[data-event-id]` equals the id) and never the not-found notice.
 //   3. Control — `/event/SHALLOW_ID` renders the same way.
-//   4. Not-found still works — a fabricated id renders the notice, no card,
-//      and the "reading the rest" line does not stay up.
+//   4. Not-found still works — a fabricated id renders the notice and no card.
+//
+// Repointed (ui-jobs 432): check 4's "reading the rest" read is dropped; its hook matches nothing.
 //   5. `?at=DEEP_ID` on the position page asks the folder route for the
 //      event by key and renders no not-found notice once it has come back.
 //
@@ -169,15 +170,9 @@ async function pinnedCase(name, id, expectCard) {
   } else {
     // Give the page its initial load and any deeper read, then settle.
     await page.waitForLoadState("networkidle", { timeout: CARD_TIMEOUT_MS }).catch(() => {});
-    try {
-      await page.waitForSelector("[data-pinned-reading]", { state: "detached", timeout: CARD_TIMEOUT_MS });
-    } catch {
-      /* asserted below */
-    }
     cardFound = (await page.locator(cardSel).count()) > 0;
   }
   const notice = (await page.getByText(NOT_FOUND_TEXT).count()) > 0;
-  const reading = (await page.locator("[data-pinned-reading]").count()) > 0;
   const cards = await page.locator("[data-event-id]").count();
   if (expectCard) {
     check(`${name} renders the card`, cardFound, `cards=${cards}`);
@@ -185,7 +180,7 @@ async function pinnedCase(name, id, expectCard) {
   } else {
     check(`${name} renders the not-found notice`, notice);
     check(`${name} renders no card`, !cardFound && cards === 0, `cards=${cards}`);
-    check(`${name} is not stuck on "reading the rest"`, !reading);
+    // Dropped: 'not stuck on "reading the rest"' read [data-pinned-reading], which nothing in the tree draws since the server-side lookup.
   }
   await ctx.close();
 }

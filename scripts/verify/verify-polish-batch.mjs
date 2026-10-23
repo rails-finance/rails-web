@@ -1,5 +1,6 @@
 // Playwright check for the 10-item polish batch (merry-neumann plan).
 // Run: node scripts/verify/verify-polish-batch.mjs   (dev server on :3000)
+// Repointed (ui-jobs 432): check 8 reads the hero's h1 "Destination DeFi" (43e8fd92).
 import { chromium } from "playwright";
 
 const results = [];
@@ -19,7 +20,7 @@ const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
   const kids = [...section.children].map((el) => el.tagName + ":" + (el.textContent || "").slice(0, 25));
-  const h1i = kids.findIndex((t) => t.includes("DeFi Explorers"));
+  const h1i = kids.findIndex((t) => t.includes("Destination DeFi"));
   const subi = kids.findIndex((t) => t.includes("Explore any DeFi position"));
   const badgei = kids.findIndex((t) => t.toLowerCase().includes("read-only"));
   return h1i < subi && subi < badgei ? "ok" : kids.join(" | ");
@@ -180,9 +181,14 @@ await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const SWITCHER_PANEL = 'div[role="menu"][aria-label="Blockchain switcher"]';
 // `:visible` — on an app route from `md` up the chooser sits on the protocol
 // title row and the bar's own copy is in the tree but hidden by a breakpoint
-// class (rails-ops TO-DO-ui-jobs 68), so a bare locator matches two.
-const switcherTrigger = page.locator('button[aria-label="Switch blockchain"]:visible');
-check("S trigger names the active chain", /Ethereum/.test((await switcherTrigger.textContent()) ?? ""));
+// class (rails-ops TO-DO-ui-jobs 68), so a bare locator matches two. Its label
+// names the chain first: "Ethereum, switch blockchain".
+const switcherTrigger = page.locator('button[aria-label$=", switch blockchain"]:visible').first();
+check(
+  "S trigger names the active chain",
+  /^Ethereum,/.test((await switcherTrigger.getAttribute("aria-label")) ?? ""),
+  (await switcherTrigger.getAttribute("aria-label")) ?? "",
+);
 // Pre-hydration clicks are lost, not replayed — poll the panel and re-click.
 let switcherOpen = false;
 for (let attempt = 0; attempt < 6 && !switcherOpen; attempt++) {

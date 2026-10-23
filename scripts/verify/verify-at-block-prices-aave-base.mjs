@@ -26,10 +26,14 @@
 // One explorer only:         EXPLORER=seamless … ; a different wallet: WALLET=0x… (applies to that explorer)
 // Against the deployed preview (dev.rails.finance), the bypass header rides
 // every request and the browser context — see lib/host.mjs.
+// Repointed 23 Oct 2026 (ui-jobs 432): receipts are read on the event page's card, armed
+// from its ⋮ (308 took the position view's page-wide inspector down); an opened timeline
+// card is read on its Figures tab (370).
 
 import { chromium } from "playwright";
-import { armInspector } from "./lib/prov-inspector.mjs";
+import { armScope } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
+import { showCardTab } from "./lib/card-tabs.mjs";
 
 const ONLY = process.env.EXPLORER;
 const EXPLORERS = [
@@ -160,6 +164,8 @@ async function expandCard(page, n) {
   const clickable = cardFor(page, n).locator('[data-anatomy="T1"] [role="button"]').first();
   await clickable.click();
   await page.waitForTimeout(250);
+  // The price row and the forensics stand on the Figures tab (ui-jobs 370, decision 0044).
+  await showCardTab(cardFor(page, n), "figures");
 }
 
 /** The forensics grid's own StatCard for one leg (the seized-leg caption) —
@@ -174,22 +180,39 @@ function legStatFor(card, label) {
     .locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " rounded-xl ")][1]');
 }
 
-async function openReceiptFor(page, card, valueText) {
-  // The toggle rides in the Tools menu on a position view and in the dock on
-  // a Market-type page; armInspector reads either, and is a no-op once armed
-  // (the tool is STICKY — a blind second click would put it down).
-  if (!(await armInspector(page))) return null;
-  const target = card.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
-  if ((await target.count()) === 0) return null;
-  await target.scrollIntoViewIfNeeded();
-  await target.click();
-  const pop = page.locator(".prov-inspect-pop");
-  await pop.waitFor({ state: "visible", timeout: 10000 });
-  const text = await pop.innerText();
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(200);
-  return text;
+/** The receipt behind a value on an event's card. Since ui-jobs 308 a position
+ *  view arms provenance per section and a timeline card's ⋮ carries no
+ *  "Inspect provenance"; the event page's card ⋮ does (`armScope`, as
+ *  verify-aave-v3-position-state reads it). So the receipt is read on the
+ *  event's page: `pick` finds the value's scope on that page's card. */
+async function openReceiptFor(page, card, valueText, pick = (c) => c) {
+  const id = await card.getAttribute("data-event-id");
+  if (!id) return null;
+  const at = new URL(page.url());
+  const ev = await page.context().newPage();
+  try {
+    await ev.goto(`${at.origin}${at.pathname}/event/${encodeURIComponent(id)}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 240000,
+    });
+    const evCard = ev.locator(`[data-event-id="${id}"]`).first();
+    await evCard.waitFor({ timeout: 120000 });
+    await evCard
+      .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
+      .first()
+      .waitFor({ timeout: 60000 })
+      .catch(() => {});
+    if (!(await armScope(ev, id, { menu: evCard.locator("[data-event-menu]").first() }))) return null;
+    const target = pick(evCard).locator("span.prov-locate-box").filter({ hasText: valueText }).first();
+    if ((await target.count()) === 0) return null;
+    await target.scrollIntoViewIfNeeded();
+    await target.click();
+    const pop = ev.locator(".prov-inspect-pop");
+    await pop.waitFor({ state: "visible", timeout: 10000 });
+    return await pop.innerText();
+  } finally {
+    await ev.close();
+  }
 }
 
 const browser = await chromium.launch();
@@ -420,7 +443,9 @@ async function runExplorer(x) {
       );
       // Opened on the chip: the reserve symbol finds the header's amount
       // first (aave-v3-base #5, seamless #65), whose receipt is the amount's.
-      const receipt = await openReceiptFor(own.page, pill, "$");
+      const receipt = await openReceiptFor(own.page, card, "$", (c) =>
+        c.locator(`[data-price-row] [title^="${d.reserveSymbol} "][title*="oracle at block"]`).first(),
+      );
       check(
         `${x.key} ordinary #${n}: the pill's receipt names IAaveOracle getAssetPrice at the block`,
         !!receipt && /getAssetPrice/.test(receipt) && !/Untraced input/.test(receipt),
@@ -500,7 +525,7 @@ async function runExplorer(x) {
       (await pills.count()) === 2,
       `${await pills.count()} pill(s)`,
     );
-    const receipt = await openReceiptFor(page, legStatFor(card, seizedCaption), "$");
+    const receipt = await openReceiptFor(page, card, "$", (c) => legStatFor(c, seizedCaption));
     check(
       `${x.key} liquidation #${n}: the seized leg's receipt is amount × price at block, no untraced input`,
       !!receipt && /amount × price at block/.test(receipt) && !/Untraced input/.test(receipt),
@@ -531,10 +556,8 @@ async function runExplorer(x) {
       .catch(() => {});
     const readPriced = (await card.locator('[data-position-state="ready"] [data-account-total]').count()) > 0;
     if (readPriced) {
-      const receipt = await openReceiptFor(
-        own.page,
-        card.locator('[data-price-row] [title*="oracle at block"]').first(),
-        "$",
+      const receipt = await openReceiptFor(own.page, card, "$", (c) =>
+        c.locator('[data-price-row] [title*="oracle at block"]').first(),
       );
       check(
         `${x.key} unpriced #${n}: its price chip is the position read's (getAssetPrice read at the block)`,

@@ -116,6 +116,11 @@ const fakeClient = {
     ),
 };
 
+// `server-only` (lib/api/reader-ip.ts, reached through the routes) throws when
+// it is imported outside Next's React server environment, where Next maps it to
+// an empty module. Mocked to the same.
+mock.module("server-only", { namedExports: {} });
+
 mock.module(pathToFileURL(path.join(ROOT, "lib/sources/chain/rpc.ts")).href, {
   namedExports: {
     chainClient: () => fakeClient,

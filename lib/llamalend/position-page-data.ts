@@ -14,7 +14,7 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
 import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
 import {
@@ -36,7 +36,7 @@ export const loadLlamalendPositionTail = cache(async (controller: string, user: 
       ),
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<LlamalendTimelineResult>(
-        await readLlamalendTimeline(new URLSearchParams({ controller, user, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+        await readLlamalendTimeline(new URLSearchParams({ controller, user, recent: String(TIMELINE_WINDOW_ROWS) }), {
           baseUrl,
           headers,
         }),

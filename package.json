@@ -8,7 +8,6 @@
     "start": "next start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build:svg": "node ../svg-build-tools/scripts/build-svg-templates.js",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --no-warnings --test scripts/test/*.test.mjs",
     "check:prov": "node scripts/check-prov-scope.mjs",
@@ -24,6 +23,7 @@
     "check:prose-limits": "node scripts/check-prose-limits.mjs",
     "check:anatomy": "node scripts/anatomy-shots.mjs --check",
     "verify:preflight": "node scripts/verify/preflight.mjs",
+    "verify:ts": "tsx --import ./scripts/verify/lib/server-only-hook.mjs --test",
     "og": "node scripts/generate-og.mjs",
     "exports:liquity-v2": "node scripts/exports-liquity-v2.mjs",
     "check": "npm run check:prov && npm run check:register && npm run check:prose-limits -- --summary && npm run check:receipts && npm run check:parties && npm run check:routes && npm run check:locale && npm run check:exponent && npm run check:og && npm run check:prose && npm run check:dead && npm run check:anatomy && npm run format:check && npm run typecheck"
@@ -51,6 +51,7 @@
     "playwright": "^1.55.0",
     "prettier": "^3.6.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

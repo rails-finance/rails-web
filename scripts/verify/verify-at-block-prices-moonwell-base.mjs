@@ -38,10 +38,14 @@
 // The Ethereum arm:           EXPLORER=moonwell BASE=http://localhost:3021 node scripts/verify/verify-at-block-prices-moonwell-base.mjs
 // Against the deployed preview (dev.rails.finance), the bypass header rides
 // every request and the browser context — see lib/host.mjs.
+// Repointed 23 Oct 2026 (ui-jobs 432): receipts are read on the event page's card, armed
+// from its ⋮ (308 took the position view's page-wide inspector down); an opened timeline
+// card is read on its Figures tab (370).
 
 import { chromium } from "playwright";
-import { armInspector } from "./lib/prov-inspector.mjs";
+import { armScope } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
+import { showCardTab } from "./lib/card-tabs.mjs";
 import { CLOSED_GROUP, openGroup } from "./lib/group-rows.mjs";
 
 const EXPLORERS = {
@@ -205,24 +209,38 @@ async function expandCard(page, n) {
   const clickable = cardFor(page, n).locator('[data-anatomy="T1"] [role="button"]').first();
   await clickable.click();
   await page.waitForTimeout(250);
+  // The price row and the forensics stand on the Figures tab (ui-jobs 370, decision 0044).
+  await showCardTab(cardFor(page, n), "figures");
 }
 
-async function openReceiptFor(page, card, valueText, scope = card) {
-  // The toggle rides in the Tools menu on a position view and in the dock on
-  // a Market-type page; armInspector reads either, and is a no-op once armed
-  // (the tool is STICKY — a blind second click would put it down).
-  if (!(await armInspector(page))) return null;
-  const target = scope.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
-  if ((await target.count()) === 0) return null;
-  await target.scrollIntoViewIfNeeded();
-  await target.click();
-  const pop = page.locator(".prov-inspect-pop");
-  await pop.waitFor({ state: "visible", timeout: 10000 });
-  const text = await pop.innerText();
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(200);
-  return text;
+/** The receipt behind a value on an event's card. Since ui-jobs 308 a position
+ *  view arms provenance per section and a timeline card's ⋮ carries no
+ *  "Inspect provenance"; the event page's card ⋮ does (`armScope`, as
+ *  verify-aave-v3-position-state reads it). So the receipt is read on the
+ *  event's page: `pick` finds the value's scope on that page's card. */
+async function openReceiptFor(page, card, valueText, pick = (c) => c) {
+  const id = await card.getAttribute("data-event-id");
+  if (!id) return null;
+  const at = new URL(page.url());
+  const ev = await page.context().newPage();
+  try {
+    await ev.goto(`${at.origin}${at.pathname}/event/${encodeURIComponent(id)}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 240000,
+    });
+    const evCard = ev.locator(`[data-event-id="${id}"]`).first();
+    await evCard.waitFor({ timeout: 120000 });
+    if (!(await armScope(ev, id, { menu: evCard.locator("[data-event-menu]").first() }))) return null;
+    const target = pick(evCard).locator("span.prov-locate-box").filter({ hasText: valueText }).first();
+    if ((await target.count()) === 0) return null;
+    await target.scrollIntoViewIfNeeded();
+    await target.click();
+    const pop = ev.locator(".prov-inspect-pop");
+    await pop.waitFor({ state: "visible", timeout: 10000 });
+    return await pop.innerText();
+  } finally {
+    await ev.close();
+  }
 }
 
 // ── Expectations from the API ───────────────────────────────────────────
@@ -337,7 +355,9 @@ if (pricedOrdinary) {
     );
     // Opened on the chip: the card also carries receipts that name the
     // market symbol (the position's debt before the event), which come first.
-    const receipt = await openReceiptFor(page, pill, "$");
+    const receipt = await openReceiptFor(page, card, "$", (c) =>
+      c.locator(`[data-price-row] [title^="${d.marketSymbol} "][title*="oracle at block"]`).first(),
+    );
     check(
       `ordinary #${n}: the pill's receipt names Comptroller.oracle() → getUnderlyingPrice at the block`,
       !!receipt &&
@@ -390,10 +410,11 @@ if (pricedLiq) {
   );
   // The seized leg's own stat card: the card's other receipts that carry a "$"
   // (the collateral held before the event) come first in document order.
-  const seizedStat = card
-    .getByText("Seized, at liquidation")
-    .first()
-    .locator("xpath=ancestor::*[.//span[contains(@class,'prov-locate-box')]][1]");
+  const seizedStat = (c) =>
+    c
+      .getByText("Seized, at liquidation")
+      .first()
+      .locator("xpath=ancestor::*[.//span[contains(@class,'prov-locate-box')]][1]");
   const receipt = await openReceiptFor(page, card, "$", seizedStat);
   check(
     `liquidation #${n}: a leg's receipt derives from exchangeRateStored and getUnderlyingPrice at the block`,

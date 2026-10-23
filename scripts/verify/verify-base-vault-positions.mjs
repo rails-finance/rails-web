@@ -227,6 +227,8 @@ const env = Object.fromEntries(
     .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 if (!env.BASE_RPC_URL) throw new Error("need BASE_RPC_URL in .env.local");
 if (!env.BASE_BACKFILL_RPC_URL) throw new Error("need BASE_BACKFILL_RPC_URL in .env.local");
 // ⚠️⚠️ NO LANE URL EVER REACHES THE OUTPUT. viem puts the endpoint it called
@@ -826,7 +828,13 @@ async function readListingDom(qs = "") {
         stats,
         vaultSymbol: symbolEl?.getAttribute("data-card-vault-symbol") ?? null,
         symbolLeadsPill: symbolEl && pillEl ? (symbolEl.compareDocumentPosition(pillEl) & 4) === 4 : null,
-        text: e.innerText.replace(/\s+/g, " ").trim(),
+        // The card's sidebar (`data-card-sidebar`, TO-DO-position-card 427) names
+        // the protocol whose card it is; it is set aside from the text the copy
+        // rules read, as the family word is.
+        text: [...(e.querySelectorAll("[data-card-sidebar]") ?? [])]
+          .reduce((t, s) => t.split(s.innerText).join(" "), e.innerText)
+          .replace(/\s+/g, " ")
+          .trim(),
         href: e.closest("a")?.getAttribute("href") ?? null,
       });
     }

@@ -33,15 +33,21 @@ export interface AaveFamilyHeadTable {
   treasury: string;
   /** The family's WETH gateway, where no registry names it (SparkLend). */
   gatewayName?: string;
+  /** A transfer in from a distributor: the wallet sent the claim, or the
+   *  payout was pushed to it. A family without them reads "Transferred". */
+  claimed?: string;
+  received?: string;
 }
 
 /** What the head reads of a row. `fee`: a liquidation's fee transfer to the
  *  treasury. `gateway`: an aToken transfer to the WETH gateway, a withdrawal
- *  paid out as ETH. */
+ *  paid out as ETH. `payout`: a transfer in from a distributor, claimed by the
+ *  wallet or received. */
 export interface AaveFamilyHeadRow {
   eventType: string;
   fee?: boolean;
   gateway?: boolean;
+  payout?: "claimed" | "received";
   swapKind?: AaveV3SwapKind;
 }
 
@@ -49,6 +55,7 @@ export interface AaveFamilyHeadRow {
 export function aaveFamilyT1Kind(row: AaveFamilyHeadRow, w: AaveFamilyHeadTable): string {
   if (row.fee) return w.feePaid;
   if (row.gateway) return w.withdrew;
+  if (row.payout && w[row.payout]) return w[row.payout]!;
   if (row.eventType === "swap" && row.swapKind) return w.swap[row.swapKind];
   switch (row.eventType) {
     case "supply":

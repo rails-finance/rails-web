@@ -680,7 +680,9 @@ export interface AaveV3Context {
   liquidatedCollateralAmount?: string;
   /** liquidation: liquidator address (lowercase). */
   liquidator?: string;
-  /** supply/borrow/repay only — the transaction sender (signer), lowercased. */
+  /** supply/borrow/repay, and transfer_in/transfer_out — the transaction
+   *  sender (signer), lowercased. A transfer carries it without poolCaller, so
+   *  the third-party test passes it by. */
   txFrom?: string;
   /** supply/borrow/repay only — msg.sender at the Pool, from the raw event's
    *  own party param (Supply/Borrow `user`, Repay `repayer`), lowercased. The

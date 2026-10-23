@@ -250,6 +250,8 @@ const env = Object.fromEntries(
     .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
+// A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
+for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 if (!env.BASE_RPC_URL) throw new Error("need BASE_RPC_URL in .env.local");
 if (!env.BASE_BACKFILL_RPC_URL) throw new Error("need BASE_BACKFILL_RPC_URL in .env.local");
 
@@ -316,7 +318,7 @@ const HORIZON = 5000;
 const CEILING = 11000;
 const LOADER_VERSION = 2;
 /** THE DRAW WINDOW — `VAULT_TIMELINE_DRAW_ROWS` in
- *  lib/shared/vault-holder-timeline.ts (= `TIMELINE_WINDOW_EVENTS`), the newest
+ *  lib/shared/vault-holder-timeline.ts (= `TIMELINE_WINDOW_ROWS`), the newest
  *  N rows of ANY tier that cross to the browser (rails-ops decision 0019,
  *  amended 2026-09-10). It is NOT `HORIZON` — a life at or under HORIZON is
  *  still built and gated whole, but only its newest DRAW_ROWS are serialised. */

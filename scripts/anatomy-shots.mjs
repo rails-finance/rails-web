@@ -488,12 +488,7 @@ function cropBox({ codes, fallbacks, pad, above, below, viewport }) {
 }
 
 async function shoot() {
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    ({ chromium } = await import("/Users/r4/Documents/Repos/rails-web-review/node_modules/playwright/index.mjs"));
-  }
+  const { chromium } = await import("playwright");
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
   const manifest = [];

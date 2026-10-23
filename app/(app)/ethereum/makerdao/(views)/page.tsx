@@ -28,8 +28,8 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore MakerDAO Vaults", canonicalPath: "/ethereum/makerdao" });
 
-/** The roster for this request, or "unavailable" — the route 404s until the
- *  backend half is deployed, and the listing is built to work without it. */
+/** The roster for this request, or "unavailable" when the backend fails to
+ *  answer; the listing is built to work without it. */
 async function ssrRoster(): Promise<MakerRosterState> {
   try {
     const hop = await ssrHop();

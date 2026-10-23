@@ -50,6 +50,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "../..");
@@ -62,6 +63,9 @@ if (!process.execArgv.includes("--experimental-strip-types")) {
     const ROOT = ${JSON.stringify(new URL("file://" + ROOT + "/").href)};
     const EXT = [".ts", ".tsx", "/index.ts", "/index.tsx", ".mjs", ".js"];
     export async function resolve(spec, ctx, next) {
+      // \`server-only\` (lib/api/reader-ip.ts) throws under plain node; Next maps
+      // it to an empty module, and so does this.
+      if (spec === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
       let s = spec;
       if (s.startsWith("@/")) s = new URL(s.slice(2), ROOT).href;
       if (s.startsWith(".") || s.startsWith("file:")) {
@@ -94,7 +98,9 @@ if (!process.execArgv.includes("--experimental-strip-types")) {
 }
 
 try {
-  process.loadEnvFile(resolvePath(ROOT, ".env.local"));
+  // A key already set in the environment wins; an empty one counts as unset, which process.loadEnvFile would not do.
+  for (const [k, v] of Object.entries(parseEnv(readFileSync(resolvePath(ROOT, ".env.local"), "utf8"))))
+    if (!process.env[k]) process.env[k] = v;
 } catch {
   /* the env must already carry RAILS_API_URL, API_BEARER_TOKEN and ALCHEMY_URL */
 }

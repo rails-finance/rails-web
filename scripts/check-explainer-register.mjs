@@ -110,28 +110,16 @@ const SHARED_CLAUSES = {
   "liquity-fork": "lib/shared/liquity-fork-explainer-clauses.tsx",
 };
 
-// Explanation surfaces that match none of the standard filename patterns. The
-// V2 trove pane's economics footnote lives in trove-economics.tsx — it matched
-// no roster pattern, so the file sat outside the gate entirely (which is how a
-// hand-rolled bold drifted in unenforced). Σ is exempted for this file only:
-// its in-card provenance receipts (the sumProv via/formula strings) carry the
-// sum notation legitimately — receipts keep their epistemics; every other ban
-// still applies to the whole file, pane prose included.
+// Explanation surfaces that match none of the standard filename patterns.
 const EXTRA_EXPLANATION_SURFACES = {
   liquity: [
-    {
-      file: "components/protocol/liquity/trove-economics.tsx",
-      mode: "full",
-      banned: BANNED.filter(([label]) => label !== "Σ (sum machinery)"),
-    },
     // The V2 trove position pane's bullet builder — it matches no roster
     // pattern (not an explainer-clauses/-position-explanation file), so it
     // sat outside the gate entirely, which is how Layer-2 modal copy drifted
     // into its Layer-1 bullets unnoticed (the 2026-07-25 audit). Σ is
-    // exempted for the same reason as trove-economics above: the file's one
-    // Σ lives in debtInFrontProv's formula string — a provenance receipt,
-    // which keeps its epistemics; every other ban applies to the whole file,
-    // pane prose included.
+    // exempted: the file's one Σ lives in debtInFrontProv's formula string —
+    // a provenance receipt, which keeps its epistemics; every other ban
+    // applies to the whole file, pane prose included.
     {
       file: "components/trove/use-trove-explanation-items.tsx",
       mode: "full",

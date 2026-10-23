@@ -45,7 +45,7 @@ import {
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -293,7 +293,7 @@ export default function CompoundPositionView({
           // Both scoped to the one market — the backend filters on `market`, so
           // the position list is 0-or-1 row and the timeline is this market only.
           fetchCompoundPositions({ wallet, market, limit: 1 }),
-          asked ? null : fetchCompoundTimeline(wallet, { market, recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchCompoundTimeline(wallet, { market, recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchCompoundGroupedTimeline(wallet, market) : null,
         ]);
         if (cancelled) return;
