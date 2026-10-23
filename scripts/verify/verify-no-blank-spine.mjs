@@ -100,7 +100,8 @@ for (const [label, path] of ROUTES.filter(([label]) => label.includes(ROUTE_FILT
           // The timeline head reads "Transferred · to 0x…" since ui-jobs 367.
           if (/Ownership Transferred|Owner set at creation|Transferred( ·)? to/i.test(label)) {
             const svg = well.querySelector("svg");
-            const isPeople = !!svg && /circle cx="9"|M16 21v-2/.test(svg.innerHTML);
+            // The one-person `user` glyph since cd9373c4 (20 Oct 2026).
+            const isPeople = !!svg && /circle cx="12" cy="7"|M19 21v-2/.test(svg.innerHTML);
             out.handovers.push({ label, isPeople });
           }
         } else {
