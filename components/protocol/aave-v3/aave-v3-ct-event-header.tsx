@@ -36,7 +36,7 @@ import {
   swapLegSign,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
-import { aaveV3CtLabel, distributorPayout, poolCallerContract } from "@/lib/aave-v3/event-label";
+import { aaveV3CtLabel, distributorPayout, poolCallerContract, stakedVia } from "@/lib/aave-v3/event-label";
 import { useChainId } from "@/lib/shared/chain-context";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
@@ -95,6 +95,10 @@ function viaGatewayOf(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | und
   return !isFee && ctx.eventType === "transfer_out" && named?.kind === "gateway";
 }
 
+/** The lead before the staking contract a stake went into: "Staked · in Aave
+ *  Umbrella". A literal, which check:parties maps to its role. */
+const STAKE_LEAD = "in";
+
 /** The timeline head's words as one line: the phone caption and the row's
  *  accessible name. `owner`: the position's wallet, which tells a claimed
  *  payout from a received one and a known contract's call from its own. */
@@ -106,11 +110,20 @@ export function aaveV3T1Caption(
 ): string {
   const gateway = viaGatewayOf(ctx, isFee, chainId);
   const payout = distributorPayout(ctx, owner, chainId);
+  const stake = stakedVia(ctx, isFee, chainId);
+  const caller = poolCallerContract(ctx, owner, chainId);
   const kind = aaveFamilyT1Kind(
-    { eventType: ctx.eventType, fee: isFee, gateway, payout, swapKind: ctx.swap?.kind },
+    {
+      eventType: ctx.eventType,
+      fee: isFee,
+      gateway,
+      payout,
+      stake,
+      migratedFrom: caller?.migratesFrom,
+      swapKind: ctx.swap?.kind,
+    },
     V3_HEAD_WORDS,
   );
-  const caller = poolCallerContract(ctx, owner, chainId);
   if (caller && ctx.poolCaller && V3_HEAD_WORDS.via)
     return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
       lead: V3_HEAD_WORDS.via,
@@ -121,7 +134,7 @@ export function aaveV3T1Caption(
   if (!transfer || !ctx.counterparty) return kind;
   const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
   return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
-    lead: ctx.eventType === "transfer_out" ? V3_HEAD_WORDS.to : V3_HEAD_WORDS.from,
+    lead: stake ? STAKE_LEAD : ctx.eventType === "transfer_out" ? V3_HEAD_WORDS.to : V3_HEAD_WORDS.from,
     address: ctx.counterparty,
     name: named?.name,
   });
@@ -149,6 +162,7 @@ export function useAaveV3HeadSpec({
   const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId, wallet);
   const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
   const viaGateway = viaGatewayOf(ctx, !!feeOf, coords.chainId);
+  const stake = stakedVia(ctx, !!feeOf, coords.chainId);
   // A liquidation's fee reads as an act with its verb, not as a custody move.
   const isTransferRow = !feeOf && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
 
@@ -263,7 +277,7 @@ export function useAaveV3HeadSpec({
         }
       : ctx.counterparty != null
         ? {
-            prefix: viaGateway ? "via" : transferOut ? "to" : "from",
+            prefix: viaGateway ? "via" : stake ? "in" : transferOut ? "to" : "from",
             address: ctx.counterparty,
             name: feeOf ? V3_HEAD_WORDS.treasury : named?.name,
             icon: feeOf
@@ -314,6 +328,8 @@ export function useAaveV3HeadSpec({
           fee: !!feeOf,
           gateway: viaGateway,
           payout: distributorPayout(ctx, wallet, coords.chainId),
+          stake,
+          migratedFrom: caller?.migratesFrom,
           swapKind: ctx.swap?.kind,
         },
         W,

@@ -72,6 +72,10 @@ placeholders:
     rounding: text
     means: |-
       The known contract that called the Pool for the wallet, by its registry name.
+  from:
+    rounding: text
+    means: |-
+      The protocol a migration helper moved the position from, Aave V2.
   sent_on:
     rounding: date
     means: |-
@@ -325,6 +329,12 @@ words:
     Claimed
   t1_received: |-
     Received
+  # A transfer out to a staking contract, which takes the aTokens into a stake.
+  t1_staked: |-
+    Staked
+  # A supply or borrow a migration helper made; the protocol's name follows it.
+  t1_migrated: |-
+    Migrated from
   t1_collateral_swap: |-
     Swapped collateral
   t1_debt_swap: |-
@@ -576,6 +586,8 @@ templates:
         a supply to the Pool
       via: |-
         a supply a known contract made for the wallet
+      migrated: |-
+        a supply Aave's migration helper made, moving the position from Aave V2
     sentences:
       supply.what:
         when: |-
@@ -597,6 +609,16 @@ templates:
           via, another account sent it
         text: |-
           {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf, through {role}.
+      supply.migrated:
+        when: |-
+          migrated, the owner sent it
+        text: |-
+          Migrated {amount} {symbol} of supply from {from} to {protocol} through {role}.
+      supply.by_migrated:
+        when: |-
+          migrated, another account sent it
+        text: |-
+          {actor} migrated {amount} {symbol} of supply from {from} to {protocol} on the owner's behalf, through {role}.
       coll.on:
         when: |-
           the Pool switched the asset on as collateral in this transaction
@@ -623,6 +645,8 @@ templates:
         supply.by,
         supply.via,
         supply.by_via,
+        supply.migrated,
+        supply.by_migrated,
         coll.on,
         coll.was_on,
         coll.zero_ltv,
@@ -646,7 +670,19 @@ templates:
         rate.held,
       ]
     groups:
-      happened: [supply.what, supply.by, supply.via, supply.by_via, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
+      happened:
+        [
+          supply.what,
+          supply.by,
+          supply.via,
+          supply.by_via,
+          supply.migrated,
+          supply.by_migrated,
+          coll.on,
+          coll.was_on,
+          coll.zero_ltv,
+          coll.stays_off,
+        ]
       leaves:
         [
           hf.under,
@@ -668,7 +704,7 @@ templates:
           rate.held,
         ]
     alternates:
-      - [supply.what, supply.by, supply.via, supply.by_via]
+      - [supply.what, supply.by, supply.via, supply.by_via, supply.migrated, supply.by_migrated]
       - [coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
       - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
@@ -772,6 +808,8 @@ templates:
         a borrow from the Pool
       via: |-
         a borrow a known contract made for the wallet
+      migrated: |-
+        a borrow Aave's migration helper made, moving the position from Aave V2
     sentences:
       borrow.what:
         when: |-
@@ -793,12 +831,24 @@ templates:
           via, another account sent it, with credit the owner delegated
         text: |-
           {actor} borrowed {amount} {symbol} on the owner's behalf through {role}, with credit the owner delegated.
+      borrow.migrated:
+        when: |-
+          migrated, the owner sent it
+        text: |-
+          Migrated {amount} {symbol} of debt from {from} to {protocol} through {role}.
+      borrow.by_migrated:
+        when: |-
+          migrated, another account sent it
+        text: |-
+          {actor} migrated {amount} {symbol} of debt from {from} to {protocol} on the owner's behalf, through {role}.
     order:
       [
         borrow.what,
         borrow.by,
         borrow.via,
         borrow.by_via,
+        borrow.migrated,
+        borrow.by_migrated,
         hf.under,
         hf.close,
         hf.close_basket,
@@ -819,7 +869,7 @@ templates:
         rate.at,
       ]
     groups:
-      happened: [borrow.what, borrow.by, borrow.via, borrow.by_via]
+      happened: [borrow.what, borrow.by, borrow.via, borrow.by_via, borrow.migrated, borrow.by_migrated]
       leaves:
         [
           hf.under,
@@ -842,7 +892,7 @@ templates:
           rate.at,
         ]
     alternates:
-      - [borrow.what, borrow.by, borrow.via, borrow.by_via]
+      - [borrow.what, borrow.by, borrow.via, borrow.by_via, borrow.migrated, borrow.by_migrated]
       - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
       - [rate.avg, rate.moved, rate.held, rate.at]
@@ -1217,20 +1267,28 @@ templates:
     variants:
       default: |-
         supply sent as an aToken transfer
+      staking: |-
+        supply staked through a staking contract
     sentences:
       tout.what:
         when: |-
-          always
+          default
         text: |-
           Sent {amount} {symbol} of supply to {recipient} as an aToken transfer.
       tout.named:
         when: |-
-          the recipient is a known contract
+          the recipient is a known contract other than a staking contract
         text: |-
           The recipient is {role}.
+      tout.staked:
+        when: |-
+          staking
+        text: |-
+          Staked {amount} {symbol} of supply through {role}.
     order:
       [
         tout.what,
+        tout.staked,
         tout.named,
         off.switched,
         hf.under,
@@ -1251,7 +1309,7 @@ templates:
         prior.plain,
       ]
     groups:
-      happened: [tout.what, tout.named, off.switched]
+      happened: [tout.what, tout.staked, tout.named, off.switched]
       leaves:
         [
           hf.under,

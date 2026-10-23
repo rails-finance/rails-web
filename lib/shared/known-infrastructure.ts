@@ -8,9 +8,9 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
  *   • custody escrows (`ccip-lock-release`) hold protocol tokens for someone
  *     else. A Maple page for one renders the custody view, not a position.
  *   • protocol contracts (settlement, router, adapter, gateway, multicall,
- *     amm-pool, lending-pool, distributor) are what a user's tokens move
- *     through or into on the way to a trade, a swap, an ETH wrap, a loan or a
- *     payout of rewards. A transfer to or from
+ *     amm-pool, lending-pool, distributor, staking) are what a user's tokens
+ *     move through or into on the way to a trade, a swap, an ETH wrap, a loan,
+ *     a payout of rewards or a stake. A transfer to or from
  *     one keeps its timeline row, and the chip names the contract ("to CoW
  *     Protocol").
  *
@@ -239,12 +239,18 @@ export interface ProtocolContract extends KnownContractBase {
     | "amm-pool"
     | "lending-pool"
     // Pays tokens out to many accounts (a reward distributor, a bulk drop): a transfer in from one is a payout.
-    | "distributor";
+    | "distributor"
+    // Takes a wallet's aTokens into a stake: a transfer out to one is a stake.
+    | "staking";
   /** A noun phrase that completes "The recipient is …" / "The sender is …" in
    *  an event's explanation. Says what the contract does, nothing more. */
   role: string;
   /** Basename under public/icons/protocols/, set only where that mark exists. */
   protocolIcon?: string;
+  /** The protocol this contract moves a position here from, where that is all
+   *  it does (Aave's V2→V3 helper): a supply or borrow it made reads as a
+   *  migration. */
+  migratesFrom?: string;
 }
 
 export type KnownInfrastructure = CcipEscrow | ProtocolContract;
@@ -628,7 +634,7 @@ const SWAP_REQUEST_CALLBACK = known(
 );
 
 const AAVE_UMBRELLA_BATCH_HELPER = known(
-  "adapter",
+  "staking",
   "Aave Umbrella",
   "UmbrellaBatchHelper",
   "Aave’s Umbrella batch helper, which wraps supplied aTokens and stakes them in Aave’s Umbrella in one transaction",
@@ -779,13 +785,16 @@ const DCA_DOT_FUN = known(
   "DcaDotFun",
   "DCA.fun’s order contract, which supplies each dollar-cost-averaging order’s funds to the Pool while the order waits",
 );
-const AAVE_MIGRATION_HELPER = known(
-  "adapter",
-  "Aave migration helper",
-  "MigrationHelperMainnet",
-  "Aave’s migration helper, which withdraws a position from Aave V2 and supplies it to Aave V3 in one transaction",
-  "aave-v3",
-);
+const AAVE_MIGRATION_HELPER: ProtocolContract = {
+  ...known(
+    "adapter",
+    "Aave migration helper",
+    "MigrationHelperMainnet",
+    "Aave’s migration helper, which withdraws a position from Aave V2 and supplies it to Aave V3 in one transaction",
+    "aave-v3",
+  ),
+  migratesFrom: "Aave V2",
+};
 const AAVE_POOL_EXPOSURE_STEWARD = known(
   "adapter",
   "Aave Pool Exposure Steward",
@@ -1733,7 +1742,7 @@ export function getCcipEscrow(address: string | null | undefined): CcipEscrow | 
 }
 
 /** A protocol contract (settlement, router, adapter, gateway, multicall,
- *  amm-pool, lending-pool, distributor) on a chain, or `undefined`. */
+ *  amm-pool, lending-pool, distributor, staking) on a chain, or `undefined`. */
 export function getProtocolContract(
   address: string | null | undefined,
   chainId: ChainId,
