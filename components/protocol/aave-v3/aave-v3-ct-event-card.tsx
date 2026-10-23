@@ -293,7 +293,9 @@ export function AaveV3CtEventCard({
     },
     spine,
     head,
-    caption: page ? aaveV3CtLabel(ctx, !!feeOf, chainId) : aaveV3T1Caption(ctx, !!feeOf, chainId),
+    caption: page
+      ? aaveV3CtLabel(ctx, !!feeOf, chainId, event.wallet)
+      : aaveV3T1Caption(ctx, !!feeOf, chainId, event.wallet),
     // A transfer states its counterparty in the caption's words; one received
     // runs dotted, the sender having acted (ui-jobs 304).
     actor: {

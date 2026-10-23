@@ -105,7 +105,16 @@ export interface CcipEscrow extends KnownContractBase {
 }
 
 export interface ProtocolContract extends KnownContractBase {
-  kind: "settlement" | "router" | "adapter" | "gateway" | "multicall" | "amm-pool" | "lending-pool";
+  kind:
+    | "settlement"
+    | "router"
+    | "adapter"
+    | "gateway"
+    | "multicall"
+    | "amm-pool"
+    | "lending-pool"
+    // Pays tokens out to many accounts (a reward distributor, a bulk drop): a transfer in from one is a payout.
+    | "distributor";
   /** A noun phrase that completes "The recipient is …" / "The sender is …" in
    *  an event's explanation. Says what the contract does, nothing more. */
   role: string;

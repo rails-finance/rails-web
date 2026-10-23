@@ -817,7 +817,7 @@ export function useAaveV3EventBody({
       state: ready,
       prev: prevReady,
       coords: stateCoords,
-      label: aaveV3CtLabel(ctx, false, coords.chainId),
+      label: aaveV3CtLabel(ctx, false, coords.chainId, wallet),
       eventTs,
       repaid,
       balancesOnly,
@@ -837,7 +837,7 @@ export function useAaveV3EventBody({
           price: a.price?.usd,
         };
       }),
-      label: aaveV3CtLabel(ctx, !!feeOf, coords.chainId),
+      label: aaveV3CtLabel(ctx, !!feeOf, coords.chainId, wallet),
       noTotal: feeOf ? ROW_SHEET_WORDS.fee : ROW_SHEET_WORDS.unread,
     });
   }
@@ -883,7 +883,7 @@ export function useAaveV3EventBody({
                   : "debt_price_usd"
                 : "price_usd",
           })),
-          aaveV3CtLabel(ctx, !!feeOf, coords.chainId),
+          aaveV3CtLabel(ctx, !!feeOf, coords.chainId, wallet),
         );
 
   // With a sheet, the rows behind a swap (its gross legs) stand under it with

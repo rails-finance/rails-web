@@ -46,7 +46,7 @@ export function aaveV3EventTitle(
   if (!isAaveV3Event(event)) return makeEventTitle(event, event.actionLabel, []);
   const ctx = event.context.data;
   const chainId = chainOf(deployment);
-  const kind = aaveV3CtLabel(ctx, !!feeLiquidation(ctx, siblings, chainId), chainId);
+  const kind = aaveV3CtLabel(ctx, !!feeLiquidation(ctx, siblings, chainId), chainId, event.wallet);
   const amount = Math.abs(Number(ctx.amount ?? "0")) || 0;
   if (ctx.eventType === "liquidation")
     return makeEventTitle(event, kind, [
