@@ -104,9 +104,8 @@ export default async function Home() {
                 <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">The DeFi Curious</p>
               </div>
               <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">Learn by example.</span> Browse real protocol activity
-                to see how DeFi works in practice — no capital required. Explore the ecosystem, follow live events as
-                they happen, and build intuition for how positions behave before you commit any of your own money.
+                <span className="font-semibold text-foreground">Learn by example.</span> See how DeFi works through real
+                positions, before you risk any of your own money.
               </p>
             </div>
             <div className="flex flex-col">
@@ -115,9 +114,8 @@ export default async function Home() {
                 <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">The Active DeFi User</p>
               </div>
               <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">Stay on top of positions.</span> Monitor collateral
-                ratios, redemption exposure, yield earned, and liquidation risk — translated into plain language,
-                computed from the chain. Know exactly where you stand.
+                <span className="font-semibold text-foreground">Stay on top of positions.</span> Collateral, debt and
+                liquidation risk, explained in plain language so you know exactly where you stand.
               </p>
             </div>
             <div className="flex flex-col">
@@ -126,9 +124,8 @@ export default async function Home() {
                 <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">DeFi Teams</p>
               </div>
               <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">Support your users.</span> Give your users a dedicated,
-                verifiable window into their positions — one that holds up even where your own frontend can&apos;t
-                reach. A Rails integration means full coverage for your protocol, and real answers for your users.
+                <span className="font-semibold text-foreground">Support your users.</span> Give them an independent,
+                verifiable view of their positions, with full coverage of your protocol.
               </p>
             </div>
             <div className="flex flex-col">
@@ -137,10 +134,8 @@ export default async function Home() {
                 <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">Crisis Support</p>
               </div>
               <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">When frontends fail.</span> DNS hijacks. Frontend
-                outages. Contract exploits. The health factor you check on a protocol&apos;s own site lives on the
-                chain, not on their servers — so when the usual interface goes dark, Rails still shows exactly where
-                your position stands. No wallet, no exposure.
+                <span className="font-semibold text-foreground">When frontends fail.</span> Your position lives on the
+                chain, not on a protocol&apos;s servers, so Rails can still show it when their site goes dark.
               </p>
             </div>
           </div>
