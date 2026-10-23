@@ -117,7 +117,8 @@ async function read(chainId: ChainId, hash: string, wallet: string): Promise<{ a
       }),
     ),
   ];
-  return { answer: { chainId, hash, wallet, blockNumber, sent, back }, rpcCalls };
+  const to = receipt.to ? receipt.to.toLowerCase() : null;
+  return { answer: { chainId, hash, wallet, blockNumber, to, sent, back }, rpcCalls };
 }
 
 /** The legs of `hash` from and to `wallet` (both lowercase). */

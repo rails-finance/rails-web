@@ -252,7 +252,29 @@ export interface ProtocolContract extends KnownContractBase {
    *  it does (Aave's V2→V3 helper): a supply or borrow it made reads as a
    *  migration. */
   migratesFrom?: string;
+  /** The product whose entry contract this is, set where the registry states
+   *  the owner and the contract is that product's own (Zerion's router). A
+   *  transaction sent here takes the product's stretch of the timeline's side
+   *  bar (`components/shared/section-sidebar.tsx`, rails-ops TO-DO-ui-jobs
+   *  439). A field of its own rather than read from `name` and `protocolIcon`:
+   *  those also sit on venues' shared contracts (CoW's settlement, Uniswap's
+   *  pools) and on the protocol's own adapters, which take the protocol's bar. */
+  bar?: BarSubject;
 }
+
+/** Who a row's stretch of the timeline's side bar names: a product whose entry
+ *  contract the transaction entered. `hue` is an oklch hue angle read off the
+ *  product's mark, drawn through the same zone and edge tokens as a roster
+ *  protocol's `brand`, so every subject's stretch has the same weight. */
+export interface BarSubject {
+  name: string;
+  /** Basename under public/icons/protocols/. */
+  icon: string;
+  hue: number;
+}
+
+/** Zerion's mark (zerion.io's `favicon-mark.png`, blue #2962EF). */
+const ZERION_BAR: BarSubject = { name: "Zerion", icon: "zerion", hue: 264 };
 
 export type KnownInfrastructure = CcipEscrow | ProtocolContract;
 
@@ -1204,7 +1226,11 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
     "0x6a000f20005980200259b80c5102003040001068",
     router("ParaSwap router", "AugustusV6", "ParaSwap’s Augustus"),
   ],
-  [BASE_CHAIN_ID, "0xd7f1dd5d49206349cae8b585fcb0ce3d96f1696f", router("Zerion router", "Router", "Zerion’s")],
+  [
+    BASE_CHAIN_ID,
+    "0xd7f1dd5d49206349cae8b585fcb0ce3d96f1696f",
+    { ...router("Zerion", "Router", "Zerion’s"), protocolIcon: "zerion", bar: ZERION_BAR },
+  ],
   [BASE_CHAIN_ID, "0x7d585b0e27bbb3d981b7757115ec11f47c476994", ENSO],
   [BASE_CHAIN_ID, "0x4fe93ebc4ce6ae4f81601cc7ce7139023919e003", ENSO],
   [
@@ -1740,6 +1766,13 @@ export function getKnownInfrastructure(
 export function getCcipEscrow(address: string | null | undefined): CcipEscrow | undefined {
   const entry = getKnownInfrastructure(address, MAINNET_CHAIN_ID);
   return entry?.kind === "ccip-lock-release" ? entry : undefined;
+}
+
+/** The bar subject of a transaction sent to `to` (its receipt's `to`): the
+ *  product whose entry contract it is, or `undefined`, where the row takes the
+ *  protocol's bar. */
+export function barSubjectOf(to: string | null | undefined, chainId: ChainId): BarSubject | undefined {
+  return getProtocolContract(to, chainId)?.bar;
 }
 
 /** A protocol contract (settlement, router, adapter, gateway, multicall,

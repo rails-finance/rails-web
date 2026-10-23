@@ -1964,7 +1964,10 @@ function ChainTruthTimelineBody({
     // read as a defect in the rule for a day). The toolbar pill states the
     // whole count throughout; these two say when the list agrees with it.
     <SpineViewProvider>
-      {/* The card's sidebar carried on (P3.1, TO-DO-position-card 427). */}
+      {/* The card's sidebar carried on (P3.1, TO-DO-position-card 427). A row
+        whose card declares the contract its transaction entered
+        (`useTimelineEntry`) stands beside that contract's owner where the
+        registry names one (P3.1.1, ui-jobs 439); the rule is in the sidebar. */}
       <SectionSidebar section="timeline">
         <div
           className="space-y-3"
