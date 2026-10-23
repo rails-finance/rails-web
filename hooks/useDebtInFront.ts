@@ -6,7 +6,7 @@ interface DebtInFrontResult {
   debtInFront: number | null;
   trovesAhead: number | null;
   /** The branch's entire debt (the whole redemption queue) — the redemption
-   *  runway's denominator. Null until the backend ships it / on read failure. */
+   *  runway's denominator. Null on read failure. */
   queueDebtTotal: number | null;
   loading: boolean;
 }

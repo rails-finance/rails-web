@@ -62,6 +62,12 @@ export const V3_HEAD_WORDS: AaveFamilyHeadTable = {
   transferred: V3_WORDS.t1_transferred,
   to: V3_WORDS.t1_to,
   from: V3_WORDS.t1_from,
+  via: V3_WORDS.t1_via,
+  sold: V3_WORDS.t1_sold,
+  claimed: V3_WORDS.t1_claimed,
+  received: V3_WORDS.t1_received,
+  staked: V3_WORDS.t1_staked,
+  migrated: V3_WORDS.t1_migrated,
   swap: {
     collateral_swap: V3_WORDS.t1_collateral_swap,
     debt_swap: V3_WORDS.t1_debt_swap,

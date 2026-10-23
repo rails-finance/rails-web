@@ -32,7 +32,7 @@ import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-ba
 import {
   lifetimeFiguresKnown,
   scaleBaseUnits,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -137,7 +137,7 @@ export default function MorphoPositionView({
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
           fetchMorphoPositions({ market: mkt, user: usr, limit: 1 }),
-          asked ? null : fetchMorphoTimeline(positionId, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchMorphoTimeline(positionId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchMorphoGroupedTimeline(positionId) : null,
         ]);
         const tData = grouped ?? flat;

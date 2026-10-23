@@ -6,7 +6,9 @@
 // The timeline's head (mode "row", rails-ops decision 0045) is words: the
 // past-participle kind (`aaveFamilyT1Kind`, lib/aave-v3/head-words.ts), a
 // transfer's counterparty as its clause, and the chips for what the spine
-// cannot show: a swap's venue, the WETH gateway, the treasury, the "by" party.
+// cannot show: a swap's venue, the WETH gateway, the treasury, the known
+// contract a supply, borrow or repay went through, the router a sale went
+// through ("Sold · via Zerion router", `ctx.sale`), the "by" party.
 // The spine carries the figures.
 //
 // The event page's card (mode "title") maps the signed amount(s) this event
@@ -27,20 +29,23 @@ import {
   externalActorProv,
   transferDeltaProv,
   transferCounterpartyProv,
+  poolCallerProv,
   swapVenueParty,
   swapVenueProv,
   swapLegNet,
   swapLegProv,
   swapLegSign,
+  saleLegProv,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
-import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
+import { aaveV3CtLabel, distributorPayout, poolCallerContract, stakedVia } from "@/lib/aave-v3/event-label";
 import { useChainId } from "@/lib/shared/chain-context";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
+import { legAmount } from "@/lib/shared/tx-legs";
 
 /** The primary reserve amount signed by direction: supply/borrow/transfer_in
  *  increase their side (+), withdraw/repay/transfer_out decrease it (−). A
@@ -68,7 +73,9 @@ export interface AaveV3CtEventHeaderProps {
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
-  /** The position owner, for the receipt's owner row (required with externalBy). */
+  /** The position owner, for the receipt's owner row (required with
+   *  externalBy), to tell a claimed payout from a received one, and to tell
+   *  a known contract's call from the wallet's. */
   wallet?: string;
   /** The event's own token movements, read here for one thing only: the moved
    *  reserve's contract address, which the icon chip needs and the context does
@@ -91,19 +98,55 @@ function viaGatewayOf(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | und
   return !isFee && ctx.eventType === "transfer_out" && named?.kind === "gateway";
 }
 
+/** The lead before the staking contract a stake went into: "Staked · in Aave
+ *  Umbrella". A literal, which check:parties maps to its role. */
+const STAKE_LEAD = "in";
+
 /** The timeline head's words as one line: the phone caption and the row's
- *  accessible name. */
-export function aaveV3T1Caption(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | undefined | null): string {
+ *  accessible name. `owner`: the position's wallet, which tells a claimed
+ *  payout from a received one and a known contract's call from its own. */
+export function aaveV3T1Caption(
+  ctx: AaveV3Context,
+  isFee: boolean,
+  chainId: ChainId | undefined | null,
+  owner?: string,
+): string {
   const gateway = viaGatewayOf(ctx, isFee, chainId);
+  const payout = distributorPayout(ctx, owner, chainId);
+  const sale = !isFee && ctx.eventType === "transfer_out" && !!ctx.sale;
+  const stake = !sale && stakedVia(ctx, isFee, chainId);
+  const caller = poolCallerContract(ctx, owner, chainId);
   const kind = aaveFamilyT1Kind(
-    { eventType: ctx.eventType, fee: isFee, gateway, swapKind: ctx.swap?.kind },
+    {
+      eventType: ctx.eventType,
+      fee: isFee,
+      gateway,
+      payout,
+      sale,
+      stake,
+      migratedFrom: caller?.migratesFrom,
+      swapKind: ctx.swap?.kind,
+    },
     V3_HEAD_WORDS,
   );
+  if (caller && ctx.poolCaller && V3_HEAD_WORDS.via)
+    return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
+      lead: V3_HEAD_WORDS.via,
+      address: ctx.poolCaller,
+      name: caller.name,
+    });
   const transfer = !isFee && !gateway && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
   if (!transfer || !ctx.counterparty) return kind;
   const named = getProtocolContract(ctx.counterparty, chainId ?? MAINNET_CHAIN_ID);
   return aaveFamilyT1Caption(kind, V3_HEAD_WORDS, {
-    lead: ctx.eventType === "transfer_out" ? V3_HEAD_WORDS.to : V3_HEAD_WORDS.from,
+    lead:
+      sale && V3_HEAD_WORDS.via
+        ? V3_HEAD_WORDS.via
+        : stake
+          ? STAKE_LEAD
+          : ctx.eventType === "transfer_out"
+            ? V3_HEAD_WORDS.to
+            : V3_HEAD_WORDS.from,
     address: ctx.counterparty,
     name: named?.name,
   });
@@ -128,11 +171,15 @@ export function useAaveV3HeadSpec({
     pool: useV3Pool(),
   };
   const deltas: ChainTruthDelta[] = [];
-  const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId);
+  const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId, wallet);
   const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
   const viaGateway = viaGatewayOf(ctx, !!feeOf, coords.chainId);
   // A liquidation's fee reads as an act with its verb, not as a custody move.
   const isTransferRow = !feeOf && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
+  // A transfer out the receipt shows as a sale through a router: the aToken
+  // out, the token paid back in, and the router as the venue.
+  const sale = !feeOf && ctx.eventType === "transfer_out" ? ctx.sale : undefined;
+  const stake = !sale && stakedVia(ctx, !!feeOf, coords.chainId);
 
   if (ctx.eventType === "liquidation") {
     const coll = Number(ctx.liquidatedCollateralAmount ?? "0") || 0;
@@ -224,6 +271,14 @@ export function useAaveV3HeadSpec({
         // header keeps it.
         ...(feeOf ? { noSpineCounterpart: true } : {}),
       });
+    const back = sale ? Number(legAmount(sale.leg)) : 0;
+    if (sale && back !== 0)
+      deltas.push({
+        value: back,
+        symbol: sale.leg.symbol,
+        address: sale.leg.token ?? undefined,
+        prov: saleLegProv(sale, ctx.reserveSymbol ?? "", coords),
+      });
   }
 
   // A transfer's counterparty is a named party of the event itself, not a
@@ -245,7 +300,7 @@ export function useAaveV3HeadSpec({
         }
       : ctx.counterparty != null
         ? {
-            prefix: viaGateway ? "via" : transferOut ? "to" : "from",
+            prefix: viaGateway || sale ? "via" : stake ? "in" : transferOut ? "to" : "from",
             address: ctx.counterparty,
             name: feeOf ? V3_HEAD_WORDS.treasury : named?.name,
             icon: feeOf
@@ -257,6 +312,20 @@ export function useAaveV3HeadSpec({
             ens: true,
           }
         : undefined;
+
+  // A supply, borrow or repay a known contract made for the wallet: "via
+  // Zerion". The signer stays on the "by" chip.
+  const caller = poolCallerContract(ctx, wallet, coords.chainId);
+  const callerParty =
+    caller && ctx.poolCaller
+      ? {
+          prefix: "via",
+          address: ctx.poolCaller,
+          name: caller.name,
+          icon: caller.protocolIcon ? protocolIconSrc(caller.protocolIcon) : undefined,
+          prov: poolCallerProv(ctx.eventType, coords, ctx.poolCaller),
+        }
+      : undefined;
 
   const externalActor =
     externalBy && wallet && ctx.txFrom && ctx.poolCaller
@@ -277,12 +346,26 @@ export function useAaveV3HeadSpec({
     const rowParty = party && viaGateway ? { ...party, prefix: "as ETH via" } : party;
     return {
       label: aaveFamilyT1Kind(
-        { eventType: ctx.eventType, fee: !!feeOf, gateway: viaGateway, swapKind: ctx.swap?.kind },
+        {
+          eventType: ctx.eventType,
+          fee: !!feeOf,
+          gateway: viaGateway,
+          payout: distributorPayout(ctx, wallet, coords.chainId),
+          stake,
+          migratedFrom: caller?.migratesFrom,
+          swapKind: ctx.swap?.kind,
+          sale: !!sale,
+        },
         W,
       ),
       critical: isAaveV3LossRow(ctx),
       deltas: [],
-      clauses: isTransferRow && rowParty ? [<PartyChip key="party" party={rowParty} />] : undefined,
+      clauses:
+        isTransferRow && rowParty
+          ? [<PartyChip key="party" party={rowParty} />]
+          : callerParty
+            ? [<PartyChip key="caller" party={callerParty} />]
+            : undefined,
       party: isTransferRow ? undefined : rowParty,
       externalActor,
     };
@@ -293,9 +376,9 @@ export function useAaveV3HeadSpec({
     critical: isAaveV3LossRow(ctx),
     // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
     // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
-    custody: isTransferRow,
+    custody: isTransferRow && !sale,
     deltas,
-    party,
+    party: party ?? callerParty,
     externalActor,
   };
 }

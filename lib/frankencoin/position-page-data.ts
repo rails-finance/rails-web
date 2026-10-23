@@ -18,7 +18,7 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
 import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
 import {
@@ -40,7 +40,7 @@ export const loadFrankencoinPositionTail = cache(async (position: string) => {
       ),
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<FrankencoinTimelineResult>(
-        await readFrankencoinTimeline(new URLSearchParams({ position, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+        await readFrankencoinTimeline(new URLSearchParams({ position, recent: String(TIMELINE_WINDOW_ROWS) }), {
           baseUrl,
           headers,
         }),

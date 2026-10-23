@@ -49,7 +49,7 @@ import {
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -171,7 +171,7 @@ export default function BasedollarTroveDetail({
         const asked = servedFoldersEnabled();
         const [pData, flat, grouped] = await Promise.all([
           fetchBasedollarTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
-          asked ? null : fetchBasedollarTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchBasedollarTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_ROWS }),
           asked ? fetchBasedollarGroupedTimeline(collateralType, troveId) : null,
         ]);
         const tData = grouped ?? flat;

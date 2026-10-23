@@ -68,6 +68,14 @@ placeholders:
     rounding: text
     means: |-
       What a named contract is.
+  caller:
+    rounding: text
+    means: |-
+      The known contract that called the Pool for the wallet, by its registry name.
+  from:
+    rounding: text
+    means: |-
+      The protocol a migration helper moved the position from, Aave V2.
   sent_on:
     rounding: date
     means: |-
@@ -312,6 +320,25 @@ words:
     to
   t1_from: |-
     from
+  # A supply, borrow or repay a known contract made for the wallet.
+  t1_via: |-
+    via
+  # A transfer out to a router or settlement whose receipt shows one leg back
+  # to the wallet in another token (lib/shared/tx-legs.ts).
+  t1_sold: |-
+    Sold
+  # A transfer in from a distributor: the wallet sent the claim, or the payout
+  # was pushed to it.
+  t1_claimed: |-
+    Claimed
+  t1_received: |-
+    Received
+  # A transfer out to a staking contract, which takes the aTokens into a stake.
+  t1_staked: |-
+    Staked
+  # A supply or borrow a migration helper made; the protocol's name follows it.
+  t1_migrated: |-
+    Migrated from
   t1_collateral_swap: |-
     Swapped collateral
   t1_debt_swap: |-
@@ -561,6 +588,10 @@ templates:
     variants:
       default: |-
         a supply to the Pool
+      via: |-
+        a supply a known contract made for the wallet
+      migrated: |-
+        a supply Aave's migration helper made, moving the position from Aave V2
     sentences:
       supply.what:
         when: |-
@@ -572,6 +603,26 @@ templates:
           another account sent it
         text: |-
           {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf.
+      supply.via:
+        when: |-
+          via, the owner sent it
+        text: |-
+          Supplied {amount} {symbol} to {protocol} through {role}.
+      supply.by_via:
+        when: |-
+          via, another account sent it
+        text: |-
+          {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf, through {role}.
+      supply.migrated:
+        when: |-
+          migrated, the owner sent it
+        text: |-
+          Migrated {amount} {symbol} of supply from {from} to {protocol} through {role}.
+      supply.by_migrated:
+        when: |-
+          migrated, another account sent it
+        text: |-
+          {actor} migrated {amount} {symbol} of supply from {from} to {protocol} on the owner's behalf, through {role}.
       coll.on:
         when: |-
           the Pool switched the asset on as collateral in this transaction
@@ -596,6 +647,10 @@ templates:
       [
         supply.what,
         supply.by,
+        supply.via,
+        supply.by_via,
+        supply.migrated,
+        supply.by_migrated,
         coll.on,
         coll.was_on,
         coll.zero_ltv,
@@ -619,7 +674,19 @@ templates:
         rate.held,
       ]
     groups:
-      happened: [supply.what, supply.by, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
+      happened:
+        [
+          supply.what,
+          supply.by,
+          supply.via,
+          supply.by_via,
+          supply.migrated,
+          supply.by_migrated,
+          coll.on,
+          coll.was_on,
+          coll.zero_ltv,
+          coll.stays_off,
+        ]
       leaves:
         [
           hf.under,
@@ -641,7 +708,7 @@ templates:
           rate.held,
         ]
     alternates:
-      - [supply.what, supply.by]
+      - [supply.what, supply.by, supply.via, supply.by_via, supply.migrated, supply.by_migrated]
       - [coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
       - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
@@ -743,6 +810,10 @@ templates:
     variants:
       default: |-
         a borrow from the Pool
+      via: |-
+        a borrow a known contract made for the wallet
+      migrated: |-
+        a borrow Aave's migration helper made, moving the position from Aave V2
     sentences:
       borrow.what:
         when: |-
@@ -754,10 +825,34 @@ templates:
           another account sent it, with credit the owner delegated
         text: |-
           {actor} borrowed {amount} {symbol} on the owner's behalf, with credit the owner delegated.
+      borrow.via:
+        when: |-
+          via, the owner sent it
+        text: |-
+          Borrowed {amount} {symbol} against the account's collateral through {role}.
+      borrow.by_via:
+        when: |-
+          via, another account sent it, with credit the owner delegated
+        text: |-
+          {actor} borrowed {amount} {symbol} on the owner's behalf through {role}, with credit the owner delegated.
+      borrow.migrated:
+        when: |-
+          migrated, the owner sent it
+        text: |-
+          Migrated {amount} {symbol} of debt from {from} to {protocol} through {role}.
+      borrow.by_migrated:
+        when: |-
+          migrated, another account sent it
+        text: |-
+          {actor} migrated {amount} {symbol} of debt from {from} to {protocol} on the owner's behalf, through {role}.
     order:
       [
         borrow.what,
         borrow.by,
+        borrow.via,
+        borrow.by_via,
+        borrow.migrated,
+        borrow.by_migrated,
         hf.under,
         hf.close,
         hf.close_basket,
@@ -778,7 +873,7 @@ templates:
         rate.at,
       ]
     groups:
-      happened: [borrow.what, borrow.by]
+      happened: [borrow.what, borrow.by, borrow.via, borrow.by_via, borrow.migrated, borrow.by_migrated]
       leaves:
         [
           hf.under,
@@ -801,7 +896,7 @@ templates:
           rate.at,
         ]
     alternates:
-      - [borrow.what, borrow.by]
+      - [borrow.what, borrow.by, borrow.via, borrow.by_via, borrow.migrated, borrow.by_migrated]
       - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
       - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
       - [rate.avg, rate.moved, rate.held, rate.at]
@@ -815,6 +910,8 @@ templates:
     variants:
       default: |-
         a repayment to the Pool
+      via: |-
+        a repayment a known contract made for the wallet
     sentences:
       repay.what:
         when: |-
@@ -846,6 +943,26 @@ templates:
           another account repaid, the reserve's debt is gone
         text: |-
           {actor} repaid {amount} {symbol} on the owner's behalf, clearing the {symbol} debt.
+      repay.via:
+        when: |-
+          via, the owner sent it, debt remains
+        text: |-
+          Repaid {amount} {symbol} of the account's debt through {role}.
+      repay.via_cleared:
+        when: |-
+          via, the owner sent it, the reserve's debt is gone
+        text: |-
+          Repaid {amount} {symbol} through {role}, clearing the account's {symbol} debt.
+      repay.by_via:
+        when: |-
+          via, another account sent it, debt remains
+        text: |-
+          {actor} repaid {amount} {symbol} of the account's debt on the owner's behalf, through {role}.
+      repay.by_via_cleared:
+        when: |-
+          via, another account sent it, the reserve's debt is gone
+        text: |-
+          {actor} repaid {amount} {symbol} on the owner's behalf through {role}, clearing the {symbol} debt.
       repay.funded:
         when: |-
           a withdraw and swap within the hour before sent this token to the wallet
@@ -859,6 +976,10 @@ templates:
         repay.atokens_cleared,
         repay.by,
         repay.by_cleared,
+        repay.via,
+        repay.via_cleared,
+        repay.by_via,
+        repay.by_via_cleared,
         repay.funded,
         hf.under,
         hf.close,
@@ -882,7 +1003,19 @@ templates:
       ]
     groups:
       happened:
-        [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared, repay.funded]
+        [
+          repay.what,
+          repay.cleared,
+          repay.atokens,
+          repay.atokens_cleared,
+          repay.by,
+          repay.by_cleared,
+          repay.via,
+          repay.via_cleared,
+          repay.by_via,
+          repay.by_via_cleared,
+          repay.funded,
+        ]
       leaves:
         [
           hf.under,
@@ -906,7 +1039,18 @@ templates:
           rate.held,
         ]
     alternates:
-      - [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared]
+      - [
+          repay.what,
+          repay.cleared,
+          repay.atokens,
+          repay.atokens_cleared,
+          repay.by,
+          repay.by_cleared,
+          repay.via,
+          repay.via_cleared,
+          repay.by_via,
+          repay.by_via_cleared,
+        ]
       - [
           hf.under,
           hf.close,
@@ -1090,15 +1234,22 @@ templates:
     variants:
       default: |-
         supply received as an aToken transfer
+      distributor: |-
+        a payout from a contract that pays tokens out to many accounts
     sentences:
       tin.what:
         when: |-
-          always
+          default
         text: |-
           Received {amount} {symbol} of supply from {sender} as an aToken transfer.
+      tin.payout:
+        when: |-
+          distributor
+        text: |-
+          Received {amount} {symbol} of supply as a reward payout from {sender}, {role}.
       tin.named:
         when: |-
-          the sender is a known contract
+          the sender is a known contract other than a distributor
         text: |-
           The sender is {role}.
       tin.returned:
@@ -1106,9 +1257,9 @@ templates:
           the previous row sent the same reserve to the same account, and the supply index accounts for the difference
         text: |-
           It returns what this position sent the same account on {sent_on}, with the interest earned since.
-    order: [tin.what, tin.named, tin.returned]
+    order: [tin.what, tin.payout, tin.named, tin.returned]
     groups:
-      happened: [tin.what, tin.named]
+      happened: [tin.what, tin.payout, tin.named]
       leaves: [tin.returned]
 
   - id: aave3.transfer_out
@@ -1120,21 +1271,43 @@ templates:
     variants:
       default: |-
         supply sent as an aToken transfer
+      staking: |-
+        supply staked through a staking contract
+      sold: |-
+        supply sold through a router or settlement contract, the payment read from the transaction's receipt
     sentences:
       tout.what:
         when: |-
-          always
+          default
         text: |-
           Sent {amount} {symbol} of supply to {recipient} as an aToken transfer.
       tout.named:
         when: |-
-          the recipient is a known contract
+          default, and the recipient is a known contract
         text: |-
           The recipient is {role}.
+      tout.staked:
+        when: |-
+          staking
+        text: |-
+          Staked {amount} {symbol} of supply through {role}.
+      tout.sold:
+        when: |-
+          sold
+        text: |-
+          Sold {amount} {symbol} of supply through {role}, and the wallet received {received} {r_symbol} in the same transaction.
+      tout.paired:
+        when: |-
+          sold
+        text: |-
+          Rails paired the two from the receipt; no protocol log joins them. The figures show {brand}'s side: one aToken transfer.
     order:
       [
         tout.what,
+        tout.staked,
         tout.named,
+        tout.sold,
+        tout.paired,
         off.switched,
         hf.under,
         hf.close,
@@ -1154,7 +1327,7 @@ templates:
         prior.plain,
       ]
     groups:
-      happened: [tout.what, tout.named, off.switched]
+      happened: [tout.what, tout.staked, tout.named, tout.sold, tout.paired, off.switched]
       leaves:
         [
           hf.under,
@@ -1175,6 +1348,8 @@ templates:
           prior.plain,
         ]
     alternates:
+      - [tout.what, tout.sold]
+      - [tout.named, tout.paired]
       - [
           hf.under,
           hf.close,

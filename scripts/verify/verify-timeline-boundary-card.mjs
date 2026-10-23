@@ -197,7 +197,7 @@
 //   in timeline-boundary-card.tsx) → on spark: FAIL 2 "card says 27,853, count
 //   line → 27,852" and FAIL 2 "oldest pill 27,853 (omitted + 1 = 27,854)";
 //   restored → 7/7. The same day, run in slices: 115/115 across 20 fixtures.
-//   2026-09-10 (the cut): `TIMELINE_WINDOW_EVENTS = 999` locally → 7 reds on
+//   2026-09-10 (the cut): `TIMELINE_WINDOW_ROWS = 999` locally → 7 reds on
 //   spark, aave-v3-base-2000 and vault-eth-mid — "listed === 1,000 exactly —
 //   listed 999" and "card count = M − 1,000 — card 27,861, M 28,860" on each
 //   arm (and spark's state line, since the route fixture still asked for

@@ -1321,6 +1321,9 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       ...(d.kind === "repay" ? { useATokens: d.useATokens } : {}),
       ...(isTransfer && d.counterparty ? { counterparty: d.counterparty } : {}),
       ...(txFrom && d.poolCaller ? { txFrom, poolCaller: d.poolCaller } : {}),
+      // A transfer's sender alone: it tells a claimed payout from a received
+      // one (lib/aave-v3/event-label.ts distributorPayout).
+      ...(isTransfer && txFrom && !d.poolCaller ? { txFrom } : {}),
       ...(isSupplySide
         ? { supplyBefore: amt(fig.before, rMeta), supplyAfter: amt(fig.after, rMeta) }
         : { debtBefore: amt(fig.before, rMeta), debtAfter: amt(fig.after, rMeta) }),

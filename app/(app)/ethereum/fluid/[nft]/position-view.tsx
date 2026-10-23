@@ -28,7 +28,7 @@ import { fetchFluidChainPosition, type FluidPositionChainResponse } from "@/lib/
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -151,7 +151,7 @@ export default function FluidPositionView({
       try {
         const [pData, tData] = await Promise.all([
           fetchFluidPositions({ nft: nftId, limit: 1 }),
-          fetchFluidTimeline(nftId, { recent: TIMELINE_WINDOW_EVENTS }),
+          fetchFluidTimeline(nftId, { recent: TIMELINE_WINDOW_ROWS }),
         ]);
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);

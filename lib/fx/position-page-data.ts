@@ -14,7 +14,7 @@ import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
 import { answerBody, answerTimeline } from "@/lib/shared/proxy-answer";
 import { readFxOpeningBalance, readFxTimeline } from "@/lib/fx/proxy-reads";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
 import type { FxTimelineResult } from "@/lib/sources/api/fx-timeline";
 
@@ -24,7 +24,7 @@ export const loadFxPositionTail = cache(async (pool: FxPoolKey, positionId: stri
     label: "fx",
     readTimeline: async (baseUrl, headers) => {
       const res = answerTimeline<FxTimelineResult>(
-        await readFxTimeline(pool, positionId, new URLSearchParams({ recent: String(TIMELINE_WINDOW_EVENTS) }), {
+        await readFxTimeline(pool, positionId, new URLSearchParams({ recent: String(TIMELINE_WINDOW_ROWS) }), {
           baseUrl,
           headers,
         }),

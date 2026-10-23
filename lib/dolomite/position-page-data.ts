@@ -13,7 +13,7 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
 import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
 import { readDolomiteOpeningBalance, readDolomitePositions, readDolomiteTimeline } from "@/lib/dolomite/proxy-reads";
@@ -32,7 +32,7 @@ export const loadDolomitePositionTail = cache(async (owner: string, accountNumbe
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<DolomiteTimelineResult>(
         await readDolomiteTimeline(
-          new URLSearchParams({ owner, accountNumber, recent: String(TIMELINE_WINDOW_EVENTS) }),
+          new URLSearchParams({ owner, accountNumber, recent: String(TIMELINE_WINDOW_ROWS) }),
           { baseUrl, headers },
         ),
         "readDolomiteTimeline",

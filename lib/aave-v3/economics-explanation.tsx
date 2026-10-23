@@ -11,7 +11,7 @@ import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 import { formatNumber } from "@/lib/utils/format";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
+import { AAVE_FAQ_URLS } from "@/lib/shared/faq-urls";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { WRITTEN_OFF_KEY } from "@/lib/aave-v3/chain-truth-tower";
 import { formatCompact } from "@/lib/shared/format-compact";

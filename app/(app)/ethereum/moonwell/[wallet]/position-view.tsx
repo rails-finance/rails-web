@@ -31,7 +31,7 @@ import { fetchMoonwellTimeline } from "@/lib/api/fetch-moonwell-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -126,7 +126,7 @@ export default function MoonwellPositionView({
       try {
         const [pData, tData] = await Promise.all([
           fetchMoonwellPositions({ wallet, limit: 1 }),
-          fetchMoonwellTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          fetchMoonwellTimeline(wallet, { recent: TIMELINE_WINDOW_ROWS }),
         ]);
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);

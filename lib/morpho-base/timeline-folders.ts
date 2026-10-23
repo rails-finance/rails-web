@@ -35,7 +35,7 @@ import type { BaseActivityEvent, MorphoContext } from "@/lib/shared/types/event-
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { MORPHO_LIQUIDATION_REPAID_VERB } from "@/lib/morpho/position-legs";
 import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import {
   groupIntoRows,
   trimToRowCap,
@@ -360,7 +360,7 @@ export async function readGroupedMorphoBase(
   opts: { span?: { from: number; to: number } | null; preferRemembered?: boolean; cap?: number } = {},
 ): Promise<MorphoBaseGroupedRead> {
   const span = opts.span ?? null;
-  const cap = opts.cap ?? TIMELINE_WINDOW_EVENTS;
+  const cap = opts.cap ?? TIMELINE_WINDOW_ROWS;
   const id = market.toLowerCase();
   const key = `${p.wallet.toLowerCase()}|${id}`;
   const answers = answerStore<MorphoBaseGroupedAnswer>("morphoBase");

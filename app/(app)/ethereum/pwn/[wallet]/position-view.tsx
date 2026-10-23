@@ -24,7 +24,7 @@ import { fetchPwnPositions } from "@/lib/api/fetch-pwn-positions";
 import { fetchPwnTimeline } from "@/lib/api/fetch-pwn-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   lifetimeFiguresKnown,
   type TimelineOpeningBalance,
@@ -93,7 +93,7 @@ export default function PwnLoanView({
   // most recent events; the response names the block the window opened at, and
   // everything below it arrives as a declared opening balance from the
   // /summary twin. PWN's deepest wallet today holds a few dozen events — far
-  // under TIMELINE_WINDOW_EVENTS — so `cutoffBlock` comes back null and this
+  // under TIMELINE_WINDOW_ROWS — so `cutoffBlock` comes back null and this
   // page reads exactly as it did before for every real position.
   const [cutoffBlock, setCutoffBlock] = useState<number | null>(initialCutoffBlock);
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
@@ -111,7 +111,7 @@ export default function PwnLoanView({
         // resolve to any of them; the timeline carries all the loans' events.
         const [pData, tData] = await Promise.all([
           fetchPwnPositions({ wallet, limit: 100 }),
-          fetchPwnTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          fetchPwnTimeline(wallet, { recent: TIMELINE_WINDOW_ROWS }),
         ]);
         setSummaries(pData.data);
 

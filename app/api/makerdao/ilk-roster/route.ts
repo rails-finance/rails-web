@@ -62,9 +62,8 @@ export async function GET(request: NextRequest) {
       createAuthFetchOptions(undefined, readerIp),
     );
     if (!response.ok) {
-      // Includes the 404 this route answers with until the backend half is
-      // deployed. The listing treats any failure as "no roster" and carries on
-      // without the Collateral type chips — see the client.
+      // The listing treats any failure as "no roster" and carries on without
+      // the Collateral type chips — see the client.
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
       return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
     }

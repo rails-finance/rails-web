@@ -64,7 +64,7 @@
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { timelineFillFromApi } from "@/lib/api/fetch-chain-timeline";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
 import {
   replayAaveV3Rows,
@@ -243,7 +243,7 @@ const ADDRESS = /^0x[0-9a-f]{40}$/;
  *  neither, so this is a payload ceiling only — ten pages of the timeline.
  *  The replay still runs over every row and the boundary card states the
  *  cut. */
-const MAX_RENDERED_EVENTS = TIMELINE_WINDOW_EVENTS;
+const MAX_RENDERED_EVENTS = TIMELINE_WINDOW_ROWS;
 
 export interface LoadAaveV3IndexParams {
   wallet: string;

@@ -4,7 +4,7 @@
 // lib/shared/liquity-fork-trove-page-data.ts.
 
 import { forkTroveTailLoader } from "@/lib/shared/liquity-fork-trove-page-data";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { resolveBranch } from "@/lib/asymmetry/asset-catalog";
 import { fetchAsymmetryTroves } from "@/lib/api/fetch-asymmetry-troves";
 import {
@@ -20,7 +20,7 @@ export const loadAsymmetryTroveTail = forkTroveTailLoader<AsymmetryTroveSummary,
   fetchTroves: fetchAsymmetryTroves,
   fetchTimeline: fetchAsymmetryTimeline,
   fetchGroupedTimeline: fetchAsymmetryGroupedTimeline,
-  recent: TIMELINE_WINDOW_EVENTS,
+  recent: TIMELINE_WINDOW_ROWS,
   openingPath: (collateralType, troveId) =>
     `/api/asymmetry/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/summary`,
 });

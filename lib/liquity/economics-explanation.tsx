@@ -19,10 +19,12 @@ import type { TroveEconomics as TroveEconomicsType } from "@/types/api/trove";
 import type { TroveMeta } from "@/lib/liquity/economics";
 import { calculateAccruedInterest } from "@/lib/liquity/utils/interest-calculator";
 import { formatPrice, formatUsdValue } from "@/components/shared/economics-chart-primitives";
-import { LIQUIDATION_RESERVE_ETH } from "@/components/transaction-timeline/explanation/shared/eventHelpers";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatExact } from "@/lib/utils/format";
 import { ExplainBullet, ExplainGroup, ExplainMore, Fig } from "@/components/shared/explain-groups";
+
+/** Liquity V2's refundable gas deposit, held apart from the collateral. */
+const LIQUIDATION_RESERVE_ETH = 0.0375;
 
 const DUST = 1e-9;
 

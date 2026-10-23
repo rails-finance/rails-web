@@ -34,6 +34,8 @@
 // private npm dependency — both bigger commitments than this phase should
 // make. Promote both to a shared workspace package when consolidation lands.
 
+import type { RouterSale } from "@/lib/shared/tx-legs";
+
 // ───────────────────────── Base primitives ─────────────────────────
 
 /** A single token movement within a transaction. */
@@ -680,7 +682,9 @@ export interface AaveV3Context {
   liquidatedCollateralAmount?: string;
   /** liquidation: liquidator address (lowercase). */
   liquidator?: string;
-  /** supply/borrow/repay only — the transaction sender (signer), lowercased. */
+  /** supply/borrow/repay, and transfer_in/transfer_out — the transaction
+   *  sender (signer), lowercased. A transfer carries it without poolCaller, so
+   *  the third-party test passes it by. */
   txFrom?: string;
   /** supply/borrow/repay only — msg.sender at the Pool, from the raw event's
    *  own party param (Supply/Borrow `user`, Repay `repayer`), lowercased. The
@@ -724,6 +728,11 @@ export interface AaveV3Context {
   liquidationBonusAtBlock?: { bonusBps: number; protocolFeeBps: number };
   /** swap only — the received leg and the pairing. */
   swap?: AaveV3SwapDetail;
+  /** transfer_out to a router or settlement only, set on the card when the
+   *  transaction's receipt shows one leg back to the wallet in another token
+   *  (hooks/useRouterSale.ts, rails-ops TO-DO-ui-jobs 438). The row reads
+   *  "Sold"; the figures still read one transfer out. */
+  sale?: RouterSale;
   /** Raw log integers behind the scaled fields above. */
   raw?: AaveV3ContextRaw;
   /** Origin envelopes for the emitted raw fields (log + param + raw + scale).

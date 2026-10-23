@@ -130,7 +130,7 @@ async function main() {
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, extraHTTPHeaders: bypassHeaders() });
     const url = `${BASE}${PAGE_PATH}`;
     // A protocol whose deepest position is shallower than the page's own
-    // TIMELINE_WINDOW_EVENTS can never window in production, so the page's own
+    // TIMELINE_WINDOW_ROWS can never window in production, so the page's own
     // request would come back with `cutoffBlock: null` and the browser half of
     // this script would have nothing to check — the wiring would ship untested.
     // When RECENT is below that constant, the page's outgoing request is

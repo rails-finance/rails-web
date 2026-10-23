@@ -10,7 +10,7 @@
 // ships the data, not a parser.
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
+import { FAQ_URLS } from "@/lib/shared/faq-urls";
 import { eventProseEngine, fillWords } from "@/lib/shared/event-prose/engine";
 import type { EventTemplate as SharedTemplate, ModalData, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { EchoKey } from "@/lib/liquity/event-prose";

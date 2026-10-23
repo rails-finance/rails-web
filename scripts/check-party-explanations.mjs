@@ -174,6 +174,8 @@ const PARTY_ROLES = [
   // "via" also names a swap's venue (Aave V3's "via CoW Protocol"); "as ETH
   // via" is SparkLend's WETH gateway on a withdrawal.
   { role: "router", prefixes: ["via", "as ETH via"], phrases: [/\brouter\b/i, /\bsettle(d|ment)\b/i] },
+  // "in" is Aave V3's Umbrella stake: the staking contract the aTokens went into.
+  { role: "stake", prefixes: ["in"], phrases: [/\bstak(e|ed|es|ing)\b/i] },
 ];
 
 function read(p) {

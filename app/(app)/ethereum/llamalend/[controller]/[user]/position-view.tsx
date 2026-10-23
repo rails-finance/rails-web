@@ -33,7 +33,7 @@ import { fetchLlamalendTimeline } from "@/lib/api/fetch-llamalend-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -151,7 +151,7 @@ export default function LlamalendPositionView({
       try {
         const [pData, tData] = await Promise.all([
           fetchLlamalendPositions({ controller, user, limit: 1 }),
-          fetchLlamalendTimeline(controller, user, { recent: TIMELINE_WINDOW_EVENTS }),
+          fetchLlamalendTimeline(controller, user, { recent: TIMELINE_WINDOW_ROWS }),
         ]);
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);

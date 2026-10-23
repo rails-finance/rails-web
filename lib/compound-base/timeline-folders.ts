@@ -38,7 +38,7 @@ import type { BaseActivityEvent, CompoundContext } from "@/lib/shared/types/even
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import type { ServedTimelineRow, TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import type { OpeningBucket } from "@/lib/shared/timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import {
   groupIntoRows,
   type GroupedRows,
@@ -524,7 +524,7 @@ export async function readGroupedCompoundBase(
   const span = opts.span ?? null;
   const market = span ? (opts.market ?? null) : null;
   if (span && !market) throw new Error("a month is read one market at a time");
-  const cap = opts.cap ?? TIMELINE_WINDOW_EVENTS;
+  const cap = opts.cap ?? TIMELINE_WINDOW_ROWS;
   const answers = answerStore<CompoundBaseGroupedAnswer>("compoundBase");
   const replays = answerStore<Replayed>("compoundBase.replay", 6);
   const answerKey = market ? `${p.wallet}|${market}` : p.wallet;

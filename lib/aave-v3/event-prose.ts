@@ -21,6 +21,8 @@ import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { EventProseCore } from "@/lib/shared/event-prose/types";
 import type { ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { poolCallerContract } from "@/lib/aave-v3/event-label";
+import { legAmount } from "@/lib/shared/tx-legs";
 import { externalActor } from "@/lib/shared/external-actor";
 import { v3Brand, isSeamless, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { feeLiquidation, liquidationBonus, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
@@ -68,27 +70,41 @@ function pick(
   ctx: AaveV3Context,
   chainId: ChainId,
   siblings?: readonly AaveV3TimelineEvent[],
+  owner?: string,
 ): { id: string; variant: string } {
+  // A supply, borrow or repay a known contract made for the wallet; a supply
+  // or borrow a migration helper made moved the position from another protocol.
+  const caller = poolCallerContract(ctx, owner, chainId);
+  const via = caller ? "via" : "default";
+  const moved = caller?.migratesFrom ? "migrated" : via;
   switch (ctx.eventType) {
     case "supply":
-      return { id: "aave3.supply", variant: "default" };
+      return { id: "aave3.supply", variant: moved };
     case "withdraw":
       return { id: "aave3.withdraw", variant: "default" };
     case "borrow":
-      return { id: "aave3.borrow", variant: "default" };
+      return { id: "aave3.borrow", variant: moved };
     case "repay":
-      return { id: "aave3.repay", variant: "default" };
+      return { id: "aave3.repay", variant: via };
     case "liquidation":
       return { id: "aave3.liquidation", variant: "default" };
     case "bad_debt_written_off":
       return { id: "aave3.bad_debt", variant: "default" };
     case "transfer_in":
+      // A distributor pays tokens out to many accounts: a payout.
+      if (getProtocolContract(ctx.counterparty, chainId)?.kind === "distributor")
+        return { id: "aave3.transfer_in", variant: "distributor" };
       return { id: "aave3.transfer_in", variant: "default" };
     case "transfer_out": {
       if (feeLiquidation(ctx, siblings, chainId)) return { id: "aave3.liq_fee", variant: "default" };
       // The gateway pulls aWETH only to withdraw it as ETH: a withdrawal.
       if (getProtocolContract(ctx.counterparty, chainId)?.kind === "gateway")
         return { id: "aave3.withdraw", variant: "gateway" };
+      // A router or settlement paid one leg back: a sale (ctx.sale).
+      if (ctx.sale) return { id: "aave3.transfer_out", variant: "sold" };
+      // A staking contract takes the aTokens into a stake.
+      if (getProtocolContract(ctx.counterparty, chainId)?.kind === "staking")
+        return { id: "aave3.transfer_out", variant: "staking" };
       return { id: "aave3.transfer_out", variant: "default" };
     }
     case "swap": {
@@ -150,7 +166,7 @@ function returnedFrom(ctx: AaveV3Context, prev: AaveV3TimelineEvent | undefined)
 /** One event's explanation and modal. */
 export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
   const { ctx, protocol, chainId, state, owner, siblings, previousEvent, timestamp } = input;
-  const sel = pick(ctx, chainId, siblings);
+  const sel = pick(ctx, chainId, siblings, owner);
   const variant = sel.variant;
   const run = PROSE.start(PROSE.template(sel.id));
   const { t, values, sp } = run;
@@ -166,6 +182,17 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       ? externalActor(ctx, owner)
       : null;
   if (actor) v.actor = actor;
+  // The known contract the row went through: its sentence takes the place of
+  // the plain one. A repay with aTokens never has one: repayWithATokens
+  // repays the caller's own debt, so the caller is the wallet. A migration
+  // names the protocol the position came from.
+  const migrated = variant === "migrated";
+  const caller = variant === "via" || migrated ? poolCallerContract(ctx, owner, chainId) : undefined;
+  if (caller) {
+    v.caller = caller.name;
+    v.role = caller.role;
+    if (caller.migratesFrom) v.from = caller.migratesFrom;
+  }
 
   // The health factor after the event, where it means something: past, close
   // to or near the liquidation line, cleared, or the account emptied.
@@ -248,7 +275,20 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
 
   switch (t.id) {
     case "aave3.supply": {
-      sp.say(actor ? "supply.by" : "supply.what", amount);
+      sp.say(
+        migrated
+          ? actor
+            ? "supply.by_migrated"
+            : "supply.migrated"
+          : caller
+            ? actor
+              ? "supply.by_via"
+              : "supply.via"
+            : actor
+              ? "supply.by"
+              : "supply.what",
+        amount,
+      );
       const coll = state?.collateral;
       if (coll && !coll.before && coll.after) sp.say("coll.on");
       else if (coll?.after) sp.say("coll.was_on");
@@ -269,7 +309,20 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       break;
     }
     case "aave3.borrow": {
-      sp.say(actor ? "borrow.by" : "borrow.what", amount);
+      sp.say(
+        migrated
+          ? actor
+            ? "borrow.by_migrated"
+            : "borrow.migrated"
+          : caller
+            ? actor
+              ? "borrow.by_via"
+              : "borrow.via"
+            : actor
+              ? "borrow.by"
+              : "borrow.what",
+        amount,
+      );
       hfLine(false);
       priorLine();
       if (!rateLine() && ctx.borrowRate && Number(ctx.borrowRate) > 0) {
@@ -281,17 +334,25 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     case "aave3.repay": {
       const cleared = (num(ctx.debtAfter) ?? 1) <= 0;
       sp.say(
-        actor
-          ? cleared
-            ? "repay.by_cleared"
-            : "repay.by"
-          : ctx.useATokens
+        caller
+          ? actor
             ? cleared
-              ? "repay.atokens_cleared"
-              : "repay.atokens"
+              ? "repay.by_via_cleared"
+              : "repay.by_via"
             : cleared
-              ? "repay.cleared"
-              : "repay.what",
+              ? "repay.via_cleared"
+              : "repay.via"
+          : actor
+            ? cleared
+              ? "repay.by_cleared"
+              : "repay.by"
+            : ctx.useATokens
+              ? cleared
+                ? "repay.atokens_cleared"
+                : "repay.atokens"
+              : cleared
+                ? "repay.cleared"
+                : "repay.what",
         amount,
       );
       // A repay of the token a withdraw and swap sent to the wallet within the hour.
@@ -355,10 +416,11 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     case "aave3.transfer_in": {
       const named = getProtocolContract(ctx.counterparty, chainId);
       v.sender = named?.name ?? V3_WORDS.another_account;
-      sp.say("tin.what", { amount: "transfer" });
-      if (named) {
-        v.role = named.role;
-        sp.say("tin.named");
+      if (named) v.role = named.role;
+      if (variant === "distributor") sp.say("tin.payout", { amount: "transfer" });
+      else {
+        sp.say("tin.what", { amount: "transfer" });
+        if (named) sp.say("tin.named");
       }
       const sentAt = returnedFrom(ctx, previousEvent);
       if (sentAt != null && timestamp != null) {
@@ -370,10 +432,18 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     case "aave3.transfer_out": {
       const named = getProtocolContract(ctx.counterparty, chainId);
       v.recipient = named?.name ?? V3_WORDS.another_account;
-      sp.say("tout.what", { amount: "transfer" });
-      if (named) {
-        v.role = named.role;
-        sp.say("tout.named");
+      if (named) v.role = named.role;
+      if (variant === "sold" && ctx.sale && named) {
+        v.received = Number(legAmount(ctx.sale.leg));
+        v.r_symbol = ctx.sale.leg.symbol;
+        sp.say("tout.sold", { amount: "transfer", received: "received" });
+        sp.say("tout.paired");
+      } else if (variant === "staking") {
+        // A stake's sentence names the staking contract by its role.
+        sp.say("tout.staked", { amount: "transfer" });
+      } else {
+        sp.say("tout.what", { amount: "transfer" });
+        if (named) sp.say("tout.named");
       }
       if (switchedOff()) sp.say("off.switched");
       hfLine(true);

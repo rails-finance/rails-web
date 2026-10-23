@@ -22,7 +22,7 @@ import {
   readCompoundV2Timeline,
 } from "@/lib/compound-v2/proxy-reads";
 import type { TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 
 /**
  * ONE timeline read, whichever shape the URL asked for — the SparkLend and
@@ -47,7 +47,7 @@ export const loadCompoundV2PositionTail = cache(async (wallet: string, grouped: 
     readTimeline: async (baseUrl, headers) =>
       answerTimeline<CompoundV2TimelineResult | CompoundV2GroupedTimelineResult>(
         await readCompoundV2Timeline(
-          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_EVENTS) }),
+          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_ROWS) }),
           { baseUrl, headers },
         ),
         "readCompoundV2Timeline",

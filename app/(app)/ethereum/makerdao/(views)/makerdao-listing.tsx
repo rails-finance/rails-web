@@ -93,7 +93,7 @@ export function MakerDAOListing({ initialItems, initialTotal, initialKey, initia
   // this view could not carry.
   const [filters, setFilters] = useState<MakerListFilters>(MAKER_LIST_DEFAULTS);
   const roster = useMakerRoster();
-  // The roster route is absent until the backend half is deployed, and a typed
+  // The roster can be unavailable (the backend failed to answer), and a typed
   // collateral-type name cannot be turned into a filter without it. That search
   // resolves to an empty result rather than to an unfiltered page — so the
   // reason is stated, else "No vaults match these filters." would read as a fact

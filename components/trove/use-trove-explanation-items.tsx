@@ -18,7 +18,7 @@ import { trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-proven
 import { pct } from "@/components/shared/ratio-bar";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
-import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
+import { HighlightableValue } from "@/components/shared/highlightable-value";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { H, type ExplainerItem } from "@/lib/shared/explainer-prose";
 import { stateOriginVia } from "@/lib/shared/trove-state-origin";

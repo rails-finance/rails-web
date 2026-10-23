@@ -4,7 +4,7 @@
 // family-agnostic `eventCardModel`. No new read path, no per-family card model.
 //
 // ⚠️ The windowed families (this one included) serve only the newest
-// `TIMELINE_WINDOW_EVENTS` rows — an OLDER event than that falls back to the
+// `TIMELINE_WINDOW_ROWS` rows — an OLDER event than that falls back to the
 // static roster card today. A server-side read by (owner, accountNumber,
 // event coordinate) rather than by "the served window" is a later phase.
 

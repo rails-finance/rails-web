@@ -34,7 +34,7 @@ import { fetchDolomiteTimeline } from "@/lib/api/fetch-dolomite-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
-  TIMELINE_WINDOW_EVENTS,
+  TIMELINE_WINDOW_ROWS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
   type TimelineWindow,
@@ -146,7 +146,7 @@ export default function DolomitePositionView({
       try {
         const [pData, tData] = await Promise.all([
           fetchDolomitePositions({ owner, accountNumber, limit: 1 }),
-          fetchDolomiteTimeline(owner, accountNumber, { recent: TIMELINE_WINDOW_EVENTS }),
+          fetchDolomiteTimeline(owner, accountNumber, { recent: TIMELINE_WINDOW_ROWS }),
         ]);
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);

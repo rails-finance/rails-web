@@ -20,6 +20,12 @@ export interface AaveFamilyHeadTable {
   transferred: string;
   to: string;
   from: string;
+  /** The lead before the known contract a supply, borrow or repay went
+   *  through. A family without it reads no clause. */
+  via?: string;
+  /** A transfer out to a router or settlement that the receipt shows as a
+   *  sale (lib/shared/tx-legs.ts). A family without it reads "Transferred". */
+  sold?: string;
   swap: Record<AaveV3SwapKind, string>;
   emode: string;
   emodeOff: string;
@@ -33,23 +39,45 @@ export interface AaveFamilyHeadTable {
   treasury: string;
   /** The family's WETH gateway, where no registry names it (SparkLend). */
   gatewayName?: string;
+  /** A transfer in from a distributor: the wallet sent the claim, or the
+   *  payout was pushed to it. A family without them reads "Transferred". */
+  claimed?: string;
+  received?: string;
+  /** A transfer out to a staking contract. A family without it reads
+   *  "Transferred". */
+  staked?: string;
+  /** The lead before the protocol a migration helper moved the position
+   *  from. A family without it reads the plain kind. */
+  migrated?: string;
 }
 
 /** What the head reads of a row. `fee`: a liquidation's fee transfer to the
  *  treasury. `gateway`: an aToken transfer to the WETH gateway, a withdrawal
- *  paid out as ETH. */
+ *  paid out as ETH. `payout`: a transfer in from a distributor, claimed by the
+ *  wallet or received. `stake`: a transfer out to a staking contract.
+ *  `migratedFrom`: the protocol a migration helper moved the supply or borrow
+ *  from. */
 export interface AaveFamilyHeadRow {
   eventType: string;
   fee?: boolean;
   gateway?: boolean;
+  payout?: "claimed" | "received";
+  stake?: boolean;
+  migratedFrom?: string;
   swapKind?: AaveV3SwapKind;
+  /** A transfer out the receipt shows as a sale through a router. */
+  sale?: boolean;
 }
 
 /** The row's past-participle kind. */
 export function aaveFamilyT1Kind(row: AaveFamilyHeadRow, w: AaveFamilyHeadTable): string {
   if (row.fee) return w.feePaid;
   if (row.gateway) return w.withdrew;
+  if (row.payout && w[row.payout]) return w[row.payout]!;
+  if (row.stake && w.staked) return w.staked;
+  if (row.migratedFrom && w.migrated) return `${w.migrated} ${row.migratedFrom}`;
   if (row.eventType === "swap" && row.swapKind) return w.swap[row.swapKind];
+  if (row.sale && w.sold) return w.sold;
   switch (row.eventType) {
     case "supply":
       return w.supplied;

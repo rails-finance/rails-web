@@ -32,6 +32,7 @@ import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { v3Protocol } from "@/lib/aave-v3/protocol-name";
 import { feeLiquidation, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
 import type { AaveV3Neighbours, AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
+import { useRouterSale } from "@/hooks/useRouterSale";
 
 export interface AaveV3CtEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
@@ -86,8 +87,20 @@ export function AaveV3CtEventCard({
   previous,
   sharedBlock,
 }: AaveV3CtEventCardProps) {
-  const ctx = event.context.data;
+  const indexed = event.context.data;
   const chainId = useChainId();
+  // A transfer out to a router or settlement reads its transaction's receipt;
+  // one leg back to the wallet in another token makes the row a sale
+  // (rails-ops TO-DO-ui-jobs 438). The figures keep the indexed row: the Aave
+  // side is still one transfer out.
+  const sale = useRouterSale({
+    enabled: indexed.eventType === "transfer_out" && !feeLiquidation(indexed, siblings, chainId),
+    chainId: chainId ?? MAINNET_CHAIN_ID,
+    txHash: event.txHash,
+    wallet: event.wallet,
+    counterparty: indexed.counterparty,
+  });
+  const ctx: AaveV3Context = sale ? { ...indexed, sale } : indexed;
   // Pointer-over or focus of the row starts the position reads the open card
   // makes (this transaction's and the previous one's), so the state is
   // usually in hand by the time the card opens.
@@ -118,7 +131,9 @@ export function AaveV3CtEventCard({
   const isSupplySwap = isSwap && ctx.swap?.kind === "supply_from_swap";
   // A swap with one position row draws that row on the flow, wearing the swap
   // badge: withdrawn on the left flank, supplied from a swap on the right (D6).
-  const isFlowSwap = isWithdrawSwap || isSupplySwap;
+  // A sale through a router draws like a withdraw and swap: the aTokens out on
+  // the left flank, wearing the swap badge.
+  const isFlowSwap = isWithdrawSwap || isSupplySwap || !!ctx.sale;
   const extBy = isSwap ? null : externalActor(ctx, event.wallet);
 
   const coords: V3Coords = {
@@ -264,7 +279,7 @@ export function AaveV3CtEventCard({
   const onOpen = useCallback(() => setActive(true), []);
   const body = useAaveV3EventBody({
     active,
-    ctx,
+    ctx: indexed,
     txHash: event.txHash,
     blockNumber: event.blockNumber,
     wallet: event.wallet,
@@ -293,14 +308,16 @@ export function AaveV3CtEventCard({
     },
     spine,
     head,
-    caption: page ? aaveV3CtLabel(ctx, !!feeOf, chainId) : aaveV3T1Caption(ctx, !!feeOf, chainId),
+    caption: page
+      ? aaveV3CtLabel(ctx, !!feeOf, chainId, event.wallet)
+      : aaveV3T1Caption(ctx, !!feeOf, chainId, event.wallet),
     // A transfer states its counterparty in the caption's words; one received
     // runs dotted, the sender having acted (ui-jobs 304).
     actor: {
       by: extBy ?? undefined,
       byOwner: kind === "transfer_in" ? false : undefined,
       custody:
-        page && ctx.counterparty && isTransfer
+        page && ctx.counterparty && isTransfer && !ctx.sale
           ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
           : undefined,
     },

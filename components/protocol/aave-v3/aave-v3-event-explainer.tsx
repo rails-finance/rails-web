@@ -19,6 +19,7 @@ import {
   seizedCollateralProv,
   swapLegNet,
   swapLegProv,
+  saleLegProv,
   swapLegSign,
   transferDeltaProv,
   writtenOffDebtProv,
@@ -34,6 +35,7 @@ import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { v3Protocol, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { legAmount } from "@/lib/shared/tx-legs";
 
 export interface AaveV3EventExplainerProps {
   ctx: AaveV3Context;
@@ -136,6 +138,13 @@ function echoFor(key: AaveV3EchoKey, ctx: AaveV3Context, coords: V3Coords): Pros
         symbol: sym,
       };
     case "received": {
+      // A sale through a router: the leg the receipt shows paid back.
+      if (ctx.sale)
+        return {
+          info: saleLegProv(ctx.sale, sym, coords),
+          value: chainTruthDeltaValue(Number(legAmount(ctx.sale.leg)), false),
+          symbol: ctx.sale.leg.symbol,
+        };
       if (!s) return null;
       const rSym = s.receivedSymbol ?? "";
       return {
