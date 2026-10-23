@@ -11,6 +11,7 @@
 //
 // Pages: the story Trove and its Repay #148 event page (Liquity V2), an Aave
 // V3 Core wallet.
+// Repointed (ui-jobs 432): the two card-row checks are dropped; the card has no rows to open since 322/330.
 //
 // Run:  BASE=http://localhost:3111 node scripts/verify/verify-prov-scope.mjs
 
@@ -151,19 +152,12 @@ for (const width of [1280, 390]) {
   await page.locator('[data-prov-scope-toggle="position-card"]').click();
   await page.waitForTimeout(500);
   const card = await marks(page, "position-card");
-  const cardRows = await page.$$eval("[data-card-row-toggle]", (els) =>
-    els.map((e) => e.getAttribute("aria-expanded")),
-  );
   check(
     `${tag}: the C17 row arms the card alone, and the card alone wears the ring`,
     (await litOnly(page, "position-card")) && card.inside > 0 && card.outside === 0,
     `inside ${card.inside}, outside ${card.outside}`,
   );
-  check(
-    `${tag}: armed on the card, every card row stands open`,
-    cardRows.every((x) => x === "true"),
-    JSON.stringify(cardRows),
-  );
+  // Dropped: "armed on the card, every card row stands open" read [data-card-row-toggle]; 322/330 removed the card's rows.
   check(`${tag}: focus sits on C17's trigger after the pick`, await focusIs(page, C17_TRIGGER));
   // The row reads "Stop inspecting" while the card is armed.
   await page.locator(C17_TRIGGER).click();
@@ -188,19 +182,12 @@ for (const width of [1280, 390]) {
     await armScope(page, "flows", { menu: FLOWS_MENU });
     await page.waitForTimeout(500);
     const flows = await marks(page, "flows");
-    const rowsNow = await page.$$eval("[data-card-row-toggle]", (els) =>
-      els.map((e) => e.getAttribute("aria-expanded")),
-    );
     check(
       `${tag}: the flows ⋮ row arms Lifetime flows alone, and the panel alone wears the ring`,
       (await litOnly(page, "flows")) && flows.inside > 0 && flows.outside === 0,
       `inside ${flows.inside}, outside ${flows.outside}`,
     );
-    check(
-      `${tag}: armed on flows, the card's closed rows stay closed`,
-      rowsNow.includes("false"),
-      JSON.stringify(rowsNow),
-    );
+    // Dropped: "armed on flows, the card's closed rows stay closed" read [data-card-row-toggle]; 322/330 removed the card's rows.
     await ladder(page, "flows", FLOWS_TRIGGER, `${tag} flows`);
   }
   check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));

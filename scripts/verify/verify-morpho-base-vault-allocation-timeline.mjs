@@ -42,6 +42,9 @@
 // lane the reader names, and the only Base lane that answers a whole-life
 // `eth_getLogs` at all.
 //
+// Repointed (ui-jobs 432): readPage opens each row's Figures tab before the
+// panels are read (the notes moved under it with ui-jobs 370; 307, 330).
+//
 // ── WHAT EACH SECTION ASSERTS ────────────────────────────────────────────────
 //   0  each sampled page answers 200, states a block near this script's own
 //      head, and the fixtures still have the shapes every section below needs
@@ -479,6 +482,19 @@ async function readPage(vault, holder) {
     }
   }
   await page.waitForTimeout(1200);
+  // An opened card shows its Explanation first; the row's notes, with the
+  // allocation panel, sit under its Figures tab (ui-jobs 370; the same opener
+  // as verify-morpho-base-vault-timeline 5c).
+  const figureTabs = page.locator("[data-vault-timeline-rows] [data-card-tab='figures']");
+  const tabCount = await figureTabs.count();
+  for (let i = 0; i < tabCount; i++) {
+    try {
+      await figureTabs.nth(i).click({ force: true, timeout: 4000 });
+    } catch {
+      /* a tab that would not open shows up as a missing panel below */
+    }
+  }
+  await page.waitForTimeout(600);
 
   const panels = await page.locator("[data-row-allocation]").evaluateAll((els) =>
     els.map((e) => ({

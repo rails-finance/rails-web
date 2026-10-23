@@ -24,7 +24,10 @@ import { aaveV4EventLegs, aaveV4FlowTimeline, type AaveV4EventLeg } from "@/lib/
 import { dayStates, type DayState } from "./lib/flow-day-states";
 
 const FIXTURE = join(process.cwd(), "scripts/verify/fixtures/aave-v4-flow-legs.json");
-const SERVER_COPY = join(process.cwd(), "../rails-server-onboarding/api/src/services/fixtures/aave-v4-flow-legs.json");
+const SERVER_COPY = join(
+  process.env.SERVER_REPO ?? join(process.cwd(), "../rails-server"),
+  "api/src/services/fixtures/aave-v4-flow-legs.json",
+);
 
 interface Case {
   name: string;

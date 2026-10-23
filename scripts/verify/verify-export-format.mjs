@@ -62,6 +62,9 @@ if (!process.execArgv.includes("--experimental-strip-types")) {
     const ROOT = ${JSON.stringify(new URL("file://" + ROOT + "/").href)};
     const EXT = [".ts", ".tsx", "/index.ts", "/index.tsx", ".mjs", ".js"];
     export async function resolve(spec, ctx, next) {
+      // \`server-only\` (lib/api/reader-ip.ts) throws under plain node; Next maps
+      // it to an empty module, and so does this.
+      if (spec === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
       let s = spec;
       if (s.startsWith("@/")) s = new URL(s.slice(2), ROOT).href;
       if (s.startsWith(".") || s.startsWith("file:")) {

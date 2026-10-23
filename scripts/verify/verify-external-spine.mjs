@@ -15,6 +15,12 @@
 // server's hot reload to serve it — it cannot pass against a deployed preview,
 // which cannot pick up a local file write, whatever BASE names. Sections B–D
 // read fixtures only and carry the bypass header — see lib/host.mjs.
+//
+// Repointed for ui-jobs 432: the spine is read by its hooks (data-spine-node,
+// data-spine-actor-badge, data-spine-dotted) in place of class names and
+// inline colours; the check badge and a warning carry the actor's badge beside
+// their own, so those checks read a corner each and the critical ink; D (the
+// flank's receipt echo) is dropped, the spine carrying no receipts.
 
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -36,29 +42,28 @@ export default function SpineProbePage() {
       {/* isLast={false} throughout: the spine line only renders when a card
           follows, and the dotted-vs-solid assertion needs it drawn. */}
       <div data-probe="undefined-tokens">
-        <SpineColumn externalParty spine="dotted" isLast={false} />
+        <SpineColumn externalParty dotted isLast={false} />
       </div>
       <div data-probe="empty-tokens">
-        <SpineColumn externalParty tokens={[]} spine="dotted" isLast={false} />
+        <SpineColumn externalParty tokens={[]} dotted isLast={false} />
       </div>
       <div data-probe="flow">
         <SpineColumn
           externalParty
           tokens={[{ symbol: "USDC", direction: "right", value: 1234 }]}
-          spine="dotted"
+          dotted
           isLast={false}
         />
       </div>
       <div data-probe="explicit-badge-wins">
-        <SpineColumn externalParty tokens={[{ symbol: "USDC", badge: "check" }]} spine="dotted" isLast={false} />
+        <SpineColumn externalParty tokens={[{ symbol: "USDC", badge: "check" }]} dotted isLast={false} />
       </div>
       <div data-probe="warning-wins">
         <SpineColumn
           icon="warning"
           warningTone="critical"
-          warningLabel="Liquidation"
           externalParty
-          spine="dotted"
+          dotted
           isLast={false}
         />
       </div>
@@ -76,9 +81,10 @@ const FIXTURE =
 const LIQ_FIXTURE =
   "/ethereum/morpho/3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49-0x1f1de251ee59f4272ac21ffda2bd4dfc40c81912";
 
-const CARD_ROOT = "div.flex.w-full.items-start.relative.rounded-xl:has(> div.min-w-0.grow)";
-// The spine column itself (spine-column.tsx root).
-const SPINE = "div.hidden.sm\\:flex.flex-col.items-center.relative.px-1.pt-4.self-stretch";
+// The event card's row (event-card.tsx).
+const CARD_ROOT = '[data-skel-section="detail-event"]';
+// The spine column itself (spine-column.tsx root, which holds its node).
+const SPINE = "div:has(> [data-spine-node])";
 
 let pass = 0;
 let fail = 0;
@@ -96,21 +102,18 @@ const bad = (m) => {
 /** What a spine column is drawing, read from the DOM rather than inferred. */
 const READ_SPINE = `(el) => {
   const svgs = [...el.querySelectorAll('svg')];
-  const html = el.innerHTML;
   return {
-    // The ExternalBadge: a pink circle wrapping a WHITE-FILLED svg.
-    externalBadge: [...el.querySelectorAll('div')].some(
-      (d) => (d.style.backgroundColor || '').replace(/\\s/g, '') === 'rgb(236,72,153)' && d.querySelector('svg[fill="white"]'),
-    ),
+    // The actor badge naming a third party (spine-column.tsx ActorBadge).
+    externalBadge: !!el.querySelector('[data-spine-actor-badge="third-party"]'),
     // The standalone glyph: a STROKED pink user icon, not a filled badge.
     standaloneGlyph: svgs.some((s) => (s.getAttribute('stroke') || '').toUpperCase() === '#EC4899'),
     tokenIcons: el.querySelectorAll('img, [class*="token"]').length,
     checkBadge: [...el.querySelectorAll('div')].some(
       (d) => (d.style.backgroundColor || '').replace(/\\s/g, '') === 'rgb(34,197,94)',
     ),
-    warningGlyph: svgs.some((s) => (s.getAttribute('stroke') || '').includes('red') || (s.getAttribute('stroke') || '') === 'rgb(239 68 68)'),
-    warningLabel: /Liquidation|Absorbed|Redemption/.test(el.textContent || ''),
-    dotted: html.includes('linear-gradient'),
+    // The node's line ink: "party" for a third party's act, a warning's tone.
+    dottedInk: el.querySelector('[data-spine-dotted]')?.getAttribute('data-spine-dotted') ?? null,
+    dotted: !!el.querySelector('[data-spine-dotted]'),
     flankText: (el.textContent || '').trim(),
   };
 }`;
@@ -150,17 +153,21 @@ async function probeStructural(page) {
   if (flow && flow.externalBadge && !flow.standaloneGlyph && flow.tokenIcons > 0 && /1\.2K/.test(flow.flankText))
     ok("externalParty + a token row → token flow KEPT, pink badge overlaid, flank value present");
   else bad(`externalParty + a token row → ${JSON.stringify(flow)}`);
-  if (flow && flow.dotted) ok("externalParty rows carry the dotted spine");
+  if (flow && flow.dottedInk === "party") ok("externalParty rows carry the dotted spine in the party ink");
   else bad(`externalParty row's spine is not dotted → ${JSON.stringify(flow && flow.dotted)}`);
 
+  // The row's own badge sits bottom-right and who acted top-left, a corner
+  // each (spine-column.tsx); the check badge no longer displaces the actor's.
   const explicit = await readAt("explicit-badge-wins");
-  if (explicit && explicit.checkBadge && !explicit.externalBadge)
-    ok("an explicit row badge (check) WINS over the external badge — one corner, one badge");
+  if (explicit && explicit.checkBadge && explicit.externalBadge)
+    ok("an explicit row badge (check) and the third party's badge take a corner each");
   else bad(`explicit badge case → ${JSON.stringify(explicit)}`);
 
+  // A warning is a change the owner did not make, so it carries the third
+  // party's badge; its line keeps the critical tone over the party ink.
   const warn = await readAt("warning-wins");
-  if (warn && warn.warningLabel && !warn.externalBadge && !warn.standaloneGlyph)
-    ok("icon='warning' still wins over externalParty — liquidation keeps its critical glyph");
+  if (warn && warn.dottedInk === "critical" && !warn.standaloneGlyph)
+    ok("icon='warning' still wins over externalParty — liquidation keeps its critical tone");
   else bad(`warning case → ${JSON.stringify(warn)}`);
 
   const owner = await readAt("owner-acted");
@@ -257,7 +264,7 @@ async function probeLive(page) {
     // header's value span, so textContent would happily report an amount that
     // is display:none and the duplication check could never fail.
     const headerText = await card.evaluate((el) => {
-      const h = el.querySelector("div.flex.flex-wrap.items-center");
+      const h = el.querySelector('[data-anatomy~="T1"]');
       return h ? h.innerText || "" : "";
     });
     const flank = (s.flankText.match(/[\d,]+\.?\d*/) || [])[0];
@@ -297,11 +304,11 @@ async function probeLive(page) {
 
   // The Explanation's operator bullet.
   const bodyText = await page.evaluate(() => document.body.textContent || "");
-  if (/executed by an address other than the owner/.test(bodyText)) {
+  if (/run by another account/.test(bodyText)) {
     ok("position Explanation states the third-party execution fact");
-    const m = bodyText.match(/Of those, [\d,]+ (?:was|were) executed by an address other than the owner[^]{0,320}/);
+    const m = bodyText.match(/[^.]{0,120}run by another account[^.]{0,200}/);
     if (m) console.log(`   → ${m[0].replace(/\s+/g, " ").slice(0, 320)}`);
-    if (/ran through \S+\.eth/.test(bodyText)) ok("…and names the leading operator where ENS resolves it");
+    if (/through \S+\.eth/.test(bodyText)) ok("…and names the leading operator where ENS resolves it");
     else bad("operator bullet present but names no operator despite a resolving address");
   } else bad("position Explanation does not mention third-party execution");
 
@@ -335,13 +342,14 @@ async function probeLiquidation(page) {
     const spine = await card.$(SPINE);
     if (!spine) continue;
     const s = await page.evaluate(new Function("el", `return (${READ_SPINE})(el)`), spine);
-    if (!/Liquidation/.test(s.flankText)) continue;
+    const head = await card.evaluate((el) => el.querySelector('[data-anatomy~="T1"]')?.innerText ?? "");
+    if (!/Liquidat/.test(head)) continue;
     liqSeen++;
-    if (s.externalBadge || s.standaloneGlyph) liqBadged++;
+    if (s.dottedInk !== "critical" || s.standaloneGlyph) liqBadged++;
   }
   if (liqSeen === 0) console.log("   note: no liquidation row in the reachable window — nothing to assert");
-  else if (liqBadged === 0) ok(`${liqSeen} liquidation row(s) keep the critical warning glyph, unbadged`);
-  else bad(`${liqBadged} of ${liqSeen} liquidation rows gained an external badge — critical must win`);
+  else if (liqBadged === 0) ok(`${liqSeen} liquidation row(s) keep the critical tone`);
+  else bad(`${liqBadged} of ${liqSeen} liquidation rows lost the critical tone — critical must win`);
 }
 
 const browser = await chromium.launch();
@@ -351,7 +359,9 @@ try {
   await probeStructural(page);
   await probeLive(page);
   await probeLiquidation(page);
-  await probeEcho(page);
+  // D dropped: the spine carries no receipts since TO-DO-mobile-timeline
+  // decision 13 (spine-column.tsx data-prov-exempt), so its flank has no echo
+  // to resolve to the header's receipt; probeEcho stays for the record.
 } catch (err) {
   bad(`threw: ${err && err.message}`);
 } finally {

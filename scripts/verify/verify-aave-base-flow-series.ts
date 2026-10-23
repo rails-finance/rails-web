@@ -34,8 +34,8 @@ import { AAVE_V3_BASE_FIRST_WRITE_OFF_BLOCK } from "@/lib/aave-v3-base/write-off
 
 const FIXTURE = join(process.cwd(), "scripts/verify/fixtures/aave-base-flow-series.json");
 const SERVER_COPY = join(
-  process.cwd(),
-  "../rails-server-onboarding/api/src/services/fixtures/aave-base-flow-series.json",
+  process.env.SERVER_REPO ?? join(process.cwd(), "../rails-server"),
+  "api/src/services/fixtures/aave-base-flow-series.json",
 );
 
 interface Lane {

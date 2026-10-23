@@ -34,6 +34,10 @@
 // aave-family-sheet.tsx). The sheet stands under the opened card's Figures
 // tab; the tabs' own checks are verify-card-tabs.mjs.
 //
+// Repointed for ui-jobs 432: the card rows' toggles left with 322/330, so 1d,
+// 1e, 1f, 1i, 1j, 1k, 3a and 5p are dropped, 1h reads the Liquidates at stat
+// and 1g and 4f read the menu and the strip alone.
+//
 // Run:  BASE=http://localhost:3109 node scripts/verify/verify-disclosure-grammar.mjs
 
 import { chromium } from "playwright";
@@ -153,8 +157,9 @@ const headerLayout = (card) =>
     .locator("[data-card-header]")
     .waitFor({ timeout: 120000 })
     .catch(() => {});
-  await page
-    .locator('[data-card-row-toggle="1"]')
+  await card
+    .locator("[data-card-head]")
+    .first()
     .waitFor({ timeout: 60000 })
     .catch(() => {});
   // ui-jobs 430: the heading row carries the page's price strip in place of
@@ -180,81 +185,30 @@ const headerLayout = (card) =>
   );
   const oldChevron = await page.locator("[data-card-disclosure-toggle], [data-card-chevron]").count();
   check("1c. no card chevron", oldChevron === 0, `${oldChevron} found`);
-  const rows = await page.$$eval("[data-card-row-toggle]", (els) =>
-    els.map((e) => [e.getAttribute("data-card-row-toggle"), e.getAttribute("aria-expanded")]),
-  );
-  check(
-    "1d. Collateral and Debt open by default, Collateral ratio closed",
-    JSON.stringify(rows) ===
-      JSON.stringify([
-        ["0", "true"],
-        ["1", "true"],
-        ["2", "false"],
-      ]),
-    JSON.stringify(rows),
-  );
-  const rowGap = await chevGap(page.locator('[data-card-row-toggle="0"]'), null);
-  check("1e. a row's chevron follows its heading", rowGap != null && rowGap >= 0 && rowGap <= 8, `${rowGap}px`);
-  await page.mouse.move(2, 2);
-  await page.waitForTimeout(400);
-  const restOp = await chevOpacity(page.locator('[data-card-row="0"]'));
-  await page.locator('[data-card-row="0"]').hover();
-  await page.waitForTimeout(400);
-  const hoverOp = await chevOpacity(page.locator('[data-card-row="0"]'));
-  check(
-    "1f. the row's chevron is hidden until the row is hovered",
-    restOp === 0 && hoverOp === 1,
-    `${restOp} → ${hoverOp}`,
-  );
+  // 1d, 1e, 1f dropped: they read the card rows' toggles and chevrons
+  // ([data-card-row-toggle]); 322/330 made every card line a stat (C18) and
+  // retired the toggle with the card chevron (C9, ui-jobs 295).
 
-  // The ⋮ opens its menu and moves no row.
+  // The ⋮ opens its menu.
   await card.locator("[data-card-menu] > button").click();
   const menuOpen = await page
     .locator('[data-card-menu] [role="menu"]')
     .waitFor({ state: "visible", timeout: 5000 })
     .then(() => true)
     .catch(() => false);
-  const rowsAfter = await page.$$eval("[data-card-row-toggle]", (els) =>
-    els.map((e) => [e.getAttribute("data-card-row-toggle"), e.getAttribute("aria-expanded")]),
-  );
-  check(
-    "1g. a press on the card ⋮ opens its menu and toggles no row",
-    menuOpen && JSON.stringify(rowsAfter) === JSON.stringify(rows),
-    JSON.stringify(rowsAfter),
-  );
+  check("1g. a press on the card ⋮ opens its menu", menuOpen);
   await page.keyboard.press("Escape");
 
-  // The ratio row opens to the risk strip, and stays open across a reload;
-  // the card-wide key of 209 is dropped on read.
-  // A missing row fails 1h below; it does not end the run.
-  await page
-    .locator('[data-card-row-toggle="2"]')
-    .click({ timeout: 10000 })
-    .catch(() => {});
-  const liq = await page
-    .locator('[data-card-row="2"]', { hasText: "Liquidates at" })
+  // 1h repointed (330): "Liquidates at" is a stat in the card's panel (C18).
+  const liq = await card
+    .locator('[data-position-panel] [data-panel-row="liquidates-at"]', { hasText: "Liquidates at" })
     .waitFor({ timeout: 5000 })
     .then(() => true)
     .catch(() => false);
-  check("1h. the Collateral ratio row opens to its lines", liq);
-  const stored = await page.evaluate((k) => Object.keys(JSON.parse(localStorage.getItem(k) ?? "{}")), STORE);
-  const rowKey = stored.find((k) => k.startsWith("position:liquity-v2:") && k.endsWith(":row2")) ?? null;
-  check("1i. the opened row is stored under a row key", !!rowKey, JSON.stringify(stored));
+  check("1h. the card's stats carry Liquidates at", liq);
+  // 1i, 1j, 1k dropped: they read the opened row's key in rails-open-cards-v1
+  // and the 209 card key; no card row opens since 322/330.
   await ctx.close();
-  if (rowKey) {
-    const cardKey = rowKey.slice(0, -":row2".length);
-    const again = await open(1280, TROVE, { store: { [rowKey]: true, [cardKey]: true } });
-    await again.page
-      .locator('[data-card-row-toggle="2"]')
-      .waitFor({ timeout: 120000 })
-      .catch(() => {});
-    await again.page.waitForTimeout(1500);
-    const ratioOpen = await again.page.getAttribute('[data-card-row-toggle="2"]', "aria-expanded").catch(() => null);
-    check("1j. the row's state survives a reload", ratioOpen === "true", ratioOpen ?? "none");
-    const left = await again.page.evaluate((k) => Object.keys(JSON.parse(localStorage.getItem(k) ?? "{}")), STORE);
-    check("1k. the card-wide key of 209 is dropped on read", !left.includes(cardKey), JSON.stringify(left));
-    await again.ctx.close();
-  }
   check("1l. no page error", errors.length === 0, errors.join("; "));
 }
 
@@ -410,25 +364,12 @@ const headerLayout = (card) =>
   const { ctx, page, errors } = await open(390, TROVE, { touch: true });
   check("390 reports no hover", await page.evaluate(() => !matchMedia("(hover: hover)").matches));
   await page
-    .locator('[data-card-row-toggle="0"]')
+    .locator("[data-card-head]")
+    .first()
     .waitFor({ timeout: 120000 })
     .catch(() => {});
-  const shown = await page.$$eval("[data-card-row] [data-disc-chev]", (els) =>
-    els.map((el) => ({ op: getComputedStyle(el).opacity, color: getComputedStyle(el).color })),
-  );
-  const muted = await page.evaluate(() => {
-    const probe = document.createElement("span");
-    probe.style.color = "var(--text-muted)";
-    document.body.append(probe);
-    const c = getComputedStyle(probe).color;
-    probe.remove();
-    return c;
-  });
-  check(
-    "3a. the rows' chevrons always show, muted",
-    shown.length === 3 && shown.every((s) => s.op === "1" && s.color === muted),
-    JSON.stringify(shown),
-  );
+  // 3a dropped: it read the card rows' chevrons on touch ([data-card-row]
+  // [data-disc-chev]); 322/330 retired the row toggles.
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   check("3b. no horizontal overflow", overflow <= 0, `${overflow}px`);
   check("3c. no page error", errors.length === 0, errors.join("; "));
@@ -495,15 +436,9 @@ const headerLayout = (card) =>
     .evaluate((el) => ({ menu: !!el.querySelector("[data-event-menu]"), help: el.querySelectorAll("button").length }))
     .catch(() => null);
   check("4e. T6 holds the ? and no ⋮", !!t6 && !t6.menu && t6.help >= 1, JSON.stringify(t6));
-  const rows = await page.$$eval("[data-card-row-toggle]", (els) =>
-    els.map((e) => [e.getAttribute("data-card-row-toggle"), e.getAttribute("aria-expanded")]),
-  );
+  // 4f repointed (322/330): the card rows' open state left with their toggles.
   const summary = await page.locator("[data-card-header] [data-position-strip]").count();
-  check(
-    "4f. the position card: the price strip in its heading row, the asset rows open, the risk row closed",
-    summary === 1 && rows.every(([i, open]) => (Number(i) < 2 ? open === "true" : open === "false")),
-    `${summary} strip, ${JSON.stringify(rows)}`,
-  );
+  check("4f. the position card: the price strip in its heading row", summary === 1, `${summary} strip`);
   check("4g. no page error", errors.length === 0, errors.join("; "));
   await ctx.close();
 }
@@ -686,13 +621,8 @@ for (const [name, path, strict] of [
     rest === 0 && early === 0 && late === 1 && left === 0,
     `${rest} · ${early} · ${late} · ${left}`,
   );
-  const row = page.locator('[data-card-row="0"]');
-  await page.mouse.move(2, 2);
-  await page.waitForTimeout(400);
-  await row.hover();
-  await page.waitForTimeout(250);
-  const rowOp = await chevOpacity(row);
-  check("5p. the position card's row shows its chevron within 250 ms of the pointer", rowOp === 1, `${rowOp}`);
+  // 5p dropped: it read the card row's chevron on hover ([data-card-row]
+  // [data-disc-chev]); 322/330 retired the row toggles.
   await page.mouse.move(2, 2);
   await page.waitForTimeout(400);
   await page.evaluate(() => document.activeElement?.blur?.());

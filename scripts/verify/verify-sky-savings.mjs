@@ -27,6 +27,9 @@
 //      power of ten as 10¹⁸, and the Sent and Received explanations say who
 //      keeps the interest earned before the transfer.
 //
+// Repointed 2026-10-23 (ui-jobs 432): a rate run row's spoken name opens with
+// "Market note, " since 403.
+//
 // Run: BASE=http://localhost:3916 node scripts/verify/verify-sky-savings.mjs
 // Needs ALCHEMY_URL, RAILS_API_URL and API_BEARER_TOKEN in .env.local (read,
 // never printed).
@@ -421,7 +424,9 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   check(
     "small page at 390: each run row names its count",
     got.runs.every(
-      (r) => r.n >= 2 && new RegExp(`^Savings rate (increased|decreased|adjusted), ${r.n} changes, `).test(r.text),
+      (r) =>
+        r.n >= 2 &&
+        new RegExp(`^Market note, Savings rate (increased|decreased|adjusted), ${r.n} changes, `).test(r.text),
     ),
     JSON.stringify(got.runs),
   );

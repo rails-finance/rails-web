@@ -25,9 +25,13 @@
 // in from and back out to account 0. Both sides are real, chain-observed
 // figures, never guessed.
 //
+// Repointed for ui-jobs 432: the legs are found among the "Traded" rows (0045)
+// and the explanation read on the opened card's tab (0044).
+//
 // Run with the dev server up: BASE=http://localhost:3711 node scripts/verify/verify-dolomite-trade-sides.mjs
 
 import { chromium } from "playwright";
+import { showCardTab } from "./lib/card-tabs.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3711";
 const OWNER = "0x52256ef863a713ef349ae6e97a7e8f35785145de";
@@ -100,25 +104,27 @@ page.on("pageerror", (e) => pageErrors.push(String(e)));
 await page.goto(`${BASE}/dolomite/${OWNER}/${NUM}`, { waitUntil: "networkidle", timeout: 60000 });
 await page.waitForTimeout(1000);
 
-async function explainerTextFor(labelText) {
-  const card = page.locator('[data-skel-section="detail-event"]').filter({ hasText: labelText });
+// Both legs head "Traded" since decision 0045 (ui-jobs 367), so each is read by
+// its position among the "Traded" rows; the Explanation is the opened card's
+// default tab since decision 0044 (ui-jobs 370).
+async function explainerTextFor(nth) {
+  const card = page.locator('[data-skel-section="detail-event"]').filter({ hasText: "Traded" }).nth(nth);
+  if ((await card.count()) === 0) return null;
   await card.locator('.group\\/evt[role="button"], [role="button"].group\\/evt').first().click();
   await page.waitForTimeout(300);
-  const explainBtn = card.locator('button[aria-label^="Show"][aria-label$="explanation"]').first();
-  if ((await explainBtn.count()) === 0) return null;
-  await explainBtn.click();
-  await page.waitForTimeout(300);
-  return card.first().textContent();
+  await showCardTab(card, "explanation");
+  return card.textContent();
 }
 
-const spentText = await explainerTextFor("Trade (spent)");
+const tradeTexts = [await explainerTextFor(0), await explainerTextFor(1)];
+const spentText = tradeTexts.find((t) => /into WETH/.test(t ?? "")) ?? tradeTexts.join(" | ");
 check(
   "explainer names the destination market on the spent leg",
   /into WETH/.test(spentText ?? ""),
   spentText ?? "(no card)",
 );
 
-const receivedText = await explainerTextFor("Trade (received)");
+const receivedText = tradeTexts.find((t) => /out of USD1/.test(t ?? "")) ?? tradeTexts.join(" | ");
 check(
   "explainer names the source market on the received leg",
   /out of USD1/.test(receivedText ?? ""),

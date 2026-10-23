@@ -746,6 +746,9 @@ const ts = require("typescript");
 const STUBS = {
   "next/headers": 'export async function headers(){ return new Headers({ host: "share-probe.invalid", "x-forwarded-proto": "http", "x-real-ip": "198.51.100.7" }); } export async function cookies(){ return { get(){ return undefined; } }; }',
   "next/navigation": 'export function notFound(){ throw new Error("notFound"); }',
+  // server-only (lib/api/reader-ip.ts) throws under plain node; Next maps it to
+  // an empty module, and so does this.
+  "server-only": "",
   // A child may stub more modules by specifier (runChild's third argument).
   ...JSON.parse(process.env.PROBE_STUBS || "{}"),
 };

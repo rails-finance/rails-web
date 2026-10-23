@@ -175,7 +175,7 @@ const SKIPS = {
     "(BASE=https://rails.finance), spends test readers' daily quota, and with " +
     "RESTART_CMD redeploys the api. Run it by hand.",
   "verify-timeline-abuse.mjs":
-    "live only: bursts 70 bare /timeline requests at the deployed site to meet the " +
+    "live only: bursts 310 bare /timeline requests at the deployed site to meet the " +
     "Vercel Firewall rate limit (BASE=https://rails.finance BURST=1), which " +
     "denies the runner's IP on every /timeline path for the rest of the window. Run it by hand.",
 };
@@ -229,12 +229,19 @@ const scripts = readdirSync(HERE)
   .sort();
 
 /** A `.ts` verifier under node:test runs as `tsx --test`; the two that are
- *  plain scripts run as `tsx <file>`. */
-function isNodeTest(file) {
-  return /from "node:test"/.test(readFileSync(join(HERE, file), "utf8"));
+ *  plain scripts run as `tsx <file>`. One that mocks a module gets node's flag
+ *  for it and mocks `server-only` itself; the rest get the server-only hook
+ *  (lib/server-only-hook.mjs), which a module mock does not tolerate. */
+const SERVER_ONLY_HOOK = join(HERE, "lib", "server-only-hook.mjs");
+function tsFlags(file) {
+  const src = readFileSync(join(HERE, file), "utf8");
+  return [
+    ...(/mock\.module\(/.test(src) ? ["--experimental-test-module-mocks"] : ["--import", SERVER_ONLY_HOOK]),
+    ...(/from "node:test"/.test(src) ? ["--test"] : []),
+  ];
 }
 function tsCommand(file) {
-  return `npx tsx ${isNodeTest(file) ? "--test " : ""}scripts/verify/${file}`;
+  return `npx tsx ${tsFlags(file).join(" ").replace(SERVER_ONLY_HOOK, "scripts/verify/lib/server-only-hook.mjs")} scripts/verify/${file}`;
 }
 
 /** The rows of the table: a script, or one part of a split script. A caller's
@@ -488,7 +495,7 @@ function runOne(job) {
     // this runner already prints. Read it before choosing.
     const { ONLY: _runnerSelector, FIXTURES, ...inherited } = process.env;
     const [cmd, ...args] = file.endsWith(".ts")
-      ? [TSX, ...(isNodeTest(file) ? ["--test"] : []), join(HERE, file)]
+      ? [TSX, ...tsFlags(file), join(HERE, file)]
       : [process.execPath, join(HERE, file)];
     const child = spawn(cmd, args, {
       cwd: ROOT,

@@ -8,6 +8,8 @@
 // Assertions that could fail; real figures throughout. The listing/detail
 // checks depend on the pinned scratch DB; the markets-view checks read live
 // chain state.
+// Repointed for ui-jobs 432: the listing's hrefs carry the /ethereum prefix
+// (the explorer moved under its chain; /dolomite redirects).
 
 import { chromium } from "playwright";
 
@@ -67,7 +69,7 @@ check("listing: card rows link to the two-segment grain", rowLinks > 0, `${rowLi
 const firstHref = await page.locator('a[href^="/ethereum/dolomite/0x"]').first().getAttribute("href");
 check(
   "listing: hrefs carry owner AND accountNumber",
-  /^\/dolomite\/0x[0-9a-f]{40}\/\d+$/.test(firstHref ?? ""),
+  /^\/ethereum\/dolomite\/0x[0-9a-f]{40}\/\d+$/.test(firstHref ?? ""),
   firstHref ?? "",
 );
 

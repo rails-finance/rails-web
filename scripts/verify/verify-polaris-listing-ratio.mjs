@@ -5,8 +5,8 @@
 //
 //   1. First page of /sepolia/polaris: every open card carrying debt states a
 //      ratio marked ≈ and equal to the RESTATED formula within 0.05 pp, a
-//      "min …%" footnote, and a liquidation price in the market's own unit
-//      (never "$"). A zero-debt card shows the dash and no ≈.
+//      "Minimum ratio …%" sub line, and an Interest rate head at the board's
+//      rate. A zero-debt card has no ratio column.
 //   2. Hovering one ratio reveals the tooltip sentence.
 //   3. No card anywhere says "from the live figures" (the retired caption).
 //   4. The ?q=<owner of usdp/8> view: the usdp/8 card's ratio matches.
@@ -18,11 +18,15 @@
 //      card is unchanged by one.
 //   6. /sepolia/polaris/usdp/8's price strip lists pETH and USDp.
 //   7. Fail-first: with /api/chain/polaris/markets aborted, every ratio slot
-//      is a dash — no ≈, no liquidation price, no rate line.
+//      is a dash — no ≈ and no rate figure.
+//
+// Repointed (ui-jobs 432): 1d reads the head's "Minimum ratio" sub, 1g and 7 the
+// `interest-rate` head; the listing's liquidation price (1d's second half, 1f) is
+// dropped, since the card shell (TO-DO-position-card 322) and decision 0018 left it off the listing.
 //
 // THE EXPECTED VALUES ARE RESTATED HERE, never imported and never read off the
-// page: icrPct = coll × pethInDebt ÷ debt × 100 and liqPrice = debt × (
-// defensiveMode ? defensiveMcr : mcr) ÷ coll, both on the row's own market,
+// page: icrPct = coll × pethInDebt ÷ debt × 100 and the minimum ratio in force
+// (defensiveMode ? defensiveMcr : mcr), both on the row's own market,
 // from the same two responses the page reads — /api/polaris/positions and
 // /api/chain/polaris/markets — fetched by this script itself. Neither the
 // rows nor the price legs are pinned: the roster gains CDPs every few blocks
@@ -68,16 +72,6 @@ async function api(path_, tries = 4) {
 // ── the restated formulas ──────────────────────────────────────────────────
 const mcrInForce = (m) => (m.defensiveMode ? m.defensiveMcr : m.mcr);
 const expectedIcrPct = (row, m) => ((row.coll * m.price.pethInDebt) / row.debt) * 100;
-const expectedLiqPrice = (row, m) => (row.debt * mcrInForce(m)) / row.coll;
-
-/** The card's own liquidation-price formatting, restated (magnitude-aware,
- *  no currency sign — the unit is USDp or a troy ounce of gold). */
-const fmtLiq = (p) => {
-  if (p < 0.01) return "<0.01";
-  if (p < 1) return p.toFixed(3);
-  if (p < 100) return p.toFixed(2);
-  return p.toLocaleString("en-US", { maximumFractionDigits: 0 });
-};
 const parseNum = (s) => Number(String(s).replace(/,/g, "").replace(/−/g, "-"));
 
 /** Read every listing card on the page: its (market, cdpId), the ratio slot's
@@ -109,6 +103,7 @@ async function readCards(page) {
         }
         footnote = parts.join(" ");
       }
+      const rateHead = card.querySelector('[data-card-head="interest-rate"]');
       out.push({
         market: idm ? idm[1] : null,
         cdpId: idm ? idm[2] : null,
@@ -116,6 +111,7 @@ async function readCards(page) {
         dash,
         pulse,
         footnote,
+        rateText: rateHead ? (rateHead.textContent ?? "").replace(/\s+/g, " ").trim() : null,
         cardText: text,
       });
     }
@@ -192,14 +188,10 @@ for (const c of cards) {
     ) {
       ratioBad.push(`${row.market}/${row.cdpId}: shown "${c.valueText}" vs expected ≈ ${want.toFixed(1)}%`);
     }
-    const wantLiq = `${fmtLiq(expectedLiqPrice(row, m))} ${row.stableSymbol}`;
-    const wantMin = `min ${(mcrInForce(m) * 100).toFixed(1)}%`;
-    if (
-      !c.footnote.includes(wantMin) ||
-      !/Liquidates if\s*pETH falls to/.test(c.footnote) ||
-      !c.footnote.includes(wantLiq)
-    ) {
-      footnoteBad.push(`${row.market}/${row.cdpId}: footnote "${c.footnote}" wanted "${wantMin}" + "${wantLiq}"`);
+    // The card's pctShort: one place, trailing zero dropped.
+    const wantMin = `Minimum ratio ${Number((mcrInForce(m) * 100).toFixed(1))}%`;
+    if (!c.footnote.includes(wantMin)) {
+      footnoteBad.push(`${row.market}/${row.cdpId}: footnote "${c.footnote}" wanted "${wantMin}"`);
     }
   } else {
     zeroDebtSeen++;
@@ -220,7 +212,7 @@ check(
   ratioBad.join(" ; "),
 );
 check(
-  "1d. …and a min-MCR footnote with the liquidation price in the market's own unit",
+  "1d. …and the head's sub line states the minimum ratio in force",
   footnoteBad.length === 0,
   footnoteBad.join(" ; "),
 );
@@ -233,10 +225,7 @@ check(
       ? "(no zero-debt row on this page — vacuously true)"
       : `${zeroDebtSeen} checked`,
 );
-check(
-  "1f. no listing card states a liquidation price in dollars",
-  !cards.some((c) => /Liquidates if[^·]*\$/.test(c.footnote)),
-);
+// Dropped: 1f "no listing card states a liquidation price in dollars"; the listing card states no liquidation price (322, decision 0018).
 // A card with debt states the board's rate; a collateral-only card states
 // none (nothing accrues on a debt of "none").
 check(
@@ -247,8 +236,9 @@ check(
       const m = byMarket[c.market];
       const row = c.cdpId ? rows[`${c.market}:${c.cdpId}`] : null;
       if (!m || !row) return true;
-      const has = c.cardText.includes(`${(m.interestRate * 100).toFixed(2)}% per year, set by the market`);
-      return row.debt > 0 ? has : !/per year, set by the market/.test(c.cardText);
+      // The Interest rate head (`data-card-head="interest-rate"`), drawn only on a card with debt.
+      const has = (c.rateText ?? "").includes(`${(m.interestRate * 100).toFixed(2)}%`);
+      return row.debt > 0 ? has : c.rateText == null;
     }),
   `usdp ${(byMarket.usdp.interestRate * 100).toFixed(2)}% / goldp ${(byMarket.goldp.interestRate * 100).toFixed(2)}%`,
 );
@@ -442,10 +432,10 @@ await page6.close();
 const page7 = await openListing(context, `${BASE}/sepolia/polaris`, { stubMarkets: true });
 const cards7 = await readCards(page7);
 check(
-  "7. with the board aborted every ratio slot is a dash — no ≈, no liquidation price, no rate line",
+  "7. with the board aborted every ratio slot is a dash — no ≈, no rate figure",
   cards7.length > 0 &&
-    cards7.every((c) => !c.valueText.includes("≈") && !c.pulse && !/Liquidates if/.test(c.footnote)) &&
-    !cards7.some((c) => /per year, set by the market/.test(c.cardText)),
+    cards7.every((c) => !c.valueText.includes("≈") && !c.pulse) &&
+    !cards7.some((c) => /\d\.\d{2}%/.test(c.rateText ?? "")),
   `${cards7.length} cards; first slot "${cards7[0]?.valueText}" footnote "${cards7[0]?.footnote}"`,
 );
 await page7.close();

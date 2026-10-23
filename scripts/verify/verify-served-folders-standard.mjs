@@ -9,6 +9,11 @@
 // groups in the browser keeps the toggle, and so does `?folders=0`, which is
 // flat and therefore groups in the browser.
 //
+// Repointed 2026-10-23 (ui-jobs 432): the Display menu is read once its
+// "Transaction hashes" row stands ("Timeline values" left with the spine's
+// values switch); S4 and C1 are dropped, since 326 (web `81662167`) took the
+// "Collapse like events" toggle off every family and nothing offers it now.
+//
 // ── THE CHECKS, per served family ──────────────────────────────────────────
 //   S0  the default page draws folders (the fixture is still served — a guard;
 //       every other check on the family waits on it)
@@ -101,16 +106,6 @@ const SERVED = [
   { id: "spark", path: "/ethereum/spark/0x000000000004444c5dc75cb358380d2e3de08a90" },
   { id: "moonwell-base", path: "/base/moonwell/0x719eae70d4a83f35bf82a2740699f5db84be919d" },
 ];
-// Aave V3 on Base declares `runs`; its default page is served, so `?folders=0`
-// makes it group in the browser. The wallet must hold five or more consecutive
-// transactions of one transfer kind, unbroken by any other row (rails-ops
-// decision 0039), so a run forms and the toggle is offered: the menu offers
-// "Collapse like events" only where a collapse spec forms a run on the list.
-// Derivation: 0xd189…cabc's newest 2,500 rows (the route's answer, read
-// 2026-10-15) hold one stretch of 6 transfer_out transactions, 54 rows from the
-// top; 6 >= 5, so the browser draws one group. The earlier wallet 0xbb8f…c3c0
-// has no stretch of transfers longer than 1 and draws none.
-const CLIENT = { id: "client", path: "/base/aave-v3/0xd1895f2019c2152fc2b9022d57f19198c4cfcabc?folders=0" };
 
 // §13: a list with folders and no loose event, bare and filtered.
 // 0xb137…ece5 is Spark's deployer, not a borrower: all 2,776 of its events are
@@ -164,8 +159,6 @@ function check(name, cond, detail = "") {
   if (!cond) failures++;
   return cond;
 }
-
-const withFlat = (path) => `${path}${path.includes("?") ? "&" : "?"}folders=0`;
 
 const browser = await chromium.launch();
 
@@ -237,7 +230,7 @@ async function menuLabels(page) {
   });
   if (!tagged) return null;
   const trigger = page.locator("button[data-verify-timeline-display]");
-  const anchor = page.getByRole("button", { name: /^Timeline values$/i }).first();
+  const anchor = page.getByRole("button", { name: /^Transaction hashes$/i }).first();
   for (let attempt = 0; attempt < 8; attempt++) {
     await trigger.click().catch(() => {});
     const open = await anchor
@@ -339,14 +332,8 @@ async function runServed(f) {
     await ctx.close();
   }
 
-  // ── S4 — `?folders=0` is flat, so it groups in the browser ─────────────
-  {
-    const { ctx, page } = await openPage(withFlat(f.path));
-    const line = await countLine(page);
-    if (line) await offersToggle(page, id, "S4 the ?folders=0 page offers the toggle", true);
-    else check(id("S4 the ?folders=0 page offers the toggle"), false, "no count line");
-    await ctx.close();
-  }
+  // S4 dropped: it read "Collapse like events" in the `?folders=0` page's
+  // Display menu, a toggle 326 (web `81662167`) removed from every family.
 }
 
 /** E1–E3: folder rows drawn, and — only once they are — no empty wording. */
@@ -398,15 +385,8 @@ try {
     await runNeverEmpty(e3, 'E3 a filter that hides every loose event leaves the folders, not "filtered out"');
   if (!ONLY || ONLY.has(e4.id))
     await runNeverEmpty(e4, "E4a a past-day cut on an all-folder answer draws the folder, not the empty label");
-  if (!ONLY || ONLY.has(CLIENT.id)) {
-    console.log(`\n── ${CLIENT.id} ${CLIENT.path}`);
-    const { ctx, page } = await openPage(CLIENT.path);
-    const line = await countLine(page);
-    if (line)
-      await offersToggle(page, (s) => `${s} [${CLIENT.id}]`, "C1 a client-grouped page offers the toggle", true);
-    else check("C1 a client-grouped page offers the toggle", false, "no count line");
-    await ctx.close();
-  }
+  // C1 dropped: it read "Collapse like events" in a client-grouped page's
+  // Display menu, a toggle 326 (web `81662167`) removed from every family.
 } finally {
   await browser.close();
 }

@@ -1,5 +1,6 @@
 // Playwright check for the 10-item polish batch (merry-neumann plan).
 // Run: node scripts/verify/verify-polish-batch.mjs   (dev server on :3000)
+// Repointed (ui-jobs 432): check 8 reads the hero's h1 "Destination DeFi" (43e8fd92).
 import { chromium } from "playwright";
 
 const results = [];
@@ -19,7 +20,7 @@ const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
   const kids = [...section.children].map((el) => el.tagName + ":" + (el.textContent || "").slice(0, 25));
-  const h1i = kids.findIndex((t) => t.includes("DeFi Explorers"));
+  const h1i = kids.findIndex((t) => t.includes("Destination DeFi"));
   const subi = kids.findIndex((t) => t.includes("Explore any DeFi position"));
   const badgei = kids.findIndex((t) => t.toLowerCase().includes("read-only"));
   return h1i < subi && subi < badgei ? "ok" : kids.join(" | ");

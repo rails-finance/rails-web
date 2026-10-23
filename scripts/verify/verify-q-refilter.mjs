@@ -37,6 +37,8 @@
 // to attach before reading, so a slow compile is a wait and an empty listing is
 // a failure — the two stop looking alike.
 //
+// Repointed (ui-jobs 432): the Liquity V2 arm reads the listing owner from `[data-wallet-label]` (339).
+//
 // Run against the worktree's own dev server:
 //   BASE=http://localhost:3021 node scripts/verify/verify-q-refilter.mjs
 
@@ -234,14 +236,12 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
     ok("liquity-v2: landed on the listing route", url.pathname === "/ethereum/liquity-v2");
 
     // The filtered listing's own cards are the evidence: every card must carry
-    // the same owner identity the detail page showed. Since ui-jobs 246 a
-    // Liquity V2 listing card shows its owner as inert text (no pill); since
-    // `aa0ea5e` the address is the text's click-opened tip in place of a
-    // `title`, so the short form under the tip is read. Reading the whole body
+    // the same owner identity the detail page showed. Reading the whole body
     // for a substring of the address would pass on an unfiltered listing that
     // merely happens to contain that owner somewhere.
     const cardCountFiltered = (await rows(page, "liquity-v2 filtered rows", V2_ROW, "href", 1)).length;
-    const OWNER_TEXT = `${V2_ROW} [data-reveal-tip] > span.font-mono`;
+    // The listing card's owner is the WalletPill again (Miles, 17 Oct 2026), whose label carries `data-wallet-label`.
+    const OWNER_TEXT = `${V2_ROW} [data-wallet-label]`;
     await page
       .locator(OWNER_TEXT)
       .first()

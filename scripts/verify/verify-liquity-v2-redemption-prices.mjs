@@ -1,6 +1,6 @@
 // Liquity V2 redemption-mode prices: our replay against the PriceFeed contract.
 //
-// The server's `liquity-v2-prices.ts` (rails-server-onboarding, identical copies
+// The server's `liquity-v2-prices.ts` (rails-server, identical copies
 // in api/src/utils and workers/liquity-processor/src/utils) prices rETH and
 // wstETH two ways: normal operations, and a redemption leg —
 //   rETH:   MAX(market, canonical) when market is within 2% of canonical, else MIN
@@ -15,8 +15,8 @@
 // inputs are replayed to the redemption's position from that block's
 // AnswerUpdated logs.
 //
-// Run (from the web repo root; needs a checkout of rails-server-onboarding
-// beside it with workers/liquity-processor/node_modules installed):
+// Run (from the web repo root; needs a checkout of rails-server beside it, or
+// SERVER_REPO naming one, with workers/liquity-processor/node_modules installed):
 //   node scripts/verify/verify-liquity-v2-redemption-prices.mjs
 // (it re-runs itself with --experimental-transform-types)
 // Needs ALCHEMY_URL (mainnet archive eth_call) in .env.local — read, never
@@ -49,7 +49,7 @@ if (!process.execArgv.includes("--experimental-transform-types")) {
 }
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const SERVER = process.env.SERVER_REPO ?? path.resolve(ROOT, "..", "rails-server-onboarding");
+const SERVER = process.env.SERVER_REPO ?? path.resolve(ROOT, "..", "rails-server");
 const PRICES_TS = path.join(SERVER, "workers/liquity-processor/src/utils/liquity-v2-prices.ts");
 const env = Object.fromEntries(
   fs
