@@ -312,6 +312,12 @@ words:
     to
   t1_from: |-
     from
+  # A transfer in from a distributor: the wallet sent the claim, or the payout
+  # was pushed to it.
+  t1_claimed: |-
+    Claimed
+  t1_received: |-
+    Received
   t1_collateral_swap: |-
     Swapped collateral
   t1_debt_swap: |-
@@ -1090,15 +1096,22 @@ templates:
     variants:
       default: |-
         supply received as an aToken transfer
+      distributor: |-
+        a payout from a contract that pays tokens out to many accounts
     sentences:
       tin.what:
         when: |-
-          always
+          default
         text: |-
           Received {amount} {symbol} of supply from {sender} as an aToken transfer.
+      tin.payout:
+        when: |-
+          distributor
+        text: |-
+          Received {amount} {symbol} of supply as a reward payout from {sender}, {role}.
       tin.named:
         when: |-
-          the sender is a known contract
+          the sender is a known contract other than a distributor
         text: |-
           The sender is {role}.
       tin.returned:
@@ -1106,9 +1119,9 @@ templates:
           the previous row sent the same reserve to the same account, and the supply index accounts for the difference
         text: |-
           It returns what this position sent the same account on {sent_on}, with the interest earned since.
-    order: [tin.what, tin.named, tin.returned]
+    order: [tin.what, tin.payout, tin.named, tin.returned]
     groups:
-      happened: [tin.what, tin.named]
+      happened: [tin.what, tin.payout, tin.named]
       leaves: [tin.returned]
 
   - id: aave3.transfer_out

@@ -34,7 +34,7 @@ import {
   swapLegSign,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
-import { aaveV3CtLabel } from "@/lib/aave-v3/event-label";
+import { aaveV3CtLabel, distributorPayout } from "@/lib/aave-v3/event-label";
 import { useChainId } from "@/lib/shared/chain-context";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
@@ -68,7 +68,8 @@ export interface AaveV3CtEventHeaderProps {
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
-  /** The position owner, for the receipt's owner row (required with externalBy). */
+  /** The position owner, for the receipt's owner row (required with
+   *  externalBy), and to tell a claimed payout from a received one. */
   wallet?: string;
   /** The event's own token movements, read here for one thing only: the moved
    *  reserve's contract address, which the icon chip needs and the context does
@@ -92,11 +93,18 @@ function viaGatewayOf(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | und
 }
 
 /** The timeline head's words as one line: the phone caption and the row's
- *  accessible name. */
-export function aaveV3T1Caption(ctx: AaveV3Context, isFee: boolean, chainId: ChainId | undefined | null): string {
+ *  accessible name. `owner`: the position's wallet, which tells a claimed
+ *  payout from a received one. */
+export function aaveV3T1Caption(
+  ctx: AaveV3Context,
+  isFee: boolean,
+  chainId: ChainId | undefined | null,
+  owner?: string,
+): string {
   const gateway = viaGatewayOf(ctx, isFee, chainId);
+  const payout = distributorPayout(ctx, owner, chainId);
   const kind = aaveFamilyT1Kind(
-    { eventType: ctx.eventType, fee: isFee, gateway, swapKind: ctx.swap?.kind },
+    { eventType: ctx.eventType, fee: isFee, gateway, payout, swapKind: ctx.swap?.kind },
     V3_HEAD_WORDS,
   );
   const transfer = !isFee && !gateway && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
@@ -128,7 +136,7 @@ export function useAaveV3HeadSpec({
     pool: useV3Pool(),
   };
   const deltas: ChainTruthDelta[] = [];
-  const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId);
+  const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId, wallet);
   const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
   const viaGateway = viaGatewayOf(ctx, !!feeOf, coords.chainId);
   // A liquidation's fee reads as an act with its verb, not as a custody move.
@@ -277,7 +285,13 @@ export function useAaveV3HeadSpec({
     const rowParty = party && viaGateway ? { ...party, prefix: "as ETH via" } : party;
     return {
       label: aaveFamilyT1Kind(
-        { eventType: ctx.eventType, fee: !!feeOf, gateway: viaGateway, swapKind: ctx.swap?.kind },
+        {
+          eventType: ctx.eventType,
+          fee: !!feeOf,
+          gateway: viaGateway,
+          payout: distributorPayout(ctx, wallet, coords.chainId),
+          swapKind: ctx.swap?.kind,
+        },
         W,
       ),
       critical: isAaveV3LossRow(ctx),

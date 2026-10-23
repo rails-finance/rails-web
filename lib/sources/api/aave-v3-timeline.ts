@@ -607,6 +607,9 @@ export function aaveV3RowsToEvents(
       ...(r.tx_from && r.pool_caller
         ? { txFrom: r.tx_from.toLowerCase(), poolCaller: r.pool_caller.toLowerCase() }
         : {}),
+      // A transfer's sender alone: it tells a claimed payout from a received
+      // one (lib/aave-v3/event-label.ts distributorPayout).
+      ...(isTransfer && r.tx_from && !r.pool_caller ? { txFrom: r.tx_from.toLowerCase() } : {}),
       ...(isSupplySide
         ? { supplyBefore: amt(lane.before, rMeta), supplyAfter: amt(lane.after, rMeta) }
         : { debtBefore: amt(lane.before, rMeta), debtAfter: amt(lane.after, rMeta) }),
