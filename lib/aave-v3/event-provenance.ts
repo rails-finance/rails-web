@@ -61,23 +61,21 @@ const poolOf = (coords?: V3Coords): { name: string; address: string } => coords?
 const V3_INDEX_VIA = "rails-server index of decoded Aave V3 logs";
 const V3_SWEEP_VIA = "live chunked eth_getLogs sweep of the Pool's own logs";
 // Arbitrum's per-wallet store on rails-server: the body of the history from
-// Etherscan's log index, or from Tenderly's archive of the chain (rails-ops
-// TO-DO-arbitrum-scoping.md §7 item 1). The footer states whether a second
-// witness has confirmed it.
+// Etherscan's log index, or from an archive node (Tenderly's or Alchemy's;
+// rails-ops TO-DO-arbitrum-scoping.md §7 item 1). The footer states whether a
+// second witness has confirmed it. A receipt names the explorer, which a
+// reader can check on, and no data vendor (receipts grammar, 23 Oct 2026).
 const V3_ETHERSCAN_VIA = "rails-server store of the Pool's logs, body from Etherscan's log index";
-const V3_TENDERLY_VIA = "rails-server store of the Pool's logs, body from Tenderly's archive";
-const V3_ALCHEMY_VIA = "rails-server store of the Pool's logs, body from Alchemy's archive";
+const V3_ARCHIVE_VIA = "rails-server store of the Pool's logs, body from an archive node";
 
 const captureVia = (coords?: V3Coords): string =>
   coords?.source === "sweep"
     ? V3_SWEEP_VIA
     : coords?.source === "etherscan"
       ? V3_ETHERSCAN_VIA
-      : coords?.source === "tenderly"
-        ? V3_TENDERLY_VIA
-        : coords?.source === "alchemy"
-          ? V3_ALCHEMY_VIA
-          : V3_INDEX_VIA;
+      : coords?.source === "tenderly" || coords?.source === "alchemy"
+        ? V3_ARCHIVE_VIA
+        : V3_INDEX_VIA;
 
 export interface V3Coords {
   txHash?: string;
@@ -329,7 +327,8 @@ export const poolCallerProv = (eventType: string, coords: V3Coords, caller: stri
  *  router or settlement (lib/shared/tx-legs.ts, rails-ops TO-DO-ui-jobs 438):
  *  the other leg, read from the transaction's receipt. An ERC-20 leg is its
  *  Transfer log; the chain's native coin leaves no log, and its leg is the
- *  value transfer Alchemy's asset-transfers index lists for the transaction.
+ *  value transfer the transaction's internal transfers list (read through
+ *  Alchemy's alchemy_getAssetTransfers).
  *  The `paired` leaf states the pairing as Rails' inference. */
 export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coords): Provenance => {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
@@ -354,7 +353,7 @@ export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coor
       ? { name: leg.counterparty === sale.via ? venueName : "payer", address: leg.counterparty }
       : { name: leg.symbol, address: leg.token ?? undefined },
     via: native
-      ? `the transaction's internal transfers · Alchemy's asset-transfers index · internal transfer to this wallet · value: ${leg.raw} · ÷10^${leg.decimals}`
+      ? `the transaction's internal transfers · internal transfer to this wallet · value: ${leg.raw} · ÷10^${leg.decimals}`
       : `transaction receipt · Transfer log #${leg.logIndex} · value: ${leg.raw} · ÷10^${leg.decimals}`,
     scaling: {
       raw: leg.raw,

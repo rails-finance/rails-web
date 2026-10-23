@@ -30,22 +30,20 @@ import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains
 const COMET_INDEX_VIA = "captured Comet events (compound_v3_*)";
 const COMET_SWEEP_VIA = "live chunked eth_getLogs sweep of the Comet's own logs";
 // Arbitrum's per-wallet store on rails-server: the body of the history from
-// Etherscan's log index, or from Tenderly's archive of the chain (rails-ops
-// TO-DO-arbitrum-scoping.md item 12). The footer states whether a second
-// witness has confirmed it.
+// Etherscan's log index, or from an archive node (Tenderly's or Alchemy's;
+// rails-ops TO-DO-arbitrum-scoping.md item 12). The footer states whether a
+// second witness has confirmed it. A receipt names the explorer, which a
+// reader can check on, and no data vendor (receipts grammar, 23 Oct 2026).
 const COMET_ETHERSCAN_VIA = "rails-server store of the Comets' logs, body from Etherscan's log index";
-const COMET_TENDERLY_VIA = "rails-server store of the Comets' logs, body from Tenderly's archive";
-const COMET_ALCHEMY_VIA = "rails-server store of the Comets' logs, body from Alchemy's archive";
+const COMET_ARCHIVE_VIA = "rails-server store of the Comets' logs, body from an archive node";
 const captureVia = (coords?: CompoundCoords): string =>
   coords?.source === "sweep"
     ? COMET_SWEEP_VIA
     : coords?.source === "etherscan"
       ? COMET_ETHERSCAN_VIA
-      : coords?.source === "tenderly"
-        ? COMET_TENDERLY_VIA
-        : coords?.source === "alchemy"
-          ? COMET_ALCHEMY_VIA
-          : COMET_INDEX_VIA;
+      : coords?.source === "tenderly" || coords?.source === "alchemy"
+        ? COMET_ARCHIVE_VIA
+        : COMET_INDEX_VIA;
 
 export interface CompoundCoords {
   txHash?: string;
