@@ -52,8 +52,15 @@ export async function openInspectorHome(page) {
 export async function armInspector(page) {
   if (await page.$(HALO)) return true;
   if (!(await openInspectorHome(page))) return false;
-  await page.click((await page.$(INSPECTOR)) ? INSPECTOR : CARD_ROW);
-  await page.waitForSelector(HALO, { timeout: 10_000 }).catch(() => {});
+  // The dock's toggle is on the page from first paint, so the press can land
+  // inside the hydration window and be lost (above). Press again until the
+  // halo shows; the card row is re-opened first where the menu closed.
+  for (let i = 0; i < 4; i++) {
+    const target = (await page.$(INSPECTOR)) ? INSPECTOR : CARD_ROW;
+    if (!(await page.$(target))) await openInspectorHome(page);
+    await page.click(target).catch(() => {});
+    if (await page.waitForSelector(HALO, { timeout: 4_000 }).catch(() => null)) return true;
+  }
   return Boolean(await page.$(HALO));
 }
 
