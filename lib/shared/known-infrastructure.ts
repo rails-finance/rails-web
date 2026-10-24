@@ -322,9 +322,10 @@ const MAGPIE_BAR: BarSubject = { name: "Magpie", icon: "magpie", hue: 290, share
 const DZAP_BAR: BarSubject = { name: "DZap", icon: "dzap", hue: 128, shared: "swap-bridge" };
 // Portals: hue 287 read off portals.fi's favicon, #6B1AFD.
 const PORTALS_BAR: BarSubject = { name: "Portals", icon: "portals", hue: 287, shared: "swap" };
-// ParaSwap: hue 50 read off velora.xyz's favicon (ParaSwap is now Velora), the
-// gradient #FF9900 to #FF6B3B.
-const PARASWAP_BAR: BarSubject = { name: "ParaSwap", icon: "paraswap", hue: 50, shared: "swap" };
+// Velora (formerly ParaSwap; Miles, 24 Oct 2026): hue 50 read off velora.xyz's
+// favicon, the gradient #FF9900 to #FF6B3B. The bar names the product as it is
+// called now; the entries keep the contract names (Augustus) and the chips.
+const PARASWAP_BAR: BarSubject = { name: "Velora", icon: "paraswap", hue: 50, shared: "swap" };
 // Uniswap: hue 3 read off the app icon uniswap.org serves, #FE518E.
 const UNISWAP_BAR: BarSubject = { name: "Uniswap", icon: "uniswap", hue: 3, shared: "swap" };
 // Sushi: hue 351 read off sushi.com's favicon, #EB59A5.
@@ -1086,6 +1087,35 @@ const PORTALS_MULTICALL: ProtocolContract = {
   ),
   bar: PORTALS_BAR,
 };
+// PortalsRouter, Base 0xb032…803c (read 24 Oct 2026): Basescan's verified source
+// (Etherscan v2 getsourcecode, chainid 8453) is `src/portals/router/PortalsRouter.sol`,
+// "Copyright (C) 2023 Portals.fi", `@author Portals.fi`, and it holds the
+// PortalsMulticall above. The same address on Ethereum is the verified
+// `UniswapV2PortalIn` and on Arbitrum `BalancerV2PortalIn`, Portals' older
+// per-venue zap contracts rather than this router, so only Base is listed.
+const PORTALS_ROUTER: ProtocolContract = {
+  ...known(
+    "router",
+    "Portals router",
+    "PortalsRouter",
+    "Portals’ router, which runs a Portals zap or signed order and calls the Portals multicall",
+  ),
+  bar: PORTALS_BAR,
+};
+// SwapProxy, Ethereum and Base 0x02e5…a9 (read 24 Oct 2026): the verified source
+// (Etherscan v2 getsourcecode, chainids 1 and 8453; the same code on Arbitrum)
+// is a GPL-3.0-or-later contract that moves a token into the Universal Router
+// and calls its `execute` for a two-transaction approve-and-swap. It names no
+// author or owner: the only `@author` tags are Solmate's and Uniswap v2's on
+// the vendored ERC20, and `IUniversalRouter` is a local interface. Its owner is
+// therefore not stated from an allowed source, so it is role-only and takes no
+// bar (a Universal Router call through it still draws Aave's).
+const SWAP_PROXY = known(
+  "router",
+  "Swap proxy",
+  "SwapProxy",
+  "a swap proxy, which pulls a token from the caller into a Universal Router and runs the router’s swap commands in the same transaction",
+);
 const ZAP_EXECUTOR = known(
   "multicall",
   "Zap executor",
@@ -1215,6 +1245,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [MAINNET_CHAIN_ID, "0x6747bcaf9bd5a5f0758cbe08903490e45ddfacb5", V3_POOL_ADAPTOR],
   [MAINNET_CHAIN_ID, "0x66a9893cc07d91d95644aedd05d03f95e1dba8af", UNISWAP_UNIVERSAL_ROUTER],
   [MAINNET_CHAIN_ID, "0x3fc91a3afd70395cd496c647d5a6cc9d4b2b7fad", UNISWAP_UNIVERSAL_ROUTER],
+  [MAINNET_CHAIN_ID, "0x02e5be68d46dac0b524905bff209cf47ee6db2a9", SWAP_PROXY],
   [MAINNET_CHAIN_ID, "0x4c82d1fbfe28c977cbb58d8c7ff8fcf9f70a2cca", UNISWAP_UNIVERSAL_ROUTER],
   [MAINNET_CHAIN_ID, "0xc36442b4a4522e871399cd717abdd847ab11fe88", UNISWAP_V3_POSITIONS],
   [MAINNET_CHAIN_ID, "0x399740157391a9f1bf4e9921a8834f9bc8f2678e", oneInchFusion("SimpleSettlement")],
@@ -1515,6 +1546,8 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   // ── Base, batch 2 (item 430) ──
   [BASE_CHAIN_ID, "0x7652245d9666f9d1de2481695688162a4e050c5f", SUPERFLUID_AAVE_BACKEND],
   [BASE_CHAIN_ID, "0xea49d02c248b357b99670d9e9741f54f72df9cb3", PORTALS_MULTICALL],
+  [BASE_CHAIN_ID, "0xb0324286b3ef7dddc93fb2ff7c8b7b8a3524803c", PORTALS_ROUTER],
+  [BASE_CHAIN_ID, "0x02e5be68d46dac0b524905bff209cf47ee6db2a9", SWAP_PROXY],
   [BASE_CHAIN_ID, "0x344e4d19c851b317bb65d31bb5c4e3815b53d727", wethGateway("FlAaveV3WethGateway")],
   [BASE_CHAIN_ID, "0xdca00000067413240aeab357a3a89ea352d013e8", DCA_DOT_FUN],
   [BASE_CHAIN_ID, "0xc28eb3e9483fc89e76aa987a9116b815704d7f40", wethGateway("AaveV3WethGateway")],
