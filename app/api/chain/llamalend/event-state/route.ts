@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readLlamalendEventState } from "@/lib/sources/chain/llamalend-event-state";
 import { UnknownLlamalendMarketError } from "@/lib/sources/chain/llamalend-position";
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // One LlamaLend position's state at the block before an event and at the
 // event's block (lib/sources/chain/llamalend-event-state.ts): collateral,
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });
   } catch (error) {
     if (error instanceof UnknownLlamalendMarketError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+      return NextResponse.json({ error: publicErrorMessage(error) }, { status: 404 });
     }
     console.error("Error reading the LlamaLend event state:", error);
     return NextResponse.json({ error: "Failed to read the position at that block" }, { status: 502 });

@@ -5,6 +5,7 @@ import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache"
 import { buildMoonwellPositionRows, type RawMoonwellWalletRow } from "@/lib/sources/api/moonwell-positions";
 import { rosterFromMarketState, type RawMoonwellBaseMarketState } from "@/lib/moonwell-base/listing-roster";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The Moonwell Base positions listing — rails-server's /api/moonwell-base/
 // positions (mig 172: one row per wallet that ever held a position, joined to
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching moonwell-base positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

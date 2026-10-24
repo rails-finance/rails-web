@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readDolomiteTimeline } from "@/lib/dolomite/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a Dolomite account's timeline — the LIVE rails-server index.
 // The grain is Account.Info = (owner, uint256 accountNumber): both params are
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readDolomiteTimeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching dolomite timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

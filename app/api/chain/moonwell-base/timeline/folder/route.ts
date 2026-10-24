@@ -10,6 +10,7 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { spanParam } from "@/lib/shared/replay-grouped-answer";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Opening one Moonwell Base folder — the members behind a header on
 // `/api/chain/moonwell-base/timeline?group=1`. The same contract the index arms
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error opening a Moonwell Base timeline folder:", error);
-    const message = error instanceof Error ? error.message : "Failed to open folder";
+    const message = publicErrorMessage(error, "Failed to open folder");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

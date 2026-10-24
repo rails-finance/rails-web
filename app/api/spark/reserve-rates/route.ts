@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // POST pass-through to the live rails-server index — the reserve's own rate
 // read AROUND a position's own transactions, for the SparkLend market notes.
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching spark reserve rates from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch reserve rates";
+    const message = publicErrorMessage(error, "Failed to fetch reserve rates");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

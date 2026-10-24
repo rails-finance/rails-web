@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readMakerOpeningBalance } from "@/lib/makerdao/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The opening balance for a MakerDAO vault — everything BELOW the block that
 // `/api/makerdao/vault/:vaultId/timeline?recent=N` opened its window at. The
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
   } catch (error) {
     console.error("Error fetching makerdao timeline summary from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch opening balance";
+    const message = publicErrorMessage(error, "Failed to fetch opening balance");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

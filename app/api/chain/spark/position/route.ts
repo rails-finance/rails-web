@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadSparkPositionFromChain } from "@/lib/sources/chain/spark-position";
 import { SPARK_CATALOG } from "@/lib/spark/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the SparkLend position read — the exact live-head detail.
 // SparkLend is a single pooled account per wallet on one mainnet Pool, so this
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Spark position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

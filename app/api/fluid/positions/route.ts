@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readFluidPositions } from "@/lib/fluid/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the Fluid positions listing — one row per position NFT from
 // mv_fluid_positions, each carrying the fluid_position_chain settled overlay
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readFluidPositions(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching fluid positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

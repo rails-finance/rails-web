@@ -8,6 +8,7 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { toServedFolder, type UpstreamFolderMembers } from "@/lib/sources/api/timeline-folder-wire";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Opening one Aave V3 folder — the members behind a header on
 // `/timeline?group=1`. The SparkLend twin of this route carries the argument in
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error opening aave-v3 timeline folder:", error);
-    const message = error instanceof Error ? error.message : "Failed to open folder";
+    const message = publicErrorMessage(error, "Failed to open folder");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
 import { parseAlchemixV2Query, readAlchemixV2Positions } from "@/lib/sources/api/alchemix-v2-backend";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the Alchemix V2 listing. A thin shell over
 // lib/sources/api/alchemix-v2-backend.ts: the query is allowlisted and the
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(read.result, { headers: proxyCacheControl(read.upstream, LISTING_CACHE_CONTROL) });
   } catch (error) {
     console.error("Error fetching alchemix v2 positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

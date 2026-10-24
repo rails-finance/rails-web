@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readCompoundV2OpeningBalance } from "@/lib/compound-v2/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The opening balance for a Compound V2 account — everything BELOW the block
 // that `/api/compound-v2/timeline?recent=N` opened its window at. The model,
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     return respondWith(answer);
   } catch (error) {
     console.error("Error fetching compound-v2 timeline summary from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch opening balance";
+    const message = publicErrorMessage(error, "Failed to fetch opening balance");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

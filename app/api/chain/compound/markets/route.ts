@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadCompoundV3Markets } from "@/lib/sources/chain/compound-markets";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Compound V3 protocol view — each Comet market's own state
 // (utilisation, rates at that utilisation, kinks, reserves vs target, and the
@@ -15,7 +16,7 @@ export async function GET() {
     return NextResponse.json(await loadCompoundV3Markets());
   } catch (error) {
     console.error("Error loading Compound V3 markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load markets";
+    const message = publicErrorMessage(error, "Failed to load markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

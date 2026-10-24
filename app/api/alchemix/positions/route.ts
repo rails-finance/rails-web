@@ -5,6 +5,7 @@ import {
   parseAlchemixPositionsQuery,
   readAlchemixPositionsFromBackend,
 } from "@/lib/sources/api/alchemix-positions-backend";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the Alchemix V3 position listing — the LIVE rails-server index over
 // the reduced per-position state at the (lineKey, tokenId) grain.
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(read.result, { headers: proxyCacheControl(read.upstream, LISTING_CACHE_CONTROL) });
   } catch (error) {
     console.error("Error fetching alchemix positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

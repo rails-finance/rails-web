@@ -16,6 +16,7 @@ import type { CometDeployment } from "@/lib/compound/asset-catalog";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
 import { proxyFail, proxyOk, respondWith, routeBoxHop, type ProxyAnswer } from "@/lib/shared/proxy-answer";
 import type { SsrHop } from "@/lib/shared/listing-ssr";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 export interface CompoundProxyTarget {
   /** rails-server mount, e.g. "/api/compound". */
@@ -105,7 +106,7 @@ export async function proxyCompoundPositions(request: NextRequest, t: CompoundPr
     );
   } catch (error) {
     console.error(`Error fetching ${t.label} positions from backend:`, error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadPolarisMarketsFromChain } from "@/lib/sources/chain/polaris-position";
 import { CHAIN_MARKET_CACHE_CONTROL } from "@/lib/api/proxy-cache";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Polaris market board — both markets' own state at one head
 // block (totals, the rate in force, mode, reserve ratio, the two MCRs, the
@@ -16,7 +17,7 @@ export async function GET() {
     return NextResponse.json(data, { headers: { "Cache-Control": CHAIN_MARKET_CACHE_CONTROL } });
   } catch (error) {
     console.error("Error loading Polaris markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain markets";
+    const message = publicErrorMessage(error, "Failed to load chain markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -12,6 +12,7 @@ import type { UpstreamGroupedTimeline } from "@/lib/sources/api/timeline-folder-
 import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import { basedollarServedFolder } from "@/lib/sources/api/basedollar-folder";
 import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a single Basedollar Trove's timeline — the LIVE rails-server index.
 // rails-server returns the raw mv_basedollar_events rows for one (branch, troveId); we run
@@ -150,7 +151,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching basedollar timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

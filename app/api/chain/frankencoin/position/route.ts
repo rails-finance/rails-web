@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadFrankencoinPositionFromChain } from "@/lib/sources/chain/frankencoin-position";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Frankencoin position read — the exact live-head detail for
 // one POSITION, keyed exactly as the protocol keys it: the Position contract's
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Frankencoin position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

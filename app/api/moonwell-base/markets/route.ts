@@ -24,6 +24,7 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { ROSTER_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
 import type { RawMoonwellBaseMarketState } from "@/lib/moonwell-base/listing-roster";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching moonwell-base market roster from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch market roster";
+    const message = publicErrorMessage(error, "Failed to fetch market roster");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

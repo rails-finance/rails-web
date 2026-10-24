@@ -3,6 +3,7 @@ import { alchemyClient } from "@/lib/sources/chain/rpc";
 import { discoverLlamalendMarkets } from "@/lib/sources/chain/llamalend-markets";
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
 import { scale1e18 } from "@/lib/llamalend/band-math";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The liquidation-forensics price read: the market's own AMM oracle AT the
 // event's block — an archive eth_call, the "oracle-at-block overlay walk".
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error reading LlamaLend price_oracle at block:", error);
-    const message = error instanceof Error ? error.message : "price_oracle read failed";
+    const message = publicErrorMessage(error, "price_oracle read failed");
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

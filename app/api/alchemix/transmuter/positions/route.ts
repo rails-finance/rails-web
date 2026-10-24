@@ -5,6 +5,7 @@ import {
   parseAlchemixTransmuterQuery,
   readAlchemixTransmuterPositions,
 } from "@/lib/sources/api/alchemix-transmuter-backend";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the Alchemix V3 Transmuter listing. A thin shell over
 // lib/sources/api/alchemix-transmuter-backend.ts: the query is allowlisted and
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(read.result, { headers: proxyCacheControl(read.upstream, LISTING_CACHE_CONTROL) });
   } catch (error) {
     console.error("Error fetching alchemix transmuter positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

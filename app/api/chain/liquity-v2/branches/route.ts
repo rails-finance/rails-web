@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import type { LiquityForkConfig, LiquityForkBranchConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { LIQUITY_V2_BRANCHES, DEBT_SYMBOL } from "@/lib/liquity/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Liquity V2 BRANCH roster — the reference deployment's
 // protocol view source, the sibling of /api/chain/{ebisu,asymmetry}/branches
@@ -25,7 +26,7 @@ export async function GET() {
     return NextResponse.json(await loadLiquityForkBranchesFromChain(CFG));
   } catch (error) {
     console.error("Error loading Liquity V2 branches from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load branches";
+    const message = publicErrorMessage(error, "Failed to load branches");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

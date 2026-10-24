@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readPwnCollateralTransfers } from "@/lib/sources/chain/pwn-collateral-transfer";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the PWN collateral-return read: how an NFT collateral came back
 // to a borrower between an earlier loan's default claim and a new loan
@@ -41,6 +42,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ transfers });
   } catch (error) {
     console.error("PWN collateral transfer read failed:", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "read failed" }, { status: 500 });
+    return NextResponse.json({ error: publicErrorMessage(error, "read failed") }, { status: 500 });
   }
 }

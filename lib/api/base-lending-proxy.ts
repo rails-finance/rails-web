@@ -19,6 +19,7 @@ import {
   type RawV3WalletRow,
 } from "@/lib/sources/api/aave-v3-positions";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 export interface BaseLendingProxyTarget {
   /** rails-server mount, e.g. "/api/seamless". */
@@ -98,7 +99,7 @@ export async function proxyBaseLendingPositions(request: NextRequest, t: BaseLen
     );
   } catch (error) {
     console.error(`Error fetching ${t.label} positions from backend:`, error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -114,7 +115,7 @@ export async function proxyBaseLendingCoverage(apiPrefix: string, readerIp?: str
     const json = await response.json();
     return NextResponse.json(json, { headers: { "Cache-Control": "public, max-age=30, s-maxage=30" } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to fetch coverage";
+    const message = publicErrorMessage(error, "Failed to fetch coverage");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

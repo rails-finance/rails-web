@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadCompoundWalletFromChain } from "@/lib/sources/chain/compound-position";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Every Compound V3 position one wallet holds on Base.
 //
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(await loadCompoundWalletFromChain(wallet, COMPOUND_BASE_DEPLOYMENT));
   } catch (error) {
     console.error("Error sweeping Compound V3 Base wallet:", error);
-    const message = error instanceof Error ? error.message : "Failed to load the wallet's positions";
+    const message = publicErrorMessage(error, "Failed to load the wallet's positions");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

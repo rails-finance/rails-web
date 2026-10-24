@@ -12,6 +12,7 @@ import type { UpstreamGroupedTimeline } from "@/lib/sources/api/timeline-folder-
 import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import { ebisuServedFolder } from "@/lib/sources/api/ebisu-folder";
 import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a single Ebisu Trove's timeline — the LIVE rails-server index.
 // rails-server returns the raw mv_ebisu_events rows for one (branch, troveId); we run
@@ -146,7 +147,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching ebisu timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

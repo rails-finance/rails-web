@@ -4,6 +4,7 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { proxyCacheControl } from "@/lib/api/proxy-cache";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import type { AaveV3PositionState } from "@/lib/aave-v3/position-state";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The position state of an Aave V3 Ethereum account around one event's
 // transaction (rails-ops TO-DO-ui-jobs §19): each reserve's exact balance before
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error reading aave-v3 position state:", error);
-    const message = error instanceof Error ? error.message : "Failed to read position state";
+    const message = publicErrorMessage(error, "Failed to read position state");
     return NextResponse.json({ error: message, code: "proxy_error" }, { status: 500 });
   }
 }

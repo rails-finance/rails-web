@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readMapleOpeningBalance } from "@/lib/maple/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The opening balance for a Maple position — everything BELOW the block that
 // `/api/maple/timeline?recent=N` opened its window at. The model, the exclusive
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching maple timeline summary from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch opening balance";
+    const message = publicErrorMessage(error, "Failed to fetch opening balance");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

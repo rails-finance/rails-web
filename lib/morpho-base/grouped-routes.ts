@@ -11,6 +11,7 @@ import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { MORPHO_BASE_DEPLOY_BLOCK } from "@/lib/morpho-base/asset-catalog";
 import { MORPHO_BASE_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
 import { morphoBaseGroupedBody, readGroupedMorphoBase } from "@/lib/morpho-base/timeline-folders";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 const INDEX = { deployment: MORPHO_BASE_DEPLOYMENT, deployBlock: MORPHO_BASE_DEPLOY_BLOCK };
 
@@ -109,7 +110,7 @@ export async function morphoBaseFolder(params: URLSearchParams, readerIp: string
     );
   } catch (error) {
     console.error("Error opening a Morpho Blue Base timeline folder:", error);
-    const message = error instanceof Error ? error.message : "Failed to open folder";
+    const message = publicErrorMessage(error, "Failed to open folder");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

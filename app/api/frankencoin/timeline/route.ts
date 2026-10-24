@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readFrankencoinTimeline } from "@/lib/frankencoin/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a Frankencoin position's timeline — the LIVE rails-server index.
 // The grain is the POSITION contract address (required). rails-server pages
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching frankencoin timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

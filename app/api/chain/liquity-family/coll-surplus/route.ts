@@ -6,6 +6,7 @@ import { resolveBranch as ebisuBranch } from "@/lib/ebisu/asset-catalog";
 import { resolveBranch as basedollarBranch } from "@/lib/basedollar/asset-catalog";
 import { LIQUITY_V1_ADDRESSES, ASSET_DECIMALS } from "@/lib/liquity-v1/asset-catalog";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // A Trove's collateral surplus at the head — still claimable, or claimed — for
 // any Liquity-V2-architecture explorer and for Liquity V1 (lib/sources/chain/
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error reading the collateral surplus:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the collateral surplus";
+    const message = publicErrorMessage(error, "Failed to read the collateral surplus");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

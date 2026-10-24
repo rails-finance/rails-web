@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readLlamalendTimeline } from "@/lib/llamalend/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a LlamaLend position's timeline — the LIVE rails-server index.
 // The grain is (controller, user): both params required, the controller being
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readLlamalendTimeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching llamalend timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

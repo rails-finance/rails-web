@@ -9,6 +9,7 @@ import {
 } from "@/lib/sources/api/morpho-positions";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The Morpho Blue Base positions listing — rails-server's /api/morpho-base/
 // positions (mig 173: one row per (market, borrower) that ever held a
@@ -105,7 +106,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching morpho-base positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

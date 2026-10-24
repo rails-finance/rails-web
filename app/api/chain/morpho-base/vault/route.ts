@@ -7,6 +7,7 @@ import { fetchVaultTail, putVaultTail } from "@/lib/api/fetch-vault-tail";
 import { routeHop } from "@/lib/shared/listing-ssr";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { MORPHO_BASE_VAULT_TAIL_VERSION, type VaultHolderTimeline } from "@/lib/shared/vault-holder-timeline";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // One MetaMorpho vault on Base at one pinned block, and one holder's attributed
 // slice of it.
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error reading a Morpho Base vault:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the vault";
+    const message = publicErrorMessage(error, "Failed to read the vault");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

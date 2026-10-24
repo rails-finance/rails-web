@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { EBISU_BRANCHES, DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Ebisu BRANCH roster — the protocol view's source. Reads
 // every branch's own TroveManager / PriceFeed (simulated fetchPrice) /
@@ -18,7 +19,7 @@ export async function GET() {
     return NextResponse.json(await loadLiquityForkBranchesFromChain(CFG));
   } catch (error) {
     console.error("Error loading Ebisu branches from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load branches";
+    const message = publicErrorMessage(error, "Failed to load branches");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

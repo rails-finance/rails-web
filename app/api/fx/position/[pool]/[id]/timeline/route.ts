@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readFxTimeline } from "@/lib/fx/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a single f(x) V2 position's timeline — the LIVE rails-server
 // index. rails-server ships the raw Operate/LiquidatePosition rows (each with
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
   } catch (error) {
     console.error("Error fetching fx timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

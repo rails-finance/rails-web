@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadAaveV3PositionFromChain } from "@/lib/sources/chain/aave-v3-position";
 import { asV3Market, POOL_BY_MARKET } from "@/lib/aave-v3/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Aave V3 position read — the exact live-head detail. V3 is one
 // pooled account per (wallet, market) — each market a separate Pool — so this
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ...data, market });
   } catch (error) {
     console.error("Error loading Aave V3 position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

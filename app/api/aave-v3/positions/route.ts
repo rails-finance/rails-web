@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readAaveV3Positions } from "@/lib/aave-v3/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Proxies the Aave V3 positions listing from the live rails-server index.
 // rails-server does the structural filter/sort/paginate over
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching aave-v3 positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

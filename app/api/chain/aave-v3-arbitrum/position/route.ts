@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadAaveV3PositionFromChain } from "@/lib/sources/chain/aave-v3-position";
 import { AAVE_V3_ARBITRUM_CHAIN_ID, AAVE_V3_ARBITRUM_POOL } from "@/lib/aave-v3-arbitrum/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // A wallet's whole Aave V3 position on Arbitrum: the reader the Ethereum and
 // Base routes use, pointed at the Arbitrum Pool and read through
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Aave V3 Arbitrum position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

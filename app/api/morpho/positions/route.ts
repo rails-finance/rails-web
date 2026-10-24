@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readMorphoPositions } from "@/lib/morpho/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Proxies the Morpho position listing from the live rails-server index.
 // rails-server does the structural filter/sort/paginate over
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readMorphoPositions(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching morpho positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

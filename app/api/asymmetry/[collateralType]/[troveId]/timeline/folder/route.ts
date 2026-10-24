@@ -8,6 +8,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { UpstreamFolder } from "@/lib/sources/api/timeline-folder-wire";
 import { asymmetryServedFolder } from "@/lib/sources/api/asymmetry-folder";
 import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Opening one Asymmetry folder — the members behind a header on
 // `/timeline?group=1`. The SparkLend twin (app/api/spark/timeline/folder)
@@ -71,7 +72,7 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error opening asymmetry timeline folder:", error);
-    const message = error instanceof Error ? error.message : "Failed to open folder";
+    const message = publicErrorMessage(error, "Failed to open folder");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

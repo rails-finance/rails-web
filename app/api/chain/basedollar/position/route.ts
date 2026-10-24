@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadLiquityForkTroveFromChain, type LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { BASEDOLLAR_BRANCHES, DEBT_SYMBOL, resolveBranch } from "@/lib/basedollar/asset-catalog";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Basedollar trove read — the exact live-head detail for ONE
 // (branch, troveId). Needs `?branch=` (key or display symbol) and `?troveId=`;
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Basedollar trove from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadFluidVaultsFromChain } from "@/lib/sources/chain/fluid-vaults";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Fluid VAULT roster — the protocol view's source. One
 // getVaultsEntireData() call against the VaultResolver at head returns every
@@ -15,7 +16,7 @@ export async function GET() {
     return NextResponse.json(await loadFluidVaultsFromChain());
   } catch (error) {
     console.error("Error loading Fluid vaults from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load vaults";
+    const message = publicErrorMessage(error, "Failed to load vaults");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

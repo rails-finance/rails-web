@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readDolomiteOpeningBalance } from "@/lib/dolomite/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The opening balance for a Dolomite account — everything BELOW the block that
 // `/api/dolomite/timeline?recent=N` opened its window at. The model, the
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching dolomite timeline summary from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch opening balance";
+    const message = publicErrorMessage(error, "Failed to fetch opening balance");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@ import {
   loadMorphoBaseHolderSummary,
 } from "@/lib/sources/chain/morpho-base-holder-exposure";
 import { resolveHolder } from "@/lib/morpho-base/vault-holder";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // One address across every catalogued MetaMorpho vault on Base, at one pinned
 // block: the vaults it holds, and its attributed slice of each of their markets.
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error reading Morpho Base holder exposure:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the holder's exposure";
+    const message = publicErrorMessage(error, "Failed to read the holder's exposure");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

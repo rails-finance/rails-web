@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadAaveEthereumHolderSweep } from "@/lib/sources/chain/aave-ethereum-holder-sweep";
 import { resolveAaveVaultHolder } from "@/lib/aave-vaults/vault-holder";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // One address across every vault Aave publishes on Ethereum, at one pinned
 // block: which of them it holds, how much of each, and what those shares convert
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error reading an Aave Ethereum holder sweep:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the holder's vaults";
+    const message = publicErrorMessage(error, "Failed to read the holder's vaults");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

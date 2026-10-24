@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readAaveV3Timeline } from "@/lib/aave-v3/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Proxies the Aave V3 timeline from the live rails-server index. rails-server
 // returns the raw reduced mv_aave_v3_events rows; we run the presentation
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readAaveV3Timeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching aave-v3 timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

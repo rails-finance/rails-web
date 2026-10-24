@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadLlamalendPositionFromChain, UnknownLlamalendMarketError } from "@/lib/sources/chain/llamalend-position";
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the LlamaLend position read — the live soft-liquidation
 // surface for one POSITION, keyed exactly as the protocol keys it:
@@ -24,10 +25,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     if (error instanceof UnknownLlamalendMarketError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+      return NextResponse.json({ error: publicErrorMessage(error) }, { status: 404 });
     }
     console.error("Error loading LlamaLend position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

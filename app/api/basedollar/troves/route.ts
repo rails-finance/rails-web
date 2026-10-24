@@ -6,6 +6,7 @@ import { buildBasedollarTroveRows, type RawBasedollarTroveRow } from "@/lib/sour
 import { resolveLiquityForkPrices } from "@/lib/sources/chain/liquity-fork-prices";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { BASEDOLLAR_BRANCHES } from "@/lib/basedollar/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the Basedollar trove listing — the LIVE rails-server index. rails-server does
 // the structural filter/sort/paginate over mv_basedollar_positions and returns the page
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching basedollar troves from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch troves";
+    const message = publicErrorMessage(error, "Failed to fetch troves");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readFluidTimeline } from "@/lib/fluid/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a Fluid position's timeline — the LIVE rails-server index, keyed
 // by the position NFT id (Fluid positions are ERC721s — the MakerDAO-cdp URL
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readFluidTimeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching fluid timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

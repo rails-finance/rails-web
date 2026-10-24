@@ -3,6 +3,7 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
 import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The opening balance for a Basedollar Trove — everything BELOW the block that
 // `/api/basedollar/:collateralType/:troveId/timeline?recent=N` opened its window
@@ -50,7 +51,7 @@ export async function GET(
     return NextResponse.json(opening, { headers: proxyCacheControl(response, LISTING_CACHE_CONTROL) });
   } catch (error) {
     console.error("Error fetching basedollar timeline summary from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch opening balance";
+    const message = publicErrorMessage(error, "Failed to fetch opening balance");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

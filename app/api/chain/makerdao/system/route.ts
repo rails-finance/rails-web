@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { loadMakerSystemFromChain } from "@/lib/sources/chain/makerdao-system";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export async function GET() {
     return NextResponse.json(await loadMakerSystemFromChain());
   } catch (error) {
     console.error("Error loading MakerDAO system from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load system state";
+    const message = publicErrorMessage(error, "Failed to load system state");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

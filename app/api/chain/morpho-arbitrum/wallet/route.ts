@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadMorphoArbitrumWallet } from "@/lib/sources/chain/morpho-arbitrum-wallet";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Every Morpho Blue position one wallet holds on Arbitrum: every censused
 // market asked at one pinned block, each held one read in full, and the loan
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(await loadMorphoArbitrumWallet(wallet));
   } catch (error) {
     console.error("Error reading Morpho Arbitrum wallet:", error);
-    const message = error instanceof Error ? error.message : "Failed to load the wallet's positions";
+    const message = publicErrorMessage(error, "Failed to load the wallet's positions");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

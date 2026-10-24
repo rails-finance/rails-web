@@ -12,6 +12,7 @@ import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { groupedTimelineBody, readGroupedMoonwellBase } from "@/lib/moonwell-base/timeline-folders";
 import { spanParam } from "@/lib/shared/replay-grouped-answer";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // A wallet's whole life on Moonwell Base: from the INDEX when the index can
 // vouch for all of it, swept from the chain's own logs otherwise.
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // An unconfigured endpoint is not an empty history, and the page says which.
     console.error("Error reading Moonwell Base history:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the history";
+    const message = publicErrorMessage(error, "Failed to read the history");
     return NextResponse.json({ error: message, unavailable: true }, { status: 503 });
   }
 }

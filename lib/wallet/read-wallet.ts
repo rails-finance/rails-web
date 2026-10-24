@@ -17,6 +17,7 @@ import { asymmetry, basedollar, ebisu } from "@/lib/wallet/families/liquity-fork
 import { withBudget, type WalletSummaryAnswer, type WalletSummaryRow } from "@/lib/wallet/summary-row";
 import type { HeadRead, WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import type { WalletCounts, WalletCountsFamily, WalletCountsPosition } from "@/lib/wallet/summary-counts";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 /** The whole read's budget, the summary route's time included. */
 export const WALLET_BUDGET_MS = 8000;
@@ -108,7 +109,7 @@ async function readFamily(
     try {
       head = await withBudget(Math.max(500, deadline - Date.now()), (signal) => f.head!(open, address, signal));
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err);
+      error = publicErrorMessage(err);
       head = { positions: open.map((p) => (p.notRead ? p : { ...p, headRead: "failed" as const })), reads: 0 };
     }
   }
@@ -144,7 +145,7 @@ export async function readWalletUncached(address: string, readerIp?: string): Pr
       readAt: Math.floor(Date.now() / 1000),
       serverMs: Date.now() - t0,
       ms: Date.now() - t0,
-      error: err instanceof Error ? err.message : String(err),
+      error: publicErrorMessage(err),
     };
   }
   const serverMs = Date.now() - t0;
@@ -170,7 +171,7 @@ export async function readWalletUncached(address: string, readerIp?: string): Pr
         headRead: "failed",
         ms: Date.now() - t0,
         reads: 0,
-        error: s.reason instanceof Error ? s.reason.message : String(s.reason),
+        error: publicErrorMessage(s.reason),
       });
     }
   });
@@ -223,7 +224,7 @@ export function readWalletCounts(address: string, readerIp?: string): Promise<Wa
     try {
       summary = await withBudget(WALLET_BUDGET_MS, (signal) => readSummary(key, signal, readerIp));
     } catch (err) {
-      const error = err instanceof Error ? err.message : String(err);
+      const error = publicErrorMessage(err);
       return { ...empty, readAt: Math.floor(Date.now() / 1000), ms: Date.now() - t0, error };
     }
     const positions: WalletCountsPosition[] = [];

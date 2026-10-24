@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadLiquityV1PositionFromChain } from "@/lib/sources/chain/liquity-v1-position";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Liquity V1 Trove read — the exact live-head detail. One
 // Trove per address on the fixed singleton contracts, so this needs only
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Liquity V1 position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -10,6 +10,7 @@ import { resolveFolder } from "@/lib/shared/timeline-grouping";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { replayGroupedBody, spanParam } from "@/lib/shared/replay-grouped-answer";
 import { readGroupedAaveV3Base } from "@/lib/aave-v3-base/timeline-folders";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 export interface AaveV3BaseLane {
   /** For log lines and refusals: "Aave V3 Base", "Seamless". */
@@ -99,7 +100,7 @@ export async function aaveV3BaseFolder(
     );
   } catch (error) {
     console.error(`Error opening a ${lane.label} timeline folder:`, error);
-    const message = error instanceof Error ? error.message : "Failed to open folder";
+    const message = publicErrorMessage(error, "Failed to open folder");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

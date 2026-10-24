@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadDolomiteMarkets } from "@/lib/sources/chain/dolomite-markets";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Dolomite protocol view — every market the core lists
 // (getNumMarkets → getMarketTokenAddress, never a hardcoded roster), its
@@ -16,7 +17,7 @@ export async function GET() {
     return NextResponse.json(await loadDolomiteMarkets());
   } catch (error) {
     console.error("Error loading Dolomite markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load markets";
+    const message = publicErrorMessage(error, "Failed to load markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

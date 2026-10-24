@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readPwnPositions } from "@/lib/pwn/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the PWN position listing — the LIVE rails-server index.
 // rails-server does the structural filter/sort/paginate over mv_pwn_positions and
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readPwnPositions(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching pwn positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -9,6 +9,7 @@ import { toGroupedTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { groupedMorphoBaseTimeline } from "@/lib/morpho-base/grouped-routes";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // A wallet's whole life on Morpho Blue Base: from the INDEX when the index
 // can vouch for all of it, swept from the singleton's own logs otherwise.
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
     // Distinguished on purpose: an unconfigured endpoint is not an empty
     // history, and the page says which one it is looking at.
     console.error("Error reading Morpho Blue Base history:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the history";
+    const message = publicErrorMessage(error, "Failed to read the history");
     return NextResponse.json({ error: message, unavailable: true }, { status: 503 });
   }
 }

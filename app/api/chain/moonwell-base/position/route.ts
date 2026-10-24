@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadMoonwellPositionFromChain } from "@/lib/sources/chain/moonwell-position";
 import { MOONWELL_BASE_DEPLOYMENT } from "@/lib/moonwell-base/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Moonwell Base position read — one ACCOUNT, whole, at the
 // head. Moonwell cross-collateralises every market through one Comptroller, so
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Moonwell Base position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

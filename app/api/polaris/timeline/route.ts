@@ -9,6 +9,7 @@ import {
 } from "@/lib/sources/api/polaris-timeline";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { POLARIS_CHAIN_ID, normalizeCdpId, normalizeMarket } from "@/lib/polaris/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of one Polaris CDP's timeline — the LIVE rails-server index. The
 // grain is (market, cdpId), both required. rails-server answers the whole
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching polaris timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

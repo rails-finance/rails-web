@@ -8,6 +8,7 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { groupedCompoundBaseTimeline } from "@/lib/compound-base/grouped-routes";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // A wallet's whole life on Compound V3 Base: from the INDEX when the index
 // can vouch for all of it, swept from the five Comets' own logs otherwise.
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // An unconfigured endpoint is not an empty history, and the page says which.
     console.error("Error reading Compound V3 Base history:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the history";
+    const message = publicErrorMessage(error, "Failed to read the history");
     return NextResponse.json({ error: message, unavailable: true }, { status: 503 });
   }
 }

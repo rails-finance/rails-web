@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadCompoundV2PositionFromChain } from "@/lib/sources/chain/compound-v2-position";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Compound V2 position read — the exact live-head detail for
 // one ACCOUNT. Compound V2 cross-collateralises its twenty listed markets
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Compound V2 position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

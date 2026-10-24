@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadDolomitePositionFromChain } from "@/lib/sources/chain/dolomite-position";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Dolomite position read — the exact live-head detail for one
 // ACCOUNT, keyed exactly as the contract keys it: Account.Info =
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Dolomite position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { loadFxSystemFromChain } from "@/lib/sources/chain/fx-system";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export async function GET() {
     return NextResponse.json(await loadFxSystemFromChain());
   } catch (error) {
     console.error("Error loading f(x) system from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load pool state";
+    const message = publicErrorMessage(error, "Failed to load pool state");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

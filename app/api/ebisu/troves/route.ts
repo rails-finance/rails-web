@@ -5,6 +5,7 @@ import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache"
 import { buildEbisuTroveRows, type RawEbisuTroveRow } from "@/lib/sources/api/ebisu-troves";
 import { resolveLiquityForkPrices } from "@/lib/sources/chain/liquity-fork-prices";
 import { EBISU_BRANCHES } from "@/lib/ebisu/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the Ebisu trove listing — the LIVE rails-server index. rails-server does
 // the structural filter/sort/paginate over mv_ebisu_positions and returns the page
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching ebisu troves from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch troves";
+    const message = publicErrorMessage(error, "Failed to fetch troves");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

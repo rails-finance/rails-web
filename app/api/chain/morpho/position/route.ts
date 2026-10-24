@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadMorphoPositionFromChain } from "@/lib/sources/chain/morpho-position";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Morpho Blue position read — the exact live-head detail for
 // one (market, user). Both coordinates are required: Morpho positions live in
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Morpho position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

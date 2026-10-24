@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadMorphoMarketsFromChain } from "@/lib/sources/chain/morpho-markets";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Morpho Blue market roster — every market's live state at one head block,
 // keyed off the generated census in lib/morpho/market-catalog.ts (Blue exposes no enumeration
@@ -16,7 +17,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Morpho markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain markets";
+    const message = publicErrorMessage(error, "Failed to load chain markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

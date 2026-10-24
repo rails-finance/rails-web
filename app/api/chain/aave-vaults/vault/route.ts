@@ -6,6 +6,7 @@ import { fetchVaultTail, putVaultTail } from "@/lib/api/fetch-vault-tail";
 import { routeHop } from "@/lib/shared/listing-ssr";
 import { AAVE_VAULT_TAIL_VERSION, type VaultHolderTimeline } from "@/lib/shared/vault-holder-timeline";
 import { chainMeta, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // One Aave vault on Ethereum at one pinned block, and one address's reading of
 // it.
@@ -137,7 +138,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error reading an Aave Ethereum vault:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the vault";
+    const message = publicErrorMessage(error, "Failed to read the vault");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

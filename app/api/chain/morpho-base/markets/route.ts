@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadMorphoMarketsFromChain } from "@/lib/sources/chain/morpho-markets";
 import { MORPHO_BASE_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Morpho Blue Base protocol view — every one of the 4,306
 // markets the CreateMarket census found, with its stored totals, its one rung
@@ -19,7 +20,7 @@ export async function GET() {
     return NextResponse.json(await loadMorphoMarketsFromChain(MORPHO_BASE_DEPLOYMENT));
   } catch (error) {
     console.error("Error loading Morpho Base markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load markets";
+    const message = publicErrorMessage(error, "Failed to load markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

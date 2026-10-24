@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadCompoundV2Markets } from "@/lib/sources/chain/compound-v2-markets";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Compound V2 protocol view — every market the Comptroller lists,
 // with its totals, its collateral factor, its rate model and the oracle price
@@ -15,7 +16,7 @@ export async function GET() {
     return NextResponse.json(await loadCompoundV2Markets());
   } catch (error) {
     console.error("Error loading Compound V2 markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load markets";
+    const message = publicErrorMessage(error, "Failed to load markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

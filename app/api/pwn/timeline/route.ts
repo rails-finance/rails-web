@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readPwnTimeline } from "@/lib/pwn/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a PWN wallet's timeline — the LIVE rails-server index.
 // rails-server returns the raw mv_pwn_events rows (loan lifecycle, LEFT JOINed to
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readPwnTimeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching pwn timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

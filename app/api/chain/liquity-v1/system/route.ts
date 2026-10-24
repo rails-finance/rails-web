@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadLiquityV1SystemFromChain } from "@/lib/sources/chain/liquity-v1-system";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Liquity V1 SYSTEM read — the protocol view's source. One
 // head-block read of the singleton contracts: the protocol's own price
@@ -15,7 +16,7 @@ export async function GET() {
     return NextResponse.json(await loadLiquityV1SystemFromChain());
   } catch (error) {
     console.error("Error loading Liquity V1 system from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load system state";
+    const message = publicErrorMessage(error, "Failed to load system state");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

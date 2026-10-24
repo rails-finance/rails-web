@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadMorphoArbitrumMarkets } from "@/lib/sources/chain/morpho-arbitrum-markets";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The Morpho Blue Arbitrum protocol page's markets table: the census's
 // markets read at one pinned block, ranked where the loan token converts to
@@ -17,7 +18,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error reading Morpho Arbitrum markets:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the markets";
+    const message = publicErrorMessage(error, "Failed to read the markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

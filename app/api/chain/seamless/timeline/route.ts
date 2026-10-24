@@ -7,6 +7,7 @@ import { SEAMLESS_CHAIN_ID, SEAMLESS_POOL, SEAMLESS_DEPLOY_BLOCK } from "@/lib/s
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { groupedAaveV3BaseTimeline, type AaveV3BaseLane } from "@/lib/aave-v3-base/grouped-routes";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // A wallet's whole life on Seamless: from the INDEX when the index can vouch
 // for all of it, swept from the Pool's own logs otherwise.
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // An unconfigured endpoint is not an empty history, and the page says which.
     console.error("Error reading Seamless history:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the history";
+    const message = publicErrorMessage(error, "Failed to read the history");
     return NextResponse.json({ error: message, unavailable: true }, { status: 503 });
   }
 }

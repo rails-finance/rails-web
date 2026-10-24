@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadMoonwellMarkets } from "@/lib/sources/chain/moonwell-market-state";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Moonwell protocol view — every market the Comptroller lists,
 // with its totals, its collateral factor and caps, its rate model and the
@@ -15,7 +16,7 @@ export async function GET() {
     return NextResponse.json(await loadMoonwellMarkets());
   } catch (error) {
     console.error("Error loading Moonwell markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load markets";
+    const message = publicErrorMessage(error, "Failed to load markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

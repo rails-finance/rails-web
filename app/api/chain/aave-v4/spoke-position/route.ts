@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadAaveV4SpokePositionFromChain } from "@/lib/sources/chain/aave-v4-position";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Aave V4 spoke-position read. Same bare
 // AaveV4SpokePositionChainResponse shape fetchAaveV4SpokePosition expects from
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       : NextResponse.json(data, { headers: { "Cache-Control": "public, s-maxage=31536000, immutable" } });
   } catch (error) {
     console.error("Error loading Aave V4 spoke position from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain spoke position";
+    const message = publicErrorMessage(error, "Failed to load chain spoke position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

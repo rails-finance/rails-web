@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readMaplePositions } from "@/lib/maple/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the Maple position listing — the LIVE rails-server index.
 // rails-server does the structural filter/sort/paginate over mv_maple_wallets
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readMaplePositions(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching maple positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

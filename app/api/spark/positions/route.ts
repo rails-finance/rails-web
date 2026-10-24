@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readSparkPositions } from "@/lib/spark/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of the SparkLend position listing — the LIVE rails-server index.
 // rails-server does the structural filter/sort/paginate over mv_spark_positions
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching spark positions from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch positions";
+    const message = publicErrorMessage(error, "Failed to fetch positions");
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

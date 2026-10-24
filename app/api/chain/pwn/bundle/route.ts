@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadPwnBundleContents } from "@/lib/sources/chain/pwn-bundle";
 import { isPwnBundler, PWN_ADDRESSES } from "@/lib/pwn/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the PWN bundle read — what the Token Bundler bundle used as a
 // loan's collateral wrapped, read at the loan's creation block (`?id=` +
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading PWN bundle contents from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load bundle contents";
+    const message = publicErrorMessage(error, "Failed to load bundle contents");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

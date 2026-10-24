@@ -3,6 +3,7 @@ import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fo
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { BASEDOLLAR_BRANCHES, DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Basedollar BRANCH roster — the protocol view's source. Reads
 // every branch's own TroveManager / PriceFeed (simulated fetchPrice) /
@@ -27,7 +28,7 @@ export async function GET() {
     return NextResponse.json(await loadLiquityForkBranchesFromChain(CFG));
   } catch (error) {
     console.error("Error loading Basedollar branches from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load branches";
+    const message = publicErrorMessage(error, "Failed to load branches");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

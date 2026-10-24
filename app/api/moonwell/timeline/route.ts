@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readMoonwellTimeline } from "@/lib/moonwell/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a Moonwell wallet's timeline — the LIVE rails-server index.
 // rails-server returns the raw replayed mv_moonwell_events rows; we run the
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readMoonwellTimeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching moonwell timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

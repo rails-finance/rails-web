@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAddress, parseAbi } from "viem";
 import { alchemyClient } from "@/lib/sources/chain/rpc";
 import { DOLOMITE_ADDRESSES } from "@/lib/dolomite/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The liquidation-forensics read: the margin core's own oracle prices AND the
 // liquidation spread AT the event's block — one archive multicall, the
@@ -172,7 +173,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error reading Dolomite prices at block:", error);
-    const message = error instanceof Error ? error.message : "at-block read failed";
+    const message = publicErrorMessage(error, "at-block read failed");
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

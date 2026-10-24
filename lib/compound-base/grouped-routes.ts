@@ -9,6 +9,7 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { spanParam } from "@/lib/shared/replay-grouped-answer";
 import { COMPOUND_BASE_DEPLOYMENT, COMPOUND_BASE_DEPLOY_BLOCK } from "@/lib/compound-base/asset-catalog";
 import { compoundBaseGroupedBody, readGroupedCompoundBase } from "@/lib/compound-base/timeline-folders";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 const INDEX = {
   deployment: COMPOUND_BASE_DEPLOYMENT,
@@ -116,7 +117,7 @@ export async function compoundBaseFolder(params: URLSearchParams, readerIp: stri
     );
   } catch (error) {
     console.error("Error opening a Compound V3 Base timeline folder:", error);
-    const message = error instanceof Error ? error.message : "Failed to open folder";
+    const message = publicErrorMessage(error, "Failed to open folder");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

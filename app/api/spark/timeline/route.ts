@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readSparkTimeline } from "@/lib/spark/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a SparkLend wallet's timeline — the LIVE rails-server index.
 // rails-server returns the raw replayed spark_events_served rows; we run the chain-
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     return respondWith(await readSparkTimeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching spark timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

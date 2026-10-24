@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readCompoundV2Timeline } from "@/lib/compound-v2/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of a Compound V2 wallet's timeline — the LIVE rails-server index.
 // rails-server pages the raw replayed mv_compound_v2_events rows by KEYSET
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
     return respondWith(answer);
   } catch (error) {
     console.error("Error fetching compound-v2 timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

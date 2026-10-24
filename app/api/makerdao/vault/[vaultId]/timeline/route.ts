@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readMakerTimeline } from "@/lib/makerdao/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Proxies a single MakerDAO vault's timeline from the live rails-server index.
 // rails returns the frob/grab deltas with each row's running ink/art, plus the
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ vau
     );
   } catch (error) {
     console.error("Error fetching makerdao vault timeline from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch timeline";
+    const message = publicErrorMessage(error, "Failed to fetch timeline");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

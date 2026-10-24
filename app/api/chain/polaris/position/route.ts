@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadPolarisPositionFromChain } from "@/lib/sources/chain/polaris-position";
 import { normalizeCdpId, normalizeMarket } from "@/lib/polaris/asset-catalog";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Polaris position read — one CDP's live-head detail, keyed
 // exactly as the protocol keys it: (market, cdpId). The overlay is the primary
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error loading Polaris CDP from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load chain position";
+    const message = publicErrorMessage(error, "Failed to load chain position");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

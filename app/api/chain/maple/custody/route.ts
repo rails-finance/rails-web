@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveMapleCustodyHoldings } from "@/lib/sources/chain/maple-custody";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the Maple escrow custody view — what a known-infrastructure
 // address (the CCIP bridge escrows) holds in each syrup pool, read at one head
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ holdings });
   } catch (error) {
     console.error("Error loading Maple custody state from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load custody state";
+    const message = publicErrorMessage(error, "Failed to load custody state");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

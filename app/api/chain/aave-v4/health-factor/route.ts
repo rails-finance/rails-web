@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { isKnownAaveV4Spoke, loadAaveV4HealthFactorAround } from "@/lib/sources/chain/aave-v4-health-factor";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // An Aave V4 position's health factor at the end of block N−1 and of block N,
 // read from the spoke's getUserAccountData — the liquidation card's before →
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { headers: { "Cache-Control": "public, s-maxage=31536000, immutable" } });
   } catch (error) {
     console.error("Error reading Aave V4 health factor at block:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the health factor";
+    const message = publicErrorMessage(error, "Failed to read the health factor");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

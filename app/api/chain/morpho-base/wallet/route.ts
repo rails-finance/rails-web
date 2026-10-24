@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadMorphoWalletFromChain } from "@/lib/sources/chain/morpho-wallet";
 import { MORPHO_BASE_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Every Morpho Blue position one wallet holds on Base.
 //
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(await loadMorphoWalletFromChain(wallet, MORPHO_BASE_DEPLOYMENT));
   } catch (error) {
     console.error("Error sweeping Morpho Base wallet:", error);
-    const message = error instanceof Error ? error.message : "Failed to load the wallet's positions";
+    const message = publicErrorMessage(error, "Failed to load the wallet's positions");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { proxyCacheControl } from "@/lib/api/proxy-cache";
 import { ALCHEMIX_TOKEN_ID, readAlchemixState } from "@/lib/sources/api/alchemix-position-backend";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // api arm of one Alchemist position's CURRENT figures.
 //
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(read.result, { headers: proxyCacheControl(read.upstream) });
   } catch (error) {
     console.error("Error reading the alchemix position state from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to read the position state";
+    const message = publicErrorMessage(error, "Failed to read the position state");
     return NextResponse.json({ success: false, error: message }, { status: 503 });
   }
 }

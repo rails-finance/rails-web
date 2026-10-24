@@ -10,6 +10,7 @@ import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import type { UpstreamFolderMembers } from "@/lib/sources/api/timeline-folder-wire";
 import { compoundFolderTokenAddresses, compoundServedFolder } from "@/lib/sources/api/compound-folder-wire";
 import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Opening one Compound V3 folder — the members behind a header on
 // `/timeline?group=1` for one (market, account). The SparkLend twin
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error opening compound timeline folder:", error);
-    const message = error instanceof Error ? error.message : "Failed to open folder";
+    const message = publicErrorMessage(error, "Failed to open folder");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

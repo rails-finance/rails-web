@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
 import { readFxOpeningBalance } from "@/lib/fx/proxy-reads";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // The opening balance for an f(x) V2 position — everything BELOW the block
 // that `/api/fx/position/:pool/:id/timeline?recent=N` opened its window at.
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
   } catch (error) {
     console.error("Error fetching fx timeline summary from backend:", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch opening balance";
+    const message = publicErrorMessage(error, "Failed to fetch opening balance");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

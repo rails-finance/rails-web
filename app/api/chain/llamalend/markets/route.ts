@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadLlamalendMarkets } from "@/lib/sources/chain/llamalend-markets";
+import { publicErrorMessage } from "@/lib/api/public-error";
 
 // Chain arm of the LlamaLend protocol view — every market the three factories
 // list (market_count() / n_collaterals() / the V2 struct enumeration, never a
@@ -16,7 +17,7 @@ export async function GET() {
     return NextResponse.json(await loadLlamalendMarkets());
   } catch (error) {
     console.error("Error loading LlamaLend markets from chain:", error);
-    const message = error instanceof Error ? error.message : "Failed to load markets";
+    const message = publicErrorMessage(error, "Failed to load markets");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
