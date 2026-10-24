@@ -18,8 +18,8 @@
 // inspector is reachable on a view that never resolves; the wallet joins it
 // when the page knows it (an id-keyed page learns its owner from the read).
 
-import { FileCode2, KeyRound, UsersRound, type LucideIcon } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { FileCode2, KeyRound, type LucideIcon } from "lucide-react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { Facehash } from "@/components/shared/facehash";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -30,7 +30,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { ChainId } from "@/lib/shared/chains";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import { ProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Prov, ProvReceiptsScope, provInspector, useReceiptRegistry } from "@/components/shared/provenance";
 import { managerProv } from "@/lib/shared/manager-provenance";
 
@@ -71,13 +71,18 @@ export function WalletHeading({
   );
 }
 
+/** The Safe kind's mark: Safe's glyph, drawn as the Lucide kind icons are. */
+function SafeIcon({ className }: { className?: string }) {
+  return <ProtocolGlyph id="safe" className={className} />;
+}
+
 /** The glyph and words for what the address is (ui-jobs 232), with a
  *  newcomer's one-line tip. A plain wallet (`account`) has none; a contract
  *  carries its name when it answers one. Where the chain names who runs the
  *  account (ui-jobs 440), the label is the kind's word, a middle dot and the
  *  product ("Safe · DeFi Saver"), and the tip says what the product can do. */
 function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
-  Icon: LucideIcon;
+  Icon: LucideIcon | ComponentType<{ className?: string }>;
   label: string | null;
   tip: string;
 } {
@@ -91,11 +96,11 @@ function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
     case "safe":
       return k.manager
         ? {
-            Icon: UsersRound,
+            Icon: SafeIcon,
             label: `Safe · ${k.manager.name}`,
             tip: `A shared wallet that ${k.manager.name}'s automation can act for.`,
           }
-        : { Icon: UsersRound, label: "Safe", tip: "A shared wallet: several owners sign together before it acts." };
+        : { Icon: SafeIcon, label: "Safe", tip: "A shared wallet: several owners sign together before it acts." };
     case "contract": {
       const m = k.manager;
       const closed = m?.closed ? " (closed)" : "";

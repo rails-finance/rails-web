@@ -14,8 +14,8 @@
 // owner is stated from the product's own publication, as the registry's
 // source order admits (known-infrastructure.ts, "Evidence"). The
 // registry's FLAction and FLBalancer entries are the same deployments and take
-// the same bar here. Mark: defisaver.com's `apple-touch-icon.png` (180 px,
-// resized to 176), green #37AF6F, oklch hue 156.
+// the same bar here. Mark: the `defisaver` glyph (protocol-glyphs.tsx); the
+// brand's green #37AF6F gives oklch hue 156.
 //
 // Summer.fi: its deployments, `OasisDEX/oasis-earn-sc` ("Summer Mono"),
 // `packages/deploy-configurations/configs/{mainnet,base,arbitrum}.conf.ts`
@@ -29,15 +29,15 @@
 // feature branches' working configs are left out. The registry's
 // OperationExecutor entries among these take the same bar here; its mainnet
 // executors 0x6e86…6070 and 0x661d…ef15 appear nowhere in the repo, so they
-// keep their role. Mark: summer.fi's `icon.svg` (its only site icon), drawn at
-// 176 px; the gradient runs pink #FF49A4 to purple #B049FF and the purple
-// covers most of the mark, oklch hue 306.
+// keep their role. Mark: the `summerfi` glyph (protocol-glyphs.tsx); the
+// brand's gradient runs pink #FF49A4 to purple #B049FF and the purple covers
+// most of it, oklch hue 306.
 //
 // Instadapp: no entry contract here yet (a DSA's `cast` names connectors by
 // string); the subject is stated once for the wallet heading's manager chip
 // (lib/shared/account-managers.ts) and any later bar. Its deployments are
-// `Instadapp/dsa-contracts` `docs/addresses.json`. Mark: instadapp.io's
-// `apple-touch-icon.png` (180 px, resized to 176), blue #3F75FF, oklch hue 265.
+// `Instadapp/dsa-contracts` `docs/addresses.json`. Mark: the `instadapp` glyph
+// (protocol-glyphs.tsx); the brand's blue #3F75FF gives oklch hue 265.
 
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { BarSubject } from "@/lib/shared/known-infrastructure";

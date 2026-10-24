@@ -271,7 +271,8 @@ export interface ProtocolContract extends KnownContractBase {
  *  protocol's `brand`, so every subject's stretch has the same weight. */
 export interface BarSubject {
   name: string;
-  /** Basename under public/icons/protocols/. */
+  /** Key in `components/icons/protocol-glyphs.tsx`; a subject with no glyph
+   *  there draws `public/icons/protocols/<icon>.png`. */
   icon: string;
   hue: number;
   /** Many apps send transactions to this contract (an aggregator's router):
@@ -285,7 +286,9 @@ export interface BarSubject {
   closed?: { since: string; source: string };
 }
 
-/** Zerion's mark (zerion.io's `favicon-mark.png`, blue #2962EF). */
+/** Zerion: the `zerion` glyph on the bar; the brand's blue #2962EF gives the
+ *  hue. The router's `protocolIcon` chip draws `zerion.png` (zerion.io's
+ *  `favicon-mark.png`). */
 const ZERION_BAR: BarSubject = { name: "Zerion", icon: "zerion", hue: 264 };
 
 export type KnownInfrastructure = CcipEscrow | ProtocolContract;
