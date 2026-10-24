@@ -183,7 +183,7 @@ export function GroupFrame({
       <div
         aria-hidden
         data-group-bracket=""
-        className="group-bracket pointer-events-none absolute bottom-0 left-0 z-20 w-3 rounded-l-xl border-y border-l border-rb-300 dark:border-rb-500"
+        className="group-bracket pointer-events-none absolute bottom-0 left-[5px] z-20 w-3 rounded-l-xl border-y border-l border-rb-300 dark:border-rb-500"
       />
       {ends && !open && (
         <>
