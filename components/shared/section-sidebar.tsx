@@ -25,11 +25,15 @@
 // at the stretch's top, which carries the receipt (lib/shared/bar-provenance.ts).
 // Every other row, and every row whose entry is unknown, stands beside the
 // protocol's bar. Adjacent rows with the same subject join into one stretch;
-// between a stretch and the protocol's bar the page's background shows for
-// 2px, so the bar reads as broken there. Each stretch is measured against this
-// frame: the row's box (`data-event-id`) from its top to its bottom. Below md
-// the stretch is the 6px edge in the product's hue, with the same 2px breaks
-// and no mark.
+// on each side of a stretch the page's background shows for `BREAK` (8px, a
+// row gap), so the bar reads as broken there, and from md every segment of
+// the bar, stretches and the protocol's bar between them, has its left corners
+// rounded at the bar's radius (16px). A stretch sets its own; the protocol's
+// bar is one span, so its cut ends are carved by inverted-corner strips in the
+// background colour, skipped between two adjacent stretches. Each stretch is
+// measured against this frame: the row's box (`data-event-id`) from its top to
+// its bottom. Below md the stretch is the 6px edge in the product's hue, with
+// the same breaks, square corners and no mark.
 //
 // "Not yours" (P3.1.2): a row whose transaction the person did not send takes
 // a small pink dot on the bar level with its head, whatever the stretch. The
@@ -118,6 +122,30 @@ export function rowBarSubject(address: string | undefined, chainId: ChainId | un
 /** Two rows this close (the timeline's row gap is 8px) are adjacent. */
 const JOIN_GAP = 16;
 
+/** The background between a stretch and the bar beside it. */
+const BREAK = 8;
+
+/** The bar's corner radius (`rounded-2xl`). */
+const RADIUS = 16;
+
+/** A strip carving one rounded corner into the protocol's bar at a cut end:
+ *  the quarter circle at `at` keeps the bar's colour, the rest is background,
+ *  with a pixel's ramp at the arc to match the stretch's anti-aliased corner. */
+function cornerStrip(key: string, top: number, r: number, at: "100% 0" | "100% 100%") {
+  return (
+    <span
+      key={key}
+      className="absolute left-0 hidden md:block"
+      style={{
+        top,
+        width: r,
+        height: r,
+        background: `radial-gradient(circle at ${at}, transparent ${r - 0.5}px, var(--background) ${r + 0.5}px)`,
+      }}
+    />
+  );
+}
+
 interface Stretch {
   top: number;
   bottom: number;
@@ -149,6 +177,7 @@ function SubjectStretches({
   const registry = useReceiptRegistry();
   const [stretches, setStretches] = useState<Stretch[]>([]);
   const [marks, setMarks] = useState<number[]>([]);
+  const [height, setHeight] = useState(0);
   useLayoutEffect(() => {
     const frame = frameRef.current;
     if (!frame || (subjects.size === 0 && marked.size === 0)) {
@@ -157,7 +186,9 @@ function SubjectStretches({
       return;
     }
     const measure = () => {
-      const origin = frame.getBoundingClientRect().top;
+      const box = frame.getBoundingClientRect();
+      const origin = box.top;
+      setHeight(box.height);
       const rows: Stretch[] = [];
       const tops: number[] = [];
       for (const el of frame.querySelectorAll<HTMLElement>("[data-event-id]")) {
@@ -219,17 +250,39 @@ function SubjectStretches({
     };
   }, [frameRef, subjects, marked]);
   if (stretches.length === 0 && marks.length === 0) return null;
+  // The protocol's bar between and around the stretches: each cut end takes a
+  // rounded corner, kept inside its segment (at most half a short segment) so a
+  // strip never reaches a stretch. The bar's own top and bottom are rounded by
+  // the bar; between two adjacent stretches there is no segment.
+  const strips: ReactNode[] = [];
+  for (let i = 0; i <= stretches.length; i++) {
+    const above = stretches[i - 1];
+    const below = stretches[i];
+    if (above && below && below.top - above.bottom <= JOIN_GAP) continue;
+    const top = above ? above.bottom + BREAK : 0;
+    const bottom = below ? below.top - BREAK : height;
+    const len = bottom - top;
+    if (len <= 0) continue;
+    const r = Math.min(RADIUS, above && below ? len / 2 : len);
+    if (above) strips.push(cornerStrip(`a:${top}`, top, r, "100% 100%"));
+    if (below) strips.push(cornerStrip(`b:${bottom}`, bottom - r, r, "100% 0"));
+  }
   return (
     <>
       <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-1.5 overflow-hidden md:w-10">
+        {/* The breaks first, so no cutout paints over a neighbouring stretch. */}
+        {stretches.map((s) => (
+          <span
+            key={`c:${s.top}:${s.subject.name}`}
+            className="absolute inset-x-0 bg-background"
+            style={{ top: s.top - BREAK, height: s.bottom - s.top + 2 * BREAK }}
+          />
+        ))}
+        {strips}
         {stretches.map((s) => (
           <span key={`${s.top}:${s.subject.name}`}>
             <span
-              className="absolute inset-x-0 bg-background"
-              style={{ top: s.top - 2, height: s.bottom - s.top + 4 }}
-            />
-            <span
-              className="absolute inset-x-0 bg-brand-edge md:bg-brand-zone"
+              className="absolute inset-x-0 bg-brand-edge md:rounded-l-2xl md:bg-brand-zone"
               style={
                 {
                   top: s.top,
