@@ -1,0 +1,66 @@
+[
+  {
+    "page": "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "open",
+    "picked_for": "batch rate changes, 134 redemptions, a withdrawal between them: the live headlines and a long table",
+    "source": "scripts/exports/liquity-v2-fixtures.json"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/WETH/20635695537089405598026559485535702323392149994216418571824164162189504962705",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "liquidated",
+    "picked_for": "an open then a liquidation: the closed headlines and the surplus claim row",
+    "source": "scripts/exports/liquity-v2-fixtures.json"
+  },
+  {
+    "page": "/ethereum/aave-v3/0xee7ca610d896c53ffe716b801c05748efd902954",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "open",
+    "picked_for": "the default grouped page: folders beside events, the export's grouped heading",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-grouped)"
+  },
+  {
+    "page": "/ethereum/aave-v3/0xee7ca610d896c53ffe716b801c05748efd902954?folders=0",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "open",
+    "picked_for": "the flat window with an opening balance below the cut: the 50-row tail of a long history",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3)"
+  },
+  {
+    "page": "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8?folders=0",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "open",
+    "picked_for": "a Base wallet over 2,000 events, served flat from the history route",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-base-2000)"
+  },
+  {
+    "page": "/base/aave-v3/0x20172ec3d9cb14cb555aa5b612e50d30b97485dd?folders=0",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "liquidated",
+    "picked_for": "a liquidated Base account: the terminal export, peaks and outcome",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-base-liquidated)"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0xdd62115f601daebccfdd2aeed834513d8dc2f4e2",
+    "chain": "ethereum",
+    "protocol": "aave-vaults",
+    "state": "holding",
+    "picked_for": "an Umbrella stake holder: the vault family, diffed on its route (no export on a vault page)",
+    "source": "scripts/verify/verify-ethereum-vault-position-page.mjs (F2)"
+  },
+  {
+    "page": "/base/morpho/vaults/0x6b13c060f13af1fdb319f52315bbbf3fb1d88844/0x5773e329824d3120fd253d1ce94ab7705fe77432",
+    "chain": "base",
+    "protocol": "morpho-base-vaults",
+    "state": "holding",
+    "picked_for": "a Base MetaMorpho vault holder: the second vault family on its route",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (base morpho vault holder)"
+  }
+]
