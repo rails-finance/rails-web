@@ -693,6 +693,21 @@ const PENDLE_SWAP: ProtocolContract = {
   proxyContractName: "ERC1967Proxy",
   bar: PENDLE_BAR,
 };
+// PendleRouterV4, Ethereum, Base and Arbitrum 0x8888…f946: Pendle's own deployments
+// repo (pendle-finance/pendle-core-v2-public, `deployments/1-core.json`,
+// `8453-core.json` and `42161-core.json`) names it `"router"`, beside `routerStatic`
+// and `limitRouter`, and the verified source (Etherscan v2 getsourcecode, read
+// 24 Oct 2026) is `PendleRouterV4` on all three chains.
+const PENDLE_ROUTER: ProtocolContract = {
+  ...known(
+    "router",
+    "Pendle router",
+    "PendleRouterV4",
+    "Pendle’s router, which swaps and routes principal and yield tokens for a wallet",
+    "pendle",
+  ),
+  bar: PENDLE_BAR,
+};
 const SWAP_AGGREGATOR_HELPER = known(
   "router",
   "Swap helper",
@@ -1266,6 +1281,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [MAINNET_CHAIN_ID, "0xab52f8c11e72d00d4f717a657378ef9b8bf7c2b6", V3_POSITION_UTILS],
   [MAINNET_CHAIN_ID, "0x410b72ccfeacbb20a31785edaa358d25a07e143d", V3_POSITION_UTILS],
   [MAINNET_CHAIN_ID, "0xd4f480965d2347d421f1bec7f545682e5ec2151d", PENDLE_SWAP],
+  [MAINNET_CHAIN_ID, "0x888888888889758f76e7103c6cbf23abbf58f946", PENDLE_ROUTER],
   [MAINNET_CHAIN_ID, "0xc8a351f33dfeed5972a78c4b2d671f20a8a47e40", DODO_DPP],
   [MAINNET_CHAIN_ID, "0x33c1eef370bbb447414156cfc4fdabd434776eaf", ZEROXBOW_ZAP],
   [MAINNET_CHAIN_ID, "0x98ccb155e86bb478d514a827d16f58c6912f9bdc", MORPHO_MIGRATION_BUNDLER],
@@ -1501,6 +1517,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [BASE_CHAIN_ID, "0xc38e4e6a15593f908255214653d3d947ca1c2338", MAYAN_SWIFT],
   [BASE_CHAIN_ID, "0x4f37a9d177470499a2dd084621020b023fcffc1f", CURVE_ROUTER],
   [BASE_CHAIN_ID, "0xd4f480965d2347d421f1bec7f545682e5ec2151d", PENDLE_SWAP],
+  [BASE_CHAIN_ID, "0x888888888889758f76e7103c6cbf23abbf58f946", PENDLE_ROUTER],
   [BASE_CHAIN_ID, "0xd4e9b0d466789d7f6201442eeccba6a75a552db0", SWAP_AGGREGATOR_HELPER],
   [BASE_CHAIN_ID, "0xb1f3a7b816b0681188f54dfa400991b93adf00ed", OKU_ROUTER],
   [BASE_CHAIN_ID, "0xfd78ba0f717223bebe555a777b70b86667837ff6", V4_HOOK_ADAPTER],
@@ -1631,6 +1648,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   // ── Arbitrum, batch 2 (item 430) ──
   [ARBITRUM_CHAIN_ID, "0xba1333333333a1ba1108e8412f11850a5c319ba9", BALANCER_V3_VAULT],
   [ARBITRUM_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", RELAY_ROUTER_V3],
+  [ARBITRUM_CHAIN_ID, "0x888888888889758f76e7103c6cbf23abbf58f946", PENDLE_ROUTER],
   [ARBITRUM_CHAIN_ID, "0xe28e2c8d240dd5ebd0adcab86fbd79df7a052034", PARASWAP_REPAY],
   [ARBITRUM_CHAIN_ID, "0x28201c152dc5b69a86fa54fcfd21bca4c0eff3ba", PARASWAP_REPAY],
 ];
