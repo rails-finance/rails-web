@@ -567,8 +567,12 @@ function runOne(job) {
     // A verifier that reads `ONLY` itself to pick FIXTURES (timeline-boundary-card)
     // would get a fixture filter matching none of its fixtures, run nothing,
     // print "0/0 checks passed" and be reported as a PASS. A verifier's own
-    // fixture filter now travels as `FIXTURES=`, which is handed on as its
-    // `ONLY`; this runner's selector stops here.
+    // fixture filter now travels as `FIXTURES=`, which is handed on under the
+    // name that verifier reads — the SPLIT table's `env` (`FAMILIES` for
+    // event-share and wallet-links), `ONLY` for the rest; this runner's
+    // selector stops here. Until 24 Oct 2026 it went as `ONLY` to every
+    // script, so `FIXTURES=` on event-share or wallet-links ran the whole
+    // family list and timed out at the cap with no verdict.
     //
     // ⚠️ DO NOT PICK A CHEAP SCRIPT BY ITS LINE COUNT. Measured 2026-09-12: `verify-stage-rail-dots.mjs` (66 lines) runs in 2.4s, and
     // `verify-unscoped-prov.mjs` — FOUR LINES SHORTER — takes 125.7s, because a
@@ -588,7 +592,7 @@ function runOne(job) {
         ...inherited,
         ...(proxied ? proxiedEnv() : {}),
         BASE,
-        ...(FIXTURES ? { ONLY: FIXTURES } : {}),
+        ...(FIXTURES ? { [SPLIT[file]?.env ?? "ONLY"]: FIXTURES } : {}),
         ...job.env,
       },
       stdio: ["ignore", "pipe", "pipe"],
