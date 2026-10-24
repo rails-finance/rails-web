@@ -562,6 +562,24 @@ const GLYPHS: Record<string, Glyph> = {
       },
     ],
   },
+  // Route: the placeholder a swap or bridge route's bar draws until its
+  // product's glyph is added under the product's `BarSubject.icon` key
+  // (`ProtocolIcon`'s `fallback`). Two opposed arrows on Lucide's
+  // arrow-right-left lines, outlined at its 2-unit stroke with round caps and
+  // joins so they fill like the other glyphs. They span 19 of the 24 units;
+  // the inset brings them to the roster's band.
+  route: {
+    viewBox: "0 0 24 24",
+    inset: 0.06,
+    paths: [
+      {
+        d: "M4 6H17.586L15.293 3.707A1 1 0 0 1 16.707 2.293L20.707 6.293A1 1 0 0 1 20.707 7.707L16.707 11.707A1 1 0 0 1 15.293 10.293L17.586 8H4A1 1 0 0 1 4 6Z",
+      },
+      {
+        d: "M20 18H6.414L8.707 20.293A1 1 0 0 1 7.293 21.707L3.293 17.707A1 1 0 0 1 3.293 16.293L7.293 12.293A1 1 0 0 1 8.707 13.707L6.414 16H20A1 1 0 0 1 20 18Z",
+      },
+    ],
+  },
   // Safe: the account kind's mark in the wallet heading, in place of a Lucide
   // icon, so its trim matches Lucide's 2-unit margin in a 24 box.
   safe: {
@@ -594,9 +612,21 @@ export function protocolGlyph(id: string): Glyph | undefined {
 
 /** The monochrome glyph when one exists, else the colour PNG — the glyph-or-img
  *  fallback pattern, packaged so surfaces don't
- *  each re-implement it. `id` is the `protocols.ts` id / glyph key. */
-export function ProtocolIcon({ id, className = "" }: { id: string; className?: string }): ReactNode {
+ *  each re-implement it. `id` is the `protocols.ts` id / glyph key. A
+ *  `fallback` glyph key draws in place of the PNG where `id` has no glyph:
+ *  the timeline bar passes `route`, so a product without its glyph yet still
+ *  draws a monochrome mark. */
+export function ProtocolIcon({
+  id,
+  className = "",
+  fallback,
+}: {
+  id: string;
+  className?: string;
+  fallback?: string;
+}): ReactNode {
   if (hasProtocolGlyph(id)) return <ProtocolGlyph id={id} className={className} />;
+  if (fallback && hasProtocolGlyph(fallback)) return <ProtocolGlyph id={fallback} className={className} />;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={protocolIconSrc(id)} alt="" className={`${className} rounded-[3px]`} />;
 }

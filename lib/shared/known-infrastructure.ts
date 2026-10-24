@@ -1,6 +1,6 @@
 import { isAddress } from "viem";
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
-import { barOwnerOf } from "@/lib/shared/bar-owners";
+import { barOwnerOf, RELAY_BAR, ZEROX_BAR } from "@/lib/shared/bar-owners";
 
 /**
  * Known contracts that are not positions, keyed by CHAIN and address. Two
@@ -170,7 +170,9 @@ import { barOwnerOf } from "@/lib/shared/bar-owners";
  *     DZapZapCore 0xce25…6ba4; LI.FI's `deployments/base.json` for LiFiDiamond.
  *     growthepie names Relay for RelayRouterV3 on Ethereum and Arbitrum; its
  *     Base row names no owner and relay-periphery's v3 addresses list another
- *     router, so Base 0xb92f…ff4f is a role.
+ *     router, so Base 0xb92f…ff4f is a role. Relay's docs' contract
+ *     addresses list it and RelayRouter 0xf504…e222 (24 Oct 2026); the bar
+ *     states Relay from them (`bar-owners.ts`) and the display keeps the role.
  *   • Owner unstated, so the display is the role: FLAction, FLBalancer,
  *     OperationExecutor, ZapperExecutor, MulticallRouter, VaultDepositooorV2,
  *     AutoRepayingManager, Deposit, App, LeveragedPosition, AaveAdaptor,
@@ -272,12 +274,17 @@ export interface ProtocolContract extends KnownContractBase {
 export interface BarSubject {
   name: string;
   /** Key in `components/icons/protocol-glyphs.tsx`; a subject with no glyph
-   *  there draws `public/icons/protocols/<icon>.png`. */
+   *  there draws `public/icons/protocols/<icon>.png`, or the `route` glyph
+   *  where it is `shared`. */
   icon: string;
-  hue: number;
-  /** Many apps send transactions to this contract (an aggregator's router):
-   *  the bar's receipt says so. */
-  shared?: boolean;
+  /** `null` where the product's mark is monochrome or many-coloured: the
+   *  stretch is drawn grey, as a position card with no hue is. */
+  hue: number | null;
+  /** A route many wallets and apps send transactions through (a swap or
+   *  bridge aggregator's router, CoW's batch settlement): the bar's receipt
+   *  says so in one sentence, and a subject without its glyph draws the
+   *  `route` placeholder. The value picks the sentence. */
+  shared?: "swap" | "swap-bridge" | "batch";
   /** The product has deactivated its app; its contracts stay on chain. Historic
    *  rows keep the product's bar and mark, since the action was done there; the
    *  bar's receipt says so in one sentence, and the header's manager chip reads
@@ -290,6 +297,60 @@ export interface BarSubject {
  *  hue. The router's `protocolIcon` chip draws `zerion.png` (zerion.io's
  *  `favicon-mark.png`). */
 const ZERION_BAR: BarSubject = { name: "Zerion", icon: "zerion", hue: 264 };
+
+/** Swap and bridge routes (rails-ops TO-DO-ui-jobs 439, ruled 24 Oct 2026): a
+ *  route's entry contract takes the route's bar, under the same rule as every
+ *  entry contract, with the weak case in the receipt. Owners as "Evidence"
+ *  above states them; a role-only entry takes no bar. `icon` is keyed by
+ *  product so its glyph drops in under that key; until then the bar draws the
+ *  `route` glyph. Each hue is the oklch hue of the product's mark as its
+ *  official site serves it (read 24 Oct 2026); `null` where the mark is
+ *  monochrome or many-coloured. */
+// 0x and Relay are stated in bar-owners.ts, which also holds their entry
+// contracts outside the registry.
+// LI.FI: hue 322 read off li.fi's favicon, #F7C2FF.
+const LIFI_BAR: BarSubject = { name: "LI.FI", icon: "lifi", hue: 322, shared: "swap-bridge" };
+// 1inch: 1inch.com's favicon.svg, black and white.
+const ONEINCH_BAR: BarSubject = { name: "1inch", icon: "1inch", hue: null, shared: "swap" };
+// Odos: odos.xyz's favicon, a dark mark.
+const ODOS_BAR: BarSubject = { name: "Odos", icon: "odos", hue: null, shared: "swap" };
+// Enso: enso.build's favicon, black and white.
+const ENSO_BAR: BarSubject = { name: "Enso", icon: "enso", hue: null, shared: "swap" };
+// Magpie: hue 290 read off magpiefi.xyz's webclip, #7138EB.
+const MAGPIE_BAR: BarSubject = { name: "Magpie", icon: "magpie", hue: 290, shared: "swap" };
+// DZap: hue 128 read off dzap.io's favicon, #7AA043.
+const DZAP_BAR: BarSubject = { name: "DZap", icon: "dzap", hue: 128, shared: "swap-bridge" };
+// Portals: hue 287 read off portals.fi's favicon, #6B1AFD.
+const PORTALS_BAR: BarSubject = { name: "Portals", icon: "portals", hue: 287, shared: "swap" };
+// ParaSwap: hue 50 read off velora.xyz's favicon (ParaSwap is now Velora), the
+// gradient #FF9900 to #FF6B3B.
+const PARASWAP_BAR: BarSubject = { name: "ParaSwap", icon: "paraswap", hue: 50, shared: "swap" };
+// Uniswap: hue 3 read off the app icon uniswap.org serves, #FE518E.
+const UNISWAP_BAR: BarSubject = { name: "Uniswap", icon: "uniswap", hue: 3, shared: "swap" };
+// Sushi: hue 351 read off sushi.com's favicon, #EB59A5.
+const SUSHI_BAR: BarSubject = { name: "Sushi", icon: "sushi", hue: 351, shared: "swap" };
+// Socket: hue 148 read off socket.tech's favicon, #38E767.
+const SOCKET_BAR: BarSubject = { name: "Socket", icon: "socket", hue: 148, shared: "swap-bridge" };
+// Mayan: mayan.finance's favicon, black and white.
+const MAYAN_BAR: BarSubject = { name: "Mayan", icon: "mayan", hue: null, shared: "swap-bridge" };
+// Rango: rango.exchange answers every read with a bot challenge, so no mark
+// was read; grey until one is.
+const RANGO_BAR: BarSubject = { name: "Rango", icon: "rango", hue: null, shared: "swap-bridge" };
+// Rainbow: rainbow.me's favicon, the many-coloured arc.
+const RAINBOW_BAR: BarSubject = { name: "Rainbow", icon: "rainbow", hue: null, shared: "swap" };
+// OKX: hue 130 read off web3.okx.com's icon, #B0FB4D.
+const OKX_BAR: BarSubject = { name: "OKX", icon: "okx", hue: 130, shared: "swap" };
+// Oku: hue 262 read off oku.trade's mark, #1561EF.
+const OKU_BAR: BarSubject = { name: "Oku", icon: "oku", hue: 262, shared: "swap" };
+// Eisen: hue 284 read off eisenfinance.com's favicon.svg, #A9A7FF.
+const EISEN_BAR: BarSubject = { name: "Eisen", icon: "eisen", hue: 284, shared: "swap" };
+// Pendle: hue 260 read off pendle.finance's favicon, #1A2E4F.
+const PENDLE_BAR: BarSubject = { name: "Pendle", icon: "pendle", hue: 260, shared: "swap" };
+// Curve: curve.finance's icon, the many-coloured ring.
+const CURVE_BAR: BarSubject = { name: "Curve", icon: "curve", hue: null, shared: "swap" };
+// CoW Protocol: cow.fi's favicon, black and white. Solvers send the
+// transactions that enter its settlement.
+const COW_BAR: BarSubject = { name: "CoW Protocol", icon: "cow", hue: null, shared: "batch" };
 
 export type KnownInfrastructure = CcipEscrow | ProtocolContract;
 
@@ -310,6 +371,7 @@ const COW: ProtocolContract = {
   contractName: "GPv2Settlement",
   protocolIcon: "cow",
   role: "CoW Protocol’s settlement contract, which takes in the tokens a CoW trade sells and pays out the tokens it buys",
+  bar: COW_BAR,
 };
 const WETH_GATEWAY: ProtocolContract = {
   name: "WETH gateway",
@@ -397,6 +459,7 @@ const ENSO: ProtocolContract = {
   kind: "router",
   contractName: "EnsoShortcuts",
   role: "Enso’s shortcuts contract, which runs a batch of DeFi actions in one transaction",
+  bar: ENSO_BAR,
 };
 
 const distributor = (name: string, contractName: string, role: string): ProtocolContract => ({
@@ -440,13 +503,15 @@ const VAULT_REWARDS_MODULE = distributor(
   "a vault’s rewards module, which claims reward tokens, swaps them and sweeps the proceeds into the vault",
 );
 
-const zeroExSettler = (contractName: string) =>
-  known(
+const zeroExSettler = (contractName: string): ProtocolContract => ({
+  ...known(
     "settlement",
     "0x Settler",
     contractName,
     "0x’s Settler, which takes in the tokens a 0x swap sells and pays out the tokens it buys",
-  );
+  ),
+  bar: ZEROX_BAR,
+});
 const oneInchFusion = (contractName: string) =>
   known(
     "settlement",
@@ -509,88 +574,113 @@ const LEFTOVER_EXCHANGER = known(
   "a leftover exchanger, which sells the dust left over from a filled order",
 );
 
-const LIFI_PERMIT2_PROXY = known(
-  "router",
-  "LI.FI Permit2 proxy",
-  "Permit2Proxy",
-  "LI.FI’s Permit2 proxy, which takes a wallet’s tokens under a Permit2 signature and passes them to LI.FI’s diamond for a swap or a bridge",
-);
-const LIFI_DEX_AGGREGATOR = known(
-  "router",
-  "LI.FI DEX aggregator",
-  "LiFiDEXAggregator",
-  "LI.FI’s DEX aggregator, which routes a swap across other trading venues",
-);
-const LIFI_EXECUTOR = known(
-  "router",
-  "LI.FI executor",
-  "Executor",
-  "LI.FI’s executor, which runs the calls of a LI.FI cross-chain swap",
-);
-const DZAP_DIAMOND = known(
-  "router",
-  "DZap",
-  "DZapDiamond",
-  "DZap’s diamond, which routes a swap or a bridge across other venues",
-);
-const RANGO_DIAMOND = known(
-  "router",
-  "Rango",
-  "RangoDiamond",
-  "Rango’s diamond, which routes a swap or a bridge across other venues",
-);
-const SOCKET_GATEWAY = known(
-  "router",
-  "Socket gateway",
-  "SocketGateway",
-  "Socket’s gateway, which routes a bridge or a swap through Socket’s liquidity layer",
-);
-const MAGPIE_V3_1 = router("Magpie router", "MagpieRouterV3_1", "Magpie’s");
-const UNISWAP_UNIVERSAL_ROUTER = known(
-  "router",
-  "Uniswap Universal Router",
-  "UniversalRouter",
-  "Uniswap’s Universal Router, which routes a swap across Uniswap pools",
-  "uniswap",
-);
+const LIFI_PERMIT2_PROXY: ProtocolContract = {
+  ...known(
+    "router",
+    "LI.FI Permit2 proxy",
+    "Permit2Proxy",
+    "LI.FI’s Permit2 proxy, which takes a wallet’s tokens under a Permit2 signature and passes them to LI.FI’s diamond for a swap or a bridge",
+  ),
+  bar: LIFI_BAR,
+};
+const LIFI_DEX_AGGREGATOR: ProtocolContract = {
+  ...known(
+    "router",
+    "LI.FI DEX aggregator",
+    "LiFiDEXAggregator",
+    "LI.FI’s DEX aggregator, which routes a swap across other trading venues",
+  ),
+  bar: LIFI_BAR,
+};
+const LIFI_EXECUTOR: ProtocolContract = {
+  ...known(
+    "router",
+    "LI.FI executor",
+    "Executor",
+    "LI.FI’s executor, which runs the calls of a LI.FI cross-chain swap",
+  ),
+  bar: LIFI_BAR,
+};
+const DZAP_DIAMOND: ProtocolContract = {
+  ...known("router", "DZap", "DZapDiamond", "DZap’s diamond, which routes a swap or a bridge across other venues"),
+  bar: DZAP_BAR,
+};
+const RANGO_DIAMOND: ProtocolContract = {
+  ...known("router", "Rango", "RangoDiamond", "Rango’s diamond, which routes a swap or a bridge across other venues"),
+  bar: RANGO_BAR,
+};
+const SOCKET_GATEWAY: ProtocolContract = {
+  ...known(
+    "router",
+    "Socket gateway",
+    "SocketGateway",
+    "Socket’s gateway, which routes a bridge or a swap through Socket’s liquidity layer",
+  ),
+  bar: SOCKET_BAR,
+};
+const MAGPIE_V3_1: ProtocolContract = { ...router("Magpie router", "MagpieRouterV3_1", "Magpie’s"), bar: MAGPIE_BAR };
+const UNISWAP_UNIVERSAL_ROUTER: ProtocolContract = {
+  ...known(
+    "router",
+    "Uniswap Universal Router",
+    "UniversalRouter",
+    "Uniswap’s Universal Router, which routes a swap across Uniswap pools",
+    "uniswap",
+  ),
+  bar: UNISWAP_BAR,
+};
 const UNIVERSAL_ROUTER_UNLABELLED = known(
   "router",
   "Swap router",
   "UniversalRouter",
   "a Universal Router deployment, which routes a swap across trading venues",
 );
-const sushiRouteProcessor = (contractName: string) =>
-  known(
+const sushiRouteProcessor = (contractName: string): ProtocolContract => ({
+  ...known(
     "router",
     "Sushi route processor",
     contractName,
     "Sushi’s route processor, which routes a swap across other trading venues",
-  );
-const EISEN_FORWARDER = known(
-  "router",
-  "Eisen forwarder",
-  "Forwarder",
-  "Eisen’s forwarder, which passes a swap to Eisen’s diamond router",
-);
-const OKU_ROUTER = known(
-  "router",
-  "Oku router",
-  "OkuRouter",
-  "Oku’s swap aggregator, which routes a swap across other trading venues",
-);
-const RAINBOW_ROUTER = known(
-  "router",
-  "Rainbow router",
-  "RainbowRouter",
-  "Rainbow’s swap aggregator, which routes a swap across other trading venues",
-);
-const CURVE_ROUTER = known(
-  "router",
-  "Curve router",
-  "CurveRouterSidechain v1.1",
-  "Curve’s router, which routes a swap across Curve pools",
-  "curve",
-);
+  ),
+  bar: SUSHI_BAR,
+});
+const EISEN_FORWARDER: ProtocolContract = {
+  ...known(
+    "router",
+    "Eisen forwarder",
+    "Forwarder",
+    "Eisen’s forwarder, which passes a swap to Eisen’s diamond router",
+  ),
+  bar: EISEN_BAR,
+};
+const OKU_ROUTER: ProtocolContract = {
+  ...known(
+    "router",
+    "Oku router",
+    "OkuRouter",
+    "Oku’s swap aggregator, which routes a swap across other trading venues",
+  ),
+  bar: OKU_BAR,
+};
+const RAINBOW_ROUTER: ProtocolContract = {
+  ...known(
+    "router",
+    "Rainbow router",
+    "RainbowRouter",
+    "Rainbow’s swap aggregator, which routes a swap across other trading venues",
+  ),
+  bar: RAINBOW_BAR,
+};
+const CURVE_ROUTER: ProtocolContract = {
+  ...known(
+    "router",
+    "Curve router",
+    "CurveRouterSidechain v1.1",
+    "Curve’s router, which routes a swap across Curve pools",
+    "curve",
+  ),
+  bar: CURVE_BAR,
+};
 const PENDLE_SWAP: ProtocolContract = {
   ...known(
     "router",
@@ -600,6 +690,7 @@ const PENDLE_SWAP: ProtocolContract = {
     "pendle",
   ),
   proxyContractName: "ERC1967Proxy",
+  bar: PENDLE_BAR,
 };
 const SWAP_AGGREGATOR_HELPER = known(
   "router",
@@ -607,12 +698,15 @@ const SWAP_AGGREGATOR_HELPER = known(
   "PendleSwap",
   "a swap aggregator helper, which routes the token leg of a trade through an aggregator",
 );
-const MAYAN_SWIFT = known(
-  "router",
-  "Mayan Swift",
-  "MayanSwift",
-  "Mayan’s Swift bridge contract, which takes in the tokens of a cross-chain order and releases them on the other side",
-);
+const MAYAN_SWIFT: ProtocolContract = {
+  ...known(
+    "router",
+    "Mayan Swift",
+    "MayanSwift",
+    "Mayan’s Swift bridge contract, which takes in the tokens of a cross-chain order and releases them on the other side",
+  ),
+  bar: MAYAN_BAR,
+};
 const SWIFT_DEST = known(
   "router",
   "Cross-chain order contract",
@@ -983,12 +1077,15 @@ const DELEVERAGE_CONNECTOR = known(
 );
 const wethGateway = (contractName: string): ProtocolContract => ({ ...WETH_GATEWAY, contractName });
 
-const PORTALS_MULTICALL = known(
-  "multicall",
-  "Portals multicall",
-  "PortalsMulticall",
-  "Portals’ multicall contract, which bundles the calls of a Portals zap into one transaction",
-);
+const PORTALS_MULTICALL: ProtocolContract = {
+  ...known(
+    "multicall",
+    "Portals multicall",
+    "PortalsMulticall",
+    "Portals’ multicall contract, which bundles the calls of a Portals zap into one transaction",
+  ),
+  bar: PORTALS_BAR,
+};
 const ZAP_EXECUTOR = known(
   "multicall",
   "Zap executor",
@@ -1002,30 +1099,34 @@ const CALL_CHAIN_MULTICALL = known(
   "a multicall router, which chains calls on several contracts in one transaction",
 );
 
-const LIFI_DIAMOND = known(
-  "router",
-  "LI.FI",
-  "LiFiDiamond",
-  "LI.FI’s diamond, which routes a swap or a bridge across other venues",
-);
-const RELAY_ROUTER_V3 = known(
-  "router",
-  "Relay router",
-  "RelayRouterV3",
-  "Relay’s router, which runs the calls of a Relay swap or bridge and passes the output on",
-);
+const LIFI_DIAMOND: ProtocolContract = {
+  ...known("router", "LI.FI", "LiFiDiamond", "LI.FI’s diamond, which routes a swap or a bridge across other venues"),
+  bar: LIFI_BAR,
+};
+const RELAY_ROUTER_V3: ProtocolContract = {
+  ...known(
+    "router",
+    "Relay router",
+    "RelayRouterV3",
+    "Relay’s router, which runs the calls of a Relay swap or bridge and passes the output on",
+  ),
+  bar: RELAY_BAR,
+};
 const VAULT_DEPOSIT_ROUTER = known(
   "router",
   "Vault deposit router",
   "VaultDepositooorV2",
   "a vault-deposit router, which deposits a wallet’s tokens into a registered vault in one call",
 );
-const DZAP_ZAP = known(
-  "router",
-  "DZap zap",
-  "DZapZapCore",
-  "DZap’s zap contract, which runs a swap-and-deposit across protocols in one transaction",
-);
+const DZAP_ZAP: ProtocolContract = {
+  ...known(
+    "router",
+    "DZap zap",
+    "DZapZapCore",
+    "DZap’s zap contract, which runs a swap-and-deposit across protocols in one transaction",
+  ),
+  bar: DZAP_BAR,
+};
 
 const BALANCER_FEE_BURNER = known(
   "settlement",
@@ -1138,7 +1239,11 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [MAINNET_CHAIN_ID, "0x33c1eef370bbb447414156cfc4fdabd434776eaf", ZEROXBOW_ZAP],
   [MAINNET_CHAIN_ID, "0x98ccb155e86bb478d514a827d16f58c6912f9bdc", MORPHO_MIGRATION_BUNDLER],
   [MAINNET_CHAIN_ID, "0xd78d199f8c402e7b5cc2abe278df0412400a3bae", SWIFT_DEST],
-  [MAINNET_CHAIN_ID, "0x8feab81d36e7576107d5de0758c1b839be31b4f6", router("OKX DEX router", "DexRouter", "OKX’s DEX")],
+  [
+    MAINNET_CHAIN_ID,
+    "0x8feab81d36e7576107d5de0758c1b839be31b4f6",
+    { ...router("OKX DEX router", "DexRouter", "OKX’s DEX"), bar: OKX_BAR },
+  ],
   [MAINNET_CHAIN_ID, "0x7e1064c62f7118cdcd7d9248e4b741169d3e234e", AAVE_ADAPTER],
   [MAINNET_CHAIN_ID, "0xeb8094c169bf5d365ec1ae76ab4a5fa61345caaf", AAVE_ADAPTER],
   [MAINNET_CHAIN_ID, "0x9ffdde9a1686870cf619869a225eb1d0e20b53e6", AAVE_ADAPTER],
@@ -1157,12 +1262,12 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [
     MAINNET_CHAIN_ID,
     "0x3611b82c7b13e72b26eb0e9be0613bee7a45ac7c",
-    router("Magpie router", "MagpieRouterCore", "Magpie’s"),
+    { ...router("Magpie router", "MagpieRouterCore", "Magpie’s"), bar: MAGPIE_BAR },
   ],
   [
     MAINNET_CHAIN_ID,
     "0x111111125421ca6dc452d289314280a0f8842a65",
-    router("1inch router", "AggregationRouterV6", "1inch’s aggregation"),
+    { ...router("1inch router", "AggregationRouterV6", "1inch’s aggregation"), bar: ONEINCH_BAR },
   ],
   [MAINNET_CHAIN_ID, "0xe78c05c508405207ecc256781b9415e6de1c8336", flashLoanAction("FLAction")],
   [MAINNET_CHAIN_ID, "0x6cae28b3d09d8f8fc74ccd496ac986fc84c0c24e", CONTANGO],
@@ -1171,7 +1276,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [
     MAINNET_CHAIN_ID,
     "0x1111111254eeb25477b68fb85ed929f73a960582",
-    router("1inch router", "AggregationRouterV5", "1inch’s aggregation"),
+    { ...router("1inch router", "AggregationRouterV5", "1inch’s aggregation"), bar: ONEINCH_BAR },
   ],
   [MAINNET_CHAIN_ID, "0x4a6c312ec70e8747a587ee860a0353cd42be0ae0", morphoGeneralAdapter("EthereumGeneralAdapter1")],
   [MAINNET_CHAIN_ID, "0xc2b92b6c69e5c3b6b29385c1a17fee906e0ca910", flashLoanAction("FLAction")],
@@ -1180,7 +1285,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [
     MAINNET_CHAIN_ID,
     "0x15392211222b46a0ea85a9a800830486d144848d",
-    router("Magpie router", "MagpieRouterV3", "Magpie’s"),
+    { ...router("Magpie router", "MagpieRouterV3", "Magpie’s"), bar: MAGPIE_BAR },
   ],
   [MAINNET_CHAIN_ID, "0x7a0f3963c666d4549e5909a7162b560abf9f006d", flashLoanAction("FLAction")],
   [MAINNET_CHAIN_ID, "0x9cfb64d91ce4eb821ff8edc1c2fda2e89e256707", ENZYME_AAVE_V3_ADAPTER],
@@ -1190,7 +1295,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [
     MAINNET_CHAIN_ID,
     "0x6a000f20005980200259b80c5102003040001068",
-    router("ParaSwap router", "AugustusV6", "ParaSwap’s Augustus"),
+    { ...router("ParaSwap router", "AugustusV6", "ParaSwap’s Augustus"), bar: PARASWAP_BAR },
   ],
   [MAINNET_CHAIN_ID, "0x22ac12a6937bbbc0a301af9154d08ead95673122", AAVE_POOL_EXPOSURE_STEWARD],
   [MAINNET_CHAIN_ID, "0xc82e6bc89c64e627437a2caa475062694b8f4498", APP_CONTRACT],
@@ -1227,19 +1332,27 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [
     BASE_CHAIN_ID,
     "0x111111125421ca6dc452d289314280a0f8842a65",
-    router("1inch router", "AggregationRouterV6", "1inch’s aggregation"),
+    { ...router("1inch router", "AggregationRouterV6", "1inch’s aggregation"), bar: ONEINCH_BAR },
   ],
-  [BASE_CHAIN_ID, "0x19ceead7105607cd444f5ad10dd51356436095a1", router("Odos router", "OdosRouterV2", "Odos’s")],
+  [
+    BASE_CHAIN_ID,
+    "0x19ceead7105607cd444f5ad10dd51356436095a1",
+    { ...router("Odos router", "OdosRouterV2", "Odos’s"), bar: ODOS_BAR },
+  ],
   [
     BASE_CHAIN_ID,
     "0x43f9a7aec2a683c4cd6016f92ff76d5f3e7b44d3",
-    router("Magpie router", "MagpieRouterCore", "Magpie’s"),
+    { ...router("Magpie router", "MagpieRouterCore", "Magpie’s"), bar: MAGPIE_BAR },
   ],
-  [BASE_CHAIN_ID, "0x9ee06954418687c6fb3a9966f7c46e0a245f0183", router("Magpie router", "MagpieRouterV2", "Magpie’s")],
+  [
+    BASE_CHAIN_ID,
+    "0x9ee06954418687c6fb3a9966f7c46e0a245f0183",
+    { ...router("Magpie router", "MagpieRouterV2", "Magpie’s"), bar: MAGPIE_BAR },
+  ],
   [
     BASE_CHAIN_ID,
     "0x6a000f20005980200259b80c5102003040001068",
-    router("ParaSwap router", "AugustusV6", "ParaSwap’s Augustus"),
+    { ...router("ParaSwap router", "AugustusV6", "ParaSwap’s Augustus"), bar: PARASWAP_BAR },
   ],
   [
     BASE_CHAIN_ID,
@@ -1408,7 +1521,11 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [BASE_CHAIN_ID, "0xa43f2e6e8313b46ddcb9190ce856af0089320956", SWAP_AAVE_V3_ADAPTER],
   [BASE_CHAIN_ID, "0x498581ff718922c3f8e6a244956af099b2652b2b", UNISWAP_V4],
   [BASE_CHAIN_ID, "0x8c94cfc11a9340e45032e5021881cc312993bf15", underscoreAaveLego("LegoAaveV3")],
-  [BASE_CHAIN_ID, "0xef42f78d25f4c681dcad2597fa04877ff802ef4b", router("Magpie router", "MagpieRouterV3", "Magpie’s")],
+  [
+    BASE_CHAIN_ID,
+    "0xef42f78d25f4c681dcad2597fa04877ff802ef4b",
+    { ...router("Magpie router", "MagpieRouterV3", "Magpie’s"), bar: MAGPIE_BAR },
+  ],
   [BASE_CHAIN_ID, "0x6cae28b3d09d8f8fc74ccd496ac986fc84c0c24e", CONTANGO],
   [BASE_CHAIN_ID, "0x49bc51d8c140b7f64577ba01f5604014450645eb", SYNTHEREUM_LENDING_MANAGER],
   [BASE_CHAIN_ID, "0xb98c948cfa24072e58935bc004a8a7b376ae746a", morphoGeneralAdapter("GeneralAdapter1")],
@@ -1426,7 +1543,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [
     BASE_CHAIN_ID,
     "0x1111111254eeb25477b68fb85ed929f73a960582",
-    router("1inch router", "AggregationRouterV5", "1inch’s aggregation"),
+    { ...router("1inch router", "AggregationRouterV5", "1inch’s aggregation"), bar: ONEINCH_BAR },
   ],
   [BASE_CHAIN_ID, "0x87af4769e4134379125a262408e1f3ec60d2ab52", flashLoanAction("FLAction")],
   [BASE_CHAIN_ID, "0xeb7f1f4d0e57972df1ae73e3a76d6f7819588194", AUTO_REPAYING_MANAGER],
@@ -1439,7 +1556,11 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [BASE_CHAIN_ID, "0xf0f0f0f0fb0d738452efd03a28e8be14c76d5f73", ELFOMOFI],
   [BASE_CHAIN_ID, "0xda86b4c61a545a4b217746ba43c8157f0ec612c7", flashLoanAction("FLAction")],
   [BASE_CHAIN_ID, "0xd9a463ce7bfff3574c7aa60c14b91a6b7f507b2d", underscoreAaveLego("AaveV3")],
-  [BASE_CHAIN_ID, "0x0d05a7d3448512b78fa8a9e46c4872c88c4a0d05", router("Odos router", "OdosRouterV3", "Odos’s")],
+  [
+    BASE_CHAIN_ID,
+    "0x0d05a7d3448512b78fa8a9e46c4872c88c4a0d05",
+    { ...router("Odos router", "OdosRouterV3", "Odos’s"), bar: ODOS_BAR },
+  ],
   [BASE_CHAIN_ID, "0x4fbdd50fb2030e8439fc9a752d37e097def2fb07", SYNTHEREUM_LENDING_MANAGER],
   [BASE_CHAIN_ID, "0x01a3c8e513b758ebb011f7afaf6c37616c9c24d9", CALL_CHAIN_MULTICALL],
   [BASE_CHAIN_ID, "0x2d43e84567019d721f095cfd632291c3ee868d8f", OPERATION_EXECUTOR],

@@ -39,7 +39,9 @@
 //
 // Colour: a product has no roster entry, so its hue is the registry's
 // `bar.hue` (read off its mark), drawn through the same `--brand-zone-*` and
-// `--brand-edge-*` tokens as a protocol's, at the same weight.
+// `--brand-edge-*` tokens as a protocol's, at the same weight; a product whose
+// mark is monochrome (`hue: null`) draws grey. A route's subject without its
+// glyph yet draws the `route` glyph.
 
 import {
   createContext,
@@ -232,8 +234,8 @@ function SubjectStretches({
                 {
                   top: s.top,
                   height: s.bottom - s.top,
-                  "--brand-hue": s.subject.hue,
-                  "--brand-strength": 1,
+                  "--brand-hue": s.subject.hue ?? 0,
+                  "--brand-strength": s.subject.hue == null ? 0 : 1,
                 } as CSSProperties
               }
               data-anatomy="P3.1.1"
@@ -241,6 +243,7 @@ function SubjectStretches({
             >
               <ProtocolIcon
                 id={s.subject.icon}
+                fallback={s.subject.shared ? "route" : undefined}
                 className="absolute left-3 top-3 hidden h-4 w-4 text-brand-mark md:block [&:is(img)]:grayscale"
               />
             </span>

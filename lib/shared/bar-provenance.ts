@@ -39,9 +39,13 @@ export function barSubjectProv(args: {
         ? " through this Safe"
         : " through this account"
       : "";
-  const shared = subject.shared
-    ? " Many apps send their transactions to this contract; the bar names the contract the transaction entered."
-    : "";
+  // The weak case: a route many wallets and apps send through.
+  const shared =
+    subject.shared === "batch"
+      ? ` ${subject.name} settles signed orders in batches; a solver sent this transaction.`
+      : subject.shared
+        ? ` ${subject.name} is a ${subject.shared === "swap-bridge" ? "swap and bridge" : "swap"} route many wallets and apps quote from; the bar names the contract.`
+        : "";
   // "Summer.fi deactivated its app in 2026; the contract stays on chain."
   const closed = subject.closed
     ? ` ${subject.name} deactivated its app in ${subject.closed.since}; the contract stays on chain.`
@@ -80,7 +84,11 @@ export function barSubjectProv(args: {
             kind: "offchain" as const,
             pclass: "offchain" as const,
             note: `${owner.source} · \`${owner.contractName}\``,
-            verify: { kind: "link" as const, href: owner.href, text: "Confirm in the owner's deployments" },
+            verify: {
+              kind: "link" as const,
+              href: owner.href,
+              text: owner.hrefText ?? "Confirm in the owner's deployments",
+            },
           },
         ]
       : []),

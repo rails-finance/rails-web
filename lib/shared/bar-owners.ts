@@ -38,6 +38,24 @@
 // (lib/shared/account-managers.ts) and any later bar. Its deployments are
 // `Instadapp/dsa-contracts` `docs/addresses.json`. Mark: the `instadapp` glyph
 // (protocol-glyphs.tsx); the brand's blue #3F75FF gives oklch hue 265.
+//
+// 0x: AllowanceHolder 0x0000…2734, the contract a wallet sends a 0x swap to
+// when it approves a token rather than signing a Permit2 permit; 0x's docs
+// (FAQ, "Chain-specific AllowanceHolder addresses", read 24 Oct 2026) give it
+// for the Cancun chains, Ethereum, Base and Arbitrum among them. The Settlers
+// it calls are registry entries (known-infrastructure.ts, `zeroExSettler`).
+//
+// Relay: its docs' contract addresses (read 24 Oct 2026), the Cancun column:
+// the v2 Router 0xf504…e222, the v2 ApprovalProxy 0xbbbf…3d98 and the v3
+// Router 0xb92f…ff4f. The registry holds the two routers under their role
+// ("Multicall router") on the chains where no source it cites named Relay;
+// the bar states the owner from these docs and leaves the display alone.
+// ERC20Router 0xeeee…60ee is not on the page and keeps its role.
+//
+// Both are routes many wallets and apps send through (`shared`), so the bar
+// draws the `route` glyph until their own are added under `0x` and `relay`.
+// 0x's mark on 0x.org's favicon is black, so its stretch is grey; Relay's
+// favicon on relay.link is #4717C8, oklch hue 282.
 
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { BarSubject } from "@/lib/shared/known-infrastructure";
@@ -54,6 +72,23 @@ export const SUMMER_FI_BAR: BarSubject = {
 };
 
 export const INSTADAPP_BAR: BarSubject = { name: "Instadapp", icon: "instadapp", hue: 265 };
+
+export const ZEROX_BAR: BarSubject = { name: "0x", icon: "0x", hue: null, shared: "swap" };
+export const RELAY_BAR: BarSubject = { name: "Relay", icon: "relay", hue: 282, shared: "swap-bridge" };
+
+const CHAINS: ChainId[] = [MAINNET_CHAIN_ID, BASE_CHAIN_ID, ARBITRUM_CHAIN_ID];
+const ZEROX_ALLOWANCE_HOLDER = "0x0000000000001ff3684f28c67538d4d072c22734";
+const RELAY: [ChainId, string, string, string][] = [
+  ...CHAINS.map((c): [ChainId, string, string, string] => [
+    c,
+    "0xbbbfd134e9b44bfb5123898ba36b01de7ab93d98",
+    "ApprovalProxy",
+    "approval proxy",
+  ]),
+  [MAINNET_CHAIN_ID, "0xf5042e6ffac5a625d4e7848e0b01373d8eb9e222", "RelayRouter", "router"],
+  [BASE_CHAIN_ID, "0xf5042e6ffac5a625d4e7848e0b01373d8eb9e222", "RelayRouter", "router"],
+  [BASE_CHAIN_ID, "0xb92fe925dc43a0ecde6c8b1a2709c170ec4fff4f", "RelayRouterV3", "router"],
+];
 
 const SUMMER_FI: [ChainId, string][] = [
   [MAINNET_CHAIN_ID, "0xca71c36d26f515ad0cce1d806b231cbc1185cdfc"],
@@ -196,6 +231,9 @@ export interface BarOwner {
   source: string;
   /** The owner's deployments, the name leaf's link. */
   href: string;
+  /** The link's words, where the owner states the address on a docs page
+   *  rather than in a deployments repo. */
+  hrefText?: string;
 }
 
 const OWNERS = new Map<string, BarOwner>();
@@ -219,6 +257,25 @@ for (const [chainId, address] of SUMMER_FI)
     role: "operation executor",
     source: "Summer.fi's deployments (oasis-earn-sc, packages/deploy-configurations/configs/)",
     href: "https://github.com/OasisDEX/oasis-earn-sc/tree/dev/packages/deploy-configurations/configs",
+  });
+
+for (const chainId of CHAINS)
+  add(chainId, ZEROX_ALLOWANCE_HOLDER, {
+    subject: ZEROX_BAR,
+    contractName: "AllowanceHolder",
+    role: "AllowanceHolder",
+    source: "0x's docs (FAQ, chain-specific AllowanceHolder addresses)",
+    href: "https://docs.0x.org/docs/introduction/faq",
+    hrefText: "Confirm in the owner's docs",
+  });
+for (const [chainId, address, contractName, role] of RELAY)
+  add(chainId, address, {
+    subject: RELAY_BAR,
+    contractName,
+    role,
+    source: "Relay's docs (contract addresses)",
+    href: "https://docs.relay.link/references/api/api_resources/contract-addresses",
+    hrefText: "Confirm in the owner's docs",
   });
 
 export function barOwnerOf(address: string | null | undefined, chainId: ChainId): BarOwner | undefined {
