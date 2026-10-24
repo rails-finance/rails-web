@@ -25,6 +25,9 @@ const TIMELINE_GAP_MS = 400;
 const REQUEST_TIMEOUT_MS = 180_000;
 
 let nextTimelineAt = 0;
+/** Requests sent to the hosts this run, and how many the Firewall rule counts. */
+const sent = { all: 0, timeline: 0 };
+export const requestsSent = () => ({ ...sent });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function countedByTimelineRule(u) {
@@ -55,9 +58,16 @@ globalThis.fetch = async function gateFetch(input, init) {
   const ctx = store.getStore();
   if (!ctx) return realFetch(input, init);
   const u = new URL(urlOf(input), ctx.base);
+  if (ctx.capture) {
+    // captureUrls: note the path and send nothing.
+    ctx.capture.push(u.pathname + u.search);
+    return new Response("{}", { status: 599 });
+  }
   const url = u.href;
   const counted = countedByTimelineRule(u);
   if (counted) await paceTimeline();
+  sent.all++;
+  if (counted) sent.timeline++;
   const started = Date.now();
   let res;
   try {
@@ -65,6 +75,8 @@ globalThis.fetch = async function gateFetch(input, init) {
     if (counted && (res.status === 429 || res.status === 403) && res.headers.get("x-vercel-mitigated")) {
       console.error(`  (the Vercel Firewall refused ${u.pathname}; waiting 61 s to retry)`);
       await sleep(61_000);
+      sent.all++;
+      sent.timeline++;
       res = await send(url, init);
     }
   } catch (err) {
@@ -81,6 +93,24 @@ export async function onHost(base, fn) {
   const ctx = { base: base.replace(/\/$/, "") + "/", requests: [] };
   const value = await store.run(ctx, fn);
   return { value, requests: ctx.requests };
+}
+
+/** The paths the app's own fetch helpers request, without requesting them:
+ *  `fn` returns the helper calls' promises; every fetch they make is noted and
+ *  answered 599, so each helper fails once it has built its URL. A route map
+ *  built this way takes the query the page sends from the code that sends it.
+ *  Throws when nothing was requested (a helper renamed under the map). */
+export async function captureUrls(fn) {
+  const ctx = { base: "https://capture.invalid/", requests: [], capture: [] };
+  await store.run(ctx, async () => {
+    try {
+      await Promise.allSettled([].concat(await fn()));
+    } catch {
+      // A helper that throws before it fetches leaves nothing to note.
+    }
+  });
+  if (ctx.capture.length === 0) throw new Error("the route map's helpers requested nothing");
+  return ctx.capture;
 }
 
 /** GET a path on the current host as JSON; null on a non-2xx answer. */

@@ -34,6 +34,8 @@ export const LIVE_SECTIONS = [
   "## Headlines", // Liquity V2 and the Aave family: the live overlay's debt, collateral, CR, HF, prices
   "## Economics", // Liquity V2: interest cost off the live recorded debt and rate
   "## Reserve rates", // Aave family: the Pool's rates and utilisation at the head
+  "## Position", // the Liquity forks: the Trove's entire debt and collateral, read at the head where taken
+  "## Live risk", // the Liquity forks: price, ratio, the branch's total debt and ratio at the head
 ];
 export const LIVE_LINE_PATTERNS = [
   /\btoday\b/i, // a "today" line is read against today's price
@@ -63,10 +65,31 @@ export const HEAD_LINE_PATTERNS = [
 export const JSON_DROPPED_PATHS = [
   // The head each host read at.
   { re: /^(timeline\.)?block(Number|Timestamp)$/, why: "the head block the read was pinned to" },
-  { re: /(^|\.)(fetchedAt|generatedAt|servedAt|cachedAt|asOf)$/, why: "the time of the read" },
+  {
+    re: /(^|\.)(fetchedAt|generatedAt|servedAt|cachedAt|asOf|readAt|measuredAt|refreshed_at)$/,
+    why: "the time of the read",
+  },
+  {
+    re: /(^|\.)oldestPriceFetchedAt$/,
+    why: "when rails-server's price cache read the oldest price behind an Aave V4 spoke-positions row",
+  },
+  {
+    re: /(^|\.)ltBlock$/,
+    why: "the head block the Aave V4 hubs route read the liquidation thresholds at",
+  },
+  {
+    re: /(^|\.)accruedToTreasury$/,
+    why: "a reserve's treasury accrual: grows every block and resets at each mintToTreasury, so two reads seconds apart differ by more than the tolerance",
+  },
+  {
+    re: /^gap$/,
+    why: "a vault's totalAssets less its allocated sum at the head: the difference of two live reads, which a small move in either swings past the tolerance",
+  },
+  { re: /^data\.cache$/, why: "rails-server's state cache answering this request (miss / fresh)" },
   { re: /^timeline\.reconcile\.(toBlock|lane|refetched|refetchDiffered)$/, why: "the read's own span and RPC lane" },
   { re: /^timeline\.history$/, why: "the cache state: how much of the history this request read from the store" },
   { re: /^lanes$/, why: "which RPC lane served the read" },
+  { re: /(^|\.)(ms|serverMs)$/, why: "how long the read took (the wallet route's timings)" },
   {
     re: /^censusBlock$/,
     why: "the block of the served vault roster each deployment has cached (lib/morpho-base/vault-roster.ts)",
@@ -158,6 +181,73 @@ export function normaliseMarkdownPair(a, b, { origins, dropLines = [[], []], hea
   }
   return [la.map((l) => l.line), lb.map((l) => l.line)];
 }
+
+/** Routes whose figures are read at the head, so two hosts asked seconds
+ *  apart read different blocks: every number outside their event rows is a
+ *  live value, compared within LIVE_TOLERANCE. Every other route serves stored
+ *  rows and is compared exactly. */
+export const LIVE_ROUTES = [
+  { re: /^\/api\/chain\//, why: "the chain overlays read the contracts at the head" },
+  { re: /^\/api\/fx\/position\/[^/]+\/[^/]+\/drift/, why: "fx's drift read: the position's debt ratio at the head" },
+  {
+    re: /^\/api\/fx\/(positions\?|stats$|position\/[^/]+\/[^/]+\/timeline)/,
+    why: "the fx listing, pool stats and timeline carry rails-server's drift snapshot, refreshed every five minutes",
+  },
+  {
+    re: /^\/api\/vaults\/positions\?/,
+    why: "the vault listing's live overlay: shares and claims read at one head block",
+  },
+  {
+    re: /^\/api\/sky-savings\/positions\?/,
+    why: "Sky Savings rows are stated at rails-server's sealed block, which moves every few blocks",
+  },
+];
+export const isLiveRoute = (route) => LIVE_ROUTES.some((r) => r.re.test(route));
+
+/** `b` with each number that sits at the same place in `a` and agrees with it
+ *  within LIVE_TOLERANCE replaced by `a`'s, so the pair prints the same. */
+export function settleLiveNumbers(a, b, key = "") {
+  if (typeof a === "number" && typeof b === "number")
+    return Math.abs(a - b) <= LIVE_TOLERANCE * Math.max(Math.abs(a), Math.abs(b)) ? a : b;
+  // A raw on-chain amount travels as a decimal string ("raw", "…Raw", an
+  // oracle "answer"); an id in one (a Trove id, a token id) is compared exactly.
+  if (typeof a === "string" && typeof b === "string" && !ID_KEY.test(key) && DECIMAL.test(a) && DECIMAL.test(b))
+    return settleLiveNumbers(Number(a), Number(b)) === Number(a) ? a : b;
+  if (Array.isArray(a) && Array.isArray(b))
+    return b.map((y, i) => (i < a.length ? settleLiveNumbers(a[i], y, key) : y));
+  if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b))
+    return Object.fromEntries(
+      Object.entries(b).map(([k, y]) => [
+        k,
+        k in a && !(HISTORY_KEYS.has(k) && typeof y === "object") ? settleLiveNumbers(a[k], y, k) : y,
+      ]),
+    );
+  return b;
+}
+
+/** `b` with its listing rows (`data`) in `a`'s order, when the two pages hold
+ *  the same rows and differ only in order: rails-server breaks a tie on the
+ *  sort key (two positions last active in one block) differently from one
+ *  request to the next, and both hosts proxy the same backend. */
+export function settleRowOrder(a, b) {
+  if (!Array.isArray(a?.data) || !Array.isArray(b?.data) || a.data.length !== b.data.length) return b;
+  const key = (r) => JSON.stringify(r);
+  const left = new Map();
+  for (const r of b.data) left.set(key(r), (left.get(key(r)) ?? 0) + 1);
+  for (const r of a.data) {
+    const n = left.get(key(r));
+    if (!n) return b;
+    left.set(key(r), n - 1);
+  }
+  return { ...b, data: a.data };
+}
+
+/** The event rows a chain route carries beside its live read (a vault
+ *  holder's history, a sweep's timeline): historical, compared exactly. A
+ *  number under the same name (a listing row's event count) is live. */
+const HISTORY_KEYS = new Set(["events", "timeline"]);
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+const ID_KEY = /(^id|Id|Ids|^nft|Nft)$/;
 
 /** One route's JSON with the dropped paths removed and the host origins
  *  written out, keys sorted, pretty-printed one value per line. */

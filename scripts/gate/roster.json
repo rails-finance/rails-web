@@ -1,66 +1,2506 @@
 [
   {
-    "page": "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+    "page": "/ethereum/aave-v3",
     "chain": "ethereum",
-    "protocol": "liquity-v2",
-    "state": "open",
-    "picked_for": "batch rate changes, 134 redemptions, a withdrawal between them: the live headlines and a long table",
-    "source": "scripts/exports/liquity-v2-fixtures.json"
+    "protocol": "aave-v3",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/liquity-v2/trove/WETH/20635695537089405598026559485535702323392149994216418571824164162189504962705",
+    "page": "/ethereum/aave-v3/market",
     "chain": "ethereum",
-    "protocol": "liquity-v2",
-    "state": "liquidated",
-    "picked_for": "an open then a liquidation: the closed headlines and the surplus claim row",
-    "source": "scripts/exports/liquity-v2-fixtures.json"
+    "protocol": "aave-v3",
+    "state": "system",
+    "picked_for": "the explorer's market sub-page",
+    "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/aave-v3/0xee7ca610d896c53ffe716b801c05748efd902954",
+    "page": "/ethereum/aave-v3/0xc593352eefa7c45863525a3194870929fd6f5948",
     "chain": "ethereum",
     "protocol": "aave-v3",
     "state": "open",
-    "picked_for": "the default grouped page: folders beside events, the export's grouped heading",
-    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-grouped)"
+    "picked_for": "open account, repay-with-collateral touching both sheet sides; sheet-family event card (confirmed open via /api/chain/wallet summary 2026-10-24)",
+    "source": "scripts/verify/verify-event-share.mjs SHEET_SUBJECTS; verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/aave-v3/0xd68af9282e90ff17b2ad2f88beb775970346b98a",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "closed",
+    "picked_for": "closed core account with 117 transactions (largest-debt closed row)",
+    "source": "live pick 2026-10-24 (/api/aave-v3/positions?status=closed)"
+  },
+  {
+    "page": "/ethereum/aave-v3/0xfb45f0e612424104753f2e2fc9507b3d082e750a?market=core",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "liquidated",
+    "picked_for": "liquidated five times with collateral swaps and a debt swap",
+    "source": "scripts/verify/fixtures/aave-v3-flow-legs.json (0xfb45...)"
+  },
+  {
+    "page": "/ethereum/aave-v3/0x067739a4be2942a1c31e4513beaac08b814f29f0?market=core",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "liquidated",
+    "picked_for": "liquidation followed by a bad_debt_written_off row",
+    "source": "scripts/verify/verify-no-blank-spine.mjs"
+  },
+  {
+    "page": "/ethereum/aave-v3/0xfb9395e0b216823c9a60d5dfcb8c6ef458232a71?market=core",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "transferred",
+    "picked_for": "aToken transfers in and out, withdraw-and-swap, repay with collateral (ParaSwap rows)",
+    "source": "scripts/verify/fixtures/aave-v3-flow-legs.json (0xfb93...)"
   },
   {
     "page": "/ethereum/aave-v3/0xee7ca610d896c53ffe716b801c05748efd902954?folders=0",
     "chain": "ethereum",
     "protocol": "aave-v3",
-    "state": "open",
-    "picked_for": "the flat window with an opening balance below the cut: the 50-row tail of a long history",
+    "state": "windowed",
+    "picked_for": "7,150-event life cut to the newest 1,000 rows plus opening balance (folders off)",
     "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3)"
+  },
+  {
+    "page": "/ethereum/aave-v3/0xee7ca610d896c53ffe716b801c05748efd902954",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "grouped",
+    "picked_for": "same life on the default served-folder page: 86 folders beside 914 events",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-grouped)"
+  },
+  {
+    "page": "/ethereum/aave-v3/0x572372831a9d6b2e3ee8fa284505599e6125fea9?market=core",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "operator",
+    "picked_for": "third-party-executed events; operator bullet in the Explanation",
+    "source": "scripts/verify/verify-operator-denominator.mjs"
+  },
+  {
+    "page": "/ethereum/aave-v3/0x564296e0bae529e11029f9078742815720b8773a",
+    "chain": "ethereum",
+    "protocol": "aave-v3",
+    "state": "operator",
+    "picked_for": "Safe account named as the DeFi Saver stretch (item 440); header chip reads plain Safe (no module), position closed",
+    "source": "live pick 2026-10-24 (item 440; full address from /api/chain/wallet summary)"
+  },
+  {
+    "page": "/base/aave-v3",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/aave-v3/market",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "system",
+    "picked_for": "the explorer's market sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/aave-v3/0xfa4400264abd97fa6d61ab04471dacad081928de",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "open",
+    "picked_for": "open account, 149 borrows, aTokens sent and received (confirmed open 2026-10-24)",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (aave-open-interest)"
+  },
+  {
+    "page": "/base/aave-v3/0xe4da32444226ab63b1f8e9b7322561b6e9314fc9",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "closed",
+    "picked_for": "closed account with collateral and debt swaps, aTokens received and sent",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (aave-closed-swaps)"
+  },
+  {
+    "page": "/base/aave-v3/0xe908c2d5613d24d49e376f19715c795db8e04f81",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "liquidated",
+    "picked_for": "items 438/439 page (event 16 Zerion sale); liquidated history with collateral swap and repay with collateral",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (aave-liquidated-swaps); TO-DO-ui-jobs.md 438-439"
+  },
+  {
+    "page": "/base/aave-v3/0x76dc70cccf2352be2dc4203a6cfd27f1bc5c61df",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "liquidated",
+    "picked_for": "liquidated three times in aTokens, each fee to the treasury",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (aave-liquidated-atokens)"
+  },
+  {
+    "page": "/base/aave-v3/0x0f26fd18e49d96560d56f198b0d61157240db6f7",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "liquidated",
+    "picked_for": "liquidated then WETH debt written off",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (aave-written-off)"
+  },
+  {
+    "page": "/base/aave-v3/0x7ac2887e026e4239416aac6483c15df05a04a92e?folders=0",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "heavy",
+    "picked_for": "heavy whole-life replay, newest rows drawn (tail), folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-base)"
   },
   {
     "page": "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8?folders=0",
     "chain": "base",
     "protocol": "aave-v3",
-    "state": "open",
-    "picked_for": "a Base wallet over 2,000 events, served flat from the history route",
+    "state": "windowed",
+    "picked_for": "2,000-row life cut by the Base window, folders off",
     "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-base-2000)"
   },
   {
-    "page": "/base/aave-v3/0x20172ec3d9cb14cb555aa5b612e50d30b97485dd?folders=0",
+    "page": "/base/aave-v3/0x19ceead7105607cd444f5ad10dd51356436095a1",
     "chain": "base",
     "protocol": "aave-v3",
-    "state": "liquidated",
-    "picked_for": "a liquidated Base account: the terminal export, peaks and outcome",
-    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-base-liquidated)"
+    "state": "grouped",
+    "picked_for": "default served-folder page with grouped folders",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (aave-v3-base-grouped)"
   },
   {
-    "page": "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0xdd62115f601daebccfdd2aeed834513d8dc2f4e2",
+    "page": "/base/aave-v3/0xeb7f3742db1409a8dfc6952bb184ae5309e8d35b",
+    "chain": "base",
+    "protocol": "aave-v3",
+    "state": "operator",
+    "picked_for": "Summer.fi DPM account (header chip 'DPM \u00b7 Summer.fi (closed)'), item 440; position closed",
+    "source": "live pick 2026-10-24 (item 440; /api/chain/wallet summary)"
+  },
+  {
+    "page": "/arbitrum/aave-v3",
+    "chain": "arbitrum",
+    "protocol": "aave-v3",
+    "state": "listing",
+    "picked_for": "front door (wallet field and links)",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/arbitrum/aave-v3/positions",
+    "chain": "arbitrum",
+    "protocol": "aave-v3",
+    "state": "listing",
+    "picked_for": "positions listing of wallets the store has read",
+    "source": "app/(app)/arbitrum/aave-v3/positions"
+  },
+  {
+    "page": "/arbitrum/aave-v3/markets",
+    "chain": "arbitrum",
+    "protocol": "aave-v3",
+    "state": "system",
+    "picked_for": "market overview",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/arbitrum/aave-v3/0x2012395e71a4af2e621d522b175f6c29232398db",
+    "chain": "arbitrum",
+    "protocol": "aave-v3",
+    "state": "heavy",
+    "picked_for": "open Arbitrum account with at least 1,870 events (Miles, 21 Oct 2026, event 1870)",
+    "source": "live pick 2026-10-24 (/api/chain/wallet summary: open); TO-DO-ui-jobs.md line 3428"
+  },
+  {
+    "page": "/ethereum/aave-v4",
     "chain": "ethereum",
-    "protocol": "aave-vaults",
-    "state": "holding",
-    "picked_for": "an Umbrella stake holder: the vault family, diffed on its route (no export on a vault page)",
-    "source": "scripts/verify/verify-ethereum-vault-position-page.mjs (F2)"
+    "protocol": "aave-v4",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/aave-v4/hubs",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "system",
+    "picked_for": "the explorer's hubs sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/main/0x82d16ff1c724ab72f218a3f7f6dd3e5385ee87e8",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "heavy",
+    "picked_for": "open Main-spoke position with 915 transactions (largest in the 500 newest rows)",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions)"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/main/0xef29235bd01ffb53b063e0a6e05289517346d83a",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "liquidated",
+    "picked_for": "open Main position with 640 transactions and one liquidation",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions)"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/main/0x2cd046c88891ca32864a4800a46a93dd3b52b5fa",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "liquidated",
+    "picked_for": "status liquidated (closed by liquidation), 27 transactions",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions?status=liquidated)"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/gold/0xa2a3e083928282e812d10117ca860701ff632892",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "liquidated",
+    "picked_for": "liquidated on the Gold spoke",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions?status=liquidated)"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/bluechip/0xcd5adcb3a1f63180f8d4f75d8f12de8883f7c641",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "closed",
+    "picked_for": "closed Bluechip-spoke position, 101 transactions",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions?status=closed)"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "operator",
+    "picked_for": "funds moved through a position manager; operator bullet and sheet subject",
+    "source": "scripts/verify/verify-operator-denominator.mjs; verify-event-share.mjs"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/bluechip/0x5b4a24501dcc7cf8cff580dbce4a2a50b7865ff1",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "open",
+    "picked_for": "open Bluechip position, 243 transactions (second spoke render path)",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions)"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/forex/0xc2a11bd14bcb4ec4524576ba153248d228ad4d25",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "open",
+    "picked_for": "open Forex-spoke position, 129 transactions (non-USD collateral spoke)",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions)"
+  },
+  {
+    "page": "/ethereum/aave-v4/spoke/ethena_eco/0x523b27014b865c4d8f3dac9c6e3b1bad13d22b87",
+    "chain": "ethereum",
+    "protocol": "aave-v4",
+    "state": "open",
+    "picked_for": "open Ethena-economy spoke position, 254 transactions",
+    "source": "live pick 2026-10-24 (/api/aave-v4/spoke-positions)"
+  },
+  {
+    "page": "/base/aave-v4",
+    "chain": "base",
+    "protocol": "aave-v4",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/aave-v4/hubs",
+    "chain": "base",
+    "protocol": "aave-v4",
+    "state": "system",
+    "picked_for": "the explorer's hubs sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/aave-v4/spoke/mag7/0x4ed83dc70c9692bf9cd63a4a90a26fe83b10de2b",
+    "chain": "base",
+    "protocol": "aave-v4",
+    "state": "open",
+    "picked_for": "open Mag7 position, 174 transactions",
+    "source": "live pick 2026-10-24 (/api/aave-v4-base/spoke-positions)"
+  },
+  {
+    "page": "/base/aave-v4/spoke/mag7/0xc9bc5cab29dc93a9d2ea16ef38620598fad5ca66",
+    "chain": "base",
+    "protocol": "aave-v4",
+    "state": "closed",
+    "picked_for": "closed position with 241 transactions (heavy)",
+    "source": "live pick 2026-10-24 (/api/aave-v4-base/spoke-positions?status=closed)"
+  },
+  {
+    "page": "/base/aave-v4/spoke/mag7/0x37619647c8efc03b1f9dce061890316073b3a051",
+    "chain": "base",
+    "protocol": "aave-v4",
+    "state": "liquidated",
+    "picked_for": "closed after one liquidation (no status=liquidated row exists on Base today)",
+    "source": "live pick 2026-10-24 (/api/aave-v4-base/spoke-positions?status=closed)"
+  },
+  {
+    "page": "/ethereum/aave",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "listing",
+    "picked_for": "the explorer's own route (no position listing; opens on Vaults overview)",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/aave/vaults",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "system",
+    "picked_for": "vaults overview",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/aave/vaults/positions",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "listing",
+    "picked_for": "holder listing across the Aave vaults",
+    "source": "lib/shared/protocols.ts (holderListing)"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "system",
+    "picked_for": "savings GHO vault page (totals and share price at one block)",
+    "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "system",
+    "picked_for": "Umbrella stkwaEthUSDC vault page (6-decimal stake token, stata hop)",
+    "source": "scripts/verify/verify-vault-value-floor.mjs"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x926bf90196781cf2161535d48af542889cac4d2e",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-closed-and-reopened",
+    "picked_for": "sGHO holder that minted, burned to zero and minted again (repinned 2026-10-20)",
+    "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-safe",
+    "picked_for": "Safe-held, transfer-heavy sGHO holder",
+    "source": "scripts/verify/verify-ethereum-vault-timeline.mjs; verify-ethereum-vault-page.mjs (shape safe)"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0x5a2a98d3c9720734c2fca8d5ec808b073c047ccd",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-cooldown",
+    "picked_for": "stkwaEthUSDC holder with cooldown rows",
+    "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x4f827a63755855cdf3e8f3bcd20265c833f15033/0xcb7cd98c26b8e7bcda9445238d713ce8d59ce3b2",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-cooldown",
+    "picked_for": "stkGHO holder with cooldown rows (replaced 0x7862 on 2026-10-20)",
+    "source": "scripts/verify/verify-ethereum-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-grouped",
+    "picked_for": "$58M life made wholly of share transfers; transfer folders",
+    "source": "scripts/verify/verify-vault-transfer-folders.mjs (F3)"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0xce6ced23118edeb23054e06118a702797b13fc2f",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-windowed",
+    "picked_for": "waEthWETH life above the 5,000 window: built into the store and drawn newest-first",
+    "source": "scripts/verify/verify-ethereum-vault-timeline.mjs (HEAVY)"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0xce6ced23118edeb23054e06118a702797b13fc2f",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-withheld",
+    "picked_for": "waEthUSDC life of 17,774 transfers above the ceiling: rows withheld",
+    "source": "scripts/verify/verify-ethereum-vault-timeline.mjs (CEILING_LIFE)"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0xa484ab92fe32b143aee7019fc1502b1daa522d31",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-heavy",
+    "picked_for": "8,319-transfer holder that is itself a vault (stkwaEthUSDT.v1 holding waEthUSDT)",
+    "source": "scripts/verify/verify-ethereum-vault-position-page.mjs (MILES)"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x7bc3485026ac48b6cf9baf0a377477fff5703af8/0x634826fb67d4eb9633f0011fae8e23cf99acd6f0",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-windowed",
+    "picked_for": "vault holder on the boundary-card windowed vault arm; also the sheet subject",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (vault-eth); verify-event-share.mjs"
+  },
+  {
+    "page": "/ethereum/aave/vaults/0x0bfc9d54fc184518a81162f8fb99c2eaca081202/0x99719e434ec7e5bf587599e4ca55817b3baceb8a",
+    "chain": "ethereum",
+    "protocol": "aave",
+    "state": "vault-holder-router",
+    "picked_for": "router that forwards its shares each transaction, keeping 1 wei (910 rows)",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (control-vault); reference/interesting-addresses.md"
+  },
+  {
+    "page": "/ethereum/alchemix",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/alchemix/lines",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "system",
+    "picked_for": "the explorer's lines sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/alchemix/transmuter",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "system",
+    "picked_for": "the explorer's transmuter sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/alchemix/v2",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "system",
+    "picked_for": "the explorer's v2 sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/alchemix/eth-alusd/1221",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "open",
+    "picked_for": "V3 alUSD position, open",
+    "source": "scripts/verify/verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/alchemix/eth-aleth/42",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "closed",
+    "picked_for": "closed alETH position",
+    "source": "live pick 2026-10-24 (/api/alchemix/positions?chainId=1)"
+  },
+  {
+    "page": "/ethereum/alchemix/eth-alusd/1231",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "closed",
+    "picked_for": "closed alUSD position",
+    "source": "live pick 2026-10-24 (/api/alchemix/positions?chainId=1)"
+  },
+  {
+    "page": "/ethereum/alchemix/eth-aleth/165",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "heavy",
+    "picked_for": "open alETH position with 201 timeline rows including line-wide redemptions",
+    "source": "live pick 2026-10-24 (/api/alchemix/position/eth-aleth/165/timeline total)"
+  },
+  {
+    "page": "/ethereum/alchemix/transmuter/eth-alusd/103",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "open",
+    "picked_for": "Transmuter NFT position",
+    "source": "scripts/verify/verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/alchemix/v2/eth-aleth-v2/0xb6af7c04f67b5eb61f0dc7ac4a760888ec3e3887",
+    "chain": "ethereum",
+    "protocol": "alchemix",
+    "state": "closed",
+    "picked_for": "Alchemix V2 frozen-record account (account-keyed route)",
+    "source": "scripts/verify/verify-anatomy-codes.mjs; reference/alchemix-v2-frozen-record.md"
+  },
+  {
+    "page": "/base/alchemix",
+    "chain": "base",
+    "protocol": "alchemix",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/alchemix/lines",
+    "chain": "base",
+    "protocol": "alchemix",
+    "state": "system",
+    "picked_for": "the explorer's lines sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/alchemix/transmuter",
+    "chain": "base",
+    "protocol": "alchemix",
+    "state": "system",
+    "picked_for": "the explorer's transmuter sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/alchemix/base-alusdb/14",
+    "chain": "base",
+    "protocol": "alchemix",
+    "state": "open",
+    "picked_for": "open alUSDb position, Deposit and Mint rows one transaction each",
+    "source": "scripts/verify/verify-no-blank-spine.mjs"
+  },
+  {
+    "page": "/base/alchemix/base-alusdb/5",
+    "chain": "base",
+    "protocol": "alchemix",
+    "state": "closed",
+    "picked_for": "closed alUSDb position with its close row",
+    "source": "scripts/verify/verify-no-blank-spine.mjs"
+  },
+  {
+    "page": "/base/alchemix/base-alusdb/11",
+    "chain": "base",
+    "protocol": "alchemix",
+    "state": "heavy",
+    "picked_for": "longest-lived open Base position (21 timeline rows; Base has nothing heavier)",
+    "source": "live pick 2026-10-24 (/api/alchemix/positions?chainId=8453)"
+  },
+  {
+    "page": "/ethereum/asymmetry",
+    "chain": "ethereum",
+    "protocol": "asymmetry",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/asymmetry/branches",
+    "chain": "ethereum",
+    "protocol": "asymmetry",
+    "state": "system",
+    "picked_for": "the explorer's branches sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/asymmetry/sUSDS/8309122898133156698498852897464396224593631760337811282458430493454418132410",
+    "chain": "ethereum",
+    "protocol": "asymmetry",
+    "state": "redeemed",
+    "picked_for": "open trove redeemed 4,759 times, 24 transactions",
+    "source": "live pick 2026-10-24 (/api/asymmetry/troves)"
+  },
+  {
+    "page": "/ethereum/asymmetry/scrvUSD/50402985093798427342747772351083401224062127320699316200972964072971547655544",
+    "chain": "ethereum",
+    "protocol": "asymmetry",
+    "state": "heavy",
+    "picked_for": "closed trove with 267 transactions and 3,030 redemptions",
+    "source": "live pick 2026-10-24 (/api/asymmetry/troves)"
+  },
+  {
+    "page": "/ethereum/asymmetry/ysyBOLD/3457046546134533088834575299190675281071325494127881427191953071703289454996",
+    "chain": "ethereum",
+    "protocol": "asymmetry",
+    "state": "delegate",
+    "picked_for": "open batch member: join, set-manager, 8 redemptions",
+    "source": "scripts/verify/verify-fork-delegate-chip.mjs"
+  },
+  {
+    "page": "/ethereum/asymmetry/ysyBOLD/44200710175298985045867238413926232399816914621841575154462571678280218005739",
+    "chain": "ethereum",
+    "protocol": "asymmetry",
+    "state": "delegate",
+    "picked_for": "open batched trove used as the fork-header delegate specimen (3.20% pill)",
+    "source": "scripts/verify/verify-fork-header-render.mjs"
+  },
+  {
+    "page": "/ethereum/ebisu",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/ebisu/branches",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "system",
+    "picked_for": "the explorer's branches sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/ebisu/sUSDe/87142273507301491546594869769469556221191943811042234974226220181932990285269",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "redeemed",
+    "picked_for": "open trove redeemed 94 times, individual rate pill",
+    "source": "live pick 2026-10-24 (/api/ebisu/troves); scripts/verify/verify-fork-header-render.mjs"
+  },
+  {
+    "page": "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "heavy",
+    "picked_for": "closed trove, 209 transactions, 46 redemptions; sheet and anatomy subject",
+    "source": "scripts/verify/verify-event-share.mjs; verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/ebisu/weETH/96106318673079424364061537607314048823102119068265791306953738301365328303139",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "liquidated",
+    "picked_for": "liquidated trove, 133 transactions",
+    "source": "live pick 2026-10-24 (/api/ebisu/troves)"
+  },
+  {
+    "page": "/ethereum/ebisu/LBTC/13394052393926264620262889431625395565724519184663421606841245358793097616197",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "delegate",
+    "picked_for": "batched trove: join, adjusts, then liquidation",
+    "source": "scripts/verify/verify-fork-delegate-chip.mjs"
+  },
+  {
+    "page": "/ethereum/ebisu/LBTC/104254006700864943255603234929125797097152208837729256885375646209538498275888",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "delegate",
+    "picked_for": "setInterestBatchManager hand-over; closed with 50 redemptions",
+    "source": "scripts/verify/verify-fork-delegate-chip.mjs"
+  },
+  {
+    "page": "/ethereum/ebisu/weETH/97919865491792238086254605631899988971051996310595593281491322821534151825406",
+    "chain": "ethereum",
+    "protocol": "ebisu",
+    "state": "redeemed",
+    "picked_for": "closed trove with 29 redemptions; one touch applies a redistribution",
+    "source": "scripts/verify/fixtures/liquity-flows-ebisu-redist.json"
+  },
+  {
+    "page": "/base/basedollar",
+    "chain": "base",
+    "protocol": "basedollar",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/basedollar/branches",
+    "chain": "base",
+    "protocol": "basedollar",
+    "state": "system",
+    "picked_for": "the explorer's branches sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/basedollar/wstETH/35503968854505941585891917177059866138830265432583817156640567483056892500874",
+    "chain": "base",
+    "protocol": "basedollar",
+    "state": "redeemed",
+    "picked_for": "open trove redeemed 46 times; sheet subject",
+    "source": "live pick 2026-10-24 (/api/basedollar/troves); scripts/verify/verify-event-share.mjs"
+  },
+  {
+    "page": "/base/basedollar/WETH/27530468316785795935447409145630139572750806430083500027941214034241540223984",
+    "chain": "base",
+    "protocol": "basedollar",
+    "state": "redeemed",
+    "picked_for": "open trove redeemed 55 times on one transaction",
+    "source": "live pick 2026-10-24 (/api/basedollar/troves)"
+  },
+  {
+    "page": "/base/basedollar/wstETH/70864797405602912374176658617996713555774753094921855443530484770277167757829",
+    "chain": "base",
+    "protocol": "basedollar",
+    "state": "closed",
+    "picked_for": "closed trove, 39 transactions (most on the roster)",
+    "source": "live pick 2026-10-24 (/api/basedollar/troves)"
+  },
+  {
+    "page": "/base/basedollar/wcbBTC/16890730427617210563572364160931334188343089598618512174126742601408726432149",
+    "chain": "base",
+    "protocol": "basedollar",
+    "state": "open",
+    "picked_for": "open trove, 4 transactions, 22 redemptions",
+    "source": "live pick 2026-10-24 (/api/basedollar/troves)"
+  },
+  {
+    "page": "/ethereum/compound-v2",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/compound-v2/markets",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/compound-v2/0x1e43f86309ddbe7c7f40ff7fc756130f11d031d7",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "closed",
+    "picked_for": "closed after repay, with cToken transfers",
+    "source": "scripts/verify/fixtures/compound-v2-flows.json (closed-repaid-transfers)"
+  },
+  {
+    "page": "/ethereum/compound-v2/0x6217c008da6ea46b6db500695287d77d03f79a42",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "open",
+    "picked_for": "open account accruing interest",
+    "source": "scripts/verify/fixtures/compound-v2-flows.json (open-interest)"
+  },
+  {
+    "page": "/ethereum/compound-v2/0x1ef05c09d64a116d7138dc754616c2562fead758",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "liquidated",
+    "picked_for": "liquidated, protocol share of the seized collateral",
+    "source": "scripts/verify/fixtures/compound-v2-flows.json (liquidated-protocol-share)"
+  },
+  {
+    "page": "/ethereum/compound-v2/0x0ceaa81ecab7ba8643c96f9957eabf9a241cee39",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "transferred",
+    "picked_for": "ETH-era cToken transfer, position open",
+    "source": "scripts/verify/fixtures/compound-v2-flows.json (eth-era-transfer-open)"
+  },
+  {
+    "page": "/ethereum/compound-v2/0xa2b47e3d5c44877cca798226b7b8118f9bfb7a56?folders=0",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "windowed",
+    "picked_for": "window arm of the boundary card, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (compound-v2)"
+  },
+  {
+    "page": "/ethereum/compound-v2/0xe08d97e151473a848c3d9ca3f323cb720472d015",
+    "chain": "ethereum",
+    "protocol": "compound-v2",
+    "state": "operator",
+    "picked_for": "third-party-executed events; operator bullet",
+    "source": "scripts/verify/verify-operator-denominator.mjs"
+  },
+  {
+    "page": "/ethereum/compound-v3",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/compound-v3/markets",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/compound-v3/usdc/0x78c3cc6789f49ab0192253afb4e869db1de8af0a",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "closed",
+    "picked_for": "USDC market, repaid and closed",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (usdc-repaid)"
+  },
+  {
+    "page": "/ethereum/compound-v3/usdc/0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "open",
+    "picked_for": "USDC market, open with received transfers (confirmed open 2026-10-24)",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (usdc-open-received)"
+  },
+  {
+    "page": "/ethereum/compound-v3/usdc/0xca29d4a791e612f2f6be73ebcc3532fa74e1370a",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "liquidated",
+    "picked_for": "absorbed (liquidated) account",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (usdc-absorbed)"
+  },
+  {
+    "page": "/ethereum/compound-v3/usdc/0xee04a53b49ac597b654d850348b408b0a28df28b",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "transferred",
+    "picked_for": "lender with base-token transfers",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (usdc-lender-transfers)"
+  },
+  {
+    "page": "/ethereum/compound-v3/usdt/0x37042001c694e7261e8cbb1c2eaf72c8bfaeca75",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "open",
+    "picked_for": "USDT market, unlogged-event path (second market)",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (usdt-unlogged)"
+  },
+  {
+    "page": "/ethereum/compound-v3/weth/0x00901e253a7e666687b2bfccfd8dde7be9fba4df",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "closed",
+    "picked_for": "WETH market, repaid",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (weth-repaid)"
+  },
+  {
+    "page": "/ethereum/compound-v3/usdc/0xe7f525dd1bc6d748ae4d7f21d31e54741e05e110?folders=0",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "windowed",
+    "picked_for": "window arm of the boundary card, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (compound-v3)"
+  },
+  {
+    "page": "/ethereum/compound-v3/usdc/0x52a3cdf2ef6b17e6ffdaceb38ef30a8c42e6a366",
+    "chain": "ethereum",
+    "protocol": "compound-v3",
+    "state": "operator",
+    "picked_for": "third-party-executed events; operator bullet",
+    "source": "scripts/verify/verify-operator-denominator.mjs"
+  },
+  {
+    "page": "/base/compound-v3",
+    "chain": "base",
+    "protocol": "compound-v3",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/compound-v3/market",
+    "chain": "base",
+    "protocol": "compound-v3",
+    "state": "system",
+    "picked_for": "the explorer's market sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/compound-v3/usdc/0x7576a93ed4f6f457850181441d20ae4e1ecb06fc",
+    "chain": "base",
+    "protocol": "compound-v3",
+    "state": "liquidated",
+    "picked_for": "absorbed account, 85 events",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (base-usdc-absorbed)"
+  },
+  {
+    "page": "/base/compound-v3/usdc/0x3a79bf27ff626b55c601f01666bc522cc65eb852",
+    "chain": "base",
+    "protocol": "compound-v3",
+    "state": "open",
+    "picked_for": "lender, 31 events",
+    "source": "scripts/verify/fixtures/compound-v3-flows.json (base-usdc-lender)"
+  },
+  {
+    "page": "/base/compound-v3/weth/0xe908c2d5613d24d49e376f19715c795db8e04f81",
+    "chain": "base",
+    "protocol": "compound-v3",
+    "state": "closed",
+    "picked_for": "closed WETH-market account of the 438/439 wallet (confirmed closed 2026-10-24)",
+    "source": "live pick 2026-10-24 (/api/chain/wallet summary)"
+  },
+  {
+    "page": "/base/compound-v3/aero/0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6?folders=0",
+    "chain": "base",
+    "protocol": "compound-v3",
+    "state": "heavy",
+    "picked_for": "10,000-row seed reach tail, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (compound-base)"
+  },
+  {
+    "page": "/base/compound-v3/usdc/0x2b4ef83aee6bb3dd5253daa7d0756ef5bd95f40f",
+    "chain": "base",
+    "protocol": "compound-v3",
+    "state": "grouped",
+    "picked_for": "default grouped page",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (compound-base-grouped)"
+  },
+  {
+    "page": "/arbitrum/compound-v3",
+    "chain": "arbitrum",
+    "protocol": "compound-v3",
+    "state": "listing",
+    "picked_for": "front door",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/arbitrum/compound-v3/positions",
+    "chain": "arbitrum",
+    "protocol": "compound-v3",
+    "state": "listing",
+    "picked_for": "positions listing of wallets the store has read",
+    "source": "app/(app)/arbitrum/compound-v3/positions"
+  },
+  {
+    "page": "/arbitrum/compound-v3/markets",
+    "chain": "arbitrum",
+    "protocol": "compound-v3",
+    "state": "system",
+    "picked_for": "market overview",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/dolomite",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/dolomite/markets",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/dolomite/0xdf3e45bd05842b4d6f53d7ce6e2df782a8790af1/53264787613775811013478705112918697967981515477769770243517082861031398544890",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "closed",
+    "picked_for": "closed after repay",
+    "source": "scripts/verify/fixtures/dolomite-flows.json (closed-repaid)"
+  },
+  {
+    "page": "/ethereum/dolomite/0x49d62ca7ab8e28f7a28d9abadf84fe8b45e3caf6/15809042418583418827551470108194220080728327193143889538122062408455944908946",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "open",
+    "picked_for": "open account accruing interest",
+    "source": "scripts/verify/fixtures/dolomite-flows.json (open-interest)"
+  },
+  {
+    "page": "/ethereum/dolomite/0xd6fd705ee0b31a9300d3e2154bcce777270cbb6f/44451896412371941443969781578301504018140206081916862292927176822012245042825",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "liquidated",
+    "picked_for": "liquidated then closed",
+    "source": "scripts/verify/fixtures/dolomite-flows.json (liquidated-closed)"
+  },
+  {
+    "page": "/ethereum/dolomite/0xe83159f6e5e8bff1a8b2dda19353116c190e7f22/53264271112357065341919164147161544310055924787166225481249937524719363165319",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "liquidated",
+    "picked_for": "liquidated and still open",
+    "source": "scripts/verify/fixtures/dolomite-flows.json (open-liquidated)"
+  },
+  {
+    "page": "/ethereum/dolomite/0x02cad4ebc79ca0ac43105833f6c648a93f409acf/12287887160623238217002012743081842729988691636767230751025114019411552433606",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "open",
+    "picked_for": "trade (swap) account",
+    "source": "scripts/verify/fixtures/dolomite-flows.json (trade)"
+  },
+  {
+    "page": "/ethereum/dolomite/0xb20000a600000300daba5ea62d64c9cfea00fbfb/0",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "operator",
+    "picked_for": "liquidator account (account number 0)",
+    "source": "scripts/verify/fixtures/dolomite-flows.json (liquidator)"
+  },
+  {
+    "page": "/ethereum/dolomite/0xd6fd705ee0b31a9300d3e2154bcce777270cbb6f/89172647092903384748810832800529553598469193965113300031520441387499554538781",
+    "chain": "ethereum",
+    "protocol": "dolomite",
+    "state": "heavy",
+    "picked_for": "open, ever liquidated, 318 transactions",
+    "source": "live pick 2026-10-24 (/api/dolomite/positions?minTx=150)"
+  },
+  {
+    "page": "/ethereum/fluid",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/fluid/vaults",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "system",
+    "picked_for": "the explorer's vaults sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/fluid/22",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "closed",
+    "picked_for": "closed after repay",
+    "source": "scripts/verify/fixtures/fluid-flows.json (closed-repaid)"
+  },
+  {
+    "page": "/ethereum/fluid/6",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "open",
+    "picked_for": "open, ETH/USDT",
+    "source": "scripts/verify/fixtures/fluid-flows.json (open-interest)"
+  },
+  {
+    "page": "/ethereum/fluid/1309",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "liquidated",
+    "picked_for": "liquidated and still open (WBTC/USDC)",
+    "source": "scripts/verify/fixtures/fluid-flows.json (liquidated-open)"
+  },
+  {
+    "page": "/ethereum/fluid/8873",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "liquidated",
+    "picked_for": "liquidated ten times then closed",
+    "source": "scripts/verify/fixtures/fluid-flows.json (liquidated-ten-closed)"
+  },
+  {
+    "page": "/ethereum/fluid/3474",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "liquidated",
+    "picked_for": "absorbed (wstETH/USDC)",
+    "source": "scripts/verify/fixtures/fluid-flows.json (absorbed)"
+  },
+  {
+    "page": "/ethereum/fluid/1504",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "transferred",
+    "picked_for": "absorbed with NFT transfers",
+    "source": "scripts/verify/fixtures/fluid-flows.json (absorbed-transfers)"
+  },
+  {
+    "page": "/ethereum/fluid/348",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "open",
+    "picked_for": "supply-only position (sUSDe)",
+    "source": "scripts/verify/fixtures/fluid-flows.json (supply-only)"
+  },
+  {
+    "page": "/ethereum/fluid/1566",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "heavy",
+    "picked_for": "open, 1,472 events (largest by events)",
+    "source": "live pick 2026-10-24 (/api/fluid/positions?sortBy=events); scripts/verify/verify-timeline-boundary-card.mjs control"
+  },
+  {
+    "page": "/ethereum/fluid/3681",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "heavy",
+    "picked_for": "closed, 327 events, liquidated 14 times",
+    "source": "live pick 2026-10-24 (/api/fluid/positions?sortBy=events)"
+  },
+  {
+    "page": "/ethereum/fluid/4456",
+    "chain": "ethereum",
+    "protocol": "fluid",
+    "state": "operator",
+    "picked_for": "third-party-executed events; operator bullet",
+    "source": "scripts/verify/verify-operator-denominator.mjs"
+  },
+  {
+    "page": "/ethereum/frankencoin",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/frankencoin/system",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "system",
+    "picked_for": "the explorer's system sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/frankencoin/0xbd5678bab4adad591a11941e60fddd81d6bc54de",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "closed",
+    "picked_for": "closed after repay (WETH)",
+    "source": "scripts/verify/fixtures/frankencoin-flows.json (closed-repaid)"
+  },
+  {
+    "page": "/ethereum/frankencoin/0xdc189ac81bec4db551a0478334691d71109d9382",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "open",
+    "picked_for": "open V2 position, cbBTC collateral and ZCHF debt",
+    "source": "scripts/verify/verify-frankencoin-frontend.mjs POSITION"
+  },
+  {
+    "page": "/ethereum/frankencoin/0xf652c3ce52933cabf07199887e64301c0705620e",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "liquidated",
+    "picked_for": "challenge with collateral sales (REALU)",
+    "source": "scripts/verify/fixtures/frankencoin-flows.json (challenge-sales)"
+  },
+  {
+    "page": "/ethereum/frankencoin/0xa73ea04fef834e41a044f0bdddd959a9ff8fc639",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "liquidated",
+    "picked_for": "five-slice challenge auction, closed since Apr 2025",
+    "source": "scripts/verify/fixtures/frankencoin-flows.json (challenge-no-debt)"
+  },
+  {
+    "page": "/ethereum/frankencoin/0x1ca30ca2ea2de8d5783ae0fd2d871513d112acea",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "liquidated",
+    "picked_for": "forced sale",
+    "source": "scripts/verify/fixtures/frankencoin-flows.json (forced-sale)"
+  },
+  {
+    "page": "/ethereum/frankencoin/0xa99160993de03273750d3e253f75fe75f6084aaf",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "liquidated",
+    "picked_for": "denied (vetoed) V2 position cleared by forced sale",
+    "source": "scripts/verify/fixtures/frankencoin-flows.json (forced-opening)"
+  },
+  {
+    "page": "/ethereum/frankencoin/0xf73fb8eeae2e4fa781855d7c1a2977798ec6839c",
+    "chain": "ethereum",
+    "protocol": "frankencoin",
+    "state": "heavy",
+    "picked_for": "closed with 68 events (heaviest on the roster)",
+    "source": "scripts/verify/fixtures/frankencoin-flows.json (closed-many; live minTx=50 query)"
+  },
+  {
+    "page": "/ethereum/fx",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/fx/pools",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "system",
+    "picked_for": "the explorer's pools sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/fx/wbtc-760",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "closed",
+    "picked_for": "closed after withdrawal",
+    "source": "scripts/verify/fixtures/fx-flows.json (closed-withdrawn)"
+  },
+  {
+    "page": "/ethereum/fx/wsteth-249",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "open",
+    "picked_for": "open with funding; six rebalance hits on 3 Feb 2025",
+    "source": "scripts/verify/fixtures/fx-flows.json (open-funding)"
+  },
+  {
+    "page": "/ethereum/fx/wsteth-137",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "liquidated",
+    "picked_for": "closed 18 Jan, funded again 20 Jan, liquidated 3 Feb 2025",
+    "source": "scripts/verify/fixtures/fx-flows.json (liquidated-closed); verify-fx-frontend.mjs"
+  },
+  {
+    "page": "/ethereum/fx/wsteth-243",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "liquidated",
+    "picked_for": "liquidated three times and redemption blocks",
+    "source": "scripts/verify/fixtures/fx-flows.json (redemptions); verify-fx-frontend.mjs"
+  },
+  {
+    "page": "/ethereum/fx/wbtc-484",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "redeemed",
+    "picked_for": "279,215 fxUSD debt cut by seven pool-wide rebalances; limit-order borrow",
+    "source": "scripts/verify/fixtures/fx-flows.json (pool-rebalances); verify-fx-frontend.mjs"
+  },
+  {
+    "page": "/ethereum/fx/wsteth-1801",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "transferred",
+    "picked_for": "ownership transfer (delegate glyph on the spine)",
+    "source": "scripts/verify/verify-fx-frontend.mjs; verify-no-blank-spine.mjs"
+  },
+  {
+    "page": "/ethereum/fx/wsteth-1",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "closed",
+    "picked_for": "closed twice",
+    "source": "scripts/verify/verify-fx-frontend.mjs"
+  },
+  {
+    "page": "/ethereum/fx/wsteth-348",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "heavy",
+    "picked_for": "busiest position in the fixture",
+    "source": "scripts/verify/fixtures/fx-flows.json (busiest)"
+  },
+  {
+    "page": "/ethereum/fx/wsteth-780",
+    "chain": "ethereum",
+    "protocol": "fx",
+    "state": "operator",
+    "picked_for": "third-party-executed events; operator bullet",
+    "source": "scripts/verify/verify-operator-denominator.mjs"
+  },
+  {
+    "page": "/ethereum/liquity-v1",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/liquity-v1/system",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "system",
+    "picked_for": "the explorer's system sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/liquity-v1/0x3f9a843c93ff9ce638287249ef93dc5c91944455?epoch=1",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "redeemed",
+    "picked_for": "life 1 ended by redemption",
+    "source": "scripts/verify/fixtures/liquity-flows-v1-redeemed.json"
+  },
+  {
+    "page": "/ethereum/liquity-v1/0x4196d3479fda0ebed8b67ff8b3134dbf4c35f1a9?epoch=2",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "liquidated",
+    "picked_for": "life 2 ended by liquidation with surplus",
+    "source": "scripts/verify/fixtures/liquity-flows-v1-liquidated.json"
+  },
+  {
+    "page": "/ethereum/liquity-v1/0xe0dfd1bc32bdc574fb7629dc9a0a42bfe66923e2",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "open",
+    "picked_for": "wallet with several lives",
+    "source": "scripts/verify/fixtures/liquity-flows-v1-lives.json"
+  },
+  {
+    "page": "/ethereum/liquity-v1/0x8eb2e0cebcd191625037a042c9edf67b7f7fd74c",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "closed",
+    "picked_for": "trove with a repay and an open on 28 Aug 2021; sheet and anatomy subject",
+    "source": "scripts/verify/verify-event-share.mjs; verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/liquity-v1/0x0561a78021d8966ddd20c28c6c4318d8675ee1f0",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "heavy",
+    "picked_for": "grain at which the window is declined (no-card control)",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (liquity-v1)"
+  },
+  {
+    "page": "/ethereum/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1",
+    "chain": "ethereum",
+    "protocol": "liquity-v1",
+    "state": "open",
+    "picked_for": "epoch-addressed page (spine check)",
+    "source": "scripts/verify/verify-no-blank-spine.mjs"
+  },
+  {
+    "page": "/ethereum/liquity-v2",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/liquity-v2/branches",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "system",
+    "picked_for": "the explorer's branches sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "open",
+    "picked_for": "open WETH trove, anatomy subject",
+    "source": "scripts/verify/verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/wstETH/115030889343838929249477912399731148122853210644532818004438297923067177856807",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "closed",
+    "picked_for": "closed wstETH trove (6 transactions)",
+    "source": "live pick 2026-10-24 (/api/troves?status=closed)"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/WETH/22412517865912344610666591322850826630726594253808037974356128721405243892759",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "redeemed",
+    "picked_for": "427 events, 320 redemptions",
+    "source": "scripts/verify/fixtures/liquity-flows-v2-redeemed.json"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/rETH/19392756892012588507808147823032851071198051944268422940534038614966657095964",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "liquidated",
+    "picked_for": "45 redemptions then liquidated with surplus to claim",
+    "source": "scripts/verify/fixtures/liquity-flows-v2-liquidated.json"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/wstETH/101248328074566068417789721342735168418436459186278271284551872577706998939160",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "delegate",
+    "picked_for": "batch member redeemed to a zombie",
+    "source": "scripts/verify/fixtures/liquity-flows-v2-zombie.json"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/WETH/30404411686890082603025828629969289056413589403947755681351563798146900259572",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "delegate",
+    "picked_for": "batched trove (rate set by the batch manager)",
+    "source": "scripts/verify/verify-rate-authorship.mjs"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/WETH/102036905498439360210701303197562255497830229508729325448634378946648943354674",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "open",
+    "picked_for": "individual-rate trove (fork-header v2 specimen)",
+    "source": "scripts/verify/verify-fork-header-render.mjs"
+  },
+  {
+    "page": "/ethereum/liquity-v2/trove/WETH/29779854367542649123526514384205099621162281315544372345570836626121545773770",
+    "chain": "ethereum",
+    "protocol": "liquity-v2",
+    "state": "open",
+    "picked_for": "sheet subject with escrow note and a Borrow event",
+    "source": "scripts/verify/verify-event-share.mjs"
+  },
+  {
+    "page": "/ethereum/llamalend",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/llamalend/markets",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/llamalend/0x1e0165dbd2019441ab7927c018701f3138114d71/0x1b957536aa60338b067d6bbfda23f44f7ea3abd5",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "closed",
+    "picked_for": "closed after repay (wstETH/crvUSD)",
+    "source": "scripts/verify/fixtures/llamalend-flows.json (closed-repaid)"
+  },
+  {
+    "page": "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xeb2cafb6ea9def8084842558ad1242bbf7fcac2b",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "open",
+    "picked_for": "open with interest",
+    "source": "scripts/verify/fixtures/llamalend-flows.json (open-interest)"
+  },
+  {
+    "page": "/ethereum/llamalend/0xaade9230aa9161880e13a38c83400d3d1995267b/0x8f1e003313650b3629a0d73b26a227574bad6c2d",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "open",
+    "picked_for": "open in liquidation bands",
+    "source": "scripts/verify/fixtures/llamalend-flows.json (open-in-bands)"
+  },
+  {
+    "page": "/ethereum/llamalend/0xa920de414ea4ab66b97da1bfe9e6eca7d4219635/0x1d737e0122c270c5fa476dab9038d05363ad3a3c",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "liquidated",
+    "picked_for": "liquidated twice",
+    "source": "scripts/verify/fixtures/llamalend-flows.json (liquidated-twice)"
+  },
+  {
+    "page": "/ethereum/llamalend/0x652aea6b22310c89dcc506710cad24d2dba56b11/0x9c283aa6b1e6676b5ded6c2a6242a80589c59112",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "liquidated",
+    "picked_for": "partial third-party hard liquidation plus a self-liquidation",
+    "source": "scripts/verify/fixtures/llamalend-flows.json (liquidated-partial)"
+  },
+  {
+    "page": "/ethereum/llamalend/0xa920de414ea4ab66b97da1bfe9e6eca7d4219635/0xa801bf4e4a789014bf2aa11a4431984f32aea018",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "liquidated",
+    "picked_for": "liquidated then bought back",
+    "source": "scripts/verify/fixtures/llamalend-flows.json (bought-back)"
+  },
+  {
+    "page": "/ethereum/llamalend/0xe438658874b0acf4d81c24172e137f0ee00621b8/0x07cb1b3a52faf636a52822d918b07d30b0914d76",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "closed",
+    "picked_for": "crvUSD-collateral tBTC borrow, closed",
+    "source": "scripts/verify/fixtures/llamalend-flows.json (tbtc-borrowed)"
+  },
+  {
+    "page": "/ethereum/llamalend/0x4e59541306910ad6dc1dac0ac9dfb29bd9f15c67/0x2618f4c64805526a3092d41f25597ccfe4dd8216",
+    "chain": "ethereum",
+    "protocol": "llamalend",
+    "state": "open",
+    "picked_for": "borrow with borrowed_amount 0 (add-collateral rendering)",
+    "source": "scripts/verify/verify-llamalend-frontend.mjs ADDCOLL"
+  },
+  {
+    "page": "/ethereum/makerdao",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/makerdao/system",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "system",
+    "picked_for": "the explorer's system sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/makerdao/220",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "closed",
+    "picked_for": "ETH-A vault repaid and closed",
+    "source": "scripts/verify/fixtures/makerdao-flows.json (closed-repaid)"
+  },
+  {
+    "page": "/ethereum/makerdao/2028",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "open",
+    "picked_for": "ETH-A vault accruing stability fee",
+    "source": "scripts/verify/fixtures/makerdao-flows.json (open-fee)"
+  },
+  {
+    "page": "/ethereum/makerdao/23048",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "liquidated",
+    "picked_for": "ETH-C liquidated, surplus returned",
+    "source": "scripts/verify/fixtures/makerdao-flows.json (liquidated-returned)"
+  },
+  {
+    "page": "/ethereum/makerdao/27943",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "liquidated",
+    "picked_for": "WSTETH-A liquidated then reopened",
+    "source": "scripts/verify/fixtures/makerdao-flows.json (liquidated-reopened)"
+  },
+  {
+    "page": "/ethereum/makerdao/261",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "liquidated",
+    "picked_for": "BAT-A bitten seven times",
+    "source": "scripts/verify/fixtures/makerdao-flows.json (bitten-seven)"
+  },
+  {
+    "page": "/ethereum/makerdao/307",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "transferred",
+    "picked_for": "ETH-A vault forked",
+    "source": "scripts/verify/fixtures/makerdao-flows.json (forked)"
+  },
+  {
+    "page": "/ethereum/makerdao/0xdfdb5d44f1c0b935c00e4fff6cbfd76c0db7e97c",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "open",
+    "picked_for": "Lockstake engine urn (LSEV2-SKY-A, address-keyed)",
+    "source": "scripts/verify/fixtures/makerdao-flows.json (lockstake)"
+  },
+  {
+    "page": "/ethereum/makerdao/1863",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "heavy",
+    "picked_for": "open ETH-A vault with 1,389 transactions",
+    "source": "live pick 2026-10-24 (/api/makerdao/vaults)"
+  },
+  {
+    "page": "/ethereum/makerdao/0x226ede73e2efae6a1acf4f162b8e28caee3aaeb4",
+    "chain": "ethereum",
+    "protocol": "makerdao",
+    "state": "operator",
+    "picked_for": "address-keyed owner page; sheet and operator subject",
+    "source": "scripts/verify/verify-event-share.mjs; verify-operator-denominator.mjs"
+  },
+  {
+    "page": "/ethereum/maple",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/maple/pools",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "system",
+    "picked_for": "the explorer's pools sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/maple/0x9f2e89676a770688292c6c08851a98268a74b4a1",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "closed",
+    "picked_for": "closed with a withdrawal queue",
+    "source": "scripts/verify/fixtures/maple-flows.json (closed-queue)"
+  },
+  {
+    "page": "/ethereum/maple/0xc4ec216635491a6d08cfe4537ed4dd767212d8c1",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "open",
+    "picked_for": "open in two pools",
+    "source": "scripts/verify/fixtures/maple-flows.json (open-two-pools)"
+  },
+  {
+    "page": "/ethereum/maple/0x3f89d5678c616a9bb4a3362102bfcca2dbc5aa5f",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "transferred",
+    "picked_for": "share transfers through a router",
+    "source": "scripts/verify/fixtures/maple-flows.json (transfers-router)"
+  },
+  {
+    "page": "/ethereum/maple/0x74d8818f48eb29ce43ffaf5a503d018e7b8e0f86",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "closed",
+    "picked_for": "withdrawal request cancelled",
+    "source": "scripts/verify/fixtures/maple-flows.json (cancelled)"
+  },
+  {
+    "page": "/ethereum/maple/0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76?folders=0",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "windowed",
+    "picked_for": "window arm of the boundary card, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (maple)"
+  },
+  {
+    "page": "/ethereum/maple/0x015cc48cc8bc37d80aaff4e43061dbaf94192308",
+    "chain": "ethereum",
+    "protocol": "maple",
+    "state": "operator",
+    "picked_for": "open lender, 236 events, 12 third-party rows",
+    "source": "scripts/verify/verify-operator-denominator.mjs"
+  },
+  {
+    "page": "/ethereum/moonwell",
+    "chain": "ethereum",
+    "protocol": "moonwell",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/moonwell/markets",
+    "chain": "ethereum",
+    "protocol": "moonwell",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/moonwell/0x93236513cd476581da11f9b9d2c3d9af6b96ef90",
+    "chain": "ethereum",
+    "protocol": "moonwell",
+    "state": "liquidated",
+    "picked_for": "liquidated then closed",
+    "source": "scripts/verify/fixtures/moonwell-flows.json (eth-liquidated-closed)"
+  },
+  {
+    "page": "/ethereum/moonwell/0x33a7ec1055edd4cc35ef289156c7a7a078043474",
+    "chain": "ethereum",
+    "protocol": "moonwell",
+    "state": "open",
+    "picked_for": "open with interest",
+    "source": "scripts/verify/fixtures/moonwell-flows.json (eth-open-interest)"
+  },
+  {
+    "page": "/ethereum/moonwell/0xcc2f8a9725aa6682478ccb62d9f0dcbed34daad3",
+    "chain": "ethereum",
+    "protocol": "moonwell",
+    "state": "operator",
+    "picked_for": "third-party-executed events; deployment's newest liquidation",
+    "source": "scripts/verify/verify-operator-denominator.mjs; verify-at-block-prices-moonwell-base.mjs"
+  },
+  {
+    "page": "/base/moonwell",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/moonwell/markets",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/moonwell/0x947d013ba806168d47dae09827fc4bdd6d35c441",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "closed",
+    "picked_for": "closed across eight markets",
+    "source": "scripts/verify/fixtures/moonwell-flows.json (base-closed-eight-markets)"
+  },
+  {
+    "page": "/base/moonwell/0x499a9e0e380a6d6c83a2b01cf1430bb3aa20a278",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "liquidated",
+    "picked_for": "open and liquidated",
+    "source": "scripts/verify/fixtures/moonwell-flows.json (base-open-liquidated)"
+  },
+  {
+    "page": "/base/moonwell/0x221421411f3b209bbae7e1845e51b3e4ecfde190",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "liquidated",
+    "picked_for": "liquidator side: liquidated collateral received",
+    "source": "scripts/verify/fixtures/moonwell-flows.json (base-liquidated-received)"
+  },
+  {
+    "page": "/base/moonwell/0x53c89d2d656a5781a4839611259d1b076b1c0699",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "liquidated",
+    "picked_for": "liquidated, collateral sent",
+    "source": "scripts/verify/fixtures/moonwell-flows.json (base-liquidated-sent)"
+  },
+  {
+    "page": "/base/moonwell/0xbc8dd54d1ae1b738b40ffddccee1428b178fa80b?folders=0",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "heavy",
+    "picked_for": "whole-life replay tail, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (moonwell-base)"
+  },
+  {
+    "page": "/base/moonwell/0x11a020d80b0a4468bf45888a0ab33cf4169f520a?folders=0",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "windowed",
+    "picked_for": "cut at the Base window, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (moonwell-base-cut)"
+  },
+  {
+    "page": "/base/moonwell/0x719eae70d4a83f35bf82a2740699f5db84be919d",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "heavy",
+    "picked_for": "MAMO-cascade wallet, 596 liquidations, grouped default page",
+    "source": "scripts/verify/verify-at-block-prices-moonwell-base.mjs"
+  },
+  {
+    "page": "/base/moonwell/0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c",
+    "chain": "base",
+    "protocol": "moonwell",
+    "state": "open",
+    "picked_for": "anatomy subject (open)",
+    "source": "scripts/verify/verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/morpho",
+    "chain": "ethereum",
+    "protocol": "morpho",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/morpho/markets",
+    "chain": "ethereum",
+    "protocol": "morpho",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/morpho/908b037029b5c0671ba3b362eaf289c3199560d1d4632e6cb527cc7240fa006e-0x5b5aa8fd70f0b3ed36deb5cd213bf77ef10c5a73",
+    "chain": "ethereum",
+    "protocol": "morpho",
+    "state": "liquidated",
+    "picked_for": "liquidated and repaid (USDC / PT-apxUSD)",
+    "source": "scripts/verify/fixtures/morpho-flows.json (eth-liquidated-repaid)"
+  },
+  {
+    "page": "/ethereum/morpho/ae60b71b407e0517ead445b7113a7ffa07ea4a9379d526ade541a3e9ec777cb4-0x35b5c3b1dc4cd7c2d740ad5ddb7dc1b6aa56a66d",
+    "chain": "ethereum",
+    "protocol": "morpho",
+    "state": "liquidated",
+    "picked_for": "liquidation leaving bad debt (sNUSD)",
+    "source": "scripts/verify/fixtures/morpho-flows.json (eth-bad-debt)"
+  },
+  {
+    "page": "/ethereum/morpho/b8fc70e82bc5bb53e773626fcc6a23f7eefa036918d7ef216ecfb1950a94a85e-0xb8a451107a9f87fde481d4d686247d6e43ed715e?folders=0",
+    "chain": "ethereum",
+    "protocol": "morpho",
+    "state": "windowed",
+    "picked_for": "window arm of the boundary card, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (morpho)"
+  },
+  {
+    "page": "/ethereum/morpho/3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49-0x1f1de251ee59f4272ac21ffda2bd4dfc40c81912",
+    "chain": "ethereum",
+    "protocol": "morpho",
+    "state": "operator",
+    "picked_for": "authorised-operator events with liquidations (the 0x405d fixture is closed)",
+    "source": "scripts/verify/verify-external-spine.mjs (LIQ_FIXTURE)"
+  },
+  {
+    "page": "/ethereum/morpho/ebd23a871b52e0a8c92bd719f4413600101b69e946cb72923b3a33fb5bc6ec85-0xebb870a0aaaa7bc55ead925d03a4af4a8db79a03",
+    "chain": "ethereum",
+    "protocol": "morpho",
+    "state": "open",
+    "picked_for": "open position (confirmed open 2026-10-24); anatomy subject",
+    "source": "scripts/verify/verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/base/morpho",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/morpho/markets",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/morpho/vaults",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "system",
+    "picked_for": "the explorer's vaults sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/morpho/vaults/positions",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "listing",
+    "picked_for": "the explorer's vaults/positions sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/morpho/0x9f03da73cf0f3a141404af735c16cf17427d81db/0x6b52694164c1c86d6e834b05b8d35eb5d178ca2587a059143ac8b159a4dcf225",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "closed",
+    "picked_for": "lender position closed (USDC / KTA)",
+    "source": "scripts/verify/fixtures/morpho-flows.json (base-lender-closed)"
+  },
+  {
+    "page": "/base/morpho/0x9f03da73cf0f3a141404af735c16cf17427d81db/0xc9658cac13a9b9b5c1ebaa8ce19c735283cc761ff528d149a7221047bb7fab45",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "open",
+    "picked_for": "lender position open (eUSD / cbBTC)",
+    "source": "scripts/verify/fixtures/morpho-flows.json (base-lender-open)"
+  },
+  {
+    "page": "/base/morpho/0xd5d30374d375556619edfb09738db580b62beaee/0x1a3e69d0109bb1be42b80e11034bb6ee98fc466721f26845dc83b2aa8d979137",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "transferred",
+    "picked_for": "borrower who then became lender in the same market",
+    "source": "scripts/verify/fixtures/morpho-flows.json (base-borrower-then-lender)"
+  },
+  {
+    "page": "/base/morpho/0xc047a11b00ec9fae2355b4506d17e3c84d7f9437/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836?folders=0",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "heavy",
+    "picked_for": "whole-life tail, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (morpho-base)"
+  },
+  {
+    "page": "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "grouped",
+    "picked_for": "default grouped page; sheet subject",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (morpho-base-grouped); verify-event-share.mjs"
+  },
+  {
+    "page": "/base/morpho/0xe5f4716ac8161999c92361e3f72932fad0310dfe",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "open",
+    "picked_for": "wallet page for a four-vault, two-asset holder (wallet vault note)",
+    "source": "scripts/verify/verify-morpho-base-wallet-vault-note.mjs"
+  },
+  {
+    "page": "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "system",
+    "picked_for": "MetaMorpho case-study vault page",
+    "source": "scripts/verify/verify-morpho-base-vault-timeline.mjs"
+  },
+  {
+    "page": "/base/morpho/vaults/0x616a4e1db48e22028f6bbf20444cd3b8e3273738",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "system",
+    "picked_for": "smUSDC vault page (heavy-holder vault)",
+    "source": "scripts/verify/verify-morpho-base-vault-timeline.mjs"
+  },
+  {
+    "page": "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2/0xc3840f38c8edc39f65443243aa7399d607e9f599",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "vault-holder-closed-and-reopened",
+    "picked_for": "minted, burned to nothing, minted again (repinned 2026-10-20)",
+    "source": "scripts/verify/verify-morpho-base-vault-timeline.mjs"
+  },
+  {
+    "page": "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2/0x3d8863a416f3091766bfea41d3d7008236a0dd1e",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "vault-holder-mixed",
+    "picked_for": "mints and burns in both directions",
+    "source": "scripts/verify/verify-morpho-base-vault-timeline.mjs"
+  },
+  {
+    "page": "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2/0xe228c34252bd874c489c2a99e03476162d74db02",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "vault-holder-transfers",
+    "picked_for": "life made wholly of plain transfers (no mint)",
+    "source": "scripts/verify/verify-morpho-base-vault-timeline.mjs"
+  },
+  {
+    "page": "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2/0x211bc3a35a5aba59531e00703a2768e966154d18",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "vault-holder-heavy",
+    "picked_for": "3,197 mints and burns, no transfers",
+    "source": "scripts/verify/verify-base-vault-position-page.mjs (F_B1)"
+  },
+  {
+    "page": "/base/morpho/vaults/0x6b13c060f13af1fdb319f52315bbbf3fb1d88844/0x2b540218c0af883f9c70958c361c9da8a63b9dba",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "vault-holder-transfers",
+    "picked_for": "WETH vault: 18-decimal asset, DECIMALS_OFFSET 0",
+    "source": "scripts/verify/verify-morpho-base-vault-timeline.mjs"
   },
   {
     "page": "/base/morpho/vaults/0x6b13c060f13af1fdb319f52315bbbf3fb1d88844/0x5773e329824d3120fd253d1ce94ab7705fe77432",
     "chain": "base",
-    "protocol": "morpho-base-vaults",
-    "state": "holding",
-    "picked_for": "a Base MetaMorpho vault holder: the second vault family on its route",
-    "source": "scripts/verify/verify-timeline-boundary-card.mjs (base morpho vault holder)"
+    "protocol": "morpho",
+    "state": "vault-holder-windowed",
+    "picked_for": "vault holder on the boundary-card vault arm",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (vault-base)"
+  },
+  {
+    "page": "/base/morpho/vaults/0x616a4e1db48e22028f6bbf20444cd3b8e3273738/0x45aa96f0b3188d47a1dafdbefce1db6b37f58216",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "vault-holder-windowed",
+    "picked_for": "smUSDC heavy life above the window: built into the store and drawn newest-first",
+    "source": "scripts/verify/verify-morpho-base-vault-timeline.mjs (HEAVY)"
+  },
+  {
+    "page": "/base/morpho/vaults/0x7bfa7c4f149e7415b73bdedfe609237e29cbf34a/0x0411bc46018cb65d59dd46c3ffe768eeea178d5e",
+    "chain": "base",
+    "protocol": "morpho",
+    "state": "vault-holder-open",
+    "picked_for": "holder page named in decision 0051 (same wallet holds Base Aave V3)",
+    "source": "rails-ops decisions/0051-one-front-door-the-search-on-the-home-page.md"
+  },
+  {
+    "page": "/arbitrum/morpho",
+    "chain": "arbitrum",
+    "protocol": "morpho",
+    "state": "listing",
+    "picked_for": "front door",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/arbitrum/morpho/positions",
+    "chain": "arbitrum",
+    "protocol": "morpho",
+    "state": "listing",
+    "picked_for": "positions listing of wallets the store has read",
+    "source": "app/(app)/arbitrum/morpho/positions"
+  },
+  {
+    "page": "/arbitrum/morpho/markets",
+    "chain": "arbitrum",
+    "protocol": "morpho",
+    "state": "system",
+    "picked_for": "market overview",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/sepolia/polaris",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/sepolia/polaris/markets",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "system",
+    "picked_for": "the explorer's markets sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/sepolia/polaris/usdp/27",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "closed",
+    "picked_for": "closed CDP owing nothing (no Costs item)",
+    "source": "scripts/verify/verify-polaris-position-page.mjs"
+  },
+  {
+    "page": "/sepolia/polaris/usdp/175",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "liquidated",
+    "picked_for": "liquidated CDP",
+    "source": "scripts/verify/verify-polaris-position-page.mjs"
+  },
+  {
+    "page": "/sepolia/polaris/usdp/2420",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "open",
+    "picked_for": "open CDP accruing interest",
+    "source": "scripts/verify/fixtures/polaris-flows.json (open-interest)"
+  },
+  {
+    "page": "/sepolia/polaris/goldp/1763",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "open",
+    "picked_for": "open gold-market CDP",
+    "source": "scripts/verify/fixtures/polaris-flows.json (goldp-open)"
+  },
+  {
+    "page": "/sepolia/polaris/goldp/29",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "liquidated",
+    "picked_for": "liquidated gold-market CDP",
+    "source": "scripts/verify/fixtures/polaris-flows.json (goldp-liquidated)"
+  },
+  {
+    "page": "/sepolia/polaris/usdp/2266",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "liquidated",
+    "picked_for": "liquidated then settled",
+    "source": "scripts/verify/fixtures/polaris-flows.json (liquidated-settled)"
+  },
+  {
+    "page": "/sepolia/polaris/usdp/2736",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "closed",
+    "picked_for": "closed by settlement",
+    "source": "scripts/verify/fixtures/polaris-flows.json (closed-settled)"
+  },
+  {
+    "page": "/sepolia/polaris/usdp/166",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "open",
+    "picked_for": "sheet and anatomy subject (withdraw, liquidation above it keeps cells)",
+    "source": "scripts/verify/verify-event-share.mjs; verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/sepolia/polaris/usdp/2520",
+    "chain": "sepolia",
+    "protocol": "polaris",
+    "state": "heavy",
+    "picked_for": "50 events, the busiest open CDP in the 100 newest",
+    "source": "live pick 2026-10-24 (/api/polaris/positions?minTx=40)"
+  },
+  {
+    "page": "/ethereum/pwn",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/pwn/book",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "system",
+    "picked_for": "the explorer's book sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/pwn/0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932?loan=31",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "heavy",
+    "picked_for": "repaid fixed-interest loan with an extension; 9 events (heaviest PWN history)",
+    "source": "scripts/verify/fixtures/pwn-flows.json (repaid-fixed-extended)"
+  },
+  {
+    "page": "/ethereum/pwn/0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932?loan=60",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "closed",
+    "picked_for": "repaid accruing-interest loan",
+    "source": "scripts/verify/fixtures/pwn-flows.json (repaid-accruing)"
+  },
+  {
+    "page": "/ethereum/pwn/0xd20510621d75d25f11ab92572e1cf39dc260431c?loan=54",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "closed",
+    "picked_for": "repaid but unclaimed, accruing",
+    "source": "scripts/verify/fixtures/pwn-flows.json (repaid-unclaimed-accruing)"
+  },
+  {
+    "page": "/ethereum/pwn/0x62ee13473eb1f771c3788f70ea988499a6008881?loan=61",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "liquidated",
+    "picked_for": "defaulted accruing loan",
+    "source": "scripts/verify/fixtures/pwn-flows.json (defaulted-accruing)"
+  },
+  {
+    "page": "/ethereum/pwn/0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13?loan=37",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "liquidated",
+    "picked_for": "defaulted fixed-interest ERC-20 loan",
+    "source": "scripts/verify/fixtures/pwn-flows.json (defaulted-fixed-erc20)"
+  },
+  {
+    "page": "/ethereum/pwn/0xc4f9af390065fd1598970ae32ef27c024bba276b?loan=55",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "closed",
+    "picked_for": "lapsed accruing loan",
+    "source": "scripts/verify/fixtures/pwn-flows.json (lapsed-accruing)"
+  },
+  {
+    "page": "/ethereum/pwn/0xcf7247c7e70672d95c13c4c292f8205f46f09281?loan=26",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "closed",
+    "picked_for": "lapsed fixed loan",
+    "source": "scripts/verify/fixtures/pwn-flows.json (lapsed-fixed)"
+  },
+  {
+    "page": "/ethereum/pwn/0x6e54a4f2a9f4d6f43be903e1c0805f0943343784?loan=59",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "open",
+    "picked_for": "open loan (borrower page)",
+    "source": "live pick 2026-10-24 (/api/pwn/positions)"
+  },
+  {
+    "page": "/ethereum/pwn/0x0598b250a99bd45155a6b9b04af2ee19a2e5fed0?loan=20",
+    "chain": "ethereum",
+    "protocol": "pwn",
+    "state": "closed",
+    "picked_for": "repaid 1 Nov 2023; sheet subject",
+    "source": "scripts/verify/verify-event-share.mjs"
+  },
+  {
+    "page": "/base/seamless",
+    "chain": "base",
+    "protocol": "seamless",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/seamless/market",
+    "chain": "base",
+    "protocol": "seamless",
+    "state": "system",
+    "picked_for": "the explorer's market sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/base/seamless/0xfa1ce082fe73876281c70441cde267ccfb897ae8",
+    "chain": "base",
+    "protocol": "seamless",
+    "state": "liquidated",
+    "picked_for": "liquidated eight times",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (seamless-liquidated)"
+  },
+  {
+    "page": "/base/seamless/0xe9c208e0887b94b8c81cbd7f3e5e10cf862d5360",
+    "chain": "base",
+    "protocol": "seamless",
+    "state": "closed",
+    "picked_for": "supplied and withdrew everything",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (seamless-closed)"
+  },
+  {
+    "page": "/base/seamless/0x9ecbd0338ef392555214a8b25bd87b9139e4a05e",
+    "chain": "base",
+    "protocol": "seamless",
+    "state": "open",
+    "picked_for": "open, aTokens sent",
+    "source": "scripts/verify/fixtures/aave-base-flow-series.json (seamless-open-sent)"
+  },
+  {
+    "page": "/base/seamless/0x258730e23cf2f25887cb962d32bd10b878ea8a4e?folders=0",
+    "chain": "base",
+    "protocol": "seamless",
+    "state": "heavy",
+    "picked_for": "whole-life replay tail, folders off",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (seamless)"
+  },
+  {
+    "page": "/base/seamless/0x3fed901fc296096e125d7332fadba63303b7ddd6",
+    "chain": "base",
+    "protocol": "seamless",
+    "state": "grouped",
+    "picked_for": "default page, grouped with no folder (noFolders)",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (seamless-grouped)"
+  },
+  {
+    "page": "/ethereum/sky-savings",
+    "chain": "ethereum",
+    "protocol": "sky-savings",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/sky-savings/rates",
+    "chain": "ethereum",
+    "protocol": "sky-savings",
+    "state": "system",
+    "picked_for": "the explorer's rates sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/sky-savings/0x176f3dab24a159341c0509bb36b833e7fdd0a132",
+    "chain": "ethereum",
+    "protocol": "sky-savings",
+    "state": "open",
+    "picked_for": "open holder, 20 events",
+    "source": "live pick 2026-10-24 (/api/sky-savings/positions)"
+  },
+  {
+    "page": "/ethereum/sky-savings/0x000000000000deaacbb476761b12b99b22b583eb",
+    "chain": "ethereum",
+    "protocol": "sky-savings",
+    "state": "closed",
+    "picked_for": "closed holder, 12 events",
+    "source": "live pick 2026-10-24 (/api/sky-savings/positions?status=closed)"
+  },
+  {
+    "page": "/ethereum/sky-savings/0x1601843c5e9bc251a3272907010afa41fa18347e",
+    "chain": "ethereum",
+    "protocol": "sky-savings",
+    "state": "heavy",
+    "picked_for": "35,747 events (deposits, withdrawals and transfers)",
+    "source": "live pick 2026-10-24 (/api/sky-savings/positions)"
+  },
+  {
+    "page": "/ethereum/sky-savings/0xef42cf85be6adf3081ada73af87e27996046fe63",
+    "chain": "ethereum",
+    "protocol": "sky-savings",
+    "state": "open",
+    "picked_for": "anatomy subject",
+    "source": "scripts/verify/verify-anatomy-codes.mjs"
+  },
+  {
+    "page": "/ethereum/spark",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "listing",
+    "picked_for": "the explorer's position listing",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/spark/market",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "system",
+    "picked_for": "the explorer's market sub-page",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e?folders=0",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "windowed",
+    "picked_for": "window arm of the boundary card, folders off; $2.0B supplier",
+    "source": "scripts/verify/verify-timeline-boundary-card.mjs (spark)"
+  },
+  {
+    "page": "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "grouped",
+    "picked_for": "default served-folder page; open (confirmed 2026-10-24)",
+    "source": "scripts/verify/verify-event-share.mjs; verify-served-folders-standard.mjs"
+  },
+  {
+    "page": "/ethereum/spark/0x654dff41d51c230fa400205a633101c5c1f1969c",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "liquidated",
+    "picked_for": "liquidated seven times",
+    "source": "live pick 2026-10-24 (/api/spark/positions?status=liquidated)"
+  },
+  {
+    "page": "/ethereum/spark/0xe613300cce4219251c4edb391ab211827f3eea42",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "liquidated",
+    "picked_for": "liquidated, 772 transactions",
+    "source": "live pick 2026-10-24 (/api/spark/positions?status=liquidated)"
+  },
+  {
+    "page": "/ethereum/spark/0x7432dce8e42166a02d40cde9adaf650d9923f9aa",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "closed",
+    "picked_for": "closed, 23 transactions",
+    "source": "live pick 2026-10-24 (/api/spark/positions?status=closed)"
+  },
+  {
+    "page": "/ethereum/spark/0xa906b94a4a768344b5f698459a074c73763b3256",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "liquidated",
+    "picked_for": "supply, borrow, liquidation with treasury fee, withdrawal through the WETH gateway",
+    "source": "scripts/verify/fixtures/spark-flow-legs.json (0xa906b94a)"
+  },
+  {
+    "page": "/ethereum/spark/0xe4317db5791ea5de9209b9839898ef65522b239e",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "transferred",
+    "picked_for": "spToken transfers in and out",
+    "source": "scripts/verify/fixtures/spark-flow-legs.json (0xe4317db5)"
+  },
+  {
+    "page": "/ethereum/spark/0x685ffd82e8395229974a4dc4e9034fe6108f128c",
+    "chain": "ethereum",
+    "protocol": "spark",
+    "state": "heavy",
+    "picked_for": "88 events, liquidated 33 times",
+    "source": "scripts/verify/fixtures/spark-flow-legs.json (0x685ffd82)"
+  },
+  {
+    "page": "/ethereum/yearn",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "listing",
+    "picked_for": "the explorer's own route (no position listing)",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/yearn/vaults",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "system",
+    "picked_for": "vaults overview",
+    "source": "lib/shared/protocols.ts"
+  },
+  {
+    "page": "/ethereum/yearn/vaults/0x310b7ea7475a0b449cfd73be81522f1b88efafaa",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "system",
+    "picked_for": "yvUSDT-1 vault page (6-decimal asset)",
+    "source": "scripts/verify/verify-ethereum-yearn-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/yearn/vaults/0x310b7ea7475a0b449cfd73be81522f1b88efafaa/0xb634316e06cc0b358437cbadd4dc94f1d3a92b3b",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "vault-holder-mixed",
+    "picked_for": "all four kinds (mint, burn, transfer in and out) in four logs",
+    "source": "scripts/verify/verify-ethereum-yearn-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/yearn/vaults/0x310b7ea7475a0b449cfd73be81522f1b88efafaa/0xe15a66b7b8e385caa6f69fd0d55984b96d7263cf",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "vault-holder-grouped",
+    "picked_for": "32 logs, 20 inside collapsed runs",
+    "source": "scripts/verify/verify-event-share.mjs (yearn-vaults)"
+  },
+  {
+    "page": "/ethereum/yearn/vaults/0xae7d8db82480e6d8e3873ecbf22cf17b3d8a7308/0x16388463d60ffe0661cf7f1f31a7d658ac790ff7",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "vault-holder-mixed",
+    "picked_for": "yvUSDC-2 second 6-decimal asset, mints and burns mixed with transfers",
+    "source": "scripts/verify/verify-ethereum-yearn-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/yearn/vaults/0xc56413869c6cdf96496f2b1ef801fedbdfa7ddb0/0xc7ac422595da7c1aef9e2f1119a015272c27faf7",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "vault-holder-mixed",
+    "picked_for": "yvWETH-1, 18-decimal asset",
+    "source": "scripts/verify/verify-ethereum-yearn-vault-timeline.mjs"
+  },
+  {
+    "page": "/ethereum/yearn/vaults/0x04aebe2e4301cdf5e9c57b01ebdfe4ac4b48dd13/0xb634316e06cc0b358437cbadd4dc94f1d3a92b3b",
+    "chain": "ethereum",
+    "protocol": "yearn",
+    "state": "vault-holder-heavy",
+    "picked_for": "yvmkUSD-A, 18-decimal asset and a longer life (longest known Yearn holder fixture)",
+    "source": "scripts/verify/verify-ethereum-yearn-vault-timeline.mjs"
+  },
+  {
+    "page": "/coverage/ethereum",
+    "chain": "ethereum",
+    "protocol": "coverage",
+    "state": "system",
+    "picked_for": "depth matrix for ethereum",
+    "source": "app/(site)/coverage; lib/shared/coverage.ts"
+  },
+  {
+    "page": "/coverage/base",
+    "chain": "base",
+    "protocol": "coverage",
+    "state": "system",
+    "picked_for": "depth matrix for base",
+    "source": "app/(site)/coverage; lib/shared/coverage.ts"
+  },
+  {
+    "page": "/coverage/arbitrum",
+    "chain": "arbitrum",
+    "protocol": "coverage",
+    "state": "system",
+    "picked_for": "depth matrix for arbitrum",
+    "source": "app/(site)/coverage; lib/shared/coverage.ts"
+  },
+  {
+    "page": "/coverage/sepolia",
+    "chain": "sepolia",
+    "protocol": "coverage",
+    "state": "system",
+    "picked_for": "depth matrix for sepolia",
+    "source": "app/(site)/coverage; lib/shared/coverage.ts"
+  },
+  {
+    "page": "/vaults",
+    "chain": "ethereum",
+    "protocol": "vaults",
+    "state": "system",
+    "picked_for": "cross-protocol vault index (spans chains)",
+    "source": "app/(app)/vaults/page.tsx"
+  },
+  {
+    "page": "/wallet/0xe908c2d5613d24d49e376f19715c795db8e04f81",
+    "chain": "ethereum",
+    "protocol": "wallet",
+    "state": "system",
+    "picked_for": "one wallet across chains and protocols (Base Aave V3 open, Ethereum Aave V3 open, Base Compound V3 closed)",
+    "source": "live pick 2026-10-24 (/api/chain/wallet summary)"
   }
 ]

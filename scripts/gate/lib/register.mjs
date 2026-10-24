@@ -17,6 +17,11 @@ require.extensions[".yaml"] = (module, filename) => {
   module.exports = { __esModule: true, default: parseContent(readFileSync(filename, "utf8")) };
 };
 
+// tsx compiles a `.tsx` module's JSX to `React.createElement` (the classic
+// runtime), where Next injects the automatic one: a list-filter module that
+// builds its option icons at import needs `React` in scope.
+globalThis.React ??= require("react");
+
 const serverOnly = require.resolve("server-only");
 require.cache[serverOnly] = { id: serverOnly, filename: serverOnly, loaded: true, exports: {} };
 
