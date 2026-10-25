@@ -8,13 +8,14 @@
 //    the known tools that logged (lib/makerdao/known-contracts.ts), a DeFi
 //    Saver recipe's name, a flash loan, the Sai CDP handed to Maker's
 //    migration contract, and tokens an Instadapp account received. Calls: the
-//    transaction, its receipt, and a few eth_calls per party at its block.
+//    transaction, its receipt, and a few eth_calls per party at its block;
+//    token symbols and decimals go through ./erc20-meta.
 //
 // 2. Changes to an ilk's minimum ratio between two blocks: the Spotter's
 //    LogNote for file(ilk, "mat", value), which only governance can call, and
 //    each change's block header for its date.
 //
-// SERVER-ONLY (ALCHEMY_URL via ./rpc).
+// SERVER-ONLY (ALCHEMY_URL via ./rpc, the api via ./erc20-meta).
 
 import {
   decodeAbiParameters,
@@ -28,6 +29,7 @@ import {
   type Hex,
 } from "viem";
 import { alchemyClient, chainBatchClient } from "./rpc";
+import { resolveErc20Meta } from "./erc20-meta";
 import { MAKER_ADDRESSES } from "@/lib/makerdao/asset-catalog";
 import {
   DYDX_SOLO,
@@ -58,8 +60,6 @@ const VIEWS = parseAbi([
   "function cache() view returns (address)",
   "function instaIndex() view returns (address)",
   "function proxies(address) view returns (address)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)",
 ]);
 const DSPROXY_EXECUTE = parseAbi(["function execute(address,bytes) payable returns (bytes)"]);
 
@@ -119,14 +119,12 @@ function recipeName(input: Hex): string | null {
   }
 }
 
-async function tokenMeta(token: string, blockNumber: bigint): Promise<{ symbol: string; decimals: number }> {
-  const client = chainBatchClient();
-  const address = getAddress(token);
-  const [symbol, decimals] = await Promise.all([
-    tryRead(client.readContract({ address, abi: VIEWS, functionName: "symbol", blockNumber })),
-    tryRead(client.readContract({ address, abi: VIEWS, functionName: "decimals", blockNumber })),
-  ]);
-  return { symbol: symbol ?? "tokens", decimals: decimals ?? 18 };
+/** A token's symbol and decimals through `resolveErc20Meta` (the api's
+ *  token_meta first, the chain for what it lacks): immutable, so the answer
+ *  holds at the transaction's block. */
+async function tokenMeta(token: string): Promise<{ symbol: string; decimals: number }> {
+  const m = (await resolveErc20Meta([token])).get(token.toLowerCase());
+  return { symbol: m?.named ? m.symbol : "tokens", decimals: m?.decimals ?? 18 };
 }
 
 const txCache = new Map<string, Promise<MakerTxContext>>();
@@ -172,7 +170,7 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
 
   const lent = transfers.find((t) => t.from === DYDX_SOLO);
   if (lent) {
-    const meta = await tokenMeta(lent.token, blockNumber);
+    const meta = await tokenMeta(lent.token);
     flashLoan = {
       lender: MAKER_KNOWN_CONTRACTS[DYDX_SOLO].name,
       symbol: meta.symbol === "WETH" ? "ETH" : meta.symbol,
@@ -189,7 +187,7 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
   const tokensIn: MakerTokenIn[] = [];
   for (const t of transfers) {
     if (!accounts.has(t.to) || accounts.has(t.from) || t.value === BigInt(0)) continue;
-    const meta = await tokenMeta(t.token, blockNumber);
+    const meta = await tokenMeta(t.token);
     tokensIn.push({
       to: t.to,
       from: t.from,
