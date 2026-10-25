@@ -18,6 +18,7 @@ import { buildFlowModel, type FlowModel } from "@/lib/shared/flows-timeline";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
+import { assetPriceChartContent } from "@/lib/shared/learn-more-content";
 import { lineName, shortAddress, type PageChain, type PageLine } from "@/lib/shared/asset-roster";
 
 const DAY_MS = 86_400_000;
@@ -93,6 +94,7 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
   const today = Math.floor(Date.now() / DAY_MS);
   const firstDay = prices.length ? Math.min(...prices.map((p) => p.points[0][0])) : null;
   const axis = useMemo(() => (firstDay == null ? null : axisModel(firstDay, today)), [firstDay, today]);
+  const help = useMemo(() => assetPriceChartContent(symbol), [symbol]);
   const lastOf = (key: string) => prices.find((p) => p.key === key)?.points.at(-1) ?? null;
 
   return (
@@ -111,6 +113,7 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
               failed={false}
               priceOnly
               allLines
+              priceHelp={help}
               renderBars={() => null}
             />
           </FlowUnitContext.Provider>
@@ -122,14 +125,19 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
       </div>
       <ul className="mt-4 space-y-3" data-asset-lines="" data-anatomy="A4">
         {section.lines.map((l) => (
-          <LineRow key={l.id} line={l} chain={section.chain} last={l.drawn ? lastOf(l.drawn.key) : null} />
+          <LineRow
+            key={l.id}
+            line={l}
+            chain={section.chain}
+            symbol={symbol}
+            last={l.drawn ? lastOf(l.drawn.key) : null}
+          />
         ))}
       </ul>
       {section.readAt && (
         <p className="mt-3 text-xs text-rb-500" data-asset-read-at="">
-          Oracles named as the protocols read them at block {section.readAt.block.toLocaleString("en-US")} (
-          {formatDate(new Date(`${section.readAt.date}T00:00:00Z`))}); a series before an oracle change carries the
-          oracle of its day.
+          Oracles as read at block {section.readAt.block.toLocaleString("en-US")} (
+          {formatDate(new Date(`${section.readAt.date}T00:00:00Z`))}); an earlier day carries the oracle of its day.
         </p>
       )}
     </section>
@@ -139,10 +147,12 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
 function LineRow({
   line,
   chain,
+  symbol,
   last,
 }: {
   line: PageLine;
   chain: number;
+  symbol: string;
   last: [number, number, number | null, number?] | null;
 }) {
   const href = (a: string) => explorerUrl(chain as ChainId, "address", a);
@@ -175,7 +185,7 @@ function LineRow({
         {line.series.map((s) => (
           <li key={s.key} data-asset-series={s.key}>
             <span className="text-foreground">{s.protocol}</span>
-            {s.token.symbol !== "ETH" || line.series.some((x) => x.token.symbol !== s.token.symbol)
+            {s.token.symbol !== symbol || line.series.some((x) => x.token.symbol !== s.token.symbol)
               ? ` prices ${s.token.symbol}`
               : ""}
             {s.via ? `, through ${s.via.name} ${shortAddress(s.via.address)}` : ""}

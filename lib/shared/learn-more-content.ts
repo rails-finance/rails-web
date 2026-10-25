@@ -1553,3 +1553,21 @@ export function liquityCollSurplusClaimContent(
     links,
   };
 }
+
+/** The "?" on an asset page's chart (rails-ops reference/asset-key-map.md):
+ *  a line per oracle, the picked one in colour. */
+export function assetPriceChartContent(symbol: string): LearnMoreContent {
+  return {
+    title: "How to read the price chart",
+    intro: `${symbol}'s price from each oracle a lending protocol reads on this chain, a point per completed UTC day, oldest at the left.`,
+    detailsHeading: "The parts:",
+    details: [
+      { bold: "The coloured line", text: "the oracle picked in the list at the tip's left." },
+      { bold: "The thin lines", text: "the other oracles, on the same axis." },
+      {
+        bold: "The cursor",
+        text: "press and drag the chart to move it; the tip shows the coloured line's price that day.",
+      },
+    ],
+  };
+}

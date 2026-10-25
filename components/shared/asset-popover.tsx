@@ -10,7 +10,10 @@
 // caller passes (its first line), the icon and ticker, the asset's name, its
 // contract on the chain's explorer, its price and where the price comes from.
 // A field the caller cannot fill is left out. It is one component so every
-// icon opens the same panel, and it takes more lines later (a price chart).
+// icon opens the same panel. Where the asset has a page (the Prices list's
+// row for its chain and contract, rails-ops reference/asset-key-map.md) the
+// panel ends with that row: the last day's price, the 30-day line and change,
+// and the link to the page.
 //
 // Two collisions on the cards it sits in:
 //   • the figure beside the icon is a provenance target (`data-prov-exact`):
@@ -29,12 +32,20 @@ import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
+import Link from "next/link";
+import { PriceUnitMark } from "@/components/assets/price-unit-mark";
+import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
+import { fmtRowPrice } from "@/components/assets/asset-price-row";
+import { loadAssetPrices } from "@/lib/api/fetch-asset-prices";
+import { rowFor, type AssetPriceRow } from "@/lib/shared/asset-prices";
+import { assetHref, NATIVE } from "@/lib/shared/asset-roster";
 
 const WORDS = {
   about: (symbol: string) => `About ${symbol}`,
   contract: "Contract",
   price: "Price",
   source: "Price source",
+  open: (symbol: string) => `Open ${symbol} →`,
 };
 
 const POP_W = 288;
@@ -190,6 +201,54 @@ function AssetPanelBody({
           )}
         </dl>
       )}
+      {(contract ?? (symbol === "ETH" ? NATIVE : null)) && <AssetPageRow chain={chain} contract={contract ?? NATIVE} />}
+    </div>
+  );
+}
+
+/** The asset's Prices list row and its page link, once the list is read;
+ *  nothing where the asset has no page. */
+function AssetPageRow({ chain, contract }: { chain: ChainId; contract: string }) {
+  const [row, setRow] = useState<AssetPriceRow | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadAssetPrices().then((list) => live && setRow(list ? rowFor(list, chain, contract) : null));
+    return () => {
+      live = false;
+    };
+  }, [chain, contract]);
+  if (!row) return null;
+  return (
+    <div
+      className="flex flex-col gap-1.5 border-t border-[var(--rb-tooltip-border)] pt-2"
+      data-asset-popover-line="page"
+    >
+      {row.price != null && (
+        <div className="flex items-center gap-2 tabular-nums">
+          <span className="flex flex-1 items-center gap-1">
+            <PriceUnitMark unit={row.unit} size={12} />
+            <span className="font-semibold text-foreground">{fmtRowPrice(row.price)}</span>
+          </span>
+          <PriceSparkline points={row.spark} label={`${row.symbol} over 30 days`} className="h-6 w-20" />
+          <span
+            className={`w-12 text-right ${row.change == null ? "text-rb-500" : row.change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+          >
+            {row.change == null ? "–" : fmtChange(row.change)}
+          </span>
+        </div>
+      )}
+      {row.oracle && (
+        <p className="truncate text-[11px] text-rb-500" title={row.oracle}>
+          {row.oracle}, last 30 days
+        </p>
+      )}
+      <Link
+        href={assetHref(chain, row.token)}
+        className="font-medium text-foreground hover:underline"
+        data-asset-popover-open={assetHref(chain, row.token)}
+      >
+        {WORDS.open(row.symbol)}
+      </Link>
     </div>
   );
 }

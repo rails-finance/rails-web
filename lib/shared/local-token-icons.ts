@@ -111,6 +111,7 @@ export const LOCAL_TOKEN_ICONS: Record<string, string> = {
   amznc: "amznc.png",
   bd: "bd.png",
   bold: "bold.png",
+  btc: "btc.png",
   crv: "crv.png",
   dai: "dai.png",
   ebusd: "ebusd.png",

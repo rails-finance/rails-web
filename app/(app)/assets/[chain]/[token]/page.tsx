@@ -12,7 +12,7 @@ import { notFound } from "next/navigation";
 import { AssetPriceChart } from "@/components/assets/asset-price-chart";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fetchAssetRosterServer } from "@/lib/api/fetch-asset-roster-server";
-import { assetHref, assetPage, chainName, chainOfSlug } from "@/lib/shared/asset-roster";
+import { assetHref, assetPage, chainOfSlug, pageLinks } from "@/lib/shared/asset-roster";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +38,7 @@ export default async function AssetPage({ params }: { params: Params }) {
   const answer = await fetchAssetRosterServer(token);
   const page = answer ? assetPage(answer, chain) : null;
   if (!page) notFound();
-  const links = [
-    ...(page.underlying ? [{ ...page.underlying, word: "Wraps" }] : []),
-    ...page.wrapped.map((w) => ({ ...w, word: `Wrapped on ${chainName(w.chain)} as` })),
-  ];
+  const links = pageLinks(page);
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -50,19 +47,20 @@ export default async function AssetPage({ params }: { params: Params }) {
             <TokenChipIcon symbol={page.symbol} address={page.token} size={24} filterable={false} untitled />
             {page.symbol}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-rb-500">
-            The price each lending protocol reads for {page.symbol}, a line per oracle, named with the protocols that
-            read it. Each line is a price per completed UTC day.
-          </p>
           {links.length > 0 && (
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm" data-asset-links="">
-              {links.map((l) => (
-                <span key={`${l.chain}:${l.token}`}>
-                  <span className="text-rb-500">{l.word} </span>
-                  <Link href={assetHref(l.chain, l.token)} className="font-medium text-foreground hover:underline">
-                    {l.symbol}
-                    {" →"}
-                  </Link>
+              {links.map((g) => (
+                <span key={g.id}>
+                  <span className="text-rb-500">{g.word} </span>
+                  {g.assets.map((l, i) => (
+                    <span key={`${l.chain}:${l.token}`}>
+                      {i > 0 && <span className="text-rb-500">, </span>}
+                      <Link href={assetHref(l.chain, l.token)} className="font-medium text-foreground hover:underline">
+                        {l.symbol}
+                      </Link>
+                    </span>
+                  ))}
+                  <span className="text-rb-500"> →</span>
                 </span>
               ))}
             </p>

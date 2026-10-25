@@ -23,6 +23,7 @@
 // `oracleUsd: { why }` cell shows) in place of the generic "not yet".
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ChevronDown, Coins } from "lucide-react";
 import { fmtNative, fmtPrice, PricePill } from "@/components/shared/price-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -261,6 +262,16 @@ export function LatestPrices({
               </p>
             )
           )}
+          <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
+          <Link
+            href="/assets"
+            role="menuitem"
+            className="mx-1 flex min-h-11 items-center rounded-md px-3 text-xs font-medium text-foreground hover:bg-[var(--surface-hover)] sm:min-h-8"
+            data-latest-prices-all=""
+            data-anatomy="H7.2.1"
+          >
+            All prices →
+          </Link>
         </div>
       )}
     </div>

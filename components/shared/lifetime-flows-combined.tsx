@@ -299,6 +299,8 @@ export interface CombinedFlowsProps {
   /** Draw every series in `prices` on one axis, the picked one in its hue and
    *  the others thin beneath it (an asset page's line per oracle). */
   allLines?: boolean;
+  /** The price chart's "?" where the caller words it (an asset page). */
+  priceHelp?: LearnMoreContent;
   /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
    *  last stop, where no outline of today's length is drawn. */
   renderBars: (barStop: number, when: string, isLive: boolean, atLive: boolean) => ReactNode;
@@ -315,6 +317,7 @@ export function CombinedFlows({
   priceOnly = false,
   onLedgerNote,
   allLines = false,
+  priceHelp,
   renderBars,
 }: CombinedFlowsProps) {
   // A cut restored from the address bar puts the cursor on its day, which
@@ -644,7 +647,8 @@ export function CombinedFlows({
     : null;
   const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
   const stackHelp = lifetimeFlowsStackContent({ events: marks, charts: { value: true, price: priceBrief } });
-  const priceOnlyHelp = lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
+  const priceOnlyHelp =
+    priceHelp ?? lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
 
   const barsBlock = (
     <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">

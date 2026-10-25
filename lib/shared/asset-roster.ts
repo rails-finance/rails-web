@@ -3,13 +3,18 @@
 // one line per oracle, each named with the protocols that read it.
 //
 // A page for a token gathers the token's entries on every chain that lists
-// the same address (native ETH's 0xeeee…eeee sentinel, cbBTC's one address on
-// Ethereum and Base), and an underlying's page adds its wrapped tokens' lines
-// on each chain (ETH draws WETH's readers), so two entries reading one oracle
-// stand on one line. A line draws one series, its earliest; the line's other
+// the same address (native ETH's 0xeeee…eeee sentinel, BTC's 0xbbbb…bbbb,
+// cbBTC's one address on Ethereum and Base), and an underlying's page adds the
+// lines of the tokens that wrap it one for one on each chain (ETH draws
+// WETH's readers, BTC draws cbBTC's, WBTC's and tBTC's), so two entries
+// reading one oracle stand on one line. A token priced as its underlying
+// times a rate (wstETH) is linked and drawn on its page alone. A line draws one series, its earliest; the line's other
 // series read the same oracle and are listed with it.
 
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
+
+/** Native ETH's key on every chain (BTC's is 0xbbbb…bbbb, Chainlink's Denominations address). */
+export const NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
 export interface RosterOracle {
   address: string;
@@ -34,9 +39,15 @@ export interface RosterAssetRef {
   token: string;
   symbol: string;
 }
+/** `wraps`: one for one (WETH, cbBTC, USDbC); `rate`: the underlying times
+ *  an exchange rate (wstETH). */
+export type LinkKind = "wraps" | "rate";
+export interface RosterLinkRef extends RosterAssetRef {
+  kind?: LinkKind;
+}
 export interface RosterAsset extends RosterAssetRef {
-  underlying: RosterAssetRef | null;
-  wrapped: RosterAssetRef[];
+  underlying: RosterLinkRef | null;
+  wrapped: RosterLinkRef[];
   lines: RosterLine[];
 }
 export interface AssetRosterAnswer {
@@ -72,8 +83,8 @@ export interface AssetPage {
   symbol: string;
   token: string;
   /** The underlying this token wraps, and the tokens that wrap this one. */
-  underlying: RosterAssetRef | null;
-  wrapped: RosterAssetRef[];
+  underlying: RosterLinkRef | null;
+  wrapped: RosterLinkRef[];
   chains: PageChain[];
 }
 
@@ -114,9 +125,10 @@ export function assetPage(answer: AssetRosterAnswer, chain: number): AssetPage |
     }
   };
   for (const a of own) add(a);
-  // An underlying's page carries its wrapped tokens' lines; a wrapper's page
-  // carries its own only.
-  for (const a of answer.related) if (a.underlying && own.some((o) => o.token === a.underlying!.token)) add(a);
+  // An underlying's page carries the lines of the tokens that wrap it one for
+  // one; a wrapper's page, and a rate token's, carry their own only.
+  for (const a of answer.related)
+    if (a.underlying && a.underlying.kind !== "rate" && own.some((o) => o.token === a.underlying!.token)) add(a);
   const chains: PageChain[] = [...byChain]
     .sort(([a], [b]) => (a === first.chain ? -1 : b === first.chain ? 1 : a - b))
     .map(([c, lines]) => {
@@ -145,4 +157,32 @@ export function shortAddress(a: string): string {
 /** A line's name in the chart's list: the oracle and the protocols on it. */
 export function lineName(l: PageLine): string {
   return `${l.oracle.name} · ${l.protocols.join(", ")}`;
+}
+
+/** The heading's links, one group per relation and chain: "Wraps BTC",
+ *  "Wrapped on Ethereum as WBTC, cbBTC, tBTC", "Priced from ETH". */
+export interface PageLinkGroup {
+  id: string;
+  word: string;
+  assets: RosterAssetRef[];
+}
+export function pageLinks(page: AssetPage): PageLinkGroup[] {
+  const groups: PageLinkGroup[] = [];
+  const u = page.underlying;
+  if (u) groups.push({ id: "under", word: u.kind === "rate" ? "Priced from" : "Wraps", assets: [u] });
+  for (const w of page.wrapped) {
+    const rate = w.kind === "rate";
+    const id = `${rate ? "rate" : "wraps"}:${w.chain}`;
+    let g = groups.find((x) => x.id === id);
+    if (!g) {
+      g = {
+        id,
+        word: rate ? `Priced from it on ${chainName(w.chain)}:` : `Wrapped on ${chainName(w.chain)} as`,
+        assets: [],
+      };
+      groups.push(g);
+    }
+    if (!g.assets.some((a) => a.chain === w.chain && a.token === w.token)) g.assets.push(w);
+  }
+  return groups;
 }
