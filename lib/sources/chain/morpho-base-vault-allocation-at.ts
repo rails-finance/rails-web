@@ -64,10 +64,6 @@ import { chainLogsBatchClient } from "./rpc";
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
-/** The endpoint these reads run on, named rather than resolved: a receipt
- *  states the NAME because the URL carries a key. */
-export const MORPHO_BASE_ALLOCATION_LANE = "BASE_BACKFILL_RPC_URL";
-
 /** Calls in flight at once: three of the client's 60-call requests. The lane's
  *  limit is compute units per SECOND, so the cap that matters is concurrency,
  *  not total. */
@@ -196,7 +192,7 @@ export async function loadMorphoBaseVaultAllocationAt(
   try {
     client = chainLogsBatchClient(MORPHO_BASE_CHAIN_ID);
   } catch {
-    // MORPHO_BASE_ALLOCATION_LANE unset: every block below is unread.
+    // BASE_BACKFILL_RPC_URL unset: every block below is unread.
   }
   const vaultAddress = vault.toLowerCase();
   const blue = MORPHO_BASE_BLUE.toLowerCase();
