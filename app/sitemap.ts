@@ -1,4 +1,5 @@
 import { MetadataRoute } from "next";
+import { unstable_cache } from "next/cache";
 import { SITE_URL } from "@/lib/shared/page-metadata";
 import { LAUNCHED_PROTOCOLS, isUnlaunchedPath, launchedChains } from "@/lib/shared/protocols";
 import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereum-vault-directory";
@@ -23,10 +24,25 @@ import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 // the two vault legs ask `isUnlaunchedPath` about the roster entry they hang
 // off — so an explorer rejoins this file by losing its flag, with no edit here.
 
+/** The Ethereum vault addresses Aave's own enumerators name, held for six
+ *  hours (rails-ops ui-jobs 444): the read is a chain sweep, crawlers drive
+ *  it, and a vault deployed today waiting hours for its sitemap line costs
+ *  nothing. A read that does not answer throws, so it is not held. */
+const SITEMAP_VAULTS_REVALIDATE_S = 6 * 3600;
+const ethereumVaultAddresses = unstable_cache(
+  async (): Promise<string[]> => {
+    const directory = await loadAaveEthereumVaultDirectory();
+    if (directory.chainStale) throw new Error("the vault directory answered stale");
+    return directory.rows.map((row) => row.address);
+  },
+  ["sitemap-aave-ethereum-vaults"],
+  { revalidate: SITEMAP_VAULTS_REVALIDATE_S },
+);
+
 /** The Ethereum vault pages — one per vault Aave's own enumerators name, asked
  *  of the chain rather than restated here, so a vault deployed tomorrow is in
- *  the sitemap the day after without an edit. The reading is cached for five
- *  minutes by the loader; a read that does not answer contributes NOTHING
+ *  the sitemap the day after without an edit. The list is held for six hours
+ *  (`ethereumVaultAddresses`); a read that does not answer contributes NOTHING
  *  rather than a guess, because a sitemap that names a page which does not
  *  exist is worse than a sitemap that names fewer.
  *
@@ -38,10 +54,9 @@ async function ethereumVaultPages(): Promise<MetadataRoute.Sitemap> {
   // here, and the chain read that would enumerate them is not made at all.
   if (isUnlaunchedPath(ethereumVaultRosterHref())) return [];
   try {
-    const directory = await loadAaveEthereumVaultDirectory();
-    if (directory.chainStale) return [];
-    return directory.rows.map((row) => ({
-      url: `${SITE_URL}${ethereumVaultHref(row.address)}`,
+    const addresses = await ethereumVaultAddresses();
+    return addresses.map((address) => ({
+      url: `${SITE_URL}${ethereumVaultHref(address)}`,
       lastModified: new Date(),
       changeFrequency: "daily" as const,
       priority: 0.6,

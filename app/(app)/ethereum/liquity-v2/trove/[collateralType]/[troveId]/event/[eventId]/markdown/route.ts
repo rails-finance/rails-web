@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { unstable_cache } from "next/cache";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { decodeEventId } from "@/lib/shared/page-metadata";
@@ -6,7 +7,7 @@ import { loadTroveHistory } from "@/lib/liquity/trove-page-data";
 import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { liquityEventPageMarkdown, liquityEventPath } from "@/lib/liquity/event-page-markdown";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { readTroveCollSurplus } from "@/lib/sources/chain/liquity-coll-surplus";
+import { readTroveCollSurplus, type CollSurplusClaim } from "@/lib/sources/chain/liquity-coll-surplus";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { liquityBranchObs, type DayObs } from "@/lib/shared/price-series";
 
@@ -16,6 +17,12 @@ import { liquityBranchObs, type DayObs } from "@/lib/shared/price-series";
 // parameter with a suffix). Built per request from the reads the event page
 // makes (lib/liquity/event-page-markdown.ts); nothing is stored (rails-ops
 // decision 0036). `noindex`, with the HTML page as the canonical.
+//
+// Every read but one is the api's. The one chain read, a liquidated Trove's
+// collateral surplus (`readTroveCollSurplus`), is held for three hours per
+// liquidation (rails-ops ui-jobs 444): agents and crawlers fetch this path, and
+// the read is several RPC calls. A claim made inside that window reaches this
+// text when it lapses; the event page reads it live.
 
 export const runtime = "nodejs";
 // The event page renders per request; so does this.
@@ -35,6 +42,32 @@ const text = (status: number, body: string) =>
     status,
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": NO_STORE },
   });
+
+const SURPLUS_REVALIDATE_S = 3 * 3600;
+
+/** The surplus read, reduced to what the Markdown states, held per liquidation.
+ *  A failed read throws, so it is not held. */
+const heldSurplus = unstable_cache(
+  async (
+    troveManager: string,
+    owner: string,
+    liquidationTx: string,
+    decimals: number,
+    priceFeed: string,
+  ): Promise<{ credited: boolean; claimed: CollSurplusClaim | null }> => {
+    const d = await readTroveCollSurplus({
+      chainId: MAINNET_CHAIN_ID,
+      troveManager,
+      owner,
+      liquidationTx,
+      decimals,
+      priceFeed,
+    });
+    return { credited: d.pool != null && d.surplusRaw !== "0", claimed: d.claimed };
+  },
+  ["liquity-v2-event-md-surplus"],
+  { revalidate: SURPLUS_REVALIDATE_S },
+);
 
 /** The branch's daily price as the page's hook keeps it: the observations, or
  *  null where the read failed or answered none. */
@@ -75,17 +108,8 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   const [dailyColl, surplus] = await Promise.all([
     dailyBranch ? dailyPrices(dailyBranch, readerIp) : Promise.resolve(null),
     trove.status === "liquidated" && holder.address && lastLiquidation && branch
-      ? readTroveCollSurplus({
-          chainId: MAINNET_CHAIN_ID,
-          troveManager: branch.troveManager,
-          owner: holder.address,
-          liquidationTx: lastLiquidation.txHash,
-          decimals: branch.decimals,
-          priceFeed: branch.priceFeed,
-        })
-          .then((d) =>
-            d.pool && d.surplusRaw !== "0" ? { creditTx: lastLiquidation.txHash, claimed: d.claimed } : null,
-          )
+      ? heldSurplus(branch.troveManager, holder.address, lastLiquidation.txHash, branch.decimals, branch.priceFeed)
+          .then((d) => (d.credited ? { creditTx: lastLiquidation.txHash, claimed: d.claimed } : null))
           .catch(() => null)
       : Promise.resolve(null),
   ]);

@@ -5,8 +5,8 @@
 // static roster card rather than throwing through the route.
 //
 // The ONE difference of substance from the position seam: an event is
-// IMMUTABLE. A position's numbers move on every visit, so `positionImage`
-// caches its result for five minutes at the edge; a decoded on-chain event
+// IMMUTABLE. A position's numbers move, so `positionImage` caches its result
+// for six hours at the edge; a decoded on-chain event
 // never changes, so a FOUND event's image is cached for a year, `immutable` —
 // once a scraper (or a CDN) has it, it never needs to ask again. The
 // not-found/fallback path keeps the SHORT cache: a scraper that arrives
@@ -21,7 +21,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { renderEventCard, type EventCardModel } from "@/lib/share/event-card";
 
 const FOUND_CACHE_CONTROL = "public, max-age=31536000, immutable";
-// Mirrors `positionImage`'s fallback cache exactly — see that file for why
+// Mirrors `positionImage`'s fallback cache — see that file for why
 // the fallback PNG itself must not be cached long either.
 const FALLBACK_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
 

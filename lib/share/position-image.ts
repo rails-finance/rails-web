@@ -16,13 +16,15 @@ import { renderPositionCard, type PositionCardModel } from "@/lib/share/position
 
 // `ImageResponse` defaults to a Cache-Control tuned for a static asset
 // (`public, immutable, no-transform, max-age=31536000` — see
-// node_modules/next/dist/compiled/@vercel/og). A live position's numbers move
-// on every visit, so that default would let a CDN or a scraper serve a
-// year-old balance. This is short-lived at the edge (5 minutes) with a decent
-// stale-while-revalidate window, and applies to the fallback PNG too — a
-// wallet that later gets a real position must not stay stuck behind a cached
-// "never seen" card for a year either.
-const CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
+// node_modules/next/dist/compiled/@vercel/og). A live position's numbers move,
+// so that default would let a CDN or a scraper serve a year-old balance. A
+// drawn card is held at the edge for six hours (rails-ops ui-jobs 444): an
+// unfurl is fetched by bots, and every render reads the chain, so a scraper's
+// repeat visits must not each pay for one. The fallback PNG stays at five
+// minutes: a wallet that later gets a real position, or a read that failed,
+// must not stay stuck behind a cached "never seen" card.
+const CACHE_CONTROL = "public, max-age=0, s-maxage=21600, stale-while-revalidate=86400";
+const FALLBACK_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
 
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 
@@ -31,7 +33,7 @@ async function staticFallback(session: SessionProtocol | undefined): Promise<Res
   const rel = (entry ? protocolShareImage(entry.id) : HOME_SHARE_IMAGE).replace(/^\//, "");
   const bytes = await readFile(path.join(PUBLIC_DIR, rel));
   return new Response(new Uint8Array(bytes), {
-    headers: { "Content-Type": "image/png", "Cache-Control": CACHE_CONTROL },
+    headers: { "Content-Type": "image/png", "Cache-Control": FALLBACK_CACHE_CONTROL },
   });
 }
 
