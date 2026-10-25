@@ -72,7 +72,6 @@ const COMPTROLLER_ABI = parseAbi([
 ]);
 
 const CTOKEN_ABI = parseAbi([
-  "function symbol() view returns (string)",
   "function underlying() view returns (address)",
   "function totalSupply() view returns (uint256)",
   "function totalBorrows() view returns (uint256)",
@@ -243,13 +242,12 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
       }),
     ]);
 
-    const PER_MARKET = 12;
+    const PER_MARKET = 11;
     const results = (await client.multicall({
       allowFailure: true,
       contracts: cTokens.flatMap(
         (c) =>
           [
-            { address: c, abi: CTOKEN_ABI, functionName: "symbol" },
             { address: c, abi: CTOKEN_ABI, functionName: "underlying" },
             { address: c, abi: CTOKEN_ABI, functionName: "totalSupply" },
             { address: c, abi: CTOKEN_ABI, functionName: "totalBorrows" },
@@ -267,7 +265,7 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
 
     // Each market's own rate model: its annualization constant and its kink.
     // Both are per-model, and the roster runs several models — see IRM_ABI.
-    const irmOf = cTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 11]));
+    const irmOf = cTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 10]));
     const irmRes = (await client.multicall({
       allowFailure: true,
       contracts: irmOf.flatMap((irm) => {
@@ -279,17 +277,18 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
       }),
     })) as Res[];
 
-    // Name the underlyings in one cached multicall. cETH is skipped (no
-    // contract to ask), but the bytes32-symbol tokens are NOT: only their
-    // symbol() is undecodable — decimals() answers fine, and the resolver is
-    // already making that call. Overriding just the symbol below keeps SAI's
-    // and MKR's scale a chain read rather than a catalog assumption.
+    // Name the cTokens and their underlyings in one resolver call (the api's
+    // token_meta first, the chain for what it lacks). cETH's underlying is
+    // skipped (no contract to ask), but the bytes32-symbol tokens are NOT: only
+    // their symbol() is undecodable — decimals() answers fine, and the resolver
+    // is already making that call. Overriding just the symbol below keeps SAI's
+    // and MKR's scale the token's answer rather than a catalog assumption.
     const wanted: string[] = [];
     cTokens.forEach((c, i) => {
-      const und = ok<string>(results[i * PER_MARKET + 1]);
+      const und = ok<string>(results[i * PER_MARKET]);
       if (und && !isZeroAddr(und)) wanted.push(und);
     });
-    const meta = await resolveErc20Meta(wanted);
+    const meta = await resolveErc20Meta([...cTokens, ...wanted]);
     // Every market figure scales by its underlying's decimals: without them the
     // read fails whole rather than state amounts scaled by the 18 stand-in.
     assertDecimalsRead(meta, wanted);
@@ -310,8 +309,9 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
     const markets: CompoundV2MarketRow[] = cTokens.map((c, i) => {
       const base = i * PER_MARKET;
       const cToken = getAddress(c).toLowerCase();
-      const und = ok<string>(results[base + 1]);
+      const und = ok<string>(results[base]);
       const underlying = und && !isZeroAddr(und) ? getAddress(und).toLowerCase() : null;
+      const cMeta = meta.get(cToken);
 
       // Identity, in the order of who can actually answer: the native-ETH
       // market has no contract to ask; SAI and MKR answer in bytes32 the shared
@@ -336,11 +336,11 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
         underlyingDecimals = m?.decimals ?? 18;
       }
 
-      const exchangeRate = ok<bigint>(results[base + 4]);
-      const totalSupplyCTokens = ok<bigint>(results[base + 2]);
-      const totalBorrowsRaw = ok<bigint>(results[base + 3]);
-      const cashRaw = ok<bigint>(results[base + 5]);
-      const reservesRaw = ok<bigint>(results[base + 6]);
+      const exchangeRate = ok<bigint>(results[base + 3]);
+      const totalSupplyCTokens = ok<bigint>(results[base + 1]);
+      const totalBorrowsRaw = ok<bigint>(results[base + 2]);
+      const cashRaw = ok<bigint>(results[base + 4]);
+      const reservesRaw = ok<bigint>(results[base + 5]);
 
       // Supplied underlying = cTokens × exchangeRateStored / 1e18, where the
       // rate is scaled 1e(18 + ud − 8): the cToken's 8dp and the rate's excess
@@ -362,7 +362,7 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
       const priceHasFeed = cfg != null ? !isZeroAddr(cfg.priceFeed) : true;
       const priceFeed = cfg != null && !isZeroAddr(cfg.priceFeed) ? getAddress(cfg.priceFeed).toLowerCase() : null;
 
-      const mkt = ok<readonly [boolean, bigint, boolean]>(results[base + 10]);
+      const mkt = ok<readonly [boolean, bigint, boolean]>(results[base + 9]);
       const cfMantissa = mkt ? mkt[1] : null;
       // collateralFactor == 0 is not a 0% rung — it is "disabled as collateral".
       // Null the value so no surface can render the parameter as if it existed.
@@ -383,7 +383,7 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
 
       return {
         cToken,
-        cTokenSymbol: ok<string>(results[base]) ?? "—",
+        cTokenSymbol: cMeta?.named ? cMeta.symbol : "—",
         underlying,
         underlyingSymbol,
         underlyingDecimals,
@@ -406,10 +406,10 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
         collateralDisabled,
         isListed: mkt ? mkt[0] : false,
 
-        supplyApr: apr(results[base + 8]),
-        borrowApr: apr(results[base + 7]),
+        supplyApr: apr(results[base + 7]),
+        borrowApr: apr(results[base + 6]),
         reserveFactor: (() => {
-          const v = ok<bigint>(results[base + 9]);
+          const v = ok<bigint>(results[base + 8]);
           return v != null ? Number(v) / 1e18 : null;
         })(),
 
