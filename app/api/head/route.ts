@@ -10,8 +10,18 @@
 // 2s against Ethereum's 12s, so one shared TTL would either stale the L2 stamp
 // or spend six times the RPC on L1. An unknown or absent chain reads Ethereum,
 // which is what every existing caller wants.
+//
+// Ethereum and Base read rails-server's GET /api/head (rails-ops ui-jobs 444):
+// the newest block the index has captured, from Sieve's checkpoint, with no RPC
+// in the path. That block is what every index-served figure is stated at, so
+// the stamp says "indexed to" (`source: "index"`), and a stalled capture shows
+// as an old stamp. Arbitrum and Sepolia have no Sieve head and read `latest`
+// over RPC (`source: "rpc"`); so does Ethereum or Base when the api does not
+// answer.
 
 import { NextRequest, NextResponse } from "next/server";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import {
   ARBITRUM_CHAIN_ID,
@@ -27,7 +37,17 @@ export const runtime = "nodejs";
 interface ChainHead {
   blockNumber: number;
   blockTimestamp: number;
+  /** "index": the newest block the index holds (the api's Sieve head);
+   *  "rpc": the chain's `latest`. */
+  source: "index" | "rpc";
 }
+
+/** The chains whose head the api serves. */
+const INDEXED: ReadonlySet<ChainId> = new Set([MAINNET_CHAIN_ID, BASE_CHAIN_ID]);
+/** The api caches its head for 5 s; asking more often re-reads its cache. */
+const INDEX_TTL_FLOOR_MS = 5_000;
+/** Past this the RPC read answers instead. */
+const INDEX_TIMEOUT_MS = 2_500;
 
 /** Roughly one block, per chain — a reload inside the same block re-serves. */
 const TTL_MS: Record<ChainId, number> = {
@@ -43,10 +63,38 @@ const TTL_MS: Record<ChainId, number> = {
 const cache = new Map<ChainId, { at: number; data: ChainHead }>();
 const inflight = new Map<ChainId, Promise<ChainHead>>();
 
-async function readHead(chainId: ChainId): Promise<ChainHead> {
+async function readRpcHead(chainId: ChainId): Promise<ChainHead> {
   const b = await chainClient(chainId).getBlock({ blockTag: "latest" });
-  return { blockNumber: Number(b.number), blockTimestamp: Number(b.timestamp) };
+  return { blockNumber: Number(b.number), blockTimestamp: Number(b.timestamp), source: "rpc" };
 }
+
+/** The api's head, or null where it was not asked or did not answer. */
+async function readIndexHead(chainId: ChainId, readerIp: string | undefined): Promise<ChainHead | null> {
+  const api = process.env.RAILS_API_URL;
+  if (!api || !INDEXED.has(chainId)) return null;
+  try {
+    const res = await fetch(
+      `${api}/api/head?chain=${chainId}`,
+      createAuthFetchOptions({ cache: "no-store", signal: AbortSignal.timeout(INDEX_TIMEOUT_MS) }, readerIp),
+    );
+    if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    const d = (await res.json()) as { blockNumber?: unknown; blockTimestamp?: unknown };
+    if (typeof d.blockNumber !== "number" || typeof d.blockTimestamp !== "number") return null;
+    return { blockNumber: d.blockNumber, blockTimestamp: d.blockTimestamp, source: "index" };
+  } catch {
+    return null;
+  }
+}
+
+async function readHead(chainId: ChainId, readerIp: string | undefined): Promise<ChainHead> {
+  return (await readIndexHead(chainId, readerIp)) ?? readRpcHead(chainId);
+}
+
+const ttlOf = (chainId: ChainId, head: ChainHead) =>
+  head.source === "index" ? Math.max(TTL_MS[chainId], INDEX_TTL_FLOOR_MS) : TTL_MS[chainId];
 
 function parseChain(raw: string | null): ChainId {
   const n = Number(raw);
@@ -57,11 +105,11 @@ export async function GET(request: NextRequest) {
   const chainId = parseChain(request.nextUrl.searchParams.get("chain"));
   try {
     const hit = cache.get(chainId);
-    if (hit && Date.now() - hit.at < TTL_MS[chainId]) return NextResponse.json(hit.data);
+    if (hit && Date.now() - hit.at < ttlOf(chainId, hit.data)) return NextResponse.json(hit.data);
     // Single-flight per chain: concurrent misses share one upstream read.
     let pending = inflight.get(chainId);
     if (!pending) {
-      pending = readHead(chainId).finally(() => inflight.delete(chainId));
+      pending = readHead(chainId, readerIpFromRequest(request)).finally(() => inflight.delete(chainId));
       inflight.set(chainId, pending);
     }
     const data = await pending;

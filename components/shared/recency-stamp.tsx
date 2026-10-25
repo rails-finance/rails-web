@@ -1,9 +1,12 @@
 "use client";
 
 // Recency stamp — decision 0006's freshness signal on the live/current surfaces.
-// "▣ 2 min": how long ago the latest block of the ROUTE'S OWN CHAIN was
-// minted, so staleness is legible and the user can judge whether a reload is
-// worth it (the reload IS the refresh — no button). The age ticks client-side
+// "▣ 2 min": how long ago the block the page is current to on the ROUTE'S OWN
+// CHAIN was minted, so staleness is legible and the user can judge whether a
+// reload is worth it (the reload IS the refresh — no button). On Ethereum and
+// Base that block is the newest one the index holds (`/api/head` source
+// "index", ui-jobs 444), so a stalled capture reads as an old stamp; on
+// Arbitrum and Sepolia it is the chain's latest. The age ticks client-side
 // off the block timestamp; the head only re-pulls on focus / reload.
 // Fail-soft: renders nothing when the chain head is unavailable.
 //
@@ -79,7 +82,7 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
       type="button"
       data-anatomy="H6"
       onClick={toggle}
-      aria-label={`Chain head minted ${age} ago, block ${block}. Press to show the ${showAge ? "block number" : "age"}.`}
+      aria-label={`${head.source === "index" ? `Indexed to block ${block}, minted ${age} ago` : `Chain head minted ${age} ago, block ${block}`}. Press to show the ${showAge ? "block number" : "age"}.`}
       // The control grammar: the stamp reads as pressable. Same height and
       // radius as the price trigger beside it, one type size down.
       className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}

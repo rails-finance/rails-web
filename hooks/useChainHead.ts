@@ -6,9 +6,13 @@ import { useChainId } from "@/lib/shared/chain-context";
 export interface ChainHead {
   blockNumber: number;
   blockTimestamp: number;
+  /** "index": the newest block the index holds (Ethereum, Base); "rpc": the
+   *  chain's latest (Arbitrum, Sepolia, or the api not answering). */
+  source?: "index" | "rpc";
 }
 
-// Fetches the current chain head (block + timestamp) from /api/head once on
+// Fetches the page's head (block + timestamp; on Ethereum and Base the newest
+// block the index holds, see app/api/head/route.ts) from /api/head once on
 // mount and again when the tab regains focus. The chain comes from context, so
 // a Base route group stamps a Base block — a page that read Base state must not
 // date itself by an Ethereum block, which is the same figure rendered against
