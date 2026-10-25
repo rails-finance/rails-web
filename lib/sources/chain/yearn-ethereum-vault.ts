@@ -26,8 +26,9 @@
 // Next's data cache; a vault page is one address at the head, read per request,
 // as the MetaMorpho vault page is.
 
-import { parseAbi } from "viem";
+import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainBatchClient } from "./rpc";
+import { erc20NameOf, resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 import { yearnRosterEntry } from "@/lib/yearn/vault-roster";
@@ -35,7 +36,6 @@ import { YEARN_CHAIN_ID } from "./yearn-ethereum-vault-directory";
 
 const VAULT_ABI = parseAbi([
   "function name() view returns (string)",
-  "function symbol() view returns (string)",
   "function totalAssets() view returns (uint256)",
   "function totalSupply() view returns (uint256)",
   "function totalIdle() view returns (uint256)",
@@ -47,11 +47,6 @@ const VAULT_ABI = parseAbi([
   "function profitMaxUnlockTime() view returns (uint256)",
   "function isShutdown() view returns (bool)",
   "function apiVersion() view returns (string)",
-  // The share token's own decimals. READ rather than assumed, although a Yearn
-  // V3 vault mirrors its asset's: the exponent every share price on the holder
-  // lane is asked with is this number, and most of this roster is 6-decimal, so
-  // a default of 18 would be a trillion-fold error stated as a price.
-  "function decimals() view returns (uint8)",
   "function balanceOf(address) view returns (uint256)",
   "function maxWithdraw(address) view returns (uint256)",
 ]);
@@ -62,10 +57,10 @@ const STRATEGY_ABI = parseAbi([
   "function name() view returns (string)",
 ]);
 
-/** The vault's own calls, in the order the first Multicall3 wave makes them. */
+/** The vault's own calls, in the order the first Multicall3 wave makes them;
+ *  `isEndorsed` on the registry follows, then `name()` where the api did not
+ *  hold one. */
 const CALLS = [
-  "name",
-  "symbol",
   "totalAssets",
   "totalSupply",
   "totalIdle",
@@ -77,7 +72,6 @@ const CALLS = [
   "profitMaxUnlockTime",
   "isShutdown",
   "apiVersion",
-  "decimals",
 ] as const;
 
 type Call = { status: string; result?: unknown };
@@ -117,9 +111,10 @@ export interface YearnVaultResponse {
   vault: {
     /** Lowercased vault address — its identity and its route. */
     address: string;
-    /** `name()` at the block; null when the call did not answer. */
+    /** `name()`: the api's token_meta row, else the call at the block; null
+     *  when neither answered. */
     name: string | null;
-    /** `symbol()` at the block; null when the call did not answer. */
+    /** `symbol()`, through resolveErc20Meta; null when it did not answer. */
     symbol: string | null;
     /** The catalogue's snapshot of the name, for a header that has no live one. */
     censusName: string;
@@ -156,7 +151,7 @@ export interface YearnVaultResponse {
     shutdown: boolean | null;
     /** `Registry.isEndorsed(vault)` at the block. Null is not false. */
     endorsed: boolean | null;
-    /** The share token's own `decimals()` at the block. A Yearn V3 vault
+    /** The share token's own `decimals()`, through resolveErc20Meta. A Yearn V3 vault
      *  mirrors its asset's decimals and adds no offset — unlike MetaMorpho,
      *  whose factory adds a `DECIMALS_OFFSET()` — but this is the READING of
      *  it, and it is what the holder lane's share prices are asked with. Null
@@ -222,34 +217,45 @@ export async function loadYearnEthereumVault(address: string, holder?: string): 
 
   try {
     const client = chainBatchClient(YEARN_CHAIN_ID);
-    // ONE block read; every call below is pinned to it.
-    const blockNumber = await client.getBlockNumber();
+    // ONE block read; every call below is pinned to it. Beside it, the share
+    // token's symbol and decimals, and its name where that was read, through
+    // resolveErc20Meta (the api's token_meta first, the chain for what it
+    // lacks): immutable, so they hold at the block. The decimals are READ
+    // rather than assumed, although a Yearn V3 vault mirrors its asset's: the
+    // exponent every share price on the holder lane is asked with is this
+    // number, and most of this roster is 6-decimal, so a default of 18 would be
+    // a trillion-fold error stated as a price.
     const vault = entry.address as `0x${string}`;
+    const [blockNumber, metas] = await Promise.all([
+      client.getBlockNumber(),
+      resolveErc20Meta([entry.address], YEARN_CHAIN_ID),
+    ]);
+    const shareMeta = metas.get(entry.address.toLowerCase());
+    const storedName = erc20NameOf(entry.address, YEARN_CHAIN_ID);
     const decimals = entry.asset.decimals;
 
+    const contracts: ContractFunctionParameters[] = [
+      { address: vault, abi: VAULT_ABI, functionName: "totalAssets" },
+      { address: vault, abi: VAULT_ABI, functionName: "totalSupply" },
+      { address: vault, abi: VAULT_ABI, functionName: "totalIdle" },
+      { address: vault, abi: VAULT_ABI, functionName: "totalDebt" },
+      {
+        address: vault,
+        abi: VAULT_ABI,
+        functionName: "convertToAssets",
+        args: [BigInt(10) ** BigInt(decimals)],
+      },
+      { address: vault, abi: VAULT_ABI, functionName: "get_default_queue" },
+      { address: vault, abi: VAULT_ABI, functionName: "accountant" },
+      { address: vault, abi: VAULT_ABI, functionName: "role_manager" },
+      { address: vault, abi: VAULT_ABI, functionName: "profitMaxUnlockTime" },
+      { address: vault, abi: VAULT_ABI, functionName: "isShutdown" },
+      { address: vault, abi: VAULT_ABI, functionName: "apiVersion" },
+      { address: YEARN_REGISTRY as `0x${string}`, abi: REGISTRY_ABI, functionName: "isEndorsed", args: [vault] },
+    ];
+    if (storedName == null) contracts.push({ address: vault, abi: VAULT_ABI, functionName: "name" });
     const reads = (await client.multicall({
-      contracts: [
-        { address: vault, abi: VAULT_ABI, functionName: "name" },
-        { address: vault, abi: VAULT_ABI, functionName: "symbol" },
-        { address: vault, abi: VAULT_ABI, functionName: "totalAssets" },
-        { address: vault, abi: VAULT_ABI, functionName: "totalSupply" },
-        { address: vault, abi: VAULT_ABI, functionName: "totalIdle" },
-        { address: vault, abi: VAULT_ABI, functionName: "totalDebt" },
-        {
-          address: vault,
-          abi: VAULT_ABI,
-          functionName: "convertToAssets",
-          args: [BigInt(10) ** BigInt(decimals)],
-        },
-        { address: vault, abi: VAULT_ABI, functionName: "get_default_queue" },
-        { address: vault, abi: VAULT_ABI, functionName: "accountant" },
-        { address: vault, abi: VAULT_ABI, functionName: "role_manager" },
-        { address: vault, abi: VAULT_ABI, functionName: "profitMaxUnlockTime" },
-        { address: vault, abi: VAULT_ABI, functionName: "isShutdown" },
-        { address: vault, abi: VAULT_ABI, functionName: "apiVersion" },
-        { address: vault, abi: VAULT_ABI, functionName: "decimals" },
-        { address: YEARN_REGISTRY as `0x${string}`, abi: REGISTRY_ABI, functionName: "isEndorsed", args: [vault] },
-      ],
+      contracts,
       allowFailure: true,
       blockNumber,
     })) as Call[];
@@ -293,8 +299,7 @@ export async function loadYearnEthereumVault(address: string, holder?: string): 
     // The share exponent, READ. A share figure is scaled by it and every share
     // price on the holder lane is asked with it, so it is the vault's own
     // answer or nothing.
-    const shareDecimalsRaw = at("decimals");
-    const shareDecimals = typeof shareDecimalsRaw === "number" ? shareDecimalsRaw : null;
+    const shareDecimals = shareMeta && !shareMeta.unresolved ? shareMeta.decimals : null;
 
     // ── ONE ADDRESS'S READING, at the same block ─────────────────────────────
     // Two calls, the second built from the first's answer: `convertToAssets` is
@@ -343,8 +348,8 @@ export async function loadYearnEthereumVault(address: string, holder?: string): 
       chainStale: false,
       vault: {
         ...base,
-        name: (at("name") as string | undefined) ?? null,
-        symbol: (at("symbol") as string | undefined) ?? null,
+        name: storedName ?? (ok(reads[CALLS.length + 1]) as string | undefined) ?? null,
+        symbol: shareMeta?.named ? shareMeta.symbol : null,
         totalAssets: scaled(big("totalAssets"), decimals),
         totalSupply: scaled(big("totalSupply"), decimals),
         totalIdle: scaled(big("totalIdle"), decimals),
