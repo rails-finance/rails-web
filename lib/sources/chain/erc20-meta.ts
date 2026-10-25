@@ -67,6 +67,19 @@ export function assertDecimalsRead(metas: Map<string, { unresolved?: true }>, ad
 const cache = new Map<string, Erc20Meta>();
 const cacheKey = (chainId: ChainId, addr: string) => `${chainId}:${addr}`;
 
+// The `name()` each token answered, where one was read: the api's row, or the
+// chain path's `name()` pass over a symbol-less token. Kept beside `cache`
+// rather than on `Erc20Meta`, so a caller that passes a meta into its response
+// is unchanged.
+const nameCache = new Map<string, string>();
+
+/** The `name()` `resolveErc20Meta` read for this token, if it read one. Asked
+ *  after a `resolveErc20Meta` call over the address; a caller that states a
+ *  name reads `name()` itself where this is undefined. */
+export function erc20NameOf(address: string, chainId: ChainId = MAINNET_CHAIN_ID): string | undefined {
+  return nameCache.get(cacheKey(chainId, address.toLowerCase()));
+}
+
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** The chains `token_meta` holds rows for. */
@@ -128,8 +141,10 @@ async function readStored(
       if (!body.tokens || !Array.isArray(body.missing)) return null;
       for (const addr of asked) {
         const row = body.tokens[addr];
-        if (row) metas.set(addr, storedMeta(addr, row));
-        else missing.push(addr);
+        if (row) {
+          metas.set(addr, storedMeta(addr, row));
+          if (row.name) nameCache.set(cacheKey(chainId, addr), row.name);
+        } else missing.push(addr);
       }
     }
   } catch {
@@ -221,7 +236,10 @@ async function readChain(todo: string[], chainId: ChainId): Promise<Map<string, 
       })) as unknown[];
       noSymbol.forEach((addr, i) => {
         const res = nameResults[i] as { status: string; result?: unknown } | undefined;
-        if (res?.status === "success" && typeof res.result === "string" && res.result) symbols.set(addr, res.result);
+        if (res?.status === "success" && typeof res.result === "string" && res.result) {
+          symbols.set(addr, res.result);
+          nameCache.set(cacheKey(chainId, addr), res.result);
+        }
       });
     } catch {
       // name() sweep failed — the affected tokens fall back below.

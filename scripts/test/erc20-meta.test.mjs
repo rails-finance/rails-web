@@ -44,7 +44,7 @@ delete process.env.ALCHEMY_URL;
 delete process.env.BASE_RPC_URL;
 delete process.env.ARBITRUM_RPC_URL;
 
-const { resolveErc20Meta } = await import(ROOT + "lib/sources/chain/erc20-meta.ts");
+const { resolveErc20Meta, erc20NameOf } = await import(ROOT + "lib/sources/chain/erc20-meta.ts");
 
 const addr = (n) => "0x" + n.toString(16).padStart(40, "0");
 
@@ -85,6 +85,8 @@ test("a stored row maps to the chain path's flags and is cached; a missing one g
   assert.deepEqual(out.get(usdc), { address: usdc, symbol: "USDC", decimals: 6, named: true });
   assert.deepEqual(out.get(nft), { address: nft, symbol: "Some NFT", decimals: 18, named: true, unresolved: true });
   assert.deepEqual(out.get(bare), { address: bare, symbol: "0x0000…1003", decimals: 8, named: false });
+  assert.equal(erc20NameOf(usdc, 1), "USD Coin");
+  assert.equal(erc20NameOf(bare, 1), undefined);
   // Missing from the table, and the chain did not answer: the fallback.
   assert.deepEqual(out.get(gone), {
     address: gone,
