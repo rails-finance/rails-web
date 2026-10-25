@@ -296,6 +296,9 @@ export interface CombinedFlowsProps {
   priceOnly?: boolean;
   /** A ledger's note while the cursor is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
+  /** Draw every series in `prices` on one axis, the picked one in its hue and
+   *  the others thin beneath it (an asset page's line per oracle). */
+  allLines?: boolean;
   /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
    *  last stop, where no outline of today's length is drawn. */
   renderBars: (barStop: number, when: string, isLive: boolean, atLive: boolean) => ReactNode;
@@ -311,6 +314,7 @@ export function CombinedFlows({
   failed,
   priceOnly = false,
   onLedgerNote,
+  allLines = false,
   renderBars,
 }: CombinedFlowsProps) {
   // A cut restored from the address bar puts the cursor on its day, which
@@ -533,10 +537,18 @@ export function CombinedFlows({
   const today = axisEndDay(model, series?.today ?? startDay + model.liveStop);
   const span = axisSpanDays(startDay, today);
   const lineScale = useMemo(() => lineStripScale(model, series, hasDebt), [model, series, hasDebt]);
-  const priceScales = useMemo(
-    () => new Map(prices.map((p) => [p.key, priceStripScale(p, startDay, today)])),
-    [prices, startDay, today],
-  );
+  const priceScales = useMemo(() => {
+    const scales = new Map(prices.map((p) => [p.key, priceStripScale(p, startDay, today)]));
+    if (!allLines || prices.length < 2) return scales;
+    // One axis for every line, so the lines stand where their prices are.
+    const axis = priceAxis(
+      [...scales.values()].flatMap(({ pieces: pc }) =>
+        [...pc.solid, ...pc.dotted, ...pc.flat, ...pc.riser].flat().map((v) => v[1]),
+      ),
+    );
+    const shared = { axis, labels: priceAxisLabels(axis.ticks) };
+    return new Map([...scales].map(([k, sc]) => [k, { ...sc, ...shared }]));
+  }, [prices, startDay, today, allLines]);
   const labelW = labelWidth([...lineScale.labels, ...[...priceScales.values()].flatMap((s) => s.labels)]);
   const geo = useMemo(() => stripGeometry(w, startDay, today, span, labelW), [w, startDay, today, span, labelW]);
   const xStop = (s: CombinedStop) => geo.xClose(s.live ? today : startDay + s.stop);
@@ -765,6 +777,13 @@ export function CombinedFlows({
                         <PriceStrip
                           s={priced}
                           scale={priceScales.get(priced.key)!}
+                          others={
+                            allLines
+                              ? prices
+                                  .filter((p) => p.key !== priced.key)
+                                  .map((p) => ({ key: p.key, pieces: priceScales.get(p.key)!.pieces }))
+                              : []
+                          }
                           geo={geo}
                           w={w}
                           today={today}
@@ -1381,6 +1400,7 @@ type PriceScale = ReturnType<typeof priceStripScale>;
 function PriceStrip({
   s,
   scale,
+  others,
   geo,
   w,
   today,
@@ -1393,6 +1413,8 @@ function PriceStrip({
 }: {
   s: FlowPriceSeries;
   scale: PriceScale;
+  /** The other lines, thin and muted under this one, on its axis. */
+  others: { key: string; pieces: PriceScale["pieces"] }[];
   geo: StripGeometry;
   w: number;
   today: number;
@@ -1452,6 +1474,26 @@ function PriceStrip({
             data-flow-gridline=""
           />
         ))}
+        {others.length > 0 && (
+          <g data-anatomy="F19.9">
+            {others.map((o) => (
+              <g key={o.key} data-price-other-line={o.key}>
+                {[...o.pieces.solid, ...o.pieces.dotted, ...o.pieces.flat]
+                  .filter((p) => p.length > 1)
+                  .map((p) => (
+                    <path
+                      key={`o${p[0][0]}`}
+                      d={path(p)}
+                      fill="none"
+                      className="stroke-rb-400/60 dark:stroke-rb-500/60"
+                      strokeWidth={1}
+                      strokeLinejoin="round"
+                    />
+                  ))}
+              </g>
+            ))}
+          </g>
+        )}
         <g
           data-price-line={s.key}
           data-price-grain={s.grain}
@@ -1807,7 +1849,7 @@ function AssetPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        aria-label={`Asset: ${selected.asset.symbol}`}
+        aria-label={selected.name ? `Line: ${selected.name}` : `Asset: ${selected.asset.symbol}`}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -1820,6 +1862,11 @@ function AssetPicker({
         data-price-picker=""
       >
         <AssetIcon s={selected} />
+        {selected.tag && (
+          <span className="px-0.5 font-mono font-normal" data-price-line-tag="">
+            {selected.tag}
+          </span>
+        )}
         <ChevronDown size={12} aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -1827,7 +1874,7 @@ function AssetPicker({
           ref={listRef}
           id={listId}
           role="listbox"
-          aria-label="Asset"
+          aria-label={selected.name ? "Line" : "Asset"}
           onKeyDown={onListKey}
           className="overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-1 min-w-full overflow-hidden py-1"
         >
@@ -1838,7 +1885,7 @@ function AssetPicker({
                 key={s.key}
                 role="option"
                 aria-selected={on}
-                aria-label={s.asset.symbol}
+                aria-label={s.name ?? s.asset.symbol}
                 tabIndex={-1}
                 onClick={() => pick(s.key)}
                 className={`mx-1 flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 ${SECTION_HEADING} outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] sm:min-h-8 ${on ? "bg-[var(--surface-hover)] text-foreground" : "text-foreground"}`}
@@ -1846,7 +1893,7 @@ function AssetPicker({
                 data-price-key={s.key}
               >
                 <AssetIcon s={s} />
-                {s.asset.symbol}
+                {s.name ?? s.asset.symbol}
               </li>
             );
           })}

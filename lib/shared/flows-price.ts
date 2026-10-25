@@ -49,6 +49,11 @@ export interface FlowPriceSeries extends PriceSeries {
   unitLabel: string;
   /** The position's health factor rather than an asset's price. */
   health?: true;
+  /** The line's name where the list holds several lines of one asset (an
+   *  asset page's oracles): the picker names it rather than the symbol. */
+  name?: string;
+  /** Its short form for the picker's button (an oracle's address). */
+  tag?: string;
 }
 
 /** The price series a panel's timeline carries: the health factor where it
