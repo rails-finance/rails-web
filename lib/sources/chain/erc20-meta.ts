@@ -1,20 +1,29 @@
 // Generic ERC-20 metadata resolver — server-only.
 // ----------------------------------------------------------------------------
 // A protocol-agnostic twin of lib/sources/chain/aave-v3-tokens.ts `resolveV3Tokens`:
-// a cached multicall over `symbol()` + `decimals()` for any set of token
-// addresses, with a truncated-address fallback so a row still renders when a
-// token reverts. Token metadata is immutable, so reading at the chain HEAD is
-// correct — this is reference data, NOT position state (which is pinned to T).
+// symbol + decimals for any set of token addresses, with a truncated-address
+// fallback so a row still renders when a token reverts. Token metadata is
+// immutable, so a read at any block is correct — this is reference data, NOT
+// position state (which is pinned to T).
+//
+// The read order (rails-ops ui-jobs 444): rails-server's `token_meta` first,
+// through POST /api/reference/erc20, for Ethereum and Base; the chain multicall
+// only for the addresses that answer lists as `missing`, or for all of them when
+// the api does not answer. The table holds what each token's symbol(), decimals()
+// and name() answered at one block, a revert stored as null, so a row maps onto
+// the same `named` / `unresolved` flags the chain path sets.
 //
 // Used by the Morpho loaders to name + scale the long tail of market tokens
 // (~1,800 distinct), which no hand-curated catalog could cover.
 //
 // SERVER-ONLY — imported only from /api/* route handlers and the server-side
-// builders/loaders under lib/sources/ (it calls Alchemy via lib/sources/chain/rpc).
+// builders/loaders under lib/sources/ (it reads the api with the bearer token and
+// the chain via lib/sources/chain/rpc).
 
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
-import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 const ERC20_ABI = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
 const NAME_ABI = parseAbi(["function name() view returns (string)"]);
@@ -60,9 +69,80 @@ const cacheKey = (chainId: ChainId, addr: string) => `${chainId}:${addr}`;
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-/** Resolve symbol + decimals for every address, batched into one multicall over
- *  the uncached ones. When `symbol()` reverts (ERC-1155 has neither accessor in
- *  the standard; some ERC-721s implement only `name()`), a second multicall over
+/** The chains `token_meta` holds rows for. */
+const STORED_CHAINS: ReadonlySet<ChainId> = new Set([MAINNET_CHAIN_ID, BASE_CHAIN_ID]);
+/** The api's POST cap. */
+const STORED_MAX = 1000;
+/** The read must not hold a page: past this the chain answers. */
+const STORED_TIMEOUT_MS = 4_000;
+
+interface StoredRow {
+  symbol: string | null;
+  decimals: number | null;
+  name: string | null;
+}
+
+/** One `token_meta` row as the chain path would have resolved it: the symbol,
+ *  else the name (the chain path's second pass), else the truncated address;
+ *  a null `decimals` is the 18 stand-in, flagged `unresolved`. */
+function storedMeta(addr: string, row: StoredRow): Erc20Meta {
+  const sym = row.symbol || row.name || undefined;
+  const decimals = typeof row.decimals === "number" ? row.decimals : null;
+  return {
+    address: addr,
+    symbol: sym || short(addr),
+    decimals: decimals ?? 18,
+    named: Boolean(sym),
+    ...(decimals != null ? {} : { unresolved: true as const }),
+  };
+}
+
+/** The api's rows for `addrs`, and the addresses it holds none for. Null where
+ *  the api was not asked (another chain, no RAILS_API_URL) or did not answer:
+ *  the caller then reads every address from the chain. */
+async function readStored(
+  addrs: string[],
+  chainId: ChainId,
+): Promise<{ metas: Map<string, Erc20Meta>; missing: string[] } | null> {
+  const api = process.env.RAILS_API_URL;
+  if (!api || !STORED_CHAINS.has(chainId)) return null;
+  const metas = new Map<string, Erc20Meta>();
+  const missing: string[] = [];
+  try {
+    for (let i = 0; i < addrs.length; i += STORED_MAX) {
+      const asked = addrs.slice(i, i + STORED_MAX);
+      const res = await fetch(
+        `${api}/api/reference/erc20`,
+        createAuthFetchOptions({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chain: chainId, addresses: asked }),
+          signal: AbortSignal.timeout(STORED_TIMEOUT_MS),
+        }),
+      );
+      if (!res.ok) {
+        void res.body?.cancel().catch(() => undefined);
+        return null;
+      }
+      const body = (await res.json()) as { tokens?: Record<string, StoredRow>; missing?: string[] };
+      if (!body.tokens || !Array.isArray(body.missing)) return null;
+      for (const addr of asked) {
+        const row = body.tokens[addr];
+        if (row) metas.set(addr, storedMeta(addr, row));
+        else missing.push(addr);
+      }
+    }
+  } catch {
+    return null;
+  }
+  return { metas, missing };
+}
+
+/** Resolve symbol + decimals for every address. The uncached ones are asked of
+ *  the api's `token_meta` first (`readStored`); what it lists as missing, or
+ *  everything when it does not answer, goes to one multicall over `symbol()` +
+ *  `decimals()`. When `symbol()` reverts (ERC-1155 has neither accessor in the
+ *  standard; some ERC-721s implement only `name()`), a second multicall over
  *  just the failures tries `name()`. Only then does a token fall back to a
  *  truncated address + 18 dp, flagged `named: false`. */
 export async function resolveErc20Meta(
@@ -78,9 +158,29 @@ export async function resolveErc20Meta(
     if (hit) out.set(addr, hit);
     else want.add(addr);
   }
-  const todo = [...want];
+  if (want.size === 0) return out;
+
+  const stored = await readStored([...want], chainId);
+  // A stored row is the chain's answer at a named block, so it is kept.
+  for (const [addr, meta] of stored?.metas ?? []) {
+    cache.set(cacheKey(chainId, addr), meta);
+    out.set(addr, meta);
+  }
+  const todo = stored ? stored.missing : [...want];
+  if (process.env.RAILS_DEBUG_ERC20_META)
+    console.info(
+      `erc20-meta chain ${chainId}: ${want.size} uncached, ${stored ? `${stored.metas.size} from the api` : "api not used"}, ${todo.length} to the chain`,
+    );
   if (todo.length === 0) return out;
 
+  for (const [addr, meta] of await readChain(todo, chainId)) out.set(addr, meta);
+  return out;
+}
+
+/** The chain path: `symbol()` + `decimals()` in one multicall, `name()` over the
+ *  symbol-less ones. Caches what the RPC answered, never a transport failure. */
+async function readChain(todo: string[], chainId: ChainId): Promise<Map<string, Erc20Meta>> {
+  const out = new Map<string, Erc20Meta>();
   let results: unknown[] = [];
   try {
     const client = chainClient(chainId);
