@@ -41,24 +41,25 @@
 //      their hash, so a catalogued market's collateral, oracle and LLTV cannot
 //      have drifted; a market created after the census is asked directly.
 //
-// ── THE LANE, AND WHY THE BATCHES ARE POSTED BY HAND ─────────────────────────
+// ── THE LANE ─────────────────────────────────────────────────────────────────
 // `BASE_BACKFILL_RPC_URL`, the same lane the sibling timeline reader names, and
-// the one these three waves were measured on. It meters on COMPUTE UNITS PER
-// SECOND as well as on response size, so one large JSON-RPC batch can be
-// refused where the same calls made singly pass — and viem does not retry an
-// HTTP 429 that carries a JSON-RPC error body. So the batches are posted here
-// rather than left to a transport: a refused batch is HALVED and retried, never
-// abandoned, because abandoning it would turn a rate limit into a page that
-// says a market held nothing. A call that is still refused at a batch of one is
-// stated UNREAD — never zero, never dropped. A zero is a reading and an unread
-// value is not, and this file keeps them apart at every level.
+// the one these three waves were measured on, through lib/sources/chain/rpc.ts
+// `chainLogsBatchClient` (60 calls a JSON-RPC request). It meters on COMPUTE
+// UNITS PER SECOND, so the calls go out in waves of three requests' worth, and
+// a call the lane refuses on its rate limit is asked again after a backoff
+// (rpc.ts `retryingRateLimits`), never abandoned, because abandoning it would
+// turn a rate limit into a page that says a market held nothing. A call that
+// is still refused, or reverts, is stated UNREAD — never zero, never dropped.
+// A zero is a reading and an unread value is not, and this file keeps them
+// apart at every level.
 
-import { decodeFunctionResult, encodeFunctionData, parseAbi } from "viem";
+import { decodeFunctionResult, encodeFunctionData, parseAbi, type PublicClient } from "viem";
 
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { MORPHO_MARKETS } from "@/lib/morpho-base/market-catalog";
 import type { VaultAllocationLeg } from "@/lib/shared/vault-holder-timeline";
 import { resolveErc20Meta } from "./erc20-meta";
+import { chainLogsBatchClient } from "./rpc";
 
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -67,12 +68,10 @@ const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
  *  states the NAME because the URL carries a key. */
 export const MORPHO_BASE_ALLOCATION_LANE = "BASE_BACKFILL_RPC_URL";
 
-/** Calls per JSON-RPC request. Under the 100 the lane was measured comfortable
- *  with, and halved on a refusal rather than raised. */
-const BATCH = 60;
-/** Requests in flight at once — the lane's limit is compute units per SECOND,
- *  so the cap that matters is concurrency, not total. */
-const CONCURRENCY = 3;
+/** Calls in flight at once: three of the client's 60-call requests. The lane's
+ *  limit is compute units per SECOND, so the cap that matters is concurrency,
+ *  not total. */
+const WAVE = 3 * 60;
 
 const VAULT_ABI = parseAbi([
   "function totalSupply() view returns (uint256)",
@@ -119,7 +118,7 @@ export interface VaultAllocationAtBlock {
  *  after the census is simply absent, and wave 3 asks the singleton for it. */
 const CATALOGUE = new Map(MORPHO_MARKETS.map((m) => [m.id.toLowerCase(), m]));
 
-// ── the batch poster ─────────────────────────────────────────────────────────
+// ── the call runner ──────────────────────────────────────────────────────────
 
 interface EthCall {
   to: string;
@@ -128,59 +127,28 @@ interface EthCall {
 }
 
 /**
- * Post `eth_call`s as JSON-RPC batches and hand back one answer per call, in
- * order, with `null` for any that did not answer.
- *
- * A batch the lane refuses whole — a 429 on compute units, a body that is not
- * an array, a transport error — is HALVED and both halves retried, down to a
- * single call. Only at that floor does a refusal become an unread answer, and
- * it becomes unread for that one call rather than for its neighbours. Halving
- * rather than dropping is the whole point: a rate limit that silently emptied a
- * leg would render as "this market held nothing", which is a different and
- * false statement.
+ * Run `eth_call`s on the lane and hand back one answer per call, in order, with
+ * `null` for any that did not answer (a revert, or a refusal the client's
+ * backoff did not outlast). The client batches each wave into JSON-RPC
+ * requests; a refusal becomes unread for that one call, not for its
+ * neighbours.
  */
-async function postCalls(url: string, calls: EthCall[]): Promise<(string | null)[]> {
+async function postCalls(client: PublicClient, calls: EthCall[]): Promise<(string | null)[]> {
   const out = new Array<string | null>(calls.length).fill(null);
-  const groups: { from: number; count: number }[] = [];
-  for (let i = 0; i < calls.length; i += BATCH) groups.push({ from: i, count: Math.min(BATCH, calls.length - i) });
-
-  const runGroup = async (from: number, count: number, attempt: number): Promise<void> => {
-    const body = Array.from({ length: count }, (_, k) => ({
-      jsonrpc: "2.0",
-      id: k,
-      method: "eth_call",
-      params: [{ to: calls[from + k].to, data: calls[from + k].data }, `0x${calls[from + k].block.toString(16)}`],
-    }));
-    let answers: unknown = null;
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      answers = await res.json();
-    } catch {
-      answers = null;
-    }
-    if (Array.isArray(answers)) {
-      for (const item of answers as { id?: number; result?: string }[]) {
-        if (typeof item?.id === "number" && typeof item.result === "string") out[from + item.id] = item.result;
-      }
-      return;
-    }
-    // The batch itself was refused. One call cannot be halved further, so a
-    // refusal there is this call's own unread answer; anything larger splits.
-    if (count === 1) return;
-    if (attempt > 6) return;
-    await new Promise((r) => setTimeout(r, 120 * attempt));
-    const half = Math.ceil(count / 2);
-    await runGroup(from, half, attempt + 1);
-    await runGroup(from + half, count - half, attempt + 1);
-  };
-
-  for (let i = 0; i < groups.length; i += CONCURRENCY)
-    await Promise.all(groups.slice(i, i + CONCURRENCY).map((g) => runGroup(g.from, g.count, 1)));
+  for (let i = 0; i < calls.length; i += WAVE)
+    await Promise.all(
+      calls.slice(i, i + WAVE).map(async (c, k) => {
+        try {
+          const result = await client.request({
+            method: "eth_call",
+            params: [{ to: c.to as `0x${string}`, data: c.data as `0x${string}` }, `0x${c.block.toString(16)}`],
+          });
+          if (typeof result === "string") out[i + k] = result;
+        } catch {
+          // Unread: stated as such by the caller.
+        }
+      }),
+    );
   return out;
 }
 
@@ -224,7 +192,12 @@ export async function loadMorphoBaseVaultAllocationAt(
   const out = new Map<number, VaultAllocationAtBlock>();
   if (!blocks.length) return out;
 
-  const url = process.env[MORPHO_BASE_ALLOCATION_LANE];
+  let client: PublicClient | null = null;
+  try {
+    client = chainLogsBatchClient(MORPHO_BASE_CHAIN_ID);
+  } catch {
+    // MORPHO_BASE_ALLOCATION_LANE unset: every block below is unread.
+  }
   const vaultAddress = vault.toLowerCase();
   const blue = MORPHO_BASE_BLUE.toLowerCase();
   const empty = (b: number): VaultAllocationAtBlock => ({
@@ -236,7 +209,7 @@ export async function loadMorphoBaseVaultAllocationAt(
     allocatedTotal: null,
     unread: true,
   });
-  if (!url) {
+  if (!client) {
     for (const b of blocks) out.set(b, empty(b));
     return out;
   }
@@ -245,7 +218,7 @@ export async function loadMorphoBaseVaultAllocationAt(
 
   // ── wave 1 — the denominator, the numerator, and how long the queue is ─────
   const w1 = await postCalls(
-    url,
+    client,
     at.flatMap((block) => [
       { to: vaultAddress, block, data: encodeFunctionData({ abi: VAULT_ABI, functionName: "totalSupply" }) },
       {
@@ -278,7 +251,7 @@ export async function loadMorphoBaseVaultAllocationAt(
         data: encodeFunctionData({ abi: VAULT_ABI, functionName: "withdrawQueue", args: [BigInt(i)] }),
       });
   }
-  const w2 = await postCalls(url, queueCalls);
+  const w2 = await postCalls(client, queueCalls);
   const queues = queueSpan.map(({ from, count }) =>
     Array.from({ length: count }, (_, i) => decode<string>(VAULT_ABI, "withdrawQueue", w2[from + i])),
   );
@@ -326,7 +299,7 @@ export async function loadMorphoBaseVaultAllocationAt(
     });
     legSpan.push(rowSpans);
   }
-  const w3 = await postCalls(url, legCalls);
+  const w3 = await postCalls(client, legCalls);
 
   // ── the collateral symbols, named through the house resolver ──────────────
   // A symbol is a name for a token, not a fact about a block: the resolver's
