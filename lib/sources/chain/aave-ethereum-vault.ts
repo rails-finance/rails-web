@@ -47,6 +47,12 @@
 //   D  only on an Umbrella stake token over a wrapper: the reserve reached by
 //      C's second `asset()` hop, and what Umbrella says about that reserve.
 //
+// Token metadata (the vault's, the stake tokens' and the wrapper's symbol and
+// decimals, the vault's name where the api holds it, the asset's and the
+// reserve's) goes through ./erc20-meta `resolveErc20Meta`: the api's token_meta
+// first, the chain for what it lacks. A HOLDER's `name()` and `symbol()` stay
+// in the shape read, because a holder may be a contract that is no token.
+//
 // `batchSize: 0` on each keeps the request count a fact about the code.
 //
 // ── WHAT EACH FAMILY READS, AND WHY ──────────────────────────────────────────
@@ -107,7 +113,7 @@
 
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainBatchClient } from "./rpc";
-import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
+import { resolveErc20Meta, assertDecimalsRead, erc20NameOf } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import {
@@ -602,11 +608,18 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
     const family = catalogue.get(address);
     if (!family) return { ...unread(address, false), blockNumber: Number(blockNumber), chainStale: false };
 
+    // The share token's symbol and decimals, and its name where that was read,
+    // through resolveErc20Meta (the api's token_meta first, the chain for what
+    // it lacks). Token metadata is immutable, so it holds at the pinned block.
+    const selfMeta = (await resolveErc20Meta([address], MAINNET_CHAIN_ID)).get(address);
+    const selfName = erc20NameOf(address, MAINNET_CHAIN_ID);
+
     // ── B: what the vault says about itself, and the holder's balance ────────
     const bPlan: { kind: string; call: ContractFunctionParameters }[] = [];
     const push = (kind: string, call: ContractFunctionParameters) => bPlan.push({ kind, call });
     const self = address as `0x${string}`;
-    for (const fn of ["name", "symbol", "decimals", "asset", "totalAssets", "totalSupply"] as const)
+    if (selfName == null) push("name", { address: self, abi: VAULT_ABI, functionName: "name" });
+    for (const fn of ["asset", "totalAssets", "totalSupply"] as const)
       push(fn, { address: self, abi: VAULT_ABI, functionName: fn });
     if (holderAddress) {
       push("balanceOf", { address: self, abi: VAULT_ABI, functionName: "balanceOf", args: [holderAddress] });
@@ -648,7 +661,7 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
     })) as Call[];
     const b = new Map<string, unknown>(bPlan.map((p, i) => [p.kind, ok(bRes[i])]));
 
-    const shareDecimals = typeof b.get("decimals") === "number" ? (b.get("decimals") as number) : null;
+    const shareDecimals = selfMeta && !selfMeta.unresolved ? selfMeta.decimals : null;
     const assetAddress = lower(b.get("asset"));
     const totalAssetsRaw = b.get("totalAssets") as bigint | undefined;
     const totalSupplyRaw = b.get("totalSupply") as bigint | undefined;
@@ -711,7 +724,6 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
     for (const stk of stakeProbe) {
       const s = stk as `0x${string}`;
       pushC(`stk.${stk}.asset`, { address: s, abi: VAULT_ABI, functionName: "asset" });
-      pushC(`stk.${stk}.symbol`, { address: s, abi: VAULT_ABI, functionName: "symbol" });
       pushC(`stk.${stk}.balance`, { address: self, abi: VAULT_ABI, functionName: "balanceOf", args: [s] });
     }
     // The middle hop, only where the asset is itself a wrapper in this
@@ -719,24 +731,31 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
     const wrapper = family === "umbrella-stake" && assetFamily === "stata" ? assetAddress : null;
     if (wrapper) {
       const w = wrapper as `0x${string}`;
-      for (const fn of ["symbol", "decimals", "asset"] as const)
-        pushC(`wrapper.${fn}`, { address: w, abi: VAULT_ABI, functionName: fn });
+      pushC("wrapper.asset", { address: w, abi: VAULT_ABI, functionName: "asset" });
       for (const fn of ["aToken", "POOL"] as const)
         pushC(`wrapper.${fn}`, { address: w, abi: STATA_ABI, functionName: fn });
     }
-    const cRes = cPlan.length
-      ? ((await client.multicall({
-          contracts: cPlan.map((p) => p.call),
-          batchSize: 0,
-          allowFailure: true,
-          blockNumber,
-        })) as Call[])
-      : [];
+    // The stake tokens' and the wrapper's symbols and decimals, beside C.
+    const [cRes, cMeta] = await Promise.all([
+      cPlan.length
+        ? (client.multicall({
+            contracts: cPlan.map((p) => p.call),
+            batchSize: 0,
+            allowFailure: true,
+            blockNumber,
+          }) as Promise<Call[]>)
+        : Promise.resolve([] as Call[]),
+      resolveErc20Meta([...stakeProbe, ...(wrapper ? [wrapper] : [])], MAINNET_CHAIN_ID),
+    ]);
     const c = new Map<string, unknown>(cPlan.map((p, i) => [p.kind, ok(cRes[i])]));
+    const symbolOf = (addr: string): string | null => {
+      const m = cMeta.get(addr);
+      return m?.named ? m.symbol : null;
+    };
 
     // ── D: the reserve a stake token covers, and Umbrella's word on it ───────
-    const wrapperDecimals =
-      typeof c.get("wrapper.decimals") === "number" ? (c.get("wrapper.decimals") as number) : null;
+    const wrapperMeta = wrapper ? cMeta.get(wrapper) : undefined;
+    const wrapperDecimals = wrapperMeta && !wrapperMeta.unresolved ? wrapperMeta.decimals : null;
     const wrapperPool = lower(c.get("wrapper.POOL"));
     const wrapperAsset = lower(c.get("wrapper.asset"));
     // stkGHO holds GHO itself, so its reserve IS its asset; the other three
@@ -835,8 +854,7 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
       return fam ? { address: addr, family: fam, symbol: null } : null;
     };
     const assetVault = refFor(assetAddress);
-    if (assetVault && wrapper === assetAddress)
-      assetVault.symbol = (c.get("wrapper.symbol") as string | undefined) ?? null;
+    if (assetVault && wrapper === assetAddress) assetVault.symbol = symbolOf(assetVault.address);
 
     // The stake tokens that named THIS vault as their own asset, with what each
     // holds of it. A member that holds nothing is left out: the claim the page
@@ -850,7 +868,7 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
       backedBy.push({
         address: stk,
         family: "umbrella-stake",
-        symbol: (c.get(`stk.${stk}.symbol`) as string | undefined) ?? null,
+        symbol: symbolOf(stk),
         shares: amount(held, shareDecimals ?? 18),
         fraction: totalSupplyRaw == null || totalSupplyRaw === ZERO ? 0 : Number(held) / Number(totalSupplyRaw),
       });
@@ -918,7 +936,7 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
             wrapper: wrapper
               ? {
                   address: wrapper,
-                  symbol: (c.get("wrapper.symbol") as string | undefined) ?? null,
+                  symbol: symbolOf(wrapper),
                   decimals: wrapperDecimals,
                   aToken: lower(c.get("wrapper.aToken")),
                   liquidityIndex: wrapperReserveData?.liquidityIndex?.toString() ?? null,
@@ -980,8 +998,8 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
       vault: {
         address,
         family,
-        name: (b.get("name") as string | undefined) ?? null,
-        symbol: (b.get("symbol") as string | undefined) ?? null,
+        name: selfName ?? (b.get("name") as string | undefined) ?? null,
+        symbol: selfMeta?.named ? selfMeta.symbol : null,
         shareDecimals,
         asset,
         assetVault,
