@@ -10,7 +10,7 @@
 //  2. THE LIVE OVERLAY. `balanceOf` and `convertToAssets(balanceOf)` per card
 //     and `totalSupply()` per distinct vault on the page, read at ONE block this
 //     route pins for the whole response. Twenty cards is ≤ 40 + 18 calls over
-//     three Multicall3 rounds (the second depends on the first), well under the
+//     two Multicall3 rounds (the second depends on the first), well under the
 //     batch ceiling. The response states that block once.
 //
 // A FAILED OVERLAY IS AN UNREAD FIGURE, NOT A ZERO. If the chain read throws —
@@ -28,8 +28,9 @@
 // MetaMorpho vault the two Base factories made). What differs between them is
 // only where the ASSET each `convertToAssets` answers in comes from: on
 // Ethereum the directory read the section already caches names it, on Base the
-// asset's own `symbol()` and `decimals()` are read in the same batch as the
-// balances, at the same block, for the ≤ 20 distinct assets a page can hold.
+// asset's `symbol()` and `decimals()` come through `resolveErc20Meta` (the
+// api's token_meta first, the chain for what it lacks), for the ≤ 20 distinct
+// assets a page can hold.
 // The `family` axis differs too: Base has exactly one value, so the route
 // accepts it and the listing offers no menu for it.
 //
@@ -58,6 +59,7 @@ import { VAULT_SIZE_BRACKETS, VAULT_SIZE_UNPRICED } from "@/lib/aave-vaults/posi
 import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
 import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereum-vault-directory";
+import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { chainBatchClient } from "@/lib/sources/chain/rpc";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
@@ -97,11 +99,6 @@ const VAULT_ABI = parseAbi([
   "function balanceOf(address) view returns (uint256)",
   "function totalSupply() view returns (uint256)",
   "function convertToAssets(uint256) view returns (uint256)",
-]);
-
-const ERC20_META_ABI = parseAbi([
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)",
 ]);
 
 type Call = { status: string; result?: unknown };
@@ -175,18 +172,14 @@ type OverlayAsset = { address: string; symbol: string; decimals: number };
 
 /** The asset behind each Base vault on the page: the roster's immutable
  *  `asset()` (a chain read, proved against every vault's creation log; the
- *  box's roster over the baked one, lib/morpho-base/vault-roster.ts), with that token's `symbol()` and
- *  `decimals()` asked at the overlay's own block. A page can hold at most 20
- *  distinct assets, so this is ≤ 40 calls in one batch beside the balances.
+ *  box's roster over the baked one, lib/morpho-base/vault-roster.ts), with that
+ *  token's `symbol()` and `decimals()` through `resolveErc20Meta`. Token
+ *  metadata is immutable, so it holds at the overlay's block.
  *
  *  A vault the catalogue does not know, or a token that did not answer, is
  *  simply absent from the map — the card then states no claim rather than a
  *  figure scaled by an assumed exponent. */
-async function baseAssets(
-  client: ReturnType<typeof chainBatchClient>,
-  vaults: string[],
-  blockNumber: bigint,
-): Promise<Map<string, OverlayAsset>> {
+async function baseAssets(vaults: string[]): Promise<Map<string, OverlayAsset>> {
   const assetOfVault = new Map<string, string>();
   const roster = await loadMorphoBaseVaultRoster();
   for (const v of vaults) {
@@ -196,23 +189,14 @@ async function baseAssets(
   const tokens = Array.from(new Set(assetOfVault.values()));
   if (tokens.length === 0) return new Map();
 
-  const meta = (await client.multicall({
-    contracts: tokens.flatMap((t) => [
-      { address: t as `0x${string}`, abi: ERC20_META_ABI, functionName: "symbol" as const },
-      { address: t as `0x${string}`, abi: ERC20_META_ABI, functionName: "decimals" as const },
-    ]),
-    batchSize: 0,
-    allowFailure: true,
-    blockNumber,
-  })) as Call[];
+  const meta = await resolveErc20Meta(tokens, BASE_CHAIN_ID);
 
   const byToken = new Map<string, OverlayAsset>();
-  tokens.forEach((t, i) => {
-    const symbol = ok(meta[i * 2]);
-    const decimals = ok(meta[i * 2 + 1]);
-    if (typeof symbol !== "string" || typeof decimals !== "number") return;
-    byToken.set(t, { address: t, symbol, decimals });
-  });
+  for (const t of tokens) {
+    const m = meta.get(t);
+    if (!m || !m.named || m.unresolved) continue;
+    byToken.set(t, { address: t, symbol: m.symbol, decimals: m.decimals });
+  }
 
   const out = new Map<string, OverlayAsset>();
   for (const [vault, token] of assetOfVault) {
@@ -256,11 +240,11 @@ async function applyOverlay(
     // chains do differently, and neither is a hand-kept table: on Ethereum it
     // is the directory read the section already caches for five minutes (a
     // roster, not a balance); on Base it is the catalogue's own immutable
-    // `asset()` per vault, with that token's `symbol()` and `decimals()` read
-    // in the same wave as the balances, at the same block. A vault whose asset
-    // did not answer leaves the claim unstated rather than scaled by a guess.
+    // `asset()` per vault, with that token's `symbol()` and `decimals()`
+    // through resolveErc20Meta. A vault whose asset did not answer leaves the
+    // claim unstated rather than scaled by a guess.
     const assetOf = await (chainId === BASE_CHAIN_ID
-      ? baseAssets(client, vaults, blockNumber)
+      ? baseAssets(vaults)
       : loadAaveEthereumVaultDirectory().then(
           (directory) => new Map(directory.rows.map((v) => [v.address.toLowerCase(), v.asset])),
         ));
