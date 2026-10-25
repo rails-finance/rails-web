@@ -1,7 +1,7 @@
 // What an address is, from one code read at head (rails-ops ui-jobs 232): a
 // key's account (no code), a smart account (an EIP-7702 delegation, or a
 // Safe whose singleton is a released deployment), or a contract, with the
-// `name()` and `symbol()` it answers. Every verdict is the chain's own
+// `name()` and `symbol()` it answers (read through `resolveErc20Meta`). Every verdict is the chain's own
 // answer; no explorer label is consulted.
 //
 // Where the account's state names the product that runs it (ui-jobs 440),
@@ -18,6 +18,7 @@
 
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
+import { erc20NameOf, resolveErc20Meta } from "./erc20-meta";
 import { EIP1167_RE, EIP7702_RE, SAFE_SINGLETONS, SLOT_ZERO } from "./aave-ethereum-vault";
 import type { ChainId } from "@/lib/shared/chains";
 import type { AccountManager, AddressKind, ManagerCall } from "@/lib/api/fetch-address-kind";
@@ -33,7 +34,6 @@ import { DEFI_SAVER_BAR, INSTADAPP_BAR, SUMMER_FI_BAR } from "@/lib/shared/bar-o
 
 const NAME_ABI = parseAbi([
   "function name() view returns (string)",
-  "function symbol() view returns (string)",
   "function owner() view returns (address)",
   "function guard() view returns (address)",
   "function authority() view returns (address)",
@@ -167,12 +167,10 @@ async function safeOwners(
   }
 }
 
-const text = (r: { status: string; result?: unknown } | undefined): string | null => {
-  if (r?.status !== "success" || typeof r.result !== "string") return null;
-  const t = r.result.replace(/\0/g, "").trim();
+const textOf = (v: string | undefined): string | null => {
+  const t = (v ?? "").replace(/\0/g, "").trim();
   return t.length > 0 && t.length <= 64 ? t : null;
 };
-
 export async function readAddressKind(addressRaw: string, chainId: ChainId): Promise<AddressKind | null> {
   const address = addressRaw.toLowerCase() as `0x${string}`;
   const client = chainClient(chainId);
@@ -194,13 +192,11 @@ export async function readAddressKind(addressRaw: string, chainId: ChainId): Pro
         block,
       };
     const instaList = INSTA_LIST[chainId] as `0x${string}` | undefined;
-    const [names, slotZero, id] = await Promise.all([
+    const [names, slotZero, id, token] = await Promise.all([
       client.multicall({
         allowFailure: true,
         blockNumber,
         contracts: [
-          { address, abi: NAME_ABI, functionName: "name" },
-          { address, abi: NAME_ABI, functionName: "symbol" },
           { address, abi: NAME_ABI, functionName: "owner" },
           { address, abi: NAME_ABI, functionName: "guard" },
           { address, abi: NAME_ABI, functionName: "authority" },
@@ -219,6 +215,17 @@ export async function readAddressKind(addressRaw: string, chainId: ChainId): Pro
             })
             .catch(() => BigInt(0))
         : Promise.resolve(BigInt(0)),
+      // Symbol through the api's token_meta (chain for what it lacks); the name
+      // is the api's row, else read here (the chain path keeps none for a
+      // token whose symbol() answered).
+      resolveErc20Meta([address], chainId).then(async (m) => ({
+        meta: m.get(address),
+        name:
+          erc20NameOf(address, chainId) ??
+          (await client
+            .readContract({ address, abi: NAME_ABI, functionName: "name", blockNumber })
+            .catch(() => undefined)),
+      })),
     ]);
     if (slotZero && slotZero !== SLOT_ZERO) {
       const singleton = `0x${slotZero.slice(-40)}`.toLowerCase();
@@ -238,11 +245,16 @@ export async function readAddressKind(addressRaw: string, chainId: ChainId): Pro
         : null;
     };
     // A DSProxy, a DPM and any Ownable account answer `owner()`.
-    const owner = addr(2);
-    const guard = addr(3);
-    const authority = addr(4);
-    const cache = addr(5);
-    const base = { kind: "contract" as const, name: text(names[0]), symbol: text(names[1]), block };
+    const owner = addr(0);
+    const guard = addr(1);
+    const authority = addr(2);
+    const cache = addr(3);
+    const base = {
+      kind: "contract" as const,
+      name: textOf(token.name),
+      symbol: token.meta?.named ? textOf(token.meta.symbol) : null,
+      block,
+    };
     const owned = owner ? { owners: [owner] } : {};
 
     // An Instadapp DSA: InstaList numbers it, and its authorities act for it.
@@ -297,7 +309,7 @@ export async function readAddressKind(addressRaw: string, chainId: ChainId): Pro
 
     // A DSProxy: owner, authority and cache answer. DeFi Saver runs it where
     // the authority lets ProxyAuth call `execute`.
-    if (owner && cache && names[4]?.status === "success") {
+    if (owner && cache && names[2]?.status === "success") {
       const proxyAuth = DFS_PROXY_AUTH[chainId] as `0x${string}` | undefined;
       let allowed = false;
       if (authority && proxyAuth)
