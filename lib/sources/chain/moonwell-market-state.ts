@@ -178,7 +178,6 @@ const ROSTER_COMPTROLLER_ABI = parseAbi([
 ]);
 
 const ROSTER_MTOKEN_ABI = parseAbi([
-  "function symbol() view returns (string)",
   "function underlying() view returns (address)",
   "function totalSupply() view returns (uint256)",
   "function totalBorrows() view returns (uint256)",
@@ -361,13 +360,12 @@ export async function loadMoonwellMarkets(
       }),
     ]);
 
-    const PER_MARKET = 17;
+    const PER_MARKET = 16;
     const results = (await client.multicall({
       allowFailure: true,
       contracts: mTokens.flatMap(
         (c) =>
           [
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "symbol" },
             { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "underlying" },
             { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalSupply" },
             { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalBorrows" },
@@ -390,7 +388,7 @@ export async function loadMoonwellMarkets(
 
     // Each market's own rate model: its per-second annualization constant and
     // its kink. Per-model reads — the four models do not share a kink.
-    const irmOf = mTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 10]));
+    const irmOf = mTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 9]));
     const irmRes = (await client.multicall({
       allowFailure: true,
       contracts: irmOf.flatMap((irm) => {
@@ -402,15 +400,16 @@ export async function loadMoonwellMarkets(
       }),
     })) as Res[];
 
-    // Name the underlyings from the tokens themselves (cached multicall). All
-    // four answer a string symbol() — Moonwell has no cETH-style native market
-    // and no bytes32-symbol legacy tokens, so no hand-resolution lane exists.
+    // Name the mTokens and their underlyings in one resolver call (the api's
+    // token_meta first, the chain for what it lacks). Every one answers a
+    // string symbol() — Moonwell has no cETH-style native market and no
+    // bytes32-symbol legacy tokens, so no hand-resolution lane exists.
     const wanted: string[] = [];
     mTokens.forEach((c, i) => {
-      const und = ok<string>(results[i * PER_MARKET + 1]);
+      const und = ok<string>(results[i * PER_MARKET]);
       if (und && !isZeroAddr(und)) wanted.push(und);
     });
-    const meta = await resolveErc20Meta(wanted, deployment.chainId);
+    const meta = await resolveErc20Meta([...mTokens, ...wanted], deployment.chainId);
     // Every market figure scales by its underlying's decimals: without them the
     // read fails whole rather than state amounts scaled by the 18 stand-in.
     assertDecimalsRead(meta, wanted);
@@ -418,17 +417,18 @@ export async function loadMoonwellMarkets(
     const markets: MoonwellMarketRow[] = mTokens.map((c, i) => {
       const base = i * PER_MARKET;
       const mToken = getAddress(c).toLowerCase();
-      const und = ok<string>(results[base + 1]);
+      const und = ok<string>(results[base]);
       const underlying = und && !isZeroAddr(und) ? getAddress(und).toLowerCase() : null;
       const m = underlying ? meta.get(underlying) : undefined;
+      const mMeta = meta.get(mToken);
       const underlyingSymbol = m?.symbol ?? "—";
       const underlyingDecimals = m?.decimals ?? 18;
 
-      const totalSupplyMTokens = ok<bigint>(results[base + 2]);
-      const totalBorrowsRaw = ok<bigint>(results[base + 3]);
-      const exchangeRate = ok<bigint>(results[base + 4]);
-      const cashRaw = ok<bigint>(results[base + 5]);
-      const reservesRaw = ok<bigint>(results[base + 6]);
+      const totalSupplyMTokens = ok<bigint>(results[base + 1]);
+      const totalBorrowsRaw = ok<bigint>(results[base + 2]);
+      const exchangeRate = ok<bigint>(results[base + 3]);
+      const cashRaw = ok<bigint>(results[base + 4]);
+      const reservesRaw = ok<bigint>(results[base + 5]);
 
       // Supplied underlying = mTokens × exchangeRateStored / 1e18, where the
       // rate is scaled 1e(18 + ud − 8): the mToken's 8dp and the rate's excess
@@ -442,10 +442,10 @@ export async function loadMoonwellMarkets(
       const totalReservesUnderlying = reservesRaw != null ? scaleRaw(reservesRaw, underlyingDecimals) : 0;
 
       // Oracle scale is the fork's own convention: 1e(36 − underlyingDecimals).
-      const priceRaw = ok<bigint>(results[base + 14]);
+      const priceRaw = ok<bigint>(results[base + 13]);
       const priceUsd = priceRaw != null && priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 - underlyingDecimals) : null;
 
-      const mkt = ok<readonly [boolean, bigint]>(results[base + 11]);
+      const mkt = ok<readonly [boolean, bigint]>(results[base + 10]);
       const cfMantissa = mkt ? mkt[1] : null;
       const collateralDisabled = cfMantissa != null && cfMantissa === ZERO;
       const collateralFactor = cfMantissa != null && cfMantissa > ZERO ? Number(cfMantissa) / 1e18 : null;
@@ -456,12 +456,12 @@ export async function loadMoonwellMarkets(
         const v = ok<bigint>(r);
         return v != null && v > ZERO ? scaleRaw(v, underlyingDecimals) : null;
       };
-      const supplyCap = capOf(results[base + 12]);
-      const borrowCap = capOf(results[base + 13]);
+      const supplyCap = capOf(results[base + 11]);
+      const borrowCap = capOf(results[base + 12]);
       // Judged on the raw slot, before scaling: exactly 1 base unit.
       const oneUnit = (r: Res | undefined): boolean => ok<bigint>(r) === ONE;
-      const supplyCapOneUnit = oneUnit(results[base + 12]);
-      const borrowCapOneUnit = oneUnit(results[base + 13]);
+      const supplyCapOneUnit = oneUnit(results[base + 11]);
+      const borrowCapOneUnit = oneUnit(results[base + 12]);
 
       // Annualize the per-SECOND rates on the model's own timestampsPerYear;
       // fall back to the file's
@@ -478,7 +478,7 @@ export async function loadMoonwellMarkets(
 
       return {
         mToken,
-        mTokenSymbol: ok<string>(results[base]) ?? "—",
+        mTokenSymbol: mMeta?.named ? mMeta.symbol : "—",
         underlying,
         underlyingSymbol,
         underlyingDecimals,
@@ -504,13 +504,13 @@ export async function loadMoonwellMarkets(
         borrowCapUsed: borrowCap != null && borrowCap > 0 ? totalBorrowsUnderlying / borrowCap : null,
         supplyCapOneUnit,
         borrowCapOneUnit,
-        mintPaused: ok<boolean>(results[base + 15]) === true,
-        borrowPaused: ok<boolean>(results[base + 16]) === true,
+        mintPaused: ok<boolean>(results[base + 14]) === true,
+        borrowPaused: ok<boolean>(results[base + 15]) === true,
 
-        supplyApr: apr(results[base + 8]),
-        borrowApr: apr(results[base + 7]),
+        supplyApr: apr(results[base + 7]),
+        borrowApr: apr(results[base + 6]),
         reserveFactor: (() => {
-          const v = ok<bigint>(results[base + 9]);
+          const v = ok<bigint>(results[base + 8]);
           return v != null ? Number(v) / 1e18 : null;
         })(),
 
