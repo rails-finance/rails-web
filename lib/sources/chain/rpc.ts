@@ -1,20 +1,27 @@
-// Shared JSON-RPC clients for the chain data-source's live-state reads.
+// Shared JSON-RPC clients for every chain read the web makes.
 // ----------------------------------------------------------------------------
-// The chain loader's *history* comes from Etherscan getLogs (wide-range, free
-// tier — see liquity-v2.ts). Its *live state* — a trove's current entireDebt /
-// entireColl, the redemption buffer ahead of it — comes from on-chain `eth_call`
-// at the latest block, which Etherscan's API doesn't serve. That's what the
-// public client is for here.
+// History is the indexed backend's (RAILS_API_URL); these clients serve what it
+// does not: the live-state overlays (`eth_call` at the head, multicalled), the
+// archive reads at a past block, the block and receipt reads, and the
+// wide-range `eth_getLogs` sweeps for the lanes the index does not cover.
 //
-// Now one client PER CHAIN, cached separately. Ethereum reads its URL from
-// ALCHEMY_URL exactly as before; Base reads BASE_RPC_URL. A chain whose env var
-// is unset throws on first use, so a misconfigured deploy fails loudly rather
-// than silently pricing from the wrong network — which, unlike a missing price,
-// would be invisible and wrong.
+//   chainClient       — the state URL (ChainMeta.rpcEnv), with an optional
+//                       second URL behind it (fallbackRpcEnv).
+//   chainBatchClient  — the same URL with JSON-RPC batching, rate-limit backoff.
+//   chainLogsClient   — the logs lane (logsRpcEnv) for wide-range getLogs.
+//   chainLogsBatchClient — the logs lane with batching, for archive eth_calls.
 //
-// SERVER-ONLY. Both env vars are server-side (no NEXT_PUBLIC_ prefix); this
-// module is imported only from /api/* route handlers (Node runtime), never from
-// a client component — the keys must not reach the browser bundle.
+// One client PER CHAIN, cached separately: Ethereum reads ALCHEMY_URL, Base
+// BASE_RPC_URL, Arbitrum ARBITRUM_RPC_URL, Sepolia SEPOLIA_RPC_URL (or one
+// derived from ALCHEMY_URL). A chain whose env var is unset throws on first
+// use, so a misconfigured deploy fails loudly rather than silently pricing from
+// the wrong network — which, unlike a missing price, would be invisible and
+// wrong.
+//
+// SERVER-ONLY. Every one of these env vars is server-side (no NEXT_PUBLIC_
+// prefix); this module is imported only from route handlers and server-side
+// loaders (Node runtime), never from a client component — the keys must not
+// reach the browser bundle.
 
 import { createPublicClient, fallback, http, type Chain, type PublicClient, type Transport } from "viem";
 import { arbitrum, base, mainnet, sepolia } from "viem/chains";
