@@ -42,7 +42,7 @@ export interface AssetChip {
 export interface CardChain {
   chain: number;
   token: string;
-  /** The asset page; null for a token with no stored price. */
+  /** The asset page; null for a token with no stored price and no page. */
   href: string | null;
 }
 
@@ -51,6 +51,8 @@ export interface ListedRef {
   chain: number;
   token: string;
   symbol: string;
+  /** It has a page without a price (a token only Morpho lists). */
+  page?: true;
 }
 
 /** Why a card has no price figures. */
@@ -157,10 +159,11 @@ export function assetCards(
   const priced = new Set(cards.flatMap((c) => c.chains.map((x) => `${x.chain}:${x.token}`)));
   for (const t of listed) {
     if (priced.has(`${t.chain}:${t.token}`) || /^0x0{40}$/.test(t.token)) continue;
-    // A symbol a card carries on another chain is that card's chain with no page.
+    const href = t.page ? assetHref(t.chain, t.token) : null;
+    // A symbol a card carries on another chain is that card's chain.
     const same = cards.find((c) => c.symbol === t.symbol && !c.chains.some((x) => x.chain === t.chain));
     if (same) {
-      same.chains.push({ chain: t.chain, token: t.token, href: null });
+      same.chains.push({ chain: t.chain, token: t.token, href });
       priced.add(`${t.chain}:${t.token}`);
       continue;
     }
@@ -171,7 +174,7 @@ export function assetCards(
       category: assetCategory(t.symbol),
       row: null,
       figure: figures.get(`${t.chain}:${t.token}`) ?? null,
-      chains: [{ chain: t.chain, token: t.token, href: null }],
+      chains: [{ chain: t.chain, token: t.token, href }],
       chips: [],
       underlying: null,
       wrapped: [],

@@ -42,6 +42,7 @@ import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
 import { asOfMark, asOfWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { loadAssetPrices } from "@/lib/api/fetch-asset-prices";
 import { rowFor, type AssetPriceRow } from "@/lib/shared/asset-prices";
+import { PRICELESS_WHY } from "@/lib/shared/asset-explorer";
 import { assetHref, NATIVE } from "@/lib/shared/asset-roster";
 import { usesWords, viaName, withVia } from "@/lib/shared/asset-via";
 import { viaForPathname, viaValue } from "@/lib/shared/asset-via-links";
@@ -207,27 +208,51 @@ function AssetPanelBody({
           )}
         </dl>
       )}
-      {(contract ?? (symbol === "ETH" ? NATIVE : null)) && <AssetPageRow chain={chain} contract={contract ?? NATIVE} />}
+      {(contract ?? (symbol === "ETH" ? NATIVE : null)) && (
+        <AssetPageRow chain={chain} contract={contract ?? NATIVE} symbol={symbol} />
+      )}
     </div>
   );
 }
 
-/** The asset's Prices list row and its page link, once the list is read;
+/** The asset's Prices list row and its page link, once the list is read; for
+ *  a token with a page and no stored price, the line saying so and the link;
  *  nothing where the asset has no page. */
-function AssetPageRow({ chain, contract }: { chain: ChainId; contract: string }) {
+function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: string; symbol: string }) {
   const pathname = usePathname();
   // The panel opens on a click, so the browser's location is there to read.
   const search = typeof window === "undefined" ? "" : window.location.search;
   const via = viaForPathname(pathname, search);
   const value = via ? viaValue(via) : null;
   const [row, setRow] = useState<ReturnType<typeof rowFor>>(null);
+  const [unpriced, setUnpriced] = useState(false);
   useEffect(() => {
     let live = true;
-    loadAssetPrices().then((list) => live && setRow(list ? rowFor(list, chain, contract, value) : null));
+    loadAssetPrices().then((list) => {
+      if (!live) return;
+      setRow(list ? rowFor(list, chain, contract, value) : null);
+      setUnpriced(Boolean(list?.unpriced?.includes(`${chain}:${contract.toLowerCase()}`)));
+    });
     return () => {
       live = false;
     };
   }, [chain, contract, value]);
+  if (!row && unpriced) {
+    const open = withVia(assetHref(chain, contract.toLowerCase()), value, `${pathname}${search}`);
+    return (
+      <div
+        className="flex flex-col gap-1.5 border-t border-[var(--rb-tooltip-border)] pt-2"
+        data-asset-popover-line="page"
+      >
+        <p className="text-[11px] text-rb-500" data-asset-popover-priceless="">
+          {PRICELESS_WHY}
+        </p>
+        <Link href={open} className="font-medium text-foreground hover:underline" data-asset-popover-open={open}>
+          {WORDS.open(symbol)}
+        </Link>
+      </div>
+    );
+  }
   if (!row) return null;
   const open = withVia(assetHref(chain, row.token), value, `${pathname}${search}`);
   return (

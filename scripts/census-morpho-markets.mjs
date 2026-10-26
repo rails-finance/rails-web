@@ -4,6 +4,9 @@
  *   node scripts/census-morpho-markets.mjs              # Ethereum → lib/morpho/
  *   node scripts/census-morpho-markets.mjs --chain base # Base     → lib/morpho-base/
  *
+ * Each run ends by running scripts/morpho-supply-tokens.mjs, which rewrites
+ * lib/morpho/supply-tokens.ts (the Morpho-only tokens /assets gives cards) for both chains.
+ *
  * WHY A CATALOG AT ALL: Morpho Blue is a singleton, not a factory, and it exposes no way to
  * enumerate its markets — `idToMarketParams(id)` answers for an id you already have, and
  * there is no `marketsLength()`. The only complete list is the `CreateMarket` log, which
@@ -338,3 +341,12 @@ const outPath = path.join(ROOT, CHAIN.out);
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, out);
 console.error(`wrote ${CHAIN.out} — ${markets.length} markets, ${interned.length} distinct addresses`);
+
+// The tokens of the markets with $1M or more of supply, which /assets gives cards
+// (scripts/morpho-supply-tokens.mjs): re-read for the census just written.
+const { execFileSync } = await import("node:child_process");
+execFileSync(
+  process.execPath,
+  ["--experimental-strip-types", "--no-warnings", path.join(ROOT, "scripts/morpho-supply-tokens.mjs")],
+  { stdio: "inherit" },
+);

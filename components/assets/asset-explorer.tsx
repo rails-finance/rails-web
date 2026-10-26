@@ -189,8 +189,11 @@ function AssetCardView({ card }: { card: AssetCard }) {
       data-anatomy="A5.4"
     >
       <div className="flex min-w-0 items-center gap-2">
-        {card.row ? (
-          <Link href={card.row.href} className="min-w-0 truncate text-sm font-semibold text-foreground hover:underline">
+        {card.row || card.chains[0]?.href ? (
+          <Link
+            href={card.row?.href ?? card.chains[0].href!}
+            className="min-w-0 truncate text-sm font-semibold text-foreground hover:underline"
+          >
             {card.symbol}
           </Link>
         ) : (

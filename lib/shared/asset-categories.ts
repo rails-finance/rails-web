@@ -4,8 +4,9 @@
 // whose grouping it is. The first six categories and their first rows are the
 // prototype's (rails-web-prototype packages/shared/src/protocol-metadata.ts);
 // Utility, LP / Pool share, Principal token and Real-world asset were added
-// on 26 Oct 2026 (Miles). The table runs by symbol over the price roster and
-// the tokens the explorers list with no stored price; a symbol it does not
+// on 26 Oct 2026 (Miles). The table runs by symbol over the price roster,
+// the tokens the explorers list with no stored price and the tokens only
+// Morpho lists (lib/morpho/supply-tokens.ts); a symbol it does not
 // name is "other". A deposit receipt (aDAI, cDAI, spDAI) sits with what it
 // earns on (a stablecoin's in Yield-bearing Stable); a one-for-one or
 // custodial wrapper (Seamless's ILM reserve tokens, Concrete's custodial
@@ -94,6 +95,11 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "USG",
     "JPYC",
     "KUSDe",
+    "USR",
+    "reUSD",
+    "msUSD",
+    "apxUSD",
+    "EURCV",
   ],
   "yield-stable": [
     "sDAI",
@@ -129,6 +135,13 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "sDOLA",
     "sUSDf",
     "svZCHF",
+    "savUSD",
+    "sUSN",
+    "apyUSD",
+    "siUSD",
+    "stUSDS",
+    "sUSDai",
+    "steakEURCV",
   ],
   "liquid-staking": [
     "stETH",
@@ -163,6 +176,9 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "ynETH",
     "ynETHx",
     "swBTC",
+    "OETH",
+    "amphrETH",
+    "JitoSOL",
   ],
   "wrapped-asset": [
     "WBTC",
@@ -184,6 +200,12 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "rweETH",
     "rWETH",
     "rwstETH",
+    "cbADA",
+    "cbDOGE",
+    "cbZEC",
+    "FXRP",
+    "kBTC",
+    "SOL",
   ],
   governance: [
     "LQTY",
@@ -268,7 +290,7 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "Surge USDf-aGHO",
   ],
   "principal-token": [],
-  rwa: ["PAXG", "XAUt", "XAUM", "wWTGXX"],
+  rwa: ["PAXG", "XAUt", "XAUM", "wWTGXX", "EUTBL", "wUSCC", "wJAAA", "mF-ONE"],
 };
 
 const BY_SYMBOL: ReadonlyMap<string, AssetCategory> = new Map(

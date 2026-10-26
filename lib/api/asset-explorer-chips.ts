@@ -18,7 +18,10 @@
 // A hit from a list that names the token's symbol carries it: a token an
 // explorer lists that the roster does not price gets a card without price
 // figures by that symbol (Miles, 26 Oct 2026). Morpho Blue's censuses name no
-// symbol, so a token only they list has no card.
+// symbol: a token only they list has a card when it sits in a market with a
+// supply of $1M or more (lib/morpho/supply-tokens.ts, Miles, 26 Oct 2026), by
+// the symbol erc20-meta reads for it, and a page without a price
+// (`morphoUnpricedPage`).
 //
 // SERVER-ONLY: the Morpho censuses are about 1.4 MB of source.
 
@@ -46,6 +49,9 @@ import { MORPHO_MARKETS as MORPHO_ETHEREUM_MARKETS } from "@/lib/morpho/market-c
 import { MORPHO_MARKETS as MORPHO_BASE_MARKETS } from "@/lib/morpho-base/market-catalog";
 import { YEARN_VAULTS } from "@/lib/yearn/vault-catalog";
 import { discoverLlamalendMarkets } from "@/lib/sources/chain/llamalend-markets";
+import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
+import { MORPHO_SUPPLY_READ, MORPHO_SUPPLY_TOKENS } from "@/lib/morpho/supply-tokens";
+import type { ChainId } from "@/lib/shared/chains";
 
 const BOLD = "0x6440f144b7e50d6a8439336510312d2f54beb01d";
 const ZERO = /^0x0{40}$/;
@@ -231,11 +237,37 @@ const llamalendTokens = unstable_cache(
   { revalidate: 6 * 3600 },
 );
 
+/** The symbols of the tokens in Morpho markets with $1M or more of supply, by
+ *  `chain:token`: erc20-meta's read (rails-server's `token_meta`, else the
+ *  chain), cached a day per supply read. A token whose symbol did not resolve
+ *  is left out; a read where none resolved is not cached. */
+const morphoSupplySymbols = unstable_cache(
+  async (): Promise<[string, string][]> => {
+    const out: [string, string][] = [];
+    let asked = 0;
+    for (const [chain, tokens] of Object.entries(MORPHO_SUPPLY_TOKENS)) {
+      asked += tokens.length;
+      const metas = await resolveErc20Meta([...tokens], Number(chain) as ChainId);
+      for (const t of tokens) {
+        const m = metas.get(t);
+        if (m?.named) out.push([`${chain}:${t}`, m.symbol]);
+      }
+    }
+    if (asked > 0 && out.length === 0) throw new Error("no Morpho token symbol resolved");
+    return out;
+  },
+  ["asset-explorer-morpho-supply-symbols-v1", MORPHO_SUPPLY_READ],
+  { revalidate: 24 * 3600 },
+);
+
 /** A token an explorer lists by symbol. */
 export interface ListedToken {
   chain: number;
   token: string;
   symbol: string;
+  /** A token only Morpho lists, in a market with $1M or more of supply: it
+   *  has a page without a price. */
+  page?: true;
 }
 
 /** The chips for each `chain:token`, from the roster and the explorers' lists,
@@ -254,7 +286,15 @@ export async function assetChips(
   for (const [t, symbol] of llama)
     hits.push({ explorer: "llamalend", chain: 1, token: t, from: "catalog", page: "/markets", symbol });
 
-  const symbolOf = new Map(assets.map((a) => [`${a.chain}:${a.token}`, a.symbol]));
+  const morpho = new Map(await morphoSupplySymbols().catch(() => [] as [string, string][]));
+  if (morpho.size)
+    for (let i = 0; i < hits.length; i++) {
+      const h = hits[i];
+      const symbol = morpho.get(`${h.chain}:${h.token}`);
+      if (symbol && !h.symbol && (h.explorer === "morpho" || h.explorer === "morpho-base")) hits[i] = { ...h, symbol };
+    }
+
+  const symbolOf = new Map([...morpho, ...assets.map((a) => [`${a.chain}:${a.token}`, a.symbol] as const)]);
   const grouped = new Map<string, Map<string, Hit[]>>();
   for (const h of hits) {
     const id = `${h.chain}:${h.token}`;
@@ -301,6 +341,24 @@ export async function assetChips(
   const listed = new Map<string, ListedToken>();
   for (const h of hits)
     if (h.symbol && byExplorer.has(h.explorer) && !listed.has(`${h.chain}:${h.token}`))
-      listed.set(`${h.chain}:${h.token}`, { chain: h.chain, token: h.token, symbol: h.symbol });
+      listed.set(`${h.chain}:${h.token}`, {
+        chain: h.chain,
+        token: h.token,
+        symbol: h.symbol,
+        ...(morpho.has(`${h.chain}:${h.token}`) ? { page: true as const } : {}),
+      });
   return { chips: out, listed: [...listed.values()] };
+}
+
+/** The page of a token without a stored price that Morpho lists in a market
+ *  with $1M or more of supply: its symbol and chips; null for any other token. */
+export async function morphoUnpricedPage(
+  chain: number,
+  token: string,
+): Promise<{ symbol: string; chips: AssetChip[] } | null> {
+  const t = token.toLowerCase();
+  if (!MORPHO_SUPPLY_TOKENS[chain]?.includes(t)) return null;
+  const { chips, listed } = await assetChips([]);
+  const hit = listed.find((l) => l.chain === chain && l.token === t);
+  return hit ? { symbol: hit.symbol, chips: chips.get(`${chain}:${t}`) ?? [] } : null;
 }
