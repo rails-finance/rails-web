@@ -358,7 +358,8 @@ export function roundsOf(
       points,
       from: wire.from,
       asOf: { block: asOf?.block ?? last[2], ts: asOf?.ts ?? last[0] },
-      joinDay: days[0][0],
+      // The rounds' first day, also where `days` were cut by a `from`.
+      joinDay: Math.min(days[0][0], Math.floor(wire.from.ts / 86_400)),
       total: wire.total,
       thinned: wire.thinned === true,
     },

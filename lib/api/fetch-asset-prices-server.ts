@@ -3,8 +3,9 @@
 // /api/prices/assets), then over the last 30 days from the daily store (GET
 // /api/prices/daily), 40 series a read, each row's series and every drawn
 // line on its page, for the flags; and where the chain serves stored rounds
-// (GET /api/prices/rounds, 12 oracles a read, each line's day closes and its
-// first and last round), each line joined above as its page's chart joins it.
+// (GET /api/prices/rounds, 12 oracles a read, each line's first and last round
+// in the window and its day closes from the window's first day), each line
+// joined above as its page's chart joins it.
 //
 // SERVER-ONLY. Reads `RAILS_API_URL` + `API_BEARER_TOKEN`.
 
@@ -19,7 +20,7 @@ import type { AssetRosterAnswer } from "@/lib/shared/asset-roster";
 const TIMEOUT_MS = 10_000;
 const MAX_SERIES = 40;
 const MAX_ORACLES = 12;
-/** The rounds a line is read with: its first and last (the day closes come whole). */
+/** The rounds a line is read with: the first and last in the window. */
 const ROUND_POINTS = 2;
 /** The daily store and roster change once a day; the rounds at each oracle update. */
 const DAILY_REVALIDATE_S = 3600;
@@ -38,6 +39,11 @@ async function get<T>(path: string, readerIp?: string | null, revalidate = DAILY
 }
 
 export async function fetchAssetPricesServer(readerIp?: string | null): Promise<AssetPriceList> {
+  return (await buildAssetPrices(readerIp)).list;
+}
+
+/** The list, with the roster and the pages it was built from (the asset explorer's cards). */
+export async function buildAssetPrices(readerIp?: string | null) {
   const roster = await get<Omit<AssetRosterAnswer, "related">>("/api/prices/assets", readerIp);
   const pages = rosterPages(roster.assets, roster.readAt, roster.native);
   const today = Math.floor(Date.now() / DAY_MS);
@@ -69,7 +75,10 @@ export async function fetchAssetPricesServer(readerIp?: string | null): Promise<
     }
   }
   const rounds = new Map<string, NonNullable<ReturnType<typeof roundsOf>>>();
-  for (const [chain, byKey] of oracles) reads.push(readRounds(chain, [...new Set(byKey.values())], rounds, readerIp));
+  // The rounds from the window's first day: the list draws no day before it.
+  const fromTs = from * 86_400;
+  for (const [chain, byKey] of oracles)
+    reads.push(readRounds(chain, [...new Set(byKey.values())], rounds, fromTs, readerIp));
   await Promise.all(reads);
   const prices = new Map<string, [number, number][]>();
   const points = new Map<string, readonly SpreadPoint[]>();
@@ -86,7 +95,7 @@ export async function fetchAssetPricesServer(readerIp?: string | null): Promise<
     points.set(id, pts);
     if (r) stamps.set(id, { asOf: r.rounds.asOf, joinDay: r.rounds.joinDay });
   }
-  return priceRows(pages, prices, today, points, stamps);
+  return { roster, pages, list: priceRows(pages, prices, today, points, stamps) };
 }
 
 /** One chain's stored rounds, 12 oracles a read; the first read answering
@@ -96,10 +105,16 @@ async function readRounds(
   chain: number,
   list: string[],
   into: Map<string, NonNullable<ReturnType<typeof roundsOf>>>,
+  fromTs: number,
   readerIp?: string | null,
 ): Promise<void> {
   const read = async (part: string[]) => {
-    const qs = new URLSearchParams({ chain: String(chain), oracles: part.join(","), max: String(ROUND_POINTS) });
+    const qs = new URLSearchParams({
+      chain: String(chain),
+      oracles: part.join(","),
+      max: String(ROUND_POINTS),
+      from: String(fromTs),
+    });
     const a = await get<RoundsAnswer>(`/api/prices/rounds?${qs.toString()}`, readerIp, ROUNDS_REVALIDATE_S).catch(
       () => null,
     );

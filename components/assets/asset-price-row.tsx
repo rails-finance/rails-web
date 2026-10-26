@@ -46,11 +46,12 @@ export function fmtRowPrice(v: number): string {
   return v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 }
 
-export function AssetPriceRow({ row }: { row: Row }) {
+/** `as="div"` draws the row inside another part (the asset explorer's card, A5.4). */
+export function AssetPriceRow({ row, as: Tag = "li" }: { row: Row; as?: "li" | "div" }) {
   const flag = row.flag ? flagWords(row.flag) : null;
   const name = `${row.symbol}${row.price != null ? `, $${fmtRowPrice(row.price)}` : ", no stored price"}${row.asOf ? ` ${asOfWords(row.asOf)}` : ""}${row.change != null ? `, ${fmtChange(row.change)} over 30 days` : ""}${flag ? `; ${flag.text}` : ""}`;
   return (
-    <li data-asset-price-row={`${row.chain}:${row.token}`} data-anatomy="A5.1">
+    <Tag data-asset-price-row={`${row.chain}:${row.token}`} data-anatomy="A5.1">
       <Link
         href={row.href}
         aria-label={name}
@@ -102,6 +103,6 @@ export function AssetPriceRow({ row }: { row: Row }) {
           {row.change == null ? "–" : fmtChange(row.change)}
         </span>
       </Link>
-    </li>
+    </Tag>
   );
 }
