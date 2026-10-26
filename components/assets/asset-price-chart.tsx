@@ -20,6 +20,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
 import { AssetRoundsChart } from "@/components/assets/asset-rounds-chart";
+import { AssetLwChart } from "@/components/assets/asset-lw-chart";
+import { ASSET_CHART_ENGINE, type AssetChartEngine } from "@/lib/shared/asset-chart-grid";
 import { roundTime } from "@/components/assets/round-time";
 import { inForce, lineSpreads } from "@/lib/shared/asset-spread";
 import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
@@ -38,7 +40,7 @@ import { buildFlowModel, type FlowModel } from "@/lib/shared/flows-timeline";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
-import { assetPriceChartContent } from "@/lib/shared/learn-more-content";
+import { assetLwChartContent, assetPriceChartContent } from "@/lib/shared/learn-more-content";
 import { lineName, shortAddress, type PageChain, type PageLine } from "@/lib/shared/asset-roster";
 import { usesWords, type ViaView } from "@/lib/shared/asset-via";
 
@@ -88,10 +90,12 @@ export function AssetPriceChart({
   section,
   symbol,
   via = null,
+  engine = ASSET_CHART_ENGINE,
 }: {
   section: PageChain;
   symbol: string;
   via?: ViaView | null;
+  engine?: AssetChartEngine;
 }) {
   const drawn = section.lines.filter((l) => l.drawn != null);
   const keys = drawn.map((l) => l.drawn!.key);
@@ -146,6 +150,8 @@ export function AssetPriceChart({
   const firstDay = prices.length ? Math.min(...prices.map((p) => p.points[0][0])) : null;
   const axis = useMemo(() => (firstDay == null ? null : axisModel(firstDay, today)), [firstDay, today]);
   const help = useMemo(() => assetPriceChartContent(symbol), [symbol]);
+  const lwHelp = useMemo(() => assetLwChartContent(symbol), [symbol]);
+  const lwLines = useMemo(() => prices.map((p) => ({ line: byKey.get(p.key)!, series: p })), [prices, byKey]);
   const lastOf = (key: string) => prices.find((p) => p.key === key)?.points.at(-1) ?? null;
   // The spread: every drawn line against the main one (the first drawn).
   const spreads = useMemo(() => {
@@ -225,8 +231,27 @@ export function AssetPriceChart({
           )}
         </p>
       )}
-      <div className="rounded-lg border border-rb-200 p-3 dark:border-rb-700" data-asset-chart="" data-anatomy="A3">
-        {roundLines.length > 0 && spreads && (
+      <div
+        className="rounded-lg border border-rb-200 p-3 dark:border-rb-700"
+        data-asset-chart={engine}
+        data-anatomy="A3"
+      >
+        {engine === "lightweight" ? (
+          prices.length > 0 ? (
+            <AssetLwChart
+              lines={lwLines}
+              chain={section.chain}
+              spreads={spreads}
+              help={lwHelp}
+              joinNote={joinDay != null ? joinText(roundLines, prices.length, joinDay) : null}
+            />
+          ) : (
+            <p className="py-6 text-center text-sm text-rb-500" data-asset-chart-state={failed ? "failed" : "loading"}>
+              {failed ? "The daily prices were not read." : "Reading the daily prices…"}
+            </p>
+          )
+        ) : null}
+        {engine === "classic" && roundLines.length > 0 && spreads && (
           <div
             className="mb-2 flex gap-1 text-xs"
             role="group"
@@ -253,7 +278,7 @@ export function AssetPriceChart({
             ))}
           </div>
         )}
-        {onRounds ? (
+        {engine !== "classic" ? null : onRounds ? (
           <FlowUnitContext.Provider value={null}>
             <AssetRoundsChart
               lines={roundLines}

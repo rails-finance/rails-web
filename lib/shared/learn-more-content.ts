@@ -1556,6 +1556,42 @@ export function liquityCollSurplusClaimContent(
 
 /** The "?" on an asset page's chart (rails-ops reference/asset-key-map.md):
  *  a line per oracle, the picked one in colour. */
+/** The asset chart's how-to-read on Lightweight Charts (anatomy A3.7). */
+export function assetLwChartContent(symbol: string): LearnMoreContent {
+  return {
+    title: "How to read the price chart",
+    intro: `${symbol}'s price from each feed a lending protocol reads on this chain, over time in UTC. Protocols reading one feed, directly or through a wrapper that only rescales it, share a line.`,
+    detailsHeading: "The parts:",
+    details: [
+      {
+        bold: "The coloured line",
+        text: "the main line: the one the most protocols read, or, opened from a protocol, the one that protocol reads.",
+      },
+      { bold: "The thin lines", text: "the other feeds, on the same axis." },
+      {
+        bold: "Steps",
+        text: "a price holds until the next round, or before the stored rounds until the next day's read, so each line moves in steps.",
+      },
+      {
+        bold: "Zoom and pan",
+        text: "scroll or pinch to zoom, drag to pan, double-click to go back to the opening view; the buttons over the chart pick a span. Zoomed in on stored rounds, the chart reads every round in the window; zoomed out, each step is the last price of its span.",
+      },
+      {
+        bold: "The readout",
+        text: "over the chart: the time under the cursor, each line's price then, and on stored rounds the round, block and transaction behind the main line's price.",
+      },
+      {
+        bold: "The spread pane",
+        text: "under the prices, each other line's deviation from the main line, with dashed lines at ±1 %. Where both lines read stored rounds they are compared at the same moment; before that, a day compares two lines only where both were read within ten minutes of each other, or one is a fixed price. Under the chart, a line more than 1 % from the main line names its largest gap, which moves the chart there. A Maker line's gap is named with its cause: Maker prices from the median of an hour before.",
+      },
+      {
+        bold: "Stored rounds",
+        text: "from the marker on the main line, the lines are the oracle's rounds as stored; before it, the daily store's read of the oracle, a price per UTC day.",
+      },
+    ],
+  };
+}
+
 export function assetPriceChartContent(symbol: string): LearnMoreContent {
   return {
     title: "How to read the price chart",

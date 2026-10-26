@@ -23,6 +23,7 @@ export function AssetSpreadStrip({
   cursorDay,
   cursorTs,
   valueAt,
+  stamp: stampText,
   onJump,
 }: {
   main: PageLine;
@@ -32,6 +33,8 @@ export function AssetSpreadStrip({
   /** On the rounds chart: the cursor's moment, and each line's deviation then. */
   cursorTs?: number | null;
   valueAt?: (lineId: string) => number | null;
+  /** The cursor's time in words, where the chart names it (a day on a daily grid). */
+  stamp?: string | null;
   onJump: (day: number, ts?: number) => void;
 }) {
   if (others.length === 0) return null;
@@ -58,13 +61,16 @@ export function AssetSpreadStrip({
   const label = (i: number) =>
     labels.filter((l) => l === labels[i]).length > 1 ? `${labels[i]} (${others[i].line.oracle.name})` : labels[i];
   const when = (g: NonNullable<LineSpread["largest"]>) => (g.ts != null ? roundTime(g.ts) : dayDate(g.day));
-  const stamp = onRounds
-    ? cursorTs != null
-      ? roundTime(cursorTs)
-      : null
-    : cursorDay != null
-      ? dayDate(cursorDay)
-      : null;
+  const stamp =
+    stampText !== undefined
+      ? stampText
+      : onRounds
+        ? cursorTs != null
+          ? roundTime(cursorTs)
+          : null
+        : cursorDay != null
+          ? dayDate(cursorDay)
+          : null;
   return (
     <div className="mt-3 text-xs" data-asset-spread="loud" data-anatomy="A3.1">
       <div className="flex items-baseline justify-between gap-3 text-rb-500">
