@@ -32,6 +32,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
+import dynamic from "next/dynamic";
 import { Activity, ChevronDown, ChevronLeft, ChevronRight, Link2, SkipBack, SkipForward } from "lucide-react";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -77,13 +78,7 @@ import {
   type FlowSide,
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel, OldPriceTip, oldLineTip } from "@/components/shared/flow-old-price";
-import {
-  LifetimeFlowsLw,
-  LwRanges,
-  nearestStopAt,
-  type FlowsLwApi,
-  type FlowsLwAxis,
-} from "@/components/shared/lifetime-flows-lw";
+import { LwRanges, nearestStopAt, type FlowsLwApi, type FlowsLwAxis } from "@/components/shared/lifetime-flows-lw-axis";
 import { LwNotice } from "@/components/shared/lw-chart-kit";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
@@ -215,6 +210,15 @@ export function FlowPip({
     />
   );
 }
+
+/** The chart on Lightweight Charts, its code fetched only where a family
+ *  draws on it (and the library itself only once the charts are shown). */
+const LifetimeFlowsLw = dynamic(() => import("@/components/shared/lifetime-flows-lw").then((m) => m.LifetimeFlowsLw), {
+  ssr: false,
+  loading: () => <div style={{ height: LW_LOADING_H }} />,
+});
+/** The chart's height while its code loads (its value, tip and price panes and its axis). */
+const LW_LOADING_H = 250;
 
 /** The line's hues; the panel's Key draws the same. */
 export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
