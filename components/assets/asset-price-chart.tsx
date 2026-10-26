@@ -7,16 +7,23 @@
 // the cursor), then the lines listed: each oracle named, the protocols that
 // read it with their series, the span stored and its "as of" stamp (decision
 // 0054, ruling 2).
-// Every line is the daily store's series (`/api/prices/daily`), a point per
-// completed UTC day.
+// A line is the daily store's series (`/api/prices/daily`), a point per
+// completed UTC day, continued from its stored rounds' first day by the
+// rounds' day closes where the chain serves them (`/api/prices/rounds`,
+// `joinRounds`); the switch over the chart opens the rounds alone, every
+// change of each line's value (A3.3). The join is stated under the chart and
+// in each line's stamp.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
-import { lineSpreads } from "@/lib/shared/asset-spread";
+import { AssetRoundsChart } from "@/components/assets/asset-rounds-chart";
+import { roundTime } from "@/components/assets/round-time";
+import { inForce, lineSpreads } from "@/lib/shared/asset-spread";
+import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
 import { CombinedFlows } from "@/components/shared/lifetime-flows-combined";
 import { FlowUnitContext } from "@/components/shared/lifetime-flows-tip";
 import { fetchDailyAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
-import { dailyStorePriceSeries } from "@/lib/shared/price-series";
+import { dailyStorePriceSeries, joinRounds, roundsOf, type PriceRounds } from "@/lib/shared/price-series";
 import type { FlowPriceSeries } from "@/lib/shared/flows-price";
 import { buildFlowModel, type FlowModel } from "@/lib/shared/flows-timeline";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
@@ -58,12 +65,32 @@ function axisModel(firstDay: number, today: number): { model: FlowModel; series:
   };
 }
 
+/** The join under the chart: from which day the lines are their stored rounds. */
+function joinText(lines: { rounds: PriceRounds }[], drawn: number, joinDay: number): string {
+  const who = lines.length === drawn ? "the lines are" : `${lines.length} of the ${drawn} lines are`;
+  const one = lines.every((l) => l.rounds.joinDay === joinDay);
+  return one
+    ? `From ${dayDate(joinDay)} ${who} their stored oracle rounds, each day at its close; before it, the daily store.`
+    : `${who[0].toUpperCase()}${who.slice(1)} their stored oracle rounds from the time each line's stamp names, each day at its close; before it, the daily store.`;
+}
+
 export function AssetPriceChart({ section, symbol }: { section: PageChain; symbol: string }) {
   const drawn = section.lines.filter((l) => l.drawn != null);
   const keys = drawn.map((l) => l.drawn!.key);
   const [answer, setAnswer] = useState<DailyAnswer | null>(null);
   const [failed, setFailed] = useState(false);
+  const [rounds, setRounds] = useState<RoundsAnswer | null>(null);
   const keyList = keys.join(",");
+  const oracleList = drawn.map((l) => l.oracle.address).join(",");
+  useEffect(() => {
+    const ctl = new AbortController();
+    setRounds(null);
+    // A failed or switched-off read leaves the daily stores alone on the chart.
+    fetchPriceRounds(section.chain, oracleList.split(",").filter(Boolean).slice(0, 12), { signal: ctl.signal })
+      .then((a) => !ctl.signal.aborted && setRounds(a))
+      .catch(() => {});
+    return () => ctl.abort();
+  }, [section.chain, oracleList]);
   useEffect(() => {
     const ctl = new AbortController();
     setFailed(false);
@@ -85,8 +112,10 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
       .filter((s) => s != null)
       .map((s) => {
         const l = byKey.get(s.key)!;
+        const wire = rounds?.lane === "on" ? rounds.lines[l.oracle.address.toLowerCase()] : undefined;
+        const r = wire && "points" in wire ? roundsOf(wire, rounds!.asOf) : null;
         return {
-          ...s,
+          ...(r ? joinRounds(s, r) : s),
           source: l.oracle.name,
           side: "collateral" as const,
           unitLabel: "USD",
@@ -94,7 +123,7 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
           tag: shortAddress(l.oracle.address),
         };
       });
-  }, [answer, byKey, drawn, symbol, section.chain]);
+  }, [answer, rounds, byKey, drawn, symbol, section.chain]);
   const today = Math.floor(Date.now() / DAY_MS);
   const firstDay = prices.length ? Math.min(...prices.map((p) => p.points[0][0])) : null;
   const axis = useMemo(() => (firstDay == null ? null : axisModel(firstDay, today)), [firstDay, today]);
@@ -105,11 +134,15 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
     const main = prices[0];
     const mainLine = main ? byKey.get(main.key) : undefined;
     if (!main || !mainLine) return null;
-    const others = prices
-      .slice(1)
-      .map((p) => ({ key: p.key, points: p.points, fixed: byKey.get(p.key)!.oracle.kind === "fixed" }));
+    const withRounds = (r: PriceRounds | undefined) => (r ? { rounds: { points: r.points, joinDay: r.joinDay } } : {});
+    const others = prices.slice(1).map((p) => ({
+      key: p.key,
+      points: p.points,
+      fixed: byKey.get(p.key)!.oracle.kind === "fixed",
+      ...withRounds(p.rounds),
+    }));
     const out = lineSpreads(
-      { key: main.key, points: main.points, fixed: mainLine.oracle.kind === "fixed" },
+      { key: main.key, points: main.points, fixed: mainLine.oracle.kind === "fixed", ...withRounds(main.rounds) },
       others,
       section.chain,
     );
@@ -121,13 +154,89 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
   const cursorDay = cursorAt == null || lastDay == null ? cursorAt : Math.min(cursorAt, lastDay);
   const onCursorDay = useCallback((d: number) => setCursorDay(d), []);
   const [jumpTo, setJumpTo] = useState<{ day: number; n: number } | null>(null);
-  const onJump = useCallback((day: number) => setJumpTo((j) => ({ day, n: (j?.n ?? 0) + 1 })), []);
+  // The rounds view: the lines that read stored rounds, and the cursor's moment.
+  const roundLines = useMemo(
+    () =>
+      prices
+        .filter((p) => p.rounds)
+        .map((p) => ({ id: byKey.get(p.key)!.id, name: p.name ?? p.key, rounds: p.rounds! })),
+    [prices, byKey],
+  );
+  const joinDay = roundLines.length ? Math.min(...roundLines.map((l) => l.rounds.joinDay)) : null;
+  const [view, setView] = useState<"days" | "rounds">("days");
+  const [cursorTs, setCursorTs] = useState<number | null>(null);
+  const onRounds = view === "rounds" && roundLines.length > 0 && spreads != null;
+  const onJump = useCallback(
+    (day: number, ts?: number) => {
+      if (ts != null && view === "rounds") setCursorTs(ts);
+      else setJumpTo((j) => ({ day, n: (j?.n ?? 0) + 1 }));
+    },
+    [view],
+  );
+  const asOfTs = roundLines.length ? Math.max(...roundLines.map((l) => l.rounds.asOf.ts)) : null;
+  const valueAt = useCallback(
+    (lineId: string) => {
+      const m = spreads?.main.id ? roundLines.find((l) => l.id === spreads.main.id) : undefined;
+      const o = roundLines.find((l) => l.id === lineId);
+      const t = cursorTs ?? asOfTs;
+      if (!m || !o || t == null) return null;
+      const a = inForce(m.rounds.points, t);
+      const b = inForce(o.rounds.points, t);
+      return a != null && b != null && a > 0 ? b / a - 1 : null;
+    },
+    [spreads, roundLines, cursorTs, asOfTs],
+  );
 
   return (
     <section className="mt-8" data-asset-chain={section.chain} data-anatomy="A2">
       <h2 className="mb-3 text-lg font-semibold text-foreground">{section.name}</h2>
       <div className="rounded-lg border border-rb-200 p-3 dark:border-rb-700" data-asset-chart="" data-anatomy="A3">
-        {axis && prices.length > 0 ? (
+        {roundLines.length > 0 && spreads && (
+          <div
+            className="mb-2 flex gap-1 text-xs"
+            role="group"
+            aria-label="What the chart draws"
+            data-asset-view={view}
+            data-anatomy="A3.2"
+          >
+            {(
+              [
+                ["days", "Every day"],
+                ["rounds", `Stored rounds, from ${dayDate(joinDay!)}`],
+              ] as const
+            ).map(([v, word]) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={`rounded px-2 py-0.5 ${view === v ? "bg-[var(--surface-sunken)] font-semibold text-foreground" : "text-rb-500 hover:text-foreground"}`}
+                data-asset-view-button={v}
+              >
+                {word}
+              </button>
+            ))}
+          </div>
+        )}
+        {onRounds ? (
+          <FlowUnitContext.Provider value={null}>
+            <AssetRoundsChart
+              lines={roundLines}
+              mainId={spreads!.main.id}
+              chain={section.chain}
+              cursorTs={cursorTs}
+              onCursorTs={setCursorTs}
+            />
+            <AssetSpreadStrip
+              main={spreads!.main}
+              others={spreads!.others}
+              cursorDay={null}
+              cursorTs={cursorTs ?? asOfTs}
+              valueAt={valueAt}
+              onJump={onJump}
+            />
+          </FlowUnitContext.Provider>
+        ) : axis && prices.length > 0 ? (
           <FlowUnitContext.Provider value={null}>
             <CombinedFlows
               model={axis.model}
@@ -147,6 +256,11 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
             {spreads && (
               <AssetSpreadStrip main={spreads.main} others={spreads.others} cursorDay={cursorDay} onJump={onJump} />
             )}
+            {joinDay != null && (
+              <p className="mt-2 text-xs text-rb-500" data-asset-join={joinDay}>
+                {joinText(roundLines, prices.length, joinDay)}
+              </p>
+            )}
           </FlowUnitContext.Provider>
         ) : (
           <p className="py-6 text-center text-sm text-rb-500" data-asset-chart-state={failed ? "failed" : "loading"}>
@@ -162,6 +276,7 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
             chain={section.chain}
             symbol={symbol}
             last={l.drawn ? lastOf(l.drawn.key) : null}
+            rounds={l.drawn ? prices.find((p) => p.key === l.drawn!.key)?.rounds : undefined}
             main={spreads?.main.id === l.id}
           />
         ))}
@@ -182,12 +297,14 @@ function LineRow({
   symbol,
   last,
   main,
+  rounds,
 }: {
   line: PageLine;
   chain: number;
   symbol: string;
   last: [number, number, number | null, number?] | null;
   main: boolean;
+  rounds?: PriceRounds;
 }) {
   const href = (a: string) => explorerUrl(chain as ChainId, "address", a);
   return (
@@ -209,7 +326,16 @@ function LineRow({
             </span>
           )}
         </span>
-        {last ? (
+        {rounds ? (
+          <span
+            className="text-xs text-rb-500 tabular-nums"
+            data-asset-as-of={last?.[0] ?? ""}
+            data-asset-rounds-from={rounds.from.block}
+          >
+            As of {roundTime(rounds.asOf.ts)}, block {rounds.asOf.block.toLocaleString("en-US")}: stored rounds from{" "}
+            {roundTime(rounds.from.ts)} (block {rounds.from.block.toLocaleString("en-US")}), the daily store before
+          </span>
+        ) : last ? (
           <span className="text-xs text-rb-500 tabular-nums" data-asset-as-of={last[0]}>
             As of {dayDate(last[0])}
             {last[2] != null ? `, block ${last[2].toLocaleString("en-US")}` : ""}

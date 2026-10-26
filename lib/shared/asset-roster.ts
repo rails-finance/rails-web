@@ -138,6 +138,14 @@ export function lineReaders(l: PageLine): string {
   return l.series.length > 0 && l.series.every((s) => s.retired) ? `${names} (retired)` : names;
 }
 
+/** A Maker OSM line (the OSM, or the Lockstake ilk's capped wrapper over one):
+ *  its price is the median of an hour before, by design. The spread strip
+ *  names that cause on its gap, and its gap flags no Prices list row (Miles,
+ *  26 Oct 2026). */
+export function delayedLine(l: PageLine): boolean {
+  return l.oracle.kind === "osm" || /\bOSM\b/.test(l.oracle.name);
+}
+
 const seriesSpan = (s: RosterSeries, today: number) => (s.firstDay == null ? 0 : (s.lastDay ?? today) - s.firstDay + 1);
 
 /** The chart's main line: the first line with a drawn series. */

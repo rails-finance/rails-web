@@ -9,6 +9,12 @@
 // series keeps the last point of each day, an event series one per block.
 // Nothing is interpolated: a day without a point reads the last one before
 // it, marked carried, with its age.
+//
+// A daily series continues on its stored oracle rounds where the chain serves
+// them (`roundsOf`, `joinRounds`; rails-ops reference/asset-key-map.md,
+// "Rounds and the daily join"): from the rounds' first day each day is their
+// close, earlier days the store's, and the series keeps every round in
+// `rounds` for a chart that draws them.
 
 import type { DailyAnswer } from "@/lib/api/fetch-daily-prices";
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -43,6 +49,8 @@ export interface PriceSeries {
   /** Days before this one are the rows alone and draw by the sparse rule:
    *  every segment dotted, the observations marked by `events`. */
   sparseBefore?: number;
+  /** The stored rounds the series reads from `rounds.joinDay` on (`joinRounds`). */
+  rounds?: PriceRounds;
 }
 /** A row's price on its day: [the row's day, price, block]; a redemption row
  *  adds the redemption price it was redeemed at. */
@@ -258,4 +266,114 @@ export function lastDays(series: PriceSeries, n: number, today?: number): PriceP
   if (pts.length === 0) return [];
   const end = today ?? pts[pts.length - 1][0];
   return pts.filter((p) => p[0] > end - n && p[0] <= end);
+}
+
+// ── Stored rounds, joined below by the daily stores ─────────────────────────
+// (rails-ops reference/asset-key-map.md, "Rounds and the daily join")
+
+/** A stored-rounds point: [unix seconds the value took force, price in the
+ *  series' unit, block it took force at, the leg that moved it (an index into
+ *  `PriceRounds.legs`), the leg row's block, its transaction, its proxy round
+ *  id (null for a cap row)]. */
+export type RoundPricePoint = [
+  ts: number,
+  price: number,
+  block: number,
+  leg: number,
+  srcBlock: number,
+  tx: string,
+  round: string | null,
+];
+export interface PriceRounds {
+  /** How the line is had from stored legs: a feed, or a composer over them. */
+  kind: "feed" | "aave" | "compound" | "product";
+  legs: { kind: "feed" | "cap"; name: string; address: string }[];
+  /** Every change of the value in force, ascending (thinned where `thinned`). */
+  points: RoundPricePoint[];
+  /** The first point: the line reads rounds from here on. */
+  from: { ts: number; block: number };
+  /** Sieve's checkpoint the rounds run to. */
+  asOf: { ts: number; block: number };
+  /** The first UTC day whose point is the rounds' close; earlier days are the daily store's. */
+  joinDay: number;
+  /** Points in the stored span (before any thinning). */
+  total: number;
+  thinned: boolean;
+}
+
+/** The source the joined days name. */
+export const ROUNDS_SOURCE = "rounds";
+
+/** The wire's line as prices: its points and day closes, or null where the
+ *  stored rows do not settle it or it states another unit than `unit` (a
+ *  WETH Comet's ETH prices, which its daily series carries in USD). `asOf`
+ *  is the answer's. */
+export function roundsOf(
+  wire: {
+    kind: PriceRounds["kind"];
+    unit?: string;
+    scale: number;
+    legs: PriceRounds["legs"];
+    from: { block: number; ts: number } | null;
+    total: number;
+    points: [number, string, number, number, number, string, string | null][];
+    days: [number, string, number, 0 | 1][];
+    thinned?: true;
+  },
+  asOf: { block: number; ts: number | null } | undefined,
+  unit = "usd",
+): { rounds: PriceRounds; days: PricePoint[] } | null {
+  if ((wire.unit ?? "usd") !== unit) return null;
+  if (!wire.from || wire.points.length === 0 || wire.days.length === 0) return null;
+  const div = 10 ** wire.scale;
+  const points: RoundPricePoint[] = [];
+  for (const [ts, raw, block, leg, src, tx, round] of wire.points) {
+    const price = Number(raw) / div;
+    if (goodPrice(price)) points.push([ts, price, block, leg, src, tx, round]);
+  }
+  const days: PricePoint[] = [];
+  for (const [day, raw, block] of wire.days) {
+    const price = Number(raw) / div;
+    if (goodPrice(price)) days.push([day, price, block]);
+  }
+  if (!points.length || !days.length) return null;
+  const last = points[points.length - 1];
+  return {
+    rounds: {
+      kind: wire.kind,
+      legs: wire.legs,
+      points,
+      from: wire.from,
+      asOf: { block: asOf?.block ?? last[2], ts: asOf?.ts ?? last[0] },
+      joinDay: days[0][0],
+      total: wire.total,
+      thinned: wire.thinned === true,
+    },
+    days,
+  };
+}
+
+/** A daily series continued by its stored rounds: the store's days before
+ *  the rounds' first day, the rounds' day closes from it on (today's, the
+ *  value in force at the checkpoint), each joined day naming ROUNDS_SOURCE. */
+export function joinRounds(series: PriceSeries, r: { rounds: PriceRounds; days: PricePoint[] }): PriceSeries {
+  const sources = [...(series.sources ?? [])];
+  let src = sources.indexOf(ROUNDS_SOURCE);
+  if (src < 0) src = sources.push(ROUNDS_SOURCE) - 1;
+  const before = series.points.filter((p) => p[0] < r.rounds.joinDay);
+  const after = r.days.map((p): PricePoint => [p[0], p[1], p[2], src]);
+  return { ...series, sources, points: [...before, ...after], rounds: r.rounds };
+}
+
+/** The rounds point in force at `ts`, or null before the first. */
+export function roundAt(rounds: PriceRounds, ts: number): RoundPricePoint | null {
+  const pts = rounds.points;
+  let lo = 0;
+  let hi = pts.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (pts[mid][0] <= ts) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo ? pts[lo - 1] : null;
 }

@@ -2,8 +2,8 @@
 // one row per asset page, from the roster, priced by the page's main line on
 // its first chain over the last 30 completed UTC days. A row is flagged where
 // its page carries a fixed price, or a line past SPREAD_LIMIT from its chart's
-// main line in those 30 days (a line only retired markets read aside), and
-// flagged rows come first.
+// main line in those 30 days (a line only retired markets read aside, and a
+// Maker OSM line, whose gap is its hour's delay), and flagged rows come first.
 //
 // Pure: the server builds the rows (lib/api/fetch-asset-prices-server.ts),
 // the list page and the asset icon's popover read them.
@@ -11,6 +11,7 @@
 import {
   assetHref,
   assetPage,
+  delayedLine,
   lineReaders,
   mainLine,
   type AssetPage,
@@ -68,9 +69,16 @@ export function pageFlag(page: AssetPage, points: Map<string, readonly SpreadPoi
     const mp = main?.drawn ? points.get(`${c.chain}|${main.drawn.key}`) : undefined;
     if (!main || !mp) continue;
     // A line only retired markets read (an offboarded Maker ilk, its price
-    // frozen at the last poke) is drawn on the page and not flagged here.
+    // frozen at the last poke) is drawn on the page and not flagged here; nor
+    // is a Maker OSM line, whose gap is the hour it runs behind by design
+    // (the page's spread strip names it).
     const others = c.lines.filter(
-      (l) => l !== main && l.drawn && points.has(`${c.chain}|${l.drawn.key}`) && !l.series.every((x) => x.retired),
+      (l) =>
+        l !== main &&
+        l.drawn &&
+        points.has(`${c.chain}|${l.drawn.key}`) &&
+        !l.series.every((x) => x.retired) &&
+        !delayedLine(l),
     );
     const spreads = lineSpreads(
       { key: main.id, points: mp, fixed: main.oracle.kind === "fixed" },
