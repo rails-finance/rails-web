@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, LayoutGrid, Vault } from "lucide-react";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
@@ -208,6 +209,14 @@ export function SiteFooter() {
               </span>
             </div>
           </div>
+          {/* The charts' attribution (Lightweight Charts' licence), on every page. */}
+          <p
+            className="mt-4 text-center text-[11px] text-rb-500 md:text-left"
+            data-lw-attribution=""
+            data-anatomy="H9.1"
+          >
+            <LwNotice />
+          </p>
         </div>
       </div>
     </footer>

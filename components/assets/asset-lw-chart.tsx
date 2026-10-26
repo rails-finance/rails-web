@@ -5,14 +5,18 @@
 // every line as a step line on one time scale, the main line in its hue and
 // the others thin, a pane under the prices with each other line's deviation
 // from the main line, range buttons, scroll or pinch to zoom, drag to pan,
-// double-click to reset. The lines are drawn on the uniform grid of
+// double-click to reset. Each line's colour and dash follow its key
+// (lib/shared/chart-series-style.ts), shared by its legend row, its spread
+// line and its spread row; a row hovered or focused, or the line nearest the
+// cursor, lights that line in both panes and dims the others, and a legend
+// row pressed hides its line (the main line stays). The lines are drawn on the uniform grid of
 // lib/shared/asset-chart-grid.ts, so the axis stays proportional to time;
 // zoomed in on stored rounds, the grid's cells read detail windows of
 // `/api/prices/rounds` (cached by step and chunk). The span before the main
 // line's stored rounds, where it is the daily store, is shaded across both
 // panes (behind the transparent canvas). The library loads with
-// this component only (a dynamic import). Licence: Apache-2.0, the NOTICE
-// shown with the chart's source line and the attribution logo on.
+// this component only (a dynamic import). Licence: Apache-2.0, the NOTICE in
+// the site's footers (components/shared/lw-attribution.tsx).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { IChartApi, ISeriesApi, LineData, Time, UTCTimestamp, WhitespaceData } from "lightweight-charts";
@@ -20,7 +24,9 @@ import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
 import { legName, roundName, roundTime } from "@/components/assets/round-time";
 import { LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { LwNotice, lwTickLabel, useLwColors, useLwLib } from "@/components/shared/lw-chart-kit";
+import { lwTickLabel, useLwColors, useLwLib } from "@/components/shared/lw-chart-kit";
+import { LineKey, useLineFocus } from "@/components/shared/lw-line-key";
+import { LW_LINE_STYLE, nearestLine, seriesStyles, type SeriesStyle } from "@/lib/shared/chart-series-style";
 import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
 import { formatDate } from "@/lib/date";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
@@ -54,7 +60,9 @@ const RANGES = [
   ["All", null],
 ] as const;
 const PRICE_H = 240;
-const SPREAD_H = 84;
+const SPREAD_H = 112;
+/** How near the cursor a line must be to light, in px. */
+const NEAR_PX = 16;
 /** Oracles a rounds read takes at most. */
 const READ_ORACLES = 12;
 /** Detail windows kept per chart. */
@@ -72,7 +80,10 @@ export interface LwLine {
 /** The chart's colours, as site tokens (lw-chart-kit reads them for the canvas). */
 const PALETTE = {
   main: [LINE_HUE.collateral],
-  thin: ["var(--rb-500)", 0.6],
+  s1: ["var(--chart-series-1)"],
+  s2: ["var(--chart-series-2)"],
+  s3: ["var(--chart-series-3)"],
+  s4: ["var(--chart-series-4)"],
   text: ["var(--rb-500)"],
   grid: ["var(--rb-chart-grid)", 0.7],
   cross: ["var(--rb-500)", 0.8],
@@ -97,12 +108,27 @@ const cellWords = (g: Grid, ts: number, roundsFrom: number | null) =>
 
 type Chunk = { from: number; to: number; answer: RoundsAnswer | null };
 
+/** A line whose every series is a market Maker has retired: drawn quieter. */
+const retiredLine = (l: LwLine) => l.line.series.length > 0 && l.line.series.every((s) => s.retired);
+/** An rgba() colour at `alpha` times its own. */
+function withAlpha(rgba: string, alpha: number): string {
+  const m = rgba.match(/rgba?\(([^)]+)\)/);
+  if (!m) return rgba;
+  const [r, g, b, a = "1"] = m[1].split(",").map((x) => x.trim());
+  return `rgba(${r}, ${g}, ${b}, ${(Number(a) * alpha).toFixed(3)})`;
+}
+/** The thin lines' strength, a retired line's, and a line's when another is lit. */
+const THIN_ALPHA = 0.85;
+const RETIRED_ALPHA = 0.45;
+const DIM_ALPHA = 0.2;
+
 export function AssetLwChart({
   lines,
   chain,
   spreads,
   help,
   joinNote,
+  usual = null,
 }: {
   /** Main line first. */
   lines: LwLine[];
@@ -111,6 +137,8 @@ export function AssetLwChart({
   help: LearnMoreContent;
   /** The join under the chart ("From 25 Oct 2026 the lines are…"), the chart's source line. */
   joinNote: string | null;
+  /** Where `via` makes another line the main one, the line most protocols read. */
+  usual?: string | null;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -120,6 +148,25 @@ export function AssetLwChart({
   const main = lines[0];
   const others = lines.slice(1);
   const mainRounds = main.series.rounds;
+  const lineKey = lines.map((l) => l.line.id).join(",");
+  // The styles go to every line but the one most protocols read (the main
+  // line without `via`); where `via` makes another line the main one, the
+  // most read takes the style the new main line leaves, so no other line moves.
+  const usualId = usual ?? main.line.id;
+  const styles = useMemo(() => {
+    const ids = lineKey.split(",");
+    const out = seriesStyles(ids.filter((id) => id !== usualId));
+    const mainId = ids[0];
+    if (mainId !== usualId && out.has(mainId)) out.set(usualId, out.get(mainId)!);
+    return out;
+  }, [lineKey, usualId]);
+  const styleOf = useCallback((id: string): SeriesStyle | undefined => styles.get(id), [styles]);
+  const focus = useLineFocus(main.line.id);
+  const { lit, hidden, light } = focus;
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
+  // The lit line, unless it is hidden.
+  const litId = lit && !hidden.has(lit.id) ? lit.id : null;
   // The data's span: the first stored day to the checkpoint (or the end of the last stored day).
   const bounds = useMemo(() => {
     const t0 = Math.min(...lines.map((l) => l.series.points[0][0] * DAY_S));
@@ -253,6 +300,7 @@ export function AssetLwChart({
   const chart = useRef<IChartApi | null>(null);
   const priceSeries = useRef<ISeriesApi<"Line">[]>([]);
   const spreadSeries = useRef<ISeriesApi<"Line">[]>([]);
+  const guideSeries = useRef<ISeriesApi<"Line"> | null>(null);
   // The shade over the daily-only span: from the first stored day to where
   // the main line's stored rounds start, placed on every range or size change.
   const shade = useRef<HTMLDivElement>(null);
@@ -263,6 +311,7 @@ export function AssetLwChart({
     const g = gridRef.current;
     if (!el) return;
     const ts = c?.timeScale();
+    if (ts) setAxisH(ts.height());
     const x = (t: number) =>
       ts && g
         ? ts.timeToCoordinate(cellTime(g, Math.max(0, Math.min(g.count - 1, cellOf(g, t)))) as UTCTimestamp)
@@ -279,14 +328,18 @@ export function AssetLwChart({
   }, [bounds.t0, joinTs]);
   const placeShadeRef = useRef(placeShade);
   placeShadeRef.current = placeShade;
-  const lineKey = lines.map((l) => l.line.id).join(",");
   const [ready, setReady] = useState(0);
+  // Each cell's value per line, price and spread, for the line nearest the cursor.
+  const sampled = useRef<{ price: (number | null)[][]; spread: (number | null)[][] }>({ price: [], spread: [] });
+  // The spread pane's top, for the lit line's label there.
+  const [axisH, setAxisH] = useState(0);
   useEffect(() => {
     const el = box.current;
     if (!lib || !el) return;
     const c = lib.createChart(el, {
       autoSize: true,
-      layout: { background: { type: lib.ColorType.Solid, color: "transparent" }, attributionLogo: true, fontSize: 11 },
+      // The attribution is in the site's footers (Miles, 26 Oct 2026).
+      layout: { background: { type: lib.ColorType.Solid, color: "transparent" }, attributionLogo: false, fontSize: 11 },
       crosshair: { mode: lib.CrosshairMode.Normal },
       rightPriceScale: { borderVisible: false },
       timeScale: {
@@ -329,30 +382,27 @@ export function AssetLwChart({
     );
     const m = c.addSeries(lib.LineSeries, { ...step, lineWidth: 2, lastValueVisible: true, priceFormat: usd });
     priceSeries.current = [m, ...thin];
-    spreadSeries.current = others.map((_, i) =>
+    // The spread pane's guide: no line of its own, it holds the ±1 % lines
+    // and keeps them in range whichever lines are hidden.
+    guideSeries.current = others.length
+      ? c.addSeries(
+          lib.LineSeries,
+          {
+            color: "transparent",
+            lineWidth: 1,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            crosshairMarkerVisible: false,
+            priceFormat: pct,
+            autoscaleInfoProvider: () => ({ priceRange: { minValue: -1.2, maxValue: 1.2 } }),
+          },
+          1,
+        )
+      : null;
+    spreadSeries.current = others.map(() =>
       c.addSeries(
         lib.LineSeries,
-        {
-          ...step,
-          lineWidth: 1,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-          priceFormat: pct,
-          // The pane always holds the ±1 % lines.
-          ...(i === 0
-            ? {
-                autoscaleInfoProvider: (base: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
-                  const r = base();
-                  return {
-                    priceRange: {
-                      minValue: Math.min(-1.2, r?.priceRange?.minValue ?? 0),
-                      maxValue: Math.max(1.2, r?.priceRange?.maxValue ?? 0),
-                    },
-                  };
-                },
-              }
-            : {}),
-        },
+        { ...step, lineWidth: 1, lastValueVisible: false, crosshairMarkerVisible: false, priceFormat: pct },
         1,
       ),
     );
@@ -366,11 +416,22 @@ export function AssetLwChart({
     c.timeScale().subscribeSizeChange(onShade);
     c.subscribeCrosshairMove((param) => {
       const g = gridRef.current;
+      if (!param.point) light(null, "chart");
       // A crosshair the code placed (a gap's row) sets the cursor itself.
-      if (!g || param.logical == null || !param.sourceEvent) return;
+      if (!g || param.logical == null || !param.sourceEvent || !param.point) return;
       pendingCross.current = null;
       const i = Math.round(param.logical);
-      if (i >= 0 && i < g.count) setCursorTs(cellAt(g, i));
+      if (i < 0 || i >= g.count) return;
+      setCursorTs(cellAt(g, i));
+      // The line nearest the cursor in the pane it is over, by each line's value in that cell.
+      const inSpread = (param.paneIndex ?? 0) === 1;
+      const ys = lines.map((l, k) => {
+        if (hiddenRef.current.has(l.line.id)) return { id: l.line.id, y: null };
+        const s = inSpread ? (k > 0 ? spreadSeries.current[k - 1] : undefined) : priceSeries.current[k];
+        const v = inSpread ? sampled.current.spread[k - 1]?.[i] : sampled.current.price[k]?.[i];
+        return { id: l.line.id, y: s && v != null ? s.priceToCoordinate(v) : null };
+      });
+      light(nearestLine(param.point.y, ys, NEAR_PX), "chart");
     });
     let timer: ReturnType<typeof setTimeout> | null = null;
     let touched = 0;
@@ -410,6 +471,7 @@ export function AssetLwChart({
       chart.current = null;
       priceSeries.current = [];
       spreadSeries.current = [];
+      guideSeries.current = null;
       c.remove();
     };
     // The series follow the lines' ids; their data follows the tracks.
@@ -432,23 +494,53 @@ export function AssetLwChart({
         horzLine: { color: palette.cross, labelBackgroundColor: palette.text },
       },
     });
-    priceSeries.current.forEach((s, i) => s.applyOptions({ color: i === 0 ? palette.main : palette.thin }));
-    spreadSeries.current.forEach((s, i) => {
-      s.applyOptions({ color: palette.thin });
-      if (i === 0) {
-        for (const p of s.priceLines()) s.removePriceLine(p);
-        for (const price of [1, -1])
-          s.createPriceLine({
-            price,
-            color: palette.caution,
-            lineWidth: 1,
-            lineStyle: 2,
-            axisLabelVisible: false,
-            title: "",
-          });
-      }
-    });
+    const g = guideSeries.current;
+    if (g) {
+      for (const p of g.priceLines()) g.removePriceLine(p);
+      for (const price of [1, -1])
+        g.createPriceLine({
+          price,
+          color: palette.caution,
+          lineWidth: 1,
+          lineStyle: 2,
+          axisLabelVisible: false,
+          title: "",
+        });
+    }
   }, [palette, ready]);
+
+  // The price axis's range once it has rescaled to the lines shown (a hook for the checks).
+  const noteScale = useCallback(() => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const r = priceSeries.current[0]?.priceScale().getVisibleRange();
+        if (r) wrap.current?.setAttribute("data-asset-lw-scale", `${r.from},${r.to}`);
+      }),
+    );
+  }, []);
+
+  // Each line's colour, dash and weight: the lit line full and a pixel wider,
+  // the others dimmed; a hidden line left out of both panes (and their scales).
+  useEffect(() => {
+    if (!chart.current || !palette) return;
+    const drawn: Record<string, { color: string; alpha: number; visible: boolean; width: number; style: number }> = {};
+    lines.forEach((l, i) => {
+      const id = l.line.id;
+      const st = styleOf(id);
+      const base = i === 0 ? palette.main : palette[`s${(st?.slot ?? 0) + 1}` as "s1"];
+      const own = i === 0 ? 1 : retiredLine(l) ? RETIRED_ALPHA : THIN_ALPHA;
+      const alpha = litId == null || litId === id ? (litId === id ? 1 : own) : own * DIM_ALPHA;
+      const width = ((i === 0 ? 2 : 1) + (litId === id ? 1 : 0)) as 1 | 2 | 3;
+      const style = i === 0 ? 0 : LW_LINE_STYLE[st?.dash ?? "solid"];
+      const visible = !hidden.has(id);
+      const opts = { color: withAlpha(base, alpha), lineWidth: width, lineStyle: style, visible };
+      priceSeries.current[i]?.applyOptions(opts);
+      if (i > 0) spreadSeries.current[i - 1]?.applyOptions(opts);
+      drawn[id] = { color: base, alpha, visible, width, style };
+    });
+    wrap.current?.setAttribute("data-asset-lw-drawn", JSON.stringify(drawn));
+    noteScale();
+  }, [palette, ready, lines, styleOf, litId, hidden, noteScale]);
 
   // The data, on every new grid or detail window; then the window and any pending crosshair.
   useEffect(() => {
@@ -459,15 +551,20 @@ export function AssetLwChart({
     const rows = (vals: (number | null)[]): (LineData | WhitespaceData)[] =>
       vals.map((v, i) => (v == null ? { time: times[i] } : { time: times[i], value: v }));
     const samples = tracks.map((t) => sampleTrack(grid, t.track));
+    sampled.current = { price: samples, spread: [] };
     priceSeries.current.forEach((s, i) => {
       // Series 0 is the main line; the thin ones follow in the lines' order.
       s.setData(rows(samples[i]));
     });
     const byDay = (i: number) => spreads?.others[i]?.spread.byDay ?? new Map<number, number>();
     spreadSeries.current.forEach((s, i) => {
-      const dev = sampleSpread(grid, tracks[0].track, tracks[i + 1].track, byDay(i));
-      s.setData(rows(dev.map((d) => (d == null ? null : d * 100))));
+      const dev = sampleSpread(grid, tracks[0].track, tracks[i + 1].track, byDay(i)).map((d) =>
+        d == null ? null : d * 100,
+      );
+      sampled.current.spread[i] = dev;
+      s.setData(rows(dev));
     });
+    guideSeries.current?.setData(times.map((time) => ({ time, value: 0 })));
     const end = grid.start + grid.count * grid.step;
     c.applyOptions({
       timeScale: {
@@ -497,7 +594,8 @@ export function AssetLwChart({
       setCursorTs(cellAt(grid, i));
     }
     placeShade();
-  }, [grid, tracks, lib, ready, applyN, spreads, bounds, placeShade]);
+    noteScale();
+  }, [grid, tracks, lib, ready, applyN, spreads, bounds, placeShade, noteScale]);
 
   // Double-click (or double-tap) puts the opening window back.
   useEffect(() => {
@@ -559,6 +657,30 @@ export function AssetLwChart({
     const want = span ?? bounds.t1 - bounds.t0;
     return Math.abs(w - want) <= want * 0.03 && Math.abs(shown.to - bounds.t1) <= want * 0.03;
   };
+  /** A line's key: the main hue, or its slot's token and dash. */
+  const keyOf = (id: string, isMain: boolean) => {
+    const st = styleOf(id);
+    const l = lines.find((x) => x.line.id === id);
+    return (
+      <LineKey
+        color={isMain ? LINE_HUE.collateral : (st?.token ?? "var(--rb-500)")}
+        dash={isMain ? "solid" : st?.dash}
+        main={isMain}
+        quiet={l ? retiredLine(l) : false}
+      />
+    );
+  };
+  /** A row's hover, by a mouse or pen only (a tap toggles, it does not light). */
+  const rowHover = (id: string) => ({
+    onPointerEnter: (e: React.PointerEvent) => e.pointerType !== "touch" && light(id, "row"),
+    onPointerLeave: (e: React.PointerEvent) => e.pointerType !== "touch" && light(null, "row"),
+  });
+  // The lit line's name and spread, over the spread pane.
+  const litLabel = (() => {
+    if (!litId || litId === main.line.id) return null;
+    const l = others.find((o) => o.line.id === litId);
+    return l ? { id: litId, name: `${l.line.oracle.name} · ${lineReaders(l.line)}`, dev: spreadAt(litId) } : null;
+  })();
   const [helpOpen, setHelpOpen] = useState(false);
   const tx = (h: string) => explorerUrl(chain as ChainId, "tx", h);
 
@@ -613,22 +735,19 @@ export function AssetLwChart({
         </div>
         <ul className="mt-1 space-y-0.5" data-asset-lw-legend="">
           {lines.map((l, i) => {
+            const id = l.line.id;
             const v = valueOf(tracks?.[i]?.track);
-            return (
-              <li key={l.line.id} className="flex items-baseline justify-between gap-3" data-asset-lw-line={l.line.id}>
+            const off = hidden.has(id);
+            const name = l.line.oracle.name;
+            const readers = lineReaders(l.line);
+            const body = (
+              <>
                 <span className="flex min-w-0 items-baseline gap-1.5">
-                  <span
-                    aria-hidden
-                    className="inline-block w-3 shrink-0 self-center"
-                    style={{
-                      height: i === 0 ? 2 : 1,
-                      background: i === 0 ? LINE_HUE.collateral : "var(--rb-500)",
-                      opacity: i === 0 ? 1 : 0.6,
-                    }}
-                  />
+                  {keyOf(id, i === 0)}
                   <span className={`min-w-0 ${i === 0 ? "font-semibold text-foreground" : "text-rb-500"}`}>
-                    {l.line.oracle.name}
-                    <span className="font-normal text-rb-500"> · {lineReaders(l.line)}</span>
+                    {name}
+                    <span className="font-normal text-rb-500"> · {readers}</span>
+                    {off && <span className="font-normal text-rb-500"> · hidden</span>}
                   </span>
                 </span>
                 <span
@@ -637,10 +756,51 @@ export function AssetLwChart({
                 >
                   {v == null ? "–" : formatPrice(v, "USD")}
                 </span>
+              </>
+            );
+            return (
+              <li
+                key={id}
+                className={`transition-opacity ${(litId != null && litId !== id) || off ? "opacity-50" : ""}`}
+                data-asset-lw-line={id}
+                data-asset-lw-slot={i === 0 ? "main" : (styleOf(id)?.slot ?? "")}
+                data-asset-lw-dash={i === 0 ? "solid" : (styleOf(id)?.dash ?? "")}
+                data-asset-lw-hidden={off ? "" : undefined}
+                data-asset-lw-lit={litId === id ? "" : undefined}
+                {...rowHover(id)}
+              >
+                {i === 0 ? (
+                  <div className="flex items-baseline justify-between gap-3 px-1" title="The main line stays drawn">
+                    {body}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    aria-pressed={!off}
+                    aria-label={`Show ${name}, ${readers}`}
+                    title={off ? "Show this line" : "Hide this line"}
+                    onClick={() => focus.toggle(id)}
+                    onFocus={() => light(id, "row")}
+                    onBlur={() => light(null, "row")}
+                    className="flex w-full items-baseline justify-between gap-3 rounded px-1 text-left hover:bg-[var(--surface-hover)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--rb-500)]"
+                  >
+                    {body}
+                  </button>
+                )}
               </li>
             );
           })}
         </ul>
+        {hidden.size > 0 && (
+          <button
+            type="button"
+            onClick={focus.showAll}
+            className="mt-1 px-1 text-rb-500 underline-offset-2 hover:text-foreground hover:underline"
+            data-asset-lw-show-all=""
+          >
+            Show all lines
+          </button>
+        )}
       </div>
       <div
         ref={box}
@@ -654,6 +814,19 @@ export function AssetLwChart({
           className="pointer-events-none absolute top-0 -z-10 w-0 bg-[var(--surface-sunken)] opacity-60"
           data-asset-lw-shade={joinTs ?? ""}
         />
+        {litLabel && (
+          <div
+            className="pointer-events-none absolute left-1 z-10 flex max-w-[calc(100%-4rem)] items-baseline gap-1.5 rounded bg-[var(--background)]/85 px-1 text-xs"
+            style={{ top: `calc(100% - ${axisH + SPREAD_H - 2}px)` }}
+            data-asset-lw-spread-label={litLabel.id}
+          >
+            {keyOf(litLabel.id, false)}
+            <span className="min-w-0 truncate text-foreground">{litLabel.name}</span>
+            <span className="shrink-0 tabular-nums text-rb-500">
+              {litLabel.dev == null ? "–" : fmtSignedSpread(litLabel.dev)}
+            </span>
+          </div>
+        )}
         {!lib && <p className="py-6 text-center text-sm text-rb-500">Drawing the chart…</p>}
       </div>
       {spreads && (
@@ -665,12 +838,17 @@ export function AssetLwChart({
           stamp={grid ? cellWords(grid, at, firstRound) : null}
           valueAt={spreadAt}
           onJump={onJump}
+          keyOf={(id) => keyOf(id, false)}
+          rowHover={rowHover}
+          lit={litId}
+          hidden={hidden}
         />
       )}
-      <p className="mt-2 text-xs text-rb-500" data-asset-chart-source="">
-        {joinNote ? `${joinNote} ` : ""}
-        <LwNotice />
-      </p>
+      {joinNote && (
+        <p className="mt-2 text-xs text-rb-500" data-asset-chart-source="">
+          {joinNote}
+        </p>
+      )}
     </div>
   );
 }

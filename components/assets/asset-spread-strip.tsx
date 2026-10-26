@@ -7,8 +7,10 @@
 // that passes it names its largest gap, and that gap puts the cursor there. A
 // Maker OSM line's gap names the hour's delay that causes it (Miles, 26 Oct
 // 2026); so does the heading where the main line is one (an asset page read
-// from Maker's side, `?via=makerdao`).
+// from Maker's side, `?via=makerdao`). Each row carries its line's key, and
+// hovering it lights that line on the chart.
 
+import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date";
 import { delayedLine, lineReaders, type PageLine } from "@/lib/shared/asset-roster";
 import { fmtSignedSpread, fmtSpread, SPREAD_LIMIT, type LineSpread } from "@/lib/shared/asset-spread";
@@ -25,6 +27,10 @@ export function AssetSpreadStrip({
   valueAt,
   stamp: stampText,
   onJump,
+  keyOf,
+  rowHover,
+  lit = null,
+  hidden,
 }: {
   main: PageLine;
   /** Each other drawn line with its spread from `main`. */
@@ -36,6 +42,15 @@ export function AssetSpreadStrip({
   /** The cursor's time in words, where the chart names it (a day on a daily grid). */
   stamp?: string | null;
   onJump: (day: number, ts?: number) => void;
+  /** A line's key (its colour and dash on the chart). */
+  keyOf?: (lineId: string) => ReactNode;
+  /** A row's pointer handlers, lighting its line. */
+  rowHover?: (lineId: string) => {
+    onPointerEnter: (e: React.PointerEvent) => void;
+    onPointerLeave: (e: React.PointerEvent) => void;
+  };
+  lit?: string | null;
+  hidden?: ReadonlySet<string>;
 }) {
   if (others.length === 0) return null;
   const limit = fmtSpread(SPREAD_LIMIT);
@@ -92,27 +107,32 @@ export function AssetSpreadStrip({
           return (
             <li
               key={o.line.id}
-              className="flex items-baseline justify-between gap-3"
+              className={`flex items-baseline justify-between gap-3 transition-opacity ${(lit != null && lit !== o.line.id) || hidden?.has(o.line.id) ? "opacity-50" : ""}`}
               data-asset-spread-line={o.line.id}
+              data-asset-spread-lit={lit === o.line.id ? "" : undefined}
+              {...rowHover?.(o.line.id)}
               data-asset-spread-gap={big ? big.dev : undefined}
               data-asset-spread-delayed={cause ? "" : undefined}
             >
-              {big ? (
-                <button
-                  type="button"
-                  className="min-w-0 text-left text-foreground hover:underline"
-                  onClick={() => onJump(big.day, big.ts)}
-                  title="Put the cursor on this gap"
-                >
-                  {label(i)}
-                  {cause} {fmtSpread(big.dev)} {big.dev > 0 ? "above" : "below"} {mainName}, {when(big)}
-                </button>
-              ) : (
-                <span className="min-w-0 text-rb-500">
-                  {label(i)}
-                  {o.spread.largest == null ? " (never read within ten minutes of it)" : ""}
-                </span>
-              )}
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                {keyOf?.(o.line.id)}
+                {big ? (
+                  <button
+                    type="button"
+                    className="min-w-0 text-left text-foreground hover:underline"
+                    onClick={() => onJump(big.day, big.ts)}
+                    title="Put the cursor on this gap"
+                  >
+                    {label(i)}
+                    {cause} {fmtSpread(big.dev)} {big.dev > 0 ? "above" : "below"} {mainName}, {when(big)}
+                  </button>
+                ) : (
+                  <span className="min-w-0 text-rb-500">
+                    {label(i)}
+                    {o.spread.largest == null ? " (never read within ten minutes of it)" : ""}
+                  </span>
+                )}
+              </span>
               <span
                 className={`shrink-0 tabular-nums ${at != null && Math.abs(at) > SPREAD_LIMIT ? "text-[var(--caution)]" : "text-rb-500"}`}
                 data-asset-spread-at={at ?? ""}
