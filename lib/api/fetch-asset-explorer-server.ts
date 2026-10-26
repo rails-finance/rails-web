@@ -8,7 +8,11 @@ import "server-only";
 import { buildAssetPrices } from "@/lib/api/fetch-asset-prices-server";
 import { assetChips } from "@/lib/api/asset-explorer-chips";
 import { assetCards, type AssetCard } from "@/lib/shared/asset-explorer";
-import type { AssetPriceList } from "@/lib/shared/asset-prices";
+import type { AssetPriceList, ChainPrice } from "@/lib/shared/asset-prices";
+
+/** A row as a card holds it: the lines other explorers read are the icon
+ *  popover's (`rowFor`'s `via`), and the cards do not draw them. */
+const bare = <T extends ChainPrice>({ alt: _alt, picks: _picks, ...r }: T) => r;
 
 export interface AssetExplorerData {
   cards: AssetCard[];
@@ -19,7 +23,12 @@ export interface AssetExplorerData {
 
 export async function fetchAssetExplorerServer(readerIp?: string | null): Promise<AssetExplorerData> {
   const { roster, pages, list } = await buildAssetPrices(readerIp);
-  const chips = await assetChips(roster.assets);
+  const { chips, listed } = await assetChips(roster.assets);
   const links = new Map(pages.map((p) => [p.page.token, { underlying: p.page.underlying, wrapped: p.page.wrapped }]));
-  return { cards: assetCards(list, links, chips), day: list.day, rounds: list.rows.some((r) => r.asOf) };
+  const rows = list.rows.map((r) => ({ ...bare(r), elsewhere: r.elsewhere.map(bare) }));
+  return {
+    cards: assetCards({ ...list, rows }, links, chips, listed),
+    day: list.day,
+    rounds: list.rows.some((r) => r.asOf),
+  };
 }

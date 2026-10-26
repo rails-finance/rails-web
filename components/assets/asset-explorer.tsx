@@ -18,6 +18,7 @@ import {
   type CardLink,
   type CardSort,
   type ExplorerState,
+  PRICELESS_WHY,
 } from "@/lib/shared/asset-explorer";
 import { chainName } from "@/lib/shared/asset-roster";
 import type { ChainId } from "@/lib/shared/chains";
@@ -52,6 +53,9 @@ export function AssetExplorer({ cards, initial }: { cards: AssetCard[]; initial:
     () => sortCards(state.cat === "all" ? cards : cards.filter((c) => c.category === state.cat), state.sort),
     [cards, state.cat, state.sort],
   );
+
+  // The list holds the priced cards; a card with no price is in the grid alone.
+  const count = state.view === "list" ? shown.filter((c) => c.row).length : shown.length;
 
   return (
     <div>
@@ -105,15 +109,14 @@ export function AssetExplorer({ cards, initial }: { cards: AssetCard[]; initial:
             ))}
           </select>
         </label>
-        <span className="ml-auto text-rb-500 tabular-nums" data-asset-count={shown.length}>
-          {shown.length.toLocaleString("en-US")} {shown.length === 1 ? "asset" : "assets"}
+        <span className="ml-auto text-rb-500 tabular-nums" data-asset-count={count}>
+          {count.toLocaleString("en-US")} {count === 1 ? "asset" : "assets"}
+          {state.view === "list" && count < shown.length ? ` with a price, of ${shown.length}` : ""}
         </span>
       </div>
       {state.view === "list" ? (
         <ul className="max-w-xl divide-y divide-rb-200 dark:divide-rb-800" data-asset-prices="">
-          {shown.map((c) => (
-            <AssetPriceRow key={c.id} row={c.row} />
-          ))}
+          {shown.map((c) => c.row && <AssetPriceRow key={c.id} row={c.row} />)}
         </ul>
       ) : (
         <ul
@@ -160,9 +163,13 @@ function AssetCardView({ card }: { card: AssetCard }) {
       data-anatomy="A5.4"
     >
       <div className="flex min-w-0 items-center gap-2">
-        <Link href={card.row.href} className="min-w-0 truncate text-sm font-semibold text-foreground hover:underline">
-          {card.symbol}
-        </Link>
+        {card.row ? (
+          <Link href={card.row.href} className="min-w-0 truncate text-sm font-semibold text-foreground hover:underline">
+            {card.symbol}
+          </Link>
+        ) : (
+          <span className="min-w-0 truncate text-sm font-semibold text-foreground">{card.symbol}</span>
+        )}
         {card.short && <span className="shrink-0 font-mono text-[11px] text-rb-500">{card.short}</span>}
         <span
           className="shrink-0 rounded-full border border-rb-200 px-1.5 py-0.5 text-[10px] leading-none text-rb-500 dark:border-rb-800"
@@ -173,20 +180,37 @@ function AssetCardView({ card }: { card: AssetCard }) {
           {ASSET_CATEGORY_LABELS[card.category]}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-1.5" data-asset-card-chains="">
-          {card.chains.map((c) => (
-            <Link
-              key={c.href}
-              href={c.href}
-              title={`${card.symbol} on ${chainName(c.chain)}`}
-              aria-label={`${card.symbol} on ${chainName(c.chain)}`}
-              className="text-rb-500 hover:text-foreground"
-            >
-              <ChainGlyph id={c.chain as ChainId} className="h-3.5 w-3.5" />
-            </Link>
-          ))}
+          {card.chains.map((c) =>
+            c.href ? (
+              <Link
+                key={c.href}
+                href={c.href}
+                title={`${card.symbol} on ${chainName(c.chain)}`}
+                aria-label={`${card.symbol} on ${chainName(c.chain)}`}
+                className="text-rb-500 hover:text-foreground"
+              >
+                <ChainGlyph id={c.chain as ChainId} className="h-3.5 w-3.5" />
+              </Link>
+            ) : (
+              <span
+                key={`${c.chain}:${c.token}`}
+                title={`${card.symbol} on ${chainName(c.chain)}, no stored price`}
+                aria-label={`${card.symbol} on ${chainName(c.chain)}, no stored price`}
+                className="text-rb-500"
+              >
+                <ChainGlyph id={c.chain as ChainId} className="h-3.5 w-3.5" />
+              </span>
+            ),
+          )}
         </span>
       </div>
-      <AssetPriceRow row={card.row} as="div" />
+      {card.row ? (
+        <AssetPriceRow row={card.row} as="div" />
+      ) : (
+        <p className="text-xs text-rb-500" data-asset-priceless="" data-anatomy="A5.10">
+          {PRICELESS_WHY}
+        </p>
+      )}
       {card.underlying && (
         <RelLinks label={card.underlying.kind === "rate" ? "Priced from" : "Wraps"} links={[card.underlying]} />
       )}

@@ -13,7 +13,9 @@
 // `joinRounds`); the switch over the chart opens the rounds alone, every
 // change of each line's value (A3.3), and the chart opens on them where the
 // main line's rounds span ROUNDS_VIEW_MIN_DAYS (`opensOnRounds`). The join
-// is stated under the chart and in each line's stamp.
+// is stated under the chart and in each line's stamp. With `via` (the page
+// read from a protocol's side, lib/shared/asset-via.ts) the section's first
+// line is the one that protocol reads, named so over the chart and in the list.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
@@ -38,6 +40,7 @@ import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { assetPriceChartContent } from "@/lib/shared/learn-more-content";
 import { lineName, shortAddress, type PageChain, type PageLine } from "@/lib/shared/asset-roster";
+import { usesWords, type ViaView } from "@/lib/shared/asset-via";
 
 const DAY_MS = 86_400_000;
 /** The store answers at most 3,000 days a read. */
@@ -81,7 +84,15 @@ function joinText(lines: { rounds: PriceRounds }[], drawn: number, joinDay: numb
     : `${who[0].toUpperCase()}${who.slice(1)} their stored oracle rounds from the time each line's stamp names, each day at its close; before it, the daily store.`;
 }
 
-export function AssetPriceChart({ section, symbol }: { section: PageChain; symbol: string }) {
+export function AssetPriceChart({
+  section,
+  symbol,
+  via = null,
+}: {
+  section: PageChain;
+  symbol: string;
+  via?: ViaView | null;
+}) {
   const drawn = section.lines.filter((l) => l.drawn != null);
   const keys = drawn.map((l) => l.drawn!.key);
   const [answer, setAnswer] = useState<DailyAnswer | null>(null);
@@ -200,6 +211,20 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
   return (
     <section className="mt-8" data-asset-chain={section.chain} data-anatomy="A2">
       <h2 className="mb-3 text-lg font-semibold text-foreground">{section.name}</h2>
+      {via && (
+        <p className="-mt-2 mb-3 text-sm text-rb-500" data-asset-via={via.lineId ?? "none"} data-anatomy="A2.1">
+          {via.lineId ? (
+            <>
+              The main line is <span className="text-foreground">{usesWords(via.name)}</span>
+              {via.usualId
+                ? "; the line most protocols read is thin beneath it."
+                : ", and the one most protocols read."}
+            </>
+          ) : (
+            `${via.explorer.label} has no stored price for ${symbol} here; the main line is the one most protocols read.`
+          )}
+        </p>
+      )}
       <div className="rounded-lg border border-rb-200 p-3 dark:border-rb-700" data-asset-chart="" data-anatomy="A3">
         {roundLines.length > 0 && spreads && (
           <div
@@ -288,6 +313,8 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
             last={l.drawn ? lastOf(l.drawn.key) : null}
             rounds={l.drawn ? prices.find((p) => p.key === l.drawn!.key)?.rounds : undefined}
             main={spreads?.main.id === l.id}
+            uses={via?.lineId === l.id ? usesWords(via.name) : null}
+            usual={via?.usualId === l.id}
           />
         ))}
       </ul>
@@ -307,6 +334,8 @@ function LineRow({
   symbol,
   last,
   main,
+  uses,
+  usual,
   rounds,
 }: {
   line: PageLine;
@@ -314,6 +343,10 @@ function LineRow({
   symbol: string;
   last: [number, number, number | null, number?] | null;
   main: boolean;
+  /** Read from a protocol's side: on its line, "the price Aave V3 Core uses". */
+  uses?: string | null;
+  /** The line most protocols read, where the main line is a protocol's. */
+  usual?: boolean;
   rounds?: PriceRounds;
 }) {
   const href = (a: string) => explorerUrl(chain as ChainId, "address", a);
@@ -332,7 +365,12 @@ function LineRow({
           </a>
           {main && (
             <span className="ml-2 text-xs font-normal text-rb-500" data-asset-main-line="">
-              main line
+              {uses ? `main line, ${uses}` : "main line"}
+            </span>
+          )}
+          {usual && (
+            <span className="ml-2 text-xs font-normal text-rb-500" data-asset-usual-line="">
+              most read
             </span>
           )}
         </span>

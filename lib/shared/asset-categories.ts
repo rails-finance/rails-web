@@ -1,12 +1,16 @@
 // Asset categories on the asset explorer (rails-ops reference/asset-key-map.md,
 // "The asset explorer"). Rails' classification: the protocols and the chain
 // state no category, so the field carries no source receipt and the page says
-// whose grouping it is. The six categories and the first rows are the
+// whose grouping it is. The first six categories and their first rows are the
 // prototype's (rails-web-prototype packages/shared/src/protocol-metadata.ts);
-// the table runs over the price roster by symbol, and a symbol it does not
-// name is "other". Liquidity-pool shares, Pendle PTs, receipt tokens (aTokens,
-// cTokens, Spark's spDAI), the Maker RWA ilks and tokens whose kind Rails has
-// not settled stay "other" until someone classifies them.
+// Utility, LP / Pool share, Principal token and Real-world asset were added
+// on 26 Oct 2026 (Miles). The table runs by symbol over the price roster and
+// the tokens the explorers list with no stored price; a symbol it does not
+// name is "other". A deposit receipt (aDAI, cDAI, spDAI) sits with what it
+// earns on (a stablecoin's in Yield-bearing Stable); a one-for-one or
+// custodial wrapper (Seamless's ILM reserve tokens, Concrete's custodial
+// assets) is a Wrapped Asset; a liquid locker of a governance token (cvxCRV,
+// sdCRV, upYFI) is Governance.
 
 export type AssetCategory =
   | "network"
@@ -15,6 +19,10 @@ export type AssetCategory =
   | "liquid-staking"
   | "wrapped-asset"
   | "governance"
+  | "utility"
+  | "lp-share"
+  | "principal-token"
+  | "rwa"
   | "other";
 
 export const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = {
@@ -24,6 +32,10 @@ export const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = {
   "liquid-staking": "Liquid Staking",
   "wrapped-asset": "Wrapped Asset",
   governance: "Governance",
+  utility: "Utility",
+  "lp-share": "LP / Pool share",
+  "principal-token": "Principal token",
+  rwa: "Real-world asset",
   other: "Other",
 };
 
@@ -35,6 +47,10 @@ export const ASSET_CATEGORY_ORDER: readonly AssetCategory[] = [
   "liquid-staking",
   "wrapped-asset",
   "governance",
+  "utility",
+  "lp-share",
+  "principal-token",
+  "rwa",
   "other",
 ];
 
@@ -52,6 +68,7 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "USDe",
     "USDaf",
     "ebUSD",
+    "BD",
     "fxUSD",
     "ZCHF",
     "SAI",
@@ -71,6 +88,12 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "deUSD",
     "mUSD",
     "rUSD",
+    "cUSD",
+    "mkUSD",
+    "AUSD",
+    "USG",
+    "JPYC",
+    "KUSDe",
   ],
   "yield-stable": [
     "sDAI",
@@ -89,6 +112,23 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "syrupUSDC",
     "syrupUSDT",
     "syrupUSDG",
+    "aDAI",
+    "cDAI",
+    "spDAI",
+    "aEthLidoUSDS",
+    "eUSDe",
+    "KsUSDe",
+    "s/lvlUSD",
+    "ysUSDC",
+    "wstUSR",
+    "yvUSDS-1",
+    "yvUSDC-1",
+    "sreUSD",
+    "cy-scrvUSD",
+    "fxSAVE",
+    "sDOLA",
+    "sUSDf",
+    "svZCHF",
   ],
   "liquid-staking": [
     "stETH",
@@ -112,8 +152,39 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "wsuperOETHb",
     "LBTC",
     "eBTC",
+    "pxETH",
+    "KweETH",
+    "uniETH",
+    "swETH",
+    "weETHs",
+    "pzETH",
+    "agETH",
+    "wstETHR",
+    "ynETH",
+    "ynETHx",
+    "swBTC",
   ],
-  "wrapped-asset": ["WBTC", "cbBTC", "tBTC", "FBTC", "BTC.b", "renBTC", "SolvBTC", "cbXRP", "PAXG", "XAUt"],
+  "wrapped-asset": [
+    "WBTC",
+    "cbBTC",
+    "tBTC",
+    "FBTC",
+    "BTC.b",
+    "renBTC",
+    "SolvBTC",
+    "cbXRP",
+    "WBTC18",
+    "cbBTC18",
+    "wcbBTC",
+    "zkBTC",
+    "BTCcx",
+    "WLFIcx",
+    "rcbBTC",
+    "rUSDC",
+    "rweETH",
+    "rWETH",
+    "rwstETH",
+  ],
   governance: [
     "LQTY",
     "CRV",
@@ -125,9 +196,6 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "COW",
     "PENDLE",
     "MKR",
-    "RPL",
-    "EIGEN",
-    "GRT",
     "SKY",
     "YFI",
     "FXS",
@@ -135,40 +203,86 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "SNX",
     "ALCX",
     "AURA",
-    "PEPE",
     "FPS",
-    "MATIC",
     "1INCH",
     "ENS",
     "GNO",
     "KNC",
-    "LRC",
-    "LINK",
-    "MANA",
-    "BAT",
     "ZRX",
-    "REP",
     "SUSHI",
     "STG",
-    "AERO",
     "SEAM",
     "WELL",
     "MORPHO",
     "DOLO",
     "WLFI",
-    "VVV",
-    "VIRTUAL",
-    "MAMO",
+    "ENA",
+    "ETHFI",
+    "SWELL",
+    "UwU",
+    "rsENA",
+    "yPRISMA",
+    "cvxCRV",
+    "ycvxCRV",
+    "upYFI",
+    "sdYFI",
+    "sdCRV",
+    "sdFXN",
+    "cvgCVX",
+    "yYB",
+  ],
+  utility: [
+    "LINK",
+    "AERO",
     "DEGEN",
     "BRETT",
+    "PEPE",
+    "MATIC",
+    "GRT",
+    "MANA",
+    "BAT",
+    "LRC",
+    "REP",
+    "RPL",
+    "EIGEN",
+    "VIRTUAL",
+    "VVV",
+    "MAMO",
+    "UNIT0",
   ],
+  "lp-share": [
+    "UNI-V2",
+    "G-UNI",
+    "steCRV",
+    "60GOLD-40WETH",
+    "sdyvCurve-upYFI-f-gauge",
+    "yvCurve-yYB-f",
+    "GHOUSR",
+    "reusdscrv",
+    "reusdsfrx",
+    "wethrsup",
+    "lvlUSDUSDC",
+    "USGfrxUSD",
+    "USD0USD0++",
+    "iREETpmUSD",
+    "Surge USDf-aGHO",
+  ],
+  "principal-token": [],
+  rwa: ["PAXG", "XAUt", "XAUM", "wWTGXX"],
 };
 
 const BY_SYMBOL: ReadonlyMap<string, AssetCategory> = new Map(
   (Object.entries(TABLE) as [AssetCategory, readonly string[]][]).flatMap(([c, syms]) => syms.map((s) => [s, c])),
 );
 
+/** A symbol's shape where it names the kind: Pendle's principal tokens
+ *  ("PT-sUSDE-25SEP2025"), Maker's real-world-asset ilks' tokens ("RWA001"). */
+const BY_SHAPE: readonly [RegExp, AssetCategory][] = [
+  [/^PT-/, "principal-token"],
+  [/^RWA\d{3}$/, "rwa"],
+];
+
 /** The category Rails puts a symbol in; "other" where the table names none. */
 export function assetCategory(symbol: string): AssetCategory {
-  return BY_SYMBOL.get(symbol) ?? "other";
+  return BY_SYMBOL.get(symbol) ?? BY_SHAPE.find(([re]) => re.test(symbol))?.[1] ?? "other";
 }

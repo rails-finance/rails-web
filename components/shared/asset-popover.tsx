@@ -13,7 +13,10 @@
 // icon opens the same panel. Where the asset has a page (the Prices list's
 // row for its chain and contract, rails-ops reference/asset-key-map.md) the
 // panel ends with that row: the last day's price, the 30-day line and change,
-// and the link to the page.
+// and the link to the page. Inside an explorer the row is priced by the line
+// that explorer's protocol reads (the page's main line where it reads none),
+// and the link carries the protocol and the path back (`?via=&from=`,
+// lib/shared/asset-via.ts), so the page opens from that protocol's side.
 //
 // Two collisions on the cards it sits in:
 //   • the figure beside the icon is a provenance target (`data-prov-exact`):
@@ -33,12 +36,15 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
 import { asOfMark, asOfWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { loadAssetPrices } from "@/lib/api/fetch-asset-prices";
 import { rowFor, type AssetPriceRow } from "@/lib/shared/asset-prices";
 import { assetHref, NATIVE } from "@/lib/shared/asset-roster";
+import { usesWords, viaName, withVia } from "@/lib/shared/asset-via";
+import { viaForPathname, viaValue } from "@/lib/shared/asset-via-links";
 
 const WORDS = {
   about: (symbol: string) => `About ${symbol}`,
@@ -209,15 +215,21 @@ function AssetPanelBody({
 /** The asset's Prices list row and its page link, once the list is read;
  *  nothing where the asset has no page. */
 function AssetPageRow({ chain, contract }: { chain: ChainId; contract: string }) {
-  const [row, setRow] = useState<AssetPriceRow | null>(null);
+  const pathname = usePathname();
+  // The panel opens on a click, so the browser's location is there to read.
+  const search = typeof window === "undefined" ? "" : window.location.search;
+  const via = viaForPathname(pathname, search);
+  const value = via ? viaValue(via) : null;
+  const [row, setRow] = useState<ReturnType<typeof rowFor>>(null);
   useEffect(() => {
     let live = true;
-    loadAssetPrices().then((list) => live && setRow(list ? rowFor(list, chain, contract) : null));
+    loadAssetPrices().then((list) => live && setRow(list ? rowFor(list, chain, contract, value) : null));
     return () => {
       live = false;
     };
-  }, [chain, contract]);
+  }, [chain, contract, value]);
   if (!row) return null;
+  const open = withVia(assetHref(chain, row.token), value, `${pathname}${search}`);
   return (
     <div
       className="flex flex-col gap-1.5 border-t border-[var(--rb-tooltip-border)] pt-2"
@@ -247,16 +259,17 @@ function AssetPageRow({ chain, contract }: { chain: ChainId; contract: string })
         </div>
       )}
       {row.oracle && (
-        <p className="text-[11px] text-rb-500" title={row.oracle}>
+        <p className="text-[11px] text-rb-500" title={row.oracle} data-asset-popover-via={row.viaLine ?? ""}>
+          {via && row.viaLine === "own"
+            ? `${usesWords(viaName(row.by[row.viaKey ?? via.id], via.label)).replace(/^t/, "T")}: `
+            : via && row.viaLine === "none"
+              ? `${via.label} has no stored price for it; the main line: `
+              : ""}
           {row.oracle}
           {row.asOf ? `, its stored rounds to block ${row.asOf.block.toLocaleString("en-US")}` : ""}, last 30 days
         </p>
       )}
-      <Link
-        href={assetHref(chain, row.token)}
-        className="font-medium text-foreground hover:underline"
-        data-asset-popover-open={assetHref(chain, row.token)}
-      >
+      <Link href={open} className="font-medium text-foreground hover:underline" data-asset-popover-open={open}>
         {WORDS.open(row.symbol)}
       </Link>
     </div>

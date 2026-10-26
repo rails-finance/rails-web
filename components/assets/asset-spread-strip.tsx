@@ -6,7 +6,8 @@
 // every line stays within SPREAD_LIMIT the strip is one line saying so; a line
 // that passes it names its largest gap, and that gap puts the cursor there. A
 // Maker OSM line's gap names the hour's delay that causes it (Miles, 26 Oct
-// 2026).
+// 2026); so does the heading where the main line is one (an asset page read
+// from Maker's side, `?via=makerdao`).
 
 import { formatDate } from "@/lib/date";
 import { delayedLine, lineReaders, type PageLine } from "@/lib/shared/asset-roster";
@@ -68,7 +69,8 @@ export function AssetSpreadStrip({
     <div className="mt-3 text-xs" data-asset-spread="loud" data-anatomy="A3.1">
       <div className="flex items-baseline justify-between gap-3 text-rb-500">
         <span>
-          Each line against {mainName}; a gap past {limit} is named
+          Each line against {mainName}
+          {delayedLine(main) ? ", an hour-delayed price" : ""}; a gap past {limit} is named
         </span>
         {stamp && <span className="shrink-0 tabular-nums">{stamp}</span>}
       </div>

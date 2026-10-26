@@ -7,7 +7,9 @@
 // card, and pages of one symbol on different chains share one (USDC on
 // Ethereum and on Base), each chain a mark linking its page. A symbol two
 // tokens carry on one chain (KNC's two contracts, Maker's UNI-V2 ilks) stays
-// two cards, each named with its short address.
+// two cards, each named with its short address. A token an explorer lists by
+// symbol that the roster does not price has a card of chips alone, with the
+// line saying why there is no price (Miles, 26 Oct 2026).
 //
 // Pure: the server builds the cards, the page's client island filters them.
 
@@ -38,8 +40,19 @@ export interface AssetChip {
 export interface CardChain {
   chain: number;
   token: string;
-  href: string;
+  /** The asset page; null for a token with no stored price. */
+  href: string | null;
 }
+
+/** A token an explorer lists by symbol (lib/api/asset-explorer-chips.ts). */
+export interface ListedRef {
+  chain: number;
+  token: string;
+  symbol: string;
+}
+
+/** Why a card has no price figures. */
+export const PRICELESS_WHY = "No price: no oracle Rails stores prices it.";
 
 export interface CardLink {
   symbol: string;
@@ -54,8 +67,9 @@ export interface AssetCard {
   /** The short address, where another card carries the same symbol. */
   short: string | null;
   category: AssetCategory;
-  /** The Prices-list row of the card's first page. */
-  row: AssetPriceRow;
+  /** The Prices-list row of the card's first page; null for a token the
+   *  roster does not price. */
+  row: AssetPriceRow | null;
   chains: CardChain[];
   chips: AssetChip[];
   /** What it wraps or is priced from, and what wraps it or is priced from it. */
@@ -77,6 +91,7 @@ export function assetCards(
   list: AssetPriceList,
   links: Map<string, { underlying: RosterLinkRef | null; wrapped: RosterLinkRef[] }>,
   chips: Map<string, AssetChip[]>,
+  listed: readonly ListedRef[] = [],
   wrappers: "own" | "merged" = WRAPPER_CARDS,
 ): AssetCard[] {
   const chipsOf = (chains: CardChain[]) => {
@@ -119,6 +134,31 @@ export function assetCards(
   }
   cards = kept;
 
+  // The tokens the explorers list that no card prices: a card each.
+  const priced = new Set(cards.flatMap((c) => c.chains.map((x) => `${x.chain}:${x.token}`)));
+  for (const t of listed) {
+    if (priced.has(`${t.chain}:${t.token}`) || /^0x0{40}$/.test(t.token)) continue;
+    // A symbol a card carries on another chain is that card's chain with no page.
+    const same = cards.find((c) => c.symbol === t.symbol && !c.chains.some((x) => x.chain === t.chain));
+    if (same) {
+      same.chains.push({ chain: t.chain, token: t.token, href: null });
+      priced.add(`${t.chain}:${t.token}`);
+      continue;
+    }
+    cards.push({
+      id: `${t.chain}:${t.token}`,
+      symbol: t.symbol,
+      short: null,
+      category: assetCategory(t.symbol),
+      row: null,
+      chains: [{ chain: t.chain, token: t.token, href: null }],
+      chips: [],
+      underlying: null,
+      wrapped: [],
+      takes: [],
+    });
+  }
+
   if (wrappers === "merged") {
     const at = new Map(cards.flatMap((c) => c.chains.map((x) => [`${x.chain}:${x.token}`, c] as const)));
     cards = cards.filter((c) => {
@@ -138,7 +178,10 @@ export function assetCards(
   const count = new Map<string, number>();
   for (const c of cards) count.set(c.symbol, (count.get(c.symbol) ?? 0) + 1);
   for (const c of cards)
-    if ((count.get(c.symbol) ?? 0) > 1) c.short = `${c.row.token.slice(0, 6)}…${c.row.token.slice(-4)}`;
+    if ((count.get(c.symbol) ?? 0) > 1) {
+      const t = c.chains[0].token;
+      c.short = `${t.slice(0, 6)}…${t.slice(-4)}`;
+    }
   return cards;
 }
 
@@ -150,14 +193,19 @@ export const CARD_SORTS: readonly { value: CardSort; label: string }[] = [
   { value: "symbol", label: "Symbol" },
 ];
 
-/** The cards in a sort: the most read (protocol series on the page), flagged
- *  ones first (the Prices list's order), or by symbol. */
+/** The cards in a sort: the most read (protocol series on the page; a card
+ *  with no price after, by its explorers), flagged ones first (the Prices
+ *  list's order), or by symbol. */
 export function sortCards(cards: readonly AssetCard[], sort: CardSort): AssetCard[] {
-  const read = (a: AssetCard, b: AssetCard) => b.row.readers - a.row.readers || a.symbol.localeCompare(b.symbol);
+  const read = (a: AssetCard, b: AssetCard) =>
+    Number(b.row != null) - Number(a.row != null) ||
+    (b.row?.readers ?? 0) - (a.row?.readers ?? 0) ||
+    b.chips.length - a.chips.length ||
+    a.symbol.localeCompare(b.symbol);
   const out = [...cards];
   if (sort === "symbol") out.sort((a, b) => a.symbol.localeCompare(b.symbol, "en-US", { sensitivity: "base" }));
   else if (sort === "flagged")
-    out.sort((a, b) => Number(b.row.flag != null) - Number(a.row.flag != null) || read(a, b));
+    out.sort((a, b) => Number(b.row?.flag != null) - Number(a.row?.flag != null) || read(a, b));
   else out.sort(read);
   return out;
 }

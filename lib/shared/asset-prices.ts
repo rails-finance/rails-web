@@ -24,6 +24,7 @@ import {
   type RosterAssetRef,
 } from "@/lib/shared/asset-roster";
 import { gapSince, lineSpreads, type SpreadPoint } from "@/lib/shared/asset-spread";
+import { lineReaderKeys, parseVia, viaLineOf } from "@/lib/shared/asset-via";
 
 /** The days a row's sparkline and change span. */
 export const ROW_DAYS = 30;
@@ -46,6 +47,16 @@ export interface ChainPrice {
   spark: [number, number][];
   /** The change over ROW_DAYS days, a fraction; null where the series is younger. */
   change: number | null;
+  /** The explorers whose protocols read this line, each with its markets or
+   *  ilks on it, keyed by explorer and by explorer and market
+   *  (`lineReaderKeys`, lib/shared/asset-via.ts). */
+  by: Record<string, string[]>;
+  /** The lines explorers read where it is not this one, for an icon on a
+   *  position page priced by the line its protocol reads (`rowFor`'s `via`). */
+  alt?: ChainPrice[];
+  /** Each explorer's line among `alt` (its index), where it is not this one,
+   *  keyed as `by` is. */
+  picks?: Record<string, number>;
 }
 
 export interface AssetPriceRow extends ChainPrice {
@@ -194,7 +205,33 @@ function chainPrice(
     asOf: end && stamp ? stamp.asOf : null,
     spark,
     change: end && base ? end[1] / base[1] - 1 : null,
+    by: line ? lineReaderKeys(line) : {},
   };
+}
+
+/** A chain's main line as a row reads it, with the other lines its explorers read. */
+function chainPrices(
+  c: AssetPage["chains"][number] | undefined,
+  chain: number,
+  line: PageLine | null,
+  prices: Map<string, [number, number][]>,
+  stamps: Map<string, RoundsStamp>,
+  today: number,
+): ChainPrice {
+  const own = chainPrice(chain, line, prices, stamps, today);
+  if (!c) return own;
+  const keys = new Set(c.lines.flatMap((l) => Object.keys(lineReaderKeys(l))));
+  const alt: PageLine[] = [];
+  const picks: Record<string, number> = {};
+  for (const k of keys) {
+    const v = parseVia(k)!;
+    const l = viaLineOf(c.lines, v.id, v.market);
+    if (!l || l === line) continue;
+    if (!alt.includes(l)) alt.push(l);
+    picks[k] = alt.indexOf(l);
+  }
+  if (!alt.length) return own;
+  return { ...own, alt: alt.map((l) => chainPrice(chain, l, prices, stamps, today)), picks };
 }
 
 /** The rows, from the pages and each series' `[day, price]` list (a joined
@@ -209,7 +246,8 @@ export function priceRows(
   let last: number | null = null;
   const joins = new Map([...stamps].map(([k, s]) => [k, s.joinDay]));
   const rows = pages.map(({ page, chain, chains, line, others, readers }): AssetPriceRow => {
-    const own = chainPrice(chain, line, prices, stamps, today);
+    const at = (n: number) => page.chains.find((c) => c.chain === n);
+    const own = chainPrices(at(chain), chain, line, prices, stamps, today);
     // The list's "at the close of" day: the last a daily-store row reads.
     if (own.day != null && own.asOf == null && (last == null || own.day > last)) last = own.day;
     return {
@@ -221,7 +259,7 @@ export function priceRows(
       unit: "usd",
       readers,
       flag: pageFlag(page, points, today, joins),
-      elsewhere: others.map((o) => chainPrice(o.chain, o.line, prices, stamps, today)),
+      elsewhere: others.map((o) => chainPrices(at(o.chain), o.chain, o.line, prices, stamps, today)),
     };
   });
   // Flagged rows first, then the most read: the assets most protocols price.
@@ -233,11 +271,25 @@ export function priceRows(
 }
 
 /** The row for an icon: the page whose token, on that chain, is `token`,
- *  priced by its main line on that chain where the page has one. */
-export function rowFor(list: AssetPriceList, chain: number, token: string): AssetPriceRow | null {
+ *  priced by its main line on that chain where the page has one; with `via`
+ *  (an explorer id, or id and market), by the line that explorer's protocol reads, the main
+ *  line where it reads none (`viaLine` says which). */
+export function rowFor(
+  list: AssetPriceList,
+  chain: number,
+  token: string,
+  via?: string | null,
+): (AssetPriceRow & { viaLine?: "own" | "none"; viaKey?: string }) | null {
   const t = token.toLowerCase();
   const row = list.rows.find((r) => r.token === t && r.chains.includes(chain));
   if (!row) return null;
   const there = row.chain === chain ? null : row.elsewhere?.find((e) => e.chain === chain && e.key != null);
-  return there ? { ...row, ...there } : row;
+  const base = there ? { ...row, ...there } : row;
+  if (!via) return base;
+  // A market no line carries reads as its explorer, as on the page.
+  const key = base.by?.[via] || base.picks?.[via] != null ? via : (parseVia(via)?.id ?? via);
+  const i = base.picks?.[key];
+  const alt = i != null ? base.alt?.[i] : undefined;
+  if (alt && alt.price != null) return { ...base, ...alt, viaLine: "own", viaKey: key };
+  return { ...base, viaLine: base.by?.[key] ? "own" : "none", viaKey: key };
 }
