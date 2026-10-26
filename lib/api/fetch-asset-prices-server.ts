@@ -1,12 +1,15 @@
 // The Prices list's rows for a server render or the list route (rails-ops
 // reference/asset-key-map.md): the whole roster (GET /api/prices/assets), then
-// each row's series over the last 30 days from the daily store
-// (GET /api/prices/daily), 40 series a read.
+// over the last 30 days from the daily store (GET /api/prices/daily), 40
+// series a read, each row's series and every drawn line on its page, for the
+// flags.
 //
 // SERVER-ONLY. Reads `RAILS_API_URL` + `API_BEARER_TOKEN`.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { dailyPricesFromAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
+import { dailyStorePriceSeries } from "@/lib/shared/price-series";
+import type { SpreadPoint } from "@/lib/shared/asset-spread";
 import { priceRows, rosterPages, ROW_DAYS, type AssetPriceList } from "@/lib/shared/asset-prices";
 import type { AssetRosterAnswer } from "@/lib/shared/asset-roster";
 
@@ -35,11 +38,11 @@ export async function fetchAssetPricesServer(readerIp?: string | null): Promise<
   // Back far enough to find the price 30 days before a series' last day.
   const from = today - ROW_DAYS - 10;
   const keys = new Map<number, Set<string>>();
-  for (const p of pages) {
-    const k = p.line?.drawn?.key;
-    if (k) keys.set(p.chain, (keys.get(p.chain) ?? new Set()).add(k));
-  }
+  const want = (chain: number, k: string) => keys.set(chain, (keys.get(chain) ?? new Set()).add(k));
+  for (const p of pages)
+    for (const c of p.page.chains) for (const l of c.lines) if (l.drawn) want(c.chain, l.drawn.key);
   const prices = new Map<string, [number, number][]>();
+  const points = new Map<string, readonly SpreadPoint[]>();
   const reads: Promise<void>[] = [];
   for (const [chain, set] of keys) {
     const list = [...set];
@@ -52,10 +55,12 @@ export async function fetchAssetPricesServer(readerIp?: string | null): Promise<
       reads.push(
         get<DailyAnswer>(`/api/prices/daily?${qs.toString()}`, readerIp).then((a) => {
           for (const [k, pts] of Object.entries(dailyPricesFromAnswer(a))) prices.set(`${chain}|${k}`, pts);
+          const series = dailyStorePriceSeries(a, () => ({ symbol: "", chain }));
+          for (const [k, s] of Object.entries(series)) points.set(`${chain}|${k}`, s.points);
         }),
       );
     }
   }
   await Promise.all(reads);
-  return priceRows(pages, prices, today);
+  return priceRows(pages, prices, today, points);
 }

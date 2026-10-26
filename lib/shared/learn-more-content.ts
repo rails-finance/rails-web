@@ -1559,14 +1559,21 @@ export function liquityCollSurplusClaimContent(
 export function assetPriceChartContent(symbol: string): LearnMoreContent {
   return {
     title: "How to read the price chart",
-    intro: `${symbol}'s price from each oracle a lending protocol reads on this chain, a point per completed UTC day, oldest at the left.`,
+    intro: `${symbol}'s price from each feed a lending protocol reads on this chain, a point per completed UTC day, oldest at the left. Protocols reading one feed, directly or through a wrapper that only rescales it, share a line.`,
     detailsHeading: "The parts:",
     details: [
-      { bold: "The coloured line", text: "the oracle picked in the list at the tip's left." },
-      { bold: "The thin lines", text: "the other oracles, on the same axis." },
+      {
+        bold: "The coloured line",
+        text: "the main line, the one the most protocols read, until another is picked in the list at the tip's left.",
+      },
+      { bold: "The thin lines", text: "the other feeds, on the same axis." },
       {
         bold: "The cursor",
         text: "press and drag the chart to move it; the tip shows the coloured line's price that day.",
+      },
+      {
+        bold: "The spread",
+        text: "under the chart, each line's deviation from the main line on the cursor's day. A day compares two lines only where both were read within ten minutes of each other, or one is a fixed price; a line more than 1 % from the main line names its largest gap, which puts the cursor on its day.",
       },
     ],
   };

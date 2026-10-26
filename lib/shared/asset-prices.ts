@@ -1,6 +1,9 @@
 // The Prices list (rails-ops reference/asset-key-map.md, "The Prices list"):
-// one row per asset page, from the roster, priced by the page's first line —
-// the oracle its chart picks — over the last 30 completed UTC days.
+// one row per asset page, from the roster, priced by the page's main line on
+// its first chain over the last 30 completed UTC days. A row is flagged where
+// its page carries a fixed price, or a line past SPREAD_LIMIT from its chart's
+// main line in those 30 days (a line only retired markets read aside), and
+// flagged rows come first.
 //
 // Pure: the server builds the rows (lib/api/fetch-asset-prices-server.ts),
 // the list page and the asset icon's popover read them.
@@ -8,10 +11,14 @@
 import {
   assetHref,
   assetPage,
+  lineReaders,
+  mainLine,
+  type AssetPage,
   type AssetRosterAnswer,
   type RosterAsset,
   type RosterAssetRef,
 } from "@/lib/shared/asset-roster";
+import { gapSince, lineSpreads, type SpreadPoint } from "@/lib/shared/asset-spread";
 
 /** The days a row's sparkline and change span. */
 export const ROW_DAYS = 30;
@@ -39,6 +46,48 @@ export interface AssetPriceRow {
   change: number | null;
   /** How many protocol series price the page. */
   readers: number;
+  /** Why the row is flagged; null where it is not. */
+  flag: RowFlag | null;
+}
+
+export interface RowFlag {
+  /** The page's fixed-price lines, by their readers ("SparkLend"). */
+  fixed: string[];
+  /** The largest gap past SPREAD_LIMIT in the last ROW_DAYS days, on any chain. */
+  gap: { chain: number; line: string; main: string; dev: number; day: number } | null;
+}
+
+/** The flag for a page from its drawn lines' recent points (`chain|key`). */
+export function pageFlag(page: AssetPage, points: Map<string, readonly SpreadPoint[]>, today: number): RowFlag | null {
+  const fixed = [
+    ...new Set(page.chains.flatMap((c) => c.lines.filter((l) => l.oracle.kind === "fixed").map(lineReaders))),
+  ];
+  let gap: RowFlag["gap"] = null;
+  for (const c of page.chains) {
+    const main = mainLine(c);
+    const mp = main?.drawn ? points.get(`${c.chain}|${main.drawn.key}`) : undefined;
+    if (!main || !mp) continue;
+    // A line only retired markets read (an offboarded Maker ilk, its price
+    // frozen at the last poke) is drawn on the page and not flagged here.
+    const others = c.lines.filter(
+      (l) => l !== main && l.drawn && points.has(`${c.chain}|${l.drawn.key}`) && !l.series.every((x) => x.retired),
+    );
+    const spreads = lineSpreads(
+      { key: main.id, points: mp, fixed: main.oracle.kind === "fixed" },
+      others.map((l) => ({
+        key: l.id,
+        points: points.get(`${c.chain}|${l.drawn!.key}`)!,
+        fixed: l.oracle.kind === "fixed",
+      })),
+      c.chain,
+    );
+    for (const [i, sp] of spreads.entries()) {
+      const g = gapSince(sp, today - ROW_DAYS);
+      if (g && (gap == null || Math.abs(g.dev) > Math.abs(gap.dev)))
+        gap = { chain: c.chain, line: lineReaders(others[i]), main: main.oracle.name, ...g };
+    }
+  }
+  return fixed.length || gap ? { fixed, gap } : null;
 }
 
 export interface AssetPriceList {
@@ -85,6 +134,7 @@ export function priceRows(
   pages: ReturnType<typeof rosterPages>,
   prices: Map<string, [number, number][]>,
   today: number,
+  points: Map<string, readonly SpreadPoint[]> = new Map(),
 ): AssetPriceList {
   let last: number | null = null;
   const rows = pages.map(({ page, chain, chains, line, readers }): AssetPriceRow => {
@@ -111,10 +161,14 @@ export function priceRows(
       spark,
       change: end && base ? end[1] / base[1] - 1 : null,
       readers,
+      flag: pageFlag(page, points, today),
     };
   });
-  // The most read first: the assets most protocols price.
-  rows.sort((a, b) => b.readers - a.readers || a.symbol.localeCompare(b.symbol));
+  // Flagged rows first, then the most read: the assets most protocols price.
+  rows.sort(
+    (a, b) =>
+      Number(b.flag != null) - Number(a.flag != null) || b.readers - a.readers || a.symbol.localeCompare(b.symbol),
+  );
   return { rows, day: last };
 }
 

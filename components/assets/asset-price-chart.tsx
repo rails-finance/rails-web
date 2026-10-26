@@ -2,13 +2,17 @@
 
 // One chain's section of an asset page (rails-ops reference/asset-key-map.md):
 // the price chart 328 built (`CombinedFlows`, the price chart alone) with a
-// line per oracle, the picked one in its hue and the others thin beneath it,
-// then the lines listed: each oracle named, the protocols that read it with
-// their series, the span stored and its "as of" stamp (decision 0054, ruling 2).
+// line per feed, the main one (the most read) in its hue and the others thin
+// beneath it, the spread strip under it (each line against the main one at
+// the cursor), then the lines listed: each oracle named, the protocols that
+// read it with their series, the span stored and its "as of" stamp (decision
+// 0054, ruling 2).
 // Every line is the daily store's series (`/api/prices/daily`), a point per
 // completed UTC day.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
+import { lineSpreads } from "@/lib/shared/asset-spread";
 import { CombinedFlows } from "@/components/shared/lifetime-flows-combined";
 import { FlowUnitContext } from "@/components/shared/lifetime-flows-tip";
 import { fetchDailyAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
@@ -96,6 +100,28 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
   const axis = useMemo(() => (firstDay == null ? null : axisModel(firstDay, today)), [firstDay, today]);
   const help = useMemo(() => assetPriceChartContent(symbol), [symbol]);
   const lastOf = (key: string) => prices.find((p) => p.key === key)?.points.at(-1) ?? null;
+  // The spread: every drawn line against the main one (the first drawn).
+  const spreads = useMemo(() => {
+    const main = prices[0];
+    const mainLine = main ? byKey.get(main.key) : undefined;
+    if (!main || !mainLine) return null;
+    const others = prices
+      .slice(1)
+      .map((p) => ({ key: p.key, points: p.points, fixed: byKey.get(p.key)!.oracle.kind === "fixed" }));
+    const out = lineSpreads(
+      { key: main.key, points: main.points, fixed: mainLine.oracle.kind === "fixed" },
+      others,
+      section.chain,
+    );
+    return { main: mainLine, others: out.map((sp) => ({ line: byKey.get(sp.key)!, spread: sp })) };
+  }, [prices, byKey, section.chain]);
+  // The cursor's day, or at the live stop the last completed day stored.
+  const [cursorAt, setCursorDay] = useState<number | null>(null);
+  const lastDay = prices[0]?.points.at(-1)?.[0] ?? null;
+  const cursorDay = cursorAt == null || lastDay == null ? cursorAt : Math.min(cursorAt, lastDay);
+  const onCursorDay = useCallback((d: number) => setCursorDay(d), []);
+  const [jumpTo, setJumpTo] = useState<{ day: number; n: number } | null>(null);
+  const onJump = useCallback((day: number) => setJumpTo((j) => ({ day, n: (j?.n ?? 0) + 1 })), []);
 
   return (
     <section className="mt-8" data-asset-chain={section.chain} data-anatomy="A2">
@@ -114,8 +140,13 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
               priceOnly
               allLines
               priceHelp={help}
+              onCursorDay={onCursorDay}
+              jumpTo={jumpTo}
               renderBars={() => null}
             />
+            {spreads && (
+              <AssetSpreadStrip main={spreads.main} others={spreads.others} cursorDay={cursorDay} onJump={onJump} />
+            )}
           </FlowUnitContext.Provider>
         ) : (
           <p className="py-6 text-center text-sm text-rb-500" data-asset-chart-state={failed ? "failed" : "loading"}>
@@ -131,6 +162,7 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
             chain={section.chain}
             symbol={symbol}
             last={l.drawn ? lastOf(l.drawn.key) : null}
+            main={spreads?.main.id === l.id}
           />
         ))}
       </ul>
@@ -149,11 +181,13 @@ function LineRow({
   chain,
   symbol,
   last,
+  main,
 }: {
   line: PageLine;
   chain: number;
   symbol: string;
   last: [number, number, number | null, number?] | null;
+  main: boolean;
 }) {
   const href = (a: string) => explorerUrl(chain as ChainId, "address", a);
   return (
@@ -169,6 +203,11 @@ function LineRow({
           >
             {shortAddress(line.oracle.address)}
           </a>
+          {main && (
+            <span className="ml-2 text-xs font-normal text-rb-500" data-asset-main-line="">
+              main line
+            </span>
+          )}
         </span>
         {last ? (
           <span className="text-xs text-rb-500 tabular-nums" data-asset-as-of={last[0]}>
@@ -189,6 +228,7 @@ function LineRow({
               ? ` prices ${s.token.symbol}`
               : ""}
             {s.via ? `, through ${s.via.name} ${shortAddress(s.via.address)}` : ""}
+            {s.retired ? ", an ilk Maker has retired" : ""}
             {s.firstDay != null ? `, from ${dayDate(s.firstDay)}` : ", nothing stored"}
             {line.drawn?.key === s.key && line.series.length > 1 ? " (drawn)" : ""}
           </li>

@@ -301,6 +301,11 @@ export interface CombinedFlowsProps {
   allLines?: boolean;
   /** The price chart's "?" where the caller words it (an asset page). */
   priceHelp?: LearnMoreContent;
+  /** The cursor's day (absolute UTC day) as it moves: an asset page's spread
+   *  strip reads it. */
+  onCursorDay?: (day: number) => void;
+  /** Puts the cursor on a day; `n` changes for each new request. */
+  jumpTo?: { day: number; n: number } | null;
   /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
    *  last stop, where no outline of today's length is drawn. */
   renderBars: (barStop: number, when: string, isLive: boolean, atLive: boolean) => ReactNode;
@@ -318,6 +323,8 @@ export function CombinedFlows({
   onLedgerNote,
   allLines = false,
   priceHelp,
+  onCursorDay,
+  jumpTo,
   renderBars,
 }: CombinedFlowsProps) {
   // A cut restored from the address bar puts the cursor on its day, which
@@ -562,6 +569,17 @@ export function CombinedFlows({
   const cx = ready && atStop ? xStop(atStop) : STRIP_PAD + geo.inner;
   const dim = ready && atStop != null && !atStop.live;
   const cursorDay = cur.live ? today : startDay + cur.stop;
+  useEffect(() => {
+    onCursorDay?.(cursorDay);
+  }, [onCursorDay, cursorDay]);
+  const jumped = useRef<number | null>(null);
+  useEffect(() => {
+    if (!jumpTo || jumped.current === jumpTo.n) return;
+    const i = stopForDay(stops, jumpTo.day - startDay);
+    if (i == null) return;
+    jumped.current = jumpTo.n;
+    setAt(i);
+  }, [jumpTo, stops, startDay]);
   const cursorPrice = priced ? (priceReadout(priced, cursorDay, model.gapDays)?.point[1] ?? null) : null;
   const cursorLevel = priced ? (levelAt(priced, cursorDay)?.[1] ?? null) : null;
   const sliderLabel = `Date, by ${(series?.bin ?? "week") === "day" ? "day" : `${series?.bin ?? "week"} and by day with events`}: moves the headlines and the bars`;
