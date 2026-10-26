@@ -33,6 +33,7 @@ import {
   type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { Activity, ChevronDown, ChevronLeft, ChevronRight, Link2, SkipBack, SkipForward } from "lucide-react";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -79,8 +80,8 @@ import {
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel, OldPriceTip, oldLineTip } from "@/components/shared/flow-old-price";
 import { LwRanges, nearestStopAt, type FlowsLwApi, type FlowsLwAxis } from "@/components/shared/lifetime-flows-lw-axis";
-import { LwNotice } from "@/components/shared/lw-chart-kit";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
+import { protocolForPathname } from "@/lib/shared/protocols";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import {
   axisEndDay,
@@ -286,9 +287,28 @@ export const FlowsCompactContext = createContext<{
 
 /** The chart engine the panel draws its value line and price chart with
  *  (ui-jobs 328 step 4c): the drawn strips ("svg"), or Lightweight Charts
- *  ("lw"), chosen per family by the panel (`flowsEngineFor`). */
+ *  ("lw"). */
 export type FlowsEngine = "svg" | "lw";
-export const FlowsEngineContext = createContext<FlowsEngine>("svg");
+/** The explorers whose value line and price chart are drawn on Lightweight
+ *  Charts: the Liquity family (the pilot) and the Aave family; every other
+ *  explorer keeps the drawn strips until its step. The one place the engine
+ *  is chosen, read by every panel (Aave V4's draws its own). */
+const LW_EXPLORERS = new Set([
+  "liquity",
+  "ebisu",
+  "asymmetry",
+  "basedollar",
+  "aave-v3",
+  "aave-v3-base",
+  "aave-v3-arbitrum",
+  "spark",
+  "seamless",
+  "aave-v4",
+]);
+export function flowsEngineFor(pathname: string | null): FlowsEngine {
+  const id = protocolForPathname(pathname)?.id;
+  return id != null && LW_EXPLORERS.has(id) ? "lw" : "svg";
+}
 
 const STRIP_H = 80;
 /** A drag this close to an end of a chart that pans keeps stepping on. */
@@ -367,7 +387,7 @@ export function CombinedFlows({
   const { compact, toggle: viewToggle } = useContext(FlowsCompactContext);
   // The chart engine: Lightweight Charts where the panel chooses it, for a
   // panel with the events row and one unit across both sides.
-  const lwOn = useContext(FlowsEngineContext) === "lw" && !priceOnly && !model.sideUnits;
+  const lwOn = flowsEngineFor(usePathname()) === "lw" && !priceOnly && !model.sideUnits;
   const [lwAxis, setLwAxis] = useState<FlowsLwAxis | null>(null);
   const lwApi = useRef<FlowsLwApi | null>(null);
 
@@ -896,11 +916,6 @@ export function CombinedFlows({
                     steps={steps}
                   />
                 </div>
-                {lwOn && !compact && (
-                  <p className="mt-2 text-[10px] leading-snug text-rb-500" data-flow-lw-notice="" data-anatomy="F23">
-                    <LwNotice />
-                  </p>
-                )}
                 {/* With the events row hidden, the cursor's date stands alone. */}
                 {priceOnly && (
                   <>

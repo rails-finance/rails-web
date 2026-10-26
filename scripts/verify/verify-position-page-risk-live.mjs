@@ -153,6 +153,11 @@ for (const lane of LANES) {
   await page.waitForTimeout(3000);
   // A card with progressive disclosure draws its risk lines only once open.
   await openPositionCards(page);
+  // The runway lands with the live read, which on a busy machine comes after
+  // the idle (aave-v3 0x26a5…e95 on 26 Oct 2026): wait up to 30 s for it.
+  await page
+    .waitForFunction((src) => new RegExp(src).test(document.body.innerText), RUNWAY.source, { timeout: 30000 })
+    .catch(() => {});
   const text = (await page.evaluate(() => document.body.innerText)) ?? "";
 
   // A figure, not the words alone: "Liquidates at" also sits in read-mores.

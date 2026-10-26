@@ -42,14 +42,24 @@
 //   - on the liquidated Trove the last stop reads the close day, and the
 //     price line draws no day after it (ruling 14).
 //
-// The chart engine (ui-jobs 328 step 4c): the Liquity family draws on
-// Lightweight Charts, one canvas for the value line and the price chart, one
+// The chart engine (ui-jobs 328 step 4c): the Liquity and Aave families draw
+// on Lightweight Charts, one canvas for the value line and the price chart, one
 // slider over it (`data-flow-strip-view="chart"`, its panes named by
 // `data-flow-chart-panes`); a canvas leaves nothing in the DOM to read, so the
 // page sets the drawn days and lines as data hooks (`[data-flow-lw-hooks]`:
-// `data-price-line`, `data-liq-level`, `data-flow-value-line`). Aave V3 keeps
-// the drawn strips, read as before. On the new engine the checks add: the
-// time axis is drawn and the NOTICE stands under the chart.
+// `data-price-line`, `data-liq-level`, `data-flow-value-line`). On the new
+// engine the checks add: the time axis is drawn with no logo or notice on the
+// chart (the site footer carries the attribution); it fits, opens on the whole
+// life with the cursor at the right, spreads its pips; ⏮ ‹ › ⏭ in order at All
+// and 30D, frozen and not, at 1280 and 390 with touch; the health view's older
+// days a dotted series meeting the solid one (`data-price-meets`); and at 1280
+// the wheel (`checkLwWheel`): over the chart it scrolls the page, Ctrl with it
+// zooms, a sideways swipe pans. Aave V3 Prime 0xb8a4…715e (wstETH/WETH, more
+// than 60 days with events, so its older health days are dotted) and EtherFi
+// 0x0f2a…bbe take the health checks; SparkLend 0x1601…347e and Aave V4 Main
+// 0x7eac…fa09 the price checks against their answers; Aave V3 Base 0xe883…4cc8
+// and Seamless 0x8182…7804 the chart's checks alone (`lwOnly`: their answer is
+// the knots). `FIXTURES=<regex>` runs the pages whose id matches.
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
 
@@ -71,6 +81,33 @@ const PAGES = [
     health: true,
   },
   {
+    id: "aave-v3 prime 0xb8a4",
+    path: "/ethereum/aave-v3/0xb8a451107a9f87fde481d4d686247d6e43ed715e?market=prime",
+    answer: "/api/aave-v3/flows",
+    health: true,
+  },
+  {
+    id: "aave-v3 etherfi 0x0f2a",
+    path: "/ethereum/aave-v3/0x0f2a32f4f54ec9d52a193e9e3493fb5fea86cbbe?market=etherfi",
+    answer: "/api/aave-v3/flows",
+    health: true,
+  },
+  {
+    id: "spark 0x1601",
+    path: "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e",
+    answer: "/api/spark/flows",
+    query: "wallet=0x1601843c5e9bc251a3272907010afa41fa18347e",
+  },
+  {
+    id: "aave-v4 main 0x7eac",
+    path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
+    answer: "/api/aave-v4/flows",
+    query: "wallet=0x7eac02864fbae93de38394a3e7b72a22e9b5fa09&spoke=main",
+  },
+  // Base's two Pools answer in another shape (the knots): the chart's checks alone.
+  { id: "aave-v3-base 0xe883", path: "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8", lwOnly: true },
+  { id: "seamless 0x8182", path: "/base/seamless/0x818214d3494fbc4be4f450c50677e55987804206", lwOnly: true },
+  {
     id: "liquity-v2 WETH Trove",
     path: "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
     answer: "/api/liquity-v2/prices/daily",
@@ -89,6 +126,8 @@ const PAGES = [
     trove: "liquidated",
   },
 ];
+
+const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
 
 const DAY = 86_400;
 /** The slider the price chart is read through: the price strip, or the one chart. */
@@ -116,6 +155,8 @@ function hfLabel(hf) {
  *  card states "Liquidates at", that asset's level today is the card's. */
 async function checkHealth(page, tag, pg, listedAll) {
   check(`${tag}: the picker lists the health factor first`, listedAll[0] === HEALTH, listedAll.join(","));
+  if ((await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").count()) > 0)
+    await checkHealthDotted(page, tag);
   // The tip names its series by its mark: the picker's accessible name.
   const heading = await page.$eval("[data-price-heading]", headingText).catch(() => "");
   check(
@@ -177,10 +218,23 @@ async function checkHealth(page, tag, pg, listedAll) {
     await page.keyboard.press("End");
     await page.waitForTimeout(200);
     const v = await page.$eval("[data-liq-readout]", (e) => Number(e.getAttribute("data-liq-value"))).catch(() => null);
+    // A level more than ten times under the day's price (a dust debt's) is
+    // not drawn (ruling 15): then the chart has none where the card states one.
+    const price = await page
+      .$eval("[data-price-readout]", (e) => Number((e.textContent ?? "").replace(/[^\d.]/g, "")))
+      .catch(() => null);
+    const cardV = Number(
+      liq
+        .replace(/^[^$\d]*\$?/, "")
+        .replace(/[^\d.KMB]/g, "")
+        .replace(/K$/, "e3")
+        .replace(/M$/, "e6"),
+    );
+    const dust = v == null && price != null && cardV > 0 && cardV < price / 10;
     check(
-      `${tag}: ${liqSym}'s level today is the card's "Liquidates at"`,
-      v != null && liq.endsWith(formatLiquidationPrice(v)),
-      `chart ${v} (${v != null ? formatLiquidationPrice(v) : "-"}), card ${liq}`,
+      `${tag}: ${liqSym}'s level today is the card's "Liquidates at"${dust ? " (a dust debt's: under a tenth of the price, not drawn)" : ""}`,
+      dust || (v != null && liq.endsWith(formatLiquidationPrice(v))),
+      `chart ${v} (${v != null ? formatLiquidationPrice(v) : "-"}), card ${liq}, price ${price}`,
     );
     await picker.click();
     await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
@@ -340,7 +394,7 @@ function check(name, ok, detail = "") {
 /** Per asset symbol, the answer's observations by day: [price, block]. */
 function answerSeries(kind, body, collSymbol) {
   const out = new Map();
-  if (kind === "/api/aave-v3/flows") {
+  if (kind.endsWith("/flows")) {
     const held = new Set();
     for (const d of body.days ?? []) for (const b of d[4] ?? []) held.add(b[1]);
     for (const [addr, p] of Object.entries(body.prices ?? {})) {
@@ -507,6 +561,16 @@ const lwShow = (s) => `x ${s.x} of ${s.plotW}, stop ${s.now}/${s.max}${s.frozen 
  *  spreads its pips over the plot. A day's close inside a grid cell (a cell
  *  longer than a day, a phone's width) once read x 0. */
 async function checkLwOpen(page, tag) {
+  // The value line's hook, once the line is drawn (a model rebuilt over more
+  // of the life sets it again).
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelector("[data-flows-combined] [data-flow-value-line]")?.getAttribute("data-flow-value-line"),
+      null,
+      { timeout: 30000 },
+    )
+    .catch(() => {});
   const r = await page.evaluate(() => {
     const w = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
     const panel = w.closest("[data-flows-combined]").getBoundingClientRect();
@@ -525,8 +589,8 @@ async function checkLwOpen(page, tag) {
         canv.every((c) => c.left >= box.left - 1 && c.right <= box.right + 1),
       sizes: `panel ${Math.round(panel.left)}–${Math.round(panel.right)}, box ${Math.round(box.left)}–${Math.round(box.right)}`,
       overflow: document.documentElement.scrollWidth - innerWidth,
-      first: Math.min(...ts),
-      last: Math.max(...ts),
+      first: ts.length ? Math.min(...ts) : 0,
+      last: ts.length ? Math.max(...ts) : 0,
       pips: [...document.querySelectorAll("[data-flows-combined] [data-flow-pip]")].map((p) =>
         parseFloat(p.style.left),
       ),
@@ -552,6 +616,89 @@ async function checkLwOpen(page, tag) {
     `${tag}: the events row spreads its pips over the plot`,
     r.pips.length > 1 && r.pips.every((x) => x >= -1 && x <= s.plotW + 1) && r.pips.filter((x) => x <= 1).length <= 1,
     `${r.pips.length} pips, ${r.pips.filter((x) => x <= 1).length} at x 0`,
+  );
+}
+
+/** The wheel on a position page (Miles, 26 Oct 2026): over the chart it
+ *  scrolls the page and leaves the window; Ctrl with the wheel (a trackpad's
+ *  pinch arrives so) zooms about the pointer and leaves the page; a sideways
+ *  swipe pans the zoomed window. Desktop only: a phone has no wheel. */
+async function checkLwWheel(page, tag) {
+  await page
+    .locator('[data-flows-combined] [data-flow-range="All"]')
+    .first()
+    .click()
+    .catch(() => {});
+  await page.waitForTimeout(600);
+  const box = page.locator("[data-flows-combined] [data-flow-lw-box]").first();
+  // The chart in the viewport's upper half, so the page has room to scroll.
+  const place = async () => {
+    await box.evaluate((el) => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 160));
+    await page.waitForTimeout(300);
+  };
+  await place();
+  const over = async () => {
+    const b = await box.boundingBox();
+    await page.mouse.move(b.x + b.width * 0.5, b.y + Math.min(40, b.height / 3));
+  };
+  const at = async () => ({ y: await page.evaluate(() => window.scrollY), ...(await lwState(page)) });
+  await over();
+  const a = await at();
+  await page.mouse.wheel(0, 240);
+  await page.waitForTimeout(700);
+  const b = await at();
+  check(
+    `${tag}: the wheel over the chart scrolls the page and leaves the window`,
+    b.y > a.y && b.from === a.from && b.to === a.to,
+    `scroll ${a.y} → ${b.y}, window ${a.to - a.from} → ${b.to - b.from} s`,
+  );
+  // The wheel moved the chart up the viewport: back under the pointer.
+  await place();
+  await over();
+  const c = await at();
+  await page.keyboard.down("Control");
+  for (let i = 0; i < 4; i++) {
+    await page.mouse.wheel(0, -100);
+    await page.waitForTimeout(40);
+  }
+  await page.keyboard.up("Control");
+  await page.waitForTimeout(900);
+  const d = await at();
+  check(
+    `${tag}: Ctrl with the wheel zooms the chart and leaves the page`,
+    d.y === c.y && d.to - d.from < (c.to - c.from) * 0.9,
+    `scroll ${c.y} → ${d.y}, window ${c.to - c.from} → ${d.to - d.from} s`,
+  );
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.wheel(-120, 0);
+    await page.waitForTimeout(40);
+  }
+  await page.waitForTimeout(900);
+  const e = await at();
+  check(
+    `${tag}: a sideways swipe pans the zoomed window and leaves the page`,
+    e.y === d.y && e.from < d.from && Math.abs(e.to - e.from - (d.to - d.from)) <= (d.to - d.from) * 0.05,
+    `scroll ${d.y} → ${e.y}, from ${d.from} → ${e.from}`,
+  );
+  await page.locator('[data-flows-combined] [data-flow-range="All"]').first().click();
+  await page.waitForTimeout(600);
+}
+
+/** The health view's older days (ruling 15): drawn as a second, dotted
+ *  series, which meets the solid line on each day the two touch. */
+async function checkHealthDotted(page, tag) {
+  const h = await page.$eval("[data-price-line]", (g) => ({
+    key: g.getAttribute("data-price-line"),
+    dotted: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).length,
+    meets: g.getAttribute("data-price-meets") ?? "",
+  }));
+  if (h.key !== "health" || h.dotted === 0) return;
+  const [met, days] = h.meets.split("/").map(Number);
+  check(
+    `${tag}: the health view's older days are a dotted series that meets the solid one`,
+    days > 0 && met === days,
+    `${h.dotted} dotted vertices; meets ${h.meets}`,
   );
 }
 
@@ -608,7 +755,7 @@ async function checkLwSteps(page, tag, touch) {
 
 const browser = await chromium.launch();
 
-for (const pg of PAGES) {
+for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
   for (const width of [1280, 390]) {
     const tag = `${pg.id} @${width}`;
     const ctx = await browser.newContext({
@@ -630,7 +777,7 @@ for (const pg of PAGES) {
     let body = null;
     page.on("response", async (r) => {
       const u = new URL(r.url());
-      if (u.pathname !== pg.answer || !r.ok()) return;
+      if (!pg.answer || u.pathname !== pg.answer || !r.ok()) return;
       try {
         body = await r.json();
       } catch {}
@@ -641,6 +788,20 @@ for (const pg of PAGES) {
         timeout: 180000,
       })
       .catch(() => {});
+    // On the new engine, the canvas: the library loads after the panel, and
+    // the panel's own icons are svgs too.
+    if ((await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").count()) > 0)
+      await page
+        .waitForFunction(
+          () =>
+            document.querySelector("[data-flows-combined] [data-flow-lw-box] canvas") &&
+            document
+              .querySelector("[data-flows-combined] [data-flow-value-line]")
+              ?.getAttribute("data-flow-value-line"),
+          null,
+          { timeout: 120000 },
+        )
+        .catch(() => {});
     await page.waitForTimeout(2500);
     // The drawn strips name their views; the chart names its panes.
     const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
@@ -658,19 +819,31 @@ for (const pg of PAGES) {
     }
     const lw = (await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").count()) > 0;
     if (lw) {
+      // The attribution is the site footer's (Miles, 26 Oct 2026): no logo
+      // or notice on the chart.
       const drawn = await page.evaluate(() => ({
         canvases: document.querySelectorAll("[data-flow-lw-box] canvas").length,
-        notice: document.querySelector("[data-flow-lw-notice]")?.textContent ?? "",
+        notice: document.querySelector("[data-flows-combined] [data-flow-lw-notice]") != null,
+        logo: document.querySelector('[data-flow-lw-box] a[href*="tradingview"]') != null,
       }));
       check(
-        `${tag}: the chart draws on Lightweight Charts with its time axis, the NOTICE under it`,
-        drawn.canvases > 0 &&
-          drawn.notice.includes("TradingView Lightweight Charts") &&
-          drawn.notice.includes("https://www.tradingview.com/"),
+        `${tag}: the chart draws on Lightweight Charts with its time axis, no logo or notice on it`,
+        drawn.canvases > 0 && !drawn.notice && !drawn.logo,
         JSON.stringify(drawn),
       );
       await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").scrollIntoViewIfNeeded();
       await checkLwOpen(page, tag);
+    }
+    if (pg.lwOnly) {
+      if (!check(`${tag}: the chart draws on Lightweight Charts`, lw)) {
+        await ctx.close();
+        continue;
+      }
+      await checkLwSteps(page, tag, width < 640);
+      if (width >= 640) await checkLwWheel(page, tag);
+      check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
+      await ctx.close();
+      continue;
     }
     const PRICE = PRICE_STRIP;
     await page.locator(PRICE).scrollIntoViewIfNeeded();
@@ -678,9 +851,10 @@ for (const pg of PAGES) {
       // The answer was read before the listener saw it: read it as the page does.
       const u = new URL(`${BASE}${pg.path}`);
       const q =
-        pg.answer === "/api/aave-v3/flows"
+        pg.query ??
+        (pg.answer === "/api/aave-v3/flows"
           ? `wallet=${u.pathname.split("/").pop()}&market=${u.searchParams.get("market")}`
-          : `collateralType=${u.pathname.split("/")[4]}`;
+          : `collateralType=${u.pathname.split("/")[4]}`);
       body = await hostFetch(`${BASE}${pg.answer}?${q}`).then((r) => r.json());
     }
     const series = answerSeries(pg.answer, body, pg.path.split("/")[4]);
@@ -718,7 +892,10 @@ for (const pg of PAGES) {
         )
         .catch(() => {});
     // The tip's toggles, once the series the chart opens on has landed.
-    await checkLevelToggle(page, tag);
+    // Only a page that draws a level has the toggle: the Aave V3 Ethereum
+    // health view and the Troves; SparkLend and Aave V4 draw the price alone
+    // until step 5.
+    if (pg.health || pg.trove) await checkLevelToggle(page, tag);
     await checkEventsToggle(page, tag);
     if ((await picker.count()) > 0) {
       await picker.click();
@@ -754,7 +931,7 @@ for (const pg of PAGES) {
       const days = [...obs.keys()];
       const lo = Math.min(...days);
       const hi = Math.max(...days);
-      const inRange = (d) => pg.answer === "/api/aave-v3/flows" || (d >= lo && d <= hi);
+      const inRange = (d) => pg.answer.endsWith("/flows") || (d >= lo && d <= hi);
       const extra = drawn.observed.filter((d) => inRange(d) && !obs.has(d));
       const wrong = drawn.carried.filter((d) => inRange(d) && obs.has(d));
       check(
@@ -811,7 +988,7 @@ for (const pg of PAGES) {
       // Outside the Liquity answer's days the Trove's own rows price the line.
       if (
         !point &&
-        pg.answer !== "/api/aave-v3/flows" &&
+        !pg.answer.endsWith("/flows") &&
         (day < Math.min(...obs0.keys()) || day > Math.max(...obs0.keys()))
       ) {
         check(`${tag}: stop ${now} reads a row's price outside the answer's days`, true, r.text ?? "");
@@ -832,6 +1009,7 @@ for (const pg of PAGES) {
 
     if (rows) await checkTroveEnd(page, tag, pg, rows, sl);
     if (lw) await checkLwSteps(page, tag, width < 640);
+    if (lw && width >= 640) await checkLwWheel(page, tag);
 
     // The value line is the one it was: the stops moved the cursor only.
     await sl.focus();

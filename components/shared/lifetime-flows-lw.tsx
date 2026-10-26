@@ -15,16 +15,20 @@
 //   the cursor's day close, the strip after it dimmed, the cursor's dots; the
 //   bars' window is shaded under the series. The library's crosshair is the
 //   faint hover only, hidden on touch.
-// - A drag never pans: the panel's slider takes the press and the drag. Wheel
-//   and pinch zoom; the range buttons (`LwRanges`) set the window; a cursor that
-//   leaves the window, by a step, a drag near an edge, a card's "View on chart"
-//   or a restored link, brings the window to it (`reveal`). Only the chart moves.
+// - A drag never pans: the panel's slider takes the press and the drag. The
+//   wheel scrolls the page (Miles, 26 Oct 2026): a pinch, Ctrl or ⌘ with the
+//   wheel (a trackpad's pinch arrives so), and Safari's gesture events zoom; a
+//   two-finger sideways swipe pans, and a gesture that starts upright stays the
+//   page's (`onWheel`). The range buttons (`LwRanges`) set the window; a cursor
+//   that leaves the window, by a step, a drag near an edge, a card's "View on
+//   chart" or a restored link, brings the window to it (`reveal`). Only the
+//   chart moves.
 // - The cursor stops on day closes; the grid is never finer than MIN_STEP.
 // - The price tip stands over the price pane, HTML placed at the cursor's x;
 //   the events row under the chart is the panel's drawing, on this axis
 //   (`onAxis`, sent again on every zoom, pan or resize).
-// - Attribution as on the asset pages: the logo where the library puts it, the
-//   NOTICE in the panel's source line (lw-chart-kit).
+// - No attribution on the chart: the site footer carries TradingView's on
+//   every page (Miles, 26 Oct 2026).
 // The library loads only once the charts are first shown.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -81,6 +85,11 @@ const SETTLE_MS = 200;
 /** A range change this long after the reader's last zoom was not theirs
  *  (the price axis widening): the window the chart last set is kept. */
 const USER_MS = 2500;
+/** Wheel events this close together are one gesture, which keeps the axis
+ *  its first event took. */
+const GESTURE_MS = 160;
+/** A wheel's zoom: one notch (100 px of delta) widens or narrows the window by this share. */
+const ZOOM_PER_NOTCH = 0.1;
 /** The chart's colours as site tokens: the panel's line hues (LINE_HUE), the
  *  liquidation red, the panel's ground for the strip after the cursor. */
 const COLORS = {
@@ -514,6 +523,9 @@ export function LifetimeFlowsLw({
   const boxH = VALUE_H + (hasPrice ? spacerH + PRICE_LINE_H + 2 : 0) + axisH;
 
   // The old-price tip of a dotted stretch under the mouse.
+  /** Where a dotted stretch of the price line touches a solid one: the days,
+   *  and how many of them the two series meet on (a cell both draw). */
+  const [meets, setMeets] = useState({ days: 0, met: 0 });
   const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
   const sampled = useRef<Record<string, (number | null)[]>>({});
   const hoverRef = useRef<(p: MouseEventParams<Time>) => void>(() => {});
@@ -556,7 +568,7 @@ export function LifetimeFlowsLw({
       autoSize: true,
       layout: {
         background: { type: lib.ColorType.Solid, color: "transparent" },
-        attributionLogo: true,
+        attributionLogo: false,
         fontSize: 10,
         panes: { enableResize: false },
       },
@@ -584,10 +596,11 @@ export function LifetimeFlowsLw({
           return `${stamp} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
         },
       },
-      // A drag is the cursor's (the panel's slider); wheel and pinch zoom.
-      handleScroll: { mouseWheel: true, pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: false },
+      // A drag is the cursor's (the panel's slider); the wheel is the page's
+      // and `onWheel` takes the zoom and the sideways pan; a pinch zooms.
+      handleScroll: { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: false },
       handleScale: {
-        mouseWheel: true,
+        mouseWheel: false,
         pinch: true,
         axisPressedMouseMove: { time: false, price: false },
         axisDoubleClickReset: false,
@@ -638,6 +651,19 @@ export function LifetimeFlowsLw({
         tickmarksFormatter: (vs: number[]) => priceAxisLabels(vs),
         minMove: 1e-8,
       };
+      // A flat stretch (a stablecoin in a zoomed window) is widened to ±1 %, as
+      // the strips' axis widens it, so its labels stay round.
+      const pxScale = {
+        priceFormat: px,
+        autoscaleInfoProvider: (base: () => { priceRange: { minValue: number; maxValue: number } | null } | null) => {
+          const r = base();
+          if (!r?.priceRange) return r;
+          const { minValue: lo, maxValue: hi } = r.priceRange;
+          if (hi - lo >= Math.abs(hi) * 1e-6) return r;
+          const d = Math.abs(hi) * 0.01 || 1;
+          return { ...r, priceRange: { minValue: lo - d, maxValue: hi + d } };
+        },
+      };
       // The tip's pane: a series with no values, its scale hidden.
       s.spacer = c.addSeries(
         lib.LineSeries,
@@ -650,8 +676,8 @@ export function LifetimeFlowsLw({
         },
         1,
       );
-      s.level = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 1, priceFormat: px }, 2);
-      s.price = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, priceFormat: px }, 2);
+      s.level = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 1, ...pxScale }, 2);
+      s.price = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, 2);
       s.priceDotted = c.addSeries(
         lib.LineSeries,
         {
@@ -659,11 +685,11 @@ export function LifetimeFlowsLw({
           lineWidth: 2,
           lineStyle: lib.LineStyle.SparseDotted,
           crosshairMarkerVisible: false,
-          priceFormat: px,
+          ...pxScale,
         },
         2,
       );
-      s.priceStep = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, priceFormat: px }, 2);
+      s.priceStep = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, 2);
       s.priceDots = c.addSeries(
         lib.LineSeries,
         {
@@ -672,7 +698,7 @@ export function LifetimeFlowsLw({
           pointMarkersVisible: true,
           pointMarkersRadius: 1.5,
           crosshairMarkerVisible: false,
-          priceFormat: px,
+          ...pxScale,
         },
         2,
       );
@@ -708,6 +734,7 @@ export function LifetimeFlowsLw({
         }
         const v = { from: cellTime(g, r.from), to: cellTime(g, r.to + 1) };
         view.current = v;
+        sendAxis();
         const w = c.timeScale().width();
         if (w > 0 && needsRegrid(g, v, boundsRef.current, w, MIN_STEP))
           setGrid(gridFor(v, boundsRef.current, w, MIN_STEP));
@@ -723,16 +750,74 @@ export function LifetimeFlowsLw({
     c.timeScale().subscribeSizeChange(onSize);
     const onHover = (p: MouseEventParams<Time>) => hoverRef.current(p);
     c.subscribeCrosshairMove(onHover);
-    // A zoom is the reader's: the wheel, or two fingers.
+    // A zoom is the reader's: Ctrl or ⌘ with the wheel, a sideways swipe, or two fingers.
     const touch = (e: Event) => {
-      if (e.type === "wheel" || ((e as TouchEvent).touches?.length ?? 0) > 1) touched.current = Date.now();
+      if (((e as TouchEvent).touches?.length ?? 0) > 1) touched.current = Date.now();
     };
+    /** The window moved by the reader: zoomed by `factor` about the plot's
+     *  x `px`, then shifted `shift` cells; held inside the axis and no
+     *  narrower than MIN_SPAN. */
+    const nudge = (factor: number, px: number, shift: number) => {
+      const g = gridRef.current;
+      const r = c.timeScale().getVisibleLogicalRange();
+      if (!g || !r) return;
+      touched.current = Date.now();
+      const b = boundsRef.current;
+      const lo = (b.t0 - g.start) / g.step;
+      const hi = (b.t1 - g.start) / g.step - 1;
+      const w0 = r.to - r.from;
+      const w = Math.min(hi - lo, Math.max(MIN_SPAN / g.step, w0 * factor));
+      const pw = c.timeScale().width() || 1;
+      const anchor = r.from + (Math.max(0, Math.min(pw, px)) / pw) * w0;
+      let from = anchor - (anchor - r.from) * (w / w0) + shift;
+      from = Math.max(lo, Math.min(from, hi - w));
+      c.timeScale().setVisibleLogicalRange({ from, to: from + w });
+    };
+    const plotX = (clientX: number) => clientX - el.getBoundingClientRect().left;
+    let gesture: { axis: "page" | "zoom" | "pan"; at: number } | null = null;
+    const onWheel = (e: WheelEvent) => {
+      const now = e.timeStamp;
+      const fresh = !gesture || now - gesture.at > GESTURE_MS;
+      const axis =
+        e.ctrlKey || e.metaKey
+          ? "zoom"
+          : fresh
+            ? Math.abs(e.deltaX) > Math.abs(e.deltaY)
+              ? "pan"
+              : "page"
+            : gesture!.axis === "zoom"
+              ? "page"
+              : gesture!.axis;
+      gesture = { axis, at: now };
+      if (axis === "page") return;
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? 120 : 1;
+      const r = c.timeScale().getVisibleLogicalRange();
+      const pw = c.timeScale().width() || 1;
+      if (axis === "zoom") {
+        const notches = Math.max(-1, Math.min(1, (e.deltaY * unit) / 100));
+        nudge((1 + ZOOM_PER_NOTCH) ** notches, plotX(e.clientX), 0);
+      } else if (r) nudge(1, 0, ((e.deltaX * unit) / pw) * (r.to - r.from));
+    };
+    // Safari's trackpad pinch: gesture events, each with the scale since its start.
+    let pinch = 1;
+    const onGesture = (e: Event) => {
+      const g = e as Event & { scale: number; clientX: number };
+      e.preventDefault();
+      if (e.type === "gesturestart") pinch = 1;
+      else if (g.scale > 0) {
+        nudge(pinch / g.scale, plotX(g.clientX), 0);
+        pinch = g.scale;
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    for (const e of ["gesturestart", "gesturechange"]) el.addEventListener(e, onGesture, { passive: false });
     // The hover crosshair is the mouse's: a touch hides it, a mouse brings it back.
     const onPointer = (e: PointerEvent) => {
       const mode = e.pointerType === "mouse" ? lib.CrosshairMode.Normal : lib.CrosshairMode.Hidden;
       c.applyOptions({ crosshair: { mode } });
     };
-    for (const e of ["wheel", "touchstart", "touchmove"]) el.addEventListener(e, touch, { passive: true });
+    for (const e of ["touchstart", "touchmove"]) el.addEventListener(e, touch, { passive: true });
     el.addEventListener("pointerdown", onPointer);
     el.addEventListener("pointermove", onPointer);
     chart.current = c;
@@ -742,7 +827,9 @@ export function LifetimeFlowsLw({
     setReady((n) => n + 1);
     return () => {
       if (timer) clearTimeout(timer);
-      for (const e of ["wheel", "touchstart", "touchmove"]) el.removeEventListener(e, touch);
+      for (const e of ["touchstart", "touchmove"]) el.removeEventListener(e, touch);
+      el.removeEventListener("wheel", onWheel);
+      for (const e of ["gesturestart", "gesturechange"]) el.removeEventListener(e, onGesture);
       el.removeEventListener("pointerdown", onPointer);
       el.removeEventListener("pointermove", onPointer);
       c.unsubscribeCrosshairMove(onHover);
@@ -847,6 +934,17 @@ export function LifetimeFlowsLw({
     }
     for (const [name, vals] of Object.entries(out)) series.current[name]?.setData(rows(vals, name.startsWith("area-")));
     sampled.current = out;
+    if (priceScale && out.price && out.priceDotted) {
+      const { solid, dotted } = priceScale.pieces;
+      const ends = (list: [number, number][][]) => new Set(list.flatMap((p) => [p[0][0], p[p.length - 1][0]]));
+      const a = ends(solid);
+      const touch = [...ends(dotted)].filter((d) => a.has(d));
+      const met = touch.filter((d) => {
+        const i = Math.round(logicalOf(grid, closeTs(d)));
+        return [i - 1, i, i + 1].some((j) => out.price[j] != null && out.priceDotted[j] != null);
+      }).length;
+      setMeets((m) => (m.days === touch.length && m.met === met ? m : { days: touch.length, met }));
+    }
     const end = grid.start + grid.count * grid.step;
     c.applyOptions({
       timeScale: {
@@ -869,7 +967,7 @@ export function LifetimeFlowsLw({
     sendAxis();
     // `sides` follows the lines.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grid, applyN, ready, valueLines, priceLines, bounds, sendAxis]);
+  }, [grid, applyN, ready, valueLines, priceLines, priceScale, bounds, sendAxis]);
 
   // The scrubber: the cursor's close, the dim after it, its dots, the window.
   useEffect(() => {
@@ -975,6 +1073,8 @@ export function LifetimeFlowsLw({
             data-price-grain={priced.grain}
             data-price-observed={priceScale.pieces.observed.join(",")}
             data-price-carried={priceScale.pieces.carried.join(",")}
+            data-price-dotted={priceScale.pieces.dotted.flatMap((p) => p.map((v) => v[0])).join(",")}
+            data-price-meets={`${meets.met}/${meets.days}`}
           />
         )}
         <span data-anatomy="F19.4">
