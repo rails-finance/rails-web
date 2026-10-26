@@ -116,10 +116,13 @@ export function parseVia(v: string | null | undefined): { id: string; market: st
 }
 
 /** How the page names the protocol: its one market or ilk where the line
- *  carries one ("Aave V3 Core", "Maker ETH-A"), else the explorer's label. */
-export function viaName(protocols: readonly string[] | undefined, label: string): string {
+ *  carries one ("Aave V3 Core", "Maker ETH-A", "Compound V3 cUSDCv3"), a
+ *  branch where the series name only the protocol ("Liquity V2's wstETH
+ *  branch"), else the explorer's label. */
+export function viaName(protocols: readonly string[] | undefined, label: string, market?: string | null): string {
   const one = [...new Set(protocols ?? [])];
-  return one.length === 1 ? one[0] : label;
+  if (one.length !== 1) return label;
+  return market && one[0] === label ? `${label}'s ${market} branch` : one[0];
 }
 
 /** "the price Aave V3 Core uses". */
@@ -154,7 +157,10 @@ export function viaPage(page: AssetPage, explorer: ViaExplorer): { page: AssetPa
   const c = page.chains[at];
   const usual = firstDrawn(c);
   const line = viaLineOf(c.lines, explorer.id, explorer.market);
-  const name = viaName(line ? lineExplorers(line, explorer.market)[explorer.id] : undefined, explorer.label);
+  const readers = line ? lineExplorers(line, explorer.market)[explorer.id] : undefined;
+  const narrowed =
+    explorer.market != null && line?.series.some((s) => marketOf(s.key) === explorer.market!.toLowerCase());
+  const name = viaName(readers, explorer.label, narrowed ? explorer.market : null);
   const lines = line ? [line, ...c.lines.filter((l) => l !== line)] : c.lines;
   const chains = [{ ...c, lines }, ...page.chains.filter((_, i) => i !== at)];
   return {

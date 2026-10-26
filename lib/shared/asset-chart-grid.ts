@@ -9,12 +9,6 @@
 // filled from detail reads of `/api/prices/rounds`, fetched in chunks of
 // CHUNK_CELLS cells with `max` = CHUNK_MAX. Pure, and imports nothing.
 
-/** The chart engine: Lightweight Charts, or with `?chart=classic` the
- *  Lifetime flows price chart and its rounds view, kept to compare the two
- *  until Miles rules (ui-jobs 234). */
-export type AssetChartEngine = "lightweight" | "classic";
-export const ASSET_CHART_ENGINE: AssetChartEngine = "lightweight";
-
 export const DAY_S = 86_400;
 
 /** The value in force at `ts` in ascending `[ts, value]` points, or null before the first. */

@@ -1586,34 +1586,7 @@ export function assetLwChartContent(symbol: string): LearnMoreContent {
       },
       {
         bold: "Stored rounds",
-        text: "from the marker on the main line, the lines are the oracle's rounds as stored; before it, the daily store's read of the oracle, a price per UTC day.",
-      },
-    ],
-  };
-}
-
-export function assetPriceChartContent(symbol: string): LearnMoreContent {
-  return {
-    title: "How to read the price chart",
-    intro: `${symbol}'s price from each feed a lending protocol reads on this chain, a point per UTC day, oldest at the left. Protocols reading one feed, directly or through a wrapper that only rescales it, share a line.`,
-    detailsHeading: "The parts:",
-    details: [
-      {
-        bold: "The coloured line",
-        text: "the main line, the one the most protocols read, until another is picked in the list at the tip's left.",
-      },
-      { bold: "The thin lines", text: "the other feeds, on the same axis." },
-      {
-        bold: "The cursor",
-        text: "press and drag the chart to move it; the tip shows the coloured line's price that day.",
-      },
-      {
-        bold: "The spread",
-        text: "under the chart, each line's deviation from the main line on the cursor's day. Where both lines read stored rounds they are compared at the same moment; before that, a day compares two lines only where both were read within ten minutes of each other, or one is a fixed price. A line more than 1 % from the main line names its largest gap, which puts the cursor there. A Maker line's gap is named with its cause: Maker prices from the median of an hour before.",
-      },
-      {
-        bold: "Stored rounds",
-        text: "from the day a line's stamp names, the line is the oracle's rounds as stored, each day at its close; before it, the daily store's read of the oracle. The switch over the chart opens the rounds alone, every change of each line's value, with the round, block and transaction behind the main line's.",
+        text: "the shaded span is the daily store's read of the oracle, a price per UTC day; after it, the lines are the oracle's rounds as stored.",
       },
     ],
   };

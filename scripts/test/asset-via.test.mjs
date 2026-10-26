@@ -77,6 +77,8 @@ test("the name: one market as the line names it, else the explorer", () => {
   assert.equal(viaName(["Aave V3 Core"], "Aave V3"), "Aave V3 Core");
   assert.equal(viaName(["Aave V3 Core", "Aave V3 Prime"], "Aave V3"), "Aave V3");
   assert.equal(viaName(undefined, "Morpho Blue"), "Morpho Blue");
+  assert.equal(viaName(["Liquity V2"], "Liquity V2", "wstETH"), "Liquity V2's wstETH branch");
+  assert.equal(viaName(["Compound V3 cUSDCv3"], "Compound V3", "0xc3d6"), "Compound V3 cUSDCv3");
 });
 
 test("via puts the explorer's chain first and its line first on it", () => {

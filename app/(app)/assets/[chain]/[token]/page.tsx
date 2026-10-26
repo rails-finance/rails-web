@@ -12,7 +12,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssetPriceChart } from "@/components/assets/asset-price-chart";
-import { ASSET_CHART_ENGINE } from "@/lib/shared/asset-chart-grid";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fetchAssetRosterServer } from "@/lib/api/fetch-asset-roster-server";
 import { assetHref, assetPage, chainName, chainOfSlug, pageLinks } from "@/lib/shared/asset-roster";
@@ -44,8 +43,6 @@ export default async function AssetPage({ params, searchParams }: { params: Para
   if (chain == null || !/^0x[0-9a-fA-F]{40}$/.test(token)) notFound();
   const explorer = viaExplorer(one(sp[VIA_PARAM]));
   const from = one(sp[FROM_PARAM]);
-  // `?chart=classic` draws the earlier chart, to compare the two (ui-jobs 234).
-  const engine = one(sp.chart) === "classic" ? "classic" : ASSET_CHART_ENGINE;
   const answer = await fetchAssetRosterServer(token);
   const opened = answer ? assetPage(answer, explorer?.chain ?? chain) : null;
   if (!opened) notFound();
@@ -100,7 +97,6 @@ export default async function AssetPage({ params, searchParams }: { params: Para
             section={c}
             symbol={page.symbol}
             via={view && c.chain === view.explorer.chain ? view : null}
-            engine={engine}
           />
         ))}
       </div>

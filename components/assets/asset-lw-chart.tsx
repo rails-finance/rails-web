@@ -8,23 +8,16 @@
 // double-click to reset. The lines are drawn on the uniform grid of
 // lib/shared/asset-chart-grid.ts, so the axis stays proportional to time;
 // zoomed in on stored rounds, the grid's cells read detail windows of
-// `/api/prices/rounds` (cached by step and chunk). The library loads with
+// `/api/prices/rounds` (cached by step and chunk). The span before the main
+// line's stored rounds, where it is the daily store, is shaded across both
+// panes (behind the transparent canvas). The library loads with
 // this component only (a dynamic import). Licence: Apache-2.0, the NOTICE
 // shown with the chart's source line and the attribution logo on.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  IChartApi,
-  ISeriesApi,
-  ISeriesMarkersPluginApi,
-  LineData,
-  Time,
-  UTCTimestamp,
-  WhitespaceData,
-} from "lightweight-charts";
+import type { IChartApi, ISeriesApi, LineData, Time, UTCTimestamp, WhitespaceData } from "lightweight-charts";
 import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
-import { legName, roundName } from "@/components/assets/asset-rounds-chart";
-import { roundTime } from "@/components/assets/round-time";
+import { legName, roundName, roundTime } from "@/components/assets/round-time";
 import { LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
@@ -329,7 +322,32 @@ export function AssetLwChart({
   const chart = useRef<IChartApi | null>(null);
   const priceSeries = useRef<ISeriesApi<"Line">[]>([]);
   const spreadSeries = useRef<ISeriesApi<"Line">[]>([]);
-  const markers = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  // The shade over the daily-only span: from the first stored day to where
+  // the main line's stored rounds start, placed on every range or size change.
+  const shade = useRef<HTMLDivElement>(null);
+  const joinTs = mainRounds?.from.ts ?? null;
+  const placeShade = useCallback(() => {
+    const el = shade.current;
+    const c = chart.current;
+    const g = gridRef.current;
+    if (!el) return;
+    const ts = c?.timeScale();
+    const x = (t: number) =>
+      ts && g
+        ? ts.timeToCoordinate(cellTime(g, Math.max(0, Math.min(g.count - 1, cellOf(g, t)))) as UTCTimestamp)
+        : null;
+    const left = Math.max(0, x(bounds.t0) ?? 0);
+    const right = Math.min(ts?.width() ?? 0, joinTs != null && joinTs > bounds.t0 ? (x(joinTs) ?? -1) : -1);
+    if (!ts || right <= left) {
+      el.style.width = "0px";
+      return;
+    }
+    el.style.left = `${left}px`;
+    el.style.width = `${right - left}px`;
+    el.style.height = `${Math.max(0, (box.current?.clientHeight ?? 0) - ts.height())}px`;
+  }, [bounds.t0, joinTs]);
+  const placeShadeRef = useRef(placeShade);
+  placeShadeRef.current = placeShade;
   const lineKey = lines.map((l) => l.line.id).join(",");
   const [ready, setReady] = useState(0);
   useEffect(() => {
@@ -412,7 +430,9 @@ export function AssetLwChart({
       pane?.setHeight(SPREAD_H);
       pane?.getHTMLElement()?.setAttribute("data-anatomy", "A3.6");
     }
-    markers.current = lib.createSeriesMarkers(m, []);
+    const onShade = () => placeShadeRef.current();
+    c.timeScale().subscribeVisibleLogicalRangeChange(onShade);
+    c.timeScale().subscribeSizeChange(onShade);
     c.subscribeCrosshairMove((param) => {
       const g = gridRef.current;
       // A crosshair the code placed (a gap's row) sets the cursor itself.
@@ -454,7 +474,8 @@ export function AssetLwChart({
     return () => {
       if (timer) clearTimeout(timer);
       for (const e of ["pointerdown", "wheel", "touchstart", "keydown"]) el.removeEventListener(e, touch);
-      markers.current = null;
+      c.timeScale().unsubscribeVisibleLogicalRangeChange(onShade);
+      c.timeScale().unsubscribeSizeChange(onShade);
       chart.current = null;
       priceSeries.current = [];
       spreadSeries.current = [];
@@ -516,22 +537,6 @@ export function AssetLwChart({
       const dev = sampleSpread(grid, tracks[0].track, tracks[i + 1].track, byDay(i));
       s.setData(rows(dev.map((d) => (d == null ? null : d * 100))));
     });
-    // The join: where the main line's stored rounds start.
-    const join = mainRounds?.from.ts;
-    const ji = join != null ? cellOf(grid, join) : -1;
-    markers.current?.setMarkers(
-      ji >= 0 && ji < grid.count && samples[0][ji] != null
-        ? [
-            {
-              time: times[ji],
-              position: "aboveBar",
-              shape: "arrowDown",
-              color: palette?.text ?? "gray",
-              id: "join",
-            },
-          ]
-        : [],
-    );
     const end = grid.start + grid.count * grid.step;
     c.applyOptions({
       timeScale: {
@@ -560,7 +565,8 @@ export function AssetLwChart({
       if (value != null) c.setCrosshairPosition(value, times[i], priceSeries.current[0]);
       setCursorTs(cellAt(grid, i));
     }
-  }, [grid, tracks, lib, ready, applyN, spreads, mainRounds, bounds, palette?.text]);
+    placeShade();
+  }, [grid, tracks, lib, ready, applyN, spreads, bounds, placeShade]);
 
   // Double-click (or double-tap) puts the opening window back.
   useEffect(() => {
@@ -707,10 +713,16 @@ export function AssetLwChart({
       </div>
       <div
         ref={box}
-        className="relative w-full"
+        className="relative isolate w-full"
         style={{ height: PRICE_H + (others.length ? SPREAD_H : 0) }}
         data-asset-lw-box=""
       >
+        <div
+          ref={shade}
+          aria-hidden
+          className="pointer-events-none absolute top-0 -z-10 w-0 bg-[var(--surface-sunken)] opacity-60"
+          data-asset-lw-shade={joinTs ?? ""}
+        />
         {!lib && <p className="py-6 text-center text-sm text-rb-500">Drawing the chart…</p>}
       </div>
       {spreads && (

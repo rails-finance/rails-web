@@ -378,16 +378,3 @@ export function joinRounds(series: PriceSeries, r: { rounds: PriceRounds; days: 
   const after = r.days.map((p): PricePoint => [p[0], p[1], p[2], src]);
   return { ...series, sources, points: [...before, ...after], rounds: r.rounds };
 }
-
-/** The rounds point in force at `ts`, or null before the first. */
-export function roundAt(rounds: PriceRounds, ts: number): RoundPricePoint | null {
-  const pts = rounds.points;
-  let lo = 0;
-  let hi = pts.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (pts[mid][0] <= ts) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo ? pts[lo - 1] : null;
-}

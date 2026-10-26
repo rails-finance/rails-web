@@ -261,7 +261,7 @@ function AssetPageRow({ chain, contract }: { chain: ChainId; contract: string })
       {row.oracle && (
         <p className="text-[11px] text-rb-500" title={row.oracle} data-asset-popover-via={row.viaLine ?? ""}>
           {via && row.viaLine === "own"
-            ? `${usesWords(viaName(row.by[row.viaKey ?? via.id], via.label)).replace(/^t/, "T")}: `
+            ? `${usesWords(viaName(row.by[row.viaKey ?? via.id], via.label, row.viaKey?.includes(":") ? via.market : null)).replace(/^t/, "T")}: `
             : via && row.viaLine === "none"
               ? `${via.label} has no stored price for it; the main line: `
               : ""}

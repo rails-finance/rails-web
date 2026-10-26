@@ -296,16 +296,6 @@ export interface CombinedFlowsProps {
   priceOnly?: boolean;
   /** A ledger's note while the cursor is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
-  /** Draw every series in `prices` on one axis, the picked one in its hue and
-   *  the others thin beneath it (an asset page's line per oracle). */
-  allLines?: boolean;
-  /** The price chart's "?" where the caller words it (an asset page). */
-  priceHelp?: LearnMoreContent;
-  /** The cursor's day (absolute UTC day) as it moves: an asset page's spread
-   *  strip reads it. */
-  onCursorDay?: (day: number) => void;
-  /** Puts the cursor on a day; `n` changes for each new request. */
-  jumpTo?: { day: number; n: number } | null;
   /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
    *  last stop, where no outline of today's length is drawn. */
   renderBars: (barStop: number, when: string, isLive: boolean, atLive: boolean) => ReactNode;
@@ -321,10 +311,6 @@ export function CombinedFlows({
   failed,
   priceOnly = false,
   onLedgerNote,
-  allLines = false,
-  priceHelp,
-  onCursorDay,
-  jumpTo,
   renderBars,
 }: CombinedFlowsProps) {
   // A cut restored from the address bar puts the cursor on its day, which
@@ -548,17 +534,8 @@ export function CombinedFlows({
   const span = axisSpanDays(startDay, today);
   const lineScale = useMemo(() => lineStripScale(model, series, hasDebt), [model, series, hasDebt]);
   const priceScales = useMemo(() => {
-    const scales = new Map(prices.map((p) => [p.key, priceStripScale(p, startDay, today)]));
-    if (!allLines || prices.length < 2) return scales;
-    // One axis for every line, so the lines stand where their prices are.
-    const axis = priceAxis(
-      [...scales.values()].flatMap(({ pieces: pc }) =>
-        [...pc.solid, ...pc.dotted, ...pc.flat, ...pc.riser].flat().map((v) => v[1]),
-      ),
-    );
-    const shared = { axis, labels: priceAxisLabels(axis.ticks) };
-    return new Map([...scales].map(([k, sc]) => [k, { ...sc, ...shared }]));
-  }, [prices, startDay, today, allLines]);
+    return new Map(prices.map((p) => [p.key, priceStripScale(p, startDay, today)]));
+  }, [prices, startDay, today]);
   const labelW = labelWidth([...lineScale.labels, ...[...priceScales.values()].flatMap((s) => s.labels)]);
   const geo = useMemo(() => stripGeometry(w, startDay, today, span, labelW), [w, startDay, today, span, labelW]);
   const xStop = (s: CombinedStop) => geo.xClose(s.live ? today : startDay + s.stop);
@@ -569,17 +546,6 @@ export function CombinedFlows({
   const cx = ready && atStop ? xStop(atStop) : STRIP_PAD + geo.inner;
   const dim = ready && atStop != null && !atStop.live;
   const cursorDay = cur.live ? today : startDay + cur.stop;
-  useEffect(() => {
-    onCursorDay?.(cursorDay);
-  }, [onCursorDay, cursorDay]);
-  const jumped = useRef<number | null>(null);
-  useEffect(() => {
-    if (!jumpTo || jumped.current === jumpTo.n) return;
-    const i = stopForDay(stops, jumpTo.day - startDay);
-    if (i == null) return;
-    jumped.current = jumpTo.n;
-    setAt(i);
-  }, [jumpTo, stops, startDay]);
   const cursorPrice = priced ? (priceReadout(priced, cursorDay, model.gapDays)?.point[1] ?? null) : null;
   const cursorLevel = priced ? (levelAt(priced, cursorDay)?.[1] ?? null) : null;
   const sliderLabel = `Date, by ${(series?.bin ?? "week") === "day" ? "day" : `${series?.bin ?? "week"} and by day with events`}: moves the headlines and the bars`;
@@ -665,8 +631,7 @@ export function CombinedFlows({
     : null;
   const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
   const stackHelp = lifetimeFlowsStackContent({ events: marks, charts: { value: true, price: priceBrief } });
-  const priceOnlyHelp =
-    priceHelp ?? lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
+  const priceOnlyHelp = lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
 
   const barsBlock = (
     <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
@@ -799,13 +764,6 @@ export function CombinedFlows({
                         <PriceStrip
                           s={priced}
                           scale={priceScales.get(priced.key)!}
-                          others={
-                            allLines
-                              ? prices
-                                  .filter((p) => p.key !== priced.key)
-                                  .map((p) => ({ key: p.key, pieces: priceScales.get(p.key)!.pieces }))
-                              : []
-                          }
                           geo={geo}
                           w={w}
                           today={today}
@@ -1422,7 +1380,6 @@ type PriceScale = ReturnType<typeof priceStripScale>;
 function PriceStrip({
   s,
   scale,
-  others,
   geo,
   w,
   today,
@@ -1435,8 +1392,6 @@ function PriceStrip({
 }: {
   s: FlowPriceSeries;
   scale: PriceScale;
-  /** The other lines, thin and muted under this one, on its axis. */
-  others: { key: string; pieces: PriceScale["pieces"] }[];
   geo: StripGeometry;
   w: number;
   today: number;
@@ -1496,26 +1451,6 @@ function PriceStrip({
             data-flow-gridline=""
           />
         ))}
-        {others.length > 0 && (
-          <g data-anatomy="F19.9">
-            {others.map((o) => (
-              <g key={o.key} data-price-other-line={o.key}>
-                {[...o.pieces.solid, ...o.pieces.dotted, ...o.pieces.flat]
-                  .filter((p) => p.length > 1)
-                  .map((p) => (
-                    <path
-                      key={`o${p[0][0]}`}
-                      d={path(p)}
-                      fill="none"
-                      className="stroke-rb-400/60 dark:stroke-rb-500/60"
-                      strokeWidth={1}
-                      strokeLinejoin="round"
-                    />
-                  ))}
-              </g>
-            ))}
-          </g>
-        )}
         <g
           data-price-line={s.key}
           data-price-grain={s.grain}
@@ -1884,11 +1819,6 @@ function AssetPicker({
         data-price-picker=""
       >
         <AssetIcon s={selected} />
-        {selected.tag && (
-          <span className="px-0.5 font-mono font-normal" data-price-line-tag="">
-            {selected.tag}
-          </span>
-        )}
         <ChevronDown size={12} aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (

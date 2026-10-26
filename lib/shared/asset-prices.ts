@@ -285,9 +285,12 @@ export function rowFor(
   if (!row) return null;
   const there = row.chain === chain ? null : row.elsewhere?.find((e) => e.chain === chain && e.key != null);
   const base = there ? { ...row, ...there } : row;
-  if (!via) return base;
-  // A market no line carries reads as its explorer, as on the page.
-  const key = base.by?.[via] || base.picks?.[via] != null ? via : (parseVia(via)?.id ?? via);
+  const v = parseVia(via);
+  if (!via || !v) return base;
+  // The series keys' markets are lower case (`liquity:wsteth`); a market no
+  // line carries reads as its explorer, as on the page.
+  const named = v.market ? `${v.id}:${v.market.toLowerCase()}` : v.id;
+  const key = base.by?.[named] || base.picks?.[named] != null ? named : v.id;
   const i = base.picks?.[key];
   const alt = i != null ? base.alt?.[i] : undefined;
   if (alt && alt.price != null) return { ...base, ...alt, viaLine: "own", viaKey: key };

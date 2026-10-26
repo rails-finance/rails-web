@@ -52,8 +52,6 @@ export interface FlowPriceSeries extends PriceSeries {
   /** The line's name where the list holds several lines of one asset (an
    *  asset page's oracles): the picker names it rather than the symbol. */
   name?: string;
-  /** Its short form for the picker's button (an oracle's address). */
-  tag?: string;
 }
 
 /** The price series a panel's timeline carries: the health factor where it

@@ -7,7 +7,8 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { AssetPriceRow } from "@/components/assets/asset-price-row";
+import { AssetPriceRow, asOfMark, asOfWords } from "@/components/assets/asset-price-row";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { ASSET_CATEGORY_LABELS, ASSET_CATEGORY_ORDER, type AssetCategory } from "@/lib/shared/asset-categories";
@@ -15,6 +16,7 @@ import {
   CARD_SORTS,
   sortCards,
   type AssetCard,
+  type CardFigure,
   type CardLink,
   type CardSort,
   type ExplorerState,
@@ -151,6 +153,30 @@ function RelLinks({ label, links: all }: { label: string; links: CardLink[] }) {
   );
 }
 
+/** A card without a price's figure: "Supply 12.3M ZCHF 10:41 UTC", "Trove debt 38.2M BOLD". */
+function FigureRow({ figure: f }: { figure: CardFigure }) {
+  const n = formatCompactTitled(f.amount);
+  const title = `${f.title}${f.asOf ? `, ${asOfWords(f.asOf)}` : ""}: ${n.title} ${f.unit}`;
+  return (
+    <p
+      className="flex items-baseline gap-1.5 text-sm tabular-nums"
+      title={title}
+      data-asset-card-figure={f.label}
+      data-anatomy="A5.11"
+    >
+      <span className="text-xs text-rb-500">{f.label}</span>
+      <span className="font-semibold text-foreground">
+        {n.display} {f.unit}
+      </span>
+      {f.asOf && (
+        <span className="text-[11px] text-rb-500" data-asset-card-figure-as-of={f.asOf.block}>
+          {asOfMark(f.asOf)}
+        </span>
+      )}
+    </p>
+  );
+}
+
 function AssetCardView({ card }: { card: AssetCard }) {
   const many = card.chains.length > 1;
   const wraps = card.wrapped.filter((w) => w.kind === "wraps");
@@ -207,9 +233,12 @@ function AssetCardView({ card }: { card: AssetCard }) {
       {card.row ? (
         <AssetPriceRow row={card.row} as="div" />
       ) : (
-        <p className="text-xs text-rb-500" data-asset-priceless="" data-anatomy="A5.10">
-          {PRICELESS_WHY}
-        </p>
+        <>
+          {card.figure && <FigureRow figure={card.figure} />}
+          <p className="text-xs text-rb-500" data-asset-priceless="" data-anatomy="A5.10">
+            {PRICELESS_WHY}
+          </p>
+        </>
       )}
       {card.underlying && (
         <RelLinks label={card.underlying.kind === "rate" ? "Priced from" : "Wraps"} links={[card.underlying]} />

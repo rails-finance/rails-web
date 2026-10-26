@@ -9,7 +9,9 @@
 // tokens carry on one chain (KNC's two contracts, Maker's UNI-V2 ilks) stays
 // two cards, each named with its short address. A token an explorer lists by
 // symbol that the roster does not price has a card of chips alone, with the
-// line saying why there is no price (Miles, 26 Oct 2026).
+// line saying why there is no price (Miles, 26 Oct 2026), and where Rails
+// reads or stores one, its figure: ZCHF's supply, a Liquity V2-family
+// stablecoin's trove debt (lib/api/asset-card-figures.ts).
 //
 // Pure: the server builds the cards, the page's client island filters them.
 
@@ -54,6 +56,19 @@ export interface ListedRef {
 /** Why a card has no price figures. */
 export const PRICELESS_WHY = "No price: no oracle Rails stores prices it.";
 
+/** A card without a price's figure: ZCHF's supply, a Liquity V2-family
+ *  stablecoin's trove debt. */
+export interface CardFigure {
+  label: "Supply" | "Trove debt";
+  amount: number;
+  /** The token's symbol, the figure's unit. */
+  unit: string;
+  /** Where the figure is a read at head: its block and time. */
+  asOf: { block: number; ts: number } | null;
+  /** The figure in a sentence, for its title. */
+  title: string;
+}
+
 export interface CardLink {
   symbol: string;
   chain: number;
@@ -70,6 +85,8 @@ export interface AssetCard {
   /** The Prices-list row of the card's first page; null for a token the
    *  roster does not price. */
   row: AssetPriceRow | null;
+  /** On a card without a price, the figure Rails reads or stores for it. */
+  figure: CardFigure | null;
   chains: CardChain[];
   chips: AssetChip[];
   /** What it wraps or is priced from, and what wraps it or is priced from it. */
@@ -92,6 +109,7 @@ export function assetCards(
   links: Map<string, { underlying: RosterLinkRef | null; wrapped: RosterLinkRef[] }>,
   chips: Map<string, AssetChip[]>,
   listed: readonly ListedRef[] = [],
+  figures: ReadonlyMap<string, CardFigure> = new Map(),
   wrappers: "own" | "merged" = WRAPPER_CARDS,
 ): AssetCard[] {
   const chipsOf = (chains: CardChain[]) => {
@@ -109,6 +127,7 @@ export function assetCards(
       short: null,
       category: assetCategory(row.symbol),
       row,
+      figure: null,
       chains,
       chips: [],
       underlying: l?.underlying ? link(l.underlying) : null,
@@ -151,6 +170,7 @@ export function assetCards(
       short: null,
       category: assetCategory(t.symbol),
       row: null,
+      figure: figures.get(`${t.chain}:${t.token}`) ?? null,
       chains: [{ chain: t.chain, token: t.token, href: null }],
       chips: [],
       underlying: null,
