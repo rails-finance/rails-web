@@ -152,7 +152,7 @@ export const logicalOf = (g: Grid, ts: number) => (ts - g.start) / g.step - 1;
  *  broken, to the one out of it). Null before the first vertex, after the
  *  last, on a segment touching a null vertex, and on a segment `keep` refuses;
  *  `pad` widens each kept run by a cell either side, so a dotted piece drawn
- *  as its own series meets the solid line it interrupts. */
+ *  as a second series meets the solid line it interrupts. */
 export function sampleJoined(
   g: Grid,
   verts: readonly (readonly [number, number | null])[],

@@ -212,7 +212,7 @@ export function FlowPip({
 }
 
 /** The chart on Lightweight Charts, its code fetched only where a family
- *  draws on it (and the library itself only once the charts are shown). */
+ *  draws on it (and the library only once the charts are shown). */
 const LifetimeFlowsLw = dynamic(() => import("@/components/shared/lifetime-flows-lw").then((m) => m.LifetimeFlowsLw), {
   ssr: false,
   loading: () => <div style={{ height: LW_LOADING_H }} />,

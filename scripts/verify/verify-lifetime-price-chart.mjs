@@ -91,7 +91,7 @@ const PAGES = [
 ];
 
 const DAY = 86_400;
-/** The slider the price chart is read through: its own strip, or the one chart. */
+/** The slider the price chart is read through: the price strip, or the one chart. */
 const PRICE_STRIP = '[data-flow-strip-view="price"], [data-flow-strip-view="chart"]';
 
 /** The price tip's words for a reader: its text (the level's mark carries

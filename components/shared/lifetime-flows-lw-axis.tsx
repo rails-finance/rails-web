@@ -1,7 +1,7 @@
 "use client";
 
 // The Lifetime flows chart's axis as the panel's HTML reads it, and the parts
-// of the chart engine the panel draws itself (rails-ops
+// of the chart engine the panel draws (rails-ops
 // reference/lifetime-flows-scrubber.md, "The chart engine"): the range
 // buttons and the pointer's nearest stop. Kept apart from the chart
 // (components/shared/lifetime-flows-lw.tsx), whose code the panel fetches
