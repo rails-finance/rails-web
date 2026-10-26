@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePriceStripActive } from "@/components/shared/price-strip";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
+import { LwNotice } from "@/components/shared/lw-attribution";
 
 /** Slim app footer used on protocol pages (/liquity-v2, /trove/*).
  *  Single row: copyright + legal on the left, the shared feedback cluster
@@ -36,6 +37,10 @@ export function AppFooter() {
               inline variant: no heading, ask + pill on one row in small text. */}
           <FeedbackCluster variant="inline" />
         </div>
+        {/* The charts' attribution (Lightweight Charts' licence), on every page. */}
+        <p className="mt-4 text-center text-[11px] text-rb-500 md:text-left" data-lw-attribution="" data-anatomy="H8.2">
+          <LwNotice />
+        </p>
       </div>
     </footer>
   );

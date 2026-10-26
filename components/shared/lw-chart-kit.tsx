@@ -3,11 +3,11 @@
 // What every chart on TradingView's Lightweight Charts shares (rails-ops
 // reference/asset-key-map.md, "The chart engine"): the library loaded by a
 // dynamic import, client only, so it lands in no route's first-load bundle;
-// the site's tokens read as canvas colours, again on a theme change; the time
-// axis's UTC labels; and the attribution the licence asks for (Apache-2.0: the
-// NOTICE word for word with a link, and the `attributionLogo` layout option
-// on). The asset chart (components/assets/asset-lw-chart.tsx) and the
-// Lifetime flows charts (components/shared/lifetime-flows-lw.tsx) take it.
+// the site's tokens read as canvas colours, again on a theme change; and the
+// time axis's UTC labels. The attribution the licence asks for (Apache-2.0)
+// is in the site's footers (components/shared/lw-attribution.tsx). The asset
+// chart (components/assets/asset-lw-chart.tsx) and the Lifetime flows charts
+// (components/shared/lifetime-flows-lw.tsx) take it.
 
 import { useEffect, useState } from "react";
 import type { Time } from "lightweight-charts";
@@ -15,22 +15,7 @@ import { monthShort } from "@/lib/date";
 
 export type LwLib = typeof import("lightweight-charts");
 
-/** The NOTICE file of tradingview/lightweight-charts at v5.2.1, word for word (its
- *  "(с)" is a Cyrillic es, U+0441, kept as the file has it). */
-export const LW_NOTICE = "TradingView Lightweight Charts™ Copyright (с) 2025 TradingView, Inc.";
-export const LW_NOTICE_URL = "https://www.tradingview.com/";
-
-/** The NOTICE and its link, at the end of a chart's source line. */
-export function LwNotice() {
-  return (
-    <span data-asset-lw-notice="">
-      {LW_NOTICE}{" "}
-      <a href={LW_NOTICE_URL} target="_blank" rel="noreferrer" className="hover:underline">
-        {LW_NOTICE_URL}
-      </a>
-    </span>
-  );
-}
+export { LwNotice } from "@/components/shared/lw-attribution";
 
 /** The library, once its chunk is in; null until then, and not fetched
  *  until `wanted` (a chart hidden until a reader opens it). */

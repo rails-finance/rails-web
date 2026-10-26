@@ -1564,10 +1564,17 @@ export function assetLwChartContent(symbol: string): LearnMoreContent {
     detailsHeading: "The parts:",
     details: [
       {
-        bold: "The coloured line",
+        bold: "The thick blue line",
         text: "the main line: the one the most protocols read, or, opened from a protocol, the one that protocol reads.",
       },
-      { bold: "The thin lines", text: "the other feeds, on the same axis." },
+      {
+        bold: "The thin lines",
+        text: "the other feeds, on the same axis, each in the colour of its key over the chart (dashed where the colours run out).",
+      },
+      {
+        bold: "Picking a line out",
+        text: "point at a row over the chart or under it, or at a line, to light that line in both panes; click or tap a row to hide its line or show it again, and the price axis rescales to the lines shown.",
+      },
       {
         bold: "Steps",
         text: "a price holds until the next round, or before the stored rounds until the next day's read, so each line moves in steps.",

@@ -253,6 +253,14 @@
   --rb-text-500: oklch(0.2528 calc(0.0204 * var(--paper-chroma)) var(--paper-hue));
 
   --rb-chart-grid: oklch(0.8979 calc(0.0183 * var(--paper-chroma)) var(--paper-hue));
+  /* A chart's other lines (lib/shared/chart-series-style.ts): four categorical
+     hues beside the main line's blue-500, validated together all-pairs with
+     the dataviz method on the light canvas (#fff) and the dark (#14161e);
+     dark mode steps violet down to 600. */
+  --chart-series-1: var(--color-teal-600);
+  --chart-series-2: var(--color-violet-700);
+  --chart-series-3: var(--color-pink-700);
+  --chart-series-4: var(--color-yellow-700);
   --rb-tooltip-bg: oklch(0.991 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
   --rb-tooltip-border: oklch(0.9159 calc(0.0154 * var(--paper-chroma)) var(--paper-hue));
 
@@ -332,6 +340,7 @@
   --rb-text-500: #dde1e8;
 
   --rb-chart-grid: #14161e;
+  --chart-series-2: var(--color-violet-600);
   --rb-tooltip-bg: #050507;
   --rb-tooltip-border: #14161e;
 

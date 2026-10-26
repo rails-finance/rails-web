@@ -162,6 +162,7 @@ export function AssetPriceChart({
             spreads={spreads}
             help={lwHelp}
             joinNote={joinDay != null ? joinText(roundLines, prices.length, joinDay) : null}
+            usual={via?.usualId ?? null}
           />
         ) : (
           <p className="py-6 text-center text-sm text-rb-500" data-asset-chart-state={failed ? "failed" : "loading"}>
