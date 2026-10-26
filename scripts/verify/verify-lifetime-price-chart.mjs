@@ -42,6 +42,15 @@
 //   - on the liquidated Trove the last stop reads the close day, and the
 //     price line draws no day after it (ruling 14).
 //
+// The chart engine (ui-jobs 328 step 4c): the Liquity family draws on
+// Lightweight Charts, one canvas for the value line and the price chart, one
+// slider over it (`data-flow-strip-view="chart"`, its panes named by
+// `data-flow-chart-panes`); a canvas leaves nothing in the DOM to read, so the
+// page sets the drawn days and lines as data hooks (`[data-flow-lw-hooks]`:
+// `data-price-line`, `data-liq-level`, `data-flow-value-line`). Aave V3 keeps
+// the drawn strips, read as before. On the new engine the checks add: the
+// time axis is drawn and the NOTICE stands under the chart.
+//
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
 
 import { chromium } from "playwright";
@@ -82,6 +91,8 @@ const PAGES = [
 ];
 
 const DAY = 86_400;
+/** The slider the price chart is read through: its own strip, or the one chart. */
+const PRICE_STRIP = '[data-flow-strip-view="price"], [data-flow-strip-view="chart"]';
 
 /** The price tip's words for a reader: its text (the level's mark carries
  *  "Liquidates at" / "Liquidates below" for a screen reader) and the picker's
@@ -118,7 +129,7 @@ async function checkHealth(page, tag, pg, listedAll) {
     `${BASE}/api/aave-v3/timeline?wallet=${wallet}&market=${u.searchParams.get("market")}&limit=1000`,
   ).then((r) => r.json());
   const blocks = new Set((tl.events ?? []).map((e) => e.blockNumber));
-  const sl = page.locator('[data-flow-strip-view="price"]').first();
+  const sl = page.locator(PRICE_STRIP).first();
   await sl.focus();
   await page.keyboard.press("End");
   await page.waitForTimeout(200);
@@ -500,10 +511,19 @@ for (const pg of PAGES) {
       } catch {}
     });
     await page.goto(`${BASE}${pg.path}`, { waitUntil: "domcontentloaded", timeout: 240000 });
-    await page.waitForSelector("[data-flows-combined] [data-flow-strip] svg", { timeout: 180000 }).catch(() => {});
+    await page
+      .waitForSelector("[data-flows-combined] [data-flow-strip] svg, [data-flows-combined] [data-flow-lw-box] canvas", {
+        timeout: 180000,
+      })
+      .catch(() => {});
     await page.waitForTimeout(2500);
+    // The drawn strips name their views; the chart names its panes.
     const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
-      els.map((e) => e.getAttribute("data-flow-strip-view")),
+      els.flatMap((e) =>
+        e.getAttribute("data-flow-strip-view") === "chart"
+          ? (e.querySelector("[data-flow-chart-panes]")?.getAttribute("data-flow-chart-panes") ?? "").split(",")
+          : [e.getAttribute("data-flow-strip-view")],
+      ),
     );
     if (
       !check(`${tag}: the value line and the price chart stand stacked`, views.join() === "value,price", views.join())
@@ -511,7 +531,21 @@ for (const pg of PAGES) {
       await ctx.close();
       continue;
     }
-    const PRICE = '[data-flow-strip-view="price"]';
+    const lw = (await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").count()) > 0;
+    if (lw) {
+      const drawn = await page.evaluate(() => ({
+        canvases: document.querySelectorAll("[data-flow-lw-box] canvas").length,
+        notice: document.querySelector("[data-flow-lw-notice]")?.textContent ?? "",
+      }));
+      check(
+        `${tag}: the chart draws on Lightweight Charts with its time axis, the NOTICE under it`,
+        drawn.canvases > 0 &&
+          drawn.notice.includes("TradingView Lightweight Charts") &&
+          drawn.notice.includes("https://www.tradingview.com/"),
+        JSON.stringify(drawn),
+      );
+    }
+    const PRICE = PRICE_STRIP;
     await page.locator(PRICE).scrollIntoViewIfNeeded();
     if (!body) {
       // The answer was read before the listener saw it: read it as the page does.
@@ -524,9 +558,16 @@ for (const pg of PAGES) {
     }
     const series = answerSeries(pg.answer, body, pg.path.split("/")[4]);
 
+    // The value line as drawn: the strip's paths, or the chart's hook.
     const valueLine = () =>
-      page.$$eval('[data-flows-combined] [data-flow-strip-view="value"] svg path', (ps) =>
-        ps.map((p) => p.getAttribute("d")).join("|"),
+      page.evaluate(
+        () =>
+          document
+            .querySelector("[data-flows-combined] [data-flow-value-line]")
+            ?.getAttribute("data-flow-value-line") ??
+          [...document.querySelectorAll('[data-flows-combined] [data-flow-strip-view="value"] svg path')]
+            .map((p) => p.getAttribute("d"))
+            .join("|"),
       );
     const pips = () =>
       page.$$eval("[data-flows-combined] [data-flow-pips]", (rows) =>

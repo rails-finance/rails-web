@@ -11,7 +11,7 @@
 
 import { Clock } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import type { oldPriceAt } from "@/lib/shared/flows-timeline";
+import { oldPriceAt, unsureAt, type FlowModel } from "@/lib/shared/flows-timeline";
 
 const WORDS = ["Old price", "Repriced"] as const;
 
@@ -57,4 +57,15 @@ export function OldPriceLabel({ note }: { note: ReturnType<typeof oldPriceAt> })
       )}
     </span>
   );
+}
+
+/** A dotted stretch's tip on the value line, for one side at a stop: the
+ *  old-price line once (left out where a reason already names each asset it
+ *  names), then what the side rests on that the page could not read. */
+export function oldLineTip(model: FlowModel, stop: number, side: "collateral" | "debt"): string[] {
+  const held = unsureAt(model, stop, side).held;
+  const old = oldPriceAt(model, stop)?.lines ?? [];
+  const stale = (model.stale.get(stop) ?? []).filter((x) => x.side === side);
+  const named = stale.length > 0 && stale.every((x) => held.some((h) => h.startsWith(`${x.symbol} `)));
+  return [...(named ? old.slice(0, old.length - 1) : old), ...held];
 }

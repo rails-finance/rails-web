@@ -20,8 +20,9 @@ import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
 import { legName, roundName, roundTime } from "@/components/assets/round-time";
 import { LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { LwNotice, lwTickLabel, useLwColors, useLwLib } from "@/components/shared/lw-chart-kit";
 import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-rounds";
-import { formatDate, monthShort } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatPrice } from "@/lib/shared/flows-price";
 import { lineReaders, type PageLine } from "@/lib/shared/asset-roster";
@@ -44,13 +45,6 @@ import {
   type Track,
 } from "@/lib/shared/asset-chart-grid";
 import { opensOnRounds, type PriceSeries, type RoundPricePoint } from "@/lib/shared/price-series";
-
-type Lib = typeof import("lightweight-charts");
-
-/** The NOTICE file of tradingview/lightweight-charts at v5.2.1, word for word (its
- *  "(с)" is a Cyrillic es, U+0441, kept as the file has it). */
-const NOTICE = "TradingView Lightweight Charts\u2122 Copyright (\u0441) 2025 TradingView, Inc.";
-const NOTICE_URL = "https://www.tradingview.com/";
 
 const RANGES = [
   ["1D", DAY_S],
@@ -75,71 +69,15 @@ export interface LwLine {
   series: PriceSeries;
 }
 
-interface Palette {
-  main: string;
-  thin: string;
-  text: string;
-  grid: string;
-  cross: string;
-  caution: string;
-  font: string;
-}
-
-/** A site token as an rgba() string the canvas takes (the tokens are oklch in light mode). */
-function tokenColor(probe: HTMLElement, ctx: CanvasRenderingContext2D, value: string, alpha = 1): string {
-  probe.style.color = value;
-  ctx.clearRect(0, 0, 1, 1);
-  ctx.fillStyle = getComputedStyle(probe).color;
-  ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-  return `rgba(${r}, ${g}, ${b}, ${((a / 255) * alpha).toFixed(3)})`;
-}
-
-function readPalette(el: HTMLElement): Palette {
-  const probe = document.createElement("span");
-  probe.style.display = "none";
-  el.appendChild(probe);
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 1;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-  const c = (v: string, a?: number) => tokenColor(probe, ctx, v, a);
-  const out = {
-    main: c(LINE_HUE.collateral),
-    thin: c("var(--rb-500)", 0.6),
-    text: c("var(--rb-500)"),
-    grid: c("var(--rb-chart-grid)", 0.7),
-    cross: c("var(--rb-500)", 0.8),
-    caution: c("var(--caution)", 0.8),
-    font: getComputedStyle(el).fontFamily,
-  };
-  probe.remove();
-  return out;
-}
-
-/** The theme's colours, read again when the root's class changes (next-themes). */
-function usePalette(ref: React.RefObject<HTMLElement | null>): Palette | null {
-  const [p, setP] = useState<Palette | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const read = () => setP(readPalette(el));
-    read();
-    const mo = new MutationObserver(read);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
-    return () => mo.disconnect();
-  }, [ref]);
-  return p;
-}
-
-const pad = (n: number) => String(n).padStart(2, "0");
-/** The axis's labels, in UTC: "2026", "Oct", "25 Oct", "10:02". */
-function tickLabel(t: Time, type: number): string {
-  const d = new Date((t as number) * 1000);
-  if (type === 0) return String(d.getUTCFullYear());
-  if (type === 1) return monthShort(d.getUTCMonth());
-  if (type === 2) return `${d.getUTCDate()} ${monthShort(d.getUTCMonth())}`;
-  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-}
+/** The chart's colours, as site tokens (lw-chart-kit reads them for the canvas). */
+const PALETTE = {
+  main: [LINE_HUE.collateral],
+  thin: ["var(--rb-500)", 0.6],
+  text: ["var(--rb-500)"],
+  grid: ["var(--rb-chart-grid)", 0.7],
+  cross: ["var(--rb-500)", 0.8],
+  caution: ["var(--caution)", 0.8],
+} as const;
 
 /** The price axis's labels, with the decimals their spacing needs ("$0.99995" beside "$1.00000"). */
 function usdTicks(prices: number[]): string[] {
@@ -176,15 +114,8 @@ export function AssetLwChart({
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  const palette = usePalette(wrap);
-  const [lib, setLib] = useState<Lib | null>(null);
-  useEffect(() => {
-    let on = true;
-    import("lightweight-charts").then((m) => on && setLib(m)).catch(() => {});
-    return () => {
-      on = false;
-    };
-  }, []);
+  const palette = useLwColors(wrap, PALETTE);
+  const lib = useLwLib();
 
   const main = lines[0];
   const others = lines.slice(1);
@@ -364,7 +295,7 @@ export function AssetLwChart({
         lockVisibleTimeRangeOnResize: true,
         minBarSpacing: 0.05,
         maxBarSpacing: 60,
-        tickMarkFormatter: (t: Time, type: number) => tickLabel(t, type),
+        tickMarkFormatter: (t: Time, type: number) => lwTickLabel(t, type),
       },
       localization: {
         locale: "en-GB",
@@ -738,12 +669,7 @@ export function AssetLwChart({
       )}
       <p className="mt-2 text-xs text-rb-500" data-asset-chart-source="">
         {joinNote ? `${joinNote} ` : ""}
-        <span data-asset-lw-notice="">
-          {NOTICE}{" "}
-          <a href={NOTICE_URL} target="_blank" rel="noreferrer" className="hover:underline">
-            {NOTICE_URL}
-          </a>
-        </span>
+        <LwNotice />
       </p>
     </div>
   );

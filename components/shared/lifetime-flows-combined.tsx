@@ -71,13 +71,20 @@ import {
   formatFlowUsd,
   oldPriceAt,
   partialAt,
-  unsureAt,
   type FlowModel,
   type FlowTick,
   tickRank,
   type FlowSide,
 } from "@/lib/shared/flows-timeline";
-import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
+import { OldPriceLabel, OldPriceTip, oldLineTip } from "@/components/shared/flow-old-price";
+import {
+  LifetimeFlowsLw,
+  LwRanges,
+  nearestStopAt,
+  type FlowsLwApi,
+  type FlowsLwAxis,
+} from "@/components/shared/lifetime-flows-lw";
+import { LwNotice } from "@/components/shared/lw-chart-kit";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import {
@@ -273,7 +280,15 @@ export const FlowsCompactContext = createContext<{
   toggle: null,
 });
 
+/** The chart engine the panel draws its value line and price chart with
+ *  (ui-jobs 328 step 4c): the drawn strips ("svg"), or Lightweight Charts
+ *  ("lw"), chosen per family by the panel (`flowsEngineFor`). */
+export type FlowsEngine = "svg" | "lw";
+export const FlowsEngineContext = createContext<FlowsEngine>("svg");
+
 const STRIP_H = 80;
+/** A drag this close to an end of a chart that pans keeps stepping on. */
+const EDGE_PX = 20;
 /** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
 const OLD_TIP_W = 282;
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
@@ -346,6 +361,11 @@ export function CombinedFlows({
   // Collapsed, the charts hide; the bars, the events and the steps keep
   // the cursor.
   const { compact, toggle: viewToggle } = useContext(FlowsCompactContext);
+  // The chart engine: Lightweight Charts where the panel chooses it, for a
+  // panel with the events row and one unit across both sides.
+  const lwOn = useContext(FlowsEngineContext) === "lw" && !priceOnly && !model.sideUnits;
+  const [lwAxis, setLwAxis] = useState<FlowsLwAxis | null>(null);
+  const lwApi = useRef<FlowsLwApi | null>(null);
 
   // On a page that ties the panel to its timeline, the day is the unit the
   // two share. A click on the strip freezes the cursor on a day; the chart and
@@ -538,7 +558,13 @@ export function CombinedFlows({
   }, [prices, startDay, today]);
   const labelW = labelWidth([...lineScale.labels, ...[...priceScales.values()].flatMap((s) => s.labels)]);
   const geo = useMemo(() => stripGeometry(w, startDay, today, span, labelW), [w, startDay, today, span, labelW]);
-  const xStop = (s: CombinedStop) => geo.xClose(s.live ? today : startDay + s.stop);
+  // On Lightweight Charts, while the charts are shown, the HTML under and
+  // over the chart (the events row, the tips, the stems) takes the chart's
+  // axis, which zooms and pans; collapsed, the whole life's.
+  const chartAxis = lwOn && !compact ? lwAxis : null;
+  const xClose = (day: number) => (chartAxis ? chartAxis.xClose(day) : geo.xClose(Math.min(day, today)));
+  const rowW = chartAxis ? chartAxis.plotW : w;
+  const xStop = (s: CombinedStop) => xClose(s.live ? today : startDay + s.stop);
   const atStop = stops[Math.min(at, last)];
   const showPrice = priced != null;
   const lineReady = lineScale.points.length > 0;
@@ -548,6 +574,13 @@ export function CombinedFlows({
   const cursorDay = cur.live ? today : startDay + cur.stop;
   const cursorPrice = priced ? (priceReadout(priced, cursorDay, model.gapDays)?.point[1] ?? null) : null;
   const cursorLevel = priced ? (levelAt(priced, cursorDay)?.[1] ?? null) : null;
+  // A cursor that leaves the chart's window brings the window to it (a step,
+  // a drag at an edge, a card's "View on chart", a restored link).
+  useEffect(() => {
+    if (chartAxis) lwApi.current?.reveal(cursorDay);
+    // The axis changing (a zoom) moves no cursor, so reveals nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursorDay, chartAxis != null]);
   const sliderLabel = `Date, by ${(series?.bin ?? "week") === "day" ? "day" : `${series?.bin ?? "week"} and by day with events`}: moves the headlines and the bars`;
 
   const valueText = tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine;
@@ -592,7 +625,7 @@ export function CombinedFlows({
   );
   const sliderProps = {
     geo,
-    w,
+    w: rowW,
     stops,
     at: Math.min(at, last),
     xStop,
@@ -718,74 +751,137 @@ export function CombinedFlows({
                   time axis and one cursor, which either chart moves. The
                   charts stay mounted while collapsed, so they draw at once
                   on expanding. */}
-                <div className={compact || priceOnly ? "hidden" : "relative"} data-flows-charts="value">
-                  <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
-                    <LineStrip
-                      model={model}
-                      scale={lineScale}
-                      failed={failed}
-                      geo={geo}
-                      w={w}
-                      today={today}
-                      cx={cx}
-                      dim={dim}
-                      ready={lineReady}
-                      head={{ collateral: head.collateral.now, debt: head.debt.now }}
-                      hasDebt={hasDebt}
-                      windowFrom={from > 0 ? startDay + from : null}
-                    />
-                  </StripSlider>
-                </div>
-                {priced && (
-                  <div className={priceOnly ? undefined : compact ? "hidden" : undefined} data-flow-price-section="">
-                    {/* The value chart's cursor line runs on down to the tip. */}
-                    {!priceOnly && <Stem x={cx} w={w} />}
-                    <PriceHeading
-                      help={
-                        priceOnly ? (
-                          <SectionHelp content={priceOnlyHelp} name="the price chart" anatomy="F19.7" />
-                        ) : null
-                      }
-                      series={prices}
-                      selected={priced}
-                      onPick={setAssetKey}
-                      day={cursorDay}
-                      gapDays={model.gapDays}
-                      isLive={cur.live && !closed}
-                      x={cx}
-                      w={w}
-                    />
-                    <div className="relative">
-                      <StripSlider
-                        {...sliderProps}
-                        ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
-                        view="price"
-                      >
-                        <PriceStrip
-                          s={priced}
-                          scale={priceScales.get(priced.key)!}
+                {lwOn ? (
+                  <div className={compact ? "hidden" : "relative"} data-flows-charts="value">
+                    <LwRanges axis={chartAxis} api={lwApi} span={span} cursorDay={cursorDay} />
+                    {!lineReady && (
+                      <p className="pointer-events-none absolute inset-x-0 top-10 text-center text-xs text-rb-500">
+                        {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
+                      </p>
+                    )}
+                    <StripSlider
+                      {...sliderProps}
+                      ariaLabel={priced ? `${sliderLabel}, over the ${priced.asset.symbol} price` : sliderLabel}
+                      view="chart"
+                      height={null}
+                      nearestAt={(px) => nearestStopAt(stops.map(xStop), px)}
+                      edge={chartAxis ? chartAxis.plotW : null}
+                    >
+                      <LifetimeFlowsLw
+                        model={model}
+                        scale={lineScale}
+                        hasDebt={hasDebt}
+                        priced={priced}
+                        priceScale={priced ? priceScales.get(priced.key)! : null}
+                        startDay={startDay}
+                        today={today}
+                        span={span}
+                        cursorDay={cursorDay}
+                        dim={dim}
+                        at={{
+                          collateral: head.collateral.now,
+                          debt: head.debt.now,
+                          price: cursorPrice,
+                          level: cursorLevel,
+                        }}
+                        windowFrom={from > 0 ? startDay + from : null}
+                        shown={!compact}
+                        onAxis={setLwAxis}
+                        apiRef={lwApi}
+                        tip={
+                          priced ? (
+                            <PriceHeading
+                              help={null}
+                              series={prices}
+                              selected={priced}
+                              onPick={setAssetKey}
+                              day={cursorDay}
+                              gapDays={model.gapDays}
+                              isLive={cur.live && !closed}
+                              x={cx}
+                              w={rowW}
+                            />
+                          ) : null
+                        }
+                      />
+                    </StripSlider>
+                  </div>
+                ) : (
+                  <>
+                    <div className={compact || priceOnly ? "hidden" : "relative"} data-flows-charts="value">
+                      <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
+                        <LineStrip
+                          model={model}
+                          scale={lineScale}
+                          failed={failed}
                           geo={geo}
                           w={w}
                           today={today}
                           cx={cx}
                           dim={dim}
-                          cursorPrice={cursorPrice}
-                          cursorLevel={cursorLevel}
+                          ready={lineReady}
+                          head={{ collateral: head.collateral.now, debt: head.debt.now }}
+                          hasDebt={hasDebt}
                           windowFrom={from > 0 ? startDay + from : null}
-                          startDay={startDay}
                         />
                       </StripSlider>
                     </div>
-                  </div>
+                    {priced && (
+                      <div
+                        className={priceOnly ? undefined : compact ? "hidden" : undefined}
+                        data-flow-price-section=""
+                      >
+                        {/* The value chart's cursor line runs on down to the tip. */}
+                        {!priceOnly && <Stem x={cx} w={w} />}
+                        <PriceHeading
+                          help={
+                            priceOnly ? (
+                              <SectionHelp content={priceOnlyHelp} name="the price chart" anatomy="F19.7" />
+                            ) : null
+                          }
+                          series={prices}
+                          selected={priced}
+                          onPick={setAssetKey}
+                          day={cursorDay}
+                          gapDays={model.gapDays}
+                          isLive={cur.live && !closed}
+                          x={cx}
+                          w={w}
+                        />
+                        <div className="relative">
+                          <StripSlider
+                            {...sliderProps}
+                            ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
+                            view="price"
+                          >
+                            <PriceStrip
+                              s={priced}
+                              scale={priceScales.get(priced.key)!}
+                              geo={geo}
+                              w={w}
+                              today={today}
+                              cx={cx}
+                              dim={dim}
+                              cursorPrice={cursorPrice}
+                              cursorLevel={cursorLevel}
+                              windowFrom={from > 0 ? startDay + from : null}
+                              startDay={startDay}
+                            />
+                          </StripSlider>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
                 {/* The events: a row of pips on the time axis, the price
                     chart's cursor line running on down to the date over it. */}
                 <div className={priceOnly ? "hidden" : compact ? "mt-2" : undefined} data-flow-events-section="">
-                  {!compact && <Stem x={cx} w={w} />}
+                  {!compact && <Stem x={cx} w={rowW} />}
                   <PipRow
                     model={model}
-                    geo={geo}
-                    w={w}
+                    xClose={xClose}
+                    clip={chartAxis != null}
+                    w={rowW}
                     today={today}
                     stops={stops}
                     at={Math.min(at, last)}
@@ -796,6 +892,11 @@ export function CombinedFlows({
                     steps={steps}
                   />
                 </div>
+                {lwOn && !compact && (
+                  <p className="mt-2 text-[10px] leading-snug text-rb-500" data-flow-lw-notice="" data-anatomy="F23">
+                    <LwNotice />
+                  </p>
+                )}
                 {/* With the events row hidden, the cursor's date stands alone. */}
                 {priceOnly && (
                   <>
@@ -906,7 +1007,7 @@ export function lineStripScale(model: FlowModel, series: FlowBinSeries | null, h
     labels: [...yTicks.map(axisLabel), ...sideTops.map((x) => x.text)],
   };
 }
-type LineScale = ReturnType<typeof lineStripScale>;
+export type LineScale = ReturnType<typeof lineStripScale>;
 
 /** The strip's frame, in either view: the slider over the plot. Its
  *  horizontal axis is the shared time axis; the cursor snaps to the nearest
@@ -929,6 +1030,9 @@ function StripSlider({
   view,
   startDay,
   tip,
+  height = STRIP_H,
+  nearestAt,
+  edge = null,
   children,
 }: {
   geo: StripGeometry;
@@ -946,8 +1050,16 @@ function StripSlider({
   /** On a page that ties the panel to its timeline: a click or a tap (a press
    *  that does not drag) freezes the cursor. */
   freeze: { frozen: boolean; onTap: (i: number) => void } | null;
-  view: "value" | "price";
+  /** One strip, or the chart of both on Lightweight Charts. */
+  view: "value" | "price" | "chart";
   startDay: number;
+  /** The frame's height (null: its content's). */
+  height?: number | null;
+  /** The stop nearest a pointer's x, where the axis is not `geo`'s. */
+  nearestAt?: (px: number) => number | null;
+  /** The plot's width on a chart that pans: a drag held this close to either
+   *  end keeps stepping the cursor on, which brings the window with it. */
+  edge?: number | null;
   /** A tip at the cursor (the price strip's readout), given whether it
    *  shows: while a pointer is over the strip or drags it, while the strip
    *  has focus, after a tap until a press lands elsewhere, and while the
@@ -972,6 +1084,7 @@ function StripSlider({
   /** The stop nearest the pointer, on the strip's time axis. */
   const nearest = (clientX: number): number | null => {
     const el = ref.current;
+    if (el && nearestAt) return nearestAt(clientX - el.getBoundingClientRect().left);
     if (!el || !ready || geo.run <= 0) return null;
     const px = clientX - el.getBoundingClientRect().left;
     const i = nearestStop(stops, geo.dayAt(px) - startDay);
@@ -983,10 +1096,39 @@ function StripSlider({
   const pressX = useRef<number | null>(null);
   const dragged = useRef(false);
   const [grabbing, setGrabbing] = useState(false);
+  // Fingers down: a second one is a pinch (the chart's zoom), which ends the
+  // drag where it stands and freezes nothing.
+  const fingers = useRef(new Set<number>());
+  // A drag held near an end keeps stepping on (`edge`).
+  const lastX = useRef<number | null>(null);
+  const edgeStep = useRef<() => void>(() => {});
+  edgeStep.current = () => {
+    const el = ref.current;
+    if (!dragging.current || edge == null || lastX.current == null || !el) return;
+    const px = lastX.current - el.getBoundingClientRect().left;
+    if (px > EDGE_PX && px < edge - EDGE_PX) return;
+    const i = nearest(lastX.current);
+    if (i != null) onPick(i);
+  };
+  useEffect(() => {
+    if (!grabbing || edge == null) return;
+    const t = setInterval(() => edgeStep.current(), 80);
+    return () => clearInterval(t);
+  }, [grabbing, edge]);
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    // A press on the tip is the tip's (its receipts), not the strip's.
-    if ((e.target as Element).closest?.("[data-flow-price-tip]")) return;
+    // A press on the tip is the tip's (its asset list, its toggle, its
+    // receipts), not the strip's.
+    if ((e.target as Element).closest?.("[data-flow-price-tip], [data-price-heading]")) return;
+    if (e.pointerType === "touch") {
+      fingers.current.add(e.pointerId);
+      if (fingers.current.size > 1) {
+        dragging.current = false;
+        dragged.current = true;
+        setGrabbing(false);
+        return;
+      }
+    }
     if (e.pointerType !== "mouse") setTapped(true);
     const i = nearest(e.clientX);
     if (i == null) return;
@@ -998,6 +1140,7 @@ function StripSlider({
   };
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!dragging.current) return;
+    lastX.current = e.clientX;
     const i = nearest(e.clientX);
     if (i == null) return;
     if (freeze && !dragged.current && Math.abs(e.clientX - (pressX.current ?? e.clientX)) < 5) return;
@@ -1008,6 +1151,7 @@ function StripSlider({
     onPick(i);
   };
   const onUp = (e: PointerEvent<HTMLDivElement>) => {
+    fingers.current.delete(e.pointerId);
     const wasPress = dragging.current && !dragged.current;
     dragging.current = false;
     setGrabbing(false);
@@ -1016,7 +1160,8 @@ function StripSlider({
       if (i != null) freeze.onTap(i);
     }
   };
-  const onCancel = () => {
+  const onCancel = (e: PointerEvent<HTMLDivElement>) => {
+    fingers.current.delete(e.pointerId);
     dragging.current = false;
     setGrabbing(false);
   };
@@ -1051,10 +1196,10 @@ function StripSlider({
       aria-valuenow={at}
       aria-valuetext={valueText}
       className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-crosshair"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
-      style={{ height: STRIP_H }}
+      style={height == null ? undefined : { height }}
       data-flow-strip=""
       data-flow-strip-view={view}
-      data-anatomy={view === "price" ? "F19" : "F4"}
+      data-anatomy={view === "price" ? "F19" : view === "chart" ? "F4 F19" : "F4"}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
@@ -1206,13 +1351,7 @@ function LineStrip({
     const px = e.clientX - (plotRef.current?.getBoundingClientRect().left ?? 0);
     let best = idx[idx.length - 1];
     for (const i of idx) if (oldAt(k, i) && Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    const stop = points[best].to - startDay;
-    const held = unsureAt(model, stop, k).held;
-    // The old-price line once, where a reason already names each asset it names.
-    const old = oldPriceAt(model, stop)?.lines ?? [];
-    const stale = (model.stale.get(stop) ?? []).filter((x) => x.side === k);
-    const named = stale.length > 0 && stale.every((x) => held.some((h) => h.startsWith(`${x.symbol} `)));
-    const lines = [...(named ? old.slice(0, old.length - 1) : old), ...held];
+    const lines = oldLineTip(model, points[best].to - startDay, k);
     setOldTip(lines.length ? { x: px, y: y(points[best][k] as number, k), lines } : null);
   };
   const area = (k: "collateral" | "debt", seq: number[]) =>
@@ -1372,7 +1511,7 @@ export function priceStripScale(s: FlowPriceSeries, startDay: number, today: num
   const axis = priceAxis(values);
   return { pieces, level, axis, labels: priceAxisLabels(axis.ticks) };
 }
-type PriceScale = ReturnType<typeof priceStripScale>;
+export type PriceScale = ReturnType<typeof priceStripScale>;
 
 /** The price line of one held asset in its unit, on the time axis the flows
  *  line uses: solid day to day, dotted where a day's price is carried, the
@@ -1954,7 +2093,8 @@ interface CursorDateProps {
  *  inside the tip, and they stay open while the cursor moves. */
 function PipRow({
   model,
-  geo,
+  xClose,
+  clip,
   w,
   today,
   stops,
@@ -1966,7 +2106,10 @@ function PipRow({
   steps,
 }: {
   model: FlowModel;
-  geo: StripGeometry;
+  /** Where an absolute day's close sits on the charts' time axis. */
+  xClose: (day: number) => number;
+  /** The axis pans (Lightweight Charts): a day outside the row is not drawn. */
+  clip: boolean;
   w: number;
   today: number;
   stops: CombinedStop[];
@@ -1979,7 +2122,6 @@ function PipRow({
   steps: ReactNode;
 }) {
   const startDay = model.start / DAY_MS;
-  const xClose = (day: number) => geo.xClose(Math.min(day, today));
   const wrapRef = useRef<HTMLDivElement>(null);
   const pipRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
@@ -2021,6 +2163,8 @@ function PipRow({
           // A pill on a white ground (rb-900 in dark), padded only vertically so each pip
           // keeps its x on the charts' axis; the whole pill takes the press.
           className="relative h-11 cursor-crosshair touch-none select-none rounded-md bg-white py-3 sm:h-[38px] dark:bg-rb-900"
+          // On a chart that pans the row ends where its plot does.
+          style={clip && w > 0 ? { width: w } : undefined}
           data-flow-pips=""
           data-anatomy="F4.1"
           onPointerDown={(e) => {
@@ -2048,7 +2192,15 @@ function PipRow({
           )}
           <div aria-hidden>
             {w > 0 &&
-              visiblePips(model.ticks, (d) => xClose(startDay + d)).map((t) => (
+              visiblePips(
+                clip
+                  ? model.ticks.filter((t) => {
+                      const x = xClose(startDay + t.day);
+                      return x >= 0 && x <= w;
+                    })
+                  : model.ticks,
+                (d) => xClose(startDay + d),
+              ).map((t) => (
                 <FlowPip
                   key={t.day}
                   tick={t.tick}

@@ -39,9 +39,12 @@ import { FLOWS_SCOPE, ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } f
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import {
   FlowsCompactContext,
+  FlowsEngineContext,
   FlowsKeyNodeContext,
   FlowsSectionsContext,
+  type FlowsEngine,
 } from "@/components/shared/lifetime-flows-combined";
+import { protocolForPathname } from "@/lib/shared/protocols";
 import { Plus, X } from "lucide-react";
 import { readFlowsView, writeFlowsView } from "@/lib/shared/flows-view-store";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
@@ -91,6 +94,16 @@ export interface LifetimeFlowsPanelProps {
 }
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
+
+/** The explorers whose value line and price chart are drawn on Lightweight
+ *  Charts (ui-jobs 328 step 4c, the Liquity family the pilot); every other
+ *  explorer keeps the drawn strips until its step, Aave V3 next. The one
+ *  place the engine is chosen. */
+const LW_EXPLORERS = new Set(["liquity", "ebisu", "asymmetry", "basedollar"]);
+function flowsEngineFor(pathname: string | null): FlowsEngine {
+  const id = protocolForPathname(pathname)?.id;
+  return id != null && LW_EXPLORERS.has(id) ? "lw" : "svg";
+}
 const BARS_HELP = lifetimeFlowsBarsContent();
 
 /** The bars' how-to-read at the header's right end, for a panel whose body
@@ -264,7 +277,9 @@ export function LifetimeFlowsPanel({
                   <FlowsKeyNodeContext.Provider value={flowsKey ? <FlowsKey {...flowsKey} /> : null}>
                     <FlowsSectionsContext.Provider value={setSections}>
                       <FlowsCompactContext.Provider value={{ compact, toggle: viewButton }}>
-                        <div className="mt-2">{scrubber}</div>
+                        <FlowsEngineContext.Provider value={flowsEngineFor(pathname)}>
+                          <div className="mt-2">{scrubber}</div>
+                        </FlowsEngineContext.Provider>
                       </FlowsCompactContext.Provider>
                     </FlowsSectionsContext.Provider>
                   </FlowsKeyNodeContext.Provider>

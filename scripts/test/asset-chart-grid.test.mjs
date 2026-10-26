@@ -10,6 +10,9 @@ import {
   gridFor,
   gridStep,
   lineTrack,
+  logicalOf,
+  sampleJoined,
+  sampleRuns,
   needsRegrid,
   sampleSpread,
   sampleTrack,
@@ -148,4 +151,53 @@ test("a window that keeps its step and stays inside the grid keeps the grid", ()
   assert.equal(needsRegrid(g, v, bounds, 600), false);
   assert.equal(needsRegrid(g, { from: 9 * DAY_S, to: 10 * DAY_S }, bounds, 600), true);
   assert.equal(needsRegrid(g, { from: 10 * DAY_S, to: 10 * DAY_S + 3600 }, bounds, 600), true);
+});
+
+test("a minimum step holds the grid at that step however far the window zooms", () => {
+  assert.equal(gridStep(DAY_S, 600, 7200), 7200);
+  assert.equal(gridFor({ from: 0, to: 3600 }, { t0: 0, t1: 10 * DAY_S }, 600, 7200).step, 7200);
+  assert.equal(gridStep(365 * DAY_S, 1200, 7200), DAY_S);
+});
+
+test("a joined line reads each cell at its end, straight between vertices, broken at a null", () => {
+  const g = { start: 0, step: 100, count: 6, t1: 600 };
+  const verts = [
+    [100, 0],
+    [300, 2],
+    [400, null],
+    [500, 4],
+    [600, 6],
+  ];
+  // Cell i is read at (i + 1) * 100.
+  assert.deepEqual(sampleJoined(g, verts), [0, 1, 2, null, 4, 6]);
+  assert.equal(logicalOf(g, 300), 2);
+});
+
+test("a kept run of a joined line, padded a cell either side, meets the line it interrupts", () => {
+  const g = { start: 0, step: 100, count: 5, t1: 500 };
+  const verts = [
+    [100, 1],
+    [200, 2],
+    [300, 3],
+    [400, 4],
+    [500, 5],
+  ];
+  const dotted = (j) => j === 1; // the segment 200–300
+  assert.deepEqual(
+    sampleJoined(g, verts, (j) => !dotted(j)),
+    [1, 2, null, 4, 5],
+  );
+  assert.deepEqual(sampleJoined(g, verts, dotted, true), [null, 2, 3, 4, null]);
+});
+
+test("step runs hold each value to the next vertex and end on their last", () => {
+  const g = { start: 0, step: 100, count: 6, t1: 600 };
+  const runs = [
+    [
+      [100, 5],
+      [300, 7],
+    ],
+    [[500, 9]],
+  ];
+  assert.deepEqual(sampleRuns(g, runs), [5, 5, 7, null, 9, null]);
 });

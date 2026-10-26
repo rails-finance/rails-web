@@ -59,17 +59,24 @@ export interface Grid {
   t1: number;
 }
 
-/** The smallest step that fits `span` seconds into `width` pixels at BAR_PX a cell. */
-export function gridStep(span: number, width: number): number {
+/** The smallest step that fits `span` seconds into `width` pixels at BAR_PX a
+ *  cell, and no finer than `minStep` (a chart whose data is daily stops its
+ *  zoom there). */
+export function gridStep(span: number, width: number, minStep = 0): number {
   const cells = Math.max(10, Math.floor(width / BAR_PX));
-  const want = span / cells;
+  const want = Math.max(span / cells, minStep);
   return GRID_STEPS.find((s) => s >= want) ?? GRID_STEPS[GRID_STEPS.length - 1];
 }
 
 /** The grid for a visible window: one window either side, cut to the data's span. */
-export function gridFor(view: { from: number; to: number }, bounds: { t0: number; t1: number }, width: number): Grid {
+export function gridFor(
+  view: { from: number; to: number },
+  bounds: { t0: number; t1: number },
+  width: number,
+  minStep = 0,
+): Grid {
   const w = Math.max(60, view.to - view.from);
-  let step = gridStep(w, width);
+  let step = gridStep(w, width, minStep);
   const a = Math.max(bounds.t0, view.from - w);
   const b = Math.min(bounds.t1, view.to + w);
   let start = Math.floor(a / step) * step;
@@ -133,6 +140,63 @@ export function sampleTrack(g: Grid, t: Track): (number | null)[] {
   return out;
 }
 
+/** A cell's position on the chart's index scale for a moment: cell `i` is
+ *  read at its end, so the moment that ends it stands at `i` (fractional
+ *  between). */
+export const logicalOf = (g: Grid, ts: number) => (ts - g.start) / g.step - 1;
+
+/** Each cell's value on a line of vertices `[ts, value]` joined straight (the
+ *  Lifetime flows charts' lines, whose points are day closes), read at the
+ *  cell's end (the data's end at most). A cell belongs to the segment it ends
+ *  in (one ending on a vertex, to the segment into it, or where that one is
+ *  broken, to the one out of it). Null before the first vertex, after the
+ *  last, on a segment touching a null vertex, and on a segment `keep` refuses;
+ *  `pad` widens each kept run by a cell either side, so a dotted piece drawn
+ *  as its own series meets the solid line it interrupts. */
+export function sampleJoined(
+  g: Grid,
+  verts: readonly (readonly [number, number | null])[],
+  keep: (segment: number) => boolean = () => true,
+  pad = false,
+): (number | null)[] {
+  const raw: (number | null)[] = new Array(g.count).fill(null);
+  const kept: boolean[] = new Array(g.count).fill(false);
+  const n = verts.length;
+  if (n === 0) return raw;
+  const ok = (j: number) => j >= 0 && j < n - 1 && verts[j][1] != null && verts[j + 1][1] != null;
+  let k = 0;
+  for (let i = 0; i < g.count; i++) {
+    const t = Math.min(g.start + (i + 1) * g.step, g.t1);
+    if (t < verts[0][0] || t > verts[n - 1][0]) continue;
+    while (verts[k][0] < t) k++;
+    const [tk, vk] = verts[k];
+    if (tk === t) {
+      if (vk == null) continue;
+      raw[i] = vk;
+      kept[i] = ok(k - 1) ? keep(k - 1) : ok(k) ? keep(k) : keep(Math.max(0, k - 1));
+      continue;
+    }
+    if (!ok(k - 1)) continue;
+    const [ta, va] = verts[k - 1];
+    raw[i] = (va as number) + (((vk as number) - (va as number)) * (t - ta)) / (tk - ta);
+    kept[i] = keep(k - 1);
+  }
+  return raw.map((v, i) => (kept[i] || (pad && (kept[i - 1] || kept[i + 1])) ? v : null));
+}
+
+/** Each cell's value on step runs (`[ts, value]` ascending, each run held
+ *  from one vertex to the next and ending on its last), null between runs. */
+export function sampleRuns(g: Grid, runs: readonly (readonly (readonly [number, number])[])[]): (number | null)[] {
+  const out: (number | null)[] = new Array(g.count).fill(null);
+  for (const run of runs) {
+    if (run.length === 0) continue;
+    const a = Math.max(0, Math.ceil(logicalOf(g, run[0][0]) - 1e-9));
+    const b = Math.min(g.count - 1, Math.floor(logicalOf(g, run[run.length - 1][0]) + 1e-9));
+    for (let i = a; i <= b; i++) out[i] = inForce(run, Math.min(g.start + (i + 1) * g.step, g.t1));
+  }
+  return out;
+}
+
 /** Each cell's deviation of `other` from `main` (a fraction): on both lines'
  *  rounds at the cell's moment, before them the day's spread (`byDay`,
  *  compared only where the store's reads were within ten minutes). */
@@ -190,9 +254,10 @@ export function needsRegrid(
   view: { from: number; to: number },
   bounds: { t0: number; t1: number },
   width: number,
+  minStep = 0,
 ): boolean {
   const w = view.to - view.from;
-  const step = gridStep(w, width);
+  const step = gridStep(w, width, minStep);
   if (step !== g.step && !(g.count >= MAX_CELLS && step < g.step)) return true;
   const gEnd = g.start + g.count * g.step;
   const margin = w / 4;
