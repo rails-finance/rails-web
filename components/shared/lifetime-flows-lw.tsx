@@ -33,6 +33,7 @@ import type {
   IPrimitivePaneRenderer,
   IPrimitivePaneView,
   ISeriesApi,
+  Logical,
   ISeriesPrimitive,
   AreaData,
   LineData,
@@ -108,6 +109,20 @@ interface Verts {
 type Side = "collateral" | "debt";
 
 const closeTs = (day: number) => (day + 1) * DAY_S;
+
+/** The x of a moment on the grid. The library places whole logical indices
+ *  alone (a fractional one reads 0), and a day's close falls inside a cell
+ *  wherever a cell is longer than a day (a phone's width, a long life): the x
+ *  is read between the two cells either side. */
+function xOf(c: IChartApi, g: Grid, ts: number): number | null {
+  const t = c.timeScale();
+  const l = logicalOf(g, ts);
+  const a = Math.floor(l);
+  const xa = t.logicalToCoordinate(a as Logical);
+  if (xa == null || l === a) return xa;
+  const xb = t.logicalToCoordinate((a + 1) as Logical);
+  return xb == null ? xa : xa + (xb - xa) * (l - a);
+}
 
 /** The value line of one side, as LineStrip draws it: no line before the side
  *  first holds anything, the step up from zero at the first event's day (or at
@@ -241,7 +256,7 @@ class ScrubberMark implements ISeriesPrimitive<Time> {
   private x(ts: number): number | null {
     const g = this.st.grid;
     if (!g || !this.chart) return null;
-    return this.chart.timeScale().logicalToCoordinate(logicalOf(g, ts) as never) as number | null;
+    return xOf(this.chart, g, ts);
   }
   private drawShade(t: Target) {
     const { shadeTs, colors } = this.st;
@@ -375,6 +390,8 @@ export function LifetimeFlowsLw({
   }, [priceScale]);
 
   const view = useRef<FlowsLwView>({ from: bounds.t0, to: bounds.t1 });
+  /** A new grid is set and its window not yet applied. */
+  const regrid = useRef(false);
   const [grid, setGrid] = useState<Grid | null>(null);
   const gridRef = useRef<Grid | null>(null);
   gridRef.current = grid;
@@ -410,9 +427,7 @@ export function LifetimeFlowsLw({
       const v = r ? { from: cellTime(g, r.from), to: cellTime(g, r.to + 1) } : view.current;
       const end = b.t1;
       onAxisRef.current({
-        xClose: (day: number) =>
-          (c.timeScale().logicalToCoordinate(logicalOf(g, Math.min(closeTs(day), end)) as never) as number | null) ??
-          -1e6,
+        xClose: (day: number) => xOf(c, g, Math.min(closeTs(day), end)) ?? -1e6,
         plotW: w,
         view: v,
         bounds: b,
@@ -438,6 +453,7 @@ export function LifetimeFlowsLw({
           to: (target.to - g.start) / g.step - 1,
         });
       else {
+        regrid.current = true;
         setGrid(gridFor(target, b, plotW(), MIN_STEP));
         setApplyN((n) => n + 1);
       }
@@ -458,14 +474,17 @@ export function LifetimeFlowsLw({
       const r = c.timeScale().getVisibleLogicalRange();
       if (!r) return;
       const b = boundsRef.current;
-      const v = { from: cellTime(g, r.from), to: cellTime(g, r.to + 1) };
+      // While a new grid waits to be applied, the library's range is still
+      // the old grid's: the window set is the one to hold.
+      const v = regrid.current ? view.current : { from: cellTime(g, r.from), to: cellTime(g, r.to + 1) };
       const w = v.to - v.from;
       if (w >= b.t1 - b.t0) return;
       const ts = Math.min(closeTs(day), b.t1);
       const m = w * REVEAL_MARGIN;
       let from: number;
-      if (ts < v.from + m) from = ts - m;
-      else if (ts > v.to - m) from = ts + m - w;
+      // Near an end of the axis the window has nowhere further to go.
+      if (ts < v.from + m && v.from > b.t0) from = ts - m;
+      else if (ts > v.to - m && v.to < b.t1) from = ts + m - w;
       else return;
       show({ from, to: from + w });
     },
@@ -717,6 +736,7 @@ export function LifetimeFlowsLw({
     el.addEventListener("pointerdown", onPointer);
     el.addEventListener("pointermove", onPointer);
     chart.current = c;
+    regrid.current = true;
     setGrid(gridFor(view.current, boundsRef.current, plotW(), MIN_STEP));
     setApplyN((n) => n + 1);
     setReady((n) => n + 1);
@@ -841,6 +861,7 @@ export function LifetimeFlowsLw({
       from: (v.from - grid.start) / grid.step,
       to: (v.to - grid.start) / grid.step - 1,
     });
+    regrid.current = false;
     markState.current.grid = grid;
     marks.current?.value.update();
     marks.current?.price?.update();
@@ -882,12 +903,7 @@ export function LifetimeFlowsLw({
   // the time axis), re-read on every axis change.
   const c = chart.current;
   const g = grid;
-  const cx =
-    c && g
-      ? ((c.timeScale().logicalToCoordinate(logicalOf(g, closeTs(Math.min(cursorDay, today))) as never) as
-          | number
-          | null) ?? null)
-      : null;
+  const cx = c && g ? xOf(c, g, closeTs(Math.min(cursorDay, today))) : null;
   const pw = c?.timeScale().width() ?? 0;
   const paneTop = VALUE_H + 1;
   void axisN;
@@ -910,6 +926,8 @@ export function LifetimeFlowsLw({
       data-flow-lw-step={grid?.step ?? ""}
       data-flow-lw-from={Math.round(view.current.from)}
       data-flow-lw-to={Math.round(view.current.to)}
+      data-flow-lw-plot-w={pw || ""}
+      data-flow-lw-cursor-x={cx == null ? "" : cx.toFixed(1)}
     >
       <div ref={box} className="relative isolate w-full" style={{ height: boxH }} data-flow-lw-box="">
         {!lib && <p className="flex h-full items-center justify-center text-xs text-rb-500">Drawing the chart…</p>}

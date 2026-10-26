@@ -481,6 +481,131 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
   // 2026): the heading states the price and the level alone.
 }
 
+/** The chart's cursor and window as its data hooks state them. */
+const lwState = (page) =>
+  page.evaluate(() => {
+    const w = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
+    const sl = document.querySelector('[data-flows-combined] [data-flow-strip-view="chart"]');
+    const x = w?.getAttribute("data-flow-lw-cursor-x") ?? "";
+    return {
+      x: x === "" ? null : Number(x),
+      plotW: Number(w?.getAttribute("data-flow-lw-plot-w") || 0),
+      from: Number(w?.getAttribute("data-flow-lw-from")),
+      to: Number(w?.getAttribute("data-flow-lw-to")),
+      now: Number(sl?.getAttribute("aria-valuenow")),
+      max: Number(sl?.getAttribute("aria-valuemax")),
+      frozen: document.querySelector("[data-flows-combined][data-flow-frozen]") != null,
+    };
+  });
+const atRight = (s) => s.x != null && s.plotW > 0 && s.x >= s.plotW - 4 && s.x <= s.plotW + 1;
+const inPlot = (s) => s.x != null && s.plotW > 0 && s.x >= 0 && s.x <= s.plotW + 1;
+const lwShow = (s) => `x ${s.x} of ${s.plotW}, stop ${s.now}/${s.max}${s.frozen ? ", frozen" : ""}`;
+
+/** On open (ui-jobs 328 step 4c, the phone's clipped chart): the chart fits
+ *  the panel with no page overflow, its window covers the whole life, the
+ *  cursor stands on the last stop at the plot's right end, and the events row
+ *  spreads its pips over the plot. A day's close inside a grid cell (a cell
+ *  longer than a day, a phone's width) once read x 0. */
+async function checkLwOpen(page, tag) {
+  const r = await page.evaluate(() => {
+    const w = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
+    const panel = w.closest("[data-flows-combined]").getBoundingClientRect();
+    const box = w.querySelector("[data-flow-lw-box]").getBoundingClientRect();
+    const canv = [...w.querySelectorAll("[data-flow-lw-box] canvas")].map((c) => c.getBoundingClientRect());
+    const line = w.querySelector("[data-flow-value-line]")?.getAttribute("data-flow-value-line") ?? "";
+    const ts = line
+      .split(/[|,]/)
+      .map((p) => Number(p.split(":")[0]))
+      .filter((t) => Number.isFinite(t) && t > 0);
+    return {
+      fits:
+        box.left >= panel.left - 1 &&
+        box.right <= panel.right + 1 &&
+        canv.length > 0 &&
+        canv.every((c) => c.left >= box.left - 1 && c.right <= box.right + 1),
+      sizes: `panel ${Math.round(panel.left)}–${Math.round(panel.right)}, box ${Math.round(box.left)}–${Math.round(box.right)}`,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+      first: Math.min(...ts),
+      last: Math.max(...ts),
+      pips: [...document.querySelectorAll("[data-flows-combined] [data-flow-pip]")].map((p) =>
+        parseFloat(p.style.left),
+      ),
+    };
+  });
+  check(
+    `${tag}: the chart fits the panel, no page overflow`,
+    r.fits && r.overflow <= 0,
+    `${r.sizes}, overflow ${r.overflow}`,
+  );
+  const s = await lwState(page);
+  check(
+    `${tag}: the window on open covers the whole life`,
+    s.from <= r.first && s.to >= r.last,
+    `window ${new Date(s.from * 1000).toISOString().slice(0, 10)}–${new Date(s.to * 1000).toISOString().slice(0, 10)}, life ${new Date(r.first * 1000).toISOString().slice(0, 10)}–${new Date(r.last * 1000).toISOString().slice(0, 10)}`,
+  );
+  check(
+    `${tag}: on open the cursor stands on the last stop, at the plot's right end`,
+    s.now === s.max && atRight(s),
+    lwShow(s),
+  );
+  check(
+    `${tag}: the events row spreads its pips over the plot`,
+    r.pips.length > 1 && r.pips.every((x) => x >= -1 && x <= s.plotW + 1) && r.pips.filter((x) => x <= 1).length <= 1,
+    `${r.pips.length} pips, ${r.pips.filter((x) => x <= 1).length} at x 0`,
+  );
+}
+
+/** The steps (⏮ ‹ › ⏭), at All and zoomed to 30D, frozen and not: ⏭ puts the
+ *  cursor on the last stop at the plot's right end and releases a freeze;
+ *  every step leaves the cursor in the plot, in order. */
+async function checkLwSteps(page, tag, touch) {
+  const press = async (sel) => {
+    await page.locator(`[data-flows-combined] ${sel}`).first().click();
+    await page.waitForTimeout(500);
+    return lwState(page);
+  };
+  const START = '[data-flow-jump="start"]';
+  const END = '[data-flow-jump="end"]';
+  const PREV = 'button[aria-label="Previous event"]';
+  const NEXT = 'button[aria-label="Next event"]';
+  const freeze = async () => {
+    const sl = page.locator('[data-flows-combined] [data-flow-strip-view="chart"]').first();
+    const b = await sl.boundingBox();
+    const s = await lwState(page);
+    const at = { x: Math.round(s.plotW * 0.5), y: Math.min(40, Math.round((b?.height ?? 80) / 3)) };
+    if (touch) await sl.tap({ position: at });
+    else await sl.click({ position: at });
+    await page.waitForTimeout(500);
+    return lwState(page);
+  };
+  const zooms =
+    (await page.locator('[data-flows-combined] [data-flow-range="30D"]').count()) > 0 ? ["All", "30D"] : ["All"];
+  for (const z of zooms) {
+    if (z !== "All") await press(`[data-flow-range="${z}"]`);
+    const t = `${tag} ${z}`;
+    const a = await press(START);
+    check(`${t}: ⏮ puts the cursor on the first stop, in the plot`, a.now === 0 && inPlot(a), lwShow(a));
+    const b = await press(NEXT);
+    check(`${t}: › moves the cursor right, in the plot`, b.now > a.now && inPlot(b) && b.x >= a.x, lwShow(b));
+    const e = await press(END);
+    check(
+      `${t}: ⏭ puts the cursor on the last stop, at the plot's right end`,
+      e.now === e.max && atRight(e),
+      lwShow(e),
+    );
+    const p = await press(PREV);
+    check(`${t}: ‹ moves the cursor left, in the plot`, p.now < e.now && inPlot(p) && p.x <= e.x, lwShow(p));
+    const f = await freeze();
+    const fe = await press(END);
+    check(
+      `${t}: ⏭ from a frozen cursor releases it on the last stop, at the right end`,
+      f.frozen && !fe.frozen && fe.now === fe.max && atRight(fe),
+      `${lwShow(f)} → ${lwShow(fe)}`,
+    );
+  }
+  if (zooms.length > 1) await press('[data-flow-range="All"]');
+}
+
 const browser = await chromium.launch();
 
 for (const pg of PAGES) {
@@ -544,6 +669,8 @@ for (const pg of PAGES) {
           drawn.notice.includes("https://www.tradingview.com/"),
         JSON.stringify(drawn),
       );
+      await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").scrollIntoViewIfNeeded();
+      await checkLwOpen(page, tag);
     }
     const PRICE = PRICE_STRIP;
     await page.locator(PRICE).scrollIntoViewIfNeeded();
@@ -704,6 +831,7 @@ for (const pg of PAGES) {
     }
 
     if (rows) await checkTroveEnd(page, tag, pg, rows, sl);
+    if (lw) await checkLwSteps(page, tag, width < 640);
 
     // The value line is the one it was: the stops moved the cursor only.
     await sl.focus();
