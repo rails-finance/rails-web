@@ -26,6 +26,8 @@ export default async function PricesPage() {
           {list?.day != null && (
             <p className="mt-2 max-w-2xl text-sm text-rb-500" data-asset-prices-day={list.day}>
               At the close of {formatDate(new Date(list.day * DAY_MS))}, from the main line on each asset&rsquo;s page;
+              {list.rows.some((r) => r.asOf) &&
+                " a row stamped after its figure reads the line’s stored rounds, the price in force at the stamp;"}{" "}
               the line and the change cover 30 days. A marked row, listed first, has a fixed price on its page or a line
               more than 1 % from its main line in those 30 days.
             </p>

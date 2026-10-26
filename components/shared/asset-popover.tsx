@@ -35,7 +35,7 @@ import { getTokenAddress } from "@/lib/shared/token-addresses";
 import Link from "next/link";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
-import { fmtRowPrice } from "@/components/assets/asset-price-row";
+import { asOfMark, asOfWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { loadAssetPrices } from "@/lib/api/fetch-asset-prices";
 import { rowFor, type AssetPriceRow } from "@/lib/shared/asset-prices";
 import { assetHref, NATIVE } from "@/lib/shared/asset-roster";
@@ -228,6 +228,15 @@ function AssetPageRow({ chain, contract }: { chain: ChainId; contract: string })
           <span className="flex flex-1 items-center gap-1">
             <PriceUnitMark unit={row.unit} size={12} />
             <span className="font-semibold text-foreground">{fmtRowPrice(row.price)}</span>
+            {row.asOf && (
+              <span
+                className="text-[11px] text-rb-500"
+                title={`The stored round in force ${asOfWords(row.asOf)}`}
+                data-asset-popover-as-of={row.asOf.block}
+              >
+                {asOfMark(row.asOf)}
+              </span>
+            )}
           </span>
           <PriceSparkline points={row.spark} label={`${row.symbol} over 30 days`} className="h-6 w-20" />
           <span
@@ -238,8 +247,9 @@ function AssetPageRow({ chain, contract }: { chain: ChainId; contract: string })
         </div>
       )}
       {row.oracle && (
-        <p className="truncate text-[11px] text-rb-500" title={row.oracle}>
-          {row.oracle}, last 30 days
+        <p className="text-[11px] text-rb-500" title={row.oracle}>
+          {row.oracle}
+          {row.asOf ? `, its stored rounds to block ${row.asOf.block.toLocaleString("en-US")}` : ""}, last 30 days
         </p>
       )}
       <Link

@@ -301,6 +301,19 @@ export interface PriceRounds {
   thinned: boolean;
 }
 
+/** An asset chart opens on its stored rounds (anatomy A3.3) once its main
+ *  line's rounds span this many days (Miles, 26 Oct 2026); below it, on
+ *  every day. */
+export const ROUNDS_VIEW_MIN_DAYS = 30;
+
+/** Whether a chart opens on its main line's rounds: they span
+ *  ROUNDS_VIEW_MIN_DAYS or more, and the range drawn (unix seconds, the
+ *  whole span where none is chosen) lies inside them. */
+export function opensOnRounds(r: PriceRounds, range?: { from: number; to: number }): boolean {
+  if ((r.asOf.ts - r.from.ts) / 86_400 < ROUNDS_VIEW_MIN_DAYS) return false;
+  return range == null || (range.from >= r.from.ts && range.to <= r.asOf.ts);
+}
+
 /** The source the joined days name. */
 export const ROUNDS_SOURCE = "rounds";
 

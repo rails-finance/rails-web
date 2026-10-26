@@ -1,7 +1,8 @@
 // A Prices list row (rails-ops reference/asset-key-map.md, "The Prices list";
 // row form, Miles 4 Oct 2026): {asset icon}{price-unit mark}{value}, the
 // 30-day sparkline and the 30-day change; the whole row is the link to the
-// asset's page. No ticker text: the link's name carries it.
+// asset's page. No ticker text: the link's name carries it. A price from
+// stored rounds carries its "as of" stamp, the checkpoint's time.
 
 import Link from "next/link";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -10,6 +11,19 @@ import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
 import type { AssetPriceRow as Row, RowFlag } from "@/lib/shared/asset-prices";
 import { fmtSpread } from "@/lib/shared/asset-spread";
 import { formatDate } from "@/lib/date";
+import { roundTime } from "@/components/assets/round-time";
+
+/** A rounds price's stamp: "10:41 UTC" on the checkpoint's day, else its date. */
+export function asOfMark(asOf: { ts: number }, now = Date.now()): string {
+  const d = new Date(asOf.ts * 1000);
+  if (Math.floor(asOf.ts / 86_400) !== Math.floor(now / 86_400_000)) return formatDate(d);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
+}
+
+/** "as of 26 Oct 2026, 10:41 UTC, block 37,412,006". */
+export function asOfWords(asOf: { ts: number; block: number }): string {
+  return `as of ${roundTime(asOf.ts)}, block ${asOf.block.toLocaleString("en-US")}`;
+}
 
 /** The flag's mark ("2.1 % apart", "fixed price") and its sentence. */
 export function flagWords(f: RowFlag): { mark: string; text: string } {
@@ -34,7 +48,7 @@ export function fmtRowPrice(v: number): string {
 
 export function AssetPriceRow({ row }: { row: Row }) {
   const flag = row.flag ? flagWords(row.flag) : null;
-  const name = `${row.symbol}${row.price != null ? `, $${fmtRowPrice(row.price)}` : ", no stored price"}${row.change != null ? `, ${fmtChange(row.change)} over 30 days` : ""}${flag ? `; ${flag.text}` : ""}`;
+  const name = `${row.symbol}${row.price != null ? `, $${fmtRowPrice(row.price)}` : ", no stored price"}${row.asOf ? ` ${asOfWords(row.asOf)}` : ""}${row.change != null ? `, ${fmtChange(row.change)} over 30 days` : ""}${flag ? `; ${flag.text}` : ""}`;
   return (
     <li data-asset-price-row={`${row.chain}:${row.token}`} data-anatomy="A5.1">
       <Link
@@ -49,6 +63,16 @@ export function AssetPriceRow({ row }: { row: Row }) {
             <>
               <PriceUnitMark unit={row.unit} size={14} />
               <span className="text-sm font-semibold text-foreground">{fmtRowPrice(row.price)}</span>
+              {row.asOf && (
+                <span
+                  className="ml-1 shrink-0 text-[11px] text-rb-500"
+                  title={`The stored round in force ${asOfWords(row.asOf)}`}
+                  data-asset-price-as-of={row.asOf.block}
+                  data-anatomy="A5.3"
+                >
+                  {asOfMark(row.asOf)}
+                </span>
+              )}
             </>
           ) : (
             <span className="pl-1 text-sm text-rb-500">–</span>

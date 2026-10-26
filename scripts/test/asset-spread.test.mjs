@@ -124,3 +124,27 @@ test("round deviations start where both lines stand and hold to the next change"
   );
   assert.equal(inForce([[10, 1]], 9), null, "nothing is in force before the first round");
 });
+
+test("day closes given without their rounds compare at the same moment (the Prices list's flags)", () => {
+  // Reads hours apart on the daily store; on the rounds, each day's close.
+  const a = {
+    key: "main",
+    points: [
+      [100, 1, 1],
+      [101, 1, 2],
+    ],
+    rounds: { points: [], joinDay: 101 },
+  };
+  const b = {
+    key: "other",
+    points: [
+      [100, 1.02, 99999],
+      [101, 1.02, 99999],
+    ],
+    rounds: { points: [], joinDay: 101 },
+  };
+  const [s] = lineSpreads(a, [b], 1);
+  assert.equal(s.roundsFrom, 101);
+  assert.ok(!s.byDay.has(100), "the daily part keeps the read window");
+  assert.ok(s.byDay.has(101) && s.passes, "the rounds' close compares with no read window");
+});

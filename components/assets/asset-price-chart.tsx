@@ -11,8 +11,9 @@
 // completed UTC day, continued from its stored rounds' first day by the
 // rounds' day closes where the chain serves them (`/api/prices/rounds`,
 // `joinRounds`); the switch over the chart opens the rounds alone, every
-// change of each line's value (A3.3). The join is stated under the chart and
-// in each line's stamp.
+// change of each line's value (A3.3), and the chart opens on them where the
+// main line's rounds span ROUNDS_VIEW_MIN_DAYS (`opensOnRounds`). The join
+// is stated under the chart and in each line's stamp.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AssetSpreadStrip } from "@/components/assets/asset-spread-strip";
@@ -23,7 +24,13 @@ import { fetchPriceRounds, type RoundsAnswer } from "@/lib/api/fetch-price-round
 import { CombinedFlows } from "@/components/shared/lifetime-flows-combined";
 import { FlowUnitContext } from "@/components/shared/lifetime-flows-tip";
 import { fetchDailyAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
-import { dailyStorePriceSeries, joinRounds, roundsOf, type PriceRounds } from "@/lib/shared/price-series";
+import {
+  dailyStorePriceSeries,
+  joinRounds,
+  opensOnRounds,
+  roundsOf,
+  type PriceRounds,
+} from "@/lib/shared/price-series";
 import type { FlowPriceSeries } from "@/lib/shared/flows-price";
 import { buildFlowModel, type FlowModel } from "@/lib/shared/flows-timeline";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
@@ -163,7 +170,10 @@ export function AssetPriceChart({ section, symbol }: { section: PageChain; symbo
     [prices, byKey],
   );
   const joinDay = roundLines.length ? Math.min(...roundLines.map((l) => l.rounds.joinDay)) : null;
-  const [view, setView] = useState<"days" | "rounds">("days");
+  // Until a button is pressed, the view opensOnRounds picks for the main line.
+  const [picked, setView] = useState<"days" | "rounds" | null>(null);
+  const mainRounds = spreads ? roundLines.find((l) => l.id === spreads.main.id)?.rounds : undefined;
+  const view = picked ?? (mainRounds && opensOnRounds(mainRounds) ? "rounds" : "days");
   const [cursorTs, setCursorTs] = useState<number | null>(null);
   const onRounds = view === "rounds" && roundLines.length > 0 && spreads != null;
   const onJump = useCallback(

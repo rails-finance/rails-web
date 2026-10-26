@@ -86,10 +86,9 @@ export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], cha
   return others.map((o) => {
     const byDay = new Map<number, number>();
     let largest: LineSpread["largest"] = null;
-    const roundsFrom =
-      main.rounds && o.rounds && main.rounds.points.length && o.rounds.points.length
-        ? Math.max(main.rounds.joinDay, o.rounds.joinDay)
-        : null;
+    // A line given its rounds' day closes alone (the Prices list's flags) has
+    // no points: its days compare at the same moment, with no moments between.
+    const roundsFrom = main.rounds && o.rounds ? Math.max(main.rounds.joinDay, o.rounds.joinDay) : null;
     const note = (day: number, dev: number, ts?: number) => {
       if (!largest || Math.abs(dev) > Math.abs(largest.dev)) largest = ts == null ? { day, dev } : { day, dev, ts };
     };
