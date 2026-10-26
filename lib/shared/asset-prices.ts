@@ -138,8 +138,9 @@ export interface AssetPriceList {
   rows: AssetPriceRow[];
   /** The last day any row reads, for the list's "as of". */
   day: number | null;
-  /** The `chain:token` of each token with a page and no stored price (a token
-   *  only Morpho lists), for the icon popover's link; on the route's answer only. */
+  /** The `chain:token` of each token with a page and no stored price (every
+   *  token an explorer lists that the roster does not price), for the icon
+   *  popover's link; on the route's answer only. */
   unpriced?: string[];
 }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAssetPricesServer, ROUNDS_REVALIDATE_S } from "@/lib/api/fetch-asset-prices-server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { MORPHO_SUPPLY_TOKENS } from "@/lib/morpho/supply-tokens";
+import { listedTokenKeys } from "@/lib/api/asset-explorer-chips";
 
 /**
  * The Prices list's rows (lib/shared/asset-prices.ts; rails-ops
@@ -9,17 +9,18 @@ import { MORPHO_SUPPLY_TOKENS } from "@/lib/morpho/supply-tokens";
  * line gives (the last completed day, or on stored rounds the value in force
  * at the checkpoint), the 30 days before as a sparkline and the change over
  * them. The asset icon's popover reads it. Cached as long as the rounds' reads.
- * `unpriced` names the tokens with a page and no stored price: those only
- * Morpho lists, in a market with $1M or more of supply (the asset page's
- * `morphoUnpricedPage`).
+ * `unpriced` names the tokens with a page and no stored price: every token an
+ * explorer lists that the roster does not price (the asset page's
+ * `unpricedPage`).
  */
 export async function GET(request: NextRequest) {
   try {
-    const list = await fetchAssetPricesServer(readerIpFromRequest(request));
+    const [list, listed] = await Promise.all([
+      fetchAssetPricesServer(readerIpFromRequest(request)),
+      listedTokenKeys().catch(() => [] as string[]),
+    ]);
     const priced = new Set(list.rows.flatMap((r) => r.chains.map((c) => `${c}:${r.token}`)));
-    const unpriced = Object.entries(MORPHO_SUPPLY_TOKENS).flatMap(([chain, tokens]) =>
-      tokens.map((t) => `${chain}:${t}`).filter((k) => !priced.has(k)),
-    );
+    const unpriced = listed.filter((k) => !priced.has(k));
     return NextResponse.json(
       { ...list, unpriced },
       {

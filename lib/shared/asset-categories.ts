@@ -3,15 +3,16 @@
 // state no category, so the field carries no source receipt and the page says
 // whose grouping it is. The first six categories and their first rows are the
 // prototype's (rails-web-prototype packages/shared/src/protocol-metadata.ts);
-// Utility, LP / Pool share, Principal token and Real-world asset were added
-// on 26 Oct 2026 (Miles). The table runs by symbol over the price roster,
+// Utility, LP / Pool share, Principal token, Real-world asset and Strategy
+// vault were added on 26 Oct 2026 (Miles). The table runs by symbol over the price roster,
 // the tokens the explorers list with no stored price and the tokens only
 // Morpho lists (lib/morpho/supply-tokens.ts); a symbol it does not
 // name is "other". A deposit receipt (aDAI, cDAI, spDAI) sits with what it
 // earns on (a stablecoin's in Yield-bearing Stable); a one-for-one or
 // custodial wrapper (Seamless's ILM reserve tokens, Concrete's custodial
 // assets) is a Wrapped Asset; a liquid locker of a governance token (cvxCRV,
-// sdCRV, upYFI) is Governance.
+// sdCRV, upYFI) is Governance. A claim on a managed strategy (a tranche, a
+// structured or curated vault, a tokenized fund strategy) is a Strategy vault.
 
 export type AssetCategory =
   | "network"
@@ -23,6 +24,7 @@ export type AssetCategory =
   | "utility"
   | "lp-share"
   | "principal-token"
+  | "strategy-vault"
   | "rwa"
   | "other";
 
@@ -36,6 +38,7 @@ export const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = {
   utility: "Utility",
   "lp-share": "LP / Pool share",
   "principal-token": "Principal token",
+  "strategy-vault": "Strategy vault",
   rwa: "Real-world asset",
   other: "Other",
 };
@@ -51,6 +54,7 @@ export const ASSET_CATEGORY_ORDER: readonly AssetCategory[] = [
   "utility",
   "lp-share",
   "principal-token",
+  "strategy-vault",
   "rwa",
   "other",
 ];
@@ -142,6 +146,8 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "stUSDS",
     "sUSDai",
     "steakEURCV",
+    "msY",
+    "sUSDv",
   ],
   "liquid-staking": [
     "stETH",
@@ -290,7 +296,33 @@ const TABLE: Record<Exclude<AssetCategory, "other">, readonly string[]> = {
     "Surge USDf-aGHO",
   ],
   "principal-token": [],
-  rwa: ["PAXG", "XAUt", "XAUM", "wWTGXX", "EUTBL", "wUSCC", "wJAAA", "mF-ONE"],
+  "strategy-vault": [
+    "mGLO",
+    "mGLOeuro",
+    "mHyperBTC",
+    "mM1-USD",
+    "muBOND",
+    "mWIN",
+    "nALPHA",
+    "nOPAL",
+    "nvPRIME",
+    "AA_FalconXUSDC",
+    "USD3",
+    "RLP",
+    "v-wmtUSDC",
+    "v-wmtUSDT",
+    "CarryTradeUSDTRYLeverage",
+    "aguaUSDCgc",
+    "CARRY",
+    "PST",
+    "PRIME",
+    "etrUSD",
+    "sETHv",
+    "savETH",
+    "vaSTETH",
+    "yvWETH-2",
+  ],
+  rwa: ["PAXG", "XAUt", "XAUM", "wWTGXX", "EUTBL", "wUSCC", "wJAAA", "mF-ONE", "oTFY"],
 };
 
 const BY_SYMBOL: ReadonlyMap<string, AssetCategory> = new Map(

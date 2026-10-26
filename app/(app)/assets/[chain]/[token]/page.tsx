@@ -7,8 +7,8 @@
 // no chain segment and no explorer rail; the chain in the path puts that
 // chain's chart first. `?via=<explorer>&from=<path>` reads the page from
 // that protocol's side and links back to where the reader came from
-// (lib/shared/asset-via.ts). A token without a stored price that Morpho lists
-// in a market with $1M or more of supply has a page of one line, the card's,
+// (lib/shared/asset-via.ts). A token an explorer lists that the roster does
+// not price has a page of the card's line, its figure where Rails has one,
 // and the explorers that list it.
 
 import Link from "next/link";
@@ -19,8 +19,9 @@ import { fetchAssetRosterServer } from "@/lib/api/fetch-asset-roster-server";
 import { assetHref, assetPage, chainName, chainOfSlug, pageLinks } from "@/lib/shared/asset-roster";
 import { FROM_PARAM, VIA_PARAM, viaPage, withVia } from "@/lib/shared/asset-via";
 import { backLink, viaExplorer } from "@/lib/shared/asset-via-links";
-import { morphoUnpricedPage } from "@/lib/api/asset-explorer-chips";
-import { PRICELESS_WHY, type AssetChip } from "@/lib/shared/asset-explorer";
+import { unpricedPage } from "@/lib/api/asset-explorer-chips";
+import { PRICELESS_WHY, type AssetChip, type CardFigure } from "@/lib/shared/asset-explorer";
+import { FigureRow } from "@/components/assets/asset-explorer";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainProvider } from "@/lib/shared/chain-context";
 import type { ChainId } from "@/lib/shared/chains";
@@ -35,7 +36,7 @@ export async function generateMetadata({ params }: { params: Params }) {
   const { chain, token } = await params;
   const answer = /^0x[0-9a-fA-F]{40}$/.test(token) ? await fetchAssetRosterServer(token).catch(() => null) : null;
   const page = answer ? assetPage(answer, chainOfSlug(chain) ?? 1) : null;
-  const unpriced = !page && chainOfSlug(chain) != null ? await morphoUnpricedPage(chainOfSlug(chain)!, token) : null;
+  const unpriced = !page && chainOfSlug(chain) != null ? await unpricedPage(chainOfSlug(chain)!, token) : null;
   return {
     title: page ? `${page.symbol} price` : (unpriced?.symbol ?? "Asset"),
     description: page
@@ -54,7 +55,7 @@ export default async function AssetPage({ params, searchParams }: { params: Para
   const answer = await fetchAssetRosterServer(token);
   const opened = answer ? assetPage(answer, explorer?.chain ?? chain) : null;
   if (!opened) {
-    const unpriced = await morphoUnpricedPage(chain, token);
+    const unpriced = await unpricedPage(chain, token);
     if (!unpriced) notFound();
     return <UnpricedPage chain={chain} token={token} back={explorer ? backLink(from) : null} {...unpriced} />;
   }
@@ -116,18 +117,20 @@ export default async function AssetPage({ params, searchParams }: { params: Para
   );
 }
 
-/** The page of a token without a stored price: the card's line and its explorers. */
+/** The page of a token without a stored price: the card's figure and line and its explorers. */
 function UnpricedPage({
   chain,
   token,
   symbol,
   chips,
+  figure,
   back,
 }: {
   chain: number;
   token: string;
   symbol: string;
   chips: AssetChip[];
+  figure: CardFigure | null;
   back: ReturnType<typeof backLink> | null;
 }) {
   return (
@@ -147,6 +150,11 @@ function UnpricedPage({
             </ChainProvider>
             {symbol}
           </h1>
+          {figure && (
+            <div className="mt-2">
+              <FigureRow figure={figure} />
+            </div>
+          )}
           <p className="mt-2 text-sm text-rb-500" data-asset-priceless="" data-anatomy="A1.3">
             {PRICELESS_WHY}
           </p>

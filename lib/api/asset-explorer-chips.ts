@@ -20,8 +20,8 @@
 // figures by that symbol (Miles, 26 Oct 2026). Morpho Blue's censuses name no
 // symbol: a token only they list has a card when it sits in a market with a
 // supply of $1M or more (lib/morpho/supply-tokens.ts, Miles, 26 Oct 2026), by
-// the symbol erc20-meta reads for it, and a page without a price
-// (`morphoUnpricedPage`).
+// the symbol erc20-meta reads for it. Every listed token the roster does not
+// price has a page without a price (`unpricedPage`, Miles, 26 Oct 2026).
 //
 // SERVER-ONLY: the Morpho censuses are about 1.4 MB of source.
 
@@ -29,7 +29,8 @@ import { unstable_cache } from "next/cache";
 import { PROTOCOLS } from "@/lib/shared/protocols";
 import { NATIVE } from "@/lib/shared/asset-roster";
 import type { RosterAsset } from "@/lib/shared/asset-roster";
-import type { AssetChip, ChipLink } from "@/lib/shared/asset-explorer";
+import type { AssetChip, CardFigure, ChipLink } from "@/lib/shared/asset-explorer";
+import { assetCardFigures } from "@/lib/api/asset-card-figures";
 import { AAVE_V3_CATALOG } from "@/lib/aave-v3/asset-catalog";
 import { SPARK_CATALOG } from "@/lib/spark/asset-catalog";
 import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
@@ -265,9 +266,6 @@ export interface ListedToken {
   chain: number;
   token: string;
   symbol: string;
-  /** A token only Morpho lists, in a market with $1M or more of supply: it
-   *  has a page without a price. */
-  page?: true;
 }
 
 /** The chips for each `chain:token`, from the roster and the explorers' lists,
@@ -341,24 +339,33 @@ export async function assetChips(
   const listed = new Map<string, ListedToken>();
   for (const h of hits)
     if (h.symbol && byExplorer.has(h.explorer) && !listed.has(`${h.chain}:${h.token}`))
-      listed.set(`${h.chain}:${h.token}`, {
-        chain: h.chain,
-        token: h.token,
-        symbol: h.symbol,
-        ...(morpho.has(`${h.chain}:${h.token}`) ? { page: true as const } : {}),
-      });
+      listed.set(`${h.chain}:${h.token}`, { chain: h.chain, token: h.token, symbol: h.symbol });
   return { chips: out, listed: [...listed.values()] };
 }
 
-/** The page of a token without a stored price that Morpho lists in a market
- *  with $1M or more of supply: its symbol and chips; null for any other token. */
-export async function morphoUnpricedPage(
+/** The page of a token an explorer lists that the roster does not price: its
+ *  symbol, chips and the card's figure (ZCHF's supply, a Liquity V2-family
+ *  stablecoin's trove debt); null for a token no list names. */
+export async function unpricedPage(
   chain: number,
   token: string,
-): Promise<{ symbol: string; chips: AssetChip[] } | null> {
+): Promise<{ symbol: string; chips: AssetChip[]; figure: CardFigure | null } | null> {
   const t = token.toLowerCase();
-  if (!MORPHO_SUPPLY_TOKENS[chain]?.includes(t)) return null;
+  if (ZERO.test(t)) return null;
   const { chips, listed } = await assetChips([]);
   const hit = listed.find((l) => l.chain === chain && l.token === t);
-  return hit ? { symbol: hit.symbol, chips: chips.get(`${chain}:${t}`) ?? [] } : null;
+  if (!hit) return null;
+  const figures = await assetCardFigures().catch(() => [] as [string, CardFigure][]);
+  return {
+    symbol: hit.symbol,
+    chips: chips.get(`${chain}:${t}`) ?? [],
+    figure: figures.find(([k]) => k === `${chain}:${t}`)?.[1] ?? null,
+  };
+}
+
+/** The `chain:token` of every listed token, for the icon popover's "No price"
+ *  line and link; the route leaves out the ones the roster prices. */
+export async function listedTokenKeys(): Promise<string[]> {
+  const { listed } = await assetChips([]);
+  return listed.filter((l) => !ZERO.test(l.token)).map((l) => `${l.chain}:${l.token}`);
 }

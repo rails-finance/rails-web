@@ -123,7 +123,7 @@ test("from is a path on this site, and the link carries it with via", () => {
   assert.equal(withVia("/assets/ethereum/0x7f39", "aave-v3", "//evil"), "/assets/ethereum/0x7f39?via=aave-v3");
 });
 
-test("categories: governance, utility, pool shares, principal tokens, real-world assets", () => {
+test("categories: governance, utility, pool shares, principal tokens, strategy vaults, real-world assets", () => {
   assert.equal(assetCategory("AAVE"), "governance");
   assert.equal(assetCategory("LINK"), "utility");
   assert.equal(assetCategory("DEGEN"), "utility");
@@ -134,6 +134,9 @@ test("categories: governance, utility, pool shares, principal tokens, real-world
   assert.equal(assetCategory("aDAI"), "yield-stable");
   assert.equal(assetCategory("BOLD"), "stablecoin");
   assert.equal(assetCategory("MALLY"), "other");
+  assert.equal(assetCategory("AA_FalconXUSDC"), "strategy-vault");
+  assert.equal(assetCategory("yvWETH-2"), "strategy-vault");
+  assert.equal(assetCategory("oTFY"), "rwa");
 });
 
 test("a market narrows the line where a line carries it, else the explorer's line stands", () => {

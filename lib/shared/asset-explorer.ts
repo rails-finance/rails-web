@@ -11,7 +11,8 @@
 // symbol that the roster does not price has a card of chips alone, with the
 // line saying why there is no price (Miles, 26 Oct 2026), and where Rails
 // reads or stores one, its figure: ZCHF's supply, a Liquity V2-family
-// stablecoin's trove debt (lib/api/asset-card-figures.ts).
+// stablecoin's trove debt (lib/api/asset-card-figures.ts). Its symbol and
+// chain mark link its page, which carries the same.
 //
 // Pure: the server builds the cards, the page's client island filters them.
 
@@ -42,7 +43,8 @@ export interface AssetChip {
 export interface CardChain {
   chain: number;
   token: string;
-  /** The asset page; null for a token with no stored price and no page. */
+  /** The asset page: the chart, or for a token without a stored price the
+   *  page of its line, figure and chips. */
   href: string | null;
 }
 
@@ -51,8 +53,6 @@ export interface ListedRef {
   chain: number;
   token: string;
   symbol: string;
-  /** It has a page without a price (a token only Morpho lists). */
-  page?: true;
 }
 
 /** Why a card has no price figures. */
@@ -159,7 +159,7 @@ export function assetCards(
   const priced = new Set(cards.flatMap((c) => c.chains.map((x) => `${x.chain}:${x.token}`)));
   for (const t of listed) {
     if (priced.has(`${t.chain}:${t.token}`) || /^0x0{40}$/.test(t.token)) continue;
-    const href = t.page ? assetHref(t.chain, t.token) : null;
+    const href = assetHref(t.chain, t.token);
     // A symbol a card carries on another chain is that card's chain.
     const same = cards.find((c) => c.symbol === t.symbol && !c.chains.some((x) => x.chain === t.chain));
     if (same) {

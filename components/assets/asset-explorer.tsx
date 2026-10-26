@@ -154,7 +154,8 @@ function RelLinks({ label, links: all }: { label: string; links: CardLink[] }) {
 }
 
 /** A card without a price's figure: "Supply 12.3M ZCHF 10:41 UTC", "Trove debt 38.2M BOLD". */
-function FigureRow({ figure: f }: { figure: CardFigure }) {
+/** A card without a price's figure (A5.11); the asset page (A1.3) draws it too. */
+export function FigureRow({ figure: f }: { figure: CardFigure }) {
   const n = formatCompactTitled(f.amount);
   const title = `${f.title}${f.asOf ? `, ${asOfWords(f.asOf)}` : ""}: ${n.title} ${f.unit}`;
   return (
