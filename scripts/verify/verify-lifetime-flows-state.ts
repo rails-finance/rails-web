@@ -2451,3 +2451,71 @@ test("Aave V3's health view: the day's prices and the last read's thresholds, th
     ["0xc", "0xd"],
   );
 });
+
+// ── Aave V4's health source (ui-jobs 328 step 5) ─────────────────────────────
+test("Aave V4: factors by symbol, weighted across two hubs; levels are the card's assetLiqPrices", async () => {
+  const { aaveV4FactorRead, aaveV4Levels } = await import("@/lib/aave-v4/flows-health");
+  const { calculateAaveV4Position } = await import("@/lib/aave-v4/utils/position-calculation");
+  const reserve = (symbol: string, supply: string, isCollateral: boolean, lt: number) => ({
+    reserveId: 0,
+    address: "0x",
+    symbol,
+    decimals: 18,
+    supplyBalanceRaw: supply,
+    debtBalanceRaw: "0",
+    isCollateral,
+    hasBorrow: false,
+    lt,
+  });
+  const read = aaveV4FactorRead(
+    {
+      wallet: "0x",
+      spoke: "main",
+      spokeName: "Main",
+      blockNumber: 100,
+      healthFactor: 1.5,
+      avgCollateralFactor: 0.8,
+      riskPremiumRaw: "0",
+      supplyAssetCount: 2,
+      debtAssetCount: 1,
+      chainStale: false,
+      reserves: [
+        reserve("WETH", "3000000000000000000", true, 0.8),
+        reserve("WETH", "1000000000000000000", true, 0.6),
+        reserve("USDC", "0", false, 0.78),
+      ],
+    },
+    86_400 * 20_000 + 5,
+  )!;
+  assert.equal(read.day, 20_000);
+  assert.equal(read.block, 100);
+  assert.ok(Math.abs(read.lt.weth - 0.75) < 1e-12);
+  assert.equal(read.lt.usdc, 0);
+
+  // One collateral: its price ÷ the health factor.
+  const one = aaveV4Levels(
+    [
+      { asset: "link", coll: 100, debt: 0, price: 10, lt: 0.7 },
+      { asset: "usdt", coll: 0, debt: 400, price: 1, lt: 0 },
+    ],
+    1.75,
+  );
+  assert.deepEqual([...one], [["link", 10 / 1.75]]);
+
+  // Several: calculateAaveV4Position's entries; a collateral the rest covers has none.
+  const lines = [
+    { asset: "weth", coll: 2, debt: 0, price: 2000, lt: 0.8 },
+    { asset: "wsteth", coll: 1, debt: 0, price: 2400, lt: 0.8 },
+    { asset: "aave", coll: 1, debt: 0, price: 100, lt: 0.7 },
+    { asset: "usdc", coll: 0, debt: 3000, price: 1, lt: 0 },
+  ];
+  const many = aaveV4Levels(lines, 1);
+  const want = calculateAaveV4Position({
+    supplies: lines
+      .filter((l) => l.coll > 0)
+      .map((l) => ({ symbol: l.asset, amount: l.coll, price: l.price, lt: l.lt, collateralEnabled: true })),
+    debts: [{ symbol: "usdc", amount: 3000, price: 1 }],
+  }).assetLiqPrices.filter((a) => a.liqPrice != null && a.liqPrice > 0);
+  assert.deepEqual([...many].sort(), want.map((a) => [a.symbol, a.liqPrice]).sort());
+  assert.ok(!many.has("aave"));
+});

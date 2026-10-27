@@ -61,12 +61,17 @@
 // zooms, a sideways swipe pans. Aave V3 Prime 0xb8a4…715e (wstETH/WETH, more
 // than 60 days with events, so its older health days are dotted) and EtherFi
 // 0x0f2a…bbe take the health checks; SparkLend 0x1601…347e (no debt, so no
-// health view) and Aave V4 Main 0x7eac…fa09 the price checks against their
-// answers. Step 5 (the health view on SparkLend, Aave V3 Base and Seamless):
+// health view) the price checks against its answer. Step 5 (the health view on SparkLend, Aave V3 Base and Seamless):
 // SparkLend 0x070b…b113 (60 days read, its older days dotted) takes the price
 // and health checks, and Aave V3 Base 0xe883…4cc8 (older days dotted) and
 // Seamless 0x8182…7804 (every day read) the chart's checks and the health
-// checks (`lwOnly`: their price answer is the knots). Each health page also
+// checks (`lwOnly`: their price answer is the knots). Aave V4 (step 5, its
+// factors read from the spoke at each picked block): Main 0x7eac…fa09 (one
+// collateral) takes the price and health checks, Main 0x7680…a65e (one
+// collateral, older days dotted) and 0x7562…af18 (three collaterals, older
+// days dotted) the health checks, and on each the picked collaterals' levels
+// today match `assetLiqPrices` worked from the spoke's state and oracle now
+// (`v4Spoke`, within 1 %: the head moves between the reads). Each health page also
 // checks that an asset picked from the list draws its level. Step 4d moved every other family onto the engine: one position
 // per family takes the chart's checks alone (`lwOnly`), its panes named
 // (`panes`: "value" where the family has no price series, a pane per side
@@ -129,6 +134,25 @@ const PAGES = [
     path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
     answer: "/api/aave-v4/flows",
     query: "wallet=0x7eac02864fbae93de38394a3e7b72a22e9b5fa09&spoke=main",
+    health: true,
+    v4Spoke: "main",
+    timeline: "/api/aave-v4/timeline?wallet=0x7eac02864fbae93de38394a3e7b72a22e9b5fa09&recent=1000",
+  },
+  {
+    id: "aave-v4 main 0x7680",
+    path: "/ethereum/aave-v4/spoke/main/0x7680c2d966cc3a82815ad92b00cb59da0dd2a65e",
+    lwOnly: true,
+    health: true,
+    v4Spoke: "main",
+    timeline: "/api/aave-v4/timeline?wallet=0x7680c2d966cc3a82815ad92b00cb59da0dd2a65e&recent=1000",
+  },
+  {
+    id: "aave-v4 main 0x7562",
+    path: "/ethereum/aave-v4/spoke/main/0x756281ae56c3d51bcdb0f46518ba1d148282af18",
+    lwOnly: true,
+    health: true,
+    v4Spoke: "main",
+    timeline: "/api/aave-v4/timeline?wallet=0x756281ae56c3d51bcdb0f46518ba1d148282af18&recent=1000",
   },
   // Base's two Pools answer in another shape (the knots): the chart's checks
   // and the health view's.
@@ -429,6 +453,65 @@ async function checkHealthAlone(page, tag, pg) {
   }
   await checkHealth(page, tag, pg, listedAll);
   if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll);
+  if (pg.v4Spoke) await checkV4Levels(page, tag, pg, listedAll);
+}
+
+/** Aave V4: each collateral's level today is its `assetLiqPrices` entry
+ *  (lib/aave-v4/utils/position-calculation.ts), worked here from the spoke's
+ *  state and the oracle now; with one collateral, its price ÷ the health
+ *  factor. A level more than ten times from the price is not drawn. */
+async function checkV4Levels(page, tag, pg, listedAll) {
+  const wallet = pg.path.split("/").pop();
+  const [pos, oracle] = await Promise.all([
+    hostFetch(`${BASE}/api/chain/aave-v4/spoke-position?wallet=${wallet}&spoke=${pg.v4Spoke}`).then((r) => r.json()),
+    hostFetch(`${BASE}/api/oracle/aave-v4`).then((r) => r.json()),
+  ]);
+  const supplies = [];
+  let debt = 0;
+  for (const r of pos.reserves ?? []) {
+    const price = oracle.prices?.[r.address]?.usd;
+    if (price == null) continue;
+    const amt = (raw) => Number(raw) / 10 ** r.decimals;
+    if (amt(r.supplyBalanceRaw) > 0)
+      supplies.push({ symbol: r.symbol, amount: amt(r.supplyBalanceRaw), price, lt: r.isCollateral ? (r.lt ?? 0) : 0 });
+    debt += amt(r.debtBalanceRaw) * price;
+  }
+  const weighted = supplies.reduce((n, x) => n + x.amount * x.price * x.lt, 0);
+  const coll = supplies.filter((x) => x.lt > 0);
+  const want = new Map();
+  for (const x of coll) {
+    const lv =
+      coll.length === 1
+        ? x.price / (weighted / debt)
+        : (debt - (weighted - x.amount * x.price * x.lt)) / (x.amount * x.lt);
+    if (lv > x.price / 10 && lv < x.price * 10) want.set(x.symbol, lv);
+  }
+  const picker = page.locator("button[data-price-picker]");
+  const sl = page.locator(PRICE_STRIP).first();
+  const got = [];
+  const bad = [];
+  for (const [sym, lv] of want) {
+    if (!listedAll.includes(sym)) {
+      bad.push(`${sym} not listed`);
+      continue;
+    }
+    await picker.click();
+    await page.locator(`[role="listbox"] [data-price-asset="${sym}"]`).click();
+    await sl.focus();
+    await page.keyboard.press("End");
+    await page.waitForTimeout(250);
+    const v = await page.$eval("[data-liq-readout]", (e) => Number(e.getAttribute("data-liq-value"))).catch(() => null);
+    got.push(`${sym} ${v?.toFixed(4)} / ${lv.toFixed(4)}`);
+    if (v == null || Math.abs(v - lv) > 0.01 * lv) bad.push(sym);
+  }
+  check(
+    `${tag}: each collateral's level today is its assetLiqPrices entry`,
+    want.size > 0 && bad.length === 0,
+    `${got.join(", ")}${bad.length ? `; off: ${bad.join(",")}` : ""}`,
+  );
+  await picker.click();
+  await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
+  await page.waitForTimeout(250);
 }
 
 /** The price tip's level line: hidden until the triangle toggle is pressed,
@@ -1162,8 +1245,8 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     const picker = page.locator("button[data-price-picker]");
     // The tip's toggles, once the series the chart opens on has landed.
     // Only a page that draws a level has the toggle: the Aave family's
-    // health view and the Troves; Aave V4 draws the price alone until its
-    // step 5 pass, and a SparkLend page with no debt has no health view.
+    // health view and the Troves; a SparkLend page with no debt has no
+    // health view.
     if (pg.health || pg.trove) await checkLevelToggle(page, tag);
     await checkEventsToggle(page, tag);
     if ((await picker.count()) > 0) {
@@ -1177,6 +1260,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     if (pg.health) {
       await checkHealth(page, tag, pg, listedAll);
       if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll);
+      if (pg.v4Spoke) await checkV4Levels(page, tag, pg, listedAll);
     }
     const pick = async (sym) => {
       if ((await picker.count()) === 0) return;

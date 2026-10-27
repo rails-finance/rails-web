@@ -1,8 +1,9 @@
 // The Aave family's health view (rails-ops reference/lifetime-price-chart.md,
 // rulings 2, 7 and 15; ui-jobs 328, steps 4 and 5): the position's health
 // factor per day, and each held asset's liquidation level. One function for
-// every Aave V3 Pool the panel draws (Aave V3 Ethereum, SparkLend, Aave V3 on
-// Base, Seamless); a family names its oracle, Pool and chain
+// every Aave Pool the panel draws (Aave V3 Ethereum, SparkLend, Aave V3 on
+// Base, Seamless, an Aave V4 spoke); a family names its oracle, Pool, chain
+// and, where it differs, its factors' word, its reader and its level rule
 // (`AaveHealthSource`), and hooks/useAaveFamilyHealth.ts reads its thresholds.
 //
 // RULES.
@@ -85,6 +86,16 @@ export function aaveV3HealthReadPicks<E extends { blockNumber: number; timestamp
     .map(([, e]) => e);
 }
 
+/** One reserve's line on a day: its balances at the day's close, its price
+ *  and its threshold (0 where it does not count as collateral). */
+export interface AaveHealthLine {
+  asset: string;
+  coll: number;
+  debt: number;
+  price: number;
+  lt: number;
+}
+
 /** What a family's health view names: the oracle whose price it records each
  *  day, the Pool whose thresholds it reads, and the chain. */
 export interface AaveHealthSource {
@@ -93,6 +104,18 @@ export interface AaveHealthSource {
   /** "the Pool": read as "{pool}'s thresholds". */
   pool: string;
   chain: number;
+  /** What the thresholds are called, short and long. Default
+   *  ["thresholds", "liquidation thresholds"]. */
+  factors?: [string, string];
+  /** The route the thresholds come from: the family's position-state route
+   *  by market (the default), or an Aave V4 spoke's state at the block
+   *  (`/api/chain/aave-v4/spoke-position?block=`, the market being the
+   *  spoke's key). */
+  reader?: "position-state" | "aave-v4-spoke";
+  /** Each asset's level on a day from its lines and health factor, where
+   *  the family's card derives it otherwise than `aaveV3Levels`; and the
+   *  rule in words. */
+  levels?: { of: (lines: readonly AaveHealthLine[], hf: number) => Map<string, number>; formula: string };
 }
 
 /** Aave V3 on Ethereum. */
@@ -100,6 +123,28 @@ export const AAVE_V3_HEALTH_SOURCE: AaveHealthSource = { oracle: "the AaveOracle
 
 const AAVE_V3_LEVEL_FORMULA =
   "the price at which the health factor reaches 1, every other balance and price held at the day's; where one reserve holds at least 99.5% of the collateral, its price ÷ the health factor";
+
+/** The Aave V3 Pools' levels (ruling 7, the card's 99.5 % rule): each asset's
+ *  price at which the health factor reaches 1, every other balance and price
+ *  held; for a debt asset the debt price that reaches it. */
+export function aaveV3Levels(lines: readonly AaveHealthLine[], hf: number): Map<string, number> {
+  let w = 0;
+  let debt = 0;
+  let collUsd = 0;
+  for (const l of lines) {
+    w += l.coll * l.price * l.lt;
+    if (l.lt > 0) collUsd += l.coll * l.price;
+    debt += l.debt * l.price;
+  }
+  const out = new Map<string, number>();
+  for (const l of lines) {
+    const cw = l.coll * l.lt;
+    if (cw > 0 && collUsd > 0 && (l.coll * l.price) / collUsd >= SINGLE_SHARE && l.debt === 0)
+      out.set(l.asset, l.price / hf);
+    else if (cw - l.debt !== 0) out.set(l.asset, (debt - l.debt * l.price - (w - cw * l.price)) / (cw - l.debt));
+  }
+  return out;
+}
 
 /** The last observation on or before `day`, or null. */
 function obsAt(obs: readonly DayObs[] | undefined, day: number): number | null {
@@ -122,10 +167,18 @@ function obsAt(obs: readonly DayObs[] | undefined, day: number): number | null {
 export function aaveV3HealthView(
   t: FlowTimeline,
   reads: readonly AaveV3ThresholdRead[],
-  o: { liveHf?: number | null; source?: AaveHealthSource },
+  o: {
+    liveHf?: number | null;
+    /** The card's levels today, by asset (lowercase), where the card states
+     *  one per collateral: an open position's today draws these. */
+    liveLevels?: Record<string, number> | null;
+    source?: AaveHealthSource;
+  },
 ): { health: PriceSeries; marks: Record<string, PriceMarks> } | null {
   if (reads.length === 0 || t.days.length === 0 || !t.dailyPrices) return null;
   const src = o.source ?? AAVE_V3_HEALTH_SOURCE;
+  const [factors, factorsLong] = src.factors ?? ["thresholds", "liquidation thresholds"];
+  const levelsOf = src.levels?.of ?? aaveV3Levels;
   const days = t.days;
   const held = new Map<string, { side: FlowSide; asset: string; amount: number; index?: number; day: number }>();
   for (const d of days)
@@ -187,37 +240,30 @@ export function aaveV3HealthView(
     if (!priced) continue;
     let w = 0;
     let debt = 0;
-    let collUsd = 0;
     let known = true;
+    const dayLines: AaveHealthLine[] = [];
     for (const [asset, l] of lines) {
-      if (l.coll > 0) {
-        const lt = read.lt[asset.toLowerCase()];
-        if (lt == null) {
-          known = false;
-          break;
-        }
-        w += l.coll * l.price * lt;
-        if (lt > 0) collUsd += l.coll * l.price;
+      const lt = l.coll > 0 ? read.lt[asset.toLowerCase()] : 0;
+      if (lt == null) {
+        known = false;
+        break;
       }
+      w += l.coll * l.price * lt;
       debt += l.debt * l.price;
+      dayLines.push({ asset, ...l, lt });
     }
     if (!known || !(debt > 0)) continue;
     const hf = live ? o.liveHf! : w / debt;
     if (!(hf > 0) || hf >= HF_CAP) continue;
     const block = live ? null : read.block;
     hfPoints.push([day, hf, block]);
-    for (const [asset, l] of lines) {
-      const lt = l.coll > 0 ? (read.lt[asset.toLowerCase()] ?? 0) : 0;
-      const cw = l.coll * lt;
-      let level: number | null = null;
-      if (cw > 0 && collUsd > 0 && (l.coll * l.price) / collUsd >= SINGLE_SHARE && l.debt === 0) level = l.price / hf;
-      else if (cw - l.debt !== 0) {
-        const restW = w - cw * l.price;
-        const restD = debt - l.debt * l.price;
-        level = (restD - restW) / (cw - l.debt);
-      }
-      if (level != null && level > l.price / LEVEL_REACH && level < l.price * LEVEL_REACH)
-        push(asset, [day, level, block]);
+    const dayLevels =
+      live && o.liveLevels
+        ? new Map(dayLines.flatMap((l) => (o.liveLevels![l.asset] > 0 ? [[l.asset, o.liveLevels![l.asset]]] : [])))
+        : levelsOf(dayLines, hf);
+    for (const [asset, level] of dayLevels) {
+      const price = lines.get(asset)!.price;
+      if (level > price / LEVEL_REACH && level < price * LEVEL_REACH) push(asset, [day, level, block]);
     }
   }
   if (hfPoints.length === 0) return null;
@@ -229,11 +275,11 @@ export function aaveV3HealthView(
     unit: "health",
     grain: "daily",
     noCarry: true,
-    source: `${src.pool}'s thresholds at each day's last event, with ${src.oracle} price recorded each day`,
+    source: `${src.pool}'s ${factors} at each day's last event, with ${src.oracle} price recorded each day`,
     points: hfPoints,
     here: {
       live: `Health factor — ${src.pool}'s figure for the position now, the card's.`,
-      read: `Health factor — on {day}, the balances held at the day's close, each at ${src.oracle} price recorded that day, against the liquidation thresholds ${src.pool} held after the event at block {block}.`,
+      read: `Health factor — on {day}, the balances held at the day's close, each at ${src.oracle} price recorded that day, against the ${factorsLong} ${src.pool} held after the event at block {block}.`,
     },
     level: {
       points: hfPoints.map(([d]) => [d, 1, null] as PricePoint),
@@ -248,12 +294,12 @@ export function aaveV3HealthView(
     marks[asset] = {
       level: {
         points: pts,
-        formula: AAVE_V3_LEVEL_FORMULA,
-        summary: `Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the thresholds ${src.pool} held at the day's last event.`,
+        formula: src.levels?.formula ?? AAVE_V3_LEVEL_FORMULA,
+        summary: `Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the ${factors} ${src.pool} held at the day's last event.`,
         end: endWord,
         here: {
           live: "Here at today's balances and prices and the card's health factor.",
-          read: `Here at the balances and prices of {day}, against the thresholds ${src.pool} held after the event at block {block}.`,
+          read: `Here at the balances and prices of {day}, against the ${factors} ${src.pool} held after the event at block {block}.`,
         },
       },
     };

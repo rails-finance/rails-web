@@ -66,6 +66,7 @@ import {
   computeAaveV4InterestPnl,
   computeAaveV4InterestSinceZero,
   resolveFallbackCollateral,
+  liquidationBuffer,
 } from "@/lib/aave-v4/spoke-cards";
 import { AAVE_V4_FALLBACK_LT, isDollarRail } from "@/lib/aave-v4/liquidation-thresholds";
 import { calculateAaveV4Position, type CalcPositionInputs } from "@/lib/aave-v4/utils/position-calculation";
@@ -98,7 +99,14 @@ import {
 } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
-import { aaveV4FlowLive, aaveV4FlowSeriesTimeline, aaveV4FocusEvents } from "@/lib/aave-v4/flows-timeline";
+import {
+  aaveV4FlowLive,
+  aaveV4FlowSeriesTimeline,
+  aaveV4FocusEvents,
+  isAaveV4PositionEvent,
+} from "@/lib/aave-v4/flows-timeline";
+import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
+import { AAVE_V4_HEALTH_SOURCE } from "@/lib/aave-v4/flows-health";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { shortAddr } from "@/lib/shared/format-event";
 import { useWalletContext } from "@/components/nav/wallet-context";
@@ -594,6 +602,22 @@ function AaveV4SpokePageInner({
     [spokeScopedEvents, wallet, spokeName],
   );
   const focusRoot = useFlowFocusRoot(focusEvents);
+  // The card's level per collateral, for the chart's today on an open
+  // position: "Liquidates at" with one collateral, else `assetLiqPrices`.
+  const liveLevels = useMemo(() => {
+    if (!activeCard || activeCard.isClosed) return null;
+    const single = liquidationBuffer(activeCard).single;
+    if (single) return { [single.symbol.toLowerCase()]: single.liqPrice };
+    const out: Record<string, number> = {};
+    for (const a of activeCard.assetLiqPrices)
+      if (a.liqPrice != null && a.liqPrice > 0) out[a.symbol.toLowerCase()] = a.liqPrice;
+    return out;
+  }, [activeCard]);
+  // The owner's rows on this spoke, for the chart's health view reads.
+  const positionEvents = useMemo(
+    () => spokeScopedEvents.filter((e) => isAaveV4PositionEvent(e, wallet, spokeName)),
+    [spokeScopedEvents, wallet, spokeName],
+  );
   const [focusTimeline, setFocusTimeline] = useState<FlowTimeline | null>(null);
   const flowFocus = useFlowFocusValue(focusRoot, focusTimeline);
   const tl = useTimelineEvents(spokeScopedEvents, {
@@ -779,6 +803,9 @@ function AaveV4SpokePageInner({
             gasUsd={activeGroup.result.totalGasCostUsd}
             historyComplete={olderCount === 0}
             onFlowTimeline={setFocusTimeline}
+            events={positionEvents}
+            liveHf={activeCard && !activeCard.isClosed ? activeCard.healthFactor : null}
+            liveLevels={liveLevels}
           />
         ) : null}
 
@@ -837,7 +864,16 @@ function AaveV4SpokeTowerBlock({
   gasUsd,
   historyComplete,
   onFlowTimeline,
+  events,
+  liveHf,
+  liveLevels,
 }: {
+  /** The card's level per collateral today, by asset key. */
+  liveLevels: Record<string, number> | null;
+  /** The position's events on this spoke, for the health view's reads. */
+  events: BaseActivityEvent[];
+  /** The card's health factor on an open position. */
+  liveHf: number | null;
   /** Told the day rows the panel draws, for the page's flow filter. */
   onFlowTimeline?: (t: FlowTimeline | null) => void;
   wallet: string;
@@ -948,7 +984,7 @@ function AaveV4SpokeTowerBlock({
     }
     return out;
   }, [reserves, prices]);
-  const flowTimeline = useMemo(
+  const flowSeriesTimeline = useMemo(
     () =>
       flowSeries
         ? aaveV4FlowSeriesTimeline(
@@ -961,6 +997,15 @@ function AaveV4SpokeTowerBlock({
         : null,
     [flowSeries, totals, todayPrices, reserves, prices],
   );
+  // The price chart's health view (ui-jobs 328, ruling 15).
+  const flowTimeline = useAaveFamilyHealth(flowSeriesTimeline, {
+    wallet,
+    market: flowSeriesEnabled ? (SPOKE_NAME_TO_KEY[spokeName] ?? null) : null,
+    source: AAVE_V4_HEALTH_SOURCE,
+    events,
+    liveHf,
+    liveLevels,
+  });
   useEffect(() => {
     onFlowTimeline?.(flowTimeline);
   }, [onFlowTimeline, flowTimeline]);
