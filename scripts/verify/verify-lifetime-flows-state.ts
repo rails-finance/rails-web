@@ -88,6 +88,7 @@ import {
 import { formatDate } from "@/lib/date";
 import {
   flowPriceSeries,
+  formatPrice,
   levelAt,
   pricePieces,
   priceReadout,
@@ -2303,7 +2304,7 @@ test("the price view's Liquity V2 marks: each row at its block, redemptions at t
     redemptionsOn(s, 103).map((e) => e.redemptionPrice),
     [2015],
   );
-  // Without the option, no marks: the forks and V1 are unchanged.
+  // Without the option, no marks: the forks are unchanged.
   const plain = liquityFlowTimeline(evs, {
     collSymbol: "WETH",
     debtSymbol: "BOLD",
@@ -2656,4 +2657,128 @@ test("Maker and Fluid ratio views: the ratio against the line in force, the card
   assert.equal(fv.health.sparseBefore, undefined);
   // 1,800 ÷ (1 × 0.9) = 2,000 USDT per ETH.
   assert.ok(Math.abs(levelAt({ ...fv.health, ...fv.marks.coll }, 101)![1] - 2_000) < 1e-9);
+});
+
+// ── Dolomite, Liquity V1 and Sky Savings (ui-jobs 328 step 5) ──────────────
+test("Dolomite margin ratio: premiums on both sides, today's line held, the card's today, no level", async () => {
+  const { DOLOMITE_HEALTH_SOURCE, dolomiteHeldRead } = await import("@/lib/dolomite/flows-health");
+  const { healthView } = await import("@/lib/shared/flows-health");
+  const row = (day: number, balances: FlowTimeline["days"][number]["balances"]) => ({
+    day,
+    events: 1,
+    tick: "both" as const,
+    cum: {},
+    balances,
+    prices: [],
+  });
+  const t: FlowTimeline = {
+    buckets: [],
+    days: [
+      row(100, [
+        { side: "collateral", asset: "0", symbol: "WETH", amount: 1 },
+        { side: "debt", asset: "2", symbol: "USDC", amount: 1_000 },
+      ]),
+    ],
+    live: { collateralUsd: 0, debtUsd: 0 },
+    dailyPrices: { "0": [[100, 2_000]], "2": [[100, 1]] },
+    today: 102,
+  };
+  const risk = { block: 9, required: 1.15, override: false, ratio: 1.9 };
+  // WETH's premium 0.25, USDC's 0.
+  const read = dolomiteHeldRead(["0", "2"], { "0": 0.25, "2": 0 }, risk)!;
+  // A market with no premium read leaves no read at all.
+  assert.equal(dolomiteHeldRead(["0", "7"], { "0": 0.25 }, risk), null);
+  const hv = healthView(t, [read], {
+    source: DOLOMITE_HEALTH_SOURCE,
+    liveHf: risk.ratio / risk.required,
+    liveLine: risk.required,
+  })!;
+  assert.equal(hv.health.unit, "ratio");
+  assert.equal(hv.health.digits, 2);
+  // 2,000 ÷ 1.25 over 1,000 = 160 %, against 115 %; today the card's 190 %.
+  assert.deepEqual(
+    hv.health.points.map((p) => [p[0], +p[1].toFixed(6)]),
+    [
+      [100, 1.6],
+      [101, 1.6],
+      [102, 1.9],
+    ],
+  );
+  assert.ok(hv.health.level!.points.every((p) => p[1] === 1.15));
+  assert.deepEqual(hv.marks, {});
+  // A borrowed market's premium multiplies its debt: USDC at 0.1.
+  const r2 = dolomiteHeldRead(["0", "2"], { "0": 0, "2": 0.1 }, risk)!;
+  const h2 = healthView(t, [r2], { source: DOLOMITE_HEALTH_SOURCE })!;
+  assert.ok(Math.abs(h2.health.points[0][1] - 2_000 / 1_100) < 1e-9);
+  // The override skips the premiums.
+  const r3 = dolomiteHeldRead(["0", "2"], { "0": 0.25, "2": 0.1 }, { ...risk, override: true, required: 1.1111 })!;
+  const h3 = healthView(t, [r3], { source: DOLOMITE_HEALTH_SOURCE })!;
+  assert.ok(Math.abs(h3.health.points[0][1] - 2) < 1e-9);
+});
+
+test("Liquity V1's level: debt × 110 % ÷ collateral after each event, no accrual, Recovery Mode named", () => {
+  const v1 = (o: Parameters<typeof lqEv>[0]) => lqEv({ rate: 0, fee: 0, ...o });
+  const evs = [
+    v1({ id: "a_1", ts: 100 * D + 3600, block: 1000, collAfter: 10, debtAfter: 10_000, debtOp: 10_000 }),
+    v1({ id: "b_1", ts: 102 * D + 7200, block: 1200, collAfter: 20, debtAfter: 10_000, collOp: 10, debtOp: 0 }),
+  ];
+  const t = liquityFlowTimeline(evs, {
+    collSymbol: "ETH",
+    debtSymbol: "LUSD",
+    family: "v1",
+    live: { price: 2100, coll: 20, debt: 10_200 },
+    surplusClaimed: false,
+    now: 104 * D + 100,
+    priceView: { collateralType: "ETH" },
+  })!;
+  const [s] = flowPriceSeries(t);
+  assert.equal(s.asset.symbol, "ETH");
+  assert.equal(levelAt(s, 101)![1], (10_000 * 1.1) / 10);
+  assert.equal(levelAt(s, 103)![1], (10_000 * 1.1) / 20);
+  // Today the card's: the entire debt × 1.1 ÷ the entire collateral.
+  assert.equal(levelAt(s, 104)![1], (10_200 * 1.1) / 20);
+  assert.equal(s.level!.formula, "debt × 110% ÷ collateral after each event");
+  assert.ok(s.level!.summary.includes("Recovery Mode is not drawn"));
+  assert.ok(s.help!.includes("Recovery Mode"));
+});
+
+test("Sky Savings: the share price in place of the sUSDS price, chi per day at its drip block, the card's today", async () => {
+  const { skyShareLine } = await import("@/lib/sky-savings/flows");
+  const RAY = (x: number) => BigInt(Math.round(x * 1e9)) * BigInt(1e18);
+  const chiDaily = [
+    { day: 98, date: "", lastDripBlock: 50, chiAtDayEnd: RAY(1.01).toString() },
+    { day: 99, date: "", lastDripBlock: 60, chiAtDayEnd: RAY(1.0101).toString() },
+    { day: 101, date: "", lastDripBlock: 80, chiAtDayEnd: RAY(1.0103).toString() },
+  ];
+  const s = skyShareLine(chiDaily, 100, { block: 99, chi: RAY(1.0105).toString() }, 102)!;
+  assert.deepEqual(
+    s.points.map((p) => [p[0], +p[1].toFixed(6), p[2]]),
+    [
+      [99, 1.0101, 60],
+      [101, 1.0103, 80],
+      [102, 1.0105, 99],
+    ],
+  );
+  const t: FlowTimeline = {
+    buckets: [],
+    days: [
+      {
+        day: 100,
+        events: 1,
+        tick: "collateral",
+        cum: {},
+        balances: [{ side: "collateral", asset: "0xs", symbol: "sUSDS", amount: 5 }],
+        prices: [],
+      },
+    ],
+    live: { collateralUsd: 0, debtUsd: 0 },
+    dailyPrices: { "0xs": [[100, 1.02]] },
+    shareLine: { asset: "0xs", series: s, unitLabel: "USDS", name: "sUSDS share price", digits: 6 },
+  };
+  const ps = flowPriceSeries(t);
+  assert.equal(ps.length, 1);
+  assert.equal(ps[0].key, "sky-savings:chi");
+  assert.equal(ps[0].unitLabel, "USDS");
+  assert.equal(ps[0].level, undefined);
+  assert.equal(formatPrice(1.0105, "USDS", 6), "1.010500 USDS");
 });

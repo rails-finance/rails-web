@@ -87,7 +87,13 @@
 // chart), a tap moves the cursor without freezing it and ⏭ brings it back.
 // MakerDAO and Fluid (step 5, `ratio`): the view in the card's terms, the
 // collateral ratio against the minimum ratio and the position ratio against
-// the liquidation threshold (`checkRatio`).
+// the liquidation threshold (`checkRatio`). Dolomite (step 5, `ratio` with
+// `noLevel`): the margin ratio against 1 + the account's margin ratio, today's
+// held across the life, no level on a market's price. Liquity V1 (`v1`): the
+// ETH price with the Trove's level at 110 %, today the card's "Liquidates at",
+// a liquidated life's level ending on its liquidation day, the how-to-read
+// naming Recovery Mode. Sky Savings (`share`): the share price (chi) in place
+// of the sUSDS price, today the card's, no level, the how-to-read naming chi.
 // `FIXTURES=<regex>` runs the pages whose id matches.
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
@@ -337,10 +343,57 @@ const PAGES = [
       help: ["the OSM price", "the Spotter's minimum ratio"],
     },
   },
+  // Step 5 on Dolomite, Liquity V1 and Sky Savings. Dolomite 0x49d6 (closed
+  // 16 Oct 2026), 0x65a9 (open, two markets a side) and 0xce8b (open,
+  // liquidated before); Liquity V1 0x04ca (open) and 0xf932 life 2
+  // (liquidated 5 Nov 2025); Sky 0x176f (open) and 0x0000…83eb (closed).
   {
-    id: "dolomite 0x49d6",
+    id: "dolomite 0x49d6 (closed)",
     path: "/ethereum/dolomite/0x49d62ca7ab8e28f7a28d9abadf84fe8b45e3caf6/15809042418583418827551470108194220080728327193143889538122062408455944908946",
     lwOnly: true,
+    ratio: {
+      label: "Margin ratio",
+      liquidates: "below",
+      head: "margin-ratio",
+      lineRow: "liquidation-line",
+      noLevel: true,
+      help: [
+        "the core's oracle price",
+        "today's margin ratio, premiums and any account override, held across the life",
+      ],
+    },
+  },
+  {
+    id: "dolomite 0x65a9",
+    path: "/ethereum/dolomite/0x65a9e8ce4570624a84cbaf7e0540bd7d706b241f/32240150336664509314013882100458201794439878083374431556084268488477773350727",
+    lwOnly: true,
+    ratio: {
+      label: "Margin ratio",
+      liquidates: "below",
+      head: "margin-ratio",
+      lineRow: "liquidation-line",
+      noLevel: true,
+      help: [
+        "the core's oracle price",
+        "today's margin ratio, premiums and any account override, held across the life",
+      ],
+    },
+  },
+  {
+    id: "dolomite 0xce8b (liquidated before)",
+    path: "/ethereum/dolomite/0xce8bb478053d602adf6c38a53ccd1c8e19be907a/32240150336664509314013882100458201794439878083374431556084268488477773350727",
+    lwOnly: true,
+    ratio: {
+      label: "Margin ratio",
+      liquidates: "below",
+      head: "margin-ratio",
+      lineRow: "liquidation-line",
+      noLevel: true,
+      help: [
+        "the core's oracle price",
+        "today's margin ratio, premiums and any account override, held across the life",
+      ],
+    },
   },
   {
     id: "fluid 6",
@@ -372,8 +425,27 @@ const PAGES = [
     id: "liquity-v1 0x04ca",
     path: "/ethereum/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1",
     lwOnly: true,
+    v1: "open",
   },
-  { id: "sky-savings 0x176f", path: "/ethereum/sky-savings/0x176f3dab24a159341c0509bb36b833e7fdd0a132", lwOnly: true },
+  {
+    id: "liquity-v1 0xf932 (liquidated)",
+    path: "/ethereum/liquity-v1/0xf9324746fcdc2e018d7feac2293490ddbab56759?epoch=2",
+    lwOnly: true,
+    v1: "liquidated",
+    liqTs: 1762305995,
+  },
+  {
+    id: "sky-savings 0x176f",
+    path: "/ethereum/sky-savings/0x176f3dab24a159341c0509bb36b833e7fdd0a132",
+    lwOnly: true,
+    share: true,
+  },
+  {
+    id: "sky-savings 0x0000…83eb (closed)",
+    path: "/ethereum/sky-savings/0x000000000000deaacbb476761b12b99b22b583eb",
+    lwOnly: true,
+    share: true,
+  },
   {
     id: "morpho 0xebb8",
     path: "/ethereum/morpho/ebd23a871b52e0a8c92bd719f4413600101b69e946cb72923b3a33fb5bc6ec85-0xebb870a0aaaa7bc55ead925d03a4af4a8db79a03",
@@ -710,31 +782,49 @@ async function checkRatio(page, tag, pg) {
     dotted.key === "health" && dotted.dotted === 0,
     JSON.stringify(dotted),
   );
-  // The collateral's level: drawn, and today the card's.
+  // The collateral's level: drawn, and today the card's; none where the card
+  // states no liquidation price (Dolomite).
   const coll = listed.find((x) => x !== r.label);
-  await picker.click();
-  await page.locator(`[role="listbox"] [data-price-asset="${coll}"]`).first().click();
-  const lv = await readAt("End");
-  const days = await page.$$eval("[data-liq-level]", (ls) =>
-    ls.reduce((n, l) => n + (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).length, 0),
-  );
-  check(`${tag}: ${coll} draws its level`, days > 0, `${days} days`);
-  if (open && r.levelRow) {
-    const liq = await page
-      .$eval(`[data-panel-row="${r.levelRow}"] dd`, (d) => d.textContent?.trim() ?? "")
-      .catch(() => "");
-    check(
-      `${tag}: ${coll}'s level today is the card's "Liquidates at"`,
-      lv.line != null && liq.endsWith(formatLiquidationPrice(lv.line)),
-      `chart ${lv.line}, card ${liq}`,
+  if (r.noLevel) {
+    if (coll) {
+      await picker.click();
+      await page.locator(`[role="listbox"] [data-price-asset="${coll}"]`).first().click();
+      await page.waitForTimeout(250);
+      const lv = await page.evaluate(() => ({
+        toggle: document.querySelector("[data-flow-level-toggle]") != null,
+        lines: document.querySelectorAll("[data-liq-level]").length,
+      }));
+      check(
+        `${tag}: ${coll} draws no level (the card states no liquidation price)`,
+        !lv.toggle && lv.lines === 0,
+        JSON.stringify(lv),
+      );
+    }
+  } else {
+    await picker.click();
+    await page.locator(`[role="listbox"] [data-price-asset="${coll}"]`).first().click();
+    const lv = await readAt("End");
+    const days = await page.$$eval("[data-liq-level]", (ls) =>
+      ls.reduce((n, l) => n + (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).length, 0),
     );
+    check(`${tag}: ${coll} draws its level`, days > 0, `${days} days`);
+    if (open && r.levelRow) {
+      const liq = await page
+        .$eval(`[data-panel-row="${r.levelRow}"] dd`, (d) => d.textContent?.trim() ?? "")
+        .catch(() => "");
+      check(
+        `${tag}: ${coll}'s level today is the card's "Liquidates at"`,
+        lv.line != null && liq.endsWith(formatLiquidationPrice(lv.line)),
+        `chart ${lv.line}, card ${liq}`,
+      );
+    }
+    if (open && fluid?.liqPriceDebtPerCol > 0)
+      check(
+        `${tag}: ${coll}'s level today is the card's read (liqPriceDebtPerCol)`,
+        lv.line != null && Math.abs(lv.line - fluid.liqPriceDebtPerCol) <= 0.005 * fluid.liqPriceDebtPerCol,
+        `chart ${lv.line}, read ${fluid.liqPriceDebtPerCol}`,
+      );
   }
-  if (open && fluid?.liqPriceDebtPerCol > 0)
-    check(
-      `${tag}: ${coll}'s level today is the card's read (liqPriceDebtPerCol)`,
-      lv.line != null && Math.abs(lv.line - fluid.liqPriceDebtPerCol) <= 0.005 * fluid.liqPriceDebtPerCol,
-      `chart ${lv.line}, read ${fluid.liqPriceDebtPerCol}`,
-    );
   await picker.click();
   await page.locator(`[role="listbox"] [data-price-asset="${r.label}"]`).click();
   await page.waitForTimeout(250);
@@ -748,6 +838,133 @@ async function checkRatio(page, tag, pg) {
   check(
     `${tag}: the how-to-read names the ${name}'s source and line`,
     help.includes(`The ${name}`) && r.help.every((w) => help.includes(w)),
+    help,
+  );
+}
+
+/** The how-to-read's text. */
+async function howToRead(page) {
+  await page.locator('[data-flow-help="F7.1"] button').click();
+  const help = await page
+    .locator('[role="dialog"][aria-label="How to read the events and charts"]')
+    .textContent({ timeout: 5000 })
+    .catch(() => "");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  return help;
+}
+
+/** Liquity V1 (ui-jobs 328 step 5): Liquity V2's view, the ETH price with the
+ *  Trove's level at 110 %. On an open Trove today's level is the card's
+ *  "Liquidates at"; on a liquidated life the level ends on the liquidation's
+ *  day; every level day is debt × 1.1 ÷ coll of a row, so it lies under the
+ *  price where the Trove stood above 110 %; the how-to-read names Recovery
+ *  Mode as not drawn. */
+async function checkV1Level(page, tag, pg) {
+  const toggle = page.locator("[data-flow-level-toggle]");
+  if (!check(`${tag}: the ETH price draws the Trove's level`, (await toggle.count()) === 1)) return;
+  if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
+  await page.waitForTimeout(150);
+  const sl = page.locator(PRICE_STRIP).first();
+  await sl.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(250);
+  const end = await page.$eval("[data-price-heading]", (h) => {
+    const lv = h.querySelector("[data-liq-readout]");
+    return {
+      line: lv ? Number(lv.getAttribute("data-liq-value")) : null,
+      asset: h.querySelector("[data-price-asset]")?.getAttribute("data-price-asset"),
+    };
+  });
+  check(`${tag}: the price is ETH's`, end.asset === "ETH", end.asset);
+  const days = await page.$$eval("[data-liq-level]", (ls) =>
+    ls.flatMap((l) => (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).map(Number)),
+  );
+  check(`${tag}: the level is drawn`, days.length > 0, `${days.length} days`);
+  if (pg.v1 === "open") {
+    const card = await page.$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent ?? "").catch(() => "");
+    const m = card.replace(/,/g, "").match(/\$(\d+(?:\.\d+)?)(K?)/);
+    const cardV = m ? Number(m[1]) * (m[2] ? 1000 : 1) : NaN;
+    check(
+      `${tag}: today's level is the card's "Liquidates at"`,
+      end.line != null && Math.abs(end.line - cardV) <= (m?.[2] ? 50 : 0.006),
+      `chart ${end.line}, card ${card}`,
+    );
+  } else {
+    // The liquidation's day, from the listing's last activity of the life.
+    const last = Math.max(...days);
+    const ld = Math.floor(pg.liqTs / 86400);
+    check(
+      `${tag}: the level ends on the liquidation's day`,
+      last === ld,
+      `last level day ${last}, liquidation day ${ld}`,
+    );
+  }
+  const help = await howToRead(page);
+  check(
+    `${tag}: the how-to-read names the 110% line and Recovery Mode as not drawn`,
+    help.includes("debt × 110%") && help.includes("Recovery Mode") && help.includes("not drawn"),
+    help,
+  );
+}
+
+/** Sky Savings (ui-jobs 328 step 5, ruling 8): the share price, chi in USDS,
+ *  in place of the sUSDS price; each completed day at its drip block; today
+ *  (on an open position) the card's share price; no level; the how-to-read
+ *  names chi and the drip. */
+async function checkShareLine(page, tag) {
+  const line = await page.$eval("[data-price-line]", (g) => ({
+    key: g.getAttribute("data-price-line"),
+    observed: (g.getAttribute("data-price-observed") ?? "").split(",").filter(Boolean).length,
+  }));
+  check(
+    `${tag}: the chart draws the share price (chi)`,
+    line.key === "sky-savings:chi" && line.observed > 0,
+    JSON.stringify(line),
+  );
+  const sl = page.locator(PRICE_STRIP).first();
+  await sl.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(250);
+  const end = await page.$eval("[data-price-heading]", (h) => ({
+    text: h.querySelector("[data-price-readout]")?.textContent ?? "",
+    block: h.querySelector("[data-price-readout]")?.getAttribute("data-price-block") ?? "",
+    toggle: document.querySelector("[data-flow-level-toggle]") != null,
+  }));
+  check(`${tag}: the share price has no level`, !end.toggle, JSON.stringify(end));
+  check(`${tag}: the share price rests on a block`, /^\d+$/.test(end.block), JSON.stringify(end));
+  const card = await page.$eval('[data-panel-row="share-price"] dd', (d) => d.textContent ?? "").catch(() => "");
+  const held = await page.$eval('[data-card-head="worth"]', (d) => d.textContent ?? "").catch(() => "");
+  const chartV = end.text.match(/(\d+\.\d{6}) USDS/)?.[1];
+  const cardV = card.match(/= (\d+\.\d{6}) USDS/)?.[1];
+  if (!held.includes("nothing held"))
+    check(
+      `${tag}: today's share price is the card's`,
+      chartV != null && chartV === cardV,
+      `chart ${end.text}, card ${card}`,
+    );
+  else
+    check(
+      `${tag}: a closed position's share price stands at its close, under today's`,
+      chartV != null && Number(chartV) <= Number(cardV),
+      `chart ${end.text}, card ${card}`,
+    );
+  // A past day: chi at its day's drip block, in the receipt's words.
+  await page.keyboard.press("Home");
+  await page.waitForTimeout(250);
+  const first = await page.$eval("[data-price-heading] [data-price-readout]", (r) => ({
+    text: r.textContent ?? "",
+    block: r.getAttribute("data-price-block") ?? "",
+  }));
+  check(
+    `${tag}: the first day's share price is chi at a drip block`,
+    /USDS/.test(first.text) && /^\d+$/.test(first.block),
+    JSON.stringify(first),
+  );
+  const help = await howToRead(page);
+  check(
+    `${tag}: the how-to-read names the share price's source`,
+    help.includes("The sUSDS share price") && help.includes("chi") && help.includes("drip"),
     help,
   );
 }
@@ -1622,6 +1839,8 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (width >= 640) await checkLwWheel(page, tag);
       if (pg.health) await checkHealthAlone(page, tag, pg);
       if (pg.ratio) await checkRatio(page, tag, pg);
+      if (pg.v1) await checkV1Level(page, tag, pg);
+      if (pg.share) await checkShareLine(page, tag);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;

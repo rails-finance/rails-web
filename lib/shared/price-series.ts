@@ -50,9 +50,13 @@ export interface PriceSeries {
    *  `HealthSource.ratio`): the position is liquidatable below it or above
    *  it. */
   liquidates?: "below" | "above";
-  /** A ratio view's sentence in the charts' how-to-read, naming its source
-   *  and its line. */
+  /** The series' sentence in the charts' how-to-read where it is the
+   *  family's (a ratio view's, Liquity V1's level, Sky's share price), naming
+   *  its source and its line. */
   help?: string;
+  /** Places the figure prints to where the card prints a fixed number (Sky's
+   *  share price, six; Dolomite's margin ratio, two in percent). */
+  digits?: number;
   /** Days before this one are the rows alone and draw by the sparse rule:
    *  every segment dotted, the observations marked by `events`. */
   sparseBefore?: number;
@@ -82,7 +86,7 @@ export interface PriceLevel {
   here?: { live: string; read: string };
 }
 /** What a family adds to an asset's series for the price view. */
-export type PriceMarks = Pick<PriceSeries, "events" | "level" | "sparseBefore">;
+export type PriceMarks = Pick<PriceSeries, "events" | "level" | "sparseBefore" | "help">;
 /** A daily wire's observation: [day, price, block], the block absent on an older server. */
 export type DayObs = [number, number, (number | null)?];
 

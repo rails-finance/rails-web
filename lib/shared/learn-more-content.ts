@@ -39,9 +39,13 @@ export interface FlowPriceHelp {
   health: boolean;
   symbol: string;
   level: boolean;
-  /** A ratio view's sentence (Maker's collateral ratio, Fluid's position
-   *  ratio), naming its source and its line. */
-  ratio?: string;
+  /** The series' sentence where it is the family's: a ratio view's (Maker's
+   *  collateral ratio, Fluid's position ratio, Dolomite's margin ratio), a
+   *  Trove's level (Liquity V1's, which names Recovery Mode) or a share
+   *  price (Sky's chi), naming its source and its line. */
+  help?: string;
+  /** The series' name where it is not "{symbol} price" (Sky's share price). */
+  name?: string;
 }
 
 const listWords = (xs: string[]) =>
@@ -60,17 +64,19 @@ export function lifetimeFlowsStackContent(opts: {
   const price = charts?.price;
   if (price)
     details.push(
-      price.health && price.ratio
-        ? { bold: `The ${price.symbol.toLowerCase()}`, text: price.ratio }
-        : price.health
-          ? {
-              bold: "The health factor",
-              text: "on the same days; the red line at 1 is where it liquidates. The list in the tip picks it or an asset's price.",
-            }
-          : {
-              bold: `The ${price.symbol} price`,
-              text: `on the same days${price.level ? "; the red line is where the position liquidates" : ""}.`,
-            },
+      price.health && price.help
+        ? { bold: `The ${price.symbol.toLowerCase()}`, text: price.help }
+        : price.help
+          ? { bold: `The ${price.name ?? `${price.symbol} price`}`, text: price.help }
+          : price.health
+            ? {
+                bold: "The health factor",
+                text: "on the same days; the red line at 1 is where it liquidates. The list in the tip picks it or an asset's price.",
+              }
+            : {
+                bold: `The ${price.symbol} price`,
+                text: `on the same days${price.level ? "; the red line is where the position liquidates" : ""}.`,
+              },
     );
   if (events) {
     const hues = events.sides

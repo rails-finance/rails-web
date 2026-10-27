@@ -344,6 +344,11 @@ export interface FlowTimeline {
   /** The position's health factor per day against its line at 1, the price
    *  view's default where the family has it (ruling 7; Aave V3 Ethereum). */
   health?: PriceSeries;
+  /** A share price the price view draws in place of the held asset's price
+   *  (ruling 8; Sky's chi): `series` in the vault asset, `unitLabel` its
+   *  symbol, printed to `digits` places as the card prints it, standing for
+   *  the asset keyed `asset`. */
+  shareLine?: { asset: string; series: PriceSeries; unitLabel: string; name: string; digits?: number };
   /** Today's UTC day number. With it the slider runs to today while anything
    *  is still held after the last event; without it, one stop past that event. */
   today?: number;

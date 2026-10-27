@@ -623,7 +623,8 @@ export function CombinedFlows({
         health: !!priced.health,
         symbol: priced.asset.symbol,
         level: priced.level != null,
-        ...(priced.health && priced.help ? { ratio: priced.help } : {}),
+        ...(priced.help ? { help: priced.help } : {}),
+        ...(priced.name ? { name: priced.name } : {}),
       }
     : null;
   const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
@@ -1160,10 +1161,12 @@ function PriceFigures({
           data-price-carried={r.carried ? r.ageDays : undefined}
         >
           <Prov
-            info={s.health ? healthProv(s, r, dayWord) : readoutProv(s, r, dayWord, dayStamp(r.point[0] * 86_400))}
+            info={
+              s.health ? healthProv(s, r, dayWord) : readoutProv(s, r, dayWord, dayStamp(r.point[0] * 86_400), isLive)
+            }
             value={String(r.point[1])}
           >
-            {formatPrice(r.point[1], s.unitLabel)}
+            {formatPrice(r.point[1], s.unitLabel, s.digits)}
           </Prov>
         </span>
       ) : (
@@ -1186,7 +1189,7 @@ function PriceFigures({
           >
             <span className={`font-semibold ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}>
               <Prov info={levelProv} value={String(lv[1])}>
-                {s.health && s.unitLabel === "" ? "1" : formatPrice(lv[1], s.unitLabel)}
+                {s.health && s.unitLabel === "" ? "1" : formatPrice(lv[1], s.unitLabel, s.digits)}
               </Prov>
             </span>
           </span>
@@ -1421,8 +1424,19 @@ function healthProv(s: FlowPriceSeries, r: PriceAt, dayWord: string): Provenance
 
 /** The receipt of the readout's price: the series' point at or before the
  *  cursor's day, read at its block. */
-function readoutProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord: string): Provenance {
+function readoutProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord: string, isLive: boolean): Provenance {
   const block = r.point[2];
+  // A series in its family's words (Sky's share price).
+  if (s.here)
+    return {
+      kind: "chain",
+      pclass: "state",
+      summary: (isLive || block == null ? s.here.live : s.here.read)
+        .replace("{block}", block?.toLocaleString("en-US") ?? "")
+        .replace("{day}", r.carried ? `${dayWord}, carried from ${pointWord}` : dayWord),
+      ...(s.here.formula ? { formula: s.here.formula } : {}),
+      ...(block != null ? { source: { block } } : {}),
+    };
   return {
     kind: "chain",
     pclass: "oracle",

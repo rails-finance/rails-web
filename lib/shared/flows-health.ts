@@ -3,12 +3,14 @@
 // and 5): the position's health factor per day, and each held asset's
 // liquidation level. One function for every family whose card works a health
 // factor from per-asset collateral factors (the Aave V3 Pools and Aave V4,
-// Compound V3, Compound V2 and Moonwell). A family names its oracle, the
+// Compound V3, Compound V2 and Moonwell; MakerDAO, Fluid and Dolomite in
+// their cards' ratios). A family names its oracle, the
 // contract whose factors it reads, the chain and its words (`HealthSource`),
 // and hooks/useFlowsHealth.ts reads its factors through the family's reader.
 //
 // RULES.
-// - A day's health factor is Σ collateral × price × factor ÷ Σ debt × price:
+// - A day's health factor is Σ collateral × price × factor ÷ Σ debt × price
+//   (× the read's debt factor where it gives one, Dolomite's 1 + premium):
 //   the balances the flows replay holds at the day's close (grown by the
 //   indexes between events), each asset at the day's price (the last
 //   recorded on or before the day), and the factors of the read at the day's
@@ -54,6 +56,9 @@ export interface FactorRead {
   /** Per asset, keyed as the timeline keys it: the factor its supply counts
    *  at as a fraction, 0 where it backs no debt. */
   lt: Record<string, number>;
+  /** Per asset, the factor its debt counts at where it is not 1 (Dolomite's
+   *  borrow premium, 1 + premium). */
+  dw?: Record<string, number>;
   /** A ratio view's line at this read (`HealthSource.ratio`): the minimum
    *  ratio or the threshold, in the ratio's terms. */
   line?: number;
@@ -67,6 +72,8 @@ export interface HealthLine {
   debt: number;
   price: number;
   lt: number;
+  /** The factor the debt counts at, 1 where unset. */
+  dw?: number;
 }
 
 /** What a family's health view names. */
@@ -119,6 +126,8 @@ export interface HealthSource {
     line: { formula: string; summary: string };
     /** The view's sentence in the charts' how-to-read. */
     help: string;
+    /** Places in percent where the card prints other than one. */
+    digits?: number;
   };
 }
 
@@ -133,12 +142,13 @@ export function basketLevels(lines: readonly HealthLine[]): Map<string, number> 
   let debt = 0;
   for (const l of lines) {
     w += l.coll * l.price * l.lt;
-    debt += l.debt * l.price;
+    debt += l.debt * (l.dw ?? 1) * l.price;
   }
   const out = new Map<string, number>();
   for (const l of lines) {
     const cw = l.coll * l.lt;
-    if (cw - l.debt !== 0) out.set(l.asset, (debt - l.debt * l.price - (w - cw * l.price)) / (cw - l.debt));
+    const dd = l.debt * (l.dw ?? 1);
+    if (cw - dd !== 0) out.set(l.asset, (debt - dd * l.price - (w - cw * l.price)) / (cw - dd));
   }
   return out;
 }
@@ -284,13 +294,14 @@ export function healthView(
     const dayLines: HealthLine[] = [];
     for (const [asset, l] of lines) {
       const lt = l.coll > 0 ? read.lt[asset.toLowerCase()] : 0;
+      const dw = l.debt > 0 ? (read.dw?.[asset.toLowerCase()] ?? 1) : 1;
       if (lt == null) {
         known = false;
         break;
       }
       w += l.coll * l.price * lt;
-      debt += l.debt * l.price;
-      dayLines.push({ asset, ...l, lt });
+      debt += l.debt * dw * l.price;
+      dayLines.push({ asset, ...l, lt, ...(dw !== 1 ? { dw } : {}) });
     }
     if (!known || !(debt > 0)) continue;
     const hf = live ? o.liveHf! : w / debt;
@@ -328,6 +339,7 @@ export function healthView(
     source: `${src.pool}'s ${factors} ${src.readAt ?? "at each day's last event"}, with ${src.oracle} price recorded each day`,
     points: hfPoints,
     ...(ratio ? { liquidates: ratio.liquidates, help: ratio.help } : {}),
+    ...(ratio?.digits != null ? { digits: ratio.digits } : {}),
     here: {
       live: `${name} — ${src.live ?? `${src.pool}'s figure for the position now, the card's`}.`,
       read: `${name} — on {day}, the balances held at the day's close, each at ${src.oracle} price recorded that day, against ${heldWords}.`,

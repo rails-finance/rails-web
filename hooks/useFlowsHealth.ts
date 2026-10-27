@@ -82,7 +82,12 @@ export function useFlowsHealth(t: FlowTimeline | null, p: FlowsHealthInput): Flo
     if (todayRead && todayRead.day >= last.day)
       all = [
         ...reads.filter((r) => r.day < todayRead.day),
-        { ...todayRead, lt: { ...last.lt, ...todayRead.lt }, line: todayRead.line ?? last.line },
+        {
+          ...todayRead,
+          lt: { ...last.lt, ...todayRead.lt },
+          ...(last.dw || todayRead.dw ? { dw: { ...last.dw, ...todayRead.dw } } : {}),
+          line: todayRead.line ?? last.line,
+        },
       ];
     const hv = healthView(t, all, { liveHf, liveLevels, liveLine, source });
     return hv ? { ...t, health: hv.health, priceMarks: { ...t.priceMarks, ...hv.marks } } : t;

@@ -27,6 +27,8 @@
 //   a family whose card states a ratio against a line (unit "ratio": Maker's
 //   collateral ratio, Fluid's position ratio) prints it as a percentage, its
 //   line the family's.
+// - Where the timeline carries a share price (`t.shareLine`, ruling 8: Sky's
+//   chi), it stands in place of the held asset's price, in the vault asset.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
@@ -68,7 +70,7 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
   const out: FlowPriceSeries[] = [];
   for (const [asset, obs] of Object.entries(t.dailyPrices)) {
     const m = meta.get(asset);
-    if (!m || face.has(m.side) || (t.unit && m.symbol === t.unit.symbol)) continue;
+    if (!m || face.has(m.side) || (t.unit && m.symbol === t.unit.symbol) || t.shareLine?.asset === asset) continue;
     const source =
       t.priceSource ??
       (t.carriedWhy?.[asset] ? "the position's events, on the days they priced it" : "daily price store");
@@ -82,6 +84,15 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
     });
     if (s) out.push({ ...s, ...t.priceMarks?.[asset], side: m.side, unitLabel });
   }
+  const share = t.shareLine;
+  if (share)
+    out.push({
+      ...share.series,
+      side: "collateral",
+      unitLabel: share.unitLabel,
+      name: share.name,
+      ...(share.digits != null ? { digits: share.digits } : {}),
+    });
   const rank = (s: FlowPriceSeries) => (s.side === "collateral" ? 0 : 1e6) + (meta.get(s.key)?.order ?? 0);
   out.sort((a, b) => rank(a) - rank(b));
   return t.health
@@ -93,8 +104,15 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
  *  health factor ("" unit) as the Aave family's cards print one, four places
  *  under 1.1 (rounded down under 1, so a liquidatable figure never reads
  *  1.0000), two above: "1.0234", "1.84"; a ratio ("%") as the Maker and
- *  Fluid cards print one: "185.3%". */
-export function formatPrice(v: number, unitLabel: string): string {
+ *  Fluid cards print one: "185.3%"; to `digits` places where the card prints
+ *  a fixed number ("1.071234 USDS"). */
+export function formatPrice(v: number, unitLabel: string, digits?: number): string {
+  if (digits != null)
+    return unitLabel === "%"
+      ? `${(v * 100).toFixed(digits)}%`
+      : unitLabel === "USD"
+        ? `$${v.toFixed(digits)}`
+        : `${v.toFixed(digits)} ${unitLabel}`;
   if (unitLabel === "%") return `${(v * 100).toFixed(1)}%`;
   if (unitLabel === "")
     return v < 1 ? (Math.floor(v * 1e4 + 1e-9) / 1e4).toFixed(4) : v < 1.1 ? v.toFixed(4) : v.toFixed(2);

@@ -250,8 +250,9 @@ export interface LiquityFlowOptions {
    *  read one (Liquity V2's daily route); null or absent keeps each event's
    *  price between events. */
   dailyColl?: DayObs[] | null;
-  /** Liquity V2's price view: each row's price marked on the collateral's
-   *  line and the liquidation level beside it, for the branch named. */
+  /** The price view: each row's price marked on the collateral's line and
+   *  the liquidation level beside it, for the branch named (Liquity V1: "ETH",
+   *  its 110 % minimum). */
   priceView?: { collateralType: string };
 }
 
@@ -607,6 +608,15 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   };
 }
 
+/** Liquity V1's level in the receipt: the 110 % line, and Recovery Mode,
+ *  which the chart does not draw. */
+const LIQUITY_V1_LEVEL_SUMMARY =
+  "Liquidation price — the ETH price at which the Trove's collateral ratio reaches Liquity V1's 110% minimum: its debt × 110% ÷ its collateral. Below that price the Trove can be liquidated. Recovery Mode is not drawn: while the system's total collateral ratio is under 150%, a Trove under that total ratio can be liquidated too, and that line hangs on the whole system's collateral and debt, which the rows do not carry.";
+
+/** Liquity V1's sentence in the charts' how-to-read. */
+const LIQUITY_V1_LEVEL_HELP =
+  "on the same days; the red line is where the Trove liquidates, its debt × 110% ÷ its collateral after each event. Recovery Mode, which lifts the line to the system's total ratio while that is under 150%, is not drawn.";
+
 /** Liquity V2's price view marks for the collateral: each row's price on
  *  its day (a redemption's with its redemption price), the liquidation level
  *  (`liquityLiqLevel`), and the days before the branch's daily series, which
@@ -633,6 +643,7 @@ function liquityPriceMarks(
   }
   const level = liquityLiqLevel(events, { collateralType, now: o.now, live: o.live });
   const mcrPct = getLiquidationThreshold(collateralType);
+  const v1 = o.family === "v1";
   const firstDay = Math.floor(replayed[0].ev.ts / DAY_S);
   const dailyFrom = daily[0]?.[0];
   const today = Math.floor(o.now / DAY_S);
@@ -643,11 +654,23 @@ function liquityPriceMarks(
       ? {
           level: {
             ...level,
-            formula: `${LIQUIDATION_PRICE_FORMULA.replace("MCR", `${mcrPct}%`)} after each event, with interest accruing between`,
-            summary: liquidationPriceSummary(collateralType, mcrPct),
+            ...(v1
+              ? {
+                  formula: `${LIQUIDATION_PRICE_FORMULA.replace("MCR", `${mcrPct}%`)} after each event`,
+                  summary: LIQUITY_V1_LEVEL_SUMMARY,
+                  here: {
+                    live: "Here at the Trove's entire debt and collateral as the TroveManager reports them now, the card's figure.",
+                    read: "Here at the debt and collateral the Trove's event at block {block} recorded; redistributions not yet applied to the Trove land at its next event.",
+                  },
+                }
+              : {
+                  formula: `${LIQUIDATION_PRICE_FORMULA.replace("MCR", `${mcrPct}%`)} after each event, with interest accruing between`,
+                  summary: liquidationPriceSummary(collateralType, mcrPct),
+                }),
           },
         }
       : {}),
+    ...(v1 && level ? { help: LIQUITY_V1_LEVEL_HELP } : {}),
     ...(sparseBefore != null ? { sparseBefore } : {}),
   };
 }

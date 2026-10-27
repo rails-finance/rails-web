@@ -442,6 +442,9 @@ export default function LiquityV1TroveView({
             collSymbol: "ETH",
             debtSymbol: "LUSD",
             family: "v1",
+            // The Trove's liquidation level at the 110% minimum (ui-jobs 328
+            // step 5): Liquity V2's view.
+            priceView: { collateralType: "ETH" },
             surplusClaimed: flowSurplusClaimed,
             now: flowsNow as number,
             dailyColl: flowDaily.obs,
