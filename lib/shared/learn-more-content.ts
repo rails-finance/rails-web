@@ -39,6 +39,9 @@ export interface FlowPriceHelp {
   health: boolean;
   symbol: string;
   level: boolean;
+  /** A ratio view's sentence (Maker's collateral ratio, Fluid's position
+   *  ratio), naming its source and its line. */
+  ratio?: string;
 }
 
 const listWords = (xs: string[]) =>
@@ -57,15 +60,17 @@ export function lifetimeFlowsStackContent(opts: {
   const price = charts?.price;
   if (price)
     details.push(
-      price.health
-        ? {
-            bold: "The health factor",
-            text: "on the same days; the red line at 1 is where it liquidates. The list in the tip picks it or an asset's price.",
-          }
-        : {
-            bold: `The ${price.symbol} price`,
-            text: `on the same days${price.level ? "; the red line is where the position liquidates" : ""}.`,
-          },
+      price.health && price.ratio
+        ? { bold: `The ${price.symbol.toLowerCase()}`, text: price.ratio }
+        : price.health
+          ? {
+              bold: "The health factor",
+              text: "on the same days; the red line at 1 is where it liquidates. The list in the tip picks it or an asset's price.",
+            }
+          : {
+              bold: `The ${price.symbol} price`,
+              text: `on the same days${price.level ? "; the red line is where the position liquidates" : ""}.`,
+            },
     );
   if (events) {
     const hues = events.sides

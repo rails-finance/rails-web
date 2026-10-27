@@ -24,7 +24,13 @@
 //   balance and price held at the day's (ruling 7), for a debt asset the debt
 //   price that reaches it (`basketLevels`). A level at or below zero, or more
 //   than LEVEL_REACH times above or below the day's price (a dust debt's), has
-//   no point.
+//   no point. A timeline in grains of a token unit has its levels drawn in
+//   the unit.
+// - A family whose card states a ratio against a line (`HealthSource.ratio`:
+//   MakerDAO's collateral ratio against its minimum, Fluid's position ratio
+//   against its threshold) draws that ratio, worked from the health factor
+//   and the read's `line` (factor 1 ÷ mat for Maker, the threshold for
+//   Fluid), and its line is the read's in force on the day, the card's today.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
@@ -48,6 +54,9 @@ export interface FactorRead {
   /** Per asset, keyed as the timeline keys it: the factor its supply counts
    *  at as a fraction, 0 where it backs no debt. */
   lt: Record<string, number>;
+  /** A ratio view's line at this read (`HealthSource.ratio`): the minimum
+   *  ratio or the threshold, in the ratio's terms. */
+  line?: number;
 }
 
 /** One asset's line on a day: its balances at the day's close, its price
@@ -81,10 +90,36 @@ export interface HealthSource {
   /** What a health factor under 1 lets happen. Default "{pool} lets a
    *  liquidator repay the debt". */
   below?: string;
+  /** Where the receipt says the factors were held. Default "the {factors
+   *  long} {pool} held after the event at block {block}". */
+  held?: string;
   /** Each asset's level on a day from its lines and health factor, where
-   *  the family's card derives it otherwise than `basketLevels`; and the
-   *  rule in words. */
-  levels?: { of: (lines: readonly HealthLine[], hf: number) => Map<string, number>; formula: string };
+   *  the family's card derives it otherwise than `basketLevels`; the rule
+   *  in words, and the receipt's sentences where they are the family's. */
+  levels?: {
+    of?: (lines: readonly HealthLine[], hf: number) => Map<string, number>;
+    formula: string;
+    summary?: string;
+    here?: { live: string; read: string };
+  };
+  /** The view in the card's terms where the card states a ratio against a
+   *  line rather than a health factor (MakerDAO's collateral ratio against
+   *  its minimum, Fluid's position ratio against its threshold): each day's
+   *  ratio from the health factor and the read's `line`, a health factor of
+   *  1 being the ratio on the line. */
+  ratio?: {
+    /** "Collateral ratio": the view's name in the list. */
+    label: string;
+    /** Which side of the line the position is liquidatable on:
+     *  "below", ratio = health factor × line; "above", ratio = line ÷
+     *  health factor. */
+    liquidates: "below" | "above";
+    formula: string;
+    /** The line's formula and receipt. */
+    line: { formula: string; summary: string };
+    /** The view's sentence in the charts' how-to-read. */
+    help: string;
+  };
 }
 
 const BASKET_LEVEL_FORMULA =
@@ -170,6 +205,8 @@ export function healthView(
     /** The card's levels today, by asset, where the card states one per
      *  collateral: an open position's today draws these. */
     liveLevels?: Record<string, number> | null;
+    /** A ratio view's line today, the card's (its minimum ratio or threshold). */
+    liveLine?: number | null;
     source?: HealthSource;
   },
 ): { health: PriceSeries; marks: Record<string, PriceMarks> } | null {
@@ -177,6 +214,9 @@ export function healthView(
   const src = o.source ?? { oracle: "the oracle", pool: "the protocol", chain: 1 };
   const [factors, factorsLong] = src.factors ?? ["thresholds", "liquidation thresholds"];
   const levelsOf = src.levels?.of ?? basketLevels;
+  // A timeline in grains of a token unit (Fluid's) draws its price pane in
+  // the unit: the levels are worked in grains and drawn in the unit.
+  const unitDiv = 10 ** (t.unit?.scale ?? 0);
   const days = t.days;
   const held = new Map<string, { side: FlowSide; asset: string; amount: number; index?: number; day: number }>();
   for (const d of days)
@@ -195,7 +235,9 @@ export function healthView(
   const end = open ? Math.max(last, today) : last;
   held.clear();
 
+  const ratio = src.ratio;
   const hfPoints: PricePoint[] = [];
+  const linePoints: PricePoint[] = [];
   const levels = new Map<string, PricePoint[]>();
   const push = (asset: string, p: PricePoint) => {
     const run = levels.get(asset);
@@ -254,36 +296,49 @@ export function healthView(
     const hf = live ? o.liveHf! : w / debt;
     if (!(hf > 0) || hf >= HF_CAP) continue;
     const block = live ? null : read.block;
-    hfPoints.push([day, hf, block]);
+    if (ratio) {
+      const line = live ? (o.liveLine ?? read.line) : read.line;
+      if (line == null || !(line > 0)) continue;
+      hfPoints.push([day, ratio.liquidates === "below" ? hf * line : line / hf, block]);
+      linePoints.push([day, line, block]);
+    } else {
+      hfPoints.push([day, hf, block]);
+      linePoints.push([day, 1, null]);
+    }
     const dayLevels =
       live && o.liveLevels
         ? new Map(dayLines.flatMap((l) => (o.liveLevels![l.asset] > 0 ? [[l.asset, o.liveLevels![l.asset]]] : [])))
         : levelsOf(dayLines, hf);
     for (const [asset, level] of dayLevels) {
       const price = lines.get(asset)!.price;
-      if (level > price / LEVEL_REACH && level < price * LEVEL_REACH) push(asset, [day, level, block]);
+      if (level > price / LEVEL_REACH && level < price * LEVEL_REACH) push(asset, [day, level / unitDiv, block]);
     }
   }
   if (hfPoints.length === 0) return null;
   const endWord: "today" | "close" = open ? "today" : "close";
   const sparseBefore = reads[0].day > hfPoints[0][0] ? reads[0].day : undefined;
+  const name = ratio?.label ?? "Health factor";
+  const heldWords = src.held ?? `the ${factorsLong} ${src.pool} held after the event at block {block}`;
   const health: PriceSeries = {
     key: "health",
-    asset: { symbol: "Health factor", chain: src.chain },
-    unit: "health",
+    asset: { symbol: name, chain: src.chain },
+    unit: ratio ? "ratio" : "health",
     grain: "daily",
     noCarry: true,
     source: `${src.pool}'s ${factors} ${src.readAt ?? "at each day's last event"}, with ${src.oracle} price recorded each day`,
     points: hfPoints,
+    ...(ratio ? { liquidates: ratio.liquidates, help: ratio.help } : {}),
     here: {
-      live: `Health factor — ${src.live ?? `${src.pool}'s figure for the position now, the card's`}.`,
-      read: `Health factor — on {day}, the balances held at the day's close, each at ${src.oracle} price recorded that day, against the ${factorsLong} ${src.pool} held after the event at block {block}.`,
-      formula: `Σ collateral × price × ${src.factor ?? "liquidation threshold"} ÷ Σ debt × price`,
+      live: `${name} — ${src.live ?? `${src.pool}'s figure for the position now, the card's`}.`,
+      read: `${name} — on {day}, the balances held at the day's close, each at ${src.oracle} price recorded that day, against ${heldWords}.`,
+      formula: ratio?.formula ?? `Σ collateral × price × ${src.factor ?? "liquidation threshold"} ÷ Σ debt × price`,
     },
     level: {
-      points: hfPoints.map(([d]) => [d, 1, null] as PricePoint),
-      formula: "below 1 the position can be liquidated",
-      summary: `Liquidation line — below a health factor of 1 ${src.below ?? `${src.pool} lets a liquidator repay the debt`}.`,
+      points: linePoints,
+      formula: ratio?.line.formula ?? "below 1 the position can be liquidated",
+      summary:
+        ratio?.line.summary ??
+        `Liquidation line — below a health factor of 1 ${src.below ?? `${src.pool} lets a liquidator repay the debt`}.`,
       end: endWord,
     },
     ...(sparseBefore != null ? { sparseBefore } : {}),
@@ -294,9 +349,11 @@ export function healthView(
       level: {
         points: pts,
         formula: src.levels?.formula ?? BASKET_LEVEL_FORMULA,
-        summary: `Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the ${factors} ${src.pool} held at the day's last event.`,
+        summary:
+          src.levels?.summary ??
+          `Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the ${factors} ${src.pool} held at the day's last event.`,
         end: endWord,
-        here: {
+        here: src.levels?.here ?? {
           live: "Here at today's balances and prices and the card's health factor.",
           read: `Here at the balances and prices of {day}, against the ${factors} ${src.pool} held after the event at block {block}.`,
         },

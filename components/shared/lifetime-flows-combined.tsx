@@ -619,7 +619,12 @@ export function CombinedFlows({
   };
   const marks = useMemo(() => eventsHelp(model, hasDebt), [model, hasDebt]);
   const priceBrief = priced
-    ? { health: !!priced.health, symbol: priced.asset.symbol, level: priced.level != null }
+    ? {
+        health: !!priced.health,
+        symbol: priced.asset.symbol,
+        level: priced.level != null,
+        ...(priced.health && priced.help ? { ratio: priced.help } : {}),
+      }
     : null;
   const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
   const stackHelp = lifetimeFlowsStackContent({ events: marks, charts: { value: true, price: priceBrief } });
@@ -1163,13 +1168,13 @@ function PriceFigures({
         </span>
       ) : (
         <span data-price-readout="" data-price-none="">
-          {s.health ? "No health factor" : "No price recorded"}
+          {s.health ? `No ${s.asset.symbol.toLowerCase()}` : "No price recorded"}
         </span>
       )}
       {showLevel && lv && levelProv && (
         <>
           <span className="inline-flex justify-center">
-            <LevelMark health={!!s.health} isLive={isLive} />
+            <LevelMark s={s} isLive={isLive} />
           </span>
           <span
             className="whitespace-nowrap"
@@ -1181,7 +1186,7 @@ function PriceFigures({
           >
             <span className={`font-semibold ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}>
               <Prov info={levelProv} value={String(lv[1])}>
-                {s.health ? "1" : formatPrice(lv[1], s.unitLabel)}
+                {s.health && s.unitLabel === "" ? "1" : formatPrice(lv[1], s.unitLabel)}
               </Prov>
             </span>
           </span>
@@ -1193,13 +1198,13 @@ function PriceFigures({
 
 /** The level's mark in the heading: the warning triangle, red at today and
  *  muted in history, naming the level on a press. */
-function LevelMark({ health, isLive }: { health: boolean; isLive: boolean }) {
-  const words = health ? "Liquidates below" : "Liquidates at";
+function LevelMark({ s, isLive }: { s: FlowPriceSeries; isLive: boolean }) {
+  const words = s.health ? (s.liquidates === "above" ? "Liquidates above" : "Liquidates below") : "Liquidates at";
   return (
     <RevealTip
       tip={
         <span className="block w-56 max-w-[calc(100vw-48px)] whitespace-normal leading-snug">
-          {health ? "Liquidates below this health factor." : "Liquidates at this price."}
+          {s.health ? `${words} this ${s.asset.symbol.toLowerCase()}.` : "Liquidates at this price."}
         </span>
       }
       label={`${words}, explain`}

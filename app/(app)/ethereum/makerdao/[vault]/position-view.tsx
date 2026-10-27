@@ -61,7 +61,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { MakerFlowsNote, makerdaoFlowsContent } from "@/components/protocol/makerdao/makerdao-flows-note";
-import { useMakerFlows } from "@/hooks/useMakerFlows";
+import { useMakerFlows, type MakerRisk } from "@/hooks/useMakerFlows";
 import type { MakerLive } from "@/lib/makerdao/flows";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { fetchMakerRateLog, type MakerRateLogResponse } from "@/lib/api/fetch-makerdao-rate-log";
@@ -500,6 +500,19 @@ export default function MakerVaultDetailView({
       feeApr: chainState.stabilityFeeApr,
     };
   }, [chainState]);
+  const flowRisk = useMemo<MakerRisk | null>(
+    () =>
+      chainState && chainState.atBlock > 0
+        ? {
+            block: chainState.atBlock,
+            mat: chainState.matRatio,
+            collateralUsd: chainState.collateralUsd,
+            debt: chainState.debtDai,
+            liquidationPriceUsd: chainState.liquidationPriceUsd,
+          }
+        : null,
+    [chainState],
+  );
   const returnedIds = useMemo(
     () => new Set([...vaultHistory.leftover].filter(([, l]) => l.role === "in").map(([id]) => id)),
     [vaultHistory.leftover],
@@ -518,6 +531,7 @@ export default function MakerVaultDetailView({
     live: flowLive,
     liveSettled: chainSettled,
     returnedIds,
+    risk: flowRisk,
   });
 
   // Who executed this vault's events — the SAME two-fact verdict each event

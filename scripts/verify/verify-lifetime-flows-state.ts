@@ -2569,3 +2569,91 @@ test("Comet and Comptroller sources: factors keyed as the timelines key them; to
   // WETH alone backs the debt: 1000 ÷ (1 × 0.8).
   assert.equal(l.get("weth"), 1250);
 });
+
+// ── MakerDAO's and Fluid's views in the card's terms (ui-jobs 328 step 5) ───
+test("Maker and Fluid ratio views: the ratio against the line in force, the card's today, levels in the chart's unit", async () => {
+  const { MAKER_HEALTH_SOURCE, makerMatReads } = await import("@/lib/makerdao/flows-health");
+  const { FLUID_HEALTH_SOURCE, fluidHeldRead } = await import("@/lib/fluid/flows-health");
+  const { healthView } = await import("@/lib/shared/flows-health");
+  const C = "coll:ETH";
+  const DB = "debt:DAI";
+  const row = (day: number, balances: FlowTimeline["days"][number]["balances"]) => ({
+    day,
+    events: 1,
+    tick: "both" as const,
+    cum: {},
+    balances,
+    prices: [],
+  });
+  const t: FlowTimeline = {
+    buckets: [],
+    days: [
+      row(100, [
+        { side: "collateral", asset: C, symbol: "ETH", amount: 10 },
+        { side: "debt", asset: DB, symbol: "DAI", amount: 6_000 },
+      ]),
+    ],
+    live: { collateralUsd: 0, debtUsd: 0 },
+    dailyPrices: {
+      [C]: [
+        [100, 1500],
+        [102, 1200],
+      ],
+      [DB]: [[100, 1]],
+    },
+    today: 103,
+  };
+  // The minimum ratio 1.5 at the first event, 1.45 filed on day 102.
+  const reads = makerMatReads("ETH", { ts: 100 * D + 10, ilkAt: { block: 50, priceUsd: 1500, mat: 1.5, dustDai: 0 } }, [
+    { block: 70, timestamp: 102 * D + 5, txHash: "0x1", mat: 1.45 },
+  ])!;
+  const hv = healthView(t, reads, { source: MAKER_HEALTH_SOURCE, liveHf: 2.2 / 1.45, liveLine: 1.45 })!;
+  assert.equal(hv.health.unit, "ratio");
+  assert.equal(hv.health.liquidates, "below");
+  assert.equal(hv.health.sparseBefore, undefined);
+  // Collateral 10 × 1,500 over 6,000 DAI: 250 %; the line 150 %, then 145 %.
+  assert.deepEqual(
+    hv.health.points.map((p) => [p[0], +p[1].toFixed(4), p[2]]),
+    [
+      [100, 2.5, 50],
+      [101, 2.5, 50],
+      [102, 2, 70],
+      [103, 2.2, null],
+    ],
+  );
+  assert.deepEqual(
+    hv.health.level!.points.map((p) => [p[0], p[1]]),
+    [
+      [100, 1.5],
+      [101, 1.5],
+      [102, 1.45],
+      [103, 1.45],
+    ],
+  );
+  // The level: debt × mat ÷ ink, the card's "Liquidates at".
+  assert.ok(Math.abs(levelAt({ ...hv.health, ...hv.marks[C] }, 100)![1] - 900) < 1e-9);
+  assert.ok(Math.abs(levelAt({ ...hv.health, ...hv.marks[C] }, 102)![1] - 870) < 1e-9);
+
+  // Fluid: a timeline in grains of the debt token (scale 2), today's
+  // threshold held from the first day, the level drawn in the token.
+  const G = 100;
+  const f: FlowTimeline = {
+    ...t,
+    unit: { symbol: "USDT", scale: 2 },
+    days: [
+      row(100, [
+        { side: "collateral", asset: "coll", symbol: "ETH", amount: 1 },
+        { side: "debt", asset: "debt", symbol: "USDT", amount: 1_800 },
+      ]),
+    ],
+    dailyPrices: { coll: [[100, 2_500 * G]], debt: [[100, G]] },
+  };
+  const fv = healthView(f, [fluidHeldRead(0.9, 999)!], { source: FLUID_HEALTH_SOURCE })!;
+  assert.equal(fv.health.liquidates, "above");
+  // 1,800 ÷ (1 × 2,500) = 72 %, against 90 % on every day.
+  assert.ok(fv.health.points.every((p) => Math.abs(p[1] - 0.72) < 1e-9));
+  assert.ok(fv.health.level!.points.every((p) => p[1] === 0.9));
+  assert.equal(fv.health.sparseBefore, undefined);
+  // 1,800 ÷ (1 × 0.9) = 2,000 USDT per ETH.
+  assert.ok(Math.abs(levelAt({ ...fv.health, ...fv.marks.coll }, 101)![1] - 2_000) < 1e-9);
+});

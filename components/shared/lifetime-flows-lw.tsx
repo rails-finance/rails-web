@@ -692,7 +692,8 @@ export function LifetimeFlowsLw({
         type: "custom" as const,
         // In a token, the hover label is the number alone, as the ticks are.
         formatter: (v: number) => formatPrice(v, unit).replace(` ${unit}`, ""),
-        tickmarksFormatter: (vs: number[]) => priceAxisLabels(vs),
+        tickmarksFormatter: (vs: number[]) =>
+          unit === "%" ? priceAxisLabels(vs.map((v) => v * 100)).map((l) => `${l}%`) : priceAxisLabels(vs),
         minMove: 1e-8,
       };
       // A flat stretch (a stablecoin in a zoomed window) is widened to ±1 %, as

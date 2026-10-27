@@ -46,6 +46,13 @@ export interface PriceSeries {
   /** A derived series' receipt in its family's words (the health factor):
    *  at the live read, and at a point resting on a block ("{block}", "{day}"). */
   here?: { live: string; read: string; formula?: string };
+  /** A ratio view's side of its line (lib/shared/flows-health.ts
+   *  `HealthSource.ratio`): the position is liquidatable below it or above
+   *  it. */
+  liquidates?: "below" | "above";
+  /** A ratio view's sentence in the charts' how-to-read, naming its source
+   *  and its line. */
+  help?: string;
   /** Days before this one are the rows alone and draw by the sparse rule:
    *  every segment dotted, the observations marked by `events`. */
   sparseBefore?: number;

@@ -85,6 +85,9 @@
 // price pane alone, with Home and End on its slider for the steps it does not
 // draw. Where the page does not tie the chart to its timeline (no Sync to
 // chart), a tap moves the cursor without freezing it and ⏭ brings it back.
+// MakerDAO and Fluid (step 5, `ratio`): the view in the card's terms, the
+// collateral ratio against the minimum ratio and the position ratio against
+// the liquidation threshold (`checkRatio`).
 // `FIXTURES=<regex>` runs the pages whose id matches.
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
@@ -299,13 +302,72 @@ const PAGES = [
       kind: "ctoken",
     },
   },
-  { id: "makerdao 2028", path: "/ethereum/makerdao/2028", lwOnly: true },
+  // Step 5 (the health view in the card's terms on MakerDAO and Fluid):
+  // each page opens on the card's ratio against its line (`ratio`), today's
+  // ratio, line and level the card's, the line at the first day the ilk
+  // read's (Maker) or today's held across the life (Fluid), no day dotted,
+  // and the how-to-read naming the source. Maker 2028 (ETH-A, 150 % → 145 %
+  // in its life), 31489 (WBTC-A, liquidated 5 Jun 2026); Fluid 6 and 8538
+  // (liquidated in part, open).
+  {
+    id: "makerdao 2028",
+    path: "/ethereum/makerdao/2028",
+    lwOnly: true,
+    ratio: {
+      label: "Collateral ratio",
+      liquidates: "below",
+      head: "collateral-ratio",
+      lineRow: "minimum-ratio",
+      levelRow: "liquidates-at",
+      ilk: "ETH-A",
+      help: ["the OSM price", "the Spotter's minimum ratio"],
+    },
+  },
+  {
+    id: "makerdao 31489 (liquidated)",
+    path: "/ethereum/makerdao/31489",
+    lwOnly: true,
+    ratio: {
+      label: "Collateral ratio",
+      liquidates: "below",
+      head: "collateral-ratio",
+      lineRow: "minimum-ratio",
+      levelRow: "liquidates-at",
+      ilk: "WBTC-A",
+      help: ["the OSM price", "the Spotter's minimum ratio"],
+    },
+  },
   {
     id: "dolomite 0x49d6",
     path: "/ethereum/dolomite/0x49d62ca7ab8e28f7a28d9abadf84fe8b45e3caf6/15809042418583418827551470108194220080728327193143889538122062408455944908946",
     lwOnly: true,
   },
-  { id: "fluid 6", path: "/ethereum/fluid/6", lwOnly: true },
+  {
+    id: "fluid 6",
+    path: "/ethereum/fluid/6",
+    lwOnly: true,
+    ratio: {
+      label: "Position ratio",
+      liquidates: "above",
+      head: "position-ratio",
+      lineRow: "liquidates-above",
+      fluid: "/api/chain/fluid/position?nft=6",
+      help: ["the vault oracle's price", "today's liquidation threshold, held across the life"],
+    },
+  },
+  {
+    id: "fluid 8538 (liquidated)",
+    path: "/ethereum/fluid/8538",
+    lwOnly: true,
+    ratio: {
+      label: "Position ratio",
+      liquidates: "above",
+      head: "position-ratio",
+      lineRow: "liquidates-above",
+      fluid: "/api/chain/fluid/position?nft=8538",
+      help: ["the vault oracle's price", "today's liquidation threshold, held across the life"],
+    },
+  },
   {
     id: "liquity-v1 0x04ca",
     path: "/ethereum/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1",
@@ -537,16 +599,157 @@ async function checkHealth(page, tag, pg, listedAll) {
 }
 
 /** The health view has landed: the heading's picker names it. */
-async function waitForHealth(page) {
+async function waitForHealth(page, label = HEALTH) {
   await page
     .waitForFunction(
       (h) =>
         document.querySelector("[data-price-heading] [data-price-picker]")?.getAttribute("aria-label")?.includes(h),
-      HEALTH,
+      label,
       { timeout: 120000 },
     )
     .catch(() => {});
   await page.waitForTimeout(500);
+}
+
+/** The view in the card's terms (MakerDAO's collateral ratio against its
+ *  minimum, Fluid's position ratio against its threshold; ui-jobs 328 step
+ *  5): listed and shown first, its line on the card's side; on an open
+ *  position today's ratio, line and level are the card's; Maker's line on
+ *  the first day with a ratio is the ilk read's mat at that day's block,
+ *  Fluid's is today's threshold there and today; no day is dotted; the
+ *  how-to-read names the source. */
+async function checkRatio(page, tag, pg) {
+  const r = pg.ratio;
+  const name = r.label.toLowerCase();
+  const pct = (t) => Number((t ?? "").match(/(\d+(?:\.\d+)?)%/)?.[1] ?? NaN);
+  const picker = page.locator("button[data-price-picker]");
+  await picker.click();
+  await page.waitForSelector('[role="listbox"] [data-price-asset]', { timeout: 5000 }).catch(() => {});
+  const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
+  await page.keyboard.press("Escape");
+  check(`${tag}: the picker lists the ${name} first`, listed[0] === r.label, listed.join(","));
+  const heading = await page.$eval("[data-price-heading]", headingText).catch(() => "");
+  check(`${tag}: the chart opens on the ${name}`, heading.includes(r.label), heading);
+  const toggle = page.locator("[data-flow-level-toggle]");
+  if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
+  await page.waitForTimeout(150);
+  const sl = page.locator(PRICE_STRIP).first();
+  const tipNow = () =>
+    page.$eval("[data-price-heading]", (h) => {
+      const ro = h.querySelector("[data-price-readout]");
+      const lv = h.querySelector("[data-liq-readout]");
+      return {
+        text: ro?.textContent ?? "",
+        none: ro?.hasAttribute("data-price-none") ?? true,
+        block: ro?.getAttribute("data-price-block") ?? "",
+        line: lv ? Number(lv.getAttribute("data-liq-value")) : null,
+      };
+    });
+  const readAt = async (key) => {
+    await sl.focus();
+    await page.keyboard.press(key);
+    await page.waitForTimeout(250);
+    return tipNow();
+  };
+  const end = await readAt("End");
+  const head = await page.$eval(`[data-card-head="${r.head}"]`, (h) => h.textContent ?? "").catch(() => null);
+  const open = head != null;
+  if (open) {
+    check(
+      `${tag}: today's ${name} is the card's`,
+      end.block === "" && !end.none && pct(end.text) === pct(head),
+      `chart ${end.text}, card ${head}`,
+    );
+    const lineCard = await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+    check(
+      `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}`,
+      end.line != null && Math.abs(end.line * 100 - pct(lineCard)) < 0.05,
+      `chart ${end.line}, card ${lineCard}`,
+    );
+  }
+  // The first day with a ratio (a life can open on a deposit alone).
+  let first = await readAt("Home");
+  for (let i = 0; first.none && i < 40; i++) {
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(120);
+    first = await tipNow();
+  }
+  check(`${tag}: the ${name} draws from its first days`, !first.none, JSON.stringify(first));
+  const words = `Liquidates ${r.liquidates}`;
+  const tip = await page.$eval("[data-price-heading]", headingText).catch(() => "");
+  check(`${tag}: the line is named "${words}"`, tip.includes(words), tip);
+  if (r.ilk && first.block) {
+    const body = await hostFetch(`${BASE}/api/chain/makerdao/ilk-at?ilk=${r.ilk}&blocks=${first.block}`).then((x) =>
+      x.json(),
+    );
+    const mat = body?.reads?.[first.block]?.mat;
+    check(
+      `${tag}: the first day's line is the ilk read's minimum ratio at block ${first.block}`,
+      mat > 0 && first.line != null && Math.abs(first.line - mat) < 1e-9,
+      `chart ${first.line}, ilk-at ${mat}`,
+    );
+  }
+  let fluid = null;
+  if (r.fluid) {
+    const body = await hostFetch(`${BASE}${r.fluid}`).then((x) => x.json());
+    fluid = body?.position ?? body;
+    check(
+      `${tag}: the line is today's threshold on the first day and today`,
+      fluid?.liquidationThreshold > 0 &&
+        first.line === fluid.liquidationThreshold &&
+        (end.line == null || end.line === fluid.liquidationThreshold),
+      `first ${first.line}, end ${end.line}, read ${fluid?.liquidationThreshold}`,
+    );
+  }
+  const dotted = await page.$eval("[data-price-line]", (g) => ({
+    key: g.getAttribute("data-price-line"),
+    dotted: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).length,
+  }));
+  check(
+    `${tag}: no day of the ${name} is drawn dotted`,
+    dotted.key === "health" && dotted.dotted === 0,
+    JSON.stringify(dotted),
+  );
+  // The collateral's level: drawn, and today the card's.
+  const coll = listed.find((x) => x !== r.label);
+  await picker.click();
+  await page.locator(`[role="listbox"] [data-price-asset="${coll}"]`).first().click();
+  const lv = await readAt("End");
+  const days = await page.$$eval("[data-liq-level]", (ls) =>
+    ls.reduce((n, l) => n + (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).length, 0),
+  );
+  check(`${tag}: ${coll} draws its level`, days > 0, `${days} days`);
+  if (open && r.levelRow) {
+    const liq = await page
+      .$eval(`[data-panel-row="${r.levelRow}"] dd`, (d) => d.textContent?.trim() ?? "")
+      .catch(() => "");
+    check(
+      `${tag}: ${coll}'s level today is the card's "Liquidates at"`,
+      lv.line != null && liq.endsWith(formatLiquidationPrice(lv.line)),
+      `chart ${lv.line}, card ${liq}`,
+    );
+  }
+  if (open && fluid?.liqPriceDebtPerCol > 0)
+    check(
+      `${tag}: ${coll}'s level today is the card's read (liqPriceDebtPerCol)`,
+      lv.line != null && Math.abs(lv.line - fluid.liqPriceDebtPerCol) <= 0.005 * fluid.liqPriceDebtPerCol,
+      `chart ${lv.line}, read ${fluid.liqPriceDebtPerCol}`,
+    );
+  await picker.click();
+  await page.locator(`[role="listbox"] [data-price-asset="${r.label}"]`).click();
+  await page.waitForTimeout(250);
+  await page.locator('[data-flow-help="F7.1"] button').click();
+  const help = await page
+    .locator('[role="dialog"][aria-label="How to read the events and charts"]')
+    .textContent({ timeout: 5000 })
+    .catch(() => "");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  check(
+    `${tag}: the how-to-read names the ${name}'s source and line`,
+    help.includes(`The ${name}`) && r.help.every((w) => help.includes(w)),
+    help,
+  );
 }
 
 /** An asset picked from the health view's list draws its liquidation level
@@ -1378,6 +1581,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     // The health view lands once its position-state reads have, and redraws
     // the price pane: every check below waits for it.
     if (pg.health) await waitForHealth(page);
+    if (pg.ratio) await waitForHealth(page, pg.ratio.label);
     // The drawn strips name their views; the chart names its panes.
     const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
       els.flatMap((e) =>
@@ -1417,6 +1621,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       else await checkLwSteps(page, tag, width < 640);
       if (width >= 640) await checkLwWheel(page, tag);
       if (pg.health) await checkHealthAlone(page, tag, pg);
+      if (pg.ratio) await checkRatio(page, tag, pg);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;

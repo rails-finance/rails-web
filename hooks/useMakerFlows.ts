@@ -18,6 +18,9 @@ import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/comp
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
+import { useMakerIlkAt, useMakerMatChanges } from "@/lib/makerdao/use-chain-history";
+import { MAKER_HEALTH_SOURCE, makerCollKey, makerMatReads } from "@/lib/makerdao/flows-health";
+import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 import {
   MK,
   makerBorrower,
@@ -33,6 +36,7 @@ import {
 } from "@/lib/makerdao/flows";
 
 const DAY_S = 86_400;
+const NO_EVENTS: never[] = [];
 
 /** The store's series key for an ilk (rails-ops reference/daily-prices.md). */
 export const makerSeriesKey = (ilk: string) => `maker:${ilk}`;
@@ -53,6 +57,21 @@ export interface MakerFlowsInput {
   liveSettled: boolean;
   /** The frobs that deposited an auction's leftover. */
   returnedIds: ReadonlySet<string>;
+  /** The card's risk figures from the live read, for the health view's
+   *  today; null where the read has not landed. */
+  risk: MakerRisk | null;
+}
+
+/** The card's risk figures now. */
+export interface MakerRisk {
+  /** The block the live read is at. */
+  block: number;
+  /** The Spotter's minimum ratio (mat), a multiplier. */
+  mat: number | null;
+  collateralUsd: number | null;
+  debt: number | null;
+  /** "Liquidates at": debt × mat ÷ ink. */
+  liquidationPriceUsd: number | null;
 }
 
 export interface MakerFlowsFacts {
@@ -144,7 +163,54 @@ export function useMakerFlows(p: MakerFlowsInput): {
   );
   const ready = opts != null && rows != null && dailySettled;
   const replayed = useMemo(() => (ready && rows && opts ? replayMaker(rows, opts) : null), [ready, rows, opts]);
-  const timeline = useMemo(() => (ready && rows && opts ? makerFlowTimeline(rows, opts) : null), [ready, rows, opts]);
+  const replayedTimeline = useMemo(
+    () => (ready && rows && opts ? makerFlowTimeline(rows, opts) : null),
+    [ready, rows, opts],
+  );
+
+  // The health view in the card's terms (ui-jobs 328 step 5;
+  // lib/makerdao/flows-health.ts): the minimum ratio at the first row, and
+  // each change to it from there to the live read's block (or the last row).
+  const first = rows && rows.length > 0 ? rows[0] : null;
+  const toBlock = first ? Math.max(p.risk?.block ?? 0, rows![rows!.length - 1].block) : 0;
+  const matFirst = useMakerIlkAt(
+    p.ilk,
+    useMemo(() => (first ? [first.block] : []), [first]),
+  );
+  const matSpans = useMemo(
+    () => (first && toBlock > first.block ? [{ from: first.block, to: toBlock }] : []),
+    [first, toBlock],
+  );
+  const matChanges = useMakerMatChanges(p.ilk, matSpans);
+  const matReads = useMemo(() => {
+    if (!first || !p.collSymbol) return null;
+    const ilkAt = matFirst?.reads.get(first.block) ?? null;
+    const span = matSpans[0];
+    const changes = span ? matChanges.get(`${span.from}-${span.to}`) : { changes: [] };
+    if (!ilkAt || !changes) return null;
+    return makerMatReads(p.collSymbol, { ts: first.ts, ilkAt }, changes.changes);
+  }, [first, p.collSymbol, matFirst, matSpans, matChanges]);
+  const risk = p.risk;
+  const liveHf =
+    risk && risk.mat && risk.collateralUsd != null && risk.debt != null && risk.debt > 0
+      ? risk.collateralUsd / risk.debt / risk.mat
+      : null;
+  const liveLevels = useMemo(
+    () =>
+      p.collSymbol && risk?.liquidationPriceUsd != null && risk.liquidationPriceUsd > 0
+        ? { [makerCollKey(p.collSymbol)]: risk.liquidationPriceUsd }
+        : null,
+    [p.collSymbol, risk],
+  );
+  const timeline = useFlowsHealth(replayedTimeline, {
+    reader: null,
+    given: matReads,
+    source: MAKER_HEALTH_SOURCE,
+    events: NO_EVENTS,
+    liveHf,
+    liveLevels,
+    liveLine: risk?.mat ?? null,
+  });
   const focusEvents = useMemo(
     () =>
       replayed && opts && timeline

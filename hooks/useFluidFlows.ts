@@ -28,8 +28,11 @@ import {
   fluidPricing,
   type FluidLive,
 } from "@/lib/fluid/flows";
+import { FLUID_COLL_KEY, FLUID_HEALTH_SOURCE, fluidHeldRead } from "@/lib/fluid/flows-health";
+import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
 const DAY_S = 86_400;
+const NO_EVENTS: never[] = [];
 
 /** The store's series key for a vault (rails-ops reference/daily-prices.md). */
 export const fluidSeriesKey = (vault: string) => `fluid:${vault.toLowerCase()}`;
@@ -50,6 +53,22 @@ export interface FluidFlowsInput {
   liveSettled: boolean;
   /** False on a smart vault: the page does not draw the panel. */
   enabled: boolean;
+  /** The card's risk figures from the live read, for the health view; null
+   *  where the read has not landed. */
+  risk: FluidRisk | null;
+}
+
+/** The card's risk figures now. */
+export interface FluidRisk {
+  /** The block the live read is at. */
+  block: number;
+  /** The vault's liquidation threshold, a fraction. */
+  liquidationThreshold: number;
+  /** The card's position ratio: debt ÷ (collateral × liquidate price). */
+  ratio: number | null;
+  /** The price, debt per collateral, at which that ratio reaches the
+   *  threshold. */
+  liqPriceDebtPerCol: number | null;
 }
 
 export interface FluidFlowsNoteFacts {
@@ -146,7 +165,31 @@ export function useFluidFlows(p: FluidFlowsInput): {
     [now, p.collSymbol, p.debtSymbol, p.open, p.live, p.liveSettled, dailySettled, dailyPrices],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? fluidFlowReplay(rows, opts) : null), [rows, opts]);
-  const timeline = useMemo(() => (rows && opts ? fluidFlowTimeline(rows, opts) : null), [rows, opts]);
+  const replayedTimeline = useMemo(() => (rows && opts ? fluidFlowTimeline(rows, opts) : null), [rows, opts]);
+  // The health view in the card's terms (ui-jobs 328 step 5;
+  // lib/fluid/flows-health.ts): today's threshold held across the life.
+  const risk = p.risk;
+  const given = useMemo(() => {
+    const r = risk ? fluidHeldRead(risk.liquidationThreshold, risk.block) : null;
+    return r ? [r] : null;
+  }, [risk]);
+  const grain = 10 ** (replayedTimeline?.unit?.scale ?? 0);
+  const liveLevels = useMemo(
+    () =>
+      risk?.liqPriceDebtPerCol != null && risk.liqPriceDebtPerCol > 0
+        ? { [FLUID_COLL_KEY]: risk.liqPriceDebtPerCol * grain }
+        : null,
+    [risk, grain],
+  );
+  const timeline = useFlowsHealth(replayedTimeline, {
+    reader: null,
+    given,
+    source: FLUID_HEALTH_SOURCE,
+    events: NO_EVENTS,
+    liveHf: risk?.ratio != null && risk.ratio > 0 ? risk.liquidationThreshold / risk.ratio : null,
+    liveLevels,
+    liveLine: risk?.liquidationThreshold ?? null,
+  });
   const focusEvents = useMemo(
     () =>
       replay && timeline && p.collSymbol && p.debtSymbol ? fluidFocusEvents(replay, p.collSymbol, p.debtSymbol) : [],

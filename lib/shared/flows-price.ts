@@ -23,7 +23,10 @@
 //   point per day, held between days and stepped on the day it moves; it has
 //   no point after the day it ends.
 // - Where the timeline carries the position's health factor (`t.health`,
-//   ruling 7), it is the first series, a ratio with no unit, its line at 1.
+//   ruling 7), it is the first series, a ratio with no unit, its line at 1;
+//   a family whose card states a ratio against a line (unit "ratio": Maker's
+//   collateral ratio, Fluid's position ratio) prints it as a percentage, its
+//   line the family's.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
@@ -41,8 +44,8 @@ import {
 export interface FlowPriceSeries extends PriceSeries {
   /** The side the asset was first held on. */
   side: FlowSide;
-  /** The unit as printed: "USD", the token the family's figures are in, or
-   *  "" for the health factor. */
+  /** The unit as printed: "USD", the token the family's figures are in, ""
+   *  for the health factor, or "%" for a ratio view. */
   unitLabel: string;
   /** The position's health factor rather than an asset's price. */
   health?: true;
@@ -81,14 +84,18 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
   }
   const rank = (s: FlowPriceSeries) => (s.side === "collateral" ? 0 : 1e6) + (meta.get(s.key)?.order ?? 0);
   out.sort((a, b) => rank(a) - rank(b));
-  return t.health ? [{ ...t.health, side: "collateral", unitLabel: "", health: true }, ...out] : out;
+  return t.health
+    ? [{ ...t.health, side: "collateral", unitLabel: t.health.unit === "ratio" ? "%" : "", health: true }, ...out]
+    : out;
 }
 
 /** "$2,451.37" · "1.0002 USDC" · "$0.0001234": a price in its unit; a
  *  health factor ("" unit) as the Aave family's cards print one, four places
  *  under 1.1 (rounded down under 1, so a liquidatable figure never reads
- *  1.0000), two above: "1.0234", "1.84". */
+ *  1.0000), two above: "1.0234", "1.84"; a ratio ("%") as the Maker and
+ *  Fluid cards print one: "185.3%". */
 export function formatPrice(v: number, unitLabel: string): string {
+  if (unitLabel === "%") return `${(v * 100).toFixed(1)}%`;
   if (unitLabel === "")
     return v < 1 ? (Math.floor(v * 1e4 + 1e-9) / 1e4).toFixed(4) : v < 1.1 ? v.toFixed(4) : v.toFixed(2);
   const a = Math.abs(v);

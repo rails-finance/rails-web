@@ -59,7 +59,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { FluidFlowsNote, fluidFlowsContent } from "@/components/protocol/fluid/fluid-flows-note";
-import { useFluidFlows } from "@/hooks/useFluidFlows";
+import { useFluidFlows, type FluidRisk } from "@/hooks/useFluidFlows";
 import { computeFluidEconomics, fluidLifetimeWithOpening } from "@/lib/fluid/economics";
 import { fluidEconomicsExplanation, fluidEconomicsContent } from "@/lib/fluid/economics-explanation";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
@@ -317,6 +317,25 @@ export default function FluidPositionView({
         : null,
     [chain],
   );
+  // The card's risk figures (its Position ratio and "Liquidates above"), for
+  // the health view: only with live debt against live collateral, as the card.
+  const flowRisk = useMemo<FluidRisk | null>(
+    () =>
+      chain &&
+      !chain.chainStale &&
+      !chain.isEmpty &&
+      chain.borrow > 0 &&
+      chain.supply > 0 &&
+      chain.liquidationThreshold > 0
+        ? {
+            block: chain.blockNumber,
+            liquidationThreshold: chain.liquidationThreshold,
+            ratio: chain.ratio,
+            liqPriceDebtPerCol: chain.liqPriceDebtPerCol,
+          }
+        : null,
+    [chain],
+  );
   const flowColl = view ? fluidLegName(view, "supply", chain) : null;
   const flowDebt = view ? fluidLegName(view, "borrow", chain) : null;
   const flows = useFluidFlows({
@@ -329,6 +348,7 @@ export default function FluidPositionView({
     live: flowLive,
     liveSettled: chainSettled,
     enabled: flowsOn,
+    risk: flowRisk,
   });
   // The timeline ties to the panel only where the panel draws.
   const flowFocus = flowsOn && flows.read !== "failed" ? flows.focus : null;
