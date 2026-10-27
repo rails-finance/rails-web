@@ -45,7 +45,7 @@ export interface PriceSeries {
   noCarry?: true;
   /** A derived series' receipt in its family's words (the health factor):
    *  at the live read, and at a point resting on a block ("{block}", "{day}"). */
-  here?: { live: string; read: string };
+  here?: { live: string; read: string; formula?: string };
   /** Days before this one are the rows alone and draw by the sparse rule:
    *  every segment dotted, the observations marked by `events`. */
   sparseBefore?: number;

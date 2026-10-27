@@ -1,31 +1,20 @@
 "use client";
 
-// The Lifetime flows panel's health view on an Aave V3 Pool page (rails-ops
-// reference/lifetime-price-chart.md, ruling 15; ui-jobs 328, steps 4 and 5):
-// the position state at the last event of each of the most recent
-// HEALTH_READS_MAX days with events the page holds, read through the family's
-// position-state route (hooks/useAaveV3PositionState.ts, by market) or, for an
-// Aave V4 spoke, the spoke's state at the block (lib/aave-v4/use-spoke-reads.ts),
-// and the
-// timeline with its health series and each asset's level added
-// (lib/aave-v3/flows-health.ts). Until every read has settled, and where no
-// read lands or the view has no point, the timeline comes back as given.
+// The Aave family's reader for the health view (hooks/useFlowsHealth.ts;
+// ui-jobs 328, steps 4 and 5): an Aave V3 Pool's thresholds from the family's
+// position-state route by market (hooks/useAaveV3PositionState.ts), an Aave V4
+// spoke's collateral factors from the spoke's state at the block
+// (lib/aave-v4/flows-health.ts). A transaction hash is read from an event's id
+// on either id form (Ethereum's "kind:hash:log", Base's "hash-log").
 
 import { useMemo } from "react";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
-import {
-  aaveV3HealthReadPicks,
-  aaveV3HealthView,
-  aaveV3ThresholdRead,
-  type AaveHealthSource,
-  type AaveV3ThresholdRead,
-} from "@/lib/aave-v3/flows-health";
-import { useAaveV3PositionStates } from "@/hooks/useAaveV3PositionState";
-import { useAaveV4SpokeReads } from "@/lib/aave-v4/use-spoke-reads";
+import { AAVE_V3_LEVELS, aaveV3ThresholdRead, type AaveHealthSource } from "@/lib/aave-v3/flows-health";
+import { readAaveV3PositionStateInBackground } from "@/hooks/useAaveV3PositionState";
 import { aaveV4FactorRead } from "@/lib/aave-v4/flows-health";
-
-/** The most position-state reads one page asks for its health view. */
-export const HEALTH_READS_MAX = 60;
+import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
+import { healthRead } from "@/lib/shared/health-reads";
+import { useFlowsHealth, type HealthPick, type HealthReader } from "@/hooks/useFlowsHealth";
 
 const TX_HASH = /0x[0-9a-fA-F]{64}/;
 
@@ -51,34 +40,38 @@ export interface AaveFamilyHealthInput {
 
 export function useAaveFamilyHealth(t: FlowTimeline | null, p: AaveFamilyHealthInput): FlowTimeline | null {
   const { events, market, wallet, source, liveHf, liveLevels } = p;
-  const picks = useMemo(
-    () =>
-      market
-        ? aaveV3HealthReadPicks(
-            events.map((e) => ({ blockNumber: e.blockNumber, timestamp: e.timestamp, txHash: txOf(e) })),
-            HEALTH_READS_MAX,
-          ).map((e) => ({ block: e.blockNumber, txHash: e.txHash!, timestamp: e.timestamp }))
-        : [],
-    [events, market],
-  );
   const v4 = source.reader === "aave-v4-spoke";
-  const states = useAaveV3PositionStates({ wallet, market: v4 ? undefined : (market ?? undefined), reads: picks });
-  const blocks = useMemo(() => (v4 ? picks.map((p) => p.block) : []), [v4, picks]);
-  const spokeReads = useAaveV4SpokeReads({ wallet, spoke: v4 ? (market ?? undefined) : undefined, blocks });
-  return useMemo(() => {
-    if (!t) return t;
-    let reads: AaveV3ThresholdRead[];
-    if (v4) {
-      if (!spokeReads) return t;
-      reads = spokeReads.flatMap((r, i) => {
-        const read = r ? aaveV4FactorRead(r, picks[i].timestamp) : null;
-        return read ? [read] : [];
-      });
-    } else {
-      if (!states) return t;
-      reads = states.flatMap((r) => (r.status === "ready" && r.data.complete ? [aaveV3ThresholdRead(r.data)] : []));
-    }
-    const hv = aaveV3HealthView(t, reads, { liveHf, liveLevels, source });
-    return hv ? { ...t, health: hv.health, priceMarks: { ...t.priceMarks, ...hv.marks } } : t;
-  }, [t, v4, states, spokeReads, picks, liveHf, liveLevels, source]);
+  // Each pick needs its transaction: the position-state read is after it.
+  const picks = useMemo<HealthPick[]>(
+    () =>
+      events.flatMap((e) => {
+        const txHash = txOf(e);
+        return txHash ? [{ blockNumber: e.blockNumber, timestamp: e.timestamp, txHash }] : [];
+      }),
+    [events],
+  );
+  const reader = useMemo<HealthReader | null>(() => {
+    if (!market) return null;
+    if (v4)
+      return {
+        key: `aave-v4:${wallet.toLowerCase()}:${market}`,
+        load: (e) =>
+          healthRead(
+            `/api/chain/aave-v4/spoke-position?wallet=${wallet}&spoke=${market}&block=${e.blockNumber}`,
+            (b) => {
+              const r = b as AaveV4SpokePositionChainResponse | null;
+              return r && Array.isArray(r.reserves) && !r.chainStale ? r : null;
+            },
+          ).then((r) => (r ? aaveV4FactorRead(r, e.timestamp) : null)),
+      };
+    return {
+      key: `aave-v3:${wallet.toLowerCase()}:${market}`,
+      load: (e) =>
+        readAaveV3PositionStateInBackground({ wallet, market, block: e.blockNumber, txHash: e.txHash! }).then((r) =>
+          r.status === "ready" && r.data.complete ? aaveV3ThresholdRead(r.data) : null,
+        ),
+    };
+  }, [v4, wallet, market]);
+  const withLevels = useMemo(() => (source.levels ? source : { ...source, levels: AAVE_V3_LEVELS }), [source]);
+  return useFlowsHealth(t, { reader, source: withLevels, events: picks, liveHf, liveLevels });
 }

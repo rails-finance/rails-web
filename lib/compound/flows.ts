@@ -88,7 +88,7 @@ const ACCRUAL_KEYS = new Set<string>([CV3.earned, CV3.accrued]);
 /** The page's asset ids: each collateral token, and the base on each side. */
 export const SUPPLY_ASSET = "base-supply";
 export const DEBT_ASSET = "base-debt";
-const collAsset = (token: string) => `coll:${token}`;
+export const collAsset = (token: string) => `coll:${token}`;
 
 /** One row of a Comet position, in human units. */
 export interface CompoundFlowEvent {

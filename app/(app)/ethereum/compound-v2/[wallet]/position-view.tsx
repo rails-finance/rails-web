@@ -377,6 +377,7 @@ export default function CompoundV2PositionView({
     chain,
     todayPrices: view?.priceByMarket,
     fixedPrices: view?.priceFixedByMarket,
+    wallet,
   });
   const ledgerData = useMemo(
     () => ({ states: flows.states, brand: "Compound", pricesAt: flows.prices }),

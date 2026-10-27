@@ -44,6 +44,11 @@ import {
   compoundV2PricePairs,
   compoundV2RowPrices,
 } from "@/lib/compound-v2/flows";
+import { ctokenCardLines, ctokenHealthReader, ctokenHealthSource, ctokenTodayRead } from "@/lib/shared/ctoken-health";
+import { cardLevels } from "@/lib/shared/flows-health";
+import { useFlowsHealth } from "@/hooks/useFlowsHealth";
+
+const V2_HEALTH_SOURCE = ctokenHealthSource(1);
 
 export interface CompoundV2FlowsInput {
   /** The page's events, when they are the whole history; null otherwise. */
@@ -56,6 +61,8 @@ export interface CompoundV2FlowsInput {
   todayPrices: Record<string, number> | undefined;
   /** Markets whose oracle price is a stored constant with no feed. */
   fixedPrices: Record<string, boolean> | undefined;
+  /** The account, for the health view's factor reads. */
+  wallet: string;
 }
 
 export interface CompoundV2FlowsFacts {
@@ -227,10 +234,32 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
     [now, live, p.todayPrices, dailyPrices],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? ctokenFlowReplay(rows, opts) : null), [rows, opts]);
-  const timeline = useMemo(
+  const replayed = useMemo(
     () => (rows && opts && (dailySettled || rows.length === 0) ? ctokenFlowTimeline(rows, opts) : null),
     [rows, opts, dailySettled],
   );
+  // The health view (ui-jobs 328, ruling 15): the Comptroller's collateral
+  // factors and the entered markets at the day's last event, the card's read today.
+  const healthEvents = useMemo(() => (rows ?? []).map((r) => ({ blockNumber: r.block, timestamp: r.ts })), [rows]);
+  const marketsKey = want?.key ?? "";
+  const reader = useMemo(
+    () => ctokenHealthReader("compound-v2", p.wallet, marketsKey ? marketsKey.split(",") : []),
+    [p.wallet, marketsKey],
+  );
+  const chainNow = p.chain && !p.chain.chainStale ? p.chain : null;
+  const todayRead = useMemo(() => (chainNow && now != null ? ctokenTodayRead(chainNow, now) : null), [chainNow, now]);
+  const liveLevels = useMemo(
+    () => (chainNow ? cardLevels(ctokenCardLines(chainNow), replayed?.todayPrices) : null),
+    [chainNow, replayed],
+  );
+  const timeline = useFlowsHealth(replayed, {
+    reader,
+    source: V2_HEALTH_SOURCE,
+    events: healthEvents,
+    liveHf: chainNow?.healthReplica ?? null,
+    liveLevels,
+    todayRead,
+  });
   const focusEvents = useMemo(() => (replay ? ctokenFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? ctokenEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

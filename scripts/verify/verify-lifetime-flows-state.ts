@@ -141,7 +141,7 @@ import {
   stopForDay,
 } from "@/lib/shared/flows-combined";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
-import { aaveV3HealthReadPicks, aaveV3HealthView } from "@/lib/aave-v3/flows-health";
+import { healthReadPicks, healthView } from "@/lib/shared/flows-health";
 import {
   assetTokenSum,
   eventAssetSum,
@@ -2407,8 +2407,8 @@ test("Aave V3's health view: the day's prices and the last read's thresholds, th
     },
     today: 104,
   };
-  const reads = [{ day: 100, block: 1000, lt: { [W]: 0.8, [U]: 0 }, emode: 0 }];
-  const hv = aaveV3HealthView(t, reads, {})!;
+  const reads = [{ day: 100, block: 1000, lt: { [W]: 0.8, [U]: 0 } }];
+  const hv = healthView(t, reads, {})!;
   assert.deepEqual(
     hv.health.points.map((p) => [p[0], +p[1].toFixed(4), p[2]]),
     [
@@ -2425,7 +2425,7 @@ test("Aave V3's health view: the day's prices and the last read's thresholds, th
   // USDC, a debt: the price at which the health factor reaches 1.
   assert.ok(Math.abs(levelAt({ ...hv.health, ...hv.marks[U] }, 103)![1] - 3.36) < 1e-9);
   // Today's point is the card's health factor.
-  const live = aaveV3HealthView(t, reads, { liveHf: 3 })!;
+  const live = healthView(t, reads, { liveHf: 3 })!;
   assert.deepEqual(live.health.points[live.health.points.length - 1], [104, 3, null]);
   // A day with no debt has no point, and is a gap, not a carry.
   const repaid: FlowTimeline = {
@@ -2433,11 +2433,11 @@ test("Aave V3's health view: the day's prices and the last read's thresholds, th
     days: [...t.days, row(104, [{ side: "debt", asset: U, symbol: "USDC", amount: 0 }])],
     today: 106,
   };
-  const r = aaveV3HealthView(repaid, reads, {})!;
+  const r = healthView(repaid, reads, {})!;
   assert.equal(r.health.points[r.health.points.length - 1][0], 103);
   assert.equal(pricePieces(r.health, 100, 106).carried.length, 0);
   // The reads: the last event of each of the most recent days.
-  const picks = aaveV3HealthReadPicks(
+  const picks = healthReadPicks(
     [
       { blockNumber: 10, timestamp: 100 * D + 5, txHash: "0xa" },
       { blockNumber: 12, timestamp: 100 * D + 50, txHash: "0xb" },
@@ -2518,4 +2518,54 @@ test("Aave V4: factors by symbol, weighted across two hubs; levels are the card'
   }).assetLiqPrices.filter((a) => a.liqPrice != null && a.liqPrice > 0);
   assert.deepEqual([...many].sort(), want.map((a) => [a.symbol, a.liqPrice]).sort());
   assert.ok(!many.has("aave"));
+});
+
+// ── Compound V3, Compound V2 and Moonwell health sources (ui-jobs 328 step 5) ─
+test("Comet and Comptroller sources: factors keyed as the timelines key them; today's levels from the card's read", async () => {
+  const { cometFactorRead, cometCardLines } = await import("@/lib/compound/flows-health");
+  const { ctokenCardLines, ctokenTodayRead } = await import("@/lib/shared/ctoken-health");
+  const { basketLevels, cardLevels } = await import("@/lib/shared/flows-health");
+  const read = cometFactorRead({ block: 7, factors: { "0xAB": { liquidate: 0.9 } } }, 86_400 * 20_000 + 1);
+  assert.deepEqual(read, { day: 20_000, block: 7, lt: { "base-supply": 0, "coll:0xab": 0.9 } });
+
+  // A Comet quoting in ETH: today's level is the read's share of its price,
+  // at the chart's (dollar) price.
+  const lines = cometCardLines({
+    collateral: [
+      {
+        address: "0xAB",
+        symbol: "wstETH",
+        decimals: 18,
+        balanceRaw: "2000000000000000000",
+        price: 1.2,
+        borrowCollateralFactor: 0.85,
+        liquidateCollateralFactor: 0.9,
+        liquidationFactor: 0.95,
+      },
+    ],
+    supplyBalanceRaw: "0",
+    borrowBalanceRaw: "1080000000000000000",
+    baseDecimals: 18,
+    basePrice: 1,
+  } as never);
+  const lv = cardLevels(lines, { "coll:0xab": 3000, "base-debt": 2500, "base-supply": 2500 });
+  // debt 1.08 ÷ (2 × 0.9) = 0.6 ETH, half the 1.2 price: half the $3,000.
+  assert.ok(Math.abs(lv["coll:0xab"] - 1500) < 1e-9);
+
+  // A market not entered counts 0, its supply backing nothing.
+  const markets = [
+    { market: "weth", supplyUnderlying: 1, borrowUnderlying: 0, priceUsd: 2000, collateralFactor: 0.8, entered: true },
+    {
+      market: "usdc",
+      supplyUnderlying: 500,
+      borrowUnderlying: 1000,
+      priceUsd: 1,
+      collateralFactor: 0.85,
+      entered: false,
+    },
+  ];
+  assert.deepEqual(ctokenTodayRead({ blockNumber: 9, markets }, 86_400 * 3).lt, { weth: 0.8, usdc: 0 });
+  const l = basketLevels(ctokenCardLines({ markets }));
+  // WETH alone backs the debt: 1000 ÷ (1 × 0.8).
+  assert.equal(l.get("weth"), 1250);
 });

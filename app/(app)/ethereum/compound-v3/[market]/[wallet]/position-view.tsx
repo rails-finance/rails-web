@@ -486,6 +486,7 @@ export default function CompoundPositionView({
     market: cometMarket,
     open: view?.status === "open",
     live: flowLive,
+    chain,
   });
 
   // The top row's price dropdown: the open market's base +

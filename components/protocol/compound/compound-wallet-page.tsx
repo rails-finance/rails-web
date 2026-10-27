@@ -321,6 +321,7 @@ function MarketSection({
     market,
     open: view.status === "open",
     live: flowLive,
+    chain,
   });
 
   const live = chain && !chain.chainStale ? chain : null;

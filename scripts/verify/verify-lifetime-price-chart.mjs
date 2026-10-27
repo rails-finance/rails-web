@@ -72,7 +72,13 @@
 // days dotted) the health checks, and on each the picked collaterals' levels
 // today match `assetLiqPrices` worked from the spoke's state and oracle now
 // (`v4Spoke`, within 1 %: the head moves between the reads). Each health page also
-// checks that an asset picked from the list draws its level. Step 4d moved every other family onto the engine: one position
+// checks that an asset picked from the list draws its level. Moonwell,
+// Compound V3 and Compound V2 (step 5, their factors read at each picked
+// block): one borrower per family and chain takes the chart's and the health
+// checks, today's figure against the card's chain read (`hf`) and each
+// collateral's level today against ruling 7's from that read (`basket`, within
+// 1.5 %), Moonwell Base 0x2d7a…9e9c (underwater) the health checks with no
+// level. Step 4d moved every other family onto the engine: one position
 // per family takes the chart's checks alone (`lwOnly`), its panes named
 // (`panes`: "value" where the family has no price series, a pane per side
 // where the sides have no common unit), and a one-day life (`priceOnly`) the
@@ -171,19 +177,128 @@ const PAGES = [
     timeline: "/api/chain/seamless/timeline?wallet=0x818214d3494fbc4be4f450c50677e55987804206",
   },
   // Step 4d: one position per family on the chart's checks alone.
-  { id: "moonwell 0x33a7", path: "/ethereum/moonwell/0x33a7ec1055edd4cc35ef289156c7a7a078043474", lwOnly: true },
-  { id: "moonwell-base 0x2d7a", path: "/base/moonwell/0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c", lwOnly: true },
+  // Step 5 (the health view on Moonwell, Compound V3 and Compound V2): each
+  // borrower takes the chart's checks and the health checks, today's figure
+  // against the card's chain read (`hf`) and each collateral's level today
+  // against ruling 7's worked from that read (`basket`).
+  {
+    id: "moonwell 0x33a7",
+    path: "/ethereum/moonwell/0x33a7ec1055edd4cc35ef289156c7a7a078043474",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/moonwell/timeline?wallet=0x33a7ec1055edd4cc35ef289156c7a7a078043474&limit=1000",
+    hf: {
+      url: "/api/chain/moonwell/position?wallet=0x33a7ec1055edd4cc35ef289156c7a7a078043474",
+      field: "healthFactor",
+    },
+    basket: { url: "/api/chain/moonwell/position?wallet=0x33a7ec1055edd4cc35ef289156c7a7a078043474", kind: "ctoken" },
+  },
+  {
+    id: "moonwell-base 0x98b8",
+    path: "/base/moonwell/0x98b8d0621c1a79dcfc5a65d01abf9cfdd46aeb7a",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/moonwell-base/timeline?wallet=0x98b8d0621c1a79dcfc5a65d01abf9cfdd46aeb7a",
+    hf: {
+      url: "/api/chain/moonwell-base/position?wallet=0x98b8d0621c1a79dcfc5a65d01abf9cfdd46aeb7a",
+      field: "healthFactor",
+    },
+    basket: {
+      url: "/api/chain/moonwell-base/position?wallet=0x98b8d0621c1a79dcfc5a65d01abf9cfdd46aeb7a",
+      kind: "ctoken",
+    },
+  },
+  // Underwater (bad debt, a health factor near 0): every level is more than
+  // ten times from its price, so none is drawn.
+  {
+    id: "moonwell-base 0x2d7a",
+    path: "/base/moonwell/0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c",
+    lwOnly: true,
+    health: true,
+    noLevel: true,
+    timeline: "/api/chain/moonwell-base/timeline?wallet=0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c",
+  },
   {
     id: "compound-v3 usdc 0xc5cd",
     path: "/ethereum/compound-v3/usdc/0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46",
     lwOnly: true,
+    health: true,
+    timeline: "/api/compound/timeline?wallet=0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46&market=usdc&limit=1000",
+    hf: {
+      url: "/api/chain/compound/position?wallet=0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46&market=usdc",
+      field: "healthFactor",
+    },
+    basket: {
+      url: "/api/chain/compound/position?wallet=0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46&market=usdc",
+      kind: "comet",
+    },
   },
   {
     id: "compound-v3-base usdc 0x3a79",
     path: "/base/compound-v3/usdc/0x3a79bf27ff626b55c601f01666bc522cc65eb852",
     lwOnly: true,
   },
-  { id: "compound-v2 0x6217", path: "/ethereum/compound-v2/0x6217c008da6ea46b6db500695287d77d03f79a42", lwOnly: true },
+  {
+    id: "compound-v3-base usdc 0x2f42",
+    path: "/base/compound-v3/usdc/0x2f42b066069945a71100aef832afdbe14d954e4b",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/compound-base/timeline?wallet=0x2f42b066069945a71100aef832afdbe14d954e4b",
+    hf: {
+      url: "/api/chain/compound-base/wallet?wallet=0x2f42b066069945a71100aef832afdbe14d954e4b",
+      field: "healthFactor",
+      market: "usdc",
+    },
+    basket: {
+      url: "/api/chain/compound-base/wallet?wallet=0x2f42b066069945a71100aef832afdbe14d954e4b",
+      kind: "comet",
+      market: "usdc",
+    },
+  },
+  {
+    id: "compound-v3-arbitrum usdc 0x13ad",
+    path: "/arbitrum/compound-v3/usdc/0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/compound-arbitrum/timeline?wallet=0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
+    hf: {
+      url: "/api/chain/compound-arbitrum/wallet?wallet=0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
+      field: "healthFactor",
+      market: "usdc",
+    },
+    basket: {
+      url: "/api/chain/compound-arbitrum/wallet?wallet=0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
+      kind: "comet",
+      market: "usdc",
+    },
+  },
+  {
+    id: "compound-v2 0x6217",
+    path: "/ethereum/compound-v2/0x6217c008da6ea46b6db500695287d77d03f79a42",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/compound-v2/timeline?wallet=0x6217c008da6ea46b6db500695287d77d03f79a42&limit=1000",
+    hf: {
+      url: "/api/chain/compound-v2/position?wallet=0x6217c008da6ea46b6db500695287d77d03f79a42",
+      field: "healthReplica",
+    },
+  },
+  // Liquidated once, two collaterals in reach of a level (0x6217's are not).
+  {
+    id: "compound-v2 0xb074",
+    path: "/ethereum/compound-v2/0xb07421eecdb730794b3a7e76e54e7683c3687d8b",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/compound-v2/timeline?wallet=0xb07421eecdb730794b3a7e76e54e7683c3687d8b&limit=1000",
+    hf: {
+      url: "/api/chain/compound-v2/position?wallet=0xb07421eecdb730794b3a7e76e54e7683c3687d8b",
+      field: "healthReplica",
+    },
+    basket: {
+      url: "/api/chain/compound-v2/position?wallet=0xb07421eecdb730794b3a7e76e54e7683c3687d8b",
+      kind: "ctoken",
+    },
+  },
   { id: "makerdao 2028", path: "/ethereum/makerdao/2028", lwOnly: true },
   {
     id: "dolomite 0x49d6",
@@ -349,12 +464,28 @@ async function checkHealth(page, tag, pg, listedAll) {
   // The card's health factor: the headline's figure.
   const cardText = await page.$eval('[data-card-head="health-factor"]', (h) => h.textContent ?? "").catch(() => "");
   const card = cardText.match(/\d+\.\d+/g)?.pop() ?? null;
+  // The chart prints four places under 1.1; a card that prints two (Moonwell)
+  // agrees at its places.
+  const places = card?.split(".")[1]?.length ?? 0;
   if (card)
     check(
       `${tag}: today's health factor is the card's`,
-      end.block === "" && end.text.trim() === card,
+      end.block === "" && (end.text.trim() === card || Number(end.text).toFixed(places) === card),
       `chart ${end.text} (block ${end.block}), card ${card}`,
     );
+  // Where the card prints no health factor (Compound V3's and V2's state the
+  // line's share), today's figure against the card's chain read.
+  if (pg.hf && !card) {
+    const body = await hostFetch(`${BASE}${pg.hf.url}`).then((r) => r.json());
+    const row = pg.hf.market ? (body.positions ?? []).find((x) => x.market === pg.hf.market) : body;
+    const want = row?.[pg.hf.field];
+    const got = Number(end.text);
+    check(
+      `${tag}: today's health factor is the card's read (${pg.hf.field})`,
+      end.block === "" && want > 0 && Math.abs(got - want) <= 0.005 * want + 0.006,
+      `chart ${end.text} (block ${end.block}), read ${want}`,
+    );
+  }
   const bad = [];
   for (const target of [Math.floor(max / 2), Math.max(0, max - 1)]) {
     await page.keyboard.press("Home");
@@ -423,9 +554,13 @@ async function waitForHealth(page) {
 async function checkPickedLevel(page, tag, listedAll) {
   const picker = page.locator("button[data-price-picker]");
   const drawn = [];
-  for (const sym of listedAll.filter((s) => s !== HEALTH)) {
+  // A Comet's base is listed twice where the account has both supplied and
+  // borrowed it (its supply and its debt): each listed entry is picked.
+  for (const [sym, nth] of listedAll
+    .map((x, i) => [x, listedAll.slice(0, i).filter((y) => y === x).length])
+    .filter(([x]) => x !== HEALTH)) {
     await picker.click();
-    await page.locator(`[role="listbox"] [data-price-asset="${sym}"]`).click();
+    await page.locator(`[role="listbox"] [data-price-asset="${sym}"]`).nth(nth).click();
     await page.waitForTimeout(250);
     const days = await page.$$eval("[data-liq-level]", (ls) =>
       ls.reduce((n, l) => n + (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).length, 0),
@@ -454,6 +589,85 @@ async function checkHealthAlone(page, tag, pg) {
   await checkHealth(page, tag, pg, listedAll);
   if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll);
   if (pg.v4Spoke) await checkV4Levels(page, tag, pg, listedAll);
+  if (pg.basket) await checkBasketLevels(page, tag, pg, listedAll);
+}
+
+/** Moonwell, Compound V2 and V3: each collateral's level today is ruling 7's,
+ *  the price at which the health factor reaches 1 with every other balance
+ *  and price held, worked from the card's chain read (each entered market's
+ *  collateral factor; each Comet collateral's liquidate factor). Compared as
+ *  a share of the price, which is unit-free (a Comet quotes in its base unit).
+ *  A level more than ten times from the price is not drawn. */
+async function checkBasketLevels(page, tag, pg, listedAll) {
+  const body = await hostFetch(`${BASE}${pg.basket.url}`).then((r) => r.json());
+  const row = pg.basket.market ? (body.positions ?? []).find((x) => x.market === pg.basket.market) : body;
+  const lines = [];
+  if (pg.basket.kind === "ctoken") {
+    for (const m of row?.markets ?? [])
+      lines.push({
+        symbol: m.symbol,
+        coll: m.supplyUnderlying,
+        debt: m.borrowUnderlying,
+        price: m.priceUsd ?? 0,
+        lt: m.entered ? (m.collateralFactor ?? 0) : 0,
+      });
+  } else if (row) {
+    for (const c of row.collateral ?? [])
+      lines.push({
+        symbol: c.symbol,
+        coll: Number(c.balanceRaw) / 10 ** c.decimals,
+        debt: 0,
+        price: c.price,
+        lt: c.liquidateCollateralFactor,
+      });
+    lines.push({
+      symbol: row.baseSymbol,
+      coll: 0,
+      debt: Number(row.borrowBalanceRaw) / 10 ** row.baseDecimals,
+      price: row.basePrice,
+      lt: 0,
+    });
+  }
+  const w = lines.reduce((n, l) => n + l.coll * l.price * l.lt, 0);
+  const debt = lines.reduce((n, l) => n + l.debt * l.price, 0);
+  const want = new Map();
+  for (const l of lines) {
+    const cw = l.coll * l.lt;
+    if (!(cw > 0) || !(l.price > 0)) continue;
+    const share = (debt - l.debt * l.price - (w - cw * l.price)) / (cw - l.debt) / l.price;
+    if (share > 0.1 && share < 10) want.set(l.symbol, share);
+  }
+  const picker = page.locator("button[data-price-picker]");
+  const sl = page.locator(PRICE_STRIP).first();
+  const got = [];
+  const bad = [];
+  for (const [sym, share] of want) {
+    const listed = listedAll.find((x) => x.toLowerCase() === sym.toLowerCase());
+    if (!listed) {
+      bad.push(`${sym} not listed`);
+      continue;
+    }
+    await picker.click();
+    await page.locator(`[role="listbox"] [data-price-asset="${listed}"]`).first().click();
+    await sl.focus();
+    await page.keyboard.press("End");
+    await page.waitForTimeout(250);
+    const v = await page.$eval("[data-liq-readout]", (e) => Number(e.getAttribute("data-liq-value"))).catch(() => null);
+    const price = await page
+      .$eval("[data-price-readout]", (e) => Number((e.textContent ?? "").replace(/[^\d.]/g, "")))
+      .catch(() => null);
+    const s = v != null && price ? v / price : null;
+    got.push(`${sym} ${s?.toFixed(4)} / ${share.toFixed(4)}`);
+    if (s == null || Math.abs(s - share) > 0.015 * share) bad.push(sym);
+  }
+  check(
+    `${tag}: each collateral's level today is ruling 7's from the card's read`,
+    want.size > 0 && bad.length === 0,
+    `${got.join(", ")}${bad.length ? `; off: ${bad.join(",")}` : ""}`,
+  );
+  await picker.click();
+  await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
+  await page.waitForTimeout(250);
 }
 
 /** Aave V4: each collateral's level today is its `assetLiqPrices` entry

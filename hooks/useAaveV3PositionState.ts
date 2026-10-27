@@ -207,42 +207,23 @@ export function useAaveV3PositionState(args: {
   return enabled ? result : null;
 }
 
-/** Several reads at once (the price chart's health view, ui-jobs 328): every
- *  answer once all have settled, in the order asked; null until then, and
- *  with no reads. Shares the cache and the queue with the cards. */
-export function useAaveV3PositionStates(args: {
-  wallet?: string;
-  market?: string;
-  reads: readonly { block: number; txHash: string }[];
-}): Settled[] | null {
-  const { wallet, market, reads } = args;
-  const keys =
-    wallet && market ? reads.map((r) => `${wallet.toLowerCase()}:${market}:${r.block}:${r.txHash.toLowerCase()}`) : [];
-  const joined = keys.join("|");
-  const [result, setResult] = useState<{ joined: string; settled: Settled[] } | null>(null);
-  useEffect(() => {
-    if (!wallet || !market || reads.length === 0) return;
-    let live = true;
-    const pending = reads.map((r, i) => {
-      const key = keys[i];
-      const kept = settled.get(key);
-      if (kept) return Promise.resolve(kept);
-      let p = inFlight.get(key);
-      if (!p) {
-        const qs = new URLSearchParams({ wallet, market, block: String(r.block), tx: r.txHash }).toString();
-        p = read(key, qs, market, true);
-        inFlight.set(key, p);
-      }
-      return p;
-    });
-    Promise.all(pending).then((all) => {
-      if (live) setResult({ joined, settled: all });
-    });
-    return () => {
-      live = false;
-    };
-    // `joined` names every read; `reads` and `keys` follow it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallet, market, joined]);
-  return result && result.joined === joined && keys.length > 0 ? result.settled : null;
+/** One read for the price chart's health view (ui-jobs 328): queued behind
+ *  every card's read, sharing the cache and the queue with the cards. */
+export function readAaveV3PositionStateInBackground(args: {
+  wallet: string;
+  market: string;
+  block: number;
+  txHash: string;
+}): Promise<AaveV3PositionStateResult> {
+  const { wallet, market, block, txHash } = args;
+  const key = `${wallet.toLowerCase()}:${market}:${block}:${txHash.toLowerCase()}`;
+  const kept = settled.get(key);
+  if (kept) return Promise.resolve(kept);
+  let p = inFlight.get(key);
+  if (!p) {
+    const qs = new URLSearchParams({ wallet, market, block: String(block), tx: txHash }).toString();
+    p = read(key, qs, market, true);
+    inFlight.set(key, p);
+  }
+  return p;
 }

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readCTokenLiquidityAt, readCTokenMembershipAt } from "@/lib/sources/chain/ctoken-liquidity-at";
+import {
+  readCTokenFactorsAt,
+  readCTokenLiquidityAt,
+  readCTokenMembershipAt,
+} from "@/lib/sources/chain/ctoken-liquidity-at";
 import type { CTokenProtocol } from "@/lib/api/fetch-ctoken-liquidity-at";
 
 // Why a Compound V2, Moonwell or Moonwell Base account could be liquidated:
@@ -24,6 +28,25 @@ export async function GET(request: NextRequest) {
   try {
     // ?membership=<market>: whether that market was entered as collateral at
     // the block (a supply row's line), in place of the liquidation reads.
+    // ?factors=<market,market,…>: each market's collateral factor as the
+    // account's borrowing counted it at the end of the block (0 where not
+    // entered), for the Lifetime flows chart's health view.
+    const factors = q.get("factors");
+    if (factors) {
+      const markets = [
+        ...new Set(
+          factors
+            .split(",")
+            .map((m) => m.trim())
+            .filter(Boolean),
+        ),
+      ].slice(0, 40);
+      const f = await readCTokenFactorsAt(protocol, wallet.toLowerCase(), block, markets);
+      return NextResponse.json(f, {
+        status: f ? 200 : 502,
+        headers: f ? { "cache-control": "public, max-age=86400, s-maxage=31536000, immutable" } : {},
+      });
+    }
     const membership = q.get("membership");
     if (membership) {
       const m = await readCTokenMembershipAt(protocol, wallet.toLowerCase(), block, membership);

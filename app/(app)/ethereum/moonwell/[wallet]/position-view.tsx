@@ -284,6 +284,7 @@ export default function MoonwellPositionView({
     fetchAll: fetchAllHistory,
     chain,
     mtokenOf,
+    wallet,
   });
   const ledgerData = useMemo(() => ({ states: flows.states, brand: "Moonwell", receipt: "mToken" }), [flows.states]);
 

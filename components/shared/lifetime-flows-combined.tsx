@@ -1409,7 +1409,7 @@ function healthProv(s: FlowPriceSeries, r: PriceAt, dayWord: string): Provenance
         : (s.here?.read ?? "Health factor — on {day}, from the read at block {block}.")
             .replace("{block}", block.toLocaleString("en-US"))
             .replace("{day}", dayWord),
-    formula: "Σ collateral × price × liquidation threshold ÷ Σ debt × price",
+    formula: s.here?.formula ?? "Σ collateral × price × liquidation threshold ÷ Σ debt × price",
     ...(block != null ? { source: { block } } : {}),
   };
 }

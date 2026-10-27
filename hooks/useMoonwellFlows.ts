@@ -32,6 +32,9 @@ import {
   type CTokenLiveMarket,
 } from "@/lib/shared/ctoken-flows";
 import { moonwellFlowRows, moonwellSeriesKey } from "@/lib/moonwell/flows";
+import { ctokenCardLines, ctokenHealthReader, ctokenHealthSource, ctokenTodayRead } from "@/lib/shared/ctoken-health";
+import { cardLevels } from "@/lib/shared/flows-health";
+import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
 const DAY_S = 86_400;
 
@@ -49,6 +52,8 @@ export interface MoonwellFlowsInput {
   chain: MoonwellChainResponse | null;
   /** A market key's mToken address, lowercased. */
   mtokenOf: (market: string) => string;
+  /** The account, for the health view's factor reads. */
+  wallet: string;
 }
 
 export interface MoonwellFlowsFacts {
@@ -165,10 +170,38 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
     [now, live, dailyPrices],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? ctokenFlowReplay(rows, opts) : null), [rows, opts]);
-  const timeline = useMemo(
+  const replayed = useMemo(
     () => (rows && opts && (dailySettled || rows.length === 0) ? ctokenFlowTimeline(rows, opts) : null),
     [rows, opts, dailySettled],
   );
+  // The health view (ui-jobs 328, ruling 15): the Comptroller's collateral
+  // factors and the entered markets at the day's last event, the card's read today.
+  const healthEvents = useMemo(() => (rows ?? []).map((r) => ({ blockNumber: r.block, timestamp: r.ts })), [rows]);
+  const marketsKey = want?.key ?? "";
+  const reader = useMemo(
+    () =>
+      ctokenHealthReader(
+        chainId === 1 ? "moonwell" : "moonwell-base",
+        p.wallet,
+        marketsKey ? marketsKey.split(",") : [],
+      ),
+    [chainId, p.wallet, marketsKey],
+  );
+  const healthSource = useMemo(() => ctokenHealthSource(chainId), [chainId]);
+  const chainNow = p.chain && !p.chain.chainStale ? p.chain : null;
+  const todayRead = useMemo(() => (chainNow && now != null ? ctokenTodayRead(chainNow, now) : null), [chainNow, now]);
+  const liveLevels = useMemo(
+    () => (chainNow ? cardLevels(ctokenCardLines(chainNow), replayed?.todayPrices) : null),
+    [chainNow, replayed],
+  );
+  const timeline = useFlowsHealth(replayed, {
+    reader,
+    source: healthSource,
+    events: healthEvents,
+    liveHf: chainNow?.healthFactor ?? null,
+    liveLevels,
+    todayRead,
+  });
   const focusEvents = useMemo(() => (replay ? ctokenFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? ctokenEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

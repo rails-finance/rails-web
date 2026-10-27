@@ -39,6 +39,11 @@ import { storedCometPrices } from "@/lib/compound/at-block-prices";
 import { fetchStoredCometPrices } from "@/lib/api/fetch-compound-stored-prices";
 import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
 import type { CompoundDeploymentKey } from "@/lib/compound/deployments";
+import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
+import { cometCardLines, cometFactorRead, cometHealthSource, cometTodayRead } from "@/lib/compound/flows-health";
+import { healthRead } from "@/lib/shared/health-reads";
+import { cardLevels } from "@/lib/shared/flows-health";
+import { useFlowsHealth, type HealthReader } from "@/hooks/useFlowsHealth";
 
 const DAY_S = 86_400;
 const CHAIN_ID = { ethereum: 1, base: 8453, arbitrum: 42161 } as const;
@@ -105,6 +110,8 @@ export interface CompoundFlowsInput {
   open: boolean;
   /** The page's live read of the position, where it has one. */
   live: CompoundLive | null;
+  /** The card's Comet read, for the health view's today. */
+  chain?: CompoundMarketChainResponse | null;
 }
 
 export function useCompoundFlows(p: CompoundFlowsInput): {
@@ -258,10 +265,44 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
     [now, market.baseToken, market.baseSymbol, market.baseDecimals, p.open, p.live, dailyPrices],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? compoundFlowReplay(rows, opts) : null), [rows, opts]);
-  const timeline = useMemo(
+  const replayed = useMemo(
     () => (rows && opts && (dailySettled || rows.length === 0) ? compoundFlowTimeline(rows, opts) : null),
     [rows, opts, dailySettled],
   );
+  // The health view (ui-jobs 328, ruling 15): each collateral's liquidate
+  // factor at the day's last event, the card's read today.
+  const healthEvents = useMemo(() => (rows ?? []).map((r) => ({ blockNumber: r.block, timestamp: r.ts })), [rows]);
+  const collTokens = useMemo(
+    () => assets.filter((t) => t !== market.baseToken.toLowerCase()),
+    [assets, market.baseToken],
+  );
+  const reader = useMemo<HealthReader | null>(() => {
+    if (collTokens.length === 0) return null;
+    const qs = `deployment=${p.deployment}&market=${market.key}&assets=${collTokens.join(",")}`;
+    return {
+      key: `cv3:${qs}`,
+      load: (e) =>
+        healthRead(`/api/chain/compound/factors-at-block?${qs}&block=${e.blockNumber}`, (b) => {
+          const a = b as { block?: number; factors?: Record<string, { liquidate: number }> } | null;
+          return a && typeof a.block === "number" && a.factors ? { block: a.block, factors: a.factors } : null;
+        }).then((a) => (a ? cometFactorRead(a, e.timestamp) : null)),
+    };
+  }, [collTokens, p.deployment, market.key]);
+  const healthSource = useMemo(() => cometHealthSource(CHAIN_ID[p.deployment]), [p.deployment]);
+  const chainNow = p.open && p.chain && !p.chain.chainStale ? p.chain : null;
+  const todayRead = useMemo(() => (chainNow && now != null ? cometTodayRead(chainNow, now) : null), [chainNow, now]);
+  const liveLevels = useMemo(
+    () => (chainNow ? cardLevels(cometCardLines(chainNow), replayed?.todayPrices) : null),
+    [chainNow, replayed],
+  );
+  const timeline = useFlowsHealth(replayed, {
+    reader,
+    source: healthSource,
+    events: healthEvents,
+    liveHf: chainNow?.healthFactor ?? null,
+    liveLevels,
+    todayRead,
+  });
   const focusEvents = useMemo(() => (replay ? compoundFocusEvents(replay) : []), [replay]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
   const facts = useMemo(

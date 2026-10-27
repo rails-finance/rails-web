@@ -1,6 +1,6 @@
 // Aave V4's health view on the Lifetime flows chart (rails-ops
 // reference/lifetime-price-chart.md, ruling 15; ui-jobs 328 step 5): the Aave
-// family's view (lib/aave-v3/flows-health.ts) with a spoke's source.
+// family's view (lib/shared/flows-health.ts) with a spoke's source.
 //
 // RULES.
 // - A day's collateral factors are the spoke's at the end of the block of the
@@ -16,7 +16,8 @@
 //
 // Pure.
 
-import type { AaveHealthLine, AaveHealthSource, AaveV3ThresholdRead } from "@/lib/aave-v3/flows-health";
+import type { AaveHealthSource } from "@/lib/aave-v3/flows-health";
+import type { FactorRead, HealthLine } from "@/lib/shared/flows-health";
 import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { calculateAaveV4Position } from "@/lib/aave-v4/utils/position-calculation";
 
@@ -24,7 +25,7 @@ const DAY_S = 86_400;
 
 /** One spoke read's collateral factors, keyed as the flows series keys its
  *  assets (the symbol, lowercase). Null for a stale answer. */
-export function aaveV4FactorRead(r: AaveV4SpokePositionChainResponse, timestamp: number): AaveV3ThresholdRead | null {
+export function aaveV4FactorRead(r: AaveV4SpokePositionChainResponse, timestamp: number): FactorRead | null {
   if (r.chainStale) return null;
   const acc = new Map<string, { w: number; n: number; lt: number }>();
   for (const x of r.reserves) {
@@ -39,12 +40,12 @@ export function aaveV4FactorRead(r: AaveV4SpokePositionChainResponse, timestamp:
   }
   const lt: Record<string, number> = {};
   for (const [k, a] of acc) lt[k] = a.n > 0 ? a.w / a.n : a.lt;
-  return { day: Math.floor(timestamp / DAY_S), block: r.blockNumber, lt, emode: 0 };
+  return { day: Math.floor(timestamp / DAY_S), block: r.blockNumber, lt };
 }
 
 /** The card's levels (`assetLiqPrices`, and price ÷ health factor with one
  *  collateral). */
-export function aaveV4Levels(lines: readonly AaveHealthLine[], hf: number): Map<string, number> {
+export function aaveV4Levels(lines: readonly HealthLine[], hf: number): Map<string, number> {
   const supplies = lines
     .filter((l) => l.coll > 0)
     .map((l) => ({ symbol: l.asset, amount: l.coll, price: l.price, lt: l.lt, collateralEnabled: l.lt > 0 }));
@@ -65,6 +66,7 @@ export const AAVE_V4_HEALTH_SOURCE: AaveHealthSource = {
   oracle: "the spoke's oracle",
   pool: "the spoke",
   chain: 1,
+  factor: "collateral factor",
   factors: ["collateral factors", "collateral factors"],
   reader: "aave-v4-spoke",
   levels: {

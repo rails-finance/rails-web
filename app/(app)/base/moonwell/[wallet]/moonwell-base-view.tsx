@@ -431,6 +431,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     fetchAll: timelineState === "ready" ? fetchFlatHistory : null,
     chain: data,
     mtokenOf,
+    wallet,
   });
   const ledgerData = useMemo(() => ({ states: flows.states, brand: "Moonwell", receipt: "mToken" }), [flows.states]);
 
