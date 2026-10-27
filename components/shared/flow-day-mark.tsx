@@ -43,11 +43,20 @@ export function moveChartToDay(
   return r.bottom < 0 ? "up" : r.top > window.innerHeight ? "down" : null;
 }
 
+export type FlowDayMarkProps = {
+  ts: number;
+  flash?: boolean;
+  /** The phone caption's copy (event-card.tsx): under 640px the card's
+   *  header is hidden and the caption carries the button beside the date,
+   *  then the event's time. */
+  phone?: { time: string };
+};
+
 /** The mark in the card header's time slot: the chart button, then the
  *  date. `ts` is the event's moment; `flash` is set briefly after "Sync to
  *  chart" or the timeline chip brings the card into view, and the card
  *  header rings while it is (event-card.tsx). */
-export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean }) {
+export function FlowDayMark({ ts, flash = false, phone }: FlowDayMarkProps) {
   const focus = useFlowFocus();
   const frozenHere = useFlowFocusState((s) => s.frozenDay === utcDay(ts));
   const chartDrawn = useFlowFocusState((s) => s.cursor != null);
@@ -62,15 +71,15 @@ export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean
   }, [moved]);
   return (
     <span
-      className="inline-flex items-center gap-1"
-      data-flow-day-mark={utcDay(ts)}
-      data-anatomy="T7"
-      {...(flash ? { "data-flow-day-flash": "" } : {})}
+      className={`inline-flex items-center gap-1${phone ? " shrink-0 whitespace-nowrap" : ""}`}
+      {...(phone
+        ? { "data-flow-day-mark-phone": utcDay(ts) }
+        : { "data-flow-day-mark": utcDay(ts), "data-anatomy": "T7", ...(flash ? { "data-flow-day-flash": "" } : {}) })}
     >
       {focus?.model && chartDrawn && !frozenHere && (
         <button
           type="button"
-          className="header-badge-tip -my-2 inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-colors hover:bg-rb-100 hover:text-foreground focus-ring sm:-my-1 sm:size-6 dark:hover:bg-rb-800"
+          className={`header-badge-tip -my-2 inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-colors hover:bg-rb-100 hover:text-foreground focus-ring dark:hover:bg-rb-800${phone ? " pointer-events-auto -mx-1.5" : " sm:-my-1 sm:size-6"}`}
           aria-label={`View ${date} on the chart`}
           data-tooltip="View on chart"
           data-flow-day-move=""
@@ -85,9 +94,15 @@ export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean
           <LifetimeFlowsIcon size={14} />
         </button>
       )}
-      <span className="text-xs" data-flow-day-date="">
-        {date}
-      </span>
+      {phone ? (
+        <span aria-hidden>
+          <span className="text-foreground">{date}</span> {phone.time}
+        </span>
+      ) : (
+        <span className="text-xs" data-flow-day-date="">
+          {date}
+        </span>
+      )}
       <span role="status" className="text-xs text-teal-600 dark:text-teal-400" data-flow-day-moved="">
         {moved && (
           <>

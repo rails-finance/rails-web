@@ -23,11 +23,12 @@
 //     steps move the cursor.
 // Pages: Aave V3 Core 0xfb93…2a71 and 0xfb45…750a (liquidated), whose answer
 // is /api/aave-v3/flows, and whose chart opens on the health view (step 4,
-// `checkHealth`); three Liquity V2 Troves, whose answer is
+// `checkHealth`); four Liquity V2 Troves, whose answer is
 // /api/liquity-v2/prices/daily (checked over the answer's own days: before
 // them the Trove's rows price the line): WETH 1022…0154 (open, read live),
-// WETH 2241…2759 (open, redeemed several hundred times) and rETH 1939…5964
-// (redeemed, then liquidated on 5 Jun 2026).
+// WETH 2241…2759 (open, redeemed several hundred times), rETH 1939…5964
+// (redeemed, then liquidated on 5 Jun 2026) and WETH 8250…8317 (closed on
+// 26 Oct 2026).
 // On each Trove (step 3), against the Trove's rows (/api/trove/…/timeline):
 //   - the price line carries no event or redemption marks (the events row
 //     does);
@@ -39,8 +40,11 @@
 //   - a day with redemptions states the last one's redemption price at its block;
 //   - on an open Trove the level's last point is today's and equals the
 //     card's "Liquidates at", and the runway at the last stop is the card's;
-//   - on the liquidated Trove the last stop reads the close day, and the
-//     price line draws no day after it (ruling 14).
+//   - on the liquidated and the closed Trove the last stop reads "At close"
+//     on the close day, and the price line draws no day after it (ruling 14);
+//   - at 390 a timeline card's caption carries "View on chart" beside its
+//     date, a 36px target, and a tap on it moves the cursor to that day and
+//     leaves the card closed.
 //
 // The chart engine (ui-jobs 328 step 4c): the Liquity and Aave families draw
 // on Lightweight Charts, one canvas for the value line and the price chart, one
@@ -218,11 +222,26 @@ const PAGES = [
     answer: "/api/liquity-v2/prices/daily",
     trove: "liquidated",
   },
+  {
+    // Listed as closed and once drawn open, its axis to today (ui-jobs 328).
+    id: "liquity-v2 WETH Trove (closed)",
+    path: "/ethereum/liquity-v2/trove/WETH/82501486677343366959104920060744506403266161051192207755275552075653445398317",
+    answer: "/api/liquity-v2/prices/daily",
+    trove: "closed",
+  },
 ];
 
 const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
 
 const DAY = 86_400;
+/** A day in the panel's words ("26 Oct '26") as a UTC day number. */
+const dayOfWord = (w) => {
+  const m = /^(\d{1,2}) (\w{3}) '(\d{2})$/.exec(w.trim());
+  if (!m) return null;
+  return (
+    Date.UTC(2000 + Number(m[3]), "JanFebMarAprMayJunJulAugSepOctNovDec".indexOf(m[2]) / 3, Number(m[1])) / 86_400_000
+  );
+};
 /** The slider the price chart is read through: the price strip, or the one chart. */
 const PRICE_STRIP = '[data-flow-strip-view="price"], [data-flow-strip-view="chart"]';
 
@@ -601,10 +620,13 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
       `level ${end?.day} ${end?.value} (${end ? formatLiquidationPrice(Number(end.value)) : "-"}), card ${card}`,
     );
   }
-  if (pg.trove === "liquidated") {
+  if (pg.trove === "liquidated" || pg.trove === "closed") {
     // A closed position's chart ends at the close (ruling 14): the last stop
-    // reads the close day, plain, and the line draws no day after it.
-    const liqDay = Math.floor(rows.find((r) => r.liquidation).ts / DAY);
+    // reads the close day, plain, under "At close", and the line draws no day
+    // after it.
+    const liqDay = Math.floor(
+      (pg.trove === "liquidated" ? rows.find((r) => r.liquidation) : rows[rows.length - 1]).ts / DAY,
+    );
     const close = await page.evaluate(() => {
       const r = document.querySelector("[data-price-readout]");
       const g = document.querySelector("[data-price-line]");
@@ -615,8 +637,14 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
         day: r?.getAttribute("data-price-day"),
         green: /text-green/.test(r?.className ?? ""),
         last: Math.max(...days),
+        heading: document.querySelector("[data-flow-date]")?.textContent ?? "",
       };
     });
+    check(
+      `${tag}: at the last stop the panel reads "At close" on the close day`,
+      close.heading.startsWith("At close, ") && dayOfWord(close.heading.slice("At close, ".length)) === liqDay,
+      `${close.heading}; close ${liqDay}`,
+    );
     check(
       `${tag}: at the last stop the heading reads the close day, and the line ends there`,
       Number(close.day) <= liqDay && !close.green && close.last === liqDay,
@@ -626,6 +654,40 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
   // The runway and the redemption price left the chart's readout for the
   // card's "Collateral can fall" and the event cards (heading figures, 14 Oct
   // 2026): the heading states the price and the level alone.
+}
+
+/** Under 640px a timeline card's "View on chart" stands in its caption,
+ *  beside the date, a 36px target: a tap moves the chart's cursor to that
+ *  day and leaves the card closed. */
+async function checkPhoneDayMark(page, tag) {
+  const btn = page.locator("[data-flow-day-mark-phone] [data-flow-day-move]").nth(1);
+  if (!check(`${tag}: 390, the captions carry "View on chart"`, (await btn.count()) > 0)) return;
+  await btn.scrollIntoViewIfNeeded();
+  const want = await btn.evaluate((b) => {
+    const r = b.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.x + r.width / 2, r.y + 3);
+    return {
+      w: Math.round(r.width),
+      h: Math.round(r.height),
+      top: hit != null && b.contains(hit),
+      day: Number(b.closest("[data-flow-day-mark-phone]").getAttribute("data-flow-day-mark-phone")),
+    };
+  });
+  check(
+    `${tag}: 390, the caption's chart button is a 36px target, its top edge its own`,
+    want.w === 36 && want.h === 36 && want.top,
+    JSON.stringify(want),
+  );
+  const opened = () => page.locator('[data-anatomy="T2"]').count();
+  const before = await opened();
+  await btn.tap();
+  await page.waitForTimeout(600);
+  const heading = (await page.locator("[data-flow-date]").first().textContent()) ?? "";
+  check(
+    `${tag}: 390, a tap on it moves the chart's cursor to that day, the card left closed`,
+    dayOfWord(heading) === want.day && (await opened()) === before,
+    `heading "${heading}", day ${want.day}, cards open ${before} → ${await opened()}`,
+  );
 }
 
 /** The chart's cursor and window as its data hooks state them. */
@@ -1154,6 +1216,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       `${tag}: the value line is unchanged by the stops`,
       (await valueLine()) === lineBeforeStops && lineBeforeStops.length > 0,
     );
+    if (pg.trove && width < 640) await checkPhoneDayMark(page, tag);
     check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }

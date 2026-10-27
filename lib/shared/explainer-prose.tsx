@@ -306,7 +306,11 @@ function dropTrailingColon(node: ReactNode): ReactNode {
     return [...node.slice(0, -1), dropTrailingColon(node[node.length - 1])];
   }
   if (isValidElement<{ children?: ReactNode }>(node) && node.props.children != null) {
-    return cloneElement(node, undefined, dropTrailingColon(node.props.children));
+    // JSX's children arrays carry no keys; handed back to cloneElement as one
+    // array they read as a list and React asks for keys, so they go back as
+    // separate children.
+    const kids = dropTrailingColon(node.props.children);
+    return Array.isArray(kids) ? cloneElement(node, undefined, ...kids) : cloneElement(node, undefined, kids);
   }
   return node;
 }

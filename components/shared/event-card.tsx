@@ -2,7 +2,19 @@
 
 import { PriceBasisProvider } from "@/components/shared/price-basis";
 import { usePathname } from "next/navigation";
-import { useState, useCallback, useEffect, useContext, useId, useMemo, useRef, type ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useState,
+  useCallback,
+  useEffect,
+  useContext,
+  useId,
+  useMemo,
+  useRef,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
@@ -21,6 +33,7 @@ import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } from "@/components/shared/mobile-spine";
 import { EventDateContext, EventDayMarkContext } from "@/components/shared/event-time";
+import type { FlowDayMarkProps } from "@/components/shared/flow-day-mark";
 import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
 import {
@@ -706,14 +719,29 @@ function EventCardView(props: EventCardProps) {
   const capDate = captionCtx
     ? (datePrefix ?? (dayMark ? `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}` : null))
     : null;
+  // A row opening a day under day marks: the day's mark, its "View on chart"
+  // beside the date, stands in the caption's date and time (flow-day-mark.tsx).
+  const phoneMark =
+    !phoneCaption && captionCtx && isValidElement<FlowDayMarkProps>(dayMark)
+      ? cloneElement(dayMark as ReactElement<FlowDayMarkProps>, { phone: { time: formatTimestamp(captionCtx.ts) } })
+      : null;
   const captionText =
     phoneCaption ??
     (captionCtx ? (
-      <>
-        {kind} &middot; {capDate && <span className="text-foreground">{capDate}</span>}
-        {capDate ? " " : ""}
-        {formatTimestamp(captionCtx.ts)}
-      </>
+      phoneMark ? (
+        <>
+          <span aria-hidden className="min-w-0 truncate">
+            {kind} &middot;
+          </span>
+          {phoneMark}
+        </>
+      ) : (
+        <>
+          {kind} &middot; {capDate && <span className="text-foreground">{capDate}</span>}
+          {capDate ? " " : ""}
+          {formatTimestamp(captionCtx.ts)}
+        </>
+      )
     ) : null);
   const spoken = spokenCaption ?? (captionCtx ? `${kind}, ${formatDate(captionCtx.ts)}` : "");
   // The row's name, the same at both widths: the spoken caption, then the
@@ -807,9 +835,11 @@ function EventCardView(props: EventCardProps) {
         // Under 640px: the caption centred on the spine, the ⋮ at the row's
         // right edge.
         <div className="relative flex justify-center px-7 pb-2.5 pt-1.5 sm:hidden" data-spine-caption="">
+          {/* With the day's mark the kind truncates alone: the mark's 36px
+              button reaches past the 20px line, and a clipped box takes no taps. */}
           <span
-            aria-hidden
-            className={`block max-w-full truncate px-2 text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
+            aria-hidden={phoneMark ? undefined : true}
+            className={`${phoneMark ? "flex items-center gap-1" : "block truncate"} max-w-full px-2 text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
             style={{ backgroundColor: "var(--background)" }}
           >
             {captionText}
