@@ -372,6 +372,12 @@ export default function AsymmetryTroveDetail({
 
   // Lifetime flows: the Trove's whole history replayed (lib/shared/liquity-flows.ts).
   // A windowed or folder-served page reads the flat history once for it.
+  // The price view's level against the branch's minimum in force each day
+  // (ui-jobs 328 step 6).
+  const flowFork = useMemo(() => {
+    const branch = resolveForkBranch(collateralType);
+    return branch ? { name: "Asymmetry", mcr: branch.mcr, stepsRead: false } : null;
+  }, [collateralType]);
   const flows = useLiquityForkFlows({
     wholeEvents: historyWindow.state === "whole" && !servedFolders?.length ? asymmetryEvents : null,
     fetchAll: fetchAllHistory,
@@ -382,6 +388,7 @@ export default function AsymmetryTroveDetail({
     chain,
     price: view?.priceUsd ?? null,
     surplusClaimed: surplus?.claimed != null,
+    fork: flowFork,
   });
 
   // The top row's price dropdown: the branch's own oracle

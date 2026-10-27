@@ -18,6 +18,7 @@ import {
   liquityFocusEvents,
   liquityForkFlowEvents,
   type LiquityFlowEvent,
+  type LiquityForkLevel,
 } from "@/lib/shared/liquity-flows";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
@@ -36,6 +37,9 @@ export interface LiquityForkFlowsInput {
   /** The listing's branch price, where the live read has none. */
   price: number | null;
   surplusClaimed: boolean;
+  /** The branch's minimum for the price view's level (ui-jobs 328 step 6);
+   *  null leaves the price alone. */
+  fork: LiquityForkLevel | null;
 }
 
 export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
@@ -81,6 +85,7 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
       debtSymbol: p.debtSymbol,
       surplusClaimed: p.surplusClaimed,
       now,
+      ...(p.fork ? { priceView: { collateralType: p.collSymbol, fork: p.fork } } : {}),
       live: p.open
         ? {
             price: livePrice,
@@ -97,7 +102,7 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
           }
         : null,
     });
-  }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain]);
+  }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain, p.fork]);
   const focusEvents = useMemo(
     () => (p.collSymbol ? liquityFocusEvents(events, p.collSymbol, p.debtSymbol) : []),
     [events, p.collSymbol, p.debtSymbol],

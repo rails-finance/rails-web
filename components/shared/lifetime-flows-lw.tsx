@@ -1145,7 +1145,12 @@ export function LifetimeFlowsLw({
         )}
         <span data-anatomy="F19.4">
           {levelHooks.map((run) => (
-            <span key={run[0][0]} data-liq-level="" data-liq-days={run.map((p) => p[0]).join(",")} />
+            <span
+              key={run[0][0]}
+              data-liq-level=""
+              data-liq-days={run.map((p) => p[0]).join(",")}
+              data-liq-values={run.map((p) => p[1]).join(",")}
+            />
           ))}
         </span>
       </div>

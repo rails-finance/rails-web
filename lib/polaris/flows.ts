@@ -51,6 +51,8 @@ import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
 import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
+import { levelByDay, type PriceMarks } from "@/lib/shared/price-series";
+import { POLARIS_NORMAL_MCR_PCT } from "@/lib/polaris/cr-at-event";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
@@ -681,6 +683,7 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
     },
     todayPrices: { [COLL]: priceNow, [DEBT]: G },
     dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: unitObs },
+    priceMarks: { [COLL]: polarisPriceMarks(rp, o, live) },
     seriesCarry: true,
     ...(daily
       ? {}
@@ -693,6 +696,57 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
     words: polarisFlowWords(o.stable, daily != null),
+  };
+}
+
+/** The price view's marks for pETH (ui-jobs 328 step 6): each priced row on
+ *  its day, and the liquidation level at the market's normal-mode minimum,
+ *  debt × 115% ÷ collateral after each event, the figure the event sheet's
+ *  "Liquidates at" and `polarisCrAtEvent`'s ratio rest on, held between
+ *  events; today at the live read's entire figures. The defensive-mode
+ *  minimum at a past block is not indexed, so it is not drawn. */
+function polarisPriceMarks(rp: PolarisReplay, o: PolarisFlowOptions, live: PolarisLive | null): PriceMarks {
+  const mcr = POLARIS_NORMAL_MCR_PCT / 100;
+  const liq = (debt: number, coll: number) => (debt > 0 && coll > 0 ? (debt * mcr) / coll : null);
+  const events: NonNullable<PriceMarks["events"]> = rp.replayed
+    .filter((r) => r.priceFrom === "row" && r.price > 0)
+    .map((r) => ({
+      day: Math.floor(r.row.ts / DAY_S),
+      price: r.price,
+      block: r.row.block,
+      tone: r.row.kind === "liquidation" ? "liquidation" : "event",
+    }));
+  const level = levelByDay(
+    rp.replayed.map((r) => ({
+      ts: r.row.ts,
+      block: r.row.block,
+      holds: r.coll > 0 && r.debt > 0,
+      liquidation: r.row.kind === "liquidation",
+      r,
+    })),
+    {
+      now: o.now,
+      at: ({ r }) => liq(r.debt, r.coll),
+      live: live ? liq(Math.max(0, live.entireDebt), live.entireColl) : null,
+    },
+  );
+  const pct = `${POLARIS_NORMAL_MCR_PCT}%`;
+  return {
+    events,
+    ...(level
+      ? {
+          level: {
+            ...level,
+            formula: `debt × ${pct} ÷ collateral after each event`,
+            summary: `Liquidation price — the price of pETH, in ${o.stable}, at which the position's collateral ratio meets the market's normal-mode minimum, ${pct}: the debt times the minimum ratio, divided by the collateral. Between events it holds: the interest and PSM shares built up since an event are written in at the next. The defensive-mode minimum (150%), in force while the market's reserve is thin, is not drawn: the mode at a past block is not indexed.`,
+            here: {
+              live: "Here at the position's entire collateral and debt as the live read states them at the latest block.",
+              read: "Here at the collateral and debt the position's event at block {block} wrote in.",
+            },
+          },
+          help: `on the same days; the red line is where the position liquidates, its debt × ${pct} ÷ its collateral after each event, the market's normal-mode minimum. The defensive mode's 150% minimum is not drawn.`,
+        }
+      : {}),
   };
 }
 

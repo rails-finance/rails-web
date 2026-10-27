@@ -46,7 +46,7 @@ import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/s
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatPrice, pricePieces, levelAt, priceReadout, type FlowPriceSeries } from "@/lib/shared/flows-price";
-import type { PriceAt } from "@/lib/shared/price-series";
+import { levelFormulaAt, type PriceAt } from "@/lib/shared/price-series";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -1141,7 +1141,7 @@ function PriceFigures({
               ? here.read.replace("{block}", lv[2].toLocaleString("en-US")).replace("{day}", dayWord)
               : `Here at the debt and collateral the trove's event at block ${lv[2].toLocaleString("en-US")} recorded, the debt grown by its interest to the end of ${dayWord}.`
         }`,
-        formula: s.level!.formula,
+        formula: levelFormulaAt(s.level!, lv[0]),
         ...(lv[2] != null ? { source: { block: lv[2] } } : {}),
       }
     : null;

@@ -94,6 +94,13 @@
 // a liquidated life's level ending on its liquidation day, the how-to-read
 // naming Recovery Mode. Sky Savings (`share`): the share price (chi) in place
 // of the sUSDS price, today the card's, no level, the how-to-read naming chi.
+// The forks and Polaris (step 6, `level`, `checkLevelView`): Ebisu WBTC 3876
+// (liquidated) and weETH 1065 (closed), whose level steps by the two minimums'
+// ratio on 4 Jan 2026, Ebisu stcUSD 6774, Asymmetry scrvUSD 2145 and Basedollar
+// cbETH 6846 (open: today's level the card's "Liquidates at"), Asymmetry ysyBOLD
+// 4577 and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
+// 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
+// USDp 3732 and GOLDp 29 (liquidated); the how-to-read names the minimum.
 // `FIXTURES=<regex>` runs the pages whose id matches.
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
@@ -457,7 +464,90 @@ const PAGES = [
     lwOnly: true,
     panes: "value",
   },
-  { id: "polaris usdp 2420", path: "/sepolia/polaris/usdp/2420", lwOnly: true },
+  // The forks and Polaris (step 6): the collateral's price with the level
+  // against the minimum in force each day.
+  {
+    id: "ebisu wbtc 3876 (liquidated, MCR step)",
+    path: "/ethereum/ebisu/wbtc/38767992399838988350336392758823407708425408086117331868518504752269504506657",
+    lwOnly: true,
+    level: {
+      asset: "WBTC",
+      endDay: 20489,
+      step: { day: 20457, ratio: 120 / 132 },
+      help: ["132% until 4 Jan 2026, 120% since"],
+    },
+  },
+  {
+    id: "ebisu weeth 1065 (closed, MCR step)",
+    path: "/ethereum/ebisu/weeth/106525219326064530299176858413070691994107358379893271777150080609961810096862",
+    lwOnly: true,
+    level: {
+      asset: "weETH",
+      endDay: 20624,
+      step: { day: 20457, ratio: 120 / 128 },
+      help: ["128% until 4 Jan 2026, 120% since"],
+    },
+  },
+  {
+    id: "ebisu stcusd 6774",
+    path: "/ethereum/ebisu/stcusd/6774201543947923016744174294482881587816035374101342731108014726689376691497",
+    lwOnly: true,
+    level: { asset: "stcUSD", card: "liquidates-at", help: ["115% minimum, which no governance log has moved"] },
+  },
+  {
+    id: "asymmetry scrvusd 2145",
+    path: "/ethereum/asymmetry/scrvusd/21455407195608252231693499135014282170032223495298941722085434215551435526302",
+    lwOnly: true,
+    level: { asset: "scrvUSD", card: "liquidates-at", help: ["today's 110% minimum, held across the life"] },
+  },
+  {
+    id: "asymmetry ysybold 4577 (closed)",
+    path: "/ethereum/asymmetry/ysybold/45771828629529054463940548704077640517998892185928814218152521258795699925919",
+    lwOnly: true,
+    level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "minimum, held across the life"] },
+  },
+  {
+    id: "basedollar cbeth 6846",
+    path: "/base/basedollar/cbeth/68469010491365517650601323854262902343759121653681014133081846278487342428277",
+    lwOnly: true,
+    level: {
+      asset: "cbETH",
+      card: "liquidates-at",
+      help: ["today's", "held across the life", "redemption and liquidation rows alone"],
+    },
+  },
+  {
+    id: "basedollar wsteth 1150 (closed)",
+    path: "/base/basedollar/wsteth/115054813357214655434932038880034226794865662069657988027541148413367718171377",
+    lwOnly: true,
+    // Redeemed to no debt on 28 Sep 2026, closed the day after: the level
+    // ends with the debt.
+    level: { asset: "wstETH", endDay: 20724, help: ["redemption and liquidation rows alone"] },
+  },
+  {
+    id: "polaris usdp 2420",
+    path: "/sepolia/polaris/usdp/2420",
+    lwOnly: true,
+    level: { asset: "pETH", card: "polaris", help: ["debt × 115%", "defensive mode's 150% minimum is not drawn"] },
+  },
+  {
+    id: "polaris usdp 3732 (liquidated)",
+    path: "/sepolia/polaris/usdp/3732",
+    lwOnly: true,
+    level: { asset: "pETH", endDay: 20734, help: ["debt × 115%", "not drawn"] },
+  },
+  {
+    id: "polaris goldp 18",
+    path: "/sepolia/polaris/goldp/18",
+    lwOnly: true,
+    level: { asset: "pETH", card: "polaris", help: ["debt × 115%", "not drawn"] },
+  },
+  {
+    id: "polaris goldp 29 (liquidated)",
+    path: "/sepolia/polaris/goldp/29",
+    lwOnly: true,
+    level: { asset: "pETH", endDay: 20709, help: ["debt × 115%", "not drawn"] },
+  },
   { id: "fx wsteth-249", path: "/ethereum/fx/wsteth-249", lwOnly: true },
   {
     id: "llamalend 0xeb2c",
@@ -904,6 +994,90 @@ async function checkV1Level(page, tag, pg) {
   check(
     `${tag}: the how-to-read names the 110% line and Recovery Mode as not drawn`,
     help.includes("debt × 110%") && help.includes("Recovery Mode") && help.includes("not drawn"),
+    help,
+  );
+}
+
+/** The forks and Polaris (ui-jobs 328 step 6): the collateral's price with
+ *  the level debt × the minimum ÷ collateral. It opens on the collateral; on
+ *  an open position today's level is the card's "Liquidates at" (a fork) or
+ *  the card's price × 115 % ÷ its ratio (Polaris, whose card states no
+ *  level); on a closed or liquidated one the level ends on that day; where
+ *  Ebisu's minimum moved, the level steps by the two minimums' ratio on that
+ *  day; the how-to-read names the minimum and what is not drawn. */
+async function checkLevelView(page, tag, pg) {
+  const want = pg.level;
+  const toggle = page.locator("[data-flow-level-toggle]");
+  if (!check(`${tag}: the ${want.asset} price draws the level`, (await toggle.count()) === 1)) return;
+  if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
+  await page.waitForTimeout(150);
+  const sl = page.locator(PRICE_STRIP).first();
+  await sl.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(250);
+  const end = await page.$eval("[data-price-heading]", (h) => {
+    const lv = h.querySelector("[data-liq-readout]");
+    return {
+      line: lv ? Number(lv.getAttribute("data-liq-value")) : null,
+      price: Number((h.querySelector("[data-price-readout]")?.textContent ?? "").replace(/[^\d.]/g, "")),
+      asset: h.querySelector("[data-price-asset]")?.getAttribute("data-price-asset"),
+    };
+  });
+  check(`${tag}: it opens on the ${want.asset} price`, end.asset === want.asset, end.asset);
+  const pts = await page.$$eval("[data-liq-level]", (ls) =>
+    ls.flatMap((l) => {
+      const v = (l.getAttribute("data-liq-values") ?? "").split(",");
+      return (l.getAttribute("data-liq-days") ?? "")
+        .split(",")
+        .filter(Boolean)
+        .map((d, i) => [Number(d), Number(v[i])]);
+    }),
+  );
+  check(`${tag}: the level is drawn`, pts.length > 0, `${pts.length} days`);
+  if (pts.length === 0) return;
+  const days = pts.map((p) => p[0]);
+  if (want.card === "liquidates-at") {
+    const card = await page.$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent ?? "").catch(() => "");
+    const m = card.replace(/,/g, "").match(/\$(\d+(?:\.(\d+))?)(K?)/);
+    const k = m?.[3] ? 1000 : 1;
+    const cardV = m ? Number(m[1]) * k : NaN;
+    // Half the card's last printed place.
+    const tol = m ? (0.5 * k) / 10 ** (m[2]?.length ?? 0) + 1e-9 : 0;
+    check(
+      `${tag}: today's level is the card's "Liquidates at"`,
+      end.line != null && Math.abs(end.line - cardV) <= tol,
+      `chart ${end.line}, card ${card}`,
+    );
+  } else if (want.card === "polaris") {
+    const ratio = await page.$eval('[data-figure="collateral-ratio"]', (d) => d.textContent ?? "").catch(() => "");
+    const icr = Number(ratio.replace(/[,%\s≈]/g, "")) / 100;
+    const worked = (end.price * 1.15) / icr;
+    check(
+      `${tag}: today's level is the card's price × 115% ÷ its ratio`,
+      end.line != null && Math.abs(end.line - worked) / worked < 0.001,
+      `chart ${end.line}, card ratio ${ratio} at ${end.price}: ${worked}`,
+    );
+  } else {
+    check(
+      `${tag}: the level ends on the close's day`,
+      Math.max(...days) === want.endDay,
+      `last ${Math.max(...days)}, want ${want.endDay}`,
+    );
+  }
+  if (want.step) {
+    const at = (d) => pts.find((p) => p[0] === d)?.[1];
+    const a = at(want.step.day - 1);
+    const b = at(want.step.day);
+    check(
+      `${tag}: the level steps where the minimum moved`,
+      a != null && b != null && Math.abs(b / a - want.step.ratio) < 0.002,
+      `${a} → ${b}, ${b / a} against ${want.step.ratio}`,
+    );
+  }
+  const help = await howToRead(page);
+  check(
+    `${tag}: the how-to-read names the minimum`,
+    want.help.every((w) => help.includes(w)),
     help,
   );
 }
@@ -1840,6 +2014,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.health) await checkHealthAlone(page, tag, pg);
       if (pg.ratio) await checkRatio(page, tag, pg);
       if (pg.v1) await checkV1Level(page, tag, pg);
+      if (pg.level) await checkLevelView(page, tag, pg);
       if (pg.share) await checkShareLine(page, tag);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();

@@ -84,6 +84,73 @@ export interface PriceLevel {
   /** The receipt's second sentence where it is not a Trove's: at the live
    *  read, and at a point resting on a block ("{block}", "{day}"). */
   here?: { live: string; read: string };
+  /** The formula on the days before a threshold step, where the threshold
+   *  moved in the life (Ebisu's MCR): each entry holds for the days before
+   *  `untilDay` and after the entry before it; `formula` holds from the last. */
+  formulaBefore?: { untilDay: number; formula: string }[];
+}
+/** One event as `levelByDay` reads it: whether its balances still hold
+ *  collateral and debt, and whether it was a liquidation. */
+export interface LevelEvent {
+  ts: number;
+  block: number;
+  holds: boolean;
+  liquidation: boolean;
+}
+/** A position's liquidation level each day from its events: after each
+ *  event, `at(event, t)`, the level its recorded balances give at time t (a
+ *  family moves it between events by its accrual, or by the threshold in
+ *  force); each day takes its end (or now). An event that leaves no
+ *  collateral or no debt (a liquidation, a close) ends the line on its day
+ *  at the level that stood before it. On an open position the last point is
+ *  today's at `live` where the page read one. Each point carries the block
+ *  of the event whose balances it rests on, null for the live read. Null
+ *  where no day has a level. Ascending events. */
+export function levelByDay<E extends LevelEvent>(
+  evs: readonly E[],
+  o: { now: number; at: (e: E, t: number) => number | null; live?: number | null },
+): Pick<PriceLevel, "points" | "end"> | null {
+  if (evs.length === 0) return null;
+  const today = Math.floor(o.now / DAY_S);
+  const last = evs[evs.length - 1];
+  const open = last.holds;
+  const firstDay = Math.floor(evs[0].ts / DAY_S);
+  const lastDay = open ? Math.max(today, Math.floor(last.ts / DAY_S)) : Math.floor(last.ts / DAY_S);
+  const points: PricePoint[] = [];
+  let i = -1;
+  for (let d = firstDay; d <= lastDay; d++) {
+    const end = Math.min((d + 1) * DAY_S, o.now);
+    const from = i;
+    while (i + 1 < evs.length && evs[i + 1].ts <= end) i++;
+    if (i < 0) continue;
+    const e = evs[i];
+    let level: number | null = null;
+    let block: number | null = e.block;
+    if (e.holds) {
+      if (d === today && open && i === evs.length - 1 && o.live != null) {
+        level = o.live;
+        block = null;
+      } else level = o.at(e, end);
+    } else {
+      // The day's first event to leave nothing: the level before it, from the
+      // last event that held both.
+      let k = from + 1;
+      while (k <= i && evs[k].holds) k++;
+      const prev = k > 0 ? evs[k - 1] : null;
+      if (k <= i && prev && prev.holds) {
+        level = o.at(prev, evs[k].ts);
+        block = prev.block;
+      }
+    }
+    if (level != null && Number.isFinite(level) && level > 0) points.push([d, level, block]);
+  }
+  if (points.length === 0) return null;
+  return { points, end: open ? "today" : last.liquidation ? "liquidation" : "close" };
+}
+/** The level's formula on a day (`PriceLevel.formulaBefore`). */
+export function levelFormulaAt(level: PriceLevel, day: number): string {
+  for (const f of level.formulaBefore ?? []) if (day < f.untilDay) return f.formula;
+  return level.formula;
 }
 /** What a family adds to an asset's series for the price view. */
 export type PriceMarks = Pick<PriceSeries, "events" | "level" | "sparseBefore" | "help">;

@@ -2782,3 +2782,56 @@ test("Sky Savings: the share price in place of the sUSDS price, chi per day at i
   assert.equal(ps[0].level, undefined);
   assert.equal(formatPrice(1.0105, "USDS", 6), "1.010500 USDS");
 });
+
+test("a fork's level (ui-jobs 328 step 6): the MCR in force at each day's end, stepping where governance moved it", async () => {
+  const { levelFormulaAt } = await import("@/lib/shared/price-series");
+  const { forkMcrAt } = await import("@/lib/shared/liquity-fork-ops");
+  // 128% until 103 D + 100 s, 120% since.
+  const fork = {
+    name: "Ebisu",
+    mcr: 1.2,
+    mcrBefore: [{ mcr: 1.28, untilBlock: 1250, untilTimestamp: 103 * D + 100 }],
+    stepsRead: true,
+  };
+  const lv = liquityLiqLevel([OPEN, ADD], {
+    collateralType: "weETH",
+    now: 105 * D,
+    mcrAt: (ts) => forkMcrAt(fork, { timestamp: ts }),
+  })!;
+  const at = (d: number) => lv.points.find((p) => p[0] === d)![1];
+  const grown = (e: LiquityFlowEvent, t: number) => e.debtAfter * (1 + (e.rate / 100) * ((t - e.ts) / YEAR));
+  assert.ok(Math.abs(at(102) - (grown(ADD, 103 * D) * 1.28) / 20) < 1e-9);
+  // The step's day takes the new minimum at its end, on the same row.
+  assert.ok(Math.abs(at(103) - (grown(ADD, 104 * D) * 1.2) / 20) < 1e-9);
+  assert.ok(at(103) < at(102));
+  // The timeline's level carries each step's formula, and names the steps.
+  const t = liquityFlowTimeline([OPEN, ADD], {
+    collSymbol: "weETH",
+    debtSymbol: "ebUSD",
+    surplusClaimed: false,
+    now: 105 * D,
+    live: null,
+    priceView: { collateralType: "weETH", fork },
+  })!;
+  const m = t.priceMarks!["coll:weETH"]!;
+  assert.equal(
+    levelFormulaAt(m.level!, 102),
+    "debt × 128% ÷ collateral after each event, with interest accruing between",
+  );
+  assert.equal(
+    levelFormulaAt(m.level!, 103),
+    "debt × 120% ÷ collateral after each event, with interest accruing between",
+  );
+  assert.ok(m.help!.includes("128% until"), m.help);
+  // A branch whose minimum no list names holds today's, and says so.
+  const held = liquityFlowTimeline([OPEN, ADD], {
+    collSymbol: "WETH",
+    debtSymbol: "BD",
+    surplusClaimed: false,
+    now: 105 * D,
+    live: null,
+    priceView: { collateralType: "WETH", fork: { name: "Basedollar", mcr: 1.1, stepsRead: false, pricedRows: "x" } },
+  })!.priceMarks!["coll:WETH"]!;
+  assert.ok(held.help!.includes("today's 110% minimum, held across the life"), held.help);
+  assert.ok(held.level!.summary.includes("no earlier value is listed"), held.level!.summary);
+});
