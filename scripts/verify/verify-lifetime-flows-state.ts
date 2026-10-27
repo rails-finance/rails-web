@@ -94,7 +94,6 @@ import {
   redemptionsOn,
   runwayPct,
   runwayShare,
-  stripGeometry,
 } from "@/lib/shared/flows-price";
 import { eventPriceSeries } from "@/lib/shared/price-series";
 import { binUnitFor, flowBins, groupOperations, isBusy, throughput } from "@/lib/shared/flows-busy";
@@ -137,6 +136,7 @@ import {
   combinedAt,
   combinedStops,
   eventStep,
+  lifeAxis,
   nearestStop,
   stopForDay,
 } from "@/lib/shared/flows-combined";
@@ -1999,16 +1999,16 @@ test("the price view: the toggle leaves the Value view's stops and axis alone, t
   // no input, so the cursor's stop is the same index in both views.
   const stops = combinedStops(model, null, 0, null);
   assert.deepEqual(combinedStops(model, null, 0, null), stops);
-  // One time axis: a day sits on one x whatever the view's labels.
+  // The whole life's axis (the events row's while the charts are hidden): a
+  // day's close later is further right, the axis's last day at the right end.
   const startDay = model.start / DAY_MS;
   const today = startDay + model.liveStop;
-  const a = stripGeometry(800, startDay, today, today - startDay, 40);
-  const b = stripGeometry(800, startDay, today, today - startDay, 40);
-  for (const s of [stops[0], stops[Math.floor(stops.length / 2)], stops[stops.length - 1]])
-    assert.equal(a.xClose(startDay + s.stop), b.xClose(startDay + s.stop));
-  // dayAt inverts xClose.
-  const d = startDay + stops[5].stop;
-  assert.ok(Math.abs(a.dayAt(a.xClose(d)) - d) < 1e-9);
+  const span = axisSpanDays(startDay, today);
+  const x = lifeAxis(800, startDay, span);
+  const xs = stops.map((s) => x(startDay + s.stop));
+  assert.ok(xs.every((v, i) => i === 0 || v >= xs[i - 1]));
+  assert.ok(xs[0] > 0);
+  assert.ok(Math.abs(x(startDay + span - 1) - 800) < 1e-9);
   // The series: one per held asset with a daily series, collateral first,
   // each point's block kept from the route.
   const prices = flowPriceSeries(t);

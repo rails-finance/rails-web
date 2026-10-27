@@ -55,7 +55,7 @@ import {
 } from "@/lib/polaris/flows";
 import { flowsLife } from "@/lib/shared/flows-combined";
 import { flowPriceSeries } from "@/lib/shared/flows-price";
-import { lineStripScale } from "@/components/shared/lifetime-flows-combined";
+import { flowLineScale } from "@/components/shared/lifetime-flows-combined";
 import { polarisLifetime } from "@/lib/polaris/economics";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
@@ -422,7 +422,7 @@ test("after the last row each side slopes to the live read, and the line's last 
     // entire debt, a debt below zero counted as none.
     const equity = f.chain.entireColl * f.chain.price!.pethInDebt - Math.max(0, f.chain.entireDebt);
     const series = binSeries(binInputFromTimeline(t)!, seriesRouteBinFor(t.today! - startDay))!;
-    const drawn = lineStripScale(m, series, true).points;
+    const drawn = flowLineScale(m, series).points;
     const tail = drawn[drawn.length - 1];
     const lineEquity = ((tail.collateral ?? 0) - (tail.debt ?? 0)) / G;
     assert.ok(near(lineEquity, equity, 1e-9), `${f.name}: the line's last point ${lineEquity} vs ${equity}`);

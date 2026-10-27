@@ -2,12 +2,13 @@
 
 // The Lifetime flows panel's value line and price chart on TradingView's
 // Lightweight Charts (rails-ops reference/lifetime-flows-scrubber.md, "The
-// chart engine"; ui-jobs 328 step 4c), the engine the panel chooses per family
-// (`FlowsEngineContext`). One chart: the value pane (collateral and debt,
-// their areas, a dotted second series over a stretch on an old price) over the
-// price pane (the held asset's price, dotted over carried days, and the
-// liquidation level as a step line), on the time grid of
-// lib/shared/asset-chart-grid.ts, with a time axis in UTC.
+// chart engine"; ui-jobs 328 steps 4c and 4d), on every family. One chart: the
+// value pane (collateral and debt, their areas, a dotted second series over a
+// stretch on an old price) over the price pane (the held asset's price, dotted
+// over carried days, and the liquidation level as a step line), on the time
+// grid of lib/shared/asset-chart-grid.ts, with a time axis in UTC. Sides with
+// no common unit (Frankencoin, PWN) take a value pane each, on its token's
+// axis; the price chart alone (the one-day rule) is the price pane alone.
 //
 // RULES (Miles, 26 Oct 2026).
 // - The cursor is the panel's (CombinedFlows and the flow-focus state); the
@@ -52,6 +53,7 @@ import type {
 import { lwTickLabel, useLwColors, useLwLib, type LwColors } from "@/components/shared/lw-chart-kit";
 import { OldPriceTip, oldLineTip } from "@/components/shared/flow-old-price";
 import type { FlowsLwApi, FlowsLwAxis, FlowsLwView } from "@/components/shared/lifetime-flows-lw-axis";
+import { flowsBounds } from "@/lib/shared/flows-combined";
 import type { LineScale, PriceScale } from "@/components/shared/lifetime-flows-combined";
 import {
   DAY_S,
@@ -64,11 +66,13 @@ import {
   type Grid,
 } from "@/lib/shared/asset-chart-grid";
 import { formatPrice, priceAxisLabels, type FlowPriceSeries } from "@/lib/shared/flows-price";
-import { formatFlowUsd, type FlowModel } from "@/lib/shared/flows-timeline";
+import { formatFlowToken, formatFlowUsd, type FlowModel } from "@/lib/shared/flows-timeline";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 
-/** The value pane, and the price pane's line under its tip. */
+/** The value pane, a side's pane where the sides have no common unit, and
+ *  the price pane's line under its tip. */
 const VALUE_H = 96;
+const SIDE_H = 72;
 const PRICE_LINE_H = 84;
 /** Room between the tip and the price line. */
 const TIP_GAP = 8;
@@ -77,8 +81,6 @@ const TIP_GAP = 8;
 const MIN_STEP = 7200;
 /** The narrowest window a range or a reveal sets. */
 const MIN_SPAN = 2 * DAY_S;
-/** The lead-in before the first event's day, a share of the axis's days. */
-const LEAD_SHARE = 0.06;
 /** A cursor this share of the window from an edge is brought further in. */
 const REVEAL_MARGIN = 0.08;
 const SETTLE_MS = 200;
@@ -133,7 +135,7 @@ function xOf(c: IChartApi, g: Grid, ts: number): number | null {
   return xb == null ? xa : xa + (xb - xa) * (l - a);
 }
 
-/** The value line of one side, as LineStrip draws it: no line before the side
+/** The value line of one side: no line before the side
  *  first holds anything, the step up from zero at the first event's day (or at
  *  its first point above zero), each point at its day's close, a segment into
  *  a point on an old price or an unread figure dotted, a null point a break. */
@@ -319,6 +321,9 @@ export interface LifetimeFlowsLwProps {
   model: FlowModel;
   scale: LineScale;
   hasDebt: boolean;
+  /** The value panes: one for both sides, one per side (no common unit), or
+   *  none (the price chart alone). */
+  value: "one" | "split" | null;
   /** The price chart's series and scale (none: the value pane alone). */
   priced: FlowPriceSeries | null;
   priceScale: PriceScale | null;
@@ -347,6 +352,7 @@ export function LifetimeFlowsLw({
   model,
   scale,
   hasDebt,
+  value,
   priced,
   priceScale,
   startDay,
@@ -370,13 +376,23 @@ export function LifetimeFlowsLw({
     if (shown) setWanted(true);
   }, [shown]);
   const lib = useLwLib(wanted);
-  const sides: Side[] = hasDebt ? ["collateral", "debt"] : ["collateral"];
+  // The sides the value panes draw: none on the price chart alone.
+  const sides: Side[] = value == null ? [] : hasDebt ? ["collateral", "debt"] : ["collateral"];
   const hasPrice = priced != null && priceScale != null;
+  // The panes, top to bottom: the value pane or a pane per side, then the
+  // tip's pane and the price pane.
+  const split = value === "split";
+  const valuePanes: Side[][] = split ? sides.map((k) => [k]) : sides.length ? [sides] : [];
+  const paneOf = (k: Side) => (split ? sides.indexOf(k) : 0);
+  const nV = valuePanes.length;
+  const spacerPane = nV;
+  const pricePane = nV + 1;
+  const valueH = valuePanes.map(() => (split ? SIDE_H : VALUE_H));
+  const sideUnits = split ? model.sideUnits : undefined;
+  /** The top of value pane `i` in the box (each pane over a 1 px separator). */
+  const sideTop = (i: number) => valueH.slice(0, i).reduce((a, b) => a + b + 1, 0);
 
-  const bounds = useMemo(() => {
-    const lead = Math.max(1, Math.round(span * LEAD_SHARE));
-    return { t0: (startDay - lead) * DAY_S, t1: (startDay + span) * DAY_S };
-  }, [startDay, span]);
+  const bounds = useMemo(() => flowsBounds(startDay, span), [startDay, span]);
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
 
@@ -407,7 +423,7 @@ export function LifetimeFlowsLw({
   const [applyN, setApplyN] = useState(0);
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<Record<string, ISeriesApi<SeriesType>>>({});
-  const marks = useRef<{ value: ScrubberMark; price: ScrubberMark | null; spacer: ScrubberMark | null } | null>(null);
+  const marks = useRef<{ value: ScrubberMark[]; price: ScrubberMark | null; spacer: ScrubberMark | null } | null>(null);
   const markState = useRef<MarkState>({ grid: null, ts: null, dim: false, shadeTs: null, colors: null });
   const touched = useRef(0);
   const plotW = useCallback(
@@ -520,7 +536,9 @@ export function LifetimeFlowsLw({
   }, [hasPrice, lib]);
   const spacerH = tipH + TIP_GAP;
   const [axisH, setAxisH] = useState(26);
-  const boxH = VALUE_H + (hasPrice ? spacerH + PRICE_LINE_H + 2 : 0) + axisH;
+  const paneHs = [...valueH, ...(hasPrice ? [spacerH, PRICE_LINE_H] : [])];
+  // Each pane, and a 1 px separator between two.
+  const boxH = paneHs.reduce((a, b) => a + b, 0) + Math.max(0, paneHs.length - 1) + axisH;
 
   // The old-price tip of a dotted stretch under the mouse.
   /** Where a dotted stretch of the price line touches a solid one: the days,
@@ -532,12 +550,13 @@ export function LifetimeFlowsLw({
   hoverRef.current = (p) => {
     const g = gridRef.current;
     const c = chart.current;
-    if (!g || !c || !p.point || p.logical == null || !p.sourceEvent || p.paneIndex !== 0) {
+    if (!g || !c || !p.point || p.logical == null || !p.sourceEvent || p.paneIndex == null || p.paneIndex >= nV) {
       if (oldTip) setOldTip(null);
       return;
     }
     const i = Math.round(p.logical);
     for (const k of sides) {
+      if (paneOf(k) !== p.paneIndex) continue;
       const v = sampled.current[`dotted-${k}`]?.[i];
       const s = series.current[`dotted-${k}`];
       const y = v == null || !s ? null : s.priceToCoordinate(v);
@@ -553,7 +572,7 @@ export function LifetimeFlowsLw({
         if (dotted && (best == null || Math.abs(pt.to - day) < Math.abs(best - day))) best = pt.to;
       }
       const lines = best == null ? [] : oldLineTip(model, best - startDay, k);
-      setOldTip(lines.length ? { x: p.point.x, y, lines } : null);
+      setOldTip(lines.length ? { x: p.point.x, y: y + sideTop(paneOf(k)), lines } : null);
       return;
     }
     if (oldTip) setOldTip(null);
@@ -607,11 +626,20 @@ export function LifetimeFlowsLw({
       },
       kineticScroll: { mouse: false, touch: false },
     });
-    const usd = {
-      type: "custom" as const,
-      formatter: (v: number) => formatFlowUsd(v),
-      tickmarksFormatter: (vs: number[]) => vs.map(scale.axisLabel),
-      minMove: 0.01,
+    // The value axis: dollars, or the model's token (Morpho); a side's own
+    // token where the sides have none in common.
+    const unitOf = (k: Side) => sideUnits?.[k] ?? model.unit;
+    const usd = (k: Side) => {
+      const unit = unitOf(k);
+      return {
+        type: "custom" as const,
+        // A token axis's hover label without the symbol, as its ticks, so the
+        // axis keeps its width.
+        formatter: (v: number) => (unit ? formatFlowToken(v, unit, false) : formatFlowUsd(v)),
+        tickmarksFormatter: (vs: number[]) =>
+          vs.map(sideUnits && unit ? (t: number) => formatFlowToken(t, unit, false) : scale.axisLabel),
+        minMove: 0.01,
+      };
     };
     const floor0 = (base: () => { priceRange: { minValue: number; maxValue: number } | null } | null) => {
       const r = base();
@@ -620,34 +648,50 @@ export function LifetimeFlowsLw({
     const quiet = { priceLineVisible: false, lastValueVisible: false } as const;
     const s: Record<string, ISeriesApi<SeriesType>> = {};
     for (const k of sides) {
-      s[`area-${k}`] = c.addSeries(lib.AreaSeries, {
-        ...quiet,
-        lineVisible: false,
-        crosshairMarkerVisible: false,
-        priceFormat: usd,
-        autoscaleInfoProvider: floor0,
-      });
-      s[`solid-${k}`] = c.addSeries(lib.LineSeries, {
-        ...quiet,
-        lineWidth: 2,
-        priceFormat: usd,
-        autoscaleInfoProvider: floor0,
-      });
-      s[`dotted-${k}`] = c.addSeries(lib.LineSeries, {
-        ...quiet,
-        lineWidth: 2,
-        lineStyle: lib.LineStyle.SparseDotted,
-        crosshairMarkerVisible: false,
-        priceFormat: usd,
-        autoscaleInfoProvider: floor0,
-      });
+      const pane = paneOf(k);
+      s[`area-${k}`] = c.addSeries(
+        lib.AreaSeries,
+        {
+          ...quiet,
+          lineVisible: false,
+          crosshairMarkerVisible: false,
+          priceFormat: usd(k),
+          autoscaleInfoProvider: floor0,
+        },
+        pane,
+      );
+      s[`solid-${k}`] = c.addSeries(
+        lib.LineSeries,
+        {
+          ...quiet,
+          lineWidth: 2,
+          priceFormat: usd(k),
+          autoscaleInfoProvider: floor0,
+        },
+        pane,
+      );
+      s[`dotted-${k}`] = c.addSeries(
+        lib.LineSeries,
+        {
+          ...quiet,
+          lineWidth: 2,
+          lineStyle: lib.LineStyle.SparseDotted,
+          crosshairMarkerVisible: false,
+          priceFormat: usd(k),
+          autoscaleInfoProvider: floor0,
+        },
+        pane,
+      );
     }
-    c.priceScale("right", 0).applyOptions({ scaleMargins: { top: 0.08, bottom: 0.02 } });
+    // A side's pane keeps room over its line for its token's name.
+    for (let i = 0; i < nV; i++)
+      c.priceScale("right", i).applyOptions({ scaleMargins: { top: split ? 0.22 : 0.08, bottom: 0.02 } });
     if (hasPrice) {
       const unit = priced!.unitLabel;
       const px = {
         type: "custom" as const,
-        formatter: (v: number) => formatPrice(v, unit),
+        // In a token, the hover label is the number alone, as the ticks are.
+        formatter: (v: number) => formatPrice(v, unit).replace(` ${unit}`, ""),
         tickmarksFormatter: (vs: number[]) => priceAxisLabels(vs),
         minMove: 1e-8,
       };
@@ -674,10 +718,10 @@ export function LifetimeFlowsLw({
           crosshairMarkerVisible: false,
           priceFormat: { type: "custom", formatter: () => "", tickmarksFormatter: (vs: number[]) => vs.map(() => "") },
         },
-        1,
+        spacerPane,
       );
-      s.level = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 1, ...pxScale }, 2);
-      s.price = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, 2);
+      s.level = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 1, ...pxScale }, pricePane);
+      s.price = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, pricePane);
       s.priceDotted = c.addSeries(
         lib.LineSeries,
         {
@@ -687,9 +731,9 @@ export function LifetimeFlowsLw({
           crosshairMarkerVisible: false,
           ...pxScale,
         },
-        2,
+        pricePane,
       );
-      s.priceStep = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, 2);
+      s.priceStep = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, pricePane);
       s.priceDots = c.addSeries(
         lib.LineSeries,
         {
@@ -700,12 +744,16 @@ export function LifetimeFlowsLw({
           crosshairMarkerVisible: false,
           ...pxScale,
         },
-        2,
+        pricePane,
       );
     }
     series.current = s;
-    const mv = new ScrubberMark(markState.current);
-    s[`area-${sides[0]}`].attachPrimitive(mv);
+    // A mark per value pane, on its first side's area.
+    const mv = valuePanes.map((ks) => {
+      const m = new ScrubberMark(markState.current);
+      s[`area-${ks[0]}`].attachPrimitive(m);
+      return m;
+    });
     let mp: ScrubberMark | null = null;
     let ms: ScrubberMark | null = null;
     if (hasPrice) {
@@ -841,20 +889,21 @@ export function LifetimeFlowsLw({
     };
     // The series follow the panes and sides; their data follows the lines.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lib, hasPrice, hasDebt, priced?.unitLabel]);
+  }, [lib, hasPrice, hasDebt, value, priced?.unitLabel]);
 
-  // The panes' heights and the price pane's room for the tip.
+  // The panes' heights and the price pane's room for the tip, as stretch
+  // factors, so a resize of the box keeps them.
+  const paneKey = paneHs.join(",");
   useEffect(() => {
     const c = chart.current;
-    if (!c || !hasPrice) return;
-    // Heights as stretch factors, so a resize of the box keeps them.
-    const [p0, p1, p2] = c.panes();
-    p0?.setStretchFactor(VALUE_H);
-    p1?.setStretchFactor(spacerH);
-    p2?.setStretchFactor(PRICE_LINE_H);
-    c.priceScale("right", 2).applyOptions({ scaleMargins: { top: 0.08, bottom: 0.06 } });
+    if (!c) return;
+    const panes = c.panes();
+    paneHs.forEach((h, i) => panes[i]?.setStretchFactor(h));
+    if (hasPrice) c.priceScale("right", pricePane).applyOptions({ scaleMargins: { top: 0.08, bottom: 0.06 } });
     sendAxis();
-  }, [ready, hasPrice, spacerH, boxH, sendAxis]);
+    // `paneKey` stands for the heights.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, hasPrice, paneKey, pricePane, sendAxis]);
 
   // Colours for the theme.
   useEffect(() => {
@@ -886,7 +935,7 @@ export function LifetimeFlowsLw({
       for (const n of ["price", "priceDotted", "priceStep", "priceDots"]) s[n]?.applyOptions({ color: hue });
       s.level?.applyOptions({ color: colors.liq });
     }
-    marks.current?.value.update();
+    marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
     marks.current?.spacer?.update();
     // `sides` follows hasDebt.
@@ -961,7 +1010,7 @@ export function LifetimeFlowsLw({
     });
     regrid.current = false;
     markState.current.grid = grid;
-    marks.current?.value.update();
+    marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
     marks.current?.spacer?.update();
     sendAxis();
@@ -978,14 +1027,16 @@ export function LifetimeFlowsLw({
     const s = series.current;
     const cs = colors;
     if (marks.current && cs) {
-      marks.current.value.dots = sides.map((k) => ({ series: s[`area-${k}`], value: at[k], color: cs[k] }));
+      marks.current.value.forEach((m, i) => {
+        m.dots = valuePanes[i].map((k) => ({ series: s[`area-${k}`], value: at[k], color: cs[k] }));
+      });
       if (marks.current.price && priced)
         marks.current.price.dots = [
           ...(at.level != null && s.level ? [{ series: s.level, value: at.level, color: cs.liq }] : []),
           ...(at.price != null && s.price ? [{ series: s.price, value: at.price, color: cs[priced.side] }] : []),
         ];
     }
-    marks.current?.value.update();
+    marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
     marks.current?.spacer?.update();
     // `sides` follows hasDebt.
@@ -1003,7 +1054,8 @@ export function LifetimeFlowsLw({
   const g = grid;
   const cx = c && g ? xOf(c, g, closeTs(Math.min(cursorDay, today))) : null;
   const pw = c?.timeScale().width() ?? 0;
-  const paneTop = VALUE_H + 1;
+  // The tip's pane: under the value panes and their separators.
+  const paneTop = sideTop(nV);
   void axisN;
 
   // The data hooks the verifiers read (a canvas leaves nothing in the DOM).
@@ -1020,7 +1072,7 @@ export function LifetimeFlowsLw({
       ref={wrap}
       className="relative"
       data-flow-chart-engine="lw"
-      data-flow-chart-panes={hasPrice ? "value,price" : "value"}
+      data-flow-chart-panes={[...(split ? sides : nV ? ["value"] : []), ...(hasPrice ? ["price"] : [])].join(",")}
       data-flow-lw-step={grid?.step ?? ""}
       data-flow-lw-from={Math.round(view.current.from)}
       data-flow-lw-to={Math.round(view.current.to)}
@@ -1030,6 +1082,19 @@ export function LifetimeFlowsLw({
       <div ref={box} className="relative isolate w-full" style={{ height: boxH }} data-flow-lw-box="">
         {!lib && <p className="flex h-full items-center justify-center text-xs text-rb-500">Drawing the chart…</p>}
       </div>
+      {/* Each side's pane names its token, in the side's hue. */}
+      {sideUnits &&
+        sides.map((k, i) => (
+          <span
+            key={k}
+            aria-hidden
+            className={`pointer-events-none absolute left-1 text-[10px] font-semibold leading-none ${k === "collateral" ? "text-blue-600 dark:text-blue-400" : "text-green-700 dark:text-green-400"}`}
+            style={{ top: sideTop(i) + 3 }}
+            data-flow-line-side-top={k}
+          >
+            {sideUnits[k].symbol}
+          </span>
+        ))}
       {hasPrice && (
         <div className="pointer-events-none absolute left-0" style={{ top: paneTop, width: pw || "100%" }}>
           <div ref={tipRef} className="pointer-events-auto" data-flow-price-tip="">

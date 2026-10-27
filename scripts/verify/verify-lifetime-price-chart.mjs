@@ -4,7 +4,7 @@
 // The panel stacks the value line over one held asset's price chart, one
 // cursor for both, the events under them. The readout is the price chart's
 // tip, shown while the chart has focus. Per page, at 1280 and 390:
-//   - the two strips stand, value over price, and the value line is the same
+//   - the chart's panes stand, value over price, and the value line is the same
 //     before and after the cursor's trip along the price chart;
 //   - the strip draws no day the series lacks: every day drawn as observed is
 //     a day of the page's own price answer, every day drawn carried is not;
@@ -59,7 +59,14 @@
 // 0x0f2a…bbe take the health checks; SparkLend 0x1601…347e and Aave V4 Main
 // 0x7eac…fa09 the price checks against their answers; Aave V3 Base 0xe883…4cc8
 // and Seamless 0x8182…7804 the chart's checks alone (`lwOnly`: their answer is
-// the knots). `FIXTURES=<regex>` runs the pages whose id matches.
+// the knots). Step 4d moved every other family onto the engine: one position
+// per family takes the chart's checks alone (`lwOnly`), its panes named
+// (`panes`: "value" where the family has no price series, a pane per side
+// where the sides have no common unit), and a one-day life (`priceOnly`) the
+// price pane alone, with Home and End on its slider for the steps it does not
+// draw. Where the page does not tie the chart to its timeline (no Sync to
+// chart), a tap moves the cursor without freezing it and ⏭ brings it back.
+// `FIXTURES=<regex>` runs the pages whose id matches.
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
 
@@ -107,6 +114,92 @@ const PAGES = [
   // Base's two Pools answer in another shape (the knots): the chart's checks alone.
   { id: "aave-v3-base 0xe883", path: "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8", lwOnly: true },
   { id: "seamless 0x8182", path: "/base/seamless/0x818214d3494fbc4be4f450c50677e55987804206", lwOnly: true },
+  // Step 4d: one position per family on the chart's checks alone.
+  { id: "moonwell 0x33a7", path: "/ethereum/moonwell/0x33a7ec1055edd4cc35ef289156c7a7a078043474", lwOnly: true },
+  { id: "moonwell-base 0x2d7a", path: "/base/moonwell/0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c", lwOnly: true },
+  {
+    id: "compound-v3 usdc 0xc5cd",
+    path: "/ethereum/compound-v3/usdc/0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46",
+    lwOnly: true,
+  },
+  {
+    id: "compound-v3-base usdc 0x3a79",
+    path: "/base/compound-v3/usdc/0x3a79bf27ff626b55c601f01666bc522cc65eb852",
+    lwOnly: true,
+  },
+  { id: "compound-v2 0x6217", path: "/ethereum/compound-v2/0x6217c008da6ea46b6db500695287d77d03f79a42", lwOnly: true },
+  { id: "makerdao 2028", path: "/ethereum/makerdao/2028", lwOnly: true },
+  {
+    id: "dolomite 0x49d6",
+    path: "/ethereum/dolomite/0x49d62ca7ab8e28f7a28d9abadf84fe8b45e3caf6/15809042418583418827551470108194220080728327193143889538122062408455944908946",
+    lwOnly: true,
+  },
+  { id: "fluid 6", path: "/ethereum/fluid/6", lwOnly: true },
+  {
+    id: "liquity-v1 0x04ca",
+    path: "/ethereum/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1",
+    lwOnly: true,
+  },
+  { id: "sky-savings 0x176f", path: "/ethereum/sky-savings/0x176f3dab24a159341c0509bb36b833e7fdd0a132", lwOnly: true },
+  {
+    id: "morpho 0xebb8",
+    path: "/ethereum/morpho/ebd23a871b52e0a8c92bd719f4413600101b69e946cb72923b3a33fb5bc6ec85-0xebb870a0aaaa7bc55ead925d03a4af4a8db79a03",
+    lwOnly: true,
+  },
+  {
+    id: "morpho-base 0x9f03",
+    path: "/base/morpho/0x9f03da73cf0f3a141404af735c16cf17427d81db/0xc9658cac13a9b9b5c1ebaa8ce19c735283cc761ff528d149a7221047bb7fab45",
+    lwOnly: true,
+    panes: "value",
+  },
+  { id: "polaris usdp 2420", path: "/sepolia/polaris/usdp/2420", lwOnly: true },
+  { id: "fx wsteth-249", path: "/ethereum/fx/wsteth-249", lwOnly: true },
+  {
+    id: "llamalend 0xeb2c",
+    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xeb2cafb6ea9def8084842558ad1242bbf7fcac2b",
+    lwOnly: true,
+  },
+  {
+    id: "frankencoin 0xdc18",
+    path: "/ethereum/frankencoin/0xdc189ac81bec4db551a0478334691d71109d9382",
+    lwOnly: true,
+    panes: "collateral,debt",
+  },
+  {
+    id: "maple 0xc4ec",
+    path: "/ethereum/maple/0xc4ec216635491a6d08cfe4537ed4dd767212d8c1",
+    lwOnly: true,
+    panes: "value",
+  },
+  {
+    id: "pwn 0xb2d3 (liquidated)",
+    path: "/ethereum/pwn/0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13?loan=37",
+    lwOnly: true,
+    panes: "collateral,debt",
+  },
+  {
+    id: "aave vault holder 0x1676",
+    path: "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
+    lwOnly: true,
+  },
+  {
+    id: "yearn vault holder 0xb634",
+    path: "/ethereum/yearn/vaults/0x310b7ea7475a0b449cfd73be81522f1b88efafaa/0xb634316e06cc0b358437cbadd4dc94f1d3a92b3b",
+    lwOnly: true,
+  },
+  {
+    id: "morpho-base vault holder 0x3d88",
+    path: "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2/0x3d8863a416f3091766bfea41d3d7008236a0dd1e",
+    lwOnly: true,
+  },
+  // A one-day life (one transaction on 11 Oct 2026, open): the price pane alone.
+  {
+    id: "liquity-v2 WETH Trove (one day)",
+    path: "/ethereum/liquity-v2/trove/WETH/9356199087677269607208888455574125294289574299403525409279454994357184117603",
+    lwOnly: true,
+    priceOnly: true,
+    panes: "price",
+  },
   {
     id: "liquity-v2 WETH Trove",
     path: "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
@@ -560,27 +653,37 @@ const lwShow = (s) => `x ${s.x} of ${s.plotW}, stop ${s.now}/${s.max}${s.frozen 
  *  cursor stands on the last stop at the plot's right end, and the events row
  *  spreads its pips over the plot. A day's close inside a grid cell (a cell
  *  longer than a day, a phone's width) once read x 0. */
-async function checkLwOpen(page, tag) {
+async function checkLwOpen(page, tag, priceOnly = false) {
   // The value line's hook, once the line is drawn (a model rebuilt over more
   // of the life sets it again).
-  await page
-    .waitForFunction(
-      () =>
-        document.querySelector("[data-flows-combined] [data-flow-value-line]")?.getAttribute("data-flow-value-line"),
-      null,
-      { timeout: 30000 },
-    )
-    .catch(() => {});
-  const r = await page.evaluate(() => {
+  if (!priceOnly)
+    await page
+      .waitForFunction(
+        () =>
+          document.querySelector("[data-flows-combined] [data-flow-value-line]")?.getAttribute("data-flow-value-line"),
+        null,
+        { timeout: 30000 },
+      )
+      .catch(() => {});
+  const r = await page.evaluate((priceOnly) => {
     const w = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
     const panel = w.closest("[data-flows-combined]").getBoundingClientRect();
     const box = w.querySelector("[data-flow-lw-box]").getBoundingClientRect();
     const canv = [...w.querySelectorAll("[data-flow-lw-box] canvas")].map((c) => c.getBoundingClientRect());
     const line = w.querySelector("[data-flow-value-line]")?.getAttribute("data-flow-value-line") ?? "";
-    const ts = line
-      .split(/[|,]/)
-      .map((p) => Number(p.split(":")[0]))
-      .filter((t) => Number.isFinite(t) && t > 0);
+    // The price chart alone: its observed days' closes.
+    const price = w.querySelector("[data-price-line]");
+    const ts = priceOnly
+      ? ["data-price-observed", "data-price-carried"].flatMap((a) =>
+          (price?.getAttribute(a) ?? "")
+            .split(",")
+            .filter(Boolean)
+            .map((d) => (Number(d) + 1) * 86400),
+        )
+      : line
+          .split(/[|,]/)
+          .map((p) => Number(p.split(":")[0]))
+          .filter((t) => Number.isFinite(t) && t > 0);
     return {
       fits:
         box.left >= panel.left - 1 &&
@@ -595,7 +698,7 @@ async function checkLwOpen(page, tag) {
         parseFloat(p.style.left),
       ),
     };
-  });
+  }, priceOnly);
   check(
     `${tag}: the chart fits the panel, no page overflow`,
     r.fits && r.overflow <= 0,
@@ -612,6 +715,7 @@ async function checkLwOpen(page, tag) {
     s.now === s.max && atRight(s),
     lwShow(s),
   );
+  if (priceOnly) return;
   check(
     `${tag}: the events row spreads its pips over the plot`,
     r.pips.length > 1 && r.pips.every((x) => x >= -1 && x <= s.plotW + 1) && r.pips.filter((x) => x <= 1).length <= 1,
@@ -644,12 +748,15 @@ async function checkLwWheel(page, tag) {
   const at = async () => ({ y: await page.evaluate(() => window.scrollY), ...(await lwState(page)) });
   await over();
   const a = await at();
-  await page.mouse.wheel(0, 240);
+  // A short page (a one-day life) may have no room left below: the wheel
+  // scrolls it up instead.
+  const down = await page.evaluate(() => window.scrollY + innerHeight < document.documentElement.scrollHeight - 2);
+  await page.mouse.wheel(0, down ? 240 : -240);
   await page.waitForTimeout(700);
   const b = await at();
   check(
     `${tag}: the wheel over the chart scrolls the page and leaves the window`,
-    b.y > a.y && b.from === a.from && b.to === a.to,
+    (down ? b.y > a.y : b.y < a.y) && b.from === a.from && b.to === a.to,
     `scroll ${a.y} → ${b.y}, window ${a.to - a.from} → ${b.to - b.from} s`,
   );
   // The wheel moved the chart up the viewport: back under the pointer.
@@ -702,6 +809,24 @@ async function checkHealthDotted(page, tag) {
   );
 }
 
+/** The price chart alone draws no steps: Home and End on its slider put the
+ *  cursor on the first stop in the plot and the last at the right end. */
+async function checkLwKeys(page, tag) {
+  const sl = page.locator('[data-flows-combined] [data-flow-strip-view="chart"]').first();
+  await sl.focus();
+  await page.keyboard.press("Home");
+  await page.waitForTimeout(400);
+  const a = await lwState(page);
+  await page.keyboard.press("End");
+  await page.waitForTimeout(400);
+  const e = await lwState(page);
+  check(
+    `${tag}: Home puts the cursor on the first stop in the plot, End on the last at the right end`,
+    a.now === 0 && inPlot(a) && a.x < e.x && e.now === e.max && atRight(e),
+    `${lwShow(a)} → ${lwShow(e)}`,
+  );
+}
+
 /** The steps (⏮ ‹ › ⏭), at All and zoomed to 30D, frozen and not: ⏭ puts the
  *  cursor on the last stop at the plot's right end and releases a freeze;
  *  every step leaves the cursor in the plot, in order. */
@@ -725,6 +850,8 @@ async function checkLwSteps(page, tag, touch) {
     await page.waitForTimeout(500);
     return lwState(page);
   };
+  // A page that ties the chart to its timeline (Sync to chart) freezes on a tap.
+  const tied = (await page.locator("[data-flow-sync]").count()) > 0;
   const zooms =
     (await page.locator('[data-flows-combined] [data-flow-range="30D"]').count()) > 0 ? ["All", "30D"] : ["All"];
   for (const z of zooms) {
@@ -744,11 +871,18 @@ async function checkLwSteps(page, tag, touch) {
     check(`${t}: ‹ moves the cursor left, in the plot`, p.now < e.now && inPlot(p) && p.x <= e.x, lwShow(p));
     const f = await freeze();
     const fe = await press(END);
-    check(
-      `${t}: ⏭ from a frozen cursor releases it on the last stop, at the right end`,
-      f.frozen && !fe.frozen && fe.now === fe.max && atRight(fe),
-      `${lwShow(f)} → ${lwShow(fe)}`,
-    );
+    if (tied)
+      check(
+        `${t}: ⏭ from a frozen cursor releases it on the last stop, at the right end`,
+        f.frozen && !fe.frozen && fe.now === fe.max && atRight(fe),
+        `${lwShow(f)} → ${lwShow(fe)}`,
+      );
+    else
+      check(
+        `${t}: a tap moves the cursor without freezing it; ⏭ brings it to the right end`,
+        !f.frozen && f.now < f.max && inPlot(f) && !fe.frozen && fe.now === fe.max && atRight(fe),
+        `${lwShow(f)} → ${lwShow(fe)}`,
+      );
   }
   if (zooms.length > 1) await press('[data-flow-range="All"]');
 }
@@ -795,9 +929,10 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
         .waitForFunction(
           () =>
             document.querySelector("[data-flows-combined] [data-flow-lw-box] canvas") &&
-            document
+            (document
               .querySelector("[data-flows-combined] [data-flow-value-line]")
-              ?.getAttribute("data-flow-value-line"),
+              ?.getAttribute("data-flow-value-line") ||
+              document.querySelector('[data-flows-combined="price"] [data-price-line]')),
           null,
           { timeout: 120000 },
         )
@@ -811,9 +946,8 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
           : [e.getAttribute("data-flow-strip-view")],
       ),
     );
-    if (
-      !check(`${tag}: the value line and the price chart stand stacked`, views.join() === "value,price", views.join())
-    ) {
+    const panes = pg.panes ?? "value,price";
+    if (!check(`${tag}: the chart's panes stand stacked (${panes})`, views.join() === panes, views.join())) {
       await ctx.close();
       continue;
     }
@@ -832,14 +966,15 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
         JSON.stringify(drawn),
       );
       await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").scrollIntoViewIfNeeded();
-      await checkLwOpen(page, tag);
+      await checkLwOpen(page, tag, pg.priceOnly);
     }
     if (pg.lwOnly) {
       if (!check(`${tag}: the chart draws on Lightweight Charts`, lw)) {
         await ctx.close();
         continue;
       }
-      await checkLwSteps(page, tag, width < 640);
+      if (pg.priceOnly) await checkLwKeys(page, tag);
+      else await checkLwSteps(page, tag, width < 640);
       if (width >= 640) await checkLwWheel(page, tag);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();

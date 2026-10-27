@@ -121,6 +121,25 @@ export function axisSpanDays(startDay: number, today: number): number {
   return Math.max(AXIS_MIN_DAYS, today + 1 - startDay);
 }
 
+/** The chart's lead-in before the first event's day, a share of the axis's days. */
+const LEAD_SHARE = 0.06;
+const DAY_S = 86_400;
+
+/** The chart's whole time axis in unix seconds: a lead-in before the first
+ *  event's day (`startDay`), then `span` days (`axisSpanDays`). */
+export function flowsBounds(startDay: number, span: number): { t0: number; t1: number } {
+  const lead = Math.max(1, Math.round(span * LEAD_SHARE));
+  return { t0: (startDay - lead) * DAY_S, t1: (startDay + span) * DAY_S };
+}
+
+/** Where an absolute day's close sits on the whole axis `w` px wide, as the
+ *  chart draws it at All: the events row's axis while the charts are hidden
+ *  or not yet drawn. */
+export function lifeAxis(w: number, startDay: number, span: number): (day: number) => number {
+  const { t0, t1 } = flowsBounds(startDay, span);
+  return (day) => ((Math.min((day + 1) * DAY_S, t1) - t0) / (t1 - t0)) * w;
+}
+
 /** The stop a step back (-1) or forward (+1) from `at` lands on, where the
  *  steps go by days with events (the timeline's day marks): the nearest day
  *  with events that way, or the live stop going forward; `at` where there is

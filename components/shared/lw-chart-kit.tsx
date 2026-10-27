@@ -15,8 +15,6 @@ import { monthShort } from "@/lib/date";
 
 export type LwLib = typeof import("lightweight-charts");
 
-export { LwNotice } from "@/components/shared/lw-attribution";
-
 /** The library, once its chunk is in; null until then, and not fetched
  *  until `wanted` (a chart hidden until a reader opens it). */
 export function useLwLib(wanted = true): LwLib | null {

@@ -3,13 +3,12 @@
 // The Lifetime flows panel on a position with a series (rails-ops
 // reference/lifetime-flows-scrubber.md), in one stacked layout: each side's
 // headline on its own line over its bar (no scale under the bars), the
-// collateral and debt line, the held asset's price chart under its heading
-// ("Daily [asset] USD price", a list where there are several, on the page's
-// surface, its readout a tip at the cursor), and the events row; each
-// of the three sections carries its own "?" how-to-read. One time axis
-// (`stripGeometry`) and one cursor: a press, a press and drag (mouse, pen and
-// touch alike; hovering moves nothing) or the arrow keys on either chart move
-// it. It stands on the line's points and on every day with events (tapping an
+// collateral and debt line and the held asset's price chart, its readout a
+// tip at the cursor, drawn as panes of one Lightweight Charts chart
+// (components/shared/lifetime-flows-lw.tsx; "The chart engine"), and the
+// events row; each of the three sections carries its own "?" how-to-read. One
+// time axis and one cursor: a press, a press and drag (mouse, pen and touch
+// alike; hovering moves nothing) or the arrow keys on the chart move it. It stands on the line's points and on every day with events (tapping an
 // event dot jumps to it); what the headlines and the bars state there is
 // `combinedAt` (lib/shared/flows-combined.ts). The charts after the cursor are
 // dimmed. The dashed outline marks where each bar ends today. Before the bars'
@@ -20,7 +19,6 @@
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useId,
@@ -33,7 +31,6 @@ import {
   type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
 import { Activity, ChevronDown, ChevronLeft, ChevronRight, Link2, SkipBack, SkipForward } from "lucide-react";
 import { LearnMoreButton, LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -47,26 +44,13 @@ import {
 import { FlowBarsHeadsContext, Headline, Rescaled, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
-import { FLOWS_SCOPE, Prov, useProvArmedFor, type Provenance } from "@/components/shared/provenance";
-import {
-  formatPrice,
-  priceAxisLabels,
-  labelWidth,
-  priceAxis,
-  pricePieces,
-  levelAt,
-  priceReadout,
-  STRIP_PAD,
-  stripGeometry,
-  type FlowPriceSeries,
-  type StripGeometry,
-} from "@/lib/shared/flows-price";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { formatPrice, pricePieces, levelAt, priceReadout, type FlowPriceSeries } from "@/lib/shared/flows-price";
 import type { PriceAt } from "@/lib/shared/price-series";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, SECTION_HEADING } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
-  axisFor,
   DAY_MS,
   dayStart,
   formatFlowToken,
@@ -78,10 +62,9 @@ import {
   tickRank,
   type FlowSide,
 } from "@/lib/shared/flows-timeline";
-import { OldPriceLabel, OldPriceTip, oldLineTip } from "@/components/shared/flow-old-price";
+import { OldPriceLabel } from "@/components/shared/flow-old-price";
 import { LwRanges, nearestStopAt, type FlowsLwApi, type FlowsLwAxis } from "@/components/shared/lifetime-flows-lw-axis";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
-import { protocolForPathname } from "@/lib/shared/protocols";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import {
   axisEndDay,
@@ -90,7 +73,7 @@ import {
   combinedStops,
   eventStep,
   axisSpanDays,
-  nearestStop,
+  lifeAxis,
   stopForDay,
   type CombinedStop,
 } from "@/lib/shared/flows-combined";
@@ -223,8 +206,6 @@ const LW_LOADING_H = 250;
 
 /** The line's hues; the panel's Key draws the same. */
 export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
-/** The liquidation level's hue: the liquidation tick's red. */
-const LIQ_HUE = FLOW_TICK.liquidation;
 
 /** The bars' and the events' how-to-read; the price chart's names its
  *  series. */
@@ -285,36 +266,8 @@ export const FlowsCompactContext = createContext<{
   toggle: null,
 });
 
-/** The chart engine the panel draws its value line and price chart with
- *  (ui-jobs 328 step 4c): the drawn strips ("svg"), or Lightweight Charts
- *  ("lw"). */
-export type FlowsEngine = "svg" | "lw";
-/** The explorers whose value line and price chart are drawn on Lightweight
- *  Charts: the Liquity family (the pilot) and the Aave family; every other
- *  explorer keeps the drawn strips until its step. The one place the engine
- *  is chosen, read by every panel (Aave V4's draws its own). */
-const LW_EXPLORERS = new Set([
-  "liquity",
-  "ebisu",
-  "asymmetry",
-  "basedollar",
-  "aave-v3",
-  "aave-v3-base",
-  "aave-v3-arbitrum",
-  "spark",
-  "seamless",
-  "aave-v4",
-]);
-export function flowsEngineFor(pathname: string | null): FlowsEngine {
-  const id = protocolForPathname(pathname)?.id;
-  return id != null && LW_EXPLORERS.has(id) ? "lw" : "svg";
-}
-
-const STRIP_H = 80;
 /** A drag this close to an end of a chart that pans keeps stepping on. */
 const EDGE_PX = 20;
-/** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
-const OLD_TIP_W = 282;
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
 
 export interface CombinedFlowsProps {
@@ -385,9 +338,6 @@ export function CombinedFlows({
   // Collapsed, the charts hide; the bars, the events and the steps keep
   // the cursor.
   const { compact, toggle: viewToggle } = useContext(FlowsCompactContext);
-  // The chart engine: Lightweight Charts where the panel chooses it, for a
-  // panel with the events row and one unit across both sides.
-  const lwOn = flowsEngineFor(usePathname()) === "lw" && !priceOnly && !model.sideUnits;
   const [lwAxis, setLwAxis] = useState<FlowsLwAxis | null>(null);
   const lwApi = useRef<FlowsLwApi | null>(null);
 
@@ -570,30 +520,28 @@ export function CombinedFlows({
     [atClose, closeDay, head.isLive, dateText, at, last, outside, byDays, stops],
   );
 
-  // The time axis both strips share: its lead-in holds the widest value label
-  // of either view, so a day sits on one x in both.
   const [stripRef, w] = useWidth();
   // The axis's last day: today, or a closed position's close day.
   const today = axisEndDay(model, series?.today ?? startDay + model.liveStop);
   const span = axisSpanDays(startDay, today);
-  const lineScale = useMemo(() => lineStripScale(model, series, hasDebt), [model, series, hasDebt]);
+  const lineScale = useMemo(() => flowLineScale(model, series), [model, series]);
   const priceScales = useMemo(() => {
-    return new Map(prices.map((p) => [p.key, priceStripScale(p, startDay, today)]));
+    return new Map(prices.map((p) => [p.key, priceLineOf(p, startDay, today)]));
   }, [prices, startDay, today]);
-  const labelW = labelWidth([...lineScale.labels, ...[...priceScales.values()].flatMap((s) => s.labels)]);
-  const geo = useMemo(() => stripGeometry(w, startDay, today, span, labelW), [w, startDay, today, span, labelW]);
-  // On Lightweight Charts, while the charts are shown, the HTML under and
-  // over the chart (the events row, the tips, the stems) takes the chart's
-  // axis, which zooms and pans; collapsed, the whole life's.
-  const chartAxis = lwOn && !compact ? lwAxis : null;
-  const xClose = (day: number) => (chartAxis ? chartAxis.xClose(day) : geo.xClose(Math.min(day, today)));
+  // While the charts are shown, the HTML under and over the chart (the events
+  // row, the tips, the stems) takes the chart's axis, which zooms and pans;
+  // hidden, or before the chart is drawn, the whole life's.
+  const shown = !compact || priceOnly;
+  const chartAxis = shown ? lwAxis : null;
+  const wholeAxis = useMemo(() => lifeAxis(w, startDay, span), [w, startDay, span]);
+  const xClose = (day: number) => (chartAxis ? chartAxis.xClose(day) : wholeAxis(Math.min(day, today)));
   const rowW = chartAxis ? chartAxis.plotW : w;
   const xStop = (s: CombinedStop) => xClose(s.live ? today : startDay + s.stop);
   const atStop = stops[Math.min(at, last)];
   const showPrice = priced != null;
   const lineReady = lineScale.points.length > 0;
   const ready = lineReady || showPrice;
-  const cx = ready && atStop ? xStop(atStop) : STRIP_PAD + geo.inner;
+  const cx = ready && atStop ? xStop(atStop) : rowW;
   const dim = ready && atStop != null && !atStop.live;
   const cursorDay = cur.live ? today : startDay + cur.stop;
   const cursorPrice = priced ? (priceReadout(priced, cursorDay, model.gapDays)?.point[1] ?? null) : null;
@@ -647,19 +595,6 @@ export function CombinedFlows({
       </button>
     </span>
   );
-  const sliderProps = {
-    geo,
-    w: rowW,
-    stops,
-    at: Math.min(at, last),
-    xStop,
-    cx,
-    ready,
-    valueText,
-    onPick: go,
-    freeze: byDays ? { frozen, onTap: tapStop } : null,
-    startDay,
-  };
   // Each side's headline, on its own line over its bar, the bars' "?" at the
   // first one's right end.
   const bareHeadline = (side: "collateral" | "debt") => (
@@ -775,128 +710,68 @@ export function CombinedFlows({
                   time axis and one cursor, which either chart moves. The
                   charts stay mounted while collapsed, so they draw at once
                   on expanding. */}
-                {lwOn ? (
-                  <div className={compact ? "hidden" : "relative"} data-flows-charts="value">
-                    <LwRanges axis={chartAxis} api={lwApi} span={span} cursorDay={cursorDay} />
-                    {!lineReady && (
-                      <p className="pointer-events-none absolute inset-x-0 top-10 text-center text-xs text-rb-500">
-                        {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
-                      </p>
-                    )}
-                    <StripSlider
-                      {...sliderProps}
-                      ariaLabel={priced ? `${sliderLabel}, over the ${priced.asset.symbol} price` : sliderLabel}
-                      view="chart"
-                      height={null}
-                      nearestAt={(px) => nearestStopAt(stops.map(xStop), px)}
-                      edge={chartAxis ? chartAxis.plotW : null}
-                    >
-                      <LifetimeFlowsLw
-                        model={model}
-                        scale={lineScale}
-                        hasDebt={hasDebt}
-                        priced={priced}
-                        priceScale={priced ? priceScales.get(priced.key)! : null}
-                        startDay={startDay}
-                        today={today}
-                        span={span}
-                        cursorDay={cursorDay}
-                        dim={dim}
-                        at={{
-                          collateral: head.collateral.now,
-                          debt: head.debt.now,
-                          price: cursorPrice,
-                          level: cursorLevel,
-                        }}
-                        windowFrom={from > 0 ? startDay + from : null}
-                        shown={!compact}
-                        onAxis={setLwAxis}
-                        apiRef={lwApi}
-                        tip={
-                          priced ? (
-                            <PriceHeading
-                              help={null}
-                              series={prices}
-                              selected={priced}
-                              onPick={setAssetKey}
-                              day={cursorDay}
-                              gapDays={model.gapDays}
-                              isLive={cur.live && !closed}
-                              x={cx}
-                              w={rowW}
-                            />
-                          ) : null
-                        }
-                      />
-                    </StripSlider>
-                  </div>
-                ) : (
-                  <>
-                    <div className={compact || priceOnly ? "hidden" : "relative"} data-flows-charts="value">
-                      <StripSlider {...sliderProps} ariaLabel={sliderLabel} view="value">
-                        <LineStrip
-                          model={model}
-                          scale={lineScale}
-                          failed={failed}
-                          geo={geo}
-                          w={w}
-                          today={today}
-                          cx={cx}
-                          dim={dim}
-                          ready={lineReady}
-                          head={{ collateral: head.collateral.now, debt: head.debt.now }}
-                          hasDebt={hasDebt}
-                          windowFrom={from > 0 ? startDay + from : null}
-                        />
-                      </StripSlider>
-                    </div>
-                    {priced && (
-                      <div
-                        className={priceOnly ? undefined : compact ? "hidden" : undefined}
-                        data-flow-price-section=""
-                      >
-                        {/* The value chart's cursor line runs on down to the tip. */}
-                        {!priceOnly && <Stem x={cx} w={w} />}
-                        <PriceHeading
-                          help={
-                            priceOnly ? (
-                              <SectionHelp content={priceOnlyHelp} name="the price chart" anatomy="F19.7" />
-                            ) : null
-                          }
-                          series={prices}
-                          selected={priced}
-                          onPick={setAssetKey}
-                          day={cursorDay}
-                          gapDays={model.gapDays}
-                          isLive={cur.live && !closed}
-                          x={cx}
-                          w={w}
-                        />
-                        <div className="relative">
-                          <StripSlider
-                            {...sliderProps}
-                            ariaLabel={`${sliderLabel}, over the ${priced.asset.symbol} price`}
-                            view="price"
-                          >
-                            <PriceStrip
-                              s={priced}
-                              scale={priceScales.get(priced.key)!}
-                              geo={geo}
-                              w={w}
-                              today={today}
-                              cx={cx}
-                              dim={dim}
-                              cursorPrice={cursorPrice}
-                              cursorLevel={cursorLevel}
-                              windowFrom={from > 0 ? startDay + from : null}
-                              startDay={startDay}
-                            />
-                          </StripSlider>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
+                <div className={shown ? "relative" : "hidden"} data-flows-charts={priceOnly ? "price" : "value"}>
+                  <LwRanges axis={chartAxis} api={lwApi} span={span} cursorDay={cursorDay} />
+                  {!lineReady && !priceOnly && (
+                    <p className="pointer-events-none absolute inset-x-0 top-10 text-center text-xs text-rb-500">
+                      {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
+                    </p>
+                  )}
+                  <StripSlider
+                    stops={stops}
+                    at={Math.min(at, last)}
+                    valueText={valueText}
+                    onPick={go}
+                    freeze={byDays ? { frozen, onTap: tapStop } : null}
+                    ariaLabel={priced ? `${sliderLabel}, over the ${priced.asset.symbol} price` : sliderLabel}
+                    nearestAt={(px) => nearestStopAt(stops.map(xStop), px)}
+                    edge={chartAxis ? chartAxis.plotW : null}
+                    priceOnly={priceOnly}
+                  >
+                    <LifetimeFlowsLw
+                      model={model}
+                      scale={lineScale}
+                      hasDebt={hasDebt}
+                      value={priceOnly ? null : model.sideUnits ? "split" : "one"}
+                      priced={priced}
+                      priceScale={priced ? priceScales.get(priced.key)! : null}
+                      startDay={startDay}
+                      today={today}
+                      span={span}
+                      cursorDay={cursorDay}
+                      dim={dim}
+                      at={{
+                        collateral: head.collateral.now,
+                        debt: head.debt.now,
+                        price: cursorPrice,
+                        level: cursorLevel,
+                      }}
+                      windowFrom={from > 0 ? startDay + from : null}
+                      shown={shown}
+                      onAxis={setLwAxis}
+                      apiRef={lwApi}
+                      tip={
+                        priced ? (
+                          <PriceHeading
+                            help={
+                              priceOnly ? (
+                                <SectionHelp content={priceOnlyHelp} name="the price chart" anatomy="F19.7" />
+                              ) : null
+                            }
+                            series={prices}
+                            selected={priced}
+                            onPick={setAssetKey}
+                            day={cursorDay}
+                            gapDays={model.gapDays}
+                            isLive={cur.live && !closed}
+                            x={cx}
+                            w={rowW}
+                          />
+                        ) : null
+                      }
+                    />
+                  </StripSlider>
+                </div>
                 {/* The events: a row of pips on the time axis, the price
                     chart's cursor line running on down to the date over it. */}
                 <div className={priceOnly ? "hidden" : compact ? "mt-2" : undefined} data-flow-events-section="">
@@ -919,8 +794,8 @@ export function CombinedFlows({
                 {/* With the events row hidden, the cursor's date stands alone. */}
                 {priceOnly && (
                   <>
-                    <Stem x={cx} w={w} />
-                    <CursorDate x={cx} w={w} {...dateProps} />
+                    <Stem x={cx} w={rowW} />
+                    <CursorDate x={cx} w={rowW} {...dateProps} />
                   </>
                 )}
               </div>
@@ -965,152 +840,62 @@ function Steady({ children }: { children: ReactNode }) {
 
 type Point = { to: number; collateral: number | null; debt: number | null };
 
-/** The flows line's points and value axes, fixed per position: the line's
- *  points and every day's figures, so the cursor's dots stay inside the strip
- *  on an event day too. Its value labels set the lead-in both strips share. */
-export function lineStripScale(model: FlowModel, series: FlowBinSeries | null, hasDebt: boolean) {
-  // The last point is today's, at the live figures.
+/** The flows line's points, the last at the live figures, and its axis
+ *  labels: compact ("$4M", "$250k"), a token axis (Morpho) without the
+ *  symbol. */
+export function flowLineScale(model: FlowModel, series: FlowBinSeries | null) {
   const points: Point[] = (series?.points ?? []).map(([, to, collateral, debt]) => ({ to, collateral, debt }));
   const tail = points[points.length - 1];
   if (tail) {
     tail.collateral = model.live.collateralUsd;
     tail.debt = model.live.debtUsd;
   }
-  let peak = 0;
-  for (const p of points) peak = Math.max(peak, p.collateral ?? 0, hasDebt ? (p.debt ?? 0) : 0);
-  for (const v of model.valued) peak = Math.max(peak, v.collateral, hasDebt ? v.debt : 0);
-  const axis = axisFor(peak);
-  // Where the sides have no common unit (Frankencoin), each line on its own
-  // axis, its top labelled in its token and hue.
-  const sideUnits = model.sideUnits;
-  let axes: { collateral: { max: number; ticks: number[] }; debt: { max: number; ticks: number[] } } | null = null;
-  if (sideUnits) {
-    const pk = { collateral: 0, debt: 0 };
-    for (const p of points) {
-      pk.collateral = Math.max(pk.collateral, p.collateral ?? 0);
-      pk.debt = Math.max(pk.debt, p.debt ?? 0);
-    }
-    for (const v of model.valued) {
-      pk.collateral = Math.max(pk.collateral, v.collateral);
-      pk.debt = Math.max(pk.debt, v.debt);
-    }
-    axes = { collateral: axisFor(pk.collateral), debt: axisFor(pk.debt) };
-  }
-  // A token axis (Morpho) labels its values without the symbol.
-  // Compact on the axis: "$4M", "$250k".
   const axisLabel = (t: number) =>
     model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t).replace(/\.0(?=[KMB])/, "");
-  // Labels at least 24px apart: every k-th of the axis's ticks. A label that
-  // reads as the one under it ("$0" thrice on a position worth cents) is left
-  // out.
-  const every = axis.ticks.length > 1 ? Math.ceil(24 / (((STRIP_H - 8) * axis.ticks[1]) / axis.max)) : 1;
-  const yTicks = axes
-    ? []
-    : axis.ticks.filter((_, i) => i % every === 0).filter((t, i, a) => i === 0 || axisLabel(t) !== axisLabel(a[i - 1]));
-  // Each side's top, its axis's end, in its token (a side that never held
-  // anything has none).
-  const sideTops =
-    axes && sideUnits
-      ? (hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const))
-          .map((k) => ({ k, t: axes[k].ticks.length > 1 ? axes[k].max : 0 }))
-          .filter((x) => x.t > 0)
-          .map((x) => ({ k: x.k, t: x.t, text: formatFlowToken(x.t, sideUnits[x.k]) }))
-      : [];
-  return {
-    points,
-    axis,
-    axes,
-    axisLabel,
-    yTicks,
-    sideTops,
-    labels: [...yTicks.map(axisLabel), ...sideTops.map((x) => x.text)],
-  };
+  return { points, axisLabel };
 }
-export type LineScale = ReturnType<typeof lineStripScale>;
+export type LineScale = ReturnType<typeof flowLineScale>;
 
-/** The strip's frame, in either view: the slider over the plot. Its
- *  horizontal axis is the shared time axis; the cursor snaps to the nearest
- *  stop. Mouse, pen and touch scrub alike: only a press moves the cursor, a
- *  drag carries it (held by pointer capture off the strip until release), and
- *  hovering moves nothing. Where a press started tells a click or a tap
- *  (which freezes, where the page has `freeze`) from a drag (which scrubs). */
+/** The slider over the chart; the cursor snaps to the stop nearest the
+ *  pointer on the chart's axis. Mouse, pen and touch scrub alike: only a
+ *  press moves the cursor, a drag carries it (held by pointer capture off the
+ *  chart until release), and hovering moves nothing. Where a press started
+ *  tells a click or a tap (which freezes, where the page has `freeze`) from a
+ *  drag (which scrubs). */
 function StripSlider({
-  geo,
-  w,
   stops,
   at,
-  xStop,
-  cx,
-  ready,
   ariaLabel,
   valueText,
   onPick,
   freeze,
-  view,
-  startDay,
-  tip,
-  height = STRIP_H,
   nearestAt,
   edge = null,
+  priceOnly,
   children,
 }: {
-  geo: StripGeometry;
-  w: number;
   stops: CombinedStop[];
   at: number;
-  xStop: (s: CombinedStop) => number;
-  /** The cursor's x. */
-  cx: number;
-  /** The plot has something to scrub over. */
-  ready: boolean;
   ariaLabel: string;
   valueText: string;
   onPick: (i: number) => void;
   /** On a page that ties the panel to its timeline: a click or a tap (a press
    *  that does not drag) freezes the cursor. */
   freeze: { frozen: boolean; onTap: (i: number) => void } | null;
-  /** One strip, or the chart of both on Lightweight Charts. */
-  view: "value" | "price" | "chart";
-  startDay: number;
-  /** The frame's height (null: its content's). */
-  height?: number | null;
-  /** The stop nearest a pointer's x, where the axis is not `geo`'s. */
-  nearestAt?: (px: number) => number | null;
+  /** The stop nearest a pointer's x on the chart's axis. */
+  nearestAt: (px: number) => number | null;
   /** The plot's width on a chart that pans: a drag held this close to either
    *  end keeps stepping the cursor on, which brings the window with it. */
   edge?: number | null;
-  /** A tip at the cursor (the price strip's readout), given whether it
-   *  shows: while a pointer is over the strip or drags it, while the strip
-   *  has focus, after a tap until a press lands elsewhere, and while the
-   *  inspector is armed on the panel. */
-  tip?: (shown: boolean) => ReactNode;
+  /** The price chart alone (anatomy F19). */
+  priceOnly: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
-  const [over, setOver] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const [tapped, setTapped] = useState(false);
-  const armed = useProvArmedFor(FLOWS_SCOPE);
-  useEffect(() => {
-    if (!tapped) return;
-    const away = (e: globalThis.PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setTapped(false);
-    };
-    document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
-  }, [tapped]);
-  /** The stop nearest the pointer, on the strip's time axis. */
   const nearest = (clientX: number): number | null => {
     const el = ref.current;
-    if (el && nearestAt) return nearestAt(clientX - el.getBoundingClientRect().left);
-    if (!el || !ready || geo.run <= 0) return null;
-    const px = clientX - el.getBoundingClientRect().left;
-    const i = nearestStop(stops, geo.dayAt(px) - startDay);
-    // The live stop sits at today, which may lie past the last event's stop count.
-    const last = stops.length - 1;
-    if (i === last - 1 && Math.abs(xStop(stops[last]) - px) < Math.abs(xStop(stops[i]) - px)) return last;
-    return i;
+    return el ? nearestAt(clientX - el.getBoundingClientRect().left) : null;
   };
   const pressX = useRef<number | null>(null);
   const dragged = useRef(false);
@@ -1148,7 +933,6 @@ function StripSlider({
         return;
       }
     }
-    if (e.pointerType !== "mouse") setTapped(true);
     const i = nearest(e.clientX);
     if (i == null) return;
     dragging.current = true;
@@ -1215,474 +999,29 @@ function StripSlider({
       aria-valuenow={at}
       aria-valuetext={valueText}
       className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-crosshair"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
-      style={height == null ? undefined : { height }}
       data-flow-strip=""
-      data-flow-strip-view={view}
-      data-anatomy={view === "price" ? "F19" : view === "chart" ? "F4 F19" : "F4"}
+      data-flow-strip-view="chart"
+      data-anatomy={priceOnly ? "F19" : "F4 F19"}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerCancel={onCancel}
       onLostPointerCapture={onCancel}
-      onPointerEnter={(e) => e.pointerType === "mouse" && setOver(true)}
-      onPointerLeave={(e) => e.pointerType === "mouse" && setOver(false)}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
       onKeyDown={onKey}
     >
       {children}
-      {tip && w > 0 && ready && tip(over || focused || tapped || grabbing || armed)}
     </div>
   );
 }
 
-/** The value labels in the lead-in at the plot's left, each centred on its
- *  gridline. */
-function AxisLabels({ ticks, y, label }: { ticks: number[]; y: (v: number) => number; label: (v: number) => string }) {
-  return (
-    <>
-      {ticks.map((t) => {
-        const ty = y(t);
-        return (
-          // Centred on its gridline, on the card's ground so it stands clear
-          // of the line under it.
-          <span
-            key={t}
-            className="pointer-events-none absolute -translate-y-1/2 rounded-sm bg-raised px-0.5 text-[10px] leading-none tabular-nums text-rb-500"
-            style={{ left: STRIP_PAD, top: Math.max(5, Math.min(STRIP_H - 5, ty)) }}
-          >
-            {label(t)}
-          </span>
-        );
-      })}
-    </>
-  );
-}
-
-/** The collateral and debt line, short and unlabelled (the headlines carry the
- *  figures), with the bars' window shaded. */
-function LineStrip({
-  model,
-  scale,
-  failed,
-  geo,
-  w,
-  today,
-  cx,
-  dim,
-  ready,
-  head,
-  hasDebt,
-  windowFrom,
-}: {
-  model: FlowModel;
-  scale: LineScale;
-  failed: boolean;
-  geo: StripGeometry;
-  w: number;
-  today: number;
-  cx: number;
-  dim: boolean;
-  ready: boolean;
-  /** The headlines' figures, where the cursor's dots sit. */
-  head: { collateral: number; debt: number };
-  hasDebt: boolean;
-  windowFrom: number | null;
-}) {
-  const startDay = model.start / DAY_MS;
-  const { points, axis, axes, axisLabel, yTicks, sideTops } = scale;
-  const n = points.length;
-  const { x0, xDay } = geo;
-  const xClose = (day: number) => geo.xClose(Math.min(day, today));
-  const x = (i: number) => xClose(points[i].to);
-  const y = (v: number, k?: "collateral" | "debt") =>
-    STRIP_H - 2 - (v / (k && axes ? axes[k].max : axis.max)) * (STRIP_H - 8);
-  // Before a side first holds anything it draws no line: its runs start at
-  // its first point above zero, the step up from zero drawn there.
-  const firstHeld = (k: "collateral" | "debt") => points.findIndex((p) => (p[k] ?? 0) > 0);
-  const runs = (k: "collateral" | "debt") => {
-    const out: number[][] = [];
-    let cur: number[] = [];
-    const from = firstHeld(k);
-    if (from < 0) return out;
-    points.forEach((p, i) => {
-      if (i < from) return;
-      if (p[k] == null) {
-        if (cur.length) out.push(cur);
-        cur = [];
-      } else cur.push(i);
-    });
-    if (cur.length) out.push(cur);
-    return out;
-  };
-  // A side's first run steps up from zero: at the first event's day to that
-  // day's close where it held something from the first point, else at its
-  // first point above zero.
-  const firstClose = model.valued[0] ?? { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
-  const leadOf = (k: "collateral" | "debt", seq: number[]): string[] => {
-    if (seq[0] !== firstHeld(k)) return [];
-    if (seq[0] === 0 && firstClose[k] > 0) return [`${x0},${y(0)}`, `${x0},${y(firstClose[k], k)}`];
-    return [`${x(seq[0])},${y(0)}`];
-  };
-  const lineOf = (k: "collateral" | "debt", seq: number[]) => {
-    const pts = seq.map((i) => `${x(i)},${y(points[i][k] as number, k)}`);
-    return [...leadOf(k, seq), ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
-  };
-  // Where the side's value at a point rests on an old price (the model's
-  // `stale`, as the readout's label), or on a price or a read the page does
-  // not have (`unsure`): the segment into that point is drawn dotted. Today's
-  // point is at live prices.
-  const oldAt = (k: "collateral" | "debt", i: number) =>
-    i < n - 1 &&
-    ((model.stale.get(points[i].to - startDay) ?? []).some((x) => x.side === k) ||
-      (model.unsure.get(points[i].to - startDay) ?? []).some((x) => x.side === k));
-  /** A run's line as its solid and dotted pieces, each a path of whole
-   *  segments; a dotted piece keeps the indexes of its points for its tip. */
-  const piecesOf = (k: "collateral" | "debt", seq: number[]) => {
-    const solid: string[] = [];
-    const dotted: { d: string; idx: number[] }[] = [];
-    const lead = leadOf(k, seq);
-    if (lead.length > 0) {
-      const p0 = `${x(seq[0])},${y(points[seq[0]][k] as number, k)}`;
-      solid.push([...lead, p0].map((p, j) => `${j ? "L" : "M"}${p}`).join(""));
-    }
-    for (let j = 1; j < seq.length; j++) {
-      const a = seq[j - 1];
-      const b = seq[j];
-      const seg = `M${x(a)},${y(points[a][k] as number, k)}L${x(b)},${y(points[b][k] as number, k)}`;
-      if (!oldAt(k, b)) {
-        solid.push(seg);
-        continue;
-      }
-      const prev = dotted[dotted.length - 1];
-      if (prev && prev.idx[prev.idx.length - 1] === a) {
-        prev.d += `L${x(b)},${y(points[b][k] as number, k)}`;
-        prev.idx.push(b);
-      } else dotted.push({ d: seg, idx: [a, b] });
-    }
-    return { solid: solid.join(""), dotted };
-  };
-  // A dotted piece under the mouse opens the label's tip for its nearest point.
-  const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
-  const plotRef = useRef<SVGSVGElement>(null);
-  const hoverOld = (e: PointerEvent<SVGPathElement>, k: "collateral" | "debt", idx: number[]) => {
-    if (e.pointerType !== "mouse") return;
-    const px = e.clientX - (plotRef.current?.getBoundingClientRect().left ?? 0);
-    let best = idx[idx.length - 1];
-    for (const i of idx) if (oldAt(k, i) && Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    const lines = oldLineTip(model, points[best].to - startDay, k);
-    setOldTip(lines.length ? { x: px, y: y(points[best][k] as number, k), lines } : null);
-  };
-  const area = (k: "collateral" | "debt", seq: number[]) =>
-    `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${leadOf(k, seq).length === 2 ? x0 : x(seq[0])},${STRIP_H}Z`;
-  const shade = windowFrom != null && windowFrom > startDay ? xDay(windowFrom) : null;
-  const sides = hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const);
-
-  if (!(w > 0 && ready))
-    return (
-      <p className="flex h-full items-center justify-center text-xs text-rb-500">
-        {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
-      </p>
-    );
-  return (
-    <>
-      <svg ref={plotRef} width={w} height={STRIP_H} aria-hidden className="block">
-        {shade != null && (
-          <rect
-            x={shade}
-            y={0}
-            width={Math.max(0, w - STRIP_PAD - shade)}
-            height={STRIP_H}
-            className="fill-rb-400/15 dark:fill-rb-500/15"
-            data-flow-window=""
-          />
-        )}
-        {/* Faint gridlines at the value labels' ticks, the zero line the
-            plot's floor. */}
-        {yTicks.map((t) => (
-          <line
-            key={t}
-            x1={STRIP_PAD}
-            x2={w - STRIP_PAD}
-            y1={y(t)}
-            y2={y(t)}
-            className="stroke-rb-400/12 dark:stroke-rb-500/15"
-            strokeWidth={1}
-            data-flow-gridline=""
-          />
-        ))}
-        {sides.map((k) =>
-          runs(k).map((seq) => {
-            const pieces = piecesOf(k, seq);
-            return (
-              <g key={`${k}${seq[0]}`}>
-                <path d={area(k, seq)} fill={LINE_HUE[k]} fillOpacity={k === "collateral" ? 0.14 : 0.12} />
-                {pieces.solid && (
-                  <path d={pieces.solid} fill="none" stroke={LINE_HUE[k]} strokeWidth={1.5} strokeLinejoin="round" />
-                )}
-                {pieces.dotted.map((p) => (
-                  <path
-                    key={p.idx[0]}
-                    d={p.d}
-                    fill="none"
-                    stroke={LINE_HUE[k]}
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeDasharray="0 4"
-                    data-flow-old-line={k}
-                  />
-                ))}
-              </g>
-            );
-          }),
-        )}
-        {dim && <AfterCursor x={cx} w={w} />}
-        {/* Each dotted piece's hit area, wider than its stroke. */}
-        {sides.map((k) =>
-          runs(k).flatMap((seq) =>
-            piecesOf(k, seq).dotted.map((p) => (
-              <path
-                key={`${k}${p.idx[0]}`}
-                d={p.d}
-                fill="none"
-                stroke="transparent"
-                strokeWidth={12}
-                pointerEvents="stroke"
-                onPointerMove={(e) => hoverOld(e, k, p.idx)}
-                onPointerLeave={() => setOldTip(null)}
-                data-flow-old-hit={k}
-              />
-            )),
-          ),
-        )}
-        <CursorLine x={cx} />
-        <CursorDot x={cx} y={y(head.collateral, "collateral")} hue={LINE_HUE.collateral} />
-        {hasDebt && <CursorDot x={cx} y={y(head.debt, "debt")} hue={LINE_HUE.debt} />}
-      </svg>
-      <div aria-hidden data-prov-exempt="" data-flow-line-axis="">
-        {sideTops.map((x, i) => (
-          <span
-            key={x.k}
-            className={`pointer-events-none absolute text-[10px] leading-none tabular-nums ${x.k === "collateral" ? "text-blue-600 dark:text-blue-400" : "text-green-700 dark:text-green-400"}`}
-            style={{ left: STRIP_PAD + 1, top: 2 + i * 12 }}
-            data-flow-line-side-top={x.k}
-          >
-            {x.text}
-          </span>
-        ))}
-        <AxisLabels ticks={yTicks} y={(t) => y(t)} label={axisLabel} />
-      </div>
-      {oldTip && (
-        <span
-          role="tooltip"
-          data-prov-hidden=""
-          data-flow-old-tip=""
-          className="pointer-events-none absolute z-[var(--z-dropdown)] rounded-2xl border p-3 text-xs font-medium text-foreground shadow-lg"
-          style={{
-            left: Math.max(4, Math.min(w - OLD_TIP_W - 4, oldTip.x - OLD_TIP_W / 2)),
-            bottom: STRIP_H - oldTip.y + 10,
-            background: "var(--rb-tooltip-bg)",
-            borderColor: "var(--rb-tooltip-border)",
-          }}
-        >
-          <OldPriceTip lines={oldTip.lines} />
-        </span>
-      )}
-    </>
-  );
-}
-
-/** The strip after the cursor lies under a translucent layer, except at
- *  today, where nothing is after it. */
-function AfterCursor({ x, w }: { x: number; w: number }) {
-  return (
-    <rect
-      x={x}
-      y={0}
-      width={Math.max(0, w - x)}
-      height={STRIP_H}
-      style={{ fill: "var(--surface-raised)" }}
-      fillOpacity={0.7}
-      pointerEvents="none"
-      data-flow-after-cursor=""
-    />
-  );
-}
-
-function CursorLine({ x }: { x: number }) {
-  return <line x1={x} x2={x} y1={0} y2={STRIP_H} className="stroke-foreground" strokeWidth={1} pointerEvents="none" />;
-}
-
-function CursorDot({ x, y, hue }: { x: number; y: number; hue: string }) {
-  return <circle cx={x} cy={y} r={3.5} fill={hue} className="stroke-background" strokeWidth={1.5} />;
-}
-
-/** One asset's price scale over the visible days, and the pieces its line
- *  draws (lib/shared/flows-price.ts). */
-export function priceStripScale(s: FlowPriceSeries, startDay: number, today: number) {
+/** The pieces one asset's price line draws over the axis's days, and its
+ *  liquidation level there (lib/shared/flows-price.ts). */
+export function priceLineOf(s: FlowPriceSeries, startDay: number, today: number) {
   const pieces = pricePieces(s, startDay, today);
-  const inView = (day: number) => day >= startDay && day <= today;
-  const level = (s.level?.points ?? []).filter((p) => inView(p[0]));
-  const values = [
-    ...[...pieces.solid, ...pieces.dotted, ...pieces.flat, ...pieces.riser].flat().map((v) => v[1]),
-    ...level.map((p) => p[1]),
-  ];
-  const axis = priceAxis(values);
-  return { pieces, level, axis, labels: priceAxisLabels(axis.ticks) };
+  const level = (s.level?.points ?? []).filter((p) => p[0] >= startDay && p[0] <= today);
+  return { pieces, level };
 }
-export type PriceScale = ReturnType<typeof priceStripScale>;
-
-/** The price line of one held asset in its unit, on the time axis the flows
- *  line uses: solid day to day, dotted where a day's price is carried, the
- *  step mark for an event series. */
-function PriceStrip({
-  s,
-  scale,
-  geo,
-  w,
-  today,
-  cx,
-  dim,
-  cursorPrice,
-  cursorLevel,
-  windowFrom,
-  startDay,
-}: {
-  s: FlowPriceSeries;
-  scale: PriceScale;
-  geo: StripGeometry;
-  w: number;
-  today: number;
-  cx: number;
-  dim: boolean;
-  cursorPrice: number | null;
-  /** The liquidation level on the cursor's day, where the series has one. */
-  cursorLevel: number | null;
-  windowFrom: number | null;
-  startDay: number;
-}) {
-  const { pieces, axis, level } = scale;
-  const xClose = (day: number) => geo.xClose(Math.min(day, today));
-  const y = (v: number) => STRIP_H - 4 - ((v - axis.min) / (axis.max - axis.min || 1)) * (STRIP_H - 8);
-  const path = (vs: [number, number][]) => vs.map(([d, v], j) => `${j ? "L" : "M"}${xClose(d)},${y(v)}`).join("");
-  // A lone day draws as a point.
-  const dots = pieces.solid.filter((p) => p.length === 1);
-  // The liquidation level: held from one day's close to the next, stepped
-  // on the day it moves; a day it has none breaks it.
-  const levelRuns: [number, number][][] = [];
-  for (const [d, v] of level) {
-    const run = levelRuns[levelRuns.length - 1];
-    if (run && run[run.length - 1][0] === d - 1) run.push([d, v]);
-    else levelRuns.push([[d, v]]);
-  }
-  const stepPath = (run: [number, number][]) =>
-    run
-      .map(([d, v], j) =>
-        j === 0 ? `M${xClose(d)},${y(v)}` : `L${xClose(d)},${y(run[j - 1][1])}L${xClose(d)},${y(v)}`,
-      )
-      .join("");
-  const hue = LINE_HUE[s.side];
-  const shade = windowFrom != null && windowFrom > startDay ? geo.xDay(windowFrom) : null;
-  if (!(w > 0)) return null;
-  return (
-    <>
-      <svg width={w} height={STRIP_H} aria-hidden className="block">
-        {shade != null && (
-          <rect
-            x={shade}
-            y={0}
-            width={Math.max(0, w - STRIP_PAD - shade)}
-            height={STRIP_H}
-            className="fill-rb-400/15 dark:fill-rb-500/15"
-            data-flow-window=""
-          />
-        )}
-        {axis.ticks.map((t) => (
-          <line
-            key={t}
-            x1={STRIP_PAD}
-            x2={w - STRIP_PAD}
-            y1={y(t)}
-            y2={y(t)}
-            className="stroke-rb-400/12 dark:stroke-rb-500/15"
-            strokeWidth={1}
-            data-flow-gridline=""
-          />
-        ))}
-        <g
-          data-price-line={s.key}
-          data-price-grain={s.grain}
-          data-price-observed={pieces.observed.join(",")}
-          data-price-carried={pieces.carried.join(",")}
-        >
-          {pieces.solid
-            .filter((p) => p.length > 1)
-            .map((p) => (
-              <path
-                key={`s${p[0][0]}`}
-                d={path(p)}
-                fill="none"
-                stroke={hue}
-                strokeWidth={1.5}
-                strokeLinejoin="round"
-                data-price-solid=""
-              />
-            ))}
-          {dots.map((p) => (
-            <circle key={`p${p[0][0]}`} cx={xClose(p[0][0])} cy={y(p[0][1])} r={1.5} fill={hue} />
-          ))}
-          {pieces.dotted.map((p) => (
-            <path
-              key={`d${p[0][0]}`}
-              d={path(p)}
-              fill="none"
-              stroke={hue}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeDasharray="0 4"
-              data-price-carried-line=""
-            />
-          ))}
-          {pieces.flat.map((p) => (
-            <path key={`f${p[0][0]}`} d={path(p)} fill="none" stroke={hue} strokeWidth={1.5} data-price-step="" />
-          ))}
-          {pieces.riser.map((p) => (
-            <path
-              key={`r${p[0][0]}`}
-              d={path(p)}
-              fill="none"
-              stroke={hue}
-              strokeWidth={1}
-              strokeDasharray="2 2"
-              data-price-riser=""
-            />
-          ))}
-        </g>
-        <g data-anatomy="F19.4">
-          {levelRuns.map((run) => (
-            <path
-              key={`l${run[0][0]}`}
-              d={stepPath(run)}
-              fill="none"
-              stroke={LIQ_HUE}
-              strokeWidth={1.25}
-              strokeLinejoin="round"
-              data-liq-level=""
-              data-liq-days={run.map((p) => p[0]).join(",")}
-            />
-          ))}
-        </g>
-        {dim && <AfterCursor x={cx} w={w} />}
-        <CursorLine x={cx} />
-        {cursorLevel != null && <CursorDot x={cx} y={y(cursorLevel)} hue={LIQ_HUE} />}
-        {cursorPrice != null && <CursorDot x={cx} y={y(cursorPrice)} hue={hue} />}
-      </svg>
-      <div aria-hidden data-prov-exempt="" data-price-axis="">
-        <AxisLabels ticks={axis.ticks} y={y} label={(t) => scale.labels[axis.ticks.indexOf(t)] ?? ""} />
-      </div>
-    </>
-  );
-}
+export type PriceScale = ReturnType<typeof priceLineOf>;
 
 /** The price chart's figures in a tip standing over the cursor, always
  *  shown: the asset (a list where the position holds several with a series)

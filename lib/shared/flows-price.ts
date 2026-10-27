@@ -1,6 +1,6 @@
 // The Lifetime flows panel's price view (rails-ops
 // reference/lifetime-flows-scrubber.md; ui-jobs 328, step 2): what the price
-// strip draws, and the time axis it shares with the flows line.
+// chart draws.
 //
 // RULES.
 // - The series are the panel's `FlowTimeline.dailyPrices`, one per held asset,
@@ -24,9 +24,6 @@
 //   no point after the day it ends.
 // - Where the timeline carries the position's health factor (`t.health`,
 //   ruling 7), it is the first series, a ratio with no unit, its line at 1.
-// - Both strips place a day at its close on one time axis (`stripGeometry`),
-//   so the cursor, the pips and the end labels sit on the same x in either
-//   view.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
@@ -85,99 +82,6 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
   const rank = (s: FlowPriceSeries) => (s.side === "collateral" ? 0 : 1e6) + (meta.get(s.key)?.order ?? 0);
   out.sort((a, b) => rank(a) - rank(b));
   return t.health ? [{ ...t.health, side: "collateral", unitLabel: "", health: true }, ...out] : out;
-}
-
-// ── The time axis both strips share ─────────────────────────────────────────
-
-/** The strip's inset each side. */
-export const STRIP_PAD = 8;
-/** The lead-in: the time axis starts this share of the strip's width before
- *  the first event's day, never under LEAD_MIN_PX nor under the widest value
- *  label, so the first event never sits on the left border. */
-const LEAD_SHARE = 0.06;
-const LEAD_MIN_PX = 16;
-
-export interface StripGeometry {
-  /** Where the first event's day starts. */
-  x0: number;
-  /** The width from `x0` to the end of today. */
-  run: number;
-  inner: number;
-  /** Where an absolute UTC day starts. */
-  xDay: (day: number) => number;
-  /** Where a day's close sits: the end of that day (today's at the right end). */
-  xClose: (day: number) => number;
-  /** The absolute day under a pixel, as `xClose` places it. */
-  dayAt: (px: number) => number;
-}
-
-/** The time axis for a strip `w` px wide, from `startDay` over `span` days to
- *  `today`, with a lead-in at least `labelW` wide. */
-export function stripGeometry(w: number, startDay: number, today: number, span: number, labelW: number): StripGeometry {
-  const inner = Math.max(0, w - STRIP_PAD * 2);
-  const lead = Math.max(LEAD_MIN_PX, labelW, Math.round(inner * LEAD_SHARE));
-  const x0 = STRIP_PAD + Math.min(lead, inner);
-  const run = Math.max(0, STRIP_PAD + inner - x0);
-  const xDay = (day: number) => x0 + ((day - startDay) / span) * run;
-  return {
-    x0,
-    run,
-    inner,
-    xDay,
-    xClose: (day: number) => xDay(Math.min(day, today) + 1),
-    dayAt: (px: number) => startDay + (run > 0 ? ((px - x0) / run) * span : 0) - 1,
-  };
-}
-
-/** A value label's width in px at 10px: about 6px a character, and some air. */
-export const labelWidth = (labels: string[]): number => Math.max(0, ...labels.map((t) => t.length)) * 6 + 8;
-
-// ── The price axis and its labels ───────────────────────────────────────────
-
-/** The smallest of 1, 2, 2.5 or 5 × 10^k at or above `x`. */
-function niceStepAbove(x: number): number {
-  if (!(x > 0)) return 1;
-  const k = 10 ** Math.floor(Math.log10(x));
-  for (const m of [1, 2, 2.5, 5, 10]) if (m * k >= x - 1e-12) return m * k;
-  return 10 * k;
-}
-
-/** A y scale over `values`, padded, with two or three round ticks inside and
- *  one round step under the lowest. */
-export function priceAxis(values: number[]): { min: number; max: number; ticks: number[] } {
-  const good = values.filter((v) => Number.isFinite(v));
-  if (good.length === 0) return { min: 0, max: 1, ticks: [] };
-  let lo = Math.min(...good);
-  let hi = Math.max(...good);
-  if (hi - lo < Math.abs(hi) * 1e-6) {
-    const d = Math.abs(hi) * 0.01 || 1;
-    lo -= d;
-    hi += d;
-  }
-  const span = hi - lo;
-  let step = niceStepAbove(span / 2.5);
-  let ticks: number[] = [];
-  for (let i = 0; i < 6 && ticks.length < 2; i++) {
-    ticks = [];
-    const places = Math.max(0, 2 - Math.floor(Math.log10(step)));
-    for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step)
-      ticks.push(parseFloat(v.toFixed(places)));
-    if (ticks.length < 2) step = niceStepAbove(step / 2.1);
-  }
-  while (ticks.length > 3) ticks = ticks.filter((_, i) => i % 2 === 0);
-  // One round step under the lowest price for context (WBTC at 75K to 100K
-  // also shows 50K), the domain taken down to it; never under zero.
-  let min = lo - span * 0.08;
-  if (ticks.length >= 2) {
-    const gap = ticks[1] - ticks[0];
-    const places = Math.max(0, 2 - Math.floor(Math.log10(gap)));
-    const below = parseFloat((ticks[0] - gap).toFixed(places));
-    if (below >= 0) {
-      ticks = [below, ...ticks];
-      min = Math.min(min, below - gap * 0.08);
-    }
-  }
-  return { min, max: hi + span * 0.08, ticks };
 }
 
 /** "$2,451.37" · "1.0002 USDC" · "$0.0001234": a price in its unit; a
