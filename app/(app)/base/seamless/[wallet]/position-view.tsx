@@ -58,6 +58,7 @@ import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubb
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { AaveV3BaseFlowsNote, aaveV3BaseFlowsContent } from "@/components/protocol/aave-v3/aave-v3-base-flows-note";
 import { useAaveV3BaseFlows } from "@/hooks/useAaveV3BaseFlows";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -97,6 +98,12 @@ import { aaveV3LastBorrowRate } from "@/lib/aave-v3/last-borrow-rate";
 
 const POSITION_ROUTE = "/api/chain/seamless/position";
 const TIMELINE_ROUTE = "/api/chain/seamless/timeline";
+/** The price chart's health view: the Seamless position-state route, and
+ *  the Pool and oracle it names. */
+const SEAMLESS_HEALTH = {
+  market: "seamless",
+  source: { oracle: "the Seamless oracle", pool: "the Seamless Pool", chain: BASE_CHAIN_ID },
+};
 const FOLDER_ROUTE = "/api/chain/seamless/timeline/folder";
 
 /** The history as the route answers it: flat, or — asked `?group=1`, the
@@ -572,6 +579,9 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     fetchAll: timelineState === "ready" ? fetchFlatHistory : null,
     chain: data,
     prices,
+    health: SEAMLESS_HEALTH,
+    pageEvents: aaveEvents,
+    liveHf: view?.status === "open" ? (view.healthFactor ?? null) : null,
   });
 
   // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.

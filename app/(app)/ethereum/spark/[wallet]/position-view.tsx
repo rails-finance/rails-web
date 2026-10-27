@@ -82,6 +82,8 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline, sparkFocusEvents } from "@/lib/spark/flows-timeline";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
+import type { AaveHealthSource } from "@/lib/aave-v3/flows-health";
 import { lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import {
@@ -131,6 +133,13 @@ interface SparkPositionDetailProps {
 
 /** How long the card waits on the live Pool read before saying it was not read. */
 const HF_READ_WAIT_MS = 30_000;
+
+/** The health view names SparkLend's oracle and Pool. */
+const SPARK_HEALTH_SOURCE: AaveHealthSource = {
+  oracle: "the SparkLend oracle",
+  pool: "the SparkLend Pool",
+  chain: MAINNET_CHAIN_ID,
+};
 
 export default function SparkPositionDetail({
   wallet,
@@ -694,10 +703,18 @@ export default function SparkPositionDetail({
   );
 
   const flowSeriesSource = useMemo(() => ({ path: "/api/spark/flows/series", params: { wallet } }), [wallet]);
-  const flowTimeline = useMemo(
+  const flowSeriesTimeline = useMemo(
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
   );
+  // The price chart's health view (ui-jobs 328, ruling 15).
+  const flowTimeline = useAaveFamilyHealth(flowSeriesTimeline, {
+    wallet,
+    market: "spark",
+    source: SPARK_HEALTH_SOURCE,
+    events: sparkEvents,
+    liveHf: liveView?.status === "open" ? (liveView.healthFactor ?? null) : null,
+  });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The supplies that back no borrowing, which the card lists apart: open, the
   // live read's collateral switch and threshold (the e-mode category's where

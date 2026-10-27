@@ -60,10 +60,14 @@
 // the wheel (`checkLwWheel`): over the chart it scrolls the page, Ctrl with it
 // zooms, a sideways swipe pans. Aave V3 Prime 0xb8a4…715e (wstETH/WETH, more
 // than 60 days with events, so its older health days are dotted) and EtherFi
-// 0x0f2a…bbe take the health checks; SparkLend 0x1601…347e and Aave V4 Main
-// 0x7eac…fa09 the price checks against their answers; Aave V3 Base 0xe883…4cc8
-// and Seamless 0x8182…7804 the chart's checks alone (`lwOnly`: their answer is
-// the knots). Step 4d moved every other family onto the engine: one position
+// 0x0f2a…bbe take the health checks; SparkLend 0x1601…347e (no debt, so no
+// health view) and Aave V4 Main 0x7eac…fa09 the price checks against their
+// answers. Step 5 (the health view on SparkLend, Aave V3 Base and Seamless):
+// SparkLend 0x070b…b113 (60 days read, its older days dotted) takes the price
+// and health checks, and Aave V3 Base 0xe883…4cc8 (older days dotted) and
+// Seamless 0x8182…7804 (every day read) the chart's checks and the health
+// checks (`lwOnly`: their price answer is the knots). Each health page also
+// checks that an asset picked from the list draws its level. Step 4d moved every other family onto the engine: one position
 // per family takes the chart's checks alone (`lwOnly`), its panes named
 // (`panes`: "value" where the family has no price series, a pane per side
 // where the sides have no common unit), and a one-day life (`priceOnly`) the
@@ -102,6 +106,9 @@ const PAGES = [
     path: "/ethereum/aave-v3/0x0f2a32f4f54ec9d52a193e9e3493fb5fea86cbbe?market=etherfi",
     answer: "/api/aave-v3/flows",
     health: true,
+    // A health factor near 50: every asset's level is more than ten times
+    // from its price (ruling 15), so none is drawn.
+    noLevel: true,
   },
   {
     id: "spark 0x1601",
@@ -110,14 +117,35 @@ const PAGES = [
     query: "wallet=0x1601843c5e9bc251a3272907010afa41fa18347e",
   },
   {
+    id: "spark 0x070b",
+    path: "/ethereum/spark/0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
+    answer: "/api/spark/flows",
+    query: "wallet=0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
+    health: true,
+    timeline: "/api/spark/timeline?wallet=0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
+  },
+  {
     id: "aave-v4 main 0x7eac",
     path: "/ethereum/aave-v4/spoke/main/0x7eac02864fbae93de38394a3e7b72a22e9b5fa09",
     answer: "/api/aave-v4/flows",
     query: "wallet=0x7eac02864fbae93de38394a3e7b72a22e9b5fa09&spoke=main",
   },
-  // Base's two Pools answer in another shape (the knots): the chart's checks alone.
-  { id: "aave-v3-base 0xe883", path: "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8", lwOnly: true },
-  { id: "seamless 0x8182", path: "/base/seamless/0x818214d3494fbc4be4f450c50677e55987804206", lwOnly: true },
+  // Base's two Pools answer in another shape (the knots): the chart's checks
+  // and the health view's.
+  {
+    id: "aave-v3-base 0xe883",
+    path: "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/aave-v3-base/timeline?wallet=0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8",
+  },
+  {
+    id: "seamless 0x8182",
+    path: "/base/seamless/0x818214d3494fbc4be4f450c50677e55987804206",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/seamless/timeline?wallet=0x818214d3494fbc4be4f450c50677e55987804206",
+  },
   // Step 4d: one position per family on the chart's checks alone.
   { id: "moonwell 0x33a7", path: "/ethereum/moonwell/0x33a7ec1055edd4cc35ef289156c7a7a078043474", lwOnly: true },
   { id: "moonwell-base 0x2d7a", path: "/base/moonwell/0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c", lwOnly: true },
@@ -279,7 +307,7 @@ async function checkHealth(page, tag, pg, listedAll) {
   const u = new URL(`${BASE}${pg.path}`);
   const wallet = u.pathname.split("/").pop();
   const tl = await hostFetch(
-    `${BASE}/api/aave-v3/timeline?wallet=${wallet}&market=${u.searchParams.get("market")}&limit=1000`,
+    `${BASE}${pg.timeline ?? `/api/aave-v3/timeline?wallet=${wallet}&market=${u.searchParams.get("market")}&limit=1000`}`,
   ).then((r) => r.json());
   const blocks = new Set((tl.events ?? []).map((e) => e.blockNumber));
   const sl = page.locator(PRICE_STRIP).first();
@@ -351,6 +379,56 @@ async function checkHealth(page, tag, pg, listedAll) {
     await picker.click();
     await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
   }
+}
+
+/** The health view has landed: the heading's picker names it. */
+async function waitForHealth(page) {
+  await page
+    .waitForFunction(
+      (h) =>
+        document.querySelector("[data-price-heading] [data-price-picker]")?.getAttribute("aria-label")?.includes(h),
+      HEALTH,
+      { timeout: 120000 },
+    )
+    .catch(() => {});
+  await page.waitForTimeout(500);
+}
+
+/** An asset picked from the health view's list draws its liquidation level
+ *  (ruling 15): at least one listed asset has a level drawn on its chart. */
+async function checkPickedLevel(page, tag, listedAll) {
+  const picker = page.locator("button[data-price-picker]");
+  const drawn = [];
+  for (const sym of listedAll.filter((s) => s !== HEALTH)) {
+    await picker.click();
+    await page.locator(`[role="listbox"] [data-price-asset="${sym}"]`).click();
+    await page.waitForTimeout(250);
+    const days = await page.$$eval("[data-liq-level]", (ls) =>
+      ls.reduce((n, l) => n + (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).length, 0),
+    );
+    if (days > 0) drawn.push(`${sym} ${days}`);
+  }
+  check(`${tag}: an asset picked from the list draws its level`, drawn.length > 0, drawn.join(", ") || "none");
+  await picker.click();
+  await page.locator(`[role="listbox"] [data-price-asset="${HEALTH}"]`).click();
+  await page.waitForTimeout(250);
+}
+
+/** The health checks on a page the price checks do not read (`lwOnly`): its
+ *  tip's level toggle, the list, the health checks and a
+ *  picked asset's level. */
+async function checkHealthAlone(page, tag, pg) {
+  await checkLevelToggle(page, tag);
+  const picker = page.locator("button[data-price-picker]");
+  let listedAll = [];
+  if ((await picker.count()) > 0) {
+    await picker.click();
+    await page.waitForSelector('[role="listbox"] [data-price-asset]', { timeout: 5000 }).catch(() => {});
+    listedAll = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
+    await page.keyboard.press("Escape");
+  }
+  await checkHealth(page, tag, pg, listedAll);
+  if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll);
 }
 
 /** The price tip's level line: hidden until the triangle toggle is pressed,
@@ -1000,6 +1078,9 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
         )
         .catch(() => {});
     await page.waitForTimeout(2500);
+    // The health view lands once its position-state reads have, and redraws
+    // the price pane: every check below waits for it.
+    if (pg.health) await waitForHealth(page);
     // The drawn strips name their views; the chart names its panes.
     const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
       els.flatMap((e) =>
@@ -1038,6 +1119,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.priceOnly) await checkLwKeys(page, tag);
       else await checkLwSteps(page, tag, width < 640);
       if (width >= 640) await checkLwWheel(page, tag);
+      if (pg.health) await checkHealthAlone(page, tag, pg);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;
@@ -1078,20 +1160,10 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     // The heading's list (several assets: open it to read its options) or
     // the asset's name (one).
     const picker = page.locator("button[data-price-picker]");
-    // The health view lands once its position-state reads have.
-    if (pg.health)
-      await page
-        .waitForFunction(
-          (h) =>
-            document.querySelector("[data-price-heading] [data-price-picker]")?.getAttribute("aria-label")?.includes(h),
-          HEALTH,
-          { timeout: 120000 },
-        )
-        .catch(() => {});
     // The tip's toggles, once the series the chart opens on has landed.
-    // Only a page that draws a level has the toggle: the Aave V3 Ethereum
-    // health view and the Troves; SparkLend and Aave V4 draw the price alone
-    // until step 5.
+    // Only a page that draws a level has the toggle: the Aave family's
+    // health view and the Troves; Aave V4 draws the price alone until its
+    // step 5 pass, and a SparkLend page with no debt has no health view.
     if (pg.health || pg.trove) await checkLevelToggle(page, tag);
     await checkEventsToggle(page, tag);
     if ((await picker.count()) > 0) {
@@ -1102,7 +1174,10 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     if ((await picker.count()) > 0) await page.keyboard.press("Escape");
     // The health view (Aave V3, ruling 7) is listed first; the assets follow.
     const listed = listedAll.filter((s) => s !== HEALTH);
-    if (pg.health) await checkHealth(page, tag, pg, listedAll);
+    if (pg.health) {
+      await checkHealth(page, tag, pg, listedAll);
+      if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll);
+    }
     const pick = async (sym) => {
       if ((await picker.count()) === 0) return;
       await picker.click();

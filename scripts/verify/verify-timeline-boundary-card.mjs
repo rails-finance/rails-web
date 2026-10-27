@@ -1012,14 +1012,21 @@ function beforeFiguresOf(json) {
   return out;
 }
 
-/** The newest event of a timeline route's list, by block. The route ships
- *  the lean wire shape (lib/shared/timeline-wire.ts): the tx hash rides as
- *  `h` when it is not already spelt inside the id, so the hash is read from
- *  whichever carries it. */
+/** The newest event of a timeline route's list, by block and then by log
+ *  index (the id's trailing number), as the page orders a transaction's
+ *  legs: one transaction's supply and withdraw share a block, and the later
+ *  log is the newer row. The route ships the lean wire shape
+ *  (lib/shared/timeline-wire.ts): the tx hash rides as `h` when it is not
+ *  already spelt inside the id, so the hash is read from whichever carries
+ *  it. */
 function newestEventOf(json) {
   const events = json.events ?? [];
   if (events.length === 0) return null;
-  const e = events.reduce((a, x) => (x.blockNumber > a.blockNumber ? x : a), events[0]);
+  const logOf = (x) => Number(String(x.id ?? "").match(/[:-](\d+)$/)?.[1] ?? -1);
+  const e = events.reduce(
+    (a, x) => (x.blockNumber > a.blockNumber || (x.blockNumber === a.blockNumber && logOf(x) > logOf(a)) ? x : a),
+    events[0],
+  );
   const id = String(e.id ?? "").toLowerCase();
   const h = String(e.h ?? e.txHash ?? "").toLowerCase();
   const hasHash = (hash) => h === hash || (h === "" && id.includes(hash.replace(/^0x/, "")));

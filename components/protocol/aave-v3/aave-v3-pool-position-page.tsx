@@ -155,7 +155,7 @@ export interface AaveV3PoolPageDeployment {
   card: AaveV3CardDeployment;
   /** Prefix for settle marks, storage keys and file names. */
   key: string;
-  flows: Pick<AaveV3BaseFlowsInput, "family" | "routeless" | "chainId" | "noDailyStore">;
+  flows: Pick<AaveV3BaseFlowsInput, "family" | "routeless" | "chainId" | "noDailyStore" | "health">;
   /** The block of the Pool's first DeficitCreated, and the chain the note names. */
   writeOff: { firstBlock: number; chain: string };
   /** Which store answered, for the cards' custody lines and the footer. */
@@ -621,6 +621,8 @@ export function AaveV3PoolPositionView({
     fetchAll: timelineState === "ready" ? fetchFlatHistory : null,
     chain: data,
     prices,
+    pageEvents: aaveEvents,
+    liveHf: view?.status === "open" ? (view.healthFactor ?? null) : null,
   });
 
   const stripAssets = useMemo<PriceStripAsset[]>(() => {

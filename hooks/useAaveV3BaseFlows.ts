@@ -34,11 +34,15 @@ import {
 } from "@/lib/aave-v3-base/flows";
 import { fetchAaveBaseFlows, isAaveBaseSummaryAnswer, type AaveBaseFlowAnswer } from "@/lib/api/fetch-aave-base-flows";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
+import type { AaveHealthSource } from "@/lib/aave-v3/flows-health";
+import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
 
 type RouteSummary = Extract<AaveBaseFlowAnswer, { days: unknown }>;
 
 const DAY_S = 86_400;
 const BASE_CHAIN_ID = 8453;
+const NO_EVENTS: readonly BaseActivityEvent[] = [];
+const NO_HEALTH: AaveHealthSource = { oracle: "", pool: "", chain: BASE_CHAIN_ID };
 
 export interface AaveV3BaseFlowsInput {
   /** The daily store's family, and the flows route's lane. */
@@ -72,6 +76,14 @@ export interface AaveV3BaseFlowsInput {
   chain: AaveV3PositionChainResponse | null;
   /** The oracle's price now by lowercase reserve (the page's read). */
   prices: Record<string, number>;
+  /** The price chart's health view (ui-jobs 328, ruling 15): the
+   *  position-state route's market and what the view names. Unset, the chart
+   *  draws the prices alone (Aave V3 Arbitrum, whose prices are its rows'). */
+  health?: { market: string; source: AaveHealthSource };
+  /** The page's events, whose days' last events the health view reads. */
+  pageEvents?: readonly BaseActivityEvent[];
+  /** The card's health factor on an open position. */
+  liveHf?: number | null;
 }
 
 export interface AaveV3BaseFlowsFacts {
@@ -234,7 +246,7 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     [source, opts, dailySettled],
   );
   const routeReady = route != null && opts != null && (dailySettled || route.days.length === 0);
-  const timeline = useMemo(
+  const replayed = useMemo(
     () =>
       replay && opts
         ? aaveBaseFlowTimeline(replay, opts)
@@ -243,6 +255,13 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
           : null,
     [replay, opts, route, routeReady],
   );
+  const timeline = useAaveFamilyHealth(replayed, {
+    wallet,
+    market: p.health?.market ?? null,
+    source: p.health?.source ?? NO_HEALTH,
+    events: p.pageEvents ?? NO_EVENTS,
+    liveHf: p.liveHf ?? null,
+  });
   const focusEvents = useMemo<FocusEvent[]>(
     () => (replay ? aaveBaseFocusEvents(replay) : route ? route.events : []),
     [replay, route],

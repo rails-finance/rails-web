@@ -1,12 +1,15 @@
-// Aave V3 Ethereum's price view (rails-ops reference/lifetime-price-chart.md,
-// rulings 2 and 7; ui-jobs 328, step 4): the position's health factor per day,
-// and each held asset's liquidation level.
+// The Aave family's health view (rails-ops reference/lifetime-price-chart.md,
+// rulings 2, 7 and 15; ui-jobs 328, steps 4 and 5): the position's health
+// factor per day, and each held asset's liquidation level. One function for
+// every Aave V3 Pool the panel draws (Aave V3 Ethereum, SparkLend, Aave V3 on
+// Base, Seamless); a family names its oracle, Pool and chain
+// (`AaveHealthSource`), and hooks/useAaveFamilyHealth.ts reads its thresholds.
 //
 // RULES.
 // - A day's health factor is Σ collateral × price × liquidation threshold ÷
 //   Σ debt × price: the balances the flows replay holds at the day's close
 //   (grown by the reserves' indexes between events), each asset at the day's
-//   AaveOracle price (the last recorded on or before the day), and the
+//   oracle price (the last recorded on or before the day), and the
 //   thresholds of the position-state read at the day's last event, or of the
 //   last read before it. A reserve counts as collateral where the read has it
 //   switched on; in an e-mode category a member reserve takes the category's
@@ -82,6 +85,19 @@ export function aaveV3HealthReadPicks<E extends { blockNumber: number; timestamp
     .map(([, e]) => e);
 }
 
+/** What a family's health view names: the oracle whose price it records each
+ *  day, the Pool whose thresholds it reads, and the chain. */
+export interface AaveHealthSource {
+  /** "the AaveOracle": read as "{oracle} price". */
+  oracle: string;
+  /** "the Pool": read as "{pool}'s thresholds". */
+  pool: string;
+  chain: number;
+}
+
+/** Aave V3 on Ethereum. */
+export const AAVE_V3_HEALTH_SOURCE: AaveHealthSource = { oracle: "the AaveOracle", pool: "the Pool", chain: 1 };
+
 const AAVE_V3_LEVEL_FORMULA =
   "the price at which the health factor reaches 1, every other balance and price held at the day's; where one reserve holds at least 99.5% of the collateral, its price ÷ the health factor";
 
@@ -106,9 +122,10 @@ function obsAt(obs: readonly DayObs[] | undefined, day: number): number | null {
 export function aaveV3HealthView(
   t: FlowTimeline,
   reads: readonly AaveV3ThresholdRead[],
-  o: { liveHf?: number | null },
+  o: { liveHf?: number | null; source?: AaveHealthSource },
 ): { health: PriceSeries; marks: Record<string, PriceMarks> } | null {
   if (reads.length === 0 || t.days.length === 0 || !t.dailyPrices) return null;
+  const src = o.source ?? AAVE_V3_HEALTH_SOURCE;
   const days = t.days;
   const held = new Map<string, { side: FlowSide; asset: string; amount: number; index?: number; day: number }>();
   for (const d of days)
@@ -208,20 +225,20 @@ export function aaveV3HealthView(
   const sparseBefore = reads[0].day > hfPoints[0][0] ? reads[0].day : undefined;
   const health: PriceSeries = {
     key: "health",
-    asset: { symbol: "Health factor", chain: 1 },
+    asset: { symbol: "Health factor", chain: src.chain },
     unit: "health",
     grain: "daily",
     noCarry: true,
-    source: "the Pool's thresholds at each day's last event, with the AaveOracle price recorded each day",
+    source: `${src.pool}'s thresholds at each day's last event, with ${src.oracle} price recorded each day`,
     points: hfPoints,
     here: {
-      live: "Health factor — the Pool's figure for the position now, the card's.",
-      read: "Health factor — on {day}, the balances held at the day's close, each at the AaveOracle price recorded that day, against the liquidation thresholds the Pool held after the event at block {block}.",
+      live: `Health factor — ${src.pool}'s figure for the position now, the card's.`,
+      read: `Health factor — on {day}, the balances held at the day's close, each at ${src.oracle} price recorded that day, against the liquidation thresholds ${src.pool} held after the event at block {block}.`,
     },
     level: {
       points: hfPoints.map(([d]) => [d, 1, null] as PricePoint),
       formula: "below 1 the position can be liquidated",
-      summary: "Liquidation line — below a health factor of 1 the Pool lets a liquidator repay the debt.",
+      summary: `Liquidation line — below a health factor of 1 ${src.pool} lets a liquidator repay the debt.`,
       end: endWord,
     },
     ...(sparseBefore != null ? { sparseBefore } : {}),
@@ -232,12 +249,11 @@ export function aaveV3HealthView(
       level: {
         points: pts,
         formula: AAVE_V3_LEVEL_FORMULA,
-        summary:
-          "Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the thresholds the Pool held at the day's last event.",
+        summary: `Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the thresholds ${src.pool} held at the day's last event.`,
         end: endWord,
         here: {
           live: "Here at today's balances and prices and the card's health factor.",
-          read: "Here at the balances and prices of {day}, against the thresholds the Pool held after the event at block {block}.",
+          read: `Here at the balances and prices of {day}, against the thresholds ${src.pool} held after the event at block {block}.`,
         },
       },
     };

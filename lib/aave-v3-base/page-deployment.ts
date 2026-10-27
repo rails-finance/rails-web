@@ -23,7 +23,13 @@ export const AAVE_V3_BASE_PAGE: AaveV3PoolPageDeployment = {
   sourceLabel: "the Aave V3 Pool on Base",
   card: AAVE_V3_BASE_LIVE_CARD_DEPLOYMENT,
   key: "aave-v3-base",
-  flows: { family: "aave-v3-base" },
+  flows: {
+    family: "aave-v3-base",
+    health: {
+      market: "base",
+      source: { oracle: "the Pool's oracle", pool: "the Pool", chain: AAVE_V3_BASE_CHAIN_ID },
+    },
+  },
   writeOff: { firstBlock: AAVE_V3_BASE_FIRST_WRITE_OFF_BLOCK, chain: "Base" },
   // The route serves the index when it can vouch for the whole life and sweeps
   // the chain otherwise; the receipts' custody line names the one that answered.
