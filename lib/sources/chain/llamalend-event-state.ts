@@ -10,6 +10,7 @@
 //   Controller.liquidation_discounts(user) the discount health subtracts
 //   AMM.read_user_tick_numbers(user)       (n1, n2)
 //   AMM.price_oracle()
+//   AMM.get_base_price()                   the band grid's anchor at the block
 // Two eth_calls per event (block − 1, block). A mined block's state never
 // changes, so each (controller, user, block) answer is kept in process
 // memory and the route caches it at the edge.
@@ -37,6 +38,7 @@ const CONTROLLER_ABI = parseAbi([
 const AMM_ABI = parseAbi([
   "function read_user_tick_numbers(address) view returns (int256[2])",
   "function price_oracle() view returns (uint256)",
+  "function get_base_price() view returns (uint256)",
 ]);
 
 /** The position at one block. Raw integers as strings; health and the
@@ -56,6 +58,9 @@ export interface LlamalendStateAt {
   pDownRaw: string | null;
   liquidationDiscountRaw: string | null;
   priceOracleRaw: string | null;
+  /** AMM.get_base_price(), 1e18: with A and a tick pair it gives the band
+   *  edges at this block (lib/llamalend/band-math.ts). */
+  basePriceRaw: string | null;
 }
 
 /** Health and the oracle price at the start of the event's block. */
@@ -102,11 +107,13 @@ async function readAt(controller: `0x${string}`, amm: `0x${string}`, user: `0x${
       { address: controller, abi: CONTROLLER_ABI, functionName: "liquidation_discounts", args: [user] },
       { address: amm, abi: AMM_ABI, functionName: "read_user_tick_numbers", args: [user] },
       { address: amm, abi: AMM_ABI, functionName: "price_oracle" },
+      { address: amm, abi: AMM_ABI, functionName: "get_base_price" },
     ] as const,
   })) as Res[];
   const us = ok<readonly [bigint, bigint, bigint, bigint]>(reads[0]);
   if (us == null) throw new Error("user_state did not answer");
   const price = ok<bigint>(reads[5]);
+  const base = ok<bigint>(reads[6]);
   const out: LlamalendStateAt = {
     block,
     hasLoan: us[2] > BigInt(0),
@@ -120,6 +127,7 @@ async function readAt(controller: `0x${string}`, amm: `0x${string}`, user: `0x${
     pDownRaw: null,
     liquidationDiscountRaw: null,
     priceOracleRaw: price != null ? price.toString() : null,
+    basePriceRaw: base != null ? base.toString() : null,
   };
   // No loan: the stored ticks are stale and health reverts, so nothing else
   // is stated.

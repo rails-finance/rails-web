@@ -105,7 +105,9 @@ import { dolomiteFlowBuckets } from "@/lib/dolomite/flows";
 import { fluidFlowBuckets } from "@/lib/fluid/flows";
 import { frankencoinFlowBuckets } from "@/lib/frankencoin/flows";
 import { fxFlowBuckets } from "@/lib/fx/flows";
-import { llamalendFlowBuckets } from "@/lib/llamalend/flows";
+import { llamalendFlowBuckets, type LlamalendFlowEvent } from "@/lib/llamalend/flows";
+import { llamalendPriceView, type LlamalendBandRead } from "@/lib/llamalend/flows-health";
+import { bandPrices, scale1e18 } from "@/lib/llamalend/band-math";
 import { makerFlowBuckets } from "@/lib/makerdao/flows";
 import { mapleFlowBuckets } from "@/lib/maple/flows";
 import { morphoFlowBuckets } from "@/lib/morpho/flows";
@@ -2991,4 +2993,102 @@ test("f(x) debt ratio: the two lines read per event, both levels, a dust debt dr
   })!;
   assert.ok(Math.abs(live.health.points.at(-1)![1] - 0.5) < 1e-12);
   assert.ok(Math.abs(live.marks[FX_COLL_KEY].warn!.points.at(-1)![1] - (1_000 * 0.95) / 0.88) < 1e-9);
+});
+
+test("LlamaLend's band and health: each read's user_prices and health held to the next event, an unread event's from its ticks", () => {
+  const D = 86_400;
+  const row = (day: number, block: number, o: Partial<LlamalendFlowEvent> = {}): LlamalendFlowEvent => ({
+    id: `r${block}`,
+    ts: day * D + 3_600,
+    block,
+    kind: "borrow",
+    self: false,
+    collDelta: BigInt(0),
+    debtDelta: BigInt(0),
+    convertedTaken: BigInt(0),
+    collAfter: BigInt(10),
+    debtAfter: BigInt(5),
+    read: false,
+    collDecimals: 18,
+    debtDecimals: 18,
+    price: 2_000,
+    convAfter: null,
+    stored: false,
+    before: null,
+    n1: BigInt(10),
+    n2: BigInt(19),
+    ...o,
+  });
+  const base = BigInt("2000000000000000000000");
+  const rows = [
+    row(100, 1),
+    row(103, 2, { n1: BigInt(12), n2: BigInt(21) }),
+    row(105, 3),
+    row(108, 4, { kind: "repay", debtAfter: BigInt(0), collAfter: BigInt(0) }),
+  ];
+  const read = (block: number, pUp: number, pDown: number, health: number): LlamalendBandRead => ({
+    block,
+    hasLoan: true,
+    pUp,
+    pDown,
+    health,
+    basePriceRaw: base,
+  });
+  // Block 1 is past the reads' cap: its band is worked from its ticks.
+  const reads = new Map([
+    [2, read(2, 1_800, 1_600, 0.2)],
+    [3, read(3, 1_850, 1_650, -0.01)],
+    [4, { block: 4, hasLoan: false, pUp: null, pDown: null, health: null, basePriceRaw: base }],
+  ]);
+  const v = llamalendPriceView(rows, reads, {
+    now: 120 * D,
+    open: false,
+    A: 30,
+    live: null,
+    collSymbol: "wstETH",
+    debtSymbol: "crvUSD",
+    cap: 60,
+  });
+  const band = v.band!;
+  const worked = bandPrices(BigInt(30), base, BigInt(10), BigInt(19));
+  assert.deepEqual(
+    band.points.map((p) => p[0]),
+    [100, 101, 102, 103, 104, 105, 106, 107, 108],
+  );
+  assert.ok(Math.abs(band.points[0][1] - scale1e18(worked.pUpRaw)) < 1e-9);
+  assert.ok(Math.abs(band.points[0][2] - scale1e18(worked.pDownRaw)) < 1e-9);
+  assert.deepEqual(band.estimated, [100, 101, 102]);
+  // Held flat to the next event, stepped there; the close day keeps the band before it.
+  assert.deepEqual(band.points[4].slice(1), [1_800, 1_600, 2]);
+  assert.deepEqual(band.points[5].slice(1), [1_850, 1_650, 3]);
+  assert.deepEqual(band.points[8].slice(1), [1_850, 1_650, 3]);
+  assert.equal(band.end, "close");
+  // Health: the reads' figures, a negative one kept, none before the first read.
+  const h = v.health!;
+  assert.deepEqual(
+    h.points.map((p) => [p[0], p[1]]),
+    [
+      [103, 0.2],
+      [104, 0.2],
+      [105, -0.01],
+      [106, -0.01],
+      [107, -0.01],
+      [108, -0.01],
+    ],
+  );
+  assert.deepEqual(h.heldDays, [104, 106, 107]);
+  assert.ok(h.level!.points.every((p) => p[1] === 0));
+  // Open, today the live read's band and health.
+  const open = llamalendPriceView(rows.slice(0, 3), reads, {
+    now: 110 * D,
+    open: true,
+    A: 30,
+    live: { pUp: 1_900, pDown: 1_700, health: 0.05 },
+    collSymbol: "wstETH",
+    debtSymbol: "crvUSD",
+    cap: 60,
+  });
+  assert.deepEqual(open.band!.points.at(-1), [110, 1_900, 1_700, null]);
+  assert.deepEqual(open.health!.points.at(-1), [110, 0.05, null]);
+  assert.equal(open.band!.end, "today");
 });

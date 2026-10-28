@@ -329,6 +329,18 @@ export default function LlamalendPositionView({
         : null,
     [chain],
   );
+  // The chart's Health view and band: the market's A, and today's band and
+  // health from the live read, the card's (lib/llamalend/flows-health.ts).
+  const flowBand = useMemo(
+    () =>
+      chain && !chain.chainStale
+        ? {
+            A: chain.A > 1 ? chain.A : null,
+            live: chain.hasLoan ? { pUp: chain.pUp, pDown: chain.pDown, health: chain.healthFull } : null,
+          }
+        : null,
+    [chain],
+  );
   const flows = useLlamalendFlows({
     controller,
     user,
@@ -339,6 +351,7 @@ export default function LlamalendPositionView({
     open: liveView?.status === "open",
     live: flowLive,
     liveSettled: chainSettled,
+    band: flowBand,
   });
   const flowFocus = flows.read !== "failed" ? flows.focus : null;
 

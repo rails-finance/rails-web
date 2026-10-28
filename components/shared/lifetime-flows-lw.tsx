@@ -25,6 +25,12 @@
 //   chart" or a restored link, brings the window to it (`reveal`). Only the
 //   chart moves.
 // - The cursor stops on day closes; the grid is never finer than MIN_STEP.
+// - A series' band (`PriceSeries.band`, LlamaLend's soft-liquidation range)
+//   is a series primitive (`BandFill`) on an unseen line at its top edge:
+//   each run of days with the same edges a shaded rectangle from the first
+//   day's start to the last day's close, drawn under the lines through the
+//   price scale, so it pans and zooms with them; its edges count in the
+//   axis's autoscale.
 // - The price tip stands over the price pane, HTML placed at the cursor's x;
 //   the events row under the chart is the panel's drawing, on this axis
 //   (`onAxis`, sent again on every zoom, pan or resize).
@@ -101,6 +107,9 @@ const COLORS = {
   debtFill: ["var(--color-green-400)", 0.12],
   liq: ["var(--color-red-500)"],
   warn: ["var(--color-amber-500)"],
+  band: ["var(--color-amber-500)", 0.16],
+  bandLight: ["var(--color-amber-500)", 0.08],
+  bandEdge: ["var(--color-amber-500)", 0.75],
   fg: ["var(--foreground)"],
   bg: ["var(--background)"],
   after: ["var(--surface-raised)", 0.7],
@@ -316,6 +325,137 @@ class ScrubberMark implements ISeriesPrimitive<Time> {
   }
 }
 
+// ── A band: a series primitive on the price line ────────────────────────────
+
+/** A run of days with the same band edges, `[from, to)` in unix seconds. */
+interface BandRun {
+  from: number;
+  to: number;
+  hi: number;
+  lo: number;
+  /** Worked rather than read: drawn lighter, its edges dashed. */
+  est: boolean;
+  day: number;
+}
+
+/** The band's runs: consecutive days with the same edges and grade. */
+function bandRuns(points: [number, number, number, number | null][], estimated: ReadonlySet<number>): BandRun[] {
+  const out: BandRun[] = [];
+  for (const [day, hi, lo] of points) {
+    const est = estimated.has(day);
+    const run = out[out.length - 1];
+    if (run && run.to === day * DAY_S && run.hi === hi && run.lo === lo && run.est === est) run.to = closeTs(day);
+    else out.push({ from: day * DAY_S, to: closeTs(day), hi, lo, est, day });
+  }
+  return out;
+}
+
+/** A drawn run, in the pane's media pixels, as the verifiers read it. */
+export interface BandDrawn {
+  day: number;
+  x0: number;
+  x1: number;
+  yHi: number;
+  yLo: number;
+}
+
+interface BandState {
+  grid: Grid | null;
+  runs: BandRun[];
+  colors: Colors | null;
+}
+
+class BandFill implements ISeriesPrimitive<Time> {
+  private req: (() => void) | null = null;
+  private chart: IChartApi | null = null;
+  private series: ISeriesApi<SeriesType> | null = null;
+  private readonly views: IPrimitivePaneView[];
+  constructor(
+    private readonly st: BandState,
+    /** Called after each draw with the runs drawn in the plot. */
+    private readonly onDrawn: (runs: BandDrawn[]) => void,
+  ) {
+    this.views = [{ zOrder: () => "bottom", renderer: () => ({ draw: (t) => this.draw(t) }) }];
+  }
+  attached(p: SeriesAttachedParameter<Time, SeriesType>) {
+    this.req = p.requestUpdate;
+    this.chart = p.chart as IChartApi;
+    this.series = p.series;
+  }
+  detached() {
+    this.req = null;
+    this.chart = null;
+    this.series = null;
+  }
+  paneViews() {
+    return this.views;
+  }
+  update() {
+    this.req?.();
+  }
+  /** The edges of the runs in the window count in the price axis's range. */
+  autoscaleInfo(a: Logical, b: Logical) {
+    const g = this.st.grid;
+    if (!g || this.st.runs.length === 0) return null;
+    const from = cellTime(g, a);
+    const to = cellTime(g, b + 1);
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const r of this.st.runs)
+      if (r.to > from && r.from < to) {
+        lo = Math.min(lo, r.lo);
+        hi = Math.max(hi, r.hi);
+      }
+    return Number.isFinite(lo) ? { priceRange: { minValue: lo, maxValue: hi } } : null;
+  }
+  /** Each run's place in the plot now, from the time and price scales. */
+  place(): BandDrawn[] {
+    const { grid: g, runs } = this.st;
+    const c = this.chart;
+    const s = this.series;
+    if (!g || !c || !s) return [];
+    const out: BandDrawn[] = [];
+    for (const r of runs) {
+      const x0 = xOf(c, g, r.from);
+      const x1 = xOf(c, g, r.to);
+      const yHi = s.priceToCoordinate(r.hi);
+      const yLo = s.priceToCoordinate(r.lo);
+      if (x0 == null || x1 == null || yHi == null || yLo == null) continue;
+      out.push({ day: r.day, x0, x1, yHi, yLo });
+    }
+    return out;
+  }
+  private draw(t: Target) {
+    const colors = this.st.colors;
+    if (!colors) return;
+    const placed = this.place();
+    const est = new Map(this.st.runs.map((r) => [r.day, r.est]));
+    const drawn: BandDrawn[] = [];
+    t.useMediaCoordinateSpace(({ context: c, mediaSize }) => {
+      for (const p of placed) {
+        const a = Math.max(0, p.x0);
+        const b = Math.min(mediaSize.width, p.x1);
+        if (b <= a) continue;
+        drawn.push(p);
+        const light = est.get(p.day) === true;
+        c.fillStyle = light ? colors.bandLight : colors.band;
+        c.fillRect(a, p.yHi, b - a, p.yLo - p.yHi);
+        c.strokeStyle = colors.bandEdge;
+        c.lineWidth = 1;
+        c.setLineDash(light ? [3, 3] : []);
+        c.beginPath();
+        for (const y of [p.yHi, p.yLo]) {
+          c.moveTo(a, Math.round(y) + 0.5);
+          c.lineTo(b, Math.round(y) + 0.5);
+        }
+        c.stroke();
+        c.setLineDash([]);
+      }
+    });
+    this.onDrawn(drawn);
+  }
+}
+
 // ── The chart ───────────────────────────────────────────────────────────────
 
 export interface LifetimeFlowsLwProps {
@@ -413,6 +553,8 @@ export function LifetimeFlowsLw({
       step: stepRuns(priceScale.pieces.flat),
       level: stepRuns(levelRuns(priceScale.level.map((p) => [p[0], p[1]] as [number, number]))),
       warn: stepRuns(levelRuns(priceScale.warn.map((p) => [p[0], p[1]] as [number, number]))),
+      band: bandRuns(priceScale.band, new Set(priceScale.bandEstimated)),
+      bandTop: stepRuns(levelRuns(priceScale.band.map((p) => [p[0], p[1]] as [number, number]))),
     };
   }, [priceScale]);
 
@@ -427,6 +569,10 @@ export function LifetimeFlowsLw({
   const series = useRef<Record<string, ISeriesApi<SeriesType>>>({});
   const marks = useRef<{ value: ScrubberMark[]; price: ScrubberMark | null; spacer: ScrubberMark | null } | null>(null);
   const markState = useRef<MarkState>({ grid: null, ts: null, dim: false, shadeTs: null, colors: null });
+  const bandState = useRef<BandState>({ grid: null, runs: [], colors: null });
+  const bandFill = useRef<BandFill | null>(null);
+  /** The band's drawn runs, written on each draw for the verifiers. */
+  const bandHook = useRef<HTMLSpanElement>(null);
   const touched = useRef(0);
   const plotW = useCallback(
     () => chart.current?.timeScale().width() || Math.max(200, (box.current?.clientWidth ?? 600) - 56),
@@ -742,6 +888,13 @@ export function LifetimeFlowsLw({
         pricePane,
       );
       s.priceStep = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, pricePane);
+      // The band's anchor: an unseen line at its top edge, so the band's
+      // primitive has a series with values to read the price scale through.
+      s.bandBase = c.addSeries(
+        lib.LineSeries,
+        { ...quiet, lineVisible: false, color: "transparent", crosshairMarkerVisible: false, ...pxScale },
+        pricePane,
+      );
       s.priceDots = c.addSeries(
         lib.LineSeries,
         {
@@ -769,6 +922,18 @@ export function LifetimeFlowsLw({
       s.spacer.attachPrimitive(ms);
       mp = new ScrubberMark(markState.current);
       s.price.attachPrimitive(mp);
+      const bf = new BandFill(bandState.current, (runs) => {
+        const el = bandHook.current;
+        if (el)
+          el.dataset.flowBandDrawn = runs
+            .map((r) => `${r.day}:${r.x0.toFixed(1)}:${r.x1.toFixed(1)}:${r.yHi.toFixed(1)}:${r.yLo.toFixed(1)}`)
+            .join(",");
+      });
+      s.bandBase.attachPrimitive(bf);
+      bandFill.current = bf;
+      // The verifiers read each run's place from the scales now, against the
+      // drawn one.
+      Object.assign(el, { flowBandPlace: () => bf.place() });
     }
     marks.current = { value: mv, price: mp, spacer: ms };
     const onRange = () => sendAxis();
@@ -892,6 +1057,7 @@ export function LifetimeFlowsLw({
       chart.current = null;
       series.current = {};
       marks.current = null;
+      bandFill.current = null;
       c.remove();
       onAxisRef.current(null);
     };
@@ -918,6 +1084,8 @@ export function LifetimeFlowsLw({
     const c = chart.current;
     if (!c || !colors) return;
     markState.current.colors = colors;
+    bandState.current.colors = colors;
+    bandFill.current?.update();
     c.applyOptions({
       layout: {
         textColor: colors.text,
@@ -982,6 +1150,7 @@ export function LifetimeFlowsLw({
       out.priceStep = sampleRuns(grid, priceLines.step);
       out.level = sampleRuns(grid, priceLines.level);
       out.warn = sampleRuns(grid, priceLines.warn);
+      out.bandBase = sampleRuns(grid, priceLines.bandTop);
       const dots: (number | null)[] = new Array(grid.count).fill(null);
       for (const [ts, v] of priceLines.dots) {
         const i = Math.round(logicalOf(grid, ts));
@@ -1020,6 +1189,9 @@ export function LifetimeFlowsLw({
     });
     regrid.current = false;
     markState.current.grid = grid;
+    bandState.current.grid = grid;
+    bandState.current.runs = priceLines?.band ?? [];
+    bandFill.current?.update();
     marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
     marks.current?.spacer?.update();
@@ -1091,6 +1263,7 @@ export function LifetimeFlowsLw({
   );
   const levelHooks = priceScale ? levelRuns(priceScale.level.map((p) => [p[0], p[1]] as [number, number])) : [];
   const warnHooks = priceScale ? levelRuns(priceScale.warn.map((p) => [p[0], p[1]] as [number, number])) : [];
+  const bandHooks = priceLines?.band ?? [];
   const shaded = windowFrom != null && windowFrom > startDay;
 
   return (
@@ -1175,6 +1348,19 @@ export function LifetimeFlowsLw({
               data-liq-level=""
               data-liq-days={run.map((p) => p[0]).join(",")}
               data-liq-values={run.map((p) => p[1]).join(",")}
+            />
+          ))}
+        </span>
+        <span data-anatomy="F19.10" ref={bandHook} data-flow-band-drawn="">
+          {bandHooks.map((r) => (
+            <span
+              key={`b${r.from}`}
+              data-band-run=""
+              data-band-from={r.from / DAY_S}
+              data-band-to={r.to / DAY_S - 1}
+              data-band-hi={r.hi}
+              data-band-lo={r.lo}
+              data-band-est={r.est ? "" : undefined}
             />
           ))}
         </span>

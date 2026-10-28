@@ -14,8 +14,11 @@
 // partial liquidation) has the position read at its block
 // (/api/chain/llamalend/event-state, the read its card's detail makes).
 // LlamaLend is not in the shared daily price store, so nothing is read
-// between events: the collateral keeps its latest event's price. It also
-// gives the page the value that ties the panel to the timeline
+// between events: the collateral keeps its latest event's price. The same
+// event-state read at the last event of each of the latest HEALTH_READS_MAX
+// days with events gives the chart its Health view and the collateral's
+// soft-liquidation band (lib/llamalend/flows-health.ts). It also gives the
+// page the value that ties the panel to the timeline
 // (components/shared/flow-focus-context.tsx).
 
 import { useEffect, useMemo, useState } from "react";
@@ -23,6 +26,14 @@ import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { HEALTH_READS_MAX, healthReadPicks } from "@/lib/shared/flows-health";
+import {
+  llamalendBandHelp,
+  llamalendBandRead,
+  llamalendPriceView,
+  type LlamalendBandLive,
+  type LlamalendBandRead,
+} from "@/lib/llamalend/flows-health";
 import {
   llamalendStateBlocks,
   llamalendFlowEvents,
@@ -31,6 +42,7 @@ import {
   llamalendFlowTimeline,
   llamalendFocusEvents,
   llamalendPriceBlocks,
+  LLAMALEND_COLL_KEY,
   type LlamalendFlowFacts,
   type LlamalendLive,
   type LlamalendStateRead,
@@ -56,22 +68,30 @@ function loadPriceAt(controller: string, block: number): Promise<number | null> 
   return p;
 }
 
-const stateCache = new Map<string, Promise<LlamalendStateRead | null>>();
+/** The position at the end of one block: its balances (base units) and
+ *  its band and health; null where the read failed. */
+interface StateAt {
+  state: LlamalendStateRead | null;
+  band: LlamalendBandRead | null;
+}
+const stateCache = new Map<string, Promise<StateAt | null>>();
 
-/** The position at the end of one block (collateral in the bands and debt,
- *  base units), cached for the page's life; null where the read failed. */
-function loadStateAt(controller: string, user: string, block: number): Promise<LlamalendStateRead | null> {
+/** The position at the end of one block, cached for the page's life. */
+function loadStateAt(controller: string, user: string, block: number): Promise<StateAt | null> {
   const url = `/api/chain/llamalend/event-state?controller=${controller}&user=${user}&block=${block}`;
   let p = stateCache.get(url);
   if (!p) {
     p = fetch(url)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
+      .then((d): StateAt | null => {
         const a = d?.after;
         if (!a) return null;
-        if (!a.hasLoan) return { coll: BigInt(0), debt: BigInt(0) };
-        if (a.collateralRaw == null || a.debtRaw == null) return null;
-        return { coll: BigInt(a.collateralRaw), debt: BigInt(a.debtRaw) };
+        const state = !a.hasLoan
+          ? { coll: BigInt(0), debt: BigInt(0) }
+          : a.collateralRaw == null || a.debtRaw == null
+            ? null
+            : { coll: BigInt(a.collateralRaw), debt: BigInt(a.debtRaw) };
+        return { state, band: llamalendBandRead(a) };
       })
       .catch(() => null);
     p.then((v) => {
@@ -112,6 +132,9 @@ export interface LlamalendFlowsInput {
    *  failed; `liveSettled` says whether it is still out. */
   live: LlamalendLive | null;
   liveSettled: boolean;
+  /** The market's A and the live read's band and health, for the chart's
+   *  Health view and band; null where the live read has none. */
+  band: { A: number | null; live: LlamalendBandLive | null } | null;
 }
 
 export function useLlamalendFlows(p: LlamalendFlowsInput): {
@@ -151,6 +174,23 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
   const bare = useMemo(() => (source ? llamalendFlowEvents(source) : null), [source]);
   const blocks = useMemo(() => (bare ? llamalendPriceBlocks(bare) : null), [bare]);
   const stateBlocks = useMemo(() => (bare ? llamalendStateBlocks(bare) : null), [bare]);
+  // The blocks whose band and health the chart reads: the last event of each
+  // of the latest HEALTH_READS_MAX days with events, and before an event that
+  // leaves no debt the one before it, whose band and health its day ends on.
+  const bandBlocks = useMemo(() => {
+    if (!bare) return null;
+    const picks = healthReadPicks(
+      bare.map((e) => ({ blockNumber: e.block, timestamp: e.ts })),
+      HEALTH_READS_MAX,
+    ).map((e) => e.blockNumber);
+    const from = picks[0] ?? Infinity;
+    const before = bare.flatMap((e, i) =>
+      i > 0 && e.debtAfter === BigInt(0) && bare[i - 1].block >= from && bare[i - 1].block !== e.block
+        ? [bare[i - 1].block]
+        : [],
+    );
+    return [...new Set([...picks, ...before])].sort((a, b) => a - b);
+  }, [bare]);
   const blocksKey =
     blocks && stateBlocks ? `${p.controller}:${p.user}:${blocks.join(",")}:${stateBlocks.join(",")}` : null;
   const [reads, setReads] = useState<{
@@ -165,8 +205,11 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
     Promise.all([
       sixAtATime(blocks, (b) => loadPriceAt(p.controller, b), alive),
       sixAtATime(stateBlocks, (b) => loadStateAt(p.controller, p.user, b), alive),
-    ]).then(([prices, states]) => {
-      if (live) setReads({ key: blocksKey, prices, states });
+    ]).then(([prices, at]) => {
+      if (!live) return;
+      const states = new Map<number, LlamalendStateRead>();
+      for (const [b, v] of at) if (v.state) states.set(b, v.state);
+      setReads({ key: blocksKey, prices, states });
     });
     return () => {
       live = false;
@@ -175,6 +218,30 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocksKey]);
   const got = reads != null && reads.key === blocksKey ? reads : null;
+  // The band and health reads, after the timeline's own: the panel draws
+  // first and the view joins when every read has settled.
+  const bandKey = got && bandBlocks ? `${p.controller}:${p.user}:${bandBlocks.join(",")}` : null;
+  const [bandReads, setBandReads] = useState<{ key: string; bands: Map<number, LlamalendBandRead> } | null>(null);
+  useEffect(() => {
+    if (!bandKey || !bandBlocks) return;
+    let live = true;
+    sixAtATime(
+      bandBlocks,
+      (b) => loadStateAt(p.controller, p.user, b),
+      () => live,
+    ).then((at) => {
+      if (!live) return;
+      const bands = new Map<number, LlamalendBandRead>();
+      for (const [b, v] of at) if (v.band) bands.set(b, v.band);
+      setBandReads({ key: bandKey, bands });
+    });
+    return () => {
+      live = false;
+    };
+    // `bandKey` stands for the controller, the owner and the blocks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bandKey]);
+  const bands = bandReads != null && bandReads.key === bandKey ? bandReads.bands : null;
   const rows = useMemo(
     () => (source && got ? llamalendFlowEvents(source, got.prices, got.states) : null),
     [source, got],
@@ -194,7 +261,34 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
     () => (rows && opts && rows.length > 0 ? llamalendFlowReplay(rows, opts) : null),
     [rows, opts],
   );
-  const timeline = useMemo(() => (rows && opts ? llamalendFlowTimeline(rows, opts) : null), [rows, opts]);
+  const plain = useMemo(() => (rows && opts ? llamalendFlowTimeline(rows, opts) : null), [rows, opts]);
+  // The Health view and the collateral's band (lib/llamalend/flows-health.ts).
+  const band = p.band;
+  const timeline = useMemo(() => {
+    if (!plain || !rows || !opts || !bands || !band || !p.collSymbol || !p.debtSymbol) return plain;
+    const v = llamalendPriceView(rows, bands, {
+      now: opts.now,
+      open: opts.open,
+      A: band.A,
+      live: band.live,
+      collSymbol: p.collSymbol,
+      debtSymbol: p.debtSymbol,
+      cap: HEALTH_READS_MAX,
+    });
+    if (!v.health && !v.band) return plain;
+    return {
+      ...plain,
+      ...(v.health ? { health: v.health } : {}),
+      priceMarks: {
+        ...plain.priceMarks,
+        [LLAMALEND_COLL_KEY]: {
+          ...plain.priceMarks?.[LLAMALEND_COLL_KEY],
+          ...(v.band ? { band: v.band } : {}),
+          help: llamalendBandHelp(p.collSymbol, p.debtSymbol, HEALTH_READS_MAX),
+        },
+      },
+    };
+  }, [plain, rows, opts, bands, band, p.collSymbol, p.debtSymbol]);
   const focusEvents = useMemo(
     () =>
       replay && timeline && p.collSymbol && p.debtSymbol

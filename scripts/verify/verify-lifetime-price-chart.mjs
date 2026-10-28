@@ -101,6 +101,11 @@
 // 4577 and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
 // USDp 3732 and GOLDp 29 (liquidated); the how-to-read names the minimum.
+// LlamaLend (step 6, `band`, `checkBand`): 0xeb2c (open), 0xa32e (in soft
+// liquidation), 0xd76a (under its band), 0x61db (liquidated), 0xbbc5
+// (closed): Health first, today the card's; the band stepping on event days,
+// today the card's Bands; the tip's band words; the drawn band against the
+// scales' placing at All, zoomed and panned.
 // `FIXTURES=<regex>` runs the pages whose id matches.
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
@@ -609,10 +614,38 @@ const PAGES = [
     lwOnly: true,
     ratio: { ...FX_RATIO, endDay: 20121 },
   },
+  // LlamaLend (step 6, `band`, `checkBand`): the card's Health first, its
+  // line at 0; the collateral's soft-liquidation band shaded on its price,
+  // stepping at events, today the card's Bands; the tip's in-band words.
   {
     id: "llamalend 0xeb2c",
     path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xeb2cafb6ea9def8084842558ad1242bbf7fcac2b",
     lwOnly: true,
+    band: { asset: "wstETH" },
+  },
+  {
+    id: "llamalend 0xa32e (in soft liquidation)",
+    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xa32ea34ac816397e3312423f88229b24d1ae0d5d",
+    lwOnly: true,
+    band: { asset: "wstETH", place: "inside" },
+  },
+  {
+    id: "llamalend 0xd76a (under its band, liquidatable)",
+    path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0xd76aa47f1ad6ce7f78ddcd4643a85c87b7e7c047",
+    lwOnly: true,
+    band: { asset: "CRV", place: "below" },
+  },
+  {
+    id: "llamalend 0x61db (liquidated)",
+    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0x61db9ae37238e7c090708aa67e808cdc61a0634b",
+    lwOnly: true,
+    band: { asset: "wstETH", closed: true },
+  },
+  {
+    id: "llamalend 0xbbc5 (closed)",
+    path: "/ethereum/llamalend/0x4e59541306910ad6dc1dac0ac9dfb29bd9f15c67/0xbbc52d0a3fe57144d0323adf5f76ca082d070bfe",
+    lwOnly: true,
+    band: { asset: "WBTC", closed: true },
   },
   {
     id: "frankencoin 0xdc18",
@@ -1050,6 +1083,241 @@ async function checkRatio(page, tag, pg) {
     `${tag}: the how-to-read names the ${name}'s source and line`,
     help.includes(`The ${name}`) && r.help.every((w) => help.includes(w)),
     help,
+  );
+}
+
+/** LlamaLend (ui-jobs 328 step 6): the chart opens on the card's Health, its
+ *  line at 0, today's figure the card's; the collateral's band is drawn as
+ *  runs that step only on days with events (or worked days), today's edges
+ *  the card's Bands and the live read's pUp and pDown; at today the tip says
+ *  where the price stands against the band; a closed life's band ends by its
+ *  last event; the band's drawn rectangles sit where the time and price
+ *  scales place its edges, at All, zoomed and panned; the how-to-read names
+ *  the sources. */
+async function checkBand(page, tag, pg, width) {
+  const want = pg.band;
+  const u = new URL(`${BASE}${pg.path}`);
+  const [, , , controller, user] = u.pathname.split("/");
+  const picker = page.locator("button[data-price-picker]");
+  await picker.click();
+  await page.waitForSelector('[role="listbox"] [data-price-asset]', { timeout: 5000 }).catch(() => {});
+  const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
+  await page.keyboard.press("Escape");
+  check(
+    `${tag}: the picker lists Health first, then ${want.asset}`,
+    listed[0] === "Health" && listed.includes(want.asset),
+    listed.join(","),
+  );
+  const sl = page.locator(PRICE_STRIP).first();
+  const tip = () =>
+    page.$eval("[data-price-heading]", (h) => {
+      const ro = h.querySelector("[data-price-readout]");
+      const bv = h.querySelector("[data-band-readout]");
+      return {
+        text: ro?.textContent ?? "",
+        none: ro?.hasAttribute("data-price-none") ?? true,
+        block: ro?.getAttribute("data-price-block") ?? "",
+        day: Number(ro?.getAttribute("data-price-day")),
+        price: Number((ro?.textContent ?? "").replace(/[^\d.]/g, "")),
+        place: h.querySelector("[data-band-place]")?.getAttribute("data-band-place") ?? null,
+        placeText: h.querySelector("[data-band-place]")?.textContent ?? "",
+        hi: bv ? Number(bv.getAttribute("data-band-hi")) : null,
+        lo: bv ? Number(bv.getAttribute("data-band-lo")) : null,
+        bandBlock: bv?.getAttribute("data-band-block") ?? null,
+        heading: h.textContent ?? "",
+      };
+    });
+  const at = async (key) => {
+    await sl.focus();
+    await page.keyboard.press(key);
+    await page.waitForTimeout(250);
+    return tip();
+  };
+  const pct = (t) =>
+    Number(
+      (t ?? "")
+        .replace(/−/g, "-")
+        .match(/-?\d+(?:\.\d+)?(?=%)/g)
+        ?.pop() ?? NaN,
+    );
+  const toggle = page.locator("[data-flow-level-toggle]");
+  if ((await toggle.getAttribute("aria-pressed").catch(() => null)) !== "true") await toggle.click().catch(() => {});
+  await page.waitForTimeout(150);
+  const end = await at("End");
+  const headTip = await page.$eval("[data-price-heading]", headingText).catch(() => "");
+  check(
+    `${tag}: the chart opens on Health, its line "Liquidates below" at 0`,
+    /Health/.test(headTip) && /Liquidates below(, explain)?\s*0\.00%/.test(headTip),
+    headTip,
+  );
+  const live = await hostFetch(`${BASE}/api/chain/llamalend/position?controller=${controller}&user=${user}`)
+    .then((r) => r.json())
+    .catch(() => null);
+  const card = await page.$eval('[data-card-head="health"]', (h) => h.textContent ?? "").catch(() => null);
+  if (!want.closed) {
+    check(
+      `${tag}: today's health is the card's`,
+      card != null && end.block === "" && !end.none && pct(end.text) === pct(card),
+      `chart ${end.text}, card ${card}`,
+    );
+  } else check(`${tag}: a closed life's card states no health`, card == null, card ?? "");
+  const tl = await hostFetch(`${BASE}/api/llamalend/timeline?controller=${controller}&user=${user}`)
+    .then((r) => r.json())
+    .catch(() => null);
+  const events = (tl?.events ?? []).filter((e) => e.context?.data?.role !== "liquidator");
+  const eventDays = new Set(events.map((e) => Math.floor(e.timestamp / 86_400)));
+  const lastEventDay = Math.max(...eventDays);
+  // The health rests on event blocks (or today's live read).
+  const blocks = new Set(events.map((e) => String(e.blockNumber)));
+  const mid = await at("Home");
+  check(
+    `${tag}: each health point read rests on an event's block`,
+    mid.none || mid.block === "" || blocks.has(mid.block),
+    mid.block,
+  );
+
+  // The collateral and its band.
+  await picker.click();
+  await page.locator(`[role="listbox"] [data-price-asset="${want.asset}"]`).first().click();
+  await page.waitForTimeout(400);
+  if ((await toggle.getAttribute("aria-pressed").catch(() => null)) !== "true") await toggle.click().catch(() => {});
+  await page.waitForTimeout(150);
+  const runs = await page.$$eval("[data-band-run]", (rs) =>
+    rs.map((r) => ({
+      from: Number(r.getAttribute("data-band-from")),
+      to: Number(r.getAttribute("data-band-to")),
+      hi: Number(r.getAttribute("data-band-hi")),
+      lo: Number(r.getAttribute("data-band-lo")),
+      est: r.hasAttribute("data-band-est"),
+    })),
+  );
+  check(
+    `${tag}: ${want.asset}'s band is drawn, its top over its bottom`,
+    runs.length > 0 && runs.every((r) => r.hi > r.lo && r.lo > 0),
+    `${runs.length} runs`,
+  );
+  const today = Math.floor(Date.now() / 86_400_000);
+  const steps = runs.slice(1).filter((r, i) => !(want.closed ? false : r.from === today && i === runs.length - 2));
+  const off = steps.filter((r) => !eventDays.has(r.from));
+  check(
+    `${tag}: the band steps only on days with events`,
+    runs.length > 1 && off.length === 0,
+    `${runs.length} runs; off ${off.map((r) => r.from).join(",")}`,
+  );
+  const last = runs.at(-1);
+  if (want.closed)
+    check(
+      `${tag}: a closed life's band ends by its last event's day`,
+      last != null && last.to <= lastEventDay,
+      `ends ${last?.to}, last event ${lastEventDay}`,
+    );
+  const lv = await at("End");
+  if (!want.closed) {
+    const pUp = live?.pUp;
+    const pDown = live?.pDown;
+    check(
+      `${tag}: today's band is the live read's pUp and pDown (the base price moves with each block)`,
+      lv.bandBlock === "" && pUp > 0 && Math.abs(lv.hi - pUp) <= 1e-6 * pUp && Math.abs(lv.lo - pDown) <= 1e-6 * pDown,
+      `chart ${lv.hi} → ${lv.lo} (block ${lv.bandBlock}), read ${pUp} → ${pDown}`,
+    );
+    const bandsRow = await page.$eval('[data-panel-row="bands"] dd', (d) => d.textContent ?? "").catch(() => "");
+    const f = (v) => formatLiquidationPrice(v).replace("$", "");
+    check(
+      `${tag}: today's band is the card's Bands`,
+      lv.hi != null && bandsRow.includes(`${f(lv.hi)} → ${f(lv.lo)}`),
+      `chart ${lv.hi != null ? `${f(lv.hi)} → ${f(lv.lo)}` : "-"}, card ${bandsRow}`,
+    );
+    const place = lv.price < lv.lo ? "below" : lv.price <= lv.hi ? "inside" : null;
+    check(
+      `${tag}: the tip's band words at today (${want.place ?? "above the band: none"})`,
+      lv.place === (want.place ?? null) &&
+        place === lv.place &&
+        (lv.place !== "inside" || /soft liquidation/.test(lv.placeText)),
+      `place ${lv.place} "${lv.placeText}", price ${lv.price}, band ${lv.hi} → ${lv.lo}`,
+    );
+  }
+  // The drawn rectangles against the scales' placing, at All, zoomed, panned.
+  const drawnVsPlaced = () =>
+    page.evaluate(() => {
+      const box = document.querySelector("[data-flows-combined] [data-flow-lw-box]");
+      const hook = document.querySelector("[data-flows-combined] [data-flow-band-drawn]");
+      const drawn = (hook?.getAttribute("data-flow-band-drawn") ?? "")
+        .split(",")
+        .filter(Boolean)
+        .map((t) => t.split(":").map(Number));
+      const placed = box?.flowBandPlace ? box.flowBandPlace() : [];
+      return { drawn, placed };
+    });
+  const agree = (d) => {
+    if (d.drawn.length === 0) return false;
+    return d.drawn.every(([day, x0, x1, yHi, yLo]) => {
+      const p = d.placed.find((q) => q.day === day);
+      return p && [x0 - p.x0, x1 - p.x1, yHi - p.yHi, yLo - p.yLo].every((v) => Math.abs(v) < 0.6);
+    });
+  };
+  const sig = (d) => d.drawn.map((r) => r.join(":")).join(",");
+  await page
+    .locator('[data-flows-combined] [data-flow-range="All"]')
+    .first()
+    .click()
+    .catch(() => {});
+  await page.waitForTimeout(800);
+  const all = await drawnVsPlaced();
+  check(
+    `${tag}: the band's drawn runs sit where the scales place its edges (All)`,
+    agree(all),
+    `${all.drawn.length} drawn`,
+  );
+  const ranges = await page.$$eval("[data-flows-combined] [data-flow-range]", (bs) =>
+    bs.map((b) => b.getAttribute("data-flow-range")),
+  );
+  const zoom = ranges.find((r) => r !== "All");
+  if (zoom) {
+    await page.locator(`[data-flows-combined] [data-flow-range="${zoom}"]`).first().click();
+    await page.waitForTimeout(900);
+    const z = await drawnVsPlaced();
+    check(
+      `${tag}: zoomed to ${zoom}, the band moves with the scales`,
+      agree(z) && sig(z) !== sig(all),
+      `${z.drawn.length} drawn`,
+    );
+    if (width >= 640) {
+      const box = page.locator("[data-flows-combined] [data-flow-lw-box]").first();
+      await box.evaluate((el) => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 160));
+      await page.waitForTimeout(300);
+      const b = await box.boundingBox();
+      await page.mouse.move(b.x + b.width * 0.5, b.y + Math.min(40, b.height / 3));
+      for (let i = 0; i < 3; i++) {
+        await page.mouse.wheel(-120, 0);
+        await page.waitForTimeout(40);
+      }
+      await page.waitForTimeout(900);
+      const pz = await drawnVsPlaced();
+      check(
+        `${tag}: panned, the band moves with the scales`,
+        (pz.drawn.length === 0 || agree(pz)) && sig(pz) !== sig(z),
+        `${pz.drawn.length} drawn`,
+      );
+    }
+    await page.locator('[data-flows-combined] [data-flow-range="All"]').first().click();
+    await page.waitForTimeout(600);
+  }
+  const help = await howToRead(page);
+  check(
+    `${tag}: the how-to-read names the band's and the price's sources`,
+    help.includes("soft-liquidation band") && help.includes("Controller.user_prices") && help.includes("oracle price"),
+    help,
+  );
+  await picker.click();
+  await page.locator('[role="listbox"] [data-price-asset="Health"]').click();
+  await page.waitForTimeout(250);
+  const hHelp = await howToRead(page);
+  check(
+    `${tag}: the how-to-read names the health's source, its discount and oracle at each read`,
+    hHelp.includes("The health") &&
+      hHelp.includes("liquidation discount stored on the position") &&
+      hHelp.includes("oracle price at that block"),
+    hHelp,
   );
 }
 
@@ -2094,6 +2362,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     // the price pane: every check below waits for it.
     if (pg.health) await waitForHealth(page);
     if (pg.ratio) await waitForHealth(page, pg.ratio.label);
+    if (pg.band) await waitForHealth(page, "Health");
     // The drawn strips name their views; the chart names its panes.
     const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
       els.flatMap((e) =>
@@ -2137,6 +2406,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.v1) await checkV1Level(page, tag, pg);
       if (pg.level) await checkLevelView(page, tag, pg);
       if (pg.share) await checkShareLine(page, tag);
+      if (pg.band) await checkBand(page, tag, pg, width);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;

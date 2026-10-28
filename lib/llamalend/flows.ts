@@ -235,6 +235,10 @@ export interface LlamalendFlowEvent {
    *  of the block before (collateral and borrowed token in the bands, base
    *  units), where the filler has read it; else null. */
   before: { coll: bigint; conv: bigint } | null;
+  /** The band tick pair the row's UserState set, signed; null where the row
+   *  states none. */
+  n1: bigint | null;
+  n2: bigint | null;
 }
 
 const big = (v: string | undefined | null): bigint | null => {
@@ -312,6 +316,8 @@ export function llamalendFlowEvents(
       convAfter: stored && lastInBlock ? (sDebt > ZERO ? sConv : ZERO) : null,
       stored,
       before: bColl != null && bConv != null ? { coll: bColl, conv: bConv } : null,
+      n1: big(c.n1),
+      n2: big(c.n2),
     };
   });
 }
@@ -647,6 +653,8 @@ export function llamalendFlowReplay(events: LlamalendFlowEvent[], o: LlamalendFl
 const grow = (rate: number, dt: number) => 1 + rate * (Math.max(0, dt) / ONE_YEAR_S);
 
 const COLL = "coll";
+/** The timeline's key for the collateral. */
+export const LLAMALEND_COLL_KEY = COLL;
 const DEBT = "debt";
 /** The borrowed token in the bands, a second collateral asset. */
 const CONV = "conv";

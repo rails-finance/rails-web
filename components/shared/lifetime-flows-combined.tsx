@@ -47,7 +47,7 @@ import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatPrice, pricePieces, levelAt, priceReadout, type FlowPriceSeries } from "@/lib/shared/flows-price";
 import { viewWord } from "@/lib/utils/format";
-import { levelFormulaAt, type PriceAt, type PricePoint } from "@/lib/shared/price-series";
+import { bandAt, levelFormulaAt, type PriceAt, type PricePoint } from "@/lib/shared/price-series";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -1030,7 +1030,8 @@ export function priceLineOf(s: FlowPriceSeries, startDay: number, today: number)
   const inAxis = (p: PricePoint) => p[0] >= startDay && p[0] <= today;
   const level = (s.level?.points ?? []).filter(inAxis);
   const warn = (s.warn?.points ?? []).filter(inAxis);
-  return { pieces, level, warn };
+  const band = (s.band?.points ?? []).filter((p) => p[0] >= startDay && p[0] <= today);
+  return { pieces, level, warn, band, bandEstimated: s.band?.estimated ?? [] };
 }
 export type PriceScale = ReturnType<typeof priceLineOf>;
 
@@ -1074,7 +1075,13 @@ function PriceHeading({
   const left = Math.max(0, Math.min(w - PAIR_W, x - PAIR_W / 2));
   const caret = Math.max(8, Math.min(PAIR_W - 8, x - left));
   const [showLevel, setShowLevel] = useState(false);
-  const levelWord = selected.health ? "liquidation level" : "liquidation price";
+  const levelWord = selected.health
+    ? "liquidation level"
+    : selected.band && !selected.level
+      ? "band"
+      : selected.band
+        ? "liquidation price and band"
+        : "liquidation price";
   return (
     <div className="relative mb-2.5" data-anatomy="F19.1">
       <div
@@ -1083,7 +1090,7 @@ function PriceHeading({
         data-price-heading=""
       >
         <span className="absolute right-0.5 top-0.5 flex items-center gap-0.5">
-          {selected.level && (
+          {(selected.level || selected.band) && (
             <button
               type="button"
               aria-pressed={showLevel}
@@ -1135,6 +1142,26 @@ function PriceFigures({
   const dayWord = isLive ? "today" : dayStamp(day * 86_400);
   const lv = s.level ? levelAt(s, day) : null;
   const wv = s.warn ? levelAt(s, day, "warn") : null;
+  const bv = s.band ? bandAt(s.band, day) : null;
+  // Where the day's price stands against the band: inside it, or under it.
+  const bandPlace = bv && r ? (r.point[1] < bv[2] ? "below" : r.point[1] <= bv[1] ? "inside" : null) : null;
+  const bandEst = bv != null && bv[3] != null && s.band?.estimated?.includes(bv[0]) === true;
+  const bandProv: Provenance | null =
+    bv && s.band
+      ? {
+          ...(bandEst ? { kind: "derived" as const } : { kind: "chain" as const, pclass: "state" as const }),
+          summary: `${s.band.summary}. ${(bv[3] == null
+            ? s.band.here.live
+            : bandEst && s.band.here.estimated
+              ? s.band.here.estimated
+              : s.band.here.read
+          )
+            .replace("{block}", bv[3]?.toLocaleString("en-US") ?? "")
+            .replace("{day}", dayWord)}`,
+          formula: s.band.formula,
+          ...(bv[3] != null ? { source: { block: bv[3] } } : {}),
+        }
+      : null;
   const here = s.level?.here;
   const levelProv: Provenance | null = lv
     ? {
@@ -1187,7 +1214,7 @@ function PriceFigures({
             }
             value={String(r.point[1])}
           >
-            {formatPrice(r.point[1], s.unitLabel, s.digits)}
+            {s.print ? s.print(r.point[1]) : formatPrice(r.point[1], s.unitLabel, s.digits)}
           </Prov>
         </span>
       ) : (
@@ -1211,6 +1238,37 @@ function PriceFigures({
             <span className={`font-semibold ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}>
               <Prov info={levelProv} value={String(lv[1])}>
                 {s.health && s.unitLabel === "" ? "1" : formatPrice(lv[1], s.unitLabel, s.digits)}
+              </Prov>
+            </span>
+          </span>
+        </>
+      )}
+      {bandPlace && s.band && (
+        <span
+          className={`col-span-2 text-xs font-semibold ${isLive ? "text-amber-600 dark:text-amber-400" : "text-rb-500"}`}
+          data-band-place={bandPlace}
+        >
+          {bandPlace === "inside" ? s.band.inside : (s.band.below ?? s.band.inside)}
+        </span>
+      )}
+      {showLevel && bv && bandProv && s.band && (
+        <>
+          <span className="inline-flex justify-center text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+            {s.band.label}
+          </span>
+          <span
+            className="whitespace-nowrap"
+            data-band-readout=""
+            data-band-day={bv[0]}
+            data-band-block={bv[3] ?? ""}
+            data-band-hi={bv[1]}
+            data-band-lo={bv[2]}
+            data-anatomy="F19.10"
+          >
+            <span className={`font-semibold ${isLive ? "text-amber-600 dark:text-amber-400" : "text-rb-500"}`}>
+              <Prov info={bandProv} value={`${bv[1]}–${bv[2]}`}>
+                {formatPrice(bv[1], s.unitLabel, s.digits).replace(` ${s.unitLabel}`, "")} →{" "}
+                {formatPrice(bv[2], s.unitLabel, s.digits)}
               </Prov>
             </span>
           </span>

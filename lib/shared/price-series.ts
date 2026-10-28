@@ -57,6 +57,9 @@ export interface PriceSeries {
   /** Places the figure prints to where the card prints a fixed number (Sky's
    *  share price, six; Dolomite's margin ratio, two in percent). */
   digits?: number;
+  /** The tip's figure as the card prints it, where its formatter is the
+   *  family's (LlamaLend's health, `fmtHealth`). */
+  print?: (v: number) => string;
   /** Days before this one are the rows alone and draw by the sparse rule:
    *  every segment dotted, the observations marked by `events`. */
   sparseBefore?: number;
@@ -68,8 +71,49 @@ export interface PriceSeries {
    *  it can be liquidated (f(x)'s rebalance): its points and receipt, and
    *  the verb its mark reads ("Rebalances"). */
   warn?: PriceLevel & { verb: string };
+  /** A price range the position is acted on inside, shaded on the same axis
+   *  (LlamaLend's soft-liquidation band). */
+  band?: PriceBand;
   /** The stored rounds the series reads from `rounds.joinDay` on (`joinRounds`). */
   rounds?: PriceRounds;
+}
+/** A band's edges on a day: [day, upper, lower, block of the read it rests
+ *  on (null for the live read)]. */
+export type BandPoint = [day: number, upper: number, lower: number, block: number | null];
+/** A price range per day, held between the reads that set it, the range
+ *  ending where the position did. */
+export interface PriceBand {
+  points: BandPoint[];
+  /** The band's name in the tip ("Band"). */
+  label: string;
+  /** The tip's line while the day's price is inside the band, and under it. */
+  inside: string;
+  below?: string;
+  /** The caption's formula in words, and the receipt's first sentence
+   *  (without its full stop). */
+  formula: string;
+  summary: string;
+  /** The receipt's second sentence: at the live read, and at a point resting
+   *  on a block ("{block}", "{day}"); `estimated` for a day in `estimated`. */
+  here: { live: string; read: string; estimated?: string };
+  /** Days whose edges are worked rather than read (LlamaLend's days before
+   *  the first read): drawn lighter, their edges dashed. */
+  estimated?: number[];
+  end: PriceLevel["end"];
+}
+/** The band's edges on `day`, or null where it has none. */
+export function bandAt(band: PriceBand | undefined, day: number): BandPoint | null {
+  const pts = band?.points;
+  if (!pts?.length) return null;
+  let lo = 0;
+  let hi = pts.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (pts[mid][0] <= day) lo = mid + 1;
+    else hi = mid;
+  }
+  const p = pts[lo - 1];
+  return p && p[0] === day ? p : null;
 }
 /** A row's price on its day: [the row's day, price, block]; a redemption row
  *  adds the redemption price it was redeemed at. */
@@ -113,10 +157,11 @@ export interface LevelEvent {
  *  at the level that stood before it. On an open position the last point is
  *  today's at `live` where the page read one. Each point carries the block
  *  of the event whose balances it rests on, null for the live read. Null
- *  where no day has a level. Ascending events. */
+ *  where no day has a level. Ascending events. A figure at or below zero is
+ *  dropped unless `signed` (LlamaLend's health, liquidatable below 0). */
 export function levelByDay<E extends LevelEvent>(
   evs: readonly E[],
-  o: { now: number; at: (e: E, t: number) => number | null; live?: number | null },
+  o: { now: number; at: (e: E, t: number) => number | null; live?: number | null; signed?: true },
 ): Pick<PriceLevel, "points" | "end"> | null {
   if (evs.length === 0) return null;
   const today = Math.floor(o.now / DAY_S);
@@ -150,7 +195,7 @@ export function levelByDay<E extends LevelEvent>(
         block = prev.block;
       }
     }
-    if (level != null && Number.isFinite(level) && level > 0) points.push([d, level, block]);
+    if (level != null && Number.isFinite(level) && (o.signed || level > 0)) points.push([d, level, block]);
   }
   if (points.length === 0) return null;
   return { points, end: open ? "today" : last.liquidation ? "liquidation" : "close" };
@@ -161,7 +206,7 @@ export function levelFormulaAt(level: PriceLevel, day: number): string {
   return level.formula;
 }
 /** What a family adds to an asset's series for the price view. */
-export type PriceMarks = Pick<PriceSeries, "events" | "level" | "warn" | "sparseBefore" | "help">;
+export type PriceMarks = Pick<PriceSeries, "events" | "level" | "warn" | "band" | "sparseBefore" | "help">;
 /** A daily wire's observation: [day, price, block], the block absent on an older server. */
 export type DayObs = [number, number, (number | null)?];
 
