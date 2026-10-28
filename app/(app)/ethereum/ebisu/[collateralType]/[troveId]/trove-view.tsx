@@ -371,7 +371,15 @@ export default function EbisuTroveDetail({
   // (ui-jobs 328 step 6).
   const flowFork = useMemo(() => {
     const branch = resolveForkBranch(collateralType);
-    return branch ? { name: "Ebisu", mcr: branch.mcr, mcrBefore: branch.mcrBefore, stepsRead: true } : null;
+    return branch
+      ? {
+          name: "Ebisu",
+          branchManager: branch.branchManager,
+          mcr: branch.mcr,
+          mcrBefore: branch.mcrBefore,
+          stepsRead: true,
+        }
+      : null;
   }, [collateralType]);
   const flows = useLiquityForkFlows({
     wholeEvents: historyWindow.state === "whole" && !servedFolders?.length ? ebisuEvents : null,

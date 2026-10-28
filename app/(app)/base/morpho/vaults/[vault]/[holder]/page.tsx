@@ -37,6 +37,10 @@
 // gate ran, and no rows exist — so no tail is offered, and the page states "at
 // least N" rather than N.
 
+import { vaultLifeChanges } from "@/lib/sources/chain/block-timestamps";
+import { withChanges } from "@/lib/shared/flows-changes";
+import { morphoVaultTimelineNoteProv } from "@/lib/morpho-base/vault-timeline-provenance";
+import type { MorphoVaultNote } from "@/lib/shared/vault-holder-timeline";
 import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -206,7 +210,13 @@ const loadHistory = cache(async (data: MorphoBaseVaultResponse, holder: string) 
     blockNumber: data.blockNumber,
     replayed: economics != null && flowTimeline != null,
   });
-  return { timeline, economics, flowTimeline, card };
+  // The vault's configuration changes inside the life, marked on the events row (ruling 10).
+  const changes = flowTimeline
+    ? await vaultLifeChanges(BASE_CHAIN_ID, timeline.notes, allEvents, (n) =>
+        morphoVaultTimelineNoteProv(coords, n as MorphoVaultNote),
+      )
+    : [];
+  return { timeline, economics, flowTimeline: withChanges(flowTimeline, changes), card };
 });
 
 /** The Lifetime flows panel and the timeline, streamed in behind a Suspense

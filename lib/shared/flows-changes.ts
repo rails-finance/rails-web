@@ -1,0 +1,78 @@
+// Protocol changes on the Lifetime flows panel's events row (rails-ops
+// reference/lifetime-price-chart.md, ruling 10): a setting the protocol moved
+// for every position (a stability fee, a minimum ratio, a vault's fee), marked
+// on the day it took effect, named there with its value before and after and
+// the log it was read from. Each family builds its changes from the series
+// its page already reads; the panel draws those inside the position's life.
+//
+// Pure: no DOM, no fetch.
+
+import type { Provenance } from "@/components/shared/provenance";
+import type { FlowTimeline } from "@/lib/shared/flows-timeline";
+
+const DAY_S = 86_400;
+
+export interface FlowChange {
+  /** The UTC day number (unix seconds ÷ 86,400) the change took effect on. */
+  day: number;
+  /** Unix seconds of its block. */
+  ts: number;
+  block: number;
+  txHash?: string;
+  /** What moved, as the family's card names it ("Stability fee"). */
+  name: string;
+  /** The value before, printed; null where no earlier value was read. */
+  from: string | null;
+  /** The value after, printed. */
+  to: string;
+  /** The receipt for the value after. */
+  prov: Provenance;
+}
+
+/** A change at a block's time. */
+export function flowChange(c: Omit<FlowChange, "day">): FlowChange {
+  return { ...c, day: Math.floor(c.ts / DAY_S) };
+}
+
+/** The changes from `startDay` to `endDay` (UTC day numbers, both inclusive),
+ *  one entry per day in day order, each day's changes in block order. */
+export function changesByDay(
+  changes: readonly FlowChange[] | undefined,
+  startDay: number,
+  endDay: number,
+): { day: number; changes: FlowChange[] }[] {
+  const byDay = new Map<number, FlowChange[]>();
+  for (const c of changes ?? []) {
+    if (c.day < startDay || c.day > endDay) continue;
+    const list = byDay.get(c.day) ?? [];
+    list.push(c);
+    byDay.set(c.day, list);
+  }
+  return [...byDay]
+    .sort((a, b) => a[0] - b[0])
+    .map(([day, list]) => ({ day, changes: list.sort((a, b) => a.block - b.block) }));
+}
+
+/** "Stability fee 5.25 % → 6.00 %", or "Name set to Steakhouse USDC" where
+ *  the value before was not read. */
+export const changeWords = (c: Pick<FlowChange, "name" | "from" | "to">): string =>
+  c.from != null ? `${c.name} ${c.from} → ${c.to}` : `${c.name} set to ${c.to}`;
+
+/** A fraction or a percent printed as the cards print a rate: "6.00 %". */
+export const pctWords = (percent: number, digits = 2): string => `${percent.toFixed(digits)} %`;
+
+/** A span of seconds in the largest whole unit that prints it exactly
+ *  ("20 days", "36 hours", "90 seconds"). */
+export function durationWords(seconds: number): string {
+  const s = Math.round(seconds);
+  const unit = (n: number, w: string) => `${n.toLocaleString("en-US")} ${w}${n === 1 ? "" : "s"}`;
+  if (s > 0 && s % DAY_S === 0) return unit(s / DAY_S, "day");
+  if (s > 0 && s % 3600 === 0) return unit(s / 3600, "hour");
+  if (s > 0 && s % 60 === 0) return unit(s / 60, "minute");
+  return unit(s, "second");
+}
+
+/** A timeline with its changes, the same object where there are none. */
+export function withChanges<T extends FlowTimeline | null>(t: T, changes: FlowChange[]): T {
+  return t && changes.length ? { ...t, changes } : t;
+}

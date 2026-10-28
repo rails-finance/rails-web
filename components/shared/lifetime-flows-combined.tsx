@@ -68,6 +68,7 @@ import { OldPriceLabel } from "@/components/shared/flow-old-price";
 import { LwRanges, nearestStopAt, type FlowsLwApi, type FlowsLwAxis } from "@/components/shared/lifetime-flows-lw-axis";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
+import { changesByDay, changeWords, type FlowChange } from "@/lib/shared/flows-changes";
 import {
   axisEndDay,
   closeStop,
@@ -197,6 +198,131 @@ export function FlowPip({
   );
 }
 
+/** A protocol change's tip: the width of the cursor's boxes, and the height
+ *  past which its list scrolls. */
+const CHANGE_TIP_W = PAIR_W;
+const CHANGE_TIP_H = 152;
+/** Days whose markers would stand closer than this share one marker. */
+const CHANGE_GAP = 16;
+
+type ChangeDay = { day: number; changes: FlowChange[] };
+
+/** The days' markers as drawn: a run of days closer than `CHANGE_GAP` px
+ *  shares the first one's marker (a fee reset every few weeks over years, on
+ *  a phone), and zooming in parts them. */
+function changeClusters(days: ChangeDay[], x: (day: number) => number): { x: number; days: ChangeDay[] }[] {
+  const out: { x: number; days: ChangeDay[] }[] = [];
+  for (const d of days) {
+    const at = x(d.day);
+    const last = out[out.length - 1];
+    if (last && at - last.x < CHANGE_GAP) last.days.push(d);
+    else out.push({ x: at, days: [d] });
+  }
+  return out;
+}
+
+/** The protocol's changes on the events row (ruling 10): a hollow diamond in
+ *  the muted tone along the row's top, apart from the account's own pips, on
+ *  the day a change took effect. Hover, focus or a tap opens its tip: each
+ *  change's name, its value before and after with the receipt, and the day.
+ *  A press on it does not move the cursor. */
+function ChangeMarker({ days, left, w, faded }: { days: ChangeDay[]; left: number; w: number; faded: boolean }) {
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const tipId = useId();
+  const open = hover || pinned || focused;
+  // A tap elsewhere closes a tip a tap or the focus opened.
+  const held = pinned || focused;
+  useEffect(() => {
+    if (!held) return;
+    const away = (e: globalThis.PointerEvent) => {
+      if (wrapRef.current?.contains(e.target as Node)) return;
+      setPinned(false);
+      setFocused(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [held]);
+  const tipW = Math.min(CHANGE_TIP_W, w);
+  const tipLeft = Math.max(-left, Math.min(w - left - tipW, -tipW / 2));
+  const dateOf = (day: number) => dayStamp(day * 86_400);
+  const label = days.map((d) => `${d.changes.map(changeWords).join("; ")}, ${dateOf(d.day)}`).join(". ");
+  return (
+    <span
+      ref={wrapRef}
+      className="absolute top-0 z-[5]"
+      style={{ left }}
+      data-flow-change={days[0].day}
+      data-flow-change-days={days.map((d) => d.day).join(",")}
+      data-flow-change-x={left.toFixed(1)}
+      data-anatomy="F4.2"
+      onPointerEnter={(e) => e.pointerType === "mouse" && setHover(true)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && setHover(false)}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || !open) return;
+        e.stopPropagation();
+        setPinned(false);
+        setHover(false);
+        setFocused(false);
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+      }}
+    >
+      <button
+        type="button"
+        className="absolute left-0 top-0 flex h-3.5 w-4 -translate-x-1/2 items-center justify-center rounded-sm pointer-coarse:h-5"
+        aria-label={label}
+        aria-expanded={open}
+        aria-describedby={open ? tipId : undefined}
+        // The row scrubs on a press; a press on the marker opens its tip instead.
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => setPinned((v) => !v)}
+        data-flow-change-button=""
+      >
+        <svg width="7" height="7" viewBox="0 0 8 8" aria-hidden style={{ opacity: faded ? 0.35 : 1 }}>
+          <path d="M4 0.75 7.25 4 4 7.25 0.75 4Z" fill="none" stroke="var(--color-rb-500)" strokeWidth="1.5" />
+        </svg>
+      </button>
+      {open && (
+        <span
+          id={tipId}
+          role="tooltip"
+          className={`absolute bottom-full mb-1.5 block overflow-y-auto overscroll-contain rounded-lg border px-2 py-1.5 text-xs font-medium leading-4 text-foreground ${CURSOR_SKIN}`}
+          style={{ left: tipLeft, width: tipW, maxHeight: CHANGE_TIP_H }}
+          data-flow-change-tip=""
+        >
+          {days.map((d) => (
+            <span key={d.day} className="block [&+&]:mt-1" data-flow-change-day={d.day}>
+              {d.changes.map((c, i) => (
+                <span
+                  key={i}
+                  className="block"
+                  data-flow-change-item=""
+                  data-flow-change-name={c.name}
+                  data-flow-change-from={c.from ?? ""}
+                  data-flow-change-to={c.to}
+                  data-flow-change-block={c.block}
+                  data-flow-change-tx={c.txHash ?? ""}
+                >
+                  <span className="font-semibold">{c.name}</span>{" "}
+                  <Prov info={c.prov} value={c.to}>
+                    {c.from != null ? `${c.from} → ${c.to}` : `set to ${c.to}`}
+                  </Prov>
+                </span>
+              ))}
+              <span className="block text-rb-500">{dateOf(d.day)}</span>
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** The chart on Lightweight Charts, its code fetched only where a family
  *  draws on it (and the library only once the charts are shown). */
 const LifetimeFlowsLw = dynamic(() => import("@/components/shared/lifetime-flows-lw").then((m) => m.LifetimeFlowsLw), {
@@ -217,7 +343,7 @@ const BARS_HELP = lifetimeFlowsBarsContent();
  *  events by the family's names for them (its buckets' events), and the
  *  marks the family draws (the warning tones its buckets carry, the marks it
  *  names, the ticks the position has). */
-function eventsHelp(model: FlowModel, hasDebt: boolean): FlowEventsHelp {
+function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: FlowChange[] }[]): FlowEventsHelp {
   const has = new Set(model.ticks.map((t) => t.tick));
   const wordsOf = (side: "collateral" | "debt") => [
     ...new Set(
@@ -245,7 +371,19 @@ function eventsHelp(model: FlowModel, hasDebt: boolean): FlowEventsHelp {
     caution,
     delegateRate: has.has("rate-delegate") || named["rate-delegate"] != null,
     ownerRate: has.has("rate-owner") || named["rate-owner"] != null,
+    changes: [...new Set(changeDays.flatMap((d) => d.changes.map((c) => c.name)))],
   };
+}
+
+/** The value line's subject in the how-to-read, where it is not collateral
+ *  and debt in one unit: the family's words for a holding, or each side in
+ *  its token where the sides have no common unit (Frankencoin, PWN). */
+function valueLineWords(model: FlowModel): string | undefined {
+  if (model.words.valueLine) return model.words.valueLine;
+  const u = model.sideUnits;
+  if (!u) return undefined;
+  const lc = (w: string) => w.toLowerCase();
+  return `the ${lc(model.labels.collateral)} in ${u.collateral.symbol} and the ${lc(model.labels.debt)} in ${u.debt.symbol}, each on its own axis,`;
 }
 
 /** This position's Key, under the bars' how-to-read: provided by the panel,
@@ -620,7 +758,9 @@ export function CombinedFlows({
     ),
     ...(hasDebt ? { debt: <div className="mb-1.5 mt-4">{bareHeadline("debt")}</div> } : {}),
   };
-  const marks = useMemo(() => eventsHelp(model, hasDebt), [model, hasDebt]);
+  // The protocol's changes inside the life, a marker a day (ruling 10).
+  const changeDays = useMemo(() => changesByDay(model.changes, startDay, today), [model.changes, startDay, today]);
+  const marks = useMemo(() => eventsHelp(model, hasDebt, changeDays), [model, hasDebt, changeDays]);
   const priceBrief = priced
     ? {
         health: !!priced.health,
@@ -633,7 +773,7 @@ export function CombinedFlows({
   const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
   const stackHelp = lifetimeFlowsStackContent({
     events: marks,
-    charts: { value: true, price: priceBrief, unit: lineUnitWords(model) },
+    charts: { value: true, price: priceBrief, unit: lineUnitWords(model), line: valueLineWords(model) },
   });
   const priceOnlyHelp = lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
 
@@ -802,6 +942,7 @@ export function CombinedFlows({
                     onPick={go}
                     date={dateProps}
                     steps={steps}
+                    changeDays={changeDays}
                   />
                 </div>
                 {/* With the events row hidden, the cursor's date stands alone. */}
@@ -1593,6 +1734,7 @@ function PipRow({
   onPick,
   date,
   steps,
+  changeDays,
 }: {
   model: FlowModel;
   /** Where an absolute day's close sits on the charts' time axis. */
@@ -1609,6 +1751,8 @@ function PipRow({
   date: CursorDateProps;
   /** The step buttons, on the date's right. */
   steps: ReactNode;
+  /** The protocol's changes inside the life, by day (`changesByDay`). */
+  changeDays: ChangeDay[];
 }) {
   const startDay = model.start / DAY_MS;
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -1655,6 +1799,8 @@ function PipRow({
           // On a chart that pans the row ends where its plot does.
           style={clip && w > 0 ? { width: w } : undefined}
           data-flow-pips=""
+          // The life's first and last UTC day, for the verifiers.
+          data-flow-life={`${startDay}-${today}`}
           data-anatomy="F4.1"
           onPointerDown={(e) => {
             if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -1699,6 +1845,18 @@ function PipRow({
                 />
               ))}
           </div>
+          {w > 0 &&
+            changeClusters(
+              clip
+                ? changeDays.filter((d) => {
+                    const x = xClose(d.day);
+                    return x >= 0 && x <= w;
+                  })
+                : changeDays,
+              xClose,
+            ).map((m) => (
+              <ChangeMarker key={m.days[0].day} days={m.days} left={m.x} w={w} faded={dim && m.x > cx + 0.5} />
+            ))}
           {/* A 1px border on the pill's ground; locked to the timeline, the sync link's teal. */}
           <span
             aria-hidden

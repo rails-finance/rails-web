@@ -544,6 +544,7 @@ export function maplePoolRateLine(
 export function mapleFlowWords(assetSymbol: string, poolSymbol: string): NonNullable<FlowTimeline["words"]> {
   return {
     held: "Still in the pool",
+    valueLine: `the pool claim's value in ${assetSymbol}`,
     restBySide: { collateral: "Interest since the last event" },
     restNote: {
       collateral: `the rise in the pool's rate since the position's last event, on the ${poolSymbol} it held`,

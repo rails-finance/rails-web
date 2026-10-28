@@ -5,6 +5,8 @@
 // Every figure is at the sealed block the api names; the server half has
 // already refused the page when the gate did not pass.
 
+import { withChanges } from "@/lib/shared/flows-changes";
+import { skyFlowChanges } from "@/lib/sky-savings/flows-changes";
 import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
@@ -154,7 +156,8 @@ export default function SkySavingsPositionView({
 
   const totals = useMemo(() => (days ? skyLifetimeTotals(days) : null), [days]);
   const flowTimeline = useMemo(
-    () => (days && rates ? skyFlowTimeline(days, rates, position, asOf, todayDay) : null),
+    () =>
+      days && rates ? withChanges(skyFlowTimeline(days, rates, position, asOf, todayDay), skyFlowChanges(rates)) : null,
     [days, rates, position, asOf, todayDay],
   );
 

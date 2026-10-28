@@ -31,6 +31,8 @@ export interface FlowEventsHelp {
   caution?: string;
   delegateRate?: boolean;
   ownerRate?: boolean;
+  /** The protocol changes marked inside the life, by name (ruling 10). */
+  changes?: string[];
 }
 
 /** The price chart under the value line: an asset's price, or the health
@@ -48,6 +50,10 @@ export interface FlowPriceHelp {
   name?: string;
 }
 
+/** "Stability fee" → "stability fee"; a name with capitals after its first
+ *  letter ("Savings Rate", "PSM exit fee") keeps its case. */
+const lowerFirst = (w: string) => (/^[A-Z][^A-Z]*$/.test(w) ? `${w[0].toLowerCase()}${w.slice(1)}` : w);
+
 const listWords = (xs: string[]) =>
   xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
@@ -56,14 +62,14 @@ const listWords = (xs: string[]) =>
  *  alone (`events` null). */
 export function lifetimeFlowsStackContent(opts: {
   events: FlowEventsHelp | null;
-  charts: { value: boolean; price: FlowPriceHelp | null; unit?: string } | null;
+  charts: { value: boolean; price: FlowPriceHelp | null; unit?: string; line?: string } | null;
 }): LearnMoreContent {
   const { events, charts } = opts;
   const details: { bold: string; text: string }[] = [];
   if (charts?.value)
     details.push({
       bold: "The value line",
-      text: `collateral and debt in ${charts.unit ?? "USD"} at each day's close.`,
+      text: `${charts.line ?? `collateral and debt in ${charts.unit ?? "USD"}`} at each day's close.`,
     });
   const price = charts?.price;
   if (price)
@@ -104,6 +110,11 @@ export function lifetimeFlowsStackContent(opts: {
         ...(marks.length ? [sentence(listWords(marks))] : []),
       ].join(" "),
     });
+    if (events.changes?.length)
+      details.push({
+        bold: "The grey diamonds",
+        text: `along the row's top, a change the protocol made for every position on the day it took effect: ${listWords(events.changes.map(lowerFirst))}. Point at, focus or tap one for the value before and after, with its receipt.`,
+      });
   }
   details.push({
     bold: "The cursor",

@@ -21,6 +21,8 @@ import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
 import { useMakerIlkAt, useMakerMatChanges } from "@/lib/makerdao/use-chain-history";
 import { MAKER_HEALTH_SOURCE, makerCollKey, makerMatReads } from "@/lib/makerdao/flows-health";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
+import type { MakerRateLogResponse } from "@/lib/api/fetch-makerdao-rate-log";
+import { makerFlowChanges } from "@/lib/makerdao/flows-changes";
 import {
   MK,
   makerBorrower,
@@ -60,6 +62,9 @@ export interface MakerFlowsInput {
   /** The card's risk figures from the live read, for the health view's
    *  today; null where the read has not landed. */
   risk: MakerRisk | null;
+  /** The ilk's stability fee history, where the page read it: the fee sets
+   *  the events row marks (ruling 10). */
+  rateLog?: MakerRateLogResponse | null;
 }
 
 /** The card's risk figures now. */
@@ -202,7 +207,7 @@ export function useMakerFlows(p: MakerFlowsInput): {
         : null,
     [p.collSymbol, risk],
   );
-  const timeline = useFlowsHealth(replayedTimeline, {
+  const healthTimeline = useFlowsHealth(replayedTimeline, {
     reader: null,
     given: matReads,
     source: MAKER_HEALTH_SOURCE,
@@ -211,6 +216,22 @@ export function useMakerFlows(p: MakerFlowsInput): {
     liveLevels,
     liveLine: risk?.mat ?? null,
   });
+  // The fee sets and the minimum ratio's changes, marked on the events row.
+  const changes = useMemo(() => {
+    if (!p.ilk) return [];
+    const ilkAt = first ? (matFirst?.reads.get(first.block) ?? null) : null;
+    const span = matSpans[0];
+    const read = span ? matChanges.get(`${span.from}-${span.to}`) : null;
+    return makerFlowChanges(
+      p.ilk,
+      p.rateLog ?? null,
+      read ? { first: ilkAt?.mat ?? null, changes: read.changes } : null,
+    );
+  }, [p.ilk, p.rateLog, first, matFirst, matSpans, matChanges]);
+  const timeline = useMemo(
+    () => (healthTimeline && changes.length ? { ...healthTimeline, changes } : healthTimeline),
+    [healthTimeline, changes],
+  );
   const focusEvents = useMemo(
     () =>
       replayed && opts && timeline

@@ -28,6 +28,8 @@ import {
   replayPolaris,
   type PolarisFlowFacts,
 } from "@/lib/polaris/flows";
+import { polarisFlowChanges } from "@/lib/polaris/flows-changes";
+import { withChanges } from "@/lib/shared/flows-changes";
 
 const DAY_S = 86_400;
 const SEPOLIA = 11155111;
@@ -92,12 +94,14 @@ export function usePolarisFlows(p: PolarisFlowsInput): {
       console.warn("Lifetime flows: Polaris rows do not chain", replay.unchained, replay.unbalanced);
   }, [replay]);
   const ok = replay != null && replay.unchained.length === 0 && replay.unbalanced.length === 0;
+  // The market's rate sets, marked on the events row (ruling 10).
+  const changes = useMemo(() => (p.events ? polarisFlowChanges(p.events, p.stable) : []), [p.events, p.stable]);
   const timeline = useMemo(
     () =>
       ok && replay && now != null && storeSettled
-        ? polarisFlowTimeline(replay, { stable: p.stable, now, open: p.open, live, daily })
+        ? withChanges(polarisFlowTimeline(replay, { stable: p.stable, now, open: p.open, live, daily }), changes)
         : null,
-    [ok, replay, now, p.stable, p.open, live, storeSettled, daily],
+    [ok, replay, now, p.stable, p.open, live, storeSettled, daily, changes],
   );
   const focusEvents = useMemo(
     () => (replay && timeline ? polarisFocusEvents(replay, p.stable) : []),

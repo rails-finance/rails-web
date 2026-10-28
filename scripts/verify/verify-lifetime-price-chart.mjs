@@ -368,6 +368,8 @@ const PAGES = [
     id: "makerdao 2028",
     path: "/ethereum/makerdao/2028",
     lwOnly: true,
+    unit: "USD",
+    changes: { day: 18866, name: "Minimum ratio", from: "150 %", to: "145 %", block: 13108692 },
     ratio: {
       label: "Collateral ratio",
       liquidates: "below",
@@ -382,6 +384,17 @@ const PAGES = [
     id: "makerdao 31489 (liquidated)",
     path: "/ethereum/makerdao/31489",
     lwOnly: true,
+    // The fee set of 27 Oct 2025, and the WBTC-A sets after the liquidation
+    // (13.50 % on 6 Jun 2026) unmarked; every set in the life against the log.
+    changes: {
+      day: 20388,
+      name: "Stability fee",
+      from: "12.75 %",
+      to: "13.00 %",
+      block: 23670008,
+      outside: 20610,
+      feeLog: "WBTC-A",
+    },
     ratio: {
       label: "Collateral ratio",
       liquidates: "below",
@@ -487,6 +500,8 @@ const PAGES = [
     id: "sky-savings 0x176f",
     path: "/ethereum/sky-savings/0x176f3dab24a159341c0509bb36b833e7fdd0a132",
     lwOnly: true,
+    valueLine: /^the balance's value in USD$/,
+    changes: { day: 20657, name: "Savings Rate", from: "3.60 %", to: "3.52 %", block: 25596101 },
     share: true,
   },
   {
@@ -545,6 +560,7 @@ const PAGES = [
     id: "ebisu weeth 1065 (closed, MCR step)",
     path: "/ethereum/ebisu/weeth/106525219326064530299176858413070691994107358379893271777150080609961810096862",
     lwOnly: true,
+    changes: { day: 20457, name: "Minimum ratio", from: "128 %", to: "120 %", block: 24160712 },
     level: {
       asset: "weETH",
       endDay: 20624,
@@ -592,6 +608,8 @@ const PAGES = [
     id: "polaris usdp 2420",
     path: "/sepolia/polaris/usdp/2420",
     lwOnly: true,
+    // The first set inside the life; the set before it is in force at no row.
+    changes: { day: 20704, name: "Primary rate", from: "", to: "4.37 %", block: 11660977 },
     level: { asset: "pETH", card: "polaris", help: ["debt × 115%", "defensive mode's 150% minimum is not drawn"] },
   },
   {
@@ -665,6 +683,7 @@ const PAGES = [
     panes: "collateral,debt,price",
     family: { kind: "declared" },
     unit: "token",
+    valueLine: /^the collateral in [\w.$-]+ and the debt in ZCHF, each on its own axis,$/,
   },
   {
     id: "frankencoin 0x4220 (price moved)",
@@ -679,6 +698,7 @@ const PAGES = [
     lwOnly: true,
     family: { kind: "pool" },
     unit: "token",
+    valueLine: /^the pool claim's value in USDC$/,
   },
   {
     id: "pwn 0xb2d3 (liquidated)",
@@ -692,7 +712,9 @@ const PAGES = [
     path: "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
     lwOnly: true,
     unit: "token",
+    valueLine: /^the claim's value in GHO$/,
     family: { kind: "vault" },
+    changes: { day: 20697, name: "Target rate", from: "4.25 %", to: "4.50 %", block: 25883272 },
   },
   {
     id: "aave umbrella stkwaEthUSDC holder 0x5a2a",
@@ -716,6 +738,8 @@ const PAGES = [
     id: "morpho-base vault holder 0x3d88",
     path: "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2/0x3d8863a416f3091766bfea41d3d7008236a0dd1e",
     lwOnly: true,
+    // The vault's first SetFee: created with no fee.
+    changes: { day: 20614, name: "Performance fee", from: "0.00 %", to: "5.00 %", block: 47141158 },
     family: { kind: "vault" },
   },
   // A one-day life (one transaction on 11 Oct 2026, open): the price pane alone.
@@ -1372,6 +1396,175 @@ async function howToRead(page) {
   return help;
 }
 
+/** The protocol's changes on the events row (ruling 10, ui-jobs 328 step 9):
+ *  the source's change (`pg.changes`) has a marker on its day, placed where
+ *  the chart places that day's close, at All, zoomed and panned; its tip
+ *  (hover at 1280, a tap at 390) names it with its values before and after
+ *  and its block, inside a receipt; no marker stands outside the life, nor
+ *  on the `outside` day; Maker's every fee set in the life is marked as the
+ *  ilk's rate log states it (`feeLog`); the "?" names the markers. */
+async function checkChanges(page, tag, pg, width) {
+  const want = pg.changes;
+  const read = () =>
+    page.evaluate(() => {
+      const row = document.querySelector("[data-flows-combined] [data-flow-pips]");
+      const w = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
+      return {
+        life: (row?.getAttribute("data-flow-life") ?? "").split("-").map(Number),
+        from: Number(w?.getAttribute("data-flow-lw-from")),
+        to: Number(w?.getAttribute("data-flow-lw-to")),
+        plotW: Number(w?.getAttribute("data-flow-lw-plot-w") || 0),
+        cursorX: Number(w?.getAttribute("data-flow-lw-cursor-x") || NaN),
+        markers: [...document.querySelectorAll("[data-flows-combined] [data-flow-change]")].map((m) => ({
+          days: (m.getAttribute("data-flow-change-days") ?? "").split(",").map(Number),
+          x: Number(m.getAttribute("data-flow-change-x")),
+          label: m.querySelector("button")?.getAttribute("aria-label") ?? "",
+        })),
+      };
+    });
+  // Where the chart's equal-time axis places a day's close, within a cell.
+  const placed = (st, m) => {
+    const span = st.to - st.from;
+    if (!(span > 0) || !(st.plotW > 0)) return false;
+    const want = (((m.days[0] + 1) * DAY - st.from) / span) * st.plotW;
+    const cell = Math.max(3, (st.plotW * 2 * DAY) / span);
+    return Math.abs(m.x - want) <= cell;
+  };
+  const sig = (st) => st.markers.map((m) => `${m.days[0]}:${m.x}`).join(",");
+  await page
+    .locator('[data-flows-combined] [data-flow-range="All"]')
+    .first()
+    .click()
+    .catch(() => {});
+  await page.waitForTimeout(700);
+  const all = await read();
+  const m = all.markers.find((k) => k.days.includes(want.day));
+  if (
+    !check(
+      `${tag}: a protocol-change marker stands on ${want.day} (${want.name})`,
+      !!m,
+      all.markers.length + " markers",
+    )
+  )
+    return;
+  check(
+    `${tag}: every marker sits where the chart places its day's close (All)`,
+    all.markers.length > 0 && all.markers.every((k) => placed(all, k)),
+    all.markers
+      .filter((k) => !placed(all, k))
+      .slice(0, 3)
+      .map((k) => `${k.days[0]}@${k.x}`)
+      .join(" "),
+  );
+  const [lifeFrom, lifeTo] = all.life;
+  const days = all.markers.flatMap((k) => k.days);
+  check(
+    `${tag}: no marker stands outside the life (${lifeFrom}–${lifeTo})`,
+    lifeFrom > 0 && days.every((d) => d >= lifeFrom && d <= lifeTo),
+    days.filter((d) => d < lifeFrom || d > lifeTo).join(","),
+  );
+  if (want.outside != null)
+    check(`${tag}: the change on ${want.outside}, after the life, has no marker`, !days.includes(want.outside));
+  if (want.feeLog) {
+    const log = await hostFetch(`${BASE}/api/makerdao/ilks/${want.feeLog}/rate-log`).then((r) => r.json());
+    const pct = (v) => `${v.toFixed(2)} %`;
+    const inLife = log.sets
+      .map((x, i) => ({ ...x, prev: log.sets[i - 1] }))
+      .filter((x) => {
+        const d = Math.floor(x.timestamp / DAY);
+        return d >= lifeFrom && d <= lifeTo;
+      });
+    const labels = all.markers.map((k) => k.label).join(" | ");
+    const missing = inLife.filter(
+      (x) =>
+        !labels.includes(
+          `Stability fee ${x.prev ? pct(x.prev.aprPct) : ""}`.trim() +
+            (x.prev ? ` → ${pct(x.aprPct)}` : ` set to ${pct(x.aprPct)}`),
+        ),
+    );
+    check(
+      `${tag}: each of the ${inLife.length} ${want.feeLog} fee sets in the life is marked as the rate log states it`,
+      inLife.length > 0 && missing.length === 0,
+      missing
+        .slice(0, 3)
+        .map((x) => x.block)
+        .join(","),
+    );
+  }
+  // The tip: the change's name, its values and its block, in a receipt.
+  const btn = page.locator(`[data-flows-combined] [data-flow-change="${m.days[0]}"] button`).first();
+  await btn.scrollIntoViewIfNeeded();
+  if (width < 640) await btn.tap();
+  else await btn.hover();
+  await page.waitForTimeout(300);
+  const items = await page.$$eval("[data-flows-combined] [data-flow-change-tip] [data-flow-change-item]", (els) =>
+    els.map((e) => ({
+      day: Number(e.closest("[data-flow-change-day]")?.getAttribute("data-flow-change-day")),
+      name: e.getAttribute("data-flow-change-name"),
+      from: e.getAttribute("data-flow-change-from"),
+      to: e.getAttribute("data-flow-change-to"),
+      block: Number(e.getAttribute("data-flow-change-block")),
+      text: e.textContent ?? "",
+      prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
+    })),
+  );
+  const it = items.find((i) => i.day === want.day && i.block === want.block);
+  check(
+    `${tag}: the marker's ${width < 640 ? "tap" : "hover"} names it, before → after: ${want.name} ${want.from || "set"} → ${want.to}`,
+    !!it && it.name === want.name && it.from === want.from && it.to === want.to && it.text.includes(want.to),
+    it ? JSON.stringify(it) : `${items.length} items`,
+  );
+  check(`${tag}: the change's figure stands in a receipt, at its block ${want.block}`, !!it?.prov);
+  if (width < 640)
+    await page.evaluate(() => document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
+  else await page.mouse.move(2, 2);
+  await page.waitForTimeout(200);
+  check(`${tag}: the tip closes`, (await page.locator("[data-flows-combined] [data-flow-change-tip]").count()) === 0);
+  // Zoomed and panned, the markers move with the chart.
+  const ranges = await page.$$eval("[data-flows-combined] [data-flow-range]", (bs) =>
+    bs.map((b) => b.getAttribute("data-flow-range")),
+  );
+  const zoom = ranges.includes("1Y") ? "1Y" : ranges.find((r) => r !== "All");
+  if (zoom) {
+    await page.locator(`[data-flows-combined] [data-flow-range="${zoom}"]`).first().click();
+    await page.waitForTimeout(900);
+    const z = await read();
+    const inWindow = z.markers.every((k) => k.x >= 0 && k.x <= z.plotW + 1);
+    check(
+      `${tag}: zoomed to ${zoom}, the markers move with the chart and stay in its window`,
+      sig(z) !== sig(all) && inWindow && z.markers.every((k) => placed(z, k)),
+      `${z.markers.length} markers`,
+    );
+    if (width >= 640) {
+      const box = page.locator("[data-flows-combined] [data-flow-lw-box]").first();
+      await box.evaluate((el) => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 160));
+      await page.waitForTimeout(300);
+      const b = await box.boundingBox();
+      await page.mouse.move(b.x + b.width * 0.5, b.y + Math.min(40, b.height / 3));
+      for (let i = 0; i < 3; i++) {
+        await page.mouse.wheel(-120, 0);
+        await page.waitForTimeout(40);
+      }
+      await page.waitForTimeout(900);
+      const pz = await read();
+      check(
+        `${tag}: panned, the markers move with the chart`,
+        pz.from !== z.from && (pz.markers.length === 0 || sig(pz) !== sig(z)) && pz.markers.every((k) => placed(pz, k)),
+        `${pz.markers.length} markers, window ${z.from}→${pz.from}`,
+      );
+    }
+    await page.locator('[data-flows-combined] [data-flow-range="All"]').first().click();
+    await page.waitForTimeout(600);
+  }
+  const help = await howToRead(page);
+  const named = /^[A-Z][^A-Z]*$/.test(want.name) ? want.name[0].toLowerCase() + want.name.slice(1) : want.name;
+  check(
+    `${tag}: the events' "?" names the markers and ${named}`,
+    help.includes("The grey diamonds") && help.includes(named),
+    help.slice(0, 400),
+  );
+}
+
 /** Liquity V1 (ui-jobs 328 step 5): Liquity V2's view, the ETH price with the
  *  Trove's level at 110 %. On an open Trove today's level is the card's
  *  "Liquidates at"; on a liquidated life the level ends on the liquidation's
@@ -1746,6 +1939,17 @@ async function checkFamilyLine(page, tag, pg) {
  *  token or tokens the pane's figures are in. */
 async function checkValueUnit(page, tag, pg) {
   const help = await howToRead(page);
+  // A page with no collateral and debt names what its value line is
+  // (`valueLine`: the holding's value in its unit, each side's in its token).
+  if (pg.valueLine) {
+    const line = help.match(/The value line\s*—\s*([^•]*?) at each day's close\./)?.[1] ?? "";
+    check(
+      `${tag}: the how-to-read's value line names what it draws (${line})`,
+      pg.valueLine.test(line),
+      line || help.slice(0, 300),
+    );
+    return;
+  }
   const sentence = help.match(/The value line\s*—\s*collateral and debt in ([^.]*?) at each day/)?.[1] ?? "";
   if (pg.unit === "USD")
     check(`${tag}: the how-to-read's value line is in USD`, sentence === "USD", sentence || help.slice(0, 300));
@@ -2618,7 +2822,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").scrollIntoViewIfNeeded();
       await checkLwOpen(page, tag, pg.priceOnly);
     }
-    if (pg.unit) await checkValueUnit(page, tag, pg);
+    if (pg.unit || pg.valueLine) await checkValueUnit(page, tag, pg);
     if (pg.lwOnly) {
       if (!check(`${tag}: the chart draws on Lightweight Charts`, lw)) {
         await ctx.close();
@@ -2634,6 +2838,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.share) await checkShareLine(page, tag);
       if (pg.family) await checkFamilyLine(page, tag, pg);
       if (pg.band) await checkBand(page, tag, pg, width);
+      if (pg.changes) await checkChanges(page, tag, pg, width);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;

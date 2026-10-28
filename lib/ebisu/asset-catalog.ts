@@ -78,7 +78,14 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     troveNft: "0x32541a7a06d3792b46512f3b6c7d8467b5c7d754",
     mcr: 1.2,
     // 128% until tx 0x4bec5d42…edbd1 set 120% (block 24,160,712, 4 Jan 2026).
-    mcrBefore: [{ mcr: 1.28, untilBlock: 24_160_712, untilTimestamp: 1_767_522_647 }],
+    mcrBefore: [
+      {
+        mcr: 1.28,
+        untilBlock: 24_160_712,
+        untilTimestamp: 1_767_522_647,
+        setBy: { txHash: "0x4bec5d42f42282e560f1bba456e7520cccccd13117993afa4b8ab8084d9edbd1", logIndex: 436 },
+      },
+    ],
     ccr: 1.5,
     scr: 1.2,
     liquidationPenaltySp: 0.05,
@@ -112,7 +119,14 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     troveNft: "0x7ef172d1869c50cc3a3de88033d1f36b2ed83fdf",
     mcr: 1.2,
     // 132% until tx 0x1362365d…77570 set 120% (block 24,160,701, 4 Jan 2026).
-    mcrBefore: [{ mcr: 1.32, untilBlock: 24_160_701, untilTimestamp: 1_767_522_515 }],
+    mcrBefore: [
+      {
+        mcr: 1.32,
+        untilBlock: 24_160_701,
+        untilTimestamp: 1_767_522_515,
+        setBy: { txHash: "0x1362365d30c973bbaff0360810ec7c414d64a93f660dc46b265b44d02ed77570", logIndex: 365 },
+      },
+    ],
     ccr: 1.5,
     scr: 1.2,
     liquidationPenaltySp: 0.05,

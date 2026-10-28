@@ -25,6 +25,10 @@
 // The vault's own figures and its family's mechanic are NOT restated here: they
 // are the vault card one path segment up.
 
+import { vaultLifeChanges } from "@/lib/sources/chain/block-timestamps";
+import { withChanges } from "@/lib/shared/flows-changes";
+import { vaultTimelineNoteProv } from "@/lib/aave-vaults/vault-timeline-provenance";
+import type { AaveVaultNote } from "@/lib/shared/vault-holder-timeline";
 import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -199,7 +203,13 @@ const loadHistory = cache(async (data: AaveEthereumVaultResponse, holder: string
     blockNumber: data.blockNumber,
     replayed: economics != null && flowTimeline != null,
   });
-  return { timeline, economics, flowTimeline, card };
+  // The vault's configuration changes inside the life, marked on the events row (ruling 10).
+  const changes = flowTimeline
+    ? await vaultLifeChanges(MAINNET_CHAIN_ID, timeline.notes, allEvents, (n) =>
+        vaultTimelineNoteProv(coords, n as AaveVaultNote),
+      )
+    : [];
+  return { timeline, economics, flowTimeline: withChanges(flowTimeline, changes), card };
 });
 
 /** The Lifetime flows panel and the timeline, streamed in behind a Suspense

@@ -532,6 +532,7 @@ export default function MakerVaultDetailView({
     liveSettled: chainSettled,
     returnedIds,
     risk: flowRisk,
+    rateLog,
   });
 
   // Who executed this vault's events — the SAME two-fact verdict each event

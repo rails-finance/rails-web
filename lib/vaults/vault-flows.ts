@@ -209,6 +209,7 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
     },
     words: {
       held: "Still in the vault",
+      valueLine: `the claim's value in ${o.assetSymbol}`,
       live: `At block ${o.blockNumber.toLocaleString("en-US")}`,
       restBySide: { collateral: "Share price change" },
       restNote: {

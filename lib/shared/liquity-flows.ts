@@ -264,6 +264,8 @@ export interface LiquityFlowOptions {
 export interface LiquityForkLevel {
   /** The fork's name, for the wording ("Ebisu"). */
   name: string;
+  /** The branch manager whose logs set the minimum, for the change markers' receipts. */
+  branchManager?: string;
   mcr: number;
   mcrBefore?: readonly ForkMcrStep[];
   /** The branch manager's logs were read for every move of the minimum (Ebisu),

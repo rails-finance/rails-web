@@ -10,6 +10,8 @@
 // the panel to the timeline (components/shared/flow-focus-context.tsx): the
 // day's mark, Apply to timeline and each card's sum read the same replay.
 
+import { forkMcrChanges } from "@/lib/shared/liquity-fork-changes";
+import { withChanges } from "@/lib/shared/flows-changes";
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
@@ -78,7 +80,7 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
   useEffect(() => setNow(Date.now() / 1000), []);
   const chain = p.chain;
   const livePrice = chain?.priceUsd ?? p.price ?? null;
-  const timeline = useMemo(() => {
+  const baseTimeline = useMemo(() => {
     if (now == null || !p.collSymbol || events.length === 0) return null;
     return liquityFlowTimeline(events, {
       collSymbol: p.collSymbol,
@@ -103,6 +105,9 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
         : null,
     });
   }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain, p.fork]);
+  // The minimum's steps, marked on the events row (ruling 10).
+  const changes = useMemo(() => (p.fork ? forkMcrChanges(p.fork) : []), [p.fork]);
+  const timeline = useMemo(() => withChanges(baseTimeline, changes), [baseTimeline, changes]);
   const focusEvents = useMemo(
     () => (p.collSymbol ? liquityFocusEvents(events, p.collSymbol, p.debtSymbol) : []),
     [events, p.collSymbol, p.debtSymbol],

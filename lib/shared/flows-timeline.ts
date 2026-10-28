@@ -27,6 +27,7 @@
 // it stays as the event recorded it.
 
 import type { DayObs, PriceMarks, PriceSeries } from "@/lib/shared/price-series";
+import type { FlowChange } from "@/lib/shared/flows-changes";
 
 export type FlowSide = "collateral" | "debt";
 
@@ -377,6 +378,10 @@ export interface FlowTimeline {
    *  store answers for it): why a day valued at a price recorded on an
    *  earlier day has none for that day. Such a day's figure is drawn dotted. */
   carriedWhy?: Record<string, string>;
+  /** The protocol's changes for every position, from the series the page
+   *  reads (lib/shared/flows-changes.ts); the events row marks those inside
+   *  the life. */
+  changes?: FlowChange[];
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -410,6 +415,9 @@ export interface FlowWords {
   linePrices?: string;
   /** The timeline's card for a moment between events (lib/shared/flow-moment.ts). */
   moment?: FlowMomentWords;
+  /** What the value line draws, for the how-to-read, where the position has
+   *  no collateral and debt ("the claim's value in GHO"). */
+  valueLine?: string;
   /** The Explanation's words for a mark under the line, where a family's
    *  event of that kind has a name of the family's (Frankencoin's sales, PWN's default
    *  claim under the red triangle). */
@@ -499,6 +507,9 @@ export interface FlowModel {
     flow: { into: FlowSide[]; out: FlowSide[] };
   }[];
   repricings: Repricing[];
+  /** The timeline's protocol changes (`FlowTimeline.changes`), by UTC day
+   *  number. */
+  changes: FlowChange[];
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
   valued: { collateral: number; debt: number }[];
@@ -1020,6 +1031,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       return [{ day: d.day - startDay, tick: d.tick, kinds, flow }];
     }),
     repricings,
+    changes: t.changes ?? [],
     live: t.live,
     valued,
     collateralHigh,

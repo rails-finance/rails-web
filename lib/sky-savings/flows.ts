@@ -117,6 +117,7 @@ export function skyFlowTimeline(
     labels: { collateral: "Balance", debt: "Debt" },
     words: {
       held: "Still saved",
+      valueLine: "the balance's value in USD",
       live: `At block ${asOf.block.toLocaleString("en-US")}`,
       rest: "Interest earned",
     },

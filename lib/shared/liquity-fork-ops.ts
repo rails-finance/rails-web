@@ -273,6 +273,8 @@ export interface ForkMcrStep {
   mcr: number;
   untilBlock: number;
   untilTimestamp: number;
+  /** The branch manager's log that set the next value, where it was read. */
+  setBy?: { txHash: string; logIndex: number };
 }
 
 /** The branch's minimum collateral ratio in force at a block (or a time). A
