@@ -151,6 +151,21 @@ const FX_RATIO = {
   held: true,
   help: ["the price each event was valued at", "rebalance ratio", "read at the block of the day's last event"],
 };
+/** Alchemix V3's view (step 6): the card's Collateralisation against its
+ *  "Liquidates at", the lower bound read now and held across the life; the
+ *  share price's level today the price its "Liquidates on a share-price drop
+ *  of" names; days with no reading dotted. */
+const ALCHEMIX_RATIO = {
+  label: "Collateralisation",
+  liquidates: "below",
+  headRow: "collateralisation",
+  lineRow: "liquidation-line",
+  dropRow: "liquidates-on-drop",
+  held: true,
+  // eth-aleth/726 held collateral and no debt for 114 days before its mint.
+  firstWithin: 160,
+  help: ["the vault's share price", "lower bound today", "not indexed at past blocks", "drawn dotted"],
+};
 const PAGES = [
   {
     id: "aave-v3 0xfb93",
@@ -674,6 +689,42 @@ const PAGES = [
     lwOnly: true,
     band: { asset: "WBTC", closed: true },
   },
+  // Alchemix V3 (step 6, `ratio` and `alchemix`): the collateralisation
+  // against today's lower bound, over the vault's share price per reading.
+  // Ethereum eth-alusd/1142 (open, 61 line redemptions) and eth-aleth/726
+  // (closed with its collateral 26 Oct 2026); Base base-alusdb/23 (open) and
+  // base-alusdb/29 (closed with its collateral). No Alchemist position has
+  // been liquidated on either chain.
+  {
+    id: "alchemix eth-alusd/1142",
+    path: "/ethereum/alchemix/eth-alusd/1142",
+    lwOnly: true,
+    unit: "token",
+    ratio: ALCHEMIX_RATIO,
+    alchemix: true,
+  },
+  {
+    id: "alchemix eth-aleth/726 (closed)",
+    path: "/ethereum/alchemix/eth-aleth/726",
+    lwOnly: true,
+    ratio: ALCHEMIX_RATIO,
+    alchemix: { closed: true },
+  },
+  {
+    id: "alchemix base-alusdb/23",
+    path: "/base/alchemix/base-alusdb/23",
+    lwOnly: true,
+    unit: "token",
+    ratio: ALCHEMIX_RATIO,
+    alchemix: true,
+  },
+  {
+    id: "alchemix base-alusdb/29 (closed)",
+    path: "/base/alchemix/base-alusdb/29",
+    lwOnly: true,
+    ratio: ALCHEMIX_RATIO,
+    alchemix: { closed: true },
+  },
   // Step 7: Frankencoin's declared liquidation price alone, under a value
   // pane per side; Maple's pool rate.
   {
@@ -973,8 +1024,11 @@ async function checkRatio(page, tag, pg) {
     return tipNow();
   };
   const end = await readAt("End");
-  const head = await page.$eval(`[data-card-head="${r.head}"]`, (h) => h.textContent ?? "").catch(() => null);
-  const open = head != null;
+  const head = r.headRow
+    ? await page.$eval(`[data-panel-row="${r.headRow}"] dd`, (d) => d.textContent ?? "").catch(() => null)
+    : await page.$eval(`[data-card-head="${r.head}"]`, (h) => h.textContent ?? "").catch(() => null);
+  // A closed Alchemist position's row reads "No debt".
+  const open = head != null && (!r.headRow || /%/.test(head));
   if (open) {
     check(
       `${tag}: today's ${name} is the card's`,
@@ -1001,7 +1055,7 @@ async function checkRatio(page, tag, pg) {
   }
   // The first day with a ratio (a life can open on a deposit alone).
   let first = await readAt("Home");
-  for (let i = 0; first.none && i < 40; i++) {
+  for (let i = 0; first.none && i < (r.firstWithin ?? 40); i++) {
     await page.keyboard.press("ArrowRight");
     await page.waitForTimeout(120);
     first = await tipNow();
@@ -1762,6 +1816,97 @@ async function checkShareLine(page, tag) {
     help.includes("The sUSDS share price") && help.includes("chi") && help.includes("drip"),
     help,
   );
+}
+
+/** Alchemix V3 (step 6): the vault's share price stands in the list beside
+ *  the collateralisation, one point per day with a reading at that reading's
+ *  block, drawn dotted between, today the card's "Share price" row to six
+ *  places at the card's reading block; it carries the level; the bound line's
+ *  receipt says it is today's, held across the life. */
+async function checkAlchemixShare(page, tag, pg) {
+  const picker = page.locator("button[data-price-picker]");
+  const pick = async (asset) => {
+    await picker.click();
+    await page.locator(`[role="listbox"] [data-price-asset="${asset}"]`).first().click();
+    await page.waitForTimeout(300);
+  };
+  await picker.click();
+  await page.waitForSelector('[role="listbox"] [data-price-asset]', { timeout: 5000 }).catch(() => {});
+  const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
+  await page.keyboard.press("Escape");
+  check(
+    `${tag}: the list holds the collateralisation and the share price alone`,
+    listed.length === 2 && listed[0] === "Collateralisation",
+    listed.join(","),
+  );
+  // The bound line's words, on the collateralisation.
+  const sl = page.locator(PRICE_STRIP).first();
+  await sl.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(250);
+  const liqText = await page.$eval("[data-price-heading]", (h) => {
+    const lv = h.querySelector("[data-liq-readout]");
+    return lv?.closest("[data-prov]")?.getAttribute("data-prov-summary") ?? lv?.textContent ?? "";
+  });
+  const levelHelp = await howToRead(page);
+  check(
+    `${tag}: the bound line's words say it is today's, held across the life`,
+    /held across the life/.test(levelHelp) && /not indexed at past blocks/.test(levelHelp),
+    liqText || levelHelp.slice(0, 300),
+  );
+  await pick(listed[1]);
+  const line = await page.$eval("[data-price-line]", (g) => ({
+    key: g.getAttribute("data-price-line") ?? "",
+    observed: (g.getAttribute("data-price-observed") ?? "").split(",").filter(Boolean).map(Number),
+    carried: (g.getAttribute("data-price-carried") ?? "").split(",").filter(Boolean).length,
+    dotted: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).length,
+    grain: g.getAttribute("data-price-grain"),
+  }));
+  check(
+    `${tag}: the chart draws the vault's share price per reading, dotted between`,
+    /^alchemix:[\w-]+:share-price$/.test(line.key) &&
+      line.observed.length > 0 &&
+      line.grain === "daily" &&
+      (line.carried === 0 || line.dotted > 0),
+    JSON.stringify({ ...line, observed: line.observed.length }),
+  );
+  await sl.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(300);
+  const end = await page.$eval("[data-price-heading]", (h) => {
+    const r = h.querySelector("[data-price-readout]");
+    return {
+      text: r?.textContent ?? "",
+      block: r?.getAttribute("data-price-block") ?? "",
+      toggle: document.querySelector("[data-flow-level-toggle]") != null,
+    };
+  });
+  const card = await page.$eval('[data-panel-row="share-price"] dd', (d) => d.textContent ?? "").catch(() => "");
+  const cardV = card.match(/= (\d+\.\d{6}) /)?.[1];
+  const chartV = end.text.match(/(\d+\.\d{6})/)?.[1];
+  if (!pg.alchemix.closed) {
+    const reading = await page
+      .$eval("[data-card-notice] a, [data-position-card] a[href*='/block/']", (a) => a.textContent ?? "")
+      .catch(() => "");
+    check(
+      `${tag}: today's share price is the card's (${cardV})`,
+      chartV != null && chartV === cardV,
+      `chart ${end.text}, card ${card}`,
+    );
+    check(
+      `${tag}: today's share price rests on the card's reading block`,
+      /^\d+$/.test(end.block) && (reading === "" || reading.replace(/,/g, "").includes(end.block)),
+      `chart ${end.block}, card ${reading}`,
+    );
+    check(`${tag}: the share price carries the level`, end.toggle, JSON.stringify(end));
+  } else check(`${tag}: a closed position's card states no share price`, cardV == null, card);
+  const help = await howToRead(page);
+  check(
+    `${tag}: the how-to-read names the share price's source`,
+    help.includes("convertToAssets") && help.includes("drawn dotted"),
+    help.slice(0, 400),
+  );
+  await pick("Collateralisation");
 }
 
 /** The card's top-row figure as `fmtNative` prints it
@@ -2837,6 +2982,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.level) await checkLevelView(page, tag, pg);
       if (pg.share) await checkShareLine(page, tag);
       if (pg.family) await checkFamilyLine(page, tag, pg);
+      if (pg.alchemix) await checkAlchemixShare(page, tag, pg);
       if (pg.band) await checkBand(page, tag, pg, width);
       if (pg.changes) await checkChanges(page, tag, pg, width);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));

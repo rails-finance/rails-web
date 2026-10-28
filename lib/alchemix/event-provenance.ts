@@ -523,21 +523,6 @@ export function usdProv(symbol: string, pricePerUnit: number, priceSource: strin
   };
 }
 
-/** A lifetime total over the position's own events — a sum of figures each of
- *  which traces to its own log. */
-export function lifetimeProv(label: string, symbol: string, events: number, coords: AlchemixCoords): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "indexed",
-    summary: `${label} — the total over the events on this page`,
-    contract: alchemistContract(coords),
-    via: `${ALCHEMIX_VIA} · ${events} event${events === 1 ? "" : "s"}`,
-    formula: `the sum of every ${symbol} amount this position's events state`,
-    verify: { kind: "rollup", text: "It rolls up the events on this page" },
-    inputs: coordInputs(coords, [{ label: "events counted", value: String(events), kind: "chain-derived" }]),
-  };
-}
-
 /** The shares a self-liquidation used on the debt left after its force repay:
  *  `SelfLiquidated.amount` states both parts, so the set-aside part the same
  *  transaction's `ForceRepay` states is taken off (lib/alchemix/self-liquidation.ts). */

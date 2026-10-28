@@ -148,7 +148,10 @@ const NA = {
       "the first card is a Challenge Started row, whose cells are stat cells (collateral challenged); the ledgers stand on mint, deposit, withdraw and sale rows",
   },
   "aave-v4": { "T2.1": NO_LEDGER },
-  "alchemix-v3": { "T2.1": NO_LEDGER, T7: NO_FLOWS_CHART },
+  "alchemix-v3": {
+    "T2.1":
+      "the Alchemist's cells carry no ledger (`ledgers: { none }`): the page has the Lifetime flows panel, and no ledger is built for its cells",
+  },
   "alchemix-v2": { "T2.1": NO_LEDGER, T7: NO_FLOWS_CHART },
   "alchemix-transmuter": { "T2.1": NO_LEDGER, T7: NO_FLOWS_CHART },
   "sky-savings": { "T2.1": NO_LEDGER, T7: NO_FLOWS_CHART },

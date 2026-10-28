@@ -337,29 +337,31 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
   };
 }
 
-/** The Lifetime flows "?": what the chart sums, in which unit, and what it
- *  leaves out. Liquity V2's `liquityLifetimeFlowsContent` is the model. */
+/** The Lifetime flows "?": what the bars and the line add up, in which unit,
+ *  and what they leave out. */
 export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
-  title: "How the lifetime flows are counted",
+  title: "About the Lifetime flows",
   intro:
-    "The chart sums the position's own events over its whole life, each side in its own unit: vault shares on the collateral side, the line's synthetic on the debt side. Nothing is converted into dollars or into the asset underneath.",
-  detailsHeading: "Key concepts",
+    "The bars add up every event of this position over its whole life, and the line under them draws what it held and owed at the end of each day. Every figure is in the asset under the vault (USDC or WETH): the collateral at the vault's share price, each unit of the synthetic owed counted as one unit of that asset, as the Alchemist counts it. No dollar figure is used.",
+  stepsHeading: "How it's built:",
+  steps: [
+    "Collateral: deposited, less withdrawn, put against debt set aside for repayment, taken as repay fees, taken by the line's redemptions, used to pay the debt at a close or returned at a close, each at the share price of its block, plus the change in that share price since (Share price move), is what the position holds.",
+    "Debt: minted, less burned, repaid, repaid from the collateral, cleared by the line's redemptions and paid off at a close, is what the position owes.",
+    "The held and owed figures on each day are the getCDP reading in force, never a sum of the events.",
+  ],
+  detailsHeading: "Key concepts:",
   details: [
     {
-      bold: "Collateral side",
-      text: "shares deposited, then shares withdrawn, put against debt set aside for repayment, taken by every line redemption, used to pay the rest of the debt at a close, returned to the holder at a close, or taken by a liquidation, and the shares held now, from the current reading. The shares a repay pays with come from the caller's wallet, so they are not drawn here.",
+      bold: "Redemptions",
+      text: "a redemption belongs to the whole line and names no position. What it cleared and took from this position is the difference of the readings either side of it, never a figure from its own event.",
     },
     {
-      bold: "Debt side",
-      text: "synthetic minted, then synthetic burned, debt cleared by repays, debt cleared by every line redemption, and debt paid off at a close, and the debt read now.",
+      bold: "Repays",
+      text: "the shares a repay pays with come from the caller's wallet, so they are not drawn; only the protocol fee on the set-aside part leaves the collateral.",
     },
     {
-      bold: "What a redemption's row is",
-      text: "the sum of what every line redemption cleared and took from this position, each a difference of the readings either side of it, never a figure from the redemption's own event. Each redemption still has its own two figures on the timeline.",
-    },
-    {
-      bold: "What the totals leave out",
-      text: "the protocol fee a repay takes from the collateral. The (i) under the chart adds it, so its account of the collateral closes on the shares held now.",
+      bold: "Collateralisation",
+      text: "the chart opens on the collateral over the debt, against the Alchemist's lower bound. The lower bound is today's, held across the life: it is not indexed at past blocks.",
     },
     {
       bold: "Interest",
