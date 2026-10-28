@@ -516,6 +516,8 @@ const PAGES = [
       lineRow: "liquidates-above",
       fluid: "/api/chain/fluid/position?nft=6",
       help: ["the vault oracle's price", "steps where Fluid governance changed it"],
+      // No change inside the life: the how-to-read names no markers.
+      helpNot: ["grey diamond"],
     },
   },
   {
@@ -529,6 +531,8 @@ const PAGES = [
       lineRow: "liquidates-above",
       fluid: "/api/chain/fluid/position?nft=8538",
       help: ["the vault oracle's price", "steps where Fluid governance changed it"],
+      // No change inside the life: the how-to-read names no markers.
+      helpNot: ["grey diamond"],
     },
   },
   // Step 8 (the threshold in force each day, /api/fluid/threshold-history):
@@ -551,7 +555,11 @@ const PAGES = [
         [20007, 0.85, 0.88],
         [20229, 0.88, 0.9],
       ],
-      help: ["the vault oracle's price", "steps where Fluid governance changed it"],
+      help: [
+        "the vault oracle's price",
+        "steps where Fluid governance changed it",
+        "each change a grey diamond on the events row",
+      ],
     },
   },
   {
@@ -574,7 +582,11 @@ const PAGES = [
       fluid: "/api/chain/fluid/position?nft=1334",
       firstLine: 0.85,
       steps: [[19953, 0.85, 0.88]],
-      help: ["the vault oracle's price", "steps where Fluid governance changed it"],
+      help: [
+        "the vault oracle's price",
+        "steps where Fluid governance changed it",
+        "each change a grey diamond on the events row",
+      ],
     },
   },
   {
@@ -887,18 +899,24 @@ const PAGES = [
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
     unit: "USD",
+    panes: "value,price,pace",
+    pace: "WETH",
   },
   {
     id: "liquity-v2 WETH Trove (redeemed)",
     path: "/ethereum/liquity-v2/trove/WETH/22412517865912344610666591322850826630726594253808037974356128721405243892759",
     answer: "/api/liquity-v2/prices/daily",
     trove: "redeemed",
+    panes: "value,price,pace",
+    pace: "WETH",
   },
   {
     id: "liquity-v2 rETH Trove (liquidated)",
     path: "/ethereum/liquity-v2/trove/rETH/19392756892012588507808147823032851071198051944268422940534038614966657095964",
     answer: "/api/liquity-v2/prices/daily",
     trove: "liquidated",
+    panes: "value,price,pace",
+    pace: "rETH",
   },
   {
     // Listed as closed and once drawn open, its axis to today (ui-jobs 328).
@@ -906,6 +924,18 @@ const PAGES = [
     path: "/ethereum/liquity-v2/trove/WETH/82501486677343366959104920060744506403266161051192207755275552075653445398317",
     answer: "/api/liquity-v2/prices/daily",
     trove: "closed",
+    panes: "value,price,pace",
+    pace: "WETH",
+  },
+  {
+    // Open since 9 May 2026, never redeemed, on a branch that was (ruling 11's pace lane).
+    id: "liquity-v2 wstETH Trove (never redeemed)",
+    path: "/ethereum/liquity-v2/trove/wstETH/36866364639024890689412217368623603118483270545575424157920590185252139913822",
+    answer: "/api/liquity-v2/prices/daily",
+    trove: "live",
+    neverRedeemed: true,
+    panes: "value,price,pace",
+    pace: "wstETH",
   },
 ];
 
@@ -1317,7 +1347,9 @@ async function checkRatio(page, tag, pg) {
   await page.waitForTimeout(150);
   check(
     `${tag}: the how-to-read names the ${name}'s source and line`,
-    help.includes(`The ${name}`) && r.help.every((w) => help.includes(w)),
+    help.includes(`The ${name}`) &&
+      r.help.every((w) => help.includes(w)) &&
+      (r.helpNot ?? []).every((w) => !help.includes(w)),
     help,
   );
 }
@@ -2597,6 +2629,150 @@ async function checkTroveMarks(page, tag, pg, rows) {
     );
 }
 
+/** The pace lane (ruling 11, Liquity V2's branch redemptions): the days the
+ *  chart holds are the route's over the life, from the first row's day to the
+ *  close or today; each of the Trove's redemption days has the branch's
+ *  redemptions, at least as many as the Trove's; the bars drawn are the days
+ *  with BOLD redeemed and the tallest is the window's largest day; the tip
+ *  reads each stop's day as the route answers it, zero on a day it lists
+ *  none; the how-to-read says the series is branch-wide. */
+async function checkPace(page, tag, pg, rows, width) {
+  const t = `${tag} pace`;
+  const hook = await page.evaluate(() => {
+    const e = document.querySelector("[data-flow-pace]");
+    return e
+      ? {
+          label: e.getAttribute("data-flow-pace"),
+          from: Number(e.getAttribute("data-pace-from")),
+          to: Number(e.getAttribute("data-pace-to")),
+          max: Number(e.getAttribute("data-pace-max")),
+          days: (e.getAttribute("data-pace-days") ?? "")
+            .split(",")
+            .filter(Boolean)
+            .map((x) => x.split(":").map(Number)),
+          drawn: (e.getAttribute("data-flow-pace-drawn") ?? "")
+            .split(",")
+            .filter(Boolean)
+            .map((x) => x.split(":").map(Number)),
+        }
+      : null;
+  });
+  if (!check(`${t}: the lane stands under the price pane`, hook != null)) return;
+  const today = Math.floor(Date.now() / 86_400_000);
+  const first = Math.floor(rows[0].ts / DAY);
+  const last = pg.trove === "redeemed" || pg.trove === "live" ? today : Math.floor(rows[rows.length - 1].ts / DAY);
+  check(
+    `${t}: the range read is the life, ${first} to ${last}, and the lane names the ${pg.pace} branch`,
+    hook.from === first && hook.to === last && hook.label.startsWith(`${pg.pace} branch`),
+    `${hook.from}–${hook.to} "${hook.label}"`,
+  );
+  const iso = (d) => new Date(d * 86_400_000).toISOString().slice(0, 10);
+  const answer = await hostFetch(
+    `${BASE}/api/liquity-v2/redemption-pace?branch=${pg.pace}&from=${iso(hook.from)}&to=${iso(hook.to)}`,
+  ).then((r) => r.json());
+  const want = new Map(
+    (answer.days ?? []).map((d) => [Date.parse(`${d.day}T00:00:00Z`) / 86_400_000, { bold: d.bold, count: d.count }]),
+  );
+  const held = new Map(hook.days.map(([d, a, c]) => [d, { bold: a, count: c }]));
+  const off = [...want].filter(([d, w]) => {
+    const h = held.get(d);
+    return !h || Math.abs(h.bold - w.bold) > 1e-6 || h.count !== w.count;
+  });
+  const extra = [...held.keys()].filter((d) => !want.has(d));
+  check(
+    `${t}: the lane holds the route's days, BOLD and counts, nothing else`,
+    off.length === 0 && extra.length === 0 && held.size === want.size,
+    `${held.size} held, ${want.size} answered; off ${off.slice(0, 3).map((x) => x[0])}; extra ${extra.slice(0, 3)}`,
+  );
+  const own = new Map();
+  for (const r of rows) if (r.redemption) own.set(Math.floor(r.ts / DAY), (own.get(Math.floor(r.ts / DAY)) ?? 0) + 1);
+  const short = [...own].filter(([d, n]) => (want.get(d)?.count ?? 0) < n);
+  check(
+    `${t}: each of the Trove's ${own.size} redemption days has at least its redemptions on the branch`,
+    short.length === 0,
+    short
+      .slice(0, 3)
+      .map(([d, n]) => `${d}: Trove ${n}, branch ${want.get(d)?.count ?? 0}`)
+      .join("; "),
+  );
+  if (pg.neverRedeemed || pg.trove === "closed")
+    check(`${t}: the Trove was never redeemed`, own.size === 0, `${own.size}`);
+  // At All, the drawn bars are the days with BOLD, the tallest the largest.
+  const positive = [...held].filter(([, h]) => h.bold > 0);
+  const drawnDays = new Set(hook.drawn.map((b) => b[0]));
+  const notHeld = [...drawnDays].filter((d) => !(held.get(d)?.bold > 0));
+  const tallest = hook.drawn.reduce((a, b) => (a == null || b[3] < a[3] ? b : a), null);
+  const maxDay = positive.reduce((a, b) => (a == null || b[1].bold > a[1].bold ? b : a), null);
+  check(
+    `${t}: the bars drawn are the days with BOLD redeemed, the tallest the life's largest (${maxDay ? maxDay[1].bold.toFixed(0) : 0})`,
+    notHeld.length === 0 &&
+      drawnDays.size === positive.length &&
+      (positive.length === 0 || (tallest && Math.abs(held.get(tallest[0]).bold - maxDay[1].bold) < 1e-6)) &&
+      Math.abs(hook.max - (maxDay ? maxDay[1].bold : 0)) < 1e-6,
+    `${drawnDays.size} drawn, ${positive.length} with BOLD; not held ${notHeld.slice(0, 3)}`,
+  );
+  // The tip, stop by stop (every stop at 1280, every seventh at 390).
+  const sl = page.locator(PRICE_STRIP).first();
+  await sl.focus();
+  await page.keyboard.press("Home");
+  const max = Number(await sl.getAttribute("aria-valuemax"));
+  const read = [];
+  for (let i = 0; i <= max; i++) {
+    if (i > 0) await page.keyboard.press("ArrowRight");
+    if (width < 640 && i % 7 !== 0 && i !== max) continue;
+    await page.waitForTimeout(30);
+    const r = await page
+      .$eval("[data-pace-readout]", (e) => ({
+        day: Number(e.getAttribute("data-pace-day")),
+        bold: Number(e.getAttribute("data-pace-amount")),
+        count: Number(e.getAttribute("data-pace-count")),
+        text: e.textContent ?? "",
+        prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
+      }))
+      .catch(() => null);
+    read.push(r);
+  }
+  const wrong = read.filter((r) => {
+    if (!r) return true;
+    const w = want.get(r.day) ?? { bold: 0, count: 0 };
+    const words =
+      w.count === 0
+        ? r.text.includes("0 BOLD") && r.text.includes("no redemptions")
+        : r.text.includes(`${Math.round(w.bold).toLocaleString("en-US")} BOLD`) &&
+          r.text.includes(`${w.count.toLocaleString("en-US")} redemption`);
+    return Math.abs(r.bold - w.bold) > 1e-6 || r.count !== w.count || !words;
+  });
+  const zeros = read.filter((r) => r && r.count === 0).length;
+  const busy = read.filter((r) => r && r.count > 0).length;
+  check(
+    `${t}: the tip reads the route's day at ${read.length} stops (${busy} with redemptions, ${zeros} at zero)`,
+    read.length > 0 && wrong.length === 0 && (want.size === 0 || busy > 0),
+    wrong
+      .slice(0, 3)
+      .map((r) => (r ? `${r.day}: ${r.text}` : "no readout"))
+      .join("; "),
+  );
+  if (BASE.includes("localhost"))
+    check(
+      `${t}: the tip's figure is inside a <Prov>`,
+      read.every((r) => r?.prov),
+    );
+  await page.keyboard.press("End");
+  await page.locator('[data-flow-help="F7.1"] button').click();
+  const help = await page
+    .locator('[role="dialog"][aria-label="How to read the events and charts"]')
+    .textContent({ timeout: 5000 })
+    .catch(() => "");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  check(
+    `${t}: the how-to-read says the bars are the ${pg.pace} branch's, every Trove on it`,
+    help.includes("The orange bars") &&
+      help.includes(`on the ${pg.pace} branch each day, every Trove on the branch, this one included`),
+    help.slice(0, 200),
+  );
+}
+
 /** The level's line of the readout at a stop: its <Prov> blocks. */
 async function checkLevelReadout(page, tag, now, r, rows) {
   const lv = await page
@@ -3059,6 +3235,8 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     if (pg.health) await waitForHealth(page);
     if (pg.ratio) await waitForHealth(page, pg.ratio.label);
     if (pg.band) await waitForHealth(page, "Health");
+    // The pace lane lands with its own read.
+    if (pg.pace) await page.waitForSelector("[data-flow-pace]", { state: "attached", timeout: 60000 }).catch(() => {});
     // The drawn strips name their views; the chart names its panes.
     const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
       els.flatMap((e) =>
@@ -3212,6 +3390,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     await pick(listed[0]);
     const rows = pg.trove ? await troveRows(pg.path) : null;
     if (rows) await checkTroveMarks(page, tag, pg, rows);
+    if (rows && pg.pace) await checkPace(page, tag, pg, rows, width);
     const obs0 = series.get(listed[0]) ?? new Map();
 
     // Three stops: the opening, the middle and the day before today; the

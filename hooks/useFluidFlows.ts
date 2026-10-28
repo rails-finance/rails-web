@@ -32,10 +32,11 @@ import {
   FLUID_COLL_KEY,
   FLUID_HEALTH_SOURCE,
   FLUID_HISTORY_HEALTH_SOURCE,
+  FLUID_HISTORY_STEADY_SOURCE,
   fluidHeldRead,
 } from "@/lib/fluid/flows-health";
 import { fluidThresholdChanges, fluidThresholdReads, type FluidThresholdHistory } from "@/lib/fluid/threshold-history";
-import { withChanges } from "@/lib/shared/flows-changes";
+import { changesByDay, withChanges } from "@/lib/shared/flows-changes";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
 const DAY_S = 86_400;
@@ -215,17 +216,24 @@ export function useFluidFlows(p: FluidFlowsInput): {
         : null,
     [risk, grain],
   );
+  // Each change to the threshold, marked on the events row; the how-to-read
+  // names the markers only where the life holds one.
+  const changes = useMemo(() => fluidThresholdChanges(history), [history]);
+  const lifeChanged = useMemo(() => {
+    if (!rows?.length || now == null) return false;
+    const first = Math.floor(rows[0].ts / DAY_S);
+    const last = p.open ? Math.floor(now / DAY_S) : Math.floor(Math.max(...rows.map((r) => r.ts)) / DAY_S);
+    return changesByDay(changes, first, last).length > 0;
+  }, [rows, now, p.open, changes]);
   const healthTimeline = useFlowsHealth(replayedTimeline, {
     reader: null,
     given,
-    source: stepped ? FLUID_HISTORY_HEALTH_SOURCE : FLUID_HEALTH_SOURCE,
+    source: stepped ? (lifeChanged ? FLUID_HISTORY_HEALTH_SOURCE : FLUID_HISTORY_STEADY_SOURCE) : FLUID_HEALTH_SOURCE,
     events: NO_EVENTS,
     liveHf: risk?.ratio != null && risk.ratio > 0 ? risk.liquidationThreshold / risk.ratio : null,
     liveLevels,
     liveLine: risk?.liquidationThreshold ?? null,
   });
-  // Each change to the threshold, marked on the events row.
-  const changes = useMemo(() => fluidThresholdChanges(history), [history]);
   const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
   const focusEvents = useMemo(
     () =>
