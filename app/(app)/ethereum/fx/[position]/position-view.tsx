@@ -43,7 +43,7 @@ import { fxLoans } from "@/lib/fx/loans";
 import { summariseFxExternalActors } from "@/lib/fx/external-actor";
 import { FxDriftPanel } from "@/components/protocol/fx/fx-drift-panel";
 import { FxSocializedReadsContext } from "@/lib/fx/socialized-reads";
-import { useFxPositionReads, useFxPricesAtRead } from "@/lib/fx/use-event-state";
+import { useFxPoolTerms, useFxPositionReads, useFxPricesAtRead } from "@/lib/fx/use-event-state";
 import { fxInTxFunding, fxOperateBlocks } from "@/lib/fx/in-tx-funding";
 import { currentHolder, withHolderSpans } from "@/lib/fx/holders";
 import { FxHolderLine } from "@/components/protocol/fx/fx-holder-line";
@@ -54,7 +54,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { FxFlowsNote, fxFlowsContent } from "@/components/protocol/fx/fx-flows-note";
-import { useFxFlows } from "@/hooks/useFxFlows";
+import { useFxFlows, type FxRisk } from "@/hooks/useFxFlows";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
@@ -421,6 +421,21 @@ export default function FxPositionView({
         : null,
     [view, settledPx],
   );
+  // The card's debt ratio and the pool's lines now (the card reads the same
+  // terms), for the health view.
+  const terms = useFxPoolTerms(view?.status === "open" ? (parsed?.pool ?? null) : null);
+  const flowRisk = useMemo<FxRisk | null>(() => {
+    if (!view || view.status !== "open" || !terms) return null;
+    const { debtRatio, debts, colls } = view.settled;
+    return debtRatio != null && debtRatio > 0 && debts != null && debts > 0 && colls != null && colls > 0
+      ? {
+          debtRatio,
+          debts,
+          colls,
+          terms: { block: terms.block, liquidateRatio: terms.liquidateRatio, rebalanceRatio: terms.rebalanceRatio },
+        }
+      : null;
+  }, [view, terms]);
   const flows = useFxFlows({
     pool: parsed?.pool ?? null,
     positionId: parsed?.positionId ?? null,
@@ -432,6 +447,7 @@ export default function FxPositionView({
     live: flowLive,
     liveSettled: settledPxIn,
     enabled: view != null,
+    risk: flowRisk,
   });
   const flowFocus = flows.read !== "failed" ? flows.focus : null;
 

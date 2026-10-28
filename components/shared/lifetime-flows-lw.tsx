@@ -100,6 +100,7 @@ const COLORS = {
   debt: ["var(--color-green-400)"],
   debtFill: ["var(--color-green-400)", 0.12],
   liq: ["var(--color-red-500)"],
+  warn: ["var(--color-amber-500)"],
   fg: ["var(--foreground)"],
   bg: ["var(--background)"],
   after: ["var(--surface-raised)", 0.7],
@@ -337,7 +338,7 @@ export interface LifetimeFlowsLwProps {
   cursorDay: number;
   dim: boolean;
   /** The cursor's figures, where its dots sit. */
-  at: { collateral: number; debt: number; price: number | null; level: number | null };
+  at: { collateral: number; debt: number; price: number | null; level: number | null; warn?: number | null };
   /** Where the bars' window opens after the first event (absolute day). */
   windowFrom: number | null;
   /** The charts are shown (the panel expanded): the chart is made the first time. */
@@ -411,6 +412,7 @@ export function LifetimeFlowsLw({
       dots,
       step: stepRuns(priceScale.pieces.flat),
       level: stepRuns(levelRuns(priceScale.level.map((p) => [p[0], p[1]] as [number, number]))),
+      warn: stepRuns(levelRuns(priceScale.warn.map((p) => [p[0], p[1]] as [number, number]))),
     };
   }, [priceScale]);
 
@@ -722,6 +724,11 @@ export function LifetimeFlowsLw({
         spacerPane,
       );
       s.level = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 1, ...pxScale }, pricePane);
+      s.warn = c.addSeries(
+        lib.LineSeries,
+        { ...quiet, lineWidth: 1, lineStyle: lib.LineStyle.Dashed, ...pxScale },
+        pricePane,
+      );
       s.price = c.addSeries(lib.LineSeries, { ...quiet, lineWidth: 2, ...pxScale }, pricePane);
       s.priceDotted = c.addSeries(
         lib.LineSeries,
@@ -935,6 +942,7 @@ export function LifetimeFlowsLw({
       const hue = colors[priced.side];
       for (const n of ["price", "priceDotted", "priceStep", "priceDots"]) s[n]?.applyOptions({ color: hue });
       s.level?.applyOptions({ color: colors.liq });
+      s.warn?.applyOptions({ color: colors.warn });
     }
     marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
@@ -973,6 +981,7 @@ export function LifetimeFlowsLw({
       out.priceDotted = sampleJoined(grid, l.v, (j) => l.kind[j] === "dotted", true);
       out.priceStep = sampleRuns(grid, priceLines.step);
       out.level = sampleRuns(grid, priceLines.level);
+      out.warn = sampleRuns(grid, priceLines.warn);
       const dots: (number | null)[] = new Array(grid.count).fill(null);
       for (const [ts, v] of priceLines.dots) {
         const i = Math.round(logicalOf(grid, ts));
@@ -1034,6 +1043,7 @@ export function LifetimeFlowsLw({
       if (marks.current.price && priced)
         marks.current.price.dots = [
           ...(at.level != null && s.level ? [{ series: s.level, value: at.level, color: cs.liq }] : []),
+          ...(at.warn != null && s.warn ? [{ series: s.warn, value: at.warn, color: cs.warn }] : []),
           ...(at.price != null && s.price ? [{ series: s.price, value: at.price, color: cs[priced.side] }] : []),
         ];
     }
@@ -1042,7 +1052,21 @@ export function LifetimeFlowsLw({
     marks.current?.spacer?.update();
     // `sides` follows hasDebt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursorDay, today, dim, windowFrom, startDay, at.collateral, at.debt, at.price, at.level, colors, ready, priced]);
+  }, [
+    cursorDay,
+    today,
+    dim,
+    windowFrom,
+    startDay,
+    at.collateral,
+    at.debt,
+    at.price,
+    at.level,
+    at.warn,
+    colors,
+    ready,
+    priced,
+  ]);
 
   // Shown again after being hidden: the axis is re-measured.
   useEffect(() => {
@@ -1066,6 +1090,7 @@ export function LifetimeFlowsLw({
     [valueLines],
   );
   const levelHooks = priceScale ? levelRuns(priceScale.level.map((p) => [p[0], p[1]] as [number, number])) : [];
+  const warnHooks = priceScale ? levelRuns(priceScale.warn.map((p) => [p[0], p[1]] as [number, number])) : [];
   const shaded = windowFrom != null && windowFrom > startDay;
 
   return (
@@ -1150,6 +1175,16 @@ export function LifetimeFlowsLw({
               data-liq-level=""
               data-liq-days={run.map((p) => p[0]).join(",")}
               data-liq-values={run.map((p) => p[1]).join(",")}
+            />
+          ))}
+        </span>
+        <span data-anatomy="F19.9">
+          {warnHooks.map((run) => (
+            <span
+              key={`w${run[0][0]}`}
+              data-warn-level=""
+              data-warn-days={run.map((p) => p[0]).join(",")}
+              data-warn-values={run.map((p) => p[1]).join(",")}
             />
           ))}
         </span>

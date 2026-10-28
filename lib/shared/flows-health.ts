@@ -33,6 +33,11 @@
 //   against its threshold) draws that ratio, worked from the health factor
 //   and the read's `line` (factor 1 ÷ mat for Maker, the threshold for
 //   Fluid), and its line is the read's in force on the day, the card's today.
+//   A ratio view may carry a second line short of it from each read's
+//   `warn` (f(x)'s rebalance ratio), with each collateral's level there.
+// - A family whose prices are its events' (`HealthSource.stepped`: Morpho,
+//   f(x)) draws a day with no event of the position's dotted: its point rests on
+//   the last event's price.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
@@ -62,6 +67,9 @@ export interface FactorRead {
   /** A ratio view's line at this read (`HealthSource.ratio`): the minimum
    *  ratio or the threshold, in the ratio's terms. */
   line?: number;
+  /** A ratio view's second line at this read, short of `line` (f(x)'s
+   *  rebalance ratio, `HealthSource.ratio.warn`). */
+  warn?: number;
 }
 
 /** One asset's line on a day: its balances at the day's close, its price
@@ -100,6 +108,13 @@ export interface HealthSource {
   /** Where the receipt says the factors were held. Default "the {factors
    *  long} {pool} held after the event at block {block}". */
   held?: string;
+  /** How a day's price is chosen: in the caption, and in a day's receipt.
+   *  Default ["recorded each day", "recorded that day"]. */
+  priceAt?: [string, string];
+  /** The family's prices are its events' (Morpho, f(x)): a day with no
+   *  event on it rests on the last event's price and is drawn dotted
+   *  (`PriceSeries.heldDays`). */
+  stepped?: true;
   /** Each asset's level on a day from its lines and health factor, where
    *  the family's card derives it otherwise than `basketLevels`; the rule
    *  in words, and the receipt's sentences where they are the family's. */
@@ -128,6 +143,18 @@ export interface HealthSource {
     help: string;
     /** Places in percent where the card prints other than one. */
     digits?: number;
+    /** A second line short of the liquidation line, from each read's
+     *  `warn` (f(x)'s rebalance ratio): its formula, receipt and verb, and
+     *  each collateral's level there, the price at which the ratio meets
+     *  it, every other balance held. Worked from the asset's liquidation
+     *  level by the two lines' ratio, which holds where the ratio moves
+     *  with one collateral's price alone. */
+    warn?: {
+      verb: string;
+      formula: string;
+      summary: string;
+      level: { formula: string; summary: string; here: { live: string; read: string } };
+    };
   };
 }
 
@@ -248,17 +275,22 @@ export function healthView(
   const ratio = src.ratio;
   const hfPoints: PricePoint[] = [];
   const linePoints: PricePoint[] = [];
+  const warnPoints: PricePoint[] = [];
+  const heldDays: number[] = [];
   const levels = new Map<string, PricePoint[]>();
-  const push = (asset: string, p: PricePoint) => {
-    const run = levels.get(asset);
+  const warnLevels = new Map<string, PricePoint[]>();
+  const push = (to: Map<string, PricePoint[]>, asset: string, p: PricePoint) => {
+    const run = to.get(asset);
     if (run) run.push(p);
-    else levels.set(asset, [p]);
+    else to.set(asset, [p]);
   };
   let di = 0;
   let ri = 0;
   for (let day = first; day <= end; day++) {
+    let eventDay = false;
     while (di < days.length && days[di].day <= day) {
       const d = days[di++];
+      if (d.day === day) eventDay = true;
       for (const b of d.balances)
         held.set(`${b.side}:${b.asset}`, {
           side: b.side,
@@ -305,24 +337,38 @@ export function healthView(
     }
     if (!known || !(debt > 0)) continue;
     const hf = live ? o.liveHf! : w / debt;
-    if (!(hf > 0) || hf >= HF_CAP) continue;
+    // A ratio liquidatable above its line falls toward 0 as the health factor
+    // grows, so it has no cap: its card prints a dust debt's 0.0%.
+    if (!(hf > 0) || (hf >= HF_CAP && ratio?.liquidates !== "above")) continue;
     const block = live ? null : read.block;
+    let warnShare: number | null = null;
     if (ratio) {
       const line = live ? (o.liveLine ?? read.line) : read.line;
       if (line == null || !(line > 0)) continue;
       hfPoints.push([day, ratio.liquidates === "below" ? hf * line : line / hf, block]);
       linePoints.push([day, line, block]);
+      const warn = read.warn;
+      if (ratio.warn && warn != null && warn > 0) {
+        warnPoints.push([day, warn, block]);
+        // The price at which the ratio meets the second line, as a share of
+        // the liquidation level's.
+        warnShare = ratio.liquidates === "below" ? warn / line : line / warn;
+      }
     } else {
       hfPoints.push([day, hf, block]);
       linePoints.push([day, 1, null]);
     }
+    if (src.stepped && !eventDay && !live) heldDays.push(day);
     const dayLevels =
       live && o.liveLevels
         ? new Map(dayLines.flatMap((l) => (o.liveLevels![l.asset] > 0 ? [[l.asset, o.liveLevels![l.asset]]] : [])))
         : levelsOf(dayLines, hf);
     for (const [asset, level] of dayLevels) {
       const price = lines.get(asset)!.price;
-      if (level > price / LEVEL_REACH && level < price * LEVEL_REACH) push(asset, [day, level / unitDiv, block]);
+      if (!(level > price / LEVEL_REACH && level < price * LEVEL_REACH)) continue;
+      push(levels, asset, [day, level / unitDiv, block]);
+      if (warnShare != null && lines.get(asset)!.coll > 0)
+        push(warnLevels, asset, [day, (level * warnShare) / unitDiv, block]);
     }
   }
   if (hfPoints.length === 0) return null;
@@ -336,13 +382,13 @@ export function healthView(
     unit: ratio ? "ratio" : "health",
     grain: "daily",
     noCarry: true,
-    source: `${src.pool}'s ${factors} ${src.readAt ?? "at each day's last event"}, with ${src.oracle} price recorded each day`,
+    source: `${src.pool}'s ${factors} ${src.readAt ?? "at each day's last event"}, with ${src.oracle} price ${src.priceAt?.[0] ?? "recorded each day"}`,
     points: hfPoints,
     ...(ratio ? { liquidates: ratio.liquidates, help: ratio.help } : {}),
     ...(ratio?.digits != null ? { digits: ratio.digits } : {}),
     here: {
       live: `${name} — ${src.live ?? `${src.pool}'s figure for the position now, the card's`}.`,
-      read: `${name} — on {day}, the balances held at the day's close, each at ${src.oracle} price recorded that day, against ${heldWords}.`,
+      read: `${name} — on {day}, the balances held at the day's close, each at ${src.oracle} price ${src.priceAt?.[1] ?? "recorded that day"}, against ${heldWords}.`,
       formula: ratio?.formula ?? `Σ collateral × price × ${src.factor ?? "liquidation threshold"} ÷ Σ debt × price`,
     },
     level: {
@@ -353,6 +399,18 @@ export function healthView(
         `Liquidation line — below a health factor of 1 ${src.below ?? `${src.pool} lets a liquidator repay the debt`}.`,
       end: endWord,
     },
+    ...(ratio?.warn && warnPoints.length
+      ? {
+          warn: {
+            points: warnPoints,
+            formula: ratio.warn.formula,
+            summary: ratio.warn.summary,
+            end: endWord,
+            verb: ratio.warn.verb,
+          },
+        }
+      : {}),
+    ...(heldDays.length ? { heldDays } : {}),
     ...(sparseBefore != null ? { sparseBefore } : {}),
   };
   const marks: Record<string, PriceMarks> = {};
@@ -370,6 +428,16 @@ export function healthView(
           read: `Here at the balances and prices of {day}, against the ${factors} ${src.pool} held after the event at block {block}.`,
         },
       },
+      ...(ratio?.warn && warnLevels.get(asset)?.length
+        ? {
+            warn: {
+              points: warnLevels.get(asset)!,
+              ...ratio.warn.level,
+              end: endWord,
+              verb: ratio.warn.verb,
+            },
+          }
+        : {}),
     };
   return { health, marks };
 }

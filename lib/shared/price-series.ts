@@ -60,6 +60,14 @@ export interface PriceSeries {
   /** Days before this one are the rows alone and draw by the sparse rule:
    *  every segment dotted, the observations marked by `events`. */
   sparseBefore?: number;
+  /** Days whose point rests on the last event's price, carried to the day (a
+   *  ratio view on a family whose prices are its events', Morpho's and
+   *  f(x)'s): drawn dotted, as a carried day. */
+  heldDays?: number[];
+  /** A second line short of `level`, where the position is acted on before
+   *  it can be liquidated (f(x)'s rebalance): its points and receipt, and
+   *  the verb its mark reads ("Rebalances"). */
+  warn?: PriceLevel & { verb: string };
   /** The stored rounds the series reads from `rounds.joinDay` on (`joinRounds`). */
   rounds?: PriceRounds;
 }
@@ -153,7 +161,7 @@ export function levelFormulaAt(level: PriceLevel, day: number): string {
   return level.formula;
 }
 /** What a family adds to an asset's series for the price view. */
-export type PriceMarks = Pick<PriceSeries, "events" | "level" | "sparseBefore" | "help">;
+export type PriceMarks = Pick<PriceSeries, "events" | "level" | "warn" | "sparseBefore" | "help">;
 /** A daily wire's observation: [day, price, block], the block absent on an older server. */
 export type DayObs = [number, number, (number | null)?];
 

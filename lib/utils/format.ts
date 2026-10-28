@@ -204,3 +204,7 @@ export function shiftDecimal(raw: string, places: number): string {
   const frac = padded.slice(padded.length - places).replace(/0+$/, "");
   return `${neg ? "-" : ""}${int}${frac ? `.${frac}` : ""}`;
 }
+
+/** A view's name inside a sentence: lowercased, an acronym kept ("the
+ *  health factor", "the LTV"). */
+export const viewWord = (name: string) => (/^[A-Z]{2,}$/.test(name) ? name : name.toLowerCase());

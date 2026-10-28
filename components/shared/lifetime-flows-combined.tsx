@@ -46,7 +46,8 @@ import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/s
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatPrice, pricePieces, levelAt, priceReadout, type FlowPriceSeries } from "@/lib/shared/flows-price";
-import { levelFormulaAt, type PriceAt } from "@/lib/shared/price-series";
+import { viewWord } from "@/lib/utils/format";
+import { levelFormulaAt, type PriceAt, type PricePoint } from "@/lib/shared/price-series";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -546,6 +547,7 @@ export function CombinedFlows({
   const cursorDay = cur.live ? today : startDay + cur.stop;
   const cursorPrice = priced ? (priceReadout(priced, cursorDay, model.gapDays)?.point[1] ?? null) : null;
   const cursorLevel = priced ? (levelAt(priced, cursorDay)?.[1] ?? null) : null;
+  const cursorWarn = priced?.warn ? (levelAt(priced, cursorDay, "warn")?.[1] ?? null) : null;
   // A cursor that leaves the chart's window brings the window to it (a step,
   // a drag at an edge, a card's "View on chart", a restored link).
   useEffect(() => {
@@ -751,6 +753,7 @@ export function CombinedFlows({
                         debt: head.debt.now,
                         price: cursorPrice,
                         level: cursorLevel,
+                        warn: cursorWarn,
                       }}
                       windowFrom={from > 0 ? startDay + from : null}
                       shown={shown}
@@ -1024,8 +1027,10 @@ function StripSlider({
  *  liquidation level there (lib/shared/flows-price.ts). */
 export function priceLineOf(s: FlowPriceSeries, startDay: number, today: number) {
   const pieces = pricePieces(s, startDay, today);
-  const level = (s.level?.points ?? []).filter((p) => p[0] >= startDay && p[0] <= today);
-  return { pieces, level };
+  const inAxis = (p: PricePoint) => p[0] >= startDay && p[0] <= today;
+  const level = (s.level?.points ?? []).filter(inAxis);
+  const warn = (s.warn?.points ?? []).filter(inAxis);
+  return { pieces, level, warn };
 }
 export type PriceScale = ReturnType<typeof priceLineOf>;
 
@@ -1129,6 +1134,7 @@ function PriceFigures({
   const r = priceReadout(s, day, gapDays);
   const dayWord = isLive ? "today" : dayStamp(day * 86_400);
   const lv = s.level ? levelAt(s, day) : null;
+  const wv = s.warn ? levelAt(s, day, "warn") : null;
   const here = s.level?.here;
   const levelProv: Provenance | null = lv
     ? {
@@ -1145,6 +1151,21 @@ function PriceFigures({
         ...(lv[2] != null ? { source: { block: lv[2] } } : {}),
       }
     : null;
+  const warnProv: Provenance | null =
+    wv && s.warn
+      ? {
+          kind: "derived",
+          summary: `${s.warn.summary}${
+            s.warn.here
+              ? ` ${(wv[2] == null ? s.warn.here.live : s.warn.here.read)
+                  .replace("{block}", wv[2]?.toLocaleString("en-US") ?? "")
+                  .replace("{day}", dayWord)}`
+              : ""
+          }`,
+          formula: levelFormulaAt(s.warn, wv[0]),
+          ...(wv[2] != null ? { source: { block: wv[2] } } : {}),
+        }
+      : null;
   return (
     <div
       className="grid grid-cols-[auto_1fr] items-center gap-x-1.5 gap-y-1 text-sm tabular-nums"
@@ -1171,7 +1192,7 @@ function PriceFigures({
         </span>
       ) : (
         <span data-price-readout="" data-price-none="">
-          {s.health ? `No ${s.asset.symbol.toLowerCase()}` : "No price recorded"}
+          {s.health ? `No ${viewWord(s.asset.symbol)}` : "No price recorded"}
         </span>
       )}
       {showLevel && lv && levelProv && (
@@ -1195,19 +1216,42 @@ function PriceFigures({
           </span>
         </>
       )}
+      {showLevel && wv && warnProv && s.warn && (
+        <>
+          <span className="inline-flex justify-center">
+            <LevelMark s={s} isLive={isLive} warn={s.warn.verb} />
+          </span>
+          <span
+            className="whitespace-nowrap"
+            data-warn-readout=""
+            data-warn-day={wv[0]}
+            data-warn-block={wv[2] ?? ""}
+            data-warn-value={wv[1]}
+            data-anatomy="F19.9"
+          >
+            <span className={`font-semibold ${isLive ? "text-amber-600 dark:text-amber-400" : "text-rb-500"}`}>
+              <Prov info={warnProv} value={String(wv[1])}>
+                {formatPrice(wv[1], s.unitLabel, s.digits)}
+              </Prov>
+            </span>
+          </span>
+        </>
+      )}
     </div>
   );
 }
 
 /** The level's mark in the heading: the warning triangle, red at today and
  *  muted in history, naming the level on a press. */
-function LevelMark({ s, isLive }: { s: FlowPriceSeries; isLive: boolean }) {
-  const words = s.health ? (s.liquidates === "above" ? "Liquidates above" : "Liquidates below") : "Liquidates at";
+function LevelMark({ s, isLive, warn }: { s: FlowPriceSeries; isLive: boolean; warn?: string }) {
+  const verb = warn ?? "Liquidates";
+  const words = s.health ? `${verb} ${s.liquidates === "above" ? "above" : "below"}` : `${verb} at`;
+  const tone = warn ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
   return (
     <RevealTip
       tip={
         <span className="block w-56 max-w-[calc(100vw-48px)] whitespace-normal leading-snug">
-          {s.health ? `${words} this ${s.asset.symbol.toLowerCase()}.` : "Liquidates at this price."}
+          {s.health ? `${words} this ${viewWord(s.asset.symbol)}.` : `${words} this price.`}
         </span>
       }
       label={`${words}, explain`}
@@ -1215,9 +1259,9 @@ function LevelMark({ s, isLive }: { s: FlowPriceSeries; isLive: boolean }) {
       className="focus-ring rounded-sm"
     >
       <span
-        className={`inline-flex border-b border-dotted border-[color:var(--tip-underline-color)] pb-px align-[-1px] ${isLive ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
+        className={`inline-flex border-b border-dotted border-[color:var(--tip-underline-color)] pb-px align-[-1px] ${isLive ? tone : "text-rb-500"}`}
         data-heading-tip=""
-        data-liq-mark=""
+        {...(warn ? { "data-warn-mark": "" } : { "data-liq-mark": "" })}
       >
         <Icon name="triangle" size={12} />
         <span className="sr-only">{words}</span>

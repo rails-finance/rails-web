@@ -87,9 +87,18 @@ export function useFlowsHealth(t: FlowTimeline | null, p: FlowsHealthInput): Flo
           lt: { ...last.lt, ...todayRead.lt },
           ...(last.dw || todayRead.dw ? { dw: { ...last.dw, ...todayRead.dw } } : {}),
           line: todayRead.line ?? last.line,
+          ...((todayRead.warn ?? last.warn) != null ? { warn: todayRead.warn ?? last.warn } : {}),
         },
       ];
     const hv = healthView(t, all, { liveHf, liveLevels, liveLine, source });
-    return hv ? { ...t, health: hv.health, priceMarks: { ...t.priceMarks, ...hv.marks } } : t;
+    if (!hv) return t;
+    // A family's how-to-read sentence for an asset stands beside the view's
+    // levels.
+    const priceMarks = { ...t.priceMarks };
+    for (const [k, m] of Object.entries(hv.marks)) {
+      const help = priceMarks[k]?.help;
+      priceMarks[k] = help ? { ...m, help } : m;
+    }
+    return { ...t, health: hv.health, priceMarks };
   }, [t, reads, todayRead, liveHf, liveLevels, liveLine, source]);
 }

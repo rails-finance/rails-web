@@ -11,6 +11,7 @@ import type { MorphoMarketAtBlockResponse } from "@/lib/sources/chain/morpho-pos
 import { blockTimeText } from "@/lib/morpho/oracle-age";
 import { fmtMorphoAmount } from "@/lib/morpho/figure-format";
 import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
+import { morphoLiqPrice } from "@/lib/morpho/flows-health";
 
 export { fmtMorphoAmount };
 
@@ -170,7 +171,7 @@ export function morphoHealthMove(
   // A debt under a millionth of a token is dust: no meaningful factor.
   const hf = (c: number, d: number) => (d > 1e-6 ? (c * price * lltv) / d : null);
   const ltv = (c: number, d: number) => (d > 1e-6 && c > 0 ? d / (c * price) : null);
-  const liq = (c: number, d: number) => (d > 1e-6 && c > 0 ? d / (c * lltv) : null);
+  const liq = (c: number, d: number) => (d > 1e-6 && c > 0 ? morphoLiqPrice(c, d, lltv) : null);
   return {
     price,
     ...(used && used.price > 0 ? { liquidationPrice: true } : {}),

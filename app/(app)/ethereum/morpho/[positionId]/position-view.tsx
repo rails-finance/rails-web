@@ -58,7 +58,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morpho/morpho-flows-note";
-import { useMorphoFlows } from "@/hooks/useMorphoFlows";
+import { morphoRisk, useMorphoFlows } from "@/hooks/useMorphoFlows";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { morphoExports } from "@/components/protocol/morpho/morpho-export-menu";
 import { ExportMenu } from "@/components/shared/export-menu";
@@ -381,6 +381,7 @@ export default function MorphoPositionView({
     lltv: view?.lltv ?? null,
     open: view?.status === "open",
     live: flowLive,
+    risk: morphoRisk(chain && !chain.chainStale ? chain : null),
   });
 
   // The top row's price dropdown. Morpho Blue runs no USD oracle: a market's

@@ -16,12 +16,14 @@
 //   market-notes.md §1): each observation held flat to the next, a dashed
 //   riser there. The grammar follows `series.grain`. Days before
 //   `series.sparseBefore` are the rows alone (decision 3's sparse rule):
-//   every segment dotted.
+//   every segment dotted. A day in `series.heldDays` rests on the last
+//   event's price and draws as a carried day.
 // - A family's rows (`series.events`) are not marked on the line: the events
 //   row under the charts carries them. The
 //   liquidation level (`series.level`) is a second line on the same axis, one
 //   point per day, held between days and stepped on the day it moves; it has
-//   no point after the day it ends.
+//   no point after the day it ends. A second line short of it
+//   (`series.warn`, f(x)'s rebalance) is drawn the same way.
 // - Where the timeline carries the position's health factor (`t.health`,
 //   ruling 7), it is the first series, a ratio with no unit, its line at 1;
 //   a family whose card states a ratio against a line (unit "ratio": Maker's
@@ -212,7 +214,8 @@ export function pricePieces(series: PriceSeries, from: number, to: number): Pric
     out.observed = [...new Set(out.observed)];
     return out;
   }
-  const days = priceDays(series, from, to);
+  const held = new Set(series.heldDays ?? []);
+  const days = priceDays(series, from, to).map((d) => (held.has(d.day) ? { ...d, carried: true } : d));
   for (const d of days) (d.carried ? out.carried : out.observed).push(d.day);
   if (days.length === 1) out.solid.push([[days[0].day, days[0].price]]);
   const sparse = series.sparseBefore;
@@ -246,10 +249,11 @@ export function priceReadout(series: PriceSeries, day: number, gapDays: number):
   return { ...p, old: p.carried && p.ageDays > gapDays };
 }
 
-/** The liquidation level on `day`: the level's point for that day, null on
- *  a day it has none (before its first day, after the day it ends). */
-export function levelAt(series: PriceSeries, day: number): PricePoint | null {
-  const pts = series.level?.points;
+/** The liquidation level on `day` (or the line short of it, `which`
+ *  "warn"): the level's point for that day, null on a day it has none
+ *  (before its first day, after the day it ends). */
+export function levelAt(series: PriceSeries, day: number, which: "level" | "warn" = "level"): PricePoint | null {
+  const pts = series[which]?.points;
   if (!pts?.length) return null;
   let lo = 0;
   let hi = pts.length;

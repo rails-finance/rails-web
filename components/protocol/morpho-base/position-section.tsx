@@ -58,7 +58,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morpho/morpho-flows-note";
-import { useMorphoFlows } from "@/hooks/useMorphoFlows";
+import { morphoRisk, useMorphoFlows } from "@/hooks/useMorphoFlows";
 import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 
@@ -194,6 +194,7 @@ export function MorphoBasePositionSection({
     lltv: pos.lltv,
     open: morphoViewFromSweep(pos, wallet, chain).status === "open",
     live: flowLive,
+    risk: morphoRisk(live),
   });
 
   const { tl, segments, readFolderMembers } = useTimelineSegment({

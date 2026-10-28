@@ -30,10 +30,14 @@ import {
   type FxLive,
   type FxPriceFrom,
 } from "@/lib/fx/flows";
+import { FX_COLL_KEY, FX_HEALTH_SOURCE, fxLineReads, fxLinesRead } from "@/lib/fx/flows-health";
+import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
 /** More blocks than any f(x) position has (1 Oct 2026: 234 operates, 226
  *  pool-made rows at most). */
 const MAX_READ_BLOCKS = 5000;
+const DAY_S = 86_400;
+const NO_EVENTS: never[] = [];
 
 export interface FxFlowsInput {
   pool: string | null;
@@ -52,6 +56,18 @@ export interface FxFlowsInput {
   live: FxLive | null;
   liveSettled: boolean;
   enabled: boolean;
+  /** The card's risk figures, for the health view: its settled debt ratio,
+   *  debt and collateral, and the pool's two lines at the head. Null while
+   *  either read is out. */
+  risk?: FxRisk | null;
+}
+
+/** The card's risk figures now. */
+export interface FxRisk {
+  debtRatio: number;
+  debts: number;
+  colls: number;
+  terms: { block: number; liquidateRatio: number; rebalanceRatio: number };
 }
 
 export interface FxFlowsNoteFacts {
@@ -142,11 +158,50 @@ export function useFxFlows(p: FxFlowsInput): {
         : null,
     [replay, now, p.collSymbol, p.open, p.live],
   );
+  // The health view in the card's terms (ui-jobs 328 step 6;
+  // lib/fx/flows-health.ts): the debt ratio against the pool's two lines.
+  const given = useMemo(
+    () =>
+      replay?.borrower && reads
+        ? fxLineReads(
+            replay.replayed.map((r) => r.row),
+            reads,
+          )
+        : null,
+    [replay, reads],
+  );
+  const risk = p.open ? (p.risk ?? null) : null;
+  const grain = replay?.grain ?? 1;
+  // Keyed by its figures: the page hands a new object on each render.
+  const [rRatio, rDebts, rColls] = [risk?.debtRatio ?? 0, risk?.debts ?? 0, risk?.colls ?? 0];
+  const [tBlock, tLiq, tReb] = [
+    risk?.terms.block ?? 0,
+    risk?.terms.liquidateRatio ?? 0,
+    risk?.terms.rebalanceRatio ?? 0,
+  ];
+  const todayRead = useMemo(
+    () => (now != null && tLiq > 0 && tReb > 0 ? fxLinesRead(Math.floor(now / DAY_S), tBlock, tLiq, tReb) : null),
+    [now, tBlock, tLiq, tReb],
+  );
+  const liveLevels = useMemo(
+    () => (rColls > 0 && tLiq > 0 ? { [FX_COLL_KEY]: (rDebts / (rColls * tLiq)) * grain } : null),
+    [rDebts, rColls, tLiq, grain],
+  );
+  const healthTimeline = useFlowsHealth(timeline, {
+    reader: null,
+    given,
+    source: FX_HEALTH_SOURCE,
+    events: NO_EVENTS,
+    liveHf: rRatio > 0 && tLiq > 0 ? tLiq / rRatio : null,
+    liveLevels,
+    liveLine: tLiq > 0 ? tLiq : null,
+    todayRead,
+  });
   const focusEvents = useMemo(
     () => (replay && timeline && p.collSymbol ? fxFocusEvents(replay, p.collSymbol) : []),
     [replay, timeline, p.collSymbol],
   );
-  const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
+  const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), healthTimeline);
   const facts = useMemo<FxFlowsNoteFacts | null>(() => {
     if (!replay) return null;
     const r = replay.replayed;
@@ -174,5 +229,5 @@ export function useFxFlows(p: FxFlowsInput): {
           : !result.ok || timeline == null
             ? "failed"
             : "done";
-  return { timeline, read, focus, facts };
+  return { timeline: healthTimeline, read, focus, facts };
 }

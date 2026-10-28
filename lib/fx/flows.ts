@@ -51,6 +51,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
 import { fxCollMoved } from "@/lib/fx/in-tx-funding";
+import { FX_PRICE_HELP } from "@/lib/fx/flows-health";
 
 const DAY_S = 86_400;
 const WAD = 1e18;
@@ -733,6 +734,8 @@ export function fxFlowTimeline(rp: FxFlowReplay, o: FxFlowOptions): FlowTimeline
     todayPrices: { [COLL]: priceNow, [DEBT]: G },
     dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: unitObs },
     seriesCarry: true,
+    priceSource: "the price each event was valued at",
+    priceMarks: { [COLL]: { help: FX_PRICE_HELP } },
     carriedWhy: {
       [COLL]: "f(x) is not in the daily price store, so a day between events keeps the last event's price.",
     },

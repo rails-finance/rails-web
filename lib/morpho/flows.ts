@@ -42,6 +42,7 @@ import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, MorphoContext, MorphoEventType } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
+import { morphoPriceHelp } from "@/lib/morpho/flows-health";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
@@ -592,6 +593,8 @@ export function morphoFlowTimeline(events: MorphoFlowEvent[], o: MorphoFlowOptio
     seriesCarry: true,
     ...(roles.borrower
       ? {
+          priceSource: "the market oracle at each event's block",
+          priceMarks: { [COLL]: { help: morphoPriceHelp(o.loanSymbol) } },
           carriedWhy: {
             [COLL]:
               "no daily oracle price is recorded for this market, so a day between events keeps the last event's price.",

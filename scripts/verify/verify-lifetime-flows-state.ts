@@ -2835,3 +2835,160 @@ test("a fork's level (ui-jobs 328 step 6): the MCR in force at each day's end, s
   assert.ok(held.help!.includes("today's 110% minimum, held across the life"), held.help);
   assert.ok(held.level!.summary.includes("no earlier value is listed"), held.level!.summary);
 });
+
+// ── Morpho and f(x) (ui-jobs 328 step 6) ───────────────────────────────────
+test("Morpho LTV: against the LLTV, days between events held, the level debt ÷ (coll × LLTV)", async () => {
+  const { morphoFlowTimeline } = await import("@/lib/morpho/flows");
+  const { morphoHealthSource, morphoLiqPrice, morphoLltvReads, MORPHO_COLL_KEY } = await import(
+    "@/lib/morpho/flows-health"
+  );
+  const { healthView } = await import("@/lib/shared/flows-health");
+  const ev = (o: Partial<import("@/lib/morpho/flows").MorphoFlowEvent> & { ts: number; block: number }) => ({
+    id: `e${o.block}`,
+    kind: "borrow" as const,
+    collAfter: null,
+    collDelta: 0,
+    debtBefore: null,
+    debtAfter: null,
+    supplyBefore: null,
+    supplyAfter: null,
+    assetsDelta: 0,
+    loanRepaid: 0,
+    price: null,
+    ...o,
+  });
+  const lltv = 0.86;
+  const events = [
+    ev({ ts: 100 * D + 10, block: 10, kind: "supply_collateral", collAfter: 2, collDelta: 2, price: 3_000 }),
+    ev({ ts: 100 * D + 20, block: 11, kind: "borrow", collAfter: 2, debtBefore: 0, debtAfter: 3_000, price: 3_000 }),
+    // Ten days on: interest 30, then 1,000 repaid, at a new price.
+    ev({ ts: 110 * D + 10, block: 20, kind: "repay", collAfter: 2, debtBefore: 3_030, debtAfter: 2_030, price: 2_500 }),
+  ];
+  const now = 112 * D;
+  const t = morphoFlowTimeline(events, {
+    loanSymbol: "USDC",
+    collSymbol: "WETH",
+    lltv,
+    now,
+    live: null,
+  })!;
+  const G = 10 ** (t.unit?.scale ?? 0);
+  const reads = morphoLltvReads(events, lltv)!;
+  assert.deepEqual(
+    reads.map((r) => [r.day, r.block, r.line]),
+    [
+      [100, 11, lltv],
+      [110, 20, lltv],
+    ],
+  );
+  const hv = healthView(t, reads, { source: morphoHealthSource(1, "USDC") })!;
+  assert.equal(hv.health.liquidates, "above");
+  assert.equal(hv.health.sparseBefore, undefined);
+  // Day 100: 3,000 ÷ (2 × 3,000) = 50 %; day 110: 2,030 ÷ (2 × 2,500) = 40.6 %,
+  // each debt grown to the day's end (36.5 % a year, the rate the repay implies).
+  const at = (d: number) => hv.health.points.find((p) => p[0] === d)![1];
+  assert.ok(Math.abs(at(100) - 0.5) < 1e-3, String(at(100)));
+  assert.ok(Math.abs(at(110) / 0.406 - 1) < 1.1e-3, String(at(110)));
+  // Days between events keep the last event's price: held, so dotted.
+  assert.deepEqual(hv.health.heldDays?.slice(0, 3), [101, 102, 103]);
+  assert.ok(!hv.health.heldDays!.includes(110));
+  assert.ok(hv.health.level!.points.every((p) => p[1] === lltv));
+  // The level on an event day: morphoHealthMove's after-figure, the debt
+  // grown to the day's end at the rate the market charged.
+  const lv = hv.marks[MORPHO_COLL_KEY].level!.points;
+  const lvAt = (d: number) => lv.find((p) => p[0] === d)![1];
+  assert.ok(Math.abs(lvAt(110) / morphoLiqPrice(2, 2_030, lltv) - 1) < 1.1e-3, String(lvAt(110)));
+  // Between events it grows with the debt: 3,000 → 3,030 over the ten days.
+  assert.ok(lvAt(105) > lvAt(100) && lvAt(109) < morphoLiqPrice(2, 3_030, lltv) * 1.0001);
+  assert.equal(hv.marks[MORPHO_COLL_KEY].warn, undefined);
+  // Today the card's: its LTV, LLTV and level.
+  const live = healthView(t, reads, {
+    source: morphoHealthSource(1, "USDC"),
+    liveHf: lltv / 0.41,
+    liveLine: lltv,
+    liveLevels: { [MORPHO_COLL_KEY]: morphoLiqPrice(2, 2_050, lltv) * G },
+  })!;
+  const last = live.health.points[live.health.points.length - 1];
+  assert.equal(last[0], 112);
+  assert.ok(Math.abs(last[1] - 0.41) < 1e-12 && last[2] == null);
+  const lastLv = live.marks[MORPHO_COLL_KEY].level!.points.at(-1)!;
+  assert.ok(Math.abs(lastLv[1] - morphoLiqPrice(2, 2_050, lltv)) < 1e-9);
+});
+
+test("f(x) debt ratio: the two lines read per event, both levels, a dust debt drawn", async () => {
+  const { FX_HEALTH_SOURCE, FX_COLL_KEY, fxLineReads, fxLinesRead } = await import("@/lib/fx/flows-health");
+  const { healthView } = await import("@/lib/shared/flows-health");
+  const row = (day: number, coll: number, debt: number) => ({
+    day,
+    events: 1,
+    tick: "both" as const,
+    cum: {},
+    balances: [
+      { side: "collateral" as const, asset: FX_COLL_KEY, symbol: "stETH", amount: coll },
+      { side: "debt" as const, asset: "debt", symbol: "fxUSD", amount: debt },
+    ],
+    prices: [],
+  });
+  const t: FlowTimeline = {
+    buckets: [],
+    days: [row(100, 2, 3_000), row(105, 2, 1e-9)],
+    live: { collateralUsd: 0, debtUsd: 0 },
+    dailyPrices: {
+      [FX_COLL_KEY]: [
+        [100, 2_500],
+        [105, 2_000],
+      ],
+      debt: [[100, 1]],
+    },
+    today: 106,
+  };
+  const W = (x: number) => String(BigInt(Math.round(x * 1e6)) * BigInt(1e12));
+  const read = (block: number, liq: number, reb: number) => ({
+    block,
+    colls: null,
+    debts: null,
+    ratio: null,
+    rate: null,
+    liquidateLine: W(liq),
+    rebalanceLine: W(reb),
+  });
+  // The lines move between the two events: 95 / 88, then 94 / 87.
+  const reads = fxLineReads(
+    [
+      { ts: 100 * D + 5, block: 10 },
+      { ts: 105 * D + 5, block: 30 },
+    ],
+    { "9": read(9, 0.95, 0.88), "10": read(10, 0.95, 0.88), "29": read(29, 0.94, 0.87) },
+  )!;
+  assert.deepEqual(
+    reads.map((r) => [r.day, r.block, r.line, r.warn]),
+    [
+      [100, 10, 0.95, 0.88],
+      [105, 29, 0.94, 0.87],
+    ],
+  );
+  const hv = healthView(t, reads, { source: FX_HEALTH_SOURCE })!;
+  // 3,000 ÷ (2 × 2,500) = 60 %, carried to day 104, held there.
+  assert.ok(Math.abs(hv.health.points[0][1] - 0.6) < 1e-12);
+  assert.deepEqual(hv.health.heldDays, [101, 102, 103, 104, 106]);
+  assert.deepEqual(
+    hv.health.warn!.points.map((p) => [p[0], p[1]]),
+    [100, 101, 102, 103, 104, 105, 106].map((d) => [d, d < 105 ? 0.88 : 0.87]),
+  );
+  assert.equal(hv.health.warn!.verb, "Rebalances");
+  // A dust debt's ratio, near 0, is drawn: a ratio liquidatable above its line has no cap.
+  assert.ok(hv.health.points.some((p) => p[0] === 105 && p[1] < 1e-9));
+  // The levels: 3,000 ÷ (2 × 0.95) and ÷ (2 × 0.88).
+  const m = hv.marks[FX_COLL_KEY];
+  assert.ok(Math.abs(m.level!.points[0][1] - 3_000 / 1.9) < 1e-9);
+  assert.ok(Math.abs(m.warn!.points[0][1] - 3_000 / 1.76) < 1e-9);
+  // Today the card's lines, ratio and level; the rebalance level follows.
+  const live = healthView(t, [...reads, fxLinesRead(106, 99, 0.95, 0.88)], {
+    source: FX_HEALTH_SOURCE,
+    liveHf: 0.95 / 0.5,
+    liveLine: 0.95,
+    liveLevels: { [FX_COLL_KEY]: 1_000 },
+  })!;
+  assert.ok(Math.abs(live.health.points.at(-1)![1] - 0.5) < 1e-12);
+  assert.ok(Math.abs(live.marks[FX_COLL_KEY].warn!.points.at(-1)![1] - (1_000 * 0.95) / 0.88) < 1e-9);
+});

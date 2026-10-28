@@ -109,6 +109,34 @@ import { chromium } from "playwright";
 import { BASE as HOST_BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 
 const BASE = (process.env.BASE_URL ?? HOST_BASE).replace(/\/$/, "");
+/** Morpho's view (step 6): the card's LTV, its LLTV in the "Share of the
+ *  LLTV line" row, today's level the price its "Liquidates on a drop of"
+ *  names; days between events dotted. */
+const MORPHO_RATIO = {
+  label: "LTV",
+  liquidates: "above",
+  head: "ltv",
+  lineRow: "lltv-share",
+  linePattern: /LLTV (\d+(?:\.\d+)?)%/,
+  dropRow: "liquidation-drop",
+  held: true,
+  help: ["the market oracle's price", "fixed when the market was created", "drawn dotted"],
+};
+/** f(x)'s view (step 6): the card's debt ratio, its "Liquidates from" and
+ *  "Rebalances from" lines, today's levels its "Liquidates at" and
+ *  "Rebalances at"; days between events dotted. */
+const FX_RATIO = {
+  label: "Debt ratio",
+  liquidates: "above",
+  head: "debt-ratio",
+  lineRow: "liquidation-line",
+  warnRow: "rebalance-line",
+  warnVerb: "Rebalances",
+  levelRow: "liquidation-at",
+  warnLevelRow: "rebalance-at",
+  held: true,
+  help: ["the price each event was valued at", "rebalance ratio", "read at the block of the day's last event"],
+};
 const PAGES = [
   {
     id: "aave-v3 0xfb93",
@@ -453,16 +481,38 @@ const PAGES = [
     lwOnly: true,
     share: true,
   },
+  // Morpho (step 6): the LTV against the market's LLTV, the collateral's
+  // level debt ÷ (collateral × LLTV); a lender's position draws the value
+  // pane alone.
   {
     id: "morpho 0xebb8",
     path: "/ethereum/morpho/ebd23a871b52e0a8c92bd719f4413600101b69e946cb72923b3a33fb5bc6ec85-0xebb870a0aaaa7bc55ead925d03a4af4a8db79a03",
     lwOnly: true,
+    ratio: MORPHO_RATIO,
   },
   {
-    id: "morpho-base 0x9f03",
+    id: "morpho 0x594c (liquidated)",
+    path: "/ethereum/morpho/66cd49c47e1178e2c446ea9ebb94cc4b0a98448b1616c471a0733c23e98d658d-0x594c5ee5a326295ff6212c31bb3311747d3bd562",
+    lwOnly: true,
+    ratio: { ...MORPHO_RATIO, endDay: 20749 },
+  },
+  {
+    id: "morpho-base 0x9f03 (lender)",
     path: "/base/morpho/0x9f03da73cf0f3a141404af735c16cf17427d81db/0xc9658cac13a9b9b5c1ebaa8ce19c735283cc761ff528d149a7221047bb7fab45",
     lwOnly: true,
     panes: "value",
+  },
+  {
+    id: "morpho-base 0xb977",
+    path: "/base/morpho/0xb97771daf3551e162be6185605d51a463067b671/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+    lwOnly: true,
+    ratio: MORPHO_RATIO,
+  },
+  {
+    id: "morpho-base 0x0d67 (liquidated)",
+    path: "/base/morpho/0x0d6772586c7d99fbe0a445fd8256a29d732e618a/0x4f55f2f1a4bcb77aa6c84da2fde5641ef0baf8dee41015efbc8e606139d34fd3",
+    lwOnly: true,
+    ratio: { ...MORPHO_RATIO, endDay: 20736 },
   },
   // The forks and Polaris (step 6): the collateral's price with the level
   // against the minimum in force each day.
@@ -548,7 +598,17 @@ const PAGES = [
     lwOnly: true,
     level: { asset: "pETH", endDay: 20709, help: ["debt × 115%", "not drawn"] },
   },
-  { id: "fx wsteth-249", path: "/ethereum/fx/wsteth-249", lwOnly: true },
+  // f(x) (step 6): the debt ratio against the pool's liquidation ratio, its
+  // rebalance ratio the dashed line short of it, both read at each day's
+  // last event; the collateral's two levels.
+  { id: "fx wsteth-249", path: "/ethereum/fx/wsteth-249", lwOnly: true, ratio: FX_RATIO },
+  { id: "fx wbtc-78", path: "/ethereum/fx/wbtc-78", lwOnly: true, ratio: FX_RATIO },
+  {
+    id: "fx wsteth-110 (liquidated)",
+    path: "/ethereum/fx/wsteth-110",
+    lwOnly: true,
+    ratio: { ...FX_RATIO, endDay: 20121 },
+  },
   {
     id: "llamalend 0xeb2c",
     path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xeb2cafb6ea9def8084842558ad1242bbf7fcac2b",
@@ -782,7 +842,7 @@ async function waitForHealth(page, label = HEALTH) {
  *  how-to-read names the source. */
 async function checkRatio(page, tag, pg) {
   const r = pg.ratio;
-  const name = r.label.toLowerCase();
+  const name = /^[A-Z]{2,}$/.test(r.label) ? r.label : r.label.toLowerCase();
   const pct = (t) => Number((t ?? "").match(/(\d+(?:\.\d+)?)%/)?.[1] ?? NaN);
   const picker = page.locator("button[data-price-picker]");
   await picker.click();
@@ -800,11 +860,14 @@ async function checkRatio(page, tag, pg) {
     page.$eval("[data-price-heading]", (h) => {
       const ro = h.querySelector("[data-price-readout]");
       const lv = h.querySelector("[data-liq-readout]");
+      const wv = h.querySelector("[data-warn-readout]");
       return {
         text: ro?.textContent ?? "",
         none: ro?.hasAttribute("data-price-none") ?? true,
         block: ro?.getAttribute("data-price-block") ?? "",
+        price: Number((ro?.textContent ?? "").replace(/[^\d.]/g, "")),
         line: lv ? Number(lv.getAttribute("data-liq-value")) : null,
+        warn: wv ? Number(wv.getAttribute("data-warn-value")) : null,
       };
     });
   const readAt = async (key) => {
@@ -823,11 +886,22 @@ async function checkRatio(page, tag, pg) {
       `chart ${end.text}, card ${head}`,
     );
     const lineCard = await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+    const cardLine = r.linePattern ? Number(lineCard.match(r.linePattern)?.[1] ?? NaN) : pct(lineCard);
     check(
       `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}`,
-      end.line != null && Math.abs(end.line * 100 - pct(lineCard)) < 0.05,
+      end.line != null && Math.abs(end.line * 100 - cardLine) < 0.05,
       `chart ${end.line}, card ${lineCard}`,
     );
+    if (r.warnRow) {
+      const warnCard = await page
+        .$eval(`[data-panel-row="${r.warnRow}"] dd`, (d) => d.textContent ?? "")
+        .catch(() => "");
+      check(
+        `${tag}: today's second line is the card's ${r.warnRow.replace(/-/g, " ")}`,
+        end.warn != null && Math.abs(end.warn * 100 - pct(warnCard)) < 0.05,
+        `chart ${end.warn}, card ${warnCard}`,
+      );
+    }
   }
   // The first day with a ratio (a life can open on a deposit alone).
   let first = await readAt("Home");
@@ -840,6 +914,10 @@ async function checkRatio(page, tag, pg) {
   const words = `Liquidates ${r.liquidates}`;
   const tip = await page.$eval("[data-price-heading]", headingText).catch(() => "");
   check(`${tag}: the line is named "${words}"`, tip.includes(words), tip);
+  if (r.warnVerb) {
+    const warnWords = `${r.warnVerb} ${r.liquidates}`;
+    check(`${tag}: the second line is named "${warnWords}"`, tip.includes(warnWords), tip);
+  }
   if (r.ilk && first.block) {
     const body = await hostFetch(`${BASE}/api/chain/makerdao/ilk-at?ilk=${r.ilk}&blocks=${first.block}`).then((x) =>
       x.json(),
@@ -866,12 +944,36 @@ async function checkRatio(page, tag, pg) {
   const dotted = await page.$eval("[data-price-line]", (g) => ({
     key: g.getAttribute("data-price-line"),
     dotted: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).length,
+    observed: (g.getAttribute("data-price-observed") ?? "").split(",").filter(Boolean).map(Number),
   }));
-  check(
-    `${tag}: no day of the ${name} is drawn dotted`,
-    dotted.key === "health" && dotted.dotted === 0,
-    JSON.stringify(dotted),
-  );
+  if (r.held) {
+    // A day with an event of the position's is solid; a day between events
+    // keeps the last event's price, dotted.
+    const carried = await page.$eval("[data-price-line]", (g) =>
+      (g.getAttribute("data-price-carried") ?? "").split(",").filter(Boolean).map(Number),
+    );
+    const span = dotted.observed.length + carried.length;
+    check(
+      `${tag}: the ${name} is solid on days with events, dotted between`,
+      dotted.key === "health" && dotted.observed.length > 0 && (span <= dotted.observed.length || dotted.dotted > 0),
+      JSON.stringify({ ...dotted, observed: dotted.observed.length, carried: carried.length }),
+    );
+  } else
+    check(
+      `${tag}: no day of the ${name} is drawn dotted`,
+      dotted.key === "health" && dotted.dotted === 0,
+      JSON.stringify(dotted),
+    );
+  if (r.endDay != null) {
+    const days = await page.$$eval("[data-liq-level]", (ls) =>
+      ls.flatMap((l) => (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).map(Number)),
+    );
+    check(
+      `${tag}: the line ends the day before the position's last event left no debt`,
+      days.length > 0 && Math.max(...days) === r.endDay,
+      `last ${Math.max(...days)}, want ${r.endDay}`,
+    );
+  }
   // The collateral's level: drawn, and today the card's; none where the card
   // states no liquidation price (Dolomite).
   const coll = listed.find((x) => x !== r.label);
@@ -904,8 +1006,27 @@ async function checkRatio(page, tag, pg) {
         .catch(() => "");
       check(
         `${tag}: ${coll}'s level today is the card's "Liquidates at"`,
-        lv.line != null && liq.endsWith(formatLiquidationPrice(lv.line)),
+        lv.line != null && liq.includes(formatLiquidationPrice(lv.line)),
         `chart ${lv.line}, card ${liq}`,
+      );
+    }
+    if (open && r.warnLevelRow) {
+      const at = await page
+        .$eval(`[data-panel-row="${r.warnLevelRow}"] dd`, (d) => d.textContent?.trim() ?? "")
+        .catch(() => "");
+      check(
+        `${tag}: ${coll}'s second level today is the card's "${r.warnLevelRow.replace(/-/g, " ")}"`,
+        lv.warn != null && at.includes(formatLiquidationPrice(lv.warn)),
+        `chart ${lv.warn}, card ${at}`,
+      );
+    }
+    if (open && r.dropRow) {
+      const drop = await page.$eval(`[data-panel-row="${r.dropRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+      const share = pct(drop) / 100;
+      check(
+        `${tag}: ${coll}'s level today is the price the card's "Liquidates on a drop of" names`,
+        lv.line != null && lv.price > 0 && Math.abs(1 - lv.line / lv.price - share) <= 0.006,
+        `level ${lv.line}, price ${lv.price}, card ${drop}`,
       );
     }
     if (open && fluid?.liqPriceDebtPerCol > 0)

@@ -19,6 +19,8 @@ import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { loadMorphoAtBlock } from "@/lib/morpho/use-market-at-block";
 import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
+import { useFlowsHealth } from "@/hooks/useFlowsHealth";
+import { MORPHO_COLL_KEY, morphoHealthSource, morphoLiqPrice, morphoLltvReads } from "@/lib/morpho/flows-health";
 import {
   MO,
   morphoFlowEvents,
@@ -34,6 +36,7 @@ import {
 /** At most this many blocks' oracle reads per page; the rest take the
  *  nearest priced row's price, and the Explanation counts them. */
 export const MORPHO_PRICE_READS = 250;
+const NO_EVENTS: never[] = [];
 
 export interface MorphoFlowsInput {
   /** The page's events, when they are the whole history; null otherwise. */
@@ -53,6 +56,27 @@ export interface MorphoFlowsInput {
   open: boolean;
   /** The page's live read of the position, where it has one. */
   live: MorphoLive | null;
+  /** The card's risk figures from the live read, for the health view; null
+   *  where the card states no LTV. */
+  risk?: MorphoRisk | null;
+}
+
+/** The card's risk figures now (lib/sources/chain/morpho-position.ts). */
+export interface MorphoRisk {
+  /** The card's LTV: the debt over the collateral's value at the oracle. */
+  ltv: number;
+  lltv: number;
+  collateral: number;
+  currentDebt: number;
+}
+
+/** The card's figures, where it prints its LTV (the card's test). */
+export function morphoRisk(
+  chain: { currentDebt: number; maxBorrow: number; ltv: number | null; lltv: number; collateral: number } | null,
+): MorphoRisk | null {
+  return chain && chain.currentDebt > 0 && chain.maxBorrow > 0 && chain.ltv != null && chain.ltv > 0
+    ? { ltv: chain.ltv, lltv: chain.lltv, collateral: chain.collateral, currentDebt: chain.currentDebt }
+    : null;
 }
 
 export interface MorphoFlowsNoteFacts {
@@ -156,7 +180,37 @@ export function useMorphoFlows(p: MorphoFlowsInput): {
     [now, p.loanSymbol, p.collSymbol, p.loanAddress, p.collAddress, p.lltv, p.open, p.live],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? morphoFlowReplay(rows, opts) : null), [rows, opts]);
-  const timeline = useMemo(() => (rows && opts ? morphoFlowTimeline(rows, opts) : null), [rows, opts]);
+  const replayedTimeline = useMemo(() => (rows && opts ? morphoFlowTimeline(rows, opts) : null), [rows, opts]);
+  // The health view in the card's terms (ui-jobs 328 step 6;
+  // lib/morpho/flows-health.ts): the LTV against the market's LLTV.
+  const given = useMemo(
+    () =>
+      replay?.roles.borrower && p.lltv != null
+        ? morphoLltvReads(
+            replay.replayed.map((r) => r.ev),
+            p.lltv,
+          )
+        : null,
+    [replay, p.lltv],
+  );
+  const healthSource = useMemo(() => morphoHealthSource(p.chainId, p.loanSymbol ?? ""), [p.chainId, p.loanSymbol]);
+  const risk = p.open ? (p.risk ?? null) : null;
+  const grain = 10 ** (replayedTimeline?.unit?.scale ?? 0);
+  // Keyed by its figures: the page hands a new object on each render.
+  const [rColl, rDebt, rLltv] = [risk?.collateral ?? 0, risk?.currentDebt ?? 0, risk?.lltv ?? 0];
+  const liveLevels = useMemo(
+    () => (rColl > 0 && rLltv > 0 ? { [MORPHO_COLL_KEY]: morphoLiqPrice(rColl, rDebt, rLltv) * grain } : null),
+    [rColl, rDebt, rLltv, grain],
+  );
+  const timeline = useFlowsHealth(replayedTimeline, {
+    reader: null,
+    given,
+    source: healthSource,
+    events: NO_EVENTS,
+    liveHf: risk ? risk.lltv / risk.ltv : null,
+    liveLevels,
+    liveLine: risk?.lltv ?? null,
+  });
   const focusEvents = useMemo(
     () => (replay && p.loanSymbol ? morphoFocusEvents(replay, p.loanSymbol, p.collSymbol ?? "collateral") : []),
     [replay, p.loanSymbol, p.collSymbol],

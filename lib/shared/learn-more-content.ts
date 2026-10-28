@@ -2,7 +2,7 @@ import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/lib/shared/faq-urls";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
-import { indefiniteArticle } from "@/lib/utils/format";
+import { indefiniteArticle, viewWord } from "@/lib/utils/format";
 
 // ── Lifetime flows: how to read the charts ───────────────────────────────────
 
@@ -65,7 +65,7 @@ export function lifetimeFlowsStackContent(opts: {
   if (price)
     details.push(
       price.health && price.help
-        ? { bold: `The ${price.symbol.toLowerCase()}`, text: price.help }
+        ? { bold: `The ${viewWord(price.symbol)}`, text: price.help }
         : price.help
           ? { bold: `The ${price.name ?? `${price.symbol} price`}`, text: price.help }
           : price.health
