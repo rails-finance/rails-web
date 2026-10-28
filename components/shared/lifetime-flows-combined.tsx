@@ -69,6 +69,7 @@ import { LwRanges, nearestStopAt, type FlowsLwApi, type FlowsLwAxis } from "@/co
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import { changesByDay, changeWords, type FlowChange } from "@/lib/shared/flows-changes";
+import { paceAt, paceWords, type FlowPace } from "@/lib/shared/flows-pace";
 import {
   axisEndDay,
   closeStop,
@@ -773,7 +774,13 @@ export function CombinedFlows({
   const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
   const stackHelp = lifetimeFlowsStackContent({
     events: marks,
-    charts: { value: true, price: priceBrief, unit: lineUnitWords(model), line: valueLineWords(model) },
+    charts: {
+      value: true,
+      price: priceBrief,
+      unit: lineUnitWords(model),
+      line: valueLineWords(model),
+      ...(model.pace ? { pace: model.pace.help } : {}),
+    },
   });
   const priceOnlyHelp = lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
 
@@ -903,6 +910,7 @@ export function CombinedFlows({
                       shown={shown}
                       onAxis={setLwAxis}
                       apiRef={lwApi}
+                      pace={priceOnly ? null : model.pace}
                       tip={
                         priced ? (
                           <PriceHeading
@@ -919,6 +927,7 @@ export function CombinedFlows({
                             isLive={cur.live && !closed}
                             x={cx}
                             w={rowW}
+                            pace={priceOnly ? null : model.pace}
                           />
                         ) : null
                       }
@@ -1194,9 +1203,12 @@ function PriceHeading({
   x,
   w,
   help,
+  pace,
 }: {
   /** The price chart's "?", at the tip's right. */
   help: ReactNode;
+  /** The pace lane, whose day the tip reads under the price. */
+  pace: FlowPace | null;
   series: FlowPriceSeries[];
   selected: FlowPriceSeries;
   onPick: (key: string) => void;
@@ -1252,6 +1264,7 @@ function PriceHeading({
           {help}
         </span>
         <PriceFigures s={selected} day={day} gapDays={gapDays} isLive={isLive} asset={asset} showLevel={showLevel} />
+        {pace && <PaceFigure pace={pace} day={day} isLive={isLive} />}
         <i
           aria-hidden
           className={`absolute top-full size-2 -translate-x-1/2 -translate-y-1 rotate-45 border-b border-r ${CURSOR_SKIN}`}
@@ -1440,6 +1453,31 @@ function PriceFigures({
           </span>
         </>
       )}
+    </div>
+  );
+}
+
+/** The pace lane's figure on the cursor's day, under the price: the day's
+ *  total and count, zero on a day the lane lists none (lib/shared/flows-pace.ts). */
+function PaceFigure({ pace, day, isLive }: { pace: FlowPace; day: number; isLive: boolean }) {
+  const at = paceAt(pace, day);
+  if (!at) return null;
+  const dayWord = isLive ? `today, ${dayStamp(day * 86_400)}` : dayStamp(day * 86_400);
+  return (
+    <div
+      className="mt-1 grid grid-cols-[auto_1fr] items-center gap-x-1.5 text-xs tabular-nums"
+      data-pace-readout=""
+      data-pace-day={at.day}
+      data-pace-amount={at.amount}
+      data-pace-count={at.count}
+      data-anatomy="F19.11"
+    >
+      <span className="text-[10px] font-semibold text-[color:var(--caution)]">{pace.short}</span>
+      <span className="whitespace-nowrap font-semibold text-rb-500">
+        <Prov info={pace.prov(at, dayWord)} value={String(at.amount)}>
+          {paceWords(pace, at)}
+        </Prov>
+      </span>
     </div>
   );
 }

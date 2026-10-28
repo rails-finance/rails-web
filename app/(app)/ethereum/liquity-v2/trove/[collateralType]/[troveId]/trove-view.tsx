@@ -47,6 +47,8 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { compareEventsInOrder } from "@/lib/shared/event-order";
+import { useRedemptionPace } from "@/hooks/useRedemptionPace";
+import { paceBranch } from "@/lib/liquity-v2/redemption-pace";
 
 export interface TroveViewProps {
   collateralType: string;
@@ -330,7 +332,7 @@ export default function TroveView({
   // The branch's daily price for the collateral between the Trove's events;
   // where the read fails, each event's price carries.
   const flowDaily = useLiquityDailyPrices(liquityDailyBranch(flowCollSymbol));
-  const { flowTimeline, flowFocus } = useTroveFlows({
+  const { flowTimeline: flowReplayed, flowFocus } = useTroveFlows({
     flowEvents,
     collSymbol: flowCollSymbol,
     debtSymbol: flowDebtSymbol,
@@ -341,6 +343,22 @@ export default function TroveView({
     price: flowPrice,
     liveState,
   });
+  // The branch's redemptions per day over the life, the chart's pace lane
+  // (lib/liquity-v2/redemption-pace.ts): to today, or to the close.
+  const paceDays = flowReplayed?.days;
+  const flowPace = useRedemptionPace(
+    paceBranch(flowCollSymbol),
+    paceDays?.length ? paceDays[0].day : null,
+    paceDays?.length && flowsNow != null
+      ? flowOpen
+        ? Math.floor(flowsNow / 86_400)
+        : paceDays[paceDays.length - 1].day
+      : null,
+  );
+  const flowTimeline = useMemo(
+    () => (flowReplayed && flowPace ? { ...flowReplayed, pace: flowPace } : flowReplayed),
+    [flowReplayed, flowPace],
+  );
 
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;
   const tl = useTimelineEvents(timelineEvents, {

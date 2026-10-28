@@ -92,3 +92,13 @@ export const FLUID_HISTORY_HEALTH_SOURCE: HealthSource = {
     help: "on the same days: the debt over the collateral at the vault oracle's price each day. The red line is the vault's liquidation threshold in force that day, which steps where Fluid governance changed it, each change a grey diamond on the events row; above it the position can be liquidated. The list in the tip picks it or the collateral's price.",
   },
 };
+
+/** The same, for a life the threshold did not move in: the how-to-read names
+ *  no markers. */
+export const FLUID_HISTORY_STEADY_SOURCE: HealthSource = {
+  ...FLUID_HISTORY_HEALTH_SOURCE,
+  ratio: {
+    ...FLUID_HISTORY_HEALTH_SOURCE.ratio!,
+    help: "on the same days: the debt over the collateral at the vault oracle's price each day. The red line is the vault's liquidation threshold in force that day, which steps where Fluid governance changed it; above it the position can be liquidated. The list in the tip picks it or the collateral's price.",
+  },
+};
