@@ -3,9 +3,10 @@
 // on as collateral (Pool ReserveUsedAsCollateralEnabled), read from the Pool's
 // logs by the wallet's topic over the Pool's whole life. Each e-mode change
 // carries the category's limits read at its block. SparkLend
-// (/api/chain/spark/account-switches) and Seamless
-// (/api/chain/seamless/account-switches) answer through here; a route keeps an
+// (/api/chain/spark/account-switches) answers through here; a route keeps an
 // answer a few minutes per wallet, since a new switch can land at any block.
+// Aave V3 Base and Seamless read rails-server instead
+// (lib/api/aave-base-account-switches.ts).
 //
 // SERVER-ONLY.
 
