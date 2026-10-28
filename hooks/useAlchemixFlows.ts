@@ -6,7 +6,7 @@
 // page's rows and its live read. A page whose rows stop short of the whole
 // history withholds the panel: a replay of part of a history would state the
 // wrong lifetime. The chart opens on the card's collateralisation against the
-// Alchemist's lower bound today, held across the life
+// Alchemist's lower bound read at each picked event's block
 // (lib/alchemix/flows-health.ts), over the vault's share price per reading.
 // It also gives the page the value that ties the panel to the timeline
 // (components/shared/flow-focus-context.tsx).
@@ -16,7 +16,9 @@ import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { useFlowsHealth } from "@/hooks/useFlowsHealth";
+import { useFlowsHealth, type HealthPick, type HealthReader } from "@/hooks/useFlowsHealth";
+import { healthRead } from "@/lib/shared/health-reads";
+import { withChanges } from "@/lib/shared/flows-changes";
 import {
   ALCHEMIX_MYT_KEY,
   alchemixFlowEvents,
@@ -28,10 +30,13 @@ import {
   type AlchemixLive,
 } from "@/lib/alchemix/flows";
 import {
-  alchemixBoundReads,
+  alchemistOf,
+  alchemixBoundChanges,
+  alchemixBoundRead,
   alchemixHealthFinish,
   alchemixHealthSource,
   alchemixLiqSharePrice,
+  isAlchemixBoundAt,
 } from "@/lib/alchemix/flows-health";
 
 const NO_EVENTS: never[] = [];
@@ -107,19 +112,25 @@ export function useAlchemixFlows(p: AlchemixFlowsInput): {
   );
   const replayedTimeline = useMemo(() => (replay && opts ? alchemixFlowTimeline(replay, opts) : null), [replay, opts]);
 
-  // The health view in the card's terms (ui-jobs 328 step 6): the
-  // collateralisation against today's lower bound, held across the life.
+  // The health view in the card's terms (ui-jobs 328 steps 6 and 8): the
+  // collateralisation against the lower bound at each picked event's block.
   const bound = p.bound != null && p.bound > 0 ? p.bound : null;
-  const given = useMemo(
-    () =>
-      replay && bound != null
-        ? alchemixBoundReads(
-            replay.replayed.map((r) => ({ ts: r.ev.ts, block: r.ev.block })),
-            bound,
-          )
-        : null,
-    [replay, bound],
+  const alchemist = useMemo(() => (wholeEvents ? alchemistOf(wholeEvents) : null), [wholeEvents]);
+  const healthEvents = useMemo<HealthPick[]>(
+    () => (replay ? replay.replayed.map((r) => ({ blockNumber: r.ev.block, timestamp: r.ev.ts })) : NO_EVENTS),
+    [replay],
   );
+  const reader = useMemo<HealthReader | null>(() => {
+    if (!alchemist) return null;
+    const qs = `chain=${p.chainId}&alchemist=${alchemist}`;
+    return {
+      key: `alchemix:${qs}`,
+      load: (e) =>
+        healthRead(`/api/chain/alchemix/bound-at-block?${qs}&block=${e.blockNumber}`, (b) =>
+          isAlchemixBoundAt(b) ? b : null,
+        ).then((a) => (a ? alchemixBoundRead(a, e.timestamp) : null)),
+    };
+  }, [alchemist, p.chainId]);
   const healthSource = useMemo(
     () => alchemixHealthSource(p.chainId, p.underlyingSymbol ?? "the underlying", p.mytSymbol),
     [p.chainId, p.underlyingSymbol, p.mytSymbol],
@@ -136,10 +147,9 @@ export function useAlchemixFlows(p: AlchemixFlowsInput): {
     [rColl, rBound, lPrice, lShares, lDebt, grain],
   );
   const withHealth = useFlowsHealth(replayedTimeline, {
-    reader: null,
-    given,
+    reader,
     source: healthSource,
-    events: NO_EVENTS,
+    events: healthEvents,
     liveHf: rColl > 0 && rBound > 0 ? rColl / rBound : null,
     liveLevels,
     liveLine: rBound > 0 ? rBound : null,
@@ -153,12 +163,17 @@ export function useAlchemixFlows(p: AlchemixFlowsInput): {
       (replay?.rows ?? []).filter((r) => r.reading?.sharePrice != null).map((r) => Math.floor(r.ts / DAY_S)),
     );
     const level = t.priceMarks?.[ALCHEMIX_MYT_KEY]?.level;
-    return {
-      ...t,
-      health: alchemixHealthFinish(t.health, readDays, live && opts ? Math.floor(opts.now / DAY_S) : null),
-      shareLine: level ? { ...t.shareLine, series: { ...t.shareLine.series, level } } : t.shareLine,
-    };
-  }, [withHealth, replay, live, opts]);
+    // Each step of the bound, marked on the day its read first showed it.
+    const changes = alchemixBoundChanges(t.health.level?.points ?? [], lBlock ?? null, alchemist);
+    return withChanges(
+      {
+        ...t,
+        health: alchemixHealthFinish(t.health, readDays, live && opts ? Math.floor(opts.now / DAY_S) : null),
+        shareLine: level ? { ...t.shareLine, series: { ...t.shareLine.series, level } } : t.shareLine,
+      },
+      changes,
+    );
+  }, [withHealth, replay, live, opts, lBlock, alchemist]);
 
   const focusEvents = useMemo(() => (replay && opts ? alchemixFocusEvents(replay, opts) : []), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

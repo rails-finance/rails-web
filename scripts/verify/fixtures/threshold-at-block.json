@@ -1,0 +1,4837 @@
+{
+ "capturedAt": "2026-10-28",
+ "riskLog": {
+  "fromBlock": 22753940,
+  "toBlock": 26292300,
+  "sets": [
+   {
+    "block": 22753940,
+    "timestamp": 1750522271,
+    "txHash": "0x73e6b7c434b3eb972356fbf17cfee412fee48ed87ff4250010514ec0669998d9",
+    "logIndex": 3,
+    "kind": "margin-ratio",
+    "marketId": null,
+    "value": 0.15
+   },
+   {
+    "block": 22778154,
+    "timestamp": 1750814687,
+    "txHash": "0x9c0d0361a4d1541bc8ecca92c2a2f1f96f8ed38b0f4f7b926af2dc5636075dce",
+    "logIndex": 157,
+    "kind": "margin-ratio",
+    "marketId": null,
+    "value": 0.17647058823529416
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 74,
+    "kind": "margin-premium",
+    "marketId": 0,
+    "value": 0
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 87,
+    "kind": "margin-premium",
+    "marketId": 1,
+    "value": 0
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 100,
+    "kind": "margin-premium",
+    "marketId": 2,
+    "value": 0
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 113,
+    "kind": "margin-premium",
+    "marketId": 3,
+    "value": 0.1643835616438356
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 126,
+    "kind": "margin-premium",
+    "marketId": 4,
+    "value": 0.019999999999999987
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 139,
+    "kind": "margin-premium",
+    "marketId": 5,
+    "value": 0
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 153,
+    "kind": "margin-premium",
+    "marketId": 6,
+    "value": 0.062499999999999986
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 166,
+    "kind": "margin-premium",
+    "marketId": 7,
+    "value": 0.7
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 179,
+    "kind": "margin-premium",
+    "marketId": 8,
+    "value": 0.1643835616438356
+   },
+   {
+    "block": 22778433,
+    "timestamp": 1750818071,
+    "txHash": "0x749dcfa9cad0bc42bc81ed6d464454550346b6c45e158eddacc41550229d6897",
+    "logIndex": 193,
+    "kind": "margin-premium",
+    "marketId": 9,
+    "value": 0.062499999999999986
+   },
+   {
+    "block": 22779690,
+    "timestamp": 1750833215,
+    "txHash": "0x4d2c65c8a254ba0d7ffc7ccf33c3b9bead59c1f3940bbe315964f3c2e3fe71f8",
+    "logIndex": 205,
+    "kind": "margin-premium",
+    "marketId": 10,
+    "value": 0.062499999999999986
+   },
+   {
+    "block": 22788634,
+    "timestamp": 1750941095,
+    "txHash": "0x247c5aab0a8a768e368bfbac84df0317ee830d15ddd18822d6338a34a0ced55a",
+    "logIndex": 153,
+    "kind": "margin-premium",
+    "marketId": 11,
+    "value": 0.062499999999999986
+   },
+   {
+    "block": 22933243,
+    "timestamp": 1752686891,
+    "txHash": "0x11cd068ea713beb88a2bedede64a50a48ef27c47593bc8432db0b769322ba3f6",
+    "logIndex": 142,
+    "kind": "margin-premium",
+    "marketId": 12,
+    "value": 0.019999999999999987
+   },
+   {
+    "block": 23268995,
+    "timestamp": 1756738271,
+    "txHash": "0x5db7b66ca451e7af3d526a5d7aa089336863802273b83c11a630eb6548e9c9f1",
+    "logIndex": 185,
+    "kind": "margin-premium",
+    "marketId": 13,
+    "value": 0.275
+   },
+   {
+    "block": 23347387,
+    "timestamp": 1757684939,
+    "txHash": "0xb47050b172e6e9eb0200f1d0b6a20ec4e3a4d8894c7a0059296cac4d4be3db08",
+    "logIndex": 385,
+    "kind": "margin-premium",
+    "marketId": 14,
+    "value": 0.13333333333333333
+   },
+   {
+    "block": 23347387,
+    "timestamp": 1757684939,
+    "txHash": "0xb47050b172e6e9eb0200f1d0b6a20ec4e3a4d8894c7a0059296cac4d4be3db08",
+    "logIndex": 395,
+    "kind": "margin-premium",
+    "marketId": 15,
+    "value": 0.275
+   },
+   {
+    "block": 23523266,
+    "timestamp": 1759808555,
+    "txHash": "0xf449c6e336dde9ec4bd52dc261283ed67562dbe95e138da6c5caea8c230542df",
+    "logIndex": 783,
+    "kind": "margin-premium",
+    "marketId": 16,
+    "value": 0
+   },
+   {
+    "block": 23975800,
+    "timestamp": 1765290335,
+    "txHash": "0xfffdea9fc665ab59e143bcdf29ad4f8d2898d49f5ae6535e405c481637657df0",
+    "logIndex": 213,
+    "kind": "margin-premium",
+    "marketId": 17,
+    "value": 0.13333333333333333
+   },
+   {
+    "block": 24180950,
+    "timestamp": 1767766547,
+    "txHash": "0x71db1ea8ffc3c26ee18c8e9a95bf0c861f7527caab71db43b19a2ae72badfc59",
+    "logIndex": 293,
+    "kind": "margin-premium",
+    "marketId": 18,
+    "value": 0.08974358974358973
+   },
+   {
+    "block": 24384982,
+    "timestamp": 1770226151,
+    "txHash": "0xabe18cd0abdc5504e1e7daaecf932a5a40e729d0ab5dbcc1cb3589be2284baff",
+    "logIndex": 1091,
+    "kind": "margin-premium",
+    "marketId": 19,
+    "value": 0
+   },
+   {
+    "block": 24384982,
+    "timestamp": 1770226151,
+    "txHash": "0xabe18cd0abdc5504e1e7daaecf932a5a40e729d0ab5dbcc1cb3589be2284baff",
+    "logIndex": 1109,
+    "kind": "margin-premium",
+    "marketId": 20,
+    "value": 0.03658536585365853
+   },
+   {
+    "block": 24384982,
+    "timestamp": 1770226151,
+    "txHash": "0xabe18cd0abdc5504e1e7daaecf932a5a40e729d0ab5dbcc1cb3589be2284baff",
+    "logIndex": 1115,
+    "kind": "margin-premium",
+    "marketId": 6,
+    "value": 0.03658536585365853
+   },
+   {
+    "block": 25654040,
+    "timestamp": 1785515315,
+    "txHash": "0xf584b3dfd774beee515afef7d774272f3235e79d1aa28a6aeecc3d0896908898",
+    "logIndex": 57,
+    "kind": "margin-premium",
+    "marketId": 21,
+    "value": 0.062499999999999986
+   },
+   {
+    "block": 25654040,
+    "timestamp": 1785515315,
+    "txHash": "0xf584b3dfd774beee515afef7d774272f3235e79d1aa28a6aeecc3d0896908898",
+    "logIndex": 69,
+    "kind": "margin-premium",
+    "marketId": 22,
+    "value": 0.41666666666666663
+   }
+  ]
+ },
+ "dolomite": [
+  {
+   "name": "closed-0x49d6",
+   "owner": "0x49d62ca7ab8e28f7a28d9abadf84fe8b45e3caf6",
+   "accountNumber": "15809042418583418827551470108194220080728327193143889538122062408455944908946",
+   "events": [
+    {
+     "block": 23943425,
+     "ts": 1764897131
+    },
+    {
+     "block": 23943431,
+     "ts": 1764897203
+    },
+    {
+     "block": 23961269,
+     "ts": 1765114271
+    },
+    {
+     "block": 23992152,
+     "ts": 1765488899
+    },
+    {
+     "block": 24017686,
+     "ts": 1765797899
+    },
+    {
+     "block": 24022305,
+     "ts": 1765853603
+    },
+    {
+     "block": 24028127,
+     "ts": 1765923803
+    },
+    {
+     "block": 24028127,
+     "ts": 1765923803
+    },
+    {
+     "block": 24028127,
+     "ts": 1765923803
+    },
+    {
+     "block": 24028215,
+     "ts": 1765924871
+    },
+    {
+     "block": 24028236,
+     "ts": 1765925123
+    },
+    {
+     "block": 24028351,
+     "ts": 1765926503
+    },
+    {
+     "block": 24035061,
+     "ts": 1766007431
+    },
+    {
+     "block": 24068024,
+     "ts": 1766404979
+    },
+    {
+     "block": 24084650,
+     "ts": 1766605475
+    },
+    {
+     "block": 24086207,
+     "ts": 1766624279
+    },
+    {
+     "block": 24107907,
+     "ts": 1766886071
+    },
+    {
+     "block": 24135317,
+     "ts": 1767216743
+    },
+    {
+     "block": 24176666,
+     "ts": 1767714935
+    },
+    {
+     "block": 24176666,
+     "ts": 1767714935
+    },
+    {
+     "block": 24176879,
+     "ts": 1767717503
+    },
+    {
+     "block": 24176879,
+     "ts": 1767717503
+    },
+    {
+     "block": 24178211,
+     "ts": 1767733547
+    },
+    {
+     "block": 24213338,
+     "ts": 1768156979
+    },
+    {
+     "block": 24219775,
+     "ts": 1768234679
+    },
+    {
+     "block": 24220030,
+     "ts": 1768237763
+    },
+    {
+     "block": 24271919,
+     "ts": 1768863047
+    },
+    {
+     "block": 24271935,
+     "ts": 1768863239
+    },
+    {
+     "block": 24325853,
+     "ts": 1769513075
+    },
+    {
+     "block": 24325853,
+     "ts": 1769513075
+    },
+    {
+     "block": 24357737,
+     "ts": 1769897291
+    },
+    {
+     "block": 24357742,
+     "ts": 1769897351
+    },
+    {
+     "block": 24357742,
+     "ts": 1769897351
+    },
+    {
+     "block": 24363103,
+     "ts": 1769962031
+    },
+    {
+     "block": 24363103,
+     "ts": 1769962031
+    },
+    {
+     "block": 24390900,
+     "ts": 1770297791
+    },
+    {
+     "block": 24391302,
+     "ts": 1770302651
+    },
+    {
+     "block": 24391302,
+     "ts": 1770302651
+    },
+    {
+     "block": 24398867,
+     "ts": 1770393959
+    },
+    {
+     "block": 24398867,
+     "ts": 1770393959
+    },
+    {
+     "block": 24398867,
+     "ts": 1770393959
+    },
+    {
+     "block": 24426892,
+     "ts": 1770732743
+    },
+    {
+     "block": 24426892,
+     "ts": 1770732743
+    },
+    {
+     "block": 24426892,
+     "ts": 1770732743
+    },
+    {
+     "block": 24426926,
+     "ts": 1770733163
+    },
+    {
+     "block": 24426926,
+     "ts": 1770733163
+    },
+    {
+     "block": 24426955,
+     "ts": 1770733511
+    },
+    {
+     "block": 24427230,
+     "ts": 1770736811
+    },
+    {
+     "block": 24427230,
+     "ts": 1770736811
+    },
+    {
+     "block": 24428590,
+     "ts": 1770753263
+    },
+    {
+     "block": 24428590,
+     "ts": 1770753263
+    },
+    {
+     "block": 24428622,
+     "ts": 1770753647
+    },
+    {
+     "block": 24428622,
+     "ts": 1770753647
+    },
+    {
+     "block": 24428727,
+     "ts": 1770754943
+    },
+    {
+     "block": 24494935,
+     "ts": 1771552835
+    },
+    {
+     "block": 24643649,
+     "ts": 1773345791
+    },
+    {
+     "block": 24656137,
+     "ts": 1773496283
+    },
+    {
+     "block": 24850049,
+     "ts": 1775832815
+    },
+    {
+     "block": 24943021,
+     "ts": 1776951815
+    },
+    {
+     "block": 24943027,
+     "ts": 1776951887
+    },
+    {
+     "block": 24943027,
+     "ts": 1776951887
+    },
+    {
+     "block": 25145745,
+     "ts": 1779392039
+    },
+    {
+     "block": 25237561,
+     "ts": 1780498079
+    },
+    {
+     "block": 25237561,
+     "ts": 1780498079
+    },
+    {
+     "block": 25237572,
+     "ts": 1780498211
+    },
+    {
+     "block": 25248253,
+     "ts": 1780627151
+    },
+    {
+     "block": 25248253,
+     "ts": 1780627151
+    },
+    {
+     "block": 25248253,
+     "ts": 1780627151
+    },
+    {
+     "block": 25248294,
+     "ts": 1780627643
+    },
+    {
+     "block": 26180392,
+     "ts": 1791856211
+    },
+    {
+     "block": 26180392,
+     "ts": 1791856211
+    },
+    {
+     "block": 26204976,
+     "ts": 1792152275
+    },
+    {
+     "block": 26204976,
+     "ts": 1792152275
+    },
+    {
+     "block": 26204976,
+     "ts": 1792152275
+    },
+    {
+     "block": 26204976,
+     "ts": 1792152275
+    }
+   ],
+   "markets": {
+    "0": "WETH",
+    "1": "USD1",
+    "2": "USDC",
+    "4": "WBTC",
+    "5": "USDT",
+    "13": "WLFI",
+    "18": "cbBTC"
+   },
+   "picks": [
+    23943431,
+    23961269,
+    23992152,
+    24017686,
+    24028351,
+    24035061,
+    24068024,
+    24084650,
+    24086207,
+    24107907,
+    24135317,
+    24178211,
+    24213338,
+    24220030,
+    24271935,
+    24325853,
+    24357742,
+    24363103,
+    24391302,
+    24398867,
+    24428727,
+    24494935,
+    24643649,
+    24656137,
+    24850049,
+    24943027,
+    25145745,
+    25237572,
+    25248294,
+    26180392,
+    26204976
+   ],
+   "answers": {
+    "23943431": {
+     "block": 23943431,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "23961269": {
+     "block": 23961269,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "23992152": {
+     "block": 23992152,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24017686": {
+     "block": 24017686,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24028351": {
+     "block": 24028351,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24035061": {
+     "block": 24035061,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24068024": {
+     "block": 24068024,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24084650": {
+     "block": 24084650,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24086207": {
+     "block": 24086207,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24107907": {
+     "block": 24107907,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24135317": {
+     "block": 24135317,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24178211": {
+     "block": 24178211,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24213338": {
+     "block": 24213338,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24220030": {
+     "block": 24220030,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24271935": {
+     "block": 24271935,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24325853": {
+     "block": 24325853,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24357742": {
+     "block": 24357742,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24363103": {
+     "block": 24363103,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24391302": {
+     "block": 24391302,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24398867": {
+     "block": 24398867,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24428727": {
+     "block": 24428727,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24494935": {
+     "block": 24494935,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24643649": {
+     "block": 24643649,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24656137": {
+     "block": 24656137,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24850049": {
+     "block": 24850049,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "24943027": {
+     "block": 24943027,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "25145745": {
+     "block": 25145745,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "25237572": {
+     "block": 25237572,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "25248294": {
+     "block": 25248294,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "26180392": {
+     "block": 26180392,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    },
+    "26204976": {
+     "block": 26204976,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "4": 0.019999999999999987,
+      "5": 0,
+      "13": 0.275,
+      "18": 0.08974358974358973
+     }
+    }
+   }
+  },
+  {
+   "name": "open-0x65a9",
+   "owner": "0x65a9e8ce4570624a84cbaf7e0540bd7d706b241f",
+   "accountNumber": "32240150336664509314013882100458201794439878083374431556084268488477773350727",
+   "events": [
+    {
+     "block": 24222060,
+     "ts": 1768262231
+    },
+    {
+     "block": 24222114,
+     "ts": 1768262879
+    },
+    {
+     "block": 24255114,
+     "ts": 1768660739
+    },
+    {
+     "block": 24255146,
+     "ts": 1768661135
+    },
+    {
+     "block": 24283491,
+     "ts": 1769002427
+    },
+    {
+     "block": 24348117,
+     "ts": 1769781311
+    },
+    {
+     "block": 24366562,
+     "ts": 1770003779
+    },
+    {
+     "block": 24369681,
+     "ts": 1770041423
+    },
+    {
+     "block": 24394611,
+     "ts": 1770342599
+    },
+    {
+     "block": 24397640,
+     "ts": 1770379163
+    },
+    {
+     "block": 24402036,
+     "ts": 1770432215
+    },
+    {
+     "block": 24405670,
+     "ts": 1770476063
+    },
+    {
+     "block": 24408671,
+     "ts": 1770512267
+    },
+    {
+     "block": 24408795,
+     "ts": 1770513815
+    },
+    {
+     "block": 24434435,
+     "ts": 1770823811
+    },
+    {
+     "block": 24449371,
+     "ts": 1771003919
+    },
+    {
+     "block": 24459834,
+     "ts": 1771129979
+    },
+    {
+     "block": 24470366,
+     "ts": 1771256747
+    },
+    {
+     "block": 24494396,
+     "ts": 1771546343
+    },
+    {
+     "block": 24494581,
+     "ts": 1771548563
+    },
+    {
+     "block": 24498370,
+     "ts": 1771594187
+    },
+    {
+     "block": 24531544,
+     "ts": 1771993787
+    },
+    {
+     "block": 24545432,
+     "ts": 1772161151
+    },
+    {
+     "block": 24556207,
+     "ts": 1772291063
+    },
+    {
+     "block": 24556305,
+     "ts": 1772292251
+    },
+    {
+     "block": 24556593,
+     "ts": 1772295755
+    },
+    {
+     "block": 24617285,
+     "ts": 1773027611
+    },
+    {
+     "block": 24667254,
+     "ts": 1773630215
+    },
+    {
+     "block": 24706928,
+     "ts": 1774108703
+    },
+    {
+     "block": 24738287,
+     "ts": 1774486547
+    },
+    {
+     "block": 24767911,
+     "ts": 1774843487
+    },
+    {
+     "block": 24782156,
+     "ts": 1775015219
+    },
+    {
+     "block": 24789571,
+     "ts": 1775104607
+    },
+    {
+     "block": 24799221,
+     "ts": 1775220719
+    },
+    {
+     "block": 24800188,
+     "ts": 1775232323
+    },
+    {
+     "block": 24864832,
+     "ts": 1776010871
+    },
+    {
+     "block": 24932586,
+     "ts": 1776826175
+    },
+    {
+     "block": 25006401,
+     "ts": 1777714295
+    },
+    {
+     "block": 25006955,
+     "ts": 1777720943
+    },
+    {
+     "block": 25006961,
+     "ts": 1777721015
+    },
+    {
+     "block": 25191230,
+     "ts": 1779939863
+    },
+    {
+     "block": 25220210,
+     "ts": 1780289027
+    },
+    {
+     "block": 25229105,
+     "ts": 1780396151
+    },
+    {
+     "block": 25280040,
+     "ts": 1781010155
+    },
+    {
+     "block": 25284727,
+     "ts": 1781066555
+    },
+    {
+     "block": 25953985,
+     "ts": 1789127567
+    },
+    {
+     "block": 26274132,
+     "ts": 1792984811
+    }
+   ],
+   "markets": {
+    "0": "WETH",
+    "1": "USD1",
+    "2": "USDC",
+    "5": "USDT",
+    "13": "WLFI"
+   },
+   "picks": [
+    24222060,
+    24222114,
+    24255146,
+    24283491,
+    24348117,
+    24369681,
+    24397640,
+    24405670,
+    24408795,
+    24434435,
+    24449371,
+    24459834,
+    24470366,
+    24498370,
+    24531544,
+    24545432,
+    24556593,
+    24617285,
+    24667254,
+    24706928,
+    24738287,
+    24767911,
+    24782156,
+    24789571,
+    24800188,
+    24864832,
+    24932586,
+    25006961,
+    25191230,
+    25220210,
+    25229105,
+    25280040,
+    25284727,
+    25953985,
+    26274132
+   ],
+   "answers": {
+    "24222060": {
+     "block": 24222060,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24222114": {
+     "block": 24222114,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24255146": {
+     "block": 24255146,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24283491": {
+     "block": 24283491,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24348117": {
+     "block": 24348117,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24369681": {
+     "block": 24369681,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24397640": {
+     "block": 24397640,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24405670": {
+     "block": 24405670,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24408795": {
+     "block": 24408795,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24434435": {
+     "block": 24434435,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24449371": {
+     "block": 24449371,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24459834": {
+     "block": 24459834,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24470366": {
+     "block": 24470366,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24498370": {
+     "block": 24498370,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24531544": {
+     "block": 24531544,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24545432": {
+     "block": 24545432,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24556593": {
+     "block": 24556593,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24617285": {
+     "block": 24617285,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24667254": {
+     "block": 24667254,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24706928": {
+     "block": 24706928,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24738287": {
+     "block": 24738287,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24767911": {
+     "block": 24767911,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24782156": {
+     "block": 24782156,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24789571": {
+     "block": 24789571,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24800188": {
+     "block": 24800188,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24864832": {
+     "block": 24864832,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "24932586": {
+     "block": 24932586,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25006961": {
+     "block": 25006961,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25191230": {
+     "block": 25191230,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25220210": {
+     "block": 25220210,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25229105": {
+     "block": 25229105,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25280040": {
+     "block": 25280040,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25284727": {
+     "block": 25284727,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25953985": {
+     "block": 25953985,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26274132": {
+     "block": 26274132,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    }
+   }
+  },
+  {
+   "name": "liquidated-before-0xce8b",
+   "owner": "0xce8bb478053d602adf6c38a53ccd1c8e19be907a",
+   "accountNumber": "32240150336664509314013882100458201794439878083374431556084268488477773350727",
+   "events": [
+    {
+     "block": 25941523,
+     "ts": 1788977495
+    },
+    {
+     "block": 25948756,
+     "ts": 1789064591
+    },
+    {
+     "block": 25956236,
+     "ts": 1789154711
+    },
+    {
+     "block": 26027805,
+     "ts": 1790016923
+    },
+    {
+     "block": 26028035,
+     "ts": 1790019731
+    },
+    {
+     "block": 26028095,
+     "ts": 1790020451
+    },
+    {
+     "block": 26041419,
+     "ts": 1790181515
+    },
+    {
+     "block": 26046702,
+     "ts": 1790245463
+    },
+    {
+     "block": 26046732,
+     "ts": 1790245835
+    },
+    {
+     "block": 26078032,
+     "ts": 1790623547
+    },
+    {
+     "block": 26097866,
+     "ts": 1790862515
+    },
+    {
+     "block": 26140118,
+     "ts": 1791371411
+    },
+    {
+     "block": 26274092,
+     "ts": 1792984331
+    },
+    {
+     "block": 26274092,
+     "ts": 1792984331
+    }
+   ],
+   "markets": {
+    "0": "WETH",
+    "1": "USD1",
+    "5": "USDT",
+    "13": "WLFI"
+   },
+   "picks": [
+    25941523,
+    25948756,
+    25956236,
+    26028095,
+    26041419,
+    26046732,
+    26078032,
+    26097866,
+    26140118,
+    26274092
+   ],
+   "answers": {
+    "25941523": {
+     "block": 25941523,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25948756": {
+     "block": 25948756,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "25956236": {
+     "block": 25956236,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26028095": {
+     "block": 26028095,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26041419": {
+     "block": 26041419,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26046732": {
+     "block": 26046732,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26078032": {
+     "block": 26078032,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26097866": {
+     "block": 26097866,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26140118": {
+     "block": 26140118,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    },
+    "26274092": {
+     "block": 26274092,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "5": 0,
+      "13": 0.275
+     }
+    }
+   }
+  },
+  {
+   "name": "weeth-premium-0x6c26",
+   "owner": "0x6c2693f5a936f37ed03cfa8465bf2d8beff19a0f",
+   "accountNumber": "53264634398202998011678213589718677637041677243442662116055745019972740369638",
+   "events": [
+    {
+     "block": 24293591,
+     "ts": 1769124299
+    },
+    {
+     "block": 24293608,
+     "ts": 1769124515
+    },
+    {
+     "block": 24293608,
+     "ts": 1769124515
+    },
+    {
+     "block": 24293645,
+     "ts": 1769124959
+    },
+    {
+     "block": 24293645,
+     "ts": 1769124959
+    },
+    {
+     "block": 24306915,
+     "ts": 1769284955
+    },
+    {
+     "block": 24306915,
+     "ts": 1769284955
+    },
+    {
+     "block": 24371908,
+     "ts": 1770068315
+    },
+    {
+     "block": 24371940,
+     "ts": 1770068699
+    },
+    {
+     "block": 24371940,
+     "ts": 1770068699
+    },
+    {
+     "block": 24919204,
+     "ts": 1776665159
+    },
+    {
+     "block": 24919207,
+     "ts": 1776665195
+    },
+    {
+     "block": 25680612,
+     "ts": 1785835223
+    },
+    {
+     "block": 25680620,
+     "ts": 1785835319
+    },
+    {
+     "block": 25680620,
+     "ts": 1785835319
+    },
+    {
+     "block": 25731089,
+     "ts": 1786443251
+    },
+    {
+     "block": 25731094,
+     "ts": 1786443311
+    },
+    {
+     "block": 25731094,
+     "ts": 1786443311
+    }
+   ],
+   "markets": {
+    "0": "WETH",
+    "6": "weETH"
+   },
+   "picks": [
+    24293645,
+    24306915,
+    24371940,
+    24919207,
+    25680620,
+    25731094
+   ],
+   "answers": {
+    "24293645": {
+     "block": 24293645,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.1111111111111111,
+     "overrideMarginRatio": 0.1111111111111111,
+     "premiums": {
+      "0": 0,
+      "6": 0.062499999999999986
+     }
+    },
+    "24306915": {
+     "block": 24306915,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.1111111111111111,
+     "overrideMarginRatio": 0.1111111111111111,
+     "premiums": {
+      "0": 0,
+      "6": 0.062499999999999986
+     }
+    },
+    "24371940": {
+     "block": 24371940,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.1111111111111111,
+     "overrideMarginRatio": 0.1111111111111111,
+     "premiums": {
+      "0": 0,
+      "6": 0.062499999999999986
+     }
+    },
+    "24919207": {
+     "block": 24919207,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.1111111111111111,
+     "overrideMarginRatio": 0.1111111111111111,
+     "premiums": {
+      "0": 0,
+      "6": 0.03658536585365853
+     }
+    },
+    "25680620": {
+     "block": 25680620,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.1111111111111111,
+     "overrideMarginRatio": 0.1111111111111111,
+     "premiums": {
+      "0": 0,
+      "6": 0.03658536585365853
+     }
+    },
+    "25731094": {
+     "block": 25731094,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.1111111111111111,
+     "overrideMarginRatio": 0.1111111111111111,
+     "premiums": {
+      "0": 0,
+      "6": 0.03658536585365853
+     }
+    }
+   }
+  },
+  {
+   "name": "override-step-0x0aaf",
+   "owner": "0x0aaf897d06b50a415824ab4fa00e845236fc9f69",
+   "accountNumber": "45058837244567983852475267108604456366341992727621759411173494977889038878813",
+   "events": [
+    {
+     "block": 23084560,
+     "ts": 1754513903
+    },
+    {
+     "block": 23084585,
+     "ts": 1754514203
+    },
+    {
+     "block": 23084585,
+     "ts": 1754514203
+    },
+    {
+     "block": 23084594,
+     "ts": 1754514311
+    },
+    {
+     "block": 23084594,
+     "ts": 1754514311
+    },
+    {
+     "block": 23084673,
+     "ts": 1754515259
+    },
+    {
+     "block": 23084673,
+     "ts": 1754515259
+    },
+    {
+     "block": 23111921,
+     "ts": 1754844215
+    },
+    {
+     "block": 23121826,
+     "ts": 1754963855
+    },
+    {
+     "block": 23172222,
+     "ts": 1755571631
+    },
+    {
+     "block": 23172250,
+     "ts": 1755571967
+    },
+    {
+     "block": 23172250,
+     "ts": 1755571967
+    },
+    {
+     "block": 23248458,
+     "ts": 1756490687
+    },
+    {
+     "block": 23248458,
+     "ts": 1756490687
+    },
+    {
+     "block": 23248618,
+     "ts": 1756492619
+    },
+    {
+     "block": 23248618,
+     "ts": 1756492619
+    },
+    {
+     "block": 23248622,
+     "ts": 1756492667
+    }
+   ],
+   "markets": {
+    "0": "WETH",
+    "1": "USD1",
+    "2": "USDC"
+   },
+   "picks": [
+    23084673,
+    23111921,
+    23121826,
+    23172250,
+    23248622
+   ],
+   "answers": {
+    "23084673": {
+     "block": 23084673,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.1111111111111111,
+     "overrideMarginRatio": 0.1111111111111111,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0
+     }
+    },
+    "23111921": {
+     "block": 23111921,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0
+     }
+    },
+    "23121826": {
+     "block": 23121826,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0
+     }
+    },
+    "23172250": {
+     "block": 23172250,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0
+     }
+    },
+    "23248622": {
+     "block": 23248622,
+     "marginRatio": 0.17647058823529416,
+     "marginRatioForAccount": 0.17647058823529416,
+     "overrideMarginRatio": null,
+     "premiums": {
+      "0": 0,
+      "1": 0,
+      "2": 0
+     }
+    }
+   }
+  }
+ ],
+ "alchemix": [
+  {
+   "name": "open-1142",
+   "chain": 1,
+   "line": "eth-alusd",
+   "token": "1142",
+   "alchemist": "0xeb83112d925268bede86654c13d423a987587e3e",
+   "events": [
+    {
+     "block": 26284594,
+     "ts": 1793110703
+    },
+    {
+     "block": 26258287,
+     "ts": 1792794131
+    },
+    {
+     "block": 26242217,
+     "ts": 1792600643
+    },
+    {
+     "block": 26228209,
+     "ts": 1792431995
+    },
+    {
+     "block": 26221175,
+     "ts": 1792347311
+    },
+    {
+     "block": 26213615,
+     "ts": 1792256231
+    },
+    {
+     "block": 26208749,
+     "ts": 1792197635
+    },
+    {
+     "block": 26207503,
+     "ts": 1792182635
+    },
+    {
+     "block": 26186694,
+     "ts": 1791932135
+    },
+    {
+     "block": 26163606,
+     "ts": 1791654251
+    },
+    {
+     "block": 26161831,
+     "ts": 1791632867
+    },
+    {
+     "block": 26159199,
+     "ts": 1791601187
+    },
+    {
+     "block": 26151543,
+     "ts": 1791509051
+    },
+    {
+     "block": 26140104,
+     "ts": 1791371243
+    },
+    {
+     "block": 26134754,
+     "ts": 1791306839
+    },
+    {
+     "block": 26133666,
+     "ts": 1791293699
+    },
+    {
+     "block": 26133621,
+     "ts": 1791293159
+    },
+    {
+     "block": 26126213,
+     "ts": 1791203855
+    },
+    {
+     "block": 26108755,
+     "ts": 1790993723
+    },
+    {
+     "block": 26106101,
+     "ts": 1790961743
+    },
+    {
+     "block": 26094717,
+     "ts": 1790824571
+    },
+    {
+     "block": 26066514,
+     "ts": 1790484635
+    },
+    {
+     "block": 26041172,
+     "ts": 1790178479
+    },
+    {
+     "block": 26028426,
+     "ts": 1790024447
+    },
+    {
+     "block": 26028420,
+     "ts": 1790024375
+    },
+    {
+     "block": 26015852,
+     "ts": 1789872719
+    },
+    {
+     "block": 26015852,
+     "ts": 1789872719
+    },
+    {
+     "block": 26015852,
+     "ts": 1789872719
+    },
+    {
+     "block": 26011906,
+     "ts": 1789825067
+    },
+    {
+     "block": 26004976,
+     "ts": 1789741619
+    },
+    {
+     "block": 26004976,
+     "ts": 1789741619
+    },
+    {
+     "block": 26004976,
+     "ts": 1789741619
+    },
+    {
+     "block": 25999595,
+     "ts": 1789676831
+    },
+    {
+     "block": 25976213,
+     "ts": 1789395095
+    },
+    {
+     "block": 25970141,
+     "ts": 1789322063
+    },
+    {
+     "block": 25969030,
+     "ts": 1789308719
+    },
+    {
+     "block": 25964960,
+     "ts": 1789259759
+    },
+    {
+     "block": 25963758,
+     "ts": 1789245299
+    },
+    {
+     "block": 25962355,
+     "ts": 1789228391
+    },
+    {
+     "block": 25962158,
+     "ts": 1789226015
+    },
+    {
+     "block": 25961674,
+     "ts": 1789220195
+    },
+    {
+     "block": 25959723,
+     "ts": 1789196747
+    },
+    {
+     "block": 25959679,
+     "ts": 1789196219
+    },
+    {
+     "block": 25958969,
+     "ts": 1789187675
+    },
+    {
+     "block": 25956556,
+     "ts": 1789158563
+    },
+    {
+     "block": 25955535,
+     "ts": 1789146263
+    },
+    {
+     "block": 25946575,
+     "ts": 1789038335
+    },
+    {
+     "block": 25946570,
+     "ts": 1789038275
+    },
+    {
+     "block": 25940383,
+     "ts": 1788963767
+    },
+    {
+     "block": 25936698,
+     "ts": 1788919331
+    },
+    {
+     "block": 25936695,
+     "ts": 1788919295
+    },
+    {
+     "block": 25936396,
+     "ts": 1788915695
+    },
+    {
+     "block": 25928975,
+     "ts": 1788826271
+    },
+    {
+     "block": 25926690,
+     "ts": 1788798731
+    },
+    {
+     "block": 25925927,
+     "ts": 1788789551
+    },
+    {
+     "block": 25925287,
+     "ts": 1788781799
+    },
+    {
+     "block": 25925141,
+     "ts": 1788780035
+    },
+    {
+     "block": 25904846,
+     "ts": 1788535631
+    },
+    {
+     "block": 25900077,
+     "ts": 1788478199
+    },
+    {
+     "block": 25900021,
+     "ts": 1788477515
+    },
+    {
+     "block": 25899846,
+     "ts": 1788475415
+    },
+    {
+     "block": 25890226,
+     "ts": 1788359567
+    },
+    {
+     "block": 25888014,
+     "ts": 1788332879
+    },
+    {
+     "block": 25887004,
+     "ts": 1788320759
+    },
+    {
+     "block": 25883465,
+     "ts": 1788278147
+    },
+    {
+     "block": 25868705,
+     "ts": 1788100355
+    },
+    {
+     "block": 25847490,
+     "ts": 1787844875
+    },
+    {
+     "block": 25843875,
+     "ts": 1787801375
+    },
+    {
+     "block": 25843871,
+     "ts": 1787801327
+    },
+    {
+     "block": 25843867,
+     "ts": 1787801279
+    },
+    {
+     "block": 25831678,
+     "ts": 1787654459
+    },
+    {
+     "block": 25825575,
+     "ts": 1787580971
+    },
+    {
+     "block": 25804293,
+     "ts": 1787324735
+    },
+    {
+     "block": 25803833,
+     "ts": 1787319203
+    },
+    {
+     "block": 25798386,
+     "ts": 1787253623
+    },
+    {
+     "block": 25796792,
+     "ts": 1787234471
+    },
+    {
+     "block": 25795255,
+     "ts": 1787215931
+    },
+    {
+     "block": 25795247,
+     "ts": 1787215835
+    },
+    {
+     "block": 25791182,
+     "ts": 1787166935
+    },
+    {
+     "block": 25791101,
+     "ts": 1787165951
+    },
+    {
+     "block": 25791089,
+     "ts": 1787165795
+    },
+    {
+     "block": 25782540,
+     "ts": 1787062907
+    },
+    {
+     "block": 25775903,
+     "ts": 1786982951
+    },
+    {
+     "block": 25768951,
+     "ts": 1786899275
+    },
+    {
+     "block": 25757768,
+     "ts": 1786764635
+    },
+    {
+     "block": 25754876,
+     "ts": 1786729763
+    },
+    {
+     "block": 25754077,
+     "ts": 1786720163
+    },
+    {
+     "block": 25748025,
+     "ts": 1786647251
+    },
+    {
+     "block": 25725795,
+     "ts": 1786379351
+    },
+    {
+     "block": 25724869,
+     "ts": 1786368203
+    },
+    {
+     "block": 25711491,
+     "ts": 1786207127
+    },
+    {
+     "block": 25692972,
+     "ts": 1785984023
+    },
+    {
+     "block": 25690954,
+     "ts": 1785959735
+    },
+    {
+     "block": 25690136,
+     "ts": 1785949895
+    },
+    {
+     "block": 25680850,
+     "ts": 1785838079
+    },
+    {
+     "block": 25675401,
+     "ts": 1785772523
+    },
+    {
+     "block": 25674332,
+     "ts": 1785759671
+    },
+    {
+     "block": 25671761,
+     "ts": 1785728723
+    },
+    {
+     "block": 25668845,
+     "ts": 1785693527
+    },
+    {
+     "block": 25663508,
+     "ts": 1785629279
+    },
+    {
+     "block": 25660748,
+     "ts": 1785596003
+    },
+    {
+     "block": 25656957,
+     "ts": 1785550415
+    },
+    {
+     "block": 25655782,
+     "ts": 1785536279
+    },
+    {
+     "block": 25655774,
+     "ts": 1785536183
+    },
+    {
+     "block": 25634519,
+     "ts": 1785280271
+    },
+    {
+     "block": 25618040,
+     "ts": 1785081815
+    },
+    {
+     "block": 25596776,
+     "ts": 1784825951
+    },
+    {
+     "block": 25581909,
+     "ts": 1784646647
+    },
+    {
+     "block": 25567276,
+     "ts": 1784470379
+    },
+    {
+     "block": 25553399,
+     "ts": 1784303231
+    },
+    {
+     "block": 25541663,
+     "ts": 1784161967
+    },
+    {
+     "block": 25524368,
+     "ts": 1783953671
+    },
+    {
+     "block": 25510224,
+     "ts": 1783783163
+    },
+    {
+     "block": 25496048,
+     "ts": 1783612439
+    },
+    {
+     "block": 25481613,
+     "ts": 1783438643
+    },
+    {
+     "block": 25466815,
+     "ts": 1783260443
+    },
+    {
+     "block": 25452612,
+     "ts": 1783089227
+    },
+    {
+     "block": 25438454,
+     "ts": 1782918443
+    },
+    {
+     "block": 25423903,
+     "ts": 1782743099
+    },
+    {
+     "block": 25411982,
+     "ts": 1782599495
+    },
+    {
+     "block": 25402794,
+     "ts": 1782488831
+    },
+    {
+     "block": 25388209,
+     "ts": 1782312983
+    },
+    {
+     "block": 25380814,
+     "ts": 1782223763
+    },
+    {
+     "block": 25367339,
+     "ts": 1782061451
+    },
+    {
+     "block": 25354990,
+     "ts": 1781912627
+    },
+    {
+     "block": 25337935,
+     "ts": 1781707331
+    },
+    {
+     "block": 25312925,
+     "ts": 1781406311
+    },
+    {
+     "block": 25302317,
+     "ts": 1781278547
+    },
+    {
+     "block": 25282323,
+     "ts": 1781037635
+    },
+    {
+     "block": 25269689,
+     "ts": 1780885523
+    },
+    {
+     "block": 25258823,
+     "ts": 1780754627
+    },
+    {
+     "block": 25244739,
+     "ts": 1780584755
+    },
+    {
+     "block": 25226995,
+     "ts": 1780370723
+    },
+    {
+     "block": 25209848,
+     "ts": 1780164155
+    },
+    {
+     "block": 25196740,
+     "ts": 1780006151
+    },
+    {
+     "block": 25180254,
+     "ts": 1779807671
+    },
+    {
+     "block": 25158819,
+     "ts": 1779549467
+    },
+    {
+     "block": 25137445,
+     "ts": 1779292115
+    },
+    {
+     "block": 25119023,
+     "ts": 1779070391
+    },
+    {
+     "block": 25096787,
+     "ts": 1778802815
+    },
+    {
+     "block": 25080047,
+     "ts": 1778601083
+    },
+    {
+     "block": 25080047,
+     "ts": 1778601083
+    },
+    {
+     "block": 25080034,
+     "ts": 1778600927
+    },
+    {
+     "block": 25080034,
+     "ts": 1778600927
+    },
+    {
+     "block": 25080019,
+     "ts": 1778600747
+    },
+    {
+     "block": 25080019,
+     "ts": 1778600747
+    },
+    {
+     "block": 25079980,
+     "ts": 1778600267
+    },
+    {
+     "block": 25079980,
+     "ts": 1778600267
+    },
+    {
+     "block": 25079966,
+     "ts": 1778600099
+    },
+    {
+     "block": 25079966,
+     "ts": 1778600099
+    },
+    {
+     "block": 25074310,
+     "ts": 1778532011
+    },
+    {
+     "block": 25074310,
+     "ts": 1778532011
+    },
+    {
+     "block": 25074298,
+     "ts": 1778531867
+    },
+    {
+     "block": 25074298,
+     "ts": 1778531867
+    },
+    {
+     "block": 25074274,
+     "ts": 1778531579
+    },
+    {
+     "block": 25074274,
+     "ts": 1778531579
+    },
+    {
+     "block": 25065802,
+     "ts": 1778429447
+    },
+    {
+     "block": 25046503,
+     "ts": 1778197175
+    },
+    {
+     "block": 25046503,
+     "ts": 1778197175
+    },
+    {
+     "block": 25046115,
+     "ts": 1778192507
+    },
+    {
+     "block": 25046115,
+     "ts": 1778192507
+    },
+    {
+     "block": 25046048,
+     "ts": 1778191703
+    },
+    {
+     "block": 25046048,
+     "ts": 1778191703
+    },
+    {
+     "block": 25046016,
+     "ts": 1778191319
+    },
+    {
+     "block": 25046016,
+     "ts": 1778191319
+    },
+    {
+     "block": 25045971,
+     "ts": 1778190779
+    },
+    {
+     "block": 25045971,
+     "ts": 1778190779
+    },
+    {
+     "block": 25040150,
+     "ts": 1778120627
+    },
+    {
+     "block": 25040150,
+     "ts": 1778120627
+    },
+    {
+     "block": 25040134,
+     "ts": 1778120435
+    },
+    {
+     "block": 25040134,
+     "ts": 1778120435
+    },
+    {
+     "block": 25040124,
+     "ts": 1778120315
+    },
+    {
+     "block": 25040124,
+     "ts": 1778120315
+    },
+    {
+     "block": 25040113,
+     "ts": 1778120183
+    },
+    {
+     "block": 25040113,
+     "ts": 1778120183
+    },
+    {
+     "block": 25040099,
+     "ts": 1778120015
+    },
+    {
+     "block": 25040099,
+     "ts": 1778120015
+    },
+    {
+     "block": 25040087,
+     "ts": 1778119871
+    },
+    {
+     "block": 25040087,
+     "ts": 1778119871
+    },
+    {
+     "block": 25040075,
+     "ts": 1778119727
+    },
+    {
+     "block": 25040075,
+     "ts": 1778119727
+    },
+    {
+     "block": 25040063,
+     "ts": 1778119583
+    },
+    {
+     "block": 25040063,
+     "ts": 1778119583
+    },
+    {
+     "block": 25040050,
+     "ts": 1778119427
+    },
+    {
+     "block": 25040050,
+     "ts": 1778119427
+    },
+    {
+     "block": 25040038,
+     "ts": 1778119283
+    },
+    {
+     "block": 25040038,
+     "ts": 1778119283
+    },
+    {
+     "block": 25040022,
+     "ts": 1778119091
+    },
+    {
+     "block": 25040022,
+     "ts": 1778119091
+    },
+    {
+     "block": 25040005,
+     "ts": 1778118887
+    },
+    {
+     "block": 25040005,
+     "ts": 1778118887
+    },
+    {
+     "block": 25039984,
+     "ts": 1778118635
+    },
+    {
+     "block": 25039984,
+     "ts": 1778118635
+    },
+    {
+     "block": 25039902,
+     "ts": 1778117651
+    },
+    {
+     "block": 25039898,
+     "ts": 1778117603
+    },
+    {
+     "block": 25039885,
+     "ts": 1778117447
+    },
+    {
+     "block": 25039885,
+     "ts": 1778117447
+    },
+    {
+     "block": 25039871,
+     "ts": 1778117279
+    },
+    {
+     "block": 25039871,
+     "ts": 1778117279
+    },
+    {
+     "block": 25039562,
+     "ts": 1778113559
+    },
+    {
+     "block": 25039562,
+     "ts": 1778113559
+    },
+    {
+     "block": 25039549,
+     "ts": 1778113403
+    },
+    {
+     "block": 25039549,
+     "ts": 1778113403
+    },
+    {
+     "block": 25039536,
+     "ts": 1778113247
+    },
+    {
+     "block": 25039536,
+     "ts": 1778113247
+    },
+    {
+     "block": 25039526,
+     "ts": 1778113127
+    },
+    {
+     "block": 25039526,
+     "ts": 1778113127
+    },
+    {
+     "block": 25039513,
+     "ts": 1778112971
+    },
+    {
+     "block": 25039513,
+     "ts": 1778112971
+    },
+    {
+     "block": 25039501,
+     "ts": 1778112827
+    },
+    {
+     "block": 25039501,
+     "ts": 1778112827
+    },
+    {
+     "block": 25039491,
+     "ts": 1778112707
+    },
+    {
+     "block": 25039491,
+     "ts": 1778112707
+    },
+    {
+     "block": 25039476,
+     "ts": 1778112527
+    },
+    {
+     "block": 25039476,
+     "ts": 1778112527
+    },
+    {
+     "block": 25032565,
+     "ts": 1778029343
+    },
+    {
+     "block": 25001970,
+     "ts": 1777661063
+    },
+    {
+     "block": 25001970,
+     "ts": 1777661063
+    },
+    {
+     "block": 25001958,
+     "ts": 1777660919
+    },
+    {
+     "block": 25001958,
+     "ts": 1777660919
+    },
+    {
+     "block": 25001946,
+     "ts": 1777660775
+    },
+    {
+     "block": 25001946,
+     "ts": 1777660775
+    },
+    {
+     "block": 25001932,
+     "ts": 1777660607
+    },
+    {
+     "block": 25001932,
+     "ts": 1777660607
+    },
+    {
+     "block": 25001915,
+     "ts": 1777660403
+    },
+    {
+     "block": 25001915,
+     "ts": 1777660403
+    },
+    {
+     "block": 25001903,
+     "ts": 1777660259
+    },
+    {
+     "block": 25001903,
+     "ts": 1777660259
+    },
+    {
+     "block": 25001888,
+     "ts": 1777660079
+    },
+    {
+     "block": 25001888,
+     "ts": 1777660079
+    },
+    {
+     "block": 25001876,
+     "ts": 1777659935
+    },
+    {
+     "block": 25001876,
+     "ts": 1777659935
+    },
+    {
+     "block": 25001862,
+     "ts": 1777659767
+    },
+    {
+     "block": 25001862,
+     "ts": 1777659767
+    },
+    {
+     "block": 25001846,
+     "ts": 1777659575
+    },
+    {
+     "block": 25001846,
+     "ts": 1777659575
+    },
+    {
+     "block": 25001835,
+     "ts": 1777659443
+    },
+    {
+     "block": 25001835,
+     "ts": 1777659443
+    },
+    {
+     "block": 25001822,
+     "ts": 1777659287
+    },
+    {
+     "block": 25001822,
+     "ts": 1777659287
+    },
+    {
+     "block": 25001810,
+     "ts": 1777659143
+    },
+    {
+     "block": 25001810,
+     "ts": 1777659143
+    },
+    {
+     "block": 25001798,
+     "ts": 1777658999
+    },
+    {
+     "block": 25001798,
+     "ts": 1777658999
+    },
+    {
+     "block": 25001786,
+     "ts": 1777658855
+    },
+    {
+     "block": 25001786,
+     "ts": 1777658855
+    },
+    {
+     "block": 25001774,
+     "ts": 1777658711
+    },
+    {
+     "block": 25001774,
+     "ts": 1777658711
+    },
+    {
+     "block": 25001765,
+     "ts": 1777658603
+    },
+    {
+     "block": 24937556,
+     "ts": 1776886055
+    },
+    {
+     "block": 24907466,
+     "ts": 1776523847
+    },
+    {
+     "block": 24907466,
+     "ts": 1776523847
+    },
+    {
+     "block": 24907453,
+     "ts": 1776523691
+    },
+    {
+     "block": 24907453,
+     "ts": 1776523691
+    },
+    {
+     "block": 24907437,
+     "ts": 1776523499
+    },
+    {
+     "block": 24907437,
+     "ts": 1776523499
+    },
+    {
+     "block": 24904744,
+     "ts": 1776491123
+    },
+    {
+     "block": 24904744,
+     "ts": 1776491123
+    },
+    {
+     "block": 24904729,
+     "ts": 1776490943
+    },
+    {
+     "block": 24904729,
+     "ts": 1776490943
+    },
+    {
+     "block": 24904715,
+     "ts": 1776490775
+    },
+    {
+     "block": 24904715,
+     "ts": 1776490775
+    },
+    {
+     "block": 24904699,
+     "ts": 1776490583
+    },
+    {
+     "block": 24904699,
+     "ts": 1776490583
+    },
+    {
+     "block": 24904684,
+     "ts": 1776490403
+    },
+    {
+     "block": 24904684,
+     "ts": 1776490403
+    },
+    {
+     "block": 24904672,
+     "ts": 1776490259
+    },
+    {
+     "block": 24904672,
+     "ts": 1776490259
+    },
+    {
+     "block": 24904656,
+     "ts": 1776490067
+    },
+    {
+     "block": 24904656,
+     "ts": 1776490067
+    },
+    {
+     "block": 24904643,
+     "ts": 1776489911
+    },
+    {
+     "block": 24904643,
+     "ts": 1776489911
+    },
+    {
+     "block": 24904619,
+     "ts": 1776489623
+    },
+    {
+     "block": 24904619,
+     "ts": 1776489623
+    },
+    {
+     "block": 24904607,
+     "ts": 1776489479
+    },
+    {
+     "block": 24904607,
+     "ts": 1776489479
+    },
+    {
+     "block": 24904595,
+     "ts": 1776489335
+    },
+    {
+     "block": 24904595,
+     "ts": 1776489335
+    },
+    {
+     "block": 24904560,
+     "ts": 1776488915
+    },
+    {
+     "block": 24904560,
+     "ts": 1776488915
+    },
+    {
+     "block": 24904537,
+     "ts": 1776488639
+    },
+    {
+     "block": 24904537,
+     "ts": 1776488639
+    },
+    {
+     "block": 24904522,
+     "ts": 1776488459
+    },
+    {
+     "block": 24904522,
+     "ts": 1776488459
+    },
+    {
+     "block": 24904507,
+     "ts": 1776488279
+    },
+    {
+     "block": 24904507,
+     "ts": 1776488279
+    },
+    {
+     "block": 24904493,
+     "ts": 1776488111
+    },
+    {
+     "block": 24904493,
+     "ts": 1776488111
+    },
+    {
+     "block": 24904493,
+     "ts": 1776488111
+    },
+    {
+     "block": 24904493,
+     "ts": 1776488111
+    }
+   ],
+   "picks": [
+    25596776,
+    25618040,
+    25634519,
+    25655782,
+    25660748,
+    25668845,
+    25675401,
+    25680850,
+    25690954,
+    25692972,
+    25711491,
+    25725795,
+    25748025,
+    25754876,
+    25757768,
+    25768951,
+    25775903,
+    25782540,
+    25791182,
+    25798386,
+    25804293,
+    25825575,
+    25831678,
+    25847490,
+    25868705,
+    25883465,
+    25890226,
+    25900077,
+    25904846,
+    25926690,
+    25928975,
+    25940383,
+    25946575,
+    25956556,
+    25963758,
+    25970141,
+    25976213,
+    25999595,
+    26004976,
+    26011906,
+    26015852,
+    26028426,
+    26041172,
+    26066514,
+    26094717,
+    26106101,
+    26108755,
+    26126213,
+    26134754,
+    26140104,
+    26151543,
+    26163606,
+    26186694,
+    26207503,
+    26213615,
+    26221175,
+    26228209,
+    26242217,
+    26258287,
+    26284594
+   ],
+   "answers": {
+    "25596776": {
+     "block": 25596776,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25618040": {
+     "block": 25618040,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25634519": {
+     "block": 25634519,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25655782": {
+     "block": 25655782,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25660748": {
+     "block": 25660748,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25668845": {
+     "block": 25668845,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25675401": {
+     "block": 25675401,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25680850": {
+     "block": 25680850,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25690954": {
+     "block": 25690954,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25692972": {
+     "block": 25692972,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25711491": {
+     "block": 25711491,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25725795": {
+     "block": 25725795,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25748025": {
+     "block": 25748025,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25754876": {
+     "block": 25754876,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25757768": {
+     "block": 25757768,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25768951": {
+     "block": 25768951,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25775903": {
+     "block": 25775903,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25782540": {
+     "block": 25782540,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25791182": {
+     "block": 25791182,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25798386": {
+     "block": 25798386,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25804293": {
+     "block": 25804293,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25825575": {
+     "block": 25825575,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25831678": {
+     "block": 25831678,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25847490": {
+     "block": 25847490,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25868705": {
+     "block": 25868705,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25883465": {
+     "block": 25883465,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25890226": {
+     "block": 25890226,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25900077": {
+     "block": 25900077,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25904846": {
+     "block": 25904846,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25926690": {
+     "block": 25926690,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25928975": {
+     "block": 25928975,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25940383": {
+     "block": 25940383,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25946575": {
+     "block": 25946575,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25956556": {
+     "block": 25956556,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25963758": {
+     "block": 25963758,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25970141": {
+     "block": 25970141,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25976213": {
+     "block": 25976213,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25999595": {
+     "block": 25999595,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26004976": {
+     "block": 26004976,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26011906": {
+     "block": 26011906,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26015852": {
+     "block": 26015852,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26028426": {
+     "block": 26028426,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26041172": {
+     "block": 26041172,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26066514": {
+     "block": 26066514,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26094717": {
+     "block": 26094717,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26106101": {
+     "block": 26106101,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26108755": {
+     "block": 26108755,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26126213": {
+     "block": 26126213,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26134754": {
+     "block": 26134754,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26140104": {
+     "block": 26140104,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26151543": {
+     "block": 26151543,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26163606": {
+     "block": 26163606,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26186694": {
+     "block": 26186694,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26207503": {
+     "block": 26207503,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26213615": {
+     "block": 26213615,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26221175": {
+     "block": 26221175,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26228209": {
+     "block": 26228209,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26242217": {
+     "block": 26242217,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26258287": {
+     "block": 26258287,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26284594": {
+     "block": 26284594,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    }
+   }
+  },
+  {
+   "name": "closed-726",
+   "chain": 1,
+   "line": "eth-aleth",
+   "token": "726",
+   "alchemist": "0xfa995b6abc387376c3e7de5f6d394ab5b6bee26b",
+   "events": [
+    {
+     "block": 26279832,
+     "ts": 1793053427
+    },
+    {
+     "block": 26279832,
+     "ts": 1793053427
+    },
+    {
+     "block": 26279832,
+     "ts": 1793053427
+    },
+    {
+     "block": 26279832,
+     "ts": 1793053427
+    },
+    {
+     "block": 26275138,
+     "ts": 1792996919
+    },
+    {
+     "block": 26249642,
+     "ts": 1792689995
+    },
+    {
+     "block": 26249629,
+     "ts": 1792689839
+    },
+    {
+     "block": 26248401,
+     "ts": 1792675067
+    },
+    {
+     "block": 26248396,
+     "ts": 1792675007
+    },
+    {
+     "block": 26248393,
+     "ts": 1792674971
+    },
+    {
+     "block": 26234717,
+     "ts": 1792510391
+    },
+    {
+     "block": 26230255,
+     "ts": 1792456667
+    },
+    {
+     "block": 26230250,
+     "ts": 1792456607
+    },
+    {
+     "block": 26224101,
+     "ts": 1792382507
+    },
+    {
+     "block": 26224095,
+     "ts": 1792382435
+    },
+    {
+     "block": 26224095,
+     "ts": 1792382435
+    },
+    {
+     "block": 26224095,
+     "ts": 1792382435
+    },
+    {
+     "block": 26224095,
+     "ts": 1792382435
+    },
+    {
+     "block": 26202247,
+     "ts": 1792119443
+    },
+    {
+     "block": 26196214,
+     "ts": 1792046831
+    },
+    {
+     "block": 26193859,
+     "ts": 1792018451
+    },
+    {
+     "block": 26192676,
+     "ts": 1792004195
+    },
+    {
+     "block": 26192665,
+     "ts": 1792004063
+    },
+    {
+     "block": 26166059,
+     "ts": 1791683771
+    },
+    {
+     "block": 26140977,
+     "ts": 1791381755
+    },
+    {
+     "block": 26140972,
+     "ts": 1791381695
+    },
+    {
+     "block": 26132512,
+     "ts": 1791279755
+    },
+    {
+     "block": 26129752,
+     "ts": 1791246479
+    },
+    {
+     "block": 26106430,
+     "ts": 1790965691
+    },
+    {
+     "block": 26095119,
+     "ts": 1790829407
+    },
+    {
+     "block": 26093965,
+     "ts": 1790815547
+    },
+    {
+     "block": 26093954,
+     "ts": 1790815415
+    },
+    {
+     "block": 26092264,
+     "ts": 1790795015
+    },
+    {
+     "block": 26070631,
+     "ts": 1790534327
+    },
+    {
+     "block": 26049057,
+     "ts": 1790273963
+    },
+    {
+     "block": 26038401,
+     "ts": 1790144987
+    },
+    {
+     "block": 25991102,
+     "ts": 1789574519
+    },
+    {
+     "block": 25875875,
+     "ts": 1788186707
+    },
+    {
+     "block": 25875865,
+     "ts": 1788186587
+    },
+    {
+     "block": 25822943,
+     "ts": 1787549327
+    },
+    {
+     "block": 25822933,
+     "ts": 1787549207
+    },
+    {
+     "block": 25811403,
+     "ts": 1787410355
+    },
+    {
+     "block": 25809902,
+     "ts": 1787392271
+    },
+    {
+     "block": 25775899,
+     "ts": 1786982903
+    },
+    {
+     "block": 25763490,
+     "ts": 1786833611
+    },
+    {
+     "block": 25732618,
+     "ts": 1786461743
+    },
+    {
+     "block": 25724890,
+     "ts": 1786368455
+    },
+    {
+     "block": 25724884,
+     "ts": 1786368383
+    },
+    {
+     "block": 25714502,
+     "ts": 1786243355
+    },
+    {
+     "block": 25714228,
+     "ts": 1786240067
+    },
+    {
+     "block": 25701487,
+     "ts": 1786086419
+    },
+    {
+     "block": 25693340,
+     "ts": 1785988439
+    },
+    {
+     "block": 25690129,
+     "ts": 1785949811
+    },
+    {
+     "block": 25687871,
+     "ts": 1785922595
+    },
+    {
+     "block": 25686614,
+     "ts": 1785907427
+    },
+    {
+     "block": 25685221,
+     "ts": 1785890675
+    },
+    {
+     "block": 25684560,
+     "ts": 1785882707
+    },
+    {
+     "block": 25682443,
+     "ts": 1785857231
+    },
+    {
+     "block": 25682014,
+     "ts": 1785852071
+    },
+    {
+     "block": 25681814,
+     "ts": 1785849671
+    },
+    {
+     "block": 25678343,
+     "ts": 1785807899
+    },
+    {
+     "block": 25673901,
+     "ts": 1785754475
+    },
+    {
+     "block": 25670529,
+     "ts": 1785713855
+    },
+    {
+     "block": 25660527,
+     "ts": 1785593339
+    },
+    {
+     "block": 25660517,
+     "ts": 1785593219
+    },
+    {
+     "block": 25659456,
+     "ts": 1785580475
+    },
+    {
+     "block": 25655530,
+     "ts": 1785533255
+    },
+    {
+     "block": 25649627,
+     "ts": 1785462227
+    },
+    {
+     "block": 25645448,
+     "ts": 1785411791
+    },
+    {
+     "block": 25644717,
+     "ts": 1785402995
+    },
+    {
+     "block": 25644712,
+     "ts": 1785402935
+    },
+    {
+     "block": 25643167,
+     "ts": 1785384371
+    },
+    {
+     "block": 25642313,
+     "ts": 1785374123
+    },
+    {
+     "block": 25642192,
+     "ts": 1785372671
+    },
+    {
+     "block": 25642182,
+     "ts": 1785372551
+    },
+    {
+     "block": 25639586,
+     "ts": 1785341291
+    },
+    {
+     "block": 25639571,
+     "ts": 1785341111
+    },
+    {
+     "block": 25639093,
+     "ts": 1785335339
+    },
+    {
+     "block": 25633445,
+     "ts": 1785267323
+    },
+    {
+     "block": 25627152,
+     "ts": 1785191495
+    },
+    {
+     "block": 25626264,
+     "ts": 1785180827
+    },
+    {
+     "block": 25626258,
+     "ts": 1785180755
+    },
+    {
+     "block": 25625377,
+     "ts": 1785170147
+    },
+    {
+     "block": 25625159,
+     "ts": 1785167519
+    },
+    {
+     "block": 25622990,
+     "ts": 1785141383
+    },
+    {
+     "block": 25622971,
+     "ts": 1785141155
+    },
+    {
+     "block": 25622673,
+     "ts": 1785137567
+    },
+    {
+     "block": 25622659,
+     "ts": 1785137399
+    },
+    {
+     "block": 25622621,
+     "ts": 1785136943
+    },
+    {
+     "block": 24994988,
+     "ts": 1777577015
+    },
+    {
+     "block": 24994988,
+     "ts": 1777577015
+    },
+    {
+     "block": 24994988,
+     "ts": 1777577015
+    },
+    {
+     "block": 24905129,
+     "ts": 1776495755
+    },
+    {
+     "block": 24905086,
+     "ts": 1776495239
+    },
+    {
+     "block": 24904545,
+     "ts": 1776488735
+    },
+    {
+     "block": 24904545,
+     "ts": 1776488735
+    },
+    {
+     "block": 24904545,
+     "ts": 1776488735
+    }
+   ],
+   "picks": [
+    24905129,
+    24994988,
+    25627152,
+    25633445,
+    25639586,
+    25645448,
+    25655530,
+    25660527,
+    25670529,
+    25673901,
+    25684560,
+    25690129,
+    25693340,
+    25701487,
+    25714502,
+    25724890,
+    25732618,
+    25763490,
+    25775899,
+    25811403,
+    25822943,
+    25875875,
+    25991102,
+    26038401,
+    26049057,
+    26070631,
+    26092264,
+    26095119,
+    26106430,
+    26132512,
+    26140977,
+    26166059,
+    26193859,
+    26196214,
+    26202247,
+    26224101,
+    26234717,
+    26249642,
+    26279832
+   ],
+   "answers": {
+    "24905129": {
+     "block": 24905129,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "24994988": {
+     "block": 24994988,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25627152": {
+     "block": 25627152,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25633445": {
+     "block": 25633445,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25639586": {
+     "block": 25639586,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25645448": {
+     "block": 25645448,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25655530": {
+     "block": 25655530,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25660527": {
+     "block": 25660527,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25670529": {
+     "block": 25670529,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25673901": {
+     "block": 25673901,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25684560": {
+     "block": 25684560,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25690129": {
+     "block": 25690129,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25693340": {
+     "block": 25693340,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25701487": {
+     "block": 25701487,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25714502": {
+     "block": 25714502,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25724890": {
+     "block": 25724890,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25732618": {
+     "block": 25732618,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25763490": {
+     "block": 25763490,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25775899": {
+     "block": 25775899,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25811403": {
+     "block": 25811403,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25822943": {
+     "block": 25822943,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25875875": {
+     "block": 25875875,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "25991102": {
+     "block": 25991102,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26038401": {
+     "block": 26038401,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26049057": {
+     "block": 26049057,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26070631": {
+     "block": 26070631,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26092264": {
+     "block": 26092264,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26095119": {
+     "block": 26095119,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26106430": {
+     "block": 26106430,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26132512": {
+     "block": 26132512,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26140977": {
+     "block": 26140977,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26166059": {
+     "block": 26166059,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26193859": {
+     "block": 26193859,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26196214": {
+     "block": 26196214,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26202247": {
+     "block": 26202247,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26224101": {
+     "block": 26224101,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26234717": {
+     "block": 26234717,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26249642": {
+     "block": 26249642,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "26279832": {
+     "block": 26279832,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    }
+   }
+  },
+  {
+   "name": "base-open-23",
+   "chain": 8453,
+   "line": "base-alusdb",
+   "token": "23",
+   "alchemist": "0xeb380d86eed275c9f2ed77745ab1b2ccf364bf7a",
+   "events": [
+    {
+     "block": 53207153,
+     "ts": 1793203653
+    },
+    {
+     "block": 53134819,
+     "ts": 1793058985
+    },
+    {
+     "block": 53129870,
+     "ts": 1793049087
+    },
+    {
+     "block": 53125458,
+     "ts": 1793040263
+    },
+    {
+     "block": 53088910,
+     "ts": 1792967167
+    },
+    {
+     "block": 53059497,
+     "ts": 1792908341
+    },
+    {
+     "block": 53055555,
+     "ts": 1792900457
+    },
+    {
+     "block": 53055546,
+     "ts": 1792900439
+    },
+    {
+     "block": 53030294,
+     "ts": 1792849935
+    },
+    {
+     "block": 52791797,
+     "ts": 1792372941
+    },
+    {
+     "block": 52492070,
+     "ts": 1791773487
+    },
+    {
+     "block": 52401665,
+     "ts": 1791592677
+    },
+    {
+     "block": 52149157,
+     "ts": 1791087661
+    },
+    {
+     "block": 52149157,
+     "ts": 1791087661
+    },
+    {
+     "block": 52149093,
+     "ts": 1791087533
+    },
+    {
+     "block": 52149093,
+     "ts": 1791087533
+    },
+    {
+     "block": 51775674,
+     "ts": 1790340695
+    },
+    {
+     "block": 51775674,
+     "ts": 1790340695
+    },
+    {
+     "block": 51775588,
+     "ts": 1790340523
+    },
+    {
+     "block": 51775588,
+     "ts": 1790340523
+    },
+    {
+     "block": 51775471,
+     "ts": 1790340289
+    },
+    {
+     "block": 51775471,
+     "ts": 1790340289
+    },
+    {
+     "block": 51775422,
+     "ts": 1790340191
+    },
+    {
+     "block": 51775422,
+     "ts": 1790340191
+    },
+    {
+     "block": 51775265,
+     "ts": 1790339877
+    },
+    {
+     "block": 51775265,
+     "ts": 1790339877
+    },
+    {
+     "block": 51775227,
+     "ts": 1790339801
+    },
+    {
+     "block": 51775227,
+     "ts": 1790339801
+    },
+    {
+     "block": 51775146,
+     "ts": 1790339639
+    },
+    {
+     "block": 51775146,
+     "ts": 1790339639
+    },
+    {
+     "block": 51775089,
+     "ts": 1790339525
+    },
+    {
+     "block": 51775050,
+     "ts": 1790339447
+    },
+    {
+     "block": 51775010,
+     "ts": 1790339367
+    },
+    {
+     "block": 51775010,
+     "ts": 1790339367
+    },
+    {
+     "block": 51774953,
+     "ts": 1790339253
+    },
+    {
+     "block": 51774953,
+     "ts": 1790339253
+    },
+    {
+     "block": 51774912,
+     "ts": 1790339171
+    },
+    {
+     "block": 51774912,
+     "ts": 1790339171
+    },
+    {
+     "block": 51774854,
+     "ts": 1790339055
+    },
+    {
+     "block": 51774854,
+     "ts": 1790339055
+    },
+    {
+     "block": 51774790,
+     "ts": 1790338927
+    },
+    {
+     "block": 51774790,
+     "ts": 1790338927
+    },
+    {
+     "block": 51774732,
+     "ts": 1790338811
+    },
+    {
+     "block": 51774732,
+     "ts": 1790338811
+    },
+    {
+     "block": 51774669,
+     "ts": 1790338685
+    },
+    {
+     "block": 51774669,
+     "ts": 1790338685
+    },
+    {
+     "block": 51774596,
+     "ts": 1790338539
+    },
+    {
+     "block": 51774596,
+     "ts": 1790338539
+    },
+    {
+     "block": 51774596,
+     "ts": 1790338539
+    },
+    {
+     "block": 51774596,
+     "ts": 1790338539
+    }
+   ],
+   "picks": [
+    51775674,
+    52149157,
+    52401665,
+    52492070,
+    52791797,
+    53030294,
+    53088910,
+    53134819,
+    53207153
+   ],
+   "answers": {
+    "51775674": {
+     "block": 51775674,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52149157": {
+     "block": 52149157,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52401665": {
+     "block": 52401665,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52492070": {
+     "block": 52492070,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52791797": {
+     "block": 52791797,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "53030294": {
+     "block": 53030294,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "53088910": {
+     "block": 53088910,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "53134819": {
+     "block": 53134819,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "53207153": {
+     "block": 53207153,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    }
+   }
+  },
+  {
+   "name": "base-closed-29",
+   "chain": 8453,
+   "line": "base-alusdb",
+   "token": "29",
+   "alchemist": "0xeb380d86eed275c9f2ed77745ab1b2ccf364bf7a",
+   "events": [
+    {
+     "block": 53006860,
+     "ts": 1792803067
+    },
+    {
+     "block": 53006860,
+     "ts": 1792803067
+    },
+    {
+     "block": 53006860,
+     "ts": 1792803067
+    },
+    {
+     "block": 53006860,
+     "ts": 1792803067
+    },
+    {
+     "block": 53006824,
+     "ts": 1792802995
+    },
+    {
+     "block": 53006824,
+     "ts": 1792802995
+    },
+    {
+     "block": 53006824,
+     "ts": 1792802995
+    },
+    {
+     "block": 53006796,
+     "ts": 1792802939
+    },
+    {
+     "block": 53006796,
+     "ts": 1792802939
+    },
+    {
+     "block": 53006796,
+     "ts": 1792802939
+    },
+    {
+     "block": 53006796,
+     "ts": 1792802939
+    },
+    {
+     "block": 52720424,
+     "ts": 1792230195
+    },
+    {
+     "block": 52720424,
+     "ts": 1792230195
+    },
+    {
+     "block": 52492070,
+     "ts": 1791773487
+    },
+    {
+     "block": 52311092,
+     "ts": 1791411531
+    },
+    {
+     "block": 52311072,
+     "ts": 1791411491
+    },
+    {
+     "block": 52221935,
+     "ts": 1791233217
+    },
+    {
+     "block": 52033651,
+     "ts": 1790856649
+    },
+    {
+     "block": 52033630,
+     "ts": 1790856607
+    },
+    {
+     "block": 51790694,
+     "ts": 1790370735
+    },
+    {
+     "block": 51790694,
+     "ts": 1790370735
+    },
+    {
+     "block": 51790598,
+     "ts": 1790370543
+    },
+    {
+     "block": 51790598,
+     "ts": 1790370543
+    },
+    {
+     "block": 51790598,
+     "ts": 1790370543
+    },
+    {
+     "block": 51790598,
+     "ts": 1790370543
+    }
+   ],
+   "picks": [
+    51790694,
+    52033651,
+    52221935,
+    52311092,
+    52492070,
+    52720424,
+    53006860
+   ],
+   "answers": {
+    "51790694": {
+     "block": 51790694,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52033651": {
+     "block": 52033651,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52221935": {
+     "block": 52221935,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52311092": {
+     "block": 52311092,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52492070": {
+     "block": 52492070,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "52720424": {
+     "block": 52720424,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    },
+    "53006860": {
+     "block": 53006860,
+     "lowerBound": 1.05263157895,
+     "lowerBoundRaw": "1052631578950000000"
+    }
+   }
+  }
+ ]
+}

@@ -2662,8 +2662,8 @@ test("Maker and Fluid ratio views: the ratio against the line in force, the card
 });
 
 // ── Dolomite, Liquity V1 and Sky Savings (ui-jobs 328 step 5) ──────────────
-test("Dolomite margin ratio: premiums on both sides, today's line held, the card's today, no level", async () => {
-  const { DOLOMITE_HEALTH_SOURCE, dolomiteHeldRead } = await import("@/lib/dolomite/flows-health");
+test("Dolomite margin ratio: premiums on both sides, the read's line, the card's today, no level", async () => {
+  const { DOLOMITE_HEALTH_SOURCE, dolomiteRiskRead } = await import("@/lib/dolomite/flows-health");
   const { healthView } = await import("@/lib/shared/flows-health");
   const row = (day: number, balances: FlowTimeline["days"][number]["balances"]) => ({
     day,
@@ -2686,10 +2686,15 @@ test("Dolomite margin ratio: premiums on both sides, today's line held, the card
     today: 102,
   };
   const risk = { block: 9, required: 1.15, override: false, ratio: 1.9 };
+  const at = (premiums: Record<string, number>, override: number | null = null) =>
+    dolomiteRiskRead(
+      { block: 9, marginRatio: 0.15, marginRatioForAccount: override ?? 0.15, overrideMarginRatio: override, premiums },
+      100 * 86_400,
+    );
   // WETH's premium 0.25, USDC's 0.
-  const read = dolomiteHeldRead(["0", "2"], { "0": 0.25, "2": 0 }, risk)!;
-  // A market with no premium read leaves no read at all.
-  assert.equal(dolomiteHeldRead(["0", "7"], { "0": 0.25 }, risk), null);
+  const read = at({ "0": 0.25, "2": 0 });
+  // A held collateral the read does not list leaves the day without a point.
+  assert.equal(healthView(t, [at({ "2": 0 })], { source: DOLOMITE_HEALTH_SOURCE }), null);
   const hv = healthView(t, [read], {
     source: DOLOMITE_HEALTH_SOURCE,
     liveHf: risk.ratio / risk.required,
@@ -2709,11 +2714,11 @@ test("Dolomite margin ratio: premiums on both sides, today's line held, the card
   assert.ok(hv.health.level!.points.every((p) => p[1] === 1.15));
   assert.deepEqual(hv.marks, {});
   // A borrowed market's premium multiplies its debt: USDC at 0.1.
-  const r2 = dolomiteHeldRead(["0", "2"], { "0": 0, "2": 0.1 }, risk)!;
+  const r2 = at({ "0": 0, "2": 0.1 });
   const h2 = healthView(t, [r2], { source: DOLOMITE_HEALTH_SOURCE })!;
   assert.ok(Math.abs(h2.health.points[0][1] - 2_000 / 1_100) < 1e-9);
   // The override skips the premiums.
-  const r3 = dolomiteHeldRead(["0", "2"], { "0": 0.25, "2": 0.1 }, { ...risk, override: true, required: 1.1111 })!;
+  const r3 = at({ "0": 0.25, "2": 0.1 }, 0.1111);
   const h3 = healthView(t, [r3], { source: DOLOMITE_HEALTH_SOURCE })!;
   assert.ok(Math.abs(h3.health.points[0][1] - 2) < 1e-9);
 });

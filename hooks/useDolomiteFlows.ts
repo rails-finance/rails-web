@@ -12,10 +12,10 @@
 // value that ties the panel to the timeline
 // (components/shared/flow-focus-context.tsx) and each event's account for its
 // card's ledgers. A borrowing account's chart opens on its margin ratio
-// against its line, at today's margin ratio, premiums and override held
-// across the life (lib/dolomite/flows-health.ts): the premiums of the markets
-// the live read holds come with it, any other market's from the core's
-// markets read (/api/chain/dolomite/markets), asked once.
+// against its line (lib/dolomite/flows-health.ts): the margin ratio, the
+// override and each market's premium read at the block of each picked event
+// (/api/chain/dolomite/risk-at-block), each risk setter log that moved one a
+// marker (/api/chain/dolomite/risk-log).
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
@@ -38,8 +38,17 @@ import {
   type DolomiteLiveMarket,
   type DolomitePriceBasis,
 } from "@/lib/dolomite/flows";
-import { DOLOMITE_HEALTH_SOURCE, dolomiteHeldRead, type DolomiteRisk } from "@/lib/dolomite/flows-health";
-import { useFlowsHealth } from "@/hooks/useFlowsHealth";
+import {
+  DOLOMITE_HEALTH_SOURCE,
+  dolomiteRiskChanges,
+  dolomiteRiskRead,
+  isDolomiteRiskAt,
+  type DolomiteRisk,
+  type DolomiteRiskLog,
+} from "@/lib/dolomite/flows-health";
+import { useFlowsHealth, type HealthPick, type HealthReader } from "@/hooks/useFlowsHealth";
+import { healthRead } from "@/lib/shared/health-reads";
+import { withChanges } from "@/lib/shared/flows-changes";
 import { dolomiteHasRisk } from "@/components/protocol/dolomite/dolomite-risk-slot";
 
 const DAY_S = 86_400;
@@ -47,6 +56,8 @@ const NO_EVENTS: never[] = [];
 
 export interface DolomiteFlowsInput {
   owner: string;
+  /** The account number (a uint256 as a string). */
+  accountNumber: string;
   /** The page's history read is still on its way: wait for it. */
   pending?: boolean;
   /** The page's events, when they are the whole history; null otherwise. */
@@ -183,8 +194,8 @@ export function useDolomiteFlows(p: DolomiteFlowsInput): {
     [rows, opts, ready],
   );
 
-  // The margin ratio view (ui-jobs 328 step 5): today's line, premiums and
-  // override, held across the life.
+  // The margin ratio view (ui-jobs 328 steps 5 and 8): the line, premiums
+  // and override at each picked event's block, today the card's.
   const chain = p.chain && !p.chain.chainStale ? p.chain : null;
   const risk = useMemo<DolomiteRisk | null>(
     () =>
@@ -199,46 +210,49 @@ export function useDolomiteFlows(p: DolomiteFlowsInput): {
     [chain],
   );
   const borrower = replay?.borrower ?? false;
-  const heldPremiums = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const b of chain?.balances ?? []) out[String(b.marketId)] = b.marginPremium;
-    return out;
-  }, [chain]);
-  const missing = useMemo(
-    () => (borrower && risk && !risk.override && want ? want.markets.filter((m) => heldPremiums[m] == null) : []),
-    [borrower, risk, want, heldPremiums],
+  // Each picked event's risk figures, at its block.
+  const healthEvents = useMemo<HealthPick[]>(
+    () => (borrower && rows ? rows.map((r) => ({ blockNumber: r.block, timestamp: r.ts, txHash: r.tx })) : NO_EVENTS),
+    [borrower, rows],
   );
-  const [marketPremiums, setMarketPremiums] = useState<Record<string, number> | null>(null);
-  const needMarkets = missing.length > 0 && marketPremiums == null;
-  useEffect(() => {
-    if (!needMarkets) return;
-    const ac = new AbortController();
-    fetch("/api/chain/dolomite/markets", { signal: ac.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: { chainStale?: boolean; markets?: { marketId: number; marginPremium: number }[] } | null) => {
-        const out: Record<string, number> = {};
-        if (body && !body.chainStale)
-          for (const m of body.markets ?? []) if (m.marginPremium >= 0) out[String(m.marketId)] = m.marginPremium;
-        setMarketPremiums(out);
-      })
-      .catch((err) => {
-        if ((err as { name?: string })?.name !== "AbortError") setMarketPremiums({});
-      });
-    return () => ac.abort();
-  }, [needMarkets]);
-  const given = useMemo(() => {
-    if (!borrower || !risk || !want || (missing.length > 0 && marketPremiums == null)) return null;
-    const r = dolomiteHeldRead(want.markets, { ...marketPremiums, ...heldPremiums }, risk);
-    return r ? [r] : null;
-  }, [borrower, risk, want, missing, marketPremiums, heldPremiums]);
-  const timeline = useFlowsHealth(replayedTimeline, {
-    reader: null,
-    given,
+  const { accountNumber } = p;
+  const reader = useMemo<HealthReader | null>(() => {
+    if (!borrower || !want) return null;
+    const qs = `owner=${owner.toLowerCase()}&accountNumber=${accountNumber}&markets=${want.markets.join(",")}`;
+    return {
+      key: `dolomite:${qs}`,
+      load: (e) =>
+        healthRead(`/api/chain/dolomite/risk-at-block?${qs}&block=${e.blockNumber}`, (b) =>
+          isDolomiteRiskAt(b) ? b : null,
+        ).then((a) => (a ? dolomiteRiskRead(a, e.timestamp) : null)),
+    };
+  }, [borrower, want, owner, accountNumber]);
+  const healthTimeline = useFlowsHealth(replayedTimeline, {
+    reader,
     source: DOLOMITE_HEALTH_SOURCE,
-    events: NO_EVENTS,
+    events: healthEvents,
     liveHf: risk?.ratio != null && risk.ratio > 0 ? risk.ratio / risk.required : null,
     liveLine: risk?.required ?? null,
   });
+
+  // The core's risk setter logs, one read per page, for the markers.
+  const [riskLog, setRiskLog] = useState<DolomiteRiskLog | null>(null);
+  useEffect(() => {
+    if (!borrower) return;
+    const ac = new AbortController();
+    fetch("/api/chain/dolomite/risk-log", { signal: ac.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<DolomiteRiskLog>) : null))
+      .then((log) => setRiskLog(log))
+      .catch(() => {});
+    return () => ac.abort();
+  }, [borrower]);
+  const marketSymbols = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const r of rows ?? []) if (!out.has(r.market)) out.set(r.market, r.symbol);
+    return out;
+  }, [rows]);
+  const changes = useMemo(() => dolomiteRiskChanges(riskLog, marketSymbols), [riskLog, marketSymbols]);
+  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
   const focusEvents = useMemo(() => (replay ? dolomiteFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? dolomiteEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

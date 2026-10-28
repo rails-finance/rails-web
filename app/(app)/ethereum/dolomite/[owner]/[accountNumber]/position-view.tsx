@@ -328,6 +328,7 @@ export default function DolomitePositionView({
   // short is a failed read.
   const flows = useDolomiteFlows({
     owner,
+    accountNumber,
     pending: loading,
     wholeEvents: historyWindow.state === "whole" ? dolomiteEvents : null,
     fetchAll: fetchAllHistory,

@@ -23,7 +23,7 @@
 // the printed total; each event card's sum is exact and its token lines add to
 // the reading; the live stop meets the live read; the share price line is the
 // readings' and today the card's; the collateralisation view is the readings'
-// ratio against today's lower bound, held across the life, today the card's,
+// ratio against the lower bound read at each picked event, today the card's,
 // and the share price's level today is the card's.
 //
 //   npx tsx --test scripts/verify/verify-alchemix-flows.ts
@@ -43,7 +43,7 @@ import {
   type AlchemixFlowOptions,
 } from "@/lib/alchemix/flows";
 import {
-  alchemixBoundReads,
+  alchemixBoundRead,
   alchemixHealthFinish,
   alchemixHealthSource,
   alchemixRatioPrint,
@@ -51,7 +51,7 @@ import {
 import { buildFlowModel, stateAt, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import { sideSumRows } from "@/lib/shared/flows-sum";
 import { eventCum, eventSideSum, eventTokenSum } from "@/lib/shared/flow-focus";
-import { healthView } from "@/lib/shared/flows-health";
+import { HEALTH_READS_MAX, healthReadPicks, healthView } from "@/lib/shared/flows-health";
 import { flowPriceSeries } from "@/lib/shared/flows-price";
 import { collateralTakenRaw, readingsBefore } from "@/lib/alchemix/readings-before";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
@@ -131,10 +131,12 @@ function withHealth(f: Fixture): FlowTimeline {
   const b = bound(f);
   const open = f.status === "open";
   const coll = open && f.live.collateralizationRaw != null ? Number(f.live.collateralizationRaw) / WAD : 0;
-  const reads = alchemixBoundReads(
-    rp.replayed.map((r) => ({ ts: r.ev.ts, block: r.ev.block })),
-    b,
-  )!;
+  // Each picked event's bound at its block: on every Alchemist the bound has
+  // stood at today's across these lives (read 28 Oct 2026).
+  const reads = healthReadPicks(
+    rp.replayed.map((r) => ({ blockNumber: r.ev.block, timestamp: r.ev.ts })),
+    HEALTH_READS_MAX,
+  ).map((e) => alchemixBoundRead({ block: e.blockNumber, lowerBound: b }, e.timestamp));
   const hv = healthView(t, reads, {
     liveHf: coll > 0 ? coll / b : null,
     liveLevels: coll > 0 ? { [ALCHEMIX_MYT_KEY]: ((sharePrice(f) * b) / coll) * rp.grain } : null,
@@ -385,7 +387,7 @@ for (const name of NAMES) {
 }
 
 for (const name of NAMES) {
-  test(`${name}: the collateralisation against today's lower bound, held across the life`, () => {
+  test(`${name}: the collateralisation against the lower bound read at each picked event`, () => {
     const f = fx(name);
     const t = withHealth(f);
     const h = t.health!;
@@ -393,10 +395,9 @@ for (const name of NAMES) {
     assert.equal(h.asset.symbol, "Collateralisation");
     assert.equal(h.unit, "ratio");
     assert.equal(h.liquidates, "below");
-    assert.ok(/held across the life/.test(h.level!.summary), "the line's words say the bound is today's");
-    assert.ok(/not indexed at past blocks/.test(h.level!.summary));
-    assert.ok(/not indexed at past blocks/.test(h.help!));
-    for (const p of h.level!.points) assert.equal(p[1], b, `${name}: the line is today's bound`);
+    assert.ok(/in force at the day's last event/.test(h.level!.summary), "the line's words name the read");
+    assert.ok(/in force at each event/.test(h.help!));
+    for (const p of h.level!.points) assert.equal(p[1], b, `${name}: the line is the bound read`);
     // Each day's point is shares × share price ÷ debt from the reading in force.
     const rp = replay(f);
     const m = buildFlowModel(t)!;

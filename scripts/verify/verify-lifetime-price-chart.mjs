@@ -90,8 +90,10 @@
 // the liquidation threshold (`checkRatio`); since step 8 Fluid's line is the
 // threshold in force each day (`firstLine`, `steps`), each change a marker
 // (Fluid 2156, open, two steps; 1334, closed, one). Dolomite (step 5, `ratio` with
-// `noLevel`): the margin ratio against 1 + the account's margin ratio, today's
-// held across the life, no level on a market's price. Liquity V1 (`v1`): the
+// `noLevel`): the margin ratio against 1 + the account's margin ratio, since
+// step 8 read at each picked event's block (`atBlock`: the first day's line
+// against the route's answer; `sparse`: only days before the earliest read
+// dotted), no level on a market's price. Liquity V1 (`v1`): the
 // ETH price with the Trove's level at 110 %, today the card's "Liquidates at",
 // a liquidated life's level ending on its liquidation day, the how-to-read
 // naming Recovery Mode. Sky Savings (`share`): the share price (chi) in place
@@ -153,11 +155,12 @@ const FX_RATIO = {
   held: true,
   help: ["the price each event was valued at", "rebalance ratio", "read at the block of the day's last event"],
 };
-/** Alchemix V3's view (step 6): the card's Collateralisation against its
- *  "Liquidates at", the lower bound read now and held across the life; the
+/** Alchemix V3's view (steps 6 and 8): the card's Collateralisation against
+ *  its "Liquidates at", the lower bound read at each picked event's block
+ *  (`atBlock`: the first day's line against the route's answer there); the
  *  share price's level today the price its "Liquidates on a share-price drop
  *  of" names; days with no reading dotted. */
-const ALCHEMIX_RATIO = {
+const alchemixRatio = (chain, alchemist) => ({
   label: "Collateralisation",
   liquidates: "below",
   headRow: "collateralisation",
@@ -166,8 +169,32 @@ const ALCHEMIX_RATIO = {
   held: true,
   // eth-aleth/726 held collateral and no debt for 114 days before its mint.
   firstWithin: 160,
-  help: ["the vault's share price", "lower bound today", "not indexed at past blocks", "drawn dotted"],
-};
+  help: ["the vault's share price", "lower bound in force at each event", "drawn dotted"],
+  atBlock: (block) => [
+    `/api/chain/alchemix/bound-at-block?chain=${chain}&alchemist=${alchemist}&block=${block}`,
+    (b) => b?.lowerBound,
+  ],
+});
+const ALX_ETH_ALUSD = "0xeb83112d925268bede86654c13d423a987587e3e";
+const ALX_ETH_ALETH = "0xfa995b6abc387376c3e7de5f6d394ab5b6bee26b";
+const ALX_BASE_ALUSDB = "0xeb380d86eed275c9f2ed77745ab1b2ccf364bf7a";
+/** Dolomite's view (steps 5 and 8): the margin ratio against 1 + the
+ *  account's margin ratio read at each picked event's block; a day before
+ *  the earliest read dotted. */
+const dolomiteRatio = (owner, accountNumber, extra = {}) => ({
+  label: "Margin ratio",
+  liquidates: "below",
+  head: "margin-ratio",
+  lineRow: "liquidation-line",
+  noLevel: true,
+  sparse: true,
+  help: ["the core's oracle price", "in force at each event, read at the block of each day's last event"],
+  atBlock: (block) => [
+    `/api/chain/dolomite/risk-at-block?owner=${owner}&accountNumber=${accountNumber}&block=${block}&markets=`,
+    (b) => (b?.marginRatioForAccount > 0 ? 1 + b.marginRatioForAccount : null),
+  ],
+  ...extra,
+});
 const PAGES = [
   {
     id: "aave-v3 0xfb93",
@@ -430,49 +457,53 @@ const PAGES = [
     id: "dolomite 0x49d6 (closed)",
     path: "/ethereum/dolomite/0x49d62ca7ab8e28f7a28d9abadf84fe8b45e3caf6/15809042418583418827551470108194220080728327193143889538122062408455944908946",
     lwOnly: true,
-    ratio: {
-      label: "Margin ratio",
-      liquidates: "below",
-      head: "margin-ratio",
-      lineRow: "liquidation-line",
-      noLevel: true,
-      help: [
-        "the core's oracle price",
-        "today's margin ratio, premiums and any account override, held across the life",
-      ],
-    },
+    ratio: dolomiteRatio(
+      "0x49d62ca7ab8e28f7a28d9abadf84fe8b45e3caf6",
+      "15809042418583418827551470108194220080728327193143889538122062408455944908946",
+    ),
   },
   {
     id: "dolomite 0x65a9",
     path: "/ethereum/dolomite/0x65a9e8ce4570624a84cbaf7e0540bd7d706b241f/32240150336664509314013882100458201794439878083374431556084268488477773350727",
     lwOnly: true,
-    ratio: {
-      label: "Margin ratio",
-      liquidates: "below",
-      head: "margin-ratio",
-      lineRow: "liquidation-line",
-      noLevel: true,
-      help: [
-        "the core's oracle price",
-        "today's margin ratio, premiums and any account override, held across the life",
-      ],
-    },
+    ratio: dolomiteRatio(
+      "0x65a9e8ce4570624a84cbaf7e0540bd7d706b241f",
+      "32240150336664509314013882100458201794439878083374431556084268488477773350727",
+    ),
   },
   {
     id: "dolomite 0xce8b (liquidated before)",
     path: "/ethereum/dolomite/0xce8bb478053d602adf6c38a53ccd1c8e19be907a/32240150336664509314013882100458201794439878083374431556084268488477773350727",
     lwOnly: true,
-    ratio: {
-      label: "Margin ratio",
-      liquidates: "below",
-      head: "margin-ratio",
-      lineRow: "liquidation-line",
-      noLevel: true,
-      help: [
-        "the core's oracle price",
-        "today's margin ratio, premiums and any account override, held across the life",
-      ],
-    },
+    ratio: dolomiteRatio(
+      "0xce8bb478053d602adf6c38a53ccd1c8e19be907a",
+      "32240150336664509314013882100458201794439878083374431556084268488477773350727",
+    ),
+  },
+  // Step 8: Dolomite 0x0aaf (closed 29 Aug 2025; its line 111.11 % →
+  // 117.65 % on 10 Aug 2025, the read that first shows the account's override
+  // gone, with debt on both days) and 0x6c26
+  // (open; weETH's margin premium 6.25 % → 3.66 % on 4 Feb 2026, a marker,
+  // the line kept by the account's override).
+  {
+    id: "dolomite 0x0aaf (closed, override step)",
+    path: "/ethereum/dolomite/0x0aaf897d06b50a415824ab4fa00e845236fc9f69/45058837244567983852475267108604456366341992727621759411173494977889038878813",
+    lwOnly: true,
+    ratio: dolomiteRatio(
+      "0x0aaf897d06b50a415824ab4fa00e845236fc9f69",
+      "45058837244567983852475267108604456366341992727621759411173494977889038878813",
+      { steps: [[20310, 1.1111111111111112, 1.1764705882352942]] },
+    ),
+  },
+  {
+    id: "dolomite 0x6c26 (weETH premium marker)",
+    path: "/ethereum/dolomite/0x6c2693f5a936f37ed03cfa8465bf2d8beff19a0f/53264634398202998011678213589718677637041677243442662116055745019972740369638",
+    lwOnly: true,
+    changes: { day: 20488, name: "weETH margin premium", from: "6.25 %", to: "3.66 %", block: 24384982 },
+    ratio: dolomiteRatio(
+      "0x6c2693f5a936f37ed03cfa8465bf2d8beff19a0f",
+      "53264634398202998011678213589718677637041677243442662116055745019972740369638",
+    ),
   },
   {
     id: "fluid 6",
@@ -737,8 +768,9 @@ const PAGES = [
     lwOnly: true,
     band: { asset: "WBTC", closed: true },
   },
-  // Alchemix V3 (step 6, `ratio` and `alchemix`): the collateralisation
-  // against today's lower bound, over the vault's share price per reading.
+  // Alchemix V3 (steps 6 and 8, `ratio` and `alchemix`): the
+  // collateralisation against the lower bound read at each picked event's
+  // block, over the vault's share price per reading.
   // Ethereum eth-alusd/1142 (open, 61 line redemptions) and eth-aleth/726
   // (closed with its collateral 26 Oct 2026); Base base-alusdb/23 (open) and
   // base-alusdb/29 (closed with its collateral). No Alchemist position has
@@ -748,14 +780,14 @@ const PAGES = [
     path: "/ethereum/alchemix/eth-alusd/1142",
     lwOnly: true,
     unit: "token",
-    ratio: ALCHEMIX_RATIO,
+    ratio: alchemixRatio(1, ALX_ETH_ALUSD),
     alchemix: true,
   },
   {
     id: "alchemix eth-aleth/726 (closed)",
     path: "/ethereum/alchemix/eth-aleth/726",
     lwOnly: true,
-    ratio: ALCHEMIX_RATIO,
+    ratio: alchemixRatio(1, ALX_ETH_ALETH),
     alchemix: { closed: true },
   },
   {
@@ -763,14 +795,14 @@ const PAGES = [
     path: "/base/alchemix/base-alusdb/23",
     lwOnly: true,
     unit: "token",
-    ratio: ALCHEMIX_RATIO,
+    ratio: alchemixRatio(8453, ALX_BASE_ALUSDB),
     alchemix: true,
   },
   {
     id: "alchemix base-alusdb/29 (closed)",
     path: "/base/alchemix/base-alusdb/29",
     lwOnly: true,
-    ratio: ALCHEMIX_RATIO,
+    ratio: alchemixRatio(8453, ALX_BASE_ALUSDB),
     alchemix: { closed: true },
   },
   // Step 7: Frankencoin's declared liquidation price alone, under a value
@@ -1128,6 +1160,16 @@ async function checkRatio(page, tag, pg) {
       `chart ${first.line}, ilk-at ${mat}`,
     );
   }
+  if (r.atBlock && first.block) {
+    const [url, valueOf] = r.atBlock(first.block);
+    const body = await hostFetch(`${BASE}${url}`).then((x) => x.json());
+    const want = valueOf(body);
+    check(
+      `${tag}: the first day's line is the at-block read's at block ${first.block}`,
+      want > 0 && first.line != null && Math.abs(first.line - want) < 1e-9,
+      `chart ${first.line}, read ${want}`,
+    );
+  }
   let fluid = null;
   if (r.fluid) {
     const body = await hostFetch(`${BASE}${r.fluid}`).then((x) => x.json());
@@ -1162,9 +1204,18 @@ async function checkRatio(page, tag, pg) {
   const dotted = await page.$eval("[data-price-line]", (g) => ({
     key: g.getAttribute("data-price-line"),
     dotted: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).length,
+    dottedDays: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).map(Number),
     observed: (g.getAttribute("data-price-observed") ?? "").split(",").filter(Boolean).map(Number),
   }));
-  if (r.held) {
+  if (r.sparse) {
+    // A day before the earliest read is dotted; every day from it is solid.
+    const lastDotted = Math.max(-Infinity, ...dotted.dottedDays);
+    check(
+      `${tag}: only days before the earliest read are dotted`,
+      dotted.key === "health" && dotted.observed.length > 0 && lastDotted <= Math.min(...dotted.observed),
+      JSON.stringify({ dotted: dotted.dotted, lastDotted, firstObserved: Math.min(...dotted.observed) }),
+    );
+  } else if (r.held) {
     // A day with an event of the position's is solid; a day between events
     // keeps the last event's price, dotted.
     const carried = await page.$eval("[data-price-line]", (g) =>
@@ -1918,8 +1969,9 @@ async function checkAlchemixShare(page, tag, pg) {
   });
   const levelHelp = await howToRead(page);
   check(
-    `${tag}: the bound line's words say it is today's, held across the life`,
-    /held across the life/.test(levelHelp) && /not indexed at past blocks/.test(levelHelp),
+    `${tag}: the bound line's words say it is the bound in force at each event`,
+    /lower bound in force at each event/.test(levelHelp) &&
+      /read at the block of each day's last event/.test(levelHelp),
     liqText || levelHelp.slice(0, 300),
   );
   await pick(listed[1]);
@@ -1928,6 +1980,7 @@ async function checkAlchemixShare(page, tag, pg) {
     observed: (g.getAttribute("data-price-observed") ?? "").split(",").filter(Boolean).map(Number),
     carried: (g.getAttribute("data-price-carried") ?? "").split(",").filter(Boolean).length,
     dotted: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).length,
+    dottedDays: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).map(Number),
     grain: g.getAttribute("data-price-grain"),
   }));
   check(
@@ -2860,6 +2913,7 @@ async function checkHealthDotted(page, tag) {
   const h = await page.$eval("[data-price-line]", (g) => ({
     key: g.getAttribute("data-price-line"),
     dotted: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).length,
+    dottedDays: (g.getAttribute("data-price-dotted") ?? "").split(",").filter(Boolean).map(Number),
     meets: g.getAttribute("data-price-meets") ?? "",
   }));
   if (h.key !== "health" || h.dotted === 0) return;
