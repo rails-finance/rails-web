@@ -8,14 +8,16 @@
 //   factor ÷ Σ debt × price, a market's supply counting where the account
 //   had it entered (getAssetsIn), at the factor Comptroller.markets() gave,
 //   both at the end of the block of the day's last event
-//   (/api/chain/ctoken-liquidity-at?factors=). One factor per market sets the
+//   (/api/chain/ctoken-liquidity-at?factors=), and at the block of each
+//   NewCollateralFactor in the life on a market held as collateral
+//   (lib/shared/collateral-factor-changes.ts). One factor per market sets the
 //   borrowing limit and the liquidation line alike.
 // - Today's factors and entered markets are the card's read.
 // - An asset's level is ruling 7's (`basketLevels`): the card states none per
 //   collateral. Today's levels are worked from the card's read (`cardLevels`),
 //   so they rest on the balances the card states.
 
-import type { FactorRead, HealthLine, HealthSource } from "@/lib/shared/flows-health";
+import { BASKET_LEVEL_FORMULA, type FactorRead, type HealthLine, type HealthSource } from "@/lib/shared/flows-health";
 import type { CTokenProtocol } from "@/lib/api/fetch-ctoken-liquidity-at";
 import type { HealthReader } from "@/hooks/useFlowsHealth";
 import { healthRead } from "@/lib/shared/health-reads";
@@ -72,15 +74,28 @@ export function ctokenCardLines(chain: {
   }));
 }
 
-/** A Comptroller's source. */
-export function ctokenHealthSource(chain: number): HealthSource {
+/** A Comptroller's source; `changed` where a factor changed in the life,
+ *  read at its block. */
+export function ctokenHealthSource(chain: number, changed = false): HealthSource {
   return {
     oracle: "the Comptroller's oracle",
     pool: "the Comptroller",
     chain,
     factor: "collateral factor",
     factors: ["collateral factors", "collateral factors and entered markets"],
-    readAt: "on the markets entered as collateral, read at the block of each day's last event",
+    readAt: changed
+      ? "on the markets entered as collateral, read at the block of each day's last event and of each change to one"
+      : "on the markets entered as collateral, read at the block of each day's last event",
+    held: "the collateral factors and entered markets the Comptroller held at the end of block {block}",
     live: "the card's read of the Comptroller now: collateral capacity ÷ debt",
+    levels: {
+      formula: BASKET_LEVEL_FORMULA,
+      summary:
+        "Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the collateral factors the Comptroller held at the day's last read.",
+      here: {
+        live: "Here at today's balances and prices and the card's health factor.",
+        read: "Here at the balances and prices of {day}, against the collateral factors the Comptroller held at the end of block {block}.",
+      },
+    },
   };
 }

@@ -7,8 +7,10 @@
 //   liquidateCollateralFactor ÷ debt × base price (liquidation capacity ÷
 //   debt, the same ratio in base tokens), each collateral's factor the
 //   Comet's at the end of the block of the day's last event
-//   (/api/chain/compound/factors-at-block, getAssetInfoByAddress). A
-//   supplied base backs no debt: it counts 0.
+//   (/api/chain/compound/factors-at-block, getAssetInfoByAddress), and at the
+//   block of each upgrade in the life that changed a held collateral's factor
+//   (lib/shared/collateral-factor-changes.ts). A supplied base backs no debt:
+//   it counts 0.
 // - Today's factors are the card's read (`liquidateCollateralFactor` per held
 //   collateral at head).
 // - An asset's level is ruling 7's (`basketLevels`): the card states none per
@@ -17,7 +19,7 @@
 //
 // Pure.
 
-import type { FactorRead, HealthLine, HealthSource } from "@/lib/shared/flows-health";
+import { BASKET_LEVEL_FORMULA, type FactorRead, type HealthLine, type HealthSource } from "@/lib/shared/flows-health";
 import { scaleCompoundChainBalance, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import { collAsset, DEBT_ASSET, SUPPLY_ASSET } from "@/lib/compound/flows";
 
@@ -58,16 +60,29 @@ export function cometCardLines(chain: CompoundMarketChainResponse): HealthLine[]
   ];
 }
 
-/** A Comet's source: its oracle and its liquidate factors. */
-export function cometHealthSource(chain: number): HealthSource {
+/** A Comet's source: its oracle and its liquidate factors; `changed` where
+ *  an upgrade in the life changed one, read at its block. */
+export function cometHealthSource(chain: number, changed = false): HealthSource {
   return {
     oracle: "the Comet's",
     pool: "the Comet",
     chain,
     factor: "liquidate collateral factor",
     factors: ["liquidate factors", "liquidate collateral factors"],
-    readAt: "read at the block of each day's last event",
+    readAt: changed
+      ? "read at the block of each day's last event and of each upgrade that changed one"
+      : "read at the block of each day's last event",
+    held: "the liquidate collateral factors the Comet held at the end of block {block}",
     live: "the card's read of the Comet now: liquidation capacity ÷ debt, in base tokens",
+    levels: {
+      formula: BASKET_LEVEL_FORMULA,
+      summary:
+        "Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the liquidate collateral factors the Comet held at the day's last read.",
+      here: {
+        live: "Here at today's balances and prices and the card's health factor.",
+        read: "Here at the balances and prices of {day}, against the liquidate collateral factors the Comet held at the end of block {block}.",
+      },
+    },
     below: "the Comet lets anyone absorb the account",
   };
 }

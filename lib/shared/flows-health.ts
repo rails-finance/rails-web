@@ -158,7 +158,7 @@ export interface HealthSource {
   };
 }
 
-const BASKET_LEVEL_FORMULA =
+export const BASKET_LEVEL_FORMULA =
   "the price at which the health factor reaches 1, every other balance and price held at the day's";
 
 /** Ruling 7: each asset's price at which the health factor reaches 1, every

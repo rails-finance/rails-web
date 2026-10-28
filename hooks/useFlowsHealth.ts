@@ -54,10 +54,28 @@ export interface FlowsHealthInput {
    *  ratio from its change history; Fluid's threshold today, held across the
    *  life). Nothing is read per event. */
   given?: readonly FactorRead[] | null;
+  /** Blocks read beside the picks, through the same reader: where a
+   *  governance change took effect (lib/shared/collateral-factor-changes.ts).
+   *  One is read only after the first pick and where no pick on its day
+   *  stands at or after it, so the line steps on its day. */
+  also?: readonly HealthPick[] | null;
+}
+
+/** The blocks of `also` the picks do not cover: after the first pick, and
+ *  on a day whose picked event, if any, comes before it. */
+export function alsoPicks(picks: readonly HealthPick[], also: readonly HealthPick[] | null | undefined): HealthPick[] {
+  if (!also?.length || picks.length === 0) return [];
+  const DAY_S = 86_400;
+  const byDay = new Map(picks.map((p) => [Math.floor(p.timestamp / DAY_S), p.blockNumber]));
+  return also.filter((a) => {
+    if (!(a.blockNumber > picks[0].blockNumber)) return false;
+    const picked = byDay.get(Math.floor(a.timestamp / DAY_S));
+    return picked == null || picked < a.blockNumber;
+  });
 }
 
 export function useFlowsHealth(t: FlowTimeline | null, p: FlowsHealthInput): FlowTimeline | null {
-  const { events, reader, source, liveHf, liveLevels, todayRead, liveLine, given } = p;
+  const { events, reader, source, liveHf, liveLevels, todayRead, liveLine, given, also } = p;
   const picks = useMemo(() => (reader ? healthReadPicks(events, HEALTH_READS_MAX) : []), [events, reader]);
   const joined = reader ? `${reader.key}|${picks.map((e) => e.blockNumber).join(",")}` : "";
   const [result, setResult] = useState<{ joined: string; reads: FactorRead[] } | null>(null);
@@ -73,7 +91,29 @@ export function useFlowsHealth(t: FlowTimeline | null, p: FlowsHealthInput): Flo
     // `joined` names the reader and every pick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined]);
-  const read = result && result.joined === joined ? result.reads : null;
+  // The change blocks' reads land on their own, so the picks' view stands
+  // while they are read.
+  const extra = useMemo(() => (reader ? alsoPicks(picks, also) : []), [reader, picks, also]);
+  const extraJoined = reader ? `${reader.key}|${extra.map((e) => e.blockNumber).join(",")}` : "";
+  const [extraResult, setExtraResult] = useState<{ joined: string; reads: FactorRead[] } | null>(null);
+  useEffect(() => {
+    if (!reader || extra.length === 0) return;
+    let live = true;
+    Promise.all(extra.map((e) => reader.load(e).catch(() => null))).then((all) => {
+      if (live) setExtraResult({ joined: extraJoined, reads: all.filter((r): r is FactorRead => r != null) });
+    });
+    return () => {
+      live = false;
+    };
+    // `extraJoined` names the reader and every block.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extraJoined]);
+  const read = useMemo(() => {
+    const base = result && result.joined === joined ? result.reads : null;
+    if (!base) return null;
+    const more = extraResult && extraResult.joined === extraJoined ? extraResult.reads : [];
+    return more.length ? [...base, ...more].sort((a, b) => a.block - b.block) : base;
+  }, [result, joined, extraResult, extraJoined]);
   const reads = reader ? read : (given ?? null);
   return useMemo(() => {
     if (!t || !reads || reads.length === 0) return t;

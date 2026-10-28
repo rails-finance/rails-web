@@ -33,6 +33,9 @@ import {
 } from "@/lib/shared/ctoken-flows";
 import { moonwellFlowRows, moonwellSeriesKey } from "@/lib/moonwell/flows";
 import { ctokenCardLines, ctokenHealthReader, ctokenHealthSource, ctokenTodayRead } from "@/lib/shared/ctoken-health";
+import { useCTokenFactorChanges } from "@/hooks/useFactorChanges";
+import { factorChangePicks } from "@/lib/shared/collateral-factor-changes";
+import { withChanges } from "@/lib/shared/flows-changes";
 import { cardLevels } from "@/lib/shared/flows-health";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
@@ -187,21 +190,37 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
       ),
     [chainId, p.wallet, marketsKey],
   );
-  const healthSource = useMemo(() => ctokenHealthSource(chainId), [chainId]);
+  // The collateral factor changes in the life on the markets the account
+  // used (ui-jobs 328 step 8): markers, and a factor read at each change's
+  // block so the line steps there.
+  const marketSymbols = useMemo(() => {
+    const out = new Map<string, { asset: string; symbol: string }>();
+    for (const r of rows ?? []) {
+      const mtoken = mtokenOf(r.market).toLowerCase();
+      if (mtoken && !out.has(mtoken)) out.set(mtoken, { asset: r.market, symbol: r.symbol });
+    }
+    return out;
+  }, [rows, mtokenOf]);
+  const changes = useCTokenFactorChanges(chainId === 1 ? "moonwell" : "moonwell-base", marketSymbols, replayed);
+  const also = useMemo(() => factorChangePicks(changes, replayed), [changes, replayed]);
+  const changed = changes.length > 0;
+  const healthSource = useMemo(() => ctokenHealthSource(chainId, changed), [chainId, changed]);
   const chainNow = p.chain && !p.chain.chainStale ? p.chain : null;
   const todayRead = useMemo(() => (chainNow && now != null ? ctokenTodayRead(chainNow, now) : null), [chainNow, now]);
   const liveLevels = useMemo(
     () => (chainNow ? cardLevels(ctokenCardLines(chainNow), replayed?.todayPrices) : null),
     [chainNow, replayed],
   );
-  const timeline = useFlowsHealth(replayed, {
+  const healthTimeline = useFlowsHealth(replayed, {
     reader,
     source: healthSource,
     events: healthEvents,
     liveHf: chainNow?.healthFactor ?? null,
     liveLevels,
     todayRead,
+    also,
   });
+  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
   const focusEvents = useMemo(() => (replay ? ctokenFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? ctokenEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

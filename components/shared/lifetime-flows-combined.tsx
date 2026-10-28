@@ -257,6 +257,7 @@ function ChangeMarker({ days, left, w, faded }: { days: ChangeDay[]; left: numbe
       style={{ left }}
       data-flow-change={days[0].day}
       data-flow-change-days={days.map((d) => d.day).join(",")}
+      data-flow-change-blocks={[...new Set(days.flatMap((d) => d.changes.map((c) => c.block)))].join(",")}
       data-flow-change-x={left.toFixed(1)}
       data-anatomy="F4.2"
       onPointerEnter={(e) => e.pointerType === "mouse" && setHover(true)}

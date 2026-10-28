@@ -35,7 +35,7 @@ const ORACLE_ABI = parseAbi(["function getUnderlyingPrice(address cToken) view r
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 
-function deployment(protocol: CTokenProtocol): {
+export function ctokenDeployment(protocol: CTokenProtocol): {
   chainId: ChainId;
   comptroller: string;
   token: (key: string) => string | undefined;
@@ -73,7 +73,7 @@ export async function readCTokenLiquidityAt(
   collateral: string,
   debtMarket?: string,
 ): Promise<CTokenLiquidityAt | null> {
-  const d = deployment(protocol);
+  const d = ctokenDeployment(protocol);
   const collToken = d.token(collateral.toLowerCase());
   const debtToken = debtMarket ? d.token(debtMarket.toLowerCase()) : undefined;
   const client = chainBatchClient(d.chainId) as PublicClient;
@@ -217,7 +217,7 @@ export async function readCTokenMembershipAt(
   block: number,
   market: string,
 ): Promise<{ block: number; entered: boolean; collateralFactor: number | null } | null> {
-  const d = deployment(protocol);
+  const d = ctokenDeployment(protocol);
   const token = d.token(market.toLowerCase());
   if (!token) return null;
   const client = chainBatchClient(d.chainId) as PublicClient;
@@ -260,7 +260,7 @@ export async function readCTokenFactorsAt(
   block: number,
   markets: string[],
 ): Promise<{ block: number; factors: Record<string, number> } | null> {
-  const d = deployment(protocol);
+  const d = ctokenDeployment(protocol);
   const client = chainBatchClient(d.chainId) as PublicClient;
   const comptroller = d.comptroller as `0x${string}`;
   const at = BigInt(block);

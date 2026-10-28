@@ -45,10 +45,14 @@ import {
   compoundV2RowPrices,
 } from "@/lib/compound-v2/flows";
 import { ctokenCardLines, ctokenHealthReader, ctokenHealthSource, ctokenTodayRead } from "@/lib/shared/ctoken-health";
+import { useCTokenFactorChanges } from "@/hooks/useFactorChanges";
+import { factorChangePicks } from "@/lib/shared/collateral-factor-changes";
+import { withChanges } from "@/lib/shared/flows-changes";
 import { cardLevels } from "@/lib/shared/flows-health";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
 const V2_HEALTH_SOURCE = ctokenHealthSource(1);
+const V2_HEALTH_SOURCE_CHANGED = ctokenHealthSource(1, true);
 
 export interface CompoundV2FlowsInput {
   /** The page's events, when they are the whole history; null otherwise. */
@@ -252,14 +256,30 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
     () => (chainNow ? cardLevels(ctokenCardLines(chainNow), replayed?.todayPrices) : null),
     [chainNow, replayed],
   );
-  const timeline = useFlowsHealth(replayed, {
+  // The collateral factor changes in the life on the markets the account
+  // used (ui-jobs 328 step 8): markers, and a factor read at each change's
+  // block so the line steps there.
+  const marketSymbols = useMemo(() => {
+    const out = new Map<string, { asset: string; symbol: string }>();
+    for (const r of rows ?? []) {
+      const ctoken = COMPOUND_V2_MARKET_BY_KEY[r.market]?.ctoken;
+      if (ctoken && !out.has(ctoken.toLowerCase()))
+        out.set(ctoken.toLowerCase(), { asset: r.market, symbol: r.symbol });
+    }
+    return out;
+  }, [rows]);
+  const changes = useCTokenFactorChanges("compound-v2", marketSymbols, replayed);
+  const also = useMemo(() => factorChangePicks(changes, replayed), [changes, replayed]);
+  const healthTimeline = useFlowsHealth(replayed, {
     reader,
-    source: V2_HEALTH_SOURCE,
+    source: changes.length > 0 ? V2_HEALTH_SOURCE_CHANGED : V2_HEALTH_SOURCE,
     events: healthEvents,
     liveHf: chainNow?.healthReplica ?? null,
     liveLevels,
     todayRead,
+    also,
   });
+  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
   const focusEvents = useMemo(() => (replay ? ctokenFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? ctokenEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

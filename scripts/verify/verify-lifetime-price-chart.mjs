@@ -285,6 +285,7 @@ const PAGES = [
   // against ruling 7's worked from that read (`basket`).
   {
     id: "moonwell 0x33a7",
+    noChanges: true,
     path: "/ethereum/moonwell/0x33a7ec1055edd4cc35ef289156c7a7a078043474",
     lwOnly: true,
     health: true,
@@ -297,6 +298,7 @@ const PAGES = [
   },
   {
     id: "moonwell-base 0x98b8",
+    changes: { day: 20206, name: "cbBTC collateral factor", from: "81 %", to: "85 %", block: 29545911 },
     path: "/base/moonwell/0x98b8d0621c1a79dcfc5a65d01abf9cfdd46aeb7a",
     lwOnly: true,
     health: true,
@@ -314,6 +316,7 @@ const PAGES = [
   // ten times from its price, so none is drawn.
   {
     id: "moonwell-base 0x2d7a",
+    changes: { day: 20702, name: "tBTC collateral factor", from: "80 %", to: "64 %", block: 50935342 },
     path: "/base/moonwell/0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c",
     lwOnly: true,
     health: true,
@@ -322,6 +325,7 @@ const PAGES = [
   },
   {
     id: "compound-v3 usdc 0xc5cd",
+    noChanges: true,
     path: "/ethereum/compound-v3/usdc/0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46",
     lwOnly: true,
     health: true,
@@ -342,6 +346,7 @@ const PAGES = [
   },
   {
     id: "compound-v3-base usdc 0x2f42",
+    noChanges: true,
     path: "/base/compound-v3/usdc/0x2f42b066069945a71100aef832afdbe14d954e4b",
     lwOnly: true,
     health: true,
@@ -359,6 +364,7 @@ const PAGES = [
   },
   {
     id: "compound-v3-arbitrum usdc 0x13ad",
+    noChanges: true,
     path: "/arbitrum/compound-v3/usdc/0x13adb56198ea3e0789c28a5528c07b4d5d674ce3",
     lwOnly: true,
     health: true,
@@ -376,6 +382,7 @@ const PAGES = [
   },
   {
     id: "compound-v2 0x6217",
+    changes: { day: 19430, name: "WBTC collateral factor", from: "70 %", to: "60 %", block: 16826903 },
     path: "/ethereum/compound-v2/0x6217c008da6ea46b6db500695287d77d03f79a42",
     lwOnly: true,
     health: true,
@@ -388,6 +395,7 @@ const PAGES = [
   // Liquidated once, two collaterals in reach of a level (0x6217's are not).
   {
     id: "compound-v2 0xb074",
+    changes: { day: 19948, name: "USDC collateral factor", from: "85.50 %", to: "84.50 %", block: 20519734 },
     path: "/ethereum/compound-v2/0xb07421eecdb730794b3a7e76e54e7683c3687d8b",
     lwOnly: true,
     health: true,
@@ -400,6 +408,63 @@ const PAGES = [
       url: "/api/chain/compound-v2/position?wallet=0xb07421eecdb730794b3a7e76e54e7683c3687d8b",
       kind: "ctoken",
     },
+  },
+  // Step 8 (the collateral factor changes on Compound V3, V2 and Moonwell,
+  // from the setters' logs): a Comet's at the upgrade that carried it, a
+  // Comptroller's at its block; each a marker (`changes`), and a life with
+  // none draws none (`noChanges`, above on 0x33a7, 0xc5cd, 0x2f42 and 0x13ad).
+  // Compound V3 0x072f (open, wstETH 87 → 85 % on 6 Aug 2025 and 85 → 86 %
+  // on 15 Nov 2025, both between its events), 0x7829 (closed 21 Aug 2025,
+  // after the first; the second outside the life), Base USDbC 0xb4f7 (WETH
+  // 84 → 74 % and 74 → 64 %), Arbitrum 0x6ed2 (WETH 90 → 88 %); Compound V2
+  // 0x0f8e (closed, after the last change); Moonwell Base 0x54ec (closed,
+  // four tBTC and USDC changes).
+  {
+    id: "compound-v3 usdc 0x072f (two upgrades between events)",
+    path: "/ethereum/compound-v3/usdc/0x072fc633b8546af8e2a242b36697267835734076",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/compound/timeline?wallet=0x072fc633b8546af8e2a242b36697267835734076&market=usdc&limit=1000",
+    changes: { day: 20306, name: "wstETH liquidation collateral factor", from: "87 %", to: "85 %", block: 23084176 },
+  },
+  {
+    id: "compound-v3 usdc 0x7829 (closed)",
+    path: "/ethereum/compound-v3/usdc/0x782949470ddd695ce5cf506a2faff476ffdf6799",
+    lwOnly: true,
+    changes: {
+      day: 20306,
+      name: "wstETH liquidation collateral factor",
+      from: "87 %",
+      to: "85 %",
+      block: 23084176,
+      outside: 20407,
+    },
+  },
+  {
+    id: "compound-v3-base usdbc 0xb4f7",
+    path: "/base/compound-v3/usdbc/0xb4f73453748396bf3a1c99b860d9932477807fa4",
+    lwOnly: true,
+    changes: { day: 20014, name: "WETH liquidation collateral factor", from: "84 %", to: "74 %", block: 21219146 },
+  },
+  {
+    id: "compound-v3-arbitrum usdc 0x6ed2",
+    path: "/arbitrum/compound-v3/usdc/0x6ed20ad6824302825bc92573f65c286f27e75a4e",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/compound-arbitrum/timeline?wallet=0x6ed20ad6824302825bc92573f65c286f27e75a4e",
+    changes: { day: 20194, name: "WETH liquidation collateral factor", from: "90 %", to: "88 %", block: 326916536 },
+  },
+  {
+    id: "compound-v2 0x0f8e (closed, no change)",
+    path: "/ethereum/compound-v2/0x0f8e3711c5be6f91fb86e54d148b0efffc82b0e0",
+    lwOnly: true,
+    noChanges: true,
+  },
+  {
+    id: "moonwell-base 0x54ec (closed)",
+    path: "/base/moonwell/0x54ecb3397b0bf31cb0b81eb2444e2a7b32507d8b",
+    lwOnly: true,
+    changes: { day: 20403, name: "tBTC collateral factor", from: "85 %", to: "84 %", block: 38046922 },
   },
   // Step 5 (the health view in the card's terms on MakerDAO and Fluid):
   // each page opens on the card's ratio against its line (`ratio`), today's
@@ -990,6 +1055,12 @@ async function checkHealth(page, tag, pg, listedAll) {
     `${BASE}${pg.timeline ?? `/api/aave-v3/timeline?wallet=${wallet}&market=${u.searchParams.get("market")}&limit=1000`}`,
   ).then((r) => r.json());
   const blocks = new Set((tl.events ?? []).map((e) => e.blockNumber));
+  // A factor read at a protocol change's block (ui-jobs 328 step 8) is a
+  // point's block too.
+  for (const b of await page.$$eval("[data-flows-combined] [data-flow-change]", (ms) =>
+    ms.flatMap((m) => (m.getAttribute("data-flow-change-blocks") ?? "").split(",").filter(Boolean).map(Number)),
+  ))
+    blocks.add(b);
   const sl = page.locator(PRICE_STRIP).first();
   await sl.focus();
   await page.keyboard.press("End");
@@ -1036,7 +1107,7 @@ async function checkHealth(page, tag, pg, listedAll) {
     const r = await read();
     if (!r.none && r.block !== "" && !blocks.has(Number(r.block))) bad.push(`${r.block}`);
   }
-  check(`${tag}: each health point rests on an event's block`, bad.length === 0, bad.join(","));
+  check(`${tag}: each health point rests on an event's or a change's block`, bad.length === 0, bad.join(","));
   const liq = await page
     .$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent?.trim() ?? "")
     .catch(() => null);
@@ -1713,7 +1784,7 @@ async function checkChanges(page, tag, pg, width) {
       prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
     })),
   );
-  const it = items.find((i) => i.day === want.day && i.block === want.block);
+  const it = items.find((i) => i.day === want.day && i.block === want.block && i.name === want.name);
   check(
     `${tag}: the marker's ${width < 640 ? "tap" : "hover"} names it, before → after: ${want.name} ${want.from || "set"} → ${want.to}`,
     !!it && it.name === want.name && it.from === want.from && it.to === want.to && it.text.includes(want.to),
@@ -1768,6 +1839,15 @@ async function checkChanges(page, tag, pg, width) {
     help.includes("The grey diamonds") && help.includes(named),
     help.slice(0, 400),
   );
+}
+
+/** A life no protocol change falls in (ui-jobs 328 step 8, `noChanges`):
+ *  no marker on the row, and the how-to-read names no grey diamonds. */
+async function checkNoChanges(page, tag) {
+  const n = await page.locator("[data-flows-combined] [data-flow-change]").count();
+  check(`${tag}: no protocol-change marker in a life with no change`, n === 0, `${n} markers`);
+  const help = await howToRead(page);
+  check(`${tag}: the how-to-read names no grey diamonds`, !help.includes("grey diamond"), help.slice(0, 200));
 }
 
 /** Liquity V1 (ui-jobs 328 step 5): Liquity V2's view, the ETH price with the
@@ -3285,6 +3365,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.alchemix) await checkAlchemixShare(page, tag, pg);
       if (pg.band) await checkBand(page, tag, pg, width);
       if (pg.changes) await checkChanges(page, tag, pg, width);
+      if (pg.noChanges) await checkNoChanges(page, tag);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;

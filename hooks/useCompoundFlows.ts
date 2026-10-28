@@ -24,6 +24,7 @@ import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import { isCompoundEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { CometMarket } from "@/lib/compound/asset-catalog";
 import {
+  collAsset,
   compoundAssets,
   compoundFlowEvents,
   compoundFlowFacts,
@@ -44,6 +45,9 @@ import { cometCardLines, cometFactorRead, cometHealthSource, cometTodayRead } fr
 import { healthRead } from "@/lib/shared/health-reads";
 import { cardLevels } from "@/lib/shared/flows-health";
 import { useFlowsHealth, type HealthReader } from "@/hooks/useFlowsHealth";
+import { useCometFactorChanges } from "@/hooks/useFactorChanges";
+import { factorChangePicks } from "@/lib/shared/collateral-factor-changes";
+import { withChanges } from "@/lib/shared/flows-changes";
 
 const DAY_S = 86_400;
 const CHAIN_ID = { ethereum: 1, base: 8453, arbitrum: 42161 } as const;
@@ -288,21 +292,36 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
         }).then((a) => (a ? cometFactorRead(a, e.timestamp) : null)),
     };
   }, [collTokens, p.deployment, market.key]);
-  const healthSource = useMemo(() => cometHealthSource(CHAIN_ID[p.deployment]), [p.deployment]);
+  // The liquidate factor changes the Comet's upgrades carried in the life, on
+  // the collaterals the account used (ui-jobs 328 step 8): markers, and a
+  // factor read at each upgrade's block so the line steps there.
+  const collSymbols = useMemo(() => {
+    const out = new Map<string, { asset: string; symbol: string }>();
+    for (const e of bare)
+      if (!e.isBase && !e.token.startsWith("symbol:") && !out.has(e.token))
+        out.set(e.token, { asset: collAsset(e.token), symbol: e.symbol });
+    return out;
+  }, [bare]);
+  const changes = useCometFactorChanges(p.deployment, market.key, collSymbols, replayed);
+  const also = useMemo(() => factorChangePicks(changes, replayed), [changes, replayed]);
+  const changed = changes.length > 0;
+  const healthSource = useMemo(() => cometHealthSource(CHAIN_ID[p.deployment], changed), [p.deployment, changed]);
   const chainNow = p.open && p.chain && !p.chain.chainStale ? p.chain : null;
   const todayRead = useMemo(() => (chainNow && now != null ? cometTodayRead(chainNow, now) : null), [chainNow, now]);
   const liveLevels = useMemo(
     () => (chainNow ? cardLevels(cometCardLines(chainNow), replayed?.todayPrices) : null),
     [chainNow, replayed],
   );
-  const timeline = useFlowsHealth(replayed, {
+  const healthTimeline = useFlowsHealth(replayed, {
     reader,
     source: healthSource,
     events: healthEvents,
     liveHf: chainNow?.healthFactor ?? null,
     liveLevels,
     todayRead,
+    also,
   });
+  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
   const focusEvents = useMemo(() => (replay ? compoundFocusEvents(replay) : []), [replay]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
   const facts = useMemo(
