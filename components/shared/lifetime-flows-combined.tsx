@@ -62,6 +62,7 @@ import {
   type FlowTick,
   tickRank,
   type FlowSide,
+  lineUnitWords,
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel } from "@/components/shared/flow-old-price";
 import { LwRanges, nearestStopAt, type FlowsLwApi, type FlowsLwAxis } from "@/components/shared/lifetime-flows-lw-axis";
@@ -630,7 +631,10 @@ export function CombinedFlows({
       }
     : null;
   const eventsOnlyHelp = lifetimeFlowsStackContent({ events: marks, charts: null });
-  const stackHelp = lifetimeFlowsStackContent({ events: marks, charts: { value: true, price: priceBrief } });
+  const stackHelp = lifetimeFlowsStackContent({
+    events: marks,
+    charts: { value: true, price: priceBrief, unit: lineUnitWords(model) },
+  });
   const priceOnlyHelp = lifetimeFlowsStackContent({ events: null, charts: { value: false, price: priceBrief } });
 
   const barsBlock = (

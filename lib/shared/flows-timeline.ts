@@ -1424,6 +1424,11 @@ export function spokenUsd(v: number, unit?: FlowUnit): string {
 
 /** A side's token: its own where the sides have none in common
  *  (`FlowTimeline.sideUnits`), else the model's. */
+/** The unit the value pane's line is drawn in: each side's token where the
+ *  sides have none in common, the model's token, else USD. */
+export const lineUnitWords = (m: Pick<FlowModel, "unit" | "sideUnits"> | null | undefined): string =>
+  m?.sideUnits ? `${m.sideUnits.collateral.symbol} and ${m.sideUnits.debt.symbol}` : (m?.unit?.symbol ?? "USD");
+
 export const unitOf = (m: Pick<FlowModel, "unit" | "sideUnits">, side: FlowSide): FlowUnit | undefined =>
   m.sideUnits?.[side] ?? m.unit;
 

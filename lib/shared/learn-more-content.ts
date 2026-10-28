@@ -56,11 +56,15 @@ const listWords = (xs: string[]) =>
  *  alone (`events` null). */
 export function lifetimeFlowsStackContent(opts: {
   events: FlowEventsHelp | null;
-  charts: { value: boolean; price: FlowPriceHelp | null } | null;
+  charts: { value: boolean; price: FlowPriceHelp | null; unit?: string } | null;
 }): LearnMoreContent {
   const { events, charts } = opts;
   const details: { bold: string; text: string }[] = [];
-  if (charts?.value) details.push({ bold: "The value line", text: "collateral and debt in USD at each day's close." });
+  if (charts?.value)
+    details.push({
+      bold: "The value line",
+      text: `collateral and debt in ${charts.unit ?? "USD"} at each day's close.`,
+    });
   const price = charts?.price;
   if (price)
     details.push(

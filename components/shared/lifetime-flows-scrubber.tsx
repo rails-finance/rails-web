@@ -79,6 +79,7 @@ import {
   type FlowSideState,
   type FlowTimeline,
   windowModel,
+  lineUnitWords,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
 import {
@@ -643,9 +644,7 @@ export function LifetimeFlowsScrubber({
   }, [lifetime, seriesKey, binInput, bin]);
 
   // The line's unit: each side's token where the sides have none in common.
-  const basisUnit = model?.sideUnits
-    ? `${model.sideUnits.collateral.symbol} and ${model.sideUnits.debt.symbol}`
-    : (model?.unit?.symbol ?? "USD");
+  const basisUnit = lineUnitWords(model);
   // The price view's series (ui-jobs 328): the held assets' daily prices the
   // timeline carries.
   const prices = useMemo(() => (lined ? flowPriceSeries(timeline) : []), [lined, timeline]);

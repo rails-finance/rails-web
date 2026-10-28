@@ -664,6 +664,7 @@ const PAGES = [
     lwOnly: true,
     panes: "collateral,debt,price",
     family: { kind: "declared" },
+    unit: "token",
   },
   {
     id: "frankencoin 0x4220 (price moved)",
@@ -677,6 +678,7 @@ const PAGES = [
     path: "/ethereum/maple/0xc4ec216635491a6d08cfe4537ed4dd767212d8c1",
     lwOnly: true,
     family: { kind: "pool" },
+    unit: "token",
   },
   {
     id: "pwn 0xb2d3 (liquidated)",
@@ -689,6 +691,7 @@ const PAGES = [
     id: "aave sgho holder 0x1676",
     path: "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
     lwOnly: true,
+    unit: "token",
     family: { kind: "vault" },
   },
   {
@@ -728,6 +731,7 @@ const PAGES = [
     path: "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
+    unit: "USD",
   },
   {
     id: "liquity-v2 WETH Trove (redeemed)",
@@ -1737,6 +1741,22 @@ async function checkFamilyLine(page, tag, pg) {
   );
 }
 
+/** The how-to-read's value-line sentence names the unit the value pane is
+ *  drawn in (ui-jobs 328): USD where the page values in dollars, else the
+ *  token or tokens the pane's figures are in. */
+async function checkValueUnit(page, tag, pg) {
+  const help = await howToRead(page);
+  const sentence = help.match(/The value line\s*—\s*collateral and debt in ([^.]*?) at each day/)?.[1] ?? "";
+  if (pg.unit === "USD")
+    check(`${tag}: the how-to-read's value line is in USD`, sentence === "USD", sentence || help.slice(0, 300));
+  else
+    check(
+      `${tag}: the how-to-read's value line names the token unit (${sentence})`,
+      sentence !== "" && sentence !== "USD" && /^[\w.$-]+( and [\w.$-]+)?$/.test(sentence),
+      sentence || help.slice(0, 300),
+    );
+}
+
 /** An asset picked from the health view's list draws its liquidation level
  *  (ruling 15): at least one listed asset has a level drawn on its chart. */
 async function checkPickedLevel(page, tag, listedAll) {
@@ -2598,6 +2618,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").scrollIntoViewIfNeeded();
       await checkLwOpen(page, tag, pg.priceOnly);
     }
+    if (pg.unit) await checkValueUnit(page, tag, pg);
     if (pg.lwOnly) {
       if (!check(`${tag}: the chart draws on Lightweight Charts`, lw)) {
         await ctx.close();
