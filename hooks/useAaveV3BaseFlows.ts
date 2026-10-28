@@ -36,6 +36,7 @@ import { fetchAaveBaseFlows, isAaveBaseSummaryAnswer, type AaveBaseFlowAnswer } 
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { AaveHealthSource } from "@/lib/aave-v3/flows-health";
 import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
+import type { AaveFamilyEmodeSwitch } from "@/lib/aave-v3/account-switches";
 
 type RouteSummary = Extract<AaveBaseFlowAnswer, { days: unknown }>;
 
@@ -84,6 +85,9 @@ export interface AaveV3BaseFlowsInput {
   pageEvents?: readonly BaseActivityEvent[];
   /** The card's health factor on an open position. */
   liveHf?: number | null;
+  /** The account's e-mode switches, once read: the health view's governance
+   *  changes wait for them. */
+  emode?: readonly AaveFamilyEmodeSwitch[] | null;
 }
 
 export interface AaveV3BaseFlowsFacts {
@@ -261,6 +265,7 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     source: p.health?.source ?? NO_HEALTH,
     events: p.pageEvents ?? NO_EVENTS,
     liveHf: p.liveHf ?? null,
+    emode: p.emode ?? null,
   });
   const focusEvents = useMemo<FocusEvent[]>(
     () => (replay ? aaveBaseFocusEvents(replay) : route ? route.events : []),

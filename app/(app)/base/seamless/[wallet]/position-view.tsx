@@ -582,6 +582,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     health: SEAMLESS_HEALTH,
     pageEvents: aaveEvents,
     liveHf: view?.status === "open" ? (view.healthFactor ?? null) : null,
+    emode: switches?.emode ?? null,
   });
 
   // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.

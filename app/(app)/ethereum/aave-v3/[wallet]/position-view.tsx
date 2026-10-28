@@ -713,6 +713,7 @@ export default function AaveV3PositionDetail({
     source: AAVE_V3_HEALTH_SOURCE,
     events: aaveEvents,
     liveHf: liveView?.status === "open" ? (liveView.healthFactor ?? null) : null,
+    emode: switches?.emode ?? null,
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The card's count counts transactions; its tip gives the events too.

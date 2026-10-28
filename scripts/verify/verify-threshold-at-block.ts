@@ -1,8 +1,10 @@
 // verify-threshold-at-block — the liquidation line read at each picked block
 // on Alchemix V3 and Dolomite (lib/alchemix/flows-health.ts,
-// lib/dolomite/flows-health.ts), and the collateral factor changes of
-// Compound V2, Moonwell and Compound V3 (lib/shared/collateral-factor-changes.ts;
-// rails-ops ui-jobs 328 step 8, reference/lifetime-price-chart.md, the rows).
+// lib/dolomite/flows-health.ts), the collateral factor changes of
+// Compound V2, Moonwell and Compound V3 (lib/shared/collateral-factor-changes.ts),
+// and the threshold and e-mode changes of the Aave V3 family
+// (lib/aave-v3/config-changes.ts; rails-ops ui-jobs 328 step 8,
+// reference/lifetime-price-chart.md, the rows).
 // ----------------------------------------------------------------------------
 // OFFLINE. Fixtures read from the page's routes on the date the file names
 // (scripts/verify/fixtures/threshold-at-block.json): each position's event
@@ -56,6 +58,8 @@ import type { CompoundDeploymentKey } from "@/lib/compound/deployments";
 import type { CTokenProtocol } from "@/lib/api/fetch-ctoken-liquidity-at";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
+import { aaveConfigChanges, type AaveConfigChange, type AaveConfigLogAnswer } from "@/lib/aave-v3/config-changes";
+import type { AaveFamilyEmodeSwitch } from "@/lib/aave-v3/account-switches";
 
 const DAY_S = 86_400;
 
@@ -519,6 +523,214 @@ for (const p of CF.positions) {
         `${p.name}: the step on ${c.day}`,
       );
       assert.equal(hv.health.points.find((x) => x[0] === c.day)![2], c.block);
+    }
+  });
+}
+
+// ── The Aave V3 family: threshold and e-mode changes ─────────────────────────
+//
+// Fixtures (scripts/verify/fixtures/aave-config-changes.json, written by
+// capture-aave-config-changes.mjs on the date it names): each Aave V3
+// Ethereum, SparkLend, Aave V3 Base and Seamless position's position-state
+// reads as its page made them (the picks and the change blocks, cut to their
+// thresholds), its e-mode switches, the markers it drew, and each market's
+// configurator log answer (/api/chain/aave-v3/config-log).
+//
+// Held (lib/aave-v3/config-changes.ts): the markers are the log's changes
+// inside the life on the reserves the account held as collateral, the page's
+// drawn markers; a change that moves the line, read at its block, gives the
+// new threshold on each reserve it moves (the category's where the account is
+// in e-mode on it) and the read before gives the old; a reserve change on a
+// reserve the account's e-mode category covers asks no read; the change
+// blocks read are changes that move the line.
+
+interface AaveRead {
+  route: string;
+  block: number;
+  ts: number;
+  txHash: string;
+  emode: number;
+  categories: Record<string, { label: string | null; lt: number }>;
+  reserves: {
+    reserve: string;
+    symbol: string | null;
+    lt: number;
+    inEmode: boolean;
+    collateral: boolean;
+    supplied: boolean;
+    owed: boolean;
+  }[];
+}
+interface AavePosition {
+  name: string;
+  market: string;
+  wallet: string;
+  path: string;
+  switches: AaveFamilyEmodeSwitch[];
+  reads: AaveRead[];
+  life: [number, number];
+  markers: { days: number[]; blocks: number[]; label: string }[];
+}
+const AF = JSON.parse(readFileSync(join(__dirname, "fixtures", "aave-config-changes.json"), "utf8")) as {
+  capturedAt: string;
+  logs: Record<string, AaveConfigLogAnswer>;
+  positions: AavePosition[];
+};
+/** The threshold a read gives the account on a reserve, in basis points. */
+const ltOfRead = (r: AaveRead, reserve: string): number | null => {
+  const x = r.reserves.find((y) => y.reserve === reserve);
+  if (!x || !x.collateral) return null;
+  return r.emode > 0 && x.inEmode ? (r.categories[String(r.emode)]?.lt ?? null) : x.lt;
+};
+const bps = (printed: string) => Math.round(parseFloat(printed) * 100);
+function aaveHeld(p: AavePosition): Map<string, { asset: string; symbol: string }> {
+  const out = new Map<string, { asset: string; symbol: string }>();
+  for (const r of p.reads)
+    for (const x of r.reserves)
+      if ((x.supplied || x.collateral) && !out.has(x.reserve))
+        out.set(x.reserve, { asset: x.reserve, symbol: x.symbol ?? x.reserve });
+  return out;
+}
+const aaveChangesOf = (p: AavePosition): AaveConfigChange[] =>
+  changesByDay(aaveConfigChanges(AF.logs[p.market], aaveHeld(p), p.switches), p.life[0], p.life[1]).flatMap(
+    (d) => d.changes as AaveConfigChange[],
+  );
+
+test("aave: the fixtures carry every market, a change read, an e-mode life and lives with none", () => {
+  for (const m of ["core", "prime", "etherfi", "spark", "base", "seamless"]) assert.ok(AF.logs[m], m);
+  assert.equal(AF.logs.base.source, "sieve");
+  assert.equal(AF.logs.core.source, "store");
+  for (const p of AF.positions) assert.ok(p.reads.length > 0, `${p.name}: reads`);
+  const changed = AF.positions.filter((p) => aaveChangesOf(p).length > 0).map((p) => p.market);
+  for (const m of ["core", "spark", "base", "seamless"]) assert.ok(changed.includes(m), `${m}: a life with a change`);
+  assert.ok(
+    AF.positions.some((p) => p.reads.some((r) => r.emode > 0) && aaveChangesOf(p).length > 0),
+    "an e-mode life with a change",
+  );
+  for (const m of ["etherfi", "spark", "base", "seamless"])
+    assert.ok(
+      AF.positions.some((p) => p.market === m && aaveChangesOf(p).length === 0),
+      `${m}: a life with none`,
+    );
+});
+
+test("aave: a listing, an LTV-only set and a block that ends where it began draw none", () => {
+  const core = AF.logs.core;
+  const every = new Map<string, { asset: string; symbol: string }>();
+  for (const l of core.logs) if ("asset" in l) every.set(l.asset, { asset: l.asset, symbol: l.asset.slice(0, 6) });
+  const all = aaveConfigChanges(core, every, []);
+  for (const c of all) assert.notEqual(c.from, c.to, `${c.block} ${c.name}`);
+  // Each reserve's first CollateralConfigurationChanged is its listing.
+  const seen = new Set<string>();
+  for (const l of core.logs)
+    if (l.kind === "collateral" && !seen.has(l.asset)) {
+      seen.add(l.asset);
+      assert.ok(
+        !all.some((c) => c.block === l.block && c.assets.includes(l.asset)),
+        `listing ${l.asset} at ${l.block}`,
+      );
+    }
+  // Block 25,037,701 sets one reserve 75 % → 0.01 % → 75 % twice.
+  assert.ok(!all.some((c) => c.block === 25_037_701), "the round trip");
+  // An account in no e-mode sees no category change.
+  assert.ok(!all.some((c) => c.name.startsWith("E-mode")));
+});
+
+test("aave: the v3.2 upgrade's re-emitted memberships and a membership change", () => {
+  const core = AF.logs.core;
+  const weth = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+  const held = new Map([[weth, { asset: weth, symbol: "WETH" }]]);
+  // An account in category 1 from before the upgrade through it.
+  const sw: AaveFamilyEmodeSwitch = {
+    blockNumber: 20_000_000,
+    timestamp: 0,
+    txHash: "0x",
+    logIndex: 0,
+    fromId: 0,
+    fromLabel: null,
+    toId: 1,
+    label: "ETH correlated",
+    ltvBps: null,
+    liquidationThresholdBps: null,
+  };
+  const at = aaveConfigChanges(core, held, [sw]).filter((c) => c.block === 20_920_979);
+  assert.deepEqual(at, [], "the upgrade's memberships draw none");
+  // A synthetic removal after the upgrade moves WETH to its own threshold.
+  const last = core.logs.at(-1)!;
+  const synth: AaveConfigLogAnswer = {
+    ...core,
+    logs: [
+      ...core.logs,
+      {
+        ...last,
+        block: last.block + 10,
+        logIndex: 0,
+        kind: "emode-collateral",
+        asset: weth,
+        categoryId: 1,
+        collateral: false,
+      },
+    ],
+  };
+  const out = aaveConfigChanges(synth, held, [sw]).filter((c) => c.block === last.block + 10);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].name, "WETH threshold in e-mode “ETH correlated”");
+  assert.ok(out[0].moves);
+  const reserveLt = [...core.logs].reverse().find((l) => l.kind === "collateral" && l.asset === weth) as { lt: number };
+  assert.equal(out[0].to, factorPct(reserveLt.lt / 1e4));
+});
+
+for (const p of AF.positions) {
+  test(`aave ${p.name}: the markers, the reads at each change, and the e-mode rule`, () => {
+    const changes = aaveChangesOf(p);
+    const drawnDays = [...new Set(p.markers.flatMap((m) => m.days))].sort((a, b) => a - b);
+    assert.deepEqual(
+      [...new Set(changes.map((c) => c.day))].sort((a, b) => a - b),
+      drawnDays,
+      `${p.name}: marker days`,
+    );
+    const labels = p.markers.map((m) => m.label).join(" | ");
+    for (const c of changes)
+      assert.ok(labels.includes(`${c.name} ${c.from} → ${c.to}`), `${p.name}: ${c.name} ${c.from} → ${c.to}`);
+    const reads = [...p.reads].sort((a, b) => a.block - b.block);
+    const byBlock = new Map(changes.map((c) => [c.block, c]));
+    const firstPick = reads.find((r) => !byBlock.has(r.block))?.block ?? Infinity;
+    for (const r of reads) {
+      const c = byBlock.get(r.block);
+      if (!c) continue;
+      // A read at a change block is a change that moves the line, after the
+      // first pick, or a pick that happens to share the block.
+      if (r.txHash === c.txHash) {
+        assert.ok(c.moves, `${p.name}: read at ${c.block} moves the line`);
+        assert.ok(r.block > firstPick, `${p.name}: read at ${c.block} after the first pick`);
+      }
+    }
+    for (const c of changes) {
+      const at = reads.find((r) => r.block === c.block && r.txHash === c.txHash);
+      const prior = reads.filter((r) => r.block < c.block).at(-1);
+      if (!c.moves) {
+        assert.ok(!at, `${p.name}: no read at ${c.block}, which moves nothing`);
+        // The account's threshold on the reserve is its category's either side.
+        const after = reads.find((r) => r.block > c.block);
+        for (const a of c.assets)
+          for (const r of [prior, after])
+            if (r && r.emode > 0 && ltOfRead(r, a) != null)
+              assert.equal(
+                ltOfRead(r, a),
+                r.categories[String(r.emode)].lt,
+                `${p.name}: ${a} on the category's threshold`,
+              );
+        continue;
+      }
+      if (!at) continue;
+      for (const a of c.assets) {
+        const v = ltOfRead(at, a);
+        if (v != null) assert.equal(v, bps(c.to), `${p.name}: the read at ${c.block} gives ${c.name} ${c.to}`);
+        const w = prior ? ltOfRead(prior, a) : null;
+        // A same-block set and reset leaves the read before on the old value.
+        if (w != null && prior && prior.block < c.block)
+          assert.equal(w, bps(c.from!), `${p.name}: the read before ${c.block} gives ${c.from}`);
+      }
     }
   });
 }

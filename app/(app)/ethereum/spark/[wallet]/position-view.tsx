@@ -714,6 +714,7 @@ export default function SparkPositionDetail({
     source: SPARK_HEALTH_SOURCE,
     events: sparkEvents,
     liveHf: liveView?.status === "open" ? (liveView.healthFactor ?? null) : null,
+    emode: switches?.emode ?? null,
   });
   const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The supplies that back no borrowing, which the card lists apart: open, the

@@ -623,6 +623,7 @@ export function AaveV3PoolPositionView({
     prices,
     pageEvents: aaveEvents,
     liveHf: view?.status === "open" ? (view.healthFactor ?? null) : null,
+    emode: switches?.emode ?? null,
   });
 
   const stripAssets = useMemo<PriceStripAsset[]>(() => {

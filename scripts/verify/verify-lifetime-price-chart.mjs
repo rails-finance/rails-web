@@ -201,6 +201,24 @@ const PAGES = [
     path: "/ethereum/aave-v3/0xfb9395e0b216823c9a60d5dfcb8c6ef458232a71?market=core",
     answer: "/api/aave-v3/flows",
     health: true,
+    // Step 8: the PoolConfigurator's threshold changes on held reserves.
+    changes: { day: 19997, name: "LINK liquidation threshold", from: "68 %", to: "71 %", block: 20870218 },
+  },
+  // An e-mode life across twelve category threshold changes, each read at
+  // its block (closed 28 Nov 2025).
+  {
+    id: "aave-v3 0xbc67 (e-mode)",
+    endsClosed: true,
+    path: "/ethereum/aave-v3/0xbc67df7a724e076a26e25e37648974dd99659be1?market=core",
+    answer: "/api/aave-v3/flows",
+    health: true,
+    changes: {
+      day: 20348,
+      name: "E-mode “PT-USDe USDe Nov 2025” liquidation threshold",
+      from: "91.50 %",
+      to: "92 %",
+      block: 23382225,
+    },
   },
   {
     id: "aave-v3 0xfb45 (liquidated)",
@@ -213,12 +231,14 @@ const PAGES = [
     path: "/ethereum/aave-v3/0xb8a451107a9f87fde481d4d686247d6e43ed715e?market=prime",
     answer: "/api/aave-v3/flows",
     health: true,
+    noChanges: true,
   },
   {
     id: "aave-v3 etherfi 0x0f2a",
     path: "/ethereum/aave-v3/0x0f2a32f4f54ec9d52a193e9e3493fb5fea86cbbe?market=etherfi",
     answer: "/api/aave-v3/flows",
     health: true,
+    noChanges: true,
     // A health factor near 50: every asset's level is more than ten times
     // from its price (ruling 15), so none is drawn.
     noLevel: true,
@@ -228,6 +248,7 @@ const PAGES = [
     path: "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e",
     answer: "/api/spark/flows",
     query: "wallet=0x1601843c5e9bc251a3272907010afa41fa18347e",
+    changes: { day: 20325, name: "WETH liquidation threshold", from: "83 %", to: "86 %", block: 23218581 },
   },
   {
     id: "spark 0x070b",
@@ -236,6 +257,26 @@ const PAGES = [
     query: "wallet=0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
     health: true,
     timeline: "/api/spark/timeline?wallet=0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
+    changes: { day: 20325, name: "wstETH liquidation threshold", from: "80 %", to: "84 %", block: 23218581 },
+  },
+  // Closed 3 Oct 2025, the 25 Aug 2025 changes read at their block.
+  {
+    id: "spark 0xd914 (closed)",
+    endsClosed: true,
+    path: "/ethereum/spark/0xd9147bd9e9466036bc2897747bce3c9e13463090",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/spark/timeline?wallet=0xd9147bd9e9466036bc2897747bce3c9e13463090",
+    changes: { day: 20325, name: "cbBTC liquidation threshold", from: "75 %", to: "82 %", block: 23218581 },
+  },
+  // In e-mode on wstETH: the reserve's change is drawn and moves nothing.
+  {
+    id: "spark 0xb3ca (e-mode)",
+    path: "/ethereum/spark/0xb3ca090080db699aaf8f1b9a9a50de5d9e6c4cc1",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/spark/timeline?wallet=0xb3ca090080db699aaf8f1b9a9a50de5d9e6c4cc1",
+    changes: { day: 20325, name: "wstETH liquidation threshold", from: "80 %", to: "84 %", block: 23218581 },
   },
   {
     id: "aave-v4 main 0x7eac",
@@ -270,6 +311,16 @@ const PAGES = [
     lwOnly: true,
     health: true,
     timeline: "/api/chain/aave-v3-base/timeline?wallet=0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8",
+    noChanges: true,
+  },
+  {
+    id: "aave-v3-base 0x0768 (closed)",
+    endsClosed: true,
+    path: "/base/aave-v3/0x0768d604c7df2571a83402e39a1cabbe25d89cc9",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/aave-v3-base/timeline?wallet=0x0768d604c7df2571a83402e39a1cabbe25d89cc9",
+    changes: { day: 19997, name: "wstETH liquidation threshold", from: "76 %", to: "79 %", block: 20495692 },
   },
   {
     id: "seamless 0x8182",
@@ -277,6 +328,18 @@ const PAGES = [
     lwOnly: true,
     health: true,
     timeline: "/api/chain/seamless/timeline?wallet=0x818214d3494fbc4be4f450c50677e55987804206",
+    changes: { day: 20062, name: "cbETH liquidation threshold", from: "72 %", to: "79 %", block: 23320114 },
+  },
+  {
+    id: "seamless 0x004e (closed)",
+    endsClosed: true,
+    // WETH against a WETH debt: the price cancels, so no level.
+    noLevel: true,
+    path: "/base/seamless/0x004ec6d1aee69c292e2598be595d7e71005975d4",
+    lwOnly: true,
+    health: true,
+    timeline: "/api/chain/seamless/timeline?wallet=0x004ec6d1aee69c292e2598be595d7e71005975d4",
+    changes: { day: 20062, name: "WETH liquidation threshold", from: "80 %", to: "83 %", block: 23320114 },
   },
   // Step 4d: one position per family on the chart's checks alone.
   // Step 5 (the health view on Moonwell, Compound V3 and Compound V2): each
@@ -1044,9 +1107,14 @@ async function checkHealth(page, tag, pg, listedAll) {
     await checkHealthDotted(page, tag);
   // The tip names its series by its mark: the picker's accessible name.
   const heading = await page.$eval("[data-price-heading]", headingText).catch(() => "");
+  // A life that ends closed (`endsClosed`) owes nothing on its close day,
+  // where the cursor opens: the tip says so.
   check(
-    `${tag}: the chart opens on the health factor, its line at 1`,
-    heading.includes(`${HEALTH}`) && /Liquidates below(, explain)?\s*1\b/.test(heading),
+    pg.endsClosed
+      ? `${tag}: the chart opens on the health factor, on a close day with no debt`
+      : `${tag}: the chart opens on the health factor, its line at 1`,
+    heading.includes(`${HEALTH}`) &&
+      (pg.endsClosed ? heading.includes("No health factor") : /Liquidates below(, explain)?\s*1\b/.test(heading)),
     heading,
   );
   const u = new URL(`${BASE}${pg.path}`);
@@ -2341,7 +2409,7 @@ async function checkValueUnit(page, tag, pg) {
 
 /** An asset picked from the health view's list draws its liquidation level
  *  (ruling 15): at least one listed asset has a level drawn on its chart. */
-async function checkPickedLevel(page, tag, listedAll) {
+async function checkPickedLevel(page, tag, listedAll, pg = {}) {
   const picker = page.locator("button[data-price-picker]");
   const drawn = [];
   // A Comet's base is listed twice where the account has both supplied and
@@ -2367,7 +2435,7 @@ async function checkPickedLevel(page, tag, listedAll) {
  *  tip's level toggle, the list, the health checks and a
  *  picked asset's level. */
 async function checkHealthAlone(page, tag, pg) {
-  await checkLevelToggle(page, tag);
+  await checkLevelToggle(page, tag, pg);
   const picker = page.locator("button[data-price-picker]");
   let listedAll = [];
   if ((await picker.count()) > 0) {
@@ -2377,7 +2445,7 @@ async function checkHealthAlone(page, tag, pg) {
     await page.keyboard.press("Escape");
   }
   await checkHealth(page, tag, pg, listedAll);
-  if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll);
+  if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll, pg);
   if (pg.v4Spoke) await checkV4Levels(page, tag, pg, listedAll);
   if (pg.basket) await checkBasketLevels(page, tag, pg, listedAll);
 }
@@ -2521,7 +2589,7 @@ async function checkV4Levels(page, tag, pg, listedAll) {
 /** The price tip's level line: hidden until the triangle toggle is pressed,
  *  the chart's level line drawn either way. Leaves the level shown, for the
  *  readout checks that follow. */
-async function checkLevelToggle(page, tag) {
+async function checkLevelToggle(page, tag, pg = {}) {
   const toggle = page.locator("[data-flow-level-toggle]");
   if (!check(`${tag}: the price tip has the level toggle`, (await toggle.count()) === 1)) return;
   const state = () =>
@@ -2539,7 +2607,8 @@ async function checkLevelToggle(page, tag) {
     off.pressed === "false" &&
       !off.readout &&
       on.pressed === "true" &&
-      on.readout &&
+      // A close day with no debt has no level to read out.
+      (on.readout || !!pg.endsClosed) &&
       off.lines > 0 &&
       on.lines === off.lines,
     `off ${JSON.stringify(off)}, on ${JSON.stringify(on)}`,
@@ -3410,7 +3479,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     // Only a page that draws a level has the toggle: the Aave family's
     // health view and the Troves; a SparkLend page with no debt has no
     // health view.
-    if (pg.health || pg.trove) await checkLevelToggle(page, tag);
+    if (pg.health || pg.trove) await checkLevelToggle(page, tag, pg);
     await checkEventsToggle(page, tag);
     if ((await picker.count()) > 0) {
       await picker.click();
@@ -3422,7 +3491,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     const listed = listedAll.filter((s) => s !== HEALTH);
     if (pg.health) {
       await checkHealth(page, tag, pg, listedAll);
-      if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll);
+      if (!pg.noLevel) await checkPickedLevel(page, tag, listedAll, pg);
       if (pg.v4Spoke) await checkV4Levels(page, tag, pg, listedAll);
     }
     const pick = async (sym) => {
