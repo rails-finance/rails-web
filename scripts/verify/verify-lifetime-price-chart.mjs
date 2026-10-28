@@ -109,7 +109,9 @@
 // liquidation), 0xd76a (under its band), 0x61db (liquidated), 0xbbc5
 // (closed): Health first, today the card's; the band stepping on event days,
 // today the card's Bands; the tip's band words; the drawn band against the
-// scales' placing at All, zoomed and panned.
+// scales' placing at All, zoomed and panned. Step 8 (`changes`, `noChanges`):
+// the markets' discount sets as markers on 0xd76a, 0x6bda (WETH, 6 % → 9.21 %)
+// and 0x3722 (CRV, 8 % → 12 %), none on 0x1109 (sfrxETH, closed).
 // The vault holder pages, Maple and Frankencoin (step 7, `shareLine`,
 // `checkFamilyLine`): one holder per vault kind (Morpho Base 0x3d88, Aave
 // Umbrella stkwaEthUSDC 0x5a2a, sGHO 0x1676, stata waEthUSDC 0xab67, Yearn
@@ -899,6 +901,32 @@ const PAGES = [
     path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0xd76aa47f1ad6ce7f78ddcd4643a85c87b7e7c047",
     lwOnly: true,
     band: { asset: "CRV", place: "below" },
+    // Step 8: the CRV market's discount changes after its last event, kept 8 %.
+    changes: { day: 20415, name: "Liquidation discount", from: "8 %", to: "12 %", block: 23861548 },
+  },
+  // Step 8 (`changes`): the market's discount sets as markers; the position
+  // takes a new liquidation discount at its owner's next event, where the
+  // read steps the line, so no read is made at the change.
+  {
+    id: "llamalend 0x6bda (WETH, 6 % → 9.21 %)",
+    path: "/ethereum/llamalend/0xa920de414ea4ab66b97da1bfe9e6eca7d4219635/0x6bda04643f10782308515650dcfb05c672266332",
+    lwOnly: true,
+    band: { asset: "WETH", place: "below" },
+    changes: { day: 20433, name: "Liquidation discount", from: "6 %", to: "9.21 %", block: 23989153 },
+  },
+  {
+    id: "llamalend 0x3722 (CRV, 8 % → 12 %, taken)",
+    path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0x37223d079dedc6a96d6415ee4850748d226ee5bf",
+    lwOnly: true,
+    band: { asset: "CRV" },
+    changes: { day: 20415, name: "Liquidation discount", from: "8 %", to: "12 %", block: 23861548 },
+  },
+  {
+    id: "llamalend 0x1109 (sfrxETH, closed, no change)",
+    path: "/ethereum/llamalend/0x8472a9a7632b173c8cf3a86d3afec50c35548e76/0x1109297e392d92c1613fdbdf30579a0215c20da9",
+    lwOnly: true,
+    band: { asset: "sfrxETH", closed: true },
+    noChanges: true,
   },
   {
     id: "llamalend 0x61db (liquidated)",

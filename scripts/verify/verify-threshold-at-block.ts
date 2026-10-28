@@ -3,8 +3,9 @@
 // lib/dolomite/flows-health.ts), the collateral factor changes of
 // Compound V2, Moonwell and Compound V3 (lib/shared/collateral-factor-changes.ts),
 // the threshold and e-mode changes of the Aave V3 family
-// (lib/aave-v3/config-changes.ts), and f(x)'s liquidation and rebalance
-// ratio changes (lib/fx/ratio-log.ts; rails-ops ui-jobs 328 step 8,
+// (lib/aave-v3/config-changes.ts), f(x)'s liquidation and rebalance ratio
+// changes (lib/fx/ratio-log.ts), and LlamaLend's discount and policy changes
+// (lib/llamalend/config-log.ts; rails-ops ui-jobs 328 step 8,
 // reference/lifetime-price-chart.md, the rows).
 // ----------------------------------------------------------------------------
 // OFFLINE. Fixtures read from the page's routes on the date the file names
@@ -71,6 +72,13 @@ import {
   type FxRatioLog,
 } from "@/lib/fx/ratio-log";
 import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
+import {
+  llamalendConfigChanges,
+  llamalendConfigSteps,
+  llamalendLifeHasDiscountChange,
+  type LlamalendConfigLog,
+  type LlamalendDiscountRow,
+} from "@/lib/llamalend/config-log";
 
 const DAY_S = 86_400;
 
@@ -899,4 +907,171 @@ test("fx: a change between two events steps the line on its day and draws its ma
     pts.filter(([d]) => d > gapDay).every(([, v]) => v === 0.9),
     "and 90 % after it",
   );
+});
+
+// ── LlamaLend: the markets' discount and policy changes ─────────────────────
+//
+// Fixture (scripts/verify/fixtures/llamalend-config-log.json, written by
+// capture-llamalend-config-log.mjs on the date it names): each market's
+// Controller setter logs (/api/chain/llamalend/config-log), and per position
+// its rows with the discount each UserState stored, the event-state read at
+// the last event of each day, and the same read at each discount change
+// inside the life.
+//
+// Held (lib/llamalend/config-log.ts): each set that moved a discount or the
+// policy is a step with its before → after, the first one's before the
+// route's `before`; a change inside the life is a marker. The line does not
+// step at a change: the stored discount each read gives is the row's, and at
+// a change's block it is still the one the position stored before it; the
+// position takes the new one at its owner's next event, which the liquidation
+// discount marker's receipt names, or says it kept the old one.
+
+interface LlPosition {
+  name: string;
+  controller: string;
+  user: string;
+  rows: { block: number; ts: number; discountRaw: string | null }[];
+  reads: Record<string, { block: number; hasLoan: boolean; discountRaw: string | null; healthRaw: string | null }>;
+  atChanges: Record<string, { block: number; hasLoan: boolean; discountRaw: string | null; healthRaw: string | null }>;
+}
+const LL = JSON.parse(readFileSync(join(__dirname, "fixtures", "llamalend-config-log.json"), "utf8")) as {
+  capturedAt: string;
+  logs: Record<string, LlamalendConfigLog>;
+  positions: LlPosition[];
+};
+const llFrac = (raw: string | null) => (raw != null && BigInt(raw) > BigInt(0) ? Number(BigInt(raw)) / 1e18 : null);
+const llRows = (p: LlPosition): LlamalendDiscountRow[] =>
+  p.rows.map((r) => ({ block: r.block, ts: r.ts, discount: llFrac(r.discountRaw) }));
+const llToday = Math.floor(Date.parse(LL.capturedAt) / 1000 / DAY_S);
+const llLife = (p: LlPosition): [number, number] => {
+  const last = p.rows[p.rows.length - 1];
+  const open = last.discountRaw != null && BigInt(last.discountRaw) > BigInt(0);
+  return [Math.floor(p.rows[0].ts / DAY_S), open ? llToday : Math.floor(last.ts / DAY_S)];
+};
+const llPos = (name: string) => LL.positions.find((p) => p.name === name)!;
+const llWords = (c: { name: string; from: string | null; to: string }) => `${c.name} ${c.from} → ${c.to}`;
+const llInLife = (p: LlPosition, log = LL.logs[p.controller]) => {
+  const [first, last] = llLife(p);
+  return changesByDay(llamalendConfigChanges(log, llRows(p), "test"), first, last).flatMap((d) => d.changes);
+};
+
+test("llamalend: the markets' steps, each with its value before", () => {
+  const steps = (c: string) =>
+    llamalendConfigSteps(LL.logs[c]).map((s) => [s.line, s.block, s.before, s.after] as const);
+  assert.deepEqual(
+    steps("0xa920de414ea4ab66b97da1bfe9e6eca7d4219635").filter(([l]) => l !== "policy"),
+    [
+      ["liquidation", 23_989_153, 0.06, 0.0921],
+      ["loan", 23_989_153, 0.09, 0.1429],
+    ],
+  );
+  assert.equal(steps("0xa920de414ea4ab66b97da1bfe9e6eca7d4219635").filter(([l]) => l === "policy").length, 3);
+  assert.deepEqual(
+    steps("0xeda215b7666936ded834f76f3fbc6f323295110a").filter(([l]) => l !== "policy"),
+    [
+      ["loan", 23_653_875, 0.11, 0.2],
+      ["liquidation", 23_861_548, 0.08, 0.12],
+      ["loan", 24_955_515, 0.2, 0.5],
+      ["loan", 25_253_381, 0.5, 0.3],
+    ],
+  );
+  assert.deepEqual(steps("0x8472a9a7632b173c8cf3a86d3afec50c35548e76"), [], "the first mint market has no set");
+});
+
+for (const p of LL.positions) {
+  test(`llamalend ${p.name}: each read's stored discount is the row's, and a change's block leaves it where it was`, () => {
+    const rows = llRows(p);
+    const storedAt = (block: number) => [...rows].reverse().find((r) => r.block <= block)?.discount ?? null;
+    for (const r of Object.values(p.reads)) {
+      if (!r.hasLoan) continue;
+      assert.equal(llFrac(r.discountRaw), storedAt(r.block), `${p.name} ${r.block}: the read's discount is the row's`);
+      assert.ok(r.healthRaw != null, `${p.name} ${r.block}: a health`);
+    }
+    for (const r of Object.values(p.atChanges)) {
+      if (!r.hasLoan) continue;
+      assert.equal(llFrac(r.discountRaw), storedAt(r.block), `${p.name} ${r.block}: no step at the change`);
+    }
+  });
+}
+
+test("llamalend 0x6bda: the WETH market's 6 % → 9.21 % is a marker, the position taking it at its next borrow", () => {
+  const p = llPos("0x6bda");
+  const inLife = llInLife(p);
+  const liq = inLife.filter((c) => c.name === "Liquidation discount");
+  assert.deepEqual(liq.map(llWords), ["Liquidation discount 6 % → 9.21 %"]);
+  assert.equal(liq[0].block, 23_989_153);
+  assert.match(liq[0].prov.summary, /took 9\.21 % at its event at block 25,926,904/);
+  assert.deepEqual(inLife.filter((c) => c.name === "Loan discount").map(llWords), ["Loan discount 9 % → 14.29 %"]);
+  assert.deepEqual(
+    inLife.filter((c) => c.name === "Rate policy").map((c) => c.block),
+    [24_290_603],
+    "the policy swaps before the life draw none",
+  );
+  const [first, last] = llLife(p);
+  assert.ok(llamalendLifeHasDiscountChange(inLife, first, last));
+});
+
+test("llamalend 0x3722 and 0x37b1: the CRV market's 8 % → 12 %, taken at a later borrow on one and kept to the close on the other", () => {
+  const took = llInLife(llPos("0x3722"));
+  assert.deepEqual(took.filter((c) => c.name !== "Rate policy").map(llWords), [
+    "Loan discount 11 % → 20 %",
+    "Liquidation discount 8 % → 12 %",
+    "Loan discount 20 % → 50 %",
+    "Loan discount 50 % → 30 %",
+  ]);
+  assert.match(
+    took.find((c) => c.name === "Liquidation discount")!.prov.summary,
+    /took 12 % at its event at block 24,378,240/,
+  );
+  const kept = llInLife(llPos("0x37b1"));
+  assert.deepEqual(
+    kept.map(llWords),
+    ["Loan discount 11 % → 20 %", "Liquidation discount 8 % → 12 %"],
+    "the changes after the close draw none",
+  );
+  assert.match(kept[1].prov.summary, /kept 8 % through the rest of this history/);
+});
+
+test("llamalend 0x1109: no set in the life draws no marker; a synthetic change inside it draws one", () => {
+  const p = llPos("0x1109");
+  const log = LL.logs[p.controller];
+  assert.deepEqual(llInLife(p), []);
+  const [first, last] = llLife(p);
+  assert.equal(llamalendLifeHasDiscountChange(llInLife(p), first, last), false);
+  const a = p.rows[2];
+  const b = p.rows[3];
+  const mid = { block: Math.floor((a.block + b.block) / 2), ts: Math.floor((a.ts + b.ts) / 2) };
+  const synthetic: LlamalendConfigLog = {
+    ...log,
+    before: { discounts: { block: mid.block - 1, loanDiscount: 0.09, liquidationDiscount: 0.06 }, policy: null },
+    sets: [
+      {
+        block: mid.block,
+        timestamp: mid.ts,
+        txHash: `0x${"1".repeat(64)}`,
+        logIndex: 1,
+        kind: "discounts",
+        loanDiscount: 0.09,
+        liquidationDiscount: 0.045,
+      },
+      {
+        block: b.block + 10_000,
+        timestamp: b.ts + 2 * DAY_S,
+        txHash: `0x${"2".repeat(64)}`,
+        logIndex: 1,
+        kind: "discounts",
+        loanDiscount: 0.1,
+        liquidationDiscount: 0.045,
+      },
+    ],
+  };
+  const inLife = llInLife(p, synthetic);
+  assert.deepEqual(
+    inLife.map(llWords),
+    ["Liquidation discount 6 % → 4.5 %"],
+    "the loan-only set after the close is outside the life",
+  );
+  assert.equal(inLife[0].day, Math.floor(mid.ts / DAY_S));
+  assert.match(inLife[0].prov.summary, /kept 6 % through the rest of this history/);
+  assert.ok(llamalendLifeHasDiscountChange(inLife, first, last));
 });

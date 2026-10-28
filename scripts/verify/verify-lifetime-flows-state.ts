@@ -3152,6 +3152,7 @@ test("LlamaLend's band and health: each read's user_prices and health held to th
     before: null,
     n1: BigInt(10),
     n2: BigInt(19),
+    discount: null,
     ...o,
   });
   const base = BigInt("2000000000000000000000");

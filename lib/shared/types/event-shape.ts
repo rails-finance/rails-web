@@ -2587,6 +2587,9 @@ export interface LlamalendContextRaw {
   stateCollateralBefore?: string;
   stateBorrowedBefore?: string;
   stateDebtBefore?: string;
+  /** The liquidation discount the row's UserState stored on the position
+   *  (1e18): the one its health takes until the owner next acts on it. */
+  liquidationDiscount?: string;
 }
 
 export interface LlamalendContext {

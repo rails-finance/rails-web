@@ -283,6 +283,7 @@ export function buildLlamalendTimeline(
         stateCollateralBefore: rawVal(bigintOf(r.state_collateral_before ?? null)),
         stateBorrowedBefore: rawVal(bigintOf(r.state_borrowed_before ?? null)),
         stateDebtBefore: rawVal(bigintOf(r.state_debt_before ?? null)),
+        liquidationDiscount: rawVal(bigintOf(r.liquidation_discount)),
       },
       isOpen: idx === 0,
     };

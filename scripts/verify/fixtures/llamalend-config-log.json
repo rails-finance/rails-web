@@ -1,0 +1,618 @@
+{
+ "capturedAt": "2026-10-28",
+ "logs": {
+  "0xa920de414ea4ab66b97da1bfe9e6eca7d4219635": {
+   "controller": "0xa920de414ea4ab66b97da1bfe9e6eca7d4219635",
+   "chainId": 1,
+   "fromBlock": 17562530,
+   "toBlock": 26294378,
+   "before": {
+    "discounts": {
+     "block": 23989152,
+     "loanDiscount": 0.09,
+     "liquidationDiscount": 0.06
+    },
+    "policy": {
+     "block": 17648032,
+     "policy": "0x1e7d3bf98d3f8d8ce193236c3e0ec4b00e32daae"
+    }
+   },
+   "sets": [
+    {
+     "block": 17648033,
+     "timestamp": 1688807015,
+     "txHash": "0x58db7d5228e82fbeb7ec65478d8c1b7cf8188469c0c508eb20704ad796a6ce2a",
+     "logIndex": 179,
+     "kind": "policy",
+     "policy": "0xbb3fda661149f6e45d829d5dd54a1608577c5fa1"
+    },
+    {
+     "block": 19100765,
+     "timestamp": 1706393063,
+     "txHash": "0x8e3f507dca8e6786c1ff4a6ffe850b0292be36bc49e85ec48dfa22db44a1da77",
+     "logIndex": 397,
+     "kind": "policy",
+     "policy": "0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933"
+    },
+    {
+     "block": 23989153,
+     "timestamp": 1765452695,
+     "txHash": "0x770552ae8f258779183cad33ee94db17aee2835685b4f00dabfa322636853491",
+     "logIndex": 199,
+     "kind": "discounts",
+     "loanDiscount": 0.1429,
+     "liquidationDiscount": 0.0921
+    },
+    {
+     "block": 24290603,
+     "timestamp": 1769088275,
+     "txHash": "0x4165f70e1ec289cdaa8acdbdc306995c6fde650aa26ff46c3eea525493930fa0",
+     "logIndex": 556,
+     "kind": "policy",
+     "policy": "0x07491d124ddb3ef59a8938fcb3ee50f9fa0b9251"
+    }
+   ]
+  },
+  "0xeda215b7666936ded834f76f3fbc6f323295110a": {
+   "controller": "0xeda215b7666936ded834f76f3fbc6f323295110a",
+   "chainId": 1,
+   "fromBlock": 19422691,
+   "toBlock": 26294378,
+   "before": {
+    "discounts": {
+     "block": 23653874,
+     "loanDiscount": 0.11,
+     "liquidationDiscount": 0.08
+    },
+    "policy": {
+     "block": 21883206,
+     "policy": "0x8b6527063fbc9c30731d7e57f1def08edce57d07"
+    }
+   },
+   "sets": [
+    {
+     "block": 21883207,
+     "timestamp": 1740001775,
+     "txHash": "0x3a37c7ed56b1d042e8e08bf6d43e5d2afed5a44a738f5119a4b8d16be40491f4",
+     "logIndex": 201,
+     "kind": "policy",
+     "policy": "0x8a7138cf49affcd35d05dbe5a160dac870e4b6f5"
+    },
+    {
+     "block": 23653875,
+     "timestamp": 1761388103,
+     "txHash": "0x6319bd8d7d40a7825ed668adb78fd8edcec5bec51dba485d4591364fcb2da230",
+     "logIndex": 381,
+     "kind": "discounts",
+     "loanDiscount": 0.2,
+     "liquidationDiscount": 0.08
+    },
+    {
+     "block": 23861548,
+     "timestamp": 1763900411,
+     "txHash": "0x63fb20a7fedf717aa97048908ac4b8d23cdaf52dd645a5d5d904483e0052154f",
+     "logIndex": 11,
+     "kind": "discounts",
+     "loanDiscount": 0.2,
+     "liquidationDiscount": 0.12
+    },
+    {
+     "block": 24902294,
+     "timestamp": 1776461627,
+     "txHash": "0xc35923f644d8615c91a0d04cc940c591f8df00f30977df3ab9e5b12c78118d08",
+     "logIndex": 545,
+     "kind": "policy",
+     "policy": "0x8b1c4d2718ba8d1be499d679687454e1db5ace19"
+    },
+    {
+     "block": 24955515,
+     "timestamp": 1777102127,
+     "txHash": "0xb4fde72788f3dabed5bd931e6c02718a62fd0980a7283b0071b759d612fc326c",
+     "logIndex": 323,
+     "kind": "discounts",
+     "loanDiscount": 0.5,
+     "liquidationDiscount": 0.12
+    },
+    {
+     "block": 25253381,
+     "timestamp": 1780689071,
+     "txHash": "0xfaf08c62f9916936b1db1d6628d60ec8ffa4ec4be06378db45482190d3185168",
+     "logIndex": 329,
+     "kind": "discounts",
+     "loanDiscount": 0.3,
+     "liquidationDiscount": 0.12
+    }
+   ]
+  },
+  "0x8472a9a7632b173c8cf3a86d3afec50c35548e76": {
+   "controller": "0x8472a9a7632b173c8cf3a86d3afec50c35548e76",
+   "chainId": 1,
+   "fromBlock": 17258064,
+   "toBlock": 26294378,
+   "before": {
+    "discounts": null,
+    "policy": null
+   },
+   "sets": []
+  }
+ },
+ "positions": [
+  {
+   "name": "0x6bda",
+   "controller": "0xa920de414ea4ab66b97da1bfe9e6eca7d4219635",
+   "user": "0x6bda04643f10782308515650dcfb05c672266332",
+   "rows": [
+    {
+     "block": 21858839,
+     "ts": 1739707439,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21858858,
+     "ts": 1739707667,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21858865,
+     "ts": 1739707751,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21858873,
+     "ts": 1739707847,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21941678,
+     "ts": 1740707543,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21960887,
+     "ts": 1740938951,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21960902,
+     "ts": 1740939131,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21960979,
+     "ts": 1740940055,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21960990,
+     "ts": 1740940187,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21967123,
+     "ts": 1741014143,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21967130,
+     "ts": 1741014227,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 21970532,
+     "ts": 1741055207,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22017097,
+     "ts": 1741617239,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22017118,
+     "ts": 1741617491,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22216408,
+     "ts": 1744021475,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22330931,
+     "ts": 1745402027,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22330944,
+     "ts": 1745402183,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22330965,
+     "ts": 1745402435,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22330980,
+     "ts": 1745402615,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22521972,
+     "ts": 1747717859,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22521990,
+     "ts": 1747718075,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22760543,
+     "ts": 1750602107,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22760566,
+     "ts": 1750602383,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22760572,
+     "ts": 1750602455,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22770321,
+     "ts": 1750720271,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22770332,
+     "ts": 1750720403,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22770341,
+     "ts": 1750720511,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 22770354,
+     "ts": 1750720667,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 23113171,
+     "ts": 1754859263,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 23113191,
+     "ts": 1754859503,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 23218854,
+     "ts": 1756133723,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 23526677,
+     "ts": 1759849751,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 23624466,
+     "ts": 1761031847,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 23624480,
+     "ts": 1761032015,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 23624497,
+     "ts": 1761032219,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 25926904,
+     "ts": 1788801311,
+     "discountRaw": "92100000000000000"
+    },
+    {
+     "block": 26020918,
+     "ts": 1789933703,
+     "discountRaw": "92100000000000000"
+    }
+   ],
+   "reads": {
+    "21858873": {
+     "block": 21858873,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "511894520851555628"
+    },
+    "21941678": {
+     "block": 21941678,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "457624572409603487"
+    },
+    "21960990": {
+     "block": 21960990,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "287334174928230357"
+    },
+    "21967130": {
+     "block": 21967130,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "480505731350681505"
+    },
+    "21970532": {
+     "block": 21970532,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "441872951827634716"
+    },
+    "22017118": {
+     "block": 22017118,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "841298058717242438"
+    },
+    "22216408": {
+     "block": 22216408,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "1521288122314453937"
+    },
+    "22330980": {
+     "block": 22330980,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "493357152645166689"
+    },
+    "22521990": {
+     "block": 22521990,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "684686824526545487"
+    },
+    "22760572": {
+     "block": 22760572,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "935581446136349845"
+    },
+    "22770354": {
+     "block": 22770354,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "396126207841451301"
+    },
+    "23113191": {
+     "block": 23113191,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "1017690198860573774"
+    },
+    "23218854": {
+     "block": 23218854,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "7599254097691591686"
+    },
+    "23526677": {
+     "block": 23526677,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "4167838766721165428"
+    },
+    "23624497": {
+     "block": 23624497,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "4890166347552119630"
+    },
+    "25926904": {
+     "block": 25926904,
+     "hasLoan": true,
+     "discountRaw": "92100000000000000",
+     "healthRaw": "5991124428411093013"
+    },
+    "26020918": {
+     "block": 26020918,
+     "hasLoan": true,
+     "discountRaw": "92100000000000000",
+     "healthRaw": "76732447455586935"
+    }
+   },
+   "atChanges": {
+    "23989153": {
+     "block": 23989153,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "3799995295805194314"
+    }
+   }
+  },
+  {
+   "name": "0x3722",
+   "controller": "0xeda215b7666936ded834f76f3fbc6f323295110a",
+   "user": "0x37223d079dedc6a96d6415ee4850748d226ee5bf",
+   "rows": [
+    {
+     "block": 23175862,
+     "ts": 1755615443,
+     "discountRaw": "80000000000000000"
+    },
+    {
+     "block": 24378240,
+     "ts": 1770144767,
+     "discountRaw": "120000000000000000"
+    },
+    {
+     "block": 24568775,
+     "ts": 1772442611,
+     "discountRaw": "120000000000000000"
+    }
+   ],
+   "reads": {
+    "23175862": {
+     "block": 23175862,
+     "hasLoan": true,
+     "discountRaw": "80000000000000000",
+     "healthRaw": "4816247926156632324"
+    },
+    "24378240": {
+     "block": 24378240,
+     "hasLoan": true,
+     "discountRaw": "120000000000000000",
+     "healthRaw": "3771246839256743878"
+    },
+    "24568775": {
+     "block": 24568775,
+     "hasLoan": true,
+     "discountRaw": "120000000000000000",
+     "healthRaw": "1102029219165529043"
+    }
+   },
+   "atChanges": {
+    "23653875": {
+     "block": 23653875,
+     "hasLoan": true,
+     "discountRaw": "80000000000000000",
+     "healthRaw": "2401387526785024201"
+    },
+    "23861548": {
+     "block": 23861548,
+     "hasLoan": true,
+     "discountRaw": "80000000000000000",
+     "healthRaw": "1363636048140258003"
+    },
+    "24955515": {
+     "block": 24955515,
+     "hasLoan": true,
+     "discountRaw": "120000000000000000",
+     "healthRaw": "933047608603330897"
+    },
+    "25253381": {
+     "block": 25253381,
+     "hasLoan": true,
+     "discountRaw": "120000000000000000",
+     "healthRaw": "417081252475658528"
+    }
+   }
+  },
+  {
+   "name": "0x37b1",
+   "controller": "0xeda215b7666936ded834f76f3fbc6f323295110a",
+   "user": "0x37b1884205cc47c2bf5cf5a0248946c4c0c85724",
+   "rows": [
+    {
+     "block": 22497704,
+     "ts": 1747423703,
+     "discountRaw": "80000000000000000"
+    },
+    {
+     "block": 24377977,
+     "ts": 1770141599,
+     "discountRaw": "0"
+    }
+   ],
+   "reads": {
+    "22497704": {
+     "block": 22497704,
+     "hasLoan": true,
+     "discountRaw": "80000000000000000",
+     "healthRaw": "1624377954367707469"
+    },
+    "24377977": {
+     "block": 24377977,
+     "hasLoan": false,
+     "discountRaw": null,
+     "healthRaw": null
+    }
+   },
+   "atChanges": {
+    "23653875": {
+     "block": 23653875,
+     "hasLoan": true,
+     "discountRaw": "80000000000000000",
+     "healthRaw": "776808990818159125"
+    },
+    "23861548": {
+     "block": 23861548,
+     "hasLoan": true,
+     "discountRaw": "80000000000000000",
+     "healthRaw": "195028558681676119"
+    },
+    "24955515": {
+     "block": 24955515,
+     "hasLoan": false,
+     "discountRaw": null,
+     "healthRaw": null
+    },
+    "25253381": {
+     "block": 25253381,
+     "hasLoan": false,
+     "discountRaw": null,
+     "healthRaw": null
+    }
+   }
+  },
+  {
+   "name": "0x1109",
+   "controller": "0x8472a9a7632b173c8cf3a86d3afec50c35548e76",
+   "user": "0x1109297e392d92c1613fdbdf30579a0215c20da9",
+   "rows": [
+    {
+     "block": 17300643,
+     "ts": 1684585727,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 17332223,
+     "ts": 1684969919,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 17332248,
+     "ts": 1684970231,
+     "discountRaw": "60000000000000000"
+    },
+    {
+     "block": 24928347,
+     "ts": 1776775127,
+     "discountRaw": "0"
+    }
+   ],
+   "reads": {
+    "17300643": {
+     "block": 17300643,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "283963164733326655"
+    },
+    "17332248": {
+     "block": 17332248,
+     "hasLoan": true,
+     "discountRaw": "60000000000000000",
+     "healthRaw": "448118814257755613"
+    },
+    "24928347": {
+     "block": 24928347,
+     "hasLoan": false,
+     "discountRaw": null,
+     "healthRaw": null
+    }
+   },
+   "atChanges": {}
+  }
+ ]
+}

@@ -239,6 +239,9 @@ export interface LlamalendFlowEvent {
    *  states none. */
   n1: bigint | null;
   n2: bigint | null;
+  /** The liquidation discount the row's UserState stored on the position, a
+   *  fraction; null where the row states none or the close's 0. */
+  discount: number | null;
 }
 
 const big = (v: string | undefined | null): bigint | null => {
@@ -248,6 +251,11 @@ const big = (v: string | undefined | null): bigint | null => {
   } catch {
     return null;
   }
+};
+
+const discountOf = (v: string | undefined): number | null => {
+  const raw = big(v);
+  return raw != null && raw > ZERO ? scale1e18(raw) : null;
 };
 
 /** The position at the end of a block, read from the archive: collateral in
@@ -318,6 +326,7 @@ export function llamalendFlowEvents(
       before: bColl != null && bConv != null ? { coll: bColl, conv: bConv } : null,
       n1: big(c.n1),
       n2: big(c.n2),
+      discount: discountOf(c.raw?.liquidationDiscount),
     };
   });
 }

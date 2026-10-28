@@ -21,6 +21,11 @@
 //   keeps the last event's and is drawn dotted, as the price is. A day whose
 //   event the page did not read has no health. Today's is the card's. The line
 //   is 0: below it anyone may liquidate the position.
+// - A governance change to the market's liquidation discount does not move
+//   the line at its block: the position keeps the discount stored at its
+//   owner's last borrow, collateral move or repay, and the next such event's
+//   read takes the new one (lib/llamalend/config-log.ts, the markers). Where
+//   the life holds such a change the how-to-read says so.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
@@ -109,6 +114,8 @@ export function llamalendPriceView(
     debtSymbol: string;
     /** How many days with events the page reads. */
     cap: number;
+    /** A change to the market's liquidation discount falls in the life. */
+    discountChanged?: boolean;
   },
 ): { health: PriceSeries | null; band: PriceBand | null } {
   const evs: Ev[] = rows.map((r) => {
@@ -231,7 +238,7 @@ export function llamalendPriceView(
         here: { live: "The line is 0 on every day.", read: "The line is 0 on every day." },
         end: hp.end,
       },
-      help: `the Controller's health at the end of each day's last event, at the liquidation discount stored on the position and the AMM's oracle price at that block (the last ${o.cap} days with events), held between events and dotted there; today the card's. The red line at 0 is where anyone may liquidate it. The list in the tip picks it or the ${o.collSymbol} price with its band.`,
+      help: `the Controller's health at the end of each day's last event, at the liquidation discount stored on the position and the AMM's oracle price at that block (the last ${o.cap} days with events), held between events and dotted there; today the card's. The red line at 0 is where anyone may liquidate it.${o.discountChanged ? " A change to the market's liquidation discount, a grey diamond on the events row, reaches the position at its owner's next borrow, collateral move or repay, where the line steps." : ""} The list in the tip picks it or the ${o.collSymbol} price with its band.`,
     };
   }
   return { health, band };

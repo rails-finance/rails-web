@@ -47,6 +47,14 @@ import {
   type LlamalendLive,
   type LlamalendStateRead,
 } from "@/lib/llamalend/flows";
+import {
+  llamalendConfigChanges,
+  llamalendLifeHasDiscountChange,
+  type LlamalendConfigLog,
+} from "@/lib/llamalend/config-log";
+import { withChanges } from "@/lib/shared/flows-changes";
+
+const DAY_S = 86_400;
 
 const cache = new Map<string, Promise<number | null>>();
 
@@ -247,6 +255,25 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
     [source, got],
   );
 
+  // The market's discount and policy setter logs
+  // (/api/chain/llamalend/config-log), one read per page. A failed read
+  // leaves `configLog` null: no marker draws.
+  const logController = source ? p.controller.toLowerCase() : null;
+  const [configLogs, setConfigLogs] = useState<{ key: string; log: LlamalendConfigLog | null } | null>(null);
+  useEffect(() => {
+    if (!logController) return;
+    const ac = new AbortController();
+    fetch(`/api/chain/llamalend/config-log?controller=${logController}`, { signal: ac.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<LlamalendConfigLog>) : null))
+      .then((log) => setConfigLogs({ key: logController, log }))
+      .catch((err) => {
+        if ((err as { name?: string })?.name !== "AbortError") setConfigLogs({ key: logController, log: null });
+      });
+    return () => ac.abort();
+  }, [logController]);
+  const configLogSettled = logController == null || configLogs?.key === logController;
+  const configLog = logController != null && configLogs?.key === logController ? configLogs.log : null;
+
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => setNow(Date.now() / 1000), []);
@@ -262,6 +289,21 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
     [rows, opts],
   );
   const plain = useMemo(() => (rows && opts ? llamalendFlowTimeline(rows, opts) : null), [rows, opts]);
+  // Each change to the market's discounts or policy, marked on the events
+  // row (lib/llamalend/config-log.ts).
+  const changes = useMemo(
+    () =>
+      rows && p.collSymbol && p.debtSymbol
+        ? llamalendConfigChanges(configLog, rows, `${p.collSymbol}/${p.debtSymbol}`)
+        : [],
+    [configLog, rows, p.collSymbol, p.debtSymbol],
+  );
+  const discountChanged = useMemo(() => {
+    if (!rows?.length || !opts) return false;
+    const first = Math.floor(rows[0].ts / DAY_S);
+    const last = opts.open ? Math.floor(opts.now / DAY_S) : Math.floor(rows[rows.length - 1].ts / DAY_S);
+    return llamalendLifeHasDiscountChange(changes, first, last);
+  }, [rows, opts, changes]);
   // The Health view and the collateral's band (lib/llamalend/flows-health.ts).
   const band = p.band;
   const timeline = useMemo(() => {
@@ -274,6 +316,7 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
       collSymbol: p.collSymbol,
       debtSymbol: p.debtSymbol,
       cap: HEALTH_READS_MAX,
+      discountChanged,
     });
     if (!v.health && !v.band) return plain;
     return {
@@ -288,25 +331,24 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
         },
       },
     };
-  }, [plain, rows, opts, bands, band, p.collSymbol, p.debtSymbol]);
+  }, [plain, rows, opts, bands, band, p.collSymbol, p.debtSymbol, discountChanged]);
+  const changed = useMemo(() => withChanges(timeline, changes), [timeline, changes]);
   const focusEvents = useMemo(
     () =>
-      replay && timeline && p.collSymbol && p.debtSymbol
-        ? llamalendFocusEvents(replay, p.collSymbol, p.debtSymbol)
-        : [],
-    [replay, timeline, p.collSymbol, p.debtSymbol],
+      replay && changed && p.collSymbol && p.debtSymbol ? llamalendFocusEvents(replay, p.collSymbol, p.debtSymbol) : [],
+    [replay, changed, p.collSymbol, p.debtSymbol],
   );
-  const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
-  const facts = useMemo(() => (replay ? llamalendFlowFacts(replay, timeline) : null), [replay, timeline]);
+  const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), changed);
+  const facts = useMemo(() => (replay ? llamalendFlowFacts(replay, changed) : null), [replay, changed]);
   const read: FlowsRead =
     p.wholeEvents == null && fetched.read !== "done"
       ? fetched.read
-      : now == null || !p.liveSettled || !p.collSymbol || !p.debtSymbol || rows == null
+      : now == null || !p.liveSettled || !p.collSymbol || !p.debtSymbol || rows == null || !configLogSettled
         ? "reading"
         : // A position whose collateral has no price at all (no block read and
           // no live read) cannot be drawn in the borrowed token.
-          rows.length > 0 && timeline == null
+          rows.length > 0 && changed == null
           ? "failed"
           : "done";
-  return { timeline, read, focus, facts };
+  return { timeline: changed, read, focus, facts };
 }
