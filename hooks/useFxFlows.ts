@@ -30,7 +30,17 @@ import {
   type FxLive,
   type FxPriceFrom,
 } from "@/lib/fx/flows";
-import { FX_COLL_KEY, FX_HEALTH_SOURCE, fxLineReads, fxLinesRead } from "@/lib/fx/flows-health";
+import {
+  FX_COLL_KEY,
+  FX_HEALTH_SOURCE,
+  FX_LOG_HEALTH_SOURCE,
+  FX_LOG_STEADY_SOURCE,
+  fxLineReads,
+  fxLinesRead,
+} from "@/lib/fx/flows-health";
+import { fxMergedReads, fxRatioChangeReads, fxRatioChanges, type FxRatioLog } from "@/lib/fx/ratio-log";
+import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
+import { changesByDay, withChanges } from "@/lib/shared/flows-changes";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
 /** More blocks than any f(x) position has (1 Oct 2026: 234 operates, 226
@@ -158,18 +168,48 @@ export function useFxFlows(p: FxFlowsInput): {
         : null,
     [replay, now, p.collSymbol, p.open, p.live],
   );
-  // The health view in the card's terms (ui-jobs 328 step 6;
-  // lib/fx/flows-health.ts): the debt ratio against the pool's two lines.
-  const given = useMemo(
-    () =>
-      replay?.borrower && reads
-        ? fxLineReads(
-            replay.replayed.map((r) => r.row),
-            reads,
-          )
-        : null,
-    [replay, reads],
+  // The pool's ratio setter logs (/api/chain/fx/ratio-log), one read per
+  // page. A failed read leaves `ratioLog` null: the lines are the event
+  // reads' alone, and no marker draws.
+  const logPool = p.enabled && isFxPoolKey(pool) ? pool : null;
+  const [ratioLogs, setRatioLogs] = useState<{ key: string; log: FxRatioLog | null } | null>(null);
+  useEffect(() => {
+    if (!logPool) return;
+    const ac = new AbortController();
+    fetch(`/api/chain/fx/ratio-log?pool=${logPool}`, { signal: ac.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<FxRatioLog>) : null))
+      .then((log) => setRatioLogs({ key: logPool, log }))
+      .catch((err) => {
+        if ((err as { name?: string })?.name !== "AbortError") setRatioLogs({ key: logPool, log: null });
+      });
+    return () => ac.abort();
+  }, [logPool]);
+  const ratioLogSettled = logPool == null || ratioLogs?.key === logPool;
+  const ratioLog = logPool != null && ratioLogs?.key === logPool ? ratioLogs.log : null;
+
+  // The health view in the card's terms (ui-jobs 328 steps 6 and 8;
+  // lib/fx/flows-health.ts): the debt ratio against the pool's two lines,
+  // read at each day's last event and stepping at each change the logs show.
+  const given = useMemo(() => {
+    if (!replay?.borrower || !reads || !ratioLogSettled) return null;
+    const rows = replay.replayed.map((r) => r.row);
+    const eventReads = fxLineReads(rows, reads);
+    if (!eventReads || rows.length === 0) return eventReads;
+    return fxMergedReads(eventReads, fxRatioChangeReads(ratioLog, rows[0].block));
+  }, [replay, reads, ratioLogSettled, ratioLog]);
+  // Each change to either ratio, marked on the events row; the how-to-read
+  // names the markers only where the life holds one.
+  const changes = useMemo(
+    () => (logPool ? fxRatioChanges(ratioLog, FX_POOLS[logPool].tokenSymbol) : []),
+    [ratioLog, logPool],
   );
+  const lifeChanged = useMemo(() => {
+    const rows = replay?.replayed;
+    if (!rows?.length || now == null) return false;
+    const first = Math.floor(rows[0].row.ts / DAY_S);
+    const last = p.open ? Math.floor(now / DAY_S) : Math.floor(rows[rows.length - 1].row.ts / DAY_S);
+    return changesByDay(changes, first, last).length > 0;
+  }, [replay, now, p.open, changes]);
   const risk = p.open ? (p.risk ?? null) : null;
   const grain = replay?.grain ?? 1;
   // Keyed by its figures: the page hands a new object on each render.
@@ -190,7 +230,7 @@ export function useFxFlows(p: FxFlowsInput): {
   const healthTimeline = useFlowsHealth(timeline, {
     reader: null,
     given,
-    source: FX_HEALTH_SOURCE,
+    source: ratioLog ? (lifeChanged ? FX_LOG_HEALTH_SOURCE : FX_LOG_STEADY_SOURCE) : FX_HEALTH_SOURCE,
     events: NO_EVENTS,
     liveHf: rRatio > 0 && tLiq > 0 ? tLiq / rRatio : null,
     liveLevels,
@@ -201,7 +241,8 @@ export function useFxFlows(p: FxFlowsInput): {
     () => (replay && timeline && p.collSymbol ? fxFocusEvents(replay, p.collSymbol) : []),
     [replay, timeline, p.collSymbol],
   );
-  const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), healthTimeline);
+  const changed = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
+  const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), changed);
   const facts = useMemo<FxFlowsNoteFacts | null>(() => {
     if (!replay) return null;
     const r = replay.replayed;
@@ -224,10 +265,10 @@ export function useFxFlows(p: FxFlowsInput): {
       ? fetched.read
       : rows && rows.length === 0
         ? "done"
-        : result == null || now == null || !p.collSymbol
+        : result == null || now == null || !p.collSymbol || !ratioLogSettled
           ? "reading"
           : !result.ok || timeline == null
             ? "failed"
             : "done";
-  return { timeline: healthTimeline, read, focus, facts };
+  return { timeline: changed, read, focus, facts };
 }

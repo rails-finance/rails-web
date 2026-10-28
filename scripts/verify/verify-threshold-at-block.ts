@@ -2,8 +2,9 @@
 // on Alchemix V3 and Dolomite (lib/alchemix/flows-health.ts,
 // lib/dolomite/flows-health.ts), the collateral factor changes of
 // Compound V2, Moonwell and Compound V3 (lib/shared/collateral-factor-changes.ts),
-// and the threshold and e-mode changes of the Aave V3 family
-// (lib/aave-v3/config-changes.ts; rails-ops ui-jobs 328 step 8,
+// the threshold and e-mode changes of the Aave V3 family
+// (lib/aave-v3/config-changes.ts), and f(x)'s liquidation and rebalance
+// ratio changes (lib/fx/ratio-log.ts; rails-ops ui-jobs 328 step 8,
 // reference/lifetime-price-chart.md, the rows).
 // ----------------------------------------------------------------------------
 // OFFLINE. Fixtures read from the page's routes on the date the file names
@@ -60,6 +61,16 @@ import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
 import { aaveConfigChanges, type AaveConfigChange, type AaveConfigLogAnswer } from "@/lib/aave-v3/config-changes";
 import type { AaveFamilyEmodeSwitch } from "@/lib/aave-v3/account-switches";
+import { FX_COLL_KEY, FX_LOG_HEALTH_SOURCE, FX_LOG_STEADY_SOURCE, fxLineReads } from "@/lib/fx/flows-health";
+import {
+  fxMergedReads,
+  fxRatioChangeReads,
+  fxRatioChanges,
+  fxRatioSteps,
+  fxRatiosAt,
+  type FxRatioLog,
+} from "@/lib/fx/ratio-log";
+import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
 
 const DAY_S = 86_400;
 
@@ -734,3 +745,158 @@ for (const p of AF.positions) {
     }
   });
 }
+
+// ── f(x): the pools' liquidation and rebalance ratio changes ────────────────
+//
+// Fixture (scripts/verify/fixtures/fx-ratio-log.json, written by
+// capture-fx-ratio-log.mjs on the date it names): each pool's setter log
+// answer (/api/chain/fx/ratio-log), and per position its event blocks and
+// times and the two ratios /api/chain/fx/event-state gives at each day's
+// last event.
+//
+// Held (lib/fx/ratio-log.ts): the log's ratios in force at each event read's
+// block are the read's; each pool's first set of each line is its
+// initialisation and no marker; a set that moved a ratio inside the life is
+// a marker with its before → after and, after the first event, one more read
+// on its day at its block, so the line steps there also between events; a
+// set that moved the bonus alone moves nothing.
+
+interface FxPosition {
+  name: string;
+  pool: string;
+  id: string;
+  events: Ev[];
+  reads: Record<string, { block: number; liquidateLine: string | null; rebalanceLine: string | null }>;
+}
+const XF = JSON.parse(readFileSync(join(__dirname, "fixtures", "fx-ratio-log.json"), "utf8")) as {
+  capturedAt: string;
+  logs: Record<string, FxRatioLog>;
+  positions: FxPosition[];
+};
+const fxReadsOf = (p: FxPosition) => p.reads as unknown as Record<string, FxStateAt>;
+const fxLife = (p: FxPosition): [number, number] => [
+  Math.floor(p.events[0].ts / DAY_S),
+  Math.floor(p.events[p.events.length - 1].ts / DAY_S),
+];
+
+test("fx: both pools' logs, each line set once at the pool's initialisation", () => {
+  for (const pool of ["wsteth", "wbtc"]) {
+    const log = XF.logs[pool];
+    assert.ok(log && log.toBlock > log.fromBlock, pool);
+    assert.equal(log.sets.filter((s) => s.line === "liquidate").length, 1, `${pool}: one liquidation set`);
+    assert.equal(log.sets.filter((s) => s.line === "rebalance").length, 1, `${pool}: one rebalance set`);
+    assert.deepEqual(fxRatioSteps(log), [], `${pool}: no change`);
+    assert.deepEqual(fxRatiosAt(log, log.toBlock), { liquidate: 0.95, rebalance: 0.88 });
+    assert.equal(fxRatiosAt(log, log.fromBlock), null, `${pool}: nothing in force before the first set`);
+  }
+  assert.ok(XF.positions.length >= 3);
+});
+
+for (const p of XF.positions) {
+  test(`fx ${p.name}: the log's ratios are the event reads', no marker and no extra read`, () => {
+    const log = XF.logs[p.pool];
+    const eventReads = fxLineReads(p.events, fxReadsOf(p));
+    assert.ok(eventReads && eventReads.length > 0, `${p.name}: event reads`);
+    for (const r of eventReads) {
+      const at = fxRatiosAt(log, r.block);
+      assert.ok(at, `${p.name}: in force at ${r.block}`);
+      assert.equal(r.line, at.liquidate, `${p.name} ${r.block}: liquidation ratio`);
+      assert.equal(r.warn, at.rebalance, `${p.name} ${r.block}: rebalance ratio`);
+    }
+    const [first, last] = fxLife(p);
+    assert.equal(changesByDay(fxRatioChanges(log, p.pool), first, last).length, 0, `${p.name}: no marker`);
+    assert.deepEqual(fxRatioChangeReads(log, p.events[0].block), []);
+    const merged = fxMergedReads(eventReads, []);
+    assert.deepEqual(merged, eventReads);
+    checkLine(p.name, flatTimeline(p.events, FX_COLL_KEY, "fxUSD"), merged, FX_LOG_STEADY_SOURCE);
+  });
+}
+
+test("fx: a change between two events steps the line on its day and draws its marker; a bonus-only set and one before the life do neither", () => {
+  const p = XF.positions.find((x) => x.events.length >= 4)!;
+  const base = XF.logs[p.pool];
+  // A day with no event between two event days.
+  const evDays = new Set(p.events.map((e) => Math.floor(e.ts / DAY_S)));
+  let gap: { block: number; ts: number } | null = null;
+  for (let i = 1; i < p.events.length && !gap; i++) {
+    const a = p.events[i - 1];
+    const b = p.events[i];
+    const midTs = Math.floor((a.ts + b.ts) / 2);
+    if (!evDays.has(Math.floor(midTs / DAY_S)) && b.block - a.block > 2)
+      gap = { block: Math.floor((a.block + b.block) / 2), ts: midTs };
+  }
+  assert.ok(gap, `${p.name}: a day with no event between two events`);
+  const set = (
+    block: number,
+    ts: number,
+    line: "liquidate" | "rebalance",
+    debtRatio: number,
+    bonusRatio: number,
+    i: number,
+  ) => ({
+    block,
+    timestamp: ts,
+    txHash: `0x${String(i).repeat(64)}`,
+    logIndex: i,
+    line,
+    debtRatio,
+    bonusRatio,
+  });
+  const before = p.events[0];
+  const log: FxRatioLog = {
+    ...base,
+    sets: [
+      ...base.sets,
+      set(before.block - 20_000, before.ts - 2 * DAY_S, "rebalance", 0.87, 0.025, 1),
+      set(gap.block, gap.ts, "liquidate", 0.9, 0.04, 2),
+      set(gap.block + 1, gap.ts + 12, "rebalance", 0.87, 0.03, 3),
+    ],
+  };
+  const steps = fxRatioSteps(log);
+  assert.deepEqual(
+    steps.map((s) => [s.block, s.line, s.before, s.debtRatio]),
+    [
+      [before.block - 20_000, "rebalance", 0.88, 0.87],
+      [gap.block, "liquidate", 0.95, 0.9],
+    ],
+    "the bonus-only set is no step",
+  );
+  const [first, last] = fxLife(p);
+  const inLife = changesByDay(fxRatioChanges(log, "wstETH"), first, last).flatMap((d) => d.changes);
+  assert.equal(inLife.length, 1, "one marker inside the life");
+  assert.equal(`${inLife[0].name} ${inLife[0].from} → ${inLife[0].to}`, "Liquidation ratio 95 % → 90 %");
+  assert.equal(inLife[0].day, Math.floor(gap.ts / DAY_S));
+  assert.ok(inLife[0].prov.summary.includes("UpdateLiquidateRatios"));
+  // The event reads as the chain would give them under this log.
+  const eventReads = fxLineReads(p.events, fxReadsOf(p))!.map((r) => {
+    const at = fxRatiosAt(log, r.block)!;
+    return { ...r, lt: { [FX_COLL_KEY]: at.liquidate }, line: at.liquidate, warn: at.rebalance };
+  });
+  const changeReads = fxRatioChangeReads(log, p.events[0].block);
+  assert.deepEqual(
+    changeReads.map((r) => [r.block, r.line, r.warn]),
+    [[gap.block, 0.9, 0.87]],
+    "one read at the change after the first event, both lines in force after it",
+  );
+  const merged = fxMergedReads(eventReads, changeReads);
+  const h = checkLine(
+    `${p.name} (a change)`,
+    flatTimeline(p.events, FX_COLL_KEY, "fxUSD"),
+    merged,
+    FX_LOG_HEALTH_SOURCE,
+  );
+  const pts = h.level!.points;
+  const gapDay = Math.floor(gap.ts / DAY_S);
+  assert.ok(
+    pts.some(([d, v]) => d === gapDay && v === 0.9),
+    "the line is 90 % on the change's day",
+  );
+  assert.ok(
+    pts.some(([d, v]) => d < gapDay && v === 0.95),
+    "and 95 % before it",
+  );
+  assert.ok(
+    pts.filter(([d]) => d > gapDay).every(([, v]) => v === 0.9),
+    "and 90 % after it",
+  );
+});

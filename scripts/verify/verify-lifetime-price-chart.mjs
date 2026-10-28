@@ -153,7 +153,7 @@ const FX_RATIO = {
   levelRow: "liquidation-at",
   warnLevelRow: "rebalance-at",
   held: true,
-  help: ["the price each event was valued at", "rebalance ratio", "read at the block of the day's last event"],
+  help: ["the price each event was valued at", "rebalance ratio", "in force that day", "unchanged across this life"],
 };
 /** Alchemix V3's view (steps 6 and 8): the card's Collateralisation against
  *  its "Liquidates at", the lower bound read at each picked event's block
@@ -864,16 +864,20 @@ const PAGES = [
     lwOnly: true,
     level: { asset: "pETH", endDay: 20709, help: ["debt × 115%", "not drawn"] },
   },
-  // f(x) (step 6): the debt ratio against the pool's liquidation ratio, its
-  // rebalance ratio the dashed line short of it, both read at each day's
-  // last event; the collateral's two levels.
-  { id: "fx wsteth-249", path: "/ethereum/fx/wsteth-249", lwOnly: true, ratio: FX_RATIO },
-  { id: "fx wbtc-78", path: "/ethereum/fx/wbtc-78", lwOnly: true, ratio: FX_RATIO },
+  // f(x) (steps 6 and 8): the debt ratio against the pool's liquidation
+  // ratio, its rebalance ratio the dashed line short of it, both in force
+  // each day (the event reads and the pool's setter logs); the collateral's
+  // two levels. Neither pool has moved a ratio since its initialisation
+  // (28 Oct 2026), so no life has a marker; the change path is checked
+  // offline (verify-threshold-at-block.ts).
+  { id: "fx wsteth-249", path: "/ethereum/fx/wsteth-249", lwOnly: true, ratio: FX_RATIO, noChanges: true },
+  { id: "fx wbtc-78", path: "/ethereum/fx/wbtc-78", lwOnly: true, ratio: FX_RATIO, noChanges: true },
   {
     id: "fx wsteth-110 (liquidated)",
     path: "/ethereum/fx/wsteth-110",
     lwOnly: true,
     ratio: { ...FX_RATIO, endDay: 20121 },
+    noChanges: true,
   },
   // LlamaLend (step 6, `band`, `checkBand`): the card's Health first, its
   // line at 0; the collateral's soft-liquidation band shaded on its price,
