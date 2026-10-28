@@ -87,7 +87,9 @@
 // chart), a tap moves the cursor without freezing it and ⏭ brings it back.
 // MakerDAO and Fluid (step 5, `ratio`): the view in the card's terms, the
 // collateral ratio against the minimum ratio and the position ratio against
-// the liquidation threshold (`checkRatio`). Dolomite (step 5, `ratio` with
+// the liquidation threshold (`checkRatio`); since step 8 Fluid's line is the
+// threshold in force each day (`firstLine`, `steps`), each change a marker
+// (Fluid 2156, open, two steps; 1334, closed, one). Dolomite (step 5, `ratio` with
 // `noLevel`): the margin ratio against 1 + the account's margin ratio, today's
 // held across the life, no level on a market's price. Liquity V1 (`v1`): the
 // ETH price with the Trove's level at 110 %, today the card's "Liquidates at",
@@ -375,7 +377,7 @@ const PAGES = [
   // Step 5 (the health view in the card's terms on MakerDAO and Fluid):
   // each page opens on the card's ratio against its line (`ratio`), today's
   // ratio, line and level the card's, the line at the first day the ilk
-  // read's (Maker) or today's held across the life (Fluid), no day dotted,
+  // read's (Maker) or the one in force at the first event (Fluid), no day dotted,
   // and the how-to-read naming the source. Maker 2028 (ETH-A, 150 % → 145 %
   // in its life), 31489 (WBTC-A, liquidated 5 Jun 2026); Fluid 6 and 8538
   // (liquidated in part, open).
@@ -482,7 +484,7 @@ const PAGES = [
       head: "position-ratio",
       lineRow: "liquidates-above",
       fluid: "/api/chain/fluid/position?nft=6",
-      help: ["the vault oracle's price", "today's liquidation threshold, held across the life"],
+      help: ["the vault oracle's price", "steps where Fluid governance changed it"],
     },
   },
   {
@@ -495,7 +497,53 @@ const PAGES = [
       head: "position-ratio",
       lineRow: "liquidates-above",
       fluid: "/api/chain/fluid/position?nft=8538",
-      help: ["the vault oracle's price", "today's liquidation threshold, held across the life"],
+      help: ["the vault oracle's price", "steps where Fluid governance changed it"],
+    },
+  },
+  // Step 8 (the threshold in force each day, /api/fluid/threshold-history):
+  // #2156 (cbBTC/USDC, open) 85 % at its first event, 88 % from 11 Oct 2024,
+  // 90 % from 21 May 2025; #1334 (WBTC/USDT, closed 25 Sep 2024) 85 %, 88 %
+  // from 18 Aug 2024, the vault's 21 May 2025 change after its close unmarked.
+  {
+    id: "fluid 2156 (two threshold steps)",
+    path: "/ethereum/fluid/2156",
+    lwOnly: true,
+    changes: { day: 20007, name: "Liquidation threshold", from: "85 %", to: "88 %", block: 20944531 },
+    ratio: {
+      label: "Position ratio",
+      liquidates: "above",
+      head: "position-ratio",
+      lineRow: "liquidates-above",
+      fluid: "/api/chain/fluid/position?nft=2156",
+      firstLine: 0.85,
+      steps: [
+        [20007, 0.85, 0.88],
+        [20229, 0.88, 0.9],
+      ],
+      help: ["the vault oracle's price", "steps where Fluid governance changed it"],
+    },
+  },
+  {
+    id: "fluid 1334 (closed, one threshold step)",
+    path: "/ethereum/fluid/1334",
+    lwOnly: true,
+    changes: {
+      day: 19953,
+      name: "Liquidation threshold",
+      from: "85 %",
+      to: "88 %",
+      block: 20556431,
+      outside: 20229,
+    },
+    ratio: {
+      label: "Position ratio",
+      liquidates: "above",
+      head: "position-ratio",
+      lineRow: "liquidates-above",
+      fluid: "/api/chain/fluid/position?nft=1334",
+      firstLine: 0.85,
+      steps: [[19953, 0.85, 0.88]],
+      help: ["the vault oracle's price", "steps where Fluid governance changed it"],
     },
   },
   {
@@ -985,7 +1033,8 @@ async function waitForHealth(page, label = HEALTH) {
  *  5): listed and shown first, its line on the card's side; on an open
  *  position today's ratio, line and level are the card's; Maker's line on
  *  the first day with a ratio is the ilk read's mat at that day's block,
- *  Fluid's is today's threshold there and today; no day is dotted; the
+ *  Fluid's the threshold in force there (`firstLine`, else today's) and
+ *  steps where governance changed it (`steps`); no day is dotted; the
  *  how-to-read names the source. */
 async function checkRatio(page, tag, pg) {
   const r = pg.ratio;
@@ -1083,13 +1132,32 @@ async function checkRatio(page, tag, pg) {
   if (r.fluid) {
     const body = await hostFetch(`${BASE}${r.fluid}`).then((x) => x.json());
     fluid = body?.position ?? body;
+    const firstLine = r.firstLine ?? fluid?.liquidationThreshold;
     check(
-      `${tag}: the line is today's threshold on the first day and today`,
+      `${tag}: the line is the threshold in force on the first day (${firstLine}) and today's at the end`,
       fluid?.liquidationThreshold > 0 &&
-        first.line === fluid.liquidationThreshold &&
-        (end.line == null || end.line === fluid.liquidationThreshold),
+        first.line === firstLine &&
+        (!open || end.line == null || end.line === fluid.liquidationThreshold),
       `first ${first.line}, end ${end.line}, read ${fluid?.liquidationThreshold}`,
     );
+  }
+  if (r.steps) {
+    // The line steps on the day governance changed the threshold: the day
+    // before holds the value before, the day itself the value after.
+    const pts = await page.$$eval("[data-liq-level]", (ls) =>
+      ls.flatMap((l) => {
+        const ds = (l.getAttribute("data-liq-days") ?? "").split(",").filter(Boolean).map(Number);
+        const vs = (l.getAttribute("data-liq-values") ?? "").split(",").filter(Boolean).map(Number);
+        return ds.map((d, i) => [d, vs[i]]);
+      }),
+    );
+    const at = (d) => pts.find((p) => p[0] === d)?.[1];
+    for (const [d, before, after] of r.steps)
+      check(
+        `${tag}: the line steps on day ${d}, ${before} → ${after}`,
+        at(d - 1) === before && at(d) === after,
+        `day before ${at(d - 1)}, day ${at(d)}`,
+      );
   }
   const dotted = await page.$eval("[data-price-line]", (g) => ({
     key: g.getAttribute("data-price-line"),

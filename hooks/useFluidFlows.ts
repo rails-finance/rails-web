@@ -28,7 +28,14 @@ import {
   fluidPricing,
   type FluidLive,
 } from "@/lib/fluid/flows";
-import { FLUID_COLL_KEY, FLUID_HEALTH_SOURCE, fluidHeldRead } from "@/lib/fluid/flows-health";
+import {
+  FLUID_COLL_KEY,
+  FLUID_HEALTH_SOURCE,
+  FLUID_HISTORY_HEALTH_SOURCE,
+  fluidHeldRead,
+} from "@/lib/fluid/flows-health";
+import { fluidThresholdChanges, fluidThresholdReads, type FluidThresholdHistory } from "@/lib/fluid/threshold-history";
+import { withChanges } from "@/lib/shared/flows-changes";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
 const DAY_S = 86_400;
@@ -154,6 +161,25 @@ export function useFluidFlows(p: FluidFlowsInput): {
   const dailySettled = want == null || daily?.key === wantKey;
   const dailyPrices = want != null && daily?.key === wantKey ? daily.prices : null;
 
+  // The vault's threshold history (/api/fluid/threshold-history), one read
+  // per page. A failed read leaves `history` null: the view holds today's
+  // threshold.
+  const vaultKey = p.enabled && p.vault ? p.vault.toLowerCase() : null;
+  const [thresholds, setThresholds] = useState<{ key: string; history: FluidThresholdHistory | null } | null>(null);
+  useEffect(() => {
+    if (!vaultKey) return;
+    const ac = new AbortController();
+    fetch(`/api/fluid/threshold-history?vault=${vaultKey}`, { signal: ac.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<FluidThresholdHistory>) : null))
+      .then((history) => setThresholds({ key: vaultKey, history }))
+      .catch((err) => {
+        if ((err as { name?: string })?.name !== "AbortError") setThresholds({ key: vaultKey, history: null });
+      });
+    return () => ac.abort();
+  }, [vaultKey]);
+  const thresholdsSettled = vaultKey == null || thresholds?.key === vaultKey;
+  const history = vaultKey != null && thresholds?.key === vaultKey ? thresholds.history : null;
+
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => setNow(Date.now() / 1000), []);
@@ -166,13 +192,21 @@ export function useFluidFlows(p: FluidFlowsInput): {
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? fluidFlowReplay(rows, opts) : null), [rows, opts]);
   const replayedTimeline = useMemo(() => (rows && opts ? fluidFlowTimeline(rows, opts) : null), [rows, opts]);
-  // The health view in the card's terms (ui-jobs 328 step 5;
-  // lib/fluid/flows-health.ts): today's threshold held across the life.
+  // The health view in the card's terms (ui-jobs 328 steps 5 and 8;
+  // lib/fluid/flows-health.ts): the threshold in force each day from the
+  // vault's config logs, or today's held across the life where they do not
+  // reach the first event.
   const risk = p.risk;
+  const stepped = useMemo(
+    () => (rows && rows.length > 0 ? fluidThresholdReads(history, { ts: rows[0].ts, block: rows[0].block }) : null),
+    [history, rows],
+  );
   const given = useMemo(() => {
+    if (!thresholdsSettled) return null;
+    if (stepped) return stepped;
     const r = risk ? fluidHeldRead(risk.liquidationThreshold, risk.block) : null;
     return r ? [r] : null;
-  }, [risk]);
+  }, [thresholdsSettled, stepped, risk]);
   const grain = 10 ** (replayedTimeline?.unit?.scale ?? 0);
   const liveLevels = useMemo(
     () =>
@@ -181,15 +215,18 @@ export function useFluidFlows(p: FluidFlowsInput): {
         : null,
     [risk, grain],
   );
-  const timeline = useFlowsHealth(replayedTimeline, {
+  const healthTimeline = useFlowsHealth(replayedTimeline, {
     reader: null,
     given,
-    source: FLUID_HEALTH_SOURCE,
+    source: stepped ? FLUID_HISTORY_HEALTH_SOURCE : FLUID_HEALTH_SOURCE,
     events: NO_EVENTS,
     liveHf: risk?.ratio != null && risk.ratio > 0 ? risk.liquidationThreshold / risk.ratio : null,
     liveLevels,
     liveLine: risk?.liquidationThreshold ?? null,
   });
+  // Each change to the threshold, marked on the events row.
+  const changes = useMemo(() => fluidThresholdChanges(history), [history]);
+  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
   const focusEvents = useMemo(
     () =>
       replay && timeline && p.collSymbol && p.debtSymbol ? fluidFocusEvents(replay, p.collSymbol, p.debtSymbol) : [],
@@ -214,7 +251,7 @@ export function useFluidFlows(p: FluidFlowsInput): {
     ? "failed"
     : p.wholeEvents == null && fetched.read !== "done"
       ? fetched.read
-      : now == null || !p.liveSettled || !p.collSymbol || !p.debtSymbol || !dailySettled
+      : now == null || !p.liveSettled || !p.collSymbol || !p.debtSymbol || !dailySettled || !thresholdsSettled
         ? "reading"
         : // A borrower whose collateral has no price at all (no priced row and
           // no live read) cannot be drawn in the debt token.

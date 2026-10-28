@@ -1,0 +1,332 @@
+{
+ "0x01c7c1c41dea58b043e700efb23dc077f12a125e": {
+  "vault": "0x01c7c1c41dea58b043e700efb23dc077f12a125e",
+  "vaultId": "29",
+  "vaultType": 10000,
+  "pair": "cbBTC/USDC",
+  "covered": true,
+  "scale": 1000,
+  "rows": [
+   {
+    "blockNumber": "20781343",
+    "blockTimestamp": 1726709147,
+    "txHash": "0x544be64f1c4156b882d5a420deabaa753b55aa561b69db668da346f659d8dfc5",
+    "txIndex": 5,
+    "logIndex": 22,
+    "txFrom": "0xa7615CD307F323172331865181DC8b80a2834324",
+    "event": "LogUpdateCoreSettings",
+    "collateralFactor": {
+     "before": null,
+     "after": 800
+    },
+    "liquidationThreshold": {
+     "before": null,
+     "after": 850
+    },
+    "liquidationMaxLimit": {
+     "before": null,
+     "after": 900
+    },
+    "thresholdChanged": false
+   },
+   {
+    "blockNumber": "20944531",
+    "blockTimestamp": 1728675719,
+    "txHash": "0x3930265695aeea22b6623f18a45ae51e09bb3504c37936e3e47cc293553c1e53",
+    "txIndex": 136,
+    "logIndex": 32,
+    "txFrom": "0x10F37Ceb965B477bA09d23FF725E0a0f1cdb83a5",
+    "event": "LogUpdateCoreSettings",
+    "collateralFactor": {
+     "before": 800,
+     "after": 850
+    },
+    "liquidationThreshold": {
+     "before": 850,
+     "after": 880
+    },
+    "liquidationMaxLimit": {
+     "before": 900,
+     "after": 925
+    },
+    "thresholdChanged": true
+   },
+   {
+    "blockNumber": "22530524",
+    "blockTimestamp": 1747821503,
+    "txHash": "0x426c0feb940384f68062ed0e1d04b45f4ab786450db244fcffd89adcc0dfe983",
+    "txIndex": 25,
+    "logIndex": 13,
+    "txFrom": "0x0Ed35B1609Ec45c7079E80d11149a52717e4859A",
+    "event": "LogUpdateLiquidationThreshold",
+    "collateralFactor": {
+     "before": 850,
+     "after": 850
+    },
+    "liquidationThreshold": {
+     "before": 880,
+     "after": 900
+    },
+    "liquidationMaxLimit": {
+     "before": 925,
+     "after": 925
+    },
+    "thresholdChanged": true
+   }
+  ],
+  "thresholdChanges": 2
+ },
+ "0x3a0b7c8840d74d39552ef53f586dd8c3d1234c40": {
+  "vault": "0x3a0b7c8840d74d39552ef53f586dd8c3d1234c40",
+  "vaultId": "22",
+  "vaultType": 10000,
+  "pair": "WBTC/USDT",
+  "covered": true,
+  "scale": 1000,
+  "rows": [
+   {
+    "blockNumber": "20263955",
+    "blockTimestamp": 1720467911,
+    "txHash": "0x0c5a34396261546866e73989771d12919cbee4f389aec3a6db01a7de02aac424",
+    "txIndex": 7,
+    "logIndex": 18,
+    "txFrom": "0xa7615CD307F323172331865181DC8b80a2834324",
+    "event": "LogUpdateCoreSettings",
+    "collateralFactor": {
+     "before": null,
+     "after": 800
+    },
+    "liquidationThreshold": {
+     "before": null,
+     "after": 850
+    },
+    "liquidationMaxLimit": {
+     "before": null,
+     "after": 900
+    },
+    "thresholdChanged": false
+   },
+   {
+    "blockNumber": "20556431",
+    "blockTimestamp": 1723995155,
+    "txHash": "0x66edeaf2cc720542aa2af6edb54ba1633fd7369f82f376a3f4a8ca03cfaf7891",
+    "txIndex": 22,
+    "logIndex": 7,
+    "txFrom": "0xa7615CD307F323172331865181DC8b80a2834324",
+    "event": "LogUpdateLiquidationMaxLimit",
+    "collateralFactor": {
+     "before": 800,
+     "after": 800
+    },
+    "liquidationThreshold": {
+     "before": 850,
+     "after": 850
+    },
+    "liquidationMaxLimit": {
+     "before": 900,
+     "after": 925
+    },
+    "thresholdChanged": false
+   },
+   {
+    "blockNumber": "20556431",
+    "blockTimestamp": 1723995155,
+    "txHash": "0x66edeaf2cc720542aa2af6edb54ba1633fd7369f82f376a3f4a8ca03cfaf7891",
+    "txIndex": 22,
+    "logIndex": 9,
+    "txFrom": "0xa7615CD307F323172331865181DC8b80a2834324",
+    "event": "LogUpdateLiquidationThreshold",
+    "collateralFactor": {
+     "before": 800,
+     "after": 800
+    },
+    "liquidationThreshold": {
+     "before": 850,
+     "after": 880
+    },
+    "liquidationMaxLimit": {
+     "before": 925,
+     "after": 925
+    },
+    "thresholdChanged": true
+   },
+   {
+    "blockNumber": "20556431",
+    "blockTimestamp": 1723995155,
+    "txHash": "0x66edeaf2cc720542aa2af6edb54ba1633fd7369f82f376a3f4a8ca03cfaf7891",
+    "txIndex": 22,
+    "logIndex": 11,
+    "txFrom": "0xa7615CD307F323172331865181DC8b80a2834324",
+    "event": "LogUpdateCollateralFactor",
+    "collateralFactor": {
+     "before": 800,
+     "after": 850
+    },
+    "liquidationThreshold": {
+     "before": 880,
+     "after": 880
+    },
+    "liquidationMaxLimit": {
+     "before": 925,
+     "after": 925
+    },
+    "thresholdChanged": false
+   },
+   {
+    "blockNumber": "22530524",
+    "blockTimestamp": 1747821503,
+    "txHash": "0x426c0feb940384f68062ed0e1d04b45f4ab786450db244fcffd89adcc0dfe983",
+    "txIndex": 25,
+    "logIndex": 7,
+    "txFrom": "0x0Ed35B1609Ec45c7079E80d11149a52717e4859A",
+    "event": "LogUpdateLiquidationThreshold",
+    "collateralFactor": {
+     "before": 850,
+     "after": 850
+    },
+    "liquidationThreshold": {
+     "before": 880,
+     "after": 900
+    },
+    "liquidationMaxLimit": {
+     "before": 925,
+     "after": 925
+    },
+    "thresholdChanged": true
+   }
+  ],
+  "thresholdChanges": 2
+ },
+ "0x92643e964ca4b2c165a95ca919b0a819aca6d5f1": {
+  "vault": "0x92643e964ca4b2c165a95ca919b0a819aca6d5f1",
+  "vaultId": "20",
+  "vaultType": 10000,
+  "pair": "weETH/USDT",
+  "covered": true,
+  "scale": 1000,
+  "rows": [
+   {
+    "blockNumber": "20155390",
+    "blockTimestamp": 1719157775,
+    "txHash": "0x64549ef2c7cf9fefc90989f7d489bbfbd8c4531794f606f9c47a8871ebe005e1",
+    "txIndex": 5,
+    "logIndex": 120,
+    "txFrom": "0x10F37Ceb965B477bA09d23FF725E0a0f1cdb83a5",
+    "event": "LogUpdateCoreSettings",
+    "collateralFactor": {
+     "before": null,
+     "after": 750
+    },
+    "liquidationThreshold": {
+     "before": null,
+     "after": 800
+    },
+    "liquidationMaxLimit": {
+     "before": null,
+     "after": 900
+    },
+    "thresholdChanged": false
+   },
+   {
+    "blockNumber": "20474088",
+    "blockTimestamp": 1723002263,
+    "txHash": "0x4c83df04142aa9380788e2e52a1c92b06645ee83c229c63483debdc66a113afd",
+    "txIndex": 146,
+    "logIndex": 81,
+    "txFrom": "0x17FD03969575d46238Cdd3A039A7793731545642",
+    "event": "LogUpdateLiquidationMaxLimit",
+    "collateralFactor": {
+     "before": 750,
+     "after": 750
+    },
+    "liquidationThreshold": {
+     "before": 800,
+     "after": 800
+    },
+    "liquidationMaxLimit": {
+     "before": 900,
+     "after": 900
+    },
+    "thresholdChanged": false
+   },
+   {
+    "blockNumber": "20474088",
+    "blockTimestamp": 1723002263,
+    "txHash": "0x4c83df04142aa9380788e2e52a1c92b06645ee83c229c63483debdc66a113afd",
+    "txIndex": 146,
+    "logIndex": 83,
+    "txFrom": "0x17FD03969575d46238Cdd3A039A7793731545642",
+    "event": "LogUpdateLiquidationThreshold",
+    "collateralFactor": {
+     "before": 750,
+     "after": 750
+    },
+    "liquidationThreshold": {
+     "before": 800,
+     "after": 820
+    },
+    "liquidationMaxLimit": {
+     "before": 900,
+     "after": 900
+    },
+    "thresholdChanged": true
+   },
+   {
+    "blockNumber": "20474088",
+    "blockTimestamp": 1723002263,
+    "txHash": "0x4c83df04142aa9380788e2e52a1c92b06645ee83c229c63483debdc66a113afd",
+    "txIndex": 146,
+    "logIndex": 85,
+    "txFrom": "0x17FD03969575d46238Cdd3A039A7793731545642",
+    "event": "LogUpdateCollateralFactor",
+    "collateralFactor": {
+     "before": 750,
+     "after": 770
+    },
+    "liquidationThreshold": {
+     "before": 820,
+     "after": 820
+    },
+    "liquidationMaxLimit": {
+     "before": 900,
+     "after": 900
+    },
+    "thresholdChanged": false
+   }
+  ],
+  "thresholdChanges": 1
+ },
+ "0xbec491fef7b4f666b270f9d5e5c3f443cbf20991": {
+  "vault": "0xbec491fef7b4f666b270f9d5e5c3f443cbf20991",
+  "vaultId": "2",
+  "vaultType": 10000,
+  "pair": "ETH/USDT",
+  "covered": true,
+  "scale": 1000,
+  "rows": [
+   {
+    "blockNumber": "19311938",
+    "blockTimestamp": 1708952867,
+    "txHash": "0x00d5a8ff5899e251aee1efe1084fc5acb2f573475838b6d861ae775f6b499c40",
+    "txIndex": 50,
+    "logIndex": 3,
+    "txFrom": "0x8e7fb4D4fAbC504A4ad73D44e09080cb68960098",
+    "event": "LogUpdateCoreSettings",
+    "collateralFactor": {
+     "before": null,
+     "after": 850
+    },
+    "liquidationThreshold": {
+     "before": null,
+     "after": 900
+    },
+    "liquidationMaxLimit": {
+     "before": null,
+     "after": 950
+    },
+    "thresholdChanged": false
+   }
+  ],
+  "thresholdChanges": 0
+ }
+}
