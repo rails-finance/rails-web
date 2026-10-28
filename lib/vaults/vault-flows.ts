@@ -19,9 +19,17 @@
 //
 // Built on the server from the page's whole history (`allEvents`), which the
 // page already reads for its gate; the client gets day rows only.
+//
+// THE PRICE VIEW IS THE SHARE PRICE (rails-ops reference/lifetime-price-chart.md,
+// ruling 8; ui-jobs 328 step 7): one share in the asset, the row's
+// `sharePriceAtBlock` on each day with an event (its last), and on the page's
+// block the card's share price. No daily share price is recorded for a vault,
+// so a day between events keeps the last event's, drawn dotted. A holding has
+// no liquidation, so the view has no level.
 
 import type { FlowBucket, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
+import type { PricePoint, PriceSeries } from "@/lib/shared/price-series";
 import type { VaultHolderEvent } from "@/lib/shared/vault-holder-timeline";
 
 const DAY_S = 86_400;
@@ -58,6 +66,11 @@ export interface VaultFlowOptions {
   /** The share token's and the asset's addresses, for the icons. */
   vaultAddress: string;
   assetAddress?: string;
+  /** The chain the vault is on. */
+  chainId: number;
+  /** The card's share price at the page's block (one share's
+   *  `convertToAssets`), in the asset; null where its read failed. */
+  sharePriceNow: number | null;
 }
 
 const toUnits = (raw: string, decimals: number): number => Number(raw) / 10 ** decimals;
@@ -155,6 +168,8 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
   if (open && priceNow != null) obs.set(today, [today, priceNow * G, o.blockNumber]);
   const shareObs = [...obs.values()].sort((a, b) => a[0] - b[0]);
 
+  const share = vaultShareLine(rows, read, o, open ? today : null);
+
   return {
     unit: { symbol: o.assetSymbol, scale },
     buckets,
@@ -169,6 +184,17 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
     },
     todayPrices: { [SHARE]: (priceNow ?? priceOf[priceOf.length - 1]) * G },
     dailyPrices: { [SHARE]: shareObs },
+    ...(share
+      ? {
+          shareLine: {
+            asset: SHARE,
+            series: share,
+            unitLabel: o.assetSymbol,
+            name: `${o.shareSymbol} share price`,
+            digits: shareDigits(share.points[share.points.length - 1][1]),
+          },
+        }
+      : {}),
     priceSource: `the vault's convertToAssets of one ${o.shareSymbol}, read at each event's block and at the page's`,
     seriesCarry: true,
     carriedWhy: {
@@ -196,5 +222,50 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
       },
       linePrices: `in ${o.assetSymbol}, with the shares at the share price of their latest event`,
     },
+  };
+}
+
+/** Places a share price prints to: six, and more under 1 so six significant
+ *  digits show. */
+export function shareDigits(p: number): number {
+  return p >= 1 || !(p > 0) ? 6 : Math.min(12, 5 - Math.floor(Math.log10(p)));
+}
+
+/** The share price the chart draws: on each day with an event the last read
+ *  `sharePriceAtBlock` there, at its block, and on `todayDay` (an open
+ *  holding) the card's share price at the page's block. Null with no point. */
+export function vaultShareLine(
+  rows: VaultHolderEvent[],
+  read: (number | null)[],
+  o: VaultFlowOptions,
+  todayDay: number | null,
+): PriceSeries | null {
+  const byDay = new Map<number, PricePoint>();
+  rows.forEach((e, i) => {
+    const p = read[i];
+    if (p == null || !(p > 0)) return;
+    const day = Math.floor(e.timestamp / DAY_S);
+    byDay.set(day, [day, p, e.blockNumber]);
+  });
+  if (todayDay != null && o.sharePriceNow != null && o.sharePriceNow > 0)
+    byDay.set(todayDay, [todayDay, o.sharePriceNow, o.blockNumber]);
+  const points = [...byDay.values()].sort((a, b) => a[0] - b[0]);
+  if (points.length === 0) return null;
+  const a = o.assetSymbol;
+  const sh = o.shareSymbol;
+  return {
+    key: `vault:${o.vaultAddress.toLowerCase()}:share-price`,
+    // The tip's mark is the share's letter, as the series it replaces drew.
+    asset: { symbol: sh, chain: o.chainId },
+    unit: a.toLowerCase(),
+    grain: "daily",
+    source: `the vault's convertToAssets of one ${sh}, read at each of this address's events and at the page's block`,
+    points,
+    here: {
+      live: `Share price — the ${a} one ${sh} redeems for at the page's block {block}: the vault's convertToAssets, the card's share price.`,
+      read: `Share price on {day} — the ${a} one ${sh} redeemed for at block {block}, the vault's convertToAssets read at this address's event there. A day with no event keeps the last event's.`,
+      formula: `convertToAssets(1 ${sh}) at the block`,
+    },
+    help: `on the days of this address's events: the ${a} one ${sh} redeems for, the vault's convertToAssets read at each event's block, and today the card's share price. No daily share price is recorded for the vault, so a day between events keeps the last event's, drawn dotted. A vault holding has no liquidation line.`,
   };
 }

@@ -32,8 +32,15 @@
 // after the last, to the pool's exit rate now (the page's chain read). Maple
 // is not in the daily price store, and the token axis needs no price.
 //
+// THE PRICE VIEW IS THE POOL'S RATE (rails-ops reference/lifetime-price-chart.md,
+// ruling 8; ui-jobs 328 step 7), in the funds asset per share: on each day with
+// a rated transaction, its rate (the day's last); between events the straight
+// line the claim is valued on, drawn dotted; today, on an open position, the
+// card's exit rate. A lender has no liquidation, so the view has no level.
+//
 // Pure: tested offline in scripts/verify/verify-maple-flows.ts.
 
+import type { PricePoint, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowBucket, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -439,10 +446,23 @@ export function mapleFlowTimeline(rp: MapleFlowReplay, o: MapleFlowOptions): Flo
     claimObs.push([d, at != null && at > 0 && then != null ? (then / at) * G : G]);
   }
 
+  const rateLine = maplePoolRateLine(rp, o, { firstDay, lastDay: open ? today : lastDay, open });
+
   return {
     unit: { symbol: o.assetSymbol, scale },
     buckets,
     days,
+    ...(rateLine
+      ? {
+          shareLine: {
+            asset: POOL_RATE,
+            series: rateLine,
+            unitLabel: o.assetSymbol,
+            name: `${o.poolSymbol} pool rate`,
+            digits: 4,
+          },
+        }
+      : {}),
     live: {
       collateralUsd: nowClaim * G,
       debtUsd: 0,
@@ -458,6 +478,65 @@ export function mapleFlowTimeline(rp: MapleFlowReplay, o: MapleFlowOptions): Flo
     totalEvents: replayed.length,
     labels: { collateral: "Pool claim", debt: "Debt" },
     words: mapleFlowWords(o.assetSymbol, o.poolSymbol),
+  };
+}
+
+const POOL_RATE = "pool-rate";
+
+/** The pool's rate the chart draws, funds asset per share, one point a day
+ *  from the first rated transaction to `lastDay`: a day with rated
+ *  transactions at its last one's rate and block; a day between at the
+ *  straight line from the event before to the next (`mapleRateAt`), resting
+ *  on the block before and listed in `heldDays`; today, on an open position,
+ *  the card's exit rate. Null with no rate. */
+export function maplePoolRateLine(
+  rp: MapleFlowReplay,
+  o: MapleFlowOptions,
+  span: { firstDay: number; lastDay: number; open: boolean },
+): PriceSeries | null {
+  const txs = rp.replayed.filter((r) => r.lastOfTx && r.rate != null && r.rate > 0);
+  if (txs.length === 0) return null;
+  const today = Math.floor(o.now / DAY_S);
+  const liveRate = o.live?.rate != null && o.live.rate > 0 ? o.live.rate : null;
+  const points: PricePoint[] = [];
+  const heldDays: number[] = [];
+  let k = -1;
+  for (let d = Math.max(span.firstDay, Math.floor(txs[0].row.ts / DAY_S)); d <= span.lastDay; d++) {
+    const end = Math.min((d + 1) * DAY_S, o.now);
+    const before = k;
+    while (k + 1 < txs.length && txs[k + 1].row.ts < end) k++;
+    if (k < 0) continue;
+    if (d === today && span.open && liveRate != null) {
+      points.push([d, liveRate, null]);
+      continue;
+    }
+    if (k > before) {
+      points.push([d, txs[k].rate!, txs[k].row.block]);
+      continue;
+    }
+    const v = mapleRateAt(rp.rates, end, o.now, liveRate);
+    if (v == null || !(v > 0)) continue;
+    points.push([d, v, txs[k].row.block]);
+    heldDays.push(d);
+  }
+  if (points.length === 0) return null;
+  const a = o.assetSymbol;
+  const sh = o.poolSymbol;
+  return {
+    key: `maple:${rp.pool.toLowerCase()}:pool-rate`,
+    asset: { symbol: sh, address: maplePoolOf(rp.pool).pool, chain: 1 },
+    unit: a.toLowerCase(),
+    grain: "daily",
+    source: `the pool's rate on this wallet's rows, and its exit rate now`,
+    points,
+    heldDays,
+    here: {
+      live: `Pool rate — the ${a} one ${sh} pays out on withdrawal now: the pool's exit rate, the card's figure.`,
+      read: `Pool rate on {day} — ${a} per ${sh} at block {block}, the day's last event: the pool's totalAssets ÷ totalSupply, or the same-block Deposit or Withdraw log's assets ÷ shares, as the row states it.`,
+      held: `Pool rate on {day} — worked in a straight line from the rate at block {block}, this wallet's last event before it, to the rate at its next event (after the last, to the exit rate now). No rate is recorded between events.`,
+      formula: "rate before + (rate after − rate before) × elapsed share of the gap",
+    },
+    help: `on the same days: the ${a} one ${sh} is worth, the pool's rate at each of this wallet's events, in a straight line between them, drawn dotted, as the claim is valued; today the card's exit rate. A lender has no liquidation line.`,
   };
 }
 

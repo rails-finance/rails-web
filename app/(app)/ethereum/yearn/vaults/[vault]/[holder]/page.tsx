@@ -139,6 +139,12 @@ const loadHistory = cache(async (data: YearnVaultResponse, holder: string) => {
           claimRaw: data.holder.claim?.raw ?? null,
           vaultAddress: data.vault.address,
           assetAddress: data.vault.asset.address,
+          chainId: YEARN_CHAIN_ID,
+          // The card's share price, the top row's: today's point.
+          sharePriceNow:
+            !data.chainStale && data.vault.sharePrice != null && data.vault.sharePrice.value > 0
+              ? data.vault.sharePrice.value
+              : null,
         })
       : null;
 

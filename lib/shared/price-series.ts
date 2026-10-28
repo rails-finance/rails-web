@@ -44,8 +44,9 @@ export interface PriceSeries {
    *  with no debt). */
   noCarry?: true;
   /** A derived series' receipt in its family's words (the health factor):
-   *  at the live read, and at a point resting on a block ("{block}", "{day}"). */
-  here?: { live: string; read: string; formula?: string };
+   *  at the live read, and at a point resting on a block ("{block}", "{day}");
+   *  `held` on a day in `heldDays` (Maple's pool rate between two events). */
+  here?: { live: string; read: string; held?: string; formula?: string };
   /** A ratio view's side of its line (lib/shared/flows-health.ts
    *  `HealthSource.ratio`): the position is liquidatable below it or above
    *  it. */

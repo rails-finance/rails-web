@@ -2785,6 +2785,136 @@ test("Sky Savings: the share price in place of the sUSDS price, chi per day at i
   assert.equal(formatPrice(1.0105, "USDS", 6), "1.010500 USDS");
 });
 
+test("a vault holder (ui-jobs 328 step 7): the share price at each event's block, the card's today, no level", async () => {
+  const { vaultFlowTimeline } = await import("@/lib/vaults/vault-flows");
+  const D = 86_400;
+  const row = (i: number, day: number, kind: string, delta: string, after: string, price: string | null) =>
+    ({
+      id: `0x${i}:0`,
+      txHash: `0x${i}`,
+      blockNumber: 1000 + i,
+      timestamp: day * D + 100,
+      logIndex: 0,
+      kind,
+      counterparty: null,
+      sharesDelta: delta,
+      assets: kind === "deposit" ? String(Number(delta) * 1.01) : null,
+      balanceAfter: after,
+      sharePriceAtBlock: price,
+    }) as never;
+  const t = vaultFlowTimeline(
+    [row(1, 100, "deposit", "100", "100", "1010000"), row(2, 103, "deposit", "50", "150", "1020000")],
+    {
+      assetSymbol: "USDC",
+      shareSymbol: "vUSDC",
+      shareDecimals: 0,
+      assetDecimals: 6,
+      blockNumber: 2000,
+      blockTimestamp: 106 * D,
+      sharesRaw: "150",
+      claimRaw: "154",
+      vaultAddress: "0xv",
+      chainId: 1,
+      sharePriceNow: 1.0301,
+    },
+  )!;
+  const s = t.shareLine!;
+  assert.deepEqual(s.series.points, [
+    [100, 1.01, 1001],
+    [103, 1.02, 1002],
+    [106, 1.0301, 2000],
+  ]);
+  const ps = flowPriceSeries(t);
+  assert.equal(ps.length, 1);
+  assert.equal(ps[0].name, "vUSDC share price");
+  assert.equal(ps[0].unitLabel, "USDC");
+  assert.equal(ps[0].level, undefined);
+  // The days between events carry the last event's, dotted.
+  const pieces = pricePieces(ps[0], 100, 106);
+  assert.deepEqual(pieces.observed, [100, 103, 106]);
+  assert.deepEqual(pieces.carried, [101, 102, 104, 105]);
+  assert.ok(ps[0].help!.includes("convertToAssets"));
+});
+
+test("Maple's pool rate (step 7): each event's rate at its block, straight between, the card's exit rate today", async () => {
+  const { mapleFlowReplay, maplePoolRateLine } = await import("@/lib/maple/flows");
+  const D = 86_400;
+  const row = (i: number, day: number, rate: number, held: number) => ({
+    id: `0x${i}:0`,
+    ts: day * D + 100,
+    block: 1000 + i,
+    tx: `0x${i}`,
+    kind: "deposit" as const,
+    pool: "syrupUSDC",
+    amount: i === 1 ? held * rate : 0,
+    unvalued: false,
+    rate,
+    ratePrecision: 0,
+    claimAfter: held * rate,
+    sharesHeld: held,
+    interestSincePrev: null,
+  });
+  const rp = mapleFlowReplay("syrupUSDC", [row(1, 100, 1.1, 10), row(2, 104, 1.14, 10)]);
+  const now = 106 * D + 50;
+  const s = maplePoolRateLine(
+    rp,
+    { assetSymbol: "USDC", poolSymbol: "syrupUSDC", now, live: { claim: 11.5, rate: 1.15 } },
+    { firstDay: 100, lastDay: 106, open: true },
+  )!;
+  const at = (d: number) => s.points.find((p) => p[0] === d)!;
+  assert.deepEqual(at(100), [100, 1.1, 1001]);
+  assert.deepEqual(at(104), [104, 1.14, 1002]);
+  assert.deepEqual(at(106), [106, 1.15, null]);
+  // 101's close is a quarter of the way from the first event to the second.
+  assert.ok(Math.abs(at(101)[1] - (1.1 + 0.04 * ((102 * D - (100 * D + 100)) / (4 * D)))) < 1e-12);
+  assert.equal(at(101)[2], 1001);
+  assert.deepEqual(s.heldDays, [101, 102, 103, 105]);
+});
+
+test("Frankencoin's declared price (step 7): each MintingUpdate's at its block, stepping where the owner moved it, drawn alone", async () => {
+  const { frankencoinFlowTimeline } = await import("@/lib/frankencoin/flows");
+  const D = 86_400;
+  const ev = (i: number, day: number, kind: string, price: number) => ({
+    id: `0x${i}:0`,
+    ts: day * D + 100,
+    block: 1000 + i,
+    kind: kind as never,
+    sale: null,
+    collAfter: BigInt(10) ** BigInt(8),
+    mintedAfter: BigInt(1000) * BigInt(10) ** BigInt(18),
+    collBefore: null,
+    mintedBefore: null,
+    understated: false,
+    collDecimals: 8,
+    split: null,
+    price,
+  });
+  const t = frankencoinFlowTimeline(
+    [ev(1, 100, "adjust", 37000), ev(2, 100, "adjust_price", 33000), ev(3, 102, "adjust_price", 38000)],
+    { collSymbol: "WBTC", now: 105 * D, open: true, live: { coll: 1, debt: 1000, price: 38000 } },
+  )!;
+  const ps = flowPriceSeries(t);
+  assert.equal(ps.length, 1, "the declared price alone, on a timeline with side units");
+  assert.equal(ps[0].name, "Declared liquidation price");
+  assert.equal(ps[0].unitLabel, "ZCHF/WBTC");
+  assert.equal(ps[0].grain, "event");
+  assert.deepEqual(
+    ps[0].points.map((p) => [p[0], p[1], p[2]]),
+    [
+      [100, 37000, 1001],
+      [100, 33000, 1002],
+      [102, 38000, 1003],
+      [105, 38000, null],
+    ],
+  );
+  const pieces = pricePieces(ps[0], 100, 105);
+  assert.deepEqual(
+    pieces.riser.map((r) => r[0][0]),
+    [100, 102],
+  );
+  assert.ok(ps[0].help!.includes("no market price is drawn"));
+});
+
 test("a fork's level (ui-jobs 328 step 6): the MCR in force at each day's end, stepping where governance moved it", async () => {
   const { levelFormulaAt } = await import("@/lib/shared/price-series");
   const { forkMcrAt } = await import("@/lib/shared/liquity-fork-ops");

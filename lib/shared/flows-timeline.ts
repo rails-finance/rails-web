@@ -345,9 +345,11 @@ export interface FlowTimeline {
    *  view's default where the family has it (ruling 7; Aave V3 Ethereum). */
   health?: PriceSeries;
   /** A share price the price view draws in place of the held asset's price
-   *  (ruling 8; Sky's chi): `series` in the vault asset, `unitLabel` its
-   *  symbol, printed to `digits` places as the card prints it, standing for
-   *  the asset keyed `asset`. */
+   *  (ruling 8; Sky's chi, a vault's convertToAssets, Maple's pool rate):
+   *  `series` in the vault asset, `unitLabel` its symbol, printed to `digits`
+   *  places, standing for the asset keyed `asset`. On a timeline with
+   *  `sideUnits` it is the price view's one line (Frankencoin's declared
+   *  liquidation price). */
   shareLine?: { asset: string; series: PriceSeries; unitLabel: string; name: string; digits?: number };
   /** Today's UTC day number. With it the slider runs to today while anything
    *  is still held after the last event; without it, one stop past that event. */

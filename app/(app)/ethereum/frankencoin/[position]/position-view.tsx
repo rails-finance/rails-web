@@ -317,7 +317,8 @@ export default function FrankencoinPositionView({
     [openingRead],
   );
   const flowLive = useMemo(
-    () => (chain ? { coll: chain.collateral ?? null, debt: chain.minted ?? null } : null),
+    () =>
+      chain ? { coll: chain.collateral ?? null, debt: chain.minted ?? null, price: chain.liqPrice ?? null } : null,
     [chain],
   );
   const flows = useFrankencoinFlows({

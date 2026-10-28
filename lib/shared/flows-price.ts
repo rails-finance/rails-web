@@ -8,7 +8,9 @@
 //   the flows line uses for the family. A side counted at its face (a
 //   Liquity Trove's debt, whose daily "price" is the interest factor) and an
 //   asset priced in itself (the unit's token) have no line. Sides with no
-//   common unit (Frankencoin, PWN) have no price view.
+//   common unit (Frankencoin, PWN) have no asset price; a family line they
+//   carry (`t.shareLine`: Frankencoin's declared liquidation price) is drawn
+//   alone.
 // - A daily series draws a point per day joined day to day; a day with no
 //   observation takes the last price before it, carried, and every segment
 //   touching a carried day is dotted. Before the first observation the strip
@@ -30,7 +32,8 @@
 //   collateral ratio, Fluid's position ratio) prints it as a percentage, its
 //   line the family's.
 // - Where the timeline carries a share price (`t.shareLine`, ruling 8: Sky's
-//   chi), it stands in place of the held asset's price, in the vault asset.
+//   chi, a vault's convertToAssets, Maple's pool rate), it stands in place of
+//   the held asset's price, in the vault asset.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
@@ -62,7 +65,16 @@ export interface FlowPriceSeries extends PriceSeries {
  *  has one, then collateral assets, each side in the order its assets were
  *  first held. */
 export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
-  if (t.sideUnits || !t.dailyPrices) return [];
+  const share = t.shareLine;
+  const shareSeries = (sh: NonNullable<FlowTimeline["shareLine"]>): FlowPriceSeries => ({
+    ...sh.series,
+    side: "collateral",
+    unitLabel: sh.unitLabel,
+    name: sh.name,
+    ...(sh.digits != null ? { digits: sh.digits } : {}),
+  });
+  if (t.sideUnits) return share ? [shareSeries(share)] : [];
+  if (!t.dailyPrices) return share ? [shareSeries(share)] : [];
   const face = new Set<FlowSide>(t.words?.moment?.face ?? []);
   const unitLabel = t.unit?.symbol ?? "USD";
   const meta = new Map<string, { symbol: string; side: FlowSide; order: number }>();
@@ -86,15 +98,7 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
     });
     if (s) out.push({ ...s, ...t.priceMarks?.[asset], side: m.side, unitLabel });
   }
-  const share = t.shareLine;
-  if (share)
-    out.push({
-      ...share.series,
-      side: "collateral",
-      unitLabel: share.unitLabel,
-      name: share.name,
-      ...(share.digits != null ? { digits: share.digits } : {}),
-    });
+  if (share) out.push(shareSeries(share));
   const rank = (s: FlowPriceSeries) => (s.side === "collateral" ? 0 : 1e6) + (meta.get(s.key)?.order ?? 0);
   out.sort((a, b) => rank(a) - rank(b));
   return t.health

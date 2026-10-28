@@ -35,8 +35,16 @@
 // was not read, or does not add to the row's move, stays whole on its own
 // line ("Minted, split not read").
 //
+// THE PRICE VIEW IS THE DECLARED LEVEL ALONE (rails-ops
+// reference/lifetime-price-chart.md; ui-jobs 328 step 7): the liquidation
+// price the owner declared, ZCHF per whole collateral token, as each
+// MintingUpdate after it states it, held to the next and stepping where the
+// owner moved it; today the card's, the position's price() at head. No
+// oracle prices the collateral, so no market price is drawn.
+//
 // Pure: tested offline in scripts/verify/verify-frankencoin-flows.ts.
 
+import type { PricePoint, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -175,6 +183,9 @@ export interface FrankencoinFlowEvent {
   collDecimals: number;
   /** The receipt's split of the ZCHF that moved, where it was read. */
   split: FrankencoinSplit | null;
+  /** The owner-declared liquidation price after the row, ZCHF per whole
+   *  collateral token, where the row states one. */
+  price?: number | null;
 }
 
 /** A receipt's split of a mint and of a repayment, base units of ZCHF; the
@@ -263,8 +274,20 @@ export function frankencoinFlowEvents(
       understated: c.collateralUnderstated === true,
       collDecimals: c.collateralDecimals,
       split: read ? splitOf(read) : null,
+      price: declaredPrice(c),
     };
   });
+}
+
+/** A row's declared price after it: the scaled figure, else the raw one at
+ *  36 − the collateral's decimals; null where it states none. */
+function declaredPrice(c: FrankencoinContext): number | null {
+  const human = c.liqPrice != null && c.liqPrice !== "" ? Number(c.liqPrice) : NaN;
+  if (Number.isFinite(human) && human > 0) return human;
+  const raw = c.raw?.price;
+  if (raw == null || raw === "") return null;
+  const v = Number(raw) / 10 ** (36 - c.collateralDecimals);
+  return Number.isFinite(v) && v > 0 ? v : null;
 }
 
 /** The receipt's split, in base units; null where it holds none. */
@@ -387,6 +410,8 @@ export interface FrankencoinLive {
   /** balanceOf(position) and minted(), tokens. */
   coll?: number | null;
   debt?: number | null;
+  /** price(), ZCHF per whole collateral token: the card's liquidation price. */
+  price?: number | null;
 }
 
 export interface FrankencoinFlowOptions {
@@ -528,8 +553,20 @@ export function frankencoinFlowTimeline(
     if (nowDebt > DUST) assets.push({ side: "debt", symbol: "ZCHF", amount: nowDebt, usd: nowDebt * G.debt });
   }
 
+  const declared = frankencoinDeclaredLine(replayed, o, open ? today : null);
+
   return {
     unit: { symbol: "ZCHF", scale: scale.debt },
+    ...(declared
+      ? {
+          shareLine: {
+            asset: "declared-price",
+            series: declared,
+            unitLabel: `ZCHF/${o.collSymbol}`,
+            name: "Declared liquidation price",
+          },
+        }
+      : {}),
     sideUnits: {
       collateral: { symbol: o.collSymbol, scale: scale.collateral },
       debt: { symbol: "ZCHF", scale: scale.debt },
@@ -547,6 +584,42 @@ export function frankencoinFlowTimeline(
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
     words: frankencoinFlowWords(o.collSymbol),
+  };
+}
+
+/** The declared liquidation price the chart draws, an event series: each
+ *  row's price after it at its block (the last where a block holds several),
+ *  and on `todayDay` (an open position) the card's at head. Null with no
+ *  price. */
+export function frankencoinDeclaredLine(
+  replayed: FrankencoinReplayed[],
+  o: FrankencoinFlowOptions,
+  todayDay: number | null,
+): PriceSeries | null {
+  const byBlock = new Map<number, PricePoint>();
+  for (const r of replayed) {
+    const p = r.ev.price;
+    if (p == null || !(p > 0)) continue;
+    byBlock.set(r.ev.block, [Math.floor(r.ev.ts / DAY_S), p, r.ev.block]);
+  }
+  const points = [...byBlock.values()].sort((a, b) => a[2]! - b[2]!);
+  const live = o.live?.price;
+  if (todayDay != null && live != null && live > 0) points.push([todayDay, live, null]);
+  if (points.length === 0) return null;
+  const c = o.collSymbol;
+  return {
+    key: "frankencoin:declared-price",
+    asset: { symbol: c, chain: 1 },
+    unit: `zchf-per-${c.toLowerCase()}`,
+    grain: "event",
+    source: "the owner-declared price on each MintingUpdate",
+    points,
+    here: {
+      live: `Liquidation price — declared by the position's owner, in ZCHF per ${c}: the position's price() at the latest block, the card's figure. A challenge auction tests it.`,
+      read: `Liquidation price on {day} — declared by the position's owner, in ZCHF per ${c}, as the MintingUpdate at block {block} states it. It holds until the owner moves it.`,
+      formula: `price ÷ 10^(36 − ${c} decimals)`,
+    },
+    help: `the liquidation price the position's owner declared, in ZCHF per ${c}, as each MintingUpdate states it, stepping where the owner moved it, and today the card's. It is the owner's declaration, tested by challenge auctions: Frankencoin runs no oracle, so no market price is drawn.`,
   };
 }
 

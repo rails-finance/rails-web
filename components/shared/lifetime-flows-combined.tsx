@@ -1528,12 +1528,18 @@ function healthProv(s: FlowPriceSeries, r: PriceAt, dayWord: string): Provenance
  *  cursor's day, read at its block. */
 function readoutProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord: string, isLive: boolean): Provenance {
   const block = r.point[2];
-  // A series in its family's words (Sky's share price).
+  // A series in its family's words (Sky's share price); a day worked between
+  // two reads (Maple's pool rate) in its own.
   if (s.here)
     return {
       kind: "chain",
       pclass: "state",
-      summary: (isLive || block == null ? s.here.live : s.here.read)
+      summary: (isLive || block == null
+        ? s.here.live
+        : s.here.held && s.heldDays?.includes(r.point[0])
+          ? s.here.held
+          : s.here.read
+      )
         .replace("{block}", block?.toLocaleString("en-US") ?? "")
         .replace("{day}", r.carried ? `${dayWord}, carried from ${pointWord}` : dayWord),
       ...(s.here.formula ? { formula: s.here.formula } : {}),

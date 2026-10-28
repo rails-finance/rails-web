@@ -106,6 +106,15 @@
 // (closed): Health first, today the card's; the band stepping on event days,
 // today the card's Bands; the tip's band words; the drawn band against the
 // scales' placing at All, zoomed and panned.
+// The vault holder pages, Maple and Frankencoin (step 7, `shareLine`,
+// `checkFamilyLine`): one holder per vault kind (Morpho Base 0x3d88, Aave
+// Umbrella stkwaEthUSDC 0x5a2a, sGHO 0x1676, stata waEthUSDC 0xab67, Yearn
+// 0xb634) draws its share price, each event day's point read at that event's
+// block, today the card's top-row figure; Maple 0xc4ec its pool rate, today the
+// card's exit rate; Frankencoin 0x4220 (its owner moved the price four times)
+// and 0xdc18 the declared liquidation price alone, each event day's figure the
+// MintingUpdate's, stepping where the rows moved it, today the position's
+// price(); no level on any, the how-to-read naming the source.
 // `FIXTURES=<regex>` runs the pages whose id matches.
 //
 // Run:  BASE_URL=http://localhost:3190 node scripts/verify/verify-lifetime-price-chart.mjs
@@ -647,17 +656,27 @@ const PAGES = [
     lwOnly: true,
     band: { asset: "WBTC", closed: true },
   },
+  // Step 7: Frankencoin's declared liquidation price alone, under a value
+  // pane per side; Maple's pool rate.
   {
     id: "frankencoin 0xdc18",
     path: "/ethereum/frankencoin/0xdc189ac81bec4db551a0478334691d71109d9382",
     lwOnly: true,
-    panes: "collateral,debt",
+    panes: "collateral,debt,price",
+    family: { kind: "declared" },
+  },
+  {
+    id: "frankencoin 0x4220 (price moved)",
+    path: "/ethereum/frankencoin/0x422050f743582bf753b4d6bf571fa1808a9d70e6",
+    lwOnly: true,
+    panes: "collateral,debt,price",
+    family: { kind: "declared", moved: true },
   },
   {
     id: "maple 0xc4ec",
     path: "/ethereum/maple/0xc4ec216635491a6d08cfe4537ed4dd767212d8c1",
     lwOnly: true,
-    panes: "value",
+    family: { kind: "pool" },
   },
   {
     id: "pwn 0xb2d3 (liquidated)",
@@ -665,20 +684,36 @@ const PAGES = [
     lwOnly: true,
     panes: "collateral,debt",
   },
+  // Step 7: each vault kind's share price.
   {
-    id: "aave vault holder 0x1676",
+    id: "aave sgho holder 0x1676",
     path: "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x1676d23711186076fa74aa53511dda750a1f0d9a",
     lwOnly: true,
+    family: { kind: "vault" },
+  },
+  {
+    id: "aave umbrella stkwaEthUSDC holder 0x5a2a",
+    path: "/ethereum/aave/vaults/0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6/0x5a2a98d3c9720734c2fca8d5ec808b073c047ccd",
+    lwOnly: true,
+    family: { kind: "vault" },
+  },
+  {
+    id: "aave stata waEthUSDC holder 0xab67",
+    path: "/ethereum/aave/vaults/0xd4fa2d31b7968e448877f69a96de69f5de8cd23e/0xab6752ad54f05fb40c7eccee4fb11a78a322e34b",
+    lwOnly: true,
+    family: { kind: "vault" },
   },
   {
     id: "yearn vault holder 0xb634",
     path: "/ethereum/yearn/vaults/0x310b7ea7475a0b449cfd73be81522f1b88efafaa/0xb634316e06cc0b358437cbadd4dc94f1d3a92b3b",
     lwOnly: true,
+    family: { kind: "vault" },
   },
   {
     id: "morpho-base vault holder 0x3d88",
     path: "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2/0x3d8863a416f3091766bfea41d3d7008236a0dd1e",
     lwOnly: true,
+    family: { kind: "vault" },
   },
   // A one-day life (one transaction on 11 Oct 2026, open): the price pane alone.
   {
@@ -1529,6 +1564,176 @@ async function checkShareLine(page, tag) {
     `${tag}: the how-to-read names the share price's source`,
     help.includes("The sUSDS share price") && help.includes("chi") && help.includes("drip"),
     help,
+  );
+}
+
+/** The card's top-row figure as `fmtNative` prints it
+ *  (components/shared/price-pill.tsx). */
+const fmtNative = (v, unit) =>
+  v < 1
+    ? `${v.toFixed(4)} ${unit}`
+    : v < 100
+      ? `${v.toFixed(2)} ${unit}`
+      : v < 10_000
+        ? `${Math.round(v).toLocaleString("en-US")} ${unit}`
+        : `${(v / 1000).toFixed(1)}K ${unit}`;
+
+/** A family's line in place of an asset's price (step 7, `shareLine`): a
+ *  vault's share price, Maple's pool rate, Frankencoin's declared liquidation
+ *  price. The line is drawn with no level; stepping back from today over the
+ *  days with events, each day's figure rests on a block (Frankencoin: the
+ *  day's last MintingUpdate's price, the line stepping only where the rows
+ *  moved it); today's is the card's; the how-to-read names the source. */
+async function checkFamilyLine(page, tag, pg) {
+  const kind = pg.family.kind;
+  const KEY = {
+    vault: /^vault:0x[0-9a-f]+:share-price$/,
+    pool: /^maple:.+:pool-rate$/,
+    declared: /^frankencoin:declared-price$/,
+  };
+  const line = await page.$eval("[data-price-line]", (g) => ({
+    key: g.getAttribute("data-price-line") ?? "",
+    observed: (g.getAttribute("data-price-observed") ?? "").split(",").filter(Boolean).map(Number),
+    grain: g.getAttribute("data-price-grain"),
+  }));
+  check(
+    `${tag}: the chart draws the ${kind === "vault" ? "share price" : kind === "pool" ? "pool rate" : "declared liquidation price"}`,
+    KEY[kind].test(line.key) && line.observed.length > 0 && line.grain === (kind === "declared" ? "event" : "daily"),
+    JSON.stringify({ ...line, observed: line.observed.length }),
+  );
+  const sl = page.locator(PRICE_STRIP).first();
+  await sl.focus();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(300);
+  const readout = () =>
+    page.$eval("[data-price-heading]", (h) => {
+      const r = h.querySelector("[data-price-readout]");
+      return {
+        text: r?.textContent ?? "",
+        day: Number(r?.getAttribute("data-price-day") ?? NaN),
+        block: r?.getAttribute("data-price-block") ?? "",
+        carried: r?.getAttribute("data-price-carried") != null,
+        none: r?.hasAttribute("data-price-none") ?? true,
+        toggle: document.querySelector("[data-flow-level-toggle]") != null,
+      };
+    });
+  const end = await readout();
+  check(`${tag}: no level`, !end.toggle, JSON.stringify(end));
+  const num = (t) => Number((t.match(/[\d,]+\.\d+/)?.[0] ?? "").replace(/,/g, ""));
+  const v = num(end.text);
+  const today = Math.floor(Date.now() / 86_400_000);
+  const open = end.day >= today - 1 && line.observed.includes(end.day);
+  if (kind === "vault") {
+    const card = await page
+      .$eval("[data-latest-prices] button .tabular-nums", (e) => e.textContent?.trim() ?? "")
+      .catch(() => "");
+    const unit = card.replace(/^[\d.,K]+\s*/, "");
+    if (open)
+      check(
+        `${tag}: today's share price is the card's (${card}), read at the page's block`,
+        card !== "" && fmtNative(v, unit) === card && /^\d+$/.test(end.block),
+        `chart ${end.text} at ${end.block}, card ${card}`,
+      );
+  } else if (kind === "pool") {
+    const pool = line.key.split(":")[1];
+    const card = await page
+      .$$eval(
+        "[data-panel-row]",
+        (rows, pool) => {
+          const r = rows.find((e) => (e.getAttribute("data-panel-row") ?? "").toLowerCase() === `shares-${pool}`);
+          return r?.textContent?.match(/@\s*(\d+\.\d{4})/)?.[1] ?? "";
+        },
+        pool,
+      )
+      .catch(() => "");
+    if (open)
+      check(
+        `${tag}: today's pool rate is the card's exit rate (@ ${card})`,
+        card !== "" && v.toFixed(4) === card,
+        `chart ${end.text}, card @ ${card}`,
+      );
+  } else {
+    const position = pg.path.split("/").pop();
+    const chain = await hostFetch(`${BASE}/api/chain/frankencoin/position?position=${position}`)
+      .then((r) => r.json())
+      .catch(() => null);
+    const live = chain?.liqPrice;
+    if (open && live != null)
+      check(
+        `${tag}: today's declared price is the position's price() (${live})`,
+        Math.abs(v - live) < 0.005,
+        `chart ${end.text}, price() ${live}`,
+      );
+  }
+  // Back over the days with events: each figure rests on a block.
+  const PREV = 'button[aria-label="Previous event"]';
+  const steps = [];
+  for (let i = 0; i < 12; i++) {
+    const prev = page.locator(PREV).first();
+    if ((await prev.count()) === 0 || (await prev.isDisabled())) break;
+    await prev.click();
+    await page.waitForTimeout(250);
+    const r = await readout();
+    if (steps.length && steps[steps.length - 1].day === r.day) break;
+    steps.push(r);
+  }
+  const bad = steps.filter((r) => r.none || r.carried || !/^\d+$/.test(r.block));
+  check(
+    `${tag}: each day with an event reads its figure at a block of that day (${steps.length} days)`,
+    steps.length > 0 && bad.length === 0,
+    bad.map((r) => `${r.day}: ${r.text} @${r.block}${r.carried ? " carried" : ""}`).join("; "),
+  );
+  if (kind === "declared") {
+    // The rows: each day's last MintingUpdate price, and the days the owner moved it.
+    const position = pg.path.split("/").pop();
+    const tl = await hostFetch(`${BASE}/api/frankencoin/timeline?position=${position}`)
+      .then((r) => r.json())
+      .catch(() => null);
+    const rows = (tl?.events ?? [])
+      .map((e) => ({ day: Math.floor(e.timestamp / 86_400), block: e.blockNumber, c: e.context?.data ?? {} }))
+      .filter((r) => r.c.liqPrice != null)
+      .sort((a, b) => a.block - b.block);
+    const dayEnd = new Map();
+    for (const r of rows) dayEnd.set(r.day, Number(r.c.liqPrice));
+    const off = steps.filter((r) => dayEnd.has(r.day) && Math.abs(num(r.text) - dayEnd.get(r.day)) > 0.005);
+    check(
+      `${tag}: each event day's declared price is its last MintingUpdate's`,
+      steps.some((r) => dayEnd.has(r.day)) && off.length === 0,
+      off.map((r) => `${r.day}: ${r.text} against ${dayEnd.get(r.day)}`).join("; "),
+    );
+    // The line steps only on a day a row moved the price.
+    const moved = new Set(
+      rows
+        .filter((r) => r.c.liqPriceBefore != null && Number(r.c.liqPriceBefore) !== Number(r.c.liqPrice))
+        .map((r) => r.day),
+    );
+    const ordered = [...steps].reverse();
+    const stepsOff = ordered.filter((r, i) => i > 0 && num(r.text) !== num(ordered[i - 1].text) && !moved.has(r.day));
+    check(
+      `${tag}: the declared price steps only on a day a MintingUpdate moved it`,
+      stepsOff.length === 0,
+      stepsOff.map((r) => r.day).join(","),
+    );
+    if (pg.family.moved) {
+      const adjusted = rows.filter((r) => r.c.eventType === "adjust_price" && moved.has(r.day)).map((r) => r.day);
+      const stepped = ordered.filter((r, i) => i > 0 && num(r.text) !== num(ordered[i - 1].text)).map((r) => r.day);
+      check(
+        `${tag}: the declared price steps at the owner's adjust_price rows`,
+        adjusted.length > 0 && adjusted.filter((d) => d > ordered[0].day).every((d) => stepped.includes(d)),
+        `adjust_price ${adjusted.join(",")}, stepped ${stepped.join(",")}`,
+      );
+    }
+  }
+  const help = await howToRead(page);
+  const words = {
+    vault: ["share price", "convertToAssets", "drawn dotted"],
+    pool: ["pool rate", "straight line", "exit rate"],
+    declared: ["declared", "MintingUpdate", "no market price is drawn"],
+  }[kind];
+  check(
+    `${tag}: the how-to-read names the source`,
+    words.every((w) => help.includes(w)),
+    help.slice(0, 400),
   );
 }
 
@@ -2406,6 +2611,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.v1) await checkV1Level(page, tag, pg);
       if (pg.level) await checkLevelView(page, tag, pg);
       if (pg.share) await checkShareLine(page, tag);
+      if (pg.family) await checkFamilyLine(page, tag, pg);
       if (pg.band) await checkBand(page, tag, pg, width);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();

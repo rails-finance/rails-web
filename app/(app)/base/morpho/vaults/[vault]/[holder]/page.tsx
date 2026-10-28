@@ -193,6 +193,9 @@ const loadHistory = cache(async (data: MorphoBaseVaultResponse, holder: string) 
           claimRaw: data.holder.claim?.raw ?? null,
           vaultAddress: data.vault.address,
           assetAddress: data.vault.asset.address,
+          chainId: BASE_CHAIN_ID,
+          // The card's share price, the top row's: today's point.
+          sharePriceNow: !data.chainStale && data.sharePrice.value > 0 ? data.sharePrice.value : null,
         })
       : null;
 
