@@ -106,6 +106,8 @@ import {
 } from "@/components/shared/timeline-toolbar";
 import { usePublishLifeCount, type LifeCount } from "@/lib/shared/life-count-store";
 import { NoteGap, noteRowHeight, type GapItem } from "@/components/shared/note-gap";
+import { protocolChangeNotes, type ProtocolChangeNote } from "@/lib/shared/protocol-change-note";
+import { lifeChanges } from "@/lib/shared/flows-combined";
 import { SpineLine } from "@/components/shared/spine-line";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { anchorMarketNotes, liveNoteGroup, mergePsmGaps, type MarketNote } from "@/lib/shared/market-note";
@@ -258,6 +260,14 @@ const WINDOW_CHUNK = TIMELINE_PAGE_ROWS;
  *  no more than it did before notes existed. */
 const NO_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
 const NO_NOTES: MarketNote[] = [];
+const NO_CHANGES: ProtocolChangeNote[] = [];
+const NO_CHANGE_ANCHORS: ReadonlyMap<string, ProtocolChangeNote[]> = new Map();
+/** Newest first, as the list reads; a tie keeps the given order. */
+const byBlockDesc = <T extends { to: { block: number } }>(xs: T[]): T[] =>
+  xs
+    .map((x, i) => ({ x, i }))
+    .sort((a, b) => b.x.to.block - a.x.to.block || a.i - b.i)
+    .map((e) => e.x);
 
 /** One closed event card's height, the unit the segment skeleton stacks. */
 const SEGMENT_SKELETON_ROW = 72;
@@ -1048,6 +1058,41 @@ function ChainTruthTimelineBody({
     return out.length ? out.sort((a, b) => b.to.block - a.to.block) : NO_NOTES;
   }, [notesInView, anchored, tl.sortedEvents]);
 
+  /** The protocol's changes inside the life (ui-jobs 448): the list the
+   *  Lifetime flows events row draws as its diamonds, from the same model,
+   *  placed as the notes are. Outside the notes switch: the diamonds stand
+   *  whatever it says, and each has its row. */
+  const changesInView = useMemo(() => {
+    const all = protocolChangeNotes(lifeChanges(focusModel, utcDay(Date.now() / 1000)));
+    if (all.length === 0) return NO_CHANGES;
+    const range = tl.dateRange;
+    return all.filter(
+      (n) =>
+        (range == null || (n.to.timestamp >= range[0] && n.to.timestamp <= range[1])) &&
+        (cut == null || n.to.timestamp <= cut),
+    );
+  }, [focusModel, tl.dateRange, cut]);
+  const changesAnchored = useMemo(
+    () => (changesInView.length ? anchorMarketNotes(changesInView, events, "desc") : NO_CHANGE_ANCHORS),
+    [changesInView, events],
+  );
+  /** The changes newer than every row standing: in the head slot, newest first. */
+  const headChanges = useMemo(() => {
+    if (!changesInView.length) return NO_CHANGES;
+    const placed = new Set<string>();
+    for (const list of changesAnchored.values()) for (const n of list) placed.add(n.id);
+    const out = changesInView.filter((n) => !placed.has(n.id));
+    return out.length ? byBlockDesc(out) : NO_CHANGES;
+  }, [changesInView, changesAnchored]);
+  /** The changes the page places, for a machine: how many
+   *  (`data-protocol-changes`) and their blocks (`data-protocol-change-blocks`),
+   *  the drawn window's and the rest alike. */
+  const placedChanges = useMemo(() => {
+    const all = [...headChanges];
+    for (const list of changesAnchored.values()) all.push(...list);
+    return { count: all.length, blocks: [...new Set(all.map((n) => n.to.block))].sort((a, b) => a - b).join(",") };
+  }, [changesAnchored, headChanges]);
+
   /** How many notes the page places: every anchored note, every head note
    *  and every live one. Stated on the root for a machine
    *  (`data-market-notes`); Display offers the notes' items when it is not
@@ -1075,8 +1120,10 @@ function ChainTruthTimelineBody({
    *  the newest row. */
   const topNotes = useMemo<GapItem[]>(() => {
     const live: GapItem[] = liveGroup ? [liveGroup, ...liveRowsShown.filter((n) => !n.live)] : liveRowsShown;
-    return !showMarketNotes || headNotes.length === 0 ? live : [...live, ...headNotes];
-  }, [showMarketNotes, headNotes, liveRowsShown, liveGroup]);
+    const shownHead = !showMarketNotes ? NO_NOTES : headNotes;
+    if (shownHead.length === 0 && headChanges.length === 0) return live;
+    return [...live, ...byBlockDesc<MarketNote | ProtocolChangeNote>([...shownHead, ...headChanges])];
+  }, [showMarketNotes, headNotes, headChanges, liveRowsShown, liveGroup]);
   const liveSlotAtTop = topNotes.length > 0;
   /** The live WINDOW's own occupancy of the head slot — read off the prop, not
    *  off `showMarketNotes`: it is not a market note, so putting the notes away
@@ -1940,7 +1987,18 @@ function ChainTruthTimelineBody({
    *  never expands it would not see it at all. Gated on `showMarketNotes`
    *  here (not on `anchored` itself — see its own comment) so the toggle
    *  hides rows without moving the toolbar pill's count. */
-  const notesFor = (row: TimelineRow): MarketNote[] => {
+  const notesFor = (row: TimelineRow): GapItem[] => {
+    const notes = marketNotesFor(row);
+    const changes =
+      changesAnchored.size === 0 || row.kind === "folder"
+        ? NO_CHANGES
+        : row.kind === "event"
+          ? (changesAnchored.get(row.event.id) ?? NO_CHANGES)
+          : row.events.flatMap((e) => changesAnchored.get(e.id) ?? NO_CHANGES);
+    if (changes.length === 0) return notes;
+    return byBlockDesc<MarketNote | ProtocolChangeNote>([...notes, ...changes]);
+  };
+  const marketNotesFor = (row: TimelineRow): MarketNote[] => {
     if (!showMarketNotes || anchored.size === 0) return NO_NOTES;
     if (row.kind === "event") return anchored.get(row.event.id) ?? NO_NOTES;
     // A served folder's members are not on the page, so no note can have
@@ -1975,6 +2033,8 @@ function ChainTruthTimelineBody({
           data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
           data-timeline-rows-loaded={rows.length}
           data-market-notes={marketNoteCount || undefined}
+          data-protocol-changes={placedChanges.count || undefined}
+          data-protocol-change-blocks={placedChanges.blocks || undefined}
         >
           {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
           <div data-skel-section="detail-timeline-header">

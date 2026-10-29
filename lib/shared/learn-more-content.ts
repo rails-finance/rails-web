@@ -114,7 +114,7 @@ export function lifetimeFlowsStackContent(opts: {
     if (events.changes?.length)
       details.push({
         bold: "The grey diamonds",
-        text: `along the row's top, a change the protocol made for every position on the day it took effect: ${listWords(events.changes.map(lowerFirst))}. Point at, focus or tap one for the value before and after, with its receipt.`,
+        text: `along the top of the events row, a change the protocol made for every position on the day it took effect: ${listWords(events.changes.map(lowerFirst))}. Point at, focus or tap one for the value before and after, with its receipt. Each day's changes also have a row in the history below.`,
       });
   }
   details.push({

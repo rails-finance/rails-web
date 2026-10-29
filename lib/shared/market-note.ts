@@ -542,16 +542,16 @@ function polarisLogIndexOf(e: BaseActivityEvent): number {
  * on the wrong side of its anchor there. Two readings of one history, so the
  * placement stays a parameter rather than a constant.
  */
-export function anchorMarketNotes(
-  notes: readonly MarketNote[],
+export function anchorMarketNotes<N extends AnchoredNote = MarketNote>(
+  notes: readonly N[],
   events: readonly BaseActivityEvent[],
   sortDirection: "asc" | "desc",
-): ReadonlyMap<string, MarketNote[]> {
-  if (notes.length === 0 || events.length === 0) return EMPTY_ANCHORS;
+): ReadonlyMap<string, N[]> {
+  if (notes.length === 0 || events.length === 0) return EMPTY_ANCHORS as ReadonlyMap<string, N[]>;
   // The displayed list, oldest first, whatever direction it is drawn in.
   const ascending = sortDirection === "asc" ? events : [...events].reverse();
-  const out = new Map<string, MarketNote[]>();
-  const anchored: MarketNote[] = [];
+  const out = new Map<string, N[]>();
+  const anchored: N[] = [];
   for (const note of notes) {
     const anchor = ascending.find((e) => e.blockNumber >= note.to.block);
     if (!anchor) continue;
@@ -570,7 +570,15 @@ export function anchorMarketNotes(
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-const EMPTY_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
+const EMPTY_ANCHORS: ReadonlyMap<string, AnchoredNote[]> = new Map();
+
+/** What placement reads of a row that sits between two events: a market
+ *  note, or a protocol change (lib/shared/protocol-change-note.ts). */
+export interface AnchoredNote {
+  id: string;
+  to: { block: number };
+  anchorEventId?: string;
+}
 
 // ── Phase 3: the Polaris primary-rate step ──────────────────────────────────
 

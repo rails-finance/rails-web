@@ -21,6 +21,14 @@ import { useMemo, type CSSProperties } from "react";
 import { LiveNoteGroupRow, MarketNoteRow, noteActor, noteSpine, NoteRunRow } from "@/components/shared/market-note-row";
 import { PolarisPsmGapRow } from "@/components/protocol/polaris/polaris-psm-gap-row";
 import { isPsmGapNote } from "@/lib/polaris/psm-gap";
+import { ProtocolChangeRow } from "@/components/shared/protocol-change-row";
+import {
+  isProtocolChangeGroup,
+  isProtocolChangeNote,
+  protocolChangeGroup,
+  type ProtocolChangeGroup,
+  type ProtocolChangeNote,
+} from "@/lib/shared/protocol-change-note";
 import { PulsingDot, SpineColumn, type SpineTip } from "@/components/shared/spine-column";
 import {
   isLiveNoteGroup,
@@ -31,23 +39,32 @@ import {
   type NoteRun,
 } from "@/lib/shared/market-note";
 
-/** What a gap holds: a note, the head slot's live notes as one card, or a
- *  run of rate notes as one group row. */
-export type GapItem = MarketNote | LiveNoteGroup | NoteRun;
+/** What a gap holds: a note, the head slot's live notes as one card, a run
+ *  of rate notes as one group row, or a protocol change (ui-jobs 448). */
+export type GapItem = MarketNote | LiveNoteGroup | NoteRun | ProtocolChangeNote | ProtocolChangeGroup;
 
-/** A gap's items with each run of same-kind rate notes as one `NoteRun`. */
+/** A gap's items with each run of same-kind rate notes as one `NoteRun` and
+ *  the protocol changes standing together as one row. */
 function withRuns(items: readonly GapItem[]): GapItem[] {
   const out: GapItem[] = [];
   let pending: MarketNote[] = [];
+  let changes: ProtocolChangeNote[] = [];
   const flush = () => {
-    out.push(...noteRuns(pending));
+    out.push(...noteRuns(pending), ...(changes.length ? [protocolChangeGroup(changes)] : []));
     pending = [];
+    changes = [];
   };
   for (const item of items) {
-    if (isLiveNoteGroup(item) || isNoteRun(item)) {
+    if (isProtocolChangeNote(item)) {
+      if (pending.length) flush();
+      changes.push(item);
+    } else if (isProtocolChangeGroup(item) || isLiveNoteGroup(item) || isNoteRun(item)) {
       flush();
       out.push(item);
-    } else pending.push(item);
+    } else {
+      if (changes.length) flush();
+      pending.push(item);
+    }
   }
   flush();
   return out;
@@ -68,6 +85,7 @@ const SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
  *  both widths (`NoteRowShell`'s T1 shape), whose own cell stands on a phone,
  *  so they take none. */
 function PhoneNode({ item }: { item: GapItem }) {
+  if (isProtocolChangeNote(item) || isProtocolChangeGroup(item)) return null;
   if (!isLiveNoteGroup(item) && (noteSpine(item) || isPsmGapNote(item))) return null;
   return (
     <div aria-hidden className="pb-1 pt-2 sm:hidden" data-note-phone-node="">
@@ -104,7 +122,11 @@ export function NoteGap({
       {notes.map((item) => (
         <div key={item.id} data-note-item={item.id}>
           <PhoneNode item={item} />
-          {isLiveNoteGroup(item) ? (
+          {isProtocolChangeGroup(item) ? (
+            <ProtocolChangeRow group={item} />
+          ) : isProtocolChangeNote(item) ? (
+            <ProtocolChangeRow group={protocolChangeGroup([item])} />
+          ) : isLiveNoteGroup(item) ? (
             <LiveNoteGroupRow group={item} />
           ) : isNoteRun(item) ? (
             <NoteRunRow run={item} />

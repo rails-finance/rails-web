@@ -68,7 +68,8 @@ import { OldPriceLabel } from "@/components/shared/flow-old-price";
 import { LwRanges, nearestStopAt, type FlowsLwApi, type FlowsLwAxis } from "@/components/shared/lifetime-flows-lw-axis";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
-import { changesByDay, changeWords, type FlowChange, type FlowChangeLink } from "@/lib/shared/flows-changes";
+import { changesByDay, changeWords, type FlowChange } from "@/lib/shared/flows-changes";
+import { ChangeValues } from "@/components/shared/protocol-change-row";
 import { paceAt, paceWords, type FlowPace } from "@/lib/shared/flows-pace";
 import {
   axisEndDay,
@@ -310,18 +311,7 @@ function ChangeMarker({ days, left, w, faded }: { days: ChangeDay[]; left: numbe
                   data-flow-change-block={c.block}
                   data-flow-change-tx={c.txHash ?? ""}
                 >
-                  <span className="font-semibold">{c.name}</span>{" "}
-                  <Prov info={c.prov} value={c.to}>
-                    {c.from != null ? (
-                      <>
-                        <ChangeSide value={c.from} link={c.fromLink} /> → <ChangeSide value={c.to} link={c.toLink} />
-                      </>
-                    ) : (
-                      <>
-                        set to <ChangeSide value={c.to} link={c.toLink} />
-                      </>
-                    )}
-                  </Prov>
+                  <span className="font-semibold">{c.name}</span> <ChangeValues change={c} />
                 </span>
               ))}
               <span className="block text-rb-500">{dateOf(d.day)}</span>
@@ -330,30 +320,6 @@ function ChangeMarker({ days, left, w, faded }: { days: ChangeDay[]; left: numbe
         </span>
       )}
     </span>
-  );
-}
-
-/** One side of a change in its tip: the value, then its contract's short
- *  address linked to the explorer; a side that is the address alone is the link. */
-function ChangeSide({ value, link }: { value: string; link?: FlowChangeLink }) {
-  if (!link) return <>{value}</>;
-  const a = (
-    <a
-      href={link.href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="underline decoration-dotted underline-offset-2"
-      data-flow-change-link=""
-    >
-      {link.text}
-    </a>
-  );
-  return link.text === value ? (
-    a
-  ) : (
-    <>
-      {value} ({a})
-    </>
   );
 }
 

@@ -2013,9 +2013,128 @@ async function checkChanges(page, tag, pg, width) {
   const named = /^[A-Z][^A-Z]*$/.test(want.name) ? want.name[0].toLowerCase() + want.name.slice(1) : want.name;
   check(
     `${tag}: the events' "?" names the markers and ${named}`,
-    help.includes("The grey diamonds") && help.includes(named),
+    help.includes("The grey diamonds") && help.includes(named) && help.includes("a row in the history below"),
     help.slice(0, 400),
   );
+}
+
+/** The protocol changes in the event history (ui-jobs 448): every change a
+ *  diamond marks has a row there and no row stands without a diamond (the
+ *  timeline root's `data-protocol-change-blocks` against the markers'
+ *  blocks, the drawn window's rows and the rest alike); each drawn row's days
+ *  are marked days; opened, each line reads as its marker names it, inside a
+ *  receipt; the row wears the sliders with the governance badge and no event
+ *  number; at 390 its node stands on the spine. A life with no change has no
+ *  row. Vault holders and Sky Savings draw their history without the flows
+ *  model, so they have no rows (`CHANGE_ROWS_EXEMPT`). */
+const CHANGE_ROWS_EXEMPT = /\/vaults\/|\/sky-savings\//;
+async function checkChangeRows(page, tag, pg, width) {
+  if (CHANGE_ROWS_EXEMPT.test(pg.path)) return;
+  await page
+    .locator('[data-flows-combined] [data-flow-range="All"]')
+    .first()
+    .click()
+    .catch(() => {});
+  await page.waitForTimeout(500);
+  const st = await page.evaluate(() => {
+    const root = document.querySelector("[data-timeline-rows-loaded]");
+    return {
+      markers: [...document.querySelectorAll("[data-flows-combined] [data-flow-change]")].map((m) => ({
+        days: (m.getAttribute("data-flow-change-days") ?? "").split(",").filter(Boolean).map(Number),
+        blocks: (m.getAttribute("data-flow-change-blocks") ?? "").split(",").filter(Boolean).map(Number),
+        label: m.querySelector("button")?.getAttribute("aria-label") ?? "",
+      })),
+      placed: (root?.getAttribute("data-protocol-change-blocks") ?? "").split(",").filter(Boolean).map(Number),
+      count: Number(root?.getAttribute("data-protocol-changes") ?? 0),
+      rows: [...document.querySelectorAll("[data-protocol-change]")].map((r) => ({
+        id: r.getAttribute("data-protocol-change"),
+        days: (r.getAttribute("data-protocol-change-days") ?? "").split(",").map(Number),
+        badge: r.querySelector("[data-spine-actor-badge]")?.getAttribute("data-spine-actor-badge") ?? null,
+        numbered: r.querySelector("[data-event-number]") != null,
+      })),
+    };
+  });
+  if (pg.noChanges) {
+    check(
+      `${tag}: no protocol-change row in a life with no change`,
+      st.rows.length === 0 && st.placed.length === 0,
+      `${st.rows.length} rows`,
+    );
+    return;
+  }
+  const marked = [...new Set(st.markers.flatMap((m) => m.blocks))].sort((a, b) => a - b);
+  const placed = [...new Set(st.placed)].sort((a, b) => a - b);
+  check(
+    `${tag}: every marked change has a history row and no row stands without a marker (${marked.length} blocks, ${st.count} changes)`,
+    marked.length > 0 && marked.join() === placed.join(),
+    `markers ${marked.slice(0, 6).join(",")} | rows ${placed.slice(0, 6).join(",")}`,
+  );
+  const markedDays = new Set(st.markers.flatMap((m) => m.days));
+  check(
+    `${tag}: each drawn row's days are marked days`,
+    st.rows.length > 0 && st.rows.every((r) => r.days.every((d) => markedDays.has(d))),
+    st.rows
+      .map((r) => r.days.join("+"))
+      .join(" ")
+      .slice(0, 200),
+  );
+  check(
+    `${tag}: each row wears the governance badge and no event number`,
+    st.rows.every((r) => r.badge === "governance" && !r.numbered),
+    JSON.stringify(st.rows.slice(0, 2)),
+  );
+  // Open the row holding the fixture's change (else the newest) and read its lines.
+  const target = st.rows.find((r) => r.days.includes(pg.changes.day)) ?? st.rows[0];
+  if (!target) return;
+  const row = page.locator(`[data-protocol-change="${target.id}"]`);
+  await row.scrollIntoViewIfNeeded();
+  await row.locator("[data-row-control], [role=button]").first().click();
+  await page.waitForTimeout(400);
+  const items = await row.locator("[data-protocol-change-item]").evaluateAll((els) =>
+    els.map((e) => ({
+      day: Number(e.closest("[data-protocol-change-day]")?.getAttribute("data-protocol-change-day")),
+      words: e.getAttribute("data-protocol-change-words") ?? "",
+      text: (e.textContent ?? "").replace(/\s+/g, " "),
+      name: e.getAttribute("data-flow-change-name"),
+      from: e.getAttribute("data-flow-change-from"),
+      to: e.getAttribute("data-flow-change-to"),
+      block: Number(e.getAttribute("data-flow-change-block")),
+      links: [...e.querySelectorAll("a[data-flow-change-link]")].map((a) => a.getAttribute("href")),
+      prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
+    })),
+  );
+  const labelOf = (day) => st.markers.find((m) => m.days.includes(day))?.label ?? "";
+  const unmatched = items.filter((i) => !labelOf(i.day).includes(i.words) || !i.text.includes(i.to));
+  check(
+    `${tag}: opened, each of the row's ${items.length} lines reads as its marker names it, on its day`,
+    items.length > 0 && unmatched.length === 0,
+    unmatched
+      .slice(0, 2)
+      .map((i) => `${i.day}: ${i.words}`)
+      .join(" | "),
+  );
+  check(`${tag}: each line's figure stands in a receipt`, items.length > 0 && items.every((i) => i.prov));
+  if (target.days.includes(pg.changes.day)) {
+    const want = pg.changes;
+    const it = items.find((i) => i.block === want.block && i.name === want.name);
+    check(
+      `${tag}: the row states ${want.name} ${want.from || "set"} → ${want.to} on ${want.day}`,
+      !!it && it.day === want.day && it.from === want.from && it.to === want.to,
+      it ? JSON.stringify(it) : `${items.length} lines`,
+    );
+    if (want.links)
+      check(
+        `${tag}: the row's line links each side's address as the tip does`,
+        JSON.stringify(it?.links ?? []) === JSON.stringify(want.links),
+        JSON.stringify(it?.links ?? []),
+      );
+  }
+  if (width < 640) {
+    const node = await row.locator(".spine-cell svg").first().boundingBox();
+    check(`${tag}: on the phone the row's node stands on the spine`, !!node && node.width > 0, JSON.stringify(node));
+  }
+  await row.locator("[data-row-control], [role=button]").first().click();
+  await page.waitForTimeout(200);
 }
 
 /** MakerDAO's price feed changes (ui-jobs 328 step 8, `feed`): each named
@@ -3565,6 +3684,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.band) await checkBand(page, tag, pg, width);
       if (pg.changes) await checkChanges(page, tag, pg, width);
       if (pg.noChanges) await checkNoChanges(page, tag);
+      if (pg.changes || pg.noChanges) await checkChangeRows(page, tag, pg, width);
       if (pg.feed) await checkFeedChanges(page, tag, pg);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();

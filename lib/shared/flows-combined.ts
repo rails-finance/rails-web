@@ -14,6 +14,7 @@
 
 import { DAY_MS, stateAt, type FlowModel, type FlowState } from "@/lib/shared/flows-timeline";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
+import type { FlowChange } from "@/lib/shared/flows-changes";
 
 export interface CombinedStop {
   /** The whole life's stop (day index from the first event; `liveStop` is today). */
@@ -51,6 +52,19 @@ export function flowsLife(model: FlowModel, today: number): FlowsLife {
   if (model.eventDays.length > 1) return "full";
   if (closeStop(model) != null) return "none";
   return today > model.start / DAY_MS ? "price" : "none";
+}
+
+/** The protocol's changes inside the life, in block order: the list the
+ *  events row draws as its diamonds (ruling 10) and the event history draws
+ *  as its protocol-change rows (ui-jobs 448). From the first event's day to
+ *  the close, or to today while anything is held; none where the panel
+ *  draws nothing (`flowsLife`). `today` is the UTC day number. */
+export function lifeChanges(model: FlowModel | null, today: number): FlowChange[] {
+  if (!model || model.changes.length === 0 || flowsLife(model, today) === "none") return [];
+  const start = model.start / DAY_MS;
+  const close = closeStop(model);
+  const end = start + (close ?? Math.max(model.liveStop, today - start));
+  return model.changes.filter((c) => c.day >= start && c.day <= end).sort((a, b) => a.block - b.block);
 }
 
 /** The cursor's stops, ascending: every point of the line and every day with

@@ -2,7 +2,7 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
-import { ArrowRightToLine, Clock, Layers, LogOut, TestTube } from "lucide-react";
+import { ArrowRightToLine, Clock, Layers, LogOut, SlidersHorizontal, TestTube } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -33,6 +33,7 @@ export type SpineIcon =
   | "custody" // Position moved between accounts (a receipt-token transfer run, or a position NFT's transfer: a Liquity V2 Trove, a Polaris position) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
+  | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the grey diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner; a shape of its own, since the hollow diamond on the spine is the market note's
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
   | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Sync to chart" cut the timeline: lucide `clock`, neutral ink, not an event
@@ -1204,6 +1205,18 @@ export function SpineColumn({
         return nodeRow(
           <MarketNoteIcon size={T} color={SPINE_COLORS.default} />,
           rateSpan ? rateFlank(rateSpan) : undefined,
+        );
+      case "protocol-change":
+        // A protocol change's node: a setting moved, in the spine's neutral
+        // ink. Nothing happened to the account here either.
+        return nodeRow(
+          <SlidersHorizontal
+            size={T}
+            strokeWidth={1.25}
+            absoluteStrokeWidth
+            color="var(--color-rb-500)"
+            aria-hidden="true"
+          />,
         );
       case "live-window":
         // The live window's node: the note's register (the account did
