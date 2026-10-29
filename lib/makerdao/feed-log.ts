@@ -10,7 +10,7 @@
 //   at each day's close (`maker:<ILK>`), the price the Vat held, so a new
 //   pip, a new source behind the OSM, a new cap and a new par each reach the
 //   collateral ratio at the first close after the poke that took them. The
-//   line steps on its own there: every day is an observation, and no read is
+//   line steps there: every day is an observation, and no read is
 //   added at a change.
 // - A new pip is "Price feed"; an OSM's change(src) is "OSM source" (the OSM
 //   reads the new source at its next poke and passes it on one hop later); a
