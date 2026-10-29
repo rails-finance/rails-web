@@ -437,10 +437,11 @@ check(
   const settled = tl.position.settled.colls;
   check(
     "1801 r4 P1: funding inside the transactions plus the stretches is the whole collateral gap (chain, block − 1 reads)",
-    near(deposited - settled, between + inTx, 1e-6) && near(inTx, 0.0097, 0.0002),
+    near(deposited - settled, between + inTx, 1e-6) && near(inTx, 0.0153, 0.0002),
     `deposited-net ${deposited.toFixed(6)} − settled ${settled.toFixed(6)} = ${(deposited - settled).toFixed(6)}; between ${between.toFixed(6)} + inside ${inTx.toFixed(6)}`,
   );
-  const last = ops.at(-1);
+  // The 21 Sep borrow, block 26,025,274 (the position closed at 26,204,855).
+  const last = ops.find((e) => e.blockNumber === 26025274);
   const sb = st.reads[String(last.blockNumber - 1)];
   const sa = st.reads[String(last.blockNumber)];
   check(
@@ -459,13 +460,12 @@ check(
       near(fee.fees.borrow, 0.005, 1e-9),
     JSON.stringify(fee.fees),
   );
-  const tk = await json(
-    `/api/chain/fx/event-state?pool=wsteth&id=1801&blocks=${tl.position.settled.block}&prices=1&tick=1`,
-  );
-  const rd = tk.reads[String(tl.position.settled.block)];
+  // The position closed at block 26,204,855: its tick is read at the block before.
+  const tk = await json(`/api/chain/fx/event-state?pool=wsteth&id=1801&blocks=26204854&prices=1&tick=1`);
+  const rd = tk.reads["26204854"];
   check(
-    "1801 r4 P7: tick 4920 with debt ticks above it",
-    rd.tick === 4920 && rd.ticksAbove > 0,
+    "1801 r4 P7: tick 4748 with 80 debt ticks above it at the block before the close",
+    rd.tick === 4748 && rd.ticksAbove === 80,
     `${rd.tick}, ${rd.ticksAbove} above`,
   );
 
@@ -485,10 +485,10 @@ check(
     gap ? `${gap[1]} = ${gap[2]} + ${gap[3]}` : `absent: ${p.moved.total} | ${p.moved.parts}`,
   );
   check(
-    "1801 r4 P1: the stretch table hides the empty stretches and totals the rest",
-    /11 stretches with no change\./.test(p.text) &&
-      gap != null &&
-      new RegExp(`Total between the transactions\\t−${gap[2].replace(".", "\\.")} stETH`).test(p.text),
+    "1801 r4 P1: the stretch table hides the empty stretches and totals the rest (the drift's between)",
+    /12 stretches with no change\./.test(p.text) &&
+      new RegExp(`Total between the transactions\\t−${between.toFixed(3).replace(".", "\\.")} stETH`).test(p.text),
+    `between ${between.toFixed(3)}`,
   );
   check("1801 r4 P6: the table header no longer says the owner's", !/Between the owner’s transactions/.test(p.text));
   check(
