@@ -67,7 +67,7 @@ export function makerFlowChanges(
           pclass: "emitted",
           summary: `The ${ilk} minimum collateral ratio (mat), set to ${ratio(c.mat)} by the Spotter's file("${ilk}", "mat") log at block ${c.block.toLocaleString("en-US")}.${before != null ? ` Before it, ${ratio(before)}.` : ""} A vault of the ilk is liquidated below it.`,
           contract: { name: "MakerDAO Spotter", address: MAKER_ADDRESSES.SPOTTER },
-          via: "eth_getLogs on the Spotter for file(ilk, what, data) · /api/chain/makerdao/mat-changes",
+          via: "the Spotter's file(ilk, what, data) logs, kept by rails-server · /api/at-block/makerdao/mat-changes",
           source: { block: c.block, txHash: c.txHash.toLowerCase() },
         },
       }),

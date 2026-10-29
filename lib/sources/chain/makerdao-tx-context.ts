@@ -1,8 +1,9 @@
-// Two historic MakerDAO reads for the vault page's ownership rows and minimum
-// ratio, both at mined blocks, so every answer is kept in process memory and
-// the routes cache it at the edge.
+// A historic MakerDAO read for the vault page's ownership rows, at a mined
+// block, so every answer is kept in process memory and the route caches it at
+// the edge (the minimum ratio's changes are rails-server's
+// /api/at-block/makerdao/mat-changes).
 //
-// 1. What one transaction around a vault's ownership did: the receipt's logs
+// What one transaction around a vault's ownership did: the receipt's logs
 //    and the calldata, read for the parties the rows name (a wallet, a
 //    DSProxy and its owner, an Instadapp account created in the transaction),
 //    the known tools that logged (lib/makerdao/known-contracts.ts), a DeFi
@@ -10,10 +11,6 @@
 //    migration contract, and tokens an Instadapp account received. Calls: the
 //    transaction, its receipt, and a few eth_calls per party at its block;
 //    token symbols and decimals go through ./erc20-meta.
-//
-// 2. Changes to an ilk's minimum ratio between two blocks: the Spotter's
-//    LogNote for file(ilk, "mat", value), which only governance can call, and
-//    each change's block header for its date.
 //
 // SERVER-ONLY (ALCHEMY_URL via ./rpc, the api via ./erc20-meta).
 
@@ -24,13 +21,11 @@ import {
   getAddress,
   keccak256,
   parseAbi,
-  stringToHex,
   toHex,
   type Hex,
 } from "viem";
 import { alchemyClient, chainBatchClient } from "./rpc";
 import { resolveErc20Meta } from "./erc20-meta";
-import { MAKER_ADDRESSES } from "@/lib/makerdao/asset-catalog";
 import {
   DYDX_SOLO,
   INSTA_INDEX,
@@ -38,13 +33,7 @@ import {
   MAKER_MIGRATION,
   SAI_TUB,
 } from "@/lib/makerdao/known-contracts";
-import type {
-  MakerMatChange,
-  MakerMatChangesResponse,
-  MakerParty,
-  MakerTokenIn,
-  MakerTxContext,
-} from "@/lib/makerdao/chain-history-types";
+import type { MakerParty, MakerTokenIn, MakerTxContext } from "@/lib/makerdao/chain-history-types";
 
 const PROXY_REGISTRY = "0x4678f0a6958e4d2bc4f1baf7bc52e8f3564f3fe4";
 // Maker changelog: PROXY_FACTORY. Its Created log names each DSProxy it builds.
@@ -53,7 +42,6 @@ const PROXY_CREATED = keccak256(toHex("Created(address,address,address,address)"
 const TRANSFER = keccak256(toHex("Transfer(address,address,uint256)"));
 const ACCOUNT_CREATED = keccak256(toHex("LogAccountCreated(address,address,address,address)"));
 const TUB_GIVE = keccak256(toHex("give(bytes32,address)")).slice(0, 10);
-const SPOTTER_FILE = keccak256(toHex("file(bytes32,bytes32,uint256)")).slice(0, 10);
 
 const VIEWS = parseAbi([
   "function owner() view returns (address)",
@@ -219,55 +207,6 @@ export function readMakerTxContext(txHash: Hex, addresses: string[]): Promise<Ma
     p = readTxContextOnce(txHash, addresses);
     p.catch(() => txCache.delete(key));
     txCache.set(key, p);
-  }
-  return p;
-}
-
-const matCache = new Map<string, Promise<MakerMatChangesResponse>>();
-
-async function readMatChangesOnce(ilk: string, fromBlock: number, toBlock: number): Promise<MakerMatChangesResponse> {
-  const client = alchemyClient();
-  // Raw filter: a LogNote is not an event viem can name by signature.
-  const logs = (await client.request({
-    method: "eth_getLogs",
-    params: [
-      {
-        address: getAddress(MAKER_ADDRESSES.SPOTTER),
-        // LogNote: topic0 is the selector padded, then (caller, arg1, arg2).
-        topics: [
-          `${SPOTTER_FILE}${"0".repeat(56)}` as Hex,
-          null,
-          stringToHex(ilk, { size: 32 }),
-          stringToHex("mat", { size: 32 }),
-        ],
-        fromBlock: toHex(fromBlock),
-        toBlock: toHex(toBlock),
-      },
-    ],
-  })) as { data: Hex; blockNumber: Hex; transactionHash: Hex }[];
-  const changes: MakerMatChange[] = [];
-  for (const log of logs) {
-    // data = abi.encode(bytes fax); fax = selector ‖ ilk ‖ what ‖ value.
-    const hex = log.data.slice(2);
-    const value = BigInt(`0x${hex.slice(128 + 8 + 128, 128 + 8 + 192)}`);
-    const header = await client.getBlock({ blockNumber: BigInt(log.blockNumber) });
-    changes.push({
-      block: Number(log.blockNumber),
-      timestamp: Number(header.timestamp),
-      txHash: String(log.transactionHash),
-      mat: Number(formatUnits(value, 27)),
-    });
-  }
-  return { ilk, fromBlock, toBlock, changes };
-}
-
-export function readMakerMatChanges(ilk: string, fromBlock: number, toBlock: number): Promise<MakerMatChangesResponse> {
-  const key = `${ilk}:${fromBlock}:${toBlock}`;
-  let p = matCache.get(key);
-  if (!p) {
-    p = readMatChangesOnce(ilk, fromBlock, toBlock);
-    p.catch(() => matCache.delete(key));
-    matCache.set(key, p);
   }
   return p;
 }

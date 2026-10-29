@@ -9,7 +9,8 @@
 //   OSM price of the day's close (the daily store's spot × mat, `maker:<ILK>`).
 //   The line is the Spotter's minimum ratio (mat) in force at the day's close:
 //   the mat read at the vault's first event (/api/chain/makerdao/ilk-at),
-//   then each Spotter file(ilk, "mat") since (/api/chain/makerdao/mat-changes).
+//   then each Spotter file(ilk, "mat") since (/api/chain/makerdao/mat-changes,
+//   a proxy to rails-server's stored Spotter logs).
 //   Every day's mat is an observation, so no day is drawn dotted.
 // - The view works it as a health factor whose factor is 1 ÷ mat (collateral
 //   ratio ÷ mat), so the collateral's level is debt × mat ÷ ink, the card's
