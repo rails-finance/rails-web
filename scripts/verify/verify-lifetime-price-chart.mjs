@@ -111,7 +111,10 @@
 // today the card's Bands; the tip's band words; the drawn band against the
 // scales' placing at All, zoomed and panned. Step 8 (`changes`, `noChanges`):
 // the markets' discount sets as markers on 0xd76a, 0x6bda (WETH, 6 % → 9.21 %)
-// and 0x3722 (CRV, 8 % → 12 %), none on 0x1109 (sfrxETH, closed).
+// and 0x3722 (CRV, 8 % → 12 %), none on 0x1109 (sfrxETH, closed). MakerDAO's
+// price feed (`feed`): the OSM source changes on 2028 and 31489, LSEV2-SKY-A
+// 0x6a01's new feed and cap, UNIV2USDCETH-A 23227's replaced LP oracle, none
+// on 31951 and 0x365f.
 // The vault holder pages, Maple and Frankencoin (step 7, `shareLine`,
 // `checkFamilyLine`): one holder per vault kind (Morpho Base 0x3d88, Aave
 // Umbrella stkwaEthUSDC 0x5a2a, sGHO 0x1676, stata waEthUSDC 0xab67, Yearn
@@ -544,6 +547,8 @@ const PAGES = [
     lwOnly: true,
     unit: "USD",
     changes: { day: 18866, name: "Minimum ratio", from: "150 %", to: "145 %", block: 13108692 },
+    // Step 8: the ETH OSM's source change in the life (24 Mar 2025).
+    feed: { words: ["OSM source Median ETHUSD → Chronicle ETH/USD"] },
     ratio: {
       label: "Collateral ratio",
       liquidates: "below",
@@ -569,6 +574,8 @@ const PAGES = [
       outside: 20610,
       feeLog: "WBTC-A",
     },
+    // Step 8: the WBTC OSM's source change in the life (14 Jan 2025).
+    feed: { words: ["OSM source Median BTCUSD → Chronicle BTC/USD"] },
     ratio: {
       label: "Collateral ratio",
       liquidates: "below",
@@ -578,6 +585,51 @@ const PAGES = [
       ilk: "WBTC-A",
       help: ["the OSM price", "the Spotter's minimum ratio"],
     },
+  },
+  // Step 8 (`feed`): the ilk's price feed changes as markers. LSEV2-SKY-A
+  // 0x6a01 (open): PIP_SKY → LOCKSTAKE_ORACLE capped at $0.04 (8 Oct 2025)
+  // and the cap to $0.025 (15 Dec 2025); UNIV2USDCETH-A 23227 (closed 2021):
+  // the LP oracle replaced under one chainlog key; none on ETH-A 31951
+  // (closed 2025) and LSEV2-SKY-A 0x365f (opened after the last cap set).
+  {
+    id: "makerdao 0x6a01 (LSEV2-SKY-A, feed and cap)",
+    path: "/ethereum/makerdao/0x6a010b5eae917d9e1d3b21e8129f8846f39c8c41",
+    lwOnly: true,
+    changes: {
+      day: 20369,
+      name: "Price feed",
+      from: "PIP_SKY (OSM, SKY/USD)",
+      to: "LOCKSTAKE_ORACLE (capped at $0.04)",
+      block: 23534264,
+    },
+    feed: {
+      words: ["Price feed PIP_SKY (OSM, SKY/USD) → LOCKSTAKE_ORACLE (capped at $0.04)", "Price cap $0.04 → $0.025"],
+    },
+  },
+  {
+    id: "makerdao 23227 (UNIV2USDCETH-A, LP oracle replaced)",
+    path: "/ethereum/makerdao/23227",
+    lwOnly: true,
+    changes: {
+      day: 18772,
+      name: "Price feed",
+      from: "PIP_UNIV2USDCETH 0xecb0…72be",
+      to: "PIP_UNIV2USDCETH 0xf751…e52a",
+      block: 12503924,
+    },
+    feed: { words: ["Price feed PIP_UNIV2USDCETH 0xecb0…72be → PIP_UNIV2USDCETH 0xf751…e52a"] },
+  },
+  {
+    id: "makerdao 31951 (ETH-A, no feed change)",
+    path: "/ethereum/makerdao/31951",
+    lwOnly: true,
+    feed: { none: true },
+  },
+  {
+    id: "makerdao 0x365f (LSEV2-SKY-A, no feed change)",
+    path: "/ethereum/makerdao/0x365f19fdce38310e2b20ee977eafaa3b02a65e83",
+    lwOnly: true,
+    feed: { none: true },
   },
   // Step 5 on Dolomite, Liquity V1 and Sky Savings. Dolomite 0x49d6 (closed
   // 16 Oct 2026), 0x65a9 (open, two markets a side) and 0xce8b (open,
@@ -1939,6 +1991,27 @@ async function checkChanges(page, tag, pg, width) {
     help.includes("The grey diamonds") && help.includes(named),
     help.slice(0, 400),
   );
+}
+
+/** MakerDAO's price feed changes (ui-jobs 328 step 8, `feed`): each named
+ *  change in the life has a marker whose label reads it, and the how-to-read
+ *  names the price feed's diamonds; on a life with none, no feed marker and no
+ *  such sentence. */
+async function checkFeedChanges(page, tag, pg) {
+  const labels = await page.$$eval("[data-flows-combined] [data-flow-change] button", (bs) =>
+    bs.map((b) => b.getAttribute("aria-label") ?? ""),
+  );
+  const all = labels.join(" | ");
+  const feedNames = /Price feed|OSM source|Price cap|Target price/;
+  const help = await howToRead(page);
+  const sentence = "A change to the ilk's price feed, a grey diamond";
+  if (pg.feed.none) {
+    check(`${tag}: no price feed marker in a life with no feed change`, !feedNames.test(all), all.slice(0, 200));
+    check(`${tag}: the how-to-read says nothing of the price feed's diamonds`, !help.includes(sentence));
+    return;
+  }
+  for (const w of pg.feed.words) check(`${tag}: a marker reads "${w}"`, all.includes(w), all.slice(0, 300));
+  check(`${tag}: the how-to-read says a feed change reaches the ratio`, help.includes(sentence), help.slice(0, 300));
 }
 
 /** A life no protocol change falls in (ui-jobs 328 step 8, `noChanges`):
@@ -3467,6 +3540,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.band) await checkBand(page, tag, pg, width);
       if (pg.changes) await checkChanges(page, tag, pg, width);
       if (pg.noChanges) await checkNoChanges(page, tag);
+      if (pg.feed) await checkFeedChanges(page, tag, pg);
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;

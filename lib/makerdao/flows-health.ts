@@ -16,6 +16,10 @@
 //   "Liquidates at".
 // - On an open vault today's ratio, line and level are the card's: its
 //   collateral value ÷ debt, its minimum ratio and its "Liquidates at".
+// - A change to the ilk's price feed (a new pip, OSM source, cap or par;
+//   lib/makerdao/feed-log.ts) reaches the ratio through the store's close,
+//   the price the Vat held, so the line steps there with no read added; where
+//   the life holds one the how-to-read says so.
 //
 // Pure.
 
@@ -78,3 +82,20 @@ export const MAKER_HEALTH_SOURCE: HealthSource = {
     help: "on the same days: the collateral at the OSM price of each day's close, over the debt with its stability fee. The red line is the Spotter's minimum ratio in force that day; below it the vault can be liquidated. The list in the tip picks it or the collateral's price.",
   },
 };
+
+/** The source with the how-to-read naming the price feed's changes, where
+ *  the life holds one. */
+export function makerHealthSource(feedChanged: boolean): HealthSource {
+  if (!feedChanged || !MAKER_HEALTH_SOURCE.ratio) return MAKER_HEALTH_SOURCE;
+  const r = MAKER_HEALTH_SOURCE.ratio;
+  return {
+    ...MAKER_HEALTH_SOURCE,
+    ratio: {
+      ...r,
+      help: r.help.replace(
+        " The list in the tip",
+        " A change to the ilk's price feed, a grey diamond on the events row, reaches the ratio through the OSM price at the next close. The list in the tip",
+      ),
+    },
+  };
+}

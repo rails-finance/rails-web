@@ -19,7 +19,8 @@ import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { fetchDailyPrices } from "@/lib/api/fetch-daily-prices";
 import { useMakerIlkAt, useMakerMatChanges } from "@/lib/makerdao/use-chain-history";
-import { MAKER_HEALTH_SOURCE, makerCollKey, makerMatReads } from "@/lib/makerdao/flows-health";
+import { makerCollKey, makerHealthSource, makerMatReads } from "@/lib/makerdao/flows-health";
+import { makerFeedChanges, makerLifeHasFeedChange, type MakerFeedLog } from "@/lib/makerdao/feed-log";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 import type { MakerRateLogResponse } from "@/lib/api/fetch-makerdao-rate-log";
 import { makerFlowChanges } from "@/lib/makerdao/flows-changes";
@@ -155,6 +156,25 @@ export function useMakerFlows(p: MakerFlowsInput): {
   }, [wantKey]);
   const dailySettled = want != null && daily?.key === wantKey;
 
+  // The ilk's price feed log (/api/chain/makerdao/feed-log), one read per
+  // page. A failed read leaves `feedLog` null: no feed marker draws.
+  const feedIlk = rows && rows.length > 0 ? p.ilk : null;
+  const [feedLogs, setFeedLogs] = useState<{ key: string; log: MakerFeedLog | null } | null>(null);
+  useEffect(() => {
+    if (!feedIlk) return;
+    const ac = new AbortController();
+    fetch(`/api/chain/makerdao/feed-log?ilk=${encodeURIComponent(feedIlk)}`, { signal: ac.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<MakerFeedLog>) : null))
+      .then((log) => setFeedLogs({ key: feedIlk, log }))
+      .catch((err) => {
+        if ((err as { name?: string })?.name !== "AbortError") setFeedLogs({ key: feedIlk, log: null });
+      });
+    return () => ac.abort();
+  }, [feedIlk]);
+  const feedLogSettled = feedIlk == null || feedLogs?.key === feedIlk;
+  const feedLog = feedIlk != null && feedLogs?.key === feedIlk ? feedLogs.log : null;
+  const feedChanges = useMemo(() => makerFeedChanges(feedLog), [feedLog]);
+
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => setNow(Date.now() / 1000), []);
@@ -207,10 +227,18 @@ export function useMakerFlows(p: MakerFlowsInput): {
         : null,
     [p.collSymbol, risk],
   );
+  // Whether a feed change falls in the life, for the how-to-read.
+  const feedChanged = useMemo(() => {
+    if (!rows?.length || !replayedTimeline) return false;
+    const firstDay = Math.floor(rows[0].ts / DAY_S);
+    const lastDay = replayedTimeline.today ?? Math.floor(rows[rows.length - 1].ts / DAY_S);
+    return makerLifeHasFeedChange(feedChanges, firstDay, lastDay);
+  }, [rows, replayedTimeline, feedChanges]);
+  const healthSource = useMemo(() => makerHealthSource(feedChanged), [feedChanged]);
   const healthTimeline = useFlowsHealth(replayedTimeline, {
     reader: null,
     given: matReads,
-    source: MAKER_HEALTH_SOURCE,
+    source: healthSource,
     events: NO_EVENTS,
     liveHf,
     liveLevels,
@@ -222,12 +250,11 @@ export function useMakerFlows(p: MakerFlowsInput): {
     const ilkAt = first ? (matFirst?.reads.get(first.block) ?? null) : null;
     const span = matSpans[0];
     const read = span ? matChanges.get(`${span.from}-${span.to}`) : null;
-    return makerFlowChanges(
-      p.ilk,
-      p.rateLog ?? null,
-      read ? { first: ilkAt?.mat ?? null, changes: read.changes } : null,
-    );
-  }, [p.ilk, p.rateLog, first, matFirst, matSpans, matChanges]);
+    return [
+      ...makerFlowChanges(p.ilk, p.rateLog ?? null, read ? { first: ilkAt?.mat ?? null, changes: read.changes } : null),
+      ...feedChanges,
+    ];
+  }, [p.ilk, p.rateLog, first, matFirst, matSpans, matChanges, feedChanges]);
   const timeline = useMemo(
     () => (healthTimeline && changes.length ? { ...healthTimeline, changes } : healthTimeline),
     [healthTimeline, changes],
@@ -265,7 +292,7 @@ export function useMakerFlows(p: MakerFlowsInput): {
             !p.liveSettled ||
             !p.collSymbol ||
             !p.debtSymbol ||
-            (rows != null && rows.length > 0 && !dailySettled)
+            (rows != null && rows.length > 0 && (!dailySettled || !feedLogSettled))
           ? "reading"
           : rows != null && rows.length > 0 && timeline == null
             ? "failed"

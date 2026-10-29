@@ -4,8 +4,9 @@
 // Compound V2, Moonwell and Compound V3 (lib/shared/collateral-factor-changes.ts),
 // the threshold and e-mode changes of the Aave V3 family
 // (lib/aave-v3/config-changes.ts), f(x)'s liquidation and rebalance ratio
-// changes (lib/fx/ratio-log.ts), and LlamaLend's discount and policy changes
-// (lib/llamalend/config-log.ts; rails-ops ui-jobs 328 step 8,
+// changes (lib/fx/ratio-log.ts), LlamaLend's discount and policy changes
+// (lib/llamalend/config-log.ts), and MakerDAO's price feed changes
+// (lib/makerdao/feed-log.ts; rails-ops ui-jobs 328 step 8,
 // reference/lifetime-price-chart.md, the rows).
 // ----------------------------------------------------------------------------
 // OFFLINE. Fixtures read from the page's routes on the date the file names
@@ -79,6 +80,8 @@ import {
   type LlamalendConfigLog,
   type LlamalendDiscountRow,
 } from "@/lib/llamalend/config-log";
+import { makerFeedChanges, makerLifeHasFeedChange, type MakerFeedLog } from "@/lib/makerdao/feed-log";
+import { makerHealthSource } from "@/lib/makerdao/flows-health";
 
 const DAY_S = 86_400;
 
@@ -1074,4 +1077,166 @@ test("llamalend 0x1109: no set in the life draws no marker; a synthetic change i
   assert.equal(inLife[0].day, Math.floor(mid.ts / DAY_S));
   assert.match(inLife[0].prov.summary, /kept 6 % through the rest of this history/);
   assert.ok(llamalendLifeHasDiscountChange(inLife, first, last));
+});
+
+// ── MakerDAO: the ilks' price feed changes ──────────────────────────────────
+//
+// Fixture (scripts/verify/fixtures/maker-feed-log.json, written by
+// capture-maker-feed-log.mjs on the date it names): each ilk's feed log
+// (/api/chain/makerdao/feed-log), and per vault its rows' blocks and times,
+// whether it is open, and the daily store's closes of `maker:<ILK>`.
+//
+// Held (lib/makerdao/feed-log.ts): each pip after the ilk's first, each OSM
+// source change, each cap set after its feed's filing and each par file is a
+// marker inside the life, named by the chainlog key or the source's kind and
+// wat(); the line takes the change from the store's close, which on each
+// change day is an observation, so no read is added.
+
+interface MkVault {
+  name: string;
+  vault: string;
+  ilk: string;
+  open: boolean;
+  rows: { block: number; ts: number }[];
+  closes: [number, number][];
+}
+const MK = JSON.parse(readFileSync(join(__dirname, "fixtures", "maker-feed-log.json"), "utf8")) as {
+  capturedAt: string;
+  logs: Record<string, MakerFeedLog>;
+  vaults: MkVault[];
+};
+const mkToday = Math.floor(Date.parse(MK.capturedAt) / 1000 / DAY_S);
+const mkLife = (v: MkVault): [number, number] => [
+  Math.floor(v.rows[0].ts / DAY_S),
+  v.open ? mkToday : Math.floor(v.rows[v.rows.length - 1].ts / DAY_S),
+];
+const mkVault = (name: string) => MK.vaults.find((v) => v.name === name)!;
+const mkWords = (c: { name: string; from: string | null; to: string }) =>
+  c.from != null ? `${c.name} ${c.from} → ${c.to}` : `${c.name} set to ${c.to}`;
+const mkInLife = (v: MkVault, log = MK.logs[v.ilk]) => {
+  const [first, last] = mkLife(v);
+  return changesByDay(makerFeedChanges(log), first, last).flatMap((d) => d.changes);
+};
+
+test("maker: the ilks' feed logs, each source and feed named from the chain, no par file", () => {
+  const eth = MK.logs["ETH-A"];
+  assert.deepEqual(
+    eth.feeds.map((f) => [f.name, f.kind, f.src?.kind, f.src?.wat]),
+    [["PIP_ETH", "osm", "median", "ETHUSD"]],
+  );
+  assert.deepEqual(
+    eth.sources.map((s) => [s.block, s.from?.wat, s.to.kind, s.to.wat]),
+    [[22_117_224, "ETHUSD", "chronicle", "ETH/USD"]],
+  );
+  assert.deepEqual(
+    MK.logs["WBTC-A"].sources.map((s) => [s.block, s.from?.wat, s.to.wat]),
+    [[21_616_020, "BTCUSD", "BTC/USD"]],
+  );
+  const sky = MK.logs["LSEV2-SKY-A"];
+  assert.deepEqual(
+    sky.feeds.map((f) => [f.block, f.name, f.kind, f.cap]),
+    [
+      [22_517_471, "PIP_SKY", "osm", null],
+      [23_534_264, "LOCKSTAKE_ORACLE", "capped", 0.04],
+    ],
+  );
+  assert.deepEqual(
+    sky.caps.map((c) => [c.block, c.from, c.to]),
+    [[24_018_461, 0.04, 0.025]],
+    "the filing's cap set draws none",
+  );
+  const lp = MK.logs["UNIV2USDCETH-A"];
+  assert.deepEqual(
+    lp.feeds.map((f) => [f.block, f.name, f.kind]),
+    [
+      [11_734_776, "PIP_UNIV2USDCETH", "lp"],
+      [12_503_924, "PIP_UNIV2USDCETH", "lp"],
+    ],
+  );
+  for (const log of Object.values(MK.logs)) assert.deepEqual(log.pars, [], `${log.ilk}: par never filed`);
+});
+
+test("maker: each vault's feed changes in its life, named; none on the lives without one", () => {
+  const want: Record<string, string[]> = {
+    "2028": ["OSM source Median ETHUSD → Chronicle ETH/USD"],
+    "31489": ["OSM source Median BTCUSD → Chronicle BTC/USD"],
+    "0x6a01": ["Price feed PIP_SKY (OSM, SKY/USD) → LOCKSTAKE_ORACLE (capped at $0.04)", "Price cap $0.04 → $0.025"],
+    "23227": ["Price feed PIP_UNIV2USDCETH 0xecb0…72be → PIP_UNIV2USDCETH 0xf751…e52a"],
+    "31951": [],
+    "0x365f": [],
+  };
+  for (const v of MK.vaults) {
+    const inLife = mkInLife(v);
+    assert.deepEqual(inLife.map(mkWords), want[v.name], v.name);
+    const [first, last] = mkLife(v);
+    assert.equal(
+      makerLifeHasFeedChange(inLife, first, last),
+      want[v.name].length > 0,
+      `${v.name}: the how-to-read's flag`,
+    );
+    for (const c of inLife) assert.equal(c.prov.kind, "chain", `${v.name}: ${c.name} stands in a chain receipt`);
+  }
+  const help = (on: boolean) => makerHealthSource(on).ratio!.help;
+  assert.match(help(true), /a grey diamond on the events row, reaches the ratio through the OSM price/);
+  assert.doesNotMatch(help(false), /grey diamond/);
+});
+
+test("maker 0x6a01: the store's close steps on the feed's and the cap's days, so the ratio steps with no read added", () => {
+  const v = mkVault("0x6a01");
+  const close = new Map(v.closes);
+  const day = (block: number) =>
+    Math.floor(MK.logs["LSEV2-SKY-A"].feeds.concat().find((f) => f.block === block)!.timestamp / DAY_S);
+  const pipDay = day(23_534_264);
+  const capDay = Math.floor(MK.logs["LSEV2-SKY-A"].caps[0].timestamp / DAY_S);
+  assert.ok(close.get(pipDay - 1)! > 0.04, `the day before the new feed, the OSM's price ${close.get(pipDay - 1)}`);
+  assert.equal(close.get(pipDay), 0.04, "the new feed's day closes at its cap");
+  assert.equal(close.get(capDay - 1), 0.04);
+  assert.equal(close.get(capDay), 0.025, "the cap's day closes at the new cap");
+  // Every change day in every life is a close the chart draws.
+  for (const w of MK.vaults)
+    for (const c of mkInLife(w)) assert.ok(new Map(w.closes).has(c.day), `${w.name}: a close on ${c.day} (${c.name})`);
+});
+
+test("maker 31951: a synthetic source change and par file inside the life draw markers; a cap set before it draws none", () => {
+  const v = mkVault("31951");
+  const log = MK.logs["ETH-A"];
+  const a = v.rows[3];
+  const b = v.rows[4];
+  const mid = { block: Math.floor((a.block + b.block) / 2), timestamp: Math.floor((a.ts + b.ts) / 2) };
+  const at = (n: number, o: { block: number; timestamp: number }) => ({
+    ...o,
+    txHash: `0x${String(n).repeat(64)}`,
+    logIndex: 1,
+  });
+  const scribe = log.sources[0].to;
+  const synthetic: MakerFeedLog = {
+    ...log,
+    sources: [
+      ...log.sources,
+      {
+        ...at(1, mid),
+        osm: log.feeds[0].pip,
+        pip: log.feeds[0].pip,
+        from: scribe,
+        to: { ...scribe, address: `0x${"ab".repeat(20)}` },
+      },
+    ],
+    caps: [
+      {
+        ...at(2, { block: v.rows[0].block - 50_000, timestamp: v.rows[0].ts - 9 * DAY_S }),
+        pip: log.feeds[0].pip,
+        from: 0.04,
+        to: 0.03,
+      },
+    ],
+    pars: [{ ...at(3, { block: mid.block + 1, timestamp: mid.timestamp + 12 }), par: 1.02 }],
+  };
+  const inLife = mkInLife(v, synthetic);
+  assert.deepEqual(inLife.map(mkWords), [
+    `OSM source Chronicle ETH/USD 0x46ef…7f4e → Chronicle ETH/USD 0xabab…abab`,
+    "Target price $1 → $1.02",
+  ]);
+  assert.equal(inLife[0].day, Math.floor(mid.timestamp / DAY_S));
+  const [first, last] = mkLife(v);
+  assert.ok(makerLifeHasFeedChange(inLife, first, last));
 });
