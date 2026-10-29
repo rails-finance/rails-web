@@ -23,6 +23,15 @@ export function externalActor(ctx: { txFrom?: string; poolCaller?: string }, wal
   return ctx.txFrom;
 }
 
+/** `externalActor`'s verdict as a flag, for the Lifetime flows model
+ *  (`FlowEvent.byOther`): false where the row names no owner. */
+export function actedByOther(
+  ctx: { txFrom?: string; poolCaller?: string },
+  wallet: string | undefined | null,
+): boolean {
+  return !!wallet && externalActor(ctx, wallet) != null;
+}
+
 /** The facts the transaction-sender test reads. */
 export interface SentFacts {
   txFrom?: string | null;

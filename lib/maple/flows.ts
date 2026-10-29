@@ -40,7 +40,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-maple-flows.ts.
 
-import { externalActor } from "@/lib/shared/external-actor";
+import { actedByOther } from "@/lib/shared/external-actor";
 import type { PricePoint, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowBucket, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
@@ -199,7 +199,7 @@ export function mapleFlowRows(events: BaseActivityEvent[]): Map<string, MapleFlo
       interestSincePrev: units(raw.interestSincePrev, c.interestSincePrev),
       byOther:
         c.eventType === "transfer_in" ||
-        (c.eventType !== "request_fill" && externalActor({ txFrom: c.txFrom, poolCaller: c.caller }, e.wallet) != null),
+        (c.eventType !== "request_fill" && actedByOther({ txFrom: c.txFrom, poolCaller: c.caller }, e.wallet)),
     };
     const list = out.get(c.pool);
     if (list) list.push(row);

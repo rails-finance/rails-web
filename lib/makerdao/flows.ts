@@ -42,7 +42,7 @@ import { daysFromEvents } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, MakerDAOEventType } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
-import { externalActor } from "@/lib/shared/external-actor";
+import { actedByOther } from "@/lib/shared/external-actor";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 
 const DAY_S = 86_400;
@@ -217,7 +217,7 @@ export function makerFlowEvents(
     const opened = (gives.get(makerTxHashOf(e)) ?? []).some(
       (g) => (g.dstOwner != null && g.dstOwner === c.txFrom) || (g.dst != null && g.dst === c.txTo),
     );
-    return !opened && externalActor({ txFrom: c.txFrom, poolCaller: c.txTo }, c.ownerAt ?? e.wallet) != null;
+    return !opened && actedByOther({ txFrom: c.txFrom, poolCaller: c.txTo }, c.ownerAt ?? e.wallet);
   };
   // Served order is chain order; a stable sort by block keeps it.
   const sorted = rows.map((e, i) => ({ e, i })).sort((a, b) => a.e.blockNumber - b.e.blockNumber || a.i - b.i);

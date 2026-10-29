@@ -45,7 +45,6 @@
 //
 // Pure: tested offline in scripts/verify/verify-polaris-flows.ts.
 
-import { polarisSentByOther } from "@/lib/polaris/event-prose";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowIndexes, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -297,6 +296,9 @@ function logIndexOf(id: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const sentByOtherThan = (txFrom: string | undefined, holder: string | undefined): boolean =>
+  !!holder && !!txFrom && txFrom.toLowerCase() !== holder.toLowerCase();
+
 /** The CDP's rows that move it, ascending (a custody transfer moves nothing
  *  and is not a flow). */
 export function polarisFlowRows(events: BaseActivityEvent[], holders?: ReadonlyMap<string, string>): PolarisFlowRow[] {
@@ -314,7 +316,9 @@ export function polarisFlowRows(events: BaseActivityEvent[], holders?: ReadonlyM
       logIndex: logIndexOf(e.id),
       tx: e.txHash || undefined,
       kind: c.eventType === "liquidate" ? "liquidation" : "owner",
-      byOther: c.eventType !== "liquidate" && polarisSentByOther(c, holders?.get(e.id)),
+      // `polarisSentByOther`'s rule, which lives beside the prose (its
+      // templates load from YAML, which this module's readers cannot import).
+      byOther: c.eventType !== "liquidate" && sentByOtherThan(c.txFrom, holders?.get(e.id)),
       collChange: wei(r.collChange, c.collChange),
       debtChange: wei(r.debtChange, c.debtChange),
       mintRedeemCollGain: wei(r.mintRedeemCollGain, c.mintRedeemCollGain),

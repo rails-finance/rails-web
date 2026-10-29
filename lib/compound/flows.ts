@@ -37,7 +37,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-compound-v3-flows.ts.
 
-import { externalActor } from "@/lib/shared/external-actor";
+import { actedByOther } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents } from "@/lib/shared/flows-timeline";
 import type { AssetBalance, FocusEvent } from "@/lib/shared/flow-focus";
@@ -184,7 +184,7 @@ export function compoundFlowEvents(
       byOther:
         c.eventType === "transfer_in" ||
         c.eventType === "transfer_collateral_in" ||
-        externalActor({ txFrom: c.txFrom, poolCaller: c.funder }, e.wallet) != null,
+        actedByOther({ txFrom: c.txFrom, poolCaller: c.funder }, e.wallet),
     };
   });
 }

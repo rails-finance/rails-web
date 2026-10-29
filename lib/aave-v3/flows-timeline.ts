@@ -25,7 +25,7 @@
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
-import { externalActor } from "@/lib/shared/external-actor";
+import { actedByOther } from "@/lib/shared/external-actor";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import {
   daysFromEvents,
@@ -406,7 +406,7 @@ export function aaveFamilyByOther(ev: BaseActivityEvent): boolean {
     | undefined;
   if (!c?.eventType || c.eventType === "swap") return false;
   if (c.eventType === "transfer_in") return true;
-  return externalActor({ txFrom: c.txFrom, poolCaller: c.poolCaller ?? c.caller }, c.owner ?? ev.wallet) != null;
+  return actedByOther({ txFrom: c.txFrom, poolCaller: c.poolCaller ?? c.caller }, c.owner ?? ev.wallet);
 }
 
 /** A balance an event states after it. */

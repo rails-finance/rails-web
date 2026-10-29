@@ -37,7 +37,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-morpho-flows.ts.
 
-import { externalActor } from "@/lib/shared/external-actor";
+import { actedByOther } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -236,7 +236,7 @@ export function morphoFlowEvents(events: BaseActivityEvent[], prices?: Map<numbe
       assetsDelta: c.side === "loan" ? delta : 0,
       loanRepaid: num(c.loanRepaid) ?? 0,
       price: stored != null && stored > 0 ? stored : read != null && read > 0 ? read : null,
-      byOther: externalActor({ txFrom: c.txFrom, poolCaller: c.caller }, e.wallet) != null,
+      byOther: actedByOther({ txFrom: c.txFrom, poolCaller: c.caller }, e.wallet),
     };
   });
 }
