@@ -12,7 +12,7 @@
 // one that moves the line on a day the account held an affected collateral
 // against a debt is one more read at the change's transaction. Ethereum's
 // index answers only a transaction with the account's event, so a change's
-// read there takes the chain route ("chain:<market>").
+// read there takes the at-block route ("chain:<market>", rails-server's store).
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";

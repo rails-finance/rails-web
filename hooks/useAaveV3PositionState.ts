@@ -42,8 +42,9 @@ const LOADING: AaveV3PositionStateResult = { status: "loading" };
  *  SparkLend read the chain at the block (app/api/chain/{aave-v3-base,
  *  aave-v3-arbitrum,seamless,spark}/
  *  position-state), same wire shape. "chain:<market>" reads an Ethereum
- *  market from the chain (app/api/chain/aave-v3/position-state), for a row
- *  the index holds no event for (an e-mode change). */
+ *  market at the block from rails-server's at-block store
+ *  (app/api/chain/aave-v3/position-state), for a row the index holds no
+ *  event for (a governance change). */
 const routeFor = (market: string): string =>
   market === "base"
     ? "/api/chain/aave-v3-base/position-state"
