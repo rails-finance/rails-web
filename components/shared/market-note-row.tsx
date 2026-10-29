@@ -269,7 +269,7 @@ function rateSetter(note: MarketNote): "governance" | "formula" {
 }
 
 /** Who acted on a note, run or live group, for the badge in the spine node's
- *  corner: the gavel where governance set it, the test tube where the
+ *  corner: the gavel where governance set it, the cog where the
  *  protocol did; a live group whose notes differ takes the protocol's. */
 /** What a note's node names: the PSM's share, a rate, else a vault's terms;
  *  a run or a live group the rate where every note states one. */
