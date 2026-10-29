@@ -3,28 +3,24 @@
 // collateral, debt and ticks after it; what stood before, what the AMM had
 // converted, and the health on each side are state only, so they are read.
 //
-// Per block, ONE multicall against the market's two contracts:
-//   Controller.user_state(user)            (collateral, converted, debt, N)
-//   Controller.health(user, true)          reverts with no loan → null
-//   Controller.user_prices(user)           band top and bottom price
-//   Controller.liquidation_discounts(user) the discount health subtracts
-//   AMM.read_user_tick_numbers(user)       (n1, n2)
-//   AMM.price_oracle()
-//   AMM.get_base_price()                   the band grid's anchor at the block
-// Two eth_calls per event (block − 1, block). A mined block's state never
-// changes, so each (controller, user, block) answer is kept in process
-// memory and the route caches it at the edge.
+// Both blocks come from rails-server's `/api/at-block/llamalend/event-state`,
+// which reads each block's seven calls once into its at-block store (Controller
+// user_state, health, user_prices and liquidation_discounts; AMM
+// read_user_tick_numbers, price_oracle and get_base_price; server mig 412,
+// rails-ops decisions/0056).
 //
 // A liquidation row may also ask for the position at the START of its block
 // (`start`): the state at block − 1 read with the block's number and time
 // (eth_call block overrides), so health and the oracle price are what the
 // block's first transaction saw. The oracle price moves with time, so health
-// can cross 0 between the end of one block and the next. One block-header
-// read and one eth_call (Multicall3 aggregate3).
+// can cross 0 between the end of one block and the next. The store keys a call
+// by its block alone, so this read stays on the chain: one block-header read
+// and one eth_call (Multicall3 aggregate3), kept in process memory.
 //
 // SERVER-ONLY.
 
 import { decodeFunctionResult, encodeFunctionData, getAddress, multicall3Abi, parseAbi } from "viem";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { alchemyClient } from "./rpc";
 import { discoverLlamalendMarkets } from "./llamalend-markets";
 import { UnknownLlamalendMarketError } from "./llamalend-position";
@@ -80,76 +76,26 @@ export interface LlamalendEventState {
   start?: LlamalendStartOfBlock | null;
 }
 
-type Res = { status: string; result?: unknown };
-const ok = <T>(r: Res | undefined): T | null => (r?.status === "success" && r.result != null ? (r.result as T) : null);
-
 const CACHE_MAX = 4000;
-const cache = new Map<string, Promise<LlamalendStateAt>>();
+const RAILS_API_URL = process.env.RAILS_API_URL;
 
-function remember(key: string, p: Promise<LlamalendStateAt>): Promise<LlamalendStateAt> {
-  if (cache.size >= CACHE_MAX) {
-    const oldest = cache.keys().next().value;
-    if (oldest != null) cache.delete(oldest);
-  }
-  cache.set(key, p);
-  p.catch(() => cache.delete(key));
-  return p;
-}
-
-async function readAt(controller: `0x${string}`, amm: `0x${string}`, user: `0x${string}`, block: number) {
-  const reads = (await alchemyClient().multicall({
-    allowFailure: true,
-    blockNumber: BigInt(block),
-    contracts: [
-      { address: controller, abi: CONTROLLER_ABI, functionName: "user_state", args: [user] },
-      { address: controller, abi: CONTROLLER_ABI, functionName: "health", args: [user, true] },
-      { address: controller, abi: CONTROLLER_ABI, functionName: "user_prices", args: [user] },
-      { address: controller, abi: CONTROLLER_ABI, functionName: "liquidation_discounts", args: [user] },
-      { address: amm, abi: AMM_ABI, functionName: "read_user_tick_numbers", args: [user] },
-      { address: amm, abi: AMM_ABI, functionName: "price_oracle" },
-      { address: amm, abi: AMM_ABI, functionName: "get_base_price" },
-    ] as const,
-  })) as Res[];
-  const us = ok<readonly [bigint, bigint, bigint, bigint]>(reads[0]);
-  if (us == null) throw new Error("user_state did not answer");
-  const price = ok<bigint>(reads[5]);
-  const base = ok<bigint>(reads[6]);
-  const out: LlamalendStateAt = {
-    block,
-    hasLoan: us[2] > BigInt(0),
-    collateralRaw: null,
-    convertedRaw: null,
-    debtRaw: null,
-    n1: null,
-    n2: null,
-    healthRaw: null,
-    pUpRaw: null,
-    pDownRaw: null,
-    liquidationDiscountRaw: null,
-    priceOracleRaw: price != null ? price.toString() : null,
-    basePriceRaw: base != null ? base.toString() : null,
-  };
-  // No loan: the stored ticks are stale and health reverts, so nothing else
-  // is stated.
-  if (!out.hasLoan) return out;
-  out.collateralRaw = us[0].toString();
-  out.convertedRaw = us[1].toString();
-  out.debtRaw = us[2].toString();
-  const health = ok<bigint>(reads[1]);
-  if (health != null) out.healthRaw = health.toString();
-  const prices = ok<readonly [bigint, bigint]>(reads[2]);
-  if (prices != null) {
-    out.pUpRaw = prices[0].toString();
-    out.pDownRaw = prices[1].toString();
-  }
-  const discount = ok<bigint>(reads[3]);
-  if (discount != null) out.liquidationDiscountRaw = discount.toString();
-  const ticks = ok<readonly [bigint, bigint]>(reads[4]);
-  if (ticks != null) {
-    out.n1 = ticks[0].toString();
-    out.n2 = ticks[1].toString();
-  }
-  return out;
+/** Both blocks from the server's store; an unlisted controller is its 404. */
+async function storedStates(
+  controller: string,
+  user: string,
+  block: number,
+  readerIp?: string,
+): Promise<{ before: LlamalendStateAt; after: LlamalendStateAt }> {
+  if (!RAILS_API_URL) throw new Error("RAILS_API_URL is not set");
+  const qs = new URLSearchParams({ controller, user, block: String(block) });
+  const res = await fetch(
+    `${RAILS_API_URL}/api/at-block/llamalend/event-state?${qs.toString()}`,
+    createAuthFetchOptions(undefined, readerIp),
+  );
+  if (res.status === 404) throw new UnknownLlamalendMarketError(controller);
+  if (!res.ok) throw new Error(`the at-block store answered ${res.status}`);
+  const body = (await res.json()) as { before: LlamalendStateAt; after: LlamalendStateAt };
+  return { before: body.before, after: body.after };
 }
 
 const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
@@ -208,18 +154,13 @@ export async function readLlamalendEventState(
   userRaw: string,
   block: number,
   withStart = false,
+  readerIp?: string,
 ): Promise<LlamalendEventState> {
   const controller = getAddress(controllerRaw).toLowerCase();
   const user = getAddress(userRaw);
-  const market = (await discoverLlamalendMarkets()).get(controller);
-  if (!market) throw new UnknownLlamalendMarketError(controller);
-  const c = controller as `0x${string}`;
-  const amm = market.amm as `0x${string}`;
-  const at = (b: number) => {
-    const key = `${controller}:${user.toLowerCase()}:${b}`;
-    return cache.get(key) ?? remember(key, readAt(c, amm, user, b));
-  };
-  const startOf = () => {
+  const startOf = async () => {
+    const market = (await discoverLlamalendMarkets()).get(controller);
+    if (!market) throw new UnknownLlamalendMarketError(controller);
     const key = `${controller}:${user.toLowerCase()}:${block}`;
     let p = startCache.get(key);
     if (!p) {
@@ -227,7 +168,7 @@ export async function readLlamalendEventState(
         const oldest = startCache.keys().next().value;
         if (oldest != null) startCache.delete(oldest);
       }
-      p = readStart(c, amm, user, block).catch(() => null);
+      p = readStart(controller as `0x${string}`, market.amm as `0x${string}`, user, block).catch(() => null);
       p.then((v) => {
         if (v == null) startCache.delete(key);
       });
@@ -235,9 +176,8 @@ export async function readLlamalendEventState(
     }
     return p;
   };
-  const [before, after, start] = await Promise.all([
-    at(block - 1),
-    at(block),
+  const [{ before, after }, start] = await Promise.all([
+    storedStates(controller, user.toLowerCase(), block, readerIp),
     withStart ? startOf() : Promise.resolve(undefined),
   ]);
   return { controller, user: user.toLowerCase(), before, after, ...(start !== undefined ? { start } : {}) };
