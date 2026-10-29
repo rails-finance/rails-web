@@ -2,17 +2,17 @@
 
 // A Liquity V2 branch's redemption pace over a Trove's life
 // (/api/liquity-v2/redemption-pace; lib/liquity-v2/redemption-pace.ts), for
-// the chart's pace lane. Null while the read is on its way, where it failed,
-// or with no branch or range; the chart then draws no lane. One read per
+// the protocol activity chart. Null while the read is on its way, where it failed,
+// or with no branch or range; the page then draws no activity chart. One read per
 // branch and range a page load.
 
 import { useEffect, useState } from "react";
-import type { FlowPace } from "@/lib/shared/flows-pace";
+import type { ProtocolActivity } from "@/lib/shared/flows-pace";
 import { isoDay, paceRange, redemptionPace, type PaceBranch } from "@/lib/liquity-v2/redemption-pace";
 
-const cache = new Map<string, Promise<FlowPace | null>>();
+const cache = new Map<string, Promise<ProtocolActivity | null>>();
 
-function load(branch: PaceBranch, from: number, to: number): Promise<FlowPace | null> {
+function load(branch: PaceBranch, from: number, to: number): Promise<ProtocolActivity | null> {
   const key = `${branch}:${from}:${to}`;
   let p = cache.get(key);
   if (!p) {
@@ -33,10 +33,10 @@ export function useRedemptionPace(
   branch: PaceBranch | null,
   firstDay: number | null,
   lastDay: number | null,
-): FlowPace | null {
+): ProtocolActivity | null {
   const range = firstDay != null && lastDay != null ? paceRange(firstDay, lastDay) : null;
   const key = branch && range ? `${branch}:${range.from}:${range.to}` : null;
-  const [state, setState] = useState<{ key: string; pace: FlowPace | null } | null>(null);
+  const [state, setState] = useState<{ key: string; pace: ProtocolActivity | null } | null>(null);
   useEffect(() => {
     if (!branch || !range || !key) return;
     let live = true;

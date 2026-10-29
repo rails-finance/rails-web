@@ -125,7 +125,7 @@ test("wstETH, a Trove never redeemed: the branch's days before the first redempt
 
 test("the lane's words: branch-wide, this Trove included; no contrast tail", () => {
   const p = redemptionPace("WETH", WETH)!;
-  assert.equal(p.label, "WETH branch, BOLD redeemed a day");
+  assert.equal(`${p.scope} · ${p.measure}`, "Whole WETH branch · BOLD redeemed a day");
   assert.match(p.help, /on the WETH branch each day, every Trove on the branch, this one included/);
   assert.match(p.help, /lowest interest rates first/);
   assert.doesNotMatch(p.help, /, not |\bfold|footgun|honest|itself|\bown\b|exactly|actually/);

@@ -28,7 +28,7 @@
 
 import type { DayObs, PriceMarks, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowChange } from "@/lib/shared/flows-changes";
-import type { FlowPace } from "@/lib/shared/flows-pace";
+import type { ProtocolActivity } from "@/lib/shared/flows-pace";
 
 export type FlowSide = "collateral" | "debt";
 
@@ -391,10 +391,10 @@ export interface FlowTimeline {
    *  reads (lib/shared/flows-changes.ts); the events row marks those inside
    *  the life. */
   changes?: FlowChange[];
-  /** A protocol-wide daily total drawn in a lane under the price pane, its
-   *  day read in the price tip (lib/shared/flows-pace.ts; Liquity V2's branch
+  /** A protocol-wide daily total drawn as its own chart under the events, on
+   *  the chart's time axis (lib/shared/flows-pace.ts; Liquity V2's branch
    *  redemptions). */
-  pace?: FlowPace;
+  activity?: ProtocolActivity;
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -525,8 +525,8 @@ export interface FlowModel {
   /** The timeline's protocol changes (`FlowTimeline.changes`), by UTC day
    *  number. */
   changes: FlowChange[];
-  /** The timeline's pace lane (`FlowTimeline.pace`), or null. */
-  pace: FlowPace | null;
+  /** The timeline's protocol activity (`FlowTimeline.activity`), or null. */
+  activity: ProtocolActivity | null;
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
   valued: { collateral: number; debt: number }[];
@@ -1053,7 +1053,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     }),
     repricings,
     changes: t.changes ?? [],
-    pace: t.pace ?? null,
+    activity: t.activity ?? null,
     live: t.live,
     valued,
     collateralHigh,

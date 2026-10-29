@@ -7,7 +7,8 @@
 // (components/shared/lifetime-flows-lw.tsx), whose code the panel fetches
 // only where a family draws on Lightweight Charts.
 
-import { DAY_S } from "@/lib/shared/asset-chart-grid";
+import type { IChartApi } from "lightweight-charts";
+import { DAY_S, type Grid } from "@/lib/shared/asset-chart-grid";
 
 /** The window shown, in unix seconds. */
 export interface FlowsLwView {
@@ -31,6 +32,20 @@ export interface FlowsLwApi {
   /** Sets the window to the last `days` of the axis (null: all of it), moved
    *  to hold `cursorDay`. */
   showSpan: (days: number | null, cursorDay: number) => void;
+}
+
+/** The tie from the Lifetime flows chart to a chart drawn under the events
+ *  on its time axis (protocol activity): the chart and the grid its logical
+ *  range counts cells of, sent again on every new grid. */
+export interface FlowsLwLink {
+  chart: IChartApi;
+  grid: Grid;
+  /** The linked chart's hover at a cell's time, drawn as this chart's
+   *  crosshair (no horizontal line); null clears it. */
+  hover: (time: number | null) => void;
+  /** The linked chart's wheel and Safari's pinch, moving this chart's window. */
+  wheel: (e: WheelEvent) => void;
+  gesture: (e: Event) => void;
 }
 
 /** The range buttons, in days ("All" the whole axis). */

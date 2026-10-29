@@ -66,7 +66,7 @@ const listWords = (xs: string[]) =>
  *  alone (`events` null). */
 export function lifetimeFlowsStackContent(opts: {
   events: FlowEventsHelp | null;
-  charts: { value: boolean; price: FlowPriceHelp | null; unit?: string; line?: string; pace?: string } | null;
+  charts: { value: boolean; price: FlowPriceHelp | null; unit?: string; line?: string; activity?: string } | null;
 }): LearnMoreContent {
   const { events, charts } = opts;
   const details: { bold: string; text: string }[] = [];
@@ -92,7 +92,7 @@ export function lifetimeFlowsStackContent(opts: {
                 text: `on the same days${price.level ? "; the red line is where the position liquidates" : ""}.`,
               },
     );
-  if (charts?.pace) details.push({ bold: "The orange bars", text: charts.pace });
+  if (charts?.activity) details.push({ bold: "The protocol activity chart", text: charts.activity });
   if (events) {
     const hues = events.sides
       .filter((s) => s.events.length > 0)

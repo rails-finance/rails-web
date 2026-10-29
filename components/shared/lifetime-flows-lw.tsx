@@ -31,11 +31,11 @@
 //   day's start to the last day's close, drawn under the lines through the
 //   price scale, so it pans and zooms with them; its edges count in the
 //   axis's autoscale.
-// - A pace lane (`FlowModel.pace`, Liquity V2's branch redemptions) is a pane
-//   of its own under the price pane, on its own scale from zero: each day's
-//   total a thin bar from the day's start to its close, drawn by a series
-//   primitive (`PaceBars`) on an unseen flat line, so the price line keeps its
-//   pane; the tallest bar in the window sets the scale.
+// - Protocol activity (`FlowModel.activity`, Liquity V2's branch redemptions)
+//   is a chart of its own under the events
+//   (components/shared/protocol-activity-chart.tsx), tied to this one through
+//   `onLink`: it takes this chart's grid and window, its hover crosshair runs
+//   on both, and its wheel and pinch move this chart's window.
 // - The price tip stands over the price pane, HTML placed at the cursor's x;
 //   the events row under the chart is the panel's drawing, on this axis
 //   (`onAxis`, sent again on every zoom, pan or resize).
@@ -63,7 +63,7 @@ import type {
 } from "lightweight-charts";
 import { lwTickLabel, useLwColors, useLwLib, type LwColors } from "@/components/shared/lw-chart-kit";
 import { OldPriceTip, oldLineTip } from "@/components/shared/flow-old-price";
-import type { FlowsLwApi, FlowsLwAxis, FlowsLwView } from "@/components/shared/lifetime-flows-lw-axis";
+import type { FlowsLwApi, FlowsLwAxis, FlowsLwLink, FlowsLwView } from "@/components/shared/lifetime-flows-lw-axis";
 import { flowsBounds } from "@/lib/shared/flows-combined";
 import type { LineScale, PriceScale } from "@/components/shared/lifetime-flows-combined";
 import {
@@ -78,7 +78,6 @@ import {
 } from "@/lib/shared/asset-chart-grid";
 import { formatPrice, priceAxisLabels, type FlowPriceSeries } from "@/lib/shared/flows-price";
 import { formatFlowToken, formatFlowUsd, type FlowModel } from "@/lib/shared/flows-timeline";
-import { paceMax, type FlowPace, type PaceDay } from "@/lib/shared/flows-pace";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 
 /** The value pane, a side's pane where the sides have no common unit, and
@@ -86,8 +85,6 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 const VALUE_H = 96;
 const SIDE_H = 72;
 const PRICE_LINE_H = 84;
-/** The pace lane under the price pane. */
-const PACE_H = 44;
 /** Room between the tip and the price line. */
 const TIP_GAP = 8;
 /** The grid's finest cell: the data is daily, so the zoom stops at about a
@@ -118,7 +115,6 @@ const COLORS = {
   band: ["var(--color-amber-500)", 0.16],
   bandLight: ["var(--color-amber-500)", 0.08],
   bandEdge: ["var(--color-amber-500)", 0.75],
-  pace: ["var(--caution)", 0.75],
   fg: ["var(--foreground)"],
   bg: ["var(--background)"],
   after: ["var(--surface-raised)", 0.7],
@@ -138,13 +134,13 @@ interface Verts {
 }
 type Side = "collateral" | "debt";
 
-const closeTs = (day: number) => (day + 1) * DAY_S;
+export const closeTs = (day: number) => (day + 1) * DAY_S;
 
 /** The x of a moment on the grid. The library places whole logical indices
  *  alone (a fractional one reads 0), and a day's close falls inside a cell
  *  wherever a cell is longer than a day (a phone's width, a long life): the x
  *  is read between the two cells either side. */
-function xOf(c: IChartApi, g: Grid, ts: number): number | null {
+export function xOf(c: IChartApi, g: Grid, ts: number): number | null {
   const t = c.timeScale();
   const l = logicalOf(g, ts);
   const a = Math.floor(l);
@@ -239,20 +235,21 @@ function levelRuns(level: [number, number][]): [number, number][][] {
 
 // ── The scrubber: a series primitive in each pane ──────────────────────────
 
-/** What the scrubber draws, shared by the two panes' primitives. */
-interface MarkState {
+/** What the scrubber draws, shared by the panes' primitives (and a linked
+ *  chart's, through its own state). */
+export interface MarkState {
   grid: Grid | null;
   /** The cursor's moment (its day's close), or null before the chart has one. */
   ts: number | null;
   dim: boolean;
   /** Where the bars' window opens, shaded to the end. */
   shadeTs: number | null;
-  colors: Colors | null;
+  colors: LwColors<"fg" | "bg" | "after" | "ground" | "shade"> | null;
 }
 type Dot = { series: ISeriesApi<SeriesType>; value: number; color: string };
 type Target = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
-class ScrubberMark implements ISeriesPrimitive<Time> {
+export class ScrubberMark implements ISeriesPrimitive<Time> {
   private req: (() => void) | null = null;
   private chart: IChartApi | null = null;
   dots: Dot[] = [];
@@ -465,100 +462,6 @@ class BandFill implements ISeriesPrimitive<Time> {
   }
 }
 
-// ── The pace lane: a series primitive on an unseen flat line ────────────────
-
-interface PaceState {
-  grid: Grid | null;
-  days: PaceDay[];
-  colors: Colors | null;
-}
-
-/** A drawn bar, in the lane's media pixels, as the verifiers read it. */
-export interface PaceDrawn {
-  day: number;
-  x0: number;
-  x1: number;
-  y: number;
-}
-
-class PaceBars implements ISeriesPrimitive<Time> {
-  private req: (() => void) | null = null;
-  private chart: IChartApi | null = null;
-  private series: ISeriesApi<SeriesType> | null = null;
-  private readonly views: IPrimitivePaneView[];
-  constructor(
-    private readonly st: PaceState,
-    /** Called after each draw with the bars drawn in the plot. */
-    private readonly onDrawn: (bars: PaceDrawn[]) => void,
-  ) {
-    this.views = [{ zOrder: () => "normal", renderer: () => ({ draw: (t) => this.draw(t) }) }];
-  }
-  attached(p: SeriesAttachedParameter<Time, SeriesType>) {
-    this.req = p.requestUpdate;
-    this.chart = p.chart as IChartApi;
-    this.series = p.series;
-  }
-  detached() {
-    this.req = null;
-    this.chart = null;
-    this.series = null;
-  }
-  paneViews() {
-    return this.views;
-  }
-  update() {
-    this.req?.();
-  }
-  /** The lane's scale: zero to the tallest day in the window. */
-  autoscaleInfo(a: Logical, b: Logical) {
-    const g = this.st.grid;
-    if (!g) return null;
-    const from = Math.floor(cellTime(g, a) / DAY_S);
-    const to = Math.floor((cellTime(g, b + 1) - 1) / DAY_S);
-    let m = 0;
-    for (const d of this.st.days) if (d.day >= from && d.day <= to && d.amount > m) m = d.amount;
-    return { priceRange: { minValue: 0, maxValue: m > 0 ? m : 1 } };
-  }
-  /** Each day's bar in the plot now, from the time and value scales. */
-  place(): PaceDrawn[] {
-    const { grid: g, days } = this.st;
-    const c = this.chart;
-    const s = this.series;
-    if (!g || !c || !s) return [];
-    const out: PaceDrawn[] = [];
-    for (const d of days) {
-      if (!(d.amount > 0)) continue;
-      const x0 = xOf(c, g, d.day * DAY_S);
-      const x1 = xOf(c, g, closeTs(d.day));
-      const y = s.priceToCoordinate(d.amount);
-      if (x0 == null || x1 == null || y == null) continue;
-      out.push({ day: d.day, x0, x1, y });
-    }
-    return out;
-  }
-  private draw(t: Target) {
-    const colors = this.st.colors;
-    const s = this.series;
-    if (!colors || !s) return;
-    const placed = this.place();
-    const drawn: PaceDrawn[] = [];
-    t.useMediaCoordinateSpace(({ context: c, mediaSize }) => {
-      const base = s.priceToCoordinate(0) ?? mediaSize.height;
-      c.fillStyle = colors.pace;
-      for (const p of placed) {
-        // A day at least a pixel wide; a gap between days wider than 3 px.
-        const gap = p.x1 - p.x0 > 3 ? 1 : 0;
-        const a = Math.max(0, p.x0 + gap / 2);
-        const b = Math.min(mediaSize.width, Math.max(a + 1, p.x1 - gap / 2));
-        if (b <= 0 || a >= mediaSize.width) continue;
-        drawn.push(p);
-        c.fillRect(a, p.y, b - a, Math.max(1, base - p.y));
-      }
-    });
-    this.onDrawn(drawn);
-  }
-}
-
 // ── The chart ───────────────────────────────────────────────────────────────
 
 export interface LifetimeFlowsLwProps {
@@ -590,8 +493,9 @@ export interface LifetimeFlowsLwProps {
   apiRef: React.MutableRefObject<FlowsLwApi | null>;
   /** The price tip, placed over the price pane. */
   tip: ReactNode;
-  /** The pace lane under the price pane, where the model carries one. */
-  pace?: FlowPace | null;
+  /** A linked chart under the events (protocol activity) takes this chart's
+   *  grid and window through the link, sent on every new grid. */
+  onLink?: (link: FlowsLwLink | null) => void;
 }
 
 export function LifetimeFlowsLw({
@@ -612,7 +516,7 @@ export function LifetimeFlowsLw({
   onAxis,
   apiRef,
   tip,
-  pace = null,
+  onLink,
 }: LifetimeFlowsLwProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -634,9 +538,6 @@ export function LifetimeFlowsLw({
   const nV = valuePanes.length;
   const spacerPane = nV;
   const pricePane = nV + 1;
-  // The pace lane stands under the price pane alone.
-  const hasPace = hasPrice && pace != null;
-  const pacePane = pricePane + 1;
   const valueH = valuePanes.map(() => (split ? SIDE_H : VALUE_H));
   const sideUnits = split ? model.sideUnits : undefined;
   /** The top of value pane `i` in the box (each pane over a 1 px separator). */
@@ -680,22 +581,17 @@ export function LifetimeFlowsLw({
     value: ScrubberMark[];
     price: ScrubberMark | null;
     spacer: ScrubberMark | null;
-    pace: ScrubberMark | null;
   } | null>(null);
   const markState = useRef<MarkState>({ grid: null, ts: null, dim: false, shadeTs: null, colors: null });
   const bandState = useRef<BandState>({ grid: null, runs: [], colors: null });
   const bandFill = useRef<BandFill | null>(null);
   /** The band's drawn runs, written on each draw for the verifiers. */
   const bandHook = useRef<HTMLSpanElement>(null);
-  const paceState = useRef<PaceState>({ grid: null, days: [], colors: null });
-  const paceBars = useRef<PaceBars | null>(null);
-  /** The pace lane's drawn bars, written on each draw for the verifiers. */
-  const paceHook = useRef<HTMLSpanElement>(null);
-  const paceDays = useMemo(
-    () => (pace ? pace.days.filter((d) => d.day >= startDay && d.day <= today) : []),
-    [pace, startDay, today],
-  );
   const touched = useRef(0);
+  const onLinkRef = useRef(onLink);
+  onLinkRef.current = onLink;
+  /** The wheel and gesture handlers, which a linked chart calls too. */
+  const input = useRef<{ wheel: (e: WheelEvent) => void; gesture: (e: Event) => void } | null>(null);
   const plotW = useCallback(
     () => chart.current?.timeScale().width() || Math.max(200, (box.current?.clientWidth ?? 600) - 56),
     [],
@@ -806,7 +702,7 @@ export function LifetimeFlowsLw({
   }, [hasPrice, lib]);
   const spacerH = tipH + TIP_GAP;
   const [axisH, setAxisH] = useState(26);
-  const paneHs = [...valueH, ...(hasPrice ? [spacerH, PRICE_LINE_H] : []), ...(hasPace ? [PACE_H] : [])];
+  const paneHs = [...valueH, ...(hasPrice ? [spacerH, PRICE_LINE_H] : [])];
   // Each pane, and a 1 px separator between two.
   const boxH = paneHs.reduce((a, b) => a + b, 0) + Math.max(0, paneHs.length - 1) + axisH;
 
@@ -1030,26 +926,6 @@ export function LifetimeFlowsLw({
         pricePane,
       );
     }
-    if (hasPace) {
-      // The pace lane's anchor: an unseen flat line at zero, its axis compact.
-      s.paceBase = c.addSeries(
-        lib.LineSeries,
-        {
-          ...quiet,
-          lineVisible: false,
-          color: "transparent",
-          crosshairMarkerVisible: false,
-          priceFormat: {
-            type: "custom",
-            formatter: (v: number) => priceAxisLabels([v])[0],
-            tickmarksFormatter: (vs: number[]) => priceAxisLabels(vs),
-            minMove: 1,
-          },
-        },
-        pacePane,
-      );
-      c.priceScale("right", pacePane).applyOptions({ scaleMargins: { top: 0.3, bottom: 0 } });
-    }
     series.current = s;
     // A mark per value pane, on its first side's area.
     const mv = valuePanes.map((ks) => {
@@ -1077,22 +953,7 @@ export function LifetimeFlowsLw({
       // drawn one.
       Object.assign(el, { flowBandPlace: () => bf.place() });
     }
-    let mpace: ScrubberMark | null = null;
-    if (hasPace) {
-      mpace = new ScrubberMark(markState.current);
-      s.paceBase.attachPrimitive(mpace);
-      const pb = new PaceBars(paceState.current, (bars) => {
-        const h = paceHook.current;
-        if (h)
-          h.dataset.flowPaceDrawn = bars
-            .map((b) => `${b.day}:${b.x0.toFixed(1)}:${b.x1.toFixed(1)}:${b.y.toFixed(1)}`)
-            .join(",");
-      });
-      s.paceBase.attachPrimitive(pb);
-      paceBars.current = pb;
-      Object.assign(el, { flowPacePlace: () => pb.place() });
-    }
-    marks.current = { value: mv, price: mp, spacer: ms, pace: mpace };
+    marks.current = { value: mv, price: mp, spacer: ms };
     const onRange = () => sendAxis();
     let timer: ReturnType<typeof setTimeout> | null = null;
     const settle = () => {
@@ -1188,12 +1049,14 @@ export function LifetimeFlowsLw({
         pinch = g.scale;
       }
     };
+    input.current = { wheel: onWheel, gesture: onGesture };
     el.addEventListener("wheel", onWheel, { passive: false });
     for (const e of ["gesturestart", "gesturechange"]) el.addEventListener(e, onGesture, { passive: false });
     // The hover crosshair is the mouse's: a touch hides it, a mouse brings it back.
     const onPointer = (e: PointerEvent) => {
       const mode = e.pointerType === "mouse" ? lib.CrosshairMode.Normal : lib.CrosshairMode.Hidden;
-      c.applyOptions({ crosshair: { mode } });
+      // The pointer is here: the horizontal line a linked hover hid comes back.
+      c.applyOptions({ crosshair: { mode, horzLine: { visible: true, labelVisible: true } } });
     };
     for (const e of ["touchstart", "touchmove"]) el.addEventListener(e, touch, { passive: true });
     el.addEventListener("pointerdown", onPointer);
@@ -1211,17 +1074,18 @@ export function LifetimeFlowsLw({
       el.removeEventListener("pointerdown", onPointer);
       el.removeEventListener("pointermove", onPointer);
       c.unsubscribeCrosshairMove(onHover);
+      input.current = null;
+      onLinkRef.current?.(null);
       chart.current = null;
       series.current = {};
       marks.current = null;
       bandFill.current = null;
-      paceBars.current = null;
       c.remove();
       onAxisRef.current(null);
     };
     // The series follow the panes and sides; their data follows the lines.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lib, hasPrice, hasPace, hasDebt, value, priced?.unitLabel]);
+  }, [lib, hasPrice, hasDebt, value, priced?.unitLabel]);
 
   // The panes' heights and the price pane's room for the tip, as stretch
   // factors, so a resize of the box keeps them.
@@ -1244,8 +1108,6 @@ export function LifetimeFlowsLw({
     markState.current.colors = colors;
     bandState.current.colors = colors;
     bandFill.current?.update();
-    paceState.current.colors = colors;
-    paceBars.current?.update();
     c.applyOptions({
       layout: {
         textColor: colors.text,
@@ -1275,7 +1137,6 @@ export function LifetimeFlowsLw({
     marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
     marks.current?.spacer?.update();
-    marks.current?.pace?.update();
     // `sides` follows hasDebt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colors, ready, priced?.side, hasDebt]);
@@ -1321,7 +1182,6 @@ export function LifetimeFlowsLw({
       // A flat, unseen line, so the pane has a scale to stand on.
       out.spacer = new Array(grid.count).fill(0);
     }
-    if (series.current.paceBase) out.paceBase = new Array(grid.count).fill(0);
     for (const [name, vals] of Object.entries(out)) series.current[name]?.setData(rows(vals, name.startsWith("area-")));
     sampled.current = out;
     if (priceScale && out.price && out.priceDotted) {
@@ -1354,17 +1214,25 @@ export function LifetimeFlowsLw({
     bandState.current.grid = grid;
     bandState.current.runs = priceLines?.band ?? [];
     bandFill.current?.update();
-    paceState.current.grid = grid;
-    paceState.current.days = paceDays;
-    paceBars.current?.update();
-    marks.current?.pace?.update();
     marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
     marks.current?.spacer?.update();
     sendAxis();
+    onLinkRef.current?.({
+      chart: c,
+      grid,
+      hover: (time) => {
+        const anchor = Object.values(series.current)[0];
+        if (time == null || !anchor) return c.clearCrosshairPosition();
+        c.applyOptions({ crosshair: { horzLine: { visible: false, labelVisible: false } } });
+        c.setCrosshairPosition(0, time as UTCTimestamp, anchor);
+      },
+      wheel: (e) => input.current?.wheel(e),
+      gesture: (e) => input.current?.gesture(e),
+    });
     // `sides` follows the lines.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grid, applyN, ready, valueLines, priceLines, priceScale, paceDays, bounds, sendAxis]);
+  }, [grid, applyN, ready, valueLines, priceLines, priceScale, bounds, sendAxis]);
 
   // The scrubber: the cursor's close, the dim after it, its dots, the window.
   useEffect(() => {
@@ -1388,7 +1256,6 @@ export function LifetimeFlowsLw({
     marks.current?.value.forEach((m) => m.update());
     marks.current?.price?.update();
     marks.current?.spacer?.update();
-    marks.current?.pace?.update();
     // `sides` follows hasDebt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1420,8 +1287,6 @@ export function LifetimeFlowsLw({
   const pw = c?.timeScale().width() ?? 0;
   // The tip's pane: under the value panes and their separators.
   const paneTop = sideTop(nV);
-  // The pace lane's top: under every other pane and its separator.
-  const paceTop = paneHs.slice(0, -1).reduce((a, b) => a + b + 1, 0);
   void axisN;
 
   // The data hooks the verifiers read (a canvas leaves nothing in the DOM).
@@ -1440,11 +1305,7 @@ export function LifetimeFlowsLw({
       ref={wrap}
       className="relative"
       data-flow-chart-engine="lw"
-      data-flow-chart-panes={[
-        ...(split ? sides : nV ? ["value"] : []),
-        ...(hasPrice ? ["price"] : []),
-        ...(hasPace ? ["pace"] : []),
-      ].join(",")}
+      data-flow-chart-panes={[...(split ? sides : nV ? ["value"] : []), ...(hasPrice ? ["price"] : [])].join(",")}
       data-flow-lw-step={grid?.step ?? ""}
       data-flow-lw-from={Math.round(view.current.from)}
       data-flow-lw-to={Math.round(view.current.to)}
@@ -1467,17 +1328,6 @@ export function LifetimeFlowsLw({
             {sideUnits[k].symbol}
           </span>
         ))}
-      {/* The pace lane names its series at its top left. */}
-      {hasPace && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute left-1 text-[10px] font-semibold leading-none text-rb-500"
-          style={{ top: paceTop + 2 }}
-          data-flow-pace-label=""
-        >
-          {pace!.label}
-        </span>
-      )}
       {hasPrice && (
         <div className="pointer-events-none absolute left-0" style={{ top: paneTop, width: pw || "100%" }}>
           <div ref={tipRef} className="pointer-events-auto" data-flow-price-tip="">
@@ -1548,18 +1398,6 @@ export function LifetimeFlowsLw({
             />
           ))}
         </span>
-        {hasPace && (
-          <span
-            data-anatomy="F19.11"
-            ref={paceHook}
-            data-flow-pace={pace!.label}
-            data-pace-from={pace!.from}
-            data-pace-to={pace!.to}
-            data-pace-max={paceMax(pace!, startDay, today)}
-            data-pace-days={paceDays.map((d) => `${d.day}:${d.amount}:${d.count}`).join(",")}
-            data-flow-pace-drawn=""
-          />
-        )}
         <span data-anatomy="F19.9">
           {warnHooks.map((run) => (
             <span
