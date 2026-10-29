@@ -1,7 +1,7 @@
 // Client for /api/chain/ctoken-liquidity-at — the Comptroller's account
 // liquidity just before and at a liquidation's block, the close factor then,
-// and the collateral market's protocol seize share
-// (lib/sources/chain/ctoken-liquidity-at.ts).
+// and the collateral market's protocol seize share (rails-server's
+// /api/at-block/ctoken/liquidity and /ctoken/membership, behind the route).
 
 export type CTokenProtocol = "compound-v2" | "moonwell" | "moonwell-base";
 
