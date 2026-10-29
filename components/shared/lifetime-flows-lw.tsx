@@ -817,11 +817,17 @@ export function LifetimeFlowsLw({
   const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
   const sampled = useRef<Record<string, (number | null)[]>>({});
   const hoverRef = useRef<(p: MouseEventParams<Time>) => void>(() => {});
+  // The library re-sends the last pointer position, with no source event,
+  // each time the chart redraws (options applied, data set); that is the
+  // pointer still there, so it is read like a move. Only an event with no
+  // point is the pointer leaving. The tip is cleared unconditionally: this
+  // handler can run several times before React re-renders it, and a check
+  // on the rendered `oldTip` would skip the clear (ui-jobs 451).
   hoverRef.current = (p) => {
     const g = gridRef.current;
     const c = chart.current;
-    if (!g || !c || !p.point || p.logical == null || !p.sourceEvent || p.paneIndex == null || p.paneIndex >= nV) {
-      if (oldTip) setOldTip(null);
+    if (!g || !c || !p.point || p.logical == null || p.paneIndex == null || p.paneIndex >= nV) {
+      setOldTip(null);
       return;
     }
     const i = Math.round(p.logical);
@@ -845,7 +851,7 @@ export function LifetimeFlowsLw({
       setOldTip(lines.length ? { x: p.point.x, y: y + sideTop(paneOf(k)), lines } : null);
       return;
     }
-    if (oldTip) setOldTip(null);
+    setOldTip(null);
   };
 
   // The chart, once the library is in and the charts are shown.
@@ -1191,8 +1197,13 @@ export function LifetimeFlowsLw({
     el.addEventListener("wheel", onWheel, { passive: false });
     for (const e of ["gesturestart", "gesturechange"]) el.addEventListener(e, onGesture, { passive: false });
     // The hover crosshair is the mouse's: a touch hides it, a mouse brings it back.
+    // Applied on a change only: each applyOptions redraws the chart and
+    // re-sends the crosshair.
+    let crossMode: number = lib.CrosshairMode.Normal;
     const onPointer = (e: PointerEvent) => {
       const mode = e.pointerType === "mouse" ? lib.CrosshairMode.Normal : lib.CrosshairMode.Hidden;
+      if (mode === crossMode) return;
+      crossMode = mode;
       c.applyOptions({ crosshair: { mode } });
     };
     for (const e of ["touchstart", "touchmove"]) el.addEventListener(e, touch, { passive: true });

@@ -58,7 +58,9 @@
 // and 30D, frozen and not, at 1280 and 390 with touch; the health view's older
 // days a dotted series meeting the solid one (`data-price-meets`); and at 1280
 // the wheel (`checkLwWheel`): over the chart it scrolls the page, Ctrl with it
-// zooms, a sideways swipe pans. Aave V3 Prime 0xb8a4…715e (wstETH/WETH, more
+// zooms, a sideways swipe pans; and at 1280, where the value line has a dotted
+// stretch, a pointer walked along it keeps one tip open (`checkOldTipSteady`,
+// ui-jobs 451). Aave V3 Prime 0xb8a4…715e (wstETH/WETH, more
 // than 60 days with events, so its older health days are dotted) and EtherFi
 // 0x0f2a…bbe take the health checks; SparkLend 0x1601…347e (no debt, so no
 // health view) the price checks against its answer. Step 5 (the health view on SparkLend, Aave V3 Base and Seamless):
@@ -3458,6 +3460,93 @@ async function checkLwOpen(page, tag, priceOnly = false) {
   );
 }
 
+/** The dotted value line's tip held steady (ui-jobs 451): a pointer moved
+ *  along a dotted stretch keeps one tip open, with no hide and show between
+ *  steps. The line's height is read from the tip, which stands 10px over
+ *  the line's point under the pointer, so the walk follows a sloped stretch.
+ *  Desktop only, on a page whose value line has a dotted stretch. */
+async function checkOldTipSteady(page, tag) {
+  if ((await page.locator("[data-flows-combined] [data-flow-old-line]").count()) === 0) return;
+  await page
+    .locator('[data-flows-combined] [data-flow-range="All"]')
+    .first()
+    .click()
+    .catch(() => {});
+  await page.waitForTimeout(600);
+  const box = page.locator("[data-flows-combined] [data-flow-lw-box]").first();
+  await box.evaluate((el) => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 200));
+  await page.waitForTimeout(300);
+  const b = await box.boundingBox();
+  const plotW = Number(
+    await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").first().getAttribute("data-flow-lw-plot-w"),
+  );
+  const tipY = () =>
+    page.evaluate(() => {
+      const t = document.querySelector("[data-flows-combined] [data-flow-old-tip]");
+      return t ? t.getBoundingClientRect().bottom + 10 : null;
+    });
+  // The longest run of tip-opening points on a coarse grid is the walk's start.
+  let start = null;
+  let bestRun = 0;
+  for (let y = b.y + 4; y < b.y + b.height * 0.6 && bestRun < 6; y += 4) {
+    let run = 0;
+    for (let x = b.x + 8; x < b.x + plotW - 4; x += 12) {
+      await page.mouse.move(x, y);
+      const ly = await tipY();
+      run = ly == null ? 0 : run + 1;
+      if (run > bestRun) {
+        bestRun = run;
+        start = { x: x - 12 * (run - 1), y };
+      }
+    }
+  }
+  if (!start) {
+    check(`${tag}: a pointer on the dotted value line opens its tip`, false, "no point on a 12×4px grid opened it");
+    return;
+  }
+  await page.mouse.move(start.x, start.y);
+  await page.waitForTimeout(100);
+  // Every mount and unmount of the tip, between steps too.
+  await page.evaluate(() => {
+    const host = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
+    window.__oldTipLog = [];
+    window.__oldTipObs?.disconnect();
+    window.__oldTipObs = new MutationObserver((ms) => {
+      for (const m of ms) {
+        for (const n of m.addedNodes)
+          if (n.nodeType === 1 && n.hasAttribute("data-flow-old-tip")) window.__oldTipLog.push("show");
+        for (const n of m.removedNodes)
+          if (n.nodeType === 1 && n.hasAttribute("data-flow-old-tip")) window.__oldTipLog.push("hide");
+      }
+    });
+    window.__oldTipObs.observe(host, { childList: true, subtree: true });
+  });
+  // Two-pixel steps along the stretch, as far as the run reached and no further.
+  const steps = Math.min(120, Math.floor((12 * (bestRun - 1)) / 2));
+  let y = (await tipY()) ?? start.y;
+  let open = 0;
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.move(start.x + 2 * i, y);
+    await page.waitForTimeout(16);
+    const ly = await tipY();
+    if (ly != null) {
+      open++;
+      y = ly;
+    }
+  }
+  const log = await page.evaluate(() => {
+    window.__oldTipObs?.disconnect();
+    return window.__oldTipLog;
+  });
+  await page.mouse.move(b.x + b.width / 2, b.y - 40);
+  // The tip was open at the start: any event at all is a hide.
+  check(
+    `${tag}: a pointer moved along the dotted value line keeps one tip open, with no hide and show`,
+    steps > 0 && open === steps && log.length === 0,
+    `${steps === 0 ? "no two neighbouring grid points held the tip; " : ""}${open}/${steps} steps open, tip events: ${log.slice(0, 8).join(",") || "none"}${log.length > 8 ? ` (+${log.length - 8})` : ""}`,
+  );
+}
+
 /** The wheel on a position page (Miles, 26 Oct 2026): over the chart it
  *  scrolls the page and leaves the window; Ctrl with the wheel (a trackpad's
  *  pinch arrives so) zooms about the pointer and leaves the page; a sideways
@@ -3710,6 +3799,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       );
       await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").scrollIntoViewIfNeeded();
       await checkLwOpen(page, tag, pg.priceOnly);
+      if (width >= 640) await checkOldTipSteady(page, tag);
     }
     if (pg.unit || pg.valueLine) await checkValueUnit(page, tag, pg);
     if (pg.lwOnly) {
