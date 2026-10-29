@@ -99,6 +99,7 @@ import {
   type RawLog,
 } from "./vault-holder-logs";
 import { countRefusedSweeps } from "./vault-sweep-walk";
+import { emptyBlockReads, readBlockWave } from "./vault-block-reads";
 import { chainMeta } from "@/lib/shared/chains";
 import { YEARN_CHAIN_ID } from "./yearn-ethereum-vault-directory";
 import {
@@ -323,16 +324,17 @@ export async function loadYearnEthereumVaultTimeline(
 
     // Above the horizon the rows are withheld and the count stated. The life
     // was READ and RECONCILED — what is withheld is the drawing of it — because
-    // each row costs an `eth_getBlockByNumber` and an archive `convertToAssets`
-    // at its own block, and nobody waits a minute for a page. With no store to
-    // build into, `tailMaxRows` is not the bound here; the inline horizon is.
+    // each row costs a timestamp and an archive `convertToAssets` at its own
+    // block (stored once on the server), and nobody waits a minute for a cold
+    // page. With no tail store to build into, `tailMaxRows` is not the bound
+    // here; the inline horizon is.
     if (transfers.length > VAULT_TIMELINE_HORIZON)
       return {
         timeline: { ...base, coverage: { ...base.coverage, withheldAbove: transfers.length } },
         allEvents: [],
       };
 
-    const allEvents = await buildRows(state, address, who, opts, transfers, depositLogs, withdrawLogs);
+    const allEvents = await buildRows(address, who, opts, transfers, depositLogs, withdrawLogs);
 
     // ── the draw window, last ─────────────────────────────────────────────────
     // THE WINDOW IS THE LAST THING THAT HAPPENS. Everything that reduces over a
@@ -375,7 +377,6 @@ async function balanceAt(
 // ── the rows ─────────────────────────────────────────────────────────────────
 
 async function buildRows(
-  client: PublicClient,
   vault: `0x${string}`,
   holder: string,
   opts: YearnVaultTimelineOptions,
@@ -389,42 +390,15 @@ async function buildRows(
   for (const log of transfers) rowBlocks.add(BigInt(log.blockNumber).toString());
   const blocks = [...rowBlocks].map((b) => BigInt(b));
 
-  // ONE batched wave: a timestamp and an archive share price per block. The
-  // price is asked with 10 ** the vault's OWN `decimals()` — see the header — and
-  // a call that does not answer leaves the figure UNREAD rather than borrowing
-  // the head price.
-  //
-  // ONE RETRY OVER THE MISSES, and only the misses: a first wave over a few
-  // thousand blocks comes back with a handful of refusals on a metered lane,
-  // and a second pass over just those recovers nearly all of them.
-  const one = BigInt(10) ** BigInt(opts.shareDecimals);
-  const readTimestamp = (blockNumber: bigint) =>
-    client
-      .getBlock({ blockNumber })
-      .then((b) => Number(b.timestamp))
-      .catch(() => null);
-  const readPrice = (blockNumber: bigint) =>
-    client
-      .readContract({ address: vault, abi: VAULT_ABI, functionName: "convertToAssets", args: [one], blockNumber })
-      .then((v) => (v as bigint).toString())
-      .catch(() => null);
-
-  const retryMisses = async <T>(first: (T | null)[], read: (b: bigint) => Promise<T | null>): Promise<(T | null)[]> => {
-    const misses = first.flatMap((v, i) => (v == null ? [i] : []));
-    if (misses.length === 0) return first;
-    await new Promise((r) => setTimeout(r, 300));
-    const second = await Promise.all(misses.map((i) => read(blocks[i])));
-    const out = first.slice();
-    misses.forEach((i, k) => (out[i] = second[k]));
-    return out;
-  };
-
-  const [timestamps, prices] = await Promise.all([
-    Promise.all(blocks.map(readTimestamp)).then((first) => retryMisses(first, readTimestamp)),
-    Promise.all(blocks.map(readPrice)).then((first) => retryMisses(first, readPrice)),
-  ]);
-  const timestampAt = new Map(blocks.map((b, i) => [b.toString(), timestamps[i]]));
-  const priceAt = new Map(blocks.map((b, i) => [b.toString(), prices[i]]));
+  // ONE wave: a timestamp and an archive share price per block, from
+  // rails-server's at-block store (./vault-block-reads), with one retry over
+  // the misses. The price is asked with 10 ** the vault's OWN `decimals()` — see
+  // the header — and a block that does not answer leaves the figure UNREAD
+  // rather than borrowing the head price. A revert states no price here.
+  const known = emptyBlockReads();
+  await readBlockWave(1, vault, opts.shareDecimals, blocks, known);
+  const timestampAt = known.timestamps;
+  const priceAt = known.prices;
 
   // The asset leg, claimed once each: a transaction that ever carries two of
   // this owner's legs pairs them by share count rather than handing both rows

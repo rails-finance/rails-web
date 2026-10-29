@@ -27,10 +27,10 @@
 // two read one endpoint; the explicit name stays as the lane the page states
 // (`MORPHO_BASE_TIMELINE_LANE`).
 //
-// `balanceOf` at the page's block, and one batched wave of
-// `eth_getBlockByNumber` and archive `convertToAssets` per DISTINCT row block,
-// go through `chainBatchClient(8453)` — the same client the vault reading
-// itself uses, in batches of 60. The allocation read beside them posts its own
+// `balanceOf` at the page's block goes through `chainBatchClient(8453)`, the
+// client the vault reading uses. The timestamp and `convertToAssets` at each
+// DISTINCT row block come from rails-server's at-block store
+// (./vault-block-reads). The allocation read beside them posts its own
 // batches on the same named lane, for the reason its own header gives.
 //
 // ── WHEN THE LANE REFUSES ON RESPONSE SIZE ───────────────────────────────────
@@ -88,9 +88,9 @@
 //
 // ── A HEAVY LIFE IS BUILT ACROSS REQUESTS, NOT REFUSED ───────────────────────
 // The twin of the same section in aave-ethereum-vault-timeline.ts, and the same
-// three tiers. What costs a long life here is the same thing: one
-// `eth_getBlockByNumber` and one archive `convertToAssets` per DISTINCT row
-// block, 1.3 ms a block measured on this chain's state lane. So above
+// three tiers. What costs a long life here is the same thing: a
+// timestamp and an archive `convertToAssets` per DISTINCT row block not yet in
+// the at-block store. So above
 // `VAULT_TIMELINE_HORIZON` a head of more than `BUILD_BLOCKS_INLINE` unbuilt
 // blocks has its OLDEST `BUILD_CHUNK_BLOCKS` built and stored here, and the
 // continuation the caller queues in `after()` carries on until the head is
@@ -676,7 +676,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // `rowFloor()` and not a captured constant: the two distrust paths above
     // may have set `tail` to null since it was first read, and the asset legs
     // must be swept over the same range these transfers were.
-    const headRows = await buildRows(state, address, who, opts, transfers, sweepFrom(rowFloor()), opening());
+    const headRows = await buildRows(address, who, opts, transfers, sweepFrom(rowFloor()), opening());
     const merged = [...headRows, ...tailRows.slice().reverse()];
     history.headRows = headRows.length;
 
@@ -854,7 +854,6 @@ function chunkedBuilder(b: ChunkedBuild) {
     const lo = cut;
 
     const rows = await buildRows(
-      b.state,
       b.address,
       b.who,
       b.opts,
@@ -930,7 +929,6 @@ function chunkedBuilder(b: ChunkedBuild) {
 // ── the rows ─────────────────────────────────────────────────────────────────
 
 async function buildRows(
-  client: PublicClient,
   vault: `0x${string}`,
   holder: string,
   opts: MorphoBaseVaultTimelineOptions,
@@ -969,7 +967,7 @@ async function buildRows(
   // denominator. Reading it twice would be two calls that could answer two
   // things about one block, and the row's "share of the vault" and its
   // allocation band would then rest on different denominators.
-  await readBlockWave(client, vault, opts.shareDecimals, blocks, known);
+  await readBlockWave(8453, vault, opts.shareDecimals, blocks, known);
   const timestampAt = known.timestamps;
 
   const rows: VaultHolderEvent[] = [];

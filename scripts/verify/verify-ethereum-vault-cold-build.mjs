@@ -86,6 +86,7 @@
 
 import { spawnSync, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
+import { vaultBlocksAnswer } from "./lib/mock-vault-blocks.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -286,7 +287,14 @@ function answer(req) {
 const server = createServer((req, res) => {
   let body = "";
   req.on("data", (c) => (body += c));
-  req.on("end", () => {
+  req.on("end", async () => {
+    // The row-block reads reach rails-server's at-block route, which reads this lane.
+    const blocks = req.method === "GET" ? await vaultBlocksAnswer(req.url, answer) : null;
+    if (blocks) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(blocks));
+      return;
+    }
     const parsed = JSON.parse(body);
     if (Array.isArray(parsed)) {
       res.writeHead(200, { "content-type": "application/json" });
@@ -301,6 +309,8 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
 process.env.ALCHEMY_URL = `http://127.0.0.1:${server.address().port}`;
+process.env.RAILS_API_URL = `http://127.0.0.1:${server.address().port}`;
+process.env.API_BEARER_TOKEN ??= "mock";
 
 // ── the loader under test ───────────────────────────────────────────────────
 let loaderPath = resolvePath(ROOT, "lib/sources/chain/aave-ethereum-vault-timeline.ts");

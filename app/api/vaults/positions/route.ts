@@ -58,9 +58,9 @@ import {
 import { VAULT_SIZE_BRACKETS, VAULT_SIZE_UNPRICED } from "@/lib/aave-vaults/position-list-filter-dimensions";
 import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
-import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereum-vault-directory";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { chainBatchClient } from "@/lib/sources/chain/rpc";
+import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { parseAbi } from "viem";
@@ -206,6 +206,22 @@ async function baseAssets(vaults: string[]): Promise<Map<string, OverlayAsset>> 
   return out;
 }
 
+/** The asset behind each Ethereum vault, from the census header: the tick's
+ *  `asset()` with that token's `symbol()` and `decimals()`. A vault whose
+ *  census row lacks any of the three is absent, and its card states no claim. */
+function censusAssets(census: readonly VaultCensusRow[]): Map<string, OverlayAsset> {
+  const out = new Map<string, OverlayAsset>();
+  for (const c of census) {
+    if (!c.asset || c.assetSymbol == null || c.assetDecimals == null) continue;
+    out.set(c.vault.toLowerCase(), {
+      address: c.asset.toLowerCase(),
+      symbol: c.assetSymbol,
+      decimals: c.assetDecimals,
+    });
+  }
+  return out;
+}
+
 /**
  * The overlay: one pinned block, one balance and one claim per card, one supply
  * per distinct vault, and the timestamp of every block a card names. Mutates the
@@ -215,6 +231,7 @@ async function baseAssets(vaults: string[]): Promise<Map<string, OverlayAsset>> 
 async function applyOverlay(
   rows: VaultPositionRow[],
   chainId: ChainId,
+  census: readonly VaultCensusRow[],
 ): Promise<{ blockNumber: number; finalized: number | null } | null> {
   if (rows.length === 0) return null;
   try {
@@ -238,16 +255,12 @@ async function applyOverlay(
     // The asset each vault's `convertToAssets` answers in, with the decimals
     // its figure is scaled by. Where it comes from is the one thing the two
     // chains do differently, and neither is a hand-kept table: on Ethereum it
-    // is the directory read the section already caches for five minutes (a
-    // roster, not a balance); on Base it is the catalogue's own immutable
-    // `asset()` per vault, with that token's `symbol()` and `decimals()`
-    // through resolveErc20Meta. A vault whose asset did not answer leaves the
+    // is the census header this response already carries (`asset()` and the
+    // token's `symbol()` and `decimals()`, read by the daily tick); on Base it
+    // is the catalogue's own immutable `asset()` per vault, with that token's
+    // `symbol()` and `decimals()` through resolveErc20Meta. A vault whose asset did not answer leaves the
     // claim unstated rather than scaled by a guess.
-    const assetOf = await (chainId === BASE_CHAIN_ID
-      ? baseAssets(vaults)
-      : loadAaveEthereumVaultDirectory().then(
-          (directory) => new Map(directory.rows.map((v) => [v.address.toLowerCase(), v.asset])),
-        ));
+    const assetOf = chainId === BASE_CHAIN_ID ? await baseAssets(vaults) : censusAssets(census);
 
     // Round 1: every card's balance, and every distinct vault's supply.
     const round1 = (await client.multicall({
@@ -299,14 +312,12 @@ async function applyOverlay(
 
     // The blocks the cards name. A date is a block's own timestamp, read at that
     // block — never inferred from a block number and an assumed cadence.
+    // Both are at or below the census block, so each is kept once in
+    // rails-server's at-block store (lib/sources/chain/vault-block-reads.ts).
     const blocks = Array.from(new Set(rows.flatMap((r) => [r.census.firstBlock, r.census.lastBlock]))).filter(
       (b) => Number.isFinite(b) && b > 0,
     );
-    const stamps = new Map<number, number>();
-    const settled = await Promise.allSettled(blocks.map((b) => client.getBlock({ blockNumber: BigInt(b) })));
-    settled.forEach((s, i) => {
-      if (s.status === "fulfilled") stamps.set(blocks[i], Number(s.value.timestamp));
-    });
+    const stamps = await readBlockTimes(chainId === BASE_CHAIN_ID ? BASE_CHAIN_ID : MAINNET_CHAIN_ID, blocks);
 
     rows.forEach((r, i) => {
       const shareDecimals = r.shareDecimals ?? 18;
@@ -447,7 +458,7 @@ export async function GET(request: NextRequest) {
 
     const censusByVault = new Map((json.census ?? []).map((c) => [c.vault.toLowerCase(), c]));
     const rows = (json.data ?? []).map((r) => toRow(r, chainId, censusByVault.get(r.vault.toLowerCase()) ?? null));
-    const read = overlay ? await applyOverlay(rows, chainId) : null;
+    const read = overlay ? await applyOverlay(rows, chainId, json.census ?? []) : null;
 
     return NextResponse.json(
       {

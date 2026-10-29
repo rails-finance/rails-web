@@ -19,11 +19,12 @@
 //                     than range. The handful of addresses that pass that limit
 //                     are the section below.
 //
-//   everything else   `chainBatchClient(1)` — `balanceOf` at the page's block,
-//                     and one JSON-RPC batch carrying an `eth_getBlockByNumber`
-//                     and an archive `convertToAssets` per DISTINCT row block.
-//                     Both chain-1 lanes are archive nodes 3.25M blocks deep,
-//                     35–68 ms per call, agreeing wei-exact.
+//   the state         `chainBatchClient(1)` — `balanceOf` at the page's block.
+//
+//   the row blocks    rails-server's `/api/at-block/vault/blocks` — the
+//                     timestamp and `convertToAssets` at each DISTINCT row
+//                     block, kept once in the at-block store
+//                     (./vault-block-reads).
 //
 // Nothing here passes `"latest"`. The block arrives as a parameter, pinned once
 // per request by the vault loader that already read it, so the page's figures
@@ -111,10 +112,9 @@
 // ── A HEAVY LIFE IS BUILT ACROSS REQUESTS, NOT REFUSED ───────────────────────
 // The sweeps and the gate above run on every life whatever its size, and they
 // are not what a large one costs: an address-filtered whole-range `eth_getLogs`
-// answers a 17,774-log holder in seconds. `buildRows` is the cost — one
-// `eth_getBlockByNumber` and one archive `convertToAssets` per DISTINCT row
-// block, 1.6 ms a block measured on this lane, so nine thousand blocks is
-// fifteen seconds of a reader waiting for a page.
+// answers a 17,774-log holder in seconds. `buildRows` is the cost — a timestamp and an
+// archive `convertToAssets` per DISTINCT row block not yet in the at-block
+// store, so nine thousand cold blocks keep a reader waiting for a page.
 //
 // So above `VAULT_TIMELINE_HORIZON` the test is no longer "how long is this
 // life" but "how much of it is still UNBUILT". A head of at most
@@ -680,17 +680,7 @@ export async function loadAaveEthereumVaultTimelineWithTail(
     // The head's own rows, replayed from where the tail left off, then the
     // tail's under them — both already newest-first, and every head block is
     // above every tail block, so the concatenation IS the sorted order.
-    const headRows = await buildRows(
-      state,
-      address,
-      who,
-      opts,
-      transfers,
-      depositLogs,
-      withdrawLogs,
-      cooldownLogs,
-      opening(),
-    );
+    const headRows = await buildRows(address, who, opts, transfers, depositLogs, withdrawLogs, cooldownLogs, opening());
     const allEvents = [...headRows, ...tailRows.slice().reverse()];
     history.headRows = headRows.length;
 
@@ -876,7 +866,6 @@ function chunkedBuilder(b: ChunkedBuild) {
     const lo = cut;
 
     const rows = await buildRows(
-      b.state,
       b.address,
       b.who,
       b.opts,
@@ -982,7 +971,6 @@ async function balanceAt(
 // ── the rows ─────────────────────────────────────────────────────────────────
 
 async function buildRows(
-  client: PublicClient,
   vault: `0x${string}`,
   holder: string,
   opts: VaultTimelineOptions,
@@ -1016,7 +1004,7 @@ async function buildRows(
   // answer carries a PLACEHOLDER timestamp of 0 or a null price, which the
   // store's own rule (below) refuses; the retry is what keeps that rule from
   // costing every large life its tail.
-  await readBlockWave(client, vault, opts.shareDecimals, blocks, known);
+  await readBlockWave(1, vault, opts.shareDecimals, blocks, known);
   const timestampAt = known.timestamps;
 
   // The asset leg, claimed once each: a transaction that ever carries two of
