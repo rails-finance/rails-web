@@ -302,7 +302,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
   out.push(
     "Each note is a receipted fact about the market this position borrows in, observed between two of the position's own " +
       "touches and stated between them, or between its last touch and the chain head for a live note. A note is " +
-      "not an event: it is counted in no total in this snapshot, and the timeline table below reads exactly as it " +
+      "not an event: this snapshot's totals leave it out, and the timeline table below reads as it " +
       "would without any of them. The rate is not fetched for a historical note — every touch on this position " +
       "already carries the market's primary rate in force at its block; a live note's later end is read from the " +
       "market's own contracts at the head. The derived figures hold the earlier touch's debt fixed and move " +

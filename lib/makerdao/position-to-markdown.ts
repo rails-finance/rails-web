@@ -43,8 +43,8 @@ export interface MakerVaultMarkdownArgs {
   events: BaseActivityEvent[];
   /** Market notes for this vault — receipted facts about the ilk's own
    *  stability fee, observed between two of this vault's own touches
-   *  (lib/makerdao/market-notes.ts). A note is NEVER an event: it is counted
-   *  in no total here, the timeline table's row count and numbering are
+   *  (lib/makerdao/market-notes.ts). A note is NEVER an event: it is left
+   *  out of every total here, the timeline table's row count and numbering are
    *  identical with and without them, and the CSV never carries one. */
   notes?: MarketNote[];
   /** This vault's live notes (`liveMakerRateStepNote`) — the Jug's own fee
@@ -188,8 +188,8 @@ function marketNotesSection(notes: MarketNote[]): string[] {
   out.push(
     "Each note is a receipted fact about the collateral type this vault borrows against, observed between two of " +
       "the vault's own touches and stated between them, or between its last touch and the chain head for a live " +
-      "note. A note is not an event: it is counted in no total in this snapshot, and the timeline table below reads " +
-      "exactly as it would without any of them. MakerDAO states no stability fee anywhere a row can carry it — " +
+      "note. A note is not an event: this snapshot's totals leave it out, and the timeline table below reads " +
+      "as it would without any of them. MakerDAO states no stability fee anywhere a row can carry it — " +
       "governance files a duty on the Jug and the spell's own block is not indexed — so the fee in force at a touch " +
       "is the ilk's last rate SET at or before it: the first Jug.drip that compounded at a new duty, derived from " +
       "that drip's own delta on the Vat's rate accumulator and then CONFIRMED by reading the Jug's duty at the " +

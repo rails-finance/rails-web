@@ -9,7 +9,8 @@
 // dates. Opened, the days newest first and one line per change: its name, its value before and after inside the
 // receipt, each side's contract linked, and the transaction that made it.
 // Not an event of the account's, so no number, no ⋮ and no share link, and
-// counted in nothing (lib/shared/protocol-change-note.ts).
+// left out of every count (lib/shared/protocol-change-note.ts). A change a
+// rate note states has no row (ui-jobs 449).
 
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { CountChip } from "@/components/shared/count-chip";
@@ -159,7 +160,9 @@ export function ProtocolChangeRow({ group }: { group: ProtocolChangeGroup }) {
             );
           })}
           <p className="text-xs text-rb-500">
-            {one ? "A change" : "Changes"} the protocol made for every position, counted in no total on this page.
+            {one
+              ? "A change the protocol made to every position. It isn't included in this page's event counts."
+              : "Changes the protocol made to every position. They aren't included in this page's event counts."}
           </p>
         </div>
       </NoteRowShell>

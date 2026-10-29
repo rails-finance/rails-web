@@ -2019,9 +2019,12 @@ async function checkChanges(page, tag, pg, width) {
 }
 
 /** The protocol changes in the event history (ui-jobs 448): every change a
- *  diamond marks has a row there and no row stands without a diamond (the
- *  timeline root's `data-protocol-change-blocks` against the markers'
- *  blocks, the drawn window's rows and the rest alike); each drawn row's days
+ *  diamond marks has a row there or is stated by a rate note, and nothing
+ *  else stands as a row (the timeline root's `data-protocol-change-blocks`
+ *  and `data-protocol-change-stated` against the markers' blocks, the drawn
+ *  window's rows and the rest alike); each stated change lies inside its
+ *  note's stretch, and no opened line is one a note states (ui-jobs 449,
+ *  Maker's stability fee and Polaris's primary rate); each drawn row's days
  *  are marked days; opened, each line reads as its marker names it, inside a
  *  receipt; the row wears the sliders with the governance badge and no event
  *  number; at 390 its node stands on the spine. A life with no change has no
@@ -2045,6 +2048,10 @@ async function checkChangeRows(page, tag, pg, width) {
         label: m.querySelector("button")?.getAttribute("aria-label") ?? "",
       })),
       placed: (root?.getAttribute("data-protocol-change-blocks") ?? "").split(",").filter(Boolean).map(Number),
+      stated: (root?.getAttribute("data-protocol-change-stated") ?? "")
+        .split(",")
+        .filter(Boolean)
+        .map((x) => ({ block: Number(x.slice(0, x.indexOf("@"))), note: x.slice(x.indexOf("@") + 1) })),
       count: Number(root?.getAttribute("data-protocol-changes") ?? 0),
       rows: [...document.querySelectorAll("[data-protocol-change]")].map((r) => ({
         id: r.getAttribute("data-protocol-change"),
@@ -2057,22 +2064,46 @@ async function checkChangeRows(page, tag, pg, width) {
   if (pg.noChanges) {
     check(
       `${tag}: no protocol-change row in a life with no change`,
-      st.rows.length === 0 && st.placed.length === 0,
+      st.rows.length === 0 && st.placed.length === 0 && st.stated.length === 0,
       `${st.rows.length} rows`,
     );
     return;
   }
   const marked = [...new Set(st.markers.flatMap((m) => m.blocks))].sort((a, b) => a - b);
   const placed = [...new Set(st.placed)].sort((a, b) => a - b);
+  const statedBlocks = new Set(st.stated.map((x) => x.block));
+  const accounted = [...new Set([...placed, ...statedBlocks])].sort((a, b) => a - b);
   check(
-    `${tag}: every marked change has a history row and no row stands without a marker (${marked.length} blocks, ${st.count} changes)`,
-    marked.length > 0 && marked.join() === placed.join(),
-    `markers ${marked.slice(0, 6).join(",")} | rows ${placed.slice(0, 6).join(",")}`,
+    `${tag}: every marked change has a history row or a rate note stating it, and nothing else stands as a row (${marked.length} blocks, ${st.count} in rows, ${st.stated.length} stated by notes)`,
+    marked.length > 0 && marked.join() === accounted.join(),
+    `markers ${marked.slice(0, 6).join(",")} | rows ${placed.slice(0, 6).join(",")} | stated ${[...statedBlocks].slice(0, 6).join(",")}`,
   );
+  if (st.stated.length) {
+    // A rate note's id ends in its stretch: `…:<from>-<to>`, or `-head` live.
+    const outside = st.stated.filter(({ block, note }) => {
+      const m = /^rate-step:.*:(\d+)-(\d+|head)$/.exec(note);
+      return !m || !(Number(m[1]) < block && (m[2] === "head" || block <= Number(m[2])));
+    });
+    check(
+      `${tag}: each of the ${st.stated.length} changes a note states lies inside that rate note's stretch`,
+      outside.length === 0,
+      outside
+        .slice(0, 3)
+        .map((x) => `${x.block}@${x.note}`)
+        .join(" "),
+    );
+  }
+  if (!st.rows.length) {
+    check(
+      `${tag}: a life whose changes every note states draws no change row`,
+      st.placed.length === 0 && st.count === 0,
+    );
+    return;
+  }
   const markedDays = new Set(st.markers.flatMap((m) => m.days));
   check(
     `${tag}: each drawn row's days are marked days`,
-    st.rows.length > 0 && st.rows.every((r) => r.days.every((d) => markedDays.has(d))),
+    st.rows.every((r) => r.days.every((d) => markedDays.has(d))),
     st.rows
       .map((r) => r.days.join("+"))
       .join(" ")
@@ -2114,7 +2145,22 @@ async function checkChangeRows(page, tag, pg, width) {
       .join(" | "),
   );
   check(`${tag}: each line's figure stands in a receipt`, items.length > 0 && items.every((i) => i.prov));
-  if (target.days.includes(pg.changes.day)) {
+  const NOTED = new Set(["Stability fee", "Primary rate"]);
+  const doubled = items.filter((i) => NOTED.has(i.name) && statedBlocks.has(i.block));
+  check(
+    `${tag}: no opened line is a change a rate note states`,
+    doubled.length === 0,
+    doubled
+      .slice(0, 2)
+      .map((i) => `${i.block}: ${i.words}`)
+      .join(" | "),
+  );
+  if (NOTED.has(pg.changes.name) && statedBlocks.has(pg.changes.block)) {
+    check(
+      `${tag}: ${pg.changes.name} at block ${pg.changes.block} is stated by a rate note and has no line`,
+      !items.some((i) => i.block === pg.changes.block && i.name === pg.changes.name),
+    );
+  } else if (target.days.includes(pg.changes.day)) {
     const want = pg.changes;
     const it = items.find((i) => i.block === want.block && i.name === want.name);
     check(

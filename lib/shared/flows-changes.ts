@@ -32,7 +32,16 @@ export interface FlowChange {
   toLink?: FlowChangeLink;
   /** The receipt for the value after. */
   prov: Provenance;
+  /** The quantity a rate note in the history states, where the family draws
+   *  one for this change's parameter (`noteQuantity` in
+   *  lib/shared/protocol-change-note.ts): a change inside such a note's
+   *  stretch takes no protocol-change row, its diamond stays (ui-jobs 449). */
+  noted?: NotedQuantity;
 }
+
+/** The parameters a rate note and a protocol change both state: Maker's
+ *  stability fee, Polaris's primary rate. */
+export type NotedQuantity = "makerdao:stability-fee" | "polaris:primary-rate";
 
 export interface FlowChangeLink {
   /** The short address, "0x8a71…b6f5". */

@@ -238,7 +238,7 @@ export const morphoVaultTimelineNoteProv = (c: VaultTimelineCoords, note: Morpho
     kind: "recompute",
     text: `Re-run eth_getLogs on the vault for this event's topic from its creation block and read the log at block ${note.blockNumber}`,
   },
-  summary: `A change to the vault's own terms — ${NOTE_CLAUSE[note.kind]}, read at block ${note.blockNumber}. It is not this address's event: it moved every holder's terms at once, which is why it sits beside the rows and is counted in no total here. The values are the log's own words, raw. What the vault's terms are NOW is the reading in the sections above, at the page's own block.`,
+  summary: `A change to the vault's own terms — ${NOTE_CLAUSE[note.kind]}, read at block ${note.blockNumber}. It is not this address's event: it moved every holder's terms at once, which is why it sits beside the rows and this page's event counts leave it out. The values are the log's own words, raw. What the vault's terms are NOW is the reading in the sections above, at the page's own block.`,
   contract: vaultContract(c),
   via: `${LANE} · eth_getLogs on the vault for this configuration event`,
 });

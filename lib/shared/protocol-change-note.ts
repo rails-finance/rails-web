@@ -12,9 +12,15 @@
 // changes in one gap stand as one row, its lines by day as the events row's
 // tip lists them.
 //
+// A change a rate note already states takes no row (ui-jobs 449; Miles,
+// 29 Oct 2026): Maker's stability fee sets and Polaris's primary-rate sets
+// inside a rate note's stretch are left out of the rows, their diamonds kept,
+// and a gap whose changes are all stated draws none (`statingNote`).
+//
 // Pure: no DOM, no fetch.
 
-import type { FlowChange } from "@/lib/shared/flows-changes";
+import type { FlowChange, NotedQuantity } from "@/lib/shared/flows-changes";
+import type { MarketNote } from "@/lib/shared/market-note";
 
 /** One protocol change as a row the history can place. */
 export interface ProtocolChangeNote {
@@ -72,4 +78,25 @@ export function protocolChangeGroup(notes: readonly ProtocolChangeNote[]): Proto
   }
   for (const d of days) d.notes.sort((a, b) => a.seq - b.seq);
   return { group: "protocol-changes", id: `protocol-changes:${notes[0].id}`, days };
+}
+
+/** The quantity a market note states, as a change names it in `noted`: a
+ *  Maker rate step states the ilk's stability fee, a Polaris rate step the
+ *  market's primary rate. Null for a note no change records (an Aave-family
+ *  reserve rate, a PSM gap, a vault's terms). */
+export function noteQuantity(note: MarketNote): NotedQuantity | null {
+  if (note.kind !== "rate-step") return null;
+  if (note.protocol === "makerdao") return "makerdao:stability-fee";
+  return note.protocol == null ? "polaris:primary-rate" : null;
+}
+
+/** The note that states a change: one of its quantity whose stretch holds the
+ *  change's block, after its earlier end and at or before its later (a live
+ *  note's later end is the head). Undefined where none does, and the change
+ *  takes a row. */
+export function statingNote(change: FlowChange, notes: readonly MarketNote[]): MarketNote | undefined {
+  if (!change.noted) return undefined;
+  return notes.find(
+    (n) => noteQuantity(n) === change.noted && n.from.block < change.block && change.block <= n.to.block,
+  );
 }
