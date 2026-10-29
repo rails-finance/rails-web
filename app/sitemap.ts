@@ -90,6 +90,12 @@ async function baseVaultPages(): Promise<MetadataRoute.Sitemap> {
   }
 }
 
+// Rendered per request. The two census reads go through `ssrHop()`, which reads
+// the request's headers to reach this deployment's own listing proxy, so the
+// file has no build-time render: a static attempt threw on `headers()` inside
+// the census try/catch and logged it as a census failure on every build.
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [vaultPages, baseVaults] = await Promise.all([ethereumVaultPages(), baseVaultPages()]);
   return [
