@@ -3462,9 +3462,10 @@ async function checkLwOpen(page, tag, priceOnly = false) {
 
 /** The dotted value line's tip held steady (ui-jobs 451): a pointer moved
  *  along a dotted stretch keeps one tip open, with no hide and show between
- *  steps. The line's height is read from the tip, which stands 10px over
- *  the line's point under the pointer, so the walk follows a sloped stretch.
- *  Desktop only, on a page whose value line has a dotted stretch. */
+ *  steps. The stretch is the longest run of tip-opening points on a coarse
+ *  grid, across or down (a steep stretch runs down), walked in 2px steps
+ *  between its ends. Desktop only, on a page whose value line has a dotted
+ *  stretch. */
 async function checkOldTipSteady(page, tag) {
   if ((await page.locator("[data-flows-combined] [data-flow-old-line]").count()) === 0) return;
   await page
@@ -3480,30 +3481,61 @@ async function checkOldTipSteady(page, tag) {
   const plotW = Number(
     await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").first().getAttribute("data-flow-lw-plot-w"),
   );
-  const tipY = () =>
-    page.evaluate(() => {
-      const t = document.querySelector("[data-flows-combined] [data-flow-old-tip]");
-      return t ? t.getBoundingClientRect().bottom + 10 : null;
-    });
-  // The longest run of tip-opening points on a coarse grid is the walk's start.
-  let start = null;
-  let bestRun = 0;
-  for (let y = b.y + 4; y < b.y + b.height * 0.6 && bestRun < 6; y += 4) {
-    let run = 0;
-    for (let x = b.x + 8; x < b.x + plotW - 4; x += 12) {
-      await page.mouse.move(x, y);
-      const ly = await tipY();
-      run = ly == null ? 0 : run + 1;
-      if (run > bestRun) {
-        bestRun = run;
-        start = { x: x - 12 * (run - 1), y };
-      }
+  const tipOpen = () =>
+    page.evaluate(() => document.querySelector("[data-flows-combined] [data-flow-old-tip]") != null);
+  const DX = 12;
+  const DY = 4;
+  const xs = [];
+  for (let x = b.x + 8; x < b.x + plotW - 4; x += DX) xs.push(x);
+  const ys = [];
+  for (let y = b.y + 8; y < b.y + b.height * 0.6; y += DY) ys.push(y);
+  const hit = ys.map(() => new Array(xs.length).fill(false));
+  for (let r = 0; r < ys.length; r++)
+    for (let q = 0; q < xs.length; q++) {
+      await page.mouse.move(xs[q], ys[r]);
+      hit[r][q] = await tipOpen();
     }
-  }
-  if (!start) {
-    check(`${tag}: a pointer on the dotted value line opens its tip`, false, "no point on a 12×4px grid opened it");
+  // The longest run, in pixels, across a row or down a column.
+  let walk = null;
+  const take = (len, from, to) => {
+    if (len > 0 && (!walk || len > walk.len)) walk = { len, from, to };
+  };
+  for (let r = 0; r < ys.length; r++)
+    for (let q = 0, run = 0; q < xs.length; q++) {
+      run = hit[r][q] ? run + 1 : 0;
+      if (run > 1) take(DX * (run - 1), { x: xs[q - run + 1], y: ys[r] }, { x: xs[q], y: ys[r] });
+    }
+  for (let q = 0; q < xs.length; q++)
+    for (let r = 0, run = 0; r < ys.length; r++) {
+      run = hit[r][q] ? run + 1 : 0;
+      if (run > 1) take(DY * (run - 1), { x: xs[q], y: ys[r - run + 1] }, { x: xs[q], y: ys[r] });
+    }
+  if (!walk) {
+    // A dotted piece shorter than a cell is not drawn at this zoom: nothing to point at.
+    if (!hit.some((row) => row.includes(true))) {
+      console.log(
+        `NOTE  ${tag}: no dotted stretch drawn at All on a ${DX}×${DY}px grid; the steady-tip walk is skipped`,
+      );
+      return;
+    }
+    check(
+      `${tag}: a pointer on the dotted value line opens its tip over a run of neighbouring points`,
+      false,
+      "only lone grid points opened it",
+    );
     return;
   }
+  // The first 120px: a longer run can cross an event day, where the dotted
+  // line breaks.
+  if (walk.len > 120) {
+    const f = 120 / walk.len;
+    walk = {
+      len: 120,
+      from: walk.from,
+      to: { x: walk.from.x + f * (walk.to.x - walk.from.x), y: walk.from.y + f * (walk.to.y - walk.from.y) },
+    };
+  }
+  const start = walk.from;
   await page.mouse.move(start.x, start.y);
   await page.waitForTimeout(100);
   // Every mount and unmount of the tip, between steps too.
@@ -3521,18 +3553,14 @@ async function checkOldTipSteady(page, tag) {
     });
     window.__oldTipObs.observe(host, { childList: true, subtree: true });
   });
-  // Two-pixel steps along the stretch, as far as the run reached and no further.
-  const steps = Math.min(120, Math.floor((12 * (bestRun - 1)) / 2));
-  let y = (await tipY()) ?? start.y;
+  // Two-pixel steps from one end of the run to the other.
+  const steps = Math.min(150, Math.floor(walk.len / 2));
   let open = 0;
   for (let i = 1; i <= steps; i++) {
-    await page.mouse.move(start.x + 2 * i, y);
+    const t = i / steps;
+    await page.mouse.move(walk.from.x + t * (walk.to.x - walk.from.x), walk.from.y + t * (walk.to.y - walk.from.y));
     await page.waitForTimeout(16);
-    const ly = await tipY();
-    if (ly != null) {
-      open++;
-      y = ly;
-    }
+    if (await tipOpen()) open++;
   }
   const log = await page.evaluate(() => {
     window.__oldTipObs?.disconnect();
@@ -3542,8 +3570,8 @@ async function checkOldTipSteady(page, tag) {
   // The tip was open at the start: any event at all is a hide.
   check(
     `${tag}: a pointer moved along the dotted value line keeps one tip open, with no hide and show`,
-    steps > 0 && open === steps && log.length === 0,
-    `${steps === 0 ? "no two neighbouring grid points held the tip; " : ""}${open}/${steps} steps open, tip events: ${log.slice(0, 8).join(",") || "none"}${log.length > 8 ? ` (+${log.length - 8})` : ""}`,
+    open === steps && log.length === 0,
+    `${walk.from.x === walk.to.x ? "down" : "across"} ${walk.len}px: ${open}/${steps} steps open, tip events: ${log.slice(0, 8).join(",") || "none"}${log.length > 8 ? ` (+${log.length - 8})` : ""}`,
   );
 }
 

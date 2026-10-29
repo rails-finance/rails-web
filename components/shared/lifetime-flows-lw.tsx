@@ -831,12 +831,37 @@ export function LifetimeFlowsLw({
       return;
     }
     const i = Math.round(p.logical);
+    const { x: px, y: py } = p.point;
     for (const k of sides) {
       if (paneOf(k) !== p.paneIndex) continue;
-      const v = sampled.current[`dotted-${k}`]?.[i];
+      const vals = sampled.current[`dotted-${k}`];
       const s = series.current[`dotted-${k}`];
-      const y = v == null || !s ? null : s.priceToCoordinate(v);
-      if (y == null || Math.abs(y - p.point.y) > 8) continue;
+      if (!vals || !s) continue;
+      // The pointer's distance from the drawn line: the segments into and
+      // out of the cell under it, so a steep stretch is as easy to hold as
+      // a flat one. A segment is drawn where both its cells have a value.
+      const at = (j: number) => {
+        const v = vals[j];
+        const x = v == null ? null : c.timeScale().logicalToCoordinate(j as Logical);
+        const y = v == null ? null : s.priceToCoordinate(v);
+        return x == null || y == null ? null : { x, y };
+      };
+      const [a, m, b] = [at(i - 1), at(i), at(i + 1)];
+      let near: { d: number; y: number } | null = m ? { d: Math.hypot(px - m.x, py - m.y), y: m.y } : null;
+      for (const [u, w] of [
+        [a, m],
+        [m, b],
+      ]) {
+        if (!u || !w) continue;
+        const dx = w.x - u.x;
+        const dy = w.y - u.y;
+        const t = Math.max(0, Math.min(1, ((px - u.x) * dx + (py - u.y) * dy) / (dx * dx + dy * dy || 1)));
+        const q = { x: u.x + t * dx, y: u.y + t * dy };
+        const d = Math.hypot(px - q.x, py - q.y);
+        if (!near || d < near.d) near = { d, y: q.y };
+      }
+      if (!near || near.d > 8) continue;
+      const y = near.y;
       // The dotted point nearest the pointer's day.
       const day = Math.floor((g.start + (i + 1) * g.step - 1) / DAY_S);
       let best: number | null = null;
