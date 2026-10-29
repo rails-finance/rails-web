@@ -35,6 +35,7 @@ export function polarisFlowChanges(events: readonly BaseActivityEvent[], stable:
       name: "Primary rate",
       from: before ? pctWords(before.rate * 100) : null,
       to: pctWords(rate * 100),
+      noted: "polaris:primary-rate",
       prov: {
         kind: "chain",
         pclass: "emitted",

@@ -63,7 +63,7 @@ export interface AaveV3PositionMarkdownArgs {
   /** Market notes for this position — receipted facts about ONE reserve's own
    *  rate, on ONE side of it, observed between two of the position's own
    *  touches (lib/aave-v3/market-notes.ts). A note is NEVER an event: it is
-   *  counted in no total here, the timeline table's row count and numbering
+   *  left out of every total here, the timeline table's row count and numbering
    *  are identical with and without them, and the CSV never carries one. */
   notes?: MarketNote[];
   /** This position's live notes — each held reserve's own rate read at the
@@ -361,8 +361,8 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "of the position's own touches and stated between them — or between its newest touch and the chain head for " +
       "a live note. A V3-family account is one cross-collateralised account holding several reserves at once, and " +
       "each reserve carries a supply rate the account earns and a variable borrow rate it pays, so a note is per " +
-      "reserve and per side rather than per position. A note is not an event: it is counted in no total in this " +
-      "snapshot, and the timeline table below reads exactly as it would without any of them. The rate is on " +
+      "reserve and per side rather than per position. A note is not an event: this snapshot's totals leave it out, " +
+      "and the timeline table below reads as it would without any of them. The rate is on " +
       "neither of the position's rows — it is the reserve's own ReserveDataUpdated, and the two ends are found by " +
       "two different rules: the earlier is the last one at or before the position's own action, which the Pool " +
       "emits inside that transaction, so it is the rate that action left in force; the later is the last one " +

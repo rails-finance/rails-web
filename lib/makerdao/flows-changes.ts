@@ -35,6 +35,7 @@ export function makerFlowChanges(
         name: "Stability fee",
         from: prev ? pctWords(prev.aprPct) : null,
         to: pctWords(s.aprPct),
+        noted: "makerdao:stability-fee",
         prov: {
           kind: "chain-derived",
           pclass: "state",

@@ -394,6 +394,7 @@ function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: F
     delegateRate: has.has("rate-delegate") || named["rate-delegate"] != null,
     ownerRate: has.has("rate-owner") || named["rate-owner"] != null,
     changes: [...new Set(changeDays.flatMap((d) => d.changes.map((c) => c.name)))],
+    noted: [...new Set(changeDays.flatMap((d) => d.changes.filter((c) => c.noted).map((c) => c.name)))],
   };
 }
 

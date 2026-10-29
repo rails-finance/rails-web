@@ -810,9 +810,8 @@ function vaultTermsBody(note: VaultTermsNote, links: NoteLinks): NoteBody {
           on the chain&rsquo;s explorer
         </a>
         ). It is not this address&rsquo;s event: it moved every holder&rsquo;s terms at once, which is why it sits among
-        the rows without being one of them and is counted in nothing on this page. The values are the log&rsquo;s own
-        words, raw. What the vault&rsquo;s terms are NOW is the reading in the sections above, at the page&rsquo;s own
-        block.
+        the rows and this page&rsquo;s event counts leave it out. The values are the log&rsquo;s own words, raw. What
+        the vault&rsquo;s terms are NOW is the reading in the sections above, at the page&rsquo;s own block.
       </>
     ),
   };

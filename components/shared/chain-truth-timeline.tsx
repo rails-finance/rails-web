@@ -106,11 +106,17 @@ import {
 } from "@/components/shared/timeline-toolbar";
 import { usePublishLifeCount, type LifeCount } from "@/lib/shared/life-count-store";
 import { NoteGap, noteRowHeight, type GapItem } from "@/components/shared/note-gap";
-import { protocolChangeNotes, type ProtocolChangeNote } from "@/lib/shared/protocol-change-note";
+import { protocolChangeNotes, statingNote, type ProtocolChangeNote } from "@/lib/shared/protocol-change-note";
 import { lifeChanges } from "@/lib/shared/flows-combined";
 import { SpineLine } from "@/components/shared/spine-line";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { anchorMarketNotes, liveNoteGroup, mergePsmGaps, type MarketNote } from "@/lib/shared/market-note";
+import {
+  anchorMarketNotes,
+  liveNoteGroup,
+  liveNoteStated,
+  mergePsmGaps,
+  type MarketNote,
+} from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { folderTerminus } from "@/lib/shared/run-folders";
 import { settleRunRows } from "@/lib/shared/timeline-chunks";
@@ -262,6 +268,7 @@ const NO_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
 const NO_NOTES: MarketNote[] = [];
 const NO_CHANGES: ProtocolChangeNote[] = [];
 const NO_CHANGE_ANCHORS: ReadonlyMap<string, ProtocolChangeNote[]> = new Map();
+const NO_STATED: { block: number; noteId: string }[] = [];
 /** Newest first, as the list reads; a tie keeps the given order. */
 const byBlockDesc = <T extends { to: { block: number } }>(xs: T[]): T[] =>
   xs
@@ -1058,20 +1065,42 @@ function ChainTruthTimelineBody({
     return out.length ? out.sort((a, b) => b.to.block - a.to.block) : NO_NOTES;
   }, [notesInView, anchored, tl.sortedEvents]);
 
+  /** The notes the history holds in this view, whatever the notes switch
+   *  says: every anchored note, every head note and, unrewound, every live
+   *  one. A change one of them states takes no row (ui-jobs 449). */
+  const notesHeld = useMemo(() => {
+    const out: MarketNote[] = [...headNotes];
+    for (const list of anchored.values()) out.push(...list);
+    if (cut == null && liveNotes) out.push(...liveNotes.filter(liveNoteStated));
+    return out;
+  }, [anchored, headNotes, liveNotes, cut]);
+
   /** The protocol's changes inside the life (ui-jobs 448): the list the
    *  Lifetime flows events row draws as its diamonds, from the same model,
-   *  placed as the notes are. Outside the notes switch: the diamonds stand
-   *  whatever it says, and each has its row. */
-  const changesInView = useMemo(() => {
+   *  placed as the notes are, less those a held note states (`stated`, each
+   *  with that note's id). Outside the notes switch: the diamonds stand
+   *  whatever it says. */
+  const { changesInView, statedChanges } = useMemo(() => {
     const all = protocolChangeNotes(lifeChanges(focusModel, utcDay(Date.now() / 1000)));
-    if (all.length === 0) return NO_CHANGES;
+    if (all.length === 0) return { changesInView: NO_CHANGES, statedChanges: NO_STATED };
     const range = tl.dateRange;
-    return all.filter(
+    const inView = all.filter(
       (n) =>
         (range == null || (n.to.timestamp >= range[0] && n.to.timestamp <= range[1])) &&
         (cut == null || n.to.timestamp <= cut),
     );
-  }, [focusModel, tl.dateRange, cut]);
+    const rows: ProtocolChangeNote[] = [];
+    const stated: { block: number; noteId: string }[] = [];
+    for (const n of inView) {
+      const note = statingNote(n.change, notesHeld);
+      if (note) stated.push({ block: n.to.block, noteId: note.id });
+      else rows.push(n);
+    }
+    return {
+      changesInView: rows.length ? rows : NO_CHANGES,
+      statedChanges: stated.length ? stated : NO_STATED,
+    };
+  }, [focusModel, tl.dateRange, cut, notesHeld]);
   const changesAnchored = useMemo(
     () => (changesInView.length ? anchorMarketNotes(changesInView, events, "desc") : NO_CHANGE_ANCHORS),
     [changesInView, events],
@@ -1086,12 +1115,17 @@ function ChainTruthTimelineBody({
   }, [changesInView, changesAnchored]);
   /** The changes the page places, for a machine: how many
    *  (`data-protocol-changes`) and their blocks (`data-protocol-change-blocks`),
-   *  the drawn window's and the rest alike. */
+   *  the drawn window's and the rest alike; and the changes a note states
+   *  instead, as `block@noteId` (`data-protocol-change-stated`). */
   const placedChanges = useMemo(() => {
     const all = [...headChanges];
     for (const list of changesAnchored.values()) all.push(...list);
-    return { count: all.length, blocks: [...new Set(all.map((n) => n.to.block))].sort((a, b) => a - b).join(",") };
-  }, [changesAnchored, headChanges]);
+    return {
+      count: all.length,
+      blocks: [...new Set(all.map((n) => n.to.block))].sort((a, b) => a - b).join(","),
+      stated: statedChanges.map((c) => `${c.block}@${c.noteId}`).join(","),
+    };
+  }, [changesAnchored, headChanges, statedChanges]);
 
   /** How many notes the page places: every anchored note, every head note
    *  and every live one. Stated on the root for a machine
@@ -2035,6 +2069,7 @@ function ChainTruthTimelineBody({
           data-market-notes={marketNoteCount || undefined}
           data-protocol-changes={placedChanges.count || undefined}
           data-protocol-change-blocks={placedChanges.blocks || undefined}
+          data-protocol-change-stated={placedChanges.stated || undefined}
         >
           {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
           <div data-skel-section="detail-timeline-header">
