@@ -5,7 +5,7 @@
    "controller": "0xa920de414ea4ab66b97da1bfe9e6eca7d4219635",
    "chainId": 1,
    "fromBlock": 17562530,
-   "toBlock": 26294378,
+   "toBlock": 26297140,
    "before": {
     "discounts": {
      "block": 23989152,
@@ -24,7 +24,27 @@
      "txHash": "0x58db7d5228e82fbeb7ec65478d8c1b7cf8188469c0c508eb20704ad796a6ce2a",
      "logIndex": 179,
      "kind": "policy",
-     "policy": "0xbb3fda661149f6e45d829d5dd54a1608577c5fa1"
+     "policy": "0xbb3fda661149f6e45d829d5dd54a1608577c5fa1",
+     "policies": {
+      "before": {
+       "address": "0x1e7d3bf98d3f8d8ce193236c3e0ec4b00e32daae",
+       "kind": "aggregate",
+       "settings": {
+        "rate0": 0.086177694019536,
+        "sigma": 0.02,
+        "targetDebtFraction": 0.1
+       }
+      },
+      "after": {
+       "address": "0xbb3fda661149f6e45d829d5dd54a1608577c5fa1",
+       "kind": "aggregate",
+       "settings": {
+        "rate0": 0.05826890589336,
+        "sigma": 0.02,
+        "targetDebtFraction": 0.1
+       }
+      }
+     }
     },
     {
      "block": 19100765,
@@ -32,7 +52,27 @@
      "txHash": "0x8e3f507dca8e6786c1ff4a6ffe850b0292be36bc49e85ec48dfa22db44a1da77",
      "logIndex": 397,
      "kind": "policy",
-     "policy": "0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933"
+     "policy": "0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933",
+     "policies": {
+      "before": {
+       "address": "0xbb3fda661149f6e45d829d5dd54a1608577c5fa1",
+       "kind": "aggregate",
+       "settings": {
+        "rate0": 0.109999999993248,
+        "sigma": 0.02,
+        "targetDebtFraction": 0.1
+       }
+      },
+      "after": {
+       "address": "0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933",
+       "kind": "aggregate",
+       "settings": {
+        "rate0": 0.109999999993248,
+        "sigma": 0.02,
+        "targetDebtFraction": 0.1
+       }
+      }
+     }
     },
     {
      "block": 23989153,
@@ -49,7 +89,28 @@
      "txHash": "0x4165f70e1ec289cdaa8acdbdc306995c6fde650aa26ff46c3eea525493930fa0",
      "logIndex": 556,
      "kind": "policy",
-     "policy": "0x07491d124ddb3ef59a8938fcb3ee50f9fa0b9251"
+     "policy": "0x07491d124ddb3ef59a8938fcb3ee50f9fa0b9251",
+     "policies": {
+      "before": {
+       "address": "0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933",
+       "kind": "aggregate",
+       "settings": {
+        "rate0": 0.098999999987616,
+        "sigma": 0.007,
+        "targetDebtFraction": 0.2667
+       }
+      },
+      "after": {
+       "address": "0x07491d124ddb3ef59a8938fcb3ee50f9fa0b9251",
+       "kind": "aggregate",
+       "settings": {
+        "rate0": 0.115499999996064,
+        "sigma": 0.007,
+        "targetDebtFraction": 0.2667,
+        "extraConst": 0
+       }
+      }
+     }
     }
    ]
   },
@@ -57,7 +118,7 @@
    "controller": "0xeda215b7666936ded834f76f3fbc6f323295110a",
    "chainId": 1,
    "fromBlock": 19422691,
-   "toBlock": 26294378,
+   "toBlock": 26297140,
    "before": {
     "discounts": {
      "block": 23653874,
@@ -76,7 +137,25 @@
      "txHash": "0x3a37c7ed56b1d042e8e08bf6d43e5d2afed5a44a738f5119a4b8d16be40491f4",
      "logIndex": 201,
      "kind": "policy",
-     "policy": "0x8a7138cf49affcd35d05dbe5a160dac870e4b6f5"
+     "policy": "0x8a7138cf49affcd35d05dbe5a160dac870e4b6f5",
+     "policies": {
+      "before": {
+       "address": "0x8b6527063fbc9c30731d7e57f1def08edce57d07",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.009999999973584,
+        "maxRate": 0.799999999999632
+       }
+      },
+      "after": {
+       "address": "0x8a7138cf49affcd35d05dbe5a160dac870e4b6f5",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.000299999981232,
+        "maxRate": 4.6656199999908
+       }
+      }
+     }
     },
     {
      "block": 23653875,
@@ -102,7 +181,25 @@
      "txHash": "0xc35923f644d8615c91a0d04cc940c591f8df00f30977df3ab9e5b12c78118d08",
      "logIndex": 545,
      "kind": "policy",
-     "policy": "0x8b1c4d2718ba8d1be499d679687454e1db5ace19"
+     "policy": "0x8b1c4d2718ba8d1be499d679687454e1db5ace19",
+     "policies": {
+      "before": {
+       "address": "0x8a7138cf49affcd35d05dbe5a160dac870e4b6f5",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 2.99970432e-7,
+        "maxRate": 2.9329999999879677
+       }
+      },
+      "after": {
+       "address": "0x8b1c4d2718ba8d1be499d679687454e1db5ace19",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 9.460799999999999e-11,
+        "maxRate": 9.460799999999999e-11
+       }
+      }
+     }
     },
     {
      "block": 24955515,
@@ -128,12 +225,221 @@
    "controller": "0x8472a9a7632b173c8cf3a86d3afec50c35548e76",
    "chainId": 1,
    "fromBlock": 17258064,
-   "toBlock": 26294378,
+   "toBlock": 26297140,
    "before": {
     "discounts": null,
     "policy": null
    },
    "sets": []
+  },
+  "0x1e0165dbd2019441ab7927c018701f3138114d71": {
+   "controller": "0x1e0165dbd2019441ab7927c018701f3138114d71",
+   "chainId": 1,
+   "fromBlock": 19422666,
+   "toBlock": 26297140,
+   "before": {
+    "discounts": {
+     "block": 25235134,
+     "loanDiscount": 0.07,
+     "liquidationDiscount": 0.04
+    },
+    "policy": {
+     "block": 19978341,
+     "policy": "0x112e37742015ece4ceb4b576a9434940838eaf02"
+    }
+   },
+   "sets": [
+    {
+     "block": 19978342,
+     "timestamp": 1717019903,
+     "txHash": "0x495993f70b6322858da280eb4b9980f8d03e76c8dab198191a9c74b86c6067cd",
+     "logIndex": 206,
+     "kind": "policy",
+     "policy": "0x319c06103bc51b3c01a1a121451aa5e2a2a7778f",
+     "policies": {
+      "before": {
+       "address": "0x112e37742015ece4ceb4b576a9434940838eaf02",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.000999999968976,
+        "maxRate": 0.549999999997776
+       }
+      },
+      "after": {
+       "address": "0x319c06103bc51b3c01a1a121451aa5e2a2a7778f",
+       "kind": "secondary",
+       "settings": {
+        "rateShift": 0.039999999988944004,
+        "targetUtilization": 0.8500000000000001,
+        "lowRatio": 0.5,
+        "highRatio": 2.999999999999997
+       }
+      }
+     }
+    },
+    {
+     "block": 21824499,
+     "timestamp": 1739291639,
+     "txHash": "0x3781f74d961514aec057aea58fb32abccaa7e88bd17b2e1e7b5f9a195f823211",
+     "logIndex": 456,
+     "kind": "policy",
+     "policy": "0x112e37742015ece4ceb4b576a9434940838eaf02",
+     "policies": {
+      "before": {
+       "address": "0x319c06103bc51b3c01a1a121451aa5e2a2a7778f",
+       "kind": "secondary",
+       "settings": {
+        "rateShift": 0.039999999988944004,
+        "targetUtilization": 0.8500000000000001,
+        "lowRatio": 0.5,
+        "highRatio": 2.999999999999997
+       }
+      },
+      "after": {
+       "address": "0x112e37742015ece4ceb4b576a9434940838eaf02",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.000999999968976,
+        "maxRate": 0.6999999999799681
+       }
+      }
+     }
+    },
+    {
+     "block": 25235135,
+     "timestamp": 1780468871,
+     "txHash": "0xb92de03bf5576975a448d3e373629efdeb9e3f7cf68664d3d1f2d1629e2af14c",
+     "logIndex": 149,
+     "kind": "discounts",
+     "loanDiscount": 0.5,
+     "liquidationDiscount": 0.04
+    },
+    {
+     "block": 25235135,
+     "timestamp": 1780468871,
+     "txHash": "0xb92de03bf5576975a448d3e373629efdeb9e3f7cf68664d3d1f2d1629e2af14c",
+     "logIndex": 215,
+     "kind": "policy",
+     "policy": "0x066a89bdf4efb6ad58427d278f16b7a2c53c3cee",
+     "policies": {
+      "before": {
+       "address": "0x112e37742015ece4ceb4b576a9434940838eaf02",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.000999999968976,
+        "maxRate": 0.6999999999799681
+       }
+      },
+      "after": {
+       "address": "0x066a89bdf4efb6ad58427d278f16b7a2c53c3cee",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.099999999988128,
+        "maxRate": 0.999999999975888
+       }
+      }
+     }
+    }
+   ]
+  },
+  "0xb536fea3a01c95dd09932440ec802a75410139d6": {
+   "controller": "0xb536fea3a01c95dd09932440ec802a75410139d6",
+   "chainId": 1,
+   "fromBlock": 19999153,
+   "toBlock": 26297140,
+   "before": {
+    "discounts": null,
+    "policy": {
+     "block": 20049734,
+     "policy": "0x201c00ba25cac8e8fc23f001b1b6095094998c31"
+    }
+   },
+   "sets": [
+    {
+     "block": 20049735,
+     "timestamp": 1717881359,
+     "txHash": "0x88efb21bc50c7142321d8ac589a9b75dfe269e658c3593d0ed8edc21490584af",
+     "logIndex": 348,
+     "kind": "policy",
+     "policy": "0xf574cbebbd549273af82b42cd0230de9ea6efef7",
+     "policies": {
+      "before": {
+       "address": "0x201c00ba25cac8e8fc23f001b1b6095094998c31",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.009999999973584,
+        "maxRate": 0.399999999984048
+       }
+      },
+      "after": {
+       "address": "0xf574cbebbd549273af82b42cd0230de9ea6efef7",
+       "kind": "susde",
+       "settings": {
+        "rateShift": 0,
+        "targetUtilization": 0.85,
+        "lowRatio": 0.35,
+        "highRatio": 1.5
+       }
+      }
+     }
+    },
+    {
+     "block": 22150459,
+     "timestamp": 1743225875,
+     "txHash": "0xf45d7bab5fa5825987caa905df128c474da3718e2044bcc0dbc7fcd2ed60cbf1",
+     "logIndex": 118,
+     "kind": "policy",
+     "policy": "0xb8ceda456f8191d8d0d5b196c7baab87a309ea50",
+     "policies": {
+      "before": {
+       "address": "0xf574cbebbd549273af82b42cd0230de9ea6efef7",
+       "kind": "susde",
+       "settings": {
+        "rateShift": 0,
+        "targetUtilization": 0.7999999999999999,
+        "lowRatio": 0.35000000000000003,
+        "highRatio": 2.5000000000000018
+       }
+      },
+      "after": {
+       "address": "0xb8ceda456f8191d8d0d5b196c7baab87a309ea50",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.000039999978576,
+        "maxRate": 0.476579999980368
+       }
+      }
+     }
+    },
+    {
+     "block": 23434996,
+     "timestamp": 1758742271,
+     "txHash": "0xeb56d6ca2782154e0477fb66a740794e7b8409e611463ee09998226ce7754c5e",
+     "logIndex": 45,
+     "kind": "policy",
+     "policy": "0xe60659e76056e3736dffb6981c289df55567395b",
+     "policies": {
+      "before": {
+       "address": "0xb8ceda456f8191d8d0d5b196c7baab87a309ea50",
+       "kind": "semilog",
+       "settings": {
+        "minRate": 0.000039999978576,
+        "maxRate": 0.476579999980368
+       }
+      },
+      "after": {
+       "address": "0xe60659e76056e3736dffb6981c289df55567395b",
+       "kind": "ema",
+       "settings": {
+        "rateShift": 0,
+        "targetUtilization": 0.85,
+        "lowRatio": 0.2,
+        "highRatio": 7.200000000000017
+       }
+      }
+     }
+    }
+   ]
   }
  },
  "positions": [
@@ -614,5 +920,6 @@
    },
    "atChanges": {}
   }
- ]
+ ],
+ "logsAt": "2026-10-29"
 }

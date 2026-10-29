@@ -25,9 +25,24 @@ export interface FlowChange {
   from: string | null;
   /** The value after, printed. */
   to: string;
+  /** A contract each side names, printed after its value and linked to the
+   *  explorer ("Semi-log, 0.5–35 % (0x8a71…b6f5)"); where the text is the
+   *  short address, the side is the link alone. */
+  fromLink?: FlowChangeLink;
+  toLink?: FlowChangeLink;
   /** The receipt for the value after. */
   prov: Provenance;
 }
+
+export interface FlowChangeLink {
+  /** The short address, "0x8a71…b6f5". */
+  text: string;
+  href: string;
+}
+
+/** A side as words: its value, then its link's text where that adds one. */
+export const sideWords = (value: string, link?: FlowChangeLink): string =>
+  link && link.text !== value ? `${value} (${link.text})` : value;
 
 /** A change at a block's time. */
 export function flowChange(c: Omit<FlowChange, "day">): FlowChange {
@@ -55,8 +70,10 @@ export function changesByDay(
 
 /** "Stability fee 5.25 % → 6.00 %", or "Name set to Steakhouse USDC" where
  *  the value before was not read. */
-export const changeWords = (c: Pick<FlowChange, "name" | "from" | "to">): string =>
-  c.from != null ? `${c.name} ${c.from} → ${c.to}` : `${c.name} set to ${c.to}`;
+export const changeWords = (c: Pick<FlowChange, "name" | "from" | "to" | "fromLink" | "toLink">): string => {
+  const to = sideWords(c.to, c.toLink);
+  return c.from != null ? `${c.name} ${sideWords(c.from, c.fromLink)} → ${to}` : `${c.name} set to ${to}`;
+};
 
 /** A fraction or a percent printed as the cards print a rate: "6.00 %". */
 export const pctWords = (percent: number, digits = 2): string => `${percent.toFixed(digits)} %`;

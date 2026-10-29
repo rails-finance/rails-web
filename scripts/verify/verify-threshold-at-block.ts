@@ -45,7 +45,7 @@ import {
   type DolomiteRiskAtAnswer,
   type DolomiteRiskLog,
 } from "@/lib/dolomite/flows-health";
-import { changesByDay } from "@/lib/shared/flows-changes";
+import { changesByDay, changeWords } from "@/lib/shared/flows-changes";
 import {
   cometFactorChanges,
   cometFactorSteps,
@@ -1006,7 +1006,7 @@ test("llamalend 0x6bda: the WETH market's 6 % → 9.21 % is a marker, the positi
   assert.match(liq[0].prov.summary, /took 9\.21 % at its event at block 25,926,904/);
   assert.deepEqual(inLife.filter((c) => c.name === "Loan discount").map(llWords), ["Loan discount 9 % → 14.29 %"]);
   assert.deepEqual(
-    inLife.filter((c) => c.name === "Rate policy").map((c) => c.block),
+    inLife.filter((c) => c.name === "Rate policy replaced").map((c) => c.block),
     [24_290_603],
     "the policy swaps before the life draw none",
   );
@@ -1016,7 +1016,7 @@ test("llamalend 0x6bda: the WETH market's 6 % → 9.21 % is a marker, the positi
 
 test("llamalend 0x3722 and 0x37b1: the CRV market's 8 % → 12 %, taken at a later borrow on one and kept to the close on the other", () => {
   const took = llInLife(llPos("0x3722"));
-  assert.deepEqual(took.filter((c) => c.name !== "Rate policy").map(llWords), [
+  assert.deepEqual(took.filter((c) => c.name !== "Rate policy replaced").map(llWords), [
     "Loan discount 11 % → 20 %",
     "Liquidation discount 8 % → 12 %",
     "Loan discount 20 % → 50 %",
@@ -1077,6 +1077,65 @@ test("llamalend 0x1109: no set in the life draws no marker; a synthetic change i
   assert.equal(inLife[0].day, Math.floor(mid.ts / DAY_S));
   assert.match(inLife[0].prov.summary, /kept 6 % through the rest of this history/);
   assert.ok(llamalendLifeHasDiscountChange(inLife, first, last));
+});
+
+test("llamalend 0x6bda: the policy swap in the life names each side's kind, setting and address", () => {
+  const [c] = llInLife(llPos("0x6bda")).filter((x) => x.name === "Rate policy replaced");
+  assert.equal(c.from, "Aggregate, base 9.9 %");
+  assert.equal(c.to, "Aggregate, base 11.55 %");
+  assert.equal(c.fromLink?.href, "https://etherscan.io/address/0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933");
+  assert.equal(c.toLink?.href, "https://etherscan.io/address/0x07491d124ddb3ef59a8938fcb3ee50f9fa0b9251");
+  assert.equal(
+    changeWords(c),
+    "Rate policy replaced Aggregate, base 9.9 % (0x8c5a…c933) → Aggregate, base 11.55 % (0x0749…9251)",
+  );
+  assert.deepEqual(
+    c.prov.inputs?.map((i) => [i.label, i.contract?.address]),
+    [
+      ["Policy replaced", "0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933"],
+      ["New policy", "0x07491d124ddb3ef59a8938fcb3ee50f9fa0b9251"],
+    ],
+  );
+});
+
+test("llamalend: each policy kind on the fixture's markets reads by its main setting", () => {
+  const words = (c: string) =>
+    llamalendConfigChanges(LL.logs[c], [], "test")
+      .filter((x) => x.name === "Rate policy replaced")
+      .map((x) => `${x.from} → ${x.to}`);
+  assert.deepEqual(words("0x1e0165dbd2019441ab7927c018701f3138114d71"), [
+    "Semi-log, 0.1–55 % → Secondary, target 85 %",
+    "Secondary, target 85 % → Semi-log, 0.1–70 %",
+    "Semi-log, 0.1–70 % → Semi-log, 10–100 %",
+  ]);
+  assert.deepEqual(words("0xb536fea3a01c95dd09932440ec802a75410139d6"), [
+    "Semi-log, 1–40 % → sUSDe-tracking, target 85 %",
+    "sUSDe-tracking, target 80 % → Semi-log, 0–47.66 %",
+    "Semi-log, 0–47.66 % → Yield-tracking, target 85 %",
+  ]);
+  assert.deepEqual(words("0xeda215b7666936ded834f76f3fbc6f323295110a"), [
+    "Semi-log, 1–80 % → Semi-log, 0.03–466.56 %",
+    "Semi-log, 0–293.3 % → Semi-log, 0 %",
+  ]);
+});
+
+test("llamalend: a policy whose kind was not told is its address alone, linked", () => {
+  const log = LL.logs["0x1e0165dbd2019441ab7927c018701f3138114d71"];
+  const blind: LlamalendConfigLog = {
+    ...log,
+    sets: log.sets.map((s) =>
+      s.kind === "policy" && s.policies
+        ? {
+            ...s,
+            policies: { before: s.policies.before && { ...s.policies.before, kind: null }, after: s.policies.after },
+          }
+        : s,
+    ),
+  };
+  const [c] = llamalendConfigChanges(blind, [], "test").filter((x) => x.name === "Rate policy replaced");
+  assert.equal(c.from, "0x112e…af02");
+  assert.equal(c.fromLink?.text, "0x112e…af02");
+  assert.equal(changeWords(c), "Rate policy replaced 0x112e…af02 → Secondary, target 85 % (0x319c…778f)");
 });
 
 // ── MakerDAO: the ilks' price feed changes ──────────────────────────────────

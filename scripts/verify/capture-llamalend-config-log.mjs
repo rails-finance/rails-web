@@ -4,12 +4,17 @@
 // setter logs (/api/chain/llamalend/config-log), and for each position below
 // its rows (block, time, the discount its UserState stored), the event-state
 // read's stored discount and health at the last event of each day, and the
-// same read at each liquidation discount change inside the life.
+// same read at each liquidation discount change inside the life. Each policy
+// set carries the replaced and the new policy's kind and settings; the
+// markets in LOG_ONLY add their logs alone, for the policy kinds no position
+// above meets (secondary, sUSDe-tracking, yield-tracking).
 //
 //   BASE=http://localhost:3049 node scripts/verify/capture-llamalend-config-log.mjs
+//   ONLY=logs BASE=… node scripts/verify/capture-llamalend-config-log.mjs
+//     refreshes the logs and keeps the fixture's positions (no event read).
 //
 // Needs a dev server with the RPC env and RAILS_API_URL set.
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const BASE = process.env.BASE ?? "http://localhost:3049";
@@ -39,6 +44,12 @@ const POSITIONS = [
     user: "0x1109297e392d92c1613fdbdf30579a0215c20da9",
   },
 ];
+const LOG_ONLY = [
+  // wstETH lend: semi-log → secondary → semi-log → semi-log.
+  "0x1e0165dbd2019441ab7927c018701f3138114d71",
+  // sUSDe lend: semi-log → sUSDe-tracking → semi-log → yield-tracking.
+  "0xb536fea3a01c95dd09932440ec802a75410139d6",
+];
 const DAY_S = 86_400;
 const MAX_DAYS = 60;
 
@@ -48,9 +59,17 @@ async function json(path) {
   return r.json();
 }
 
+const out = join(import.meta.dirname, "fixtures", "llamalend-config-log.json");
 const logs = {};
-for (const c of new Set(POSITIONS.map((p) => p.controller)))
+for (const c of new Set([...POSITIONS.map((p) => p.controller), ...LOG_ONLY]))
   logs[c] = await json(`/api/chain/llamalend/config-log?controller=${c}`);
+
+if (process.env.ONLY === "logs") {
+  const kept = JSON.parse(readFileSync(out, "utf8"));
+  writeFileSync(out, `${JSON.stringify({ ...kept, logsAt: new Date().toISOString().slice(0, 10), logs }, null, 1)}\n`);
+  console.log(`wrote ${out} (logs only)`);
+  process.exit(0);
+}
 
 const readAt = async (p, block) => {
   const s = await json(`/api/chain/llamalend/event-state?controller=${p.controller}&user=${p.user}&block=${block}`);
@@ -85,7 +104,6 @@ for (const p of POSITIONS) {
   console.log(`${p.name}: ${rows.length} rows, ${picks.length} reads, ${Object.keys(atChanges).length} change reads`);
 }
 
-const out = join(import.meta.dirname, "fixtures", "llamalend-config-log.json");
 writeFileSync(
   out,
   `${JSON.stringify({ capturedAt: new Date().toISOString().slice(0, 10), logs, positions }, null, 1)}\n`,

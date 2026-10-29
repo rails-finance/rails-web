@@ -966,6 +966,24 @@ const PAGES = [
     band: { asset: "WETH", place: "below" },
     changes: { day: 20433, name: "Liquidation discount", from: "6 %", to: "9.21 %", block: 23989153 },
   },
+  // The same life's rate policy swap: each side named by its kind and main
+  // setting, its address linked to Etherscan.
+  {
+    id: "llamalend 0x6bda (WETH, rate policy replaced)",
+    path: "/ethereum/llamalend/0xa920de414ea4ab66b97da1bfe9e6eca7d4219635/0x6bda04643f10782308515650dcfb05c672266332",
+    lwOnly: true,
+    changes: {
+      day: 20475,
+      name: "Rate policy replaced",
+      from: "Aggregate, base 9.9 %",
+      to: "Aggregate, base 11.55 %",
+      block: 24290603,
+      links: [
+        "https://etherscan.io/address/0x8c5a7f011f733fbb0a6c969c058716d5ce9bc933",
+        "https://etherscan.io/address/0x07491d124ddb3ef59a8938fcb3ee50f9fa0b9251",
+      ],
+    },
+  },
   {
     id: "llamalend 0x3722 (CRV, 8 % → 12 %, taken)",
     path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0x37223d079dedc6a96d6415ee4850748d226ee5bf",
@@ -1933,6 +1951,7 @@ async function checkChanges(page, tag, pg, width) {
       to: e.getAttribute("data-flow-change-to"),
       block: Number(e.getAttribute("data-flow-change-block")),
       text: e.textContent ?? "",
+      links: [...e.querySelectorAll("a[data-flow-change-link]")].map((a) => a.getAttribute("href")),
       prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
     })),
   );
@@ -1943,6 +1962,12 @@ async function checkChanges(page, tag, pg, width) {
     it ? JSON.stringify(it) : `${items.length} items`,
   );
   check(`${tag}: the change's figure stands in a receipt, at its block ${want.block}`, !!it?.prov);
+  if (want.links)
+    check(
+      `${tag}: each side's address links to Etherscan`,
+      JSON.stringify(it?.links ?? []) === JSON.stringify(want.links),
+      JSON.stringify(it?.links ?? []),
+    );
   if (width < 640)
     await page.evaluate(() => document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
   else await page.mouse.move(2, 2);

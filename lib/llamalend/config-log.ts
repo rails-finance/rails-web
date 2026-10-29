@@ -24,10 +24,18 @@
 //   band in place; a policy sets the rate the debt grows at, which each read
 //   includes.
 // - No setter logs the AMM's price oracle on any market, so none is marked.
+// - A policy is named by the kind rails-server read from its getters at the
+//   set block, and its main setting there ("Semi-log, 0.5–35 %", "Secondary,
+//   target 85 %"); each side carries its address linked to Etherscan, and a
+//   side whose kind was not told is the address alone. A policy's own setters
+//   (SetRates, SetParameters) are not read: its settings are the ones it held
+//   at the set.
 //
 // Pure.
 
-import { flowChange, pctWords, type FlowChange } from "@/lib/shared/flows-changes";
+import { flowChange, pctWords, type FlowChange, type FlowChangeLink } from "@/lib/shared/flows-changes";
+import { explorerUrl } from "@/lib/shared/chains";
+import type { Provenance } from "@/components/shared/provenance";
 
 export type LlamalendConfigSet =
   | {
@@ -39,7 +47,34 @@ export type LlamalendConfigSet =
       loanDiscount: number;
       liquidationDiscount: number;
     }
-  | { block: number; timestamp: number; txHash: string; logIndex: number; kind: "policy"; policy: string };
+  | {
+      block: number;
+      timestamp: number;
+      txHash: string;
+      logIndex: number;
+      kind: "policy";
+      policy: string;
+      /** The replaced and the new policy, each read at this block. */
+      policies?: { before: LlamalendPolicyInfo | null; after: LlamalendPolicyInfo | null };
+    };
+
+export type LlamalendPolicyKind =
+  | "semilog"
+  | "secondary"
+  | "susde"
+  | "ema"
+  | "hyperbolic-dynamic"
+  | "hyperbolic"
+  | "aggregate"
+  | "kinked";
+
+/** A policy's kind (null where no getter told it) and its settings: rates a
+ *  year as fractions, utilisations and ratios as fractions. */
+export interface LlamalendPolicyInfo {
+  address: string;
+  kind: LlamalendPolicyKind | null;
+  settings: Record<string, number>;
+}
 
 /** /api/chain/llamalend/config-log?controller= */
 export interface LlamalendConfigLog {
@@ -69,6 +104,8 @@ export interface LlamalendConfigStep {
   after: number | string;
   /** The loan discount the same set left, for the liquidation marker's receipt. */
   loanDiscount?: number;
+  /** A policy step's two policies as read at the set. */
+  policies?: { before: LlamalendPolicyInfo | null; after: LlamalendPolicyInfo | null };
 }
 
 const usable = (log: LlamalendConfigLog | null | undefined): log is LlamalendConfigLog =>
@@ -82,6 +119,70 @@ export const llamalendPctWords = (fraction: number): string => {
 
 /** "0x1e7d…daae". */
 const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+const KIND_WORDS: Record<LlamalendPolicyKind, string> = {
+  semilog: "Semi-log",
+  secondary: "Secondary",
+  susde: "sUSDe-tracking",
+  ema: "Yield-tracking",
+  "hyperbolic-dynamic": "Hyperbolic",
+  hyperbolic: "Hyperbolic",
+  aggregate: "Aggregate",
+  kinked: "Kinked",
+};
+
+/** What each kind sets the rate from, for the receipt. */
+const KIND_SENTENCE: Record<LlamalendPolicyKind, string> = {
+  semilog: "a semi-log policy runs the rate from its minimum at 0 % utilisation to its maximum at 100 % on a log scale",
+  secondary: "a secondary policy takes the crvUSD mint rate (its AMM's) and meets it at the target utilisation",
+  susde: "an sUSDe-tracking policy takes sUSDe's yield and meets it at the target utilisation",
+  ema: "a yield-tracking policy takes a vault's yield and meets it at the target utilisation",
+  "hyperbolic-dynamic": "a hyperbolic policy takes a vault's yield and meets it at the target utilisation",
+  hyperbolic: "a hyperbolic policy meets its target rate at the target utilisation",
+  aggregate:
+    "an aggregate policy sets the crvUSD mint rate from its base rate, moved by crvUSD's price and the PegKeepers' debt",
+  kinked: "a kinked policy meets its base rate at the target utilisation",
+};
+
+/** "0.5–35 %", or "0 %" where both ends print the same. */
+const rangeWords = (lo: number, hi: number) => {
+  const a = llamalendPctWords(lo);
+  const b = llamalendPctWords(hi);
+  return a === b ? a : `${a.replace(/ %$/, "")}–${b}`;
+};
+
+/** "Semi-log, 0.5–35 %", "Secondary, target 85 %", "Aggregate, base 11.55 %"; null where the kind was not told. */
+export function llamalendPolicyWords(p: LlamalendPolicyInfo | null | undefined): string | null {
+  if (!p?.kind) return null;
+  const s = p.settings ?? {};
+  const name = KIND_WORDS[p.kind];
+  if (p.kind === "semilog")
+    return s.minRate != null && s.maxRate != null ? `${name}, ${rangeWords(s.minRate, s.maxRate)}` : name;
+  if (p.kind === "aggregate") return s.rate0 != null ? `${name}, base ${llamalendPctWords(s.rate0)}` : name;
+  return s.targetUtilization != null ? `${name}, target ${llamalendPctWords(s.targetUtilization)}` : name;
+}
+
+/** The settings beyond the main one, for the receipt ("0.5× at 0 %, 3× at 100 %, plus 4 %"). */
+function policyDetailWords(p: LlamalendPolicyInfo): string | null {
+  const s = p.settings ?? {};
+  const x = (v: number) => `${Math.round(v * 100) / 100}×`;
+  const parts: string[] = [];
+  if (p.kind === "aggregate") {
+    if (s.sigma != null) parts.push(`sigma ${llamalendPctWords(s.sigma)}`);
+    if (s.targetDebtFraction != null) parts.push(`target PegKeeper debt ${llamalendPctWords(s.targetDebtFraction)}`);
+    if (s.extraConst) parts.push(`plus ${llamalendPctWords(s.extraConst)}`);
+  } else if (p.kind !== "semilog") {
+    if (s.lowRatio != null) parts.push(`${x(s.lowRatio)} at 0 %`);
+    if (s.highRatio != null) parts.push(`${x(s.highRatio)} at 100 %`);
+    if (s.rateShift) parts.push(`plus ${llamalendPctWords(s.rateShift)}`);
+  }
+  return parts.length ? parts.join(", ") : null;
+}
+
+const policyLink = (address: string): FlowChangeLink => ({
+  text: shortAddress(address),
+  href: explorerUrl(1, "address", address),
+});
 
 /** Each setting a set moved, oldest first. */
 export function llamalendConfigSteps(log: LlamalendConfigLog | null | undefined): LlamalendConfigStep[] {
@@ -108,7 +209,7 @@ export function llamalendConfigSteps(log: LlamalendConfigLog | null | undefined)
       loan = s.loanDiscount;
     } else {
       const p = s.policy.toLowerCase();
-      if (p !== policy) out.push({ ...at, line: "policy", before: policy, after: p });
+      if (p !== policy) out.push({ ...at, line: "policy", before: policy, after: p, policies: s.policies });
       policy = p;
     }
   }
@@ -139,7 +240,7 @@ export function llamalendDiscountTaken(
 const NAME: Record<LlamalendConfigLine, string> = {
   liquidation: "Liquidation discount",
   loan: "Loan discount",
-  policy: "Rate policy",
+  policy: "Rate policy replaced",
 };
 
 /** Each change to the market's discounts or policy, as markers; a
@@ -158,10 +259,44 @@ export function llamalendConfigChanges(
     let from: string | null;
     let to: string;
     let summary: string;
+    let fromLink: FlowChangeLink | undefined;
+    let toLink: FlowChangeLink | undefined;
+    let inputs: Provenance["inputs"];
     if (s.line === "policy") {
-      from = typeof s.before === "string" ? shortAddress(s.before) : null;
-      to = shortAddress(String(s.after));
-      summary = `The ${market} market's monetary policy, replaced by ${String(s.after)} in its Controller's SetMonetaryPolicy log at block ${blockWords}${typeof s.before === "string" ? `; before it, ${s.before}` : ""}. The policy sets the rate the market's debt grows at; the health read at each event includes the debt it grew.`;
+      const before = typeof s.before === "string" ? s.before : null;
+      const after = String(s.after);
+      const info = (a: string, side: LlamalendPolicyInfo | null | undefined) =>
+        side && side.address.toLowerCase() === a ? side : null;
+      const was = before ? info(before, s.policies?.before) : null;
+      const now = info(after, s.policies?.after);
+      fromLink = before ? policyLink(before) : undefined;
+      toLink = policyLink(after);
+      from = before ? (llamalendPolicyWords(was) ?? shortAddress(before)) : null;
+      to = llamalendPolicyWords(now) ?? shortAddress(after);
+      const sideSentence = (label: string, a: string, p: LlamalendPolicyInfo | null) => {
+        const words = llamalendPolicyWords(p);
+        const detail = p ? policyDetailWords(p) : null;
+        return words
+          ? `${label} ${a}: ${words}${detail ? ` (${detail})` : ""}; ${KIND_SENTENCE[p!.kind!]}.`
+          : `${label} ${a}, whose kind its getters did not tell.`;
+      };
+      summary = [
+        `The ${market} market's monetary policy, replaced in its Controller's SetMonetaryPolicy log at block ${blockWords}.`,
+        before ? sideSentence("Before it,", before, was) : null,
+        sideSentence("The new policy,", after, now),
+        `Each policy's kind is told by its getters and its settings read at the block of the set. The policy sets the rate the market's debt grows at; the health read at each event includes the debt it grew.`,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const leaf = (label: string, a: string, p: LlamalendPolicyInfo | null) => ({
+        label,
+        value: llamalendPolicyWords(p) ?? shortAddress(a),
+        kind: "chain" as const,
+        pclass: "state" as const,
+        note: `read at block ${blockWords}`,
+        contract: { name: p?.kind ? `${KIND_WORDS[p.kind]} policy` : "Policy", address: a },
+      });
+      inputs = [...(before ? [leaf("Policy replaced", before, was)] : []), leaf("New policy", after, now)];
     } else {
       const after = Number(s.after);
       from = typeof s.before === "number" ? llamalendPctWords(s.before) : null;
@@ -187,10 +322,13 @@ export function llamalendConfigChanges(
       name: NAME[s.line],
       from,
       to,
+      ...(fromLink ? { fromLink } : {}),
+      ...(toLink ? { toLink } : {}),
       prov: {
         kind: "chain",
         pclass: "emitted",
         summary,
+        ...(inputs ? { inputs } : {}),
         contract: { name: `LlamaLend ${market} Controller`, address: log.controller },
         via: "rails-server at-block store · /api/at-block/llamalend/config-log",
         source: { block: s.block, txHash: tx },
