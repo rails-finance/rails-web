@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     const response = await fetch(
-      `${RAILS_API_URL}/api/at-block/llamalend/config-log?controller=${controller}`,
+      `${RAILS_API_URL}/api/at-block/llamalend/config-log?controller=${controller}&index=tx`,
       createAuthFetchOptions(undefined, readerIpFromRequest(request)),
     );
     if (response.status === 404)

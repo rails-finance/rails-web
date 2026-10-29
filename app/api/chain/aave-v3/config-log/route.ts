@@ -6,10 +6,12 @@ import { proxyCacheControl } from "@/lib/api/proxy-cache";
 // An Aave V3-family PoolConfigurator's threshold and e-mode logs over its life
 // (?market=core|prime|etherfi|spark|base|seamless), for the governance change
 // markers on the Lifetime flows events row (lib/aave-v3/config-changes.ts).
-// Proxy to rails-server's `/api/at-block/aave-v3/config-log`: Base and
-// Seamless from the Base Sieve's capture of each configurator, the Ethereum
-// markets and SparkLend from the at-block store's log ranges (rails-ops
-// decisions/0056). The backend's Cache-Control (an hour) is forwarded.
+// Proxy to rails-server's `/api/at-block/aave-v3/config-log?index=tx`: Base
+// and Seamless from the Base Sieve's capture of each configurator, the
+// Ethereum markets and SparkLend from the mainnet Sieve's (rails-ops
+// decisions/0056); each log with its transaction's index and its place in the
+// transaction (lib/shared/log-order.ts). The backend's Cache-Control (an
+// hour) is forwarded.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
   if (!MARKETS.has(market)) return NextResponse.json({ error: "market is required" }, { status: 400 });
   try {
     const response = await fetch(
-      `${RAILS_API_URL}/api/at-block/aave-v3/config-log?market=${market}`,
+      `${RAILS_API_URL}/api/at-block/aave-v3/config-log?market=${market}&index=tx`,
       createAuthFetchOptions(undefined, readerIpFromRequest(request)),
     );
     if (!response.ok) {

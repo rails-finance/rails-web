@@ -21,6 +21,7 @@
 //
 // Pure.
 
+import { logOrder } from "@/lib/shared/log-order";
 import type { FactorRead } from "@/lib/shared/flows-health";
 import { flowChange, pctWords, type FlowChange } from "@/lib/shared/flows-changes";
 import { fxLinesRead } from "@/lib/fx/flows-health";
@@ -36,6 +37,8 @@ export interface FxRatioSet {
   timestamp: number;
   txHash: string;
   logIndex: number;
+  /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+  transactionIndex?: number;
   line: FxRatioLine;
   debtRatio: number;
   bonusRatio: number;
@@ -55,7 +58,7 @@ export interface FxRatioLog {
 const usable = (log: FxRatioLog | null | undefined): log is FxRatioLog =>
   log != null && Array.isArray(log.sets) && log.sets.some((s) => s.line === "liquidate" && s.debtRatio > 0);
 
-const sorted = (log: FxRatioLog) => [...log.sets].sort((a, b) => a.block - b.block || a.logIndex - b.logIndex);
+const sorted = (log: FxRatioLog) => [...log.sets].sort(logOrder);
 
 /** "95 %", "90.5 %". */
 export const fxRatioWords = (fraction: number): string => {

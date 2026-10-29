@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     const response = await fetch(
-      `${RAILS_API_URL}/api/at-block/makerdao/feed-log?ilk=${encodeURIComponent(ilk)}`,
+      `${RAILS_API_URL}/api/at-block/makerdao/feed-log?ilk=${encodeURIComponent(ilk)}&index=tx`,
       createAuthFetchOptions(undefined, readerIpFromRequest(request)),
     );
     if (!response.ok) {

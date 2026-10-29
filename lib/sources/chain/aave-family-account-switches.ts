@@ -109,6 +109,7 @@ async function load(ref: AaveFamilyPoolRef, wallet: `0x${string}`): Promise<Aave
       timestamp: Number(block.timestamp),
       txHash: l.transactionHash,
       logIndex: l.logIndex,
+      transactionIndex: l.transactionIndex,
       fromId: previous,
       fromLabel: previousLabel,
       toId: id,

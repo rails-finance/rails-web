@@ -25,6 +25,7 @@
 //
 // Pure.
 
+import { logOrder } from "@/lib/shared/log-order";
 import { flowChange, type FlowChange } from "@/lib/shared/flows-changes";
 import { MAKER_ADDRESSES } from "@/lib/makerdao/asset-catalog";
 
@@ -40,6 +41,8 @@ interface MakerLogAt {
   timestamp: number;
   txHash: string;
   logIndex: number;
+  /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+  transactionIndex?: number;
 }
 
 export interface MakerFeed extends MakerLogAt {
@@ -123,7 +126,7 @@ export function makerFeedChanges(log: MakerFeedLog | null | undefined): FlowChan
   const out: FlowChange[] = [];
   const blockWords = (b: number) => b.toLocaleString("en-US");
   const via = "rails-server at-block store · /api/at-block/makerdao/feed-log";
-  const feeds = [...log.feeds].sort((a, b) => a.block - b.block || a.logIndex - b.logIndex);
+  const feeds = [...log.feeds].sort(logOrder);
   feeds.forEach((f, i) => {
     const prev = feeds[i - 1];
     if (!prev) return;
@@ -193,7 +196,7 @@ export function makerFeedChanges(log: MakerFeedLog | null | undefined): FlowChan
       }),
     );
   }
-  const pars = [...log.pars].sort((a, b) => a.block - b.block || a.logIndex - b.logIndex);
+  const pars = [...log.pars].sort(logOrder);
   pars.forEach((p, i) => {
     const before = i > 0 ? pars[i - 1].par : 1;
     const tx = p.txHash.toLowerCase();
