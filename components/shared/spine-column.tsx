@@ -13,8 +13,8 @@ import {
   Layers,
   LogOut,
   ScrollText,
+  Settings2,
   SlidersHorizontal,
-  TestTube,
   Timer,
   UserMinus,
   UserPlus,
@@ -92,7 +92,8 @@ export const WARNING_TONE_TEXT: Record<Tone, string> = {
  *  `standards/detail-page-anatomy.md`, "The spine", "Three marks"): the owner
  *  draws none; a third party (a delegate, a batch manager, a keeper, a
  *  liquidator) the person glyph; governance the gavel, both on party pink; the
- *  protocol (a formula or the market set it) the test tube on neutral ink. */
+ *  protocol (a formula or the market set it, with no vote) the cog on neutral
+ *  ink. */
 export type SpineActor = "owner" | "third-party" | "protocol" | "governance";
 
 // ── Vertical order ──────────────────────────────────────────────────────────
@@ -643,9 +644,7 @@ function ActorBadge({ size, actor }: { size: number; actor: SpineActor }) {
       ) : actor === "governance" ? (
         <GavelGlyph size={g} />
       ) : (
-        // Turned 45°: upright at badge size the tube and its liquid line read
-        // as an exclamation mark.
-        <TestTube size={g + 1} strokeWidth={2.5} style={{ transform: "rotate(45deg)" }} aria-hidden="true" />
+        <Settings2 size={g + 1} strokeWidth={2.5} aria-hidden="true" />
       )}
     </div>
   );
