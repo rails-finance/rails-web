@@ -1,11 +1,9 @@
 import { MetadataRoute } from "next";
-import { unstable_cache } from "next/cache";
 import { SITE_URL } from "@/lib/shared/page-metadata";
 import { LAUNCHED_PROTOCOLS, isUnlaunchedPath, launchedChains } from "@/lib/shared/protocols";
-import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereum-vault-directory";
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
-import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import {
   baseVaultHref,
   baseVaultRosterHref,
@@ -24,45 +22,32 @@ import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 // the two vault legs ask `isUnlaunchedPath` about the roster entry they hang
 // off — so an explorer rejoins this file by losing its flag, with no edit here.
 
-/** The Ethereum vault addresses Aave's own enumerators name, held for six
- *  hours (rails-ops ui-jobs 444): the read is a chain sweep, crawlers drive
- *  it, and a vault deployed today waiting hours for its sitemap line costs
- *  nothing. A read that does not answer throws, so it is not held. */
-const SITEMAP_VAULTS_REVALIDATE_S = 6 * 3600;
-const ethereumVaultAddresses = unstable_cache(
-  async (): Promise<string[]> => {
-    const directory = await loadAaveEthereumVaultDirectory();
-    if (directory.chainStale) throw new Error("the vault directory answered stale");
-    return directory.rows.map((row) => row.address);
-  },
-  ["sitemap-aave-ethereum-vaults"],
-  { revalidate: SITEMAP_VAULTS_REVALIDATE_S },
-);
-
-/** The Ethereum vault pages — one per vault Aave's own enumerators name, asked
- *  of the chain rather than restated here, so a vault deployed tomorrow is in
- *  the sitemap the day after without an edit. The list is held for six hours
- *  (`ethereumVaultAddresses`); a read that does not answer contributes NOTHING
- *  rather than a guess, because a sitemap that names a page which does not
- *  exist is worse than a sitemap that names fewer.
+/** The Ethereum vault pages — one per vault in the stored census: the daily
+ *  tick asks Aave's own enumerators (`getStataTokens`, `getStkTokens`) and the
+ *  book's sGHO, so a vault deployed tomorrow is here the morning after without
+ *  an edit, and the sitemap makes no chain read. Every vault is named, held or
+ *  not, as the directory names them. A read that does not answer contributes
+ *  NOTHING rather than a guess, because a sitemap that names a page which does
+ *  not exist is worse than a sitemap that names fewer.
  *
  *  The POSITIONS are not listed and never will be: there are 11,837 of them on
  *  this chain, they change daily, and the listing above them is the page a
  *  crawler should find. */
 async function ethereumVaultPages(): Promise<MetadataRoute.Sitemap> {
   // The layer's own explorer is unlaunched: no vault page under it is named
-  // here, and the chain read that would enumerate them is not made at all.
+  // here, and the census read that would list them is not made at all.
   if (isUnlaunchedPath(ethereumVaultRosterHref())) return [];
   try {
-    const addresses = await ethereumVaultAddresses();
-    return addresses.map((address) => ({
-      url: `${SITE_URL}${ethereumVaultHref(address)}`,
+    const hop = await ssrHop();
+    const page = await fetchVaultPositions({ chainId: MAINNET_CHAIN_ID, limit: 1, overlay: false, ...hop });
+    return page.census.map((c) => ({
+      url: `${SITE_URL}${ethereumVaultHref(c.vault)}`,
       lastModified: new Date(),
       changeFrequency: "daily" as const,
       priority: 0.6,
     }));
   } catch (error) {
-    console.error("The vault roster did not answer for the sitemap:", error);
+    console.error("The Ethereum vault census did not answer for the sitemap:", error);
     return [];
   }
 }
