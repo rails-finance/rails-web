@@ -112,6 +112,20 @@ const CURSOR_SKIN =
 /** The triangle pip's size: large enough to read as a triangle. */
 const PIP_TRIANGLE = 7;
 
+/** The external act's mark (rails-ops reference/lifetime-flows-scrubber.md):
+ *  a filled diamond in the party pink, for an act on the position that the
+ *  owner did not take and that took nothing from it: a delegate's rate
+ *  change on the pips, a protocol change along the row's top. A
+ *  liquidation and a redemption keep their triangles. */
+const EXTERNAL_INK = "var(--color-pink-500)";
+function ExternalDiamond({ size = 7, opacity = 1 }: { size?: number; opacity?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 8 8" aria-hidden style={{ opacity }}>
+      <path d="M4 0 8 4 4 8 0 4Z" fill={EXTERNAL_INK} />
+    </svg>
+  );
+}
+
 /** The pips to draw, strongest last so a dot never covers a triangle. In a
  *  run of same-kind triangles closer than a triangle's width (a redemption a
  *  day, on a phone) each is drawn only once it clears the last one drawn, so
@@ -153,7 +167,7 @@ function FlowBar({ sides, up, left, opacity }: { sides: FlowSide[]; up: boolean;
 /** One pip on the line strip, centred on `left`: a filled warning triangle
  *  (the spine's path) for a liquidation, a redemption or another caution
  *  event; a ring in the debt hue for the owner's rate change; a delegate's
- *  rate change a dot; a movement a bar per direction (`FlowBar`), where the
+ *  rate change the pink diamond; a movement a bar per direction (`FlowBar`), where the
  *  day carries its flow, else a dot in its tick's hue. */
 export function FlowPip({
   tick,
@@ -179,8 +193,18 @@ export function FlowPip({
         <path d={WARNING_TRIANGLE_PATH} fill={FLOW_TICK[tick]} />
       </svg>
     );
+  if (tick === "rate-delegate")
+    return (
+      <span
+        className="pointer-events-none absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2"
+        style={{ left, opacity }}
+        data-flow-pip={tick}
+      >
+        <ExternalDiamond />
+      </span>
+    );
   const ring = tick === "rate-owner";
-  if (!ring && tick !== "rate-delegate" && flow && (flow.into.length || flow.out.length))
+  if (!ring && flow && (flow.into.length || flow.out.length))
     return (
       <>
         {flow.into.length > 0 && <FlowBar sides={flow.into} up left={left} opacity={opacity} />}
@@ -223,8 +247,8 @@ function changeClusters(days: ChangeDay[], x: (day: number) => number): { x: num
   return out;
 }
 
-/** The protocol's changes on the events row (ruling 10): a hollow diamond in
- *  the muted tone along the row's top, apart from the account's own pips, on
+/** The protocol's changes on the events row (ruling 10): the external act's
+ *  pink diamond along the row's top, apart from the account's own pips, on
  *  the day a change took effect. Hover, focus or a tap opens its tip: each
  *  change's name, its value before and after with the receipt, and the day.
  *  A press on it does not move the cursor. */
@@ -286,9 +310,7 @@ function ChangeMarker({ days, left, w, faded }: { days: ChangeDay[]; left: numbe
         onClick={() => setPinned((v) => !v)}
         data-flow-change-button=""
       >
-        <svg width="7" height="7" viewBox="0 0 8 8" aria-hidden style={{ opacity: faded ? 0.35 : 1 }}>
-          <path d="M4 0.75 7.25 4 4 7.25 0.75 4Z" fill="none" stroke="var(--color-rb-500)" strokeWidth="1.5" />
-        </svg>
+        <ExternalDiamond opacity={faded ? 0.35 : 1} />
       </button>
       {open && (
         <span

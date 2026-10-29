@@ -126,7 +126,7 @@ export const FX_HEALTH_SOURCE: HealthSource = {
 
 /** f(x)'s source where the pool's setter logs (lib/fx/ratio-log.ts) give
  *  the two ratios in force each day: the lines step on the day a change took
- *  effect, each change a grey diamond. */
+ *  effect, each change a pink diamond. */
 export const FX_LOG_HEALTH_SOURCE: HealthSource = {
   ...FX_HEALTH_SOURCE,
   readAt: "in force each day (the pool's setter logs, and the read at each day's last event)",
@@ -143,7 +143,7 @@ export const FX_LOG_HEALTH_SOURCE: HealthSource = {
       summary:
         "Rebalance line — the pool's rebalance ratio in force that day (getRebalanceRatios, set by its UpdateRebalanceRatios logs): from this debt ratio a keeper can rebalance the position's tick, taking collateral to repay debt.",
     },
-    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation ratio and the dashed amber line its rebalance ratio in force that day, which step where f(x) governance changed them, each change a grey diamond on the events row; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
+    help: "on the same days: the debt over the collateral at the price each event was valued at, held between events and drawn dotted there. The red line is the pool's liquidation ratio and the dashed amber line its rebalance ratio in force that day, which step where f(x) governance changed them, each change a pink diamond on the events row; above them a keeper can liquidate the position or rebalance its tick. The list in the tip picks it or the collateral's price.",
   },
 };
 

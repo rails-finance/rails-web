@@ -89,7 +89,7 @@ export const FLUID_HISTORY_HEALTH_SOURCE: HealthSource = {
       summary:
         "Liquidation line — the vault's liquidation threshold in force that day, from the vault's config logs: it steps on the day Fluid governance changed it. Above it Fluid can liquidate the position.",
     },
-    help: "on the same days: the debt over the collateral at the vault oracle's price each day. The red line is the vault's liquidation threshold in force that day, which steps where Fluid governance changed it, each change a grey diamond on the events row; above it the position can be liquidated. The list in the tip picks it or the collateral's price.",
+    help: "on the same days: the debt over the collateral at the vault oracle's price each day. The red line is the vault's liquidation threshold in force that day, which steps where Fluid governance changed it, each change a pink diamond on the events row; above it the position can be liquidated. The list in the tip picks it or the collateral's price.",
   },
 };
 

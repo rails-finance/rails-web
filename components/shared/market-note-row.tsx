@@ -66,7 +66,7 @@ import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { SpineColumn, type SpineNoteGlyph } from "@/components/shared/spine-column";
 import { H } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
@@ -237,7 +237,7 @@ export function MarketNoteRow({
       isLast={isLast}
       label={body.label}
       marker={{ attr: "data-market-note", value: note.id }}
-      spine={{ actor: noteActor(note) }}
+      spine={{ actor: noteActor(note), noteGlyph: noteGlyphOf(note) }}
       header={
         <>
           <NoteHeadline note={note} body={body} />
@@ -271,6 +271,14 @@ function rateSetter(note: MarketNote): "governance" | "formula" {
 /** Who acted on a note, run or live group, for the badge in the spine node's
  *  corner: the gavel where governance set it, the test tube where the
  *  protocol did; a live group whose notes differ takes the protocol's. */
+/** What a note's node names: the PSM's share, a rate, else a vault's terms;
+ *  a run or a live group the rate where every note states one. */
+export function noteGlyphOf(item: MarketNote | NoteRun | LiveNoteGroup): SpineNoteGlyph {
+  const notes = isLiveNoteGroup(item) ? item.notes : isNoteRun(item) ? item.notes : [item];
+  if (notes.length > 0 && notes.every((n) => n.kind === "psm-gap")) return "share";
+  return notes.every((n) => noteRateSpan(n)) ? "rate" : "terms";
+}
+
 export function noteActor(item: MarketNote | NoteRun | LiveNoteGroup): "governance" | "protocol" {
   const notes = isLiveNoteGroup(item) ? item.notes : isNoteRun(item) ? item.notes : [item];
   return notes.length > 0 && notes.every((n) => rateSetter(n) === "governance") ? "governance" : "protocol";
@@ -577,7 +585,7 @@ export function LiveNoteGroupRow({
   return (
     <div data-live-note-group={group.notes.length} className={`spine-row relative ${scale.cardRounded}`}>
       <div className="spine-cell">
-        <SpineColumn icon="market" isLast={isLast} actor={noteActor(group)} />
+        <SpineColumn icon="market" isLast={isLast} actor={noteActor(group)} noteGlyph={noteGlyphOf(group)} />
       </div>
       <div className="spine-content rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
         <div className="flex items-center gap-2 px-5 pb-1 pt-4">

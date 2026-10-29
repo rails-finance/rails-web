@@ -138,7 +138,7 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
       : ctx.eventType === "transfer"
         ? // An ownership handover is a people event with no token flow — the
           // person glyph with the join badge marks the new owner taking over.
-          { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+          { icon: "handover", isLast: !!isLast }
         : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   // T1's word, which the phone spine view's caption repeats. A hop of an NFT

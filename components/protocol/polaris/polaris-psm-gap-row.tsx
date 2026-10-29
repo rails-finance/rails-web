@@ -124,7 +124,7 @@ export function PolarisPsmGapRow({ note, isLast = false }: { note: PsmGapNote; i
       isLast={isLast}
       label={`${RATE_NOTE_T1.name}, ${W.psm_gap_head}, ${tradesWords}, ${collText} pETH and ${debtText} ${stable}, ${range}`}
       marker={{ attr: "data-market-note", value: note.id }}
-      spine={{ tokens }}
+      spine={{ tokens, noteGlyph: "share" }}
       header={
         // Under 640px the short words, so the caption keeps its count and dates.
         <span

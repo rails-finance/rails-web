@@ -95,7 +95,7 @@ export function makerHealthSource(feedChanged: boolean): HealthSource {
       ...r,
       help: r.help.replace(
         " The list in the tip",
-        " A change to the ilk's price feed, a grey diamond on the events row, reaches the ratio through the OSM price at the next close. The list in the tip",
+        " A change to the ilk's price feed, a pink diamond on the events row, reaches the ratio through the OSM price at the next close. The list in the tip",
       ),
     },
   };

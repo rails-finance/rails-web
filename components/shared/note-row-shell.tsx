@@ -60,7 +60,7 @@ export interface NoteRowShellProps {
   /** The spine's rate flank, on a rate note; token rows under the node, on a
    *  row that moved a share into the position (ui-jobs 402); who acted, for
    *  the node's badge (the protocol where unset, ui-jobs 408). */
-  spine?: Pick<SpineColumnProps, "rateSpan" | "rateMoves" | "rateTone" | "rateProv" | "tokens" | "actor">;
+  spine?: Pick<SpineColumnProps, "rateSpan" | "rateMoves" | "rateTone" | "rateProv" | "tokens" | "actor" | "noteGlyph">;
 }
 
 export function NoteRowShell({

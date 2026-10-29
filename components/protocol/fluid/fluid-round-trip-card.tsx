@@ -121,7 +121,7 @@ export function FluidRoundTripCard({ hops, operates, isLast, numbers }: FluidRou
       timestamp: first.timestamp,
       number: range?.n,
     },
-    spine: { icon: "delegate", iconDirection: "up", isLast: !!isLast },
+    spine: { icon: "handover", isLast: !!isLast },
     head: { label: `Ownership round trip · ${hops.length} hops · ownership unchanged`, deltas: [] },
     caption: "Ownership round trip",
     cells,

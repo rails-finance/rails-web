@@ -145,7 +145,7 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
     critical || caution
       ? { icon: "warning", warningTone: critical ? "critical" : "caution", warningLegs, isLast: !!isLast }
       : ctx.eventType === "ownership_transferred"
-        ? { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+        ? { icon: "handover", isLast: !!isLast }
         : { tokens, isLast: !!isLast };
 
   const actionLabel =

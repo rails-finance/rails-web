@@ -213,7 +213,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
             // person glyph with the join badge marks the new owner taking
             // over; dotted spine (nothing moved). The glyph is the event's
             // meaning, so it wins over the third-party fallback.
-            { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+            { icon: "handover", isLast: !!isLast }
           : // Third-party operate badges the flow pink (color-grammar §4)
             // rather than replacing it — see spine-column's `externalParty`.
             { tokens, externalParty: !!extBy, isLast: !!isLast };

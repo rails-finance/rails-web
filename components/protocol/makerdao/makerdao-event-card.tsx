@@ -132,7 +132,7 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
         ? // An ownership handover is a people event with no token flow — the
           // person glyph with the join badge marks the new owner taking over;
           // dotted spine (nothing moved in the urn).
-          { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+          { icon: "handover", isLast: !!isLast }
         : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   // The timeline's head is words (decision 0045); the event page's card keeps

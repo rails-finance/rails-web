@@ -740,7 +740,7 @@ function tickWords(model: FlowModel): string | null {
   if (has.has("liquidation")) parts.push(named.liquidation ?? "red triangle, a liquidation");
   if (has.has("redemption")) parts.push("orange triangle, a redemption");
   if (has.has("caution")) parts.push("orange triangle, a change the owner did not make");
-  if (has.has("rate-delegate")) parts.push("pink dot, the delegate's rate change");
+  if (has.has("rate-delegate")) parts.push("pink diamond, the delegate's rate change");
   if (has.has("rate-owner")) parts.push("ring, the owner's rate change");
   return parts.length === 0 ? null : `Marks: ${parts.join("; ")}`;
 }

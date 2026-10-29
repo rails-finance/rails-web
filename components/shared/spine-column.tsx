@@ -2,7 +2,23 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
-import { ArrowRightToLine, Clock, Layers, LogOut, SlidersHorizontal, TestTube } from "lucide-react";
+import {
+  ArrowRightToLine,
+  ChartLine,
+  ChartPie,
+  CircleEqual,
+  Clock,
+  Hourglass,
+  KeyRound,
+  Layers,
+  LogOut,
+  Radio,
+  ScrollText,
+  SlidersHorizontal,
+  TestTube,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -21,23 +37,28 @@ import type { Tone } from "@/lib/shared/tone";
 export type SpineIcon =
   | "warning" // A change the owner did not make: redemption, liquidation (caution/critical tone via warningTone). Draws `warningLegs` as nodes; a triangle only where no leg is known
   | "rate-change" // Interest rate / parameter change (% with up/down arrow)
-  | "delegate" // Delegation change (user icon with +/- badge)
+  | "delegate" // Delegation change: lucide `user-plus` for a batch-manager join, `user-minus` for a leave (iconDirection), neutral ink
+  | "handover" // The position's ownership handed to another account (a MakerDAO give, a Fluid or f(x) NFT transfer, a Frankencoin ownership transfer): lucide `key-round`, neutral ink
   | "external" // Third-party action with nothing to draw (pink user icon) — the FALLBACK for `externalParty`; cards pass the flag, not this
   | "mint" // Token minted into existence (e.g. a loan NFT) — plus-in-circle
   | "burn" // Token burned / destroyed (e.g. a settled loan NFT) — flame
-  | "extend" // Term renegotiated / duration extended — clock
+  | "extend" // Term renegotiated / duration extended / a cooldown started — lucide `hourglass` (the clock is the state card's)
   | "close" // The holder closed the position in one step with nothing left to draw (e.g. an Alchemix self-liquidation, collateral paying the debt) — lucide `log-out`, neutral ink: a holder action, never a hazard
   | "dead-end" // Debt repaid from the position's own collateral, with nothing else moved — an Alchemix V2 `Liquidate`: the account holder selling their own collateral shares to clear their own debt, never a third party (rails-ops reference/alchemix-v2-frozen-record.md) — lucide `arrow-right-to-line`, neutral ink: a holder action, never a hazard
   | "touch" // A touch that moved nothing the holder chose and rewrote the position's figures (a Polaris CDP's interest and PSM share written in, ui-jobs 404) — lucide `fingerprint-pattern`, neutral ink
-  | "no-change" // Operation that moved nothing (zero-delta adjust) — equals-in-circle
+  | "no-change" // Operation that moved nothing (zero-delta adjust) — lucide `circle-equal`
   | "custody" // Position moved between accounts (a receipt-token transfer run, or a position NFT's transfer: a Liquity V2 Trove, a Polaris position) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
-  | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
-  | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the grey diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner; a shape of its own, since the hollow diamond on the spine is the market note's
-  | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
+  | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): the glyph `noteGlyph` names (a rate's `chart-line`, a vault's terms `scroll-text`, a PSM share `chart-pie`), thin neutral ink, never a party colour
+  | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the pink diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner
+  | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: lucide `radio` (the position as it stands now) in the notes' thin neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts
   | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Sync to chart" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
+
+/** What a market note's node names: a rate the market or governance moved,
+ *  a vault's terms, the PSM's pro-rata share of a Polaris CDP. */
+export type SpineNoteGlyph = "rate" | "terms" | "share";
 
 /** The spine's inks: neutral; a warning tone on a warning node and its
  *  dotted stretch; the external-party pink (color-grammar.md §4b) on the
@@ -176,6 +197,8 @@ export interface SpineColumnProps {
   tokens?: SpineTokenRow[];
   /** Semantic icon override — replaces token icons entirely */
   icon?: SpineIcon;
+  /** icon="market" only: what the note's node names. Default "rate". */
+  noteGlyph?: SpineNoteGlyph;
   /** The event was executed by a third party (someone other than the position
    *  owner): the node takes the third party's badge (`actor`) on the token
    *  icons rather than replacing them. When there are no token rows to draw,
@@ -329,49 +352,6 @@ function RateIcon({ size, color = "var(--color-rb-500)" }: { size: number; color
       <line x1="19" y1="5" x2="5" y2="19" />
       <circle cx="6.5" cy="6.5" r="2.5" />
       <circle cx="17.5" cy="17.5" r="2.5" />
-    </svg>
-  );
-}
-
-/** The market note's node: a 10px hollow diamond centred on the spine line, in
- *  the spine's neutral ink. Drawn at the flank's token size so it sits on the
- *  same centre as every other glyph, with the diamond itself small enough that
- *  the row reads as an annotation beside the timeline rather than a row of it.
- *  The stroke is pinned in absolute pixels. */
-function MarketNoteIcon({ size, color }: { size: number; color: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect
-        x={11}
-        y={11}
-        width={10}
-        height={10}
-        transform="rotate(45 16 16)"
-        fill="none"
-        stroke={color}
-        strokeWidth={1}
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
-
-/** The live window's node: the market note's square, left on its edges. Same
- *  box, same neutral ink, same 1px pinned stroke, same hollow interior — the
- *  register says "nothing happened to the account", and the window's whole
- *  claim is that the holder did nothing inside it. What differs is the
- *  silhouette, which is what a reader can use while the two rows sit adjacent
- *  in the head slot: an upright square at rest against the note's pivoted one.
- *  Side 11 to the diamond's 10, because the pivoted square's wider bounding
- *  extent otherwise leaves this one reading as the smaller mark.
- *
- *  It takes the tip of the spine (`liveHoldsTip`), so the flat top edge is the
- *  first thing on the column: the lead-in line meets it square and stops,
- *  where a vertex would run the line into a point. */
-function LiveWindowIcon({ size, color }: { size: number; color: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect x={10.5} y={10.5} width={11} height={11} stroke={color} strokeWidth={1} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }
@@ -540,7 +520,6 @@ function SwapBadge({ size }: { size: number }) {
   );
 }
 
-/** Equals-in-circle for zero-delta operations — muted, states "nothing moved". */
 /** lucide `fingerprint-pattern` (not in the installed lucide-react): a touch. */
 function TouchIcon({ size, color = "var(--color-rb-500)" }: { size: number; color?: string }) {
   return (
@@ -564,25 +543,6 @@ function TouchIcon({ size, color = "var(--color-rb-500)" }: { size: number; colo
       <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
       <path d="M8.65 22c.21-.66.45-1.32.57-2" />
       <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
-    </svg>
-  );
-}
-
-function NoChangeIcon({ size, color = "var(--color-rb-500)" }: { size: number; color?: string }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="9" />
-      <line x1="8.5" y1="10" x2="15.5" y2="10" />
-      <line x1="8.5" y1="14" x2="15.5" y2="14" />
     </svg>
   );
 }
@@ -652,32 +612,6 @@ function UserIcon({ size, color = "var(--color-rb-500)" }: { size: number; color
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
-  );
-}
-
-/** +/− badge overlaid bottom-right of the delegate glyph, in the glyph's
- *  neutral ink: the pink belongs to the actor's badge. Plus for a
- *  batch-manager join, minus for a leave. */
-function DelegateBadge({ size, join }: { size: number; join: boolean }) {
-  const r = Math.round(size * 0.5);
-  return (
-    <div
-      className="absolute bottom-0 right-0 rounded-full flex items-center justify-center"
-      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", boxShadow: "0 0 0 2px var(--background)" }}
-    >
-      <svg
-        width={r * 0.6}
-        height={r * 0.6}
-        viewBox="0 0 12 12"
-        fill="none"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      >
-        {join && <path d="M6 2.5v7" />}
-        <path d="M2.5 6h7" />
-      </svg>
-    </div>
   );
 }
 
@@ -754,26 +688,6 @@ function BurnIcon({ size }: { size: number }) {
       strokeLinejoin="round"
     >
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-    </svg>
-  );
-}
-
-// Extend — a loan's term renegotiated / duration pushed out. A clock reads as
-// "time changed"; neutral rb-500.
-function ExtendIcon({ size }: { size: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="var(--color-rb-500)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
     </svg>
   );
 }
@@ -953,6 +867,7 @@ export function SpineColumn({
   swapLegs,
   swapAxis,
   icon,
+  noteGlyph = "rate",
   externalParty,
   warningTone = "caution",
   warningTip,
@@ -1161,18 +1076,18 @@ export function SpineColumn({
           ) : undefined,
         );
       }
-      case "delegate":
-        // A delegation is a people event, not a rate tweak: a person glyph
-        // with a join (+) / leave (−) badge. iconDirection up = join
-        // (setInterestBatchManager), down = leave (removeFromBatch).
+      case "delegate": {
+        // A delegation is a people event, not a rate tweak: iconDirection up
+        // = join (setInterestBatchManager), down = leave (removeFromBatch).
         // A join's `rateSpan` puts the delegate's rate on the right flank.
+        const Person = iconDirection === "down" ? UserMinus : UserPlus;
         return nodeRow(
-          <div className="relative">
-            <UserIcon size={T} />
-            <DelegateBadge size={T} join={iconDirection !== "down"} />
-          </div>,
+          <Person size={T} strokeWidth={2} color="var(--color-rb-500)" aria-hidden="true" />,
           rateSpan ? rateFlank(rateSpan) : undefined,
         );
+      }
+      case "handover":
+        return nodeRow(<KeyRound size={T} strokeWidth={2} color="var(--color-rb-500)" aria-hidden="true" />);
       case "external":
         // A third-party action with NOTHING TO DRAW: the person glyph in the
         // pink external-party tint (color-grammar.md §4b) stands alone, with
@@ -1184,9 +1099,9 @@ export function SpineColumn({
       case "burn":
         return nodeRow(<BurnIcon size={T} />);
       case "extend":
-        return nodeRow(<ExtendIcon size={T} />);
+        return nodeRow(<Hourglass size={T} strokeWidth={2} color="var(--color-rb-500)" aria-hidden="true" />);
       case "no-change":
-        return nodeRow(<NoChangeIcon size={T} />);
+        return nodeRow(<CircleEqual size={T} strokeWidth={2} color="var(--color-rb-500)" aria-hidden="true" />);
       case "touch":
         return nodeRow(<TouchIcon size={T} />);
       case "custody":
@@ -1196,16 +1111,25 @@ export function SpineColumn({
           <SwapIcon size={T} axis={swapAxis} />,
           swapLegs?.length ? <SwapLegs legs={swapLegs} /> : undefined,
         );
-      case "market":
-        // A market note's node, among the quietest marks on the column: a
-        // small hollow diamond in the spine's neutral ink, no fill, no party
-        // colour, no pulse. Nothing happened to the ACCOUNT here.
+      case "market": {
+        // A market note's node, among the quietest marks on the column: the
+        // glyph of what moved, thin, in the spine's neutral ink, no fill, no
+        // party colour, no pulse. Nothing happened to the ACCOUNT here.
         // A rate note (ui-jobs 399) puts the rate after on the flank, as a
         // rate change does.
+        const Glyph = noteGlyph === "terms" ? ScrollText : noteGlyph === "share" ? ChartPie : ChartLine;
         return nodeRow(
-          <MarketNoteIcon size={T} color={SPINE_COLORS.default} />,
+          <Glyph
+            size={T}
+            strokeWidth={1.25}
+            absoluteStrokeWidth
+            color={SPINE_COLORS.default}
+            aria-hidden="true"
+            data-spine-note-glyph={noteGlyph}
+          />,
           rateSpan ? rateFlank(rateSpan) : undefined,
         );
+      }
       case "protocol-change":
         // A protocol change's node: a setting moved, in the spine's neutral
         // ink. Nothing happened to the account here either.
@@ -1219,10 +1143,11 @@ export function SpineColumn({
           />,
         );
       case "live-window":
-        // The live window's node: the note's register (the account did
-        // nothing here), differing in SHAPE alone, which is what tells the two
-        // classes apart where they stand together in the head slot.
-        return nodeRow(<LiveWindowIcon size={T} color={SPINE_COLORS.default} />);
+        // The live window's node: the notes' register (the account did
+        // nothing here), its own glyph.
+        return nodeRow(
+          <Radio size={T} strokeWidth={1.25} absoluteStrokeWidth color={SPINE_COLORS.default} aria-hidden="true" />,
+        );
       case "close":
         return nodeRow(
           <LogOut size={T} strokeWidth={1.5} absoluteStrokeWidth color="var(--color-rb-500)" aria-hidden="true" />,

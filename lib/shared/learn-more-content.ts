@@ -99,7 +99,7 @@ export function lifetimeFlowsStackContent(opts: {
       events.liquidation && `a red triangle is ${named(events.liquidation)}`,
       events.redemption && `an orange triangle is ${named(events.redemption)}`,
       events.caution && `an orange triangle${events.redemption ? ", also," : " is"} ${events.caution}`,
-      events.delegateRate && "a pink dot is the delegate setting the interest rate",
+      events.delegateRate && "a pink diamond is the delegate setting the interest rate",
       events.ownerRate && "a ring is the owner changing it",
     ].filter((m): m is string => !!m);
     const sentence = (t: string) => `${t[0].toUpperCase()}${t.slice(1)}.`;
@@ -113,7 +113,7 @@ export function lifetimeFlowsStackContent(opts: {
     });
     if (events.changes?.length)
       details.push({
-        bold: "The grey diamonds",
+        bold: "The pink diamonds",
         text: `along the top of the events row, a change the protocol made for every position on the day it took effect: ${listWords(events.changes.map(lowerFirst))}. Point at, focus or tap one for the value before and after, with its receipt. Each day's changes also have a row in the history below.`,
       });
   }
