@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  ctokenDeployment,
-  readCTokenLiquidityAt,
-  readCTokenMembershipAt,
-} from "@/lib/sources/chain/ctoken-liquidity-at";
-import type { CTokenProtocol } from "@/lib/api/fetch-ctoken-liquidity-at";
+import { ctokenDeployment } from "@/lib/sources/chain/ctoken-liquidity-at";
+import type { CTokenLiquidityAt, CTokenProtocol } from "@/lib/api/fetch-ctoken-liquidity-at";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { proxyCacheControl } from "@/lib/api/proxy-cache";
@@ -12,14 +8,18 @@ import { proxyCacheControl } from "@/lib/api/proxy-cache";
 // Why a Compound V2, Moonwell or Moonwell Base account could be liquidated:
 // the Comptroller's getAccountLiquidity at the block before the liquidation and
 // at its block, the close factor, and the collateral market's protocol seize
-// share (lib/sources/chain/ctoken-liquidity-at.ts). A past block's answer never
-// changes, so it is cached hard. Node runtime.
+// share. Each form of the route is a proxy to rails-server's at-block store,
+// which answers from postgres and reads the chain once for a block it does not
+// hold (server mig 412; rails-ops decisions/0056):
 //
-// `?factors=` is a proxy to rails-server's `/api/at-block/ctoken/factors`,
-// which answers from its at-block store and reads the chain once for a block
-// it does not hold (server mig 412; rails-ops decisions/0056); `tokens` names
-// each key's cToken or mToken from the catalog. The backend's Cache-Control
-// is forwarded: a year at a finalized block, seconds above it.
+//   (plain)      /api/at-block/ctoken/liquidity; the proxy puts the catalog's
+//                label on each counted market where it has one
+//   ?membership= /api/at-block/ctoken/membership
+//   ?factors=    /api/at-block/ctoken/factors; `tokens` names each key's
+//                cToken or mToken from the catalog
+//
+// The backend's Cache-Control is forwarded: a year at a finalized block,
+// seconds above it. A read the backend cannot answer is null, as before.
 
 export const runtime = "nodejs";
 
@@ -27,34 +27,21 @@ const PROTOCOLS: CTokenProtocol[] = ["compound-v2", "moonwell", "moonwell-base"]
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
-async function factorsFromServer(
+async function fromServer<T>(
   request: NextRequest,
-  protocol: CTokenProtocol,
-  wallet: string,
-  block: number,
-  markets: string[],
-): Promise<NextResponse> {
-  if (!RAILS_API_URL) {
-    console.error("RAILS_API_URL environment variable is not set");
-    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
-  }
-  const d = ctokenDeployment(protocol);
-  const params = new URLSearchParams({
-    protocol,
-    wallet,
-    block: String(block),
-    factors: markets.join(","),
-    tokens: markets.map((k) => d.token(k.toLowerCase())?.toLowerCase() ?? "").join(","),
-  });
+  path: string,
+  params: URLSearchParams,
+): Promise<{ body: T; cache: HeadersInit } | null> {
+  if (!RAILS_API_URL) throw new Error("RAILS_API_URL environment variable is not set");
   const response = await fetch(
-    `${RAILS_API_URL}/api/at-block/ctoken/factors?${params}`,
+    `${RAILS_API_URL}/api/at-block/ctoken/${path}?${params}`,
     createAuthFetchOptions(undefined, readerIpFromRequest(request)),
   );
   if (!response.ok) {
     console.error(`Backend API error: ${response.status} ${response.statusText}`);
-    return NextResponse.json(null, { status: 502 });
+    return null;
   }
-  return NextResponse.json(await response.json(), { headers: proxyCacheControl(response) });
+  return { body: (await response.json()) as T, cache: proxyCacheControl(response) };
 }
 
 export async function GET(request: NextRequest) {
@@ -72,6 +59,7 @@ export async function GET(request: NextRequest) {
     // account's borrowing counted it at the end of the block (0 where not
     // entered), for the Lifetime flows chart's health view.
     const factors = q.get("factors");
+    const d = ctokenDeployment(protocol);
     if (factors) {
       const markets = [
         ...new Set(
@@ -81,25 +69,47 @@ export async function GET(request: NextRequest) {
             .filter(Boolean),
         ),
       ].slice(0, 40);
-      return await factorsFromServer(request, protocol, wallet.toLowerCase(), block, markets);
+      const params = new URLSearchParams({
+        protocol,
+        wallet: wallet.toLowerCase(),
+        block: String(block),
+        factors: markets.join(","),
+        tokens: markets.map((k) => d.token(k.toLowerCase())?.toLowerCase() ?? "").join(","),
+      });
+      const r = await fromServer(request, "factors", params);
+      if (!r) return NextResponse.json(null, { status: 502 });
+      return NextResponse.json(r.body, { headers: r.cache });
     }
     const membership = q.get("membership");
     if (membership) {
-      const m = await readCTokenMembershipAt(protocol, wallet.toLowerCase(), block, membership);
-      return NextResponse.json(m, {
-        headers: m ? { "cache-control": "public, max-age=86400, s-maxage=31536000, immutable" } : {},
+      const token = d.token(membership.toLowerCase());
+      if (!token) return NextResponse.json(null);
+      const params = new URLSearchParams({
+        protocol,
+        wallet: wallet.toLowerCase(),
+        block: String(block),
+        market: token.toLowerCase(),
       });
+      const r = await fromServer(request, "membership", params);
+      return r ? NextResponse.json(r.body, { headers: r.cache }) : NextResponse.json(null);
     }
-    const data = await readCTokenLiquidityAt(
+    const collToken = d.token(collateral.toLowerCase());
+    const debtMarket = q.get("debtMarket");
+    const debtToken = debtMarket ? d.token(debtMarket.toLowerCase()) : undefined;
+    const params = new URLSearchParams({
       protocol,
-      wallet.toLowerCase(),
-      block,
-      collateral,
-      q.get("debtMarket") ?? undefined,
-    );
-    return NextResponse.json(data, {
-      headers: data ? { "cache-control": "public, max-age=86400, s-maxage=31536000, immutable" } : {},
+      wallet: wallet.toLowerCase(),
+      block: String(block),
+      ...(collToken ? { collateral: collToken.toLowerCase() } : {}),
+      ...(debtToken ? { debt: debtToken.toLowerCase() } : {}),
     });
+    const r = await fromServer<CTokenLiquidityAt>(request, "liquidity", params);
+    if (!r) return NextResponse.json(null);
+    const data: CTokenLiquidityAt = {
+      ...r.body,
+      counted: r.body.counted?.map((m) => ({ ...m, label: d.label?.(m.market) ?? m.label })) ?? null,
+    };
+    return NextResponse.json(data, { headers: r.cache });
   } catch (error) {
     console.error("Error reading account liquidity at block:", error);
     return NextResponse.json(null);
