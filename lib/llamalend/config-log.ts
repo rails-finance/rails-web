@@ -27,7 +27,7 @@
 // - A policy is named by the kind rails-server read from its getters at the
 //   set block, and its main setting there ("Semi-log, 0.5–35 %", "Secondary,
 //   target 85 %"); each side carries its address linked to Etherscan, and a
-//   side whose kind was not told is the address alone. A policy's own setters
+//   side whose kind was not told is the address alone. The setters on a policy
 //   (SetRates, SetParameters) are not read: its settings are the ones it held
 //   at the set.
 //
