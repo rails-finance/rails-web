@@ -3553,14 +3553,25 @@ async function checkOldTipSteady(page, tag) {
     });
     window.__oldTipObs.observe(host, { childList: true, subtree: true });
   });
-  // Two-pixel steps from one end of the run to the other.
+  // Two-pixel steps from one end of the run to the other. Across, the
+  // pointer follows the line's height, read from the tip, which stands 10px
+  // over the point of the line nearest the pointer.
+  const across = walk.from.y === walk.to.y;
+  const lineY = () =>
+    page.evaluate(() => {
+      const t = document.querySelector("[data-flows-combined] [data-flow-old-tip]");
+      return t ? t.getBoundingClientRect().bottom + 10 : null;
+    });
   const steps = Math.min(150, Math.floor(walk.len / 2));
   let open = 0;
+  let y = walk.from.y;
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    await page.mouse.move(walk.from.x + t * (walk.to.x - walk.from.x), walk.from.y + t * (walk.to.y - walk.from.y));
+    if (!across) y = walk.from.y + t * (walk.to.y - walk.from.y);
+    await page.mouse.move(walk.from.x + t * (walk.to.x - walk.from.x), y);
     await page.waitForTimeout(16);
     if (await tipOpen()) open++;
+    if (across) y = (await lineY()) ?? y;
   }
   const log = await page.evaluate(() => {
     window.__oldTipObs?.disconnect();
@@ -3571,7 +3582,7 @@ async function checkOldTipSteady(page, tag) {
   check(
     `${tag}: a pointer moved along the dotted value line keeps one tip open, with no hide and show`,
     open === steps && log.length === 0,
-    `${walk.from.x === walk.to.x ? "down" : "across"} ${walk.len}px: ${open}/${steps} steps open, tip events: ${log.slice(0, 8).join(",") || "none"}${log.length > 8 ? ` (+${log.length - 8})` : ""}`,
+    `${across ? "across" : "down"} ${walk.len}px: ${open}/${steps} steps open, tip events: ${log.slice(0, 8).join(",") || "none"}${log.length > 8 ? ` (+${log.length - 8})` : ""}`,
   );
 }
 

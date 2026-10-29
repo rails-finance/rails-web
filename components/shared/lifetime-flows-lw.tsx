@@ -104,6 +104,8 @@ const USER_MS = 2500;
 /** Wheel events this close together are one gesture, which keeps the axis
  *  its first event took. */
 const GESTURE_MS = 160;
+/** How long the dotted line's tip stays after the pointer leaves the line. */
+const TIP_LEAVE_MS = 150;
 /** A wheel's zoom: one notch (100 px of delta) widens or narrows the window by this share. */
 const ZOOM_PER_NOTCH = 0.1;
 /** The chart's colours as site tokens: the panel's line hues (LINE_HUE), the
@@ -817,6 +819,21 @@ export function LifetimeFlowsLw({
   const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
   const sampled = useRef<Record<string, (number | null)[]>>({});
   const hoverRef = useRef<(p: MouseEventParams<Time>) => void>(() => {});
+  // The tip closes a moment after the pointer leaves the line, so the one-cell
+  // break where an event day interrupts a dotted run does not close and reopen it.
+  const tipLeave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showOldTip = (t: { x: number; y: number; lines: string[] } | null) => {
+    if (t) {
+      if (tipLeave.current) clearTimeout(tipLeave.current);
+      tipLeave.current = null;
+      setOldTip(t);
+    } else if (!tipLeave.current)
+      tipLeave.current = setTimeout(() => {
+        tipLeave.current = null;
+        setOldTip(null);
+      }, TIP_LEAVE_MS);
+  };
+  useEffect(() => () => void (tipLeave.current && clearTimeout(tipLeave.current)), []);
   // The library re-sends the last pointer position, with no source event,
   // each time the chart redraws (options applied, data set); that is the
   // pointer still there, so it is read like a move. Only an event with no
@@ -827,7 +844,7 @@ export function LifetimeFlowsLw({
     const g = gridRef.current;
     const c = chart.current;
     if (!g || !c || !p.point || p.logical == null || p.paneIndex == null || p.paneIndex >= nV) {
-      setOldTip(null);
+      showOldTip(null);
       return;
     }
     const i = Math.round(p.logical);
@@ -873,10 +890,10 @@ export function LifetimeFlowsLw({
         if (dotted && (best == null || Math.abs(pt.to - day) < Math.abs(best - day))) best = pt.to;
       }
       const lines = best == null ? [] : oldLineTip(model, best - startDay, k);
-      setOldTip(lines.length ? { x: p.point.x, y: y + sideTop(paneOf(k)), lines } : null);
+      showOldTip(lines.length ? { x: p.point.x, y: y + sideTop(paneOf(k)), lines } : null);
       return;
     }
-    setOldTip(null);
+    showOldTip(null);
   };
 
   // The chart, once the library is in and the charts are shown.
