@@ -147,6 +147,16 @@ const nextConfig: NextConfig = {
   // framer-motion into each route's own chunks instead of the vendor-chunk split,
   // sidestepping the unwritten-chunk bug. (Drop once on a Next that emits it.)
   transpilePackages: ["framer-motion"],
+  experimental: {
+    // Compile in a child process. Next turns the build worker off by default
+    // when a config has a `webpack` function (the YAML loader below), so
+    // webpack ran inside the `next build` process and that process kept about
+    // 4.4 GB of compiler heap through the type check that follows, whose
+    // worker adds about 2.4 GB. On Vercel's 8 GB standard machine the sum ran
+    // out of memory at "Linting and checking validity of types". In a worker,
+    // the compiler's memory is released when compilation ends.
+    webpackBuildWorker: true,
+  },
   // Content files (content/<protocol>/*.yaml, the strings a prose writer
   // edits) are parsed at build time into the module's data.
   webpack(config: { module: { rules: unknown[] } }) {
