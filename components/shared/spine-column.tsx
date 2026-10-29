@@ -12,10 +12,10 @@ import {
   KeyRound,
   Layers,
   LogOut,
-  Radio,
   ScrollText,
   SlidersHorizontal,
   TestTube,
+  Timer,
   UserMinus,
   UserPlus,
 } from "lucide-react";
@@ -51,7 +51,7 @@ export type SpineIcon =
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): the glyph `noteGlyph` names (a rate's `chart-line`, a vault's terms `scroll-text`, a PSM share `chart-pie`), thin neutral ink, never a party colour
   | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the pink diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner
-  | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: lucide `radio` (the position as it stands now) in the notes' thin neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts
+  | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: lucide `timer` (the time since the last touch) in the notes' thin neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts
   | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Sync to chart" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
@@ -1146,7 +1146,7 @@ export function SpineColumn({
         // The live window's node: the notes' register (the account did
         // nothing here), its own glyph.
         return nodeRow(
-          <Radio size={T} strokeWidth={1.25} absoluteStrokeWidth color={SPINE_COLORS.default} aria-hidden="true" />,
+          <Timer size={T} strokeWidth={1.25} absoluteStrokeWidth color={SPINE_COLORS.default} aria-hidden="true" />,
         );
       case "close":
         return nodeRow(

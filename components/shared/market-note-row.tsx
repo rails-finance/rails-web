@@ -3,7 +3,7 @@
 // One market note, drawn in the timeline between the two events it brackets.
 // ----------------------------------------------------------------------------
 // NOT AN EVENT, and the spine says so before a word is read: the quietest node
-// on it (a hollow diamond, no party colour), and a header that names no
+// on it (a thin glyph, no party colour), and a header that names no
 // action. An event card states something the ACCOUNT did; this states
 // something that happened to the market while the account did nothing, and
 // the two must never be mistaken for each other at a glance.
@@ -32,7 +32,7 @@
 // moved is named in the panel's stat label and the (i). The row has
 // its own ground (`bg-note`, #1d212b dark / #f0f0f0 light) rather than the
 // cards' `bg-raised`, so a note reads as a different KIND of row from an
-// event before the diamond does — not a card waiting for a hover it never
+// event before the node does — not a card waiting for a hover it never
 // gets. Clicking the header opens the same kind of panel an
 // event card opens: a stat grid with the figures each carrying their receipt,
 // the (i) holding the prose a receipt cannot (which two logs were read, whose
@@ -43,7 +43,7 @@
 // The geometry, the disclosure control and the row's own <ProvReceiptsScope>
 // are <NoteRowShell>'s (components/shared/note-row-shell.tsx) — shared with the
 // live-window row, which is a different class of fact in the same frame. The
-// diamond lands on the same vertical line as the cards' own nodes, which is the
+// node lands on the same vertical line as the cards' own nodes, which is the
 // whole point of giving the note a node at all: the reader has to see which two
 // events it sits between. Every figure carries its own receipt.
 //
@@ -51,7 +51,7 @@
 // between a rate step and a vault's terms is the label,
 // the headline figure, the stat cards, the derivation prose, the "?" content
 // and how a value on the mark is written — nothing else. Each kind hands back
-// exactly those and the shell draws them: same geometry, same diamond on the
+// exactly those and the shell draws them: same geometry, same node on the
 // spine, same mark, same panel. A third kind is a third arm of that switch
 // plus its own provenance module, never a branch in the layout.
 

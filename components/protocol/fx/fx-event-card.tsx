@@ -209,9 +209,7 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers, previousEv
             isLast: !!isLast,
           }
         : isTransfer
-          ? // An ownership handover is a people event with no token flow — the
-            // person glyph with the join badge marks the new owner taking
-            // over; dotted spine (nothing moved). The glyph is the event's
+          ? // An ownership handover moves no token: the key. The glyph is the event's
             // meaning, so it wins over the third-party fallback.
             { icon: "handover", isLast: !!isLast }
           : // Third-party operate badges the flow pink (color-grammar §4)

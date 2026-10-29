@@ -45,6 +45,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-polaris-flows.ts.
 
+import { polarisSentByOther } from "@/lib/polaris/event-prose";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowIndexes, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -252,6 +253,9 @@ export interface PolarisFlowRow {
   logIndex: number;
   tx?: string;
   kind: "owner" | "liquidation";
+  /** A touch another account sent: its sender is not the CDP's holder at the
+   *  event (`polarisSentByOther`, as the card judges it). */
+  byOther?: boolean;
   collChange: bigint;
   debtChange: bigint;
   mintRedeemCollGain: bigint;
@@ -295,7 +299,7 @@ function logIndexOf(id: string): number {
 
 /** The CDP's rows that move it, ascending (a custody transfer moves nothing
  *  and is not a flow). */
-export function polarisFlowRows(events: BaseActivityEvent[]): PolarisFlowRow[] {
+export function polarisFlowRows(events: BaseActivityEvent[], holders?: ReadonlyMap<string, string>): PolarisFlowRow[] {
   const out: PolarisFlowRow[] = [];
   for (const e of events) {
     if (!isPolarisEvent(e)) continue;
@@ -310,6 +314,7 @@ export function polarisFlowRows(events: BaseActivityEvent[]): PolarisFlowRow[] {
       logIndex: logIndexOf(e.id),
       tx: e.txHash || undefined,
       kind: c.eventType === "liquidate" ? "liquidation" : "owner",
+      byOther: c.eventType !== "liquidate" && polarisSentByOther(c, holders?.get(e.id)),
       collChange: wei(r.collChange, c.collChange),
       debtChange: wei(r.debtChange, c.debtChange),
       mintRedeemCollGain: wei(r.mintRedeemCollGain, c.mintRedeemCollGain),
@@ -609,6 +614,7 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
       tx: r.row.tx,
       // A liquidation is the liquidator's transaction.
       countsTx: r.row.kind === "owner",
+      ...(r.row.byOther ? { byOther: true } : {}),
       balances: [
         { asset: COLL, symbol: PETH_SYMBOL, side: "collateral", amount: slope.held[i].coll, index: 1 },
         { asset: DEBT, symbol: o.stable, side: "debt", amount: slope.held[i].debt, index: 1 },

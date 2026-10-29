@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // Every note draws its collapsed row whenever Display's "Market notes" is on
 // (Miles, 20 Oct 2026: the collapsed row is the view; the bare spine marker
-// went). The row's node is the hollow diamond; a rate note's head names its
+// went). The row's node is the rate's chart line; a rate note's head names its
 // kind in words and its rate after stands in the pink pill on the spine's
 // flank. The whole row, or Enter/Space on its header, opens the panel in
 // place and closes it again. Display carries "Market notes" alone; the
@@ -86,7 +86,7 @@ console.log(`Market notes — against ${BASE}\n`);
     (await page.getByRole("button", { name: /^Market notes ·/i }).count()) === 0,
   );
 
-  // A lone fee note: the T1 head, the diamond, the pink pill on the flank.
+  // A lone fee note: the T1 head, the chart line, the pink pill on the flank.
   const row = page.locator("[data-market-note]:not([data-market-note-run] [data-market-note])").first();
   const id = await row.getAttribute("data-market-note");
   const head = ((await row.locator("[data-head-kind]").first().textContent()) ?? "").trim();
@@ -101,8 +101,8 @@ console.log(`Market notes — against ${BASE}\n`);
     `${flank.text} ${flank.dir}`,
   );
   check(
-    "2c. the row's node is the hollow diamond",
-    (await row.locator('[data-spine-node] svg rect[transform^="rotate(45"]').count()) >= 1,
+    "2c. the row's node is the rate's chart line",
+    (await row.locator('[data-spine-node] svg[data-spine-note-glyph="rate"]').count()) >= 1,
   );
 
   const header = row.locator('[role="button"][aria-expanded]').first();

@@ -37,6 +37,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-compound-v3-flows.ts.
 
+import { externalActor } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents } from "@/lib/shared/flows-timeline";
 import type { AssetBalance, FocusEvent } from "@/lib/shared/flow-focus";
@@ -119,6 +120,9 @@ export interface CompoundFlowEvent {
   usdValue: number | null;
   /** Comet's oracle price per token address at the block, where read. */
   prices: Record<string, number> | null;
+  /** Another account acted: a transfer received, or a sender and funder
+   *  both other than the owner (the card's `externalActor` verdict). */
+  byOther?: boolean;
 }
 
 /** A decimal string in units of 10^-decimals, exact; null where it is not
@@ -177,6 +181,10 @@ export function compoundFlowEvents(
       collAfter: num(c.collateralAfter),
       usdValue: num(c.usdValue),
       prices: prices?.get(e.blockNumber) ?? null,
+      byOther:
+        c.eventType === "transfer_in" ||
+        c.eventType === "transfer_collateral_in" ||
+        externalActor({ txFrom: c.txFrom, poolCaller: c.funder }, e.wallet) != null,
     };
   });
 }
@@ -659,6 +667,7 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
       legs: r.legs.map((l) => ({ bucket: l.bucket, usd: legUsd(r, l), symbol: l.symbol })),
       tx: r.ev.tx,
       countsTx: !absorb && r.ev.kind !== "transfer_in" && r.ev.kind !== "transfer_collateral_in",
+      ...(!absorb && r.ev.byOther ? { byOther: true } : {}),
       balances,
       prices,
     };

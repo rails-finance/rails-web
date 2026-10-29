@@ -4,7 +4,7 @@
 // CDP's touches, as one row (rails-ops TO-DO-ui-jobs 402; the model is
 // lib/polaris/psm-gap.ts). The shape is the note run row's on the shared shell
 // (components/shared/market-note-row.tsx, `NoteRunRow`): the kind in words
-// with the count, the gap's dates, and on the spine the hollow diamond with
+// with the count, the gap's dates, and on the spine the pie glyph with
 // the share the closing touch wrote on its flanks. Opened: the two shares and
 // their net, each on the touch's own receipt, the count of trades, and the
 // pro-rata sentence with the market's read-more.

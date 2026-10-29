@@ -1,7 +1,7 @@
 // Protocol changes in the event history (rails-ops TO-DO-ui-jobs 448; Miles,
 // 29 Oct 2026). A change the protocol made for every position (a collateral
 // factor, a liquidation discount, a rate policy) is drawn on the Lifetime
-// flows events row as a grey diamond (reference/lifetime-price-chart.md,
+// flows events row as a pink diamond (reference/lifetime-price-chart.md,
 // ruling 10); the same list, from the same model, stands in the history as
 // rows in the market-note format (components/shared/note-row-shell.tsx) with
 // a spine glyph of their own.

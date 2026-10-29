@@ -621,6 +621,10 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
       legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * r.price, symbol: r.ev.symbol })),
       tx: r.ev.tx,
       countsTx: r.ev.byOwner,
+      // The account acting as a liquidator (seize_in, a payout) is its own act.
+      ...(!liq && !r.ev.byOwner && r.ev.kind !== "seize_in" && r.ev.kind !== "liquidation_payout"
+        ? { byOther: true }
+        : {}),
       balances,
       prices: r.price > 0 && r.basis !== "nearest" && r.basis !== "none" ? [{ asset: m, usd: r.price }] : [],
       ...(unsure.length ? { unsure } : {}),

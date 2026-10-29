@@ -78,6 +78,8 @@ export function skyFlowTimeline(
       day: d.day,
       events,
       tick: "collateral",
+      // Shares another account sent in that day.
+      ...(BigInt(d.received) > BigInt(0) ? { byOther: true as const } : {}),
       cum: { ...cum },
       balances: [{ asset: SUSDS.address, symbol: SUSDS.symbol, side: "collateral", amount: units(d.sharesAfter) }],
       prices: [{ asset: SUSDS.address, usd: rayNumber(d.chi) * p, ts: d.day * 86_400 }],

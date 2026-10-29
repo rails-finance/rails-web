@@ -44,6 +44,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-fluid-flows.ts.
 
+import { externalActor } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowIndexes, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -143,6 +144,9 @@ export interface FluidFlowEvent {
   /** The vault oracle at the row's block (debt token per collateral token),
    *  where the row carries it (mig 114). */
   price: number | null;
+  /** A sender and initiator both other than the owner at the row (the card's
+   *  `externalActor` verdict). */
+  byOther?: boolean;
 }
 
 const num = (v: unknown): number | null => {
@@ -195,6 +199,7 @@ export function fluidFlowEvents(events: BaseActivityEvent[]): FluidFlowEvent[] {
         c.oraclePriceAtBlock?.debtPerCol != null && c.oraclePriceAtBlock.debtPerCol > 0
           ? c.oraclePriceAtBlock.debtPerCol
           : null,
+      byOther: externalActor({ txFrom: c.txFrom, poolCaller: c.initiator }, c.ownerAt ?? e.wallet) != null,
     };
     col = colAfter;
     debt = debtAfter;
@@ -486,6 +491,7 @@ export function fluidFlowTimeline(events: FluidFlowEvent[], o: FluidFlowOptions)
       ),
       tx: r.ev.tx,
       countsTx: !liq,
+      ...(!liq && r.ev.byOther ? { byOther: true } : {}),
       balances,
       prices,
       ...(unpriced

@@ -2,8 +2,8 @@
 
 // The market notes in one gap of the timeline, each drawn as its collapsed row
 // (Miles, 20 Oct 2026, ui-jobs 399: the collapsed row is the view; a bare
-// marker with a blank right side is not). The row's node is the hollow
-// diamond, its chevron opens its panel, or a group's lines, in place.
+// marker with a blank right side is not). The row's node is the note
+// glyph, its chevron opens its panel, or a group's lines, in place.
 //
 // What a gap holds: a note, the head slot's live notes as one card, a run of
 // same-kind rate notes as one group row (`noteRuns`, lib/shared/market-note.ts),
@@ -14,7 +14,7 @@
 // Below 640px a rate note or a run draws as an event row does, its node and
 // pill on the spine and its words as the caption under them (ui-jobs 403).
 // Any other row's spine cell is hidden there (app/globals.css, `.spine-row`),
-// so the gap draws the diamond on the line above that card.
+// so the gap draws the node on the line above that card.
 
 import { useMemo, type CSSProperties } from "react";
 
@@ -88,7 +88,7 @@ export const noteRowHeight = (cardPad: number) => 2 * cardPad + NOTE_HEADER;
 const SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
 
 /** The row's node on a phone, where the row's spine cell is hidden: the
- *  hollow diamond on the line. A rate note and a run are timeline rows at
+ *  note glyph on the line. A rate note and a run are timeline rows at
  *  both widths (`NoteRowShell`'s T1 shape), whose own cell stands on a phone,
  *  so they take none. */
 function PhoneNode({ item }: { item: GapItem }) {

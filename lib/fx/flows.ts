@@ -44,6 +44,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-fx-flows.ts.
 
+import { fxExternalActor } from "@/lib/fx/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -252,6 +253,8 @@ export interface FxFlowRow {
   /** The PositionSnapshot's oracle price (fxUSD per normalized unit), on the
    *  position's own rows. */
   price: number | null;
+  /** An operate another account sent (`fxExternalActor`). */
+  byOther?: boolean;
 }
 
 const num = (v: unknown): number | null => {
@@ -297,6 +300,7 @@ export function fxFlowRows(events: BaseActivityEvent[]): FxFlowRow[] {
       collBefore: kind === "liquidation" ? num(d.collBefore) : null,
       debtBefore: kind === "liquidation" && d.collBefore != null ? num(d.debtBefore) : null,
       price: price != null && price > 0 ? price : null,
+      byOther: fxExternalActor(d) != null,
     });
   }
   // Ascending by block; a block's rows keep the page's order.
@@ -680,6 +684,7 @@ export function fxFlowTimeline(rp: FxFlowReplay, o: FxFlowOptions): FlowTimeline
       ),
       tx: r.row.tx,
       countsTx: k === "operate",
+      ...(r.row.byOther ? { byOther: true } : {}),
       balances: [
         { asset: COLL, symbol: o.collSymbol, side: "collateral", amount: Math.max(0, r.coll) },
         { asset: DEBT, symbol: DEBT_SYMBOL, side: "debt", amount: Math.max(0, r.debt) },

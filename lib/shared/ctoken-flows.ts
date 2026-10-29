@@ -499,6 +499,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
       legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * r.price, symbol: r.ev.symbol })),
       tx: r.ev.tx,
       countsTx: !liq && r.ev.byOwner !== false,
+      ...(!liq && r.ev.byOwner === false ? { byOther: true } : {}),
       balances,
       prices: r.ownPrice && r.price > 0 ? [{ asset: m, usd: r.price }] : [],
     };

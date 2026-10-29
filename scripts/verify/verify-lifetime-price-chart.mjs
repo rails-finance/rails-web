@@ -699,7 +699,7 @@ const PAGES = [
       fluid: "/api/chain/fluid/position?nft=6",
       help: ["the vault oracle's price", "steps where Fluid governance changed it"],
       // No change inside the life: the how-to-read names no markers.
-      helpNot: ["grey diamond"],
+      helpNot: ["each change a pink diamond"],
     },
   },
   {
@@ -714,7 +714,7 @@ const PAGES = [
       fluid: "/api/chain/fluid/position?nft=8538",
       help: ["the vault oracle's price", "steps where Fluid governance changed it"],
       // No change inside the life: the how-to-read names no markers.
-      helpNot: ["grey diamond"],
+      helpNot: ["each change a pink diamond"],
     },
   },
   // Step 8 (the threshold in force each day, /api/fluid/threshold-history):
@@ -740,7 +740,7 @@ const PAGES = [
       help: [
         "the vault oracle's price",
         "steps where Fluid governance changed it",
-        "each change a grey diamond on the events row",
+        "each change a pink diamond on the events row",
       ],
     },
   },
@@ -767,7 +767,7 @@ const PAGES = [
       help: [
         "the vault oracle's price",
         "steps where Fluid governance changed it",
-        "each change a grey diamond on the events row",
+        "each change a pink diamond on the events row",
       ],
     },
   },
@@ -2013,7 +2013,7 @@ async function checkChanges(page, tag, pg, width) {
   const named = /^[A-Z][^A-Z]*$/.test(want.name) ? want.name[0].toLowerCase() + want.name.slice(1) : want.name;
   check(
     `${tag}: the events' "?" names the markers and ${named}`,
-    help.includes("The grey diamonds") && help.includes(named) && help.includes("a row in the history below"),
+    help.includes("The pink diamonds") && help.includes(named) && help.includes("a row in the history below"),
     help.slice(0, 400),
   );
 }
@@ -2194,7 +2194,7 @@ async function checkFeedChanges(page, tag, pg) {
   const all = labels.join(" | ");
   const feedNames = /Price feed|OSM source|Price cap|Target price/;
   const help = await howToRead(page);
-  const sentence = "A change to the ilk's price feed, a grey diamond";
+  const sentence = "A change to the ilk's price feed, a pink diamond";
   if (pg.feed.none) {
     check(`${tag}: no price feed marker in a life with no feed change`, !feedNames.test(all), all.slice(0, 200));
     check(`${tag}: the how-to-read says nothing of the price feed's diamonds`, !help.includes(sentence));
@@ -2205,12 +2205,12 @@ async function checkFeedChanges(page, tag, pg) {
 }
 
 /** A life no protocol change falls in (ui-jobs 328 step 8, `noChanges`):
- *  no marker on the row, and the how-to-read names no grey diamonds. */
+ *  no marker on the row, and the how-to-read names no change diamonds. */
 async function checkNoChanges(page, tag) {
   const n = await page.locator("[data-flows-combined] [data-flow-change]").count();
   check(`${tag}: no protocol-change marker in a life with no change`, n === 0, `${n} markers`);
   const help = await howToRead(page);
-  check(`${tag}: the how-to-read names no grey diamonds`, !help.includes("grey diamond"), help.slice(0, 200));
+  check(`${tag}: the how-to-read names no change diamonds`, !help.includes("The pink diamonds"), help.slice(0, 200));
 }
 
 /** Liquity V1 (ui-jobs 328 step 5): Liquity V2's view, the ETH price with the

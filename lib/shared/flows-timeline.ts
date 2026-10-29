@@ -93,6 +93,12 @@ export interface FlowEvent {
    *  a delegate or batch manager ("rate-delegate") or by the owner
    *  ("rate-owner"). A day draws its strongest (`tickRank`). */
   tick: FlowTick;
+  /** Another account acted on the position (a keeper's repay, a transfer
+   *  received): the family's row names a sender or caller other than the
+   *  owner, as the card's spine judges it. The events row draws the day's
+   *  movement as the external act's pink diamond. Unset where the row does
+   *  not say. */
+  byOther?: boolean;
   /** What the event adds to each bucket, in USD, and the asset it moved. */
   legs: { bucket: string; usd: number; symbol?: string }[];
   /** The transaction, and whether the position card counts it (false: a
@@ -290,6 +296,8 @@ export interface FlowDayRow {
   tick: FlowEvent["tick"];
   /** The day's rate changes, which move no bucket, for the tick's words. */
   rates?: ("rate-delegate" | "rate-owner")[];
+  /** A movement that day was another account's act (`FlowEvent.byOther`). */
+  byOther?: true;
   /** Running USD per bucket after the day. */
   cum: Record<string, number>;
   /** Balances the day's events stated, after its last event. */
@@ -510,6 +518,8 @@ export interface FlowModel {
      *  the wallet (a withdrawal, a borrow) that day; the events row draws a
      *  bar above the line for the first and below it for the second. */
     flow: { into: FlowSide[]; out: FlowSide[] };
+    /** The day's movement was another account's act (`FlowDayRow.byOther`). */
+    byOther?: true;
   }[];
   repricings: Repricing[];
   /** The timeline's protocol changes (`FlowTimeline.changes`), by UTC day
@@ -678,6 +688,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
     /** The day's strongest event that is not a movement. */
     mark: FlowTick | null;
     rates: Set<"rate-delegate" | "rate-owner">;
+    byOther: boolean;
     balances: Map<string, FlowEvent["balances"][number]>;
     prices: Map<string, { usd: number; ts: number }>;
     cells: Set<string>;
@@ -700,6 +711,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       events: n,
       tick: cur.mark ?? (cur.sides.size === 2 ? "both" : cur.sides.has("debt") ? "debt" : "collateral"),
       ...(cur.rates.size ? { rates: [...cur.rates] } : {}),
+      ...(cur.byOther ? { byOther: true as const } : {}),
       cum: { ...cum },
       balances: [...cur.balances.values()],
       prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts })),
@@ -722,6 +734,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       sides: new Set(),
       mark: null,
       rates: new Set(),
+      byOther: false,
       balances: new Map(),
       prices: new Map(),
       cells: new Set(),
@@ -768,6 +781,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       const had = cur.unsure.get(k);
       cur.unsure.set(k, had ? { ...had, held: had.held || u.held, untilNext: had.untilNext || u.untilNext } : u);
     }
+    if (ev.byOther && (ev.tick === "both" || ev.tick === "collateral" || ev.tick === "debt")) cur.byOther = true;
     if (ev.tick === "both") {
       cur.sides.add("collateral");
       cur.sides.add("debt");
@@ -1035,7 +1049,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         if (!to.includes(b.side)) to.push(b.side);
       }
       for (const r of d.rates ?? []) kinds.push(RATE_WORD[r]);
-      return [{ day: d.day - startDay, tick: d.tick, kinds, flow }];
+      return [{ day: d.day - startDay, tick: d.tick, kinds, flow, ...(d.byOther ? { byOther: true as const } : {}) }];
     }),
     repricings,
     changes: t.changes ?? [],

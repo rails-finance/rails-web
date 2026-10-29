@@ -42,6 +42,8 @@ import { daysFromEvents } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, MakerDAOEventType } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
+import { externalActor } from "@/lib/shared/external-actor";
+import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
@@ -175,6 +177,10 @@ export interface MakerFlowEvent {
   /** A deposit of what an auction handed back (lib/makerdao/vault-history.tsx
    *  `makerLeftoverLinks`). */
   returned: boolean;
+  /** Another account acted: the card's `externalActor` verdict against the
+   *  owner in force, less a vault a contract opened and gave the signer in the
+   *  same transaction (`openedForSigner`). */
+  byOther?: boolean;
 }
 
 const num = (v: unknown): number | null => {
@@ -197,6 +203,22 @@ export function makerFlowEvents(
   returnedIds: ReadonlySet<string> = new Set(),
 ): MakerFlowEvent[] | null {
   const rows = events.filter(isMakerDAOEvent).filter((e) => isFlowRow(e.context.data.eventType));
+  // Each transaction's gives, for `openedForSigner`'s rule.
+  const gives = new Map<string, { dstOwner?: string | null; dst?: string | null }[]>();
+  for (const e of events.filter(isMakerDAOEvent)) {
+    const g = e.context.data;
+    if (g.eventType !== "give") continue;
+    const tx = makerTxHashOf(e);
+    gives.set(tx, [...(gives.get(tx) ?? []), { dstOwner: g.giveDstOwner, dst: g.giveDst }]);
+  }
+  const byOther = (e: (typeof rows)[number]): boolean => {
+    const c = e.context.data;
+    if (c.eventType === "grab") return false;
+    const opened = (gives.get(makerTxHashOf(e)) ?? []).some(
+      (g) => (g.dstOwner != null && g.dstOwner === c.txFrom) || (g.dst != null && g.dst === c.txTo),
+    );
+    return !opened && externalActor({ txFrom: c.txFrom, poolCaller: c.txTo }, c.ownerAt ?? e.wallet) != null;
+  };
   // Served order is chain order; a stable sort by block keeps it.
   const sorted = rows.map((e, i) => ({ e, i })).sort((a, b) => a.e.blockNumber - b.e.blockNumber || a.i - b.i);
   const out: MakerFlowEvent[] = [];
@@ -243,6 +265,7 @@ export function makerFlowEvents(
         price:
           c.eventType === "grab" && c.priceAtBlock?.usd != null && c.priceAtBlock.usd > 0 ? c.priceAtBlock.usd : null,
         returned: c.eventType === "frob" && returnedIds.has(e.id),
+        byOther: byOther(e),
       });
       ink = inkAfter;
       art = artAfter;
@@ -441,6 +464,7 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
       tx: r.ev.tx,
       // The card counts the owner's transactions; a liquidation is a keeper's.
       countsTx: r.ev.kind !== "grab",
+      ...(r.ev.byOther ? { byOther: true } : {}),
       balances: [
         { asset: coll, symbol: o.collSymbol, side: "collateral", amount: Math.max(0, r.ev.inkAfter) },
         { asset: debt, symbol: o.debtSymbol, side: "debt", amount: Math.max(0, r.ev.debtAfter) },

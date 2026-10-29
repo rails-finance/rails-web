@@ -37,6 +37,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-morpho-flows.ts.
 
+import { externalActor } from "@/lib/shared/external-actor";
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
@@ -196,6 +197,9 @@ export interface MorphoFlowEvent {
   /** The market oracle at the block (loan token per collateral token), where
    *  the row or a read states it. */
   price: number | null;
+  /** A sender and caller both other than the owner (the card's
+   *  `externalActor` verdict). */
+  byOther?: boolean;
 }
 
 const num = (v: unknown): number | null => {
@@ -232,6 +236,7 @@ export function morphoFlowEvents(events: BaseActivityEvent[], prices?: Map<numbe
       assetsDelta: c.side === "loan" ? delta : 0,
       loanRepaid: num(c.loanRepaid) ?? 0,
       price: stored != null && stored > 0 ? stored : read != null && read > 0 ? read : null,
+      byOther: externalActor({ txFrom: c.txFrom, poolCaller: c.caller }, e.wallet) != null,
     };
   });
 }
@@ -507,6 +512,7 @@ export function morphoFlowTimeline(events: MorphoFlowEvent[], o: MorphoFlowOptio
       ),
       tx: r.ev.tx,
       countsTx: r.ev.kind !== "liquidation",
+      ...(r.ev.kind !== "liquidation" && r.ev.byOther ? { byOther: true } : {}),
       balances,
       prices,
     };

@@ -45,6 +45,9 @@ export interface PolarisFlowsInput {
   stable: string;
   /** The CDP is open (the page's verdict). */
   open: boolean;
+  /** The CDP's holder at each event (`polarisHoldersAt`), for the touches
+   *  another account sent. */
+  holders?: ReadonlyMap<string, string>;
 }
 
 export function usePolarisFlows(p: PolarisFlowsInput): {
@@ -53,7 +56,7 @@ export function usePolarisFlows(p: PolarisFlowsInput): {
   focus: FlowFocusValue;
   facts: PolarisFlowFacts | null;
 } {
-  const rows = useMemo(() => (p.events ? polarisFlowRows(p.events) : null), [p.events]);
+  const rows = useMemo(() => (p.events ? polarisFlowRows(p.events, p.holders) : null), [p.events, p.holders]);
   const live = useMemo(() => (p.chainSettled ? polarisFlowLive(p.chain) : null), [p.chain, p.chainSettled]);
 
   // The daily store, one read per page from the first row's day. A failed or

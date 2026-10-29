@@ -1236,8 +1236,8 @@ test("maker: each vault's feed changes in its life, named; none on the lives wit
     for (const c of inLife) assert.equal(c.prov.kind, "chain", `${v.name}: ${c.name} stands in a chain receipt`);
   }
   const help = (on: boolean) => makerHealthSource(on).ratio!.help;
-  assert.match(help(true), /a grey diamond on the events row, reaches the ratio through the OSM price/);
-  assert.doesNotMatch(help(false), /grey diamond/);
+  assert.match(help(true), /a pink diamond on the events row, reaches the ratio through the OSM price/);
+  assert.doesNotMatch(help(false), /pink diamond/);
 });
 
 test("maker 0x6a01: the store's close steps on the feed's and the cap's days, so the ratio steps with no read added", () => {

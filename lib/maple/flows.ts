@@ -40,6 +40,7 @@
 //
 // Pure: tested offline in scripts/verify/verify-maple-flows.ts.
 
+import { externalActor } from "@/lib/shared/external-actor";
 import type { PricePoint, PriceSeries } from "@/lib/shared/price-series";
 import type { FlowBucket, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
@@ -123,6 +124,10 @@ export interface MapleFlowRow {
   claimAfter: number | null;
   /** Shares plus shares in the queue after the row. */
   sharesHeld: number;
+  /** Another account acted: a transfer received, or a sender and caller both
+   *  other than the account (the card's `externalActor` verdict; a queue
+   *  fill is the queue working). */
+  byOther?: boolean;
   /** The server's interest since the pool's previous row (that row's shares
    *  and escrow at this block's rate, less its claim), where it states one. */
   interestSincePrev: number | null;
@@ -192,6 +197,9 @@ export function mapleFlowRows(events: BaseActivityEvent[]): Map<string, MapleFlo
       claimAfter: units(raw.valueAfter, c.valueAfter),
       sharesHeld: (units(raw.sharesAfter, c.sharesAfter) ?? 0) + (units(raw.escrowAfter, c.escrowAfter) ?? 0),
       interestSincePrev: units(raw.interestSincePrev, c.interestSincePrev),
+      byOther:
+        c.eventType === "transfer_in" ||
+        (c.eventType !== "request_fill" && externalActor({ txFrom: c.txFrom, poolCaller: c.caller }, e.wallet) != null),
     };
     const list = out.get(c.pool);
     if (list) list.push(row);
@@ -401,6 +409,7 @@ export function mapleFlowTimeline(rp: MapleFlowReplay, o: MapleFlowOptions): Flo
     tick: "collateral",
     legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * G, symbol: o.assetSymbol })),
     tx: r.row.tx,
+    ...(r.row.byOther ? { byOther: true } : {}),
     balances: [{ asset: CLAIM, symbol: o.assetSymbol, side: "collateral", amount: Math.max(0, r.claim) }],
     prices: [{ asset: CLAIM, usd: G }],
   }));

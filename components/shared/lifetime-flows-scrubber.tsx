@@ -742,6 +742,7 @@ function tickWords(model: FlowModel): string | null {
   if (has.has("caution")) parts.push("orange triangle, a change the owner did not make");
   if (has.has("rate-delegate")) parts.push("pink diamond, the delegate's rate change");
   if (has.has("rate-owner")) parts.push("ring, the owner's rate change");
+  if (model.ticks.some((t) => t.byOther)) parts.push("pink diamond, another account's act on the position");
   return parts.length === 0 ? null : `Marks: ${parts.join("; ")}`;
 }
 

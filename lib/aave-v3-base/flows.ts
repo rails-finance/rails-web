@@ -64,6 +64,7 @@ import {
   AAVE_V3_NOT_COUNTED,
   aaveV3LegBucket,
   countsTx,
+  aaveFamilyByOther,
   withATokenRepayLeg,
 } from "@/lib/aave-v3/flows-timeline";
 
@@ -757,6 +758,7 @@ function aaveBaseFlowEvent(r: AaveBaseReplayed, notCounted: readonly string[]): 
     legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * l.price, symbol: l.symbol })),
     tx: r.tx,
     countsTx: countsTx(r.ev, notCounted),
+    ...(aaveFamilyByOther(r.ev) ? { byOther: true } : {}),
     balances: r.after.map((b) => ({
       asset: b.asset,
       symbol: b.symbol,

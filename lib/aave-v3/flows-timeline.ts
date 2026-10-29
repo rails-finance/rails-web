@@ -25,6 +25,7 @@
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
+import { externalActor } from "@/lib/shared/external-actor";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import {
   daysFromEvents,
@@ -396,6 +397,18 @@ export function countsTx(ev: BaseActivityEvent, notCounted: readonly string[]): 
   return (s.events ?? []).some((e) => !out(e.action));
 }
 
+/** Another account acted on the position: a transfer received, or a row
+ *  whose sender and caller are both someone other than the owner (the card's
+ *  `externalActor` verdict). A swap is the owner's order. */
+export function aaveFamilyByOther(ev: BaseActivityEvent): boolean {
+  const c = ev.context?.data as
+    | { eventType?: string; txFrom?: string; poolCaller?: string; caller?: string; owner?: string }
+    | undefined;
+  if (!c?.eventType || c.eventType === "swap") return false;
+  if (c.eventType === "transfer_in") return true;
+  return externalActor({ txFrom: c.txFrom, poolCaller: c.poolCaller ?? c.caller }, c.owner ?? ev.wallet) != null;
+}
+
 /** A balance an event states after it. */
 export interface StatedBalance {
   side: FlowSide;
@@ -445,6 +458,7 @@ export function flowEventsFromLegs<E extends BaseActivityEvent>(
       prices: [],
       tx: ev.txHash ?? ev.id,
       countsTx: countsTx(ev, notCounted),
+      ...(aaveFamilyByOther(ev) ? { byOther: true } : {}),
     };
     const sides = new Set<FlowSide>();
     const stated = new Map<string, { symbol: string; side: FlowSide; amount: number }>();

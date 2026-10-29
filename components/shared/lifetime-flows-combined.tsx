@@ -115,7 +115,8 @@ const PIP_TRIANGLE = 7;
 /** The external act's mark (rails-ops reference/lifetime-flows-scrubber.md):
  *  a filled diamond in the party pink, for an act on the position that the
  *  owner did not take and that took nothing from it: a delegate's rate
- *  change on the pips, a protocol change along the row's top. A
+ *  change or another account's movement on the pips, a protocol change
+ *  along the row's top. A
  *  liquidation and a redemption keep their triangles. */
 const EXTERNAL_INK = "var(--color-pink-500)";
 function ExternalDiamond({ size = 7, opacity = 1 }: { size?: number; opacity?: number }) {
@@ -174,11 +175,14 @@ export function FlowPip({
   left,
   opacity,
   flow,
+  byOther,
 }: {
   tick: FlowTick;
   left: number;
   opacity: number;
   flow?: { into: FlowSide[]; out: FlowSide[] };
+  /** The day's movement was another account's act: the pink diamond. */
+  byOther?: boolean;
 }) {
   if (tick === "liquidation" || tick === "redemption" || tick === "caution")
     return (
@@ -193,12 +197,14 @@ export function FlowPip({
         <path d={WARNING_TRIANGLE_PATH} fill={FLOW_TICK[tick]} />
       </svg>
     );
-  if (tick === "rate-delegate")
+  const moved = tick === "collateral" || tick === "debt" || tick === "both";
+  if (tick === "rate-delegate" || (byOther && moved))
     return (
       <span
         className="pointer-events-none absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2"
         style={{ left, opacity }}
         data-flow-pip={tick}
+        {...(byOther && moved ? { "data-flow-by-other": "" } : {})}
       >
         <ExternalDiamond />
       </span>
@@ -393,6 +399,7 @@ function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: F
     caution,
     delegateRate: has.has("rate-delegate") || named["rate-delegate"] != null,
     ownerRate: has.has("rate-owner") || named["rate-owner"] != null,
+    byOther: model.ticks.some((t) => t.byOther),
     changes: [...new Set(changeDays.flatMap((d) => d.changes.map((c) => c.name)))],
     noted: [...new Set(changeDays.flatMap((d) => d.changes.filter((c) => c.noted).map((c) => c.name)))],
   };
@@ -1900,6 +1907,7 @@ function PipRow({
                   key={t.day}
                   tick={t.tick}
                   flow={t.flow}
+                  byOther={t.byOther}
                   left={xClose(startDay + t.day)}
                   opacity={dim && xClose(startDay + t.day) > cx + 0.5 ? 0.35 : 1}
                 />

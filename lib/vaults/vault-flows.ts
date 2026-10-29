@@ -135,6 +135,8 @@ export function vaultFlowTimeline(events: VaultHolderEvent[], o: VaultFlowOption
       tick: "collateral",
       legs: b && amount > DUST ? [{ bucket: b, usd: amount * G, symbol: o.assetSymbol }] : [],
       tx: e.txHash,
+      // Shares another account sent in.
+      ...(e.kind === "transfer-in" ? { byOther: true } : {}),
       balances: [
         {
           asset: SHARE,

@@ -31,6 +31,8 @@ export interface FlowEventsHelp {
   caution?: string;
   delegateRate?: boolean;
   ownerRate?: boolean;
+  /** A day's movement was another account's act. */
+  byOther?: boolean;
   /** The protocol changes marked inside the life, by name (ruling 10). */
   changes?: string[];
   /** Those a rate note in the history may state instead of a row (ui-jobs 449). */
@@ -102,6 +104,8 @@ export function lifetimeFlowsStackContent(opts: {
       events.redemption && `an orange triangle is ${named(events.redemption)}`,
       events.caution && `an orange triangle${events.redemption ? ", also," : " is"} ${events.caution}`,
       events.delegateRate && "a pink diamond is the delegate setting the interest rate",
+      events.byOther &&
+        `a pink diamond${events.delegateRate ? ", also," : " is"} a day another account acted on the position`,
       events.ownerRate && "a ring is the owner changing it",
     ].filter((m): m is string => !!m);
     const sentence = (t: string) => `${t[0].toUpperCase()}${t.slice(1)}.`;

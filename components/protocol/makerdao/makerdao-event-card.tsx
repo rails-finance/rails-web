@@ -129,8 +129,7 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
     isGrab || isLseLiq
       ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
       : isGive
-        ? // An ownership handover is a people event with no token flow — the
-          // person glyph with the join badge marks the new owner taking over;
+        ? // An ownership handover moves no token: the key;
           // dotted spine (nothing moved in the urn).
           { icon: "handover", isLast: !!isLast }
         : { tokens, externalParty: !!extBy, isLast: !!isLast };

@@ -332,6 +332,7 @@ export default function PolarisPositionView({
     chainSettled,
     stable,
     open: view?.status === "open",
+    holders,
   });
   const flowFocus = flows.read !== "failed" ? flows.focus : null;
 
