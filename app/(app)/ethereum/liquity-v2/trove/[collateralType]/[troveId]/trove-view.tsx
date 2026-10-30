@@ -345,7 +345,7 @@ export default function TroveView({
   });
   // The branch's redemptions per day over the life, the protocol activity
   // chart under the events (lib/liquity-v2/redemption-pace.ts): to today, or
-  // to the close. It starts shown where a redemption reached this Trove.
+  // to the close.
   const paceDays = flowReplayed?.days;
   const flowPaceBranch = paceBranch(flowCollSymbol);
   const flowPace = useRedemptionPace(
@@ -357,11 +357,9 @@ export default function TroveView({
         : paceDays[paceDays.length - 1].day
       : null,
   );
-  const redeemed = flowEvents.some((e) => e.kind === "redemption");
   const flowTimeline = useMemo(
-    () =>
-      flowReplayed && flowPace ? { ...flowReplayed, activity: { ...flowPace, explains: redeemed } } : flowReplayed,
-    [flowReplayed, flowPace, redeemed],
+    () => (flowReplayed && flowPace ? { ...flowReplayed, activity: flowPace } : flowReplayed),
+    [flowReplayed, flowPace],
   );
 
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;

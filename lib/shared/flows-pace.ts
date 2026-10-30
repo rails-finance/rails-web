@@ -43,9 +43,6 @@ export interface ProtocolActivity {
   noun: [string, string];
   /** The how-to-read's sentence for the chart. */
   help: string;
-  /** The activity explains the position (a Trove a redemption reached): the
-   *  chart starts shown; otherwise it starts hidden. */
-  explains: boolean;
   /** The receipt for a day's figure. */
   prov: (at: PaceDay, dayWord: string) => Provenance;
 }

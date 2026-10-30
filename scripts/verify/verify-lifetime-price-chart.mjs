@@ -1186,9 +1186,9 @@ const PAGES = [
   },
   {
     // Open since 9 May 2026, on a branch with redemptions; redeemed once by
-    // 30 Oct 2026, so its protocol activity panel opens shown. That redemption
-    // (block 26300839) took the whole debt: an open zombie with no debt, so
-    // the card's "Liquidates at" reads none and the level has no point today.
+    // 30 Oct 2026. That redemption (block 26300839) took the whole debt: an
+    // open zombie with no debt, so the card's "Liquidates at" reads none and
+    // the level has no point today.
     id: "liquity-v2 wstETH Trove (open since May)",
     path: "/ethereum/liquity-v2/trove/wstETH/36866364639024890689412217368623603118483270545575424157920590185252139913822",
     answer: "/api/liquity-v2/prices/daily",
@@ -1198,8 +1198,8 @@ const PAGES = [
     pace: "wstETH",
   },
   {
-    // Open since 2 Nov 2025, never redeemed on 30 Oct 2026, on a branch that
-    // was: its protocol activity panel opens hidden (ui-jobs 452).
+    // Open since 2 Nov 2025, never redeemed by 30 Oct 2026, on a branch that
+    // was.
     id: "liquity-v2 WETH Trove (never redeemed)",
     path: "/ethereum/liquity-v2/trove/WETH/30404411686890082603025828629969289056413589403947755681351563798146900259572",
     answer: "/api/liquity-v2/prices/daily",
@@ -3128,15 +3128,17 @@ async function checkTroveMarks(page, tag, pg, rows) {
 
 /** The protocol activity chart (ruling 11, ui-jobs 452; Liquity V2's branch
  *  redemptions): a panel of its own under the events, titled by its scope,
- *  shown at first on a Trove a redemption reached and hidden otherwise; its
- *  days are the route's over the life, from the first row's day to the close
+ *  hidden at load on every Trove (ui-jobs 457); on Show its readout stands
+ *  inside the panel from the first frame and ends at the cursor; its days are the route's over the life, from the first row's day to the close
  *  or today; each of the Trove's redemption days has the branch's
  *  redemptions, at least as many as the Trove's; the bars drawn are the days
  *  with BOLD redeemed and the tallest is the window's largest day (the scale
  *  is the square root, which keeps the order); its window and plot are the
  *  chart's, at open, after a scrub and after a zoom; the readout reads each
  *  stop's day as the route answers it, zero on a day it lists none; the
- *  how-to-read says the series is branch-wide and drawn by the square root. */
+ *  how-to-read says the series is branch-wide and drawn by the square root;
+ *  the charts hidden and shown again, the price tip stands inside the chart
+ *  from its first frame and ends at the cursor. */
 async function checkPace(page, tag, pg, rows, width) {
   const t = `${tag} activity`;
   const unit = pg.paceUnit ?? "BOLD";
@@ -3173,16 +3175,11 @@ async function checkPace(page, tag, pg, rows, width) {
     p0.title === `Whole ${pg.pace} branch · ${unit} redeemed a day`,
     p0.title,
   );
-  check(
-    `${t}: it starts ${own.size > 0 ? "shown, the Trove redeemed" : "hidden, the Trove never redeemed"}`,
-    p0.shown === own.size > 0,
-    `shown ${p0.shown}, ${own.size} redemption days`,
-  );
-  if (!p0.shown) {
-    await page.locator("[data-protocol-activity-toggle]").click();
-    await page.waitForSelector("[data-protocol-activity-box] canvas", { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(1500);
-  }
+  check(`${t}: it starts hidden`, !p0.shown, `shown ${p0.shown}, ${own.size} redemption days`);
+  await page.locator("[data-protocol-activity]").scrollIntoViewIfNeeded();
+  checkFirstFrames(t, "the readout", await firstFrames(page, "activity"));
+  await page.waitForSelector("[data-protocol-activity-box] canvas", { timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(1500);
   await page.locator("[data-protocol-activity]").scrollIntoViewIfNeeded();
   await page.waitForTimeout(600);
   const p1 = await panel();
@@ -3354,6 +3351,85 @@ async function checkPace(page, tag, pg, rows, width) {
       help.includes(`on the ${pg.pace} branch each day, every Trove on the branch, this one included`) &&
       help.includes("grows with the square root"),
     help.slice(0, 200),
+  );
+  // The charts hidden and shown again: the price tip's first frames.
+  const hide = page.locator('[data-flows-view-toggle="full"]').first();
+  if ((await hide.count()) > 0) {
+    await hide.click();
+    await page.waitForTimeout(400);
+    await page.locator("[data-flows-view-toggle]").first().scrollIntoViewIfNeeded();
+    checkFirstFrames(`${tag} charts`, "the price tip", await firstFrames(page, "charts"));
+    await page.waitForTimeout(1500);
+  }
+}
+
+/** Presses Show (the protocol activity panel, `kind` "activity") or the
+ *  charts' button ("charts") inside the page and reads the tip's box on every
+ *  animation frame for the next second (ui-jobs 457): its edges against the
+ *  panel (the activity section; the chart's frame for the price tip), its
+ *  caret and the cursor's x, all from the panel's left. */
+function firstFrames(page, kind) {
+  return page.evaluate(async (kind) => {
+    const q = (s) => document.querySelector(s);
+    const btn =
+      kind === "charts" ? q('[data-flows-view-toggle="compact"]') : q('[data-protocol-activity-toggle="hidden"]');
+    if (!btn) return null;
+    const read = () => {
+      const tip = kind === "charts" ? q("[data-price-heading]") : q("[data-pace-readout]");
+      const main = q("[data-flows-combined] [data-flow-chart-engine=lw]");
+      const bound = kind === "charts" ? main : q("[data-protocol-activity]");
+      if (!tip || !bound) return { drawn: false };
+      const r = tip.getBoundingClientRect();
+      if (getComputedStyle(tip).visibility === "hidden" || r.width === 0 || tip.offsetParent == null)
+        return { drawn: false };
+      const b = bound.getBoundingClientRect();
+      const c = tip.querySelector("i[aria-hidden]")?.getBoundingClientRect();
+      const cx = main?.getAttribute("data-flow-lw-cursor-x");
+      return {
+        drawn: true,
+        l: r.left - b.left,
+        r: r.right - b.left,
+        bw: b.width,
+        caret: c ? c.left + c.width / 2 - b.left : null,
+        cursor: cx ? main.getBoundingClientRect().left + Number(cx) - b.left : null,
+      };
+    };
+    const out = [];
+    btn.click();
+    const t0 = performance.now();
+    await new Promise((done) => {
+      const f = () => {
+        out.push({ t: Math.round(performance.now() - t0), ...read() });
+        if (performance.now() - t0 < 1000) requestAnimationFrame(f);
+        else done();
+      };
+      requestAnimationFrame(f);
+    });
+    return out;
+  }, kind);
+}
+
+/** Every drawn frame inside the panel; the last drawn, its caret on the
+ *  cursor (held 8 px in from the tip's ends, as the tip draws it). */
+function checkFirstFrames(t, what, frames) {
+  if (!check(`${t}: ${what}'s button opens it`, frames != null)) return;
+  const drawn = frames.filter((f) => f.drawn);
+  const outside = drawn.filter((f) => f.l < -0.5 || f.r > f.bw + 0.5);
+  const right = drawn.length ? Math.max(...drawn.map((f) => f.r - f.bw)) : null;
+  check(
+    `${t}: ${what} stands inside the panel on every frame of the first second (${drawn.length} of ${frames.length} drawn)`,
+    drawn.length > 0 && outside.length === 0,
+    `${outside.length} outside, from ${drawn[0]?.t ?? "-"} ms; the right edge at most ${right?.toFixed(1)} px past the panel's`,
+  );
+  const e = drawn[drawn.length - 1];
+  // The tip places its caret from its width rounded up, inside its 1 px border.
+  const want = e && e.cursor != null ? e.l + Math.max(8, Math.min(Math.ceil(e.r - e.l) - 8, e.cursor - e.l)) : null;
+  check(
+    `${t}: ${what} ends at the cursor's x`,
+    want != null && e.caret != null && Math.abs(e.caret - want) <= 2.5,
+    e
+      ? `caret ${e.caret?.toFixed(1)}, cursor ${e.cursor?.toFixed(1)}, tip ${e.l.toFixed(1)}–${e.r.toFixed(1)}`
+      : "never drawn",
   );
 }
 

@@ -12,8 +12,7 @@
 //   Trove's on that branch, this one's included.
 // - The range read runs from the life's first day to its last (today, or the
 //   close), at most the route's cap of 1,100 days, the newest kept.
-// - The chart starts hidden; the page shows it where a redemption reached the
-//   Trove (`explains`).
+// - The chart starts hidden on every Trove.
 //
 // Pure: tested offline in scripts/verify/verify-redemption-pace.ts.
 
@@ -125,8 +124,7 @@ export function branchRedemptionPace(src: PaceSource, body: unknown): ProtocolAc
     scope: `Whole ${branch} branch`,
     measure: `${unit} redeemed a day`,
     noun: ["redemption", "redemptions"],
-    help: `under the events, ${unit} redeemed on the ${branch} branch each day, every Trove on the branch, this one included. Redemptions take the Troves with the lowest interest rates first, so a run of tall bars marks a stretch of redemption pressure on the branch; read it against this Trove's interest rate and any redemption that reached it, an orange triangle on the events row. A bar's height grows with the square root of the day's ${unit}, so a small day stays visible beside the largest; the axis marks round amounts at their heights. The line over the bars reads the cursor's day: the ${unit} redeemed and the number of redemptions. The chart starts shown on a Trove a redemption reached, hidden otherwise.`,
-    explains: false,
+    help: `under the events, ${unit} redeemed on the ${branch} branch each day, every Trove on the branch, this one included. Redemptions take the Troves with the lowest interest rates first, so a run of tall bars marks a stretch of redemption pressure on the branch; read it against this Trove's interest rate and any redemption that reached it, an orange triangle on the events row. A bar's height grows with the square root of the day's ${unit}, so a small day stays visible beside the largest; the axis marks round amounts at their heights. The line over the bars reads the cursor's day: the ${unit} redeemed and the number of redemptions. The chart starts hidden.`,
     prov: (at, dayWord) => ({
       kind: "chain-derived",
       pclass: "indexed",
