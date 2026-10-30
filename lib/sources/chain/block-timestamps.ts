@@ -5,6 +5,7 @@
 // a block that does not answer is left out, never a placeholder.
 
 import { chainClient } from "@/lib/sources/chain/rpc";
+import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
 import type { ChainId } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
 import type { FlowChange } from "@/lib/shared/flows-changes";
@@ -21,6 +22,16 @@ export async function blockTimestamps(chainId: ChainId, blocks: readonly number[
     return t == null;
   });
   if (want.length === 0) return out;
+  // rails-server's stored block times first (Ethereum and Base).
+  if (chainId === 1 || chainId === 8453) {
+    for (const [b, t] of await readBlockTimes(chainId, want).catch(() => new Map<number, number>())) {
+      if (!(t > 0)) continue;
+      kept.set(`${chainId}:${b}`, t);
+      out.set(b, t);
+    }
+    want.splice(0, want.length, ...want.filter((b) => !out.has(b)));
+    if (want.length === 0) return out;
+  }
   const client = chainClient(chainId);
   const answers = await Promise.all(
     want.map((b) =>
