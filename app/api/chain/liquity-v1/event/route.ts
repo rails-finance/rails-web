@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readLiquityV1Event } from "@/lib/sources/chain/liquity-v1-event";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
 
 // One Liquity V1 Trove event read from its receipt (lib/sources/chain/
-// liquity-v1-event.ts): the borrowing fee, the reserve, what a close burned,
+// liquity-v1-event.ts, from rails-server's at-block store): the borrowing fee, the reserve, what a close burned,
 // where a liquidation's debt and ETH went, and the PriceFeed price at the
 // event's block. `?tx=` names the transaction, `?wallet=` the Trove's owner.
 // A mined transaction's receipt never changes, so the answer is cached hard.
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (!TX.test(tx)) return NextResponse.json({ error: "tx must be a transaction hash" }, { status: 400 });
   if (!ADDRESS.test(wallet)) return NextResponse.json({ error: "wallet must be an address" }, { status: 400 });
   try {
-    const data = await readLiquityV1Event(tx, wallet.toLowerCase());
+    const data = await readLiquityV1Event(tx, wallet.toLowerCase(), readerIpFromRequest(request));
     return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });
   } catch (error) {
     console.error("Error reading the Liquity V1 event:", error);

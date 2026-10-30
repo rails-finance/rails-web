@@ -59,7 +59,6 @@ export const MAKER_KNOWN_CONTRACTS: Record<string, MakerKnownContract> = {
 
 export const MAKER_MIGRATION = "0xc73e0383f3aff3215e6f04b0331d58cecf0ab849";
 export const SAI_TUB = "0x448a5065aebb8e423f0896e6c5d525c040f59af3";
-export const INSTA_INDEX = "0x2971adfa57b20e5a416ae5a708a8655a9c74f723";
 export const DYDX_SOLO = "0x1e0447b19bb6ecfdae1e4ae1694b0c3659614e4e";
 
 export function knownContract(address: string | null | undefined): MakerKnownContract | undefined {
