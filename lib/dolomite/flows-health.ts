@@ -25,6 +25,7 @@
 //
 // Pure.
 
+import { logOrder } from "@/lib/shared/log-order";
 import type { FactorRead, HealthSource } from "@/lib/shared/flows-health";
 import { flowChange, pctWords, type FlowChange } from "@/lib/shared/flows-changes";
 import { DOLOMITE_ADDRESSES } from "@/lib/dolomite/asset-catalog";
@@ -97,6 +98,8 @@ export interface DolomiteRiskLog {
     timestamp: number;
     txHash: string;
     logIndex: number;
+    /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+    transactionIndex?: number;
     kind: "margin-ratio" | "margin-premium";
     marketId: number | null;
     value: number;
@@ -116,7 +119,7 @@ export function dolomiteRiskChanges(log: DolomiteRiskLog | null, markets: Readon
   if (!log || !Array.isArray(log.sets)) return [];
   const last = new Map<string, number>();
   const out: FlowChange[] = [];
-  for (const s of [...log.sets].sort((a, b) => a.block - b.block || a.logIndex - b.logIndex)) {
+  for (const s of [...log.sets].sort(logOrder)) {
     const key = s.kind === "margin-ratio" ? "ratio" : `m${s.marketId}`;
     const before = last.get(key);
     last.set(key, s.value);

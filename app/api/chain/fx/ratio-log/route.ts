@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     const response = await fetch(
-      `${RAILS_API_URL}/api/at-block/fx/ratio-log?pool=${pool}`,
+      `${RAILS_API_URL}/api/at-block/fx/ratio-log?pool=${pool}&index=tx`,
       createAuthFetchOptions(undefined, readerIpFromRequest(request)),
     );
     if (!response.ok) {

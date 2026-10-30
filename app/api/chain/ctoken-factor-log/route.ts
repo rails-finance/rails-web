@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     const response = await fetch(
-      `${RAILS_API_URL}/api/at-block/ctoken/factor-log?protocol=${protocol}`,
+      `${RAILS_API_URL}/api/at-block/ctoken/factor-log?protocol=${protocol}&index=tx`,
       createAuthFetchOptions(undefined, readerIpFromRequest(request)),
     );
     if (!response.ok) {

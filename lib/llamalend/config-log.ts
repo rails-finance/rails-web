@@ -33,6 +33,7 @@
 //
 // Pure.
 
+import { logOrder } from "@/lib/shared/log-order";
 import { flowChange, pctWords, type FlowChange, type FlowChangeLink } from "@/lib/shared/flows-changes";
 import { explorerUrl } from "@/lib/shared/chains";
 import type { Provenance } from "@/components/shared/provenance";
@@ -43,6 +44,8 @@ export type LlamalendConfigSet =
       timestamp: number;
       txHash: string;
       logIndex: number;
+      /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+      transactionIndex?: number;
       kind: "discounts";
       loanDiscount: number;
       liquidationDiscount: number;
@@ -52,6 +55,8 @@ export type LlamalendConfigSet =
       timestamp: number;
       txHash: string;
       logIndex: number;
+      /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+      transactionIndex?: number;
       kind: "policy";
       policy: string;
       /** The replaced and the new policy, each read at this block. */
@@ -100,6 +105,8 @@ export interface LlamalendConfigStep {
   timestamp: number;
   txHash: string;
   logIndex: number;
+  /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+  transactionIndex?: number;
   before: number | string | null;
   after: number | string;
   /** The loan discount the same set left, for the liquidation marker's receipt. */
@@ -187,14 +194,20 @@ const policyLink = (address: string): FlowChangeLink => ({
 /** Each setting a set moved, oldest first. */
 export function llamalendConfigSteps(log: LlamalendConfigLog | null | undefined): LlamalendConfigStep[] {
   if (!usable(log)) return [];
-  const sets = [...log.sets].sort((a, b) => a.block - b.block || a.logIndex - b.logIndex);
+  const sets = [...log.sets].sort(logOrder);
   let liq: number | null = log.before.discounts?.liquidationDiscount ?? null;
   let loan: number | null = log.before.discounts?.loanDiscount ?? null;
   let policy: string | null = log.before.policy?.policy ?? null;
   const out: LlamalendConfigStep[] = [];
   const same = (a: number | null, b: number) => a != null && Math.abs(a - b) < 1e-12;
   for (const s of sets) {
-    const at = { block: s.block, timestamp: s.timestamp, txHash: s.txHash, logIndex: s.logIndex };
+    const at = {
+      block: s.block,
+      timestamp: s.timestamp,
+      txHash: s.txHash,
+      logIndex: s.logIndex,
+      transactionIndex: s.transactionIndex,
+    };
     if (s.kind === "discounts") {
       if (!same(liq, s.liquidationDiscount))
         out.push({

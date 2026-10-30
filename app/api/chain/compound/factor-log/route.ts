@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     const response = await fetch(
-      `${RAILS_API_URL}/api/at-block/compound/factor-log?chain=${deployment.chainId}&comet=${market.comet.toLowerCase()}`,
+      `${RAILS_API_URL}/api/at-block/compound/factor-log?chain=${deployment.chainId}&comet=${market.comet.toLowerCase()}&index=tx`,
       createAuthFetchOptions(undefined, readerIpFromRequest(request)),
     );
     if (!response.ok) {

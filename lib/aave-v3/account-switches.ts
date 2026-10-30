@@ -16,7 +16,12 @@ export interface AaveFamilyEmodeSwitch {
   /** Unix seconds. */
   timestamp: number;
   txHash: string;
+  /** The block's logIndex. */
   logIndex: number;
+  /** The transaction's index in the block, where the source gives it: a
+   *  configurator change is placed against the switch by it
+   *  (lib/aave-v3/config-changes.ts). */
+  transactionIndex?: number;
   fromId: number;
   /** The previous category's label (null for none). */
   fromLabel: string | null;

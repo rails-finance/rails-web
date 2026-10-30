@@ -30,6 +30,7 @@
 // Pure: no fetch. The routes are /api/chain/ctoken-factor-log and
 // /api/chain/compound/factor-log.
 
+import { logOrder, type LogPlace } from "@/lib/shared/log-order";
 import type { HealthPick } from "@/hooks/useFlowsHealth";
 import { flowChange, pctWords, type FlowChange } from "@/lib/shared/flows-changes";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
@@ -60,6 +61,8 @@ export interface CTokenFactorLog {
     timestamp: number;
     txHash: string;
     logIndex: number;
+    /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+    transactionIndex?: number;
     /** The cToken or mToken, lowercased. */
     market: string;
     from: number;
@@ -78,7 +81,7 @@ export function ctokenFactorChanges(
   if (!log || !Array.isArray(log.sets)) return [];
   const seen = new Set<string>();
   const out: FactorChange[] = [];
-  for (const s of [...log.sets].sort((a, b) => a.block - b.block || a.logIndex - b.logIndex)) {
+  for (const s of [...log.sets].sort(logOrder)) {
     const market = s.market.toLowerCase();
     const first = !seen.has(market);
     seen.add(market);
@@ -118,6 +121,8 @@ export function ctokenFactorChanges(
 export interface CometConfigLog {
   block: number;
   logIndex: number;
+  /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
+  transactionIndex?: number;
   txHash: string;
   kind: "set" | "listed" | "deploy";
   /** The collateral asset, lowercased (`set`, `listed`). */
@@ -140,7 +145,14 @@ export interface CometFactorLog {
   fromBlock: number;
   toBlock: number;
   configs: CometConfigLog[];
-  upgrades: { block: number; logIndex: number; timestamp: number; txHash: string; impl: string }[];
+  upgrades: {
+    block: number;
+    logIndex: number;
+    transactionIndex?: number;
+    timestamp: number;
+    txHash: string;
+    impl: string;
+  }[];
 }
 
 /** A factor change as it took effect: at the upgrade that carried it. */
@@ -155,20 +167,19 @@ export interface CometFactorStep {
   sets: { block: number; txHash: string }[];
 }
 
-const before = (a: { block: number; logIndex: number }, b: { block: number; logIndex: number }) =>
-  a.block < b.block || (a.block === b.block && a.logIndex < b.logIndex);
+const before = (a: LogPlace, b: LogPlace) => logOrder(a, b) < 0;
 
 /** Each upgrade's liquidation collateral factor changes against the
  *  implementation it replaced. */
 export function cometFactorSteps(log: CometFactorLog | null): CometFactorStep[] {
   if (!log || !Array.isArray(log.configs) || !Array.isArray(log.upgrades)) return [];
-  type Pos = { block: number; logIndex: number };
+  type Pos = LogPlace;
   const all: ({ at: "config"; c: CometConfigLog } | { at: "upgrade"; u: CometFactorLog["upgrades"][number] })[] = [
     ...log.configs.map((c) => ({ at: "config" as const, c })),
     ...log.upgrades.map((u) => ({ at: "upgrade" as const, u })),
   ];
   const pos = (x: (typeof all)[number]): Pos => (x.at === "config" ? x.c : x.u);
-  all.sort((a, b) => pos(a).block - pos(b).block || pos(a).logIndex - pos(b).logIndex);
+  all.sort((a, b) => logOrder(pos(a), pos(b)));
   const settings = new Map<string, number>();
   const built = new Map<string, { factors: Map<string, number>; at: Pos }>();
   const sets: CometConfigLog[] = [];
@@ -181,7 +192,10 @@ export function cometFactorSteps(log: CometFactorLog | null): CometFactorStep[] 
         settings.set(c.asset.toLowerCase(), c.to);
         if (c.kind === "set") sets.push(c);
       } else if (c.kind === "deploy" && c.impl)
-        built.set(c.impl.toLowerCase(), { factors: new Map(settings), at: { block: c.block, logIndex: c.logIndex } });
+        built.set(c.impl.toLowerCase(), {
+          factors: new Map(settings),
+          at: { block: c.block, transactionIndex: c.transactionIndex, logIndex: c.logIndex },
+        });
       continue;
     }
     const u = x.u;

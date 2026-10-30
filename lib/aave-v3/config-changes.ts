@@ -25,7 +25,9 @@
 //   on a reserve the account held, while in that category, moves the reserve
 //   between the category's threshold and its own, and is a marker.
 // - The account's category at a change is its last e-mode switch before it
-//   (lib/aave-v3/account-switches.ts).
+//   (lib/aave-v3/account-switches.ts), by block, transaction and log
+//   (lib/shared/log-order.ts): a switch in the change's block counts where
+//   its transaction came first.
 // - Where a change moves the line and the account held an affected reserve as
 //   collateral against a debt on its day, the change's block is one more read
 //   (`configChangePicks`), through the family's position-state read at the
@@ -38,12 +40,16 @@
 import type { HealthPick } from "@/hooks/useFlowsHealth";
 import { flowChange, type FlowChange } from "@/lib/shared/flows-changes";
 import { factorPct } from "@/lib/shared/collateral-factor-changes";
+import { logOrder } from "@/lib/shared/log-order";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { AaveFamilyEmodeSwitch } from "@/lib/aave-v3/account-switches";
 
 interface At {
   block: number;
+  /** The log's place in its transaction (`transactionIndex` given). */
   logIndex: number;
+  /** The transaction's index in the block (lib/shared/log-order.ts). */
+  transactionIndex?: number;
   timestamp: number;
   txHash: string;
 }
@@ -72,7 +78,12 @@ export type AaveConfigChange = FlowChange & { assets: string[]; moves: boolean }
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const pct = (bps: number) => factorPct(bps / 1e4);
-const pos = (x: { block: number; logIndex: number }) => x.block * 1e5 + x.logIndex;
+/** A switch's place, to order it against the configurator's logs. */
+const switchAt = (x: AaveFamilyEmodeSwitch) => ({
+  block: x.blockNumber,
+  transactionIndex: x.transactionIndex,
+  logIndex: x.logIndex,
+});
 
 /** The configurator's markers for an account: `held` maps each reserve the
  *  account held as collateral in its life (lowercased) to its timeline key and
@@ -83,9 +94,7 @@ export function aaveConfigChanges(
   emode: readonly AaveFamilyEmodeSwitch[],
 ): AaveConfigChange[] {
   if (!log || !Array.isArray(log.logs)) return [];
-  const switches = [...emode].sort(
-    (a, b) => pos({ block: a.blockNumber, logIndex: a.logIndex }) - pos({ block: b.blockNumber, logIndex: b.logIndex }),
-  );
+  const switches = [...emode].sort((a, b) => logOrder(switchAt(a), switchAt(b)));
   let si = 0;
   let user = 0;
   const reserveLt = new Map<string, number>();
@@ -128,9 +137,8 @@ export function aaveConfigChanges(
       }),
     });
 
-  for (const l of [...log.logs].sort((a, b) => pos(a) - pos(b))) {
-    while (si < switches.length && pos({ block: switches[si].blockNumber, logIndex: switches[si].logIndex }) < pos(l))
-      user = switches[si++].toId;
+  for (const l of [...log.logs].sort(logOrder)) {
+    while (si < switches.length && logOrder(switchAt(switches[si]), l) < 0) user = switches[si++].toId;
     const blockWords = l.block.toLocaleString("en-US");
     if (l.kind === "collateral") {
       const asset = l.asset.toLowerCase();

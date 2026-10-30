@@ -702,6 +702,72 @@ test("aave: the v3.2 upgrade's re-emitted memberships and a membership change", 
   assert.equal(out[0].to, factorPct(reserveLt.lt / 1e4));
 });
 
+test("aave on Base: a category change and a switch in one block are ordered by transaction, then log", () => {
+  // The Base Sieve keeps a log's index inside its transaction; the switch
+  // carries the block's. In block 200 the account's switch into category 1
+  // is transaction 5 (block-wide log 40), the category's new threshold
+  // transaction 8, its first log (0). By the index alone the change came
+  // first and the account was not yet in the category; by transaction the
+  // switch came first and the change moves its line.
+  const asset = "0x4200000000000000000000000000000000000006";
+  const held = new Map([[asset, { asset, symbol: "WETH" }]]);
+  const at = (block: number, transactionIndex: number, logIndex: number) => ({
+    block,
+    transactionIndex,
+    logIndex,
+    timestamp: block * 12,
+    txHash: `0x${String(block * 100 + transactionIndex).padStart(64, "0")}`,
+  });
+  const cat = (lt: number) => ({
+    kind: "category" as const,
+    categoryId: 1,
+    ltv: 9000,
+    lt,
+    bonus: 10100,
+    label: "ETH correlated",
+  });
+  const log = (change: { block: number; transactionIndex: number; logIndex: number }): AaveConfigLogAnswer => ({
+    market: "base",
+    chainId: 8453,
+    configurator: "0x5731a04b1e775f0fdd454bf70f3335886e9a96be",
+    source: "sieve",
+    fromBlock: 0,
+    toBlock: 1_000,
+    logs: [
+      { ...at(100, 1, 0), ...cat(9300) },
+      { ...at(100, 1, 1), kind: "asset-category", asset, from: 0, to: 1 },
+      { ...at(change.block, change.transactionIndex, change.logIndex), ...cat(9500) },
+    ],
+  });
+  const sw = (transactionIndex: number | undefined, logIndex: number): AaveFamilyEmodeSwitch => ({
+    blockNumber: 200,
+    timestamp: 2_400,
+    txHash: "0x",
+    logIndex,
+    ...(transactionIndex != null ? { transactionIndex } : {}),
+    fromId: 0,
+    fromLabel: null,
+    toId: 1,
+    label: "ETH correlated",
+    ltvBps: 9000,
+    liquidationThresholdBps: 9300,
+  });
+  const names = (l: AaveConfigLogAnswer, s: AaveFamilyEmodeSwitch) =>
+    aaveConfigChanges(l, held, [s]).map((c) => `${c.name} ${c.from} → ${c.to}`);
+  const change = { block: 200, transactionIndex: 8, logIndex: 0 };
+  assert.deepEqual(
+    names(log(change), sw(5, 40)),
+    ["E-mode “ETH correlated” liquidation threshold 93 % → 95 %"],
+    "the switch's transaction came first",
+  );
+  // The answer before transactionIndex: the change's tx-local 0 against the switch's block-wide 40.
+  const bare = log(change);
+  bare.logs = bare.logs.map(({ transactionIndex: _t, ...l }) => l as (typeof bare.logs)[number]);
+  assert.deepEqual(names(bare, sw(undefined, 40)), [], "by the index alone the change was drawn before the switch");
+  // A switch in a later transaction of the block, whatever its index, comes after the change.
+  assert.deepEqual(names(log(change), sw(9, 3)), [], "the change's transaction came first");
+});
+
 for (const p of AF.positions) {
   test(`aave ${p.name}: the markers, the reads at each change, and the e-mode rule`, () => {
     const changes = aaveChangesOf(p);

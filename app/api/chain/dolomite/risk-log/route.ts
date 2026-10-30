@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     const response = await fetch(
-      `${RAILS_API_URL}/api/at-block/dolomite/risk-log`,
+      `${RAILS_API_URL}/api/at-block/dolomite/risk-log?index=tx`,
       createAuthFetchOptions(undefined, readerIpFromRequest(request)),
     );
     if (!response.ok) {
