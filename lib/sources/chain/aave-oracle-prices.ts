@@ -19,13 +19,12 @@
 // travel together.
 //
 // The answer comes from rails-server's `/api/at-block/aave-v3/oracle-prices`
-// (rails-ops decisions/0056): getAssetPrice at the newest five-minute grid block
-// the chain's finalized tag and the market's Sieve checkpoint reach, composed
-// from Sieve's stored rounds where they settle it (Core, SparkLend, Aave V3
-// Base, Seamless) and read once into the at-block store otherwise (every
-// other reserve, Prime, EtherFi and Arbitrum, which has no Sieve). The
-// multicall at the head below answers only when that route cannot (no
-// RAILS_API_URL, an oracle it does not serve, a failed request).
+// (rails-ops decisions/0056). Asked with no block, as here, it answers
+// getAssetPrice at the chain's latest block, read on a keyless gateway first
+// and kept 30 s in the api per oracle and asset set; asked at a block, from
+// Sieve's stored rounds and the at-block store. The multicall below answers
+// only when that route cannot (no RAILS_API_URL, an oracle it does not serve,
+// a failed request).
 //
 // SERVER-ONLY — imported from /api/* route handlers only (it calls the chain via
 // lib/sources/chain/rpc). Mirrors the batched-multicall shape of compound-prices.

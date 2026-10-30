@@ -3,7 +3,7 @@ import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/
 import { AAVE_V3_BASE_CHAIN_ID, AAVE_V3_BASE_ORACLE } from "@/lib/aave-v3-base/asset-catalog";
 
 // On-chain USD for arbitrary Base reserve addresses — the Base Pool's OWN
-// IAaveOracle at a recent finalized block, through rails-server (Sieve first, then the at-block store; lib/sources/chain/aave-oracle-prices.ts). The Ethereum twin of this
+// IAaveOracle at the latest block, through rails-server (lib/sources/chain/aave-oracle-prices.ts). The Ethereum twin of this
 // route exists for the same reason: the economics tower values lifetime flows,
 // and a reserve the wallet has fully exited is priced by nothing else on the
 // page. An asset the oracle can't price is simply absent from the response —
