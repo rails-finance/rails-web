@@ -7,7 +7,7 @@ import { OraclePricesData } from "@/types/api/oracle";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
 import { viewFromTroveSummary, liveFromTroveState } from "@/lib/liquity/trove-card-view";
 import { TroveDetailsBand } from "@/components/trove/TroveDetailsBand";
-import type { PositionCardExports, PositionPanelColumns } from "@/components/shared/position-card";
+import type { PositionCardExports, PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
 import { useTroveExplanationItems } from "@/components/trove/use-trove-explanation-items";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -82,25 +82,38 @@ export function TroveSummaryStack({
   // The panel (TO-DO-position-card 322): the queue on the left, the yearly
   // cost on the right, where the card adds Liquidates at.
   const bandProps = { trove, liveState, debtInFront, trovesAhead, debtInFrontLoading };
+  // A zombie sits outside the branch's rate-sorted list, so it has no debt or
+  // Troves in front. With no debt a redemption cannot reach it; with debt it
+  // is reached only while it is the branch's most recent zombie (ui-jobs 456).
+  const zombieDebt = liveState?.debt.entire ?? trove.debt.current;
+  const queueRows: PositionPanelRow[] = trove.isZombie
+    ? [
+        {
+          id: "redemption",
+          label: "Redemption",
+          value: zombieDebt > 0 ? "Outside the rate queue" : "Not redeemable",
+        },
+      ]
+    : [
+        {
+          id: "debt-in-front",
+          label: "Debt in front",
+          value: <TroveDetailsBand {...bandProps} part="queue" bare />,
+        },
+        ...(trovesAhead != null
+          ? [
+              {
+                id: "troves-in-front",
+                label: "Troves in front",
+                value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
+              },
+            ]
+          : []),
+      ];
   const panel: PositionPanelColumns | undefined =
     trove.status === "open"
       ? [
-          [
-            {
-              id: "debt-in-front",
-              label: "Debt in front",
-              value: <TroveDetailsBand {...bandProps} part="queue" bare />,
-            },
-            ...(trovesAhead != null
-              ? [
-                  {
-                    id: "troves-in-front",
-                    label: "Troves in front",
-                    value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
-                  },
-                ]
-              : []),
-          ],
+          queueRows,
           [{ id: "costs", label: "Costs per year", value: <TroveDetailsBand {...bandProps} part="costs" bare /> }],
         ]
       : undefined;

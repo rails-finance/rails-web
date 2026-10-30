@@ -6,7 +6,7 @@
 // Costs per year and the room to borrow on the right, where the shared card
 // adds Liquidates at. The rows sit inside the card's receipts scope, so each
 // figure keeps its receipt. A zombie Trove sits outside the redemption queue
-// and has no queue rows.
+// and carries one Redemption row instead.
 
 import type { ReactNode } from "react";
 import type { PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
@@ -28,6 +28,15 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
 
+  if (chain.status === "zombie") {
+    // A zombie is outside the rate-sorted list: with no debt a redemption cannot
+    // reach it; with debt it is reached only as the branch's most recent zombie.
+    left.push({
+      id: "redemption",
+      label: "Redemption",
+      value: chain.entireDebt > 0 ? "Outside the rate queue" : "Not redeemable",
+    });
+  }
   if (chain.status === "active" && chain.debtInFront != null) {
     left.push({
       id: "debt-in-front",
