@@ -19,6 +19,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { AaveV3PositionView, AaveV3ReserveAmount } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
+import { aaveLtvLines } from "@/lib/shared/aave-ltv-lines";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import { aaveV3LiquidationRead, type AaveV3CardCaptions } from "./chain-truth-tower";
 import { AAVE_V3_SWAP_LABELS } from "./swap-kinds";
@@ -245,9 +246,7 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
     );
   }
   if (chain && !chain.chainStale) {
-    lines.push(
-      `- **Loan-to-value:** ${num(chain.ltv * 100, 1)}% of a ${num(chain.avgLiquidationThreshold * 100, 1)}% liquidation threshold`,
-    );
+    lines.push(...aaveLtvLines(chain));
     if (chain.availableBorrowsUsd > 0) {
       lines.push(`- **Available to borrow:** ${usd(chain.availableBorrowsUsd)} more before the LTV cap`);
     }

@@ -18,6 +18,7 @@ import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { SparkPositionView } from "@/components/protocol/spark/spark-position-card";
 import type { SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
+import { aaveLtvLines } from "@/lib/shared/aave-ltv-lines";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import { sparkLiquidationRead, type SparkCardCaptions } from "./economics";
 import {
@@ -212,9 +213,7 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
     );
   }
   if (chain && !chain.chainStale) {
-    lines.push(
-      `- **Loan-to-value:** ${num(chain.ltv * 100, 1)}% of a ${num(chain.avgLiquidationThreshold * 100, 1)}% liquidation threshold`,
-    );
+    lines.push(...aaveLtvLines(chain));
     if (chain.availableBorrowsUsd > 0) {
       lines.push(`- **Available to borrow:** ${usd(chain.availableBorrowsUsd)} more before the LTV cap`);
     }
