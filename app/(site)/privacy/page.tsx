@@ -108,11 +108,7 @@ export default function PrivacyPage() {
               <strong>DeFi Protocols:</strong> To read the state and events of the protocols Rails covers
             </li>
             <li>
-              <strong>GitHub:</strong> For open-source code hosting, and as a source of token icons (Trust Wallet assets
-              on raw.githubusercontent.com)
-            </li>
-            <li>
-              <strong>DefiLlama:</strong> As a source of token icons (token-icons.llamao.fi)
+              <strong>GitHub:</strong> For open-source code hosting
             </li>
             <li>
               <strong>Telegram:</strong> To deliver messages sent through the feedback form to the Rails team
@@ -122,8 +118,7 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p className="text-rb-500 mb-4">
-            Token icons load in your browser from DefiLlama and GitHub, so those services see your IP address and
-            browser details.
+            Token icons and the profile pictures on the Pulse page are served from Rails.
           </p>
         </section>
 

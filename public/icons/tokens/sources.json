@@ -1,0 +1,2127 @@
+{
+  "0x0000000000085d4780b73119b644ae5ecd22b376": {
+    "chain": 1,
+    "symbol": "TUSD",
+    "source": "trustwallet"
+  },
+  "0x0000000000c5dc95539589fbd24be07c6c14eca4": {
+    "chain": 1,
+    "symbol": "CULT",
+    "source": "defillama"
+  },
+  "0x00000000efe302beaa2b3e6e1b18d08d69a9012a": {
+    "chain": 1,
+    "symbol": "AUSD",
+    "source": "trustwallet"
+  },
+  "0x0000000f2eb9f69274678c76222b35eec7588a65": {
+    "chain": 8453,
+    "symbol": "yoUSD",
+    "source": "defillama"
+  },
+  "0x0000206329b97db379d5e1bf586bbdb969c63274": {
+    "chain": 1,
+    "symbol": "USDA",
+    "source": "trustwallet"
+  },
+  "0x0001a500a6b18995b03f44bb040a5ffc28e45cb0": {
+    "chain": 1,
+    "symbol": "OLAS",
+    "source": "trustwallet"
+  },
+  "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776": {
+    "chain": 1,
+    "symbol": "stUSD",
+    "source": "trustwallet"
+  },
+  "0x004626a008b1acdc4c74ab51644093b155e59a23": {
+    "chain": 1,
+    "symbol": "stEUR",
+    "source": "trustwallet"
+  },
+  "0x004e9c3ef86bc1ca1f0bb5c7662861ee93350568": {
+    "chain": 1,
+    "symbol": "uniBTC",
+    "source": "defillama"
+  },
+  "0x007115416ab6c266329a03b09a8aa39ac2ef7d9d": {
+    "chain": 1,
+    "symbol": "mBTC",
+    "source": "defillama"
+  },
+  "0x01995a697752266d8e748738aaa3f06464b8350b": {
+    "chain": 1,
+    "symbol": "CANA",
+    "source": "defillama"
+  },
+  "0x01ba69727e2860b37bc1a2bd56999c1afb4c15d8": {
+    "chain": 1,
+    "symbol": "ynRWAx",
+    "source": "defillama"
+  },
+  "0x030b69280892c888670edcdcd8b69fd8026a0bf3": {
+    "chain": 1,
+    "symbol": "mMEV",
+    "source": "defillama"
+  },
+  "0x043eb4b75d0805c43d7c834902e335621983cf03": {
+    "chain": 8453,
+    "symbol": "CADC",
+    "source": "defillama"
+  },
+  "0x04c154b66cb340f3ae24111cc767e0184ed00cc6": {
+    "chain": 1,
+    "symbol": "pxETH",
+    "source": "defillama"
+  },
+  "0x04d5ddf5f3a8939889f11e97f8c4bb48317f1938": {
+    "chain": 8453,
+    "symbol": "USDz",
+    "source": "defillama"
+  },
+  "0x0520930f21b14cafac7a27b102487bee7138a017": {
+    "chain": 1,
+    "symbol": "BGBTC",
+    "source": "defillama"
+  },
+  "0x056b269eb1f75477a8666ae8c7fe01b64dd55ecc": {
+    "chain": 1,
+    "symbol": "USD3",
+    "source": "defillama"
+  },
+  "0x05be1d4c307c19450a6fd7ce7307ce72a3829a60": {
+    "chain": 1,
+    "symbol": "IMF",
+    "source": "defillama"
+  },
+  "0x066d10e240999aea6798b2e2ca0bdac2923cbdff": {
+    "chain": 1,
+    "symbol": "nFALCON",
+    "source": "defillama"
+  },
+  "0x067ae75628177fd257c2b1e500993e1a0babcbd1": {
+    "chain": 8453,
+    "symbol": "aBasGHO",
+    "source": "defillama"
+  },
+  "0x06b964d96f5dcf7eae9d7c559b09edce244d4b8e": {
+    "chain": 1,
+    "symbol": "USUALX",
+    "source": "trustwallet"
+  },
+  "0x06ea695b91700071b161a434fed42d1dcbad9f00": {
+    "chain": 1,
+    "symbol": "hemiBTC",
+    "source": "defillama"
+  },
+  "0x07d1718ff05a8c53c8f05adaed57c0d672945f9a": {
+    "chain": 1,
+    "symbol": "arUSD",
+    "source": "defillama"
+  },
+  "0x08efcc2f3e61185d0ea7f8830b3fec9bfa2ee313": {
+    "chain": 1,
+    "symbol": "sNUSD",
+    "source": "defillama"
+  },
+  "0x091a5a1e3aa8b96ab0fb0bc217f5e60ec4c611a0": {
+    "chain": 8453,
+    "symbol": "LevETH",
+    "source": "defillama"
+  },
+  "0x091a5abe6616e26268e5eecff256c2212fce2707": {
+    "chain": 8453,
+    "symbol": "BondETH",
+    "source": "defillama"
+  },
+  "0x093df218d70ea6036afa26704a1c70d12010b908": {
+    "chain": 1,
+    "symbol": "aptUSD",
+    "source": "defillama"
+  },
+  "0x098697ba3fee4ea76294c5d6a466a4e3b3e95fe6": {
+    "chain": 1,
+    "symbol": "USP",
+    "source": "defillama"
+  },
+  "0x0990b149e915cb08e2143a5c6f669c907eddc8b0": {
+    "chain": 1,
+    "symbol": "eurSAFO",
+    "source": "defillama"
+  },
+  "0x09d4214c03d01f49544c0448dbe3a27f768f2b34": {
+    "chain": 1,
+    "symbol": "rUSD",
+    "source": "defillama"
+  },
+  "0x09db87a538bd693e9d08544577d5ccfaa6373a48": {
+    "chain": 1,
+    "symbol": "ynETH",
+    "source": "defillama"
+  },
+  "0x0a1a1a107e45b7ced86833863f482bc5f4ed82ef": {
+    "chain": 1,
+    "symbol": "USDai",
+    "source": "defillama"
+  },
+  "0x0a4c9cb2778ab3302996a34befcf9a8bc288c33b": {
+    "chain": 8453,
+    "symbol": "XSGD",
+    "source": "defillama"
+  },
+  "0x0a6e7ba5042b38349e437ec6db6214aec7b35676": {
+    "chain": 1,
+    "symbol": "SWELL",
+    "source": "defillama"
+  },
+  "0x0b2b2b2076d95dda7817e785989fe353fe955ef9": {
+    "chain": 1,
+    "symbol": "sUSDai",
+    "source": "defillama"
+  },
+  "0x0b38210ea11411557c13457d4da7dc6ea731b88a": {
+    "chain": 1,
+    "symbol": "API3",
+    "source": "trustwallet"
+  },
+  "0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b": {
+    "chain": 8453,
+    "symbol": "VIRTUAL",
+    "source": "trustwallet"
+  },
+  "0x0bfc9d54fc184518a81162f8fb99c2eaca081202": {
+    "chain": 1,
+    "symbol": "waEthWETH",
+    "source": "defillama"
+  },
+  "0x0d438f3b5175bebc262bf23753c1e53d03432bde": {
+    "chain": 1,
+    "symbol": "wNXM",
+    "source": "trustwallet"
+  },
+  "0x0d86883faf4ffd7aeb116390af37746f45b6f378": {
+    "chain": 1,
+    "symbol": "USD3",
+    "source": "defillama"
+  },
+  "0x0d8775f648430679a709e98d2b0cb6250d2887ef": {
+    "chain": 1,
+    "symbol": "BAT",
+    "source": "trustwallet"
+  },
+  "0x0dc4f92879b7670e5f4e4e6e3c801d229129d90d": {
+    "chain": 1,
+    "symbol": "wARS",
+    "source": "trustwallet"
+  },
+  "0x0e397938c1aa0680954093495b70a9f5e2249aba": {
+    "chain": 1,
+    "symbol": "QQQon",
+    "source": "defillama"
+  },
+  "0x0f81001ef0a83ecce5ccebf63eb302c70a39a654": {
+    "chain": 1,
+    "symbol": "DOLO",
+    "source": "defillama"
+  },
+  "0x0fabfeacedf47e890c50c8120177fff69c6a1d9b": {
+    "chain": 8453,
+    "symbol": "pythUSDC",
+    "source": "defillama"
+  },
+  "0x11113ff3a60c2450f4b22515cb760417259ee94b": {
+    "chain": 1,
+    "symbol": "nBASIS",
+    "source": "defillama"
+  },
+  "0x119dd7daff816f29d7ee47596ae5e4bdc4299165": {
+    "chain": 1,
+    "symbol": "nOPAL",
+    "source": "defillama"
+  },
+  "0x1202f5c7b4b9e47a1a484e8b270be34dbbc75055": {
+    "chain": 1,
+    "symbol": "wstUSR",
+    "source": "defillama"
+  },
+  "0x12b004719fb632f1e7c010c6f5d6009fb4258442": {
+    "chain": 1,
+    "symbol": "liUSD-1w",
+    "source": "defillama"
+  },
+  "0x136471a34f6ef19fe571effc1ca711fdb8e49f2b": {
+    "chain": 1,
+    "symbol": "USYC",
+    "source": "defillama"
+  },
+  "0x14d60e7fdc0d71d8611742720e4c50e7a974020c": {
+    "chain": 1,
+    "symbol": "USCC",
+    "source": "defillama"
+  },
+  "0x15700b564ca08d9439c58ca5053166e8317aa138": {
+    "chain": 1,
+    "symbol": "deUSD",
+    "source": "trustwallet"
+  },
+  "0x158079ee67fce2f58472a96584a73c7ab9ac95c1": {
+    "chain": 1,
+    "symbol": "cREP",
+    "source": "trustwallet"
+  },
+  "0x17fc002b466eec40dae837fc4be5c67993ddbd6f": {
+    "chain": 42161,
+    "symbol": "FRAX",
+    "source": "trustwallet"
+  },
+  "0x18bc5bcc660cf2b9ce3cd51a404afe1a0cbd3c22": {
+    "chain": 8453,
+    "symbol": "IDRX",
+    "source": "trustwallet"
+  },
+  "0x19062190b1925b5b6689d7073fdfc8c2976ef8cb": {
+    "chain": 1,
+    "symbol": "BZZ",
+    "source": "trustwallet"
+  },
+  "0x1985365e9f78359a9b6ad760e32412f4a445e862": {
+    "chain": 1,
+    "symbol": "REP",
+    "source": "trustwallet"
+  },
+  "0x19ebb35279a16207ec4ba82799cc64715065f7f6": {
+    "chain": 1,
+    "symbol": "PRIME",
+    "source": "defillama"
+  },
+  "0x19ebd191f7a24ece672ba13a302212b5ef7f35cb": {
+    "chain": 1,
+    "symbol": "yUSD",
+    "source": "defillama"
+  },
+  "0x1a7e4e63778b4f12a199c062f3efdd288afcbce8": {
+    "chain": 1,
+    "symbol": "EURA",
+    "source": "trustwallet"
+  },
+  "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3": {
+    "chain": 1,
+    "symbol": "STRCx",
+    "source": "trustwallet"
+  },
+  "0x1bc0c42215582d5a085795f4badbac3ff36d1bcb": {
+    "chain": 8453,
+    "symbol": "CLANKER",
+    "source": "trustwallet"
+  },
+  "0x1c2757c1fef1038428b5bef062495ce94bbe92b2": {
+    "chain": 8453,
+    "symbol": "mBASIS",
+    "source": "defillama"
+  },
+  "0x1c7a460413dd4e964f96d8dfc56e7223ce88cd85": {
+    "chain": 8453,
+    "symbol": "SEAM",
+    "source": "trustwallet"
+  },
+  "0x1e33e98af620f1d563fcd3cfd3c75ace841204ef": {
+    "chain": 1,
+    "symbol": "DUSD",
+    "source": "defillama"
+  },
+  "0x1fca74d9ef54a6ac80ffe7d3b14e76c4330fd5d8": {
+    "chain": 8453,
+    "symbol": "VCHF",
+    "source": "defillama"
+  },
+  "0x2103e845c5e135493bb6c2a4f0b8651956ea8682": {
+    "chain": 1,
+    "symbol": "XAUM",
+    "source": "defillama"
+  },
+  "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2": {
+    "chain": 8453,
+    "symbol": "sUSDe",
+    "source": "defillama"
+  },
+  "0x2255718832bc9fd3be1caf75084f4803da14ff01": {
+    "chain": 1,
+    "symbol": "VBILL",
+    "source": "defillama"
+  },
+  "0x22ae3d9a738471f405169af055d31c687087d4c7": {
+    "chain": 1,
+    "symbol": "PST",
+    "source": "defillama"
+  },
+  "0x22af33fe49fd1fa80c7149773dde5890d3c76f3b": {
+    "chain": 8453,
+    "symbol": "BNKR",
+    "source": "trustwallet"
+  },
+  "0x236aa50979d5f3de3bd1eeb40e81137f22ab794b": {
+    "chain": 8453,
+    "symbol": "tBTC",
+    "source": "defillama"
+  },
+  "0x238a700ed6165261cf8b2e544ba797bc11e466ba": {
+    "chain": 1,
+    "symbol": "mF-ONE",
+    "source": "defillama"
+  },
+  "0x2411802d8bea09be0af8fd8d08314a63e706b29c": {
+    "chain": 1,
+    "symbol": "fwstETH",
+    "source": "defillama"
+  },
+  "0x2416092f143378750bb29b79ed961ab195cceea5": {
+    "chain": 42161,
+    "symbol": "ezETH",
+    "source": "defillama"
+  },
+  "0x2615a94df961278dcbc41fb0a54fec5f10a693ae": {
+    "chain": 8453,
+    "symbol": "uXRP",
+    "source": "defillama"
+  },
+  "0x271c616157e69a43b4977412a64183cf110edf16": {
+    "chain": 1,
+    "symbol": "sUSP",
+    "source": "defillama"
+  },
+  "0x27b5739e22ad9033bcbf192059122d163b60349d": {
+    "chain": 1,
+    "symbol": "yvyCRV",
+    "source": "defillama"
+  },
+  "0x27f6c8289550fce67f6b50bed1f519966afe5287": {
+    "chain": 1,
+    "symbol": "tGBP",
+    "source": "defillama"
+  },
+  "0x280839980a7ed0d7717f64125fe241012e5f5815": {
+    "chain": 1,
+    "symbol": "strUSD",
+    "source": "defillama"
+  },
+  "0x28b3a8fb53b741a8fd78c0fb9a6b2393d896a43d": {
+    "chain": 1,
+    "symbol": "spUSDC",
+    "source": "defillama"
+  },
+  "0x2a8c22e3b10036f3aef5875d04f8441d4188b656": {
+    "chain": 1,
+    "symbol": "mBASIS",
+    "source": "defillama"
+  },
+  "0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22": {
+    "chain": 8453,
+    "symbol": "cbETH",
+    "source": "trustwallet"
+  },
+  "0x2b95a1dcc3d405535f9ed33c219ab38e8d7e0884": {
+    "chain": 1,
+    "symbol": "aCRV",
+    "source": "defillama"
+  },
+  "0x2bf11d2e04bc40daa95c24b8b90ec4f5c57dd326": {
+    "chain": 1,
+    "symbol": "CarryTradeUSDTRYLeverage",
+    "source": "defillama"
+  },
+  "0x2e880962a9609aa3eab4def919fe9e917e99073b": {
+    "chain": 1,
+    "symbol": "BOSS",
+    "source": "defillama"
+  },
+  "0x2f8bae126b8d416c009b82ccd60e4f9cabbd7702": {
+    "chain": 1,
+    "symbol": "mGLOeuro",
+    "source": "defillama"
+  },
+  "0x30b8a2c8e7fa41e77b54b8faf45c610e7ad909e3": {
+    "chain": 8453,
+    "symbol": "mMAI",
+    "source": "defillama"
+  },
+  "0x311935cd80b76769bf2ecc9d8ab7635b2139cf82": {
+    "chain": 8453,
+    "symbol": "SOL",
+    "source": "defillama"
+  },
+  "0x31d553822b37bda67126d5ea9d165b9456f72b07": {
+    "chain": 8453,
+    "symbol": "CLAUNCH",
+    "source": "defillama"
+  },
+  "0x3231cb76718cdef2155fc47b5286d82e6eda273f": {
+    "chain": 1,
+    "symbol": "EURe",
+    "source": "trustwallet"
+  },
+  "0x343324f53cbeee3ee6d171f2a20f005964c98047": {
+    "chain": 1,
+    "symbol": "LENDS",
+    "source": "defillama"
+  },
+  "0x34d78e7b06542dab48f9bf9f0835c7582141314e": {
+    "chain": 1,
+    "symbol": "wSTRCx",
+    "source": "defillama"
+  },
+  "0x35751007a407ca6feffe80b3cb397736d2cf4dbe": {
+    "chain": 42161,
+    "symbol": "weETH",
+    "source": "defillama"
+  },
+  "0x35a18000230da775cac24873d00ff85bccded550": {
+    "chain": 1,
+    "symbol": "cUNI",
+    "source": "defillama"
+  },
+  "0x35d8949372d46b7a3d5a56006ae77b215fc69bc0": {
+    "chain": 1,
+    "symbol": "bUSD0",
+    "source": "defillama"
+  },
+  "0x35e5db674d8e93a03d814fa0ada70731efe8a4b9": {
+    "chain": 8453,
+    "symbol": "USR",
+    "source": "defillama"
+  },
+  "0x3845badade8e6dff049820680d1f14bd3903a5d0": {
+    "chain": 1,
+    "symbol": "SAND",
+    "source": "trustwallet"
+  },
+  "0x38eeb52f0771140d10c4e9a9a72349a329fe8a6a": {
+    "chain": 1,
+    "symbol": "apyUSD",
+    "source": "defillama"
+  },
+  "0x39aa39c021dfbae8fac545936693ac917d5e7563": {
+    "chain": 1,
+    "symbol": "cUSDC",
+    "source": "trustwallet"
+  },
+  "0x39b8b6385416f4ca36a20319f70d28621895279d": {
+    "chain": 1,
+    "symbol": "EURe",
+    "source": "defillama"
+  },
+  "0x3a43aec53490cb9fa922847385d82fe25d0e9de7": {
+    "chain": 8453,
+    "symbol": "yoETH",
+    "source": "defillama"
+  },
+  "0x3b27f92c0e212c671ea351827edf93db27cc0c65": {
+    "chain": 1,
+    "symbol": "yvUSDT",
+    "source": "defillama"
+  },
+  "0x3b790d651e950497c7723d47b24e6f61534f7969": {
+    "chain": 1,
+    "symbol": "sPOL",
+    "source": "defillama"
+  },
+  "0x3d7d6fdf07ee548b939a80edbc9b2256d0cdc003": {
+    "chain": 1,
+    "symbol": "srUSDe",
+    "source": "defillama"
+  },
+  "0x3db228fe836d99ccb25ec4dfdc80ed6d2cddcb4b": {
+    "chain": 1,
+    "symbol": "ynUSDx",
+    "source": "defillama"
+  },
+  "0x3e31966d4f81c72d2a55310a6365a56a4393e98d": {
+    "chain": 8453,
+    "symbol": "WMTX",
+    "source": "trustwallet"
+  },
+  "0x3f56e0c36d275367b8c502090edf38289b3dea0d": {
+    "chain": 42161,
+    "symbol": "MAI",
+    "source": "trustwallet"
+  },
+  "0x3f5bf3edac59d650d8fdf9657a71f2f904a3a4ee": {
+    "chain": 8453,
+    "symbol": "AERO",
+    "source": "defillama"
+  },
+  "0x4186bfc76e2e237523cbc30fd220fe055156b41f": {
+    "chain": 42161,
+    "symbol": "rsETH",
+    "source": "trustwallet"
+  },
+  "0x41ab1b6fcbb2fa9dced81acbdec13ea6315f2bf2": {
+    "chain": 1,
+    "symbol": "XDC",
+    "source": "trustwallet"
+  },
+  "0x43415eb6ff9db7e26a15b704e7a3edce97d31c4e": {
+    "chain": 1,
+    "symbol": "USTB",
+    "source": "defillama"
+  },
+  "0x437cc33344a0b27a429f795ff6b469c72698b291": {
+    "chain": 1,
+    "symbol": "wM",
+    "source": "defillama"
+  },
+  "0x43e54c2e7b3e294de3a155785f52ab49d87b9922": {
+    "chain": 1,
+    "symbol": "asdCRV",
+    "source": "defillama"
+  },
+  "0x449b3317a6d1efb1bc3ba0700c9eaa4ffff4ae65": {
+    "chain": 8453,
+    "symbol": "AUDD",
+    "source": "defillama"
+  },
+  "0x4591dbff62656e7859afe5e45f6f47d3669fbb28": {
+    "chain": 1,
+    "symbol": "mkUSD",
+    "source": "defillama"
+  },
+  "0x4737d9b4592b40d51e110b94c9c043c6654067ae": {
+    "chain": 1,
+    "symbol": "slvlUSD",
+    "source": "defillama"
+  },
+  "0x474f4cb764df9da079d94052fed39625c147c12c": {
+    "chain": 8453,
+    "symbol": "BONSAI",
+    "source": "defillama"
+  },
+  "0x476a2d04ab8a7fb93e13ac14f2c077866ff13500": {
+    "chain": 1,
+    "symbol": "waEthEURC",
+    "source": "defillama"
+  },
+  "0x4772d2e014f9fc3a820c444e3313968e9a5c8121": {
+    "chain": 8453,
+    "symbol": "yUSD",
+    "source": "defillama"
+  },
+  "0x48b847cf774a5710f36f594b11fc10e2e59bba72": {
+    "chain": 1,
+    "symbol": "UNIT0",
+    "source": "defillama"
+  },
+  "0x48f9e38f3070ad8945dfeae3fa70987722e3d89c": {
+    "chain": 1,
+    "symbol": "iUSD",
+    "source": "defillama"
+  },
+  "0x4956b52ae2ff65d74ca2d61207523288e4528f96": {
+    "chain": 1,
+    "symbol": "RLP",
+    "source": "trustwallet"
+  },
+  "0x4b0181102a0112a2ef11abee5563bb4a3176c9d7": {
+    "chain": 1,
+    "symbol": "cSUSHI",
+    "source": "defillama"
+  },
+  "0x4da9a0f397db1397902070f93a4d6ddbc0e0e6e8": {
+    "chain": 8453,
+    "symbol": "LCAP",
+    "source": "defillama"
+  },
+  "0x4ddc2d193948926d02f9b1fe9e1daa0718270ed5": {
+    "chain": 1,
+    "symbol": "cETH",
+    "source": "trustwallet"
+  },
+  "0x4e65fe4dba92790696d040ac24aa414708f5c0ab": {
+    "chain": 8453,
+    "symbol": "aBasUSDC",
+    "source": "defillama"
+  },
+  "0x4e72025984424e52838cf8953e2863eff036b67a": {
+    "chain": 1,
+    "symbol": "mWIN",
+    "source": "defillama"
+  },
+  "0x4e74d4db6c0726ccded4656d0bce448876bb4c7a": {
+    "chain": 8453,
+    "symbol": "wBLT",
+    "source": "trustwallet"
+  },
+  "0x4ed4e862860bed51a9570b96d89af5e1b0efefed": {
+    "chain": 8453,
+    "symbol": "DEGEN",
+    "source": "trustwallet"
+  },
+  "0x4f827a63755855cdf3e8f3bcd20265c833f15033": {
+    "chain": 1,
+    "symbol": "stkGHO.v1",
+    "source": "defillama"
+  },
+  "0x5086bf358635b81d8c47c66d1c8b9e567db70c72": {
+    "chain": 1,
+    "symbol": "reUSD",
+    "source": "defillama"
+  },
+  "0x532f27101965dd16442e59d40670faf5ebb142e4": {
+    "chain": 8453,
+    "symbol": "BRETT",
+    "source": "trustwallet"
+  },
+  "0x5422374b27757da72d5265cc745ea906e0446634": {
+    "chain": 1,
+    "symbol": "USDCV",
+    "source": "defillama"
+  },
+  "0x547213367cfb08ab418e7b54d7883b2c2aa27fd7": {
+    "chain": 1,
+    "symbol": "sUSDz",
+    "source": "defillama"
+  },
+  "0x54c1ff361b402f66c13107421e6a431c3375ef24": {
+    "chain": 1,
+    "symbol": "FLHYon",
+    "source": "defillama"
+  },
+  "0x553c7f9c780316fc1d34b8e14ac2465ab22a090b": {
+    "chain": 1,
+    "symbol": "REALU",
+    "source": "defillama"
+  },
+  "0x57b96d4af698605563a4653d882635da59bf11af": {
+    "chain": 1,
+    "symbol": "RCH",
+    "source": "defillama"
+  },
+  "0x57c3571f10767e49c9d7b60feb6c67804783b7ae": {
+    "chain": 1,
+    "symbol": "wstGBP",
+    "source": "defillama"
+  },
+  "0x57e114b691db790c35207b2e685d4a43181e6061": {
+    "chain": 1,
+    "symbol": "ENA",
+    "source": "trustwallet"
+  },
+  "0x57f5e098cad7a3d1eed53991d4d66c45c9af7812": {
+    "chain": 1,
+    "symbol": "wUSDM",
+    "source": "defillama"
+  },
+  "0x5875eee11cf8398102fdad704c9e96607675467a": {
+    "chain": 8453,
+    "symbol": "sUSDS",
+    "source": "trustwallet"
+  },
+  "0x58d97b57bb95320f9a05dc918aef65434969c2b2": {
+    "chain": 1,
+    "symbol": "MORPHO",
+    "source": "trustwallet"
+  },
+  "0x593ccca4c4bf58b7526a4c164ceef4003c6388db": {
+    "chain": 1,
+    "symbol": "nALPHA",
+    "source": "defillama"
+  },
+  "0x594daad7d77592a2b97b725a7ad59d7e188b5bfa": {
+    "chain": 1,
+    "symbol": "APU",
+    "source": "trustwallet"
+  },
+  "0x59d9356e565ab3a36dd77763fc0d87feaf85508c": {
+    "chain": 1,
+    "symbol": "USDM",
+    "source": "defillama"
+  },
+  "0x5a097b014c547718e79030a077a91ae37679eff5": {
+    "chain": 1,
+    "symbol": "xstETH",
+    "source": "defillama"
+  },
+  "0x5a0f93d040de44e78f251b03c43be9cf317dcf64": {
+    "chain": 1,
+    "symbol": "JAAA",
+    "source": "defillama"
+  },
+  "0x5a42864b14c0c8241ef5ab62dae975b163a2e0c1": {
+    "chain": 1,
+    "symbol": "mHyperETH",
+    "source": "defillama"
+  },
+  "0x5b423e07dfba087d72840851f63a51cbe1967cda": {
+    "chain": 1,
+    "symbol": "stNXM",
+    "source": "defillama"
+  },
+  "0x5c20b550819128074fd538edf79791733ccedd18": {
+    "chain": 1,
+    "symbol": "fUSDT",
+    "source": "defillama"
+  },
+  "0x5caf5a86f39073637ac7c8a7b5290871de80cb9b": {
+    "chain": 1,
+    "symbol": "waEthDAI",
+    "source": "defillama"
+  },
+  "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34": {
+    "chain": 8453,
+    "symbol": "USDe",
+    "source": "defillama"
+  },
+  "0x5d3a536e4d6dbd6114cc1ead35777bab948e3643": {
+    "chain": 1,
+    "symbol": "cDAI",
+    "source": "trustwallet"
+  },
+  "0x5dd8bfa6c5c68d05d25ef6143e05c11e26c4cdb7": {
+    "chain": 1,
+    "symbol": "yoUSDEdge",
+    "source": "defillama"
+  },
+  "0x5ee5bf7ae06d1be5997a1a72006fe6c607ec6de8": {
+    "chain": 1,
+    "symbol": "aEthWBTC",
+    "source": "defillama"
+  },
+  "0x5f7827fdeb7c20b443265fc2f40845b715385ff2": {
+    "chain": 1,
+    "symbol": "EURCV",
+    "source": "defillama"
+  },
+  "0x5f9d59db355b4a60501544637b00e94082ca575b": {
+    "chain": 1,
+    "symbol": "waEthUSDe",
+    "source": "defillama"
+  },
+  "0x5fa487bca6158c64046b2813623e20755091da0b": {
+    "chain": 1,
+    "symbol": "thBILL",
+    "source": "defillama"
+  },
+  "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42": {
+    "chain": 8453,
+    "symbol": "EURC",
+    "source": "trustwallet"
+  },
+  "0x62344be8ca1c339b46274a4017dd87af436900b1": {
+    "chain": 8453,
+    "symbol": "wsrUSD",
+    "source": "defillama"
+  },
+  "0x627ea69929212916ec57b1b26d2e1a19f6129b53": {
+    "chain": 1,
+    "symbol": "srmHYPER",
+    "source": "defillama"
+  },
+  "0x64351fc9810adad17a690e4e1717df5e7e085160": {
+    "chain": 1,
+    "symbol": "msETH",
+    "source": "defillama"
+  },
+  "0x643c4e15d7d62ad0abec4a9bd4b001aa3ef52d66": {
+    "chain": 1,
+    "symbol": "SYRUP",
+    "source": "trustwallet"
+  },
+  "0x657d9aba1dbb59e53f9f3ecaa878447dcfc96dcb": {
+    "chain": 1,
+    "symbol": "ynETHx",
+    "source": "defillama"
+  },
+  "0x657e8c867d8b37dcc18fa4caead9c45eb088c642": {
+    "chain": 1,
+    "symbol": "eBTC",
+    "source": "trustwallet"
+  },
+  "0x65a44528e8868166401ea08b549e19552af589db": {
+    "chain": 1,
+    "symbol": "srNUSD",
+    "source": "defillama"
+  },
+  "0x66a1e37c9b0eaddca17d3662d6c05f4decf3e110": {
+    "chain": 1,
+    "symbol": "USR",
+    "source": "defillama"
+  },
+  "0x677ddbd918637e5f2c79e164d402454de7da8619": {
+    "chain": 1,
+    "symbol": "VUSD",
+    "source": "defillama"
+  },
+  "0x67eaf2bee4384a2f84da9eb8105c661c123736ba": {
+    "chain": 8453,
+    "symbol": "aBasAAVE",
+    "source": "defillama"
+  },
+  "0x68025a4615407993a680102b08a23a61d11c657c": {
+    "chain": 1,
+    "symbol": "ARM-WETH",
+    "source": "defillama"
+  },
+  "0x6921b130d297cc43754afba22e5eac0fbf8db75b": {
+    "chain": 8453,
+    "symbol": "doginme",
+    "source": "trustwallet"
+  },
+  "0x6985884c4392d348587b19cb9eaaf157f13271cd": {
+    "chain": 8453,
+    "symbol": "ZRO",
+    "source": "trustwallet"
+  },
+  "0x6a1792a91c08e9f0bfe7a990871b786643237f0f": {
+    "chain": 1,
+    "symbol": "waEthRLUSD",
+    "source": "defillama"
+  },
+  "0x6b3595068778dd592e39a122f4f5a5cf09c90fe2": {
+    "chain": 1,
+    "symbol": "SUSHI",
+    "source": "trustwallet"
+  },
+  "0x6bb7a212910682dcfdbd5bcbb3e28fb4e8da10ee": {
+    "chain": 8453,
+    "symbol": "GHO",
+    "source": "defillama"
+  },
+  "0x6bf183243fdd1e306ad2c4450bc7dcf6f0bf8aa6": {
+    "chain": 1,
+    "symbol": "stkwaEthUSDC.v1",
+    "source": "defillama"
+  },
+  "0x6c84a8f1c29108f47a79964b5fe888d4f4d0de40": {
+    "chain": 42161,
+    "symbol": "tBTC",
+    "source": "defillama"
+  },
+  "0x6c8c6b02e7b2be14d4fa6022dfd6d75921d90e4e": {
+    "chain": 1,
+    "symbol": "cBAT",
+    "source": "trustwallet"
+  },
+  "0x6e37c95b43566e538d8c278eb69b00fc717a001b": {
+    "chain": 8453,
+    "symbol": "Re7RWA",
+    "source": "defillama"
+  },
+  "0x6f20ae2c98c2d34e6a57f3411f2c5af92e32592d": {
+    "chain": 1,
+    "symbol": "etrUSD",
+    "source": "defillama"
+  },
+  "0x6f40d4a6237c257fff2db00fa0510deeecd303eb": {
+    "chain": 1,
+    "symbol": "FLUID",
+    "source": "trustwallet"
+  },
+  "0x70654aad8b7734dc319d0c3608ec7b32e03fa162": {
+    "chain": 8453,
+    "symbol": "satUSD",
+    "source": "defillama"
+  },
+  "0x70e36f6bf80a52b3b46b3af8e106cc0ed743e8e4": {
+    "chain": 1,
+    "symbol": "cCOMP",
+    "source": "defillama"
+  },
+  "0x7122985656e38bdc0302db86685bb972b145bd3c": {
+    "chain": 1,
+    "symbol": "STONE",
+    "source": "defillama"
+  },
+  "0x7204b7dbf9412567835633b6f00c3edc3a8d6330": {
+    "chain": 1,
+    "symbol": "csUSDC",
+    "source": "defillama"
+  },
+  "0x72e4f9f808c49a2a61de9c5896298920dc4eeea9": {
+    "chain": 1,
+    "symbol": "BITCOIN",
+    "source": "trustwallet"
+  },
+  "0x734eec7930bc84ec5732022b9eb949a81fb89abe": {
+    "chain": 1,
+    "symbol": "ETH0",
+    "source": "defillama"
+  },
+  "0x738d1115b90efa71ae468f1287fc864775e23a31": {
+    "chain": 1,
+    "symbol": "srUSD",
+    "source": "defillama"
+  },
+  "0x73a15fed60bf67631dc6cd7bc5b6e8da8190acf5": {
+    "chain": 1,
+    "symbol": "USD0",
+    "source": "trustwallet"
+  },
+  "0x73e0c0d45e048d25fc26fa3159b0aa04bfa4db98": {
+    "chain": 1,
+    "symbol": "kBTC",
+    "source": "defillama"
+  },
+  "0x7433806912eae67919e66aea853d46fa0aef98a8": {
+    "chain": 1,
+    "symbol": "mGLOBAL",
+    "source": "defillama"
+  },
+  "0x74db7a52773a52699dbc0c01b1254e5301e3e119": {
+    "chain": 1,
+    "symbol": "AVLT",
+    "source": "defillama"
+  },
+  "0x768be13e1680b5ebe0024c42c896e3db59ec0149": {
+    "chain": 8453,
+    "symbol": "SKI",
+    "source": "trustwallet"
+  },
+  "0x76e222b07c53d28b89b0bac18602810fc22b49a8": {
+    "chain": 1,
+    "symbol": "JOE",
+    "source": "trustwallet"
+  },
+  "0x7712c34205737192402172409a8f7ccef8aa2aec": {
+    "chain": 1,
+    "symbol": "BUIDL",
+    "source": "defillama"
+  },
+  "0x7743e50f534a7f9f1791dde7dcd89f7783eefc39": {
+    "chain": 1,
+    "symbol": "fxSAVE",
+    "source": "defillama"
+  },
+  "0x78fc2c2ed1a4cdb5402365934ae5648adad094d0": {
+    "chain": 1,
+    "symbol": "Re7WETH",
+    "source": "defillama"
+  },
+  "0x7a56e1c57c7475ccf742a1832b028f0456652f97": {
+    "chain": 1,
+    "symbol": "SolvBTC",
+    "source": "defillama"
+  },
+  "0x7b43e3875440b44613dc3bc08e7763e6da63c8f8": {
+    "chain": 1,
+    "symbol": "USDR",
+    "source": "defillama"
+  },
+  "0x7ba6f01772924a82d9626c126347a28299e98c98": {
+    "chain": 8453,
+    "symbol": "msETH",
+    "source": "defillama"
+  },
+  "0x7bc3485026ac48b6cf9baf0a377477fff5703af8": {
+    "chain": 1,
+    "symbol": "waEthUSDT",
+    "source": "defillama"
+  },
+  "0x7c1156e515aa1a2e851674120074968c905aaf37": {
+    "chain": 1,
+    "symbol": "lvlUSD",
+    "source": "defillama"
+  },
+  "0x7cf9dec92ca9fd46f8d86e7798b72624bc116c05": {
+    "chain": 1,
+    "symbol": "mAPOLLO",
+    "source": "defillama"
+  },
+  "0x7d214438d0f27afccc23b3d1e1a53906ace5cfea": {
+    "chain": 8453,
+    "symbol": "reUSD",
+    "source": "defillama"
+  },
+  "0x7dff72693f6a4149b17e7c6314655f6a9f7c8b33": {
+    "chain": 42161,
+    "symbol": "GHO",
+    "source": "defillama"
+  },
+  "0x7fcd174e80f264448ebee8c88a7c4476aaf58ea6": {
+    "chain": 8453,
+    "symbol": "wsuperOETHb",
+    "source": "defillama"
+  },
+  "0x80a2ae356fc9ef4305676f7a3e2ed04e12c33946": {
+    "chain": 1,
+    "symbol": "cYFI",
+    "source": "defillama"
+  },
+  "0x80d9964feb4a507dd697b4437fc5b25b618ce446": {
+    "chain": 8453,
+    "symbol": "pythETH",
+    "source": "defillama"
+  },
+  "0x812ba41e071c7b7fa4ebcfb62df5f45f6fa853ee": {
+    "chain": 1,
+    "symbol": "Neiro",
+    "source": "trustwallet"
+  },
+  "0x820c137fa70c8691f0e44dc420a5e53c168921dc": {
+    "chain": 8453,
+    "symbol": "USDS",
+    "source": "trustwallet"
+  },
+  "0x8238884ec9668ef77b90c6dff4d1a9f4f4823bfe": {
+    "chain": 1,
+    "symbol": "USDO",
+    "source": "trustwallet"
+  },
+  "0x827ce7e8e35861d9ac7fe002755767b695a5594a": {
+    "chain": 1,
+    "symbol": "StockMarketTRBasisTrade",
+    "source": "defillama"
+  },
+  "0x8292bb45bf1ee4d140127049757c2e0ff06317ed": {
+    "chain": 1,
+    "symbol": "RLUSD",
+    "source": "defillama"
+  },
+  "0x834df4c1d8f51be24322e39e4766697be015512f": {
+    "chain": 8453,
+    "symbol": "CETES",
+    "source": "defillama"
+  },
+  "0x83db73ef5192de4b6a4c92bd0141ba1a0dc87c65": {
+    "chain": 8453,
+    "symbol": "cUSDO",
+    "source": "trustwallet"
+  },
+  "0x8464f6ecae1ea58ec816c13f964030eab8ec123a": {
+    "chain": 1,
+    "symbol": "yETH",
+    "source": "defillama"
+  },
+  "0x852724426b2851487b278a3377449bf26b06c1ba": {
+    "chain": 1,
+    "symbol": "BTCcx",
+    "source": "defillama"
+  },
+  "0x85b78aca6deae198fbf201c82daf6ca21942acc6": {
+    "chain": 1,
+    "symbol": "ARM-WETH-stETH",
+    "source": "defillama"
+  },
+  "0x8747a3114ef7f0eebd3eb337f745e31dbf81a952": {
+    "chain": 1,
+    "symbol": "DQTS",
+    "source": "defillama"
+  },
+  "0x87b65c4aaffa76881f9e96f3e7ed945ddfc3cd7a": {
+    "chain": 1,
+    "symbol": "syrupUSDG",
+    "source": "defillama"
+  },
+  "0x87c9053c819bb28e0d73d33059e1b3da80afb0cf": {
+    "chain": 1,
+    "symbol": "mRe7YIELD",
+    "source": "defillama"
+  },
+  "0x88887be419578051ff9f4eb6c858a951921d8888": {
+    "chain": 1,
+    "symbol": "stcUSD",
+    "source": "defillama"
+  },
+  "0x888883b5f5d21fb10dfeb70e8f9722b9fb0e5e51": {
+    "chain": 1,
+    "symbol": "EUROP",
+    "source": "defillama"
+  },
+  "0x890a5122aa1da30fec4286de7904ff808f0bd74a": {
+    "chain": 1,
+    "symbol": "msY",
+    "source": "defillama"
+  },
+  "0x8ba6dcc667d3ff64c1a2123ce72ff5f0199e5315": {
+    "chain": 1,
+    "symbol": "ALEX",
+    "source": "trustwallet"
+  },
+  "0x8bdf6a2dfda084bd242cd285cf75e80de3eb00ba": {
+    "chain": 1,
+    "symbol": "stMXN",
+    "source": "defillama"
+  },
+  "0x8c106eedad96553e64287a5a6839c3cc78afa3d0": {
+    "chain": 1,
+    "symbol": "gtusdcp",
+    "source": "defillama"
+  },
+  "0x8c213ee79581ff4984583c6a801e5263418c4b86": {
+    "chain": 1,
+    "symbol": "JTRSY",
+    "source": "defillama"
+  },
+  "0x8c3a6b12332a6354805eb4b72ef619aedd22bcdd": {
+    "chain": 8453,
+    "symbol": "mDEGEN",
+    "source": "defillama"
+  },
+  "0x8c9532a60e0e7c6bbd2b2c1303f63ace1c3e9811": {
+    "chain": 1,
+    "symbol": "pzETH",
+    "source": "defillama"
+  },
+  "0x8d301801d899dc81feabbde69407a53b82bdbf19": {
+    "chain": 1,
+    "symbol": "stGLD",
+    "source": "defillama"
+  },
+  "0x8e870d67f660d95d5be530380d0ec0bd388289e1": {
+    "chain": 1,
+    "symbol": "USDP",
+    "source": "trustwallet"
+  },
+  "0x8ed97a637a790be1feff5e888d43629dc05408f6": {
+    "chain": 1,
+    "symbol": "NPC",
+    "source": "trustwallet"
+  },
+  "0x90551c1795392094fe6d29b758eccd233cfaa260": {
+    "chain": 1,
+    "symbol": "fWETH",
+    "source": "defillama"
+  },
+  "0x90a1717e0dabe37693f79afe43ae236dc3b65957": {
+    "chain": 1,
+    "symbol": "USDM1",
+    "source": "defillama"
+  },
+  "0x90a2a4c76b5d8c0bc892a69ea28aa775a8f2dd48": {
+    "chain": 1,
+    "symbol": "SPYx",
+    "source": "trustwallet"
+  },
+  "0x90d2af7d622ca3141efa4d8f1f24d86e5974cc8f": {
+    "chain": 1,
+    "symbol": "eUSDe",
+    "source": "defillama"
+  },
+  "0x911d86c72155c33993d594b0ec7e6206b4c803da": {
+    "chain": 1,
+    "symbol": "wstLINK",
+    "source": "defillama"
+  },
+  "0x912ce59144191c1204e64559fe8253a0e49e6548": {
+    "chain": 42161,
+    "symbol": "ARB",
+    "source": "trustwallet"
+  },
+  "0x917cee801a67f933f2e6b33fc0cd1ed2d5909d88": {
+    "chain": 1,
+    "symbol": "weETHs",
+    "source": "defillama"
+  },
+  "0x91ad1f5443cf356010d2171d6d26b11c309c4b16": {
+    "chain": 1,
+    "symbol": "waEthRPL",
+    "source": "defillama"
+  },
+  "0x93919784c523f39cacaa98ee0a9d96c3f32b593e": {
+    "chain": 8453,
+    "symbol": "uniBTC",
+    "source": "defillama"
+  },
+  "0x93e62845c1dd5822ebc807ab71a5fb750decd15a": {
+    "chain": 1,
+    "symbol": "wNVDAx",
+    "source": "defillama"
+  },
+  "0x940181a94a35a4569e4529a3cdfb74e38fd98631": {
+    "chain": 8453,
+    "symbol": "AERO",
+    "source": "trustwallet"
+  },
+  "0x9477724bb54ad5417de8baff29e59df3fb4da74f": {
+    "chain": 1,
+    "symbol": "ACRDX",
+    "source": "defillama"
+  },
+  "0x956f47f50a910163d8bf957cf5846d573e7f87ca": {
+    "chain": 1,
+    "symbol": "FEI",
+    "source": "trustwallet"
+  },
+  "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce": {
+    "chain": 1,
+    "symbol": "SHIB",
+    "source": "trustwallet"
+  },
+  "0x95b4ef2869ebd94beb4eee400a99824bf5dc325b": {
+    "chain": 1,
+    "symbol": "cMKR",
+    "source": "defillama"
+  },
+  "0x95eef579155cd2c5510f312c8fa39208c3be01a8": {
+    "chain": 1,
+    "symbol": "Re7USDT",
+    "source": "defillama"
+  },
+  "0x96f6ef951840721adbf46ac996b59e0235cb985c": {
+    "chain": 1,
+    "symbol": "USDY",
+    "source": "trustwallet"
+  },
+  "0x97ad75064b20fb2b2447fed4fa953bf7f007a706": {
+    "chain": 1,
+    "symbol": "beraSTONE",
+    "source": "defillama"
+  },
+  "0x97be14dd8f994a5364573bc035d85309e7cb34de": {
+    "chain": 8453,
+    "symbol": "JitoSOL",
+    "source": "defillama"
+  },
+  "0x98a878b1cd98131b271883b390f68d2c90674665": {
+    "chain": 1,
+    "symbol": "apxUSD",
+    "source": "defillama"
+  },
+  "0x98c23e9d8f34fefb1b7bd6a91b7ff122f4e16f5c": {
+    "chain": 1,
+    "symbol": "aEthUSDC",
+    "source": "defillama"
+  },
+  "0x98c51c8e958cccd37f798b2b9332d148e2c05d57": {
+    "chain": 8453,
+    "symbol": "DAIMON",
+    "source": "defillama"
+  },
+  "0x99351baed3d8ab544ccb08af96a105910fda71e7": {
+    "chain": 1,
+    "symbol": "aFXArbUSDTRY",
+    "source": "defillama"
+  },
+  "0x997e2efbce91d170b00ea402e35a66c887ee1da9": {
+    "chain": 1,
+    "symbol": "AUTO",
+    "source": "defillama"
+  },
+  "0x99cd4ec3f88a45940936f469e4bb72a2a701eeb9": {
+    "chain": 1,
+    "symbol": "stUSDS",
+    "source": "trustwallet"
+  },
+  "0x9b5528528656dbc094765e2abb79f293c21191b9": {
+    "chain": 1,
+    "symbol": "mHYPER",
+    "source": "defillama"
+  },
+  "0x9b8df6e244526ab5f6e6400d331db28c8fdddb55": {
+    "chain": 8453,
+    "symbol": "uSOL",
+    "source": "defillama"
+  },
+  "0x9ba021b0a9b958b5e75ce9f6dff97c7ee52cb3e6": {
+    "chain": 1,
+    "symbol": "apxETH",
+    "source": "defillama"
+  },
+  "0x9c0e042d65a2e1ff31ac83f404e5cb79f452c337": {
+    "chain": 8453,
+    "symbol": "uAPT",
+    "source": "defillama"
+  },
+  "0x9c5c365e764829876243d0b289733b9d2b729685": {
+    "chain": 8453,
+    "symbol": "deSPXA",
+    "source": "defillama"
+  },
+  "0x9d275685dc284c8eb1c79f6aba7a63dc75ec890a": {
+    "chain": 1,
+    "symbol": "AAPLx",
+    "source": "trustwallet"
+  },
+  "0x9eaf8c1e34f05a589eda6bafdf391cf6ad3cb239": {
+    "chain": 8453,
+    "symbol": "YFI",
+    "source": "trustwallet"
+  },
+  "0x9fb7b4477576fe5b32be4c1843afb1e55f251b33": {
+    "chain": 1,
+    "symbol": "fUSDC",
+    "source": "defillama"
+  },
+  "0xa0769f7a8fc65e47de93797b4e21c073c117fc80": {
+    "chain": 1,
+    "symbol": "EUTBL",
+    "source": "defillama"
+  },
+  "0xa0d69e286b938e21cbf7e51d71f6a4c8918f482f": {
+    "chain": 1,
+    "symbol": "eUSD",
+    "source": "defillama"
+  },
+  "0xa19f6e0df08a7917f2f8a33db66d0af31ff5eca6": {
+    "chain": 1,
+    "symbol": "mFARM",
+    "source": "defillama"
+  },
+  "0xa1f72459dfa10bad200ac160ecd78c6b77a747be": {
+    "chain": 8453,
+    "symbol": "CLAWNCH",
+    "source": "defillama"
+  },
+  "0xa258c4606ca8206d8aa700ce2143d7db854d168c": {
+    "chain": 1,
+    "symbol": "yvWETH",
+    "source": "defillama"
+  },
+  "0xa2cac0023a4797b4729db94783405189a4203afc": {
+    "chain": 8453,
+    "symbol": "Re7WETH",
+    "source": "defillama"
+  },
+  "0xa354f35829ae975e850e23e9615b11da1b3dc4de": {
+    "chain": 1,
+    "symbol": "yvUSDC",
+    "source": "defillama"
+  },
+  "0xa484ab92fe32b143aee7019fc1502b1daa522d31": {
+    "chain": 1,
+    "symbol": "stkwaEthUSDT.v1",
+    "source": "defillama"
+  },
+  "0xa608512bbc9934e4b1ddecf0f5fb38b6ad93308d": {
+    "chain": 8453,
+    "symbol": "GUD",
+    "source": "defillama"
+  },
+  "0xa61beb4a3d02decb01039e378237032b351125b4": {
+    "chain": 8453,
+    "symbol": "EURA",
+    "source": "defillama"
+  },
+  "0xa849eaae994fb86afa73382e9bd88c2b6b18dc71": {
+    "chain": 1,
+    "symbol": "MVL",
+    "source": "trustwallet"
+  },
+  "0xa88594d404727625a9437c3f886c7643872296ae": {
+    "chain": 8453,
+    "symbol": "WELL",
+    "source": "trustwallet"
+  },
+  "0xa98b4a70e17e55045cde4972b95bc2e8cec22a0f": {
+    "chain": 1,
+    "symbol": "aguaUSDCgc",
+    "source": "defillama"
+  },
+  "0xa9b17f572341219703bc951725bdb3ca756b1a65": {
+    "chain": 1,
+    "symbol": "XAUH",
+    "source": "defillama"
+  },
+  "0xaaa0008c8cf3a7dca931adaf04336a5d808c82cc": {
+    "chain": 8453,
+    "symbol": "deJAAA",
+    "source": "defillama"
+  },
+  "0xaaee1a9723aadb7afa2810263653a34ba2c21c7a": {
+    "chain": 1,
+    "symbol": "Mog",
+    "source": "trustwallet"
+  },
+  "0xaafd07d53a7365d3e9fb6f3a3b09ec19676b73ce": {
+    "chain": 1,
+    "symbol": "stkwaEthWETH.v1",
+    "source": "defillama"
+  },
+  "0xab5eb14c09d416f0ac63661e57edb7aecdb9befa": {
+    "chain": 1,
+    "symbol": "msUSD",
+    "source": "defillama"
+  },
+  "0xac1bd2486aaf3b5c0fc3fd868558b082a531b2b4": {
+    "chain": 8453,
+    "symbol": "TOSHI",
+    "source": "trustwallet"
+  },
+  "0xac3fe22294beaed9d1fd752323a6d06d12ff3098": {
+    "chain": 8453,
+    "symbol": "VNXAU",
+    "source": "defillama"
+  },
+  "0xaca92e438df0b2401ff60da7e4337b687a2435da": {
+    "chain": 1,
+    "symbol": "mUSD",
+    "source": "defillama"
+  },
+  "0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf": {
+    "chain": 8453,
+    "symbol": "VVV",
+    "source": "trustwallet"
+  },
+  "0xad55aebc9b8c03fc43cd9f62260391c13c23e7c0": {
+    "chain": 1,
+    "symbol": "cUSDO",
+    "source": "trustwallet"
+  },
+  "0xaf559d1d59b33ca4b950ab2091372af8a773e234": {
+    "chain": 1,
+    "symbol": "sUSDfr",
+    "source": "defillama"
+  },
+  "0xb0505e5a99abd03d94a1169e638b78edfed26ea4": {
+    "chain": 8453,
+    "symbol": "uSUI",
+    "source": "trustwallet"
+  },
+  "0xb0f70c0bd6fd87dbeb7c10dc692a2a6106817072": {
+    "chain": 1,
+    "symbol": "BTC.b",
+    "source": "defillama"
+  },
+  "0xb1c2db5d6ca03fce73dbd304d320bf76c55ae1b1": {
+    "chain": 1,
+    "symbol": "USG",
+    "source": "defillama"
+  },
+  "0xb200000000000000000000451d033a5000cb479e": {
+    "chain": 8453,
+    "symbol": "cbHYPE",
+    "source": "defillama"
+  },
+  "0xb2000000000000000000008501b13360000cb2ec": {
+    "chain": 8453,
+    "symbol": "cbZEC",
+    "source": "defillama"
+  },
+  "0xb29749498954a3a821ec37bde86e386df3ce30b6": {
+    "chain": 8453,
+    "symbol": "LsETH",
+    "source": "defillama"
+  },
+  "0xb3319f5d18bc0d84dd1b4825dcde5d5f7266d407": {
+    "chain": 1,
+    "symbol": "cZRX",
+    "source": "trustwallet"
+  },
+  "0xb4444468e444f89e1c2cac2f1d3ee7e336cbd1f5": {
+    "chain": 1,
+    "symbol": "RZR",
+    "source": "defillama"
+  },
+  "0xb51edddd8c47856d81c8681ea71404cec93e92c6": {
+    "chain": 1,
+    "symbol": "waEthPYUSD",
+    "source": "defillama"
+  },
+  "0xb67675158b412d53fe6b68946483ba920b135ba1": {
+    "chain": 8453,
+    "symbol": "wstUSR",
+    "source": "defillama"
+  },
+  "0xb755506531786c8ac63b756bab1ac387bacb0c04": {
+    "chain": 8453,
+    "symbol": "ZARP",
+    "source": "defillama"
+  },
+  "0xb7890cee6cf4792cdcc13489d36d9d42726ab863": {
+    "chain": 8453,
+    "symbol": "uUSDC",
+    "source": "defillama"
+  },
+  "0xb80b3215ea8183a064073f9892eb64236160a4df": {
+    "chain": 1,
+    "symbol": "waEthUSDS",
+    "source": "defillama"
+  },
+  "0xb90b2a35c65dbc466b04240097ca756ad2005295": {
+    "chain": 1,
+    "symbol": "BOBO",
+    "source": "trustwallet"
+  },
+  "0xb90d347e10a085b591955cbd0603ac7866fcadc8": {
+    "chain": 1,
+    "symbol": "xCVX",
+    "source": "defillama"
+  },
+  "0xbaa5cc21fd487b8fcc2f632f3f4e8d37262a0842": {
+    "chain": 8453,
+    "symbol": "MORPHO",
+    "source": "trustwallet"
+  },
+  "0xbb51e2a15a9158ebe2b0ceb8678511e063ab7a55": {
+    "chain": 1,
+    "symbol": "mEDGE",
+    "source": "defillama"
+  },
+  "0xbb819d845b573b5d7c538f5b85057160cfb5f313": {
+    "chain": 8453,
+    "symbol": "meUSD",
+    "source": "defillama"
+  },
+  "0xbc65ad17c5c0a2a4d159fa5a503f4992c7b545fe": {
+    "chain": 1,
+    "symbol": "sUSDC",
+    "source": "defillama"
+  },
+  "0xbe1936a67f503e0eaf2434b0cf9f4e3d7100008a": {
+    "chain": 1,
+    "symbol": "PROS",
+    "source": "defillama"
+  },
+  "0xbeef010f9cb27031ad51e3333f9af9c6b1228183": {
+    "chain": 8453,
+    "symbol": "steakUSDC",
+    "source": "defillama"
+  },
+  "0xbeef01735c132ada46aa9aa4c54623caa92a64cb": {
+    "chain": 1,
+    "symbol": "steakUSDC",
+    "source": "defillama"
+  },
+  "0xbeef03f0bf3cb2e348393008a826538aadd7d183": {
+    "chain": 8453,
+    "symbol": "steakUSDM",
+    "source": "defillama"
+  },
+  "0xbeef047a543e45807105e51a8bbefcc5950fcfba": {
+    "chain": 1,
+    "symbol": "steakUSDT",
+    "source": "defillama"
+  },
+  "0xbeef050a7485865a7a8d8ca0cc5f7536b7a3443e": {
+    "chain": 8453,
+    "symbol": "steakETH",
+    "source": "defillama"
+  },
+  "0xbeef088055857739c12cd3765f20b7679def0f51": {
+    "chain": 1,
+    "symbol": "steakUSDC",
+    "source": "defillama"
+  },
+  "0xbeefa1abfebe621df50ceaef9f54fdb73648c92c": {
+    "chain": 8453,
+    "symbol": "steakUSDA",
+    "source": "defillama"
+  },
+  "0xbeefa28d5e56d41d35df760ab53b94d9ffd7051f": {
+    "chain": 8453,
+    "symbol": "steakEURA",
+    "source": "defillama"
+  },
+  "0xbeefc011e94f43b8b7b455ebab290c7ab4e216f1": {
+    "chain": 1,
+    "symbol": "csUSDL",
+    "source": "defillama"
+  },
+  "0xbf1aea8670d2528e08334083616dd9c5f3b087ae": {
+    "chain": 8453,
+    "symbol": "MAI",
+    "source": "defillama"
+  },
+  "0xbfd5206962267c7b4b4a8b3d76ac2e1b2a5c4d5e": {
+    "chain": 8453,
+    "symbol": "OSAK",
+    "source": "defillama"
+  },
+  "0xc0041ef357b183448b235a8ea73ce4e4ec8c265f": {
+    "chain": 8453,
+    "symbol": "COOKIE",
+    "source": "defillama"
+  },
+  "0xc0634090f2fe6c6d75e61be2b949464abb498973": {
+    "chain": 8453,
+    "symbol": "KTA",
+    "source": "defillama"
+  },
+  "0xc0c17dd08263c16f6b64e772fb9b723bf1344ddf": {
+    "chain": 1,
+    "symbol": "pmUSD",
+    "source": "defillama"
+  },
+  "0xc0d3700000987c99b3c9009069e4f8413fd22330": {
+    "chain": 8453,
+    "symbol": "cdxUSD",
+    "source": "defillama"
+  },
+  "0xc11b1268c1a384e55c48c2391d8d480264a3a7f4": {
+    "chain": 1,
+    "symbol": "cWBTC",
+    "source": "defillama"
+  },
+  "0xc1256ae5ff1cf2719d4937adb3bbccab2e00a2ca": {
+    "chain": 8453,
+    "symbol": "mwUSDC",
+    "source": "defillama"
+  },
+  "0xc139190f447e929f090edeb554d95abb8b18ac1c": {
+    "chain": 1,
+    "symbol": "USDtb",
+    "source": "trustwallet"
+  },
+  "0xc26a6fa2c37b38e549a4a1807543801db684f99c": {
+    "chain": 1,
+    "symbol": "AA_FalconXUSDC",
+    "source": "defillama"
+  },
+  "0xc31389794ffac23331e0d9f611b7953f90aa5fdc": {
+    "chain": 8453,
+    "symbol": "RLP",
+    "source": "defillama"
+  },
+  "0xc360e625f19a7ea47e47810b13e386221d5187d1": {
+    "chain": 1,
+    "symbol": "nvPRIME",
+    "source": "defillama"
+  },
+  "0xc4441c2be5d8fa8126822b9929ca0b81ea0de38e": {
+    "chain": 1,
+    "symbol": "USUAL",
+    "source": "trustwallet"
+  },
+  "0xc58d044404d8b14e953c115e67823784dea53d8f": {
+    "chain": 1,
+    "symbol": "jrUSDe",
+    "source": "defillama"
+  },
+  "0xc5a9f6edb48160ed9d9fb156a23c39d7140457ee": {
+    "chain": 1,
+    "symbol": "deHYB",
+    "source": "defillama"
+  },
+  "0xc5d6a7b61d18afa11435a889557b068bb9f29930": {
+    "chain": 1,
+    "symbol": "sUSDD",
+    "source": "defillama"
+  },
+  "0xc83e27f270cce0a3a3a29521173a83f402c1768b": {
+    "chain": 1,
+    "symbol": "USDQ",
+    "source": "defillama"
+  },
+  "0xc8495eaff71d3a563b906295fcf2f685b1783085": {
+    "chain": 1,
+    "symbol": "mHyperBTC",
+    "source": "defillama"
+  },
+  "0xc88fcd8b874fdb3256e8b55b3decb8c24eab4c02": {
+    "chain": 1,
+    "symbol": "wSPYx",
+    "source": "defillama"
+  },
+  "0xc96de26018a54d51c097160568752c4e3bd6c364": {
+    "chain": 1,
+    "symbol": "FBTC",
+    "source": "defillama"
+  },
+  "0xca83dde9c22254f58e771be5e157773212acbac3": {
+    "chain": 1,
+    "symbol": "VUSD",
+    "source": "defillama"
+  },
+  "0xcb17c9db87b595717c857a08468793f5bab6445f": {
+    "chain": 8453,
+    "symbol": "cbLTC",
+    "source": "defillama"
+  },
+  "0xcb327b99ff831bf8223cced12b1338ff3aa322ff": {
+    "chain": 8453,
+    "symbol": "bsdETH",
+    "source": "trustwallet"
+  },
+  "0xcb585250f852c6c6bf90434ab21a00f02833a4af": {
+    "chain": 8453,
+    "symbol": "cbXRP",
+    "source": "defillama"
+  },
+  "0xcbada732173e39521cdbe8bf59a6dc85a9fc7b8c": {
+    "chain": 8453,
+    "symbol": "cbADA",
+    "source": "defillama"
+  },
+  "0xcbd06e5a2b0c65597161de254aa074e489deb510": {
+    "chain": 8453,
+    "symbol": "cbDOGE",
+    "source": "defillama"
+  },
+  "0xcc5c22c7a6bcc25e66726aef011dde74289ed203": {
+    "chain": 1,
+    "symbol": "mM1-USD",
+    "source": "defillama"
+  },
+  "0xcc7ff230365bd730ee4b352cc2492cedac49383e": {
+    "chain": 8453,
+    "symbol": "hyUSD",
+    "source": "defillama"
+  },
+  "0xcccc62962d17b8914c62d74ffb843d73b2a3cccc": {
+    "chain": 1,
+    "symbol": "cUSD",
+    "source": "defillama"
+  },
+  "0xccf4429db6322d5c611ee964527d42e5d685dd6a": {
+    "chain": 1,
+    "symbol": "cWBTC",
+    "source": "defillama"
+  },
+  "0xcd6ddda305955acd6b94b934f057e8b0daad58de": {
+    "chain": 8453,
+    "symbol": "PERP",
+    "source": "defillama"
+  },
+  "0xcf0c122c6b73ff809c693db761e7baebe62b6a2e": {
+    "chain": 1,
+    "symbol": "FLOKI",
+    "source": "trustwallet"
+  },
+  "0xcfa3ef56d303ae4faaba0592388f19d7c3399fb4": {
+    "chain": 8453,
+    "symbol": "eUSD",
+    "source": "defillama"
+  },
+  "0xd0580192e98ea6ceb9c7b6191ed2e27560911697": {
+    "chain": 1,
+    "symbol": "trUSD",
+    "source": "defillama"
+  },
+  "0xd09acb80c1e8f2291862c4978a008791c9167003": {
+    "chain": 42161,
+    "symbol": "tETH",
+    "source": "defillama"
+  },
+  "0xd11c452fc99cf405034ee446803b6f6c1f6d5ed8": {
+    "chain": 1,
+    "symbol": "tETH",
+    "source": "defillama"
+  },
+  "0xd166337499e176bbc38a1fbd113ab144e5bd2df7": {
+    "chain": 1,
+    "symbol": "sUSDat",
+    "source": "defillama"
+  },
+  "0xd1b5651e55d4ceed36251c61c50c889b36f6abb5": {
+    "chain": 1,
+    "symbol": "sdCRV",
+    "source": "defillama"
+  },
+  "0xd22a58f79e9481d1a88e00c343885a588b34b68b": {
+    "chain": 42161,
+    "symbol": "EURS",
+    "source": "defillama"
+  },
+  "0xd2af830e8cbdfed6cc11bab697bb25496ed6fa62": {
+    "chain": 1,
+    "symbol": "WOUSD",
+    "source": "defillama"
+  },
+  "0xd3fd63209fa2d55b07a0f6db36c2f43900be3094": {
+    "chain": 1,
+    "symbol": "wsrUSD",
+    "source": "defillama"
+  },
+  "0xd4fa2d31b7968e448877f69a96de69f5de8cd23e": {
+    "chain": 1,
+    "symbol": "waEthUSDC",
+    "source": "defillama"
+  },
+  "0xd76f5faf6888e24d9f04bf92a0c8b921fe4390e0": {
+    "chain": 1,
+    "symbol": "wBRL",
+    "source": "trustwallet"
+  },
+  "0xd88fd4a11255e51f64f78b4a7d74456325c2d8dc": {
+    "chain": 8453,
+    "symbol": "BV7X",
+    "source": "defillama"
+  },
+  "0xd993935e13851dd7517af10687ec7e5022127228": {
+    "chain": 8453,
+    "symbol": "apxUSD",
+    "source": "defillama"
+  },
+  "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca": {
+    "chain": 8453,
+    "symbol": "USDbC",
+    "source": "trustwallet"
+  },
+  "0xd9d920aa40f578ab794426f5c90f6c731d159def": {
+    "chain": 1,
+    "symbol": "xSolvBTC",
+    "source": "defillama"
+  },
+  "0xda5e1988097297dcdc1f90d4dfe7909e847cbef6": {
+    "chain": 1,
+    "symbol": "WLFI",
+    "source": "trustwallet"
+  },
+  "0xda816459f1ab5631232fe5e97a05bbbb94970c95": {
+    "chain": 1,
+    "symbol": "yvDAI",
+    "source": "defillama"
+  },
+  "0xdab276f6e19ccc54ca5aaa2645a94087ca776a3f": {
+    "chain": 1,
+    "symbol": "stBRL",
+    "source": "defillama"
+  },
+  "0xdb90a4e973b7663ce0ccc32b6fbd37ffb19bfa83": {
+    "chain": 8453,
+    "symbol": "degenUSDC",
+    "source": "defillama"
+  },
+  "0xdbdc1ef57537e34680b898e1febd3d68c7389bcb": {
+    "chain": 1,
+    "symbol": "siUSD",
+    "source": "defillama"
+  },
+  "0xdbfefd2e8460a6ee4955a68582f85708baea60a3": {
+    "chain": 8453,
+    "symbol": "superOETHb",
+    "source": "defillama"
+  },
+  "0xdcee70654261af21c44c093c300ed3bb97b78192": {
+    "chain": 1,
+    "symbol": "wOETH",
+    "source": "defillama"
+  },
+  "0xdd0f28e19c1780eb6396170735d45153d261490d": {
+    "chain": 1,
+    "symbol": "gtUSDC",
+    "source": "defillama"
+  },
+  "0xdd3b11ef34cd511a2da159034a05fcb94d806686": {
+    "chain": 1,
+    "symbol": "REKT",
+    "source": "defillama"
+  },
+  "0xdd468a1ddc392dcdbef6db6e34e89aa338f9f186": {
+    "chain": 1,
+    "symbol": "MUSD",
+    "source": "defillama"
+  },
+  "0xdd5eff0756db08bad0ff16b66f88f506e7318894": {
+    "chain": 1,
+    "symbol": "yPrism",
+    "source": "defillama"
+  },
+  "0xdd629e5241cbc5919847783e6c96b2de4754e438": {
+    "chain": 1,
+    "symbol": "mTBILL",
+    "source": "defillama"
+  },
+  "0xddc0f880ff6e4e22e4b74632fbb43ce4df6ccc5a": {
+    "chain": 1,
+    "symbol": "reUSDe",
+    "source": "defillama"
+  },
+  "0xdec933e2392ad908263e70a386fbf34e703ffe8f": {
+    "chain": 8453,
+    "symbol": "wbCOIN",
+    "source": "trustwallet"
+  },
+  "0xe063f04f280c60aeca68b38341c2eecbec703ae2": {
+    "chain": 1,
+    "symbol": "xETH",
+    "source": "defillama"
+  },
+  "0xe0f63a424a4439cbe457d80e4f4b51ad25b2c56c": {
+    "chain": 1,
+    "symbol": "SPX",
+    "source": "trustwallet"
+  },
+  "0xe19d1c837b8a1c83a56cd9165b2c0256d39653ad": {
+    "chain": 1,
+    "symbol": "sdFXN",
+    "source": "defillama"
+  },
+  "0xe1b4d34e8754600962cd944b535180bd758e6c2e": {
+    "chain": 1,
+    "symbol": "agETH",
+    "source": "defillama"
+  },
+  "0xe24a3dc889621612422a64e6388927901608b91d": {
+    "chain": 1,
+    "symbol": "sUSN",
+    "source": "defillama"
+  },
+  "0xe2e7a17dff93280dec073c995595155283e3c372": {
+    "chain": 1,
+    "symbol": "spUSDT",
+    "source": "defillama"
+  },
+  "0xe2fc85bfb48c4cf147921fbe110cf92ef9f26f94": {
+    "chain": 1,
+    "symbol": "xUSD",
+    "source": "defillama"
+  },
+  "0xe3668873d944e4a949da05fc8bde419eff543882": {
+    "chain": 1,
+    "symbol": "yPRISMA",
+    "source": "defillama"
+  },
+  "0xe41d2489571d322189246dafa5ebde1f4699f498": {
+    "chain": 1,
+    "symbol": "ZRX",
+    "source": "trustwallet"
+  },
+  "0xe4880249745eac5f1ed9d8f7df844792d560e750": {
+    "chain": 1,
+    "symbol": "USTBL",
+    "source": "defillama"
+  },
+  "0xe4ca6596d2c28014c6f89964f57838e0be9f369b": {
+    "chain": 1,
+    "symbol": "USDU",
+    "source": "defillama"
+  },
+  "0xe65cdb6479bac1e22340e4e755fae7e509ecd06c": {
+    "chain": 1,
+    "symbol": "cAAVE",
+    "source": "defillama"
+  },
+  "0xe72b141df173b999ae7c1adcbf60cc9833ce56a8": {
+    "chain": 1,
+    "symbol": "ETH+",
+    "source": "defillama"
+  },
+  "0xe7c3d8c9a439fede00d2600032d5db0be71c3c29": {
+    "chain": 1,
+    "symbol": "JPYC",
+    "source": "defillama"
+  },
+  "0xecac9c5f704e954931349da37f60e39f515c11c1": {
+    "chain": 8453,
+    "symbol": "LBTC",
+    "source": "defillama"
+  },
+  "0xeded6ae915b129b67a4ad49901518f2736427063": {
+    "chain": 8453,
+    "symbol": "AUDM",
+    "source": "defillama"
+  },
+  "0xedfa23602d0ec14714057867a78d01e94176bea0": {
+    "chain": 8453,
+    "symbol": "wrsETH",
+    "source": "defillama"
+  },
+  "0xefe3c772c7020f14d5f6b9d7436f1b8dfa8fb5af": {
+    "chain": 1,
+    "symbol": "wemUSD",
+    "source": "defillama"
+  },
+  "0xf1376bcef0f78459c0ed0ba5ddce976f1ddf51f4": {
+    "chain": 1,
+    "symbol": "uniETH",
+    "source": "defillama"
+  },
+  "0xf197ffc28c23e0309b5559e7a166f2c6164c80aa": {
+    "chain": 8453,
+    "symbol": "MXNB",
+    "source": "defillama"
+  },
+  "0xf24608e0ccb972b0b0f4a6446a0bbf58c701a026": {
+    "chain": 8453,
+    "symbol": "mwEURC",
+    "source": "defillama"
+  },
+  "0xf469fbd2abcd6b9de8e169d128226c0fc90a012e": {
+    "chain": 1,
+    "symbol": "pumpBTC",
+    "source": "defillama"
+  },
+  "0xf4d97f2da56e8c3098f3a8d538db630a2606a024": {
+    "chain": 8453,
+    "symbol": "DIEM",
+    "source": "defillama"
+  },
+  "0xf4f447e6afa04c9d11ef0e2fc0d7f19c24ee55de": {
+    "chain": 8453,
+    "symbol": "vyUSD",
+    "source": "defillama"
+  },
+  "0xf5dce57282a584d2746faf1593d3121fcac444dc": {
+    "chain": 1,
+    "symbol": "cDAI",
+    "source": "trustwallet"
+  },
+  "0xf650c3d88d12db855b8bf7d11be6c55a4e07dcc9": {
+    "chain": 1,
+    "symbol": "cUSDT",
+    "source": "defillama"
+  },
+  "0xf6b1117ec07684d3958cad8beb1b302bfd21103f": {
+    "chain": 1,
+    "symbol": "TSLAon",
+    "source": "defillama"
+  },
+  "0xf7d85ec4e7710f71992752eac2111312e73e9c9c": {
+    "chain": 1,
+    "symbol": "ftUSD",
+    "source": "defillama"
+  },
+  "0xf7e2a6226ffe0693dd85406ac3a8917cbea5dc40": {
+    "chain": 8453,
+    "symbol": "OTX",
+    "source": "defillama"
+  },
+  "0xf97f4df75117a78c1a5a0dbb814af92458539fb4": {
+    "chain": 42161,
+    "symbol": "LINK",
+    "source": "trustwallet"
+  },
+  "0xfa2b947eec368f42195f24f36d2af29f7c24cec2": {
+    "chain": 1,
+    "symbol": "USDf",
+    "source": "trustwallet"
+  },
+  "0xfaba6f8e4a5e8ab82f62fe7c39859fa577269be3": {
+    "chain": 1,
+    "symbol": "ONDO",
+    "source": "trustwallet"
+  },
+  "0xface851a4921ce59e912d19329929ce6da6eb0c7": {
+    "chain": 1,
+    "symbol": "cLINK",
+    "source": "defillama"
+  },
+  "0xfae103dc9cf190ed75350761e95403b7b8afa6c0": {
+    "chain": 1,
+    "symbol": "rswETH",
+    "source": "trustwallet"
+  },
+  "0xfb0a3cf9b019bfd8827443d131b235b3e0fc58d2": {
+    "chain": 1,
+    "symbol": "ARM-WETH-eETH",
+    "source": "defillama"
+  },
+  "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a": {
+    "chain": 42161,
+    "symbol": "GMX",
+    "source": "trustwallet"
+  },
+  "0xfcc9cc1209651ed8867332d6f664cf82743a2584": {
+    "chain": 8453,
+    "symbol": "mGLO",
+    "source": "defillama"
+  },
+  "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": {
+    "chain": 42161,
+    "symbol": "USD\u20ae0",
+    "source": "trustwallet"
+  },
+  "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2": {
+    "chain": 8453,
+    "symbol": "USDT",
+    "source": "trustwallet"
+  },
+  "0xfe0c30065b384f05761f15d0cc899d4f9f9cc0eb": {
+    "chain": 1,
+    "symbol": "ETHFI",
+    "source": "trustwallet"
+  },
+  "0xfe0ccc9942e98c963fe6b4e5194eb6e3baa4cb64": {
+    "chain": 1,
+    "symbol": "sYUSD",
+    "source": "defillama"
+  },
+  "0xfe6eb3b609a7c8352a241f7f3a21cea4e9209b8f": {
+    "chain": 1,
+    "symbol": "spETH",
+    "source": "defillama"
+  },
+  "0xfedc5f4a6c38211c1338aa411018dfaf26612c08": {
+    "chain": 1,
+    "symbol": "SPYon",
+    "source": "defillama"
+  }
+}
