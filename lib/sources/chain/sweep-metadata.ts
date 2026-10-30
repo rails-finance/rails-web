@@ -21,6 +21,8 @@
 // SERVER-ONLY.
 
 import type { PublicClient } from "viem";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { readBlockTimes } from "./vault-block-reads";
 
 const META_GROUP = 20; // sub-calls per coalesced JSON-RPC request
 const META_CONCURRENCY = 1;
@@ -77,10 +79,52 @@ export async function inPacedGroups<T>(items: T[], fn: (item: T) => Promise<void
  *  complete (they never needed a timestamp), and tells the reader exactly what
  *  is not on screen. */
 export async function resolveBlockTimestamps(client: PublicClient, blocks: number[]): Promise<Map<number, number>> {
-  const out = new Map<number, number>();
-  await inPacedGroups(blocks, async (b) => {
-    out.set(b, Number((await client.getBlock({ blockNumber: BigInt(b) })).timestamp));
-  });
+  // rails-server's stored block times first (Ethereum and Base), the chain for
+  // the blocks it did not answer.
+  const chainId = client.chain?.id;
+  const out =
+    chainId === 1 || chainId === 8453
+      ? await readBlockTimes(chainId, blocks).catch(() => new Map<number, number>())
+      : new Map<number, number>();
+  await inPacedGroups(
+    blocks.filter((b) => !out.has(b)),
+    async (b) => {
+      out.set(b, Number((await client.getBlock({ blockNumber: BigInt(b) })).timestamp));
+    },
+  );
+  return out;
+}
+
+/** The senders rails-server holds or reads on its own endpoint: `tx_entry`'s,
+ *  then one batched read for the rest (`/api/reference/tx-senders`). A hash it
+ *  does not answer is absent. */
+async function storedTxSenders(chainId: number, hashes: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const api = process.env.RAILS_API_URL;
+  if (!api || (chainId !== 1 && chainId !== 8453 && chainId !== 42161)) return out;
+  const MAX = 1000;
+  for (let i = 0; i < hashes.length; i += MAX) {
+    try {
+      const res = await fetch(
+        `${api}/api/reference/tx-senders`,
+        createAuthFetchOptions({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chain: chainId, hashes: hashes.slice(i, i + MAX) }),
+          signal: AbortSignal.timeout(15_000),
+        }),
+      );
+      if (!res.ok) {
+        void res.body?.cancel().catch(() => undefined);
+        continue;
+      }
+      const body = (await res.json()) as { senders?: Record<string, string> };
+      for (const [h, f] of Object.entries(body.senders ?? {}))
+        if (/^0x[0-9a-f]{40}$/.test(f)) out.set(h.toLowerCase(), f);
+    } catch {
+      // The chain path below reads these.
+    }
+  }
   return out;
 }
 
@@ -89,9 +133,17 @@ export async function resolveBlockTimestamps(client: PublicClient, blocks: numbe
  *  transaction leaves the pair incomplete and the card simply does not mark
  *  the event, rather than marking it wrongly. Never throws. */
 export async function resolveTxSenders(client: PublicClient, hashes: string[]): Promise<Map<string, string>> {
+  const stored = client.chain ? await storedTxSenders(client.chain.id, hashes) : new Map<string, string>();
   const out = new Map<string, string>();
-  await inPacedGroups(hashes, async (h) => {
-    out.set(h, (await client.getTransaction({ hash: h as `0x${string}` })).from.toLowerCase());
-  });
+  for (const h of hashes) {
+    const f = stored.get(h.toLowerCase());
+    if (f) out.set(h, f);
+  }
+  await inPacedGroups(
+    hashes.filter((h) => !out.has(h)),
+    async (h) => {
+      out.set(h, (await client.getTransaction({ hash: h as `0x${string}` })).from.toLowerCase());
+    },
+  );
   return out;
 }

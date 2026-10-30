@@ -350,8 +350,8 @@ export function LiquityForkPositionExplanation({
         </span>
       ) : (
         <span key="zombie">
-          Redemption cancelled all of its debt, which leaves it a <H>zombie</H>: outside the redemption queue, with
-          nothing left to redeem. Closing the Trove returns the{" "}
+          Redemption cancelled all of its debt, which leaves it a <H>zombie</H>: outside the redemption queue. With no
+          debt, a redemption cannot reach it and there is nothing to liquidate. Closing the Trove returns the{" "}
           <H>
             <AmountText value={chain.entireColl} /> {chain.symbol}
           </H>

@@ -3,7 +3,7 @@ import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/
 import { AAVE_V3_ARBITRUM_CHAIN_ID, AAVE_V3_ARBITRUM_ORACLE } from "@/lib/aave-v3-arbitrum/asset-catalog";
 
 // On-chain USD for Arbitrum reserve addresses — the Arbitrum Pool's IAaveOracle
-// at the head, one batched multicall; the twin of the Base route. An asset the
+// at a recent finalized block, from rails-server's at-block store (Arbitrum has no Sieve); the twin of the Base route. An asset the
 // oracle cannot price is absent from the response.
 //
 // Node runtime, no edge caching.

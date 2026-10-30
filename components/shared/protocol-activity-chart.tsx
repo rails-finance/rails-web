@@ -14,16 +14,17 @@
 //   panel's, drawn here as there (`ScrubberMark`), the strip after it dimmed.
 // - The bars are neutral grey: the orange is the position's redemption mark
 //   on the events row, and the bars are every position's.
-// - It starts shown where the series explains the position
-//   (`ProtocolActivity.explains`), hidden otherwise; the reader's choice
-//   holds for the page.
+// - It starts hidden on every position; the reader's choice holds while the
+//   page is open.
 // - The readout reads the cursor's day, zero on a day the source lists none.
+//   It is placed from its measured width: measured before the first paint
+//   after it shows, and hidden until then (ui-jobs 457).
 // - The scale is the square root of the amount: a bar's height grows with
 //   the square root of its day's total, and the axis marks round amounts
 //   (`sqrtTicks`) as price lines at their heights, the library's own ticks
 //   left blank.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type {
   IChartApi,
   IPrimitivePaneView,
@@ -202,10 +203,7 @@ export function ProtocolActivityChart({
   frame = (p) => p,
 }: ProtocolActivityChartProps) {
   const title = activityTitle(activity);
-  // The default follows `explains` (it can turn as the history lands) until
-  // the reader presses the button.
-  const [choice, setChoice] = useState<boolean | null>(null);
-  const shown = choice ?? activity.explains;
+  const [shown, setShown] = useState(false);
   const bodyId = `protocol-activity-${activity.unit}-${activity.from}`;
 
   const wrap = useRef<HTMLDivElement>(null);
@@ -468,20 +466,29 @@ export function ProtocolActivityChart({
   const ownGrid = gridRef.current;
   const ownWindow = ownRange && ownGrid ? [cellTime(ownGrid, ownRange.from), cellTime(ownGrid, ownRange.to + 1)] : null;
   const ownW = chart.current?.timeScale().width() ?? 0;
-  const hasAt = at != null;
+  const words = at ? paceWords(activity, at) : null;
   const tipRef = useRef<HTMLDivElement>(null);
-  const [tipW, setTipW] = useState(180);
-  useEffect(() => {
+  // The readout's width, null until measured while shown: a hidden body
+  // measures zero, and a width set after the paint would draw one frame at
+  // the wrong x.
+  const [tipW, setTipW] = useState<number | null>(null);
+  useLayoutEffect(() => {
     const el = tipRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setTipW(Math.ceil(el.getBoundingClientRect().width)));
+    if (!el || !shown) return setTipW(null);
+    const read = () => {
+      const w = Math.ceil(el.getBoundingClientRect().width);
+      if (w > 0) setTipW(w);
+    };
+    read();
+    const ro = new ResizeObserver(read);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [shown, hasAt]);
-  const tipLeft = cx == null ? 0 : Math.max(0, Math.min(pw - tipW, cx - tipW / 2));
-  const caret = cx == null ? tipW / 2 : Math.max(8, Math.min(tipW - 8, cx - tipLeft));
+  }, [shown, words]);
+  const tw = tipW ?? 0;
+  const tipLeft = cx == null ? 0 : Math.max(0, Math.min(pw - tw, cx - tw / 2));
+  const caret = cx == null ? tw / 2 : Math.max(8, Math.min(tw - 8, cx - tipLeft));
   const dayWord = isLive ? `today, ${dayStamp(cursorDay)}` : dayStamp(cursorDay);
-  const visible = cx != null && cx >= 0 && cx <= pw;
+  const visible = tipW != null && pw > 0 && cx != null && cx >= 0 && cx <= pw;
 
   return (
     <section
@@ -490,7 +497,6 @@ export function ProtocolActivityChart({
       className="mt-5 border-t border-rb-200 pt-3 dark:border-rb-800"
       data-protocol-activity={title}
       data-protocol-activity-shown={shown ? "" : undefined}
-      data-protocol-activity-explains={activity.explains ? "" : undefined}
       data-anatomy="F19.11"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -502,7 +508,7 @@ export function ProtocolActivityChart({
         </h3>
         <button
           type="button"
-          onClick={() => setChoice(!shown)}
+          onClick={() => setShown(!shown)}
           aria-expanded={shown}
           aria-controls={bodyId}
           className={`${CTRL_GHOST} ${CTRL_OFF} h-8 shrink-0 gap-1.5 rounded-lg bg-sunken px-2.5 text-xs font-medium pointer-coarse:h-11`}
@@ -527,7 +533,7 @@ export function ProtocolActivityChart({
             >
               <span className="font-semibold text-foreground">
                 <Prov info={activity.prov(at, dayWord)} value={String(at.amount)}>
-                  {paceWords(activity, at)}
+                  {words}
                 </Prov>
               </span>
               <i

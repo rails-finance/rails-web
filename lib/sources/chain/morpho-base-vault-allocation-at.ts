@@ -41,49 +41,30 @@
 //      their hash, so a catalogued market's collateral, oracle and LLTV cannot
 //      have drifted; a market created after the census is asked directly.
 //
-// ── THE LANE ─────────────────────────────────────────────────────────────────
-// `BASE_BACKFILL_RPC_URL`, the same lane the sibling timeline reader names, and
-// the one these three waves were measured on, through lib/sources/chain/rpc.ts
-// `chainLogsBatchClient` (60 calls a JSON-RPC request). It meters on COMPUTE
-// UNITS PER SECOND, so the calls go out in waves of three requests' worth, and
-// a call the lane refuses on its rate limit is asked again after a backoff
-// (rpc.ts `retryingRateLimits`), never abandoned, because abandoning it would
-// turn a rate limit into a page that says a market held nothing. A call that
-// is still refused, or reverts, is stated UNREAD — never zero, never dropped.
-// A zero is a reading and an unread value is not, and this file keeps them
-// apart at every level.
+// ── THE STORE ────────────────────────────────────────────────────────────────
+// The three waves are read by rails-server's `/api/at-block/metamorpho/allocation`
+// (its services/metamorpho-allocation-at.ts), which keeps each call once the
+// block is final (server mig 412; rails-ops decisions/0056); `idToMarketParams`
+// it reads once per market, at the newest block that queued it. A call that
+// reverts or answers nothing is stated UNREAD — never zero, never dropped. A
+// request the server could not answer leaves every block unread. A zero is a
+// reading and an unread value is not, and this file keeps them apart at every
+// level.
 
-import { decodeFunctionResult, encodeFunctionData, parseAbi, type PublicClient } from "viem";
-
-import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
+import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { MORPHO_MARKETS } from "@/lib/morpho-base/market-catalog";
 import type { VaultAllocationLeg } from "@/lib/shared/vault-holder-timeline";
+import { atBlockGet } from "./at-block-api";
 import { resolveErc20Meta } from "./erc20-meta";
-import { chainLogsBatchClient } from "./rpc";
 
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
-/** Calls in flight at once: three of the client's 60-call requests. The lane's
- *  limit is compute units per SECOND, so the cap that matters is concurrency,
- *  not total. */
-const WAVE = 3 * 60;
-
-const VAULT_ABI = parseAbi([
-  "function totalSupply() view returns (uint256)",
-  "function balanceOf(address) view returns (uint256)",
-  "function withdrawQueueLength() view returns (uint256)",
-  "function withdrawQueue(uint256) view returns (bytes32)",
-]);
-
-const BLUE_ABI = parseAbi([
-  "function idToMarketParams(bytes32) view returns (address loanToken, address collateralToken, address oracle, address irm, uint256 lltv)",
-  "function market(bytes32) view returns (uint128 totalSupplyAssets, uint128 totalSupplyShares, uint128 totalBorrowAssets, uint128 totalBorrowShares, uint128 lastUpdate, uint128 fee)",
-  "function position(bytes32, address) view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
-]);
-
+/** idToMarketParams: loanToken, collateralToken, oracle, irm, lltv. */
 type MarketParamsTuple = readonly [string, string, string, string, bigint];
+/** market(id): totalSupplyAssets, totalSupplyShares, totalBorrowAssets, totalBorrowShares, lastUpdate, fee. */
 type MarketTuple = readonly [bigint, bigint, bigint, bigint, bigint, bigint];
+/** position(id, vault): supplyShares, borrowShares, collateral. */
 type PositionTuple = readonly [bigint, bigint, bigint];
 
 /** One block's answer: the queue as it stood, the two attribution operands, and
@@ -114,58 +95,16 @@ export interface VaultAllocationAtBlock {
  *  after the census is simply absent, and wave 3 asks the singleton for it. */
 const CATALOGUE = new Map(MORPHO_MARKETS.map((m) => [m.id.toLowerCase(), m]));
 
-// ── the call runner ──────────────────────────────────────────────────────────
-
-interface EthCall {
-  to: string;
-  data: string;
-  block: bigint;
-}
-
-/**
- * Run `eth_call`s on the lane and hand back one answer per call, in order, with
- * `null` for any that did not answer (a revert, or a refusal the client's
- * backoff did not outlast). The client batches each wave into JSON-RPC
- * requests; a refusal becomes unread for that one call, not for its
- * neighbours.
- */
-async function postCalls(client: PublicClient, calls: EthCall[]): Promise<(string | null)[]> {
-  const out = new Array<string | null>(calls.length).fill(null);
-  for (let i = 0; i < calls.length; i += WAVE)
-    await Promise.all(
-      calls.slice(i, i + WAVE).map(async (c, k) => {
-        try {
-          const result = await client.request({
-            method: "eth_call",
-            params: [{ to: c.to as `0x${string}`, data: c.data as `0x${string}` }, `0x${c.block.toString(16)}`],
-          });
-          if (typeof result === "string") out[i + k] = result;
-        } catch {
-          // Unread: stated as such by the caller.
-        }
-      }),
-    );
-  return out;
-}
-
-type VaultFn = "totalSupply" | "balanceOf" | "withdrawQueueLength" | "withdrawQueue";
-type BlueFn = "idToMarketParams" | "market" | "position";
-
-/** One `eth_call` answer, decoded, with a refusal and a revert both landing on
- *  null — the caller states an unread figure either way rather than a zero. */
-function decode<T>(abi: typeof VAULT_ABI, fn: VaultFn, data: string | null): T | null;
-function decode<T>(abi: typeof BLUE_ABI, fn: BlueFn, data: string | null): T | null;
-function decode<T>(abi: typeof VAULT_ABI | typeof BLUE_ABI, fn: string, data: string | null): T | null {
-  if (!data || data === "0x") return null;
-  try {
-    return decodeFunctionResult({
-      abi: abi as typeof VAULT_ABI,
-      functionName: fn as VaultFn,
-      data: data as `0x${string}`,
-    }) as T;
-  } catch {
-    return null;
-  }
+/** The server's answer: per block the raw reads, and each market's params. */
+interface ServerAllocation {
+  reads: {
+    block: number;
+    totalSupply: string | null;
+    holderShares: string | null;
+    queueLength: string | null;
+    legs: { id: string | null; position: string[] | null; market: string[] | null }[];
+  }[];
+  params: Record<string, string[] | null>;
 }
 
 // ── the three waves ──────────────────────────────────────────────────────────
@@ -188,14 +127,7 @@ export async function loadMorphoBaseVaultAllocationAt(
   const out = new Map<number, VaultAllocationAtBlock>();
   if (!blocks.length) return out;
 
-  let client: PublicClient | null = null;
-  try {
-    client = chainLogsBatchClient(MORPHO_BASE_CHAIN_ID);
-  } catch {
-    // BASE_BACKFILL_RPC_URL unset: every block below is unread.
-  }
   const vaultAddress = vault.toLowerCase();
-  const blue = MORPHO_BASE_BLUE.toLowerCase();
   const empty = (b: number): VaultAllocationAtBlock => ({
     blockNumber: b,
     totalSupply: null,
@@ -205,97 +137,36 @@ export async function loadMorphoBaseVaultAllocationAt(
     allocatedTotal: null,
     unread: true,
   });
-  if (!client) {
+
+  let served: ServerAllocation;
+  try {
+    served = await atBlockGet<ServerAllocation>(
+      "metamorpho/allocation",
+      new URLSearchParams({ vault: vaultAddress, holder: holder.toLowerCase(), blocks: blocks.join(",") }),
+    );
+  } catch {
+    // The server did not answer: every block below is unread.
     for (const b of blocks) out.set(b, empty(b));
     return out;
   }
-
-  const at = blocks.map((b) => BigInt(b));
-
-  // ── wave 1 — the denominator, the numerator, and how long the queue is ─────
-  const w1 = await postCalls(
-    client,
-    at.flatMap((block) => [
-      { to: vaultAddress, block, data: encodeFunctionData({ abi: VAULT_ABI, functionName: "totalSupply" }) },
-      {
-        to: vaultAddress,
-        block,
-        data: encodeFunctionData({ abi: VAULT_ABI, functionName: "balanceOf", args: [holder as `0x${string}`] }),
-      },
-      { to: vaultAddress, block, data: encodeFunctionData({ abi: VAULT_ABI, functionName: "withdrawQueueLength" }) },
-    ]),
-  );
-
-  const state = blocks.map((b, i) => ({
-    blockNumber: b,
-    block: at[i],
-    totalSupply: decode<bigint>(VAULT_ABI, "totalSupply", w1[i * 3]),
-    holderShares: decode<bigint>(VAULT_ABI, "balanceOf", w1[i * 3 + 1]),
-    queueLength: decode<bigint>(VAULT_ABI, "withdrawQueueLength", w1[i * 3 + 2]),
-  }));
-
-  // ── wave 2 — the queue's own shape at each block ──────────────────────────
-  const queueCalls: EthCall[] = [];
-  const queueSpan: { from: number; count: number }[] = [];
-  for (const s of state) {
-    const n = s.queueLength == null ? 0 : Number(s.queueLength);
-    queueSpan.push({ from: queueCalls.length, count: n });
-    for (let i = 0; i < n; i++)
-      queueCalls.push({
-        to: vaultAddress,
-        block: s.block,
-        data: encodeFunctionData({ abi: VAULT_ABI, functionName: "withdrawQueue", args: [BigInt(i)] }),
-      });
-  }
-  const w2 = await postCalls(client, queueCalls);
-  const queues = queueSpan.map(({ from, count }) =>
-    Array.from({ length: count }, (_, i) => decode<string>(VAULT_ABI, "withdrawQueue", w2[from + i])),
-  );
-
-  // ── wave 3 — Blue's own rows, and the params the catalogue cannot supply ──
-  const legCalls: EthCall[] = [];
-  const legSpan: { id: string | null; queueIndex: number; pos: number; mkt: number; params: number | null }[][] = [];
-  for (let b = 0; b < state.length; b++) {
-    const rowSpans: (typeof legSpan)[number] = [];
-    queues[b].forEach((id, queueIndex) => {
-      if (!id) {
-        rowSpans.push({ id: null, queueIndex, pos: -1, mkt: -1, params: null });
-        return;
-      }
-      const block = state[b].block;
-      const pos = legCalls.length;
-      legCalls.push({
-        to: blue,
-        block,
-        data: encodeFunctionData({
-          abi: BLUE_ABI,
-          functionName: "position",
-          args: [id as `0x${string}`, vaultAddress as `0x${string}`],
-        }),
-      });
-      const mkt = legCalls.length;
-      legCalls.push({
-        to: blue,
-        block,
-        data: encodeFunctionData({ abi: BLUE_ABI, functionName: "market", args: [id as `0x${string}`] }),
-      });
-      // Only where the census does not already hold this market's immutable
-      // params. Blue mints an id as the hash of those params, so a catalogued
-      // row cannot be a stale one — it can only be missing.
-      let params: number | null = null;
-      if (!CATALOGUE.has(id.toLowerCase())) {
-        params = legCalls.length;
-        legCalls.push({
-          to: blue,
-          block,
-          data: encodeFunctionData({ abi: BLUE_ABI, functionName: "idToMarketParams", args: [id as `0x${string}`] }),
-        });
-      }
-      rowSpans.push({ id, queueIndex, pos, mkt, params });
-    });
-    legSpan.push(rowSpans);
-  }
-  const w3 = await postCalls(client, legCalls);
+  const byBlock = new Map(served.reads.map((r) => [r.block, r]));
+  const big = (v: string | null | undefined) => (v == null ? null : BigInt(v));
+  const state = blocks.map((b) => {
+    const r = byBlock.get(b);
+    return {
+      blockNumber: b,
+      totalSupply: big(r?.totalSupply),
+      holderShares: big(r?.holderShares),
+      queueLength: big(r?.queueLength),
+      legs: r?.legs ?? [],
+    };
+  });
+  /** A market's params from the chain, only where the census does not hold them. */
+  const fromChainOf = (id: string): MarketParamsTuple | null => {
+    if (CATALOGUE.has(id.toLowerCase())) return null;
+    const p = served.params[id.toLowerCase()];
+    return p ? ([p[0], p[1], p[2], p[3], BigInt(p[4])] as const) : null;
+  };
 
   // ── the collateral symbols, named through the house resolver ──────────────
   // A symbol is a name for a token, not a fact about a block: the resolver's
@@ -303,12 +174,11 @@ export async function loadMorphoBaseVaultAllocationAt(
   // the leg is identified by its market id alone rather than by a truncated
   // address dressed as a ticker.
   const collateralAddresses = new Set<string>();
-  for (let b = 0; b < legSpan.length; b++)
-    for (const span of legSpan[b]) {
-      if (!span.id) continue;
-      const catalogued = CATALOGUE.get(span.id.toLowerCase());
-      const fromChain =
-        span.params == null ? null : (decode<MarketParamsTuple>(BLUE_ABI, "idToMarketParams", w3[span.params]) ?? null);
+  for (const s of state)
+    for (const leg of s.legs) {
+      if (!leg.id) continue;
+      const catalogued = CATALOGUE.get(leg.id.toLowerCase());
+      const fromChain = fromChainOf(leg.id);
       const collateral = (catalogued?.collateralToken ?? fromChain?.[1] ?? "").toLowerCase();
       if (collateral && collateral !== ZERO_ADDR) collateralAddresses.add(collateral);
     }
@@ -322,13 +192,13 @@ export async function loadMorphoBaseVaultAllocationAt(
     const legs: VaultAllocationLeg[] = [];
     let allocated: bigint | null = null;
 
-    for (const span of legSpan[b]) {
+    for (const [queueIndex, span] of s.legs.entries()) {
       if (!span.id) {
         // The queue slot itself did not answer. There IS a leg here — the
         // length said so — and nothing about it was read.
         legs.push({
           marketId: "",
-          queueIndex: span.queueIndex,
+          queueIndex,
           collateralToken: null,
           collateralSymbol: null,
           collateralNamed: false,
@@ -343,15 +213,14 @@ export async function loadMorphoBaseVaultAllocationAt(
         continue;
       }
       const catalogued = CATALOGUE.get(span.id.toLowerCase());
-      const fromChain =
-        span.params == null ? null : decode<MarketParamsTuple>(BLUE_ABI, "idToMarketParams", w3[span.params]);
+      const fromChain = fromChainOf(span.id);
       const collateralToken = (catalogued?.collateralToken ?? fromChain?.[1])?.toLowerCase() ?? null;
       const oracle = (catalogued?.oracle ?? fromChain?.[2])?.toLowerCase() ?? null;
       const lltv = catalogued?.lltv ?? fromChain?.[4]?.toString() ?? null;
       const coll = collateralToken && collateralToken !== ZERO_ADDR ? meta.get(collateralToken) : undefined;
 
-      const position = decode<PositionTuple>(BLUE_ABI, "position", w3[span.pos]);
-      const market = decode<MarketTuple>(BLUE_ABI, "market", w3[span.mkt]);
+      const position = span.position ? (span.position.map((v) => BigInt(v)) as unknown as PositionTuple) : null;
+      const market = span.market ? (span.market.map((v) => BigInt(v)) as unknown as MarketTuple) : null;
       // Blue's own share→asset conversion on its STORED totals — the market's
       // last settled state, which is what `market(id)` holds. No accrual is
       // applied: accruing in a reader would be Rails' arithmetic sitting where
@@ -367,7 +236,7 @@ export async function loadMorphoBaseVaultAllocationAt(
 
       legs.push({
         marketId: span.id.toLowerCase(),
-        queueIndex: span.queueIndex,
+        queueIndex,
         collateralToken,
         collateralSymbol: coll?.named ? coll.symbol : null,
         collateralNamed: Boolean(coll?.named),

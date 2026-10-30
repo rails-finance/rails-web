@@ -18,12 +18,58 @@
 // default would resolve nothing rather than mis-price, but the two are meant to
 // travel together.
 //
+// The answer comes from rails-server's `/api/at-block/aave-v3/oracle-prices`
+// (rails-ops decisions/0056): getAssetPrice at the newest five-minute grid block
+// the chain's finalized tag and the market's Sieve checkpoint reach, composed
+// from Sieve's stored rounds where they settle it (Core, SparkLend, Aave V3
+// Base, Seamless) and read once into the at-block store otherwise (every
+// other reserve, Prime, EtherFi and Arbitrum, which has no Sieve). The
+// multicall at the head below answers only when that route cannot (no
+// RAILS_API_URL, an oracle it does not serve, a failed request).
+//
 // SERVER-ONLY — imported from /api/* route handlers only (it calls the chain via
 // lib/sources/chain/rpc). Mirrors the batched-multicall shape of compound-prices.
 
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+
+/** The server's market key per AaveOracle, as its AAVE_V3_POSITION_MARKETS names them. */
+const SERVER_MARKET: Record<string, string> = {
+  "0x54586be62e3c3580375ae3723c145253060ca0c2": "core",
+  "0xe3c061981870c0c7b1f3c4f4bb36b95f1f260be6": "prime",
+  "0x43b64f28a678944e0655404b0b98e443851cc34f": "etherfi",
+  "0x8105f69d9c41644c6a0803fda7d03aa70996cfd9": "spark",
+  "0x2cc0fc26ed4563a5ce5e8bdcfe1a2878676ae156": "base",
+  "0xfdd4e83890bccd1fbf9b10d71a5cc0a738753b01": "seamless",
+  "0xb56c2f0b653b2e0b10c9b928c8580ac5df02c7c7": "arbitrum",
+};
+/** The server route's limit on assets a request. */
+const SERVER_MAX_ASSETS = 40;
+
+/** One oracle's prices from the server route, raw (8 decimals) by asset; null when the route cannot answer. */
+async function serverPrices(oracle: string, assets: string[]): Promise<Map<string, bigint> | null> {
+  const market = SERVER_MARKET[oracle];
+  const api = process.env.RAILS_API_URL;
+  if (!market || !api) return null;
+  const out = new Map<string, bigint>();
+  try {
+    for (let i = 0; i < assets.length; i += SERVER_MAX_ASSETS) {
+      const qs = new URLSearchParams({ market, assets: assets.slice(i, i + SERVER_MAX_ASSETS).join(",") });
+      const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
+        ...createAuthFetchOptions(),
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { prices?: Record<string, string> };
+      for (const [a, v] of Object.entries(body.prices ?? {})) out.set(a.toLowerCase(), BigInt(v));
+    }
+  } catch {
+    return null;
+  }
+  return out;
+}
 
 const AAVE_ORACLE_ABI = parseAbi(["function getAssetPrice(address asset) view returns (uint256)"]);
 
@@ -62,15 +108,6 @@ export async function resolveAaveOraclePrices(
   const out: AaveOraclePriceMap = new Map();
   if (reqs.length === 0) return out;
 
-  let client: ReturnType<typeof chainClient>;
-  try {
-    client = chainClient(chainId);
-  } catch {
-    // That chain's RPC env var is unset — no on-chain USD; callers stay
-    // token-only, which is what an absent price already means to them.
-    return out;
-  }
-
   // The distinct (oracle, asset) pairs we need a price for.
   const pairs: { oracle: string; asset: string }[] = [];
   const seen = new Set<string>();
@@ -87,11 +124,39 @@ export async function resolveAaveOraclePrices(
   }
   if (pairs.length === 0) return out;
 
+  // The server route first, one request per oracle (chunked); an oracle it
+  // cannot answer is read at the head below.
+  const byOracle = new Map<string, string[]>();
+  for (const p of pairs) (byOracle.get(p.oracle) ?? byOracle.set(p.oracle, []).get(p.oracle)!).push(p.asset);
+  const answered = new Set<string>();
+  await Promise.all(
+    [...byOracle].map(async ([oracle, assets]) => {
+      const got = await serverPrices(oracle, assets);
+      if (!got) return;
+      answered.add(oracle);
+      for (const a of assets) {
+        const v = got.get(a);
+        if (v != null && v > BigInt(0)) out.set(priceKey(oracle, a), Number(v) / PRICE_SCALE);
+      }
+    }),
+  );
+  const chainPairs = pairs.filter((p) => !answered.has(p.oracle));
+  if (chainPairs.length === 0) return out;
+
+  let client: ReturnType<typeof chainClient>;
+  try {
+    client = chainClient(chainId);
+  } catch {
+    // That chain's RPC env var is unset — no on-chain USD; callers stay
+    // token-only, which is what an absent price already means to them.
+    return out;
+  }
+
   let results: unknown[] = [];
   try {
     results = (await client.multicall({
       allowFailure: true,
-      contracts: pairs.map(
+      contracts: chainPairs.map(
         (p) =>
           ({
             address: p.oracle as `0x${string}`,
@@ -105,7 +170,7 @@ export async function resolveAaveOraclePrices(
     results = [];
   }
 
-  pairs.forEach((p, i) => {
+  chainPairs.forEach((p, i) => {
     const res = results[i] as { status: string; result?: unknown } | undefined;
     if (res?.status !== "success" || res.result == null) return;
     const usd = Number(res.result as bigint) / PRICE_SCALE;

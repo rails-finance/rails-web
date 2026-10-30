@@ -973,6 +973,7 @@ export function CombinedFlows({
                             isLive={cur.live && !closed}
                             x={cx}
                             w={rowW}
+                            placed={chartAxis != null}
                           />
                         ) : null
                       }
@@ -1284,6 +1285,7 @@ function PriceHeading({
   isLive,
   x,
   w,
+  placed,
   help,
 }: {
   /** The price chart's "?", at the tip's right. */
@@ -1298,6 +1300,9 @@ function PriceHeading({
   /** The cursor's x, which the tip's caret points at. */
   x: number;
   w: number;
+  /** The chart's axis is in: `x` and `w` are the plot's. Hidden until then,
+   *  so the tip's first frame is at the cursor (ui-jobs 457). */
+  placed: boolean;
 }) {
   const asset =
     series.length > 1 ? (
@@ -1319,7 +1324,7 @@ function PriceHeading({
         ? "liquidation price and band"
         : "liquidation price";
   return (
-    <div className="relative mb-2.5" data-anatomy="F19.1">
+    <div className="relative mb-2.5" style={placed ? undefined : { visibility: "hidden" }} data-anatomy="F19.1">
       <div
         className={`relative rounded-lg border px-2 py-1.5 ${CURSOR_SKIN} ${SECTION_HEADING} text-rb-500`}
         style={{ marginLeft: Math.max(0, left), width: PAIR_W }}

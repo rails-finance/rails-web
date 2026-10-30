@@ -9,7 +9,6 @@
 //                       second URL behind it (fallbackRpcEnv).
 //   chainBatchClient  — the same URL with JSON-RPC batching, rate-limit backoff.
 //   chainLogsClient   — the logs lane (logsRpcEnv) for wide-range getLogs.
-//   chainLogsBatchClient — the logs lane with batching, for archive eth_calls.
 //
 // One client PER CHAIN, cached separately: Ethereum reads ALCHEMY_URL, Base
 // BASE_RPC_URL, Arbitrum ARBITRUM_RPC_URL, Sepolia SEPOLIA_RPC_URL (or one
@@ -203,29 +202,6 @@ export function chainLogsClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClie
 // a half minutes of backoff), where the metered state provider takes pacing.
 // Those reads now go to the state client, paced. Written down so the next
 // reader does not re-derive it.
-
-const logsBatchCache = new Map<ChainId, PublicClient>();
-
-/** The logs lane's endpoint with JSON-RPC batching (60 calls a request), for
- *  archive `eth_call`s at past blocks that a reader chose to run on that lane
- *  and its rate budget (lib/sources/chain/morpho-base-vault-allocation-at.ts on
- *  Base's `BASE_BACKFILL_RPC_URL`), not for a sweep's block and transaction
- *  reads (the note above). A rate-limit refusal is retried as on the other
- *  paced clients. Throws when the var is unset. */
-export function chainLogsBatchClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
-  const meta = chainMeta(chainId);
-  const url = meta.logsRpcEnv === meta.rpcEnv ? stateRpcUrl(meta) : process.env[meta.logsRpcEnv];
-  if (!url) throw new Error(`${meta.logsRpcEnv} not set — ${meta.name} archive reads on the logs lane need it`);
-  let client = logsBatchCache.get(meta.id);
-  if (!client) {
-    client = createPublicClient({
-      chain: VIEM_CHAINS[meta.id],
-      transport: retryingRateLimits(http(url, { batch: { batchSize: 60, wait: 8 }, timeout: 45_000 })),
-    });
-    logsBatchCache.set(meta.id, client);
-  }
-  return client;
-}
 
 function logsClientFor(chainId: ChainId): PublicClient {
   const meta = chainMeta(chainId);

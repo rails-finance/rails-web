@@ -7,7 +7,7 @@
 // position state (which is pinned to T).
 //
 // The read order (rails-ops ui-jobs 444): rails-server's `token_meta` first,
-// through POST /api/reference/erc20, for Ethereum and Base; the chain multicall
+// through POST /api/reference/erc20, for Ethereum, Base, Arbitrum and Sepolia; the chain multicall
 // only for the addresses that answer lists as `missing`, or for all of them when
 // the api does not answer. The table holds what each token's symbol(), decimals()
 // and name() answered at one block, a revert stored as null, so a row maps onto
@@ -23,7 +23,13 @@
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 
 const ERC20_ABI = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
 const NAME_ABI = parseAbi(["function name() view returns (string)"]);
@@ -83,7 +89,12 @@ export function erc20NameOf(address: string, chainId: ChainId = MAINNET_CHAIN_ID
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** The chains `token_meta` holds rows for. */
-const STORED_CHAINS: ReadonlySet<ChainId> = new Set([MAINNET_CHAIN_ID, BASE_CHAIN_ID]);
+const STORED_CHAINS: ReadonlySet<ChainId> = new Set([
+  MAINNET_CHAIN_ID,
+  BASE_CHAIN_ID,
+  ARBITRUM_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+]);
 /** The api's POST cap. */
 const STORED_MAX = 1000;
 /** The read must not hold a page: past this the chain answers. */

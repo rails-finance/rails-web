@@ -3,7 +3,7 @@ import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/
 import { SEAMLESS_CHAIN_ID, SEAMLESS_ORACLE } from "@/lib/seamless/asset-catalog";
 
 // On-chain USD for arbitrary Seamless reserve addresses — this market's OWN
-// IAaveOracle at the head, one batched multicall. Its own, not Aave's: the two
+// IAaveOracle at a recent finalized block, through rails-server (Sieve first, then the at-block store; lib/sources/chain/aave-oracle-prices.ts). Its own, not Aave's: the two
 // markets price through different oracle deployments, and the economics tower
 // values lifetime flows on reserves a wallet has fully exited, which nothing
 // else on the page prices. An asset the oracle can't price is simply absent —

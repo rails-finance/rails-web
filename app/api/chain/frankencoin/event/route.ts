@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFrankencoinEvent } from "@/lib/sources/chain/frankencoin-event";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
 
 // One Frankencoin position event read from its receipt (lib/sources/chain/
-// frankencoin-event.ts): where a mint's or a repayment's ZCHF went, a mint's
+// frankencoin-event.ts, from rails-server's at-block store): where a mint's or a repayment's ZCHF went, a mint's
 // rate at that block, a challenge's buyer or bidder and where its ZCHF went,
 // a new owner's kind. `?tx=` names the transaction, `?position=` the Position
 // contract, `?kind=` the row's kind, `?log=` its log index (which isolates its
@@ -36,12 +37,17 @@ export async function GET(request: NextRequest) {
   if (first != null && !/^\d{1,10}$/.test(first))
     return NextResponse.json({ error: "first must be a block number" }, { status: 400 });
   try {
-    const data = await readFrankencoinEvent(tx, position.toLowerCase(), {
-      kind,
-      logIndex: log != null ? Number(log) : undefined,
-      newOwner: owner?.toLowerCase(),
-      firstBlock: first != null ? Number(first) : undefined,
-    });
+    const data = await readFrankencoinEvent(
+      tx,
+      position.toLowerCase(),
+      {
+        kind,
+        logIndex: log != null ? Number(log) : undefined,
+        newOwner: owner?.toLowerCase(),
+        firstBlock: first != null ? Number(first) : undefined,
+      },
+      readerIpFromRequest(request),
+    );
     return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });
   } catch (error) {
     console.error("Error reading the Frankencoin event:", error);
