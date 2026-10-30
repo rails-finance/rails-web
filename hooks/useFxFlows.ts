@@ -40,6 +40,7 @@ import {
 } from "@/lib/fx/flows-health";
 import { fxMergedReads, fxRatioChangeReads, fxRatioChanges, type FxRatioLog } from "@/lib/fx/ratio-log";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
+import { fetchChangeLog } from "@/lib/shared/change-log-read";
 import { changesByDay, withChanges } from "@/lib/shared/flows-changes";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 
@@ -172,20 +173,20 @@ export function useFxFlows(p: FxFlowsInput): {
   // page. A failed read leaves `ratioLog` null: the lines are the event
   // reads' alone, and no marker draws.
   const logPool = p.enabled && isFxPoolKey(pool) ? pool : null;
-  const [ratioLogs, setRatioLogs] = useState<{ key: string; log: FxRatioLog | null } | null>(null);
+  const [ratioLogs, setRatioLogs] = useState<{ key: string; log: FxRatioLog | null; unavailable: boolean } | null>(
+    null,
+  );
   useEffect(() => {
     if (!logPool) return;
     const ac = new AbortController();
-    fetch(`/api/chain/fx/ratio-log?pool=${logPool}`, { signal: ac.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<FxRatioLog>) : null))
-      .then((log) => setRatioLogs({ key: logPool, log }))
-      .catch((err) => {
-        if ((err as { name?: string })?.name !== "AbortError") setRatioLogs({ key: logPool, log: null });
-      });
+    fetchChangeLog<FxRatioLog>(`/api/chain/fx/ratio-log?pool=${logPool}`, ac.signal)
+      .then((read) => setRatioLogs({ key: logPool, ...read }))
+      .catch(() => {});
     return () => ac.abort();
   }, [logPool]);
   const ratioLogSettled = logPool == null || ratioLogs?.key === logPool;
   const ratioLog = logPool != null && ratioLogs?.key === logPool ? ratioLogs.log : null;
+  const ratioLogUnavailable = logPool != null && ratioLogs?.key === logPool && ratioLogs.unavailable;
 
   // The health view in the card's terms (ui-jobs 328 steps 6 and 8;
   // lib/fx/flows-health.ts): the debt ratio against the pool's two lines,
@@ -241,7 +242,10 @@ export function useFxFlows(p: FxFlowsInput): {
     () => (replay && timeline && p.collSymbol ? fxFocusEvents(replay, p.collSymbol) : []),
     [replay, timeline, p.collSymbol],
   );
-  const changed = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
+  const changed = useMemo(
+    () => withChanges(healthTimeline, changes, ratioLogUnavailable),
+    [healthTimeline, changes, ratioLogUnavailable],
+  );
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), changed);
   const facts = useMemo<FxFlowsNoteFacts | null>(() => {
     if (!replay) return null;

@@ -98,7 +98,11 @@ export function durationWords(seconds: number): string {
   return unit(s, "second");
 }
 
-/** A timeline with its changes, the same object where there are none. */
-export function withChanges<T extends FlowTimeline | null>(t: T, changes: FlowChange[]): T {
-  return t && changes.length ? { ...t, changes } : t;
+/** A timeline with its changes, the same object where there are none. Where
+ *  the change log could not be read (`unavailable`), the timeline says so, and
+ *  the panel's events row names the markers as unavailable. */
+export function withChanges<T extends FlowTimeline | null>(t: T, changes: FlowChange[], unavailable = false): T {
+  if (!t) return t;
+  if (!changes.length && !unavailable) return t;
+  return { ...t, ...(changes.length ? { changes } : {}), ...(unavailable ? { changesUnavailable: true } : {}) };
 }

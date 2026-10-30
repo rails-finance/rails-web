@@ -30,6 +30,7 @@ import {
   type AaveConfigLogAnswer,
 } from "@/lib/aave-v3/config-changes";
 import type { AaveFamilyEmodeSwitch } from "@/lib/aave-v3/account-switches";
+import { fetchChangeLog, type ChangeLogRead } from "@/lib/shared/change-log-read";
 import { withChanges } from "@/lib/shared/flows-changes";
 
 /** The markets whose PoolConfigurator logs rails-server serves. */
@@ -39,32 +40,30 @@ const INDEX_MARKETS = new Set(["core", "prime", "etherfi"]);
 /** A change's read, marked so the reader takes the chain route for it. */
 type ChangePick = HealthPick & { change?: true };
 
-const logs = new Map<string, Promise<AaveConfigLogAnswer | null>>();
+const logs = new Map<string, Promise<ChangeLogRead<AaveConfigLogAnswer>>>();
 
 /** The market's configurator logs, read once per tab. */
-function useConfigLog(market: string | null): AaveConfigLogAnswer | null {
-  const [got, setGot] = useState<{ market: string; log: AaveConfigLogAnswer | null } | null>(null);
+function useConfigLog(market: string | null): ChangeLogRead<AaveConfigLogAnswer> {
+  const [got, setGot] = useState<{ market: string; read: ChangeLogRead<AaveConfigLogAnswer> } | null>(null);
   useEffect(() => {
     if (!market) return;
     let p = logs.get(market);
     if (!p) {
-      p = fetch(`/api/chain/aave-v3/config-log?market=${market}`)
-        .then((r) => (r.ok ? (r.json() as Promise<AaveConfigLogAnswer>) : null))
-        .catch(() => null);
+      p = fetchChangeLog<AaveConfigLogAnswer>(`/api/chain/aave-v3/config-log?market=${market}`);
       p.then((v) => {
-        if (v == null) logs.delete(market);
+        if (v.unavailable) logs.delete(market);
       });
       logs.set(market, p);
     }
     let live = true;
-    p.then((log) => {
-      if (live) setGot({ market, log });
+    p.then((read) => {
+      if (live) setGot({ market, read });
     });
     return () => {
       live = false;
     };
   }, [market]);
-  return got && got.market === market ? got.log : null;
+  return got && got.market === market ? got.read : { log: null, unavailable: false };
 }
 
 const TX_HASH = /0x[0-9a-fA-F]{64}/;
@@ -130,7 +129,7 @@ export function useAaveFamilyHealth(t: FlowTimeline | null, p: AaveFamilyHealthI
     };
   }, [v4, wallet, market]);
   const configMarket = !v4 && market && CONFIG_MARKETS.has(market) && emode ? market : null;
-  const log = useConfigLog(configMarket);
+  const { log, unavailable: changesUnavailable } = useConfigLog(configMarket);
   const held = useMemo(() => heldCollateral(t), [t]);
   const changes = useMemo(
     () => (configMarket && log && emode ? changesInLife(aaveConfigChanges(log, held, emode), t) : []),
@@ -146,5 +145,5 @@ export function useAaveFamilyHealth(t: FlowTimeline | null, p: AaveFamilyHealthI
     return stepped ? { ...s, readAt: "at each day's last event and at each governance change that moved one" } : s;
   }, [source, stepped]);
   const health = useFlowsHealth(t, { reader, source: withLevels, events: picks, liveHf, liveLevels, also });
-  return useMemo(() => withChanges(health, changes), [health, changes]);
+  return useMemo(() => withChanges(health, changes, changesUnavailable), [health, changes, changesUnavailable]);
 }

@@ -201,7 +201,11 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
     }
     return out;
   }, [rows, mtokenOf]);
-  const changes = useCTokenFactorChanges(chainId === 1 ? "moonwell" : "moonwell-base", marketSymbols, replayed);
+  const { changes, unavailable: changesUnavailable } = useCTokenFactorChanges(
+    chainId === 1 ? "moonwell" : "moonwell-base",
+    marketSymbols,
+    replayed,
+  );
   const also = useMemo(() => factorChangePicks(changes, replayed), [changes, replayed]);
   const changed = changes.length > 0;
   const healthSource = useMemo(() => ctokenHealthSource(chainId, changed), [chainId, changed]);
@@ -220,7 +224,10 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
     todayRead,
     also,
   });
-  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
+  const timeline = useMemo(
+    () => withChanges(healthTimeline, changes, changesUnavailable),
+    [healthTimeline, changes, changesUnavailable],
+  );
   const focusEvents = useMemo(() => (replay ? ctokenFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? ctokenEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

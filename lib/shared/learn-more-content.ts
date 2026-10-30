@@ -37,6 +37,8 @@ export interface FlowEventsHelp {
   changes?: string[];
   /** Those a rate note in the history may state instead of a row (ui-jobs 449). */
   noted?: string[];
+  /** The change log could not be read: the markers are not drawn. */
+  changesUnavailable?: boolean;
 }
 
 /** The price chart under the value line: an asset's price, or the health
@@ -117,7 +119,12 @@ export function lifetimeFlowsStackContent(opts: {
         ...(marks.length ? [sentence(listWords(marks))] : []),
       ].join(" "),
     });
-    if (events.changes?.length)
+    if (events.changesUnavailable)
+      details.push({
+        bold: "Protocol changes",
+        text: "the change history could not be read, so no protocol changes are marked. The rest of the chart is unaffected.",
+      });
+    else if (events.changes?.length)
       details.push({
         bold: "The pink diamonds",
         text: `along the top of the events row, a change the protocol made for every position on the day it took effect: ${listWords(events.changes.map(lowerFirst))}. Point at, focus or tap one for the value before and after, with its receipt. Each day's changes also have a row in the history below${events.noted?.length ? ", except a change a rate note there states" : ""}.`,

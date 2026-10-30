@@ -302,7 +302,12 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
         out.set(e.token, { asset: collAsset(e.token), symbol: e.symbol });
     return out;
   }, [bare]);
-  const changes = useCometFactorChanges(p.deployment, market.key, collSymbols, replayed);
+  const { changes, unavailable: changesUnavailable } = useCometFactorChanges(
+    p.deployment,
+    market.key,
+    collSymbols,
+    replayed,
+  );
   const also = useMemo(() => factorChangePicks(changes, replayed), [changes, replayed]);
   const changed = changes.length > 0;
   const healthSource = useMemo(() => cometHealthSource(CHAIN_ID[p.deployment], changed), [p.deployment, changed]);
@@ -321,7 +326,10 @@ export function useCompoundFlows(p: CompoundFlowsInput): {
     todayRead,
     also,
   });
-  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
+  const timeline = useMemo(
+    () => withChanges(healthTimeline, changes, changesUnavailable),
+    [healthTimeline, changes, changesUnavailable],
+  );
   const focusEvents = useMemo(() => (replay ? compoundFocusEvents(replay) : []), [replay]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
   const facts = useMemo(
