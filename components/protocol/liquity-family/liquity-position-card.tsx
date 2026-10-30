@@ -872,6 +872,11 @@ export function useLiquityCardSlots({
       </span>
     ) : pending && debt > 0 && coll > 0 ? (
       <span className="inline-block h-3 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+    ) : zombie && debt <= 0 ? (
+      // A redemption that took the whole debt leaves an open zombie holding
+      // collateral and no debt: there is nothing to liquidate until the owner
+      // borrows again.
+      <span data-liq-none="no-debt">None while it has no debt</span>
     ) : null;
   // Each heading's read-more (decision 0038), in the branch's symbols.
   const tips = troveCardTips(ct, cfg.debtSymbol, ratioLabel("cdp") !== "Collateral ratio");

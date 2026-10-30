@@ -1161,11 +1161,14 @@ const PAGES = [
   },
   {
     // Open since 9 May 2026, on a branch with redemptions; redeemed once by
-    // 30 Oct 2026, so its protocol activity panel opens shown.
+    // 30 Oct 2026, so its protocol activity panel opens shown. That redemption
+    // (block 26300839) took the whole debt: an open zombie with no debt, so
+    // the card's "Liquidates at" reads none and the level has no point today.
     id: "liquity-v2 wstETH Trove (open since May)",
     path: "/ethereum/liquity-v2/trove/wstETH/36866364639024890689412217368623603118483270545575424157920590185252139913822",
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
+    noDebt: true,
     panes: "value,price",
     pace: "wstETH",
   },
@@ -2916,7 +2919,7 @@ async function checkLevelToggle(page, tag, pg = {}) {
       !off.readout &&
       on.pressed === "true" &&
       // A close day with no debt has no level to read out.
-      (on.readout || !!pg.endsClosed) &&
+      (on.readout || !!pg.endsClosed || !!pg.noDebt) &&
       off.lines > 0 &&
       on.lines === off.lines,
     `off ${JSON.stringify(off)}, on ${JSON.stringify(on)}`,
@@ -3374,7 +3377,23 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
       value: e.getAttribute("data-liq-value"),
     }))
     .catch(() => null);
-  if (pg.trove === "live" || pg.trove === "redeemed") {
+  if (pg.noDebt) {
+    // An open Trove with no debt: the card says none, and the level draws no
+    // point today.
+    const today = Math.floor(Date.now() / 1000 / DAY);
+    const card = (
+      await page
+        .locator('[data-panel-row="liquidates-at"] dd')
+        .first()
+        .textContent()
+        .catch(() => null)
+    )?.trim();
+    check(
+      `${tag}: with no debt the card's "Liquidates at" reads none, and the level has no point today`,
+      card === "None while it has no debt" && (end == null || Number(end.day) !== today),
+      `level ${end?.day} ${end?.value}, card ${card}`,
+    );
+  } else if (pg.trove === "live" || pg.trove === "redeemed") {
     const today = Math.floor(Date.now() / 1000 / DAY);
     const card = (
       await page
