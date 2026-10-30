@@ -119,6 +119,6 @@ test("an api that does not answer sends every address to the chain and caches no
 
 test("a chain token_meta does not hold is not asked of the api", async () => {
   const asked = stubApi({});
-  await resolveErc20Meta([addr(0x3001)], 42161);
+  await resolveErc20Meta([addr(0x3001)], 10);
   assert.equal(asked.length, 0);
 });

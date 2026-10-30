@@ -113,19 +113,14 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
   // The minimum's steps, marked on the events row (ruling 10).
   const changes = useMemo(() => (p.fork ? forkMcrChanges(p.fork) : []), [p.fork]);
   const changed = useMemo(() => withChanges(baseTimeline, changes), [baseTimeline, changes]);
-  // The branch's redemptions over the life: to today, or to the close. The
-  // chart starts shown where a redemption reached this Trove.
+  // The branch's redemptions over the life: to today, or to the close.
   const lifeDays = changed?.days;
   const pace = useRedemptionPace(
     p.pace ?? null,
     lifeDays?.length ? lifeDays[0].day : null,
     lifeDays?.length && now != null ? (p.open ? Math.floor(now / 86_400) : lifeDays[lifeDays.length - 1].day) : null,
   );
-  const redeemed = events.some((e) => e.kind === "redemption");
-  const timeline = useMemo(
-    () => (changed && pace ? { ...changed, activity: { ...pace, explains: redeemed } } : changed),
-    [changed, pace, redeemed],
-  );
+  const timeline = useMemo(() => (changed && pace ? { ...changed, activity: pace } : changed), [changed, pace]);
   const focusEvents = useMemo(
     () => (p.collSymbol ? liquityFocusEvents(events, p.collSymbol, p.debtSymbol) : []),
     [events, p.collSymbol, p.debtSymbol],

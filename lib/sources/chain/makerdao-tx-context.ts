@@ -1,94 +1,46 @@
 // A historic MakerDAO read for the vault page's ownership rows, at a mined
 // block, so every answer is kept in process memory and the route caches it at
-// the edge (the minimum ratio's changes are rails-server's
-// /api/at-block/makerdao/mat-changes).
+// the edge.
 //
 // What one transaction around a vault's ownership did: the receipt's logs
 //    and the calldata, read for the parties the rows name (a wallet, a
 //    DSProxy and its owner, an Instadapp account created in the transaction),
 //    the known tools that logged (lib/makerdao/known-contracts.ts), a DeFi
 //    Saver recipe's name, a flash loan, the Sai CDP handed to Maker's
-//    migration contract, and tokens an Instadapp account received. Calls: the
-//    transaction, its receipt, and a few eth_calls per party at its block;
+//    migration contract, and tokens an Instadapp account received. The chain
+//    facts (the transaction, its receipt's logs, and each party's code and
+//    owner(), cache(), instaIndex() and Proxy Registry entry at its block) come
+//    from rails-server's `/api/at-block/makerdao/tx-facts`, which keeps each
+//    once the block is final (server migs 412, 413, 417; rails-ops decisions/0056);
 //    token symbols and decimals go through ./erc20-meta.
 //
-// SERVER-ONLY (ALCHEMY_URL via ./rpc, the api via ./erc20-meta).
+// SERVER-ONLY (the api via ./at-block-api and ./erc20-meta).
 
-import {
-  decodeAbiParameters,
-  decodeFunctionData,
-  formatUnits,
-  getAddress,
-  keccak256,
-  parseAbi,
-  toHex,
-  type Hex,
-} from "viem";
-import { alchemyClient, chainBatchClient } from "./rpc";
+import { decodeAbiParameters, decodeFunctionData, formatUnits, keccak256, parseAbi, toHex, type Hex } from "viem";
+import { atBlockGet } from "./at-block-api";
 import { resolveErc20Meta } from "./erc20-meta";
-import {
-  DYDX_SOLO,
-  INSTA_INDEX,
-  MAKER_KNOWN_CONTRACTS,
-  MAKER_MIGRATION,
-  SAI_TUB,
-} from "@/lib/makerdao/known-contracts";
+import { DYDX_SOLO, MAKER_KNOWN_CONTRACTS, MAKER_MIGRATION, SAI_TUB } from "@/lib/makerdao/known-contracts";
 import type { MakerParty, MakerTokenIn, MakerTxContext } from "@/lib/makerdao/chain-history-types";
 
-const PROXY_REGISTRY = "0x4678f0a6958e4d2bc4f1baf7bc52e8f3564f3fe4";
 // Maker changelog: PROXY_FACTORY. Its Created log names each DSProxy it builds.
 const PROXY_FACTORY = "0xa26e15c895efc0616177b7c1e7270a4c7d51c997";
 const PROXY_CREATED = keccak256(toHex("Created(address,address,address,address)"));
 const TRANSFER = keccak256(toHex("Transfer(address,address,uint256)"));
-const ACCOUNT_CREATED = keccak256(toHex("LogAccountCreated(address,address,address,address)"));
 const TUB_GIVE = keccak256(toHex("give(bytes32,address)")).slice(0, 10);
 
-const VIEWS = parseAbi([
-  "function owner() view returns (address)",
-  "function cache() view returns (address)",
-  "function instaIndex() view returns (address)",
-  "function proxies(address) view returns (address)",
-]);
 const DSPROXY_EXECUTE = parseAbi(["function execute(address,bytes) payable returns (bytes)"]);
 
 const lower = (a: string) => a.toLowerCase();
 const topicAddress = (t: Hex | undefined) => (t ? lower(`0x${t.slice(26)}`) : "");
 
-async function tryRead<T>(p: Promise<T>): Promise<T | null> {
-  try {
-    return await p;
-  } catch {
-    return null;
-  }
-}
-
-async function classify(address: string, blockNumber: bigint, createdOwner: string | null): Promise<MakerParty> {
-  const client = chainBatchClient();
-  const addr = getAddress(address);
-  const code = await client.getCode({ address: addr, blockNumber });
-  const base = { address: lower(address), createdInTx: createdOwner != null };
-  if (!code || code === "0x") return { ...base, kind: "eoa", owner: null };
-  const [owner, cache, index] = await Promise.all([
-    tryRead(client.readContract({ address: addr, abi: VIEWS, functionName: "owner", blockNumber })),
-    tryRead(client.readContract({ address: addr, abi: VIEWS, functionName: "cache", blockNumber })),
-    tryRead(client.readContract({ address: addr, abi: VIEWS, functionName: "instaIndex", blockNumber })),
-  ]);
-  if (index && lower(index) === INSTA_INDEX) {
-    return { ...base, kind: "instadapp-account", owner: createdOwner };
-  }
-  if (owner && cache) {
-    const registered = await tryRead(
-      client.readContract({
-        address: getAddress(PROXY_REGISTRY),
-        abi: VIEWS,
-        functionName: "proxies",
-        args: [owner],
-        blockNumber,
-      }),
-    );
-    if (registered && lower(registered) === lower(address)) return { ...base, kind: "dsproxy", owner: lower(owner) };
-  }
-  return { ...base, kind: "contract", owner: null };
+/** The server's facts: the transaction, its receipt's logs, and each party. */
+interface MakerTxFacts {
+  block: number;
+  from: string;
+  to: string | null;
+  input: Hex;
+  logs: { address: string; topics: Hex[]; data: Hex; logIndex: number }[];
+  parties: Record<string, MakerParty>;
 }
 
 /** The first string of a DeFi Saver recipe tuple inside a DSProxy execute. */
@@ -117,15 +69,13 @@ async function tokenMeta(token: string): Promise<{ symbol: string; decimals: num
 
 const txCache = new Map<string, Promise<MakerTxContext>>();
 
-async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<MakerTxContext> {
-  const client = alchemyClient();
-  const [tx, receipt] = await Promise.all([
-    client.getTransaction({ hash: txHash }),
-    client.getTransactionReceipt({ hash: txHash }),
-  ]);
-  const blockNumber = receipt.blockNumber;
+async function readTxContextOnce(txHash: Hex, addresses: string[], readerIp?: string): Promise<MakerTxContext> {
+  const qs = new URLSearchParams({ tx: txHash });
+  if (addresses.length) qs.set("addresses", [...new Set(addresses.map(lower))].join(","));
+  const facts = await atBlockGet<MakerTxFacts>("makerdao/tx-facts", qs, readerIp);
+  const tx = { from: facts.from, to: facts.to, input: facts.input };
+  const receipt = { logs: facts.logs };
 
-  const created = new Map<string, string>();
   const tools = new Set<string>();
   let migratedCup: string | null = null;
   let flashLoan: MakerTxContext["flashLoan"] = null;
@@ -137,9 +87,6 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
     if (at === PROXY_FACTORY && t0 === PROXY_CREATED && log.data.length >= 130) {
       // Created(sender indexed, owner indexed, proxy, cache)
       proxiesBuilt.push({ owner: topicAddress(log.topics[2]), proxy: lower(`0x${log.data.slice(26, 66)}`) });
-    }
-    if (at === INSTA_INDEX && t0 === ACCOUNT_CREATED) {
-      created.set(topicAddress(log.topics[2]), topicAddress(log.topics[1]));
     }
     const known = MAKER_KNOWN_CONTRACTS[at];
     if (known?.role === "tool") tools.add(known.name);
@@ -166,10 +113,11 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
     };
   }
 
-  const wanted = [...new Set([lower(tx.from), ...(tx.to ? [lower(tx.to)] : []), ...addresses.map(lower)])];
-  const classified = await Promise.all(wanted.map((a) => classify(a, blockNumber, created.get(a) ?? null)));
-  const parties: Record<string, MakerParty> = {};
-  for (const p of classified) parties[p.address] = p;
+  // Each party's kind at the block, as the server classified it (the sender, the
+  // target and the addresses asked); the Instadapp accounts this transaction
+  // created carry their creator.
+  const parties: Record<string, MakerParty> = facts.parties;
+  const classified = Object.values(parties);
 
   const accounts = new Set(classified.filter((p) => p.kind === "instadapp-account").map((p) => p.address));
   const tokensIn: MakerTokenIn[] = [];
@@ -187,7 +135,7 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
 
   return {
     txHash: lower(txHash),
-    block: Number(blockNumber),
+    block: facts.block,
     from: lower(tx.from),
     to: tx.to ? lower(tx.to) : null,
     parties,
@@ -200,11 +148,11 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
   };
 }
 
-export function readMakerTxContext(txHash: Hex, addresses: string[]): Promise<MakerTxContext> {
+export function readMakerTxContext(txHash: Hex, addresses: string[], readerIp?: string): Promise<MakerTxContext> {
   const key = `${lower(txHash)}:${[...new Set(addresses.map(lower))].sort().join(",")}`;
   let p = txCache.get(key);
   if (!p) {
-    p = readTxContextOnce(txHash, addresses);
+    p = readTxContextOnce(txHash, addresses, readerIp);
     p.catch(() => txCache.delete(key));
     txCache.set(key, p);
   }

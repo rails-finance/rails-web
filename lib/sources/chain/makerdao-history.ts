@@ -1,12 +1,14 @@
-// Two historic MakerDAO reads for the vault page, both by chain call at a mined
-// block, so every answer is kept in process memory and the routes cache it at
-// the edge.
+// Two historic MakerDAO reads for the vault page at a mined block; the routes
+// cache each answer at the edge.
 //
 // 1. An ilk's risk state at a block: Vat.ilks (spot, dust), Spotter.ilks (mat)
-//    and Spotter.par, three eth_calls batched into one request. The OSM price is the Spotter's
-//    poke inverted (spot = price / par / mat), the same arithmetic the index
-//    uses for a liquidation's price (server migration 111) and the live card
-//    uses at head (makerdao-position.ts).
+//    and Spotter.par, from rails-server's `/api/at-block/makerdao/ilk-at`, which
+//    keeps each read once the block is final (server mig 412; rails-ops
+//    decisions/0056). The OSM price is the Spotter's poke inverted (spot = price
+//    / par / mat), the same arithmetic the index uses for a liquidation's price
+//    (server migration 111) and the live card uses at head
+//    (makerdao-position.ts); a LockStake ilk adds its capped feed's cap and the
+//    OSM behind it (makerdao-lse-oracle.ts).
 //
 // 2. How a liquidation's auction ran. The grab's transaction carries the Dog's
 //    Bark for this urn (ilk, urn, ink, art, due, clip, id) and the Clipper's
@@ -19,24 +21,14 @@
 //    answered as not read. Calls: the receipt, one eth_getLogs over the clip
 //    filtered by id, one block header, one eth_call for mat.
 //
-// SERVER-ONLY (ALCHEMY_URL via ./rpc).
+// SERVER-ONLY (ALCHEMY_URL via ./rpc, RAILS_API_URL via ./at-block-api).
 
-import { decodeEventLog, formatUnits, getAddress, parseAbi, stringToHex } from "viem";
-import { alchemyClient, chainBatchClient } from "./rpc";
-import { MAKER_ADDRESSES, isLseIlk } from "@/lib/makerdao/asset-catalog";
-import { readPriceCap } from "./makerdao-lse-oracle";
-import type {
-  MakerAuctionRead,
-  MakerAuctionTake,
-  MakerIlkAt,
-  MakerIlkAtResponse,
-} from "@/lib/makerdao/chain-history-types";
+import { decodeEventLog, formatUnits, getAddress, parseAbi } from "viem";
+import { alchemyClient } from "./rpc";
+import { atBlockGet } from "./at-block-api";
+import { MAKER_ADDRESSES } from "@/lib/makerdao/asset-catalog";
+import type { MakerAuctionRead, MakerAuctionTake, MakerIlkAtResponse } from "@/lib/makerdao/chain-history-types";
 
-const RAY = BigInt(10) ** BigInt(27);
-
-const VAT_ABI = parseAbi([
-  "function ilks(bytes32) view returns (uint256 Art, uint256 rate, uint256 spot, uint256 line, uint256 dust)",
-]);
 const SPOTTER_ABI = parseAbi([
   "function ilks(bytes32) view returns (address pip, uint256 mat)",
   "function par() view returns (uint256)",
@@ -51,57 +43,11 @@ const TAKE_EVENT = AUCTION_ABI[2];
 /** At most this many blocks per ilk-at request. */
 export const MAKER_ILK_AT_MAX_BLOCKS = 60;
 
-const ilkCache = new Map<string, Promise<MakerIlkAt>>();
-
-async function readIlkAtOnce(ilk: string, block: number): Promise<MakerIlkAt> {
-  const ilkB = stringToHex(ilk, { size: 32 });
-  const vat = getAddress(MAKER_ADDRESSES.VAT);
-  const spotter = getAddress(MAKER_ADDRESSES.SPOTTER);
-  // Three plain eth_calls, batched into one HTTP request: Multicall3 is not
-  // deployed before block 14,353,601, and most vault histories start earlier.
-  const client = chainBatchClient();
-  const blockNumber = BigInt(block);
-  const [vatIlk, spotIlk, par] = await Promise.all([
-    client.readContract({ address: vat, abi: VAT_ABI, functionName: "ilks", args: [ilkB], blockNumber }),
-    client.readContract({ address: spotter, abi: SPOTTER_ABI, functionName: "ilks", args: [ilkB], blockNumber }),
-    client.readContract({ address: spotter, abi: SPOTTER_ABI, functionName: "par", blockNumber }),
-  ]);
-  const spot = vatIlk[2];
-  const dust = vatIlk[4];
-  const mat = spotIlk[1];
-  const priceUsd =
-    mat > BigInt(0) && spot > BigInt(0) ? Number(formatUnits((((spot * par) / RAY) * mat) / RAY, 27)) : null;
-  // LockStake: the pip is a capped wrapper; say what the cap and the OSM were.
-  const priceCap = isLseIlk(ilk) ? await readPriceCap(client, spotIlk[0], blockNumber) : null;
-  return {
-    block,
-    priceUsd,
-    ...(priceCap ? { priceCap } : {}),
-    mat: mat > BigInt(0) ? Number(formatUnits(mat, 27)) : null,
-    dustDai: Number(formatUnits(dust, 45)),
-  };
-}
-
-function readIlkAt(ilk: string, block: number): Promise<MakerIlkAt> {
-  const key = `${ilk}:${block}`;
-  let p = ilkCache.get(key);
-  if (!p) {
-    p = readIlkAtOnce(ilk, block);
-    p.catch(() => ilkCache.delete(key));
-    ilkCache.set(key, p);
-  }
-  return p;
-}
-
-export async function readMakerIlkAtBlocks(ilk: string, blocks: number[]): Promise<MakerIlkAtResponse> {
-  const wanted = [...new Set(blocks)].sort((a, b) => a - b);
-  const reads: Record<string, MakerIlkAt> = {};
-  // Four at a time, as the f(x) event-state read does.
-  for (let i = 0; i < wanted.length; i += 4) {
-    const got = await Promise.all(wanted.slice(i, i + 4).map((b) => readIlkAt(ilk, b)));
-    for (const g of got) reads[String(g.block)] = g;
-  }
-  return { ilk, reads };
+/** The ilk at each block, from the server's store, in one request (at most
+ *  MAKER_ILK_AT_MAX_BLOCKS blocks, the server's own limit). */
+export function readMakerIlkAtBlocks(ilk: string, blocks: number[], readerIp?: string): Promise<MakerIlkAtResponse> {
+  const qs = new URLSearchParams({ ilk, blocks: [...new Set(blocks)].join(",") });
+  return atBlockGet<MakerIlkAtResponse>("makerdao/ilk-at", qs, readerIp);
 }
 
 const auctionCache = new Map<string, Promise<MakerAuctionRead>>();
