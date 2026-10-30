@@ -49,11 +49,7 @@ redrawn for the share-card renderer. Lucide's notice, reproduced for that transc
 
 ## People's images
 
-The team's own images are `public/avatars/x/milesessex.png`, `public/avatars/x/rails_finance.svg`,
-`public/avatars/github/*` and `public/about-team-*.jpg`.
-
-The other X profile pictures on `/pulse` are 96 px copies of each account's picture as unavatar.io
-served it on 2026-10-30, kept as `public/avatars/x/<handle>.jpg`: castle_labs, Ceazor7,
-defiscan_info, DuckDegen, gutomartino, justinCbram, LiquityProtocol, StaniKulechov and TokenBrice.
-Each belongs to its account holder and is shown beside that account's post. A handle with no file
-here shows `public/avatars/x/_fallback.svg`.
+The repository holds only the team's own images: `public/avatars/x/milesessex.png`,
+`public/avatars/x/rails_finance.svg`, `public/avatars/github/*` and `public/about-team-*.jpg`.
+Other people's profile pictures are fetched at request time (`app/api/avatar/x/[handle]/route.ts`)
+and are not stored here.

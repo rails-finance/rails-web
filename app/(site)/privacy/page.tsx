@@ -117,9 +117,7 @@ export default function PrivacyPage() {
               <strong>Vercel:</strong> For site hosting and cookieless, aggregate traffic analytics
             </li>
           </ul>
-          <p className="text-rb-500 mb-4">
-            Token icons and the profile pictures on the Pulse page are served from Rails.
-          </p>
+          <p className="text-rb-500 mb-4">Token icons are served from Rails.</p>
         </section>
 
         <section className="mb-8">
