@@ -7,6 +7,7 @@
 // close or today.
 
 import { useEffect, useMemo, useState } from "react";
+import { fetchChangeLog, type ChangeLogRead } from "@/lib/shared/change-log-read";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import {
   cometFactorChanges,
@@ -19,31 +20,35 @@ import type { CTokenProtocol } from "@/lib/api/fetch-ctoken-liquidity-at";
 import type { CompoundDeploymentKey } from "@/lib/compound/deployments";
 
 const NONE: FactorChange[] = [];
-const logs = new Map<string, Promise<unknown>>();
+const logs = new Map<string, Promise<ChangeLogRead<unknown>>>();
 
-function useLog<T>(url: string | null): T | null {
-  const [got, setGot] = useState<{ url: string; log: T | null } | null>(null);
+function useLog<T>(url: string | null): ChangeLogRead<T> {
+  const [got, setGot] = useState<{ url: string; read: ChangeLogRead<T> } | null>(null);
   useEffect(() => {
     if (!url) return;
     let p = logs.get(url);
     if (!p) {
-      p = fetch(url)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null);
+      p = fetchChangeLog<unknown>(url);
       p.then((v) => {
-        if (v == null) logs.delete(url);
+        if (v.unavailable) logs.delete(url);
       });
       logs.set(url, p);
     }
     let live = true;
-    p.then((log) => {
-      if (live) setGot({ url, log: log as T | null });
+    p.then((read) => {
+      if (live) setGot({ url, read: read as ChangeLogRead<T> });
     });
     return () => {
       live = false;
     };
   }, [url]);
-  return got && got.url === url ? got.log : null;
+  return got && got.url === url ? got.read : { log: null, unavailable: false };
+}
+
+/** A family's factor changes, and whether its log could not be read. */
+export interface FactorChangesRead {
+  changes: FactorChange[];
+  unavailable: boolean;
 }
 
 /** The life's first and last UTC days: the last is null while anything is
@@ -80,12 +85,14 @@ export function useCTokenFactorChanges(
   protocol: CTokenProtocol,
   markets: ReadonlyMap<string, { asset: string; symbol: string }>,
   t: FlowTimeline | null,
-): FactorChange[] {
-  const log = useLog<CTokenFactorLog>(markets.size > 0 ? `/api/chain/ctoken-factor-log?protocol=${protocol}` : null);
+): FactorChangesRead {
+  const { log, unavailable } = useLog<CTokenFactorLog>(
+    markets.size > 0 ? `/api/chain/ctoken-factor-log?protocol=${protocol}` : null,
+  );
   const life = useMemo(() => lifeDays(t), [t]);
   return useMemo(
-    () => inLife(ctokenFactorChanges(log, markets, CTOKEN_NAMES[protocol]), life),
-    [log, markets, protocol, life],
+    () => ({ changes: inLife(ctokenFactorChanges(log, markets, CTOKEN_NAMES[protocol]), life), unavailable }),
+    [log, unavailable, markets, protocol, life],
   );
 }
 
@@ -96,10 +103,13 @@ export function useCometFactorChanges(
   market: string,
   assets: ReadonlyMap<string, { asset: string; symbol: string }>,
   t: FlowTimeline | null,
-): FactorChange[] {
-  const log = useLog<CometFactorLog>(
+): FactorChangesRead {
+  const { log, unavailable } = useLog<CometFactorLog>(
     assets.size > 0 ? `/api/chain/compound/factor-log?deployment=${deployment}&market=${market}` : null,
   );
   const life = useMemo(() => lifeDays(t), [t]);
-  return useMemo(() => inLife(cometFactorChanges(log, assets), life), [log, assets, life]);
+  return useMemo(
+    () => ({ changes: inLife(cometFactorChanges(log, assets), life), unavailable }),
+    [log, unavailable, assets, life],
+  );
 }

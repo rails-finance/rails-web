@@ -48,6 +48,7 @@ import {
 } from "@/lib/dolomite/flows-health";
 import { useFlowsHealth, type HealthPick, type HealthReader } from "@/hooks/useFlowsHealth";
 import { healthRead } from "@/lib/shared/health-reads";
+import { fetchChangeLog, type ChangeLogRead } from "@/lib/shared/change-log-read";
 import { withChanges } from "@/lib/shared/flows-changes";
 import { dolomiteHasRisk } from "@/components/protocol/dolomite/dolomite-risk-slot";
 
@@ -236,13 +237,12 @@ export function useDolomiteFlows(p: DolomiteFlowsInput): {
   });
 
   // The core's risk setter logs, one read per page, for the markers.
-  const [riskLog, setRiskLog] = useState<DolomiteRiskLog | null>(null);
+  const [riskRead, setRiskRead] = useState<ChangeLogRead<DolomiteRiskLog>>({ log: null, unavailable: false });
   useEffect(() => {
     if (!borrower) return;
     const ac = new AbortController();
-    fetch("/api/chain/dolomite/risk-log", { signal: ac.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<DolomiteRiskLog>) : null))
-      .then((log) => setRiskLog(log))
+    fetchChangeLog<DolomiteRiskLog>("/api/chain/dolomite/risk-log", ac.signal)
+      .then((read) => setRiskRead(read))
       .catch(() => {});
     return () => ac.abort();
   }, [borrower]);
@@ -251,8 +251,11 @@ export function useDolomiteFlows(p: DolomiteFlowsInput): {
     for (const r of rows ?? []) if (!out.has(r.market)) out.set(r.market, r.symbol);
     return out;
   }, [rows]);
-  const changes = useMemo(() => dolomiteRiskChanges(riskLog, marketSymbols), [riskLog, marketSymbols]);
-  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
+  const changes = useMemo(() => dolomiteRiskChanges(riskRead.log, marketSymbols), [riskRead, marketSymbols]);
+  const timeline = useMemo(
+    () => withChanges(healthTimeline, changes, riskRead.unavailable),
+    [healthTimeline, changes, riskRead.unavailable],
+  );
   const focusEvents = useMemo(() => (replay ? dolomiteFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? dolomiteEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

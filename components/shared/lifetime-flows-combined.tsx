@@ -74,6 +74,7 @@ import {
 } from "@/components/shared/lifetime-flows-lw-axis";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
+import { CHANGES_UNAVAILABLE_NOTE } from "@/lib/shared/change-log-read";
 import { changesByDay, changeWords, type FlowChange } from "@/lib/shared/flows-changes";
 import { ChangeValues } from "@/components/shared/protocol-change-row";
 import {
@@ -414,6 +415,7 @@ function eventsHelp(model: FlowModel, hasDebt: boolean, changeDays: { changes: F
     byOther: model.ticks.some((t) => t.byOther),
     changes: [...new Set(changeDays.flatMap((d) => d.changes.map((c) => c.name)))],
     noted: [...new Set(changeDays.flatMap((d) => d.changes.filter((c) => c.noted).map((c) => c.name)))],
+    changesUnavailable: model.changesUnavailable,
   };
 }
 
@@ -999,6 +1001,11 @@ export function CombinedFlows({
                     steps={steps}
                     changeDays={changeDays}
                   />
+                  {model.changesUnavailable && !priceOnly && (
+                    <p className="mt-1 text-xs text-rb-500" data-flow-changes-unavailable="">
+                      {CHANGES_UNAVAILABLE_NOTE}
+                    </p>
+                  )}
                 </div>
                 {/* Protocol activity: its own chart on the chart's time axis,
                     under the events, while the charts are shown. */}

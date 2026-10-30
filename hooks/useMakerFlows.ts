@@ -23,6 +23,8 @@ import { makerCollKey, makerHealthSource, makerMatReads } from "@/lib/makerdao/f
 import { makerFeedChanges, makerLifeHasFeedChange, type MakerFeedLog } from "@/lib/makerdao/feed-log";
 import { useFlowsHealth } from "@/hooks/useFlowsHealth";
 import type { MakerRateLogResponse } from "@/lib/api/fetch-makerdao-rate-log";
+import { fetchChangeLog } from "@/lib/shared/change-log-read";
+import { withChanges } from "@/lib/shared/flows-changes";
 import { makerFlowChanges } from "@/lib/makerdao/flows-changes";
 import {
   MK,
@@ -159,20 +161,20 @@ export function useMakerFlows(p: MakerFlowsInput): {
   // The ilk's price feed log (/api/chain/makerdao/feed-log), one read per
   // page. A failed read leaves `feedLog` null: no feed marker draws.
   const feedIlk = rows && rows.length > 0 ? p.ilk : null;
-  const [feedLogs, setFeedLogs] = useState<{ key: string; log: MakerFeedLog | null } | null>(null);
+  const [feedLogs, setFeedLogs] = useState<{ key: string; log: MakerFeedLog | null; unavailable: boolean } | null>(
+    null,
+  );
   useEffect(() => {
     if (!feedIlk) return;
     const ac = new AbortController();
-    fetch(`/api/chain/makerdao/feed-log?ilk=${encodeURIComponent(feedIlk)}`, { signal: ac.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<MakerFeedLog>) : null))
-      .then((log) => setFeedLogs({ key: feedIlk, log }))
-      .catch((err) => {
-        if ((err as { name?: string })?.name !== "AbortError") setFeedLogs({ key: feedIlk, log: null });
-      });
+    fetchChangeLog<MakerFeedLog>(`/api/chain/makerdao/feed-log?ilk=${encodeURIComponent(feedIlk)}`, ac.signal)
+      .then((read) => setFeedLogs({ key: feedIlk, ...read }))
+      .catch(() => {});
     return () => ac.abort();
   }, [feedIlk]);
   const feedLogSettled = feedIlk == null || feedLogs?.key === feedIlk;
   const feedLog = feedIlk != null && feedLogs?.key === feedIlk ? feedLogs.log : null;
+  const feedLogUnavailable = feedIlk != null && feedLogs?.key === feedIlk && feedLogs.unavailable;
   const feedChanges = useMemo(() => makerFeedChanges(feedLog), [feedLog]);
 
   // Set on mount, so the server's render and the first client render agree.
@@ -256,8 +258,8 @@ export function useMakerFlows(p: MakerFlowsInput): {
     ];
   }, [p.ilk, p.rateLog, first, matFirst, matSpans, matChanges, feedChanges]);
   const timeline = useMemo(
-    () => (healthTimeline && changes.length ? { ...healthTimeline, changes } : healthTimeline),
-    [healthTimeline, changes],
+    () => withChanges(healthTimeline, changes, feedLogUnavailable),
+    [healthTimeline, changes, feedLogUnavailable],
   );
   const focusEvents = useMemo(
     () =>

@@ -391,6 +391,9 @@ export interface FlowTimeline {
    *  reads (lib/shared/flows-changes.ts); the events row marks those inside
    *  the life. */
   changes?: FlowChange[];
+  /** The family's change log could not be read: the events row says its
+   *  markers are unavailable. An empty list is not this. */
+  changesUnavailable?: true;
   /** A protocol-wide daily total drawn as its own chart under the events, on
    *  the chart's time axis (lib/shared/flows-pace.ts; Liquity V2's branch
    *  redemptions). */
@@ -525,6 +528,8 @@ export interface FlowModel {
   /** The timeline's protocol changes (`FlowTimeline.changes`), by UTC day
    *  number. */
   changes: FlowChange[];
+  /** The timeline's change log could not be read (`FlowTimeline.changesUnavailable`). */
+  changesUnavailable: boolean;
   /** The timeline's protocol activity (`FlowTimeline.activity`), or null. */
   activity: ProtocolActivity | null;
   live: FlowLive;
@@ -1053,6 +1058,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     }),
     repricings,
     changes: t.changes ?? [],
+    changesUnavailable: t.changesUnavailable === true,
     activity: t.activity ?? null,
     live: t.live,
     valued,

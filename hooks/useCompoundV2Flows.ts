@@ -268,7 +268,7 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
     }
     return out;
   }, [rows]);
-  const changes = useCTokenFactorChanges("compound-v2", marketSymbols, replayed);
+  const { changes, unavailable: changesUnavailable } = useCTokenFactorChanges("compound-v2", marketSymbols, replayed);
   const also = useMemo(() => factorChangePicks(changes, replayed), [changes, replayed]);
   const healthTimeline = useFlowsHealth(replayed, {
     reader,
@@ -279,7 +279,10 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
     todayRead,
     also,
   });
-  const timeline = useMemo(() => withChanges(healthTimeline, changes), [healthTimeline, changes]);
+  const timeline = useMemo(
+    () => withChanges(healthTimeline, changes, changesUnavailable),
+    [healthTimeline, changes, changesUnavailable],
+  );
   const focusEvents = useMemo(() => (replay ? ctokenFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? ctokenEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);

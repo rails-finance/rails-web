@@ -52,6 +52,7 @@ import {
   llamalendLifeHasDiscountChange,
   type LlamalendConfigLog,
 } from "@/lib/llamalend/config-log";
+import { fetchChangeLog } from "@/lib/shared/change-log-read";
 import { withChanges } from "@/lib/shared/flows-changes";
 
 const DAY_S = 86_400;
@@ -259,20 +260,22 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
   // (/api/chain/llamalend/config-log), one read per page. A failed read
   // leaves `configLog` null: no marker draws.
   const logController = source ? p.controller.toLowerCase() : null;
-  const [configLogs, setConfigLogs] = useState<{ key: string; log: LlamalendConfigLog | null } | null>(null);
+  const [configLogs, setConfigLogs] = useState<{
+    key: string;
+    log: LlamalendConfigLog | null;
+    unavailable: boolean;
+  } | null>(null);
   useEffect(() => {
     if (!logController) return;
     const ac = new AbortController();
-    fetch(`/api/chain/llamalend/config-log?controller=${logController}`, { signal: ac.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<LlamalendConfigLog>) : null))
-      .then((log) => setConfigLogs({ key: logController, log }))
-      .catch((err) => {
-        if ((err as { name?: string })?.name !== "AbortError") setConfigLogs({ key: logController, log: null });
-      });
+    fetchChangeLog<LlamalendConfigLog>(`/api/chain/llamalend/config-log?controller=${logController}`, ac.signal)
+      .then((read) => setConfigLogs({ key: logController, ...read }))
+      .catch(() => {});
     return () => ac.abort();
   }, [logController]);
   const configLogSettled = logController == null || configLogs?.key === logController;
   const configLog = logController != null && configLogs?.key === logController ? configLogs.log : null;
+  const configLogUnavailable = logController != null && configLogs?.key === logController && configLogs.unavailable;
 
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
@@ -332,7 +335,10 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
       },
     };
   }, [plain, rows, opts, bands, band, p.collSymbol, p.debtSymbol, discountChanged]);
-  const changed = useMemo(() => withChanges(timeline, changes), [timeline, changes]);
+  const changed = useMemo(
+    () => withChanges(timeline, changes, configLogUnavailable),
+    [timeline, changes, configLogUnavailable],
+  );
   const focusEvents = useMemo(
     () =>
       replay && changed && p.collSymbol && p.debtSymbol ? llamalendFocusEvents(replay, p.collSymbol, p.debtSymbol) : [],
