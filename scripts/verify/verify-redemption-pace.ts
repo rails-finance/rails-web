@@ -28,7 +28,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  branchRedemptionPace,
   dayOfIso,
+  forkPaceSource,
   isoDay,
   PACE_MAX_DAYS,
   paceBranch,
@@ -140,4 +142,46 @@ test("a malformed answer is no lane", () => {
   const none = redemptionPace("WETH", { ...WETH, days: [] })!;
   assert.equal(paceFilled(none, none.from, none.to).length, 27);
   assert.equal(paceMax(none, none.from, none.to), 0);
+});
+
+// The forks: the same series in their own stable, from rails-server's
+// /api/{ebisu,asymmetry,basedollar}/redemption-pace on victoria, 30 Oct 2026
+// (fixtures/liquity-fork-redemption-pace.json).
+const forks = JSON.parse(
+  readFileSync(join(__dirname, "fixtures", "liquity-fork-redemption-pace.json"), "utf8"),
+) as Record<string, RedemptionPaceAnswer>;
+
+test("a fork's branch: its stable in the title, its route and table in the receipt", () => {
+  const ysy = branchRedemptionPace(
+    forkPaceSource("asymmetry", "ysyBOLD", "USDaf"),
+    forks["asymmetry:ysyBOLD:2026-10-20:2026-10-29"],
+  )!;
+  assert.equal(`${ysy.scope} · ${ysy.measure}`, "Whole ysyBOLD branch · USDaf redeemed a day");
+  const filled = paceFilled(ysy, ysy.from, ysy.to);
+  assert.equal(filled.length, 10);
+  assert.equal(paceAt(ysy, day("2026-10-27"))!.count, 0);
+  assert.equal(sum(filled.map((d) => d.count)), 47);
+  assert.equal(paceWords(ysy, paceAt(ysy, day("2026-10-29"))!), "1,508 USDaf · 7 redemptions");
+  const at = ysy.prov(paceAt(ysy, day("2026-10-29"))!, "29 Oct 2026");
+  assert.match(String(at.via), /asymmetry_redemption_ysybold · \/api\/asymmetry\/redemption-pace\?branch=ysyBOLD/);
+  assert.match(at.summary, /USDaf burned before the redemption fee/);
+  assert.doesNotMatch(ysy.help, /BOLD redeemed|, not |\bfold|footgun|honest/);
+
+  const bd = branchRedemptionPace(
+    forkPaceSource("basedollar", "wstETH", "BD"),
+    forks["basedollar:wstETH:2026-10-20:2026-10-29"],
+  )!;
+  assert.equal(`${bd.scope} · ${bd.measure}`, "Whole wstETH branch · BD redeemed a day");
+  assert.equal(sum(bd.days.map((d) => d.count)), 203);
+});
+
+test("Ebisu, never redeemed: a chart of zeros", () => {
+  const eb = branchRedemptionPace(
+    forkPaceSource("ebisu", "weETH", "ebUSD"),
+    forks["ebisu:weETH:2026-10-20:2026-10-29"],
+  )!;
+  assert.equal(`${eb.scope} · ${eb.measure}`, "Whole weETH branch · ebUSD redeemed a day");
+  assert.equal(eb.days.length, 0);
+  assert.equal(paceMax(eb, eb.from, eb.to), 0);
+  assert.equal(paceWords(eb, paceAt(eb, day("2026-10-25"))!), "0 ebUSD · no redemptions");
 });

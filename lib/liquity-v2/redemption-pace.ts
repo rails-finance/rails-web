@@ -1,7 +1,9 @@
 // Liquity V2's redemption pace: BOLD redeemed on a branch per UTC day, from
 // rails-server's /api/liquity-v2/redemption-pace (the web's proxy of the same
 // path), drawn as the Trove page's protocol activity chart under the Lifetime
-// flows chart (lib/shared/flows-pace.ts; ui-jobs 452).
+// flows chart (lib/shared/flows-pace.ts; ui-jobs 452). The forks (Ebisu,
+// Asymmetry, Basedollar) read the same series in their own stable from
+// /api/{ebisu,asymmetry,basedollar}/redemption-pace (`forkPaceSource`).
 //
 // RULES.
 // - The answer lists the days with a redemption; every other day of the range
@@ -48,6 +50,36 @@ export function paceBranch(collSymbol: string | null | undefined): PaceBranch | 
   return s === "weth" ? "WETH" : s === "wsteth" ? "wstETH" : s === "reth" ? "rETH" : null;
 }
 
+export type PaceFork = "ebisu" | "asymmetry" | "basedollar";
+
+/** Where a branch's series is read and what it is counted in. */
+export interface PaceSource {
+  /** The web route, without the query ("/api/ebisu/redemption-pace"). */
+  path: string;
+  /** The branch's display symbol, the route's `branch`. */
+  branch: string;
+  /** The stable redeemed ("BOLD", "ebUSD"). */
+  unit: string;
+  /** The rails-server table the route sums, for the receipt. */
+  table: string;
+}
+
+/** Liquity V2's own branch. */
+export const v2PaceSource = (branch: PaceBranch): PaceSource => ({
+  path: "/api/liquity-v2/redemption-pace",
+  branch,
+  unit: "BOLD",
+  table: "redemption_events",
+});
+
+/** A fork's branch: `branch` is the display symbol, `unit` the fork's stable. */
+export const forkPaceSource = (fork: PaceFork, branch: string, unit: string): PaceSource => ({
+  path: `/api/${fork}/redemption-pace`,
+  branch,
+  unit,
+  table: `${fork}_redemption_${branch.toLowerCase()}`,
+});
+
 /** The range to read for a life from `first` to `last` (UTC day numbers):
  *  the whole life, or its newest PACE_MAX_DAYS. */
 export function paceRange(first: number, last: number): { from: number; to: number } {
@@ -74,18 +106,24 @@ export function paceDays(body: unknown): { from: number; to: number; days: PaceD
   return { from, to, days };
 }
 
-/** The Trove page's protocol activity for a branch's answer. */
+/** The Trove page's protocol activity for a Liquity V2 branch's answer. */
 export function redemptionPace(branch: PaceBranch, body: unknown): ProtocolActivity | null {
+  return branchRedemptionPace(v2PaceSource(branch), body);
+}
+
+/** The Trove page's protocol activity for a branch's answer, V2's or a fork's. */
+export function branchRedemptionPace(src: PaceSource, body: unknown): ProtocolActivity | null {
   const read = paceDays(body);
   if (!read) return null;
-  const via = `rails-server redemption_events · /api/liquity-v2/redemption-pace?branch=${branch}`;
+  const { branch, unit } = src;
+  const via = `rails-server ${src.table} · ${src.path}?branch=${branch}`;
   return {
     ...read,
-    unit: "BOLD",
+    unit,
     scope: `Whole ${branch} branch`,
-    measure: "BOLD redeemed a day",
+    measure: `${unit} redeemed a day`,
     noun: ["redemption", "redemptions"],
-    help: `under the events, BOLD redeemed on the ${branch} branch each day, every Trove on the branch, this one included. Redemptions take the Troves with the lowest interest rates first, so a run of tall bars marks a stretch of redemption pressure on the branch; read it against this Trove's interest rate and any redemption that reached it, an orange triangle on the events row. A bar's height grows with the square root of the day's BOLD, so a small day stays visible beside the largest; the axis marks round amounts at their heights. The line over the bars reads the cursor's day: the BOLD redeemed and the number of redemptions. The chart starts shown on a Trove a redemption reached, hidden otherwise.`,
+    help: `under the events, ${unit} redeemed on the ${branch} branch each day, every Trove on the branch, this one included. Redemptions take the Troves with the lowest interest rates first, so a run of tall bars marks a stretch of redemption pressure on the branch; read it against this Trove's interest rate and any redemption that reached it, an orange triangle on the events row. A bar's height grows with the square root of the day's ${unit}, so a small day stays visible beside the largest; the axis marks round amounts at their heights. The line over the bars reads the cursor's day: the ${unit} redeemed and the number of redemptions. The chart starts shown on a Trove a redemption reached, hidden otherwise.`,
     explains: false,
     prov: (at, dayWord) => ({
       kind: "chain-derived",
@@ -93,7 +131,7 @@ export function redemptionPace(branch: PaceBranch, body: unknown): ProtocolActiv
       summary:
         at.count === 0
           ? `No redemption reached the ${branch} branch on ${dayWord} (UTC): the day has no Redemption log in the index.`
-          : `BOLD redeemed on the ${branch} branch on ${dayWord} (UTC), across every Trove on the branch: the sum of the ${at.count.toLocaleString("en-US")} TroveManager Redemption ${at.count === 1 ? "log's" : "logs'"} _actualBoldAmount, the BOLD burned before the redemption fee.`,
+          : `${unit} redeemed on the ${branch} branch on ${dayWord} (UTC), across every Trove on the branch: the sum of the ${at.count.toLocaleString("en-US")} TroveManager Redemption ${at.count === 1 ? "log's" : "logs'"} _actualBoldAmount, the ${unit} burned before the redemption fee.`,
       formula: "Σ _actualBoldAmount ÷ 10¹⁸ over the day's Redemption logs",
       via,
     }),

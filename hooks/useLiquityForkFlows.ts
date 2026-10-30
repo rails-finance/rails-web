@@ -25,6 +25,8 @@ import {
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { PaceSource } from "@/lib/liquity-v2/redemption-pace";
+import { useRedemptionPace } from "@/hooks/useRedemptionPace";
 
 export interface LiquityForkFlowsInput {
   /** The page's events, when they are the whole history; null otherwise. */
@@ -42,6 +44,9 @@ export interface LiquityForkFlowsInput {
   /** The branch's minimum for the price view's level (ui-jobs 328 step 6);
    *  null leaves the price alone. */
   fork: LiquityForkLevel | null;
+  /** The branch's redemptions per day, the protocol activity chart under the
+   *  events (lib/liquity-v2/redemption-pace.ts); null draws none. */
+  pace?: PaceSource | null;
 }
 
 export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
@@ -107,7 +112,20 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
   }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain, p.fork]);
   // The minimum's steps, marked on the events row (ruling 10).
   const changes = useMemo(() => (p.fork ? forkMcrChanges(p.fork) : []), [p.fork]);
-  const timeline = useMemo(() => withChanges(baseTimeline, changes), [baseTimeline, changes]);
+  const changed = useMemo(() => withChanges(baseTimeline, changes), [baseTimeline, changes]);
+  // The branch's redemptions over the life: to today, or to the close. The
+  // chart starts shown where a redemption reached this Trove.
+  const lifeDays = changed?.days;
+  const pace = useRedemptionPace(
+    p.pace ?? null,
+    lifeDays?.length ? lifeDays[0].day : null,
+    lifeDays?.length && now != null ? (p.open ? Math.floor(now / 86_400) : lifeDays[lifeDays.length - 1].day) : null,
+  );
+  const redeemed = events.some((e) => e.kind === "redemption");
+  const timeline = useMemo(
+    () => (changed && pace ? { ...changed, activity: { ...pace, explains: redeemed } } : changed),
+    [changed, pace, redeemed],
+  );
   const focusEvents = useMemo(
     () => (p.collSymbol ? liquityFocusEvents(events, p.collSymbol, p.debtSymbol) : []),
     [events, p.collSymbol, p.debtSymbol],

@@ -48,7 +48,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { compareEventsInOrder } from "@/lib/shared/event-order";
 import { useRedemptionPace } from "@/hooks/useRedemptionPace";
-import { paceBranch } from "@/lib/liquity-v2/redemption-pace";
+import { paceBranch, v2PaceSource } from "@/lib/liquity-v2/redemption-pace";
 
 export interface TroveViewProps {
   collateralType: string;
@@ -347,8 +347,9 @@ export default function TroveView({
   // chart under the events (lib/liquity-v2/redemption-pace.ts): to today, or
   // to the close. It starts shown where a redemption reached this Trove.
   const paceDays = flowReplayed?.days;
+  const flowPaceBranch = paceBranch(flowCollSymbol);
   const flowPace = useRedemptionPace(
-    paceBranch(flowCollSymbol),
+    flowPaceBranch ? v2PaceSource(flowPaceBranch) : null,
     paceDays?.length ? paceDays[0].day : null,
     paceDays?.length && flowsNow != null
       ? flowOpen

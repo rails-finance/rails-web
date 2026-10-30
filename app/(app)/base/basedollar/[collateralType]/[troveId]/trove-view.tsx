@@ -75,6 +75,7 @@ import {
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { useLiquityForkFlows } from "@/hooks/useLiquityForkFlows";
+import { forkPaceSource } from "@/lib/liquity-v2/redemption-pace";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { unpricedEvents } from "@/lib/shared/liquity-flows";
 import { LiquityFlowsNote, troveLives } from "@/lib/shared/liquity-flows-explanation";
@@ -385,6 +386,12 @@ export default function BasedollarTroveDetail({
         }
       : null;
   }, [collateralType]);
+  // The branch's redemptions per day, the protocol activity chart under the
+  // events (lib/liquity-v2/redemption-pace.ts).
+  const flowPace = useMemo(() => {
+    const branch = resolveForkBranch(collateralType);
+    return branch ? forkPaceSource("basedollar", branch.symbol, DEBT_SYMBOL) : null;
+  }, [collateralType]);
   const flows = useLiquityForkFlows({
     wholeEvents: historyWindow.state === "whole" && !servedFolders?.length ? basedollarEvents : null,
     fetchAll: fetchAllHistory,
@@ -396,6 +403,7 @@ export default function BasedollarTroveDetail({
     price: view?.priceUsd ?? null,
     surplusClaimed: surplus?.claimed != null,
     fork: flowFork,
+    pace: flowPace,
   });
 
   // The top row's price dropdown: the branch's own oracle
