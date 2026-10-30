@@ -220,6 +220,8 @@ export function ProtocolActivityChart({
   const bars = useRef<ActivityBars | null>(null);
   const barHook = useRef<HTMLSpanElement>(null);
   const gridRef = useRef<Grid | null>(null);
+  /** The chart above's hover drew the crosshair here, its horizontal line hidden. */
+  const linkHover = useRef(false);
   /** The axis's round amounts, as price lines on the unseen series. */
   const tickLines = useRef<IPriceLine[]>([]);
   const colorsRef = useRef<Colors | null>(null);
@@ -325,8 +327,13 @@ export function ProtocolActivityChart({
     const onLeave = () => linkRef.current?.hover(null);
     const onWheel = (e: WheelEvent) => linkRef.current?.wheel(e);
     const onGesture = (e: Event) => linkRef.current?.gesture(e);
+    // Applied on a change only: each applyOptions redraws the chart.
+    let crossMode: number = lib.CrosshairMode.Normal;
     const onPointer = (e: PointerEvent) => {
       const mode = e.pointerType === "mouse" ? lib.CrosshairMode.Normal : lib.CrosshairMode.Hidden;
+      if (mode === crossMode && !linkHover.current) return;
+      crossMode = mode;
+      linkHover.current = false;
       c.applyOptions({ crosshair: { mode, horzLine: { visible: true, labelVisible: true } } });
     };
     el.addEventListener("pointerleave", onLeave);
@@ -389,7 +396,10 @@ export function ProtocolActivityChart({
     const mirror = (p: MouseEventParams<Time>) => {
       if (!p.sourceEvent) return;
       if (p.time == null) return c.clearCrosshairPosition();
-      c.applyOptions({ crosshair: { horzLine: { visible: false, labelVisible: false } } });
+      if (!linkHover.current) {
+        linkHover.current = true;
+        c.applyOptions({ crosshair: { horzLine: { visible: false, labelVisible: false } } });
+      }
       c.setCrosshairPosition(0, p.time, s);
     };
     sync();

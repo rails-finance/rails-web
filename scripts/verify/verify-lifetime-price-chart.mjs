@@ -58,7 +58,9 @@
 // and 30D, frozen and not, at 1280 and 390 with touch; the health view's older
 // days a dotted series meeting the solid one (`data-price-meets`); and at 1280
 // the wheel (`checkLwWheel`): over the chart it scrolls the page, Ctrl with it
-// zooms, a sideways swipe pans. Aave V3 Prime 0xb8a4…715e (wstETH/WETH, more
+// zooms, a sideways swipe pans; and at 1280, where the value line has a dotted
+// stretch, a pointer walked along it keeps one tip open (`checkOldTipSteady`,
+// ui-jobs 451). Aave V3 Prime 0xb8a4…715e (wstETH/WETH, more
 // than 60 days with events, so its older health days are dotted) and EtherFi
 // 0x0f2a…bbe take the health checks; SparkLend 0x1601…347e (no debt, so no
 // health view) the price checks against its answer. Step 5 (the health view on SparkLend, Aave V3 Base and Seamless):
@@ -3542,6 +3544,168 @@ async function checkLwOpen(page, tag, priceOnly = false) {
   );
 }
 
+/** The dotted value line's tip held steady (ui-jobs 451): a pointer moved
+ *  along a dotted stretch keeps one tip open, with no hide and show between
+ *  steps. The stretch is the longest run of tip-opening points on a coarse
+ *  grid, across or down (a steep stretch runs down), walked in 2px steps
+ *  from its first point that holds the tip until the tip closes; it must
+ *  hold for 6px and not reopen. Desktop only, on a page whose value line
+ *  has a dotted stretch. */
+async function checkOldTipSteady(page, tag) {
+  if ((await page.locator("[data-flows-combined] [data-flow-old-line]").count()) === 0) return;
+  await page
+    .locator('[data-flows-combined] [data-flow-range="All"]')
+    .first()
+    .click()
+    .catch(() => {});
+  await page.waitForTimeout(600);
+  const box = page.locator("[data-flows-combined] [data-flow-lw-box]").first();
+  await box.evaluate((el) => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 200));
+  await page.waitForTimeout(300);
+  const b = await box.boundingBox();
+  const plotW = Number(
+    await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").first().getAttribute("data-flow-lw-plot-w"),
+  );
+  const tipOpen = () =>
+    page.evaluate(() => document.querySelector("[data-flows-combined] [data-flow-old-tip]") != null);
+  const DX = 12;
+  const DY = 4;
+  const xs = [];
+  for (let x = b.x + 8; x < b.x + plotW - 4; x += DX) xs.push(x);
+  const ys = [];
+  for (let y = b.y + 8; y < b.y + b.height * 0.6; y += DY) ys.push(y);
+  const hit = ys.map(() => new Array(xs.length).fill(false));
+  for (let r = 0; r < ys.length; r++) {
+    // Off the chart between rows, so a tip outlasting the last row's end
+    // is gone before the next row starts.
+    await page.mouse.move(b.x + b.width / 2, b.y - 40);
+    await page.waitForTimeout(200);
+    for (let q = 0; q < xs.length; q++) {
+      await page.mouse.move(xs[q], ys[r]);
+      hit[r][q] = await tipOpen();
+    }
+  }
+  // The longest run, in pixels, across a row or down a column.
+  let walk = null;
+  const take = (len, from, to) => {
+    if (len > 0 && (!walk || len > walk.len)) walk = { len, from, to };
+  };
+  for (let r = 0; r < ys.length; r++)
+    for (let q = 0, run = 0; q < xs.length; q++) {
+      run = hit[r][q] ? run + 1 : 0;
+      if (run > 1) take(DX * (run - 1), { x: xs[q - run + 1], y: ys[r] }, { x: xs[q], y: ys[r] });
+    }
+  for (let q = 0; q < xs.length; q++)
+    for (let r = 0, run = 0; r < ys.length; r++) {
+      run = hit[r][q] ? run + 1 : 0;
+      if (run > 1) take(DY * (run - 1), { x: xs[q], y: ys[r - run + 1] }, { x: xs[q], y: ys[r] });
+    }
+  if (!walk) {
+    // A dotted piece shorter than a cell is not drawn at this zoom: nothing to point at.
+    if (!hit.some((row) => row.includes(true))) {
+      console.log(
+        `NOTE  ${tag}: no dotted stretch drawn at All on a ${DX}×${DY}px grid; the steady-tip walk is skipped`,
+      );
+      return;
+    }
+    check(
+      `${tag}: a pointer on the dotted value line opens its tip over a run of neighbouring points`,
+      false,
+      "only lone grid points opened it",
+    );
+    return;
+  }
+  // The first 120px: a longer run can cross an event day, where the dotted
+  // line breaks.
+  if (walk.len > 120) {
+    const f = 120 / walk.len;
+    walk = {
+      len: 120,
+      from: walk.from,
+      to: { x: walk.from.x + f * (walk.to.x - walk.from.x), y: walk.from.y + f * (walk.to.y - walk.from.y) },
+    };
+  }
+  // The grid moved faster than the tip's leave delay, so a hit can be the
+  // tip outlasting the pointer: the walk starts at the first point along the
+  // run that holds the tip once the delay has run out.
+  // Each point is tried as found and a few pixels to either side of the
+  // run (a steep stretch slants off a column of the grid).
+  const sideways = walk.from.y === walk.to.y ? { x: 0, y: 1 } : { x: 1, y: 0 };
+  let held = false;
+  for (let i = 0; !held && (i === 0 || walk.len > 0); i++) {
+    const f = i === 0 ? 0 : Math.min(1, 4 / walk.len);
+    const at = { x: walk.from.x + f * (walk.to.x - walk.from.x), y: walk.from.y + f * (walk.to.y - walk.from.y) };
+    walk.len = walk.len * (1 - f);
+    for (const off of [0, -4, 4, -8, 8]) {
+      const o = { x: at.x + off * sideways.x, y: at.y + off * sideways.y };
+      await page.mouse.move(o.x, o.y);
+      await page.waitForTimeout(250);
+      if (await tipOpen()) {
+        held = true;
+        walk.from = o;
+        walk.to = { x: walk.to.x + off * sideways.x, y: walk.to.y + off * sideways.y };
+        break;
+      }
+    }
+    if (!held) walk.from = at;
+  }
+  if (!held) {
+    check(`${tag}: a pointer on the dotted value line opens its tip`, false, "no point along the run held it");
+    return;
+  }
+  // Every mount and unmount of the tip, between steps too.
+  await page.evaluate(() => {
+    const host = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
+    window.__oldTipLog = [];
+    window.__oldTipObs?.disconnect();
+    window.__oldTipObs = new MutationObserver((ms) => {
+      for (const m of ms) {
+        for (const n of m.addedNodes)
+          if (n.nodeType === 1 && n.hasAttribute("data-flow-old-tip")) window.__oldTipLog.push("show");
+        for (const n of m.removedNodes)
+          if (n.nodeType === 1 && n.hasAttribute("data-flow-old-tip")) window.__oldTipLog.push("hide");
+      }
+    });
+    window.__oldTipObs.observe(host, { childList: true, subtree: true });
+  });
+  // Two-pixel steps from one end of the run on, until the tip closes: the
+  // coarse grid can bridge a short solid piece between two dotted ones
+  // (the tip outlasts the pointer by a moment), so the walk ends where the
+  // line's dotted stretch does. Across, the pointer follows the line's
+  // height, read from the tip, which stands 10px over the point of the
+  // line nearest the pointer.
+  const across = walk.from.y === walk.to.y;
+  const lineY = () =>
+    page.evaluate(() => {
+      const t = document.querySelector("[data-flows-combined] [data-flow-old-tip]");
+      return t ? t.getBoundingClientRect().bottom + 10 : null;
+    });
+  const steps = Math.min(150, Math.floor(walk.len / 2));
+  let open = 0;
+  let y = walk.from.y;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    if (!across) y = walk.from.y + t * (walk.to.y - walk.from.y);
+    await page.mouse.move(walk.from.x + t * (walk.to.x - walk.from.x), y);
+    await page.waitForTimeout(16);
+    if (!(await tipOpen())) break;
+    open++;
+    if (across) y = (await lineY()) ?? y;
+  }
+  const log = await page.evaluate(() => {
+    window.__oldTipObs?.disconnect();
+    return window.__oldTipLog;
+  });
+  await page.mouse.move(b.x + b.width / 2, b.y - 40);
+  // The tip was open at the start: a show is a reopen. The walk holds it
+  // for 6px at least, and a close ends the walk.
+  check(
+    `${tag}: a pointer moved along the dotted value line keeps one tip open, with no hide and show`,
+    open >= 3 && !log.includes("show") && log.filter((e) => e === "hide").length <= 1,
+    `${across ? "across" : "down"}: held ${2 * open}px of a ${Math.round(walk.len)}px run (${open}/${steps} steps), tip events: ${log.slice(0, 8).join(",") || "none"}${log.length > 8 ? ` (+${log.length - 8})` : ""}`,
+  );
+}
+
 /** The wheel on a position page (Miles, 26 Oct 2026): over the chart it
  *  scrolls the page and leaves the window; Ctrl with the wheel (a trackpad's
  *  pinch arrives so) zooms about the pointer and leaves the page; a sideways
@@ -3849,6 +4013,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       );
       await page.locator("[data-flows-combined] [data-flow-chart-engine=lw]").scrollIntoViewIfNeeded();
       await checkLwOpen(page, tag, pg.priceOnly);
+      if (width >= 640) await checkOldTipSteady(page, tag);
     }
     if (pg.unit || pg.valueLine) await checkValueUnit(page, tag, pg);
     if (pg.lwOnly) {

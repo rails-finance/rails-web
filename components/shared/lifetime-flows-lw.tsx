@@ -101,6 +101,8 @@ const USER_MS = 2500;
 /** Wheel events this close together are one gesture, which keeps the axis
  *  its first event took. */
 const GESTURE_MS = 160;
+/** How long the dotted line's tip stays after the pointer leaves the line. */
+const TIP_LEAVE_MS = 150;
 /** A wheel's zoom: one notch (100 px of delta) widens or narrows the window by this share. */
 const ZOOM_PER_NOTCH = 0.1;
 /** The chart's colours as site tokens: the panel's line hues (LINE_HUE), the
@@ -603,6 +605,8 @@ export function LifetimeFlowsLw({
   onLinkRef.current = onLink;
   /** The wheel and gesture handlers, which a linked chart calls too. */
   const input = useRef<{ wheel: (e: WheelEvent) => void; gesture: (e: Event) => void } | null>(null);
+  /** A linked chart's hover drew the crosshair here, its horizontal line hidden. */
+  const linkHover = useRef(false);
   const plotW = useCallback(
     () => chart.current?.timeScale().width() || Math.max(200, (box.current?.clientWidth ?? 600) - 56),
     [],
@@ -725,20 +729,66 @@ export function LifetimeFlowsLw({
   const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
   const sampled = useRef<Record<string, (number | null)[]>>({});
   const hoverRef = useRef<(p: MouseEventParams<Time>) => void>(() => {});
+  // The tip closes a moment after the pointer leaves the line, so the one-cell
+  // break where an event day interrupts a dotted run does not close and reopen it.
+  const tipLeave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showOldTip = (t: { x: number; y: number; lines: string[] } | null) => {
+    if (t) {
+      if (tipLeave.current) clearTimeout(tipLeave.current);
+      tipLeave.current = null;
+      setOldTip(t);
+    } else if (!tipLeave.current)
+      tipLeave.current = setTimeout(() => {
+        tipLeave.current = null;
+        setOldTip(null);
+      }, TIP_LEAVE_MS);
+  };
+  useEffect(() => () => void (tipLeave.current && clearTimeout(tipLeave.current)), []);
+  // The library re-sends the last pointer position, with no source event,
+  // each time the chart redraws (options applied, data set); that is the
+  // pointer still there, so it is read like a move. Only an event with no
+  // point is the pointer leaving. The tip is cleared unconditionally: this
+  // handler can run several times before React re-renders it, and a check
+  // on the rendered `oldTip` would skip the clear (ui-jobs 451).
   hoverRef.current = (p) => {
     const g = gridRef.current;
     const c = chart.current;
-    if (!g || !c || !p.point || p.logical == null || !p.sourceEvent || p.paneIndex == null || p.paneIndex >= nV) {
-      if (oldTip) setOldTip(null);
+    if (!g || !c || !p.point || p.logical == null || p.paneIndex == null || p.paneIndex >= nV) {
+      showOldTip(null);
       return;
     }
     const i = Math.round(p.logical);
+    const { x: px, y: py } = p.point;
     for (const k of sides) {
       if (paneOf(k) !== p.paneIndex) continue;
-      const v = sampled.current[`dotted-${k}`]?.[i];
+      const vals = sampled.current[`dotted-${k}`];
       const s = series.current[`dotted-${k}`];
-      const y = v == null || !s ? null : s.priceToCoordinate(v);
-      if (y == null || Math.abs(y - p.point.y) > 8) continue;
+      if (!vals || !s) continue;
+      // The pointer's distance from the drawn line: the segments into and
+      // out of the cell under it, so a steep stretch is as easy to hold as
+      // a flat one. A segment is drawn where both its cells have a value.
+      const at = (j: number) => {
+        const v = vals[j];
+        const x = v == null ? null : c.timeScale().logicalToCoordinate(j as Logical);
+        const y = v == null ? null : s.priceToCoordinate(v);
+        return x == null || y == null ? null : { x, y };
+      };
+      const [a, m, b] = [at(i - 1), at(i), at(i + 1)];
+      let near: { d: number; y: number } | null = m ? { d: Math.hypot(px - m.x, py - m.y), y: m.y } : null;
+      for (const [u, w] of [
+        [a, m],
+        [m, b],
+      ]) {
+        if (!u || !w) continue;
+        const dx = w.x - u.x;
+        const dy = w.y - u.y;
+        const t = Math.max(0, Math.min(1, ((px - u.x) * dx + (py - u.y) * dy) / (dx * dx + dy * dy || 1)));
+        const q = { x: u.x + t * dx, y: u.y + t * dy };
+        const d = Math.hypot(px - q.x, py - q.y);
+        if (!near || d < near.d) near = { d, y: q.y };
+      }
+      if (!near || near.d > 8) continue;
+      const y = near.y;
       // The dotted point nearest the pointer's day.
       const day = Math.floor((g.start + (i + 1) * g.step - 1) / DAY_S);
       let best: number | null = null;
@@ -750,10 +800,10 @@ export function LifetimeFlowsLw({
         if (dotted && (best == null || Math.abs(pt.to - day) < Math.abs(best - day))) best = pt.to;
       }
       const lines = best == null ? [] : oldLineTip(model, best - startDay, k);
-      setOldTip(lines.length ? { x: p.point.x, y: y + sideTop(paneOf(k)), lines } : null);
+      showOldTip(lines.length ? { x: p.point.x, y: y + sideTop(paneOf(k)), lines } : null);
       return;
     }
-    if (oldTip) setOldTip(null);
+    showOldTip(null);
   };
 
   // The chart, once the library is in and the charts are shown.
@@ -1073,9 +1123,15 @@ export function LifetimeFlowsLw({
     el.addEventListener("wheel", onWheel, { passive: false });
     for (const e of ["gesturestart", "gesturechange"]) el.addEventListener(e, onGesture, { passive: false });
     // The hover crosshair is the mouse's: a touch hides it, a mouse brings it back.
+    // Applied on a change only: each applyOptions redraws the chart and
+    // re-sends the crosshair.
+    let crossMode: number = lib.CrosshairMode.Normal;
     const onPointer = (e: PointerEvent) => {
       const mode = e.pointerType === "mouse" ? lib.CrosshairMode.Normal : lib.CrosshairMode.Hidden;
       // The pointer is here: the horizontal line a linked hover hid comes back.
+      if (mode === crossMode && !linkHover.current) return;
+      crossMode = mode;
+      linkHover.current = false;
       c.applyOptions({ crosshair: { mode, horzLine: { visible: true, labelVisible: true } } });
     };
     for (const e of ["touchstart", "touchmove"]) el.addEventListener(e, touch, { passive: true });
@@ -1244,7 +1300,10 @@ export function LifetimeFlowsLw({
       hover: (time) => {
         const anchor = Object.values(series.current)[0];
         if (time == null || !anchor) return c.clearCrosshairPosition();
-        c.applyOptions({ crosshair: { horzLine: { visible: false, labelVisible: false } } });
+        if (!linkHover.current) {
+          linkHover.current = true;
+          c.applyOptions({ crosshair: { horzLine: { visible: false, labelVisible: false } } });
+        }
         c.setCrosshairPosition(0, time as UTCTimestamp, anchor);
       },
       wheel: (e) => input.current?.wheel(e),
