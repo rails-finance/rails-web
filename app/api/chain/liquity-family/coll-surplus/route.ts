@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readTroveCollSurplus } from "@/lib/sources/chain/liquity-coll-surplus";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { resolveBranch as asymmetryBranch } from "@/lib/asymmetry/asset-catalog";
 import { resolveBranch as ebisuBranch } from "@/lib/ebisu/asset-catalog";
@@ -49,14 +50,17 @@ export async function GET(request: NextRequest) {
   if (!ADDRESS.test(owner)) return NextResponse.json({ error: "owner must be an address" }, { status: 400 });
   if (!TX.test(tx)) return NextResponse.json({ error: "tx must be a transaction hash" }, { status: 400 });
   try {
-    const data = await readTroveCollSurplus({
-      chainId: proto.chainId,
-      troveManager: branch.troveManager,
-      owner,
-      liquidationTx: tx,
-      decimals: branch.decimals,
-      priceFeed: branch.priceFeed,
-    });
+    const data = await readTroveCollSurplus(
+      {
+        chainId: proto.chainId,
+        troveManager: branch.troveManager,
+        owner,
+        liquidationTx: tx,
+        decimals: branch.decimals,
+        priceFeed: branch.priceFeed,
+      },
+      readerIpFromRequest(request),
+    );
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error reading the collateral surplus:", error);

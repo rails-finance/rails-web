@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readMakerTxContext } from "@/lib/sources/chain/makerdao-tx-context";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
 
 // What one transaction around a MakerDAO vault's ownership did: its parties,
 // the tools that logged, a flash loan, a migrated Sai CDP
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "tx and up to 8 addresses are required" }, { status: 400 });
   }
   try {
-    const data = await readMakerTxContext(tx.toLowerCase() as `0x${string}`, addresses);
+    const data = await readMakerTxContext(tx.toLowerCase() as `0x${string}`, addresses, readerIpFromRequest(request));
     return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });
   } catch (error) {
     console.error("Error reading the MakerDAO transaction:", error);
