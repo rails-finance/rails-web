@@ -107,9 +107,9 @@
 // 4577 and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
 // USDp 3732 and GOLDp 29 (liquidated); the how-to-read names the minimum.
-// LlamaLend (step 6, `band`, `checkBand`): 0xeb2c (open), 0xa32e (in soft
-// liquidation), 0xd76a (under its band), 0x61db (liquidated), 0xbbc5
-// (closed): Health first, today the card's; the band stepping on event days,
+// LlamaLend (step 6, `band`, `checkBand`): wstETH 0x95f1 (open), CRV 0xe5b2
+// (in soft liquidation), 0xd76a (under its band), 0x61db and 0xa32e
+// (liquidated), 0xbbc5 (closed): Health first, today the card's; the band stepping on event days,
 // today the card's Bands; the tip's band words; the drawn band against the
 // scales' placing at All, zoomed and panned. Step 8 (`changes`, `noChanges`):
 // the markets' discount sets as markers on 0xd76a, 0x6bda (WETH, 6 % → 9.21 %)
@@ -234,6 +234,7 @@ const PAGES = [
   },
   {
     id: "aave-v3 0xfb45 (liquidated)",
+    endsClosed: true,
     path: "/ethereum/aave-v3/0xfb45f0e612424104753f2e2fc9507b3d082e750a?market=core",
     answer: "/api/aave-v3/flows",
     health: true,
@@ -952,17 +953,27 @@ const PAGES = [
   // LlamaLend (step 6, `band`, `checkBand`): the card's Health first, its
   // line at 0; the collateral's soft-liquidation band shaded on its price,
   // stepping at events, today the card's Bands; the tip's in-band words.
+  // An open life and one in soft liquidation go stale when their owner or a
+  // liquidator closes them (0xeb2c repaid 30 Oct 2026, 0xa32e was liquidated
+  // 29 Oct 2026). These two have sat unchanged for months: 0x95f1 well above
+  // its band, 0xe5b2 a dust debt no liquidator takes, its price mid-band.
   {
-    id: "llamalend 0xeb2c",
-    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xeb2cafb6ea9def8084842558ad1242bbf7fcac2b",
+    id: "llamalend 0x95f1 (wstETH, open)",
+    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0x95f1872c2c63f54072bd42f68beee71e0d6f67d3",
     lwOnly: true,
     band: { asset: "wstETH" },
   },
   {
-    id: "llamalend 0xa32e (in soft liquidation)",
+    id: "llamalend 0xe5b2 (CRV, in soft liquidation)",
+    path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0xe5b2a2459914b78f52bef1d294605efc91e311a3",
+    lwOnly: true,
+    band: { asset: "CRV", place: "inside" },
+  },
+  {
+    id: "llamalend 0xa32e (liquidated from soft liquidation)",
     path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xa32ea34ac816397e3312423f88229b24d1ae0d5d",
     lwOnly: true,
-    band: { asset: "wstETH", place: "inside" },
+    band: { asset: "wstETH", closed: true },
   },
   {
     id: "llamalend 0xd76a (under its band, liquidatable)",
@@ -1175,11 +1186,14 @@ const PAGES = [
   },
   {
     // Open since 9 May 2026, on a branch with redemptions; redeemed once by
-    // 30 Oct 2026, so its protocol activity panel opens shown.
+    // 30 Oct 2026, so its protocol activity panel opens shown. That redemption
+    // (block 26300839) took the whole debt: an open zombie with no debt, so
+    // the card's "Liquidates at" reads none and the level has no point today.
     id: "liquity-v2 wstETH Trove (open since May)",
     path: "/ethereum/liquity-v2/trove/wstETH/36866364639024890689412217368623603118483270545575424157920590185252139913822",
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
+    noDebt: true,
     panes: "value,price",
     pace: "wstETH",
   },
@@ -2930,7 +2944,7 @@ async function checkLevelToggle(page, tag, pg = {}) {
       !off.readout &&
       on.pressed === "true" &&
       // A close day with no debt has no level to read out.
-      (on.readout || !!pg.endsClosed) &&
+      (on.readout || !!pg.endsClosed || !!pg.noDebt) &&
       off.lines > 0 &&
       on.lines === off.lines,
     `off ${JSON.stringify(off)}, on ${JSON.stringify(on)}`,
@@ -3404,7 +3418,23 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
       value: e.getAttribute("data-liq-value"),
     }))
     .catch(() => null);
-  if (pg.trove === "live" || pg.trove === "redeemed") {
+  if (pg.noDebt) {
+    // An open Trove with no debt: the card says none, and the level draws no
+    // point today.
+    const today = Math.floor(Date.now() / 1000 / DAY);
+    const card = (
+      await page
+        .locator('[data-panel-row="liquidates-at"] dd')
+        .first()
+        .textContent()
+        .catch(() => null)
+    )?.trim();
+    check(
+      `${tag}: with no debt the card's "Liquidates at" reads none, and the level has no point today`,
+      card === "None while it has no debt" && (end == null || Number(end.day) !== today),
+      `level ${end?.day} ${end?.value}, card ${card}`,
+    );
+  } else if (pg.trove === "live" || pg.trove === "redeemed") {
     const today = Math.floor(Date.now() / 1000 / DAY);
     const card = (
       await page
