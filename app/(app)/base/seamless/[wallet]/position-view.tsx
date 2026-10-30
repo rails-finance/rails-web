@@ -28,6 +28,7 @@
 // history's completeness is a property of the request rather than of the
 // explorer, so it is stated under the last event.
 
+import { useExportConfigLog } from "@/hooks/useAaveFamilyHealth";
 import { aaveV3CardNotCollateral } from "@/lib/aave-v3/collateral-split";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
@@ -586,8 +587,11 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   });
 
   // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
+  // The configurator log the markdown export's "Protocol changes" section reads.
+  const configLog = useExportConfigLog("seamless");
   const exports = view
     ? aaveV3Exports({
+        configLog,
         wallet,
         protocolName: "Seamless",
         marketName: "Base",

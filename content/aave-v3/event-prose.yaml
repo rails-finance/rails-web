@@ -422,6 +422,8 @@ position_words:
     The supplied {inert_assets} back nothing: their liquidation threshold is zero, so they support no borrowing.
   ltv_cap: |-
     Borrowing stands at {ltv} of the collateral, against a {max_ltv} cap.
+  ltv_cap_zero: |-
+    Borrowing stands at {ltv} of the collateral, and the cap is 0%, so nothing more can be borrowed.
   liq_single: |-
     If {liq_symbol} falls about {drop} to {liq_price}, the account can be liquidated.
   liq_basket: |-

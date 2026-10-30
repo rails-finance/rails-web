@@ -59,7 +59,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { aaveV3FlowSeriesTimeline, aaveV3FocusEvents, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { AAVE_V3_HEALTH_SOURCE } from "@/lib/aave-v3/flows-health";
-import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
+import { useAaveFamilyHealth, useExportConfigLog } from "@/hooks/useAaveFamilyHealth";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
@@ -750,8 +750,11 @@ export default function AaveV3PositionDetail({
   );
 
   // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
+  // The configurator log the markdown export's "Protocol changes" section reads.
+  const configLog = useExportConfigLog(market);
   const exports = view
     ? aaveV3Exports({
+        configLog,
         wallet,
         marketName: MARKET_NAME[market] ?? "Core",
         view: liveView ?? view,

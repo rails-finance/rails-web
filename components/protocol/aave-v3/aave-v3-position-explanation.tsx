@@ -133,15 +133,18 @@ export function AaveV3PositionExplanation({
 
   // ── Risk ──
   if (hasDebt) {
-    if (chain.totalCollateralUsd > 0 && chain.ltv > 0)
+    // A cap of 0 (every collateral reserve's LTV set to 0, as a freeze does)
+    // says so: the Pool lends nothing more against this collateral.
+    if (chain.totalCollateralUsd > 0) {
+      const ltv = <H>{pct(chain.totalDebtUsd / chain.totalCollateralUsd)}</H>;
       add(
         "risk",
         "ltv",
-        positionNodes("ltv_cap", {
-          ltv: <H>{pct(chain.totalDebtUsd / chain.totalCollateralUsd)}</H>,
-          max_ltv: <H>{pct(chain.ltv)}</H>,
-        }),
+        chain.ltv > 0
+          ? positionNodes("ltv_cap", { ltv, max_ltv: <H>{pct(chain.ltv)}</H> })
+          : positionNodes("ltv_cap_zero", { ltv }),
       );
+    }
     // One asset on both sides has no price to fall: its sentence is the "?"'s.
     const same = aaveV3SameAsset(chain);
     const liqRead = view ? aaveV3LiquidationRead(view) : null;

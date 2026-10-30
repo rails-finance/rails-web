@@ -61,7 +61,11 @@ export type AaveConfigLog =
   | (At & { kind: "collateral"; asset: string; ltv: number; lt: number; bonus: number })
   | (At & { kind: "category"; categoryId: number; ltv: number; lt: number; bonus: number; label: string })
   | (At & { kind: "asset-category"; asset: string; from: number; to: number })
-  | (At & { kind: "emode-collateral"; asset: string; categoryId: number; collateral: boolean });
+  | (At & { kind: "emode-collateral"; asset: string; categoryId: number; collateral: boolean })
+  // ReserveFrozen and PendingLtvChanged, which move no threshold: the markdown
+  // export's "Protocol changes" rows read them (lib/shared/aave-reserve-changes.ts).
+  | (At & { kind: "frozen"; asset: string; frozen: boolean })
+  | (At & { kind: "pending-ltv"; asset: string; ltv: number });
 
 /** /api/chain/aave-v3/config-log. */
 export interface AaveConfigLogAnswer {
@@ -179,6 +183,7 @@ export function aaveConfigChanges(
       );
       continue;
     }
+    if (l.kind === "frozen" || l.kind === "pending-ltv") continue;
     // A membership change.
     const asset = l.asset.toLowerCase();
     const h = held.get(asset);

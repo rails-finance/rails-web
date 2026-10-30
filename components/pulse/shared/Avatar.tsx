@@ -3,13 +3,22 @@
 import { useState } from "react";
 import type { TimelineEvent } from "@/types/pulse";
 
-/** The avatars held in public/avatars — the team's own, by platform and
- *  lower-cased handle (ATTRIBUTION.md). Everyone else's X picture is read
- *  through /api/avatar/x at request time and never stored in the repo. */
+/** The avatars held in public/avatars, by platform and lower-cased handle
+ *  (ATTRIBUTION.md): the team's own and one stored copy of each other X account
+ *  the timeline names. The browser talks to this origin only. */
 const LOCAL_AVATARS: Partial<Record<TimelineEvent["platform"], Record<string, string>>> = {
   x: {
     milesessex: "/avatars/x/milesessex.png",
     rails_finance: "/avatars/x/rails_finance.svg",
+    castle_labs: "/avatars/x/castle_labs.jpg",
+    ceazor7: "/avatars/x/ceazor7.jpg",
+    defiscan_info: "/avatars/x/defiscan_info.jpg",
+    duckdegen: "/avatars/x/duckdegen.jpg",
+    gutomartino: "/avatars/x/gutomartino.jpg",
+    justincbram: "/avatars/x/justincbram.jpg",
+    liquityprotocol: "/avatars/x/liquityprotocol.jpg",
+    stanikulechov: "/avatars/x/stanikulechov.jpg",
+    tokenbrice: "/avatars/x/tokenbrice.jpg",
   },
   github: {
     milodonid: "/avatars/github/milodonid.png",
@@ -22,15 +31,15 @@ function normalizeHandle(handle?: string): string | null {
   return normalized || null;
 }
 
-/** Where a handle's picture comes from: a local file for the team's own,
- *  the request-time route for any other X handle, and nothing for the
- *  rest (the initial shows instead). */
+/** Where a handle's picture comes from: its local file, the local placeholder
+ *  for an X handle with none, and nothing for the rest (the initial shows
+ *  instead). */
 function getAvatarSrc(handle?: string, platform?: TimelineEvent["platform"]): string | null {
   const normalized = normalizeHandle(handle);
   if (!normalized || !platform) return null;
   const local = LOCAL_AVATARS[platform]?.[normalized];
   if (local) return local;
-  if (platform === "x") return `/api/avatar/x/${normalized}`;
+  if (platform === "x") return "/avatars/x/_fallback.svg";
   return null;
 }
 
@@ -45,7 +54,7 @@ export function Avatar({
   platform?: TimelineEvent["platform"];
   size?: number;
   className?: string;
-  /** Explicit image path that bypasses the local-file / /api/avatar lookup. */
+  /** Explicit image path that bypasses the local-file lookup. */
   overrideSrc?: string;
 }) {
   const [failed, setFailed] = useState(false);

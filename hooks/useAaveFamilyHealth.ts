@@ -66,6 +66,14 @@ function useConfigLog(market: string | null): ChangeLogRead<AaveConfigLogAnswer>
   return got && got.market === market ? got.read : { log: null, unavailable: false };
 }
 
+/** The configurator log for a position export: undefined where the market
+ *  has none (lib/aave-v3/markdown-sections.ts leaves the section out). */
+export function useExportConfigLog(market: string | null): ChangeLogRead<AaveConfigLogAnswer> | undefined {
+  const served = market && CONFIG_MARKETS.has(market) ? market : null;
+  const read = useConfigLog(served);
+  return served ? read : undefined;
+}
+
 const TX_HASH = /0x[0-9a-fA-F]{64}/;
 
 /** An event's transaction: its hash, or the one its id spells. */

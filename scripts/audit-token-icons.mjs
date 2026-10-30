@@ -2,10 +2,14 @@
 // Token-icon census — which assets would draw as a letter, and fetch the rest.
 // ----------------------------------------------------------------------------
 // The chip (components/shared/token-chip-icon.tsx) resolves a mark in order:
-// local PNG by symbol → local PNG by address → Trust Wallet (chain, address)
-// → DeFiLlama (chain, address) → the initial-letter glyph. Nothing tells us
-// which assets end at the letter until a reader meets one, so this walks a
-// universe of (chain, address) and asks each tier the way the chip does.
+// local PNG by symbol → local PNG by address → the placeholder glyph. It asks
+// no third party. Nothing tells us which assets end at the placeholder until a
+// reader meets one, so this walks a universe of (chain, address), asks each
+// local tier the way the chip does, and asks Trust Wallet and DeFiLlama (the
+// sources the chip used to read in the browser) whether they hold a mark to
+// store. A mark found there is saved once as a 64 px public/icons/tokens/<address>.png
+// and its source is recorded in public/icons/tokens/sources.json (30 Oct 2026:
+// 425 icons from token_meta, the rosters and the Base universe).
 //
 //   node scripts/audit-token-icons.mjs                 # report only
 //   node scripts/audit-token-icons.mjs --fetch         # also pull the misses

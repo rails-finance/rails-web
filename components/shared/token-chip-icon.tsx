@@ -1,15 +1,17 @@
 "use client";
 
-// Token chip with a single render path and an ordered source fallback:
+// Token chip with a single render path over self-hosted sources only:
 //   1. Local PNG by symbol — the curated, self-hosted set in
 //      public/icons/tokens (e.g. usdc.png, wbtc.png, eth.png).
 //   2. Local PNG by address — for assets stored under their token address
-//      rather than a symbol (e.g. LINK/USDT/EURC).
-//   3. Trust Wallet CDN — by address, for anything not self-hosted.
-//   4. DeFiLlama icons CDN — for DeFi-native assets Trust Wallet hasn't
-//      indexed (cbBTC, rsETH, LBTC at time of writing).
-//   5. UnknownTokenSvg placeholder — same visual vocabulary as Etherscan's
+//      rather than a symbol (e.g. LINK/USDT/EURC, and every icon fetched once
+//      by scripts/audit-token-icons.mjs).
+//   3. UnknownTokenSvg placeholder — same visual vocabulary as Etherscan's
 //      empty-token glyph; reads as "unknown" rather than a brand mark.
+//
+// The reader's browser asks no third party for a mark. A token with no local
+// icon draws the placeholder; add its PNG with the audit script (--fetch) and
+// regenerate the manifest. Sources of the fetched icons: icon-sources.json.
 //
 // Every source renders through the same <img> at the full `size` envelope —
 // no per-source scaling. Earlier code special-cased SVG sprites at 0.88x to
@@ -18,10 +20,8 @@
 // the same cluster). Consolidating onto the curated local PNGs, which are
 // uniformly full-bleed, removes the guesswork. See getLocalTokenIcon.
 //
-// Plain <img> with onError fallback (vs next/image) avoids needing a
-// next.config remotePatterns entry for raw.githubusercontent.com or
-// token-icons.llamao.fi. Icons are 16-28px so optimization isn't
-// load-bearing.
+// Plain <img> with onError fallback (vs next/image): icons are 16-28px so
+// optimization isn't load-bearing.
 
 import { createContext, useContext, useState } from "react";
 import { UnknownTokenSvg } from "@/components/shared/unknown-token-svg";
@@ -30,7 +30,6 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared
 import { getLocalTokenIcon } from "@/lib/shared/local-token-icons";
 import { PT_UNDERLYING_BASE, PT_UNDERLYING_MAINNET } from "@/lib/shared/pt-underlying";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
-import { getDefiLlamaLogoUrl, getTokenLogoUrl } from "@/lib/shared/token-logo";
 
 const TokenFilterCtx = createContext<((symbol: string) => void) | null>(null);
 export function useTokenFilterCtx() {
@@ -177,7 +176,6 @@ export function TokenChipIcon({
   // could never be reached.
   const onChain = ptUnderlying?.[0] ?? (aliased ? undefined : address) ?? getTokenAddress(lookup, chainId);
   const resolvedAddress = override ?? onChain ?? getTokenAddress(lookup, MAINNET_CHAIN_ID);
-  const cdnChain = !override && onChain ? chainId : MAINNET_CHAIN_ID;
 
   const srcs: string[] = [];
   // 1. Local PNG by symbol (the curated set is mostly symbol-named).
@@ -193,11 +191,6 @@ export function TokenChipIcon({
   if (resolvedAddress) {
     const localByAddress = getLocalTokenIcon(resolvedAddress);
     if (localByAddress && localByAddress !== localBySymbol) srcs.push(localByAddress);
-    // 3 + 4. CDN tiers, by address — null on a chain neither CDN indexes (a
-    //        testnet), where the local tier above is the only source.
-    for (const url of [getTokenLogoUrl(resolvedAddress, cdnChain), getDefiLlamaLogoUrl(resolvedAddress, cdnChain)]) {
-      if (url) srcs.push(url);
-    }
   }
 
   const chip =

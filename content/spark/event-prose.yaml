@@ -424,6 +424,8 @@ position_words:
     Borrowing stands at {ltv} of the collateral's value, against the {max_ltv} limit.
   ltv_emode: |-
     Borrowing stands at {ltv} of the collateral's value, against the {max_ltv} limit of the {emode} e-mode category.
+  ltv_zero: |-
+    Borrowing stands at {ltv} of the collateral's value, and the limit is 0%, so nothing more can be borrowed.
   drop: |-
     A fall of about {drop} in the collateral's value against the debt would make the account liquidatable.
   drop_single: |-

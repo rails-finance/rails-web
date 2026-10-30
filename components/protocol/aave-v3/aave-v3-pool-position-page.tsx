@@ -44,6 +44,7 @@
 // so it is stated under the last event rather than on a coverage page — see
 // <TimelineCoverageFooter>.
 
+import { useExportConfigLog } from "@/hooks/useAaveFamilyHealth";
 import { aaveV3CardNotCollateral } from "@/lib/aave-v3/collateral-split";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
@@ -641,8 +642,11 @@ export function AaveV3PoolPositionView({
   }, [view, prices]);
 
   // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
+  // The configurator log the markdown export's "Protocol changes" section reads.
+  const configLog = useExportConfigLog(d.marketKey);
   const exports = view
     ? aaveV3Exports({
+        configLog,
         wallet,
         marketName: d.marketName,
         source: captureSource,
