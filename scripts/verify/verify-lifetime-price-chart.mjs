@@ -3491,11 +3491,16 @@ async function checkOldTipSteady(page, tag) {
   const ys = [];
   for (let y = b.y + 8; y < b.y + b.height * 0.6; y += DY) ys.push(y);
   const hit = ys.map(() => new Array(xs.length).fill(false));
-  for (let r = 0; r < ys.length; r++)
+  for (let r = 0; r < ys.length; r++) {
+    // Off the chart between rows, so a tip outlasting the last row's end
+    // is gone before the next row starts.
+    await page.mouse.move(b.x + b.width / 2, b.y - 40);
+    await page.waitForTimeout(200);
     for (let q = 0; q < xs.length; q++) {
       await page.mouse.move(xs[q], ys[r]);
       hit[r][q] = await tipOpen();
     }
+  }
   // The longest run, in pixels, across a row or down a column.
   let walk = null;
   const take = (len, from, to) => {
@@ -3539,14 +3544,26 @@ async function checkOldTipSteady(page, tag) {
   // The grid moved faster than the tip's leave delay, so a hit can be the
   // tip outlasting the pointer: the walk starts at the first point along the
   // run that holds the tip once the delay has run out.
+  // Each point is tried as found and a few pixels to either side of the
+  // run (a steep stretch slants off a column of the grid).
+  const sideways = walk.from.y === walk.to.y ? { x: 0, y: 1 } : { x: 1, y: 0 };
   let held = false;
   for (let i = 0; !held && (i === 0 || walk.len > 0); i++) {
     const f = i === 0 ? 0 : Math.min(1, 4 / walk.len);
-    walk.from = { x: walk.from.x + f * (walk.to.x - walk.from.x), y: walk.from.y + f * (walk.to.y - walk.from.y) };
+    const at = { x: walk.from.x + f * (walk.to.x - walk.from.x), y: walk.from.y + f * (walk.to.y - walk.from.y) };
     walk.len = walk.len * (1 - f);
-    await page.mouse.move(walk.from.x, walk.from.y);
-    await page.waitForTimeout(250);
-    held = await tipOpen();
+    for (const off of [0, -4, 4, -8, 8]) {
+      const o = { x: at.x + off * sideways.x, y: at.y + off * sideways.y };
+      await page.mouse.move(o.x, o.y);
+      await page.waitForTimeout(250);
+      if (await tipOpen()) {
+        held = true;
+        walk.from = o;
+        walk.to = { x: walk.to.x + off * sideways.x, y: walk.to.y + off * sideways.y };
+        break;
+      }
+    }
+    if (!held) walk.from = at;
   }
   if (!held) {
     check(`${tag}: a pointer on the dotted value line opens its tip`, false, "no point along the run held it");
