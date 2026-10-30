@@ -13,6 +13,7 @@ import {
 } from "@/lib/fluid/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -20,7 +21,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore Fluid Positions", canonicalPath: "/ethereum/fluid" });
 
-export default async function FluidListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function FluidListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = fluidListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, FLUID_LIST_DEFAULTS);
@@ -40,3 +41,5 @@ export default async function FluidListingPage({ searchParams }: { searchParams:
 
   return <FluidListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/fluid", FluidListingPage);

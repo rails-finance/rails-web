@@ -17,6 +17,7 @@ import { holderListingMetadata, listingMetadata } from "@/lib/shared/page-metada
 import { parsePolarisSearch } from "@/lib/polaris/search";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
 import type { Metadata } from "next";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -53,7 +54,7 @@ export async function generateMetadata({
   });
 }
 
-export default async function PolarisListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function PolarisListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = polarisListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, POLARIS_LIST_DEFAULTS);
@@ -69,3 +70,5 @@ export default async function PolarisListingPage({ searchParams }: { searchParam
 
   return <PolarisListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/sepolia/polaris", PolarisListingPage);

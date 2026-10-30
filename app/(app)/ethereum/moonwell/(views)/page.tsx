@@ -14,6 +14,7 @@ import {
 } from "@/lib/moonwell/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -21,7 +22,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore Moonwell Positions", canonicalPath: "/ethereum/moonwell" });
 
-export default async function MoonwellListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function MoonwellListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = moonwellListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, MOONWELL_LIST_DEFAULTS);
@@ -43,3 +44,5 @@ export default async function MoonwellListingPage({ searchParams }: { searchPara
 
   return <MoonwellListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/moonwell", MoonwellListingPage);

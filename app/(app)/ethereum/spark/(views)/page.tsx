@@ -14,6 +14,7 @@ import {
 } from "@/lib/spark/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -21,7 +22,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore SparkLend Positions", canonicalPath: "/ethereum/spark" });
 
-export default async function SparkListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function SparkListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = sparkListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, SPARK_LIST_DEFAULTS);
@@ -41,3 +42,5 @@ export default async function SparkListingPage({ searchParams }: { searchParams:
 
   return <SparkListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/spark", SparkListingPage);

@@ -17,6 +17,7 @@ import {
 } from "@/lib/moonwell-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, ssrHop, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -46,7 +47,7 @@ async function ssrRoster(): Promise<MoonwellBaseRosterState> {
   }
 }
 
-export default async function MoonwellBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function MoonwellBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   // Options are irrelevant to the codec, so the decode pass needs no roster.
   const dims = moonwellBaseListDimensions(MOONWELL_BASE_LIST_DEFAULTS, undefined);
   const sp = toURLSearchParams(await searchParams);
@@ -72,3 +73,5 @@ export default async function MoonwellBaseListingPage({ searchParams }: { search
 
   return <MoonwellBaseListing {...initial} initialSearch={sp.toString()} initialRoster={roster} />;
 }
+
+export default withExplorerAbout("/base/moonwell", MoonwellBaseListingPage);

@@ -18,6 +18,7 @@ import {
 } from "@/lib/compound-v2/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -28,7 +29,7 @@ export const metadata = listingMetadata({
   canonicalPath: "/ethereum/compound-v2",
 });
 
-export default async function CompoundV2ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function CompoundV2ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = compoundV2ListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, COMPOUND_V2_LIST_DEFAULTS);
@@ -50,3 +51,5 @@ export default async function CompoundV2ListingPage({ searchParams }: { searchPa
 
   return <CompoundV2Listing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/compound-v2", CompoundV2ListingPage);

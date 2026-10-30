@@ -22,6 +22,7 @@ import {
 } from "@/lib/llamalend/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -29,7 +30,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore LlamaLend Positions", canonicalPath: "/ethereum/llamalend" });
 
-export default async function LlamalendListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function LlamalendListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = llamalendListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, LLAMALEND_LIST_DEFAULTS);
@@ -51,3 +52,5 @@ export default async function LlamalendListingPage({ searchParams }: { searchPar
 
   return <LlamalendListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/llamalend", LlamalendListingPage);

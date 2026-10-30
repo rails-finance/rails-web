@@ -21,6 +21,7 @@ import {
 } from "@/lib/makerdao/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, ssrHop, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -40,7 +41,7 @@ async function ssrRoster(): Promise<MakerRosterState> {
   }
 }
 
-export default async function MakerDAOListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function MakerDAOListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = makerListDimensions(MAKER_LIST_DEFAULTS, undefined);
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, MAKER_LIST_DEFAULTS);
@@ -61,3 +62,5 @@ export default async function MakerDAOListingPage({ searchParams }: { searchPara
 
   return <MakerDAOListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/makerdao", MakerDAOListingPage);

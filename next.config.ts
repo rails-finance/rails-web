@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import path from "node:path";
 import type { NextConfig } from "next";
 
@@ -139,7 +140,22 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/yearn", "/ethereum/yearn"],
 ];
 
+/** The deployed commit's date, for the sitemap's `lastmod`
+ *  (lib/shared/site-dates.ts). The build's start time where git cannot answer. */
+function deployedAt(): string {
+  try {
+    const date = execSync("git log -1 --format=%cI", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+    if (date) return new Date(date).toISOString();
+  } catch {
+    // no git in this build environment
+  }
+  return new Date().toISOString();
+}
+
 const nextConfig: NextConfig = {
+  env: { RAILS_DEPLOYED_AT: deployedAt() },
   // Next 15.5.7 dev: webpack reports framer-motion's server vendor chunk as
   // compiled but never writes `.next/server/vendor-chunks/framer-motion@….js`,
   // so any route that SSRs a framer-motion component 500s with

@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
+import { LEGAL_LAST_UPDATED } from "@/lib/shared/site-dates";
+
+const SHARE = {
+  title: "Privacy Policy | Rails",
+  description: "Rails Privacy Policy. Learn how we handle data and protect your privacy.",
+};
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
     "Rails Privacy Policy. Learn how we handle data and protect your privacy when using the Rails DeFi analytics platform.",
   openGraph: {
-    title: "Privacy Policy | Rails",
-    description: "Rails Privacy Policy. Learn how we handle data and protect your privacy.",
+    ...SHARE,
     url: `${SITE_URL}/privacy`,
     images: [HOME_SHARE_IMAGE],
   },
+  twitter: twitterCard(SHARE),
   robots: {
     index: true,
     follow: false,
@@ -24,10 +30,9 @@ export default function PrivacyPage() {
         <h1 className="font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,48px)] mb-2">
           Privacy Policy
         </h1>
-        {/* Hardcoded on purpose: this must name the date the policy text last
-            changed, not the date the page was built. Bump it by hand whenever
-            the wording below is revised. */}
-        <p className="text-sm text-rb-500 mb-8">Last updated: September 28, 2026</p>
+        {/* The date the wording last changed, set by hand in site-dates.ts;
+            the sitemap names the same date. */}
+        <p className="text-sm text-rb-500 mb-8">Last updated: {LEGAL_LAST_UPDATED.label}</p>
 
         <section className="mb-8">
           <h2 className="text-2xl font-semibold text-rb-500 mb-4">Overview</h2>

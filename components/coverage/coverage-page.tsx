@@ -20,7 +20,7 @@ import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { DepthMatrix } from "@/components/coverage/depth-matrix";
 import { CapabilityPill } from "@/components/coverage/capability-sheet";
 import { CoverageDrawerBody } from "@/components/coverage/drawer-body";
-import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
 
 // The coverage surface is one page component behind two per-chain routes
 // (/coverage/ethereum, /coverage/base). The toggle at the top links between
@@ -40,15 +40,12 @@ const coverageBlurb = (chainId: ChainId) =>
 export function coverageMetadata(chainId: ChainId): Metadata {
   const blurb = coverageBlurb(chainId);
   const url = `${SITE_URL}${coverageHref(chainId)}`;
+  const share = { title: `Rails Coverage — ${CHAINS[chainId].name}`, description: blurb };
   return {
     title: `Coverage — ${CHAINS[chainId].name}`,
     description: blurb,
-    openGraph: {
-      title: `Rails Coverage — ${CHAINS[chainId].name}`,
-      description: blurb,
-      url,
-      images: [HOME_SHARE_IMAGE],
-    },
+    openGraph: { ...share, url, images: [HOME_SHARE_IMAGE] },
+    twitter: twitterCard(share),
     alternates: { canonical: url },
     // A chain whose every explorer is unlaunched has an unlaunched front door:
     // the page still serves, and it is out of the sitemap and out of search

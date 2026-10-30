@@ -23,6 +23,7 @@ import { holderListingMetadata, listingMetadata } from "@/lib/shared/page-metada
 import { parseTroveSearch } from "@/lib/liquity-v2/search";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
 import type { Metadata } from "next";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -66,7 +67,7 @@ export async function generateMetadata({
   });
 }
 
-export default async function LiquityV2ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function LiquityV2ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = liquityV2ListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, LIQUITY_V2_LIST_DEFAULTS);
@@ -86,3 +87,5 @@ export default async function LiquityV2ListingPage({ searchParams }: { searchPar
 
   return <LiquityV2Listing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/liquity-v2", LiquityV2ListingPage);

@@ -7,6 +7,7 @@ import { fetchAllPwnPositions } from "@/lib/api/fetch-pwn-positions";
 import { pwnListDimensions, PWN_LIST_DEFAULTS } from "@/lib/pwn/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -14,7 +15,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore PWN Loans", canonicalPath: "/ethereum/pwn" });
 
-export default async function PwnListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function PwnListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = pwnListDimensions([]);
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, PWN_LIST_DEFAULTS);
@@ -34,3 +35,5 @@ export default async function PwnListingPage({ searchParams }: { searchParams: P
 
   return <PwnListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/pwn", PwnListingPage);

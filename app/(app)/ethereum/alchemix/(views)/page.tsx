@@ -4,6 +4,7 @@ import { ALCHEMIX_ETHEREUM } from "@/lib/alchemix/lines";
 import { alchemixListingPageData } from "@/lib/alchemix/listing-page-data";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import type { RawSearchParams } from "@/lib/shared/listing-ssr";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 // Alchemix V3 on Ethereum — the alUSD and alETH lines.
 //
@@ -22,11 +23,9 @@ export function generateMetadata(): Metadata {
   });
 }
 
-export default async function AlchemixEthereumListingPage({
-  searchParams,
-}: {
-  searchParams: Promise<RawSearchParams>;
-}) {
+async function AlchemixEthereumListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const data = await alchemixListingPageData(ALCHEMIX_ETHEREUM, await searchParams);
   return <AlchemixListing deployment={ALCHEMIX_ETHEREUM} {...data} />;
 }
+
+export default withExplorerAbout("/ethereum/alchemix", AlchemixEthereumListingPage);

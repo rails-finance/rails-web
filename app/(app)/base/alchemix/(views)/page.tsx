@@ -4,6 +4,7 @@ import { ALCHEMIX_BASE } from "@/lib/alchemix/lines";
 import { alchemixListingPageData } from "@/lib/alchemix/listing-page-data";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import type { RawSearchParams } from "@/lib/shared/listing-ssr";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 // Alchemix V3 on Base — the alUSDb line.
 //
@@ -25,7 +26,9 @@ export function generateMetadata(): Metadata {
   });
 }
 
-export default async function AlchemixBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function AlchemixBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const data = await alchemixListingPageData(ALCHEMIX_BASE, await searchParams);
   return <AlchemixListing deployment={ALCHEMIX_BASE} {...data} />;
 }
+
+export default withExplorerAbout("/base/alchemix", AlchemixBaseListingPage);

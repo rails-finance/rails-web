@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { GraduationCap, Wallet, Code2, ShieldAlert } from "lucide-react";
 import { CoveredStats } from "@/components/home/covered-stats";
 import { HomeHero } from "@/components/home/home-hero";
@@ -13,6 +14,10 @@ import { getHomeStats } from "@/lib/home/home-stats-data";
 // ISR — the page (and the live-example trove data fetched below) regenerates
 // in the background at most hourly; every visitor gets the static render.
 export const revalidate = 3600;
+
+// The root layout sets no canonical (each page names its own), so the home page
+// names "/" here.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default async function Home() {
   // Independent legs — the hero count, the live-example trove, and the

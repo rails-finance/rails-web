@@ -11,6 +11,7 @@ import {
 } from "@/lib/aave-v3-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -18,7 +19,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore Aave V3 Positions on Base", canonicalPath: "/base/aave-v3" });
 
-export default async function AaveV3BaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function AaveV3BaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = aaveV3BaseListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, AAVE_V3_BASE_LIST_DEFAULTS);
@@ -40,3 +41,5 @@ export default async function AaveV3BaseListingPage({ searchParams }: { searchPa
 
   return <AaveV3BaseListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/base/aave-v3", AaveV3BaseListingPage);

@@ -12,6 +12,8 @@ import {
   VAULT_INDEX_HREF,
 } from "@/lib/vaults/routes";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
+import { DEPLOYED_AT, LEGAL_LAST_UPDATED } from "@/lib/shared/site-dates";
+import { articles } from "@/app/(site)/blog/data/articles";
 
 // UNLAUNCHED EXPLORERS ARE NOT HERE. An explorer flagged `unlaunched` on the
 // roster serves at its URL and is linked from nowhere, so naming it in the
@@ -42,7 +44,7 @@ async function ethereumVaultPages(): Promise<MetadataRoute.Sitemap> {
     const page = await fetchVaultPositions({ chainId: MAINNET_CHAIN_ID, limit: 1, overlay: false, ...hop });
     return page.census.map((c) => ({
       url: `${SITE_URL}${ethereumVaultHref(c.vault)}`,
-      lastModified: new Date(),
+      lastModified: DEPLOYED_AT,
       changeFrequency: "daily" as const,
       priority: 0.6,
     }));
@@ -80,7 +82,7 @@ async function baseVaultPages(): Promise<MetadataRoute.Sitemap> {
       .filter((c) => c.participants > 0)
       .map((c) => ({
         url: `${SITE_URL}${baseVaultHref(c.vault)}`,
-        lastModified: new Date(),
+        lastModified: DEPLOYED_AT,
         changeFrequency: "daily" as const,
         priority: 0.6,
       }));
@@ -96,18 +98,22 @@ async function baseVaultPages(): Promise<MetadataRoute.Sitemap> {
 // the census try/catch and logged it as a census failure on every build.
 export const dynamic = "force-dynamic";
 
+// `lastmod` is the deployed commit's date for every app page (the markup and
+// the explanation ship with a build), the publication date for a blog post and
+// the wording date for the legal pages. `changeFrequency` says how often the
+// figures on a page move: daily for anything reading the chain.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [vaultPages, baseVaults] = await Promise.all([ethereumVaultPages(), baseVaultPages()]);
   return [
     {
       url: SITE_URL,
-      lastModified: new Date(),
+      lastModified: DEPLOYED_AT,
       changeFrequency: "daily",
       priority: 1,
     },
     {
       url: `${SITE_URL}/about/architecture`,
-      lastModified: new Date(),
+      lastModified: DEPLOYED_AT,
       changeFrequency: "monthly",
       priority: 0.6,
     },
@@ -118,14 +124,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // cannot leave a stale URL here for a crawler to follow into a 404.
     ...launchedChains().map((chain) => ({
       url: `${SITE_URL}/coverage/${chain.slug}`,
-      lastModified: new Date(),
+      lastModified: DEPLOYED_AT,
       changeFrequency: "weekly" as const,
       priority: 0.8,
     })),
     ...LAUNCHED_PROTOCOLS.map((entry) => ({
       url: `${SITE_URL}${entry.href}`,
-      lastModified: new Date(),
-      changeFrequency: "hourly" as const,
+      lastModified: DEPLOYED_AT,
+      changeFrequency: "daily" as const,
       priority: 0.9,
     })),
     // Each explorer's protocol-level sub-pages (branch roster, market roster,
@@ -134,7 +140,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...LAUNCHED_PROTOCOLS.flatMap((entry) =>
       entry.subPages.map((sub) => ({
         url: `${SITE_URL}${sub.href}`,
-        lastModified: new Date(),
+        lastModified: DEPLOYED_AT,
         changeFrequency: "daily" as const,
         priority: 0.7,
       })),
@@ -143,7 +149,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // (`listingHref`); every other explorer's listing is its route, above.
     ...LAUNCHED_PROTOCOLS.filter((entry) => entry.listingHref !== entry.href).map((entry) => ({
       url: `${SITE_URL}${entry.listingHref}`,
-      lastModified: new Date(),
+      lastModified: DEPLOYED_AT,
       changeFrequency: "daily" as const,
       priority: 0.8,
     })),
@@ -151,7 +157,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // same way.
     ...LAUNCHED_PROTOCOLS.map((entry) => ({
       url: `${SITE_URL}${entry.infoHref}`,
-      lastModified: new Date(),
+      lastModified: DEPLOYED_AT,
       changeFrequency: "monthly" as const,
       priority: 0.5,
     })),
@@ -164,13 +170,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         : [
             {
               url: `${SITE_URL}${roster}/positions`,
-              lastModified: new Date(),
+              lastModified: DEPLOYED_AT,
               changeFrequency: "daily" as const,
               priority: 0.7,
             },
             {
               url: `${SITE_URL}${roster}/info`,
-              lastModified: new Date(),
+              lastModified: DEPLOYED_AT,
               changeFrequency: "monthly" as const,
               priority: 0.5,
             },
@@ -181,7 +187,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ? [
           {
             url: `${SITE_URL}${VAULT_INDEX_HREF}`,
-            lastModified: new Date(),
+            lastModified: DEPLOYED_AT,
             changeFrequency: "daily" as const,
             priority: 0.7,
           },
@@ -192,63 +198,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // …and each Base vault the census has ever seen a holder of, under Morpho.
     // Neither chain enumerates its positions.
     ...baseVaults,
+    // The blog index changes when a post is added; each post on its own date.
     {
       url: `${SITE_URL}/blog`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
+      lastModified: new Date(
+        articles
+          .map((a) => a.publishedAt)
+          .sort()
+          .at(-1) ?? DEPLOYED_AT,
+      ),
+      changeFrequency: "monthly",
       priority: 0.8,
     },
-    {
-      url: `${SITE_URL}/blog/when-frontends-fail-what-happens-in-a-crisis`,
-      lastModified: new Date("2025-11-25"),
-      changeFrequency: "monthly",
+    ...articles.map((article) => ({
+      url: `${SITE_URL}/blog/${article.slug}`,
+      lastModified: new Date(article.publishedAt),
+      changeFrequency: "yearly" as const,
       priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/blog/keeping-defi-open-and-accessible`,
-      lastModified: new Date("2025-11-17"),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/blog/from-kitchen-table-sketches-to-rails-web-app`,
-      lastModified: new Date("2025-11-10"),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/blog/introducing-rails-finance`,
-      lastModified: new Date("2025-11-06"),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/blog/rails-solution-defi-trust-problem`,
-      lastModified: new Date("2025-11-06"),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/blog/bold-survived-stream-finance-chaos`,
-      lastModified: new Date("2025-11-06"),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
+    })),
     {
       url: `${SITE_URL}/pulse`,
-      lastModified: new Date(),
+      lastModified: DEPLOYED_AT,
       changeFrequency: "daily",
       priority: 0.8,
     },
     {
       url: `${SITE_URL}/privacy`,
-      lastModified: new Date(),
+      lastModified: new Date(LEGAL_LAST_UPDATED.iso),
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: `${SITE_URL}/terms`,
-      lastModified: new Date(),
+      lastModified: new Date(LEGAL_LAST_UPDATED.iso),
       changeFrequency: "yearly",
       priority: 0.3,
     },

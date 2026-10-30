@@ -22,6 +22,7 @@ import {
 } from "@/lib/morpho/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, ssrHop, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -41,7 +42,7 @@ async function ssrRoster(): Promise<MorphoRosterState> {
   }
 }
 
-export default async function MorphoListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function MorphoListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = morphoListDimensions(MORPHO_LIST_DEFAULTS, undefined);
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, MORPHO_LIST_DEFAULTS);
@@ -67,3 +68,5 @@ export default async function MorphoListingPage({ searchParams }: { searchParams
 
   return <MorphoListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/morpho", MorphoListingPage);

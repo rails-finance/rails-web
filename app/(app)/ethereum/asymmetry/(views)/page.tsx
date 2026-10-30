@@ -8,6 +8,7 @@ import { fetchAsymmetryTroves } from "@/lib/api/fetch-asymmetry-troves";
 import { asymmetryListDimensions, ASYMMETRY_LIST_DEFAULTS } from "@/lib/asymmetry/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -15,7 +16,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore Asymmetry Troves", canonicalPath: "/ethereum/asymmetry" });
 
-export default async function AsymmetryListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function AsymmetryListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = asymmetryListDimensions([]);
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, ASYMMETRY_LIST_DEFAULTS);
@@ -35,3 +36,5 @@ export default async function AsymmetryListingPage({ searchParams }: { searchPar
 
   return <AsymmetryListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/asymmetry", AsymmetryListingPage);

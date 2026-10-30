@@ -11,6 +11,7 @@ import {
 } from "@/lib/compound-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -21,7 +22,7 @@ export const metadata = listingMetadata({
   canonicalPath: "/base/compound-v3",
 });
 
-export default async function CompoundBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function CompoundBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = compoundBaseListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, COMPOUND_BASE_LIST_DEFAULTS);
@@ -43,3 +44,5 @@ export default async function CompoundBaseListingPage({ searchParams }: { search
 
   return <CompoundBaseListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/base/compound-v3", CompoundBaseListingPage);

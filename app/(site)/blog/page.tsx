@@ -1,19 +1,24 @@
 import { BlogCard } from "@/components/blog/BlogCard";
 import { articles } from "./data/articles";
 import type { Metadata } from "next";
-import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
+
+const SHARE = {
+  title: "Blog - Rails",
+  description:
+    "Insights and updates from the Rails team about DeFi analytics, transaction explanations, and building better support infrastructure.",
+};
 
 export const metadata: Metadata = {
   title: "Blog",
   description:
     "Insights and updates from the Rails team about DeFi analytics, transaction explanations, and building better support infrastructure for decentralized finance.",
   openGraph: {
-    title: "Blog - Rails",
-    description:
-      "Insights and updates from the Rails team about DeFi analytics, transaction explanations, and building better support infrastructure.",
+    ...SHARE,
     url: `${SITE_URL}/blog`,
     images: [HOME_SHARE_IMAGE],
   },
+  twitter: twitterCard(SHARE),
 };
 
 export default function BlogPage() {

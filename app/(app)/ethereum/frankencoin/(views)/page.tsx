@@ -19,6 +19,7 @@ import {
 } from "@/lib/frankencoin/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -29,7 +30,7 @@ export const metadata = listingMetadata({
   canonicalPath: "/ethereum/frankencoin",
 });
 
-export default async function FrankencoinListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function FrankencoinListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = frankencoinListDimensions();
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, FRANKENCOIN_LIST_DEFAULTS);
@@ -51,3 +52,5 @@ export default async function FrankencoinListingPage({ searchParams }: { searchP
 
   return <FrankencoinListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/frankencoin", FrankencoinListingPage);

@@ -8,6 +8,7 @@ import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
 import { ebisuListDimensions, EBISU_LIST_DEFAULTS } from "@/lib/ebisu/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -15,7 +16,7 @@ export const maxDuration = 30;
 
 export const metadata = listingMetadata({ title: "Explore Ebisu Troves", canonicalPath: "/ethereum/ebisu" });
 
-export default async function EbisuListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function EbisuListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = ebisuListDimensions([]);
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, EBISU_LIST_DEFAULTS);
@@ -35,3 +36,5 @@ export default async function EbisuListingPage({ searchParams }: { searchParams:
 
   return <EbisuListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/ethereum/ebisu", EbisuListingPage);

@@ -18,6 +18,7 @@ import {
 } from "@/lib/morpho-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -28,7 +29,7 @@ export const metadata = listingMetadata({
   canonicalPath: "/base/morpho",
 });
 
-export default async function MorphoBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function MorphoBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   // Codec dims only (decode/ssrInitial), so evaluated with the defaults — same
   // convention as the client driver's cached serverCodecDimsRef.
   const dims = morphoBaseListDimensions(MORPHO_BASE_LIST_DEFAULTS);
@@ -52,3 +53,5 @@ export default async function MorphoBaseListingPage({ searchParams }: { searchPa
 
   return <MorphoBaseListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/base/morpho", MorphoBaseListingPage);

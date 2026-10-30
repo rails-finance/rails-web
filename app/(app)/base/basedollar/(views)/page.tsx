@@ -9,6 +9,7 @@ import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
 import { basedollarListDimensions, BASEDOLLAR_LIST_DEFAULTS } from "@/lib/basedollar/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
+import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -19,7 +20,7 @@ export const metadata = listingMetadata({
   canonicalPath: "/base/basedollar",
 });
 
-export default async function BasedollarListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+async function BasedollarListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = basedollarListDimensions([]);
   const sp = toURLSearchParams(await searchParams);
   const { filters, page } = ssrDecode(dims, sp, BASEDOLLAR_LIST_DEFAULTS);
@@ -39,3 +40,5 @@ export default async function BasedollarListingPage({ searchParams }: { searchPa
 
   return <BasedollarListing {...initial} initialSearch={sp.toString()} />;
 }
+
+export default withExplorerAbout("/base/basedollar", BasedollarListingPage);

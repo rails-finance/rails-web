@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
+import { LEGAL_LAST_UPDATED } from "@/lib/shared/site-dates";
+
+const SHARE = {
+  title: "Terms of Service | Rails",
+  description: "Rails Terms of Service. Read about acceptable use, disclaimers, and limitations.",
+};
 
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
     "Rails Terms of Service. Read about acceptable use, disclaimers, and limitations when using the Rails DeFi analytics platform.",
   openGraph: {
-    title: "Terms of Service | Rails",
-    description: "Rails Terms of Service. Read about acceptable use, disclaimers, and limitations.",
+    ...SHARE,
     url: `${SITE_URL}/terms`,
     images: [HOME_SHARE_IMAGE],
   },
+  twitter: twitterCard(SHARE),
   robots: {
     index: true,
     follow: false,
@@ -24,10 +30,9 @@ export default function TermsPage() {
         <h1 className="font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,48px)] mb-2">
           Terms of Service
         </h1>
-        {/* Hardcoded on purpose: this must name the date the Terms last
-            changed, not the date the page was built. Bump it by hand whenever
-            the wording below is revised. */}
-        <p className="text-sm text-rb-500 mb-8">Last updated: September 28, 2026</p>
+        {/* The date the wording last changed, set by hand in site-dates.ts;
+            the sitemap names the same date. */}
+        <p className="text-sm text-rb-500 mb-8">Last updated: {LEGAL_LAST_UPDATED.label}</p>
 
         <div className="notice-caution p-4 mb-8">
           <h3 className="text-lg font-bold text-caution-800 dark:text-caution-300 mb-2">Important Notice</h3>

@@ -79,6 +79,21 @@ export const TWITTER_HANDLE = RAILS_X_AT;
 // regenerated in place alongside this hashed copy.
 export const HOME_SHARE_IMAGE = "/og/home-eaad142d.png";
 
+/** The Twitter card for a page that sets its own `openGraph` without
+ *  `shareMetadata`: the same title and description, on the home share image.
+ *  Next replaces a page's `twitter` wholesale, so a page that leaves it out
+ *  carries the root layout's home-page card. */
+export function twitterCard(og: { title: string; description: string }): NonNullable<Metadata["twitter"]> {
+  return {
+    card: "summary_large_image",
+    title: og.title,
+    description: og.description,
+    images: [HOME_SHARE_IMAGE],
+    creator: TWITTER_HANDLE,
+    site: TWITTER_HANDLE,
+  };
+}
+
 /** The share card for an explorer, by roster `id`. Must agree with `cardOut`
  *  in scripts/generate-og.mjs; `npm run check:og` proves every roster card exists. */
 export function protocolShareImage(id: string): string {

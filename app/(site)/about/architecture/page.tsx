@@ -1,18 +1,23 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
+
+const SHARE = {
+  title: "Technical Architecture — Rails",
+  description: "How Rails processes and serves blockchain data accurately, layer by layer.",
+};
 
 export const metadata: Metadata = {
   title: "Technical Architecture",
   description:
     "The multi-layer architecture behind Rails — Sieve indexer, RabbitMQ, processors and materialized views, the chain-state refresher, and the API and frontend that serve it.",
   openGraph: {
-    title: "Technical Architecture — Rails",
-    description: "How Rails processes and serves blockchain data accurately, layer by layer.",
+    ...SHARE,
     url: `${SITE_URL}/about/architecture`,
     images: [HOME_SHARE_IMAGE],
   },
+  twitter: twitterCard(SHARE),
 };
 
 const H2 = "text-3xl font-semibold tracking-tight text-foreground";
