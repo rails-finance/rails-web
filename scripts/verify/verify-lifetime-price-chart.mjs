@@ -3431,8 +3431,25 @@ async function checkTroveEnd(page, tag, pg, rows, sl) {
     )?.trim();
     check(
       `${tag}: with no debt the card's "Liquidates at" reads none, and the level has no point today`,
-      card === "None while it has no debt" && (end == null || Number(end.day) !== today),
+      card === "None" && (end == null || Number(end.day) !== today),
       `level ${end?.day} ${end?.value}, card ${card}`,
+    );
+    // ui-jobs 456: a zombie with no debt is outside the redemption order, so the
+    // card names that in one row and carries no Debt-in-front row.
+    const redemption = (
+      await page
+        .locator('[data-panel-row="redemption"] dd')
+        .first()
+        .textContent()
+        .catch(() => null)
+    )?.trim();
+    const queueRows = await page
+      .locator('[data-panel-row="debt-in-front"], [data-panel-row="troves-in-front"]')
+      .count();
+    check(
+      `${tag}: with no debt the card reads "Not redeemable" and has no Debt-in-front row`,
+      redemption === "Not redeemable" && queueRows === 0,
+      `redemption ${redemption}, queue rows ${queueRows}`,
     );
   } else if (pg.trove === "live" || pg.trove === "redeemed") {
     const today = Math.floor(Date.now() / 1000 / DAY);
