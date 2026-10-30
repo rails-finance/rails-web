@@ -3,7 +3,7 @@ import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/
 import { AAVE_V3_ORACLE } from "@/lib/aave-v3/asset-catalog";
 
 // On-chain oracle USD for arbitrary V3 reserve addresses — IAaveOracle
-// getAssetPrice at the live head, one batched multicall (the same oracle the
+// getAssetPrice at a recent finalized block, read through rails-server (Sieve first, then the at-block store; lib/sources/chain/aave-oracle-prices.ts) (the same oracle the
 // listing transform prices its rows with). Exists for the detail page's
 // lifetime-flow lines: the listing row's priceByAddress covers only the
 // reserves the account still holds, so exited/liquidated reserves arrive

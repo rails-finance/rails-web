@@ -78,7 +78,7 @@ export async function fetchSparkPosition(p: FetchSparkPositionParams): Promise<S
 }
 
 /** On-chain oracle USD for arbitrary reserve addresses (IAaveOracle
- *  getAssetPrice @ head) — prices the exited/liquidated reserves the listing
+ *  getAssetPrice at a recent finalized block, through rails-server) — prices the exited/liquidated reserves the listing
  *  row's priceByAddress (current reserves only) omits, so the economics tower
  *  can value lifetime flows. An unpriceable asset is simply absent. */
 export async function fetchSparkOraclePrices(assets: string[], baseUrl?: string): Promise<Record<string, number>> {
