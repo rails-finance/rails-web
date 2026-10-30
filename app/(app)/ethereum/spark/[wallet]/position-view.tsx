@@ -82,7 +82,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline, sparkFocusEvents } from "@/lib/spark/flows-timeline";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
-import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
+import { useAaveFamilyHealth, useExportConfigLog } from "@/hooks/useAaveFamilyHealth";
 import type { AaveHealthSource } from "@/lib/aave-v3/flows-health";
 import { lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -760,8 +760,11 @@ export default function SparkPositionDetail({
   }, [view]);
 
   // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  // The configurator log the markdown export's "Protocol changes" section reads.
+  const configLog = useExportConfigLog("spark");
   const exports = view
     ? sparkExports({
+        configLog,
         wallet,
         view,
         chain,

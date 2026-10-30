@@ -143,15 +143,19 @@ export function SparkPositionExplanation({
 
     // The borrow limit (max LTV) against where the account stands; the
     // liquidation point is the fall below.
-    if (chain.totalCollateralUsd > 0 && chain.ltv > 0 && chain.avgLiquidationThreshold > 0) {
+    if (chain.totalCollateralUsd > 0 && chain.avgLiquidationThreshold > 0) {
       const ltv = <H>{pct(chain.totalDebtUsd / chain.totalCollateralUsd)}</H>;
       const max_ltv = <H>{pct(chain.ltv)}</H>;
+      // A limit of 0 (every collateral reserve's LTV set to 0, as a freeze
+      // does) says so: the Pool lends nothing more against this collateral.
       add(
         "risk",
         "ltv",
-        emode && emode.id > 0
-          ? positionNodes("ltv_emode", { ltv, max_ltv, emode: emode.label ?? String(emode.id) })
-          : positionNodes("ltv", { ltv, max_ltv }),
+        chain.ltv <= 0
+          ? positionNodes("ltv_zero", { ltv })
+          : emode && emode.id > 0
+            ? positionNodes("ltv_emode", { ltv, max_ltv, emode: emode.label ?? String(emode.id) })
+            : positionNodes("ltv", { ltv, max_ltv }),
       );
     }
     if (liqRead?.single) {
