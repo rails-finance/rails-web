@@ -109,7 +109,7 @@ const SECONDS_PER_BLOCK: Record<ChainId, number> = {
 
 /** The page's headline instrument: every lltv in use across the protocol, with how many
  *  markets sit on each. Nine bars is the whole parameter space — that IS the claim. */
-/** True where the page's market(id) totals are rails-server's replay of the Base Sieve
+/** True where the page's market(id) totals are rails-server's replay of the chain's Sieve
  *  (the response's totalsSource), so the receipts name the replay instead of a head read. */
 const TotalsFromLogs = createContext(false);
 
@@ -193,6 +193,7 @@ function MarketRow({ m, block, chainId }: { m: MorphoMarketRow; block: number; c
   const label = m.isIdle ? "idle — no collateral" : (m.collateralSymbol ?? "unnamed collateral");
   const coords: MorphoMarketCoords = {
     fromLogs: useContext(TotalsFromLogs),
+    chainId,
     blockNumber: block,
     marketId: m.id,
     loanSymbol: m.loanSymbol,
@@ -423,6 +424,7 @@ function LoanTokenColumns() {
 function LoanTokenRow({ g, block, chainId }: { g: MorphoLoanGroupSummary; block: number; chainId: ChainId }) {
   const coords: MorphoMarketCoords = {
     fromLogs: useContext(TotalsFromLogs),
+    chainId,
     blockNumber: block,
     loanSymbol: g.loanSymbol,
     loanToken: g.loanToken,
@@ -674,6 +676,7 @@ function FamilyEntry({
 }) {
   const coords: MorphoMarketCoords = {
     fromLogs: useContext(TotalsFromLogs),
+    chainId,
     blockNumber: block,
     loanSymbol: g.loanSymbol,
     loanToken: g.loanToken,
@@ -746,7 +749,7 @@ export function MorphoLoanTokenView({
 }: {
   /** The block the roster was read at. */
   block: number;
-  /** The totals are rails-server's replay of the Base Sieve at `block`. */
+  /** The totals are rails-server's replay of the chain's Sieve at `block`. */
   fromLogs?: boolean;
   /** This token alone, already shaped (lib/morpho/markets-shape
    *  loanTokenViewData) — the rest of the roster never crosses. */
@@ -754,7 +757,13 @@ export function MorphoLoanTokenView({
   chainId?: ChainId;
 }) {
   const registry = useReceiptRegistry();
-  const coords: MorphoMarketCoords = { fromLogs, blockNumber: block, loanSymbol: g.loanSymbol, loanToken: g.loanToken };
+  const coords: MorphoMarketCoords = {
+    fromLogs,
+    chainId,
+    blockNumber: block,
+    loanSymbol: g.loanSymbol,
+    loanToken: g.loanToken,
+  };
   const shape = g;
   const util = g.totalSupply > 0 ? g.totalBorrow / g.totalSupply : null;
   // Blue credits accrued interest to a market's stored supply with no token moving, so a

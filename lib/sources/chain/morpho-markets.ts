@@ -154,7 +154,7 @@ export interface MorphoLoanGroup {
   loanTokenSupply: number | null;
 }
 
-/** Where market(id)'s totals came from: rails-server's replay of the Base
+/** Where market(id)'s totals came from: rails-server's replay of the chain's
  *  Sieve at `blockNumber`, or a chain read there. */
 export type MorphoTotalsSource = "sieve" | "chain";
 
@@ -337,10 +337,10 @@ export async function loadMorphoMarketsFromChain(
       functionName: "market",
       args: [m.id as `0x${string}`],
     });
-    // Base: the stored totals from rails-server's replay of the Base Sieve, at its
-    // block, and every other read pinned to that block; a market the replay does
-    // not answer is read on chain there. Elsewhere, or when the api fails, every
-    // market at the head.
+    // Base, and Ethereum with MORPHO_ETH_SUPPLY_REPLAY on: the stored totals from
+    // rails-server's replay of the chain's Sieve, at its block, and every other read
+    // pinned to that block; a market the replay does not answer is read on chain
+    // there. Elsewhere, or when the api fails, every market at the head.
     const replayed = await readReplayedMarkets(deployment.chainId);
     let blockNumber: number;
     let at: bigint | undefined;
@@ -552,8 +552,9 @@ export async function loadMorphoMarketFromChain(
     const client = chainClient(deployment.chainId);
     const MORPHO = deployment.blue as `0x${string}`;
     const hasOracle = params.oracle !== ZERO_ADDR && params.collateralToken !== ZERO_ADDR;
-    // Base: market(id) from rails-server's replay at its block; elsewhere, or where the
-    // replay does not answer, read at the head. Every other read is at that block.
+    // Base (and Ethereum behind its switch): market(id) from rails-server's replay at its
+    // block; elsewhere, or where the replay does not answer, read at the head. Every
+    // other read is at that block.
     const replayed = await readReplayedMarkets(deployment.chainId, params.id);
     const stored = replayed?.states.get(params.id.toLowerCase());
     const head = stored ? null : await client.getBlock();

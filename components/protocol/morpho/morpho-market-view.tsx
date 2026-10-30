@@ -98,6 +98,7 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
   const block = data.blockNumber;
   const coords: MorphoMarketCoords = {
     fromLogs: data.totalsSource === "sieve",
+    chainId,
     blockNumber: block,
     marketId: m.id,
     loanSymbol: m.loanSymbol,

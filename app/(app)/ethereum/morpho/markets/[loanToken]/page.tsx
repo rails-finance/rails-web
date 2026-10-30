@@ -85,7 +85,11 @@ export default async function MorphoLoanTokenPage({ params }: Params) {
         </header>
 
         {g ? (
-          <MorphoLoanTokenView block={data.blockNumber} group={loanTokenViewData(data, g)} />
+          <MorphoLoanTokenView
+            block={data.blockNumber}
+            fromLogs={data.totalsSource === "sieve"}
+            group={loanTokenViewData(data, g)}
+          />
         ) : (
           <p className="text-sm text-rb-500">The market roster could not be read from chain at this block.</p>
         )}

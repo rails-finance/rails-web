@@ -37,6 +37,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { MORPHO_ADDRESSES } from "@/lib/morpho/asset-catalog";
+import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 const LANE = "live Morpho Blue reads (/morpho/markets)";
 
@@ -63,14 +64,18 @@ export interface MorphoMarketCoords {
   irm?: string | null;
   /** The loan token's own address — the contract the supply figure comes from. */
   loanToken?: string | null;
-  /** market(id)'s fields are rails-server's replay of the Base Sieve at the
+  /** market(id)'s fields are rails-server's replay of the chain's Sieve at the
    *  block (equal to the eth_call there), not a read of the singleton. */
   fromLogs?: boolean;
+  /** The chain the replay's Sieve follows; Base where unset. */
+  chainId?: ChainId;
 }
 
 /** Where a market(id) field was read: at the head, or replayed from Sieve at the block. */
 const stateAt = (coords: MorphoMarketCoords): string =>
-  coords.fromLogs ? "@ block, replayed from the Base Sieve" : "@ head";
+  coords.fromLogs
+    ? `@ block, replayed from the ${coords.chainId === MAINNET_CHAIN_ID ? "Ethereum" : "Base"} Sieve`
+    : "@ head";
 /** Where a chain read beside them was made: the replay pins every read to its block. */
 const readAt = (coords: MorphoMarketCoords): string => (coords.fromLogs ? "@ block" : "@ head");
 

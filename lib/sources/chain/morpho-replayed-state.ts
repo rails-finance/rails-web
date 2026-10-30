@@ -1,12 +1,15 @@
 // Morpho Blue reads the api answers instead of the chain (rails-ops decisions/0056).
 // ----------------------------------------------------------------------------
-//   readReplayedMarkets  Base only: every market's market(id) fields at one block,
-//                        replayed by rails-server from the Base Sieve
-//                        (`/api/morpho-base/market-state`). A market the replay
-//                        cannot settle is in `unreplayed`; the caller reads
-//                        those, and any market missing from the answer, on chain.
-//                        Ethereum's Sieve captures no Supply or Withdraw, so its
-//                        supply totals do not replay and it has no such route.
+//   readReplayedMarkets  every market's market(id) fields at one block, replayed
+//                        by rails-server: on Base from the Base Sieve
+//                        (`/api/morpho-base/market-state`), on Ethereum from
+//                        victoria's mainnet Sieve by morpho-processor
+//                        (`/api/morpho/market-state`), the latter only with
+//                        MORPHO_ETH_SUPPLY_REPLAY on in this process's env (off
+//                        by default; the api answers 404 until the worker's flag
+//                        of the same name is on). A market the replay cannot
+//                        settle is in `unreplayed`; the caller reads those, and
+//                        any market missing from the answer, on chain.
 //   readOracleViaApi     a market oracle's price() and its feeds' rounds at a
 //                        block (`/api/at-block/morpho/oracle`), keyless first and
 //                        kept 30 s by the api: readOracle's answer.
@@ -38,15 +41,25 @@ interface StateBody {
   unreplayed: string[];
 }
 
-let memo: { at: number; value: Promise<ReplayedMarkets | null> } | null = null;
+/** The Ethereum switch: on, 1 or true. */
+const ETH_REPLAY = /^(on|1|true)$/i.test(process.env.MORPHO_ETH_SUPPLY_REPLAY ?? "");
 
-async function fetchState(query: string): Promise<ReplayedMarkets | null> {
+/** The api route that replays `chainId`'s markets, or null where none is switched on. */
+function routeFor(chainId: ChainId): string | null {
+  if (chainId === BASE_CHAIN_ID) return "/api/morpho-base/market-state";
+  if (chainId === MAINNET_CHAIN_ID && ETH_REPLAY) return "/api/morpho/market-state";
+  return null;
+}
+
+const memo = new Map<string, { at: number; value: Promise<ReplayedMarkets | null> }>();
+
+async function fetchState(route: string, query: string): Promise<ReplayedMarkets | null> {
   if (!RAILS_API_URL) return null;
   const res = await fetch(
-    `${RAILS_API_URL}/api/morpho-base/market-state${query}`,
+    `${RAILS_API_URL}${route}${query}`,
     createAuthFetchOptions({ cache: "no-store", signal: AbortSignal.timeout(TIMEOUT_MS) }),
   );
-  if (!res.ok) throw new Error(`/api/morpho-base/market-state answered ${res.status}`);
+  if (!res.ok) throw new Error(`${route} answered ${res.status}`);
   const body = (await res.json()) as StateBody;
   if (!(body.blockNumber > 0) || !Array.isArray(body.markets)) throw new Error("market-state answered no block");
   const states = new Map<string, MarketTuple>();
@@ -56,20 +69,22 @@ async function fetchState(query: string): Promise<ReplayedMarkets | null> {
   return { blockNumber: body.blockNumber, states };
 }
 
-/** Every replayed market on `chainId` (Base only), or one market with `id`. */
+/** Every replayed market on `chainId` (Base; Ethereum behind its switch), or one market with `id`. */
 export async function readReplayedMarkets(chainId: ChainId, id?: string): Promise<ReplayedMarkets | null> {
-  if (chainId !== BASE_CHAIN_ID) return null;
+  const route = routeFor(chainId);
+  if (!route) return null;
   const run = (q: string) =>
-    fetchState(q).catch((err: unknown) => {
+    fetchState(route, q).catch((err: unknown) => {
       console.error("morpho market state: api read failed, reading the chain:", err);
       return null;
     });
   if (id) return run(`?ids=${id.replace(/^0x/, "").toLowerCase()}`);
-  if (memo && Date.now() - memo.at < TTL_MS) return memo.value;
+  const hit = memo.get(route);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   const entry = { at: Date.now(), value: run("") };
-  memo = entry;
+  memo.set(route, entry);
   const value = await entry.value;
-  if (value == null) memo = null;
+  if (value == null && memo.get(route) === entry) memo.delete(route);
   return value;
 }
 
