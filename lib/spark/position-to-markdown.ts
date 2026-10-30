@@ -19,6 +19,9 @@ import type { SparkPositionView } from "@/components/protocol/spark/spark-positi
 import type { SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 import { aaveLtvLines } from "@/lib/shared/aave-ltv-lines";
+import type { ChangeLogRead } from "@/lib/shared/change-log-read";
+import type { AaveConfigLogAnswer } from "@/lib/aave-v3/config-changes";
+import { debtLiquidationLine, protocolChangesSection } from "@/lib/aave-v3/markdown-sections";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import { sparkLiquidationRead, type SparkCardCaptions } from "./economics";
 import {
@@ -60,6 +63,9 @@ export interface SparkPositionMarkdownArgs {
    *  timeline table; listed alongside the historical notes in the "Market
    *  notes" section only. */
   liveNotes?: MarketNote[];
+  /** The market's PoolConfigurator log, as the position chart's markers read
+   *  it, for the "Protocol changes" section; absent where the market has none. */
+  configLog?: ChangeLogRead<AaveConfigLogAnswer>;
   /** When the snapshot was taken (copy time) — passed in so the serializer
    *  stays pure. */
   generatedAt: Date;
@@ -131,6 +137,11 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
   // lands on the row the note renders beside on screen.
   const anchoredNotes = anchorMarketNotes(args.notes ?? [], events, "asc");
   const allNotes = [...[...anchoredNotes.values()].flat(), ...(args.liveNotes ?? [])];
+  const changesSection = protocolChangesSection(
+    args.configLog,
+    [...view.supplies, ...view.borrows, ...view.peakSupplies, ...view.peakBorrows],
+    markdownFirstTimestamp(events, args.history),
+  );
   const notesLine = marketNotesLine(allNotes);
   if (notesLine) lines.push(notesLine);
   lines.push("");
@@ -173,6 +184,7 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
     if (lastT) lines.push(`- **Record closed:** ${fmtUtc(lastT)}`);
     lines.push(`- **Transactions (own, excludes liquidations):** ${view.txCount}`);
     lines.push("");
+    lines.push(...changesSection);
     lines.push(...marketNotesSection(allNotes));
     lines.push(...timelineTable(events, args.history, anchoredNotes));
     return lines.join("\n");
@@ -195,6 +207,8 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
       `- **Liquidation buffer:** collateral can fall ${num(read.dropPct, 1)}% before the health factor reaches 1.0`,
     );
   }
+  const debtLine = debtLiquidationLine(view.healthFactor, view.borrows, view.priceByAddress);
+  if (debtLine) lines.push(debtLine);
   lines.push(...sideLines(view, view.supplies, "Collateral"));
   if (captions?.supplyInterestUsd != null && captions.supplyInterestUsd >= 0.01) {
     lines.push(
@@ -244,6 +258,7 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
   lines.push(`- **Transactions (own, excludes liquidations):** ${view.txCount}`);
   lines.push("");
 
+  lines.push(...changesSection);
   lines.push(...marketNotesSection(allNotes));
   lines.push(...timelineTable(events, args.history, anchoredNotes));
   return lines.join("\n");
