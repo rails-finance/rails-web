@@ -150,6 +150,17 @@ export function xOf(c: IChartApi, g: Grid, ts: number): number | null {
   return xb == null ? xa : xa + (xb - xa) * (l - a);
 }
 
+/** The absolute UTC day under a px: the moment there read off two whole
+ *  cells' x (a point stands at its cell's end, `logicalOf`), unrounded. */
+function dayAt(c: IChartApi, g: Grid, px: number): number {
+  const t = c.timeScale();
+  const x0 = t.logicalToCoordinate(0 as Logical);
+  const x1 = t.logicalToCoordinate(1 as Logical);
+  if (x0 == null || x1 == null || x1 === x0) return Math.floor(g.start / DAY_S);
+  const ts = g.start + ((px - x0) / (x1 - x0) + 1) * g.step;
+  return Math.floor(ts / DAY_S);
+}
+
 /** The value line of one side: no line before the side
  *  first holds anything, the step up from zero at the first event's day (or at
  *  its first point above zero), each point at its day's close, a segment into
@@ -619,6 +630,7 @@ export function LifetimeFlowsLw({
       const end = b.t1;
       onAxisRef.current({
         xClose: (day: number) => xOf(c, g, Math.min(closeTs(day), end)) ?? -1e6,
+        dayAt: (px: number) => dayAt(c, g, px),
         plotW: w,
         view: v,
         bounds: b,
@@ -954,6 +966,14 @@ export function LifetimeFlowsLw({
       Object.assign(el, { flowBandPlace: () => bf.place() });
     }
     marks.current = { value: mv, price: mp, spacer: ms };
+    // The verifiers read a day's start and close x, and the day under an x.
+    Object.assign(el, {
+      flowDayX: (day: number) => {
+        const g = gridRef.current;
+        return g ? [xOf(c, g, day * DAY_S), xOf(c, g, closeTs(day))] : null;
+      },
+      flowDayAt: (px: number) => (gridRef.current ? dayAt(c, gridRef.current, px) : null),
+    });
     const onRange = () => sendAxis();
     let timer: ReturnType<typeof setTimeout> | null = null;
     const settle = () => {
@@ -1311,6 +1331,7 @@ export function LifetimeFlowsLw({
       data-flow-lw-to={Math.round(view.current.to)}
       data-flow-lw-plot-w={pw || ""}
       data-flow-lw-cursor-x={cx == null ? "" : cx.toFixed(1)}
+      data-flow-lw-cursor-day={Math.min(cursorDay, today)}
     >
       <div ref={box} className="relative isolate w-full" style={{ height: boxH }} data-flow-lw-box="">
         {!lib && <p className="flex h-full items-center justify-center text-xs text-rb-500">Drawing the chart…</p>}

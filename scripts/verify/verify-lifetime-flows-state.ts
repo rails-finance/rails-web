@@ -675,7 +675,7 @@ test("the Lifetime series: a bin with no price recorded for a held asset is a ga
   assert.deepEqual(binRanges(monday + 3, monday + 3, "week"), [[monday + 3, monday + 3]]);
 });
 
-test("Combined: the cursor stops on the line's points and every day with events", () => {
+test("Combined: the cursor stops on every day, marking the line's points and the days with events", () => {
   const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
   const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
   const startDay = full.start / DAY_MS;
@@ -703,11 +703,11 @@ test("Combined: the cursor stops on the line's points and every day with events"
       const at = stops.find((s) => s.stop === d);
       assert.ok(at?.event, `${bin}: event day ${d} is a stop`);
     }
-    // Nothing else: a stop is a point's day, an event day or today.
-    for (const s of stops) assert.ok(s.live || s.point != null || s.event, `${bin}: stop ${s.stop} has a reason`);
-    assert.equal(
-      stops.length,
-      new Set([...line.points.slice(0, -1).map(([, to]) => to - startDay), ...full.eventDays]).size + 1,
+    // Every day of the life is a stop, so a press lands on the day under it.
+    assert.deepEqual(
+      days.slice(0, -1),
+      Array.from({ length: full.liveStop }, (_, d) => d),
+      `${bin}: every day`,
     );
     // Snapping: each stop is its own nearest; a day between two stops goes to the nearer.
     stops.forEach((s, i) => assert.equal(nearestStop(stops, s.stop), i));
@@ -720,11 +720,15 @@ test("Combined: the cursor stops on the line's points and every day with events"
     assert.equal(nearestStop(stops, -5), 0);
     assert.equal(nearestStop(stops, full.liveStop + 5), stops.length - 1);
   }
-  // Without the series: the event days and today.
+  // Without the series: every day and today, the days with events marked.
   const bare = combinedStops(full, null, 0);
   assert.deepEqual(
     bare.map((s) => s.stop),
-    [...full.eventDays.filter((d) => d < full.liveStop), full.liveStop],
+    Array.from({ length: full.liveStop + 1 }, (_, d) => d),
+  );
+  assert.deepEqual(
+    bare.filter((s) => s.event && !s.live).map((s) => s.stop),
+    full.eventDays.filter((d) => d < full.liveStop),
   );
 });
 
@@ -1740,24 +1744,17 @@ test("the state card: a day between events states the chart's figures, each asse
   assert.equal(flowMoment(route, focus, (startDay + route.liveStop) * 86_400 + 10), null);
 });
 
-test("Combined: a cut restored from the address bar puts the cursor on a stop of its own, which the steps pass over", () => {
+test("Combined: a cut restored from the address bar has its day's stop, which the steps pass over", () => {
   const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
   const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
   const line = binSeries(binInputFromWire(series), "month")!;
-  const plain = combinedStops(full, line, 0);
+  const stops = combinedStops(full, line, 0);
   // A day that is neither a month's end nor a day with events.
-  let day = 1;
-  while (plain.some((s) => s.stop === day)) day++;
-  const restored = combinedStops(full, line, 0, day);
-  assert.equal(restored.length, plain.length + 1);
-  const i = stopForDay(restored, day);
-  assert.ok(i != null);
-  assert.equal(restored[i].point, null);
-  assert.equal(restored[i].event, false);
+  const i = stops.findIndex((s) => !s.live && s.point == null && !s.event);
+  assert.ok(i > 0);
+  assert.equal(stopForDay(stops, stops[i].stop), i);
   // The back and forward steps go by days with events, so they pass over it.
-  assert.notEqual(eventStep(restored, i - 1, 1), i);
-  // A day that already has a stop adds none.
-  assert.equal(combinedStops(full, line, 0, full.eventDays[3]).length, plain.length);
+  assert.notEqual(eventStep(stops, i - 1, 1), i);
 });
 
 // The reserves' indexes (lifetime-flows-series-*-indexed.json: the route's
@@ -2000,8 +1997,8 @@ test("the price view: the toggle leaves the Value view's stops and axis alone, t
   const model = buildFlowModel(t) as FlowModel;
   // The stops are a function of the model and the line's series: the view is
   // no input, so the cursor's stop is the same index in both views.
-  const stops = combinedStops(model, null, 0, null);
-  assert.deepEqual(combinedStops(model, null, 0, null), stops);
+  const stops = combinedStops(model, null, 0);
+  assert.deepEqual(combinedStops(model, null, 0), stops);
   // The whole life's axis (the events row's while the charts are hidden): a
   // day's close later is further right, the axis's last day at the right end.
   const startDay = model.start / DAY_MS;

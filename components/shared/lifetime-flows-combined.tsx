@@ -85,6 +85,7 @@ import {
   axisSpanDays,
   lifeAxis,
   stopForDay,
+  nearestStop,
   type CombinedStop,
 } from "@/lib/shared/flows-combined";
 
@@ -496,11 +497,7 @@ export function CombinedFlows({
   // (ruling 14, rails-ops reference/lifetime-price-chart.md).
   const closed = closeStop(model) != null;
   const closeAbs = startDay + model.lastDay;
-  const [restoreDay, setRestoreDay] = useState<number | null>(null);
-  const stops = useMemo(
-    () => combinedStops(model, series, from, restoreDay == null ? null : restoreDay - model.start / DAY_MS),
-    [model, series, from, restoreDay],
-  );
+  const stops = useMemo(() => combinedStops(model, series, from), [model, series, from]);
   const last = stops.length - 1;
   const [at, setAt] = useState(last);
   // A new series (the first read landing) puts the cursor at today, or on
@@ -644,7 +641,6 @@ export function CombinedFlows({
     focus?.store.set({ restore: null });
     restoreTo.current = day;
     keepDay.current = day;
-    setRestoreDay(day);
     setFrozen(true);
   }, [focus, restore, model.start, model.liveStop]);
   useEffect(() => {
@@ -736,7 +732,16 @@ export function CombinedFlows({
     // The axis changing (a zoom) moves no cursor, so reveals nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursorDay, chartAxis != null]);
-  const sliderLabel = `Date, by ${(series?.bin ?? "week") === "day" ? "day" : `${series?.bin ?? "week"} and by day with events`}: moves the headlines and the bars`;
+  const sliderLabel = "Date, by day: moves the headlines and the bars";
+  /** The stop under a pointer's x: on the chart, the day whose span holds
+   *  the moment there, at any zoom; before the chart is drawn, the stop whose
+   *  close is nearest on the whole life's axis. */
+  const stopAtPx = (px: number): number | null => {
+    if (!chartAxis) return nearestStopAt(stops.map(xStop), px);
+    const stop = chartAxis.dayAt(px) - startDay;
+    if (stop <= 0) return 0;
+    return stopForDay(stops, stop) ?? nearestStop(stops, stop);
+  };
 
   const valueText = tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine;
   const cursorWord = atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop));
@@ -924,7 +929,7 @@ export function CombinedFlows({
                     onPick={go}
                     freeze={byDays ? { frozen, onTap: tapStop } : null}
                     ariaLabel={priced ? `${sliderLabel}, over the ${priced.asset.symbol} price` : sliderLabel}
-                    nearestAt={(px) => nearestStopAt(stops.map(xStop), px)}
+                    nearestAt={stopAtPx}
                     edge={chartAxis ? chartAxis.plotW : null}
                     priceOnly={priceOnly}
                   >
@@ -1013,7 +1018,7 @@ export function CombinedFlows({
                         onPick={go}
                         freeze={byDays ? { frozen, onTap: tapStop } : null}
                         ariaLabel={sliderLabel}
-                        nearestAt={(px) => nearestStopAt(stops.map(xStop), px)}
+                        nearestAt={stopAtPx}
                         edge={chartAxis ? chartAxis.plotW : null}
                         priceOnly={false}
                         mirror
@@ -1210,8 +1215,8 @@ function StripSlider({
       ArrowDown: -1,
       ArrowRight: 1,
       ArrowUp: 1,
-      PageDown: -4,
-      PageUp: 4,
+      PageDown: -7,
+      PageUp: 7,
     };
     if (freeze && e.key === "Enter") {
       e.preventDefault();

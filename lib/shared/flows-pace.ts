@@ -9,6 +9,9 @@
 // - The series is the days a source reported, ascending; a day it does not
 //   list inside the range read is zero, and the chart and its readout say so.
 // - A day outside the range read has no figure (null), never a zero.
+// - The chart's bars grow with the square root of the day's amount, so a
+//   small day stays visible beside the largest; its axis marks round amounts
+//   (`sqrtTicks`) at their heights, and the readout states the amount.
 // - The title names the scope ("Whole WETH branch") and the measure ("BOLD
 //   redeemed a day"), so the bars never read as the position's.
 //
@@ -91,4 +94,17 @@ export function paceWords(p: Pick<ProtocolActivity, "unit" | "noun">, at: PaceDa
       ? `no ${p.noun[1]}`
       : `${at.count.toLocaleString("en-US")} ${at.count === 1 ? p.noun[0] : p.noun[1]}`;
   return `${amount} · ${count}`;
+}
+
+/** Round amounts to mark on a square-root axis up to `max`: near a quarter,
+ *  a half and the whole of its height (a sixteenth, a quarter and all of
+ *  `max`), each taken down to 1, 2 or 5 times a power of ten. */
+export function sqrtTicks(max: number): number[] {
+  if (!(max > 0)) return [];
+  const nice = (v: number) => {
+    const p = 10 ** Math.floor(Math.log10(v));
+    const m = v / p;
+    return (m >= 5 ? 5 : m >= 2 ? 2 : 1) * p;
+  };
+  return [...new Set([max / 16, max / 4, max].map(nice))];
 }

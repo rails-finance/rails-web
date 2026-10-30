@@ -67,22 +67,18 @@ export function lifeChanges(model: FlowModel | null, today: number): FlowChange[
   return model.changes.filter((c) => c.day >= start && c.day <= end).sort((a, b) => a.block - b.block);
 }
 
-/** The cursor's stops, ascending: every point of the line and every day with
- *  events, one stop per day; the last is the live stop. Without a series, the
- *  event days and the live stop. On a closed position the live stop stands
- *  on the close day, which has no other stop. `from` is the stop the bars' window opens on
- *  (0 where it covers the whole life). `extra` adds one more day (the day
- *  of a cut restored from the address bar) where it has no stop. */
-export function combinedStops(
-  model: FlowModel,
-  series: FlowBinSeries | null,
-  from: number,
-  extra: number | null = null,
-): CombinedStop[] {
+/** The cursor's stops, ascending: every day of the life, one stop per day,
+ *  so a press lands on the day under it at any zoom (ui-jobs 452, round 2);
+ *  each carries the line's point that ends on it, if any, and whether it has
+ *  events. The last is the live stop. On a closed position the live stop
+ *  stands on the close day, which has no other stop. `from` is the stop the
+ *  bars' window opens on (0 where it covers the whole life). */
+export function combinedStops(model: FlowModel, series: FlowBinSeries | null, from: number): CombinedStop[] {
   const startDay = model.start / DAY_MS;
   const close = closeStop(model);
   const end = close ?? model.liveStop;
   const byStop = new Map<number, { point: number | null; event: boolean }>();
+  for (let d = 0; d < end; d++) byStop.set(d, { point: null, event: false });
   const n = series?.points.length ?? 0;
   for (let i = 0; i < n - 1; i++) {
     const stop = Math.max(0, Math.min(model.liveStop, series!.points[i][1] - startDay));
@@ -93,8 +89,6 @@ export function combinedStops(
     const had = byStop.get(d);
     byStop.set(d, { point: had?.point ?? null, event: true });
   }
-  if (extra != null && extra >= 0 && extra < end && !byStop.has(extra))
-    byStop.set(extra, { point: null, event: false });
   const out: CombinedStop[] = [...byStop]
     .sort((a, b) => a[0] - b[0])
     .map(([stop, { point, event }]) => ({

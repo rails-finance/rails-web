@@ -18,12 +18,17 @@
 //   (`ProtocolActivity.explains`), hidden otherwise; the reader's choice
 //   holds for the page.
 // - The readout reads the cursor's day, zero on a day the source lists none.
+// - The scale is the square root of the amount: a bar's height grows with
+//   the square root of its day's total, and the axis marks round amounts
+//   (`sqrtTicks`) as price lines at their heights, the library's own ticks
+//   left blank.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   IChartApi,
   IPrimitivePaneView,
   ISeriesApi,
+  IPriceLine,
   ISeriesPrimitive,
   Logical,
   MouseEventParams,
@@ -44,6 +49,7 @@ import {
   paceAt,
   paceMax,
   paceWords,
+  sqrtTicks,
   type PaceDay,
   type ProtocolActivity,
 } from "@/lib/shared/flows-pace";
@@ -110,15 +116,21 @@ class ActivityBars implements ISeriesPrimitive<Time> {
   update() {
     this.req?.();
   }
-  /** The scale: zero to the tallest day in the window. */
-  autoscaleInfo(a: Logical, b: Logical) {
+  /** The tallest day's amount in the logical range. */
+  maxIn(a: number, b: number): number {
     const g = this.st.grid;
-    if (!g) return null;
+    if (!g) return 0;
     const from = Math.floor(cellTime(g, a) / DAY_S);
     const to = Math.floor((cellTime(g, b + 1) - 1) / DAY_S);
     let m = 0;
     for (const d of this.st.days) if (d.day >= from && d.day <= to && d.amount > m) m = d.amount;
-    return { priceRange: { minValue: 0, maxValue: m > 0 ? m : 1 } };
+    return m;
+  }
+  /** The scale: zero to the square root of the tallest day in the window. */
+  autoscaleInfo(a: Logical, b: Logical) {
+    if (!this.st.grid) return null;
+    const m = this.maxIn(a, b);
+    return { priceRange: { minValue: 0, maxValue: m > 0 ? Math.sqrt(m) : 1 } };
   }
   /** Each day's bar in the plot now, from the time and value scales. */
   place(): BarDrawn[] {
@@ -131,7 +143,7 @@ class ActivityBars implements ISeriesPrimitive<Time> {
       if (!(d.amount > 0)) continue;
       const x0 = xOf(c, g, d.day * DAY_S);
       const x1 = xOf(c, g, closeTs(d.day));
-      const y = s.priceToCoordinate(d.amount);
+      const y = s.priceToCoordinate(Math.sqrt(d.amount));
       if (x0 == null || x1 == null || y == null) continue;
       out.push({ day: d.day, x0, x1, y });
     }
@@ -208,6 +220,33 @@ export function ProtocolActivityChart({
   const bars = useRef<ActivityBars | null>(null);
   const barHook = useRef<HTMLSpanElement>(null);
   const gridRef = useRef<Grid | null>(null);
+  /** The axis's round amounts, as price lines on the unseen series. */
+  const tickLines = useRef<IPriceLine[]>([]);
+  const colorsRef = useRef<Colors | null>(null);
+  colorsRef.current = colors;
+  /** Marks the window's round amounts on the axis. */
+  const setTicks = useRef<() => void>(() => {});
+  setTicks.current = () => {
+    const c = chart.current;
+    const s = base.current;
+    const b = bars.current;
+    const cs = colorsRef.current;
+    const r = c?.timeScale().getVisibleLogicalRange();
+    if (!c || !s || !b || !cs || !r) return;
+    for (const l of tickLines.current) s.removePriceLine(l);
+    tickLines.current = sqrtTicks(b.maxIn(r.from, r.to)).map((v) =>
+      s.createPriceLine({
+        price: Math.sqrt(v),
+        color: cs.grid,
+        lineWidth: 1,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        axisLabelColor: cs.ground,
+        axisLabelTextColor: cs.text,
+        title: "",
+      }),
+    );
+  };
   const linkRef = useRef(link);
   linkRef.current = link;
   const [ready, setReady] = useState(0);
@@ -228,7 +267,7 @@ export function ProtocolActivityChart({
         panes: { enableResize: false },
       },
       crosshair: { mode: lib.CrosshairMode.Normal },
-      grid: { vertLines: { visible: false } },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0 } },
       timeScale: {
         borderVisible: false,
@@ -257,11 +296,13 @@ export function ProtocolActivityChart({
       lineVisible: false,
       color: "transparent",
       crosshairMarkerVisible: false,
+      // The values are square roots: a label squares them back; the
+      // library's ticks are blank, the round amounts drawn as price lines.
       priceFormat: {
         type: "custom",
-        formatter: (v: number) => priceAxisLabels([v])[0],
-        tickmarksFormatter: (vs: number[]) => priceAxisLabels(vs),
-        minMove: 1,
+        formatter: (v: number) => priceAxisLabels([Math.max(0, v) ** 2])[0],
+        tickmarksFormatter: (vs: number[]) => vs.map(() => ""),
+        minMove: 0.01,
       },
     });
     const m = new ScrubberMark(markState.current);
@@ -307,6 +348,7 @@ export function ProtocolActivityChart({
       el.removeEventListener("pointermove", onPointer);
       chart.current = null;
       base.current = null;
+      tickLines.current = [];
       mark.current = null;
       bars.current = null;
       c.remove();
@@ -335,6 +377,7 @@ export function ProtocolActivityChart({
         const sw = c.priceScale("right").width();
         if (mw > sw) c.applyOptions({ rightPriceScale: { minimumWidth: mw } });
         else if (sw > mw) link.chart.applyOptions({ rightPriceScale: { minimumWidth: sw } });
+        setTicks.current();
         setAxisN((n) => n + 1);
       });
     };
@@ -371,6 +414,7 @@ export function ProtocolActivityChart({
   useEffect(() => {
     barState.current.days = days;
     bars.current?.update();
+    setTicks.current();
     // `daysKey` stands for the days.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daysKey, ready]);
@@ -387,7 +431,6 @@ export function ProtocolActivityChart({
         fontFamily: colors.font,
         panes: { separatorColor: "transparent", separatorHoverColor: "transparent" },
       },
-      grid: { horzLines: { color: colors.grid } },
       crosshair: {
         vertLine: { color: colors.cross, labelBackgroundColor: colors.text },
         horzLine: { color: colors.cross, labelBackgroundColor: colors.text },
@@ -395,6 +438,7 @@ export function ProtocolActivityChart({
     });
     bars.current?.update();
     mark.current?.update();
+    setTicks.current();
   }, [colors, ready]);
 
   // The cursor, drawn as on the chart above.

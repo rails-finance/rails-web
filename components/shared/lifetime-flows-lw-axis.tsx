@@ -22,6 +22,9 @@ export interface FlowsLwAxis {
   xClose: (day: number) => number;
   /** The plot's width: the chart less its price axis. */
   plotW: number;
+  /** The absolute UTC day under a px from the chart's left edge: the day
+   *  whose start-to-close span holds the moment there. */
+  dayAt: (px: number) => number;
   view: FlowsLwView;
   bounds: { t0: number; t1: number };
 }

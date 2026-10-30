@@ -85,7 +85,7 @@ export function redemptionPace(branch: PaceBranch, body: unknown): ProtocolActiv
     scope: `Whole ${branch} branch`,
     measure: "BOLD redeemed a day",
     noun: ["redemption", "redemptions"],
-    help: `under the events, BOLD redeemed on the ${branch} branch each day, every Trove on the branch, this one included. Redemptions take the Troves with the lowest interest rates first, so a run of tall bars marks a stretch of redemption pressure on the branch; read it against this Trove's interest rate and any redemption that reached it, an orange triangle on the events row. The line over the bars reads the cursor's day: the BOLD redeemed and the number of redemptions. The chart starts shown on a Trove a redemption reached, hidden otherwise.`,
+    help: `under the events, BOLD redeemed on the ${branch} branch each day, every Trove on the branch, this one included. Redemptions take the Troves with the lowest interest rates first, so a run of tall bars marks a stretch of redemption pressure on the branch; read it against this Trove's interest rate and any redemption that reached it, an orange triangle on the events row. A bar's height grows with the square root of the day's BOLD, so a small day stays visible beside the largest; the axis marks round amounts at their heights. The line over the bars reads the cursor's day: the BOLD redeemed and the number of redemptions. The chart starts shown on a Trove a redemption reached, hidden otherwise.`,
     explains: false,
     prov: (at, dayWord) => ({
       kind: "chain-derived",
